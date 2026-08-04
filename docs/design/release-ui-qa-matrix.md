@@ -4,10 +4,10 @@
 
 ## 자동화 계약
 
-- Playwright spec: `front/e2e/release-ui-qa-matrix.spec.ts`
-- Fixture: `front/e2e/helpers/releaseUiQaFixtures.ts`
-- 실행 명령: `yarn --cwd front test:e2e:release-ui-qa`
-- smoke 회귀: `yarn --cwd front test:e2e:smoke`
+- Playwright spec: `e2e/release-ui-qa-matrix.spec.ts`
+- Fixture: `e2e/helpers/releaseUiQaFixtures.ts`
+- 실행 명령: `yarn test:e2e:release-ui-qa`
+- smoke 회귀: `yarn test:e2e:smoke`
 
 ## Viewport Matrix
 

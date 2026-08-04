@@ -1,5 +1,5 @@
 import { CONFIG } from "site.config"
-import { getServerSideSitemap } from "next-sitemap"
+import { getServerSideSitemapLegacy } from "next-sitemap"
 import { GetServerSideProps } from "next"
 import { isPublicSurfaceHost } from "src/libs/publicSurfaceUrl"
 import { buildSitemapFields, collectSitemapPosts } from "src/libs/sitemapPosts"
@@ -19,7 +19,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const posts = await collectSitemapPosts()
   const fields = buildSitemapFields(posts, CONFIG.link, `${CONFIG.since}-01-01T00:00:00.000Z`)
 
-  return getServerSideSitemap(ctx, fields)
+  return getServerSideSitemapLegacy(ctx, fields)
 }
 
 const Sitemap = () => null

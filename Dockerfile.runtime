@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
 #
 # Homeserver runtime image for the Next.js app (#1536).
-# Build context is `front/`. `front/Dockerfile` stays the local dev container base
-# used by `front/Makefile` (`make setup` / `make dev`) and is not this image.
+# Build context is the Web repository root. This is the promoted runtime image,
+# not a local development container base.
 #
-# Node 20 line is fixed by package.json `engines.node` (">=20 <21").
+# Node 20 line is fixed by package.json `engines.node` (">=20.19 <21").
 # Same base tag family as NODE_RUNTIME_IMAGE (node:20-alpine), which the
 # container-image-scan job already scans for OS vulnerabilities.
 #
@@ -23,8 +23,6 @@ WORKDIR /app
 # `file:packages/...` dependencies resolve at install time, so they must land before yarn runs.
 COPY package.json yarn.lock ./
 COPY packages packages
-# postinstall: scripts/patch-lodash-template.cjs. Installing with --ignore-scripts would skip it.
-COPY scripts/patch-lodash-template.cjs scripts/patch-lodash-template.cjs
 
 # Playwright is a devDependency; its browser download is useless for a build-only stage.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
@@ -62,7 +60,7 @@ ARG NEXT_PUBLIC_SIGNUP_ENABLED="false"
 ARG NEXT_PUBLIC_RUM_SAMPLE_RATE="0"
 # Commit SHA exposed as <meta name="aquila-build-sha">. NEXT_PUBLIC_* so it is inlined into the
 # client bundle and therefore fixed to the image digest. Without a producer the meta renders
-# "unknown" and front/e2e/live.spec.ts cannot tell which commit a live host is serving.
+# "unknown" and e2e/live.spec.ts cannot tell which commit a live host is serving.
 # frontend-image.yml passes github.sha; an empty default keeps local `docker build` working.
 ARG NEXT_PUBLIC_AQUILA_BUILD_SHA=""
 ENV NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
