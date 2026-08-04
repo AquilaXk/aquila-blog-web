@@ -121,7 +121,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@storybook/addon-a11y": "10.4.6",
     "@storybook/nextjs-vite": "10.4.6",
     "@types/gtag.js": "^0.0.12",
