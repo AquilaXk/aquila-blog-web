@@ -1,19 +1,37 @@
-import type { StorybookConfig } from "@storybook/nextjs"
+import { fileURLToPath } from "node:url"
+import type { StorybookConfig } from "@storybook/nextjs-vite"
+import { mergeConfig } from "vite"
 
-// Next.js bundled webpack 경로 오염을 막아 Storybook webpack 인스턴스를 단일화한다.
-process.env.__NEXT_PRIVATE_RENDER_WORKER ??= "defined"
+const siteConfigPath = fileURLToPath(new URL("../site.config.js", import.meta.url))
+const siteConfigAdapterPath = fileURLToPath(new URL("./site-config.ts", import.meta.url))
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(ts|tsx)"],
-  addons: ["@storybook/addon-essentials", "@storybook/addon-a11y"],
+  addons: ["@storybook/addon-a11y"],
   framework: {
-    name: "@storybook/nextjs",
+    name: "@storybook/nextjs-vite",
     options: {},
   },
   staticDirs: ["../public"],
   docs: {
     autodocs: "tag",
   },
+  viteFinal: async (config) =>
+    mergeConfig(config, {
+      resolve: {
+        alias: {
+          "site.config": siteConfigAdapterPath,
+        },
+      },
+      optimizeDeps: {
+        include: ["site.config"],
+      },
+      build: {
+        commonjsOptions: {
+          include: [/node_modules/, siteConfigPath],
+        },
+      },
+    }),
 }
 
 export default config

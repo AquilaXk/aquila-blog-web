@@ -8,9 +8,10 @@ import test from "node:test"
 
 import { buildCanonicalManifest, validatePublicPolicies } from "./validate-public-policies.mjs"
 
-const repoRoot = path.resolve(import.meta.dirname, "../../..")
-const policySource = path.join(repoRoot, "front/legal/policies")
-const exporter = path.join(repoRoot, "front/scripts/legal/export-policy-manifest.mjs")
+const repoRoot = path.resolve(import.meta.dirname, "../..")
+const policySource = path.join(repoRoot, "legal/policies")
+const exporter = path.join(repoRoot, "scripts/legal/export-policy-manifest.mjs")
+const frontendMetadataPath = path.join(repoRoot, "src/apis/backend/legal.ts")
 
 const copyPolicies = () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aquila-public-policies-"))
@@ -27,7 +28,7 @@ const writePolicy = (directory, name, policy) => {
 }
 
 test("selects the highest effective policy for every public document", () => {
-  const result = validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") })
+  const result = validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath })
 
   assert.equal(result.ok, true)
   assert.deepEqual(result.manifest, {
@@ -43,13 +44,13 @@ test("selects the highest effective policy for every public document", () => {
 
 test("a newer draft neither replaces active metadata nor changes the canonical manifest", () => {
   const directory = copyPolicies()
-  const baseline = buildCanonicalManifest(validatePublicPolicies({ policiesDir: directory, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") }).active)
+  const baseline = buildCanonicalManifest(validatePublicPolicies({ policiesDir: directory, frontendMetadataPath }).active)
   const draft = JSON.parse(fs.readFileSync(path.join(directory, "terms.ko-KR.v1.0.2.yaml"), "utf8"))
   draft.version = "9.0.0"
   draft.status = "draft"
   writePolicy(directory, "terms.ko-KR.v9.0.0.yaml", draft)
 
-  const result = validatePublicPolicies({ policiesDir: directory, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") })
+  const result = validatePublicPolicies({ policiesDir: directory, frontendMetadataPath })
 
   assert.equal(result.ok, true)
   assert.deepEqual(buildCanonicalManifest(result.active), baseline)
@@ -62,21 +63,21 @@ test("rejects a policy whose canonical content hash drifts", () => {
   policy.contentSha256 = "0".repeat(64)
   fs.writeFileSync(policyPath, `${JSON.stringify(policy, null, 2)}\n`)
 
-  const result = validatePublicPolicies({ policiesDir: directory, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") })
+  const result = validatePublicPolicies({ policiesDir: directory, frontendMetadataPath })
 
   assert.equal(result.ok, false)
   assert.match(result.errors.join("\n"), /contentSha256 mismatch/)
 })
 
 test("canonical manifest contains policy identity only, while frontend acceptance metadata excludes cookies", () => {
-  const result = validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") })
+  const result = validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath })
   const manifest = buildCanonicalManifest(result.active)
 
   assert.equal(result.ok, true)
   assert.equal("repository" in manifest, false)
   assert.equal("commit" in manifest, false)
   assert.equal(JSON.stringify(manifest).includes("cookies"), true)
-  const acceptanceSource = fs.readFileSync(path.join(repoRoot, "front/src/apis/backend/legal.ts"), "utf8")
+  const acceptanceSource = fs.readFileSync(frontendMetadataPath, "utf8")
   assert.doesNotMatch(acceptanceSource, /^\s*cookies:/m)
 })
 
@@ -100,8 +101,8 @@ test("rejects effective reviewRequired and frontend acceptance hash drift", () =
   const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"))
   policy.reviewRequired = ["internal"]
   writePolicy(directory, "privacy.ko-KR.v1.0.3.yaml", policy)
-  assert.match(validatePublicPolicies({ policiesDir: directory, frontendMetadataPath: path.join(repoRoot, "front/src/apis/backend/legal.ts") }).errors.join("\n"), /must not contain reviewRequired/)
+  assert.match(validatePublicPolicies({ policiesDir: directory, frontendMetadataPath }).errors.join("\n"), /must not contain reviewRequired/)
   const metadata = path.join(directory, "legal.ts")
-  fs.writeFileSync(metadata, fs.readFileSync(path.join(repoRoot, "front/src/apis/backend/legal.ts"), "utf8").replace(/contentSha256: "[a-f0-9]{64}"/, `contentSha256: "${"0".repeat(64)}"`))
+  fs.writeFileSync(metadata, fs.readFileSync(frontendMetadataPath, "utf8").replace(/contentSha256: "[a-f0-9]{64}"/, `contentSha256: "${"0".repeat(64)}"`))
   assert.match(validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath: metadata }).errors.join("\n"), /terms contentSha256 mismatch/)
 })
