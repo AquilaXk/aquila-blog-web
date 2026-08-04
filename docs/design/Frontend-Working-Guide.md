@@ -21,7 +21,7 @@ raw `serverApiFetch`는 스트리밍·특수 Response 소비에만 남긴다.
 
 ### 구현 위치
 
-- `front/src/libs/server/backend.ts` — `serverApiFetch` / `serverApiFetchJson`
-- `front/src/libs/server/adminPage.ts` — `readAdminProtectedBootstrap`
-- `front/src/pages/feed.tsx` — RSS 503 경로
-- `front/src/pages/index.tsx`, `front/src/libs/server/postDetailPage.ts` — 공개 degraded shell
+- `src/libs/server/backend.ts` — `serverApiFetch` / `serverApiFetchJson`
+- `src/libs/server/adminPage.ts` — `readAdminProtectedBootstrap`
+- `src/pages/feed.tsx` — RSS 503 경로
+- `src/pages/index.tsx`, `src/libs/server/postDetailPage.ts` — 공개 degraded shell

@@ -1,6 +1,6 @@
-# Aquila Blog Frontend
+# Aquila Blog Web
 
-`front/`는 Next.js Pages Router 기반 사용자/관리자 UI 애플리케이션입니다.
+Next.js Pages Router 기반 사용자/관리자 UI 애플리케이션입니다.
 
 ## Stack
 
@@ -23,7 +23,6 @@
 ## 실행
 
 ```bash
-cd front
 yarn install --frozen-lockfile
 yarn dev
 ```
@@ -35,7 +34,7 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 | 이름 | 용도 |
 | --- | --- |
 | `NEXT_PUBLIC_BACKEND_URL` | 브라우저 런타임 API base URL |
-| `BACKEND_INTERNAL_URL` | SSR/server-side API base URL. 공개 인터넷을 왕복하지 않는 컨테이너 내부 주소를 허용하며, 공개 호스트에는 `https://`만 허용합니다. 홈서버 배포에서는 `http://caddy` 하나로 고정됩니다(`deploy/env/env.contract.json`) |
+| `BACKEND_INTERNAL_URL` | SSR/server-side API base URL. 홈서버에서는 Platform 저장소가 소유한 내부 Caddy 주소를 주입하며 Web 저장소는 이 값을 소유하지 않습니다. |
 
 ## 선택 환경변수
 
@@ -72,7 +71,6 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 프론트는 검증된 Platform 계약 스냅샷을 타입으로 변환해 계약 드리프트를 검증합니다. 스냅샷은 `contracts/platform/manifest.lock.json`에 고정된 Platform repository와 40자리 source commit, artifact SHA-256을 포함합니다. 일반 검증은 network/live backend를 사용하지 않습니다.
 
 ```bash
-cd front
 yarn contracts:generate
 yarn contracts:check
 ```
@@ -81,7 +79,7 @@ Platform canonical bundle을 새 snapshot으로 반영할 때만 importer를 사
 
 ```bash
 node scripts/contracts/import-platform-contracts.mjs \
-  --source ../contracts/public-api \
+  --source <platform-checkout>/contracts/public-api \
   --output contracts/platform \
   --source-repository AquilaXk/aquila-blog \
   --source-commit <40-hex-commit>
@@ -90,7 +88,6 @@ node scripts/contracts/import-platform-contracts.mjs \
 ## 검증 명령
 
 ```bash
-cd front
 yarn lint
 yarn build
 yarn check:bundle-size
@@ -107,5 +104,6 @@ yarn test:e2e:live
 
 ## 문서
 
-- 문서 허브: [../docs/README.md](../docs/README.md)
+- 운영 release: [docs/operations/web-release.md](docs/operations/web-release.md)
+- 운영 rollback: [docs/operations/web-rollback.md](docs/operations/web-rollback.md)
 - UI 릴리즈 QA: [docs/design/release-ui-qa-matrix.md](docs/design/release-ui-qa-matrix.md)
