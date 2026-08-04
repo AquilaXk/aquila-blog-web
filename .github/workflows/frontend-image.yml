@@ -1,0 +1,108 @@
+name: Publish Web frontend image
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: web-frontend-image-main
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  publish:
+    if: github.repository == 'AquilaXk/aquila-blog-web' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Web main without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate canonical Web source SHA
+        id: source
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Web source SHA must be a full lowercase commit SHA" >&2
+            exit 1
+          fi
+          printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push immutable Web image
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: Dockerfile.runtime
+          push: true
+          tags: ghcr.io/aquilaxk/aquila-blog-web-front:sha-${{ github.sha }}
+          build-args: NEXT_PUBLIC_AQUILA_BUILD_SHA=${{ steps.source.outputs.source_sha }}
+
+      - name: Validate pushed image digest
+        id: image
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE_DIGEST}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "pushed image digest must be immutable lowercase sha256" >&2
+            exit 1
+          fi
+          image_ref="ghcr.io/aquilaxk/aquila-blog-web-front@${IMAGE_DIGEST}"
+          printf 'image_ref=%s\n' "${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.72.0"
+          TRIVY_SHA256: "bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea"
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          printf '%s  %s\n' "${TRIVY_SHA256}" /tmp/trivy.tgz | sha256sum --check -
+          tar -xzf /tmp/trivy.tgz -C /tmp trivy
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+
+      - name: Pull and scan pushed immutable Web image
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE_REF}"
+          trivy image --ignorefile .trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_REF}"
+
+      - name: Create Platform dispatch token
+        id: app-token
+        if: ${{ vars.REPO_SPLIT_SYNC_ENABLED == 'true' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          owner: AquilaXk
+          repositories: aquila-blog
+          permission-contents: write
+
+      - name: Dispatch immutable Web image to Platform
+        if: ${{ vars.REPO_SPLIT_SYNC_ENABLED == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/AquilaXk/aquila-blog/dispatches" -f event_type="web_frontend_image_ready" -f "client_payload[image_ref]=${IMAGE_REF}" -f "client_payload[source_sha]=${SOURCE_SHA}"
