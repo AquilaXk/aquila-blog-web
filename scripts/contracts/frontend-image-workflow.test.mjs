@@ -84,3 +84,12 @@ test("Web CI executes the frontend image workflow contract test", () => {
   const ci = readFileSync(ciPath, "utf8")
   assert.match(ci, /node --test scripts\/contracts\/frontend-image-workflow\.test\.mjs/)
 })
+
+test("runtime image removes vulnerable Node tooling and upgrades the fixed OpenSSL packages", () => {
+  const dockerfilePath = path.join(root, "Dockerfile.runtime")
+  const source = readFileSync(dockerfilePath, "utf8")
+  const runtimeStage = source.slice(source.lastIndexOf("FROM node:20-alpine"))
+
+  assert.match(runtimeStage, /^[ \t]*&& apk upgrade --no-cache libcrypto3 libssl3 \\$/m)
+  assert.match(runtimeStage, /^[ \t]*&& rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx \\$/m)
+})
