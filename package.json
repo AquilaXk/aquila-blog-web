@@ -100,9 +100,10 @@
     "flatted": "3.4.2",
     "form-data": "4.0.6",
     "js-yaml": "4.3.0",
-    "**/@typescript-eslint/typescript-estree/minimatch/brace-expansion": "5.0.4",
-    "**/@joshwooding/vite-plugin-react-docgen-typescript/glob/minimatch/brace-expansion": "5.0.4",
-    "**/minimatch/brace-expansion": "2.1.4",
+    "**/@typescript-eslint/typescript-estree/minimatch/brace-expansion": "5.0.9",
+    "**/@joshwooding/vite-plugin-react-docgen-typescript/glob/minimatch/brace-expansion": "5.0.9",
+    "**/@redocly/openapi-core/minimatch/brace-expansion": "2.1.4",
+    "**/minimatch/brace-expansion": "1.1.18",
     "ws": "8.21.1",
     "katex": "0.16.44",
     "**/fast-glob/micromatch": "4.0.8",
@@ -121,8 +122,8 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.62.0",
-    "@storybook/addon-a11y": "10.2.9",
-    "@storybook/nextjs-vite": "10.2.9",
+    "@storybook/addon-a11y": "10.4.6",
+    "@storybook/nextjs-vite": "10.4.6",
     "@types/gtag.js": "^0.0.12",
     "@types/node": "^20.17.10",
     "@types/react": "19.2.17",
@@ -133,9 +134,9 @@
     "openapi-typescript": "^7.4.4",
     "postcss": "8.5.24",
     "prettier": "^2.7.1",
-    "storybook": "10.2.9",
+    "storybook": "10.4.6",
     "typescript": "^5.6.3",
-    "vite": "7.1.12",
+    "vite": "8.0.16",
     "webpack": "^5.97.1"
   }
 }
