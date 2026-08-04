@@ -55,13 +55,15 @@ test("Web root guard fails closed when a required path is missing", (t) => {
   assert.match(result.stderr, /missing required path: legal\/schemas/)
 })
 
-test("Web root guard fails closed when a forbidden monorepo directory exists", (t) => {
-  assert.equal(fs.existsSync(guardPath), true, "Web root guard must exist")
-  const root = createWebRootFixture(t)
-  fs.mkdirSync(path.join(root, "front"))
+for (const forbiddenDirectory of ["front", "back", "deploy"]) {
+  test(`Web root guard fails closed for ${forbiddenDirectory}`, (t) => {
+    assert.equal(fs.existsSync(guardPath), true, "Web root guard must exist")
+    const root = createWebRootFixture(t)
+    fs.mkdirSync(path.join(root, forbiddenDirectory))
 
-  const result = runGuard(root)
+    const result = runGuard(root)
 
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /forbidden directory exists: front/)
-})
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, new RegExp(`forbidden directory exists: ${forbiddenDirectory}`))
+  })
+}
