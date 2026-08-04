@@ -21,14 +21,19 @@ const requiredDirectories = [
 ]
 const requiredFiles = ["Dockerfile.runtime", "README.md", "package.json", "yarn.lock"]
 
-const createWebRootFixture = (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "web-root-"))
+const initializeGitRepository = (root) => {
+  const result = spawnSync("git", ["init", "--quiet", root], { encoding: "utf8" })
+  assert.equal(result.status, 0, result.stderr)
+}
+
+const createWebRootFixture = (t, root = fs.mkdtempSync(path.join(os.tmpdir(), "web-root-")), initializeGit = true) => {
   t.after(() => fs.rmSync(root, { force: true, recursive: true }))
 
   for (const directory of requiredDirectories) fs.mkdirSync(path.join(root, directory), { recursive: true })
   for (const file of requiredFiles) fs.writeFileSync(path.join(root, file), "fixture\n")
   fs.mkdirSync(path.join(root, "scripts/repo-boundary"), { recursive: true })
   fs.copyFileSync(guardPath, path.join(root, "scripts/repo-boundary/check-web-root.mjs"))
+  if (initializeGit) initializeGitRepository(root)
   return root
 }
 
@@ -53,6 +58,18 @@ test("Web root guard fails closed when a required path is missing", (t) => {
 
   assert.equal(result.status, 1)
   assert.match(result.stderr, /missing required path: legal\/schemas/)
+})
+
+test("Web root guard fails closed when nested below the Git repository root", (t) => {
+  const monorepoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "web-monorepo-"))
+  t.after(() => fs.rmSync(monorepoRoot, { force: true, recursive: true }))
+  initializeGitRepository(monorepoRoot)
+  const root = createWebRootFixture(t, path.join(monorepoRoot, "front"), false)
+
+  const result = runGuard(root)
+
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Git repository root does not match the web root/)
 })
 
 for (const forbiddenDirectory of ["front", "back", "deploy"]) {

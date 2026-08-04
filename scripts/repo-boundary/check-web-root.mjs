@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs"
+import { spawnSync } from "node:child_process"
 import path from "node:path"
 
 const webRoot = path.resolve(import.meta.dirname, "../..")
@@ -20,8 +21,19 @@ const requiredPaths = [
   "yarn.lock",
 ]
 const forbiddenDirectories = ["front", "back", "deploy"]
+const gitRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+  cwd: webRoot,
+  encoding: "utf8",
+})
+const gitRootFinding =
+  gitRoot.status !== 0 || !gitRoot.stdout.trim()
+    ? "unable to confirm Git repository root"
+    : path.resolve(gitRoot.stdout.trim()) !== webRoot
+      ? "Git repository root does not match the web root"
+      : null
 
 const findings = [
+  ...(gitRootFinding ? [gitRootFinding] : []),
   ...requiredPaths
     .filter((requiredPath) => !fs.existsSync(path.join(webRoot, requiredPath)))
     .map((requiredPath) => `missing required path: ${requiredPath}`),
