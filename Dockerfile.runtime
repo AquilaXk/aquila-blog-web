@@ -4,7 +4,7 @@
 # Build context is the Web repository root. This is the promoted runtime image,
 # not a local development container base.
 #
-# Node 20 line is fixed by package.json `engines.node` (">=20 <21").
+# Node 20 line is fixed by package.json `engines.node` (">=20.19 <21").
 # Same base tag family as NODE_RUNTIME_IMAGE (node:20-alpine), which the
 # container-image-scan job already scans for OS vulnerabilities.
 #
@@ -23,8 +23,6 @@ WORKDIR /app
 # `file:packages/...` dependencies resolve at install time, so they must land before yarn runs.
 COPY package.json yarn.lock ./
 COPY packages packages
-# postinstall: scripts/patch-lodash-template.cjs. Installing with --ignore-scripts would skip it.
-COPY scripts/patch-lodash-template.cjs scripts/patch-lodash-template.cjs
 
 # Playwright is a devDependency; its browser download is useless for a build-only stage.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
