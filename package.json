@@ -120,7 +120,7 @@
     "yaml": "1.10.3"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.2",
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.62.1",
     "@storybook/addon-a11y": "10.4.6",
     "@storybook/nextjs-vite": "10.4.6",
