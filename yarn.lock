@@ -5128,10 +5128,10 @@ jsx-ast-utils@^3.3.5:
     object.assign "^4.1.4"
     object.values "^1.1.6"
 
-katex@0.16.44, katex@^0.16.0, katex@^0.16.9:
-  version "0.16.44"
-  resolved "https://registry.yarnpkg.com/katex/-/katex-0.16.44.tgz#fcd7c25803d999f17780bfefe859993d083fb4b6"
-  integrity sha512-EkxoDTk8ufHqHlf9QxGwcxeLkWRR3iOuYfRpfORgYfqc8s13bgb+YtRY59NK5ZpRaCwq1kqA6a5lpX8C/eLphQ==
+katex@0.18.1, katex@^0.16.0, katex@^0.16.9:
+  version "0.18.1"
+  resolved "https://registry.yarnpkg.com/katex/-/katex-0.18.1.tgz#98c3e169ef9196072ec857e893beb88374519014"
+  integrity sha512-Td8GCYSxDAoMhHOlKmCFMJ/hz5qlAAb71n66Dryw9nfCVfumLo7nhuotbvKom/XPADmrYC3O5QR71EPq4DarJQ==
   dependencies:
     commander "^8.3.0"
 
