@@ -1,4 +1,4 @@
-import { setCookie } from "cookies-next"
+import { setCookie } from "cookies-next/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import type { SystemHealthPayload, TaskRetryPolicy } from "src/routes/Admin/AdminToolsWorkspaceModel"
 
