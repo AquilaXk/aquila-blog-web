@@ -1,46 +1,107 @@
-name: "\U0001F41E Bug report"
-description: Report an issue.
-title: "[Bug]: "
-labels: [pending triage]
+name: "🐞 Bug report"
+description: "Web root에서 재현되는 결함을 실행·검증 계약과 함께 신고합니다."
+title: "[Bug] "
+labels: ["bug"]
 body:
-  - type: markdown
+  - type: dropdown
+    id: severity
     attributes:
-      value: |
-        Thanks for taking the time to fill out this bug report!
-  - type: textarea
-    id: describe
-    attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is. If applicable, add screenshots to help explain your problem.
-    validations:
-      required: true
-  - type: textarea
-    id: reproduse
-    attributes:
-      label: To reproduce
-      description: Steps to reproduce the behavior
-      value: |
-        1. Go to ...
-        2. Click on ...
-        3. Scroll down to ..
-        4. See error
-    validations:
-      required: true
-  - type: input
-    id: browser
-    attributes:
-      label: Browser
-      description: What Browser are you using and on Which OS?
-      placeholder: e.g. Google Chrome v109, Windows 10
-    validations:
-      required: true
-  - type: checkboxes
-    id: validation
-    attributes:
-      label: Validations
-      description: Before submitting the issue, please make sure you do the following
+      label: Severity
+      description: 사용자 영향과 대응 우선순위에 가장 가까운 수준을 선택해 주세요.
       options:
-        - label: Follow our [Code of Conduct](https://github.com/morethanmin/morethan-log/blob/main/.github/CODE_OF_CONDUCT.md)
-          required: true
-        - label: Check that there isn't [already an issue](https://github.com/morethanmin/morethan-log/issues) that reports the same bug to avoid creating a duplicate.
+        - Sev1 - 서비스 사용 불가 또는 데이터 손실 위험
+        - Sev2 - 핵심 사용자 흐름이 실패
+        - Sev3 - 우회 가능한 기능 또는 UI 회귀
+        - Sev4 - 경미한 문구·시각·개선 이슈
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: Domain
+      description: 관련 Web root 경로 또는 실행 영역을 적어 주세요.
+      placeholder: 예) src/**, pages/**, e2e/**, .github/workflows/**
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: 무엇이 기대와 다르게 동작하는지 간결하게 설명해 주세요.
+      placeholder: 예) 로그인 후 공개 글 상세로 이동하면 페이지가 렌더링되지 않습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps To Reproduce
+      description: 다른 사람이 같은 결과를 재현할 수 있도록 순서와 입력값을 적어 주세요.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: Expected Result
+      description: 정상 동작과 완료 조건을 적어 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_result
+    attributes:
+      label: Actual Result
+      description: 실제 동작, 오류 메시지, 스크린샷 또는 로그의 안전한 요약을 적어 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: 영향 받는 사용자, 경로, 빈도와 가능한 우회 방법을 적어 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: execution_contract
+    attributes:
+      label: Execution Contract
+      description: Worker가 구현 결정을 추측하지 않도록 root에서 확정한 계약을 적어 주세요.
+      placeholder: |
+        - Confirmed decisions / interfaces:
+        - Allow:
+        - Deny / Non-goals:
+        - Completion criteria / edge cases:
+        - Unresolved implementation decisions: 없음
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification_delivery
+    attributes:
+      label: Verification & Delivery
+      description: 실행할 검증, 남길 증거, skip 조건, 기능 단위 commit을 적어 주세요.
+      placeholder: |
+        - Exact commands:
+        - Expected / observed evidence:
+        - Skipped checks and rerun conditions: 없음
+        - Commit slices:
+          1. fix(scope): 버그 수정 요약
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: duplicate_check
+    attributes:
+      label: Duplicate Check
+      options:
+        - label: "[열린 이슈](https://github.com/AquilaXk/aquila-blog-web/issues)에서 같은 문제를 검색했습니다."
           required: true
