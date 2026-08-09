@@ -1,5 +1,5 @@
 import http from "node:http"
-import { readFile, stat } from "node:fs/promises"
+import { open } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -49,8 +49,10 @@ const server = http.createServer(async (request, response) => {
     return
   }
 
+  let handle
   try {
-    if (!(await stat(targetPath)).isFile()) {
+    handle = await open(targetPath, "r")
+    if (!(await handle.stat()).isFile()) {
       send(response, 404, "Not found")
       return
     }
@@ -62,9 +64,11 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
-    response.end(await readFile(targetPath))
+    response.end(await handle.readFile())
   } catch {
     send(response, 404, "Not found")
+  } finally {
+    if (handle) await handle.close()
   }
 })
 
