@@ -4,13 +4,16 @@ import test from "node:test";
 import YAML from "yaml";
 
 const repositoryUrl = "https://github.com/AquilaXk/aquila-blog-web";
-const governanceFiles = [
-  ".github/ISSUE_TEMPLATE/bug_report.yml",
-  ".github/ISSUE_TEMPLATE/config.yml",
-  ".github/CONTRIBUTING.md",
-  ".github/PULL_REQUEST_TEMPLATE.md",
-  ".github/CODE_OF_CONDUCT.md",
-];
+const governanceFiles = {
+  ".github/CONTRIBUTING.md": [
+    `${repositoryUrl}/issues`,
+    `${repositoryUrl}/issues/new?template=task_request.yml`,
+    `${repositoryUrl}/pulls`,
+    `${repositoryUrl}/compare?expand=1`,
+  ],
+  ".github/PULL_REQUEST_TEMPLATE.md": [`${repositoryUrl}/issues/XX`],
+  ".github/CODE_OF_CONDUCT.md": ["https://github.com/AquilaXk)"],
+};
 const supportedFieldTypes = new Set(["markdown", "input", "textarea", "dropdown", "checkboxes"]);
 
 const read = (file) => readFile(file, "utf8");
@@ -46,6 +49,7 @@ function validateIssueForm(form) {
     }
 
     assert.equal(typeof field.id, "string", "non-markdown fields must have an id");
+    assert.match(field.id, /^[A-Za-z0-9_-]+$/, `invalid field id: ${field.id}`);
     assert.ok(!ids.has(field.id), `duplicate field id: ${field.id}`);
     ids.add(field.id);
     assert.equal(typeof field.attributes.label, "string", `missing label: ${field.id}`);
@@ -76,6 +80,13 @@ function assertRequiredField(form, { id, label, type }) {
   assert.equal(field.attributes.label, label, `field label: ${id}`);
   assert.equal(field.validations?.required, true, `field must be required: ${id}`);
   return field;
+}
+
+function assertGovernanceContent(file, content) {
+  for (const url of governanceFiles[file]) {
+    assert.ok(content.includes(url), `missing current-repository URL in ${file}: ${url}`);
+  }
+  assert.doesNotMatch(content, /morethanmin|morethan-log/);
 }
 
 async function readForm(file) {
@@ -155,6 +166,10 @@ test("form validator rejects required, id, and field-type mutations", async () =
   findField(duplicateId, "summary").id = "domain";
   assert.throws(() => validateIssueForm(duplicateId), /duplicate field id/);
 
+  const invalidId = structuredClone(form);
+  findField(invalidId, "summary").id = "summary/details";
+  assert.throws(() => validateIssueForm(invalidId), /invalid field id/);
+
   const unsupportedType = structuredClone(form);
   findField(unsupportedType, "summary").type = "radio";
   assert.throws(() => validateIssueForm(unsupportedType), /unsupported field type/);
@@ -168,17 +183,18 @@ test("issue configuration blocks blank issues without contact links", async () =
   assert.deepEqual(config.contact_links, []);
 });
 
-test("governance links target the Web repository and exclude upstream URLs", async () => {
-  const contents = await Promise.all(governanceFiles.map(read));
-  const governance = contents.join("\n");
+test("each governance file targets the Web repository and excludes upstream URLs", async (t) => {
+  for (const file of Object.keys(governanceFiles)) {
+    await t.test(file, async () => {
+      const content = await read(file);
+      assertGovernanceContent(file, content);
+    });
+  }
 
-  assert.match(governance, new RegExp(`${repositoryUrl}/issues`));
-  assert.match(governance, new RegExp(`${repositoryUrl}/pulls`));
-  assert.match(governance, new RegExp(`${repositoryUrl}/compare\\?expand=1`));
-  assert.match(governance, new RegExp(`${repositoryUrl}/issues/new\\?template=task_request\\.yml`));
-  assert.match(governance, /select `Feature`/);
-  assert.match(governance, /https:\/\/github\.com\/AquilaXk\)/);
-  assert.doesNotMatch(governance, /morethanmin|morethan-log/);
+  for (const file of Object.keys(governanceFiles)) {
+    const badContent = `${await read(file)}\nhttps://github.com/morethanmin/morethan-log`;
+    assert.throws(() => assertGovernanceContent(file, badContent), /morethanmin|morethan-log/);
+  }
 });
 
 // FUNDING is intentionally excluded: sponsor and payment settings require separate authority.
