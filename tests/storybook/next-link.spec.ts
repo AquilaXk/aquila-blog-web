@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 
-const expectStoryLink = async (page, storyId, href) => {
+const expectStoryLink = async (page: Page, storyId: string, href: string) => {
   const pageErrors: Error[] = []
   page.on("pageerror", (error) => pageErrors.push(error))
 
