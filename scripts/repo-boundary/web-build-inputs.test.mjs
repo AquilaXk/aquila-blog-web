@@ -116,6 +116,7 @@ test("Web CI keeps the Storybook bundle gate strict", () => {
   const smokeScript = packageJson.scripts["test:storybook:smoke"]
 
   assert.equal(storybookStep.run, "yarn test:storybook:smoke")
+  assert.equal(storybookStep.env.STORYBOOK_STATIC_PORT, "6106")
   assert.ok(smokeScript.startsWith("STORYBOOK_GATE_ENFORCEMENT=strict yarn storybook:gate &&"))
   assert.match(
     smokeScript,

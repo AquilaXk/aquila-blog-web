@@ -2,11 +2,12 @@ import http from "node:http"
 import { open } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { resolveStorybookStaticPort } from "../../.storybook/storybook-static-port.mjs"
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const staticRoot = path.join(projectRoot, "storybook-static")
 const host = "127.0.0.1"
-const port = Number(process.env.STORYBOOK_STATIC_PORT || "6006")
+const port = resolveStorybookStaticPort(process.env.STORYBOOK_STATIC_PORT)
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",

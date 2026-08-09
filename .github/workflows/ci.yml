@@ -59,6 +59,8 @@ jobs:
       - run: yarn check:bundle-size
       - run: npx playwright install --with-deps chromium
       - run: yarn test:storybook:smoke
+        env:
+          STORYBOOK_STATIC_PORT: "6106"
 
   playwright-smoke:
     runs-on: ubuntu-latest
