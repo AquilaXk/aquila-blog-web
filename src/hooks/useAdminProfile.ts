@@ -1,4 +1,4 @@
-import { setCookie } from "cookies-next"
+import { setCookie } from "cookies-next/client"
 import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "src/apis/backend/client"
 import type { ProfileCardLinkItem } from "src/constants/profileCardLinks"
