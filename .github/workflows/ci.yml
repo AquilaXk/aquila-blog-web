@@ -57,9 +57,10 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn build
       - run: yarn check:bundle-size
-      - run: yarn storybook:gate
+      - run: npx playwright install --with-deps chromium
+      - run: yarn test:storybook:smoke
         env:
-          STORYBOOK_GATE_ENFORCEMENT: strict
+          STORYBOOK_STATIC_PORT: "6106"
 
   playwright-smoke:
     runs-on: ubuntu-latest
