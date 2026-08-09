@@ -60,6 +60,8 @@ jobs:
       - run: yarn storybook:gate
         env:
           STORYBOOK_GATE_ENFORCEMENT: strict
+      - run: npx playwright install --with-deps chromium
+      - run: yarn test:storybook:smoke
 
   playwright-smoke:
     runs-on: ubuntu-latest
