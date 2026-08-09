@@ -67,7 +67,7 @@ Please try to create bug reports that are:
 - _Unique._ Do not duplicate existing opened issues.
 - _Scoped to a Single Bug._ One bug per report.
 
-If you have any great ideas of Feature Request, please [open a new issue](https://github.com/AquilaXk/aquila-blog-web/issues/new/choose). Discussions are disabled for this repository, so include the problem, intended outcome, and delivery criteria in the issue.
+If you have any great ideas of Feature Request, please [open a new task issue](https://github.com/AquilaXk/aquila-blog-web/issues/new?template=task_request.yml) and select `Feature` for Task Type. Discussions are disabled for this repository, so include the problem, intended outcome, and delivery criteria in the issue.
 
 **Even better: Submit a pull request with a fix or new feature!**
 
