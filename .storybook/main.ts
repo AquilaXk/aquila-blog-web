@@ -6,6 +6,7 @@ import { mergeConfig } from "vite"
 const siteConfigPath = fileURLToPath(new URL("../site.config.js", import.meta.url))
 const siteConfigAdapterPath = fileURLToPath(new URL("./site-config.ts", import.meta.url))
 const nextFontLocalAdapterPath = fileURLToPath(new URL("./next-font-local.ts", import.meta.url))
+const nextLinkAdapterPath = fileURLToPath(new URL("./next-link.tsx", import.meta.url))
 const nextRouterAdapterPath = fileURLToPath(new URL("./next-router.ts", import.meta.url))
 
 const config: StorybookConfig = {
@@ -25,6 +26,7 @@ const config: StorybookConfig = {
       resolve: {
         alias: {
           "next/font/local": nextFontLocalAdapterPath,
+          "next/link": nextLinkAdapterPath,
           "next/router": nextRouterAdapterPath,
           "site.config": siteConfigAdapterPath,
         },
