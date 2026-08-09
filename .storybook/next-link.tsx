@@ -6,6 +6,7 @@ import {
   type AnchorHTMLAttributes,
   type ReactElement,
   type ReactNode,
+  type RefAttributes,
 } from "react"
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
@@ -29,11 +30,14 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(
       throw new TypeError("Storybook next/link legacyBehavior requires one React element")
     }
 
-    return cloneElement(children as ReactElement<AnchorHTMLAttributes<HTMLAnchorElement>>, {
-      ...anchorProps,
-      href,
-      ref,
-    })
+    return cloneElement(
+      children as ReactElement<AnchorHTMLAttributes<HTMLAnchorElement> & RefAttributes<HTMLAnchorElement>>,
+      {
+        ...anchorProps,
+        href,
+        ref,
+      }
+    )
   }
 )
 
