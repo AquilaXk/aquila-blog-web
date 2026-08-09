@@ -109,9 +109,18 @@ test("Web Security verifies scanner release assets before execution", () => {
 
 test("Web CI keeps the Storybook bundle gate strict", () => {
   const workflow = loadYaml(fs.readFileSync(path.join(frontRoot, ".github/workflows/ci.yml"), "utf8"))
-  const storybookStep = workflow.jobs["storybook-bundle"].steps.find((step) => step.run === "yarn storybook:gate")
+  const packageJson = JSON.parse(fs.readFileSync(path.join(frontRoot, "package.json"), "utf8"))
+  const storybookStep = workflow.jobs["storybook-bundle"].steps.find(
+    (step) => step.run === "yarn test:storybook:smoke"
+  )
+  const smokeScript = packageJson.scripts["test:storybook:smoke"]
 
-  assert.equal(storybookStep.env.STORYBOOK_GATE_ENFORCEMENT, "strict")
+  assert.equal(storybookStep.run, "yarn test:storybook:smoke")
+  assert.ok(smokeScript.startsWith("STORYBOOK_GATE_ENFORCEMENT=strict yarn storybook:gate &&"))
+  assert.match(
+    smokeScript,
+    /^STORYBOOK_GATE_ENFORCEMENT=strict yarn storybook:gate && playwright test --config=playwright\.storybook\.config\.ts$/
+  )
 })
 
 test("Web CI runs repository extraction contract tests", () => {
