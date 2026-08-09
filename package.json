@@ -34,7 +34,7 @@
     "storybook:build:raw": "HOME=$PWD/.storybook-home CI=1 STORYBOOK_DISABLE_TELEMETRY=1 STORYBOOK_DISABLE_UPDATE_CHECK=1 storybook build",
     "storybook:build": "yarn storybook:build:raw",
     "storybook:gate": "node scripts/storybook/run-storybook-gate.mjs",
-    "test:storybook:smoke": "playwright test --config=playwright.storybook.config.ts",
+    "test:storybook:smoke": "STORYBOOK_GATE_ENFORCEMENT=strict yarn storybook:gate && playwright test --config=playwright.storybook.config.ts",
     "check:bundle-size": "node scripts/with-test-lock.mjs --resource front-verify --label bundle-size -- node scripts/check-bundle-size.mjs",
     "check:design-colors": "node --test scripts/check-design-colors.test.mjs && node scripts/check-design-colors.mjs",
     "check:refactor-boundaries": "node scripts/check-refactor-boundaries.mjs",
