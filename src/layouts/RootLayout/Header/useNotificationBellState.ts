@@ -29,7 +29,7 @@ import {
   persistLastEventId,
   persistSnapshot,
   resolveNotificationAvatarSrc,
-  sanitizeNotificationEventId,
+  selectLatestNotificationEventId,
   toLatestNotificationEventId,
 } from "./NotificationBellModel"
 
@@ -75,6 +75,8 @@ export const useNotificationBellState = (enabled: boolean) => {
   const [isReady, setIsReady] = useState(false)
   const [isRealtimeActive, setIsRealtimeActive] = useState(false)
   const [isSnapshotFallback, setIsSnapshotFallback] = useState(false)
+  const [hasUnavailableNotifications, setHasUnavailableNotifications] = useState(false)
+  const [isUnreadCountUnavailable, setIsUnreadCountUnavailable] = useState(false)
   const [notificationAccessState, setNotificationAccessState] = useState<"pending" | "ready" | "blocked">(
     "pending"
   )
@@ -94,10 +96,26 @@ export const useNotificationBellState = (enabled: boolean) => {
     lastLoggedSnapshotFailureStreakRef.current = 0
   }, [])
 
+  const markNotificationDataUnavailable = useCallback(() => {
+    setHasUnavailableNotifications(true)
+    setIsUnreadCountUnavailable(true)
+  }, [])
+
+  const clearNotificationDataUnavailable = useCallback(() => {
+    setHasUnavailableNotifications(false)
+    setIsUnreadCountUnavailable(false)
+  }, [])
+
   const setLastNotificationEventId = useCallback((eventId: string | null) => {
-    const sanitized = sanitizeNotificationEventId(eventId)
-    lastEventIdRef.current = sanitized
-    persistLastEventId(sanitized)
+    if (eventId === null) {
+      lastEventIdRef.current = null
+      persistLastEventId(null)
+      return
+    }
+
+    const nextEventId = selectLatestNotificationEventId(lastEventIdRef.current, eventId)
+    lastEventIdRef.current = nextEventId
+    persistLastEventId(nextEventId)
   }, [])
 
   const prewarmNotificationAvatars = useCallback((nextItems: TMemberNotification[]) => {
@@ -153,6 +171,11 @@ export const useNotificationBellState = (enabled: boolean) => {
       setIsReady(true)
       setIsSnapshotFallback(fallback)
       setNotificationAccessState("ready")
+      if (fallback) {
+        markNotificationDataUnavailable()
+      } else {
+        clearNotificationDataUnavailable()
+      }
 
       if (!sameItems || !sameUnreadCount) {
         persistSnapshot({
@@ -161,7 +184,12 @@ export const useNotificationBellState = (enabled: boolean) => {
         })
       }
     },
-    [prewarmNotificationAvatars, setLastNotificationEventId]
+    [
+      clearNotificationDataUnavailable,
+      markNotificationDataUnavailable,
+      prewarmNotificationAvatars,
+      setLastNotificationEventId,
+    ]
   )
 
   const pushNotification = useCallback((incoming: TMemberNotification) => {
@@ -233,12 +261,19 @@ export const useNotificationBellState = (enabled: boolean) => {
         })
         return "snapshot-fallback"
       }
+      markNotificationDataUnavailable()
       setIsReady(false)
       setIsSnapshotFallback(false)
       setNotificationAccessState("pending")
       return "error"
     }
-  }, [applySnapshotState, enabled, resetSnapshotFailureObservation, setLastNotificationEventId])
+  }, [
+    applySnapshotState,
+    enabled,
+    markNotificationDataUnavailable,
+    resetSnapshotFailureObservation,
+    setLastNotificationEventId,
+  ])
 
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -305,6 +340,7 @@ export const useNotificationBellState = (enabled: boolean) => {
       setIsReady(false)
       setIsRealtimeActive(false)
       setIsSnapshotFallback(false)
+      clearNotificationDataUnavailable()
       setNotificationAccessState("pending")
       reconnectAttemptRef.current = 0
       pollingFailureStreakRef.current = 0
@@ -332,7 +368,14 @@ export const useNotificationBellState = (enabled: boolean) => {
       setIsSnapshotFallback(false)
       setNotificationAccessState("pending")
     }
-  }, [applySnapshotState, closeEventSource, enabled, preferPolling, setLastNotificationEventId])
+  }, [
+    applySnapshotState,
+    clearNotificationDataUnavailable,
+    closeEventSource,
+    enabled,
+    preferPolling,
+    setLastNotificationEventId,
+  ])
 
   useNotificationBackgroundActivation({
     enabled,
@@ -377,6 +420,7 @@ export const useNotificationBellState = (enabled: boolean) => {
     clearHiddenCloseTimer,
     loadSnapshot,
     pushNotification,
+    markNotificationDataUnavailable,
     setLastNotificationEventId,
     setUnreadCount,
     setIsReady,
@@ -495,7 +539,7 @@ export const useNotificationBellState = (enabled: boolean) => {
         unreadCount: 0,
       })
     } catch {
-      // keep current state if mark-all fails
+      markNotificationDataUnavailable()
     }
   }
 
@@ -532,7 +576,7 @@ export const useNotificationBellState = (enabled: boolean) => {
           unreadCount: nextUnreadCount,
         })
       } catch {
-        // move to target even if mark-read fails
+        markNotificationDataUnavailable()
       }
     }
 
@@ -551,6 +595,8 @@ export const useNotificationBellState = (enabled: boolean) => {
     items,
     unreadCount,
     isSnapshotFallback,
+    hasUnavailableNotifications,
+    isUnreadCountUnavailable,
     hasUnread,
     unreadBadge,
     handleOpenChange,

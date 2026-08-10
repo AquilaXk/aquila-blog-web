@@ -1,7 +1,7 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react"
 import { ApiError, ApiTimeoutError } from "src/apis/backend/client"
 import { buildNotificationStreamUrl } from "src/apis/backend/notifications"
-import type { TMemberNotification, TMemberNotificationStreamPayload } from "src/types"
+import type { TMemberNotification } from "src/types"
 import {
   canProbeNotificationStreamRecovery,
   markNotificationPollingFallbackEntered,
@@ -12,6 +12,8 @@ import {
 } from "./notificationStreamRecovery"
 import {
   EventSourceLifecycleState,
+  decodeNotificationEvent,
+  decodeNotificationUnavailableEvent,
   getNavigatorConnection,
   getNextPollingDelayMs,
   HIDDEN_GRACE_CLOSE_MS,
@@ -23,7 +25,6 @@ import {
   POLLING_MIN_INTERVAL_MS,
   POLLING_SAVE_DATA_MULTIPLIER,
   POLLING_SLOW_NETWORK_MULTIPLIER,
-  sanitizeNotificationEventId,
   SNAPSHOT_FAILURE_LOG_THRESHOLD,
   SnapshotLoadStatus,
   STREAM_MAX_RECONNECT_ATTEMPTS,
@@ -59,6 +60,7 @@ type UseNotificationBellTransportParams = {
   clearHiddenCloseTimer: () => void
   loadSnapshot: () => Promise<SnapshotLoadStatus>
   pushNotification: (incoming: TMemberNotification) => void
+  markNotificationDataUnavailable: () => void
   setLastNotificationEventId: (eventId: string | null) => void
   setUnreadCount: Dispatch<SetStateAction<number>>
   setIsReady: Dispatch<SetStateAction<boolean>>
@@ -131,6 +133,7 @@ export const useNotificationBellTransport = ({
   clearHiddenCloseTimer,
   loadSnapshot,
   pushNotification,
+  markNotificationDataUnavailable,
   setLastNotificationEventId,
   setUnreadCount,
   setIsReady,
@@ -161,6 +164,7 @@ export const useNotificationBellTransport = ({
       if (disposed || reconnectTimerRef.current !== null || intentionalCloseRef.current) return
 
       setIsReady(false)
+      markNotificationDataUnavailable()
       const nextAttempt = reconnectAttemptRef.current + 1
       reconnectAttemptRef.current = nextAttempt
       recoveryStateRef.current = recordNotificationStreamFailure(recoveryStateRef.current, Date.now())
@@ -209,22 +213,35 @@ export const useNotificationBellTransport = ({
 
       const handleNotification = (event: MessageEvent<string>) => {
         markStreamOpen()
-        try {
-          const payload = JSON.parse(event.data) as TMemberNotificationStreamPayload
-          setLastNotificationEventId(
-            sanitizeNotificationEventId(event.lastEventId) || `notification-${payload.notification.id}`
-          )
-          pushNotification(payload.notification)
-          setUnreadCount((prev) => {
-            if (prev === payload.unreadCount) return prev
-            unreadCountRef.current = payload.unreadCount
-            return payload.unreadCount
-          })
-          setIsReady(true)
-          setIsSnapshotFallback(false)
-        } catch {
-          // ignore malformed payloads
+        const decoded = decodeNotificationEvent(event)
+        if (!decoded) {
+          markNotificationDataUnavailable()
+          return
         }
+
+        setLastNotificationEventId(decoded.eventId)
+        pushNotification(decoded.notification)
+        setUnreadCount((prev) => {
+          if (prev === decoded.unreadCount) return prev
+          unreadCountRef.current = decoded.unreadCount
+          return decoded.unreadCount
+        })
+        setIsReady(true)
+        setIsSnapshotFallback(false)
+      }
+
+      const handleNotificationUnavailable = (event: MessageEvent<string>) => {
+        markStreamOpen()
+        const decoded = decodeNotificationUnavailableEvent(event)
+        if (!decoded) {
+          markNotificationDataUnavailable()
+          return
+        }
+
+        setLastNotificationEventId(decoded.eventId)
+        markNotificationDataUnavailable()
+        setIsReady(true)
+        setIsSnapshotFallback(false)
       }
 
       const handleConnected = (_event: MessageEvent<string>) => {
@@ -249,6 +266,7 @@ export const useNotificationBellTransport = ({
       const detachListeners = () => {
         eventSource.removeEventListener("connected", handleConnected)
         eventSource.removeEventListener("notification", handleNotification)
+        eventSource.removeEventListener("notification-unavailable", handleNotificationUnavailable)
         eventSource.removeEventListener("heartbeat", handleHeartbeat)
         eventSource.onerror = null
       }
@@ -256,6 +274,7 @@ export const useNotificationBellTransport = ({
       eventSourceCleanupRef.current = detachListeners
       eventSource.addEventListener("connected", handleConnected)
       eventSource.addEventListener("notification", handleNotification)
+      eventSource.addEventListener("notification-unavailable", handleNotificationUnavailable)
       eventSource.addEventListener("heartbeat", handleHeartbeat)
       eventSource.onerror = () => {
         const isIntentionalClose = intentionalCloseRef.current || disposed
@@ -266,6 +285,7 @@ export const useNotificationBellTransport = ({
         }
         streamLifecycleRef.current = "idle"
         if (isIntentionalClose) return
+        markNotificationDataUnavailable()
         scheduleReconnect()
       }
     }
@@ -294,6 +314,7 @@ export const useNotificationBellTransport = ({
     isRealtimeActive,
     lastEventIdRef,
     loadSnapshot,
+    markNotificationDataUnavailable,
     notificationAccessState,
     pushNotification,
     reconnectAttemptRef,

@@ -1,4 +1,8 @@
-import type { TMemberNotification } from "src/types"
+import type {
+  TMemberNotification,
+  TMemberNotificationStreamPayload,
+  TMemberNotificationUnavailablePayload,
+} from "src/types"
 
 export type NotificationTransportMode = "auto" | "polling-only" | "sse"
 export type SnapshotLoadStatus = "success" | "snapshot-fallback" | "blocked" | "error"
@@ -19,7 +23,7 @@ export const POLLING_FAILURE_COOLDOWN_MS = 180_000
 export const HIDDEN_GRACE_CLOSE_MS = 45_000
 export const LAST_EVENT_ID_STORAGE_KEY = "member.notification.lastEventId.v1"
 export const SNAPSHOT_STORAGE_KEY = "member.notification.snapshot.v1"
-export const NOTIFICATION_EVENT_ID_REGEX = /^notification-\d+$/
+export const NOTIFICATION_EVENT_ID_REGEX = /^notification-[1-9]\d*$/
 export const AVATAR_PRELOAD_LIMIT = 8
 export const AVATAR_PRELOAD_CACHE_MAX = 128
 export const SNAPSHOT_FAILURE_LOG_THRESHOLD = 2
@@ -76,6 +80,103 @@ export const sanitizeNotificationEventId = (raw: string | null | undefined): str
   const normalized = raw.trim()
   if (!NOTIFICATION_EVENT_ID_REGEX.test(normalized)) return null
   return normalized
+}
+
+type NotificationEventInput = {
+  data: string
+  lastEventId: string
+}
+
+export type DecodedNotificationEvent = TMemberNotificationStreamPayload & {
+  eventId: string
+}
+
+export type DecodedNotificationUnavailableEvent = Pick<TMemberNotificationUnavailablePayload, "notificationId"> & {
+  eventId: string
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const isPositiveSafeInteger = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0
+
+const isNonNegativeSafeInteger = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+
+const isMemberNotification = (value: unknown): value is TMemberNotification => {
+  if (!isRecord(value)) return false
+  if (value.type !== "COMMENT_REPLY" && value.type !== "POST_COMMENT") return false
+
+  return (
+    isPositiveSafeInteger(value.id) &&
+    typeof value.createdAt === "string" &&
+    isPositiveSafeInteger(value.actorId) &&
+    typeof value.actorName === "string" &&
+    (value.actorProfileImageDirectUrl === undefined || typeof value.actorProfileImageDirectUrl === "string") &&
+    typeof value.actorProfileImageUrl === "string" &&
+    isPositiveSafeInteger(value.postId) &&
+    isPositiveSafeInteger(value.commentId) &&
+    typeof value.postTitle === "string" &&
+    typeof value.commentPreview === "string" &&
+    typeof value.message === "string" &&
+    typeof value.isRead === "boolean"
+  )
+}
+
+const parseNotificationEventData = (data: string): unknown => {
+  try {
+    return JSON.parse(data)
+  } catch {
+    return null
+  }
+}
+
+export const decodeNotificationEvent = ({
+  data,
+  lastEventId,
+}: NotificationEventInput): DecodedNotificationEvent | null => {
+  const eventId = sanitizeNotificationEventId(lastEventId)
+  const parsed = parseNotificationEventData(data)
+  if (!eventId || !isRecord(parsed) || !isMemberNotification(parsed.notification)) return null
+  if (!isNonNegativeSafeInteger(parsed.unreadCount)) return null
+  if (eventId !== `notification-${parsed.notification.id}`) return null
+
+  return {
+    eventId,
+    notification: parsed.notification,
+    unreadCount: parsed.unreadCount,
+  }
+}
+
+export const decodeNotificationUnavailableEvent = ({
+  data,
+  lastEventId,
+}: NotificationEventInput): DecodedNotificationUnavailableEvent | null => {
+  const eventId = sanitizeNotificationEventId(lastEventId)
+  const parsed = parseNotificationEventData(data)
+  if (!eventId || !isRecord(parsed) || parsed.status !== "UNAVAILABLE") return null
+  if (!isPositiveSafeInteger(parsed.notificationId)) return null
+  if (eventId !== `notification-${parsed.notificationId}`) return null
+
+  return {
+    eventId,
+    notificationId: parsed.notificationId,
+  }
+}
+
+export const selectLatestNotificationEventId = (
+  current: string | null,
+  candidate: string | null
+): string | null => {
+  const currentEventId = sanitizeNotificationEventId(current)
+  const candidateEventId = sanitizeNotificationEventId(candidate)
+  if (!candidateEventId) return currentEventId
+  if (!currentEventId) return candidateEventId
+
+  const currentId = BigInt(currentEventId.slice("notification-".length))
+  const candidateId = BigInt(candidateEventId.slice("notification-".length))
+  return candidateId > currentId ? candidateEventId : currentEventId
 }
 
 export const persistLastEventId = (eventId: string | null) => {

@@ -8,6 +8,8 @@ type NotificationBellPanelProps = {
   panelRef: Ref<HTMLDivElement>
   isMobileViewport: boolean
   isSnapshotFallback: boolean
+  hasUnavailableNotifications: boolean
+  isUnreadCountUnavailable: boolean
   hasUnread: boolean
   items: TMemberNotification[]
   onClose: () => void
@@ -19,6 +21,8 @@ export const NotificationBellPanel = ({
   panelRef,
   isMobileViewport,
   isSnapshotFallback,
+  hasUnavailableNotifications,
+  isUnreadCountUnavailable,
   hasUnread,
   items,
   onClose,
@@ -46,10 +50,21 @@ export const NotificationBellPanel = ({
           <strong>알림</strong>
           {isSnapshotFallback && <small>오프라인 스냅샷</small>}
         </div>
-        <button type="button" className="readAllBtn" onClick={onMarkAllRead} disabled={!hasUnread}>
+        <button
+          type="button"
+          className="readAllBtn"
+          onClick={onMarkAllRead}
+          disabled={!hasUnread || isUnreadCountUnavailable}
+        >
           모두 읽음
         </button>
       </div>
+      {(hasUnavailableNotifications || isUnreadCountUnavailable) && (
+        <div className="unavailableStatus" role="status" aria-live="polite">
+          {hasUnavailableNotifications && <strong>일부 알림을 표시할 수 없습니다.</strong>}
+          {isUnreadCountUnavailable && <span>읽지 않은 알림 수를 확인할 수 없습니다.</span>}
+        </div>
+      )}
       {items.length > 0 ? (
         <ul className="list">
           {items.map((item, index) => (
@@ -84,11 +99,11 @@ export const NotificationBellPanel = ({
             </li>
           ))}
         </ul>
-      ) : (
+      ) : !hasUnavailableNotifications ? (
         <div className="empty">
           <strong>알림이 없습니다.</strong>
         </div>
-      )}
+      ) : null}
     </div>
   </>
 )

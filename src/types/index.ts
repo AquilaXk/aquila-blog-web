@@ -87,6 +87,11 @@ export type TMemberNotificationStreamPayload = {
   unreadCount: number
 }
 
+export type TMemberNotificationUnavailablePayload = {
+  notificationId: number
+  status: "UNAVAILABLE"
+}
+
 export type TPosts = TPost[]
 
 export type TTags = {
