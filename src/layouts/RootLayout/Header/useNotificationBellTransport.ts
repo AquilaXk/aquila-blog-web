@@ -162,17 +162,7 @@ export const useNotificationBellTransport = ({
         setIsReady(true)
       }
 
-      const handleConnected = () => {
-        markStreamOpen()
-        const recovered = reconnectAttemptRef.current > 0
-        reconnectAttemptRef.current = 0
-        setIsReady(true)
-        if (recovered) {
-          void loadSnapshot()
-        }
-      }
-
-      const handleHeartbeat = () => {
+      const handleRecoveryEvent = () => {
         markStreamOpen()
         const recovered = reconnectAttemptRef.current > 0
         reconnectAttemptRef.current = 0
@@ -183,18 +173,18 @@ export const useNotificationBellTransport = ({
       }
 
       const detachListeners = () => {
-        eventSource.removeEventListener("connected", handleConnected)
+        eventSource.removeEventListener("connected", handleRecoveryEvent)
         eventSource.removeEventListener("notification", handleNotification)
         eventSource.removeEventListener("notification-unavailable", handleNotificationUnavailable)
-        eventSource.removeEventListener("heartbeat", handleHeartbeat)
+        eventSource.removeEventListener("heartbeat", handleRecoveryEvent)
         eventSource.onerror = null
       }
 
       eventSourceCleanupRef.current = detachListeners
-      eventSource.addEventListener("connected", handleConnected)
+      eventSource.addEventListener("connected", handleRecoveryEvent)
       eventSource.addEventListener("notification", handleNotification)
       eventSource.addEventListener("notification-unavailable", handleNotificationUnavailable)
-      eventSource.addEventListener("heartbeat", handleHeartbeat)
+      eventSource.addEventListener("heartbeat", handleRecoveryEvent)
       eventSource.onerror = () => {
         const isIntentionalClose = intentionalCloseRef.current || disposed
         detachListeners()

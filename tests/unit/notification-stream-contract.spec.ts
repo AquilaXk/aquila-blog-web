@@ -125,19 +125,21 @@ test("stream 생성 실패는 lifecycle idle과 explicit unavailable로 끝난�
   )
 })
 
-test("heartbeat reconnect 복구는 canonical snapshot을 다시 읽는다", () => {
+test("connected·heartbeat reconnect 복구는 shared handler로 canonical snapshot을 다시 읽는다", () => {
   const transportSource = readFileSync(
     path.resolve(__dirname, "../../src/layouts/RootLayout/Header/useNotificationBellTransport.ts"),
     "utf8"
   )
-  const handleHeartbeat = transportSource.slice(
-    transportSource.indexOf("const handleHeartbeat ="),
+  const handleRecoveryEvent = transportSource.slice(
+    transportSource.indexOf("const handleRecoveryEvent ="),
     transportSource.indexOf("const detachListeners =")
   )
 
-  expect(handleHeartbeat).toMatch(
+  expect(handleRecoveryEvent).toMatch(
     /const recovered = reconnectAttemptRef\.current > 0[\s\S]*if \(recovered\) \{[\s\S]*void loadSnapshot\(\)/
   )
+  expect(transportSource).toContain('eventSource.addEventListener("connected", handleRecoveryEvent)')
+  expect(transportSource).toContain('eventSource.addEventListener("heartbeat", handleRecoveryEvent)')
 })
 
 test("read mutation 실패는 data unavailable 오분류 없이 canonical snapshot을 다시 읽는다", () => {
