@@ -1,3 +1,4 @@
+import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
   escapeMarkdownLinkLabel,
@@ -5,12 +6,7 @@ import {
 } from "./markdownEditorUploadModel"
 
 /** Stable per-upload token so concurrent same-name placeholders never collide. */
-export const createUploadPlaceholderId = (): string => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID()
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-}
+export const createUploadPlaceholderId = (): string => createSecureRandomUuid()
 
 /** Normalize + escape file names used inside uploading placeholders. */
 export const sanitizeUploadPlaceholderFileName = (fileName: string): string => {

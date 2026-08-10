@@ -1,5 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
+import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import {
   applyThumbnailTransformToUrl,
@@ -185,12 +186,7 @@ export const isComposingKeyboardEvent = (
   return nativeEvent.isComposing === true || nativeEvent.keyCode === 229
 }
 
-export const generateIdempotencyKey = () => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID()
-  }
-  return `post-write-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
+export const generateIdempotencyKey = () => createSecureRandomUuid()
 
 const EDITOR_RUNTIME_GUARD_SAMPLE_LIMIT = 240
 

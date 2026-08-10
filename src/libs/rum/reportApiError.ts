@@ -1,6 +1,7 @@
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
 import { classifyApiError, type ApiErrorCategory } from "src/apis/backend/errorClassification"
 import { hasOptionalTrackingConsent } from "src/libs/privacy/optionalTrackingConsentCore"
+import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import {
   extractStackTop,
   resolveErrorMessageFromUnknown,
@@ -34,11 +35,7 @@ declare global {
   }
 }
 
-const createApiErrorReportId = () => {
-  const timestamp = Date.now().toString(36)
-  const random = Math.random().toString(36).slice(2, 8)
-  return `err_${timestamp}_${random}`
-}
+export const createApiErrorReportId = () => `err_${createSecureRandomUuid()}`
 
 export const wasApiErrorReported = (error: unknown) =>
   typeof error === "object" && error !== null && reportedApiErrors.has(error)
