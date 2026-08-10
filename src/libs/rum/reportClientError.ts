@@ -1,5 +1,6 @@
 import { classifyApiError, type ApiErrorCategory } from "src/apis/backend/errorClassification"
 import { hasOptionalTrackingConsent } from "src/libs/privacy/optionalTrackingConsentCore"
+import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import {
   extractStackTop,
   resolveErrorMessageFromUnknown,
@@ -40,11 +41,7 @@ type ReportClientErrorInput = {
 const CLIENT_ERROR_ENDPOINT = "/api/rum/client-errors"
 const MAX_REQUEST_ID_LENGTH = 64
 
-export const createClientErrorId = () => {
-  const timestamp = Date.now().toString(36)
-  const random = Math.random().toString(36).slice(2, 8)
-  return `err_${timestamp}_${random}`
-}
+export const createClientErrorId = () => `err_${createSecureRandomUuid()}`
 
 const resolveErrorName = (error: unknown) => {
   if (error instanceof Error && error.name.trim()) return error.name.trim().slice(0, 80)
