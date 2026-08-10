@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { registeredBrowserStorageKeys } from "src/libs/privacy/browserStorageRegistry"
 import {
   decodeNotificationEvent,
   decodeNotificationUnavailableEvent,
@@ -109,4 +110,19 @@ test("notification runtime은 polling이나 legacy session snapshot을 healthy s
   expect(modelSource).toContain("window.sessionStorage.removeItem(LEGACY_SNAPSHOT_STORAGE_KEY)")
   expect(modelSource).not.toContain("window.sessionStorage.getItem(LEGACY_SNAPSHOT_STORAGE_KEY)")
   expect(modelSource).not.toContain("window.sessionStorage.setItem(LEGACY_SNAPSHOT_STORAGE_KEY")
+})
+
+test("legacy notification snapshot registry는 신규 저장 없이 초기화 삭제만 기록한다", () => {
+  const legacySnapshotEntry = registeredBrowserStorageKeys.find(
+    (entry) => entry.key === "member.notification.snapshot.v1"
+  )
+
+  expect(legacySnapshotEntry).toEqual(
+    expect.objectContaining({
+      area: "sessionStorage",
+      purpose: "notification-legacy-snapshot-cleanup",
+      retention: "removed on next notification initialization",
+      stores: "no new data; legacy notification snapshot key removal only",
+    })
+  )
 })
