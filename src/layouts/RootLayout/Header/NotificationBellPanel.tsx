@@ -62,7 +62,7 @@ export const NotificationBellPanel = ({
           {isUnreadCountUnavailable && <span>읽지 않은 알림 수를 확인할 수 없습니다.</span>}
         </div>
       )}
-      {items.length > 0 ? (
+      {items.length > 0 && (
         <ul className="list">
           {items.map((item, index) => (
             <li key={item.id}>
@@ -96,11 +96,12 @@ export const NotificationBellPanel = ({
             </li>
           ))}
         </ul>
-      ) : !hasUnavailableNotifications ? (
+      )}
+      {items.length === 0 && !hasUnavailableNotifications && (
         <div className="empty">
           <strong>알림이 없습니다.</strong>
         </div>
-      ) : null}
+      )}
     </div>
   </>
 )
