@@ -154,6 +154,23 @@ export const StyledWrapper = styled.div`
     }
   }
 
+  .unavailableStatus {
+    display: grid;
+    gap: 0.18rem;
+    margin: 0 0.12rem 0.62rem;
+    padding: 0.66rem 0.72rem;
+    border: 1px solid ${({ theme }) => theme.colors.orange7};
+    border-radius: 8px;
+    background: ${({ theme }) => theme.colors.orange3};
+    color: ${({ theme }) => theme.colors.orange11};
+
+    strong,
+    span {
+      font-size: 0.72rem;
+      line-height: 1.45;
+    }
+  }
+
   .list {
     list-style: none;
     margin: 0;

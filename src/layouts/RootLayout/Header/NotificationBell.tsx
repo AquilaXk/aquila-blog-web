@@ -16,13 +16,15 @@ const NotificationBell: React.FC<Props> = ({ enabled }) => {
     setOpen,
     isMobileViewport,
     items,
-    isSnapshotFallback,
+    hasUnavailableNotifications,
+    isUnreadCountUnavailable,
     hasUnread,
     unreadBadge,
     handleOpenChange,
     handleMarkAllRead,
     handleMoveToNotification,
   } = useNotificationBellState(enabled)
+  const hasUnavailableState = hasUnavailableNotifications || isUnreadCountUnavailable
 
   if (!enabled) {
     return null
@@ -36,19 +38,24 @@ const NotificationBell: React.FC<Props> = ({ enabled }) => {
         className="trigger"
         data-ui="nav-control"
         data-open={open}
-        aria-label="알림"
+        aria-label={hasUnavailableState ? "알림, 상태 확인 필요" : "알림"}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => void handleOpenChange()}
       >
         <AppIcon name="bell" />
-        {hasUnread && <span className="badge">{unreadBadge}</span>}
+        {(hasUnread || hasUnavailableState) && (
+          <span className="badge" data-unavailable={hasUnavailableState}>
+            {hasUnavailableState ? "!" : unreadBadge}
+          </span>
+        )}
       </button>
       {open && (
         <NotificationBellPanel
           panelRef={panelRef}
           isMobileViewport={isMobileViewport}
-          isSnapshotFallback={isSnapshotFallback}
+          hasUnavailableNotifications={hasUnavailableNotifications}
+          isUnreadCountUnavailable={isUnreadCountUnavailable}
           hasUnread={hasUnread}
           items={items}
           onClose={() => setOpen(false)}

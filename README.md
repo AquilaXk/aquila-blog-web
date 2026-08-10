@@ -44,7 +44,6 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 | `NEXT_PUBLIC_MONITORING_EMBED_URL` | 관리자 도구의 모니터링 iframe URL(예: Grafana kiosk URL) |
 | `NEXT_PUBLIC_LOGS_EMBED_URL` | 관리자 도구의 로그 iframe URL |
 | `NEXT_PUBLIC_PROMETHEUS_URL` | 관리자 도구의 Prometheus 바로가기 URL |
-| `NEXT_PUBLIC_NOTIFICATION_STREAM_MODE` | 알림 전송 모드(`auto`, `polling-only`, `sse`) |
 | `NEXT_PUBLIC_SIGNUP_ENABLED` | 회원가입 화면 활성화 여부 |
 | `NEXT_PUBLIC_RUM_SAMPLE_RATE` | Web Vitals 수집 샘플 비율 |
 | `UPTIME_KUMA_PROXY_ORIGIN` | `/status/*` rewrite 대상 오리진 |
@@ -59,7 +58,6 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 - 로그인 상태 조회는 `/member/api/v1/auth/me` 기반입니다.
 - SSR에서 auth 스냅샷(`authMeProbe`)을 주입하고, 비로그인 확정 상태에서는 클라이언트 재검증 호출을 생략합니다.
 - 비로그인 새로고침 시 `auth/me 401` 콘솔 노이즈를 줄이기 위한 억제 로직이 포함되어 있습니다.
-- 알림 채널은 production에서 `polling-only`를 기본값으로 사용하며, snapshot 요청은 ETag/304 조건부 요청으로 대역폭을 절감합니다.
 
 관련 코드:
 
