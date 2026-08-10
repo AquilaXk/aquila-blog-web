@@ -226,6 +226,81 @@ test.describe("core smoke auth and notifications", () => {
   await expect(bellTrigger).toBeFocused()
 })
 
+  test("알림 API·payload 실패는 typed cursor를 보존하고 explicit unavailable로 표시한다", async ({ page }) => {
+  await mockFeedEndpoints(page)
+
+  await page.route("**/member/api/v1/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 1,
+        username: "aquila",
+        nickname: "관리자",
+        isAdmin: true,
+      }),
+    })
+  })
+
+  await page.route("**/member/api/v1/notifications/snapshot", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ resultCode: "503-1", msg: "notification unavailable", data: null }),
+    })
+  })
+
+  await page.route("**/member/api/v1/notifications/stream**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: [
+        "id: notification-61",
+        "event: notification-unavailable",
+        'data: {"notificationId":61,"status":"UNAVAILABLE"}',
+        "",
+        "id: notification-62",
+        "event: notification",
+        'data: {"notification":{"id":62},"unreadCount":1}',
+        "",
+        "",
+      ].join("\n"),
+    })
+  })
+
+  await page.context().addCookies([
+    {
+      name: "apiKey",
+      value: "e2e-session",
+      url: "http://127.0.0.1:3000",
+    },
+  ])
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem(
+      "member.notification.snapshot.v1",
+      JSON.stringify({ items: [{ id: 999 }], unreadCount: 99 })
+    )
+  })
+
+  await page.goto("/")
+  const bellTrigger = page.getByRole("button", { name: "알림" })
+  await expect(bellTrigger).toBeVisible()
+  await bellTrigger.click()
+
+  const notificationPanel = page.getByRole("dialog", { name: "알림 목록" })
+  const unavailableStatus = notificationPanel.getByRole("status")
+  await expect(unavailableStatus).toContainText("일부 알림을 표시할 수 없습니다.")
+  await expect(unavailableStatus).toContainText("읽지 않은 알림 수를 확인할 수 없습니다.")
+  await expect(notificationPanel.getByText("알림이 없습니다.")).toHaveCount(0)
+  await expect(notificationPanel.getByRole("button", { name: "모두 읽음" })).toBeDisabled()
+  await expect
+    .poll(() => page.evaluate(() => window.sessionStorage.getItem("member.notification.lastEventId.v1")))
+    .toBe("notification-61")
+  await expect
+    .poll(() => page.evaluate(() => window.sessionStorage.getItem("member.notification.snapshot.v1")))
+    .toBeNull()
+})
+
   test("로그인 실패 메시지가 상태코드 기준으로 표준화된다", async ({ page }) => {
   await page.route("**/member/api/v1/auth/login", async (route) => {
     await route.fulfill({

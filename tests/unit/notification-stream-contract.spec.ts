@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test"
+import { existsSync, readFileSync } from "node:fs"
+import path from "node:path"
 import {
   decodeNotificationEvent,
   decodeNotificationUnavailableEvent,
+  resolveNotificationReconnectPlan,
   selectLatestNotificationEventId,
 } from "src/layouts/RootLayout/Header/NotificationBellModel"
 
@@ -60,4 +63,50 @@ test("manual reconnect cursor는 duplicate·out-of-order event로 후퇴하지 �
   expect(selectLatestNotificationEventId("notification-61", "notification-59")).toBe("notification-61")
   expect(selectLatestNotificationEventId("notification-61", "notification-72")).toBe("notification-72")
   expect(selectLatestNotificationEventId("notification-61", "invalid")).toBe("notification-61")
+})
+
+test("SSE reconnect는 네 번까지만 지연 재시도하고 소진 뒤 중단한다", () => {
+  expect(resolveNotificationReconnectPlan(0)).toEqual({ nextAttempt: 1, retryDelayMs: 1_500 })
+  expect(resolveNotificationReconnectPlan(1)).toEqual({ nextAttempt: 2, retryDelayMs: 3_000 })
+  expect(resolveNotificationReconnectPlan(2)).toEqual({ nextAttempt: 3, retryDelayMs: 4_500 })
+  expect(resolveNotificationReconnectPlan(3)).toEqual({ nextAttempt: 4, retryDelayMs: 6_000 })
+  expect(resolveNotificationReconnectPlan(4)).toEqual({ nextAttempt: 5, retryDelayMs: null })
+})
+
+test("notification snapshot과 stream URL은 stale·relative fallback 없이 실패한다", () => {
+  const clientSource = readFileSync(path.resolve(__dirname, "../../src/apis/backend/client.ts"), "utf8")
+  const notificationApiSource = readFileSync(
+    path.resolve(__dirname, "../../src/apis/backend/notifications.ts"),
+    "utf8"
+  )
+  const snapshotPolicy = clientSource.match(
+    /matcher: \/\^\\\/member\\\/api\\\/v1\\\/notifications\\\/snapshot[\s\S]*?\n  },/
+  )?.[0]
+  const streamBuilder = notificationApiSource.slice(
+    notificationApiSource.indexOf("export const buildNotificationStreamUrl")
+  )
+
+  expect(snapshotPolicy).toContain('cacheMode: "no-store"')
+  expect(snapshotPolicy).toContain("staleIfError: false")
+  expect(streamBuilder).not.toContain("try {")
+  expect(streamBuilder).not.toContain("catch {")
+})
+
+test("notification runtime은 polling이나 legacy session snapshot을 healthy source로 사용하지 않는다", () => {
+  const headerRoot = path.resolve(__dirname, "../../src/layouts/RootLayout/Header")
+  const modelSource = readFileSync(path.join(headerRoot, "NotificationBellModel.ts"), "utf8")
+  const stateSource = readFileSync(path.join(headerRoot, "useNotificationBellState.ts"), "utf8")
+  const transportSource = readFileSync(path.join(headerRoot, "useNotificationBellTransport.ts"), "utf8")
+
+  expect(existsSync(path.join(headerRoot, "notificationStreamRecovery.ts"))).toBe(false)
+  for (const source of [modelSource, stateSource, transportSource]) {
+    expect(source).not.toContain("NEXT_PUBLIC_NOTIFICATION_STREAM_MODE")
+    expect(source).not.toContain("persistSnapshot")
+    expect(source).not.toContain("loadStoredSnapshot")
+    expect(source).not.toContain('setStreamMode("poll")')
+  }
+  expect(stateSource).not.toContain("toLatestNotificationEventId")
+  expect(modelSource).toContain("window.sessionStorage.removeItem(LEGACY_SNAPSHOT_STORAGE_KEY)")
+  expect(modelSource).not.toContain("window.sessionStorage.getItem(LEGACY_SNAPSHOT_STORAGE_KEY)")
+  expect(modelSource).not.toContain("window.sessionStorage.setItem(LEGACY_SNAPSHOT_STORAGE_KEY")
 })

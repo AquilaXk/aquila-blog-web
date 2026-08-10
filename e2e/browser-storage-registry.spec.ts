@@ -147,6 +147,21 @@ test("browser storage registry records retention and deletion metadata for every
   }
 })
 
+test("legacy notification snapshot registry는 신규 저장 없이 초기화 삭제만 기록한다", () => {
+  const legacySnapshotEntry = registeredBrowserStorageKeys.find(
+    (entry) => entry.key === "member.notification.snapshot.v1"
+  )
+
+  expect(legacySnapshotEntry).toEqual(
+    expect.objectContaining({
+      area: "sessionStorage",
+      purpose: "notification-legacy-snapshot-cleanup",
+      retention: "removed on next notification initialization",
+      stores: "no new data; legacy notification snapshot key removal only",
+    })
+  )
+})
+
 test("signup cooldown registry documents hashed storage instead of raw email identifiers", () => {
   const cooldownEntry = registeredBrowserStorageKeys.find((entry) => entry.key === "auth.signupMailCooldown.v1")
   const hookSource = readFileSync(path.join(srcRoot, "hooks/useSignupMailCooldown.ts"), "utf8")
