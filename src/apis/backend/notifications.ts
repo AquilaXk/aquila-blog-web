@@ -49,10 +49,6 @@ export const markAllNotificationsRead = () =>
 export const buildNotificationStreamUrl = () => {
   if (typeof window === "undefined") return NOTIFICATIONS_STREAM_API_PATH
 
-  try {
-    const apiBaseUrl = getApiBaseUrl()
-    return new URL(NOTIFICATIONS_STREAM_API_PATH, `${apiBaseUrl}/`).toString()
-  } catch {
-    return NOTIFICATIONS_STREAM_API_PATH
-  }
+  const apiBaseUrl = getApiBaseUrl()
+  return new URL(NOTIFICATIONS_STREAM_API_PATH, `${apiBaseUrl}/`).toString()
 }

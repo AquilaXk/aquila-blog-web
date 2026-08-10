@@ -7,7 +7,6 @@ import { resolveNotificationAvatarSrc } from "./NotificationBellModel"
 type NotificationBellPanelProps = {
   panelRef: Ref<HTMLDivElement>
   isMobileViewport: boolean
-  isSnapshotFallback: boolean
   hasUnavailableNotifications: boolean
   isUnreadCountUnavailable: boolean
   hasUnread: boolean
@@ -20,7 +19,6 @@ type NotificationBellPanelProps = {
 export const NotificationBellPanel = ({
   panelRef,
   isMobileViewport,
-  isSnapshotFallback,
   hasUnavailableNotifications,
   isUnreadCountUnavailable,
   hasUnread,
@@ -48,7 +46,6 @@ export const NotificationBellPanel = ({
       <div className="panelHead">
         <div className="panelTitle">
           <strong>알림</strong>
-          {isSnapshotFallback && <small>오프라인 스냅샷</small>}
         </div>
         <button
           type="button"

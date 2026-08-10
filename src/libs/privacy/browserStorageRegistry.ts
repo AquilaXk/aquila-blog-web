@@ -250,11 +250,11 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   {
     area: "sessionStorage",
     key: "member.notification.snapshot.v1",
-    purpose: "notification-snapshot",
+    purpose: "notification-legacy-snapshot-cleanup",
     required: false,
-    retention: "browser tab session",
-    deletion: "tab close, notification refresh, logout, or browser storage deletion",
-    stores: "notification list snapshot and unread count",
+    retention: "removed on next notification initialization",
+    deletion: "notification initialization, tab close, or browser storage deletion",
+    stores: "no new data; legacy notification snapshot key removal only",
   },
   {
     area: "sessionStorage",

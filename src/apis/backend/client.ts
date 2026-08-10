@@ -60,9 +60,9 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
   {
     matcher: /^\/member\/api\/v1\/notifications\/snapshot/i,
     policy: {
-      cacheMode: "revalidate",
+      cacheMode: "no-store",
       retryCount: 0,
-      staleIfError: true,
+      staleIfError: false,
       timeoutMs: 4_000,
     },
   },

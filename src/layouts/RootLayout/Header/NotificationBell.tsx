@@ -16,7 +16,6 @@ const NotificationBell: React.FC<Props> = ({ enabled }) => {
     setOpen,
     isMobileViewport,
     items,
-    isSnapshotFallback,
     hasUnavailableNotifications,
     isUnreadCountUnavailable,
     hasUnread,
@@ -55,7 +54,6 @@ const NotificationBell: React.FC<Props> = ({ enabled }) => {
         <NotificationBellPanel
           panelRef={panelRef}
           isMobileViewport={isMobileViewport}
-          isSnapshotFallback={isSnapshotFallback}
           hasUnavailableNotifications={hasUnavailableNotifications}
           isUnreadCountUnavailable={isUnreadCountUnavailable}
           hasUnread={hasUnread}

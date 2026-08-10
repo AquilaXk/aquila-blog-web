@@ -1,10 +1,11 @@
 import { useEffect } from "react"
+import type { NotificationAccessState } from "./NotificationBellModel"
 
 type UseNotificationBackgroundActivationParams = {
   enabled: boolean
   isDocumentVisible: boolean
   isRealtimeActive: boolean
-  notificationAccessState: "pending" | "ready" | "blocked"
+  notificationAccessState: NotificationAccessState
   open: boolean
   pathname: string
   loadSnapshot: () => Promise<unknown>

@@ -3,12 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import { ApiError } from "src/apis/backend/client"
 import {
-  buildNotificationStreamUrl,
   getNotificationSnapshot,
   markAllNotificationsRead,
   markNotificationRead,
 } from "src/apis/backend/notifications"
-import { createNotificationStreamRecoveryState } from "src/layouts/RootLayout/Header/notificationStreamRecovery"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import { pushRoute } from "src/libs/router"
@@ -19,37 +17,18 @@ import {
   AVATAR_PRELOAD_CACHE_MAX,
   AVATAR_PRELOAD_LIMIT,
   EventSourceLifecycleState,
-  NOTIFICATION_TRANSPORT_MODE,
+  NotificationAccessState,
   SnapshotLoadStatus,
-  clearStoredSnapshot,
+  clearLegacyStoredNotificationSnapshot,
   isSameNotificationList,
-  isSameSiteOrigin,
   loadStoredLastEventId,
-  loadStoredSnapshot,
   persistLastEventId,
-  persistSnapshot,
   resolveNotificationAvatarSrc,
   selectLatestNotificationEventId,
-  toLatestNotificationEventId,
 } from "./NotificationBellModel"
 
 export const useNotificationBellState = (enabled: boolean) => {
   const router = useRouter()
-  const preferPolling = useMemo(() => {
-    if (NOTIFICATION_TRANSPORT_MODE === "polling-only") return true
-    if (NOTIFICATION_TRANSPORT_MODE === "sse") return false
-    if (typeof window === "undefined") return false
-
-    try {
-      const streamUrl = new URL(buildNotificationStreamUrl(), window.location.origin)
-      const currentUrl = new URL(window.location.href)
-      // 완전한 cross-site 오리진에서만 폴링으로 강등한다.
-      // www/api 같은 동일 사이트 서브도메인 조합은 SSE를 우선 유지한다.
-      return streamUrl.origin !== currentUrl.origin && !isSameSiteOrigin(streamUrl, currentUrl)
-    } catch {
-      return false
-    }
-  }, [])
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -64,37 +43,24 @@ export const useNotificationBellState = (enabled: boolean) => {
   const streamLifecycleRef = useRef<EventSourceLifecycleState>("idle")
   const reconnectTimerRef = useRef<number | null>(null)
   const reconnectAttemptRef = useRef(0)
-  const recoveryStateRef = useRef(createNotificationStreamRecoveryState())
   const initialLastEventId = useMemo(() => loadStoredLastEventId(), [])
   const lastEventIdRef = useRef<string | null>(initialLastEventId)
-  const [streamMode, setStreamMode] = useState<"sse" | "poll">(preferPolling ? "poll" : "sse")
   const [open, setOpen] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [items, setItems] = useState<TMemberNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isReady, setIsReady] = useState(false)
   const [isRealtimeActive, setIsRealtimeActive] = useState(false)
-  const [isSnapshotFallback, setIsSnapshotFallback] = useState(false)
   const [hasUnavailableNotifications, setHasUnavailableNotifications] = useState(false)
   const [isUnreadCountUnavailable, setIsUnreadCountUnavailable] = useState(false)
-  const [notificationAccessState, setNotificationAccessState] = useState<"pending" | "ready" | "blocked">(
-    "pending"
-  )
+  const [notificationAccessState, setNotificationAccessState] = useState<NotificationAccessState>("pending")
   const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
   )
   const isDocumentVisibleRef = useRef(isDocumentVisible)
-  const pollingFailureStreakRef = useRef(0)
-  const lastSnapshotErrorRef = useRef<unknown>(null)
-  const lastLoggedSnapshotFailureStreakRef = useRef(0)
   const itemsRef = useRef<TMemberNotification[]>([])
   const unreadCountRef = useRef(0)
   const preloadedAvatarSrcRef = useRef<Set<string>>(new Set())
-
-  const resetSnapshotFailureObservation = useCallback(() => {
-    lastSnapshotErrorRef.current = null
-    lastLoggedSnapshotFailureStreakRef.current = 0
-  }, [])
 
   const markNotificationDataUnavailable = useCallback(() => {
     setHasUnavailableNotifications(true)
@@ -148,11 +114,9 @@ export const useNotificationBellState = (enabled: boolean) => {
     ({
       nextItems,
       nextUnreadCount,
-      fallback,
     }: {
       nextItems: TMemberNotification[]
       nextUnreadCount: number
-      fallback: boolean
     }) => {
       const sameItems = isSameNotificationList(itemsRef.current, nextItems)
       const sameUnreadCount = unreadCountRef.current === nextUnreadCount
@@ -167,29 +131,11 @@ export const useNotificationBellState = (enabled: boolean) => {
         setUnreadCount(nextUnreadCount)
       }
 
-      setLastNotificationEventId(toLatestNotificationEventId(nextItems))
       setIsReady(true)
-      setIsSnapshotFallback(fallback)
       setNotificationAccessState("ready")
-      if (fallback) {
-        markNotificationDataUnavailable()
-      } else {
-        clearNotificationDataUnavailable()
-      }
-
-      if (!sameItems || !sameUnreadCount) {
-        persistSnapshot({
-          items: nextItems,
-          unreadCount: nextUnreadCount,
-        })
-      }
+      clearNotificationDataUnavailable()
     },
-    [
-      clearNotificationDataUnavailable,
-      markNotificationDataUnavailable,
-      prewarmNotificationAvatars,
-      setLastNotificationEventId,
-    ]
+    [clearNotificationDataUnavailable, prewarmNotificationAvatars]
   )
 
   const pushNotification = useCallback((incoming: TMemberNotification) => {
@@ -228,50 +174,36 @@ export const useNotificationBellState = (enabled: boolean) => {
 
     try {
       const snapshot = await getNotificationSnapshot()
-      resetSnapshotFailureObservation()
       applySnapshotState({
         nextItems: snapshot.items,
         nextUnreadCount: snapshot.unreadCount,
-        fallback: false,
       })
       return "success"
     } catch (error) {
-      lastSnapshotErrorRef.current = error
       if (error instanceof ApiError && error.status === 401) {
         itemsRef.current = []
         unreadCountRef.current = 0
         setItems([])
         setUnreadCount(0)
         setIsReady(false)
-        setIsSnapshotFallback(false)
         setNotificationAccessState("blocked")
         setOpen(false)
-        clearStoredSnapshot()
+        clearLegacyStoredNotificationSnapshot()
         setLastNotificationEventId(null)
-        resetSnapshotFailureObservation()
+        clearNotificationDataUnavailable()
         return "blocked"
       }
 
-      const stored = loadStoredSnapshot()
-      if (stored) {
-        applySnapshotState({
-          nextItems: stored.items,
-          nextUnreadCount: stored.unreadCount,
-          fallback: true,
-        })
-        return "snapshot-fallback"
-      }
       markNotificationDataUnavailable()
       setIsReady(false)
-      setIsSnapshotFallback(false)
-      setNotificationAccessState("pending")
+      setNotificationAccessState("unavailable")
       return "error"
     }
   }, [
     applySnapshotState,
+    clearNotificationDataUnavailable,
     enabled,
     markNotificationDataUnavailable,
-    resetSnapshotFailureObservation,
     setLastNotificationEventId,
   ])
 
@@ -328,6 +260,8 @@ export const useNotificationBellState = (enabled: boolean) => {
   }, [isMobileViewport, open])
 
   useEffect(() => {
+    clearLegacyStoredNotificationSnapshot()
+
     if (!enabled) {
       clearReconnectTimerRef.current()
       attachEventSourceRef.current = null
@@ -339,43 +273,21 @@ export const useNotificationBellState = (enabled: boolean) => {
       setOpen(false)
       setIsReady(false)
       setIsRealtimeActive(false)
-      setIsSnapshotFallback(false)
       clearNotificationDataUnavailable()
       setNotificationAccessState("pending")
       reconnectAttemptRef.current = 0
-      pollingFailureStreakRef.current = 0
-      recoveryStateRef.current = createNotificationStreamRecoveryState()
       setLastNotificationEventId(null)
-      clearStoredSnapshot()
-      setStreamMode(preferPolling ? "poll" : "sse")
       return
     }
 
-    const stored = loadStoredSnapshot()
-    if (stored) {
-      pollingFailureStreakRef.current = 0
-      applySnapshotState({
-        nextItems: stored.items,
-        nextUnreadCount: stored.unreadCount,
-        fallback: true,
-      })
-    } else {
-      itemsRef.current = []
-      unreadCountRef.current = 0
-      setItems([])
-      setUnreadCount(0)
-      setIsReady(false)
-      setIsSnapshotFallback(false)
-      setNotificationAccessState("pending")
-    }
-  }, [
-    applySnapshotState,
-    clearNotificationDataUnavailable,
-    closeEventSource,
-    enabled,
-    preferPolling,
-    setLastNotificationEventId,
-  ])
+    itemsRef.current = []
+    unreadCountRef.current = 0
+    setItems([])
+    setUnreadCount(0)
+    setIsReady(false)
+    clearNotificationDataUnavailable()
+    setNotificationAccessState("pending")
+  }, [clearNotificationDataUnavailable, closeEventSource, enabled, setLastNotificationEventId])
 
   useNotificationBackgroundActivation({
     enabled,
@@ -388,18 +300,11 @@ export const useNotificationBellState = (enabled: boolean) => {
     setIsRealtimeActive,
   })
 
-  useEffect(() => {
-    if (!enabled || !isReady) return
-    persistSnapshot({ items, unreadCount })
-  }, [enabled, isReady, items, unreadCount])
-
   useNotificationBellTransport({
     enabled,
     isRealtimeActive,
-    streamMode,
     notificationAccessState,
     isDocumentVisible,
-    preferPolling,
     isDocumentVisibleRef,
     eventSourceRef,
     eventSourceCleanupRef,
@@ -410,11 +315,7 @@ export const useNotificationBellState = (enabled: boolean) => {
     streamLifecycleRef,
     reconnectTimerRef,
     reconnectAttemptRef,
-    recoveryStateRef,
     lastEventIdRef,
-    pollingFailureStreakRef,
-    lastSnapshotErrorRef,
-    lastLoggedSnapshotFailureStreakRef,
     unreadCountRef,
     closeEventSource,
     clearHiddenCloseTimer,
@@ -424,9 +325,6 @@ export const useNotificationBellState = (enabled: boolean) => {
     setLastNotificationEventId,
     setUnreadCount,
     setIsReady,
-    setIsSnapshotFallback,
-    setIsRealtimeActive,
-    setStreamMode,
   })
 
   useEffect(() => {
@@ -534,10 +432,6 @@ export const useNotificationBellState = (enabled: boolean) => {
       itemsRef.current = nextItems
       setUnreadCount((prev) => (prev === 0 ? prev : 0))
       setItems((prev) => (isSameNotificationList(prev, nextItems) ? prev : nextItems))
-      persistSnapshot({
-        items: nextItems,
-        unreadCount: 0,
-      })
     } catch {
       markNotificationDataUnavailable()
     }
@@ -558,6 +452,8 @@ export const useNotificationBellState = (enabled: boolean) => {
 
     if (nextOpen && !isReady) {
       await loadSnapshot()
+      reconnectAttemptRef.current = 0
+      attachEventSourceRef.current?.()
     }
   }
 
@@ -571,10 +467,6 @@ export const useNotificationBellState = (enabled: boolean) => {
         itemsRef.current = nextItems
         setUnreadCount((prev) => (prev === nextUnreadCount ? prev : nextUnreadCount))
         setItems((prev) => (isSameNotificationList(prev, nextItems) ? prev : nextItems))
-        persistSnapshot({
-          items: nextItems,
-          unreadCount: nextUnreadCount,
-        })
       } catch {
         markNotificationDataUnavailable()
       }
@@ -583,8 +475,6 @@ export const useNotificationBellState = (enabled: boolean) => {
     setOpen(false)
     await pushRoute(router, `${toCanonicalPostPath(notification.postId)}#comment-${notification.commentId}`)
   }
-
-
   return {
     rootRef,
     triggerRef,
@@ -594,7 +484,6 @@ export const useNotificationBellState = (enabled: boolean) => {
     isMobileViewport,
     items,
     unreadCount,
-    isSnapshotFallback,
     hasUnavailableNotifications,
     isUnreadCountUnavailable,
     hasUnread,
