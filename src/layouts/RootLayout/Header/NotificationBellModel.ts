@@ -133,6 +133,15 @@ export const selectLatestNotificationEventId = (
   return candidateId > currentId ? candidateEventId : currentEventId
 }
 
+export const resolveNotificationEventAdvance = (current: string | null, candidate: string | null) => {
+  const currentEventId = sanitizeNotificationEventId(current)
+  const eventId = selectLatestNotificationEventId(currentEventId, candidate)
+  return {
+    eventId,
+    advanced: eventId !== currentEventId,
+  }
+}
+
 export const persistLastEventId = (eventId: string | null) => {
   if (typeof window === "undefined") return
   if (!eventId) {

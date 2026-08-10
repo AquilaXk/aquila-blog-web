@@ -33,7 +33,7 @@ type UseNotificationBellTransportParams = {
   loadSnapshot: () => Promise<SnapshotLoadStatus>
   pushNotification: (incoming: TMemberNotification) => void
   markNotificationDataUnavailable: () => void
-  setLastNotificationEventId: (eventId: string | null) => void
+  setLastNotificationEventId: (eventId: string | null) => boolean
   setUnreadCount: Dispatch<SetStateAction<number>>
   setIsReady: Dispatch<SetStateAction<boolean>>
 }
@@ -112,12 +112,19 @@ export const useNotificationBellTransport = ({
       clearReconnectTimer()
       intentionalCloseRef.current = false
       streamLifecycleRef.current = "connecting"
-      const streamUrl = new URL(buildNotificationStreamUrl(), window.location.origin)
-      if (lastEventIdRef.current) {
-        streamUrl.searchParams.set("lastEventId", lastEventIdRef.current)
+      let eventSource: EventSource
+      try {
+        const streamUrl = new URL(buildNotificationStreamUrl(), window.location.origin)
+        if (lastEventIdRef.current) {
+          streamUrl.searchParams.set("lastEventId", lastEventIdRef.current)
+        }
+        eventSource = new EventSource(streamUrl.toString(), { withCredentials: true })
+      } catch {
+        streamLifecycleRef.current = "idle"
+        markNotificationDataUnavailable()
+        setIsReady(false)
+        return
       }
-
-      const eventSource = new EventSource(streamUrl.toString(), { withCredentials: true })
       eventSourceRef.current = eventSource
 
       const markStreamOpen = () => {
@@ -132,7 +139,7 @@ export const useNotificationBellTransport = ({
           return
         }
 
-        setLastNotificationEventId(decoded.eventId)
+        if (!setLastNotificationEventId(decoded.eventId)) return
         pushNotification(decoded.notification)
         setUnreadCount((previous) => {
           if (previous === decoded.unreadCount) return previous
@@ -150,7 +157,7 @@ export const useNotificationBellTransport = ({
           return
         }
 
-        setLastNotificationEventId(decoded.eventId)
+        if (!setLastNotificationEventId(decoded.eventId)) return
         markNotificationDataUnavailable()
         setIsReady(true)
       }
@@ -167,8 +174,12 @@ export const useNotificationBellTransport = ({
 
       const handleHeartbeat = () => {
         markStreamOpen()
+        const recovered = reconnectAttemptRef.current > 0
         reconnectAttemptRef.current = 0
         setIsReady(true)
+        if (recovered) {
+          void loadSnapshot()
+        }
       }
 
       const detachListeners = () => {

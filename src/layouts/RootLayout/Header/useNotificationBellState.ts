@@ -24,7 +24,7 @@ import {
   loadStoredLastEventId,
   persistLastEventId,
   resolveNotificationAvatarSrc,
-  selectLatestNotificationEventId,
+  resolveNotificationEventAdvance,
 } from "./NotificationBellModel"
 
 export const useNotificationBellState = (enabled: boolean) => {
@@ -74,14 +74,21 @@ export const useNotificationBellState = (enabled: boolean) => {
 
   const setLastNotificationEventId = useCallback((eventId: string | null) => {
     if (eventId === null) {
+      const changed = lastEventIdRef.current !== null
       lastEventIdRef.current = null
       persistLastEventId(null)
-      return
+      return changed
     }
 
-    const nextEventId = selectLatestNotificationEventId(lastEventIdRef.current, eventId)
+    const { eventId: nextEventId, advanced } = resolveNotificationEventAdvance(
+      lastEventIdRef.current,
+      eventId
+    )
+    if (!advanced) return false
+
     lastEventIdRef.current = nextEventId
     persistLastEventId(nextEventId)
+    return true
   }, [])
 
   const prewarmNotificationAvatars = useCallback((nextItems: TMemberNotification[]) => {
@@ -433,7 +440,7 @@ export const useNotificationBellState = (enabled: boolean) => {
       setUnreadCount((prev) => (prev === 0 ? prev : 0))
       setItems((prev) => (isSameNotificationList(prev, nextItems) ? prev : nextItems))
     } catch {
-      markNotificationDataUnavailable()
+      await loadSnapshot()
     }
   }
 
@@ -468,7 +475,7 @@ export const useNotificationBellState = (enabled: boolean) => {
         setUnreadCount((prev) => (prev === nextUnreadCount ? prev : nextUnreadCount))
         setItems((prev) => (isSameNotificationList(prev, nextItems) ? prev : nextItems))
       } catch {
-        markNotificationDataUnavailable()
+        await loadSnapshot()
       }
     }
 

@@ -66,12 +66,98 @@ test("manual reconnect cursor는 duplicate·out-of-order event로 후퇴하지 �
   expect(selectLatestNotificationEventId("notification-61", "invalid")).toBe("notification-61")
 })
 
+test("duplicate·역순 event는 cursor와 notification UI admission을 모두 거부한다", async () => {
+  const model = await import("src/layouts/RootLayout/Header/NotificationBellModel")
+  const resolveNotificationEventAdvance = (
+    model as typeof model & {
+      resolveNotificationEventAdvance?: (
+        current: string | null,
+        candidate: string | null
+      ) => { eventId: string | null; advanced: boolean }
+    }
+  ).resolveNotificationEventAdvance
+  const transportSource = readFileSync(
+    path.resolve(__dirname, "../../src/layouts/RootLayout/Header/useNotificationBellTransport.ts"),
+    "utf8"
+  )
+  const eventHandlers = transportSource.slice(
+    transportSource.indexOf("const handleNotification ="),
+    transportSource.indexOf("const handleConnected =")
+  )
+
+  expect(resolveNotificationEventAdvance).toBeDefined()
+  expect(resolveNotificationEventAdvance?.("notification-61", "notification-61")).toEqual({
+    eventId: "notification-61",
+    advanced: false,
+  })
+  expect(resolveNotificationEventAdvance?.("notification-61", "notification-59")).toEqual({
+    eventId: "notification-61",
+    advanced: false,
+  })
+  expect(resolveNotificationEventAdvance?.("notification-61", "notification-72")).toEqual({
+    eventId: "notification-72",
+    advanced: true,
+  })
+  expect(eventHandlers.match(/if \(!setLastNotificationEventId\(decoded\.eventId\)\) return/g)).toHaveLength(2)
+})
+
 test("SSE reconnect는 네 번까지만 지연 재시도하고 소진 뒤 중단한다", () => {
   expect(resolveNotificationReconnectPlan(0)).toEqual({ nextAttempt: 1, retryDelayMs: 1_500 })
   expect(resolveNotificationReconnectPlan(1)).toEqual({ nextAttempt: 2, retryDelayMs: 3_000 })
   expect(resolveNotificationReconnectPlan(2)).toEqual({ nextAttempt: 3, retryDelayMs: 4_500 })
   expect(resolveNotificationReconnectPlan(3)).toEqual({ nextAttempt: 4, retryDelayMs: 6_000 })
   expect(resolveNotificationReconnectPlan(4)).toEqual({ nextAttempt: 5, retryDelayMs: null })
+})
+
+test("stream 생성 실패는 lifecycle idle과 explicit unavailable로 끝난다", () => {
+  const transportSource = readFileSync(
+    path.resolve(__dirname, "../../src/layouts/RootLayout/Header/useNotificationBellTransport.ts"),
+    "utf8"
+  )
+  const attachEventSource = transportSource.slice(
+    transportSource.indexOf("const attachEventSource ="),
+    transportSource.indexOf("attachEventSourceRef.current = attachEventSource")
+  )
+
+  expect(attachEventSource).toContain("try {")
+  expect(attachEventSource).toMatch(
+    /catch \{[\s\S]*streamLifecycleRef\.current = "idle"[\s\S]*markNotificationDataUnavailable\(\)[\s\S]*setIsReady\(false\)[\s\S]*return/
+  )
+})
+
+test("heartbeat reconnect 복구는 canonical snapshot을 다시 읽는다", () => {
+  const transportSource = readFileSync(
+    path.resolve(__dirname, "../../src/layouts/RootLayout/Header/useNotificationBellTransport.ts"),
+    "utf8"
+  )
+  const handleHeartbeat = transportSource.slice(
+    transportSource.indexOf("const handleHeartbeat ="),
+    transportSource.indexOf("const detachListeners =")
+  )
+
+  expect(handleHeartbeat).toMatch(
+    /const recovered = reconnectAttemptRef\.current > 0[\s\S]*if \(recovered\) \{[\s\S]*void loadSnapshot\(\)/
+  )
+})
+
+test("read mutation 실패는 data unavailable 오분류 없이 canonical snapshot을 다시 읽는다", () => {
+  const stateSource = readFileSync(
+    path.resolve(__dirname, "../../src/layouts/RootLayout/Header/useNotificationBellState.ts"),
+    "utf8"
+  )
+  const handleMarkAllRead = stateSource.slice(
+    stateSource.indexOf("const handleMarkAllRead ="),
+    stateSource.indexOf("const handleOpenChange =")
+  )
+  const handleMoveToNotification = stateSource.slice(
+    stateSource.indexOf("const handleMoveToNotification ="),
+    stateSource.indexOf("return {", stateSource.indexOf("const handleMoveToNotification ="))
+  )
+
+  for (const handler of [handleMarkAllRead, handleMoveToNotification]) {
+    expect(handler).toMatch(/catch \{\s*await loadSnapshot\(\)\s*\}/)
+    expect(handler).not.toContain("markNotificationDataUnavailable()")
+  }
 })
 
 test("notification snapshot과 stream URL은 stale·relative fallback 없이 실패한다", () => {
