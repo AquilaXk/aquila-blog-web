@@ -37,6 +37,28 @@ jobs:
           fi
           printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
 
+      - name: Validate Platform handoff configuration
+        env:
+          REPO_SPLIT_SYNC_ENABLED: ${{ vars.REPO_SPLIT_SYNC_ENABLED }}
+          REPO_SYNC_APP_CLIENT_ID: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
+          REPO_SYNC_APP_PRIVATE_KEY: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ "${REPO_SPLIT_SYNC_ENABLED}" == "true" ]]; then
+            :
+          else
+            echo "Repository split sync must be explicitly enabled" >&2
+            exit 1
+          fi
+          if ! [[ -n "${REPO_SYNC_APP_CLIENT_ID}" ]]; then
+            echo "Repository sync GitHub App client ID must be configured" >&2
+            exit 1
+          fi
+          if ! [[ -n "${REPO_SYNC_APP_PRIVATE_KEY}" ]]; then
+            echo "Repository sync GitHub App private key must be configured" >&2
+            exit 1
+          fi
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -88,7 +110,6 @@ jobs:
 
       - name: Create Platform dispatch token
         id: app-token
-        if: ${{ vars.REPO_SPLIT_SYNC_ENABLED == 'true' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
@@ -98,7 +119,6 @@ jobs:
           permission-contents: write
 
       - name: Dispatch immutable Web image to Platform
-        if: ${{ vars.REPO_SPLIT_SYNC_ENABLED == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           IMAGE_REF: ${{ steps.image.outputs.image_ref }}
