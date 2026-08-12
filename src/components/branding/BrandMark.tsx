@@ -7,8 +7,9 @@ type Props = {
  * 회사 브랜드 마크. 블로그 헤더·관리자 shell·회사 표면이 같은 자산을 쓴다 - 마크는 표면별 장식이
  * 아니라 회사 정체성이므로 소비처마다 다른 파일을 두지 않는다.
  *
- * 자산은 256px 래스터(`/brand-mascot.png`)다. 가장 큰 소비처 슬롯이 36px라 한 장으로 7x DPR까지
- * 덮고, 크기별 사본을 두면 마크를 바꿀 때 갱신해야 할 파일만 늘어난다.
+ * 자산은 256px 래스터(`/brand-mascot.d43c0dc3.png`)다. 가장 큰 소비처 슬롯이 36px라 한 장으로
+ * 7x DPR까지 덮는다. 정본을 바꿀 때는 content hash가 포함된 URL도 함께 바꿔 오래된 origin cache를
+ * 재사용하지 않는다.
  */
 const BrandMark: React.FC<Props> = ({ className, priority = false }) => {
   return (
@@ -16,7 +17,7 @@ const BrandMark: React.FC<Props> = ({ className, priority = false }) => {
       {/* Hot path icon: keep native img to avoid next/image runtime cost in shared header bundle. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand-mascot.png"
+        src="/brand-mascot.d43c0dc3.png"
         alt=""
         width={256}
         height={256}

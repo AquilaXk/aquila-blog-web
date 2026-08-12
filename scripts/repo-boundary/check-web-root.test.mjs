@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -7,6 +8,7 @@ import test from "node:test"
 
 const webRoot = path.resolve(import.meta.dirname, "../..")
 const guardPath = path.join(webRoot, "scripts/repo-boundary/check-web-root.mjs")
+const brandMarkSource = fs.readFileSync(path.join(webRoot, "src/components/branding/BrandMark.tsx"), "utf8")
 
 const requiredDirectories = [
   ".github",
@@ -38,6 +40,19 @@ const createWebRootFixture = (t, root = fs.mkdtempSync(path.join(os.tmpdir(), "w
 }
 
 const runGuard = (cwd) => spawnSync(process.execPath, ["scripts/repo-boundary/check-web-root.mjs"], { cwd, encoding: "utf8" })
+
+test("shared brand mark uses a content-versioned canonical asset", () => {
+  const assetMatch = brandMarkSource.match(/src="\/(brand-mascot\.([a-f0-9]{8})\.png)"/)
+  assert.ok(assetMatch, "BrandMark must use a content-versioned PNG URL")
+
+  const [, assetFile, expectedHashPrefix] = assetMatch
+  const assetPath = path.join(webRoot, "public", assetFile)
+  assert.equal(fs.existsSync(assetPath), true, `missing canonical brand asset: ${assetFile}`)
+  assert.equal(fs.existsSync(path.join(webRoot, "public/brand-mascot.png")), false)
+
+  const actualHash = createHash("sha256").update(fs.readFileSync(assetPath)).digest("hex")
+  assert.equal(actualHash.slice(0, expectedHashPrefix.length), expectedHashPrefix)
+})
 
 test("Web root guard accepts the standalone required structure", (t) => {
   assert.equal(fs.existsSync(guardPath), true, "Web root guard must exist")
