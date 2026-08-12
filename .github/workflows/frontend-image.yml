@@ -125,4 +125,4 @@ jobs:
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: |
           set -euo pipefail
-          gh api --method POST "repos/AquilaXk/aquila-blog/dispatches" -f event_type="web_frontend_image_ready" -f "client_payload[image_ref]=${IMAGE_REF}" -f "client_payload[source_sha]=${SOURCE_SHA}"
+          gh api --method POST "repos/AquilaXk/aquila-blog/dispatches" -f event_type="web_frontend_image_ready" -f "client_payload[source_repository]=AquilaXk/aquila-blog-web" -f "client_payload[image_ref]=${IMAGE_REF}" -f "client_payload[source_sha]=${SOURCE_SHA}"

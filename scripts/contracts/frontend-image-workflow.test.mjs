@@ -81,6 +81,7 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
   assert.equal(dispatch.env.GH_TOKEN, "${{ steps.app-token.outputs.token }}")
   assert.match(dispatch.run, /gh api --method POST "repos\/AquilaXk\/aquila-blog\/dispatches"/)
   assert.match(dispatch.run, /event_type="web_frontend_image_ready"/)
+  assert.match(dispatch.run, /"client_payload\[source_repository\]=AquilaXk\/aquila-blog-web"/)
   assert.match(dispatch.run, /"client_payload\[image_ref\]=\$\{IMAGE_REF\}"/)
   assert.match(dispatch.run, /"client_payload\[source_sha\]=\$\{SOURCE_SHA\}"/)
   assert.ok(job.steps.indexOf(token) < job.steps.indexOf(dispatch))
