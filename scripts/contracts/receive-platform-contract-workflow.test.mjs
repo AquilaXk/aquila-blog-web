@@ -112,5 +112,5 @@ test("stable branch, write identity, and Draft PR stay exactly Web-owned", () =>
   assert.match(pr.run, /pr\.head\?\.repo\?\.full_name !== "AquilaXk\/aquila-blog-web"/)
   assert.match(String(pr.if), /steps\.commit\.outputs\.ready == 'true'/)
   assert.match(pr.run, /\[Chore\] sync Platform public contract/)
-  for (const section of ["## Related Issue", "## Verification", "## Risk & Delivery", "## Evidence", "## Checklist"]) assert.match(pr.run, new RegExp(section.replace(/[&]/g, "\\&")))
+  for (const section of ["## Related Issue", "## Verification", "## Risk & Delivery", "## Evidence", "## Checklist"]) assert.ok(pr.run.includes(section))
 })
