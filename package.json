@@ -61,7 +61,7 @@
     "cookies-next": "6.1.1",
     "dompurify": "3.4.13",
     "katex": "0.18.1",
-    "mermaid": "10.9.8",
+    "mermaid": "11.16.1",
     "next": "15.5.21",
     "next-sitemap": "4.2.3",
     "pdfjs-dist": "5.4.394",
@@ -76,7 +76,7 @@
     "remark-math": "^6.0.0",
     "sharp": "0.35.3",
     "shiki": "^4.0.2",
-    "simple-icons": "^16.13.0"
+    "simple-icons": "^16.28.0"
   },
   "resolutions": {
     "@babel/plugin-transform-modules-systemjs": "7.29.4",
@@ -130,7 +130,7 @@
     "@types/node": "^20.17.10",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "autoprefixer": "^10.4.0",
+    "autoprefixer": "^10.5.4",
     "eslint": "8.57.1",
     "eslint-config-next": "15.5.21",
     "openapi-typescript": "^7.4.4",
@@ -139,7 +139,7 @@
     "storybook": "10.4.6",
     "typescript": "^5.6.3",
     "vite": "8.0.16",
-    "webpack": "^5.97.1",
+    "webpack": "^5.109.2",
     "yaml": "1.10.3"
   }
 }

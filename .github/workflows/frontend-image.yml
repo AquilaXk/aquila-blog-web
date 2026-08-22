@@ -87,7 +87,7 @@ jobs:
             exit 1
           fi
           image_ref="ghcr.io/aquilaxk/aquila-blog-web-front@${IMAGE_DIGEST}"
-          printf 'image_ref=%s\n' "${image_ref}" >> "${GITHUB_OUTPUT}"
+          printf 'image_ref=%s\nimage_digest=%s\n' "${image_ref}" "${IMAGE_DIGEST}" >> "${GITHUB_OUTPUT}"
 
       - name: Install Trivy
         env:
@@ -108,7 +108,58 @@ jobs:
           docker pull "${IMAGE_REF}"
           trivy image --ignorefile .trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_REF}"
 
+      - name: Check current Web source freshness
+        id: freshness
+        env:
+          WEB_GH_TOKEN: ${{ github.token }}
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          PRODUCER_RUN_ID: ${{ github.run_id }}
+          PRODUCER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [ "${SOURCE_REPOSITORY}" != "AquilaXk/aquila-blog-web" ]; then
+            echo "Web image delivery source repository is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Web image delivery source SHA must be full lowercase hex" >&2
+            exit 1
+          fi
+          if [[ ! "${PRODUCER_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Web image producer run identity is invalid" >&2
+            exit 1
+          fi
+          if [ "${PRODUCER_RUN_URL}" != "https://github.com/${SOURCE_REPOSITORY}/actions/runs/${PRODUCER_RUN_ID}" ]; then
+            echo "Web image producer run URL is invalid" >&2
+            exit 1
+          fi
+
+          if ! CURRENT_WEB_MAIN_SHA="$(GH_TOKEN="${WEB_GH_TOKEN}" gh api "repos/${SOURCE_REPOSITORY}/commits/main" --jq '.sha')"; then
+            echo "Web main SHA lookup failed before image dispatch" >&2
+            exit 1
+          fi
+          if [[ ! "${CURRENT_WEB_MAIN_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Web main SHA lookup returned an invalid commit" >&2
+            exit 1
+          fi
+          if [ "${SOURCE_SHA}" != "${CURRENT_WEB_MAIN_SHA}" ]; then
+            printf 'should_dispatch=false\n' >> "${GITHUB_OUTPUT}"
+            {
+              echo "## Web image delivery"
+              echo "- status: stale source; dispatch skipped"
+              echo "- source: ${SOURCE_REPOSITORY}@${SOURCE_SHA}"
+              echo "- current Web main SHA: ${CURRENT_WEB_MAIN_SHA}"
+              echo "- producer run: [${PRODUCER_RUN_ID}](${PRODUCER_RUN_URL})"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          printf 'should_dispatch=true\n' >> "${GITHUB_OUTPUT}"
+
       - name: Create Platform dispatch token
+        if: steps.freshness.outputs.should_dispatch == 'true'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -118,11 +169,122 @@ jobs:
           repositories: aquila-blog
           permission-contents: write
 
-      - name: Dispatch immutable Web image to Platform
+      - name: Prepare immutable Web image delivery
+        if: steps.freshness.outputs.should_dispatch == 'true'
+        id: delivery
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          PLATFORM_GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SCHEMA_VERSION: "1"
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.image_digest }}
+          TARGET_REPOSITORY: AquilaXk/aquila-blog
+          PRODUCER_RUN_ID: ${{ github.run_id }}
+          PRODUCER_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PRODUCER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          gh api --method POST "repos/AquilaXk/aquila-blog/dispatches" -f event_type="web_frontend_image_ready" -f "client_payload[source_repository]=AquilaXk/aquila-blog-web" -f "client_payload[image_ref]=${IMAGE_REF}" -f "client_payload[source_sha]=${SOURCE_SHA}"
+
+          if [ "${SCHEMA_VERSION}" != "1" ]; then
+            echo "Web image delivery schema version is invalid" >&2
+            exit 1
+          fi
+          if [ "${SOURCE_REPOSITORY}" != "AquilaXk/aquila-blog-web" ]; then
+            echo "Web image delivery source repository is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Web image delivery source SHA must be full lowercase hex" >&2
+            exit 1
+          fi
+          if [[ ! "${IMAGE_DIGEST}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Web image delivery digest must be immutable lowercase sha256" >&2
+            exit 1
+          fi
+          if [ "${IMAGE_REF}" != "ghcr.io/aquilaxk/aquila-blog-web-front@${IMAGE_DIGEST}" ]; then
+            echo "Web image delivery ref does not match the validated digest" >&2
+            exit 1
+          fi
+          if [ "${TARGET_REPOSITORY}" != "AquilaXk/aquila-blog" ]; then
+            echo "Web image delivery target repository is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${PRODUCER_RUN_ID}" =~ ^[1-9][0-9]*$ ]] || [[ ! "${PRODUCER_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Web image producer run identity is invalid" >&2
+            exit 1
+          fi
+          if [ "${PRODUCER_RUN_URL}" != "https://github.com/${SOURCE_REPOSITORY}/actions/runs/${PRODUCER_RUN_ID}" ]; then
+            echo "Web image producer run URL is invalid" >&2
+            exit 1
+          fi
+
+          if ! TARGET_SHA="$(GH_TOKEN="${PLATFORM_GH_TOKEN}" gh api "repos/${TARGET_REPOSITORY}/commits/main" --jq '.sha')"; then
+            echo "Platform main SHA lookup failed before image dispatch" >&2
+            exit 1
+          fi
+          if [[ ! "${TARGET_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Platform main SHA lookup returned an invalid commit" >&2
+            exit 1
+          fi
+
+          DELIVERY_ID="$(
+            printf '%s\n' \
+              "schema_version=${SCHEMA_VERSION}" \
+              "source_repository=${SOURCE_REPOSITORY}" \
+              "source_sha=${SOURCE_SHA}" \
+              "image_digest=${IMAGE_DIGEST}" \
+              "target_repository=${TARGET_REPOSITORY}" \
+              "target_sha=${TARGET_SHA}" |
+              openssl dgst -sha256 | awk '{print $NF}'
+          )"
+          if [[ ! "${DELIVERY_ID}" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "Web image delivery ID calculation failed" >&2
+            exit 1
+          fi
+
+          {
+            echo "target_sha=${TARGET_SHA}"
+            echo "delivery_id=${DELIVERY_ID}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Dispatch immutable Web image to Platform
+        if: steps.freshness.outputs.should_dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SCHEMA_VERSION: "1"
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.image_digest }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          TARGET_REPOSITORY: AquilaXk/aquila-blog
+          TARGET_SHA: ${{ steps.delivery.outputs.target_sha }}
+          DELIVERY_ID: ${{ steps.delivery.outputs.delivery_id }}
+          PRODUCER_RUN_ID: ${{ github.run_id }}
+          PRODUCER_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PRODUCER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/AquilaXk/aquila-blog/dispatches" \
+            -f event_type="web_frontend_image_ready" \
+            -f "client_payload[schema_version]=${SCHEMA_VERSION}" \
+            -f "client_payload[source_repository]=${SOURCE_REPOSITORY}" \
+            -f "client_payload[source_sha]=${SOURCE_SHA}" \
+            -f "client_payload[image_ref]=${IMAGE_REF}" \
+            -f "client_payload[image_digest]=${IMAGE_DIGEST}" \
+            -f "client_payload[target_repository]=${TARGET_REPOSITORY}" \
+            -f "client_payload[target_sha]=${TARGET_SHA}" \
+            -f "client_payload[delivery_id]=${DELIVERY_ID}" \
+            -f "client_payload[producer_run_id]=${PRODUCER_RUN_ID}" \
+            -f "client_payload[producer_run_attempt]=${PRODUCER_RUN_ATTEMPT}"
+
+          {
+            echo "## Web image delivery"
+            echo "- status: dispatched"
+            echo "- schema version: ${SCHEMA_VERSION}"
+            echo "- delivery ID: ${DELIVERY_ID}"
+            echo "- source: ${SOURCE_REPOSITORY}@${SOURCE_SHA}"
+            echo "- image digest: ${IMAGE_DIGEST}"
+            echo "- target: ${TARGET_REPOSITORY}@${TARGET_SHA}"
+            echo "- producer run: [${PRODUCER_RUN_ID}](${PRODUCER_RUN_URL})"
+          } >> "${GITHUB_STEP_SUMMARY}"
