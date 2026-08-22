@@ -108,7 +108,7 @@
     "katex": "0.18.1",
     "**/fast-glob/micromatch": "4.0.8",
     "micromatch/picomatch": "2.3.2",
-    "nanoid": "3.3.17",
+    "nanoid": "3.3.18",
     "postcss": "8.5.25",
     "prismjs": "1.30.0",
     "readdirp/picomatch": "2.3.2",
