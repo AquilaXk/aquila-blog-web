@@ -5,10 +5,12 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 
 import {
   gitEnvWithoutInheritedRepository,
   inheritedGitEnvKeys,
+  importPlatformContractBytes,
   importPlatformContracts,
 } from "./import-platform-contracts.mjs"
 import { verifyPlatformContracts } from "./verify-platform-contracts.mjs"
@@ -115,6 +117,58 @@ test("imports verified canonical bytes and creates a pinned lock", async (t) => 
       errorCodes: { path: "error-codes.json", sha256: sha256(Buffer.from('[{"code":"NOT_FOUND","httpStatus":404,"defaultUserMessage":"missing","kind":"USER"}]\n')) },
     },
   })
+  await verifyPlatformContracts({ directory: output })
+})
+
+test("imports verified API bytes without requiring a Platform checkout", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+
+  await importPlatformContractBytes({
+    manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
+    openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
+    errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+    output,
+    sourceRepository,
+    sourceCommit,
+  })
+
+  await verifyPlatformContracts({ directory: output })
+})
+
+test("rejects invalid byte input before changing the output", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  await fs.mkdir(output, { recursive: true })
+  await fs.writeFile(path.join(output, "sentinel"), "keep")
+
+  await assert.rejects(
+    importPlatformContractBytes({
+      manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
+      openapiBytes: Buffer.from('{"openapi":"3.1.0","paths":{}}\n'),
+      errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+      output,
+      sourceRepository,
+      sourceCommit,
+    }),
+    /source artifact hash does not match manifest: openapi.json/,
+  )
+  assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
+})
+
+test("byte-input CLI imports without the Git-backed source option", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./import-platform-contracts.mjs", import.meta.url)),
+    "--manifest", path.join(source, "manifest.json"),
+    "--openapi", path.join(source, "openapi.json"),
+    "--error-codes", path.join(source, "error-codes.json"),
+    "--output", output,
+    "--source-repository", sourceRepository,
+    "--source-commit", sourceCommit,
+  ], { encoding: "utf8" })
+  assert.equal(result.status, 0, result.stderr)
   await verifyPlatformContracts({ directory: output })
 })
 

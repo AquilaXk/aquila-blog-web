@@ -178,6 +178,23 @@ async function readSourceArtifacts(source, manifest) {
   return artifacts
 }
 
+function readArtifactBytes(manifest, artifactBytes) {
+  const artifacts = {}
+  for (const [name, expectedPath] of SOURCE_ARTIFACTS) {
+    const artifact = manifest.artifacts[name]
+    validateSourceArtifact(artifact, name, expectedPath)
+    const bytes = artifactBytes[name]
+    if (!Buffer.isBuffer(bytes)) {
+      fail(`source artifact bytes are missing: ${artifact.path}`)
+    }
+    if (sha256(bytes) !== artifact.sha256) {
+      fail(`source artifact hash does not match manifest: ${artifact.path}`)
+    }
+    artifacts[name] = { ...artifact, bytes }
+  }
+  return artifacts
+}
+
 function validateOpenApi(bytes) {
   try {
     const openapi = JSON.parse(bytes.toString("utf8"))
@@ -247,8 +264,50 @@ export async function importPlatformContracts({ source, output, sourceRepository
   ])
 }
 
+// The receiver obtains immutable bytes through the Platform Contents API.  Keep this path
+// separate from the Git-backed CLI until Phase C, but share every content validation and
+// defer output writes until the complete candidate is known to be valid.
+export async function importPlatformContractBytes({
+  manifestBytes,
+  openapiBytes,
+  errorCodesBytes,
+  output,
+  sourceRepository,
+  sourceCommit,
+}) {
+  validateSourceIdentity(sourceRepository, sourceCommit)
+  if (!Buffer.isBuffer(manifestBytes)) {
+    fail("source manifest bytes are missing")
+  }
+
+  let manifest
+  try {
+    manifest = JSON.parse(manifestBytes.toString("utf8"))
+  } catch (error) {
+    fail(`source manifest is malformed or missing: ${error.message}`)
+  }
+  validateManifest(manifest)
+
+  const artifacts = readArtifactBytes(manifest, {
+    openapi: openapiBytes,
+    errorCodes: errorCodesBytes,
+  })
+  validateOpenApi(artifacts.openapi.bytes)
+  validateErrorCodeArtifact(artifacts.errorCodes.bytes)
+
+  const lock = createLock(manifest, artifacts, sourceRepository, sourceCommit)
+  validateLock(lock)
+
+  await fs.mkdir(output, { recursive: true })
+  await Promise.all([
+    fs.writeFile(path.join(output, "openapi.json"), artifacts.openapi.bytes),
+    fs.writeFile(path.join(output, "error-codes.json"), artifacts.errorCodes.bytes),
+    fs.writeFile(path.join(output, "manifest.lock.json"), `${JSON.stringify(lock, null, 2)}\n`),
+  ])
+}
+
 function usage() {
-  fail("Usage: node scripts/contracts/import-platform-contracts.mjs --source <dir> --output <dir> --source-repository AquilaXk/aquila-blog --source-commit <40-hex>")
+  fail("Usage: node scripts/contracts/import-platform-contracts.mjs (--source <dir> | --manifest <file> --openapi <file> --error-codes <file>) --output <dir> --source-repository AquilaXk/aquila-blog --source-commit <40-hex>")
 }
 
 function parseArgs(args) {
@@ -256,17 +315,22 @@ function parseArgs(args) {
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index]
     const value = args[index + 1]
-    const known = ["--source", "--output", "--source-repository", "--source-commit"].includes(key)
+    const known = ["--source", "--manifest", "--openapi", "--error-codes", "--output", "--source-repository", "--source-commit"].includes(key)
     if (!known || !value || values[key]) {
       usage()
     }
     values[key] = value
   }
-  if (Object.keys(values).length !== 4) {
+  const gitBacked = ["--source", "--output", "--source-repository", "--source-commit"].every((key) => values[key])
+  const byteBacked = ["--manifest", "--openapi", "--error-codes", "--output", "--source-repository", "--source-commit"].every((key) => values[key])
+  if ((gitBacked && Object.keys(values).length !== 4) || (byteBacked && Object.keys(values).length !== 6) || (!gitBacked && !byteBacked)) {
     usage()
   }
   return {
-    source: path.resolve(values["--source"]),
+    source: values["--source"] && path.resolve(values["--source"]),
+    manifest: values["--manifest"] && path.resolve(values["--manifest"]),
+    openapi: values["--openapi"] && path.resolve(values["--openapi"]),
+    errorCodes: values["--error-codes"] && path.resolve(values["--error-codes"]),
     output: path.resolve(values["--output"]),
     sourceRepository: values["--source-repository"],
     sourceCommit: values["--source-commit"],
@@ -274,7 +338,17 @@ function parseArgs(args) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  importPlatformContracts(parseArgs(process.argv.slice(2)))
+  const options = parseArgs(process.argv.slice(2))
+  const importOperation = options.source
+    ? importPlatformContracts(options)
+    : Promise.all([fs.readFile(options.manifest), fs.readFile(options.openapi), fs.readFile(options.errorCodes)])
+      .then(([manifestBytes, openapiBytes, errorCodesBytes]) => importPlatformContractBytes({
+        ...options,
+        manifestBytes,
+        openapiBytes,
+        errorCodesBytes,
+      }))
+  importOperation
     .then(() => console.log("[platform-contracts] imported"))
     .catch((error) => {
       console.error(error.message)

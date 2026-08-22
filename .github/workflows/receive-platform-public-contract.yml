@@ -1,0 +1,309 @@
+name: Receive Platform public contract
+
+on:
+  repository_dispatch:
+    types: [platform_public_contract_ready]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: platform-public-contract-receiver
+  cancel-in-progress: false
+
+env:
+  PLATFORM_REPOSITORY: AquilaXk/aquila-blog
+  WEB_REPOSITORY: AquilaXk/aquila-blog-web
+  SYNC_BRANCH: chore/platform-contract-sync
+
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Validate immutable Platform delivery
+        id: delivery
+        env:
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          EVENT_SENDER_TYPE: ${{ github.event.sender.type }}
+          EVENT_SENDER_LOGIN: ${{ github.event.sender.login }}
+          EXPECTED_APP_LOGIN: ${{ vars.REPO_SYNC_APP_BOT_LOGIN }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const { createHash } = require("node:crypto")
+          const payload = JSON.parse(process.env.CLIENT_PAYLOAD || "null")
+          const keys = ["schema_version", "source_repository", "source_commit", "manifest_sha256", "openapi_sha256", "error_codes_sha256", "target_repository", "target_commit", "delivery_id"]
+          if (!process.env.EXPECTED_APP_LOGIN || process.env.EVENT_SENDER_TYPE !== "Bot" || process.env.EVENT_SENDER_LOGIN !== process.env.EXPECTED_APP_LOGIN) throw new Error("repository dispatch sender is not the configured App bot")
+          if (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).sort().join("\n") !== [...keys].sort().join("\n")) throw new Error("payload must contain exactly nine keys")
+          if (payload.schema_version !== "1" || payload.source_repository !== "AquilaXk/aquila-blog" || payload.target_repository !== "AquilaXk/aquila-blog-web") throw new Error("payload repository identity is invalid")
+          for (const key of ["source_commit", "target_commit"]) if (!/^[a-f0-9]{40}$/.test(payload[key])) throw new Error(`${key} is invalid`)
+          for (const key of ["manifest_sha256", "openapi_sha256", "error_codes_sha256"]) if (!/^[a-f0-9]{64}$/.test(payload[key])) throw new Error(`${key} is invalid`)
+          const expectedDelivery = createHash("sha256").update(keys.slice(0, 8).map((key) => payload[key]).join("\n") + "\n").digest("hex")
+          if (payload.delivery_id !== expectedDelivery) throw new Error("delivery_id is invalid")
+          require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, keys.map((key) => `${key}=${payload[key]}`).join("\n") + "\n")
+          NODE
+
+      - name: Confirm initial target main identity
+        id: initial-target
+        env:
+          TARGET_COMMIT: ${{ steps.delivery.outputs.target_commit }}
+          WEB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          target_main="$(GH_TOKEN="${WEB_TOKEN}" gh api "repos/${WEB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          if [[ ! "${target_main}" =~ ^[a-f0-9]{40}$ ]]; then echo "current Web main SHA is invalid" >&2; exit 1; fi
+          if [[ "${target_main}" != "${TARGET_COMMIT}" ]]; then echo "stale=true" >> "${GITHUB_OUTPUT}"; exit 0; fi
+          echo "stale=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Create Platform read token
+        id: platform-token
+        if: ${{ steps.initial-target.outputs.stale == 'false' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          owner: AquilaXk
+          repositories: aquila-blog
+          permission-contents: read
+
+      - name: Confirm authenticated source and target freshness
+        id: freshness
+        if: ${{ steps.initial-target.outputs.stale == 'false' }}
+        env:
+          PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
+          WEB_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          TARGET_COMMIT: ${{ steps.delivery.outputs.target_commit }}
+        run: |
+          set -euo pipefail
+          source_main="$(GH_TOKEN="${PLATFORM_TOKEN}" gh api "repos/${PLATFORM_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          target_main="$(GH_TOKEN="${WEB_TOKEN}" gh api "repos/${WEB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          if [[ ! "${source_main}" =~ ^[a-f0-9]{40}$ || ! "${target_main}" =~ ^[a-f0-9]{40}$ ]]; then echo "current repository SHA is invalid" >&2; exit 1; fi
+          if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${TARGET_COMMIT}" ]]; then echo "stale=true" >> "${GITHUB_OUTPUT}"; exit 0; fi
+          echo "stale=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout immutable Web target without persisted credentials
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.delivery.outputs.target_commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 20
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Install locked Web dependencies
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        run: yarn install --frozen-lockfile
+
+      - name: Read exact Platform contract bytes
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.platform-token.outputs.token }}
+          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          MANIFEST_SHA256: ${{ steps.delivery.outputs.manifest_sha256 }}
+          OPENAPI_SHA256: ${{ steps.delivery.outputs.openapi_sha256 }}
+          ERROR_CODES_SHA256: ${{ steps.delivery.outputs.error_codes_sha256 }}
+        run: |
+          set -euo pipefail
+          mkdir incoming
+          gh api "repos/${PLATFORM_REPOSITORY}/contents/contracts/public-api/manifest.json?ref=${SOURCE_COMMIT}" --jq .content | base64 --decode > incoming/manifest.json
+          gh api "repos/${PLATFORM_REPOSITORY}/contents/contracts/public-api/openapi.json?ref=${SOURCE_COMMIT}" --jq .content | base64 --decode > incoming/openapi.json
+          gh api "repos/${PLATFORM_REPOSITORY}/contents/contracts/public-api/error-codes.json?ref=${SOURCE_COMMIT}" --jq .content | base64 --decode > incoming/error-codes.json
+          node - <<'NODE'
+          const { createHash } = require("node:crypto"); const fs = require("node:fs")
+          for (const [file, expected] of [["manifest.json", process.env.MANIFEST_SHA256], ["openapi.json", process.env.OPENAPI_SHA256], ["error-codes.json", process.env.ERROR_CODES_SHA256]]) if (createHash("sha256").update(fs.readFileSync(`incoming/${file}`)).digest("hex") !== expected) throw new Error(`${file} hash does not match delivery`)
+          NODE
+
+      - name: Build validated Web-local contract candidate
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        run: |
+          set -euo pipefail
+          candidate="$(mktemp -d)"
+          node scripts/contracts/import-platform-contracts.mjs --manifest incoming/manifest.json --openapi incoming/openapi.json --error-codes incoming/error-codes.json --output "${candidate}/contracts/platform" --source-repository "${PLATFORM_REPOSITORY}" --source-commit "${{ steps.delivery.outputs.source_commit }}"
+          mkdir -p "${candidate}/packages/shared-contracts/src/generated" .contract-candidate/generated
+          ./node_modules/.bin/openapi-typescript "${candidate}/contracts/platform/openapi.json" -o "${candidate}/packages/shared-contracts/src/generated/backend-openapi.d.ts"
+          node scripts/contracts/verify-platform-contracts.mjs --directory "${candidate}/contracts/platform"
+          cp -R "${candidate}/contracts/platform" .contract-candidate/platform
+          cp "${candidate}/packages/shared-contracts/src/generated/backend-openapi.d.ts" .contract-candidate/generated/backend-openapi.d.ts
+
+      - name: Detect Web-local contract changes
+        id: changes
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        run: |
+          set -euo pipefail
+          if cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/platform/manifest.lock.json contracts/platform/manifest.lock.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts; then echo "changed=false" >> "${GITHUB_OUTPUT}"; else echo "changed=true" >> "${GITHUB_OUTPUT}"; fi
+
+      - name: Discover exact existing Web Draft PR
+        id: existing-pr
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        env:
+          WEB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prs="$(GH_TOKEN="${WEB_TOKEN}" gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
+          PRS="${prs}" node - <<'NODE'
+          const fs = require("node:fs")
+          const prs = JSON.parse(process.env.PRS)
+          if (!Array.isArray(prs) || prs.length > 1) throw new Error("expected at most one generated Draft PR")
+          if (!prs.length) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "exists=false\npr_number=\n")
+            process.exit(0)
+          }
+          const pr = prs[0]
+          if (!pr.draft || pr.state !== "open" || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated Draft PR identity is invalid")
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `exists=true\npr_number=${pr.number}\n`)
+          NODE
+
+      - name: Recheck source and target freshness before Web write token
+        id: prewrite
+        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') }}
+        env:
+          PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
+          WEB_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          TARGET_COMMIT: ${{ steps.delivery.outputs.target_commit }}
+        run: |
+          set -euo pipefail
+          source_main="$(GH_TOKEN="${PLATFORM_TOKEN}" gh api "repos/${PLATFORM_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"; target_main="$(GH_TOKEN="${WEB_TOKEN}" gh api "repos/${WEB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          if [[ ! "${source_main}" =~ ^[a-f0-9]{40}$ || ! "${target_main}" =~ ^[a-f0-9]{40}$ ]]; then echo "current repository SHA is invalid" >&2; exit 1; fi
+          if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${TARGET_COMMIT}" ]]; then echo "stale=true" >> "${GITHUB_OUTPUT}"; exit 0; fi
+          echo "stale=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Create Web write token
+        id: web-token
+        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') && steps.prewrite.outputs.stale == 'false' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          owner: AquilaXk
+          repositories: aquila-blog-web
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Commit Web-local contract candidate
+        id: commit
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.web-token.outputs.token }}
+          WEB_TOKEN: ${{ steps.web-token.outputs.token }}
+          PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
+          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          EXPECTED_APP_LOGIN: ${{ vars.REPO_SYNC_APP_BOT_LOGIN }}
+          APP_SLUG: ${{ steps.web-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git; app_login="${APP_SLUG}[bot]"; app_id="$(gh api "/users/${app_login}" --jq .id)"
+          if [[ -z "${EXPECTED_APP_LOGIN}" || "${app_login}" != "${EXPECTED_APP_LOGIN}" || ! "${app_id}" =~ ^[0-9]+$ ]]; then echo "write token identity is not the configured App bot" >&2; exit 1; fi
+          git config user.name "${app_login}"; git config user.email "${app_id}+${app_login}@users.noreply.github.com"
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          if git ls-remote --exit-code --heads origin "refs/heads/${SYNC_BRANCH}" >/dev/null 2>&1; then git fetch --no-tags origin "refs/heads/${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}"; fi
+          if git show-ref --verify --quiet "refs/remotes/origin/${SYNC_BRANCH}"; then git checkout -B "${SYNC_BRANCH}" "origin/${SYNC_BRANCH}"; git merge --no-edit origin/main; else git checkout -B "${SYNC_BRANCH}" origin/main; fi
+          allowed_path() { [[ "$1" == contracts/platform/* || "$1" == packages/shared-contracts/src/generated/backend-openapi.d.ts ]]; }
+          while IFS= read -r changed; do [[ -z "${changed}" ]] || allowed_path "${changed}" || { echo "stable branch contains out-of-scope path: ${changed}" >&2; exit 1; }; done < <(git diff --name-only origin/main...HEAD)
+          cp .contract-candidate/platform/* contracts/platform/; cp .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts
+          git add contracts/platform packages/shared-contracts/src/generated/backend-openapi.d.ts
+          while IFS= read -r changed; do [[ -z "${changed}" ]] || allowed_path "${changed}" || { echo "staged change is out of scope: ${changed}" >&2; exit 1; }; done < <(git diff --cached --name-only)
+          if ! git diff --cached --quiet; then git commit -m "chore(contracts): sync Platform ${SOURCE_COMMIT:0:12}"; fi
+          source_main="$(GH_TOKEN="${PLATFORM_TOKEN}" gh api "repos/${PLATFORM_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"; target_main="$(GH_TOKEN="${WEB_TOKEN}" gh api "repos/${WEB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          if [[ ! "${source_main}" =~ ^[a-f0-9]{40}$ || ! "${target_main}" =~ ^[a-f0-9]{40}$ ]]; then echo "current repository SHA is invalid" >&2; exit 1; fi
+          if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${{ steps.delivery.outputs.target_commit }}" ]]; then echo "ready=false" >> "${GITHUB_OUTPUT}"; exit 0; fi
+          if ! git show-ref --verify --quiet "refs/remotes/origin/${SYNC_BRANCH}" || [[ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/remotes/origin/${SYNC_BRANCH}")" ]]; then git push origin "HEAD:refs/heads/${SYNC_BRANCH}"; fi
+          echo "ready=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Close stale Web Draft PR
+        id: close-stale-pr
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'false' && steps.existing-pr.outputs.exists == 'true' && steps.prewrite.outputs.stale == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.web-token.outputs.token }}
+          PR_NUMBER: ${{ steps.existing-pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${WEB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          should_close="$(PR="${pr}" node - <<'NODE'
+          const pr = JSON.parse(process.env.PR)
+          if (pr.state === "closed") { process.stdout.write("false"); process.exit(0) }
+          if (pr.state !== "open" || !pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("stale Draft PR identity is invalid")
+          process.stdout.write("true")
+          NODE
+          )"
+          if [[ "${should_close}" == "true" ]]; then gh pr close "${PR_NUMBER}" --repo "${WEB_REPOSITORY}"; fi
+
+      - name: Create or update the Web draft PR
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' && steps.commit.outputs.ready == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.web-token.outputs.token }}
+          SYNC_BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          set -euo pipefail
+          prs="$(gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
+          pr_number="$(PRS="${prs}" node - <<'NODE'
+          const prs = JSON.parse(process.env.PRS); if (!Array.isArray(prs) || prs.length > 1) throw new Error("expected at most one generated draft PR"); if (!prs.length) process.exit(0)
+          const pr = prs[0]; if (!pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated PR identity is invalid"); process.stdout.write(String(pr.number))
+          NODE
+          )"
+          body="$(mktemp)"; cat > "${body}" <<'BODY'
+          ## Related Issue
+
+          - Refs #70
+
+          ## Summary
+
+          Automated Platform public-contract candidate update.
+
+          ## Changes
+
+          - Canonical Platform bytes and generated Web type only.
+
+          ## Scope
+
+          ### Included
+
+          - `contracts/platform/**`
+          - `packages/shared-contracts/src/generated/backend-openapi.d.ts`
+
+          ### Excluded
+
+          - Platform repository writes and runtime deployment.
+
+          ## Verification
+
+          | Check | Result / Evidence |
+          | --- | --- |
+          | Byte/hash/import validation | Receiver completed before branch write. |
+
+          ### Not Run
+
+          - Required CI owns full Web regression after this Draft PR.
+
+          ## Risk & Delivery
+
+          - Risk: Cross-repository
+          - Rollout / rollback / recovery: No runtime rollout; close this Draft PR if the contract is not accepted.
+
+          ## Evidence
+
+          - Immutable Platform source identity is recorded in the sync commit.
+
+          ## Checklist
+
+          - [x] 관련 이슈의 Acceptance Criteria와 PR 결과가 일치합니다.
+          - [x] 범위 밖 변경과 다른 저장소가 소유한 source를 포함하지 않았습니다.
+          - [x] 계약·문서가 바뀌었다면 같은 PR 또는 명시된 counterpart에서 반영했습니다.
+          - [x] 실행한 검증의 결과를 기록했습니다.
+          - [x] 민감 데이터, 임시 우회 경로 또는 hidden fallback을 추가하지 않았습니다.
+          - [x] 위험 작업이면 rollout·rollback·recovery가 명확합니다.
+          BODY
+          if [[ -n "${pr_number}" ]]; then gh pr edit "${pr_number}" --repo "${WEB_REPOSITORY}" --title "[Chore] sync Platform public contract" --body-file "${body}"; else gh pr create --repo "${WEB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --draft --title "[Chore] sync Platform public contract" --body-file "${body}"; fi
