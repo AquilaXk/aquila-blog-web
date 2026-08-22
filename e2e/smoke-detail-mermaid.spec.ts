@@ -110,7 +110,7 @@ test.describe("core smoke detail mermaid", () => {
       timeout: 20_000,
     })
     .toBeGreaterThan(0)
-  await expect(page.locator(".aq-mermaid-stage")).toContainText("v10.")
+  await expect(page.locator(".aq-mermaid-stage")).toContainText("v11.")
   await expect(page.locator("pre code", { hasText: /^info$/ })).toHaveCount(0)
 })
 
