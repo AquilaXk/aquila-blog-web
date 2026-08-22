@@ -76,7 +76,7 @@
     "remark-math": "^6.0.0",
     "sharp": "0.35.3",
     "shiki": "^4.0.2",
-    "simple-icons": "^16.13.0"
+    "simple-icons": "^16.28.0"
   },
   "resolutions": {
     "@babel/plugin-transform-modules-systemjs": "7.29.4",
