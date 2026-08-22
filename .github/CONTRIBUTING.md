@@ -14,6 +14,10 @@
 
 이슈를 만들기 전에 [열린 이슈](https://github.com/AquilaXk/aquila-blog-web/issues)를 검색해 중복 owner를 확인합니다.
 
+## 보안 제보와 공개 이슈
+
+취약점 세부사항은 공개 Issue에 작성하지 마세요. 보안 제보는 [maintainer private contact](https://github.com/AquilaXk/aquila-blog-web/blob/main/.github/CODE_OF_CONDUCT.md#enforcement)로 보내고, 공개 이슈에는 취약점 재현 정보나 민감 데이터를 포함하지 않습니다. 공개 이슈를 작성할 때는 토큰, 쿠키, 개인정보, 내부 URL을 제거하거나 마스킹하세요.
+
 ## Definition of Ready
 
 구현을 시작하기 전에 다음이 명확해야 합니다.

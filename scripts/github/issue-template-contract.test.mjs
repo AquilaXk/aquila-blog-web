@@ -4,6 +4,8 @@ import test from "node:test";
 import YAML from "yaml";
 
 const repositoryUrl = "https://github.com/AquilaXk/aquila-blog-web";
+const privateSecurityReportUrl =
+  `${repositoryUrl}/blob/main/.github/CODE_OF_CONDUCT.md#enforcement`;
 const formFiles = {
   bug: ".github/ISSUE_TEMPLATE/bug_report.yml",
   task: ".github/ISSUE_TEMPLATE/task_request.yml",
@@ -174,6 +176,22 @@ test("issue configuration blocks blank issues", async () => {
   assertObject(config, "config must be an object");
   assert.equal(config.blank_issues_enabled, false);
   assert.deepEqual(config.contact_links, []);
+});
+
+test("public issue guidance keeps sensitive security reports private and sanitized", async () => {
+  const contributing = await read(".github/CONTRIBUTING.md");
+  const opsForm = await read(formFiles.ops);
+  const bugForm = await read(formFiles.bug);
+
+  assert.ok(contributing.includes(privateSecurityReportUrl));
+  assert.match(contributing, /취약점.*공개 Issue/);
+
+  assert.ok(opsForm.includes(privateSecurityReportUrl));
+  assert.match(opsForm, /취약점 세부사항.*공개 Issue/);
+  assert.match(opsForm, /토큰.*쿠키.*개인정보.*내부 URL/);
+  assert.match(opsForm, /데이터 분류.*마스킹 요구사항/);
+
+  assert.match(bugForm, /토큰.*쿠키.*개인정보.*내부 URL/);
 });
 
 test("pull request template is outcome and risk focused", async () => {
