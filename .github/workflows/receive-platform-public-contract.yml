@@ -61,7 +61,7 @@ jobs:
 
       - name: Create Platform read token
         id: platform-token
-        if: ${{ steps.initial-target.outputs.stale != 'true' }}
+        if: ${{ steps.initial-target.outputs.stale == 'false' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
@@ -72,7 +72,7 @@ jobs:
 
       - name: Confirm authenticated source and target freshness
         id: freshness
-        if: ${{ steps.initial-target.outputs.stale != 'true' }}
+        if: ${{ steps.initial-target.outputs.stale == 'false' }}
         env:
           PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
           WEB_TOKEN: ${{ github.token }}
@@ -87,7 +87,7 @@ jobs:
           echo "stale=false" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout immutable Web target without persisted credentials
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.delivery.outputs.target_commit }}
@@ -95,7 +95,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js 20
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
@@ -103,11 +103,11 @@ jobs:
           cache-dependency-path: yarn.lock
 
       - name: Install locked Web dependencies
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: yarn install --frozen-lockfile
 
       - name: Read exact Platform contract bytes
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         env:
           GH_TOKEN: ${{ steps.platform-token.outputs.token }}
           SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
@@ -126,7 +126,7 @@ jobs:
           NODE
 
       - name: Build validated Web-local contract candidate
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: |
           set -euo pipefail
           candidate="$(mktemp -d)"
@@ -139,14 +139,14 @@ jobs:
 
       - name: Detect Web-local contract changes
         id: changes
-        if: ${{ steps.freshness.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: |
           set -euo pipefail
           if cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/platform/manifest.lock.json contracts/platform/manifest.lock.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts; then echo "changed=false" >> "${GITHUB_OUTPUT}"; else echo "changed=true" >> "${GITHUB_OUTPUT}"; fi
 
       - name: Recheck source and target freshness before Web write token
         id: prewrite
-        if: ${{ steps.freshness.outputs.stale != 'true' && steps.changes.outputs.changed == 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' }}
         env:
           PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
           WEB_TOKEN: ${{ github.token }}
@@ -161,7 +161,7 @@ jobs:
 
       - name: Create Web write token
         id: web-token
-        if: ${{ steps.freshness.outputs.stale != 'true' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
@@ -173,7 +173,7 @@ jobs:
 
       - name: Commit Web-local contract candidate
         id: commit
-        if: ${{ steps.freshness.outputs.stale != 'true' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale != 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
         env:
           GH_TOKEN: ${{ steps.web-token.outputs.token }}
           WEB_TOKEN: ${{ steps.web-token.outputs.token }}
@@ -202,7 +202,7 @@ jobs:
           echo "ready=true" >> "${GITHUB_OUTPUT}"
 
       - name: Create or update the Web draft PR
-        if: ${{ steps.freshness.outputs.stale != 'true' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale != 'true' && steps.commit.outputs.ready == 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' && steps.commit.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ steps.web-token.outputs.token }}
           SYNC_BRANCH: ${{ env.SYNC_BRANCH }}
