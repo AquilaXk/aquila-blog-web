@@ -74,14 +74,8 @@ test("automatic delivery and manual validation have one explicit boundary", () =
   const job = onlyJob(document)
   const context = matchingStep(job, (candidate) => String(candidate.run ?? "").includes("dispatch_enabled="), "producer context")
 
-  assert.deepEqual(triggers.push.branches, ["main"])
-  assert.deepEqual(triggers.push.paths, [
-    "legal/policies/**",
-    "legal/schemas/**",
-    "scripts/legal/**",
-    "contracts/export/legal-policy-manifest.json",
-    "src/apis/backend/legal.ts",
-  ])
+  assert.deepEqual(triggers.push, { branches: ["main"] })
+  assert.equal(Object.hasOwn(triggers.push, "paths"), false, "every main push must produce a replacement delivery run")
   assert.deepEqual(Object.keys(triggers.workflow_dispatch.inputs), ["source_ref"])
   assert.equal(triggers.workflow_dispatch.inputs.source_ref.default, "main")
   assert.deepEqual(document.permissions, { contents: "read" })

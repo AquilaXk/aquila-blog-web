@@ -4,12 +4,6 @@ name: Dispatch Web legal policy to Platform
   push:
     branches:
       - main
-    paths:
-      - "legal/policies/**"
-      - "legal/schemas/**"
-      - "scripts/legal/**"
-      - "contracts/export/legal-policy-manifest.json"
-      - "src/apis/backend/legal.ts"
   workflow_dispatch:
     inputs:
       source_ref:
