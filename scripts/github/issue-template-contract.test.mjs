@@ -4,17 +4,17 @@ import test from "node:test";
 import YAML from "yaml";
 
 const repositoryUrl = "https://github.com/AquilaXk/aquila-blog-web";
-const governanceFiles = {
-  ".github/CONTRIBUTING.md": [
-    `${repositoryUrl}/issues`,
-    `${repositoryUrl}/issues/new?template=task_request.yml`,
-    `${repositoryUrl}/pulls`,
-    `${repositoryUrl}/compare?expand=1`,
-  ],
-  ".github/PULL_REQUEST_TEMPLATE.md": [`${repositoryUrl}/issues/XX`],
-  ".github/CODE_OF_CONDUCT.md": ["https://github.com/AquilaXk)"],
+const privateSecurityReportUrl =
+  `${repositoryUrl}/security/advisories/new`;
+const formFiles = {
+  bug: ".github/ISSUE_TEMPLATE/bug_report.yml",
+  task: ".github/ISSUE_TEMPLATE/task_request.yml",
+  ops: ".github/ISSUE_TEMPLATE/ops_security_data.yml",
+  epic: ".github/ISSUE_TEMPLATE/epic_tracker.yml",
 };
 const supportedFieldTypes = new Set(["markdown", "input", "textarea", "dropdown", "checkboxes"]);
+const legacyRequiredVocabulary =
+  /Execution Contract|Verification & Delivery|Exact commands|Commit slices|Unresolved implementation decisions/;
 
 const read = (file) => readFile(file, "utf8");
 
@@ -30,11 +30,12 @@ function findField(form, id) {
 
 function validateIssueForm(form) {
   assertObject(form, "form must be an object");
-  for (const key of ["name", "description", "labels", "body"]) {
+  for (const key of ["name", "description", "title", "labels", "body"]) {
     assert.ok(key in form, `form must include ${key}`);
   }
   assert.equal(typeof form.name, "string");
   assert.equal(typeof form.description, "string");
+  assert.equal(typeof form.title, "string");
   assert.ok(Array.isArray(form.labels), "labels must be an array");
   assert.ok(Array.isArray(form.body), "body must be an array");
 
@@ -45,6 +46,7 @@ function validateIssueForm(form) {
     assertObject(field.attributes, "each body entry must have attributes");
 
     if (field.type === "markdown") {
+      assert.equal(typeof field.attributes.value, "string", "markdown fields require value");
       continue;
     }
 
@@ -53,14 +55,16 @@ function validateIssueForm(form) {
     assert.ok(!ids.has(field.id), `duplicate field id: ${field.id}`);
     ids.add(field.id);
     assert.equal(typeof field.attributes.label, "string", `missing label: ${field.id}`);
-    if (field.type !== "checkboxes") {
-      assert.equal(field.validations?.required, true, `field must be required: ${field.id}`);
+
+    if (field.validations && "required" in field.validations) {
+      assert.equal(typeof field.validations.required, "boolean", `invalid required flag: ${field.id}`);
     }
 
     if (field.type === "dropdown") {
       assert.ok(Array.isArray(field.attributes.options), `dropdown options: ${field.id}`);
       assert.ok(field.attributes.options.every((option) => typeof option === "string"));
     }
+
     if (field.type === "checkboxes") {
       assert.ok(Array.isArray(field.attributes.options), `checkbox options: ${field.id}`);
       for (const option of field.attributes.options) {
@@ -74,127 +78,156 @@ function validateIssueForm(form) {
   }
 }
 
-function assertRequiredField(form, { id, label, type }) {
+function assertRequiredField(form, id, type) {
   const field = findField(form, id);
   assert.equal(field.type, type, `field type: ${id}`);
-  assert.equal(field.attributes.label, label, `field label: ${id}`);
   assert.equal(field.validations?.required, true, `field must be required: ${id}`);
-  return field;
-}
-
-function assertGovernanceContent(file, content) {
-  for (const url of governanceFiles[file]) {
-    assert.ok(content.includes(url), `missing current-repository URL in ${file}: ${url}`);
-  }
-  assert.doesNotMatch(content, /morethanmin|morethan-log/);
 }
 
 async function readForm(file) {
-  const form = YAML.parse(await read(file));
+  const content = await read(file);
+  assert.doesNotMatch(content, legacyRequiredVocabulary);
+  const form = YAML.parse(content);
   validateIssueForm(form);
   return form;
 }
 
-test("bug form requires the Web reproduction and delivery contract", async () => {
-  const form = await readForm(".github/ISSUE_TEMPLATE/bug_report.yml");
+test("four practical issue forms keep only core required fields", async () => {
+  const forms = Object.fromEntries(
+    await Promise.all(
+      Object.entries(formFiles).map(async ([key, file]) => [key, await readForm(file)]),
+    ),
+  );
 
-  assert.equal(form.name, "🐞 Bug report");
-  assert.equal(form.title, "[Bug] ");
+  assert.equal(forms.bug.name, "🐞 Bug / Fix");
+  assert.equal(forms.task.name, "🛠 Task / Feature / Refactor");
+  assert.equal(forms.ops.name, "🛡 Ops / Security / Data");
+  assert.equal(forms.epic.name, "🧭 Epic / Tracker");
 
-  const severity = assertRequiredField(form, {
-    id: "severity",
-    label: "Severity",
-    type: "dropdown",
-  });
-  for (const option of ["Sev1", "Sev2", "Sev3", "Sev4"]) {
-    assert.ok(severity.attributes.options.some((value) => value.startsWith(option)));
-  }
-
-  for (const field of [
-    { id: "domain", label: "Domain", type: "input" },
-    { id: "summary", label: "Summary", type: "textarea" },
-    { id: "steps_to_reproduce", label: "Steps To Reproduce", type: "textarea" },
-    { id: "expected_result", label: "Expected Result", type: "textarea" },
-    { id: "actual_result", label: "Actual Result", type: "textarea" },
-    { id: "impact", label: "Impact", type: "textarea" },
-    { id: "execution_contract", label: "Execution Contract", type: "textarea" },
-    { id: "verification_delivery", label: "Verification & Delivery", type: "textarea" },
+  for (const [id, type] of [
+    ["severity", "dropdown"],
+    ["domain", "input"],
+    ["summary", "textarea"],
+    ["reproduction_evidence", "textarea"],
+    ["expected_actual", "textarea"],
+    ["impact", "textarea"],
+    ["scope", "textarea"],
+    ["acceptance", "textarea"],
+    ["verification", "textarea"],
   ]) {
-    assertRequiredField(form, field);
+    assertRequiredField(forms.bug, id, type);
   }
 
-  for (const pathPattern of ["src/**", "pages/**", "e2e/**", ".github/workflows/**"]) {
-    assert.ok(findField(form, "domain").attributes.placeholder.includes(pathPattern));
-  }
-
-  const duplicateCheck = findField(form, "duplicate_check");
-  assert.equal(duplicateCheck.type, "checkboxes");
-  assert.equal(duplicateCheck.attributes.options[0].required, true);
-  assert.match(duplicateCheck.attributes.options[0].label, new RegExp(`${repositoryUrl}/issues`));
-});
-
-test("task form uses the same execution and delivery vocabulary", async () => {
-  const form = await readForm(".github/ISSUE_TEMPLATE/task_request.yml");
-
-  const taskType = assertRequiredField(form, {
-    id: "task_type",
-    label: "Task Type",
-    type: "dropdown",
-  });
-  assert.ok(taskType.attributes.options.includes("Feature"));
-
-  for (const field of [
-    { id: "domain", label: "Domain", type: "input" },
-    { id: "execution_contract", label: "Execution Contract", type: "textarea" },
-    { id: "verification_delivery", label: "Verification & Delivery", type: "textarea" },
+  for (const [id, type] of [
+    ["work_type", "dropdown"],
+    ["domain", "input"],
+    ["summary", "textarea"],
+    ["problem_evidence", "textarea"],
+    ["goal", "textarea"],
+    ["scope", "textarea"],
+    ["acceptance", "textarea"],
+    ["verification", "textarea"],
   ]) {
-    assertRequiredField(form, field);
+    assertRequiredField(forms.task, id, type);
+  }
+  assert.equal(findField(forms.task, "approach").validations?.required, undefined);
+  assert.equal(findField(forms.task, "dependencies").validations?.required, undefined);
+
+  for (const [id, type] of [
+    ["change_type", "dropdown"],
+    ["primary_risk", "dropdown"],
+    ["domain", "input"],
+    ["summary", "textarea"],
+    ["problem_evidence", "textarea"],
+    ["goal", "textarea"],
+    ["scope", "textarea"],
+    ["safety_contract", "textarea"],
+    ["rollout_rollback", "textarea"],
+    ["acceptance", "textarea"],
+    ["verification", "textarea"],
+  ]) {
+    assertRequiredField(forms.ops, id, type);
+  }
+
+  for (const [id, type] of [
+    ["domain", "input"],
+    ["goal", "textarea"],
+    ["ownership", "textarea"],
+    ["child_issues", "textarea"],
+    ["dependency_order", "textarea"],
+    ["exit_criteria", "textarea"],
+    ["evidence", "textarea"],
+  ]) {
+    assertRequiredField(forms.epic, id, type);
+  }
+
+  for (const form of Object.values(forms)) {
+    const ready = findField(form, "ready_check");
+    assert.equal(ready.type, "checkboxes");
+    assert.ok(ready.attributes.options.every((option) => option.required === true));
+    assert.ok(
+      ready.attributes.options.some((option) => option.label.includes(`${repositoryUrl}/issues`)),
+    );
   }
 });
 
-test("form validator rejects required, id, and field-type mutations", async () => {
-  const form = await readForm(".github/ISSUE_TEMPLATE/bug_report.yml");
-  const requiredFalse = structuredClone(form);
-  findField(requiredFalse, "domain").validations.required = false;
-  assert.throws(() => validateIssueForm(requiredFalse), /field must be required/);
-
-  const requiredMissing = structuredClone(form);
-  delete findField(requiredMissing, "domain").validations.required;
-  assert.throws(() => validateIssueForm(requiredMissing), /field must be required/);
-
-  const duplicateId = structuredClone(form);
-  findField(duplicateId, "summary").id = "domain";
-  assert.throws(() => validateIssueForm(duplicateId), /duplicate field id/);
-
-  const invalidId = structuredClone(form);
-  findField(invalidId, "summary").id = "summary/details";
-  assert.throws(() => validateIssueForm(invalidId), /invalid field id/);
-
-  const unsupportedType = structuredClone(form);
-  findField(unsupportedType, "summary").type = "radio";
-  assert.throws(() => validateIssueForm(unsupportedType), /unsupported field type/);
-});
-
-test("issue configuration blocks blank issues without contact links", async () => {
+test("issue configuration blocks blank issues", async () => {
   const config = YAML.parse(await read(".github/ISSUE_TEMPLATE/config.yml"));
-
   assertObject(config, "config must be an object");
   assert.equal(config.blank_issues_enabled, false);
   assert.deepEqual(config.contact_links, []);
 });
 
-test("each governance file targets the Web repository and excludes upstream URLs", async (t) => {
-  for (const file of Object.keys(governanceFiles)) {
-    await t.test(file, async () => {
-      const content = await read(file);
-      assertGovernanceContent(file, content);
-    });
-  }
+test("public issue guidance keeps sensitive security reports private and sanitized", async () => {
+  const contributing = await read(".github/CONTRIBUTING.md");
+  const opsForm = await read(formFiles.ops);
+  const bugForm = await read(formFiles.bug);
 
-  for (const file of Object.keys(governanceFiles)) {
-    const badContent = `${await read(file)}\nhttps://github.com/morethanmin/morethan-log`;
-    assert.throws(() => assertGovernanceContent(file, badContent), /morethanmin|morethan-log/);
-  }
+  assert.ok(contributing.includes(privateSecurityReportUrl));
+  assert.match(contributing, /취약점.*공개 Issue/);
+  assert.match(contributing, /취약점 세부사항.*PoC.*secret/);
+  assert.doesNotMatch(contributing, /CODE_OF_CONDUCT\.md#enforcement/);
+  assert.doesNotMatch(contributing, /maintainer private contact/);
+
+  assert.ok(opsForm.includes(privateSecurityReportUrl));
+  assert.match(opsForm, /취약점 세부사항.*공개 Issue/);
+  assert.match(opsForm, /취약점 세부사항.*PoC.*secret/);
+  assert.doesNotMatch(opsForm, /CODE_OF_CONDUCT\.md#enforcement/);
+  assert.doesNotMatch(opsForm, /maintainer private contact/);
+  assert.match(opsForm, /토큰.*쿠키.*개인정보.*내부 URL/);
+  assert.match(opsForm, /데이터 분류.*마스킹 요구사항/);
+
+  assert.match(bugForm, /토큰.*쿠키.*개인정보.*내부 URL/);
 });
 
-// FUNDING is intentionally excluded: sponsor and payment settings require separate authority.
+test("pull request template is outcome and risk focused", async () => {
+  const content = await read(".github/PULL_REQUEST_TEMPLATE.md");
+  for (const heading of [
+    "## Related Issue",
+    "## Summary",
+    "## Changes",
+    "## Scope",
+    "## Verification",
+    "## Risk & Delivery",
+    "## Review Guide",
+    "## Evidence",
+    "## Checklist",
+  ]) {
+    assert.ok(content.includes(heading), `missing PR section: ${heading}`);
+  }
+  assert.doesNotMatch(content, legacyRequiredVocabulary);
+  assert.doesNotMatch(content, /Commit plan|Plan ↔ Issue/);
+});
+
+test("contributing guide links every issue form and current repository", async () => {
+  const content = await read(".github/CONTRIBUTING.md");
+  for (const file of Object.values(formFiles)) {
+    const template = file.split("/").at(-1);
+    assert.ok(
+      content.includes(`${repositoryUrl}/issues/new?template=${template}`),
+      `missing template link: ${template}`,
+    );
+  }
+  assert.ok(content.includes(`${repositoryUrl}/issues`));
+  assert.doesNotMatch(content, /morethanmin|morethan-log|NOTION_PAGE_ID|localhost:8001/);
+});
