@@ -5,7 +5,7 @@ import YAML from "yaml";
 
 const repositoryUrl = "https://github.com/AquilaXk/aquila-blog-web";
 const privateSecurityReportUrl =
-  `${repositoryUrl}/blob/main/.github/CODE_OF_CONDUCT.md#enforcement`;
+  `${repositoryUrl}/security/advisories/new`;
 const formFiles = {
   bug: ".github/ISSUE_TEMPLATE/bug_report.yml",
   task: ".github/ISSUE_TEMPLATE/task_request.yml",
@@ -185,9 +185,15 @@ test("public issue guidance keeps sensitive security reports private and sanitiz
 
   assert.ok(contributing.includes(privateSecurityReportUrl));
   assert.match(contributing, /취약점.*공개 Issue/);
+  assert.match(contributing, /취약점 세부사항.*PoC.*secret/);
+  assert.doesNotMatch(contributing, /CODE_OF_CONDUCT\.md#enforcement/);
+  assert.doesNotMatch(contributing, /maintainer private contact/);
 
   assert.ok(opsForm.includes(privateSecurityReportUrl));
   assert.match(opsForm, /취약점 세부사항.*공개 Issue/);
+  assert.match(opsForm, /취약점 세부사항.*PoC.*secret/);
+  assert.doesNotMatch(opsForm, /CODE_OF_CONDUCT\.md#enforcement/);
+  assert.doesNotMatch(opsForm, /maintainer private contact/);
   assert.match(opsForm, /토큰.*쿠키.*개인정보.*내부 URL/);
   assert.match(opsForm, /데이터 분류.*마스킹 요구사항/);
 
