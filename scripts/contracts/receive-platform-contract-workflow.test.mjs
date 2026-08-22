@@ -27,7 +27,7 @@ test("receiver admits only the exact App-owned nine-key Platform payload", () =>
   const job = document.jobs.receive
   assert.match(source, /^  repository_dispatch:\n    types: \[platform_public_contract_ready\]/m)
   assert.equal(job.if, undefined, "untrusted dispatches must fail in admission, not be silently skipped")
-  assert.equal(document.permissions["pull-requests"], undefined)
+  assert.equal(document.permissions["pull-requests"], "read")
   const admit = step(job, "Validate immutable Platform delivery")
   assert.equal(admit.env.EXPECTED_APP_LOGIN, "${{ vars.REPO_SYNC_APP_BOT_LOGIN }}")
   assert.match(admit.run, /EVENT_SENDER_TYPE !== "Bot"/)
@@ -116,4 +116,29 @@ test("stable branch, write identity, and Draft PR stay exactly Web-owned", () =>
   assert.match(String(pr.if), /steps\.commit\.outputs\.ready == 'true'/)
   assert.match(pr.run, /\[Chore\] sync Platform public contract/)
   for (const section of ["## Related Issue", "## Verification", "## Risk & Delivery", "## Evidence", "## Checklist"]) assert.ok(pr.run.includes(section))
+})
+
+test("a fresh unchanged candidate only opens the scoped stale-Draft-PR lifecycle when one exact PR exists", () => {
+  const { source, document } = workflow()
+  const job = document.jobs.receive
+  assert.equal(document.permissions["pull-requests"], "read")
+  const discovery = job.steps.find((candidate) => candidate.id === "existing-pr")
+  assert.ok(discovery, "the receiver must discover an exact existing Draft PR before creating a Web write token")
+  assert.equal(discovery.env.WEB_TOKEN, "${{ github.token }}")
+  assert.match(discovery.run, /repos\/\$\{WEB_REPOSITORY\}\/pulls\?state=open&head=AquilaXk:\$\{SYNC_BRANCH\}&base=main/)
+  assert.match(discovery.run, /pr\.head\?\.repo\?\.full_name !== "AquilaXk\/aquila-blog-web"/)
+  assert.match(discovery.run, /pr\.draft/)
+  assert.match(discovery.run, /pr\.base\?\.ref !== "main"/)
+  assert.match(discovery.run, /exists=false/)
+  assert.match(discovery.run, /exists=true/)
+
+  const writeToken = step(job, "Create Web write token")
+  assert.match(String(writeToken.if), /steps\.changes\.outputs\.changed == 'true'/)
+  assert.match(String(writeToken.if), /steps\.existing-pr\.outputs\.exists == 'true'/)
+  const close = job.steps.find((candidate) => candidate.id === "close-stale-pr")
+  assert.ok(close, "only an existing stale Draft PR may enter the close path")
+  assert.match(String(close.if), /steps\.changes\.outputs\.changed == 'false'/)
+  assert.match(String(close.if), /steps\.existing-pr\.outputs\.exists == 'true'/)
+  assert.match(close.run, /pr\.state === "closed"/)
+  assert.doesNotMatch(source, /git branch -[dD]|git reset|git push[^\n]*(?:--force|--force-with-lease)/)
 })

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: platform-public-contract-receiver
@@ -144,9 +145,30 @@ jobs:
           set -euo pipefail
           if cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/platform/manifest.lock.json contracts/platform/manifest.lock.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts; then echo "changed=false" >> "${GITHUB_OUTPUT}"; else echo "changed=true" >> "${GITHUB_OUTPUT}"; fi
 
+      - name: Discover exact existing Web Draft PR
+        id: existing-pr
+        if: ${{ steps.freshness.outputs.stale == 'false' }}
+        env:
+          WEB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prs="$(GH_TOKEN="${WEB_TOKEN}" gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
+          PRS="${prs}" node - <<'NODE'
+          const fs = require("node:fs")
+          const prs = JSON.parse(process.env.PRS)
+          if (!Array.isArray(prs) || prs.length > 1) throw new Error("expected at most one generated Draft PR")
+          if (!prs.length) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "exists=false\npr_number=\n")
+            process.exit(0)
+          }
+          const pr = prs[0]
+          if (!pr.draft || pr.state !== "open" || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated Draft PR identity is invalid")
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `exists=true\npr_number=${pr.number}\n`)
+          NODE
+
       - name: Recheck source and target freshness before Web write token
         id: prewrite
-        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') }}
         env:
           PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
           WEB_TOKEN: ${{ github.token }}
@@ -161,7 +183,7 @@ jobs:
 
       - name: Create Web write token
         id: web-token
-        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') && steps.prewrite.outputs.stale == 'false' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
@@ -200,6 +222,24 @@ jobs:
           if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${{ steps.delivery.outputs.target_commit }}" ]]; then echo "ready=false" >> "${GITHUB_OUTPUT}"; exit 0; fi
           if ! git show-ref --verify --quiet "refs/remotes/origin/${SYNC_BRANCH}" || [[ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/remotes/origin/${SYNC_BRANCH}")" ]]; then git push origin "HEAD:refs/heads/${SYNC_BRANCH}"; fi
           echo "ready=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Close stale Web Draft PR
+        id: close-stale-pr
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'false' && steps.existing-pr.outputs.exists == 'true' && steps.prewrite.outputs.stale == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.web-token.outputs.token }}
+          PR_NUMBER: ${{ steps.existing-pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${WEB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          should_close="$(PR="${pr}" node - <<'NODE'
+          const pr = JSON.parse(process.env.PR)
+          if (pr.state === "closed") { process.stdout.write("false"); process.exit(0) }
+          if (pr.state !== "open" || !pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("stale Draft PR identity is invalid")
+          process.stdout.write("true")
+          NODE
+          )"
+          if [[ "${should_close}" == "true" ]]; then gh pr close "${PR_NUMBER}" --repo "${WEB_REPOSITORY}"; fi
 
       - name: Create or update the Web draft PR
         if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' && steps.commit.outputs.ready == 'true' }}
