@@ -7370,10 +7370,10 @@ signal-exit@^3.0.3, signal-exit@^3.0.7:
   resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-3.0.7.tgz#a9a1767f8af84155114eaabd73f99273c8f59ad9"
   integrity sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==
 
-simple-icons@^16.13.0:
-  version "16.13.0"
-  resolved "https://registry.yarnpkg.com/simple-icons/-/simple-icons-16.13.0.tgz#2ff5b28430620b3bb2f9d86f6a23e514b8e0f6bc"
-  integrity sha512-N4AMZvFERU5YLEtUudtUesiM2H4O5xQ9qfS3K0oOV5II5KVtxOUAlmZ7KqBgiTSGBgCVkuLD/Z9dJKBtnI3kKQ==
+simple-icons@^16.28.0:
+  version "16.28.0"
+  resolved "https://registry.yarnpkg.com/simple-icons/-/simple-icons-16.28.0.tgz#5cb3cad9902a188d1d2656791b36a8fee4b5685a"
+  integrity sha512-sQPR5AtK/ijRjou7zw7mlLp08oB6FH7i0lOy5XJ2zp9mJs/yejgiOn7KvQoe2q4YJIx6VmgUSW5AOefebPt5kg==
 
 slash@^4.0.0:
   version "4.0.0"
