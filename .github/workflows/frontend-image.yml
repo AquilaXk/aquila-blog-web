@@ -276,8 +276,7 @@ jobs:
             -f "client_payload[target_sha]=${TARGET_SHA}" \
             -f "client_payload[delivery_id]=${DELIVERY_ID}" \
             -f "client_payload[producer_run_id]=${PRODUCER_RUN_ID}" \
-            -f "client_payload[producer_run_attempt]=${PRODUCER_RUN_ATTEMPT}" \
-            -f "client_payload[producer_run_url]=${PRODUCER_RUN_URL}"
+            -f "client_payload[producer_run_attempt]=${PRODUCER_RUN_ATTEMPT}"
 
           {
             echo "## Web image delivery"

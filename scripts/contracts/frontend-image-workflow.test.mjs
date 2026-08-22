@@ -305,7 +305,7 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
   assert.equal(dispatch.env.GH_TOKEN, "${{ steps.app-token.outputs.token }}")
   assert.match(dispatch.run, /gh api --method POST "repos\/AquilaXk\/aquila-blog\/dispatches"/)
   assert.match(dispatch.run, /event_type="web_frontend_image_ready"/)
-  for (const field of [
+  const expectedPayloadFields = [
     "schema_version",
     "source_repository",
     "source_sha",
@@ -316,10 +316,13 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
     "delivery_id",
     "producer_run_id",
     "producer_run_attempt",
-    "producer_run_url",
-  ]) {
+  ]
+  const payloadFields = [...dispatch.run.matchAll(/client_payload\[([^\]]+)\]/g)].map((match) => match[1])
+  assert.deepEqual(payloadFields, expectedPayloadFields, "repository_dispatch client_payload must stay within 10 properties")
+  for (const field of expectedPayloadFields) {
     assert.match(dispatch.run, new RegExp(`client_payload\\[${field}\\]`), `missing payload field ${field}`)
   }
+  assert.doesNotMatch(dispatch.run, /client_payload\[producer_run_url\]/)
   assert.match(dispatch.run, /"client_payload\[image_ref\]=\$\{IMAGE_REF\}"/)
   assert.match(dispatch.run, /"client_payload\[source_sha\]=\$\{SOURCE_SHA\}"/)
   assert.ok(job.steps.indexOf(prepare) < job.steps.indexOf(dispatch))
@@ -359,10 +362,10 @@ test("delivery preparation validates exact identities and emits one canonical pa
     delivery_id: prepared.values.delivery_id,
     producer_run_id: prepared.fixture.producerRunId,
     producer_run_attempt: prepared.fixture.producerRunAttempt,
-    producer_run_url: prepared.fixture.producerRunUrl,
   })) {
     assert.match(call, new RegExp(`client_payload\\[${field}\\]=${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`))
   }
+  assert.doesNotMatch(call, /client_payload\[producer_run_url\]/)
   assert.match(dispatched.summaryText, new RegExp(prepared.values.delivery_id))
   assert.match(dispatched.summaryText, new RegExp(prepared.fixture.producerRunUrl.replaceAll("/", "\\/")))
   assert.doesNotMatch(dispatched.summaryText, /web-token-fixture|platform-token-fixture/)
