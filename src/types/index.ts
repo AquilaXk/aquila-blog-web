@@ -43,9 +43,14 @@ export type TPost = {
   actorCanDelete?: boolean
 }
 
+export type TrustedContentHtml = {
+  readonly kind: "trusted-content-html"
+  readonly html: string
+}
+
 export type PostDetail = TPost & {
   content: string
-  contentHtml?: string
+  trustedContentHtml?: TrustedContentHtml
 }
 
 export type TPostComment = {

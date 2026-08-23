@@ -1,3 +1,5 @@
+import type { TrustedContentHtml } from "src/types"
+
 export type MarkdownImageWidthCommitPayload = {
   src: string
   alt: string
@@ -7,7 +9,7 @@ export type MarkdownImageWidthCommitPayload = {
 
 export type MarkdownRendererProps = {
   content?: string
-  contentHtml?: string
+  trustedContentHtml?: TrustedContentHtml
   disableMermaid?: boolean
   forceScheme?: "dark" | "light"
   editableImages?: boolean

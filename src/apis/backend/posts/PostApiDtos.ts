@@ -1,5 +1,13 @@
 import type { TPost } from "src/types"
+import type { components } from "@shared/contracts"
 import type { ApiFetchMeta } from "../client"
+
+type GeneratedPostWithContentDto = components["schemas"]["PostWithContentDto"]
+
+export type ContentHtmlTrustFields = Pick<
+  GeneratedPostWithContentDto,
+  "contentHtml" | "contentHtmlHash" | "contentHtmlSanitizerPolicyVersion" | "contentHtmlTrustState"
+>
 
 export type PageDto<T> = {
   content: T[]
@@ -46,7 +54,7 @@ export type ApiPostDto = {
   actorHasLiked?: boolean
 }
 
-export type ApiPostWithContentDto = {
+export type ApiPostWithContentDto = ContentHtmlTrustFields & {
   id: number
   createdAt: string
   modifiedAt: string
@@ -58,7 +66,6 @@ export type ApiPostWithContentDto = {
   authorProfileImgUrl?: string
   title: string
   content: string
-  contentHtml?: string
   tags?: string[]
   category?: string[]
   published: boolean

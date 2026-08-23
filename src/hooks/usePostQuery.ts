@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/router"
 import { getPostDetailByIdWithMeta } from "src/apis/backend/posts/PostApiDetailRequests"
+import { withoutTrustedContentHtml } from "src/apis/backend/posts/contentHtmlTrust"
 import { queryKey } from "src/constants/queryKey"
 import { PostDetail } from "src/types"
 import type { ApiFetchMeta } from "src/apis/backend/client"
@@ -11,6 +12,12 @@ const extractCanonicalPostIdFromAsPath = (asPath: string): string => {
   const canonicalMatch = pathname.match(/^\/posts\/(\d+)(?:\/)?$/)
   return canonicalMatch ? canonicalMatch[1] : ""
 }
+
+export const resolvePostQueryData = (
+  post: PostDetail | null | undefined,
+  isRefetchError: boolean,
+): PostDetail | null | undefined =>
+  post && isRefetchError ? withoutTrustedContentHtml(post) : post
 
 const usePostQuery = () => {
   const router = useRouter()
@@ -42,7 +49,7 @@ const usePostQuery = () => {
   })
 
   return {
-    post: query.data ?? undefined,
+    post: resolvePostQueryData(query.data, query.isRefetchError) ?? undefined,
     staleMeta: hasRouteId ? (staleMetaByRouteId.get(routeId) ?? null) : null,
     isLoading: !hasRouteId || query.isLoading || (query.isFetching && query.data === undefined),
     isNotFound: hasRouteId && query.status === "success" && query.data === null,

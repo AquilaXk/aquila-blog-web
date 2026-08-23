@@ -1,7 +1,8 @@
 import type { PostDetail } from "src/types"
-import { ApiError, apiFetch, apiFetchWithMeta, type ApiFetchMeta } from "../client"
+import { ApiError, apiFetchWithMeta, type ApiFetchMeta } from "../client"
 import type { ApiPostWithContentDto } from "./PostApiDtos"
 import { extractPostIdFromSlug, mapPostDetail } from "./PostApiMappers"
+import { withoutTrustedContentHtml } from "./contentHtmlTrust"
 import {
   getFreshServerSnapshot,
   isServerRuntime,
@@ -28,8 +29,10 @@ export const getPostDetailBySlug = async (slug: string): Promise<PostDetail | nu
   if (!postId) return null
 
   try {
-    const post = await apiFetch<ApiPostWithContentDto>(`/post/api/v1/posts/${postId}`)
-    const mapped = mapPostDetail(post)
+    const post = await apiFetchWithMeta<ApiPostWithContentDto>(`/post/api/v1/posts/${postId}`)
+    const mapped = await mapPostDetail(post.data, {
+      allowTrustedContentHtml: !post.meta.stale,
+    })
 
     // slug mismatch should 404 to avoid duplicate-url indexing.
     if (mapped.slug !== slug) return null
@@ -67,7 +70,9 @@ export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailR
   const loadPostDetail = async () => {
     const post = await apiFetchWithMeta<ApiPostWithContentDto>(endpoint)
     return {
-      data: mapPostDetail(post.data),
+      data: await mapPostDetail(post.data, {
+        allowTrustedContentHtml: !post.meta.stale,
+      }),
       meta: post.meta,
     }
   }
@@ -95,7 +100,7 @@ export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailR
         return null
       }
       const staleSnapshot = postDetailSsrCache.get(endpoint)?.value
-      if (staleSnapshot) return staleSnapshot
+      if (staleSnapshot) return withoutTrustedContentHtml(staleSnapshot)
       throw error
     } finally {
       pendingPostDetailPromises.delete(endpoint)
