@@ -390,6 +390,26 @@ export const useEditorStudioDraftLifecycle = ({
     setPostVersion,
   ])
 
+  const resolveLoadedPostSnapshot = useCallback(
+    (post: PostForEditor, shouldMaskTempPlaceholder: boolean) => {
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
+        { summary: post.summary, source: post.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        throw new Error("canonical summary response is malformed")
+      }
+
+      const canonicalSummary = resolvedSummary.state
+      const snapshot = shouldMaskTempPlaceholder
+        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
+          buildEmptyEditorMetaSnapshot())
+        : syncEditorMeta(post.content ?? "", canonicalSummary, post.contentHtml)
+      return { canonicalSummary, snapshot }
+    },
+    [buildEmptyEditorMetaSnapshot, syncEditorMeta],
+  )
+
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
     options: LoadPostForEditorOptions = {}
@@ -487,17 +507,10 @@ export const useEditorStudioDraftLifecycle = ({
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(resolvedPost, rawSnapshot)
       const nextTitle = shouldMaskTempTitle ? "" : resolvedPost.title ?? ""
       const nextVisibility = toVisibility(!!resolvedPost.published, !!resolvedPost.listed)
-      const resolvedSummary = resolvePersistedSummaryResult(
-        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
-        { summary: resolvedPost.summary, source: resolvedPost.summarySource },
+      const { canonicalSummary, snapshot } = resolveLoadedPostSnapshot(
+        resolvedPost,
+        shouldMaskTempPlaceholder,
       )
-      if (!resolvedSummary.ok) {
-        throw new Error("canonical summary response is malformed")
-      }
-      const canonicalSummary = resolvedSummary.state
-      const snapshot = shouldMaskTempPlaceholder
-        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ?? buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(resolvedPost.content ?? "", canonicalSummary, resolvedPost.contentHtml)
       setPostTitle(nextTitle)
       setPostVisibility(nextVisibility)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
@@ -528,19 +541,18 @@ export const useEditorStudioDraftLifecycle = ({
     applyLoadedPostContext,
     beginLocalDraftPostLoad,
     buildEditorStateFingerprint,
-    buildEmptyEditorMetaSnapshot,
     endLocalDraftPostLoad,
     isBlankServerTempDraft,
     postId,
     pretty,
     resolveEditorMetaSnapshot,
+    resolveLoadedPostSnapshot,
     serverBaselineEditorFingerprintRef,
     setLoadingKey,
     setPostTitle,
     setPostVisibility,
     setResult,
     signalLocalDraftBaselineReady,
-    syncEditorMeta,
     toVisibility,
   ])
 
@@ -589,17 +601,10 @@ export const useEditorStudioDraftLifecycle = ({
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(tempPost, rawSnapshot)
       const nextTitle = shouldMaskTempTitle ? "" : tempPost.title ?? ""
       const nextVisibility = toVisibility(!!tempPost.published, !!tempPost.listed)
-      const resolvedSummary = resolvePersistedSummaryResult(
-        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
-        { summary: tempPost.summary, source: tempPost.summarySource },
+      const { canonicalSummary, snapshot } = resolveLoadedPostSnapshot(
+        tempPost,
+        shouldMaskTempPlaceholder,
       )
-      if (!resolvedSummary.ok) {
-        throw new Error("canonical summary response is malformed")
-      }
-      const canonicalSummary = resolvedSummary.state
-      const snapshot = shouldMaskTempPlaceholder
-        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ?? buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(tempPost.content ?? "", canonicalSummary, tempPost.contentHtml)
       setPostTitle(nextTitle)
       setPostVisibility(nextVisibility)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
@@ -643,13 +648,13 @@ export const useEditorStudioDraftLifecycle = ({
     applyLoadedPostContext,
     beginLocalDraftPostLoad,
     buildEditorStateFingerprint,
-    buildEmptyEditorMetaSnapshot,
     endLocalDraftPostLoad,
     isBlankServerTempDraft,
     isCompactMobileLayout,
     pretty,
     requestTempPostWithConflictRetry,
     resolveEditorMetaSnapshot,
+    resolveLoadedPostSnapshot,
     router,
     serverBaselineEditorFingerprintRef,
     setIsNewEditorBootstrapPending,
@@ -661,7 +666,6 @@ export const useEditorStudioDraftLifecycle = ({
     setPublishStatus,
     setResult,
     signalLocalDraftBaselineReady,
-    syncEditorMeta,
     tempPostRequestRef,
     toEditorPostRoute,
     toVisibility,
