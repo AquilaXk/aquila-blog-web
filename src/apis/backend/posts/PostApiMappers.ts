@@ -1,6 +1,7 @@
 import type { PostDetail, TPost } from "src/types"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { ApiPostDto, ApiPostWithContentDto } from "./PostApiDtos"
+import { resolveTrustedContentHtml } from "./contentHtmlTrust"
 
 const slugify = (value: string) =>
   value
@@ -182,7 +183,10 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
   }
 }
 
-export const mapPostDetail = (post: ApiPostWithContentDto): PostDetail => {
+export const mapPostDetail = async (
+  post: ApiPostWithContentDto,
+  { allowTrustedContentHtml }: { allowTrustedContentHtml: boolean },
+): Promise<PostDetail> => {
   const parsed = parsePostMeta(post.content)
   const dtoTags = normalizeStringArray(post.tags)
   const dtoCategories = normalizeCategoryArray(post.category)
@@ -194,6 +198,9 @@ export const mapPostDetail = (post: ApiPostWithContentDto): PostDetail => {
   const hasActorHasLiked = typeof post.actorHasLiked === "boolean"
   const hasActorCanModify = typeof post.actorCanModify === "boolean"
   const hasActorCanDelete = typeof post.actorCanDelete === "boolean"
+  const trustedContentHtml = !allowTrustedContentHtml || post.content.trim()
+    ? undefined
+    : await resolveTrustedContentHtml(post)
 
   return {
     ...mapPostDto({
@@ -216,7 +223,7 @@ export const mapPostDetail = (post: ApiPostWithContentDto): PostDetail => {
     ...(category.length > 0 ? { category } : {}),
     summary,
     content: normalizedContent,
-    ...(post.contentHtml ? { contentHtml: post.contentHtml } : {}),
+    ...(trustedContentHtml ? { trustedContentHtml } : {}),
     modifiedTime: post.modifiedAt,
     likesCount: post.likesCount,
     commentsCount: post.commentsCount,

@@ -542,7 +542,11 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
           <BodySection data-rum-section="body">
             {leadSummaryText ? <p className="leadSummary">{leadSummaryText}</p> : null}
             <RecoverableSurfaceBoundary surface="markdown" resetKey={postId}>
-              <MarkdownRenderer content={renderedContent} forceScheme="light" />
+              <MarkdownRenderer
+                content={renderedContent}
+                trustedContentHtml={data?.trustedContentHtml}
+                forceScheme="light"
+              />
             </RecoverableSurfaceBoundary>
           </BodySection>
           {data.type[0] === "Post" && <div ref={relatedPrefetchTriggerRef} className="relatedPrefetchTrigger" aria-hidden="true" />}

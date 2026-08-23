@@ -1,13 +1,55 @@
 import { expect, test } from "@playwright/test"
-import {
-  mockAvatarAsset,
-} from "./helpers/smokeFixtures"
+import { createHash } from "node:crypto"
+import { mockAvatarAsset } from "./helpers/smokeFixtures"
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
 })
 
 test.describe("core smoke detail rendering", () => {
+  test("HTML-only trusted payload는 public detail의 단일 renderer에서 렌더된다", async ({ page }) => {
+    const contentHtml = "<p>신뢰된 HTML 전용 본문</p>"
+
+    await page.route("**/post/api/v1/posts/1645", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1645,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "신뢰 HTML 본문",
+          content: "",
+          contentHtml,
+          contentHtmlHash: createHash("sha256").update(contentHtml, "utf8").digest("hex"),
+          contentHtmlSanitizerPolicyVersion: "content-html-v1",
+          contentHtmlTrustState: "TRUSTED_CURRENT",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          commentsCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+    await page.route("**/post/api/v1/posts/1645/hit", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { hitCount: 1 } }),
+      })
+    })
+
+    await page.goto("/posts/1645")
+
+    await expect(page.getByRole("heading", { name: "신뢰 HTML 본문" })).toBeVisible()
+    await expect(page.locator(".aq-markdown")).toContainText("신뢰된 HTML 전용 본문")
+  })
+
   test("leading summary block은 header deck과 body lead summary에 중복 렌더되지 않는다", async ({ page }) => {
   await page.route("**/post/api/v1/posts/1701", async (route) => {
     await route.fulfill({

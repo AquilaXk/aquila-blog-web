@@ -50,7 +50,7 @@ const resolveMarkdownTableCellAlignment = (node: unknown, propAlignment: unknown
 
 const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   content,
-  contentHtml,
+  trustedContentHtml,
   disableMermaid = false,
   forceScheme,
   editableImages = false,
@@ -59,8 +59,8 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   const rootRef = useRef<HTMLDivElement>(null)
   const imageRenderOrderRef = useRef(0)
   const renderModel = useMemo(
-    () => resolveMarkdownRenderModel({ content, contentHtml }),
-    [content, contentHtml]
+    () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
+    [content, trustedContentHtml]
   )
   const { normalizedContent, renderKey, resolvedContentHtml, segments } = renderModel
   const { tableLayouts } = renderModel
