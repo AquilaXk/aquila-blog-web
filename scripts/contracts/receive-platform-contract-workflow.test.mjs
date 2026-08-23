@@ -67,6 +67,7 @@ test("receiver reads the manifest-declared immutable Platform bytes before any W
   const writerIndex = job.steps.indexOf(step(job, "Create Web write token"))
   const checkout = step(job, "Checkout immutable Web target without persisted credentials")
   assert.equal(checkout.with.ref, "${{ steps.delivery.outputs.target_commit }}")
+  assert.equal(checkout.with["fetch-depth"], 0, "durable sync branch merge requires full history")
   assert.ok(job.steps.indexOf(token) < job.steps.indexOf(checkout), "stale Platform source must avoid checkout/install")
   assert.ok(job.steps.indexOf(fetch) < writerIndex)
   assert.match(String(step(job, "Create Web write token").if), /steps\.changes\.outputs\.changed == 'true'/)
