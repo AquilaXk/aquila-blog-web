@@ -287,6 +287,8 @@ export const mockDetailEndpoint = async (page: Page, overrides: MockDetailOverri
         authorProfileImageDirectUrl: "/avatar.png",
         title: overrideTitle ?? "모바일 테이블/코드블록 회귀 테스트",
         content: overrideContent ?? DETAIL_CONTENT,
+        summary: "",
+        summarySource: "NONE",
         tags: ["모바일"],
         category: ["프론트"],
         published: true,

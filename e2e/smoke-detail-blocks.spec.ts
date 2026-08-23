@@ -151,6 +151,8 @@ test.describe("core smoke detail blocks and typography", () => {
           "토글 내부 본문입니다.",
           ":::",
         ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
         tags: [],
         category: [],
         published: true,
