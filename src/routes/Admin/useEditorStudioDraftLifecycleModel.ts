@@ -61,21 +61,26 @@ export const isLocalDraftRestoreSuggestionEligible = (input: {
   serverBaselineFingerprint: string
   restored: LocalDraftFingerprintSnapshot[]
   dismissed: LocalDraftFingerprintSnapshot[]
-}): boolean =>
-  input.candidate != null &&
-  localDraftSourcesEqual(input.candidate.source, input.currentSource) &&
-  input.candidate.fingerprint !== input.editorFingerprint &&
-  input.candidate.fingerprint !== input.serverBaselineFingerprint &&
-  !input.restored.some(
-    (snapshot) =>
-      localDraftSourcesEqual(snapshot.source, input.candidate.source) &&
-      snapshot.fingerprint === input.candidate.fingerprint
-  ) &&
-  !input.dismissed.some(
-    (snapshot) =>
-      localDraftSourcesEqual(snapshot.source, input.candidate.source) &&
-      snapshot.fingerprint === input.candidate.fingerprint
+}): boolean => {
+  const candidate = input.candidate
+  if (candidate == null) return false
+
+  return (
+    localDraftSourcesEqual(candidate.source, input.currentSource) &&
+    candidate.fingerprint !== input.editorFingerprint &&
+    candidate.fingerprint !== input.serverBaselineFingerprint &&
+    !input.restored.some(
+      (snapshot) =>
+        localDraftSourcesEqual(snapshot.source, candidate.source) &&
+        snapshot.fingerprint === candidate.fingerprint
+    ) &&
+    !input.dismissed.some(
+      (snapshot) =>
+        localDraftSourcesEqual(snapshot.source, candidate.source) &&
+        snapshot.fingerprint === candidate.fingerprint
+    )
   )
+}
 
 export const removeLocalDraftCandidateForSource = (
   candidate: LocalDraftFingerprintSnapshot | null,
