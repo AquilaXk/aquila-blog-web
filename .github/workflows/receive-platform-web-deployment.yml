@@ -1,0 +1,154 @@
+name: Verify Platform Web deployment
+
+on:
+  repository_dispatch:
+    types: [platform_web_deployment_ready]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-web-deployment-smoke
+  cancel-in-progress: false
+
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Validate verified Platform deployment
+        id: delivery
+        env:
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          EVENT_SENDER_TYPE: ${{ github.event.sender.type }}
+          EVENT_SENDER_LOGIN: ${{ github.event.sender.login }}
+          EXPECTED_APP_LOGIN: ${{ vars.REPO_SYNC_APP_BOT_LOGIN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { createHash } = require("node:crypto")
+          const { appendFileSync } = require("node:fs")
+
+          const payload = JSON.parse(process.env.CLIENT_PAYLOAD || "null")
+          const keys = [
+            "schema_version",
+            "platform_repository",
+            "platform_sha",
+            "web_repository",
+            "web_sha",
+            "image_digest",
+            "deploy_run_id",
+            "domain",
+            "served_build_sha",
+            "deployment_identity",
+          ]
+
+          if (
+            !process.env.EXPECTED_APP_LOGIN ||
+            process.env.EVENT_SENDER_TYPE !== "Bot" ||
+            process.env.EVENT_SENDER_LOGIN !== process.env.EXPECTED_APP_LOGIN
+          ) {
+            throw new Error("repository dispatch sender is not the configured App bot")
+          }
+          if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload) ||
+            Object.keys(payload).sort().join("\n") !== [...keys].sort().join("\n")
+          ) {
+            throw new Error("payload must contain exactly ten keys")
+          }
+          if (
+            payload.schema_version !== "1" ||
+            payload.platform_repository !== "AquilaXk/aquila-blog" ||
+            payload.web_repository !== "AquilaXk/aquila-blog-web" ||
+            payload.domain !== "https://blog.aquilaxk.site"
+          ) {
+            throw new Error("payload repository or domain identity is invalid")
+          }
+          for (const key of ["platform_sha", "web_sha", "served_build_sha"]) {
+            if (!/^[a-f0-9]{40}$/.test(payload[key])) throw new Error(`${key} is invalid`)
+          }
+          if (!/^sha256:[a-f0-9]{64}$/.test(payload.image_digest)) {
+            throw new Error("image_digest is invalid")
+          }
+          if (!/^[1-9][0-9]*$/.test(payload.deploy_run_id)) {
+            throw new Error("deploy_run_id is invalid")
+          }
+          if (payload.served_build_sha !== payload.web_sha) {
+            throw new Error("served_build_sha does not match web_sha")
+          }
+
+          const canonical = keys
+            .slice(0, -1)
+            .map((key) => `${key}=${payload[key]}\n`)
+            .join("")
+          const expectedIdentity = createHash("sha256").update(canonical).digest("hex")
+          if (payload.deployment_identity !== expectedIdentity) {
+            throw new Error("deployment_identity is invalid")
+          }
+
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            keys.map((key) => `${key}=${payload[key]}`).join("\n") + "\n",
+          )
+          NODE
+
+      - name: Checkout immutable Web receiver
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.delivery.outputs.web_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20.19"
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Install locked Web dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Chromium for public smoke
+        run: yarn playwright install chromium --with-deps
+
+      - name: Run served Platform deployment smoke
+        id: smoke
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.delivery.outputs.domain }}
+          PLAYWRIGHT_USE_WEBSERVER: "false"
+          PLAYWRIGHT_LIVE_MULTI_BROWSER: "false"
+          PLAYWRIGHT_LIVE_FAIL_FAST: "true"
+          E2E_EXPECTED_DOMAIN: ${{ steps.delivery.outputs.domain }}
+          E2E_EXPECTED_FRONT_COMMIT_SHA: ${{ steps.delivery.outputs.web_sha }}
+        run: |
+          set -euo pipefail
+          env -u NO_COLOR timeout 5m yarn playwright test e2e/platform-deployment-smoke.spec.ts --project=chromium --workers=1
+
+      - name: Record Platform deployment backlink
+        if: ${{ always() && steps.delivery.outcome == 'success' }}
+        env:
+          PLATFORM_REPOSITORY: ${{ steps.delivery.outputs.platform_repository }}
+          PLATFORM_SHA: ${{ steps.delivery.outputs.platform_sha }}
+          WEB_SHA: ${{ steps.delivery.outputs.web_sha }}
+          IMAGE_DIGEST: ${{ steps.delivery.outputs.image_digest }}
+          DEPLOY_RUN_ID: ${{ steps.delivery.outputs.deploy_run_id }}
+          DEPLOYMENT_IDENTITY: ${{ steps.delivery.outputs.deployment_identity }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Verified Platform Web deployment smoke"
+            echo
+            echo "- Platform run: https://github.com/${PLATFORM_REPOSITORY}/actions/runs/${DEPLOY_RUN_ID}"
+            echo "- Platform SHA: \`${PLATFORM_SHA}\`"
+            echo "- Web SHA: \`${WEB_SHA}\`"
+            echo "- Image digest: \`${IMAGE_DIGEST}\`"
+            echo "- Deployment identity: \`${DEPLOYMENT_IDENTITY}\`"
+            echo "- Smoke result: \`${SMOKE_OUTCOME}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
