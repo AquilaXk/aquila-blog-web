@@ -118,6 +118,7 @@ const mockFeedEndpoints = async (page: Page) => {
             authorProfileImgUrl: "/avatar.png",
             title: "접근성 점검용 피드 카드",
             summary: "A11y smoke",
+            summarySource: "MANUAL",
             tags: ["a11y"],
             category: ["테스트"],
             published: true,

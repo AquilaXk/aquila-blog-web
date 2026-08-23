@@ -96,6 +96,7 @@ export const createExplorePage = (title: string, tag = "모바일테스트") => 
       authorProfileImgUrl: "/avatar.png",
       title,
       summary: "iPhone 15 Pro 레이아웃 회귀 자동화",
+      summarySource: "MANUAL",
       tags: [tag],
       category: ["테스트"],
       published: true,
