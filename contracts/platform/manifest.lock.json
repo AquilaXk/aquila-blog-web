@@ -1,12 +1,12 @@
 {
   "version": 1,
   "sourceRepository": "AquilaXk/aquila-blog",
-  "sourceCommit": "de3e80148507e887140344fd38855f37b422f73c",
+  "sourceCommit": "2b3cade706890e1e534763122cd0488d7811865b",
   "contract": "aquila-public-api",
   "artifacts": {
     "openapi": {
       "path": "openapi.json",
-      "sha256": "a6e070502d5c1bfd010e84e0e72246786ecffb434e9ef3d235042a44ae42de4a"
+      "sha256": "e2ad5389b086b18c1c48881019642b12521f9fa66f766ef83c365c2059349167"
     },
     "errorCodes": {
       "path": "error-codes.json",

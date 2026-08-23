@@ -1909,6 +1909,8 @@ export interface components {
         PostSummaryBackfillRequest: {
             /** Format: int64 */
             afterId?: number;
+            /** Format: int64 */
+            maxId: number;
             /** Format: int32 */
             limit?: number;
             dryRun?: boolean;
