@@ -143,7 +143,20 @@ jobs:
         if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: |
           set -euo pipefail
-          if cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/platform/manifest.lock.json contracts/platform/manifest.lock.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts; then echo "changed=false" >> "${GITHUB_OUTPUT}"; else echo "changed=true" >> "${GITHUB_OUTPUT}"; fi
+          if cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts && node - <<'NODE'
+          const { isDeepStrictEqual } = require("node:util")
+          const fs = require("node:fs")
+          const candidate = JSON.parse(fs.readFileSync(".contract-candidate/platform/manifest.lock.json", "utf8"))
+          const current = JSON.parse(fs.readFileSync("contracts/platform/manifest.lock.json", "utf8"))
+          delete candidate.sourceCommit
+          delete current.sourceCommit
+          if (!isDeepStrictEqual(candidate, current)) process.exit(1)
+          NODE
+          then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Discover exact existing Web Draft PR
         id: existing-pr

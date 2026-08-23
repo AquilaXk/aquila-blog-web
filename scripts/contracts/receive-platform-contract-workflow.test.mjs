@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import test from "node:test"
@@ -141,4 +142,64 @@ test("a fresh unchanged candidate only opens the scoped stale-Draft-PR lifecycle
   assert.match(String(close.if), /steps\.existing-pr\.outputs\.exists == 'true'/)
   assert.match(close.run, /pr\.state === "closed"/)
   assert.doesNotMatch(source, /git branch -[dD]|git reset|git push[^\n]*(?:--force|--force-with-lease)/)
+})
+
+function detectChanges(run, candidate, current) {
+  const directory = mkdtempSync(path.join(tmpdir(), "web-contract-change-"))
+  try {
+    for (const file of [
+      ".contract-candidate/platform/openapi.json",
+      ".contract-candidate/platform/error-codes.json",
+      ".contract-candidate/platform/manifest.lock.json",
+      ".contract-candidate/generated/backend-openapi.d.ts",
+      "contracts/platform/openapi.json",
+      "contracts/platform/error-codes.json",
+      "contracts/platform/manifest.lock.json",
+      "packages/shared-contracts/src/generated/backend-openapi.d.ts",
+    ]) mkdirSync(path.dirname(path.join(directory, file)), { recursive: true })
+    for (const [file, value] of Object.entries(candidate)) writeFileSync(path.join(directory, file), value)
+    for (const [file, value] of Object.entries(current)) writeFileSync(path.join(directory, file), value)
+    const output = path.join(directory, "output")
+    const result = spawnSync("bash", ["-c", run], { cwd: directory, encoding: "utf8", env: { ...process.env, GITHUB_OUTPUT: output } })
+    assert.equal(result.status, 0, result.stderr)
+    return readFileSync(output, "utf8").trim()
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+test("sourceCommit-only manifest provenance changes are a Web receiver no-op", () => {
+  const { document } = workflow()
+  const detect = step(document.jobs.receive, "Detect Web-local contract changes")
+  assert.match(detect.run, /require\("node:util"\)/)
+  assert.match(detect.run, /isDeepStrictEqual/)
+  assert.match(detect.run, /delete candidate\.sourceCommit/)
+  assert.match(detect.run, /delete current\.sourceCommit/)
+  assert.match(detect.run, /\.contract-candidate\/platform\/manifest\.lock\.json/)
+  assert.match(detect.run, /contracts\/platform\/manifest\.lock\.json/)
+  assert.match(detect.run, /openapi\.json/)
+  assert.match(detect.run, /error-codes\.json/)
+  assert.match(detect.run, /backend-openapi\.d\.ts/)
+
+  const current = {
+    "contracts/platform/openapi.json": "{\"openapi\":\"3.1.0\"}\n",
+    "contracts/platform/error-codes.json": "{\"errors\":[]}\n",
+    "contracts/platform/manifest.lock.json": "{\"sourceCommit\":\"a\",\"artifacts\":{\"open_api\":{\"sha256\":\"same\"}}}\n",
+    "packages/shared-contracts/src/generated/backend-openapi.d.ts": "export type paths = {}\n",
+  }
+  const onlySourceCommitChanged = {
+    ".contract-candidate/platform/openapi.json": current["contracts/platform/openapi.json"],
+    ".contract-candidate/platform/error-codes.json": current["contracts/platform/error-codes.json"],
+    ".contract-candidate/platform/manifest.lock.json": "{\"sourceCommit\":\"b\",\"artifacts\":{\"open_api\":{\"sha256\":\"same\"}}}\n",
+    ".contract-candidate/generated/backend-openapi.d.ts": current["packages/shared-contracts/src/generated/backend-openapi.d.ts"],
+  }
+  assert.equal(detectChanges(detect.run, onlySourceCommitChanged, current), "changed=false")
+
+  const openApiHashChanged = {
+    ...onlySourceCommitChanged,
+    ".contract-candidate/platform/manifest.lock.json": "{\"sourceCommit\":\"b\",\"artifacts\":{\"open_api\":{\"sha256\":\"changed\"}}}\n",
+  }
+  assert.equal(detectChanges(detect.run, openApiHashChanged, current), "changed=true")
+  assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/platform/openapi.json": "{\"openapi\":\"3.1.1\"}\n" }, current), "changed=true")
+  assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/generated/backend-openapi.d.ts": "export type paths = { changed: true }\n" }, current), "changed=true")
 })
