@@ -25,7 +25,7 @@ const git = (cwd, args, env = process.env) => execFileSync(
   { encoding: "utf8", env: gitEnvWithoutInheritedRepository(env) },
 )
 
-async function fixture(env = process.env, { withSummaryFixtures = false } = {}) {
+async function fixture(env = process.env) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "platform-contracts-"))
   const source = path.join(root, "contracts", "public-api")
   const output = path.join(root, "output")
@@ -35,18 +35,14 @@ async function fixture(env = process.env, { withSummaryFixtures = false } = {}) 
   const summaryFixtures = Buffer.from('{"fixture":"transport-only"}\n')
   await fs.writeFile(path.join(source, "openapi.json"), openapi)
   await fs.writeFile(path.join(source, "error-codes.json"), errorCodes)
-  if (withSummaryFixtures) {
-    await fs.writeFile(path.join(source, "summary-fixtures.json"), summaryFixtures)
-  }
+  await fs.writeFile(path.join(source, "summary-fixtures.json"), summaryFixtures)
   await fs.writeFile(path.join(source, "manifest.json"), `${JSON.stringify({
     version: 1,
     contract: "aquila-public-api",
     artifacts: {
       openapi: { path: "openapi.json", sha256: sha256(openapi) },
       errorCodes: { path: "error-codes.json", sha256: sha256(errorCodes) },
-      ...(withSummaryFixtures ? {
-        summaryFixtures: { path: "summary-fixtures.json", sha256: sha256(summaryFixtures) },
-      } : {}),
+      summaryFixtures: { path: "summary-fixtures.json", sha256: sha256(summaryFixtures) },
     },
   }, null, 2)}\n`)
   git(root, ["init", "--initial-branch=main"], env)
@@ -108,8 +104,8 @@ async function importInChildProcess({ source, output, sourceCommit }, env) {
   return result
 }
 
-test("imports verified canonical bytes and creates a pinned lock", async (t) => {
-  const { root, source, output, sourceCommit } = await fixture()
+test("imports exact three canonical artifacts and creates a pinned lock", async (t) => {
+  const { root, source, output, sourceCommit, summaryFixtures } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
 
   await importPlatformContracts({ source, output, sourceRepository, sourceCommit })
@@ -122,12 +118,13 @@ test("imports verified canonical bytes and creates a pinned lock", async (t) => 
     artifacts: {
       openapi: { path: "openapi.json", sha256: sha256(Buffer.from('{"openapi":"3.0.1","paths":{}}\n')) },
       errorCodes: { path: "error-codes.json", sha256: sha256(Buffer.from('[{"code":"NOT_FOUND","httpStatus":404,"defaultUserMessage":"missing","kind":"USER"}]\n')) },
+      summaryFixtures: { path: "summary-fixtures.json", sha256: sha256(summaryFixtures) },
     },
   })
   await verifyPlatformContracts({ directory: output })
 })
 
-test("imports verified API bytes without requiring a Platform checkout", async (t) => {
+test("imports verified exact API bytes without requiring a Platform checkout", async (t) => {
   const { root, source, output, sourceCommit } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
 
@@ -135,6 +132,7 @@ test("imports verified API bytes without requiring a Platform checkout", async (
     manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
     openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
     errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+    summaryFixturesBytes: await fs.readFile(path.join(source, "summary-fixtures.json")),
     output,
     sourceRepository,
     sourceCommit,
@@ -143,8 +141,8 @@ test("imports verified API bytes without requiring a Platform checkout", async (
   await verifyPlatformContracts({ directory: output })
 })
 
-test("imports an exact three-artifact manifest and hash-locks raw summary fixture bytes", async (t) => {
-  const { root, source, output, sourceCommit, summaryFixtures } = await fixture(process.env, { withSummaryFixtures: true })
+test("hash-locks raw required summary fixture bytes", async (t) => {
+  const { root, source, output, sourceCommit, summaryFixtures } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
 
   await importPlatformContractBytes({
@@ -166,7 +164,7 @@ test("imports an exact three-artifact manifest and hash-locks raw summary fixtur
 })
 
 test("byte-input CLI imports exact three-artifact bytes", async (t) => {
-  const { root, source, output, sourceCommit, summaryFixtures } = await fixture(process.env, { withSummaryFixtures: true })
+  const { root, source, output, sourceCommit, summaryFixtures } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
 
   const result = spawnSync(process.execPath, [
@@ -185,28 +183,29 @@ test("byte-input CLI imports exact three-artifact bytes", async (t) => {
   await verifyPlatformContracts({ directory: output })
 })
 
-test("rejects unknown artifacts and replaces a three-artifact output with the exact two-artifact output", async (t) => {
-  const three = await fixture(process.env, { withSummaryFixtures: true })
-  const two = await fixture()
-  t.after(() => Promise.all([
-    fs.rm(three.root, { recursive: true, force: true }),
-    fs.rm(two.root, { recursive: true, force: true }),
-  ]))
+test("rejects missing or unknown artifacts without changing an exact three-artifact output", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
 
-  await importPlatformContracts({ source: three.source, output: three.output, sourceRepository, sourceCommit: three.sourceCommit })
-  await importPlatformContracts({ source: two.source, output: three.output, sourceRepository, sourceCommit: two.sourceCommit })
-  await assert.rejects(fs.access(path.join(three.output, "summary-fixtures.json")))
-  await verifyPlatformContracts({ directory: three.output })
-
-  const manifest = JSON.parse(await fs.readFile(path.join(two.source, "manifest.json"), "utf8"))
-  manifest.artifacts.unexpected = { path: "unexpected.json", sha256: "0".repeat(64) }
-  await fs.writeFile(path.join(two.source, "manifest.json"), `${JSON.stringify(manifest)}\n`)
+  await importPlatformContracts({ source, output, sourceRepository, sourceCommit })
+  const before = await fs.readdir(output)
+  const manifest = JSON.parse(await fs.readFile(path.join(source, "manifest.json"), "utf8"))
+  delete manifest.artifacts.summaryFixtures
+  await fs.writeFile(path.join(source, "manifest.json"), `${JSON.stringify(manifest)}\n`)
   await assert.rejects(
-    importPlatformContracts({ source: two.source, output: three.output, sourceRepository, sourceCommit: two.sourceCommit }),
+    importPlatformContracts({ source, output, sourceRepository, sourceCommit }),
     /source manifest has an invalid identity or shape/,
   )
-  await fs.writeFile(path.join(three.output, "unexpected.json"), "unexpected\n")
-  await assert.rejects(verifyPlatformContracts({ directory: three.output }), /unexpected output file/)
+  assert.deepEqual(await fs.readdir(output), before)
+
+  manifest.artifacts.summaryFixtures = { path: "summary-fixtures.json", sha256: sha256(await fs.readFile(path.join(source, "summary-fixtures.json"))) }
+  manifest.artifacts.unexpected = { path: "unexpected.json", sha256: "0".repeat(64) }
+  await fs.writeFile(path.join(source, "manifest.json"), `${JSON.stringify(manifest)}\n`)
+  await assert.rejects(
+    importPlatformContracts({ source, output, sourceRepository, sourceCommit }),
+    /source manifest has an invalid identity or shape/,
+  )
+  assert.deepEqual(await fs.readdir(output), before)
 })
 
 test("rejects invalid byte input before changing the output", async (t) => {
@@ -220,6 +219,7 @@ test("rejects invalid byte input before changing the output", async (t) => {
       manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
       openapiBytes: Buffer.from('{"openapi":"3.1.0","paths":{}}\n'),
       errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+      summaryFixturesBytes: await fs.readFile(path.join(source, "summary-fixtures.json")),
       output,
       sourceRepository,
       sourceCommit,
@@ -229,7 +229,7 @@ test("rejects invalid byte input before changing the output", async (t) => {
   assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
 })
 
-test("rejects undeclared summary fixture byte input before changing the output", async (t) => {
+test("rejects missing required summary fixture byte input before changing the output", async (t) => {
   const { root, source, output, sourceCommit } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   await fs.mkdir(output, { recursive: true })
@@ -240,12 +240,11 @@ test("rejects undeclared summary fixture byte input before changing the output",
       manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
       openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
       errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
-      summaryFixturesBytes: Buffer.from('{"unexpected":true}\n'),
       output,
       sourceRepository,
       sourceCommit,
     }),
-    /source artifact is undeclared: summary-fixtures.json/,
+    /source artifact bytes are missing: summary-fixtures.json/,
   )
   assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
 })
@@ -273,7 +272,7 @@ test("rejects a malformed declared summary fixture before changing the output", 
   assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
 })
 
-test("byte-input CLI imports without the Git-backed source option", async (t) => {
+test("byte-input CLI rejects a missing required summary fixture", async (t) => {
   const { root, source, output, sourceCommit } = await fixture()
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   const result = spawnSync(process.execPath, [
@@ -285,8 +284,8 @@ test("byte-input CLI imports without the Git-backed source option", async (t) =>
     "--source-repository", sourceRepository,
     "--source-commit", sourceCommit,
   ], { encoding: "utf8" })
-  assert.equal(result.status, 0, result.stderr)
-  await verifyPlatformContracts({ directory: output })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /Usage:/)
 })
 
 test("rejects a duplicate error code before changing the output", async (t) => {

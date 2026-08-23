@@ -59,7 +59,7 @@ test("receiver reads the manifest-declared immutable Platform bytes before any W
   assert.match(fetch.run, /\/contents\/contracts\/public-api\/error-codes\.json\?ref=/)
   assert.match(fetch.run, /summary-fixtures\.json/)
   assert.match(fetch.run, /summaryFixtures/)
-  assert.match(fetch.run, /summary_fixtures_sha256/)
+  assert.doesNotMatch(fetch.run, /summary_fixtures=/)
   assert.doesNotMatch(source, /repository:\s*AquilaXk\/aquila-blog/)
   assert.doesNotMatch(source, /path:\s*platform/)
   assert.doesNotMatch(source, /git -C platform|git clone|actions\/checkout[^\n]*aquila-blog/)
@@ -75,7 +75,7 @@ test("receiver reads the manifest-declared immutable Platform bytes before any W
   assert.match(step(job, "Install locked Web dependencies").run, /yarn install --frozen-lockfile/)
 })
 
-test("receiver writes separate summary-fixture outputs from the verified manifest", () => {
+test("receiver validates the required summary fixture from the verified manifest", () => {
   const { document } = workflow()
   const fetch = step(document.jobs.receive, "Read exact Platform contract bytes")
   const heredoc = /node - <<'NODE'\n([\s\S]*?)\nNODE/.exec(fetch.run)
@@ -115,10 +115,7 @@ test("receiver writes separate summary-fixture outputs from the verified manifes
       },
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(output, "utf8").split("\n").filter(Boolean), [
-      "summary_fixtures=true",
-      `summary_fixtures_sha256=${sha256(summaryFixtures)}`,
-    ])
+    assert.equal(existsSync(output), false)
 
     manifest.artifacts.summaryFixtures = null
     writeFileSync(path.join(incoming, "manifest.json"), JSON.stringify(manifest))
@@ -223,10 +220,12 @@ function detectChanges(run, candidate, current) {
     for (const file of [
       ".contract-candidate/platform/openapi.json",
       ".contract-candidate/platform/error-codes.json",
+      ".contract-candidate/platform/summary-fixtures.json",
       ".contract-candidate/platform/manifest.lock.json",
       ".contract-candidate/generated/backend-openapi.d.ts",
       "contracts/platform/openapi.json",
       "contracts/platform/error-codes.json",
+      "contracts/platform/summary-fixtures.json",
       "contracts/platform/manifest.lock.json",
       "packages/shared-contracts/src/generated/backend-openapi.d.ts",
     ]) mkdirSync(path.dirname(path.join(directory, file)), { recursive: true })
@@ -257,12 +256,14 @@ test("sourceCommit-only manifest provenance changes are a Web receiver no-op", (
   const current = {
     "contracts/platform/openapi.json": "{\"openapi\":\"3.1.0\"}\n",
     "contracts/platform/error-codes.json": "{\"errors\":[]}\n",
+    "contracts/platform/summary-fixtures.json": "{\"fixture\":\"same\"}\n",
     "contracts/platform/manifest.lock.json": "{\"sourceCommit\":\"a\",\"artifacts\":{\"open_api\":{\"sha256\":\"same\"}}}\n",
     "packages/shared-contracts/src/generated/backend-openapi.d.ts": "export type paths = {}\n",
   }
   const onlySourceCommitChanged = {
     ".contract-candidate/platform/openapi.json": current["contracts/platform/openapi.json"],
     ".contract-candidate/platform/error-codes.json": current["contracts/platform/error-codes.json"],
+    ".contract-candidate/platform/summary-fixtures.json": current["contracts/platform/summary-fixtures.json"],
     ".contract-candidate/platform/manifest.lock.json": "{\"sourceCommit\":\"b\",\"artifacts\":{\"open_api\":{\"sha256\":\"same\"}}}\n",
     ".contract-candidate/generated/backend-openapi.d.ts": current["packages/shared-contracts/src/generated/backend-openapi.d.ts"],
   }
@@ -277,15 +278,15 @@ test("sourceCommit-only manifest provenance changes are a Web receiver no-op", (
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/generated/backend-openapi.d.ts": "export type paths = { changed: true }\n" }, current), "changed=true")
 })
 
-test("summary fixture presence, removal, and bytes are Web-local candidate changes", () => {
+test("required summary fixture bytes are Web-local candidate changes", () => {
   const { document } = workflow()
   const detect = step(document.jobs.receive, "Detect Web-local contract changes")
   const commit = step(document.jobs.receive, "Commit Web-local contract candidate")
   const pr = step(document.jobs.receive, "Create or update the Web draft PR")
 
   assert.match(detect.run, /summary-fixtures\.json/)
-  assert.match(detect.run, /summary-fixtures candidate presence is invalid/)
-  assert.match(commit.run, /rm -f contracts\/platform\/summary-fixtures\.json/)
+  assert.doesNotMatch(detect.run, /candidate presence/)
+  assert.doesNotMatch(commit.run, /rm -f contracts\/platform\/summary-fixtures\.json/)
   assert.match(commit.run, /git add -A -- contracts\/platform/)
   assert.match(pr.run, /Refs #35/)
   assert.match(pr.run, /#1520/)

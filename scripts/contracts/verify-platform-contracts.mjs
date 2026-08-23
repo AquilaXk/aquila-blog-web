@@ -7,8 +7,7 @@ const SHA256 = /^[a-f0-9]{64}$/
 const COMMIT = /^[a-f0-9]{40}$/
 const LOCK_KEYS = ["artifacts", "contract", "sourceCommit", "sourceRepository", "version"]
 const ARTIFACT_KEYS = ["path", "sha256"]
-const REQUIRED_ARTIFACT_NAMES = ["errorCodes", "openapi"]
-const SUMMARY_FIXTURE_ARTIFACT = "summaryFixtures"
+const REQUIRED_ARTIFACT_NAMES = ["errorCodes", "openapi", "summaryFixtures"]
 const ERROR_CODE_KEYS = ["code", "defaultUserMessage", "httpStatus", "kind"]
 
 function fail(message) {
@@ -28,7 +27,7 @@ function sha256(value) {
 
 function expectedPath(name) {
   if (name === "openapi") return "openapi.json"
-  if (name === SUMMARY_FIXTURE_ARTIFACT) return "summary-fixtures.json"
+  if (name === "summaryFixtures") return "summary-fixtures.json"
   return "error-codes.json"
 }
 
@@ -59,15 +58,13 @@ export function validateErrorCodes(value) {
 
 export function validateLock(lock) {
   const artifactNames = Object.keys(lock?.artifacts ?? {}).sort()
-  const validArtifactNames = JSON.stringify(artifactNames) === JSON.stringify(REQUIRED_ARTIFACT_NAMES)
-    || JSON.stringify(artifactNames) === JSON.stringify([...REQUIRED_ARTIFACT_NAMES, SUMMARY_FIXTURE_ARTIFACT])
   const validLock = hasExactKeys(lock, LOCK_KEYS)
     && lock.version === 1
     && lock.contract === "aquila-public-api"
     && lock.sourceRepository === "AquilaXk/aquila-blog"
     && typeof lock.sourceCommit === "string"
     && COMMIT.test(lock.sourceCommit)
-    && validArtifactNames
+    && JSON.stringify(artifactNames) === JSON.stringify(REQUIRED_ARTIFACT_NAMES)
   if (!validLock) {
     fail("manifest.lock.json has an invalid shape or source identity")
   }
