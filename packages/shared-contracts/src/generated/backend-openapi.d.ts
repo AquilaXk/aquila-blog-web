@@ -1876,7 +1876,8 @@ export interface components {
             /** @enum {string} */
             summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
             contentHtmlHash?: string | null;
-            contentHtmlSanitizerPolicyVersion?: string | null;
+            /** @enum {string|null} */
+            contentHtmlSanitizerPolicyVersion?: "content-html-v1" | null;
             /** @enum {string} */
             contentHtmlTrustState?: "TRUSTED_CURRENT" | "UNKNOWN" | "REJECTED";
         };
