@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import type { GetServerSidePropsContext } from "next"
+import summaryFixtures from "../contracts/platform/summary-fixtures.json"
 import type { ExplorePostsPage } from "../src/apis/backend/posts"
 import { createFeedServerSideProps } from "../src/pages/feed"
 import {
@@ -25,6 +26,9 @@ const makePost = (
   summary: `RSS summary ${id}`,
   fullWidth: false,
 })
+
+const noneSummaryFixture = summaryFixtures.fixtures.find((fixture) => fixture.id === "none-no-fallback")
+if (!noneSummaryFixture) throw new Error("missing imported summary fixture: none-no-fallback")
 
 const createPagedLoader =
   (posts: TPost[], requestedPages: number[]) =>
@@ -90,6 +94,27 @@ test.describe("RSS feed contract", () => {
     expect(xml).toContain("<link>https://example.com</link>")
     expect(xml).toContain("<guid>https://example.com/posts/1</guid>")
     expect(xml).toContain("<pubDate>Sun, 21 Jun 2026 00:00:00 GMT</pubDate>")
+  })
+
+  test("NONE canonical summary는 RSS item description을 title이나 placeholder로 대체하지 않는다", () => {
+    const xml = buildRssFeedXml(
+      [
+        {
+          ...makePost(35),
+          title: noneSummaryFixture.title,
+          summary: noneSummaryFixture.expected?.summary,
+        },
+      ],
+      {
+        siteUrl: "https://example.com",
+        title: "AquilaLog",
+        description: "RSS contract",
+        lang: "ko-KR",
+      }
+    )
+    const item = xml.slice(xml.indexOf("<item>"), xml.indexOf("</item>") + "</item>".length)
+
+    expect(item).not.toContain("<description>")
   })
 
   test("feed route writes 200 RSS response headers and XML body", async () => {

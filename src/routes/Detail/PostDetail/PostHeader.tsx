@@ -96,7 +96,7 @@ const PostHeader: React.FC<Props> = ({
       : shareFeedback === "shared"
         ? "복사 완료"
         : "복사 완료"
-  const resolvedDeckSummary = (deckSummary ?? data.summary ?? "").trim()
+  const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const readSource = (data.content || data.summary || data.title).trim()
   const readTimeText = `${Math.max(1, Math.ceil(readSource.length / 500))}분 READ`
   const viewCount = hitCount ?? data.hitCount ?? 0

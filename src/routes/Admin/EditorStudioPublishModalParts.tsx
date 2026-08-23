@@ -78,7 +78,6 @@ type PreviewCardProps<TViewport extends string> = {
   previewFrameStyle: CSSProperties
   previewKicker: string
   previewSummary: string
-  previewSummaryFallback: string
   previewThumbnailSrc: string
   previewViewport: TViewport
   previewViewportLabel: string
@@ -100,7 +99,6 @@ export const EditorStudioPublishPreviewCard = <TViewport extends string,>({
   previewFrameStyle,
   previewKicker,
   previewSummary,
-  previewSummaryFallback,
   previewThumbnailSrc,
   previewViewport,
   previewViewportLabel,
@@ -156,7 +154,7 @@ export const EditorStudioPublishPreviewCard = <TViewport extends string,>({
         <div className="content">
           <PreviewVisibilityBadge>{previewVisibilityLabel}</PreviewVisibilityBadge>
           <h4>{postTitle.trim() || "제목을 입력하면 카드 결과가 여기에 표시됩니다."}</h4>
-          <p className="summary">{previewSummary || previewSummaryFallback}</p>
+          {previewSummary ? <p className="summary">{previewSummary}</p> : null}
           <div className="meta">
             <span>{previewDateText}</span>
             <span className="dot">·</span>

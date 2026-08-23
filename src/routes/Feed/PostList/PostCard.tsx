@@ -14,7 +14,6 @@ import {
   parseThumbnailZoomFromUrl,
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
-import { normalizeCardSummary } from "src/libs/postSummary"
 
 type Props = {
   data: TPost
@@ -41,7 +40,7 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular", index = 0 }) => {
     data?.date?.start_date || data.createdTime,
     CONFIG.lang
   )
-  const summary = normalizeCardSummary(data.summary, { fallback: "" })
+  const summary = data.summary ?? ""
   const likesCount = data.likesCount ?? 0
   const commentsCount = data.commentsCount ?? 0
   const categoryLabels = toDisplayCategoryLabels(data)

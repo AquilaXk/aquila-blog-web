@@ -87,10 +87,12 @@ export const expectMinTouchTarget = async (
   label: string
 ) => {
   await expect(locator, label).toBeVisible()
-  const box = await locator.boundingBox()
-  expect(box, `${label} boundingBox`).not.toBeNull()
-  expect(box!.width, `${label} width`).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX)
-  expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX)
+  await expect
+    .poll(async () => {
+      const box = await locator.boundingBox()
+      return box ? Math.min(box.width, box.height) : 0
+    }, { message: `${label} minimum dimension` })
+    .toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX)
 }
 
 /** goto 전에 호출한다. client navigation/hydration에도 루트 fontSize가 유지된다. */

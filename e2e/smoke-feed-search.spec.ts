@@ -116,7 +116,8 @@ test.describe("core smoke feed and search", () => {
       body: JSON.stringify(
         createExplorePage("빈 표시값 카드", "", {
           category: [],
-          summary: "핵심 내용을 정리 중입니다.",
+          summary: "",
+          summarySource: "NONE",
           tags: [],
           thumbnail: "https://cdn.example.invalid/empty-card.png",
         })
@@ -251,14 +252,15 @@ test.describe("core smoke feed and search", () => {
   await expect(page.getByText("aquilaXk's Blog")).toHaveCount(0)
 })
 
-  test("피드 카드 요약의 escaped quote는 화면에서 정리되어 렌더된다", async ({ page }) => {
+  test("피드 카드 canonical quote summary는 그대로 렌더된다", async ({ page }) => {
+  const canonicalSummary = 'SSE 알림이 "잠깐 되다가 멈추는" 현상 추적'
   await page.route("**/post/api/v1/posts/feed**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(
         createExplorePage("요약 정규화", "SSE", {
-          summary: 'SSE 알림이 \\\\\\"잠깐 되다가 멈추는\\\\\\" 현상 추적',
+          summary: canonicalSummary,
         })
       ),
     })
@@ -273,8 +275,7 @@ test.describe("core smoke feed and search", () => {
   })
 
   await page.goto("/")
-  await expect(page.getByText('SSE 알림이 "잠깐 되다가 멈추는" 현상 추적')).toBeVisible()
-  await expect(page.getByText('\\"잠깐 되다가 멈추는\\"')).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-post-card"] .summary').first()).toHaveText(canonicalSummary)
 })
 
   test("검색 입력은 search API의 kw 파라미터를 통해 백엔드 탐색으로 동작한다", async ({ page }) => {

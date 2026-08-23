@@ -17,6 +17,8 @@ const postPayload = (overrides: Record<string, unknown> = {}): ApiPostWithConten
     authorName: "관리자",
     title: "신뢰 본문",
     content: "",
+    summary: "",
+    summarySource: "NONE",
     tags: [],
     category: [],
     published: true,

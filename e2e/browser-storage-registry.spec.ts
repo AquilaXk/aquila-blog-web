@@ -69,6 +69,7 @@ test("browser storage registry includes privacy and runtime keys used by public 
       }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v2" }),
+      expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
       expect.objectContaining({ area: "sessionStorage", key: "auth.signupMailCooldown.v1" }),
       expect.objectContaining({
@@ -90,7 +91,7 @@ test("browser storage registry covers source storage constants", () => {
     expect.objectContaining({ name: "IP_SECURITY_KEY", key: "auth.login.ipSecurityOn" }),
     expect.objectContaining({ name: "SIGNUP_MAIL_COOLDOWN_STORAGE_KEY", key: "auth.signupMailCooldown.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_V1_STORAGE_KEY", key: "admin.editor.localDraft.v1" }),
-    expect.objectContaining({ name: "LOCAL_DRAFT_CREATE_STORAGE_KEY", key: "admin.editor.localDraft.create.v2" }),
+    expect.objectContaining({ name: "LOCAL_DRAFT_CREATE_STORAGE_KEY", key: "admin.editor.localDraft.create.v3" }),
     expect.objectContaining({
       name: "LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX",
       key: "admin.editor.localDraft.post.",

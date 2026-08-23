@@ -1,7 +1,7 @@
 import { getApiBaseUrl } from "src/apis/backend/client"
 import { convertHtmlToMarkdown as convertHtmlClipboardToMarkdown } from "src/libs/markdown/htmlToMarkdown"
-import { buildPreviewSummaryFromMarkdown, normalizePersistedSummary } from "src/libs/postSummary"
 import { normalizeCategoryValue } from "src/libs/utils"
+import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   DEFAULT_THUMBNAIL_FOCUS_X,
   DEFAULT_THUMBNAIL_FOCUS_Y,
@@ -22,7 +22,6 @@ export type ParsedEditorMeta = {
   body: string
   tags: string[]
   category: string
-  summary: string
   thumbnail: string
 }
 
@@ -30,7 +29,6 @@ export type ResolvedEditorMetaSnapshot = {
   body: string
   tags: string[]
   category: string
-  summary: string
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -47,6 +45,8 @@ export type LocalDraftPayload = {
   title: string
   content: string
   summary: string
+  summarySource: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE"
+  summaryIntent: SummaryIntent
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -75,7 +75,7 @@ const PREVIEW_THUMBNAIL_ALLOWED_PATH_REGEX = /^\/post\/api\/v1\/images\/posts\/[
 const PREVIEW_THUMBNAIL_ALLOWED_QUERY_REGEX = /^\?(?:[A-Za-z0-9._~/%=&-]*)$/
 const FRONTMATTER_DELIMITER_REGEX = /^\s*---\s*$/
 const LEADING_EDITOR_METADATA_LINE_REGEX =
-  /^\s*(tags?|categories?|summary|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*(.+)\s*$/i
+  /^\s*(tags?|categories?|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*(.+)\s*$/i
 const EDITOR_BODY_PLACEHOLDER = "내용을 입력하세요."
 const EDITOR_TOGGLE_TITLE_PLACEHOLDER = "토글 제목"
 const HTML_TAG_REGEX = /<\/?([a-z][a-z0-9:-]*)\b([^>]*)>/gi
@@ -203,9 +203,6 @@ export const normalizeSafePreviewThumbnailUrl = (raw: string): string => {
     return ""
   }
 }
-
-export const makePreviewSummary = (content: string, maxLength = PREVIEW_SUMMARY_MAX_LENGTH) =>
-  buildPreviewSummaryFromMarkdown(content, maxLength, "")
 
 const splitFrontmatterBlock = (content: string) => {
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
@@ -392,7 +389,6 @@ export const resolveEditorMetaSnapshot = (content: string, contentHtml?: string 
     body: resolvedBody,
     tags: parsed.tags,
     category: parsed.category,
-    summary: normalizePersistedSummary(parsed.summary),
     thumbnailUrl: syncedThumbnail,
     thumbnailFocusX: syncedThumbnailFocusX,
     thumbnailFocusY: syncedThumbnailFocusY,
@@ -404,6 +400,8 @@ export const buildEditorStateFingerprint = ({
   title,
   content,
   summary,
+  summarySource,
+  summaryIntent,
   thumbnailUrl,
   thumbnailFocusX,
   thumbnailFocusY,
@@ -415,6 +413,8 @@ export const buildEditorStateFingerprint = ({
   title: string
   content: string
   summary: string
+  summarySource: LocalDraftPayload["summarySource"]
+  summaryIntent: SummaryIntent
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -427,6 +427,8 @@ export const buildEditorStateFingerprint = ({
     title,
     content,
     summary,
+    summarySource,
+    summaryIntent,
     thumbnailUrl,
     thumbnailFocusX,
     thumbnailFocusY,
@@ -440,7 +442,6 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
   let trimmed = content.replace(/\r\n?/g, "\n").trimStart()
   const tags: string[] = []
   let category = ""
-  let summary = ""
   let thumbnail = ""
 
   const pushTags = (items: string[]) => {
@@ -465,7 +466,6 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
 
       if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))
       if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
-      if (key === "summary") summary = normalizeMetaScalar(value)
       if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
         thumbnail = normalizeMetaScalar(value)
       }
@@ -486,7 +486,6 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
         const value = match[2]
         if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
         if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
-        if (key === "summary") summary = normalizeMetaScalar(value)
         if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
           thumbnail = normalizeMetaScalar(value)
         }
@@ -498,7 +497,6 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
     body: resolveEditorBodyFallback(content, trimmed),
     tags,
     category,
-    summary,
     thumbnail,
   }
 }
@@ -508,19 +506,17 @@ const serializeMetaItems = (items: string[]) => items.map((item) => JSON.stringi
 export const composeEditorContent = (
   body: string,
   tags: string[],
-  options?: { category?: string; summary?: string; thumbnail?: string }
+  options?: { category?: string; thumbnail?: string }
 ) => {
   const normalizedBody = body.trim()
   const normalizedTags = dedupeStrings(tags)
   const normalizedCategory = options?.category ? normalizeCategoryValue(options.category) : ""
-  const normalizedSummary = normalizePersistedSummary(options?.summary)
   const normalizedThumbnail = options?.thumbnail?.trim() || ""
   const metadataLines: string[] = []
 
   if (normalizedTags.length > 0) metadataLines.push(`tags: [${serializeMetaItems(normalizedTags)}]`)
   if (normalizedCategory) metadataLines.push(`category: [${serializeMetaItems([normalizedCategory])}]`)
   if (normalizedThumbnail) metadataLines.push(`thumbnail: ${JSON.stringify(normalizedThumbnail)}`)
-  if (normalizedSummary) metadataLines.push(`summary: ${JSON.stringify(normalizedSummary)}`)
 
   if (metadataLines.length === 0) return normalizedBody
   if (!normalizedBody) return `---\n${metadataLines.join("\n")}\n---`

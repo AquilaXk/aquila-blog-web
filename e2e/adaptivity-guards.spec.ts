@@ -148,6 +148,8 @@ test.describe("adaptivity font-scale", () => {
           authorProfileImageDirectUrl: "/avatar.png",
           title: "adaptivity 상세 점검",
           content: "## 본문\n\n폰트 확대 회귀 점검용 문단입니다.",
+          summary: "adaptivity 상세 점검",
+          summarySource: "MANUAL",
           tags: ["adaptivity"],
           category: ["테스트"],
           published: true,

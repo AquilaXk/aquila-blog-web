@@ -39,6 +39,17 @@ const normalizeInitialEditorPost = (payload: unknown): PostForEditor | null => {
   const version =
     typeof rawVersion === "number" && Number.isFinite(rawVersion) ? rawVersion : undefined
   const contentHtml = typeof candidate.contentHtml === "string" ? candidate.contentHtml : undefined
+  const summarySource =
+    candidate.summarySource === "MANUAL" ||
+    candidate.summarySource === "LEADING_BLOCK" ||
+    candidate.summarySource === "EXTRACTED" ||
+    candidate.summarySource === "MIGRATED" ||
+    candidate.summarySource === "NONE"
+      ? candidate.summarySource
+      : null
+  if (typeof candidate.summary !== "string" || summarySource == null) return null
+  if ((summarySource === "NONE") !== (candidate.summary.length === 0)) return null
+  if (summarySource !== "NONE" && candidate.summary.trim().length === 0) return null
 
   return {
     id,
@@ -49,6 +60,8 @@ const normalizeInitialEditorPost = (payload: unknown): PostForEditor | null => {
     published: candidate.published === true,
     listed: candidate.listed === true,
     ...(candidate.tempDraft === undefined ? {} : { tempDraft: candidate.tempDraft === true }),
+    summary: candidate.summary,
+    summarySource,
   }
 }
 

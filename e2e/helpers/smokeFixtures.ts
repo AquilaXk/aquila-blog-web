@@ -83,6 +83,7 @@ export const createExplorePost = (overrides: Partial<Record<string, unknown>> & 
   authorUsername: "aquila",
   authorProfileImgUrl: "/avatar.png",
   summary: "탐색 API 스모크",
+  summarySource: "MANUAL",
   tags: ["테스트태그"],
   category: ["백엔드"],
   published: true,

@@ -18,6 +18,11 @@ import type {
 import type {
   ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
+import type {
+  ApiEditorPostDto,
+  ApiPostSummaryPreviewResponse,
+  ApiPostWriteRequest,
+} from "src/apis/backend/posts/PostApiDtos"
 
 export const MARKDOWN_EDITOR_MERMAID_ENABLED = process.env.NEXT_PUBLIC_EDITOR_V2_MERMAID_ENABLED !== "false"
 export const ADMIN_POSTS_WORKSPACE_ROUTE = "/admin/posts"
@@ -44,16 +49,69 @@ export const normalizeEditorReturnRoute = (value: string) => {
 
 export type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null
 
-export type PostForEditor = {
+export type PostForEditor = ApiEditorPostDto & {
   id: number
   title: string
   content: string
-  contentHtml?: string
-  version?: number
   published: boolean
   listed: boolean
-  tempDraft?: boolean
 }
+
+export type SummaryIntent =
+  | { kind: "unchanged" }
+  | { kind: "manual"; summary: string }
+  | { kind: "auto" }
+
+export type CanonicalSummaryState = {
+  summary: string
+  summarySource: NonNullable<ApiEditorPostDto["summarySource"]>
+  intent: SummaryIntent
+}
+
+const SUMMARY_SOURCES = new Set<CanonicalSummaryState["summarySource"]>([
+  "MANUAL",
+  "LEADING_BLOCK",
+  "EXTRACTED",
+  "MIGRATED",
+  "NONE",
+])
+
+export const toSummaryWriteFields = (
+  intent: SummaryIntent,
+): Pick<ApiPostWriteRequest, "summaryMode" | "summary"> => {
+  if (intent.kind === "unchanged") return { summaryMode: null, summary: null }
+  if (intent.kind === "manual") return { summaryMode: "MANUAL", summary: intent.summary }
+  return { summaryMode: "AUTO", summary: null }
+}
+
+const resolveCanonicalSummaryResult = (
+  current: CanonicalSummaryState,
+  response: unknown,
+  intent: SummaryIntent,
+): { ok: true; state: CanonicalSummaryState } | { ok: false; state: CanonicalSummaryState } => {
+  if (response == null || typeof response !== "object") return { ok: false, state: current }
+  const { summary, source } = response as Partial<ApiPostSummaryPreviewResponse>
+  if (typeof summary !== "string" || !SUMMARY_SOURCES.has(source as CanonicalSummaryState["summarySource"])) {
+    return { ok: false, state: current }
+  }
+  const summarySource = source as CanonicalSummaryState["summarySource"]
+  if ((summarySource === "NONE") !== (summary.length === 0)) return { ok: false, state: current }
+  if (summarySource !== "NONE" && summary.trim().length === 0) return { ok: false, state: current }
+  return {
+    ok: true,
+    state: {
+      summary,
+      summarySource,
+      intent,
+    },
+  }
+}
+
+export const resolveSummaryPreviewResult = (current: CanonicalSummaryState, response: unknown) =>
+  resolveCanonicalSummaryResult(current, response, { kind: "auto" })
+
+export const resolvePersistedSummaryResult = (current: CanonicalSummaryState, response: unknown) =>
+  resolveCanonicalSummaryResult(current, response, { kind: "unchanged" })
 
 export type RsData<T> = {
   resultCode: string
@@ -142,7 +200,6 @@ export const buildEmptyEditorMetaSnapshot = (): ResolvedEditorMetaSnapshot => ({
   body: "",
   tags: [],
   category: "",
-  summary: "",
   thumbnailUrl: "",
   thumbnailFocusX: DEFAULT_THUMBNAIL_FOCUS_X,
   thumbnailFocusY: DEFAULT_THUMBNAIL_FOCUS_Y,

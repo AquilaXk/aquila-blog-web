@@ -10,6 +10,7 @@ import {
   useTransition,
 } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import type { ApiPostSummaryPreviewRequest, ApiPostSummaryPreviewResponse } from "src/apis/backend/posts/PostApiDtos"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import useAuthSession from "src/hooks/useAuthSession"
 import {
@@ -52,7 +53,6 @@ import {
   dedupeStrings,
   detectPublishPlaceholderIssue,
   extractFirstMarkdownImage,
-  makePreviewSummary,
   normalizeSafeImageUrl,
   normalizeSafePreviewThumbnailUrl,
   resolveEditorMetaSnapshot,
@@ -95,6 +95,9 @@ import {
   type ManageMobileStudioStep,
   type NoticeState,
   type PostForEditor,
+  type CanonicalSummaryState,
+  type SummaryIntent,
+  resolveSummaryPreviewResult,
   type PreviewViewportMode,
   type RsData,
   type StudioSurface,
@@ -133,6 +136,9 @@ export const EditorStudioWorkspaceController = ({
   const deferredPostContent = useDeferredValue(postContent)
   const [, startPostContentTransition] = useTransition()
   const [postSummary, setPostSummary] = useState("")
+  const [postSummarySource, setPostSummarySource] = useState<CanonicalSummaryState["summarySource"]>("NONE")
+  const [summaryIntent, setSummaryIntent] = useState<SummaryIntent>({ kind: "auto" })
+  const postSummaryRevisionRef = useRef(0)
   const [postThumbnailUrl, setPostThumbnailUrl] = useState("")
   const [postThumbnailFocusX, setPostThumbnailFocusX] = useState(DEFAULT_THUMBNAIL_FOCUS_X)
   const [postThumbnailFocusY, setPostThumbnailFocusY] = useState(DEFAULT_THUMBNAIL_FOCUS_Y)
@@ -169,11 +175,9 @@ export const EditorStudioWorkspaceController = ({
   const flushEditorMarkdownRef = useRef<MarkdownEditorFlush | null>(null)
   const deferredContentDerivedCacheRef = useRef<{
     fingerprint: string
-    summary: string
     firstImage: string
   }>({
     fingerprint: "",
-    summary: "",
     firstImage: "",
   })
   const markdownEditorLoadGuardStateRef = useRef<MarkdownEditorLoadGuardState>({
@@ -409,12 +413,14 @@ export const EditorStudioWorkspaceController = ({
     void replaceShallowRoutePreservingScroll(router, { query: nextQuery })
   }, [router])
 
-  const syncEditorMeta = useCallback((content: string, contentHtml?: string | null) => {
+  const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState, contentHtml?: string | null) => {
     const snapshot = resolveEditorMetaSnapshot(content, contentHtml)
     markdownEditorLoadGuardStateRef.current = createMarkdownEditorLoadGuardState(snapshot.body)
     postContentLiveRef.current = snapshot.body
     setPostContent(snapshot.body)
-    setPostSummary(snapshot.summary)
+    setPostSummary(canonicalSummary.summary)
+    setPostSummarySource(canonicalSummary.summarySource)
+    setSummaryIntent(canonicalSummary.intent)
     setPostThumbnailUrl(snapshot.thumbnailUrl)
     setPostThumbnailFocusX(snapshot.thumbnailFocusX)
     setPostThumbnailFocusY(snapshot.thumbnailFocusY)
@@ -450,6 +456,8 @@ export const EditorStudioWorkspaceController = ({
     postContent,
     getCurrentPostContent,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postThumbnailUrl,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -467,6 +475,8 @@ export const EditorStudioWorkspaceController = ({
     setPostTitle,
     setPostContent,
     setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostThumbnailUrl,
     setPostThumbnailFocusX,
     setPostThumbnailFocusY,
@@ -523,18 +533,59 @@ export const EditorStudioWorkspaceController = ({
 
     const next = {
       fingerprint,
-      summary: makePreviewSummary(deferredPostContent),
       firstImage: extractFirstMarkdownImage(deferredPostContent),
     }
     deferredContentDerivedCacheRef.current = next
     return next
   }, [deferredPostContent])
 
-  const resolvedPreviewSummary = useMemo(() => {
-    const manual = postSummary.trim()
-    if (manual) return manual
-    return deferredContentDerived.summary
-  }, [deferredContentDerived.summary, postSummary])
+  const resolvedPreviewSummary = postSummary
+
+  const handlePostSummaryChange = useCallback((summary: string) => {
+    postSummaryRevisionRef.current += 1
+    if (summary.trim()) {
+      setPostSummary(summary)
+      setPostSummarySource("MANUAL")
+      setSummaryIntent({ kind: "manual", summary })
+    } else {
+      setPostSummary("")
+      setPostSummarySource("NONE")
+      setSummaryIntent({ kind: "auto" })
+    }
+  }, [])
+
+  const handlePreviewSummary = useCallback(async () => {
+    const summaryRevision = postSummaryRevisionRef.current
+    const current: CanonicalSummaryState = {
+      summary: postSummary,
+      summarySource: postSummarySource,
+      intent: summaryIntent,
+    }
+    try {
+      setLoadingKey("previewSummary")
+      setPublishStatus({ tone: "loading", text: "요약 미리보기를 불러오는 중입니다." })
+      const response = await apiFetch<ApiPostSummaryPreviewResponse>("/post/api/v1/adm/posts/preview-summary", {
+        method: "POST",
+        body: JSON.stringify({ title: postTitle, content: getCurrentPostContent() } satisfies ApiPostSummaryPreviewRequest),
+      })
+      const resolved = resolveSummaryPreviewResult(current, response)
+      if (!resolved.ok) throw new Error("canonical summary preview response is malformed")
+      if (postSummaryRevisionRef.current !== summaryRevision) {
+        setPublishStatus({ tone: "error", text: "요약이 변경되어 미리보기 결과를 반영하지 않았습니다." })
+        return
+      }
+      setPostSummary(resolved.state.summary)
+      setPostSummarySource(resolved.state.summarySource)
+      setSummaryIntent(resolved.state.intent)
+      setPublishStatus({ tone: "success", text: "canonical 요약 미리보기를 반영했습니다." })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setPublishStatus({ tone: "error", text: "요약 미리보기를 불러오지 못했습니다." })
+      setResult(pretty({ error: message }))
+    } finally {
+      setLoadingKey("")
+    }
+  }, [getCurrentPostContent, postSummary, postSummarySource, postTitle, setPublishStatus, summaryIntent])
 
   const resolvedPreviewThumbnail = useMemo(() => {
     const manual = stripThumbnailFocusFromUrl(normalizeSafeImageUrl(postThumbnailUrl))
@@ -635,6 +686,8 @@ export const EditorStudioWorkspaceController = ({
     postTags,
     postCategory,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postThumbnailUrl,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -654,6 +707,9 @@ export const EditorStudioWorkspaceController = ({
     setIsTempDraftMode,
     setPostId,
     setPostVersion,
+    setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostVisibility,
     setKnownTags,
     setLocalDraftSavedAt,
@@ -861,7 +917,7 @@ export const EditorStudioWorkspaceController = ({
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
-        handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing,
+        handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePreviewSummary, handlePostSummaryChange,
         handleCreateNewPostFromSelectedPanel, handleDeleteComment, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
         handleLikePost, handleListComments, handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
         handleLoadOrCreateTempPost, handleModifyComment, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
@@ -877,7 +933,7 @@ export const EditorStudioWorkspaceController = ({
         loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
-        postSummary, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
+        postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
         postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,
         profileImageFileInputRef, profileImageFileName, profileImageNotice, profileImgInputUrl, profileNotice,
         profileRoleInput, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,

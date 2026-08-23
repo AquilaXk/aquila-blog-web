@@ -127,27 +127,22 @@ jobs:
           for (const [file, expected] of [["manifest.json", process.env.MANIFEST_SHA256], ["openapi.json", process.env.OPENAPI_SHA256], ["error-codes.json", process.env.ERROR_CODES_SHA256]]) if (createHash("sha256").update(fs.readFileSync(`incoming/${file}`)).digest("hex") !== expected) throw new Error(`${file} hash does not match delivery`)
           const manifest = JSON.parse(fs.readFileSync("incoming/manifest.json", "utf8"))
           const names = Object.keys(manifest?.artifacts ?? {}).sort()
-          if (manifest?.version !== 1 || manifest?.contract !== "aquila-public-api" || ![["errorCodes", "openapi"], ["errorCodes", "openapi", "summaryFixtures"]].some((expected) => JSON.stringify(names) === JSON.stringify(expected))) throw new Error("manifest has an invalid artifact shape")
-          const declaresSummaryFixtures = Object.hasOwn(manifest.artifacts, "summaryFixtures")
+          if (manifest?.version !== 1 || manifest?.contract !== "aquila-public-api" || JSON.stringify(names) !== JSON.stringify(["errorCodes", "openapi", "summaryFixtures"])) throw new Error("manifest has an invalid artifact shape")
           const summary = manifest.artifacts.summaryFixtures
-          if (declaresSummaryFixtures && (!summary || Object.keys(summary).sort().join("\\n") !== "path\\nsha256" || summary.path !== "summary-fixtures.json" || !/^[a-f0-9]{64}$/.test(summary.sha256))) throw new Error("manifest summary fixture declaration is invalid")
-          if (declaresSummaryFixtures) fs.writeFileSync("incoming/summary-fixtures.sha256", summary.sha256)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary_fixtures=${declaresSummaryFixtures}\nsummary_fixtures_sha256=${summary?.sha256 ?? ""}\n`)
+          if (!summary || Object.keys(summary).sort().join("\\n") !== "path\\nsha256" || summary.path !== "summary-fixtures.json" || !/^[a-f0-9]{64}$/.test(summary.sha256)) throw new Error("manifest summary fixture declaration is invalid")
+          fs.writeFileSync("incoming/summary-fixtures.sha256", summary.sha256)
           NODE
-          if [[ -f incoming/summary-fixtures.sha256 ]]; then
-            SUMMARY_FIXTURES_SHA256="$(<incoming/summary-fixtures.sha256)"
-            gh api "repos/${PLATFORM_REPOSITORY}/contents/contracts/public-api/summary-fixtures.json?ref=${SOURCE_COMMIT}" --jq .content | base64 --decode > incoming/summary-fixtures.json
-            actual_summary_sha256="$(node -e 'const { createHash } = require("node:crypto"); const fs = require("node:fs"); process.stdout.write(createHash("sha256").update(fs.readFileSync("incoming/summary-fixtures.json")).digest("hex"))')"
-            if [[ "${actual_summary_sha256}" != "${SUMMARY_FIXTURES_SHA256}" ]]; then echo "summary-fixtures.json hash does not match verified manifest" >&2; exit 1; fi
-          fi
+          SUMMARY_FIXTURES_SHA256="$(<incoming/summary-fixtures.sha256)"
+          gh api "repos/${PLATFORM_REPOSITORY}/contents/contracts/public-api/summary-fixtures.json?ref=${SOURCE_COMMIT}" --jq .content | base64 --decode > incoming/summary-fixtures.json
+          actual_summary_sha256="$(node -e 'const { createHash } = require("node:crypto"); const fs = require("node:fs"); process.stdout.write(createHash("sha256").update(fs.readFileSync("incoming/summary-fixtures.json")).digest("hex"))')"
+          if [[ "${actual_summary_sha256}" != "${SUMMARY_FIXTURES_SHA256}" ]]; then echo "summary-fixtures.json hash does not match verified manifest" >&2; exit 1; fi
 
       - name: Build validated Web-local contract candidate
         if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: |
           set -euo pipefail
           candidate="$(mktemp -d)"
-          args=(--manifest incoming/manifest.json --openapi incoming/openapi.json --error-codes incoming/error-codes.json --output "${candidate}/contracts/platform" --source-repository "${PLATFORM_REPOSITORY}" --source-commit "${{ steps.delivery.outputs.source_commit }}")
-          if [[ "${{ steps.platform-bytes.outputs.summary_fixtures }}" == "true" ]]; then args+=(--summary-fixtures incoming/summary-fixtures.json); fi
+          args=(--manifest incoming/manifest.json --openapi incoming/openapi.json --error-codes incoming/error-codes.json --summary-fixtures incoming/summary-fixtures.json --output "${candidate}/contracts/platform" --source-repository "${PLATFORM_REPOSITORY}" --source-commit "${{ steps.delivery.outputs.source_commit }}")
           node scripts/contracts/import-platform-contracts.mjs "${args[@]}"
           mkdir -p "${candidate}/packages/shared-contracts/src/generated" .contract-candidate/generated
           ./node_modules/.bin/openapi-typescript "${candidate}/contracts/platform/openapi.json" -o "${candidate}/packages/shared-contracts/src/generated/backend-openapi.d.ts"
@@ -160,13 +155,7 @@ jobs:
         if: ${{ steps.freshness.outputs.stale == 'false' }}
         run: |
           set -euo pipefail
-          candidate_summary=false; current_summary=false
-          [[ -f .contract-candidate/platform/summary-fixtures.json ]] && candidate_summary=true
-          [[ -f contracts/platform/summary-fixtures.json ]] && current_summary=true
-          # summary-fixtures candidate presence is invalid for an unchanged candidate.
-          if [[ "${candidate_summary}" != "${current_summary}" ]]; then
-            echo "changed=true" >> "${GITHUB_OUTPUT}"
-          elif [[ "${candidate_summary}" == "true" ]] && ! cmp -s .contract-candidate/platform/summary-fixtures.json contracts/platform/summary-fixtures.json; then
+          if ! cmp -s .contract-candidate/platform/summary-fixtures.json contracts/platform/summary-fixtures.json; then
             echo "changed=true" >> "${GITHUB_OUTPUT}"
           elif cmp -s .contract-candidate/platform/openapi.json contracts/platform/openapi.json && cmp -s .contract-candidate/platform/error-codes.json contracts/platform/error-codes.json && cmp -s .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts && node - <<'NODE'
           const { isDeepStrictEqual } = require("node:util")
@@ -252,7 +241,7 @@ jobs:
           allowed_path() { [[ "$1" == contracts/platform/* || "$1" == packages/shared-contracts/src/generated/backend-openapi.d.ts ]]; }
           while IFS= read -r changed; do [[ -z "${changed}" ]] || allowed_path "${changed}" || { echo "stable branch contains out-of-scope path: ${changed}" >&2; exit 1; }; done < <(git diff --name-only origin/main...HEAD)
           cp .contract-candidate/platform/openapi.json .contract-candidate/platform/error-codes.json .contract-candidate/platform/manifest.lock.json contracts/platform/
-          if [[ -f .contract-candidate/platform/summary-fixtures.json ]]; then cp .contract-candidate/platform/summary-fixtures.json contracts/platform/; else rm -f contracts/platform/summary-fixtures.json; fi
+          cp .contract-candidate/platform/summary-fixtures.json contracts/platform/
           cp .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts
           git add -A -- contracts/platform
           git add packages/shared-contracts/src/generated/backend-openapi.d.ts

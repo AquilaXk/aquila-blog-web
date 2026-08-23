@@ -1,4 +1,4 @@
-import type { PostDetail, TPost } from "src/types"
+import type { PostDetail, PostSummarySource, TPost } from "src/types"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { ApiPostDto, ApiPostWithContentDto } from "./PostApiDtos"
 import { resolveTrustedContentHtml } from "./contentHtmlTrust"
@@ -10,16 +10,6 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9가-힣\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
-
-const stripMarkdown = (value: string) =>
-  value
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[(.*?)\]\((.*?)\)/g, " ")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
-    .replace(/[#>*_~-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
 
 const normalizeMetaItems = (raw: string): string[] => {
   const normalized = raw.trim().replace(/^\[|\]$/g, "")
@@ -102,12 +92,6 @@ const parsePostMeta = (content: string): ParsedPostMeta => {
   return { content: trimmed, tags, category: categories }
 }
 
-const toSummary = (content: string, maxLength = 180) => {
-  const plain = stripMarkdown(content)
-  if (plain.length <= maxLength) return plain
-  return `${plain.slice(0, maxLength).trim()}...`
-}
-
 const toStatus = (published: boolean, listed: boolean): TPost["status"] => {
   if (!published) return ["Private"]
   if (listed) return ["Public"]
@@ -142,10 +126,37 @@ const pickPreferredImageUrl = (...candidates: Array<string | undefined>) => {
   return ""
 }
 
+const POST_SUMMARY_SOURCES = new Set<PostSummarySource>([
+  "MANUAL",
+  "LEADING_BLOCK",
+  "EXTRACTED",
+  "MIGRATED",
+  "NONE",
+])
+
+const normalizeCanonicalSummary = ({
+  summary,
+  summarySource,
+}: {
+  summary?: unknown
+  summarySource?: unknown
+}): { summary: string; summarySource: PostSummarySource } => {
+  if (
+    typeof summary !== "string" ||
+    typeof summarySource !== "string" ||
+    !POST_SUMMARY_SOURCES.has(summarySource as PostSummarySource) ||
+    (summarySource === "NONE" ? summary.length > 0 : summary.trim().length === 0)
+  ) {
+    throw new Error("canonical post summary pair is malformed")
+  }
+
+  return { summary, summarySource: summarySource as PostSummarySource }
+}
+
 export const mapPostDto = (post: ApiPostDto): TPost => {
   const normalizedTags = normalizeStringArray(post.tags)
   const normalizedCategories = normalizeCategoryArray(post.category)
-  const hasSummary = typeof post.summary === "string" && post.summary.trim().length > 0
+  const canonicalSummary = normalizeCanonicalSummary(post)
   const normalizedThumbnail = pickPreferredImageUrl(post.thumbnail)
   const hasThumbnail = normalizedThumbnail.length > 0
   const authorProfileImage = pickPreferredImageUrl(
@@ -160,7 +171,8 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     date: { start_date: post.createdAt.slice(0, 10) },
     type: ["Post"],
     slug: toSlug(post.id, post.title),
-    ...(hasSummary ? { summary: post.summary } : {}),
+    summary: canonicalSummary.summary,
+    summarySource: canonicalSummary.summarySource,
     author: [
       {
         id: String(post.authorId),
@@ -193,7 +205,6 @@ export const mapPostDetail = async (
   const tags = dtoTags.length > 0 ? dtoTags : parsed.tags
   const category = dtoCategories.length > 0 ? dtoCategories : parsed.category
   const normalizedContent = parsed.content
-  const summary = toSummary(normalizedContent)
 
   const hasActorHasLiked = typeof post.actorHasLiked === "boolean"
   const hasActorCanModify = typeof post.actorCanModify === "boolean"
@@ -213,7 +224,8 @@ export const mapPostDetail = async (
       authorProfileImgUrl:
         post.authorProfileImageDirectUrl || post.authorProfileImageUrl || post.authorProfileImgUrl || "",
       title: post.title,
-      summary,
+      summary: post.summary,
+      summarySource: post.summarySource,
       tags,
       category,
       published: post.published,
@@ -221,7 +233,6 @@ export const mapPostDetail = async (
     }),
     ...(tags.length > 0 ? { tags } : {}),
     ...(category.length > 0 ? { category } : {}),
-    summary,
     content: normalizedContent,
     ...(trustedContentHtml ? { trustedContentHtml } : {}),
     modifiedTime: post.modifiedAt,

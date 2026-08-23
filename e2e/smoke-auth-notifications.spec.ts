@@ -106,6 +106,8 @@ test.describe("core smoke auth and notifications", () => {
         authorProfileImageDirectUrl: "/avatar.png",
         title: "좋아요 이동 테스트",
         content: "본문",
+        summary: "",
+        summarySource: "NONE",
         tags: [],
         category: [],
         published: true,

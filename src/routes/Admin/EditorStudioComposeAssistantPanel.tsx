@@ -204,9 +204,7 @@ export const EditorStudioComposeAssistantPanel = ({
           <div className="content">
             <PreviewVisibilityBadge>{previewVisibilityLabel}</PreviewVisibilityBadge>
             <h4>{postTitle.trim() || "제목을 입력하면 카드 결과가 여기에 표시됩니다."}</h4>
-            <p className="summary">
-              {summaryPreview || "요약을 비워두면 본문에서 자동 생성한 요약이 반영됩니다."}
-            </p>
+            {summaryPreview ? <p className="summary">{summaryPreview}</p> : null}
             <div className="meta">
               <span>{previewDateText}</span>
               <span className="dot">·</span>
@@ -244,9 +242,7 @@ export const EditorStudioComposeAssistantPanel = ({
           <span>{summaryLengthLabel}</span>
         </div>
       </ComposeAssistantGroupHeader>
-      <ComposeSidebarSummaryText>
-        {summaryPreview || "요약을 입력하면 카드 결과와 발행 요약에 함께 반영됩니다."}
-      </ComposeSidebarSummaryText>
+      {summaryPreview ? <ComposeSidebarSummaryText>{summaryPreview}</ComposeSidebarSummaryText> : null}
     </ComposeAssistantGroup>
 
     <AssistantDisclosure open={isComposeAssistOpen}>

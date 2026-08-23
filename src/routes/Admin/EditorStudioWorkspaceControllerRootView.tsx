@@ -22,7 +22,7 @@ import { LIST_SORT_OPTIONS } from "./useEditorStudioListConditions"
 import { deriveComposeViewModel, deriveEditorContentMetrics, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
-import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue, makePreviewSummary } from "./editorStudioMetaModel"
+import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
 import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, SHOW_LEGACY_UTILITY_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
@@ -81,6 +81,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleLoadOrCreateTempPost,
     commitPostCategory,
     handlePostCategoryChange,
+    handlePostSummaryChange,
+    handlePreviewSummary,
     handleModifyComment,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
@@ -145,6 +147,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     postContent,
     postId,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -224,6 +228,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         title: "",
         content: "",
         summary: "",
+        summarySource: "NONE",
+        summaryIntent: { kind: "auto" },
         thumbnailUrl: "",
         thumbnailFocusX: DEFAULT_THUMBNAIL_FOCUS_X,
         thumbnailFocusY: DEFAULT_THUMBNAIL_FOCUS_Y,
@@ -240,6 +246,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         title: postTitle,
         content: postContent,
         summary: postSummary,
+        summarySource: postSummarySource,
+        summaryIntent,
         thumbnailUrl: postThumbnailUrl,
         thumbnailFocusX: postThumbnailFocusX,
         thumbnailFocusY: postThumbnailFocusY,
@@ -252,6 +260,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       postCategory,
       postContent,
       postSummary,
+      postSummarySource,
+      summaryIntent,
       postTags,
       postThumbnailFocusX,
       postThumbnailFocusY,
@@ -348,6 +358,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         title: postTitle,
         content: liveContent,
         summary: postSummary,
+        summarySource: postSummarySource,
+        summaryIntent,
         thumbnailUrl: postThumbnailUrl,
         thumbnailFocusX: postThumbnailFocusX,
         thumbnailFocusY: postThumbnailFocusY,
@@ -372,6 +384,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     postCategory,
     postContent,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -392,10 +406,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       handleExitDedicatedEditor()
     })
   }, [handleExitDedicatedEditor, requestGuardedAction])
-  const composeSummaryPreview = useMemo(
-    () => postSummary.trim() || deferredContentDerived.summary,
-    [deferredContentDerived.summary, postSummary]
-  )
+  const composeSummaryPreview = postSummary
   const profilePreviewSrc = profileImgInputUrl.trim()
   const profileImageStatus = profilePreviewSrc ? "설정됨" : "기본 이미지 사용 중"
   const profileRoleStatus = profileRoleInput.trim() || "미설정"
@@ -692,7 +703,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onPostTitleKeyDown={handleTitleKeyDown}
         postContent={postContent}
         postSummary={postSummary}
-        onPostSummaryChange={setPostSummary}
+        onPostSummaryChange={handlePostSummaryChange}
+        isFillSummaryFromBodyDisabled={!postContent.trim() || loadingKey === "previewSummary"}
+        onFillSummaryFromBody={() => void handlePreviewSummary()}
         postCategory={postCategory}
         onPostCategoryChange={handlePostCategoryChange}
         onCommitPostCategory={commitPostCategory}
@@ -731,7 +744,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
               previewKicker="카드 미리보기"
               previewMetaEditorPanel={previewMetaEditorPanel}
               previewSummary={resolvedPreviewSummary}
-              previewSummaryFallback="요약을 비워두면 본문에서 자동 생성한 요약이 카드에 반영됩니다."
               previewThumbnailSrc={previewThumbnailSrc}
               previewViewport={previewViewport}
               previewViewportLabel={previewViewportConfig.label}
@@ -945,9 +957,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
             composeStatusTone={composeStatusTone}
             postSummary={postSummary}
             postSummaryMaxLength={PREVIEW_SUMMARY_MAX_LENGTH}
-            onPostSummaryChange={setPostSummary}
-            isFillSummaryFromBodyDisabled={!postContent.trim()}
-            onFillSummaryFromBody={() => setPostSummary(makePreviewSummary(postContent))}
+            onPostSummaryChange={handlePostSummaryChange}
+            isFillSummaryFromBodyDisabled={!postContent.trim() || loadingKey === "previewSummary"}
+            onFillSummaryFromBody={() => void handlePreviewSummary()}
             postTags={postTags}
             tagDraft={tagDraft}
             onTagDraftChange={setTagDraft}
@@ -1031,7 +1043,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
             previewKicker="실제 카드 결과"
             previewMetaEditorPanel={previewMetaEditorPanel}
             previewSummary={resolvedPreviewSummary}
-            previewSummaryFallback="요약을 비워두면 본문에서 자동 생성한 요약이 카드에 반영됩니다."
             previewThumbnailSrc={previewThumbnailSrc}
             previewViewport={previewViewport}
             previewViewportLabel={previewViewportConfig.label}

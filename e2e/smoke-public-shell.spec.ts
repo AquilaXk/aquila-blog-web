@@ -487,6 +487,8 @@ test.describe("core smoke public shell", () => {
         authorProfileImageDirectUrl: "/avatar.png",
         title: "상세 E2E 글",
         content: "본문 E2E",
+        summary: "",
+        summarySource: "NONE",
         tags: ["테스트태그"],
         category: [],
         published: true,
