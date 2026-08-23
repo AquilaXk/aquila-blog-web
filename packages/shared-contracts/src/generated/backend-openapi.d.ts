@@ -1875,6 +1875,10 @@ export interface components {
             summary?: string;
             /** @enum {string} */
             summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
+            contentHtmlHash?: string | null;
+            contentHtmlSanitizerPolicyVersion?: string | null;
+            /** @enum {string} */
+            contentHtmlTrustState?: "TRUSTED_CURRENT" | "UNKNOWN" | "REJECTED";
         };
         RsDataPostWithContentDto: {
             resultCode?: string;
