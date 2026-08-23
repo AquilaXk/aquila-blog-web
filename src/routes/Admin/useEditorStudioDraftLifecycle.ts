@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { replaceRoute } from "src/libs/router"
 import {
   adminContentHadEmptyFenceForTelemetry,
@@ -18,6 +19,11 @@ import {
 import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
 import { isServerTempDraftPost } from "./editorTempDraft"
 import { useEditorStudioLocalDraftLifecycle } from "./useEditorStudioDraftLifecycleModel"
+import {
+  resolvePersistedSummaryResult,
+  type CanonicalSummaryState,
+  type SummaryIntent,
+} from "./EditorStudioWorkspaceControllerRootModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
@@ -29,7 +35,6 @@ type ComposeMobileStudioStep = "edit" | "publish"
 
 type ResolvedEditorMetaSnapshot = {
   body: string
-  summary: string
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -38,7 +43,7 @@ type ResolvedEditorMetaSnapshot = {
   category: string
 }
 
-type PostForEditor = {
+type PostForEditor = ApiEditorPostDto & {
   id: string | number
   version?: number | null
   title?: string
@@ -76,6 +81,8 @@ type EditorFingerprintPayload = {
   title: string
   content: string
   summary: string
+  summarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -95,6 +102,8 @@ type UseEditorStudioDraftLifecycleParams = {
   postContent: string
   getCurrentPostContent: () => string
   postSummary: string
+  postSummarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
   postThumbnailUrl: string
   postThumbnailFocusX: number
   postThumbnailFocusY: number
@@ -112,6 +121,8 @@ type UseEditorStudioDraftLifecycleParams = {
   setPostTitle: StudioSetState<string>
   setPostContent: StudioSetState<string>
   setPostSummary: StudioSetState<string>
+  setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
+  setSummaryIntent: StudioSetState<SummaryIntent>
   setPostThumbnailUrl: StudioSetState<string>
   setPostThumbnailFocusX: StudioSetState<number>
   setPostThumbnailFocusY: StudioSetState<number>
@@ -139,7 +150,7 @@ type UseEditorStudioDraftLifecycleParams = {
   buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
   pretty: (value: unknown) => string
   resolveEditorMetaSnapshot: (content: string, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
-  syncEditorMeta: (content: string, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
+  syncEditorMeta: (content: string, summary: CanonicalSummaryState, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
   buildEmptyEditorMetaSnapshot: () => ResolvedEditorMetaSnapshot
   isBlankServerTempDraft: (
     post: Pick<PostForEditor, "title" | "published" | "listed" | "tempDraft">,
@@ -182,6 +193,8 @@ export const useEditorStudioDraftLifecycle = ({
   getCurrentPostContent,
   postId,
   postSummary,
+  postSummarySource,
+  summaryIntent,
   postTags,
   postThumbnailFocusX,
   postThumbnailFocusY,
@@ -209,6 +222,8 @@ export const useEditorStudioDraftLifecycle = ({
   setPostContent,
   setPostId,
   setPostSummary,
+  setPostSummarySource,
+  setSummaryIntent,
   setPostTags,
   setPostThumbnailFocusX,
   setPostThumbnailFocusY,
@@ -254,6 +269,8 @@ export const useEditorStudioDraftLifecycle = ({
     getCurrentPostContent,
     postId,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -273,6 +290,8 @@ export const useEditorStudioDraftLifecycle = ({
     setPostContent,
     setPostId,
     setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostTags,
     setPostThumbnailFocusX,
     setPostThumbnailFocusY,
@@ -300,6 +319,8 @@ export const useEditorStudioDraftLifecycle = ({
       setPostTitle("")
       setPostContent("")
       setPostSummary("")
+      setPostSummarySource("NONE")
+      setSummaryIntent({ kind: "auto" })
       setPostThumbnailUrl("")
       setPostThumbnailFocusX(defaultThumbnailFocusX)
       setPostThumbnailFocusY(defaultThumbnailFocusY)
@@ -333,6 +354,8 @@ export const useEditorStudioDraftLifecycle = ({
     setPostContent,
     setPostId,
     setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostTags,
     setPostThumbnailFocusX,
     setPostThumbnailFocusY,
@@ -464,15 +487,25 @@ export const useEditorStudioDraftLifecycle = ({
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(resolvedPost, rawSnapshot)
       const nextTitle = shouldMaskTempTitle ? "" : resolvedPost.title ?? ""
       const nextVisibility = toVisibility(!!resolvedPost.published, !!resolvedPost.listed)
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
+        { summary: resolvedPost.summary, source: resolvedPost.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        throw new Error("canonical summary response is malformed")
+      }
+      const canonicalSummary = resolvedSummary.state
       const snapshot = shouldMaskTempPlaceholder
-        ? (syncEditorMeta("") ?? buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(resolvedPost.content ?? "", resolvedPost.contentHtml)
+        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ?? buildEmptyEditorMetaSnapshot())
+        : syncEditorMeta(resolvedPost.content ?? "", canonicalSummary, resolvedPost.contentHtml)
       setPostTitle(nextTitle)
       setPostVisibility(nextVisibility)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
         title: nextTitle,
         content: snapshot.body,
-        summary: snapshot.summary,
+        summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
+        summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
+        summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" } : canonicalSummary.intent,
         thumbnailUrl: snapshot.thumbnailUrl,
         thumbnailFocusX: snapshot.thumbnailFocusX,
         thumbnailFocusY: snapshot.thumbnailFocusY,
@@ -556,15 +589,25 @@ export const useEditorStudioDraftLifecycle = ({
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(tempPost, rawSnapshot)
       const nextTitle = shouldMaskTempTitle ? "" : tempPost.title ?? ""
       const nextVisibility = toVisibility(!!tempPost.published, !!tempPost.listed)
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
+        { summary: tempPost.summary, source: tempPost.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        throw new Error("canonical summary response is malformed")
+      }
+      const canonicalSummary = resolvedSummary.state
       const snapshot = shouldMaskTempPlaceholder
-        ? (syncEditorMeta("") ?? buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(tempPost.content ?? "", tempPost.contentHtml)
+        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ?? buildEmptyEditorMetaSnapshot())
+        : syncEditorMeta(tempPost.content ?? "", canonicalSummary, tempPost.contentHtml)
       setPostTitle(nextTitle)
       setPostVisibility(nextVisibility)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
         title: nextTitle,
         content: snapshot.body,
-        summary: snapshot.summary,
+        summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
+        summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
+        summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" } : canonicalSummary.intent,
         thumbnailUrl: snapshot.thumbnailUrl,
         thumbnailFocusX: snapshot.thumbnailFocusX,
         thumbnailFocusY: snapshot.thumbnailFocusY,

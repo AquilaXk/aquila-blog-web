@@ -5,6 +5,7 @@ import {
   type SetStateAction,
 } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import type { ApiPostWriteResult } from "src/apis/backend/posts/PostApiDtos"
 import { normalizeCategoryValue } from "src/libs/utils"
 import { resolveEditorFailureRecovery } from "./editorFailureRecoveryModel"
 import { buildLocalDraftFingerprint } from "./editorStudioMetaModel"
@@ -13,6 +14,7 @@ import {
   resolveCreateWritePostId,
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
+import { resolvePersistedSummaryResult, toSummaryWriteFields, type CanonicalSummaryState, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
@@ -27,15 +29,14 @@ type RsData<T> = {
   msg: string
 }
 
-type PostWriteResult = {
-  id?: number | string
-  version?: number
-}
+type PostWriteResult = ApiPostWriteResult
 
 type EditorFingerprintPayload = {
   title: string
   content: string
   summary: string
+  summarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
   thumbnailUrl: string
   thumbnailFocusX: number
   thumbnailFocusY: number
@@ -53,6 +54,8 @@ const armLocalDraftFingerprintBaseline = (
     title: string
     content: string
     summary: string
+    summarySource: CanonicalSummaryState["summarySource"]
+    summaryIntent: SummaryIntent
     thumbnailUrl: string
     thumbnailFocusX: number
     thumbnailFocusY: number
@@ -69,6 +72,8 @@ const armLocalDraftFingerprintBaseline = (
     title: payload.title,
     content: payload.content,
     summary: payload.summary,
+    summarySource: payload.summarySource,
+    summaryIntent: payload.summaryIntent,
     thumbnailUrl: payload.thumbnailUrl,
     thumbnailFocusX: payload.thumbnailFocusX,
     thumbnailFocusY: payload.thumbnailFocusY,
@@ -89,6 +94,8 @@ type UseEditorStudioPersistenceParams = {
   postTags: string[]
   postCategory: string
   postSummary: string
+  postSummarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
   postThumbnailUrl: string
   postThumbnailFocusX: number
   postThumbnailFocusY: number
@@ -108,6 +115,9 @@ type UseEditorStudioPersistenceParams = {
   setIsTempDraftMode: StudioSetState<boolean>
   setPostId: StudioSetState<string>
   setPostVersion: StudioSetState<number | null>
+  setPostSummary: StudioSetState<string>
+  setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
+  setSummaryIntent: StudioSetState<SummaryIntent>
   setPostVisibility: StudioSetState<PostVisibility>
   setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
@@ -125,7 +135,7 @@ type UseEditorStudioPersistenceParams = {
   composeEditorContent: (
     content: string,
     tags: string[],
-    meta: { category: string; summary: string; thumbnail: string }
+    meta: { category: string; thumbnail: string }
   ) => string
   toFlags: (visibility: PostVisibility) => { published: boolean; listed: boolean }
   buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
@@ -162,6 +172,8 @@ export const useEditorStudioPersistence = ({
   getCurrentPostContent,
   postId,
   postSummary,
+  postSummarySource,
+  summaryIntent,
   postTags,
   postThumbnailFocusX,
   postThumbnailFocusY,
@@ -188,6 +200,9 @@ export const useEditorStudioPersistence = ({
   setPostThumbnailUrl,
   setPostThumbnailZoom,
   setPostVersion,
+  setPostSummary,
+  setPostSummarySource,
+  setSummaryIntent,
   setPostVisibility,
   setPreviewThumbnailSourceUrl,
   setPublishStatus,
@@ -256,11 +271,16 @@ export const useEditorStudioPersistence = ({
       setPublishStatus({ tone: "loading", text: "글 작성 중입니다..." })
       const contentWithMetadata = composeEditorContent(currentPostContent, postTags, {
         category: postCategory,
-        summary: postSummary,
         thumbnail: effectiveThumbnailUrl,
       })
 
-      const fingerprint = `${postTitle}\n---\n${contentWithMetadata}\n---\n${postVisibility}`
+      const summaryWriteFields = toSummaryWriteFields(summaryIntent)
+      const fingerprint = JSON.stringify({
+        title: postTitle,
+        content: contentWithMetadata,
+        visibility: postVisibility,
+        ...summaryWriteFields,
+      })
       if (lastWriteFingerprintRef.current !== fingerprint || !lastWriteIdempotencyKeyRef.current) {
         lastWriteFingerprintRef.current = fingerprint
         lastWriteIdempotencyKeyRef.current = generateIdempotencyKey()
@@ -274,6 +294,7 @@ export const useEditorStudioPersistence = ({
         body: JSON.stringify({
           title: postTitle,
           content: contentWithMetadata,
+          ...summaryWriteFields,
           ...toFlags(postVisibility),
         }),
       })
@@ -287,14 +308,31 @@ export const useEditorStudioPersistence = ({
         return false
       }
 
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
+        { summary: response.data?.summary, source: response.data?.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
+        setPublishStatus({ tone: "error", text: message })
+        setResult(pretty({ error: message, response }))
+        return false
+      }
+      const canonicalSummary = resolvedSummary.state
+
       setPostId(createWritePostId.postId)
       setPostVersion(typeof response.data?.version === "number" ? response.data.version : null)
       setEditorMode("edit")
       setIsTempDraftMode(false)
+      setPostSummary(canonicalSummary.summary)
+      setPostSummarySource(canonicalSummary.summarySource)
+      setSummaryIntent(canonicalSummary.intent)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
         title: postTitle,
         content: currentPostContent,
-        summary: postSummary,
+        summary: canonicalSummary.summary,
+        summarySource: canonicalSummary.summarySource,
+        summaryIntent: canonicalSummary.intent,
         thumbnailUrl: postThumbnailUrl,
         thumbnailFocusX: postThumbnailFocusX,
         thumbnailFocusY: postThumbnailFocusY,
@@ -321,7 +359,9 @@ export const useEditorStudioPersistence = ({
           {
             title: postTitle,
             content: currentPostContent,
-            summary: postSummary,
+            summary: canonicalSummary.summary,
+            summarySource: canonicalSummary.summarySource,
+            summaryIntent: canonicalSummary.intent,
             thumbnailUrl: postThumbnailUrl,
             thumbnailFocusX: postThumbnailFocusX,
             thumbnailFocusY: postThumbnailFocusY,
@@ -371,6 +411,8 @@ export const useEditorStudioPersistence = ({
     postCategory,
     postId,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -390,6 +432,9 @@ export const useEditorStudioPersistence = ({
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
     setPostId,
+    setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostVersion,
     setPublishStatus,
     setResult,
@@ -443,21 +488,38 @@ export const useEditorStudioPersistence = ({
           title: postTitle,
           content: composeEditorContent(currentPostContent, postTags, {
             category: postCategory,
-            summary: postSummary,
             thumbnail: effectiveThumbnailUrl,
           }),
+          ...toSummaryWriteFields(summaryIntent),
           ...toFlags(postVisibility),
           version: postVersion,
         }),
       })
 
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
+        { summary: response.data?.summary, source: response.data?.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
+        setPublishStatus({ tone: "error", text: message })
+        setResult(pretty({ error: message, response }))
+        return false
+      }
+      const canonicalSummary = resolvedSummary.state
+
       setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
+      setPostSummary(canonicalSummary.summary)
+      setPostSummarySource(canonicalSummary.summarySource)
+      setSummaryIntent(canonicalSummary.intent)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
         title: postTitle,
         content: currentPostContent,
-        summary: postSummary,
+        summary: canonicalSummary.summary,
+        summarySource: canonicalSummary.summarySource,
+        summaryIntent: canonicalSummary.intent,
         thumbnailUrl: postThumbnailUrl,
         thumbnailFocusX: postThumbnailFocusX,
         thumbnailFocusY: postThumbnailFocusY,
@@ -474,7 +536,9 @@ export const useEditorStudioPersistence = ({
           {
             title: postTitle,
             content: currentPostContent,
-            summary: postSummary,
+            summary: canonicalSummary.summary,
+            summarySource: canonicalSummary.summarySource,
+            summaryIntent: canonicalSummary.intent,
             thumbnailUrl: postThumbnailUrl,
             thumbnailFocusX: postThumbnailFocusX,
             thumbnailFocusY: postThumbnailFocusY,
@@ -514,6 +578,8 @@ export const useEditorStudioPersistence = ({
     postCategory,
     postId,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -532,6 +598,9 @@ export const useEditorStudioPersistence = ({
     setLoadingKey,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
+    setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostVersion,
     setPublishStatus,
     setResult,
@@ -585,20 +654,36 @@ export const useEditorStudioPersistence = ({
           title: postTitle,
           content: composeEditorContent(currentPostContent, postTags, {
             category: postCategory,
-            summary: postSummary,
             thumbnail: effectiveThumbnailUrl,
           }),
+          ...toSummaryWriteFields(summaryIntent),
           ...toFlags(postVisibility),
           version: postVersion,
         }),
       })
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
+        { summary: response.data?.summary, source: response.data?.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
+        setPublishStatus({ tone: "error", text: message })
+        setResult(pretty({ error: message, response }))
+        return false
+      }
+      const canonicalSummary = resolvedSummary.state
       setPostVisibility(postVisibility)
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
+      setPostSummary(canonicalSummary.summary)
+      setPostSummarySource(canonicalSummary.summarySource)
+      setSummaryIntent(canonicalSummary.intent)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
         title: postTitle,
         content: currentPostContent,
-        summary: postSummary,
+        summary: canonicalSummary.summary,
+        summarySource: canonicalSummary.summarySource,
+        summaryIntent: canonicalSummary.intent,
         thumbnailUrl: postThumbnailUrl,
         thumbnailFocusX: postThumbnailFocusX,
         thumbnailFocusY: postThumbnailFocusY,
@@ -616,7 +701,9 @@ export const useEditorStudioPersistence = ({
           {
             title: postTitle,
             content: currentPostContent,
-            summary: postSummary,
+            summary: canonicalSummary.summary,
+            summarySource: canonicalSummary.summarySource,
+            summaryIntent: canonicalSummary.intent,
             thumbnailUrl: postThumbnailUrl,
             thumbnailFocusX: postThumbnailFocusX,
             thumbnailFocusY: postThumbnailFocusY,
@@ -647,6 +734,7 @@ export const useEditorStudioPersistence = ({
   }, [
     buildEditorStateFingerprint,
     composeEditorContent,
+    dedupeStrings,
     detectPublishPlaceholderIssue,
     editorMode,
     effectiveThumbnailUrl,
@@ -654,6 +742,8 @@ export const useEditorStudioPersistence = ({
     postCategory,
     postId,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailFocusX,
     postThumbnailFocusY,
@@ -672,6 +762,9 @@ export const useEditorStudioPersistence = ({
     setLoadingKey,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
+    setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostVersion,
     setPostVisibility,
     setPublishStatus,

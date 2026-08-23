@@ -83,6 +83,8 @@ const baseDraft = (
 ): LocalDraftPayload => ({
   content: "body",
   summary: "",
+  summarySource: "NONE",
+  summaryIntent: { kind: "auto" },
   thumbnailUrl: "",
   thumbnailFocusX: 50,
   thumbnailFocusY: 50,
@@ -210,11 +212,27 @@ test.describe("editor local draft context slots", () => {
   test("resolves create and per-post storage keys", () => {
     expect(localDraftStorageKey({ kind: "create" })).toBe(LOCAL_DRAFT_CREATE_STORAGE_KEY)
     expect(localDraftStorageKey({ kind: "post", postId: "42" })).toBe(
-      `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.v2`
+      `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.v3`
     )
     expect(resolveLocalDraftSource("create", "")).toEqual({ kind: "create" })
     expect(resolveLocalDraftSource("edit", "42")).toEqual({ kind: "post", postId: "42" })
     expect(resolveLocalDraftSource("edit", "  ")).toEqual({ kind: "create" })
+  })
+
+  test("preserves an incompatible v2 draft instead of deleting or overwriting it", () => {
+    withLocalStorage((storage) => {
+      const legacyKey = "admin.editor.localDraft.create.v2"
+      const legacyDraft = JSON.stringify({
+        title: "보존할 v2 초안",
+        content: "사용자 원문",
+        summary: "기존 요약",
+        savedAt: new Date().toISOString(),
+      })
+      storage.setItem(legacyKey, legacyDraft)
+
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      expect(storage.getItem(legacyKey)).toBe(legacyDraft)
+    })
   })
 
   test("isolates create and post slots so edit autosave cannot overwrite create", () => {
@@ -239,7 +257,7 @@ test.describe("editor local draft context slots", () => {
       expect(readLocalDraft({ kind: "create" })?.title).toBe("create draft")
       expect(readLocalDraft({ kind: "post", postId: "7" })?.title).toBe("post draft")
       expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toContain("create draft")
-      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}7.v2`)).toContain("post draft")
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}7.v3`)).toContain("post draft")
     })
   })
 
@@ -251,6 +269,8 @@ test.describe("editor local draft context slots", () => {
           title: "legacy",
           content: "legacy body",
           summary: "",
+          summarySource: "NONE",
+          summaryIntent: { kind: "auto" },
           thumbnailUrl: "",
           tags: ["a"],
           category: "",
@@ -272,12 +292,14 @@ test.describe("editor local draft context slots", () => {
     })
   })
 
-  test("keeps v1 legacy draft when create.v2 write fails", () => {
+  test("keeps v1 legacy draft when current-slot write fails", () => {
     withLocalStorage((storage) => {
       const legacy = JSON.stringify({
         title: "legacy-keep",
         content: "legacy body",
         summary: "",
+        summarySource: "NONE",
+        summaryIntent: { kind: "auto" },
         thumbnailUrl: "",
         tags: [],
         category: "",
@@ -299,12 +321,14 @@ test.describe("editor local draft context slots", () => {
     })
   })
 
-  test("keeps v1 when create.v2 exists but is corrupt or expired", () => {
+  test("keeps v1 when the current slot exists but is corrupt or expired", () => {
     withLocalStorage((storage) => {
       const legacy = JSON.stringify({
         title: "legacy-recover",
         content: "legacy body",
         summary: "",
+        summarySource: "NONE",
+        summaryIntent: { kind: "auto" },
         thumbnailUrl: "",
         tags: [],
         category: "",
@@ -325,6 +349,8 @@ test.describe("editor local draft context slots", () => {
           title: "expired-create",
           content: "expired",
           summary: "",
+          summarySource: "NONE",
+          summaryIntent: { kind: "auto" },
           thumbnailUrl: "",
           tags: [],
           category: "",
@@ -370,11 +396,13 @@ test.describe("editor local draft context slots", () => {
       const validSavedAt = (offsetMs: number) => new Date(now - offsetMs).toISOString()
 
       storage.setItem(
-        `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v2`,
+        `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`,
         JSON.stringify({
           title: "expired",
           content: "body",
           summary: "",
+          summarySource: "NONE",
+          summaryIntent: { kind: "auto" },
           thumbnailUrl: "",
           thumbnailFocusX: 50,
           thumbnailFocusY: 50,
@@ -389,11 +417,13 @@ test.describe("editor local draft context slots", () => {
 
       for (let index = 2; index <= LOCAL_DRAFT_POST_SLOT_LIMIT + 2; index += 1) {
         storage.setItem(
-          `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${index}.v2`,
+          `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${index}.v3`,
           JSON.stringify({
             title: `post-${index}`,
             content: "body",
             summary: "",
+            summarySource: "NONE",
+            summaryIntent: { kind: "auto" },
             thumbnailUrl: "",
             thumbnailFocusX: 50,
             thumbnailFocusY: 50,
@@ -418,7 +448,7 @@ test.describe("editor local draft context slots", () => {
       const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
         (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
       )
-      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v2`)).toBeNull()
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`)).toBeNull()
       expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
       expect(readLocalDraft({ kind: "post", postId: "2" })).toBeNull()
       expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })?.title).toBe(

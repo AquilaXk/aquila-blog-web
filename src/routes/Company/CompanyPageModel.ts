@@ -206,14 +206,8 @@ export const COMPANY_FOOTER_LINK_GROUPS = [
   },
 ] as const
 
-const NEWS_SUMMARY_MAX_LENGTH = 96
-
-/** 요약이 없는 글은 카드를 비워 두지 않고 제목만 남긴다. 자리를 채우는 문구를 만들지 않는다. */
-export const toCompanyNewsSummary = (summary: string | undefined) => {
-  const normalized = (summary || "").replace(/\s+/g, " ").trim()
-  if (normalized.length <= NEWS_SUMMARY_MAX_LENGTH) return normalized
-  return `${normalized.slice(0, NEWS_SUMMARY_MAX_LENGTH).trimEnd()}…`
-}
+/** canonical 요약을 그대로 전달하고, 없는 값에는 별도 문구를 만들지 않는다. */
+export const toCompanyNewsSummary = (summary: string | undefined) => summary ?? ""
 
 export const toCompanyNewsDate = (isoDate: string) => {
   const parsed = new Date(isoDate)

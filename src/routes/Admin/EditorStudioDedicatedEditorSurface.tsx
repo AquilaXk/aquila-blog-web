@@ -68,6 +68,8 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   postContent: string
   postSummary: string
   onPostSummaryChange: (value: string) => void
+  isFillSummaryFromBodyDisabled: boolean
+  onFillSummaryFromBody: () => void
   postCategory: string
   onPostCategoryChange: (value: string) => void
   onCommitPostCategory: () => void
@@ -212,6 +214,8 @@ export const EditorStudioDedicatedEditorSurface = ({
   postContent,
   postSummary,
   onPostSummaryChange,
+  isFillSummaryFromBodyDisabled,
+  onFillSummaryFromBody,
   postCategory,
   onPostCategoryChange,
   onCommitPostCategory,
@@ -366,6 +370,13 @@ export const EditorStudioDedicatedEditorSurface = ({
             <small>
               {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
             </small>
+            <SecondaryButton
+              type="button"
+              disabled={isFillSummaryFromBodyDisabled}
+              onClick={onFillSummaryFromBody}
+            >
+              본문 기준으로 채우기
+            </SecondaryButton>
           </label>
           <label>
             <span>Category</span>

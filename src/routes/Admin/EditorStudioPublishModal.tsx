@@ -46,7 +46,6 @@ type EditorStudioPublishModalProps<TViewport extends string> = {
   previewKicker: string
   previewMetaEditorPanel: ReactNode
   previewSummary: string
-  previewSummaryFallback: string
   previewThumbnailSrc: string
   previewViewport: TViewport
   previewViewportLabel: string
@@ -89,7 +88,6 @@ export const EditorStudioPublishModal = <TViewport extends string,>({
   previewKicker,
   previewMetaEditorPanel,
   previewSummary,
-  previewSummaryFallback,
   previewThumbnailSrc,
   previewViewport,
   previewViewportLabel,
@@ -147,7 +145,6 @@ export const EditorStudioPublishModal = <TViewport extends string,>({
               previewFrameStyle={previewFrameStyle}
               previewKicker={previewKicker}
               previewSummary={previewSummary}
-              previewSummaryFallback={previewSummaryFallback}
               previewThumbnailSrc={previewThumbnailSrc}
               previewViewport={previewViewport}
               previewViewportLabel={previewViewportLabel}

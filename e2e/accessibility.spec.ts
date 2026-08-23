@@ -6,7 +6,7 @@ const AVATAR_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0WkAAAAASUVORK5CYII="
 const AVATAR_PNG = Buffer.from(AVATAR_PNG_BASE64, "base64")
 const testBaseUrl = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000"
-const localDraftStorageKey = "admin.editor.localDraft.create.v2"
+const localDraftStorageKey = "admin.editor.localDraft.create.v3"
 const adminMember = {
   id: 1,
   username: "qa-admin",
@@ -67,6 +67,8 @@ const mockAuthenticatedEditor = async (page: Page) => {
         id: 990,
         title: "임시글",
         content: "",
+        summary: "",
+        summarySource: "NONE",
         published: false,
         listed: false,
         tempDraft: true,
@@ -81,6 +83,8 @@ const mockAuthenticatedEditor = async (page: Page) => {
           title: "접근성 launch gate 작성 테스트",
           content: "# 접근성 Editor\n\nkeyboard-only 점검용 본문입니다.",
           summary: "접근성 editor gate",
+          summarySource: "MANUAL",
+          summaryIntent: { kind: "manual", summary: "접근성 editor gate" },
           thumbnailUrl: "",
           thumbnailFocusX: 50,
           thumbnailFocusY: 50,
@@ -214,6 +218,8 @@ const mockDetailEndpoint = async (page: Page) => {
         authorProfileImageDirectUrl: "/avatar.png",
         title: "접근성 상세 점검",
         content: "## 본문 제목\n\n접근성 점검용 문단입니다.",
+        summary: "접근성 상세 점검",
+        summarySource: "MANUAL",
         tags: ["a11y"],
         category: ["테스트"],
         published: true,

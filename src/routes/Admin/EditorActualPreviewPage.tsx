@@ -39,7 +39,8 @@ export const EditorActualPreviewPage: NextPage<AdminPageProps> = ({ initialMembe
             slug: snapshot.id,
             type: ["Post"],
             title: snapshot.title.trim() || "제목을 입력하세요",
-            summary: snapshot.summary.trim() || undefined,
+            summary: snapshot.summary,
+            summarySource: snapshot.summarySource,
             tags: snapshot.tags,
             author: [
                 {

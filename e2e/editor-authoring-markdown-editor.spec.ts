@@ -1,14 +1,17 @@
 import { Buffer } from "node:buffer"
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { resolve } from "node:path"
+import summaryFixtures from "../contracts/platform/summary-fixtures.json"
 import type { Page, Route } from "./helpers/authoringPlaywright"
 import { expect, test } from "./helpers/authoringPlaywright"
 
 const sourcePath = (...segments: string[]) => resolve(__dirname, "../src", ...segments)
 const frontPath = (...segments: string[]) => resolve(__dirname, "..", ...segments)
 const joinParts = (...parts: string[]) => parts.join("")
-const localDraftStorageKey = "admin.editor.localDraft.create.v2"
+const localDraftStorageKey = "admin.editor.localDraft.create.v3"
 const categoryCatalogStorageKey = "admin.editor.customCategories"
+const leadingBlockSummaryFixture = summaryFixtures.fixtures.find((fixture) => fixture.id === "leading-block")
+if (!leadingBlockSummaryFixture) throw new Error("leading-block summary fixture is required")
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
   "base64"
@@ -199,6 +202,8 @@ const routeAuthenticatedEditor = async (page: Page, markdown = longMarkdownDraft
         id: 990,
         title: "임시글",
         content: "",
+        summary: "",
+        summarySource: "NONE",
         published: false,
         listed: false,
         tempDraft: true,
@@ -213,6 +218,8 @@ const routeAuthenticatedEditor = async (page: Page, markdown = longMarkdownDraft
           title,
           content,
           summary: "Markdown split editor test",
+          summarySource: "MANUAL",
+          summaryIntent: { kind: "manual", summary: "Markdown split editor test" },
           thumbnailUrl: "",
           thumbnailFocusX: 50,
           thumbnailFocusY: 50,
@@ -234,6 +241,9 @@ const routeEditorPost = async (page: Page, postId: number, markdown: string) => 
     id: postId,
     title: "Markdown 수정 테스트",
     content: markdown,
+    summary: "Markdown 수정 테스트",
+    summarySource: "MANUAL",
+    summaryIntent: { kind: "manual", summary: "Markdown 수정 테스트" },
     published: false,
     listed: false,
     tempDraft: false,
@@ -1667,5 +1677,44 @@ test.describe("Markdown editor replacement", () => {
     const codeBlock = preview.locator(".aq-code-block").first()
     await expect(codeBlock.locator(".aq-code-title")).toHaveText("UserService.kt")
     await expect(codeBlock.locator(".aq-code-copy")).toHaveText("COPY")
+  })
+
+  test("canonical summary preview applies the platform result and preserves a manual edit when the next preview fails", async ({
+    page,
+  }) => {
+    const { title, content, expected } = leadingBlockSummaryFixture
+    let previewRequestCount = 0
+
+    await routeAuthenticatedEditor(page, content, title)
+    await page.route("**/post/api/v1/adm/posts/preview-summary", async (route) => {
+      previewRequestCount += 1
+      expect(route.request().postDataJSON()).toEqual({ title, content })
+
+      if (previewRequestCount === 1) {
+        await fulfillJson(route, { summary: expected.summary, source: expected.source })
+        return
+      }
+
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({}) })
+    })
+
+    await page.goto("/editor/new?source=local-draft")
+
+    const summaryInput = page.getByRole("textbox", { name: /^Summary/ })
+    const previewButton = page.getByRole("button", { name: "본문 기준으로 채우기" })
+    await previewButton.click()
+    await expect(summaryInput).toHaveValue(expected.summary)
+
+    const manualSummary = "사용자가 유지한 요약"
+    await summaryInput.fill(manualSummary)
+    await previewButton.click()
+
+    await expect(summaryInput).toHaveValue(manualSummary)
+    await expect(page.getByText("요약 미리보기를 불러오지 못했습니다.")).toBeVisible()
+
+    await summaryInput.fill("")
+    await page.getByRole("button", { name: "발행 설정" }).click()
+    await expect(page.getByRole("dialog")).toBeVisible()
+    await expect(page.getByText("요약을 비워두면 본문에서 자동 생성한 요약이 카드에 반영됩니다.")).toHaveCount(0)
   })
 })

@@ -2,6 +2,7 @@ import { NextPage } from "next"
 import { AppProps } from "next/app"
 import { EmotionCache } from "@emotion/cache"
 import { ReactElement, ReactNode } from "react"
+import type { components } from "@shared/contracts"
 
 // TODO: refactor types
 export type NextPageWithLayout<PageProps = {}> = NextPage<PageProps> & {
@@ -15,6 +16,9 @@ export type AppPropsWithLayout = AppProps & {
 
 export type TPostStatus = "Private" | "Public" | "PublicOnDetail"
 export type TPostType = "Post" | "Paper" | "Page"
+export type PostSummarySource = NonNullable<
+  components["schemas"]["PostDto"]["summarySource"]
+> & NonNullable<components["schemas"]["PostWithContentDto"]["summarySource"]>
 
 export type TPost = {
   id: string
@@ -24,6 +28,7 @@ export type TPost = {
   tags?: string[]
   category?: string[]
   summary?: string
+  summarySource?: PostSummarySource
   author?: {
     id: string
     name: string

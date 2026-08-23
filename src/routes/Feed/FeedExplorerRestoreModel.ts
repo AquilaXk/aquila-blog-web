@@ -5,7 +5,7 @@ import {
   FEED_EXPLORER_SNAPSHOT_SUFFIX,
 } from "src/libs/feed/feedRestoreCache"
 import { normalizeKeywordQuery, normalizeTagQuery } from "src/libs/query/normalize"
-import type { TPost } from "src/types"
+import type { PostSummarySource, TPost } from "src/types"
 
 export const FEED_EXPLORER_RESTORE_TTL_MS = 15 * 60_000
 export const FEED_EXPLORER_RESTORE_MAX_PAGES = 8
@@ -37,7 +37,8 @@ export type FeedExplorerSnapshotPost = {
   createdTime: string
   date?: { start_date: string }
   modifiedTime?: string
-  summary?: string
+  summary: string
+  summarySource: PostSummarySource
   thumbnail?: string
   tags?: string[]
   category?: string[]
@@ -114,7 +115,8 @@ export const toSnapshotPost = (post: TPost): FeedExplorerSnapshotPost => {
     createdTime: post.createdTime,
     ...(post.date?.start_date ? { date: { start_date: post.date.start_date } } : {}),
     ...(post.modifiedTime ? { modifiedTime: post.modifiedTime } : {}),
-    ...(post.summary ? { summary: post.summary } : {}),
+    summary: post.summary ?? "",
+    summarySource: post.summarySource ?? "NONE",
     ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
     ...(post.tags?.length ? { tags: post.tags } : {}),
     ...(post.category?.length ? { category: post.category } : {}),
@@ -162,7 +164,8 @@ export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
     createdTime: post.createdTime,
     fullWidth: false,
     ...(post.modifiedTime ? { modifiedTime: post.modifiedTime } : {}),
-    ...(post.summary ? { summary: post.summary } : {}),
+    summary: post.summary,
+    summarySource: post.summarySource,
     ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
     ...(post.tags?.length ? { tags: post.tags } : {}),
     ...(post.category?.length ? { category: post.category } : {}),

@@ -3,6 +3,25 @@ import type { components } from "@shared/contracts"
 import type { ApiFetchMeta } from "../client"
 
 type GeneratedPostWithContentDto = components["schemas"]["PostWithContentDto"]
+type GeneratedPostDto = components["schemas"]["PostDto"]
+type GeneratedPostWriteRequest = components["schemas"]["PostWriteRequest"]
+type GeneratedPostModifyRequest = components["schemas"]["PostModifyRequest"]
+type GeneratedPostWriteResult = components["schemas"]["PostWriteResultDto"]
+type GeneratedPostSummaryPreviewRequest = components["schemas"]["PostSummaryPreviewRequest"]
+type GeneratedPostSummaryPreviewResponse = components["schemas"]["PostSummaryPreviewResponse"]
+
+type PostSummaryFields = Pick<GeneratedPostDto, "summary" | "summarySource">
+type PostWithContentSummaryFields = Pick<GeneratedPostWithContentDto, "summary" | "summarySource">
+
+export type ApiEditorPostDto = Pick<
+  GeneratedPostWithContentDto,
+  "id" | "title" | "content" | "contentHtml" | "version" | "published" | "listed" | "tempDraft" | "summary" | "summarySource"
+>
+export type ApiPostWriteRequest = GeneratedPostWriteRequest
+export type ApiPostModifyRequest = GeneratedPostModifyRequest
+export type ApiPostWriteResult = GeneratedPostWriteResult
+export type ApiPostSummaryPreviewRequest = GeneratedPostSummaryPreviewRequest
+export type ApiPostSummaryPreviewResponse = GeneratedPostSummaryPreviewResponse
 
 export type ContentHtmlTrustFields = Pick<
   GeneratedPostWithContentDto,
@@ -31,7 +50,7 @@ export type PostsBootstrapDto = {
   tags: ApiTagCountDto[]
 }
 
-export type ApiPostDto = {
+export type ApiPostDto = PostSummaryFields & {
   id: number
   createdAt: string
   modifiedAt: string
@@ -43,7 +62,6 @@ export type ApiPostDto = {
   authorProfileImageDirectUrl?: string
   title: string
   thumbnail?: string
-  summary?: string
   tags?: string[]
   category?: string[]
   published: boolean
@@ -54,7 +72,7 @@ export type ApiPostDto = {
   actorHasLiked?: boolean
 }
 
-export type ApiPostWithContentDto = ContentHtmlTrustFields & {
+export type ApiPostWithContentDto = ContentHtmlTrustFields & PostWithContentSummaryFields & {
   id: number
   createdAt: string
   modifiedAt: string

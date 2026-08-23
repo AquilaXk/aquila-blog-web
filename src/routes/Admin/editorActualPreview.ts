@@ -1,4 +1,4 @@
-import type { TPost } from "src/types"
+import type { PostSummarySource, TPost } from "src/types"
 
 export type EditorActualPreviewVisibility = "PRIVATE" | "PUBLIC_UNLISTED" | "PUBLIC_LISTED"
 
@@ -7,6 +7,7 @@ export type EditorActualPreviewSnapshot = {
   title: string
   content: string
   summary: string
+  summarySource: PostSummarySource
   tags: string[]
   visibility: EditorActualPreviewVisibility
   thumbnailUrl: string
@@ -17,6 +18,18 @@ export type EditorActualPreviewSnapshot = {
 
 const STORAGE_PREFIX = "editor.actual-preview.v1:"
 const FALLBACK_ID = "draft-preview"
+const SUMMARY_SOURCES: PostSummarySource[] = ["MANUAL", "LEADING_BLOCK", "EXTRACTED", "MIGRATED", "NONE"]
+
+const hasValidSummaryPair = (
+  snapshot: Partial<EditorActualPreviewSnapshot>
+): snapshot is Partial<EditorActualPreviewSnapshot> &
+  Required<Pick<EditorActualPreviewSnapshot, "summary" | "summarySource">> => {
+  const { summary, summarySource } = snapshot
+  if (typeof summary !== "string" || typeof summarySource !== "string") return false
+  if (!SUMMARY_SOURCES.includes(summarySource as PostSummarySource)) return false
+  if (summarySource === "NONE") return summary.length === 0
+  return summary.trim().length > 0
+}
 
 export const toEditorActualPreviewRoute = (id?: string | number) =>
   `/editor/preview/${encodeURIComponent(String(id || FALLBACK_ID))}`
@@ -39,12 +52,14 @@ export const readEditorActualPreviewSnapshot = (
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<EditorActualPreviewSnapshot>
     if (!parsed || typeof parsed !== "object") return null
+    if (!hasValidSummaryPair(parsed)) return null
 
     return {
       id: typeof parsed.id === "string" ? parsed.id : String(id || FALLBACK_ID),
       title: typeof parsed.title === "string" ? parsed.title : "",
       content: typeof parsed.content === "string" ? parsed.content : "",
-      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      summary: parsed.summary,
+      summarySource: parsed.summarySource,
       tags: Array.isArray(parsed.tags) ? parsed.tags.filter((item): item is string => typeof item === "string") : [],
       visibility:
         parsed.visibility === "PRIVATE" ||

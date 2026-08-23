@@ -10,7 +10,6 @@ import { readHeaderAuthShellSnapshot } from "src/libs/headerAuthShell"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import { TPostComment } from "src/types"
 import DeferredCommentBox from "./DeferredCommentBox"
-import { extractLeadingSummaryBlock } from "src/libs/postSummary"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
 import { RelatedPostsSection } from "./PostDetailRelatedSection"
 import { collectTocFromArticle, createObserverRegistry, createRafScheduler, isSameToc, type TocItem } from "./PostDetailTocModel"
@@ -113,16 +112,11 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
   const showStickyToc = visibleTocItems.length >= 2
   const commentsCount = typeof data?.commentsCount === "number" ? data.commentsCount : 0
   const commentsProgressLabel = commentsRailActive ? "읽는 중" : `${commentsCount}`
-  const extractedSummaryState = useMemo(
-    () => extractLeadingSummaryBlock(data?.content || "", Number.POSITIVE_INFINITY),
-    [data?.content]
-  )
-  const leadSummaryText = extractedSummaryState.summary
-  const headerDeckSummaryText = extractedSummaryState.summary ? "" : data?.summary?.trim() || ""
-  const renderedContent = useMemo(() => {
-    if (!data?.content) return ""
-    return extractedSummaryState.summary ? extractedSummaryState.contentWithoutSummary : data.content
-  }, [data?.content, extractedSummaryState.contentWithoutSummary, extractedSummaryState.summary])
+  const headerDeckSummaryText =
+    data?.summarySource === "LEADING_BLOCK" || data?.summarySource === "NONE"
+      ? ""
+      : data?.summary ?? ""
+  const renderedContent = data?.content ?? ""
   const {
     relatedByAuthorPosts,
     relatedByTagPosts,
@@ -540,7 +534,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
             />
           ) : null}
           <BodySection data-rum-section="body">
-            {leadSummaryText ? <p className="leadSummary">{leadSummaryText}</p> : null}
             <RecoverableSurfaceBoundary surface="markdown" resetKey={postId}>
               <MarkdownRenderer
                 content={renderedContent}

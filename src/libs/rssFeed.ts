@@ -105,14 +105,14 @@ export const buildRssFeedXml = (posts: TPost[], options: BuildRssFeedOptions) =>
   const items = posts
     .map((post) => {
       const canonicalUrl = `${siteUrl}${toCanonicalPostPath(post.id)}`
-      const summary = post.summary?.trim() || post.title
+      const summary = post.summary ?? ""
 
       return [
         "    <item>",
         `      <title>${escapeXml(post.title)}</title>`,
         `      <link>${escapeXml(canonicalUrl)}</link>`,
         `      <guid>${escapeXml(canonicalUrl)}</guid>`,
-        `      <description>${escapeXml(summary)}</description>`,
+        ...(summary ? [`      <description>${escapeXml(summary)}</description>`] : []),
         `      <pubDate>${getRssPostDate(post).toUTCString()}</pubDate>`,
         "    </item>",
       ].join("\n")

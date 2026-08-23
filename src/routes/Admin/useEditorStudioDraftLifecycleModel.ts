@@ -14,6 +14,7 @@ import {
   type LocalDraftSource,
 } from "./editorStudioMetaModel"
 import type { PostVisibility } from "./editorStudioState"
+import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   describeLocalDraftSlot,
   migrateLocalDraftV1Once,
@@ -265,6 +266,8 @@ type UseEditorStudioLocalDraftLifecycleParams = {
   postContent: string
   getCurrentPostContent: () => string
   postSummary: string
+  postSummarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
   postThumbnailUrl: string
   postThumbnailFocusX: number
   postThumbnailFocusY: number
@@ -280,6 +283,8 @@ type UseEditorStudioLocalDraftLifecycleParams = {
   setPostTitle: StudioSetState<string>
   setPostContent: StudioSetState<string>
   setPostSummary: StudioSetState<string>
+  setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
+  setSummaryIntent: StudioSetState<SummaryIntent>
   setPostThumbnailUrl: StudioSetState<string>
   setPostThumbnailFocusX: StudioSetState<number>
   setPostThumbnailFocusY: StudioSetState<number>
@@ -317,6 +322,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
   getCurrentPostContent,
   postId,
   postSummary,
+  postSummarySource,
+  summaryIntent,
   postTags,
   postThumbnailFocusX,
   postThumbnailFocusY,
@@ -336,6 +343,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
   setPostContent,
   setPostId,
   setPostSummary,
+  setPostSummarySource,
+  setSummaryIntent,
   setPostTags,
   setPostThumbnailFocusX,
   setPostThumbnailFocusY,
@@ -408,6 +417,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
       title: postTitle,
       content: postContent,
       summary: postSummary,
+      summarySource: postSummarySource,
+      summaryIntent,
       thumbnailUrl: postThumbnailUrl,
       thumbnailFocusX: postThumbnailFocusX,
       thumbnailFocusY: postThumbnailFocusY,
@@ -422,6 +433,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
       postCategory,
       postContent,
       postSummary,
+      postSummarySource,
+      summaryIntent,
       postTags,
       postThumbnailFocusX,
       postThumbnailFocusY,
@@ -577,6 +590,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
       title: draft.title,
       content: draft.content,
       summary: draft.summary,
+      summarySource: draft.summarySource,
+      summaryIntent: draft.summaryIntent,
       thumbnailUrl: draft.thumbnailUrl,
       thumbnailFocusX: draft.thumbnailFocusX,
       thumbnailFocusY: draft.thumbnailFocusY,
@@ -600,6 +615,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostTitle(draft.title)
     setPostContent(draft.content)
     setPostSummary(draft.summary)
+    setPostSummarySource(draft.summarySource)
+    setSummaryIntent(draft.summaryIntent)
     setPostThumbnailUrl(draft.thumbnailUrl)
     setPostThumbnailFocusX(draft.thumbnailFocusX)
     setPostThumbnailFocusY(draft.thumbnailFocusY)
@@ -638,6 +655,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostContent,
     setPostId,
     setPostSummary,
+    setPostSummarySource,
+    setSummaryIntent,
     setPostTags,
     setPostThumbnailFocusX,
     setPostThumbnailFocusY,
@@ -696,6 +715,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
         title: localDraft.title,
         content: localDraft.content,
         summary: localDraft.summary,
+        summarySource: localDraft.summarySource,
+        summaryIntent: localDraft.summaryIntent,
         thumbnailUrl: localDraft.thumbnailUrl,
         thumbnailFocusX: localDraft.thumbnailFocusX,
         thumbnailFocusY: localDraft.thumbnailFocusY,
@@ -756,6 +777,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
             title: pendingDraft.title,
             content: pendingDraft.content,
             summary: pendingDraft.summary,
+            summarySource: pendingDraft.summarySource,
+            summaryIntent: pendingDraft.summaryIntent,
             thumbnailUrl: pendingDraft.thumbnailUrl,
             thumbnailFocusX: pendingDraft.thumbnailFocusX,
             thumbnailFocusY: pendingDraft.thumbnailFocusY,
@@ -817,6 +840,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
     postContent,
     postLoadInFlightEpoch,
     postSummary,
+    postSummarySource,
+    summaryIntent,
     postTags,
     postThumbnailUrl,
     postTitle,

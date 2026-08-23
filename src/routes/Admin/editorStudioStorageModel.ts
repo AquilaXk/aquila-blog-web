@@ -1,5 +1,5 @@
-import { normalizePersistedSummary } from "src/libs/postSummary"
 import { normalizeCategoryValue } from "src/libs/utils"
+import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   clampThumbnailFocusX,
   clampThumbnailFocusY,
@@ -24,7 +24,7 @@ export const CATEGORY_CATALOG_STORAGE_KEY = "admin.editor.customCategories"
 export const LOCAL_DRAFT_V1_STORAGE_KEY = "admin.editor.localDraft.v1"
 /** @deprecated Use LOCAL_DRAFT_V1_STORAGE_KEY; retained for one-time migration callers. */
 export const LOCAL_DRAFT_STORAGE_KEY = LOCAL_DRAFT_V1_STORAGE_KEY
-export const LOCAL_DRAFT_CREATE_STORAGE_KEY = "admin.editor.localDraft.create.v2"
+export const LOCAL_DRAFT_CREATE_STORAGE_KEY = "admin.editor.localDraft.create.v3"
 export const LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX = "admin.editor.localDraft.post."
 export const LOCAL_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 export const LOCAL_DRAFT_POST_SLOT_LIMIT = 20
@@ -49,7 +49,7 @@ export const resolveLocalDraftSource = (
 
 export const localDraftStorageKey = (source: LocalDraftSource): string => {
   if (source.kind === "create") return LOCAL_DRAFT_CREATE_STORAGE_KEY
-  return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.v2`
+  return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.v3`
 }
 
 export const describeLocalDraftSlot = (
@@ -136,10 +136,36 @@ const parseLocalDraftPayload = (
         ? parsed.postVersion
         : null
 
+    const summary = typeof parsed.summary === "string" ? parsed.summary : null
+    const summarySource =
+      parsed.summarySource === "MANUAL" ||
+      parsed.summarySource === "LEADING_BLOCK" ||
+      parsed.summarySource === "EXTRACTED" ||
+      parsed.summarySource === "MIGRATED" ||
+      parsed.summarySource === "NONE"
+        ? parsed.summarySource
+        : null
+    const summaryIntent: SummaryIntent | null =
+      parsed.summaryIntent && typeof parsed.summaryIntent === "object" && "kind" in parsed.summaryIntent
+        ? parsed.summaryIntent.kind === "unchanged"
+          ? { kind: "unchanged" }
+          : parsed.summaryIntent.kind === "auto"
+            ? { kind: "auto" }
+            : parsed.summaryIntent.kind === "manual" && typeof parsed.summaryIntent.summary === "string"
+              ? { kind: "manual", summary: parsed.summaryIntent.summary }
+              : null
+        : null
+    if (summary == null || summarySource == null || summaryIntent == null) return null
+    if ((summarySource === "NONE") !== (summary.length === 0)) return null
+    if (summarySource !== "NONE" && summary.trim().length === 0) return null
+    if (summaryIntent.kind === "manual" && summaryIntent.summary !== summary) return null
+
     return {
       title: typeof parsed.title === "string" ? parsed.title : "",
       content: typeof parsed.content === "string" ? parsed.content : "",
-      summary: normalizePersistedSummary(parsed.summary),
+      summary,
+      summarySource,
+      summaryIntent,
       thumbnailUrl: stripThumbnailFocusFromUrl(rawThumbnailUrl),
       thumbnailFocusX: parsedFocusX,
       thumbnailFocusY: parsedFocusY,
@@ -164,7 +190,7 @@ const listPostDraftEntries = (): Array<{ key: string; savedAtMs: number }> => {
   const keys: string[] = []
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index)
-    if (!key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX) || !key.endsWith(".v2")) continue
+    if (!key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX) || !key.endsWith(".v3")) continue
     keys.push(key)
   }
   for (const key of keys) {
@@ -206,18 +232,16 @@ export const migrateLocalDraftV1Once = () => {
     if (existingCreateRaw) {
       const existingCreate = parseLocalDraftPayload(existingCreateRaw, { kind: "create" })
       if (existingCreate) {
-        // Verified readable create.v2 — safe to drop legacy v1.
+        // Verified readable current create slot — safe to drop legacy v1.
         window.localStorage.removeItem(LOCAL_DRAFT_V1_STORAGE_KEY)
         return
       }
-      // Corrupt/expired create.v2: fall through and try migrating recoverable v1.
+      // Corrupt/expired current slot: fall through and try migrating recoverable v1.
     }
 
     const migrated = parseLocalDraftPayload(raw, { kind: "create" })
     if (!migrated) {
-      // Unrecoverable v1 only — drop it. Keep v1 when create.v2 is bad and v1 is good.
-      if (existingCreateRaw) return
-      window.localStorage.removeItem(LOCAL_DRAFT_V1_STORAGE_KEY)
+      // Preserve an incompatible v1 payload; canonical summary semantics cannot be inferred safely.
       return
     }
 
@@ -228,10 +252,10 @@ export const migrateLocalDraftV1Once = () => {
         source: { kind: "create" },
       })
     )
-    // Remove v1 only after create.v2 write succeeded.
+    // Remove v1 only after the current-slot write succeeded.
     window.localStorage.removeItem(LOCAL_DRAFT_V1_STORAGE_KEY)
   } catch {
-    // Preserve recoverable legacy draft when create.v2 persistence fails.
+    // Preserve recoverable legacy draft when current-slot persistence fails.
   }
 }
 
