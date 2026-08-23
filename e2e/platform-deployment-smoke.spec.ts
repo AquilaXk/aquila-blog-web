@@ -6,8 +6,22 @@ const requiredEnv = (name: string) => {
   return value
 }
 
+const isActuatorReady = (contentType: string, body: unknown) => {
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() || ""
+  const isJson =
+    mediaType === "application/json" || (mediaType.startsWith("application/") && mediaType.endsWith("+json"))
+  return isJson && typeof body === "object" && body !== null && (body as { status?: unknown }).status === "UP"
+}
+
 test.describe("verified Platform Web deployment", () => {
   test.setTimeout(90_000)
+
+  test("rejects readiness fallback payloads", () => {
+    expect(isActuatorReady("text/html", { status: "UP" })).toBe(false)
+    expect(isActuatorReady("application/jsonp", { status: "UP" })).toBe(false)
+    expect(isActuatorReady("application/json", { status: "DOWN" })).toBe(false)
+    expect(isActuatorReady("application/vnd.spring-boot.actuator.v3+json;charset=UTF-8", { status: "UP" })).toBe(true)
+  })
 
   test("exact custom domain serves the expected Web build and same-origin readiness", async ({ page }) => {
     const expectedDomain = requiredEnv("E2E_EXPECTED_DOMAIN")
@@ -39,5 +53,7 @@ test.describe("verified Platform Web deployment", () => {
     })
     expect(readiness.status()).toBe(200)
     expect(new URL(readiness.url()).origin).toBe(expectedOrigin)
+    const readinessBody = await readiness.json().catch(() => null)
+    expect(isActuatorReady(readiness.headers()["content-type"] || "", readinessBody)).toBe(true)
   })
 })

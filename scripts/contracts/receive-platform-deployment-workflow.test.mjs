@@ -9,6 +9,7 @@ import test from "node:test"
 const root = path.resolve(import.meta.dirname, "../..")
 const workflowPath = path.join(root, ".github/workflows/receive-platform-web-deployment.yml")
 const ciPath = path.join(root, ".github/workflows/ci.yml")
+const smokeSpecPath = path.join(root, "e2e/platform-deployment-smoke.spec.ts")
 
 function workflow() {
   assert.equal(existsSync(workflowPath), true, "Platform deployment receiver workflow must exist")
@@ -142,5 +143,8 @@ test("receiver performs one bounded Chromium smoke and records deployment proven
 
   const ci = readFileSync(ciPath, "utf8")
   assert.match(ci, /node --test scripts\/contracts\/receive-platform-deployment-workflow\.test\.mjs/)
-  assert.match(ci, /playwright test e2e\/platform-deployment-smoke\.spec\.ts --list/)
+  assert.match(ci, /PLAYWRIGHT_USE_WEBSERVER=false yarn playwright test e2e\/platform-deployment-smoke\.spec\.ts --grep .*readiness fallback payloads/)
+
+  const smokeSpec = readFileSync(smokeSpecPath, "utf8")
+  assert.match(smokeSpec, /test\("rejects readiness fallback payloads"/)
 })
