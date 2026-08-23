@@ -390,8 +390,13 @@ export const useEditorStudioDraftLifecycle = ({
     setPostVersion,
   ])
 
-  const resolveLoadedPostSnapshot = useCallback(
-    (post: PostForEditor, shouldMaskTempPlaceholder: boolean) => {
+  const resolveLoadedPostState = useCallback(
+    (post: PostForEditor) => {
+      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "", post.contentHtml)
+      const shouldMaskTempTitle = isServerTempDraftPost(post)
+      const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
+      const title = shouldMaskTempTitle ? "" : post.title ?? ""
+      const visibility = toVisibility(!!post.published, !!post.listed)
       const resolvedSummary = resolvePersistedSummaryResult(
         { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
         { summary: post.summary, source: post.summarySource },
@@ -405,9 +410,33 @@ export const useEditorStudioDraftLifecycle = ({
         ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
           buildEmptyEditorMetaSnapshot())
         : syncEditorMeta(post.content ?? "", canonicalSummary, post.contentHtml)
-      return { canonicalSummary, snapshot }
+      return {
+        shouldMaskTempPlaceholder,
+        title,
+        visibility,
+        fingerprintPayload: {
+          title,
+          content: snapshot.body,
+          summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
+          summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
+          summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" as const } : canonicalSummary.intent,
+          thumbnailUrl: snapshot.thumbnailUrl,
+          thumbnailFocusX: snapshot.thumbnailFocusX,
+          thumbnailFocusY: snapshot.thumbnailFocusY,
+          thumbnailZoom: snapshot.thumbnailZoom,
+          tags: snapshot.tags,
+          category: snapshot.category,
+          visibility,
+        } satisfies EditorFingerprintPayload,
+      }
     },
-    [buildEmptyEditorMetaSnapshot, syncEditorMeta],
+    [
+      buildEmptyEditorMetaSnapshot,
+      isBlankServerTempDraft,
+      resolveEditorMetaSnapshot,
+      syncEditorMeta,
+      toVisibility,
+    ],
   )
 
   const loadPostForEditor = useCallback(async (
@@ -499,34 +528,12 @@ export const useEditorStudioDraftLifecycle = ({
         }),
       }
 
-      const rawSnapshot = resolveEditorMetaSnapshot(
-        resolvedPost.content ?? "",
-        resolvedPost.contentHtml
+      const loadedPostState = resolveLoadedPostState(resolvedPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload,
       )
-      const shouldMaskTempTitle = isServerTempDraftPost(resolvedPost)
-      const shouldMaskTempPlaceholder = isBlankServerTempDraft(resolvedPost, rawSnapshot)
-      const nextTitle = shouldMaskTempTitle ? "" : resolvedPost.title ?? ""
-      const nextVisibility = toVisibility(!!resolvedPost.published, !!resolvedPost.listed)
-      const { canonicalSummary, snapshot } = resolveLoadedPostSnapshot(
-        resolvedPost,
-        shouldMaskTempPlaceholder,
-      )
-      setPostTitle(nextTitle)
-      setPostVisibility(nextVisibility)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
-        title: nextTitle,
-        content: snapshot.body,
-        summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
-        summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
-        summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" } : canonicalSummary.intent,
-        thumbnailUrl: snapshot.thumbnailUrl,
-        thumbnailFocusX: snapshot.thumbnailFocusX,
-        thumbnailFocusY: snapshot.thumbnailFocusY,
-        thumbnailZoom: snapshot.thumbnailZoom,
-        tags: snapshot.tags,
-        category: snapshot.category,
-        visibility: nextVisibility,
-      })
       applyLoadedPostContext(resolvedPost)
       signalLocalDraftBaselineReady()
       setResult(pretty(resolvedPost))
@@ -542,18 +549,16 @@ export const useEditorStudioDraftLifecycle = ({
     beginLocalDraftPostLoad,
     buildEditorStateFingerprint,
     endLocalDraftPostLoad,
-    isBlankServerTempDraft,
     postId,
     pretty,
     resolveEditorMetaSnapshot,
-    resolveLoadedPostSnapshot,
+    resolveLoadedPostState,
     serverBaselineEditorFingerprintRef,
     setLoadingKey,
     setPostTitle,
     setPostVisibility,
     setResult,
     signalLocalDraftBaselineReady,
-    toVisibility,
   ])
 
   const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
@@ -596,38 +601,21 @@ export const useEditorStudioDraftLifecycle = ({
         await replaceRoute(router, destination)
         return
       }
-      const rawSnapshot = resolveEditorMetaSnapshot(tempPost.content ?? "", tempPost.contentHtml)
-      const shouldMaskTempTitle = isServerTempDraftPost(tempPost)
-      const shouldMaskTempPlaceholder = isBlankServerTempDraft(tempPost, rawSnapshot)
-      const nextTitle = shouldMaskTempTitle ? "" : tempPost.title ?? ""
-      const nextVisibility = toVisibility(!!tempPost.published, !!tempPost.listed)
-      const { canonicalSummary, snapshot } = resolveLoadedPostSnapshot(
-        tempPost,
-        shouldMaskTempPlaceholder,
+      const loadedPostState = resolveLoadedPostState(tempPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload,
       )
-      setPostTitle(nextTitle)
-      setPostVisibility(nextVisibility)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
-        title: nextTitle,
-        content: snapshot.body,
-        summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
-        summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
-        summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" } : canonicalSummary.intent,
-        thumbnailUrl: snapshot.thumbnailUrl,
-        thumbnailFocusX: snapshot.thumbnailFocusX,
-        thumbnailFocusY: snapshot.thumbnailFocusY,
-        thumbnailZoom: snapshot.thumbnailZoom,
-        tags: snapshot.tags,
-        category: snapshot.category,
-        visibility: nextVisibility,
-      })
       applyLoadedPostContext(tempPost)
       setIsTempDraftMode(true)
       signalLocalDraftBaselineReady()
       setPublishStatus(
         {
           tone: "success",
-          text: shouldMaskTempPlaceholder ? "새 글을 시작할 수 있습니다." : "저장된 임시 저장본을 불러왔습니다.",
+          text: loadedPostState.shouldMaskTempPlaceholder
+            ? "새 글을 시작할 수 있습니다."
+            : "저장된 임시 저장본을 불러왔습니다.",
         },
         "page"
       )
@@ -649,12 +637,10 @@ export const useEditorStudioDraftLifecycle = ({
     beginLocalDraftPostLoad,
     buildEditorStateFingerprint,
     endLocalDraftPostLoad,
-    isBlankServerTempDraft,
     isCompactMobileLayout,
     pretty,
     requestTempPostWithConflictRetry,
-    resolveEditorMetaSnapshot,
-    resolveLoadedPostSnapshot,
+    resolveLoadedPostState,
     router,
     serverBaselineEditorFingerprintRef,
     setIsNewEditorBootstrapPending,
@@ -668,7 +654,6 @@ export const useEditorStudioDraftLifecycle = ({
     signalLocalDraftBaselineReady,
     tempPostRequestRef,
     toEditorPostRoute,
-    toVisibility,
     loadExistingTempPostForRecovery,
   ])
 
