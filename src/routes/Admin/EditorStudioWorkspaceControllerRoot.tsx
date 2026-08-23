@@ -138,6 +138,7 @@ export const EditorStudioWorkspaceController = ({
   const [postSummary, setPostSummary] = useState("")
   const [postSummarySource, setPostSummarySource] = useState<CanonicalSummaryState["summarySource"]>("NONE")
   const [summaryIntent, setSummaryIntent] = useState<SummaryIntent>({ kind: "auto" })
+  const postSummaryRevisionRef = useRef(0)
   const [postThumbnailUrl, setPostThumbnailUrl] = useState("")
   const [postThumbnailFocusX, setPostThumbnailFocusX] = useState(DEFAULT_THUMBNAIL_FOCUS_X)
   const [postThumbnailFocusY, setPostThumbnailFocusY] = useState(DEFAULT_THUMBNAIL_FOCUS_Y)
@@ -541,17 +542,20 @@ export const EditorStudioWorkspaceController = ({
   const resolvedPreviewSummary = postSummary
 
   const handlePostSummaryChange = useCallback((summary: string) => {
-    setPostSummary(summary)
+    postSummaryRevisionRef.current += 1
     if (summary.trim()) {
+      setPostSummary(summary)
       setPostSummarySource("MANUAL")
       setSummaryIntent({ kind: "manual", summary })
     } else {
+      setPostSummary("")
       setPostSummarySource("NONE")
       setSummaryIntent({ kind: "auto" })
     }
   }, [])
 
   const handlePreviewSummary = useCallback(async () => {
+    const summaryRevision = postSummaryRevisionRef.current
     const current: CanonicalSummaryState = {
       summary: postSummary,
       summarySource: postSummarySource,
@@ -566,6 +570,10 @@ export const EditorStudioWorkspaceController = ({
       })
       const resolved = resolveSummaryPreviewResult(current, response)
       if (!resolved.ok) throw new Error("canonical summary preview response is malformed")
+      if (postSummaryRevisionRef.current !== summaryRevision) {
+        setPublishStatus({ tone: "error", text: "요약이 변경되어 미리보기 결과를 반영하지 않았습니다." })
+        return
+      }
       setPostSummary(resolved.state.summary)
       setPostSummarySource(resolved.state.summarySource)
       setSummaryIntent(resolved.state.intent)
@@ -925,7 +933,7 @@ export const EditorStudioWorkspaceController = ({
         loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
-        postSummary, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
+        postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
         postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,
         profileImageFileInputRef, profileImageFileName, profileImageNotice, profileImgInputUrl, profileNotice,
         profileRoleInput, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,

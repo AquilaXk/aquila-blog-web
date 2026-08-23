@@ -187,7 +187,12 @@ const fulfillJson = async (route: Route, data: unknown) => {
   })
 }
 
-const routeAuthenticatedEditor = async (page: Page, markdown = longMarkdownDraft, title = "Markdown 작성 테스트") => {
+const routeAuthenticatedEditor = async (
+  page: Page,
+  markdown = longMarkdownDraft,
+  title = "Markdown 작성 테스트",
+  seedLocalDraft = true
+) => {
   await page.route("**/member/api/v1/auth/me", async (route) => {
     await fulfillJson(route, adminMember)
   })
@@ -210,6 +215,7 @@ const routeAuthenticatedEditor = async (page: Page, markdown = longMarkdownDraft
       },
     })
   })
+  if (!seedLocalDraft) return
   await page.addInitScript(
     ({ storageKey, content, title }) => {
       window.localStorage.setItem(
@@ -1716,5 +1722,151 @@ test.describe("Markdown editor replacement", () => {
     await page.getByRole("button", { name: "발행 설정" }).click()
     await expect(page.getByRole("dialog")).toBeVisible()
     await expect(page.getByText("요약을 비워두면 본문에서 자동 생성한 요약이 카드에 반영됩니다.")).toHaveCount(0)
+  })
+
+  test("canonical summary preview does not overwrite a manual edit made while a successful request is pending", async ({
+    page,
+  }) => {
+    const { title, content, expected } = leadingBlockSummaryFixture
+    let releasePreview: (() => void) | undefined
+    let signalPreviewStarted: (() => void) | undefined
+    const previewStarted = new Promise<void>((resolve) => {
+      signalPreviewStarted = resolve
+    })
+
+    await routeAuthenticatedEditor(page, content, title)
+    await page.route("**/post/api/v1/adm/posts/preview-summary", async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ title, content })
+      signalPreviewStarted?.()
+      await new Promise<void>((resolve) => {
+        releasePreview = resolve
+      })
+      await fulfillJson(route, { summary: expected.summary, source: expected.source })
+    })
+
+    await page.goto("/editor/new?source=local-draft")
+
+    const summaryInput = page.getByRole("textbox", { name: /^Summary/ })
+    const previewResponse = page.waitForResponse((response) =>
+      response.url().includes("/post/api/v1/adm/posts/preview-summary") && response.status() === 200
+    )
+    await page.getByRole("button", { name: "본문 기준으로 채우기" }).click()
+    await previewStarted
+
+    const manualSummary = "응답 중에도 유지할 수동 요약"
+    await summaryInput.fill(manualSummary)
+    releasePreview?.()
+
+    await previewResponse
+    await expect(page.getByText("요약이 변경되어 미리보기 결과를 반영하지 않았습니다.")).toBeVisible()
+    await expect(summaryInput).toHaveValue(manualSummary)
+  })
+
+  test("loaded canonical post exits without an unsaved-changes dialog", async ({ page }) => {
+    const postId = 771
+    await routeAuthenticatedEditor(page)
+    await routeEditorPost(page, postId, leadingBlockSummaryFixture.content)
+
+    await page.goto(`/editor/${postId}`)
+    await expect(page.locator("#post-title")).toHaveValue("Markdown 수정 테스트")
+
+    await page.getByRole("button", { name: "← 글 관리" }).click()
+    await expect(page.getByRole("dialog", { name: "저장되지 않은 변경이 있습니다" })).toHaveCount(0)
+    await expect(page).toHaveURL(/\/admin\/posts/)
+  })
+
+  test("whitespace-only Summary autosaves as an empty v3 draft and survives reload", async ({ page }) => {
+    const title = "공백 요약 초안"
+    const content = "공백 요약도 본문은 보존해야 합니다."
+    const manualSummary = "공백 전 수동 요약"
+    await routeAuthenticatedEditor(page, content, title, false)
+
+    await page.goto("/editor/new?source=local-draft")
+    await page.locator("#post-title").fill(title)
+    await page.getByTestId("markdown-editor-write-pane").locator("textarea").fill(content)
+    await page.getByLabel("Summary").fill(manualSummary)
+    await expect
+      .poll(() =>
+        page.evaluate((storageKey) => {
+          const raw = window.localStorage.getItem(storageKey)
+          return raw ? JSON.parse(raw) : null
+        }, localDraftStorageKey)
+      )
+      .toMatchObject({
+        title,
+        content,
+        summary: manualSummary,
+        summarySource: "MANUAL",
+        summaryIntent: { kind: "manual", summary: manualSummary },
+      })
+    const initialSavedAt = await page.evaluate((storageKey) => {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) throw new Error("saved local draft is missing")
+      return (JSON.parse(raw) as { savedAt: string }).savedAt
+    }, localDraftStorageKey)
+    await page.getByLabel("Summary").fill("   ")
+    await expect
+      .poll(() =>
+        page.evaluate(({ storageKey, initialSavedAt }) => {
+          const raw = window.localStorage.getItem(storageKey)
+          if (!raw) {
+            return {
+              savedAtChanged: false,
+              summary: "<missing>",
+              summarySource: "<missing>",
+              intentKind: "<missing>",
+            }
+          }
+          const draft = JSON.parse(raw) as {
+            summary: string
+            summarySource: string
+            summaryIntent: { kind: string }
+            savedAt: string
+          }
+          return {
+            savedAtChanged: draft.savedAt !== initialSavedAt,
+            summary: draft.summary,
+            summarySource: draft.summarySource,
+            intentKind: draft.summaryIntent.kind,
+          }
+        }, { storageKey: localDraftStorageKey, initialSavedAt })
+      )
+      .toEqual({ savedAtChanged: true, summary: "", summarySource: "NONE", intentKind: "auto" })
+
+    await page.goto("/editor/new?source=local-draft")
+    await expect(page.locator("#post-title")).toHaveValue(title)
+    await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toHaveValue(content)
+    await expect(page.getByLabel("Summary")).toHaveValue("")
+  })
+
+  test("actual preview renders a leading summary block only in the body", async ({ page }) => {
+    const { content, expected } = leadingBlockSummaryFixture
+    const previewId = "leading-summary"
+    await routeAuthenticatedEditor(page)
+    await page.addInitScript(
+      ({ content, previewId, summary, summarySource }) => {
+        window.localStorage.setItem(
+          `editor.actual-preview.v1:${previewId}`,
+          JSON.stringify({
+            id: previewId,
+            title: "LEADING_BLOCK 실제 보기",
+            content,
+            summary,
+            summarySource,
+            tags: [],
+            visibility: "PUBLIC_LISTED",
+            thumbnailUrl: "",
+            authorName: "aquila",
+            authorImageUrl: "",
+            createdAt: "2026-08-24T00:00:00.000Z",
+          })
+        )
+      },
+      { content, previewId, summary: expected.summary, summarySource: expected.source }
+    )
+
+    await page.goto(`/editor/preview/${previewId}`)
+    await expect(page.locator(".deck")).toHaveCount(0)
+    await expect(page.locator(".aq-markdown").getByText("OIDC는 그 위에 인증 계층을 추가합니다.", { exact: false })).toHaveCount(1)
   })
 })
