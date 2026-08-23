@@ -21,6 +21,7 @@ import {
   decideLocalDraftAutosave,
   isLocalDraftAutosaveGatedForPostIdTransition,
   isLocalDraftBaselineSettleLoadingKey,
+  isLocalDraftRestoreSuggestionEligible,
   resolveCreateWritePostId,
   resolveLocalDraftShouldAdoptBaseline,
   shouldReleasePostIdTransitionGate,
@@ -92,6 +93,56 @@ const baseDraft = (
 })
 
 test.describe("editor local draft context slots", () => {
+  test("shows a same-slot restore candidate only when it differs from editor and baseline", () => {
+    const candidate = '{"title":"local"}'
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidateFingerprint: candidate,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restoredFingerprint: "",
+        dismissedFingerprint: "",
+      })
+    ).toBe(true)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidateFingerprint: candidate,
+        editorFingerprint: candidate,
+        serverBaselineFingerprint: '{"title":"server"}',
+        restoredFingerprint: "",
+        dismissedFingerprint: "",
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidateFingerprint: candidate,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: candidate,
+        restoredFingerprint: "",
+        dismissedFingerprint: "",
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidateFingerprint: candidate,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restoredFingerprint: candidate,
+        dismissedFingerprint: "",
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidateFingerprint: candidate,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restoredFingerprint: "",
+        dismissedFingerprint: candidate,
+      })
+    ).toBe(false)
+  })
+
   test("resolves create and per-post storage keys", () => {
     expect(localDraftStorageKey({ kind: "create" })).toBe(LOCAL_DRAFT_CREATE_STORAGE_KEY)
     expect(localDraftStorageKey({ kind: "post", postId: "42" })).toBe(
