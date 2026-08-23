@@ -427,12 +427,13 @@ export const EditorStudioWorkspaceController = ({
 
   const {
     clearLocalDraft,
-    dismissedLocalDraftFingerprint,
+    dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,
     handleLoadOrCreateTempPost,
-    localDraftCandidateFingerprint,
+    localDraftCandidate,
+    localDraftSource,
     loadPostForEditor,
-    restoredLocalDraftFingerprint,
+    restoredLocalDraft,
     restoreLocalDraft,
     saveLocalDraft,
     signalLocalDraftBaselineReady,
@@ -760,14 +761,22 @@ export const EditorStudioWorkspaceController = ({
   }, [customCategoryCatalog])
 
   const handlePostCategoryChange = useCallback((value: string) => {
-    const category = normalizeCategoryValue(value)
+    setPostCategory(value)
+  }, [])
+
+  const commitPostCategory = useCallback(() => {
+    if (!postCategory.trim()) {
+      setPostCategory("")
+      return
+    }
+    const category = normalizeCategoryValue(postCategory)
     setPostCategory(category)
     if (!category) return
     setCustomCategoryCatalog((current) => {
       if (current.includes(category)) return current
       return dedupeStrings([...current, category]).sort(compareCategoryValues)
     })
-  }, [])
+  }, [postCategory])
 
   useEffect(() => {
     setKnownTags((prev) =>
@@ -843,7 +852,7 @@ export const EditorStudioWorkspaceController = ({
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
         closePublishModal, commentContent, commentId, commitPreviewThumbTransform, copyPostDetailLink,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
-        customCategoryCatalog, deletedListNotice, dismissedLocalDraftFingerprint, dismissLocalDraftRestoreSuggestion,
+        customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing,
         handleCreateNewPostFromSelectedPanel, handleDeleteComment, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
@@ -858,7 +867,7 @@ export const EditorStudioWorkspaceController = ({
         isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftCandidateFingerprint, localDraftSavedAt, localDraftSlotLabel, member, metaNotice,
+        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
@@ -875,9 +884,9 @@ export const EditorStudioWorkspaceController = ({
         setMobileComposeStep,
         setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
         setPreviewViewport, setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
-        softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraftFingerprint,
+        softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
         thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
-        handlePostCategoryChange,
+        commitPostCategory, handlePostCategoryChange,
       }}
     />
   )

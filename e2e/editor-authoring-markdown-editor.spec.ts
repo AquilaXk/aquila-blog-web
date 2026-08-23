@@ -8,6 +8,7 @@ const sourcePath = (...segments: string[]) => resolve(__dirname, "../src", ...se
 const frontPath = (...segments: string[]) => resolve(__dirname, "..", ...segments)
 const joinParts = (...parts: string[]) => parts.join("")
 const localDraftStorageKey = "admin.editor.localDraft.create.v2"
+const categoryCatalogStorageKey = "admin.editor.customCategories"
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
   "base64"
@@ -524,8 +525,12 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByRole("heading", { name: "Publish inspector" })).toBeVisible()
     await expect(page.getByLabel("Summary")).toHaveAttribute("maxLength", "150")
     await page.getByLabel("Category").fill("개발")
-    await expect(page.getByLabel("Category")).toHaveValue("folder::개발")
-    await page.getByRole("button", { name: "지우기" }).click()
+    await page.getByLabel("Category").blur()
+    await expect(page.getByLabel("Category")).toHaveValue("개발")
+    await expect
+      .poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), categoryCatalogStorageKey))
+      .toBe(JSON.stringify(["folder::개발"]))
+    await page.getByRole("button", { name: "카테고리 지우기" }).click()
     await expect(page.getByLabel("Category")).toHaveValue("")
 
     await page.getByLabel("Summary").fill("x".repeat(200))
@@ -554,7 +559,7 @@ test.describe("Markdown editor replacement", () => {
     await page.goto("/editor/new")
     const restoreSuggestion = page.getByRole("status").filter({ hasText: "브라우저 임시글이 있습니다." })
     await expect(restoreSuggestion).toBeVisible()
-    await page.getByRole("button", { name: "이번 세션에 표시 안 함" }).click()
+    await restoreSuggestion.getByRole("button", { name: "이번 세션에 표시 안 함" }).click()
     await expect(restoreSuggestion).toHaveCount(0)
     await expect
       .poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), localDraftStorageKey))
@@ -562,6 +567,10 @@ test.describe("Markdown editor replacement", () => {
 
     await page.reload()
     await expect(restoreSuggestion).toBeVisible()
+    await restoreSuggestion.getByRole("button", { name: "삭제" }).click()
+    await expect
+      .poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), localDraftStorageKey))
+      .toBeNull()
   })
 
   test("dedicated editor outline hides inline markdown markers from headings", async ({ page }) => {

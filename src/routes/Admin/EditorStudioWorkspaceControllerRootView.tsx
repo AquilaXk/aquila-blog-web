@@ -55,7 +55,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     deleteConfirmState,
     deletePostsFromList,
     deletedListNotice,
-    dismissedLocalDraftFingerprint,
+    dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,
     deleteTagFromCatalog,
     disabled,
@@ -79,6 +79,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleListPageSizeChange,
     handleListSortChange,
     handleLoadOrCreateTempPost,
+    commitPostCategory,
     handlePostCategoryChange,
     handleModifyComment,
     handlePreviewThumbPointerDown,
@@ -127,8 +128,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     loadAdminPosts,
     loadPostForEditor,
     loadingKey,
-    localDraftCandidateFingerprint,
+    localDraftCandidate,
     localDraftSavedAt,
+    localDraftSource,
     localDraftSlotLabel,
     member,
     metaNotice,
@@ -170,7 +172,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     removeTagFromPost,
     restoreDeletedPostFromList,
     restoreLocalDraft,
-    restoredLocalDraftFingerprint,
+    restoredLocalDraft,
     result,
     safePreviewThumbnail,
     saveLocalDraft,
@@ -328,11 +330,12 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     pristineCreateFingerprint,
   })
   const isLocalDraftRestoreSuggestionVisible = isLocalDraftRestoreSuggestionEligible({
-    candidateFingerprint: localDraftCandidateFingerprint,
+    candidate: localDraftCandidate,
+    currentSource: localDraftSource,
     editorFingerprint: editorStateFingerprint,
     serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
-    restoredFingerprint: restoredLocalDraftFingerprint,
-    dismissedFingerprint: dismissedLocalDraftFingerprint,
+    restored: restoredLocalDraft,
+    dismissed: dismissedLocalDraft,
   })
   const getIsEditorUnsavedDirty = useCallback(() => {
     const liveContent =
@@ -692,6 +695,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onPostSummaryChange={setPostSummary}
         postCategory={postCategory}
         onPostCategoryChange={handlePostCategoryChange}
+        onCommitPostCategory={commitPostCategory}
         categorySuggestions={customCategoryCatalog}
         postVisibility={postVisibility}
         onPostVisibilityChange={setPostVisibility}
@@ -700,8 +704,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         publishNoticeTone={publishNotice.tone}
         publishNoticeText={publishNotice.text}
         isLocalDraftRestoreSuggestionVisible={isLocalDraftRestoreSuggestionVisible}
+        isLocalDraftRestoreSuggestionActionsDisabled={loadingKey.length > 0}
         onRestoreLocalDraft={restoreLocalDraft}
         onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
+        onClearLocalDraft={clearLocalDraft}
         resultPanel={dedicatedEditorResultPanel}
         publishModal={
           isPublishModalOpen ? (

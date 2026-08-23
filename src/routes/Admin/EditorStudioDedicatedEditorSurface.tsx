@@ -7,6 +7,7 @@ import type {
 } from "react"
 import { useMemo, useState } from "react"
 import { CONFIG } from "site.config"
+import { splitCategoryDisplay } from "src/libs/utils"
 import {
   EditorGuideBackdrop,
   EditorGuideBody,
@@ -69,6 +70,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onPostSummaryChange: (value: string) => void
   postCategory: string
   onPostCategoryChange: (value: string) => void
+  onCommitPostCategory: () => void
   categorySuggestions: string[]
   postVisibility: PostVisibility
   onPostVisibilityChange: (value: PostVisibility) => void
@@ -77,8 +79,10 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   publishNoticeTone: NoticeTone
   publishNoticeText: string
   isLocalDraftRestoreSuggestionVisible: boolean
+  isLocalDraftRestoreSuggestionActionsDisabled: boolean
   onRestoreLocalDraft: () => void
   onDismissLocalDraftRestoreSuggestion: () => void
+  onClearLocalDraft: () => void
   resultPanel: ReactNode
   publishModal: ReactNode
 }
@@ -174,6 +178,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   onPostSummaryChange,
   postCategory,
   onPostCategoryChange,
+  onCommitPostCategory,
   categorySuggestions,
   postVisibility,
   onPostVisibilityChange,
@@ -182,8 +187,10 @@ export const EditorStudioDedicatedEditorSurface = ({
   publishNoticeTone,
   publishNoticeText,
   isLocalDraftRestoreSuggestionVisible,
+  isLocalDraftRestoreSuggestionActionsDisabled,
   onRestoreLocalDraft,
   onDismissLocalDraftRestoreSuggestion,
+  onClearLocalDraft,
   resultPanel,
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
@@ -329,10 +336,16 @@ export const EditorStudioDedicatedEditorSurface = ({
             <EditorInspectorTagInputRow>
               <input
                 list="editor-category-suggestions"
-                value={postCategory}
+                value={postCategory.trim() ? splitCategoryDisplay(postCategory).label : ""}
                 onChange={(event) => onPostCategoryChange(event.target.value)}
+                onBlur={onCommitPostCategory}
               />
-              <SecondaryButton type="button" onClick={() => onPostCategoryChange("")} disabled={!postCategory}>
+              <SecondaryButton
+                type="button"
+                aria-label="카테고리 지우기"
+                onClick={() => onPostCategoryChange("")}
+                disabled={!postCategory}
+              >
                 지우기
               </SecondaryButton>
             </EditorInspectorTagInputRow>
@@ -345,8 +358,13 @@ export const EditorStudioDedicatedEditorSurface = ({
           {isLocalDraftRestoreSuggestionVisible ? (
             <PublishNotice role="status" aria-live="polite" data-tone="idle">
               브라우저 임시글이 있습니다.
-              <SecondaryButton type="button" onClick={onRestoreLocalDraft}>복구</SecondaryButton>
-              <SecondaryButton type="button" onClick={onDismissLocalDraftRestoreSuggestion}>
+              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onRestoreLocalDraft}>
+                복구
+              </SecondaryButton>
+              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onClearLocalDraft}>
+                삭제
+              </SecondaryButton>
+              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onDismissLocalDraftRestoreSuggestion}>
                 이번 세션에 표시 안 함
               </SecondaryButton>
             </PublishNotice>
