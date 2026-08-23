@@ -227,6 +227,12 @@ export const useEditorStudioDraftLifecycle = ({
 }: UseEditorStudioDraftLifecycleParams) => {
   const {
     localDraftFingerprint,
+    localDraftSource,
+    localDraftCandidate,
+    restoredLocalDraft,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
+    signalLocalDraftRemoved,
     saveLocalDraft,
     restoreLocalDraft,
     clearLocalDraft,
@@ -621,6 +627,12 @@ export const useEditorStudioDraftLifecycle = ({
 
   return {
     localDraftFingerprint,
+    localDraftSource,
+    localDraftCandidate,
+    restoredLocalDraft,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
+    signalLocalDraftRemoved,
     saveLocalDraft,
     restoreLocalDraft,
     clearLocalDraft,

@@ -20,7 +20,9 @@ import {
 import {
   decideLocalDraftAutosave,
   isLocalDraftAutosaveGatedForPostIdTransition,
+  removeLocalDraftCandidateForSource,
   isLocalDraftBaselineSettleLoadingKey,
+  isLocalDraftRestoreSuggestionEligible,
   resolveCreateWritePostId,
   resolveLocalDraftShouldAdoptBaseline,
   shouldReleasePostIdTransitionGate,
@@ -92,6 +94,119 @@ const baseDraft = (
 })
 
 test.describe("editor local draft context slots", () => {
+  test("shows a same-slot restore candidate only when it differs from editor and baseline", () => {
+    const candidate = '{"title":"local"}'
+    const createSource = { kind: "create" } as const
+    const otherSource = { kind: "post", postId: "7" } as const
+    const candidateSnapshot = { source: createSource, fingerprint: candidate }
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(true)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: candidate,
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: candidate,
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+
+    const otherSnapshot = { source: otherSource, fingerprint: candidate }
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, createSource)).toBeNull()
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, otherSource)).toEqual(candidateSnapshot)
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+  })
+
   test("resolves create and per-post storage keys", () => {
     expect(localDraftStorageKey({ kind: "create" })).toBe(LOCAL_DRAFT_CREATE_STORAGE_KEY)
     expect(localDraftStorageKey({ kind: "post", postId: "42" })).toBe(

@@ -56,6 +56,7 @@ import {
   normalizeSafeImageUrl,
   normalizeSafePreviewThumbnailUrl,
   resolveEditorMetaSnapshot,
+  type LocalDraftSource,
   type MetaUsageMap,
   type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
@@ -427,11 +428,17 @@ export const EditorStudioWorkspaceController = ({
 
   const {
     clearLocalDraft,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
     handleLoadOrCreateTempPost,
+    localDraftCandidate,
+    localDraftSource,
     loadPostForEditor,
+    restoredLocalDraft,
     restoreLocalDraft,
     saveLocalDraft,
     signalLocalDraftBaselineReady,
+    signalLocalDraftRemoved,
     switchToCreateMode,
   } = useEditorStudioDraftLifecycle({
     router,
@@ -607,6 +614,11 @@ export const EditorStudioWorkspaceController = ({
     tagUsageMap,
   })
 
+  const removePersistedLocalDraft = useCallback((source: LocalDraftSource) => {
+    removeLocalDraft(source)
+    signalLocalDraftRemoved(source)
+  }, [signalLocalDraftRemoved])
+
   const {
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
@@ -664,7 +676,7 @@ export const EditorStudioWorkspaceController = ({
     refreshPublicPostReadViews,
     pretty,
     generateIdempotencyKey,
-    removeLocalDraft,
+    removeLocalDraft: removePersistedLocalDraft,
     signalLocalDraftBaselineReady,
     uploadWithConflictRetry,
     normalizeSafeImageUrl,
@@ -755,6 +767,24 @@ export const EditorStudioWorkspaceController = ({
     persistCatalog(CATEGORY_CATALOG_STORAGE_KEY, customCategoryCatalog)
   }, [customCategoryCatalog])
 
+  const handlePostCategoryChange = useCallback((value: string) => {
+    setPostCategory(value)
+  }, [])
+
+  const commitPostCategory = useCallback(() => {
+    if (!postCategory.trim()) {
+      setPostCategory("")
+      return
+    }
+    const category = normalizeCategoryValue(postCategory)
+    setPostCategory(category)
+    if (!category) return
+    setCustomCategoryCatalog((current) => {
+      if (current.includes(category)) return current
+      return dedupeStrings([...current, category]).sort(compareCategoryValues)
+    })
+  }, [postCategory])
+
   useEffect(() => {
     setKnownTags((prev) =>
       dedupeStrings([...prev, ...Object.keys(tagUsageMap), ...customTagCatalog, ...postTags]).sort((a, b) =>
@@ -829,7 +859,7 @@ export const EditorStudioWorkspaceController = ({
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
         closePublishModal, commentContent, commentId, commitPreviewThumbTransform, copyPostDetailLink,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
-        deletedListNotice,
+        customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing,
         handleCreateNewPostFromSelectedPanel, handleDeleteComment, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
@@ -844,7 +874,7 @@ export const EditorStudioWorkspaceController = ({
         isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftSavedAt, localDraftSlotLabel, member, metaNotice,
+        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
@@ -861,8 +891,9 @@ export const EditorStudioWorkspaceController = ({
         setMobileComposeStep,
         setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
         setPreviewViewport, setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
-        softDeleteUndoState, studioSurface, tagDraft, tagUsageMap,
+        softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
         thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
+        commitPostCategory, handlePostCategoryChange,
       }}
     />
   )
