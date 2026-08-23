@@ -36,8 +36,7 @@ const adminUrlPattern = /\/admin(\/|$|\?)/
 
 const isWebKitCorsAccessControlNoise = (message: string) =>
   /due to access control checks\./i.test(message) &&
-  (/\/api\.[\w.-]+\//i.test(message) ||
-    /\/(?:www\.)?[\w.-]+\/_next\/data\/[^/\s]+\/[^?\s]+\.json/i.test(message))
+  /\/(?:www\.)?[\w.-]+\/_next\/data\/[^/\s]+\/[^?\s]+\.json/i.test(message)
 
 
 const tryEnterAdminRoute = async (page: Page, timeoutMs: number) => {
@@ -477,7 +476,7 @@ test.describe("live critical error filter", () => {
       isWebKitCorsAccessControlNoise(
         "https://api.blog.aquilaxk.site/member/api/v1/notifications/snapshot due to access control checks."
       )
-    ).toBe(true)
+    ).toBe(false)
     expect(isWebKitCorsAccessControlNoise("TypeError: Cannot read properties of undefined")).toBe(false)
     expect(
       isWebKitCorsAccessControlNoise("https://cdn.example.com/widget.js due to access control checks.")

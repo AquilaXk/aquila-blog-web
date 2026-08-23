@@ -325,6 +325,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/adm/posts/summary-backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** canonical summary bounded backfill */
+        post: operations["backfillSummary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/post/api/v1/adm/posts/preview-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** canonical summary 미리보기 */
+        post: operations["previewSummary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/member/api/v1/signup/social/pending": {
         parameters: {
             query?: never;
@@ -1487,8 +1521,8 @@ export interface components {
             /** Format: date-time */
             expiresAt?: string;
             /** Format: int64 */
-            completedFileId?: number;
-            failureReason?: string;
+            completedFileId?: number | null;
+            failureReason?: string | null;
         };
         PostCommentModifyRequest: {
             content: string;
@@ -1501,11 +1535,14 @@ export interface components {
         PostModifyRequest: {
             title: string;
             content: string;
-            contentHtml?: string;
-            published?: boolean;
-            listed?: boolean;
+            contentHtml?: string | null;
+            published?: boolean | null;
+            listed?: boolean | null;
             /** Format: int64 */
             version?: number;
+            /** @enum {string|null} */
+            summaryMode?: "AUTO" | "MANUAL" | null;
+            summary?: string | null;
         };
         PostWriteResultDto: {
             /** Format: int64 */
@@ -1515,6 +1552,9 @@ export interface components {
             version?: number;
             published?: boolean;
             listed?: boolean;
+            summary?: string;
+            /** @enum {string} */
+            summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
         };
         RsDataPostWriteResultDto: {
             resultCode?: string;
@@ -1563,8 +1603,8 @@ export interface components {
             blogTitle?: string;
             homeIntroTitle?: string;
             homeIntroDescription?: string;
-            blogDesign?: string;
-            legacyBlogScheme?: string;
+            blogDesign?: string | null;
+            legacyBlogScheme?: string | null;
             serviceLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
             contactLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
         };
@@ -1609,13 +1649,13 @@ export interface components {
             draft?: components["schemas"]["MemberProfileWorkspaceContentDto"];
             published?: components["schemas"]["MemberProfileWorkspaceContentDto"];
             /** Format: date-time */
-            lastDraftSavedAt?: string;
+            lastDraftSavedAt?: string | null;
             /** Format: date-time */
-            lastPublishedAt?: string;
+            lastPublishedAt?: string | null;
             dirtyFromPublished?: boolean;
         };
         TaskDlqReplayRequest: {
-            taskType?: string;
+            taskType?: string | null;
             /** Format: int32 */
             limit?: number;
             resetRetryCount?: boolean;
@@ -1626,7 +1666,7 @@ export interface components {
             data?: components["schemas"]["TaskDlqReplayResult"];
         };
         TaskDlqReplayResult: {
-            taskType?: string;
+            taskType?: string | null;
             /** Format: int32 */
             requestedLimit?: number;
             /** Format: int32 */
@@ -1635,7 +1675,7 @@ export interface components {
             replayedTaskIds?: number[];
         };
         SearchPipelineForceControlRequest: {
-            forceControl?: boolean;
+            forceControl?: boolean | null;
         };
         RsDataSearchRuntimeFlags: {
             resultCode?: string;
@@ -1704,11 +1744,11 @@ export interface components {
             data?: components["schemas"]["CloudExternalPlaybackTokenDto"];
         };
         CreateVideoUploadSessionReqBody: {
-            originalFilename?: string;
-            contentType?: string;
+            originalFilename?: string | null;
+            contentType?: string | null;
             /** Format: int64 */
-            byteSize?: number;
-            folderPath?: string;
+            byteSize?: number | null;
+            folderPath?: string | null;
         };
         RsDataCloudVideoUploadSessionDto: {
             resultCode?: string;
@@ -1718,9 +1758,12 @@ export interface components {
         PostWriteRequest: {
             title: string;
             content: string;
-            contentHtml?: string;
-            published?: boolean;
-            listed?: boolean;
+            contentHtml?: string | null;
+            published?: boolean | null;
+            listed?: boolean | null;
+            /** @enum {string|null} */
+            summaryMode?: "AUTO" | "MANUAL" | null;
+            summary?: string | null;
         };
         PostDto: {
             /** Format: int64 */
@@ -1735,7 +1778,7 @@ export interface components {
             authorUsername?: string;
             authorProfileImgUrl?: string;
             title?: string;
-            thumbnail?: string;
+            thumbnail?: string | null;
             summary?: string;
             /** Format: int64 */
             version?: number;
@@ -1751,6 +1794,8 @@ export interface components {
             actorHasLiked?: boolean;
             tags?: string[];
             category?: string[];
+            /** @enum {string} */
+            summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
         };
         RsDataPostDto: {
             resultCode?: string;
@@ -1760,7 +1805,7 @@ export interface components {
         PostCommentWriteRequest: {
             content: string;
             /** Format: int64 */
-            parentCommentId?: number;
+            parentCommentId?: number | null;
         };
         PostCommentDto: {
             /** Format: int64 */
@@ -1778,7 +1823,7 @@ export interface components {
             /** Format: int64 */
             postId?: number;
             /** Format: int64 */
-            parentCommentId?: number;
+            parentCommentId?: number | null;
             content?: string;
             actorCanModify?: boolean;
             actorCanDelete?: boolean;
@@ -1812,7 +1857,7 @@ export interface components {
             authorProfileImageDirectUrl?: string;
             title?: string;
             content?: string;
-            contentHtml?: string;
+            contentHtml?: string | null;
             /** Format: int64 */
             version?: number;
             published?: boolean;
@@ -1827,6 +1872,9 @@ export interface components {
             actorHasLiked?: boolean;
             actorCanModify?: boolean;
             actorCanDelete?: boolean;
+            summary?: string;
+            /** @enum {string} */
+            summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
         };
         RsDataPostWithContentDto: {
             resultCode?: string;
@@ -1853,13 +1901,43 @@ export interface components {
             url?: string;
             name?: string;
         };
+        PostSummaryBackfillRequest: {
+            /** Format: int64 */
+            afterId?: number;
+            /** Format: int32 */
+            limit?: number;
+            dryRun?: boolean;
+        };
+        PostSummaryBackfillResponse: {
+            /** Format: int32 */
+            scanned?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            skipped?: number;
+            /** Format: int64 */
+            nextAfterId?: number;
+            hasMore?: boolean;
+            dryRun?: boolean;
+        };
+        PostSummaryPreviewRequest: {
+            title: string;
+            content: string;
+        };
+        PostSummaryPreviewResponse: {
+            summary?: string;
+            /** @enum {string} */
+            source?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
+            contentHash?: string;
+            algorithmVersion?: string;
+        };
         SocialSignupPendingRequest: {
             token: string;
         };
         OAuthSignupPendingDetails: {
             provider?: string;
             nickname?: string;
-            profileImgUrl?: string;
+            profileImgUrl?: string | null;
             /** Format: date-time */
             expiresAt?: string;
         };
@@ -1870,7 +1948,7 @@ export interface components {
         };
         SocialSignupCompleteRequest: {
             token: string;
-            nickname?: string;
+            nickname?: string | null;
             termsVersion: string;
             termsContentSha256: string;
             privacyVersion: string;
@@ -1916,7 +1994,7 @@ export interface components {
             termsAccepted: boolean;
             privacyAccepted: boolean;
             legalPolicyVersion: string;
-            nextPath?: string;
+            nextPath?: string | null;
         };
         RsDataSignupEmailStartResult: {
             resultCode?: string;
@@ -1927,7 +2005,7 @@ export interface components {
             email?: string;
         };
         SignupCompleteRequest: {
-            username?: string;
+            username?: string | null;
             password: string;
             nickname: string;
             termsVersion: string;
@@ -1942,7 +2020,7 @@ export interface components {
         PrivacyRequestCreateRequest: {
             /** @enum {string} */
             type: "EXPORT" | "CORRECTION" | "DELETION" | "PROCESSING_RESTRICTION" | "CONSENT_WITHDRAWAL";
-            message?: string;
+            message?: string | null;
         };
         PrivacyRequestDto: {
             /** Format: int64 */
@@ -1953,13 +2031,13 @@ export interface components {
             type?: "EXPORT" | "CORRECTION" | "DELETION" | "PROCESSING_RESTRICTION" | "CONSENT_WITHDRAWAL";
             /** @enum {string} */
             status?: "RECEIVED" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
-            message?: string;
+            message?: string | null;
             /** Format: date-time */
             requestedAt?: string;
             /** Format: date-time */
             dueAt?: string;
             /** Format: date-time */
-            completedAt?: string;
+            completedAt?: string | null;
         };
         PrivacyRequestResBody: {
             item?: components["schemas"]["PrivacyRequestDto"];
@@ -1989,7 +2067,7 @@ export interface components {
             nickname: string;
         };
         MemberLoginRequest: {
-            email?: string;
+            email?: string | null;
             password: string;
             rememberMe?: boolean;
             ipSecurity?: boolean;
@@ -2023,7 +2101,7 @@ export interface components {
             privacyVersion?: string;
             privacyContentSha256?: string;
             /** Format: date-time */
-            acceptedAt?: string;
+            acceptedAt?: string | null;
             refusalGuidePath?: string;
             exportGuidePath?: string;
             deletionGuidePath?: string;
@@ -2069,14 +2147,14 @@ export interface components {
         UpdateProfileCardRequest: {
             role?: string;
             bio?: string;
-            aboutRole?: string;
-            aboutBio?: string;
-            aboutDetails?: string;
+            aboutRole?: string | null;
+            aboutBio?: string | null;
+            aboutDetails?: string | null;
             blogTitle?: string;
             homeIntroTitle?: string;
             homeIntroDescription?: string;
-            blogDesign?: string;
-            legacyBlogScheme?: string;
+            blogDesign?: string | null;
+            legacyBlogScheme?: string | null;
             serviceLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
             contactLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
         };
@@ -2092,7 +2170,7 @@ export interface components {
             /** Format: int64 */
             aggregateId?: number;
             /** @enum {string} */
-            status?: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+            status?: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "QUARANTINED";
             /** Format: int32 */
             retryCount?: number;
             /** Format: int32 */
@@ -2101,7 +2179,7 @@ export interface components {
             modifiedAt?: string;
             /** Format: date-time */
             nextRetryAt?: string;
-            errorMessage?: string;
+            errorMessage?: string | null;
         };
         TaskQueueDiagnostics: {
             /** Format: int64 */
@@ -2119,13 +2197,13 @@ export interface components {
             /** Format: int64 */
             staleProcessingCount?: number;
             /** Format: date-time */
-            oldestReadyPendingAt?: string;
+            oldestReadyPendingAt?: string | null;
             /** Format: date-time */
-            oldestProcessingAt?: string;
+            oldestProcessingAt?: string | null;
             /** Format: int64 */
-            oldestReadyPendingAgeSeconds?: number;
+            oldestReadyPendingAgeSeconds?: number | null;
             /** Format: int64 */
-            oldestProcessingAgeSeconds?: number;
+            oldestProcessingAgeSeconds?: number | null;
             /** Format: int64 */
             processingTimeoutSeconds?: number;
             taskTypes?: components["schemas"]["TaskTypeDiagnostics"][];
@@ -2157,18 +2235,18 @@ export interface components {
             /** Format: int64 */
             backlogCount?: number;
             /** Format: int64 */
-            queueLagSeconds?: number;
+            queueLagSeconds?: number | null;
             /** Format: int64 */
             failedCount?: number;
             /** Format: int64 */
             staleProcessingCount?: number;
             /** Format: date-time */
-            oldestReadyPendingAt?: string;
+            oldestReadyPendingAt?: string | null;
             /** Format: int64 */
-            oldestReadyPendingAgeSeconds?: number;
+            oldestReadyPendingAgeSeconds?: number | null;
             /** Format: date-time */
-            latestFailureAt?: string;
-            latestFailureMessage?: string;
+            latestFailureAt?: string | null;
+            latestFailureMessage?: string | null;
             retryPolicy?: components["schemas"]["TaskRetryPolicy"];
         };
         UploadedFileCleanupDiagnostics: {
@@ -2186,7 +2264,7 @@ export interface components {
             cleanupSafetyThreshold?: number;
             blockedBySafetyThreshold?: boolean;
             /** Format: date-time */
-            oldestEligiblePurgeAfter?: string;
+            oldestEligiblePurgeAfter?: string | null;
             sampleEligibleObjectKeys?: string[];
             reconcile?: components["schemas"]["UploadedFileReconcileDiagnostics"];
         };
@@ -2238,24 +2316,34 @@ export interface components {
             /** Format: int64 */
             replayNotificationCount?: number;
             /** Format: int64 */
+            replayUnavailableNotificationCount?: number;
+            /** Format: int64 */
+            replayFailureCount?: number;
+            /** Format: int64 */
+            unreadUnavailableCount?: number;
+            /** Format: int64 */
             heartbeatSentCount?: number;
             /** Format: int64 */
             sendFailureCount?: number;
+            /** Format: int64 */
+            sendFailureRemovedEmitterCount?: number;
+            /** Format: int32 */
+            emitterStateMismatchCount?: number;
         };
         SignupMailDiagnostics: {
             status?: string;
             adapter?: string;
-            host?: string;
+            host?: string | null;
             /** Format: int32 */
-            port?: number;
-            mailFrom?: string;
+            port?: number | null;
+            mailFrom?: string | null;
             usernameConfigured?: boolean;
             passwordConfigured?: boolean;
             smtpAuth?: boolean;
             startTlsEnabled?: boolean;
             missing?: string[];
-            canConnect?: boolean;
-            connectionError?: string;
+            canConnect?: boolean | null;
+            connectionError?: string | null;
             /** Format: date-time */
             checkedAt?: string;
             verifyPath?: string;
@@ -2268,7 +2356,7 @@ export interface components {
             processTasksLockKey?: string;
             processTasksLockExists?: boolean;
             /** Format: int64 */
-            processTasksLockTtlSeconds?: number;
+            processTasksLockTtlSeconds?: number | null;
             legacyOrphanLikely?: boolean;
         };
         HealthChecks: {
@@ -2290,17 +2378,17 @@ export interface components {
             /** Format: int32 */
             blockedEventCount?: number;
             /** Format: date-time */
-            latestEventAt?: string;
+            latestEventAt?: string | null;
             /** Format: date-time */
-            latestBlockedAt?: string;
+            latestBlockedAt?: string | null;
         };
         AdminDashboardSignupMailSnapshot: {
             status?: string;
             /** Format: int64 */
-            queueLagSeconds?: number;
+            queueLagSeconds?: number | null;
             /** Format: date-time */
-            latestFailureAt?: string;
-            latestFailureMessage?: string;
+            latestFailureAt?: string | null;
+            latestFailureMessage?: string | null;
         };
         AdminDashboardSnapshot: {
             /** Format: date-time */
@@ -2315,7 +2403,7 @@ export interface components {
             eligibleForPurgeCount?: number;
             blockedBySafetyThreshold?: boolean;
             /** Format: date-time */
-            oldestEligiblePurgeAfter?: string;
+            oldestEligiblePurgeAfter?: string | null;
         };
         AdminDashboardTaskQueueSnapshot: {
             /** Format: int64 */
@@ -2329,10 +2417,10 @@ export interface components {
             /** Format: int64 */
             staleProcessingCount?: number;
             /** Format: int64 */
-            oldestReadyPendingAgeSeconds?: number;
+            oldestReadyPendingAgeSeconds?: number | null;
             /** Format: date-time */
-            latestFailureAt?: string;
-            latestFailureMessage?: string;
+            latestFailureAt?: string | null;
+            latestFailureMessage?: string | null;
         };
         CloudFileListResBody: {
             files?: components["schemas"]["CloudFileDto"][];
@@ -2347,7 +2435,7 @@ export interface components {
             id?: number;
             username?: string;
             nickname?: string;
-            legalReconsent?: components["schemas"]["LegalReconsentStatus"];
+            legalReconsent?: components["schemas"]["LegalReconsentStatus"] | null;
             isAdmin?: boolean;
         };
         AuthSecurityEventDto: {
@@ -2357,13 +2445,13 @@ export interface components {
             createdAt?: string;
             eventType?: string;
             /** Format: int64 */
-            memberId?: number;
-            loginIdentifier?: string;
+            memberId?: number | null;
+            loginIdentifier?: string | null;
             rememberLoginEnabled?: boolean;
             ipSecurityEnabled?: boolean;
-            clientIpFingerprint?: string;
-            requestPath?: string;
-            reason?: string;
+            clientIpFingerprint?: string | null;
+            requestPath?: string | null;
+            reason?: string | null;
         };
         PageDtoPostDto: {
             content?: components["schemas"]["PostDto"][];
@@ -2402,7 +2490,7 @@ export interface components {
             authorUsername?: string;
             authorProfileImgUrl?: string;
             title?: string;
-            thumbnail?: string;
+            thumbnail?: string | null;
             summary?: string;
             tags?: string[];
             category?: string[];
@@ -2424,7 +2512,7 @@ export interface components {
             /** Format: int32 */
             pageSize?: number;
             hasNext?: boolean;
-            nextCursor?: string;
+            nextCursor?: string | null;
         };
         PublicPostsBootstrapDto: {
             feed?: components["schemas"]["CursorFeedPageDto"];
@@ -2463,7 +2551,7 @@ export interface components {
         PrivacyExportMemberSnapshot: {
             /** Format: int64 */
             id?: number;
-            email?: string;
+            email?: string | null;
             username?: string;
             nickname?: string;
             /** Format: date-time */
@@ -2475,7 +2563,7 @@ export interface components {
             /** Format: date-time */
             generatedAt?: string;
             member?: components["schemas"]["PrivacyExportMemberSnapshot"];
-            latestLegalAcceptance?: components["schemas"]["PrivacyLegalAcceptanceSnapshot"];
+            latestLegalAcceptance?: components["schemas"]["PrivacyLegalAcceptanceSnapshot"] | null;
         };
         PrivacyLegalAcceptanceSnapshot: {
             termsVersion?: string;
@@ -2574,9 +2662,9 @@ export interface components {
             profile?: components["schemas"]["MemberWithUsernameDto"];
         };
         AccountDeletionRequest: {
-            password?: string;
+            password?: string | null;
             oauthAccountDeletionConfirmed?: boolean;
-            reason?: string;
+            reason?: string | null;
         };
         AccountDeletionResult: {
             /** Format: int64 */
@@ -3273,6 +3361,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataPostDto"];
+                };
+            };
+        };
+    };
+    backfillSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostSummaryBackfillRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PostSummaryBackfillResponse"];
+                };
+            };
+        };
+    };
+    previewSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostSummaryPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PostSummaryPreviewResponse"];
                 };
             };
         };
