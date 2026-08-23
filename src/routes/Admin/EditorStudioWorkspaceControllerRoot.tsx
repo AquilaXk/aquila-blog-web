@@ -56,6 +56,7 @@ import {
   normalizeSafeImageUrl,
   normalizeSafePreviewThumbnailUrl,
   resolveEditorMetaSnapshot,
+  type LocalDraftSource,
   type MetaUsageMap,
   type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
@@ -437,6 +438,7 @@ export const EditorStudioWorkspaceController = ({
     restoreLocalDraft,
     saveLocalDraft,
     signalLocalDraftBaselineReady,
+    signalLocalDraftRemoved,
     switchToCreateMode,
   } = useEditorStudioDraftLifecycle({
     router,
@@ -612,6 +614,11 @@ export const EditorStudioWorkspaceController = ({
     tagUsageMap,
   })
 
+  const removePersistedLocalDraft = useCallback((source: LocalDraftSource) => {
+    removeLocalDraft(source)
+    signalLocalDraftRemoved(source)
+  }, [signalLocalDraftRemoved])
+
   const {
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
@@ -669,7 +676,7 @@ export const EditorStudioWorkspaceController = ({
     refreshPublicPostReadViews,
     pretty,
     generateIdempotencyKey,
-    removeLocalDraft,
+    removeLocalDraft: removePersistedLocalDraft,
     signalLocalDraftBaselineReady,
     uploadWithConflictRetry,
     normalizeSafeImageUrl,

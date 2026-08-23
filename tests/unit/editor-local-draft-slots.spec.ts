@@ -20,6 +20,7 @@ import {
 import {
   decideLocalDraftAutosave,
   isLocalDraftAutosaveGatedForPostIdTransition,
+  removeLocalDraftCandidateForSource,
   isLocalDraftBaselineSettleLoadingKey,
   isLocalDraftRestoreSuggestionEligible,
   resolveCreateWritePostId,
@@ -105,8 +106,8 @@ test.describe("editor local draft context slots", () => {
         currentSource: createSource,
         editorFingerprint: '{"title":"editor"}',
         serverBaselineFingerprint: '{"title":"server"}',
-        restored: null,
-        dismissed: null,
+        restored: [],
+        dismissed: [],
       })
     ).toBe(true)
     expect(
@@ -115,8 +116,8 @@ test.describe("editor local draft context slots", () => {
         currentSource: createSource,
         editorFingerprint: candidate,
         serverBaselineFingerprint: '{"title":"server"}',
-        restored: null,
-        dismissed: null,
+        restored: [],
+        dismissed: [],
       })
     ).toBe(false)
     expect(
@@ -125,8 +126,8 @@ test.describe("editor local draft context slots", () => {
         currentSource: createSource,
         editorFingerprint: '{"title":"editor"}',
         serverBaselineFingerprint: candidate,
-        restored: null,
-        dismissed: null,
+        restored: [],
+        dismissed: [],
       })
     ).toBe(false)
     expect(
@@ -135,8 +136,8 @@ test.describe("editor local draft context slots", () => {
         currentSource: createSource,
         editorFingerprint: '{"title":"editor"}',
         serverBaselineFingerprint: '{"title":"server"}',
-        restored: candidateSnapshot,
-        dismissed: null,
+        restored: [candidateSnapshot],
+        dismissed: [],
       })
     ).toBe(false)
     expect(
@@ -145,8 +146,8 @@ test.describe("editor local draft context slots", () => {
         currentSource: createSource,
         editorFingerprint: '{"title":"editor"}',
         serverBaselineFingerprint: '{"title":"server"}',
-        restored: null,
-        dismissed: candidateSnapshot,
+        restored: [],
+        dismissed: [candidateSnapshot],
       })
     ).toBe(false)
     expect(
@@ -155,8 +156,53 @@ test.describe("editor local draft context slots", () => {
         currentSource: otherSource,
         editorFingerprint: '{"title":"editor"}',
         serverBaselineFingerprint: '{"title":"server"}',
-        restored: null,
-        dismissed: null,
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+
+    const otherSnapshot = { source: otherSource, fingerprint: candidate }
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, createSource)).toBeNull()
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, otherSource)).toEqual(candidateSnapshot)
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
       })
     ).toBe(false)
   })
