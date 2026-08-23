@@ -165,6 +165,26 @@ test("imports an exact three-artifact manifest and hash-locks raw summary fixtur
   await verifyPlatformContracts({ directory: output })
 })
 
+test("byte-input CLI imports exact three-artifact bytes", async (t) => {
+  const { root, source, output, sourceCommit, summaryFixtures } = await fixture(process.env, { withSummaryFixtures: true })
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./import-platform-contracts.mjs", import.meta.url)),
+    "--manifest", path.join(source, "manifest.json"),
+    "--openapi", path.join(source, "openapi.json"),
+    "--error-codes", path.join(source, "error-codes.json"),
+    "--summary-fixtures", path.join(source, "summary-fixtures.json"),
+    "--output", output,
+    "--source-repository", sourceRepository,
+    "--source-commit", sourceCommit,
+  ], { encoding: "utf8" })
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(await fs.readFile(path.join(output, "summary-fixtures.json")), summaryFixtures)
+  await verifyPlatformContracts({ directory: output })
+})
+
 test("rejects unknown artifacts and replaces a three-artifact output with the exact two-artifact output", async (t) => {
   const three = await fixture(process.env, { withSummaryFixtures: true })
   const two = await fixture()
@@ -205,6 +225,50 @@ test("rejects invalid byte input before changing the output", async (t) => {
       sourceCommit,
     }),
     /source artifact hash does not match manifest: openapi.json/,
+  )
+  assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
+})
+
+test("rejects undeclared summary fixture byte input before changing the output", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  await fs.mkdir(output, { recursive: true })
+  await fs.writeFile(path.join(output, "sentinel"), "keep")
+
+  await assert.rejects(
+    importPlatformContractBytes({
+      manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
+      openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
+      errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+      summaryFixturesBytes: Buffer.from('{"unexpected":true}\n'),
+      output,
+      sourceRepository,
+      sourceCommit,
+    }),
+    /source artifact is undeclared: summary-fixtures.json/,
+  )
+  assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
+})
+
+test("rejects a malformed declared summary fixture before changing the output", async (t) => {
+  const { root, source, output, sourceCommit } = await fixture()
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  await fs.mkdir(output, { recursive: true })
+  await fs.writeFile(path.join(output, "sentinel"), "keep")
+  const manifest = JSON.parse(await fs.readFile(path.join(source, "manifest.json"), "utf8"))
+  manifest.artifacts.summaryFixtures = null
+
+  await assert.rejects(
+    importPlatformContractBytes({
+      manifestBytes: Buffer.from(JSON.stringify(manifest)),
+      openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
+      errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+      summaryFixturesBytes: Buffer.from('{"fixture":"ignored"}\n'),
+      output,
+      sourceRepository,
+      sourceCommit,
+    }),
+    /source manifest has an invalid summaryFixtures artifact/,
   )
   assert.equal(await fs.readFile(path.join(output, "sentinel"), "utf8"), "keep")
 })

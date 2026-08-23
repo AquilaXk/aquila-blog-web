@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
@@ -71,6 +72,74 @@ test("receiver reads the manifest-declared immutable Platform bytes before any W
   assert.match(String(step(job, "Create Web write token").if), /steps\.changes\.outputs\.changed == 'true'/)
   assert.ok(job.steps.indexOf(step(job, "Set up Node.js 20")) < job.steps.indexOf(step(job, "Build validated Web-local contract candidate")))
   assert.match(step(job, "Install locked Web dependencies").run, /yarn install --frozen-lockfile/)
+})
+
+test("receiver writes separate summary-fixture outputs from the verified manifest", () => {
+  const { document } = workflow()
+  const fetch = step(document.jobs.receive, "Read exact Platform contract bytes")
+  const heredoc = /node - <<'NODE'\n([\s\S]*?)\nNODE/.exec(fetch.run)
+  assert.ok(heredoc, "Platform byte validation heredoc must exist")
+
+  const directory = mkdtempSync(path.join(tmpdir(), "platform-contract-output-"))
+  try {
+    const incoming = path.join(directory, "incoming")
+    const output = path.join(directory, "github-output")
+    mkdirSync(incoming)
+    const openapi = Buffer.from('{"openapi":"3.1.0"}\n')
+    const errorCodes = Buffer.from('[]\n')
+    const summaryFixtures = Buffer.from('{"fixture":"transport-only"}\n')
+    const sha256 = (value) => createHash("sha256").update(value).digest("hex")
+    writeFileSync(path.join(incoming, "openapi.json"), openapi)
+    writeFileSync(path.join(incoming, "error-codes.json"), errorCodes)
+    const manifest = {
+      version: 1,
+      contract: "aquila-public-api",
+      artifacts: {
+        openapi: { path: "openapi.json", sha256: sha256(openapi) },
+        errorCodes: { path: "error-codes.json", sha256: sha256(errorCodes) },
+        summaryFixtures: { path: "summary-fixtures.json", sha256: sha256(summaryFixtures) },
+      },
+    }
+    writeFileSync(path.join(incoming, "manifest.json"), JSON.stringify(manifest))
+
+    const result = spawnSync(process.execPath, ["-e", heredoc[1]], {
+      cwd: directory,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: output,
+        MANIFEST_SHA256: sha256(readFileSync(path.join(incoming, "manifest.json"))),
+        OPENAPI_SHA256: sha256(openapi),
+        ERROR_CODES_SHA256: sha256(errorCodes),
+      },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(readFileSync(output, "utf8").split("\n").filter(Boolean), [
+      "summary_fixtures=true",
+      `summary_fixtures_sha256=${sha256(summaryFixtures)}`,
+    ])
+
+    manifest.artifacts.summaryFixtures = null
+    writeFileSync(path.join(incoming, "manifest.json"), JSON.stringify(manifest))
+    const invalidOutput = path.join(directory, "invalid-github-output")
+    writeFileSync(invalidOutput, "keep\n")
+    const invalid = spawnSync(process.execPath, ["-e", heredoc[1]], {
+      cwd: directory,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: invalidOutput,
+        MANIFEST_SHA256: sha256(readFileSync(path.join(incoming, "manifest.json"))),
+        OPENAPI_SHA256: sha256(openapi),
+        ERROR_CODES_SHA256: sha256(errorCodes),
+      },
+    })
+    assert.notEqual(invalid.status, 0)
+    assert.match(invalid.stderr, /manifest summary fixture declaration is invalid/)
+    assert.equal(readFileSync(invalidOutput, "utf8"), "keep\n")
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test("stale delivery is a successful no-write no-op and Web changes remain narrowly owned", () => {
