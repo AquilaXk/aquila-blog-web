@@ -7,7 +7,8 @@ const SHA256 = /^[a-f0-9]{64}$/
 const COMMIT = /^[a-f0-9]{40}$/
 const LOCK_KEYS = ["artifacts", "contract", "sourceCommit", "sourceRepository", "version"]
 const ARTIFACT_KEYS = ["path", "sha256"]
-const ARTIFACT_NAMES = ["errorCodes", "openapi"]
+const REQUIRED_ARTIFACT_NAMES = ["errorCodes", "openapi"]
+const SUMMARY_FIXTURE_ARTIFACT = "summaryFixtures"
 const ERROR_CODE_KEYS = ["code", "defaultUserMessage", "httpStatus", "kind"]
 
 function fail(message) {
@@ -26,7 +27,9 @@ function sha256(value) {
 }
 
 function expectedPath(name) {
-  return name === "openapi" ? "openapi.json" : "error-codes.json"
+  if (name === "openapi") return "openapi.json"
+  if (name === SUMMARY_FIXTURE_ARTIFACT) return "summary-fixtures.json"
+  return "error-codes.json"
 }
 
 export function validateErrorCodes(value) {
@@ -55,18 +58,21 @@ export function validateErrorCodes(value) {
 }
 
 export function validateLock(lock) {
+  const artifactNames = Object.keys(lock?.artifacts ?? {}).sort()
+  const validArtifactNames = JSON.stringify(artifactNames) === JSON.stringify(REQUIRED_ARTIFACT_NAMES)
+    || JSON.stringify(artifactNames) === JSON.stringify([...REQUIRED_ARTIFACT_NAMES, SUMMARY_FIXTURE_ARTIFACT])
   const validLock = hasExactKeys(lock, LOCK_KEYS)
     && lock.version === 1
     && lock.contract === "aquila-public-api"
     && lock.sourceRepository === "AquilaXk/aquila-blog"
     && typeof lock.sourceCommit === "string"
     && COMMIT.test(lock.sourceCommit)
-    && hasExactKeys(lock.artifacts, ARTIFACT_NAMES)
+    && validArtifactNames
   if (!validLock) {
     fail("manifest.lock.json has an invalid shape or source identity")
   }
 
-  for (const name of ARTIFACT_NAMES) {
+  for (const name of artifactNames) {
     const artifact = lock.artifacts[name]
     const validArtifact = hasExactKeys(artifact, ARTIFACT_KEYS)
       && artifact.path === expectedPath(name)
@@ -111,6 +117,14 @@ function validateErrorCodeBytes(bytes) {
 export async function verifyPlatformContracts({ directory }) {
   const lock = await readLock(path.join(directory, "manifest.lock.json"))
   validateLock(lock)
+
+  const expectedFiles = new Set(["manifest.lock.json", ...Object.values(lock.artifacts).map((artifact) => artifact.path)])
+  const outputFiles = await fs.readdir(directory)
+  for (const file of outputFiles) {
+    if (!expectedFiles.has(file)) {
+      fail(`unexpected output file: ${file}`)
+    }
+  }
 
   for (const [name, artifact] of Object.entries(lock.artifacts)) {
     const bytes = await readArtifact(directory, artifact)

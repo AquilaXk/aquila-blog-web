@@ -49,6 +49,45 @@ export const resolveLocalDraftShouldAdoptBaseline = (input: {
   pendingSuccessfulBaseline: boolean
 }): boolean => input.loadingKey.length === 0 && input.pendingSuccessfulBaseline
 
+type LocalDraftFingerprintSnapshot = {
+  source: LocalDraftSource
+  fingerprint: string
+}
+
+export const isLocalDraftRestoreSuggestionEligible = (input: {
+  candidate: LocalDraftFingerprintSnapshot | null
+  currentSource: LocalDraftSource
+  editorFingerprint: string
+  serverBaselineFingerprint: string
+  restored: LocalDraftFingerprintSnapshot[]
+  dismissed: LocalDraftFingerprintSnapshot[]
+}): boolean => {
+  const candidate = input.candidate
+  if (candidate == null) return false
+
+  return (
+    localDraftSourcesEqual(candidate.source, input.currentSource) &&
+    candidate.fingerprint !== input.editorFingerprint &&
+    candidate.fingerprint !== input.serverBaselineFingerprint &&
+    !input.restored.some(
+      (snapshot) =>
+        localDraftSourcesEqual(snapshot.source, candidate.source) &&
+        snapshot.fingerprint === candidate.fingerprint
+    ) &&
+    !input.dismissed.some(
+      (snapshot) =>
+        localDraftSourcesEqual(snapshot.source, candidate.source) &&
+        snapshot.fingerprint === candidate.fingerprint
+    )
+  )
+}
+
+export const removeLocalDraftCandidateForSource = (
+  candidate: LocalDraftFingerprintSnapshot | null,
+  source: LocalDraftSource
+): LocalDraftFingerprintSnapshot | null =>
+  candidate != null && localDraftSourcesEqual(candidate.source, source) ? null : candidate
+
 export type LocalDraftBaselineReadySignal = {
   /**
    * Write/publish request snapshot to arm as baseline. Omit on post-load settle so
@@ -324,6 +363,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
   const [baselineReadyEpoch, setBaselineReadyEpoch] = useState(0)
   const [postLoadInFlightEpoch, setPostLoadInFlightEpoch] = useState(0)
   const [postIdTransitionAwaitingLoad, setPostIdTransitionAwaitingLoad] = useState(false)
+  const [localDraftCandidate, setLocalDraftCandidate] = useState<LocalDraftFingerprintSnapshot | null>(null)
+  const [restoredLocalDraft, setRestoredLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
+  const [dismissedLocalDraft, setDismissedLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
   const postIdTransitionEditorFingerprintRef = useRef<string | null>(null)
   const prevEditorModeRef = useRef(editorMode)
   const prevPostIdRef = useRef(postId)
@@ -345,6 +387,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
     // Force the autosave effect to re-run even when loadingKey is already idle
     // (non-baseline keys may have cleared it before this success signal).
     setBaselineReadyEpoch((value) => value + 1)
+  }, [])
+
+  const signalLocalDraftRemoved = useCallback((source: LocalDraftSource) => {
+    setLocalDraftCandidate((current) => removeLocalDraftCandidateForSource(current, source))
   }, [])
 
   const beginLocalDraftPostLoad = useCallback(() => {
@@ -468,6 +514,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
     persistLocalDraft(payload)
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
+    setLocalDraftCandidate({ source, fingerprint: currentLocalDraftFingerprint })
     setLocalDraftSavedAt(payload.savedAt)
     setLocalDraftSlotLabel(describeLocalDraftSlot(payload))
 
@@ -538,6 +585,17 @@ export const useEditorStudioLocalDraftLifecycle = ({
       category: draft.category ? normalizeCategoryValue(draft.category) : "",
       visibility: draft.visibility,
     })
+    const restoredDraft = { source: draft.source, fingerprint: lastLocalDraftFingerprintRef.current }
+    setLocalDraftCandidate(restoredDraft)
+    setRestoredLocalDraft((current) =>
+      current.some(
+        (snapshot) =>
+          localDraftSourcesEqual(snapshot.source, restoredDraft.source) &&
+          snapshot.fingerprint === restoredDraft.fingerprint
+      )
+        ? current
+        : [...current, restoredDraft]
+    )
 
     setPostTitle(draft.title)
     setPostContent(draft.content)
@@ -596,6 +654,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     removeLocalDraft(draftSource)
     // Keep editor fingerprint as baseline so autosave does not recreate the cleared slot.
     lastLocalDraftFingerprintRef.current = localDraftFingerprint
+    signalLocalDraftRemoved(draftSource)
     setLocalDraftSavedAt("")
     setLocalDraftSlotLabel("")
     setPublishStatus(
@@ -610,6 +669,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     lastLocalDraftFingerprintRef,
     localDraftFingerprint,
     removeLocalDraft,
+    signalLocalDraftRemoved,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
     setPublishStatus,
@@ -622,6 +682,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       // Do not reset lastArmedFingerprint to "" — that re-arms autosave after publish/clear.
       setLocalDraftSavedAt("")
       setLocalDraftSlotLabel("")
+      setLocalDraftCandidate(null)
       return
     }
 
@@ -629,12 +690,43 @@ export const useEditorStudioLocalDraftLifecycle = ({
     // make server-loaded editor content look dirty and overwrite the restorable slot.
     setLocalDraftSavedAt(localDraft.savedAt)
     setLocalDraftSlotLabel(describeLocalDraftSlot(localDraft))
+    setLocalDraftCandidate({
+      source: localDraft.source,
+      fingerprint: buildLocalDraftFingerprint({
+        title: localDraft.title,
+        content: localDraft.content,
+        summary: localDraft.summary,
+        thumbnailUrl: localDraft.thumbnailUrl,
+        thumbnailFocusX: localDraft.thumbnailFocusX,
+        thumbnailFocusY: localDraft.thumbnailFocusY,
+        thumbnailZoom: localDraft.thumbnailZoom,
+        tags: dedupeStrings(localDraft.tags),
+        category: localDraft.category ? normalizeCategoryValue(localDraft.category) : "",
+        visibility: localDraft.visibility,
+      }),
+    })
   }, [
+    buildLocalDraftFingerprint,
+    dedupeStrings,
     draftSource,
+    normalizeCategoryValue,
     readLocalDraft,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
   ])
+
+  const dismissLocalDraftRestoreSuggestion = useCallback(() => {
+    if (localDraftCandidate == null) return
+    setDismissedLocalDraft((current) =>
+      current.some(
+        (snapshot) =>
+          localDraftSourcesEqual(snapshot.source, localDraftCandidate.source) &&
+          snapshot.fingerprint === localDraftCandidate.fingerprint
+      )
+        ? current
+        : [...current, localDraftCandidate]
+    )
+  }, [localDraftCandidate])
 
   useEffect(() => {
     const shouldAdoptBaseline = resolveLocalDraftShouldAdoptBaseline({
@@ -734,6 +826,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
   return {
     localDraftFingerprint,
+    localDraftSource: draftSource,
+    localDraftCandidate,
+    restoredLocalDraft,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
+    signalLocalDraftRemoved,
     saveLocalDraft,
     restoreLocalDraft,
     clearLocalDraft,

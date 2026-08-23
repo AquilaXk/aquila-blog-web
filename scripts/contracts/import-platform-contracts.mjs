@@ -12,10 +12,11 @@ const COMMIT = /^[a-f0-9]{40}$/
 const SHA256 = /^[a-f0-9]{64}$/
 const MANIFEST_KEYS = ["artifacts", "contract", "version"]
 const ARTIFACT_KEYS = ["path", "sha256"]
-const SOURCE_ARTIFACTS = [
+const REQUIRED_SOURCE_ARTIFACTS = [
   ["openapi", "openapi.json"],
   ["errorCodes", "error-codes.json"],
 ]
+const SUMMARY_FIXTURE_ARTIFACT = ["summaryFixtures", "summary-fixtures.json"]
 let inheritedGitEnvKeysCache
 
 // git rev-parse --local-env-vars lists every environment variable that binds git to one
@@ -139,13 +140,21 @@ function validateSourceCommit(source, sourceRepository, sourceCommit, files) {
 }
 
 function validateManifest(manifest) {
+  const artifactNames = Object.keys(manifest?.artifacts ?? {}).sort()
   const valid = hasExactKeys(manifest, MANIFEST_KEYS)
     && manifest.version === 1
     && manifest.contract === "aquila-public-api"
-    && hasExactKeys(manifest.artifacts, ["errorCodes", "openapi"])
+    && (JSON.stringify(artifactNames) === JSON.stringify(["errorCodes", "openapi"])
+      || JSON.stringify(artifactNames) === JSON.stringify(["errorCodes", "openapi", "summaryFixtures"]))
   if (!valid) {
     fail("source manifest has an invalid identity or shape")
   }
+}
+
+function sourceArtifactEntries(manifest) {
+  return Object.hasOwn(manifest.artifacts, "summaryFixtures")
+    ? [...REQUIRED_SOURCE_ARTIFACTS, SUMMARY_FIXTURE_ARTIFACT]
+    : REQUIRED_SOURCE_ARTIFACTS
 }
 
 function validateSourceArtifact(artifact, name, expectedPath) {
@@ -160,7 +169,7 @@ function validateSourceArtifact(artifact, name, expectedPath) {
 
 async function readSourceArtifacts(source, manifest) {
   const artifacts = {}
-  for (const [name, expectedPath] of SOURCE_ARTIFACTS) {
+  for (const [name, expectedPath] of sourceArtifactEntries(manifest)) {
     const artifact = manifest.artifacts[name]
     validateSourceArtifact(artifact, name, expectedPath)
 
@@ -179,8 +188,15 @@ async function readSourceArtifacts(source, manifest) {
 }
 
 function readArtifactBytes(manifest, artifactBytes) {
+  const declaresSummaryFixtures = Object.hasOwn(manifest.artifacts, "summaryFixtures")
+  const suppliesSummaryFixtures = Buffer.isBuffer(artifactBytes.summaryFixtures)
+  if (declaresSummaryFixtures !== suppliesSummaryFixtures) {
+    fail(declaresSummaryFixtures
+      ? "source artifact bytes are missing: summary-fixtures.json"
+      : "source artifact is undeclared: summary-fixtures.json")
+  }
   const artifacts = {}
-  for (const [name, expectedPath] of SOURCE_ARTIFACTS) {
+  for (const [name, expectedPath] of sourceArtifactEntries(manifest)) {
     const artifact = manifest.artifacts[name]
     validateSourceArtifact(artifact, name, expectedPath)
     const bytes = artifactBytes[name]
@@ -240,6 +256,18 @@ function createLock(manifest, artifacts, sourceRepository, sourceCommit) {
   }
 }
 
+async function writeOutput(output, artifacts, lock) {
+  await fs.mkdir(output, { recursive: true })
+  await Promise.all([
+    fs.writeFile(path.join(output, "openapi.json"), artifacts.openapi.bytes),
+    fs.writeFile(path.join(output, "error-codes.json"), artifacts.errorCodes.bytes),
+    fs.writeFile(path.join(output, "manifest.lock.json"), `${JSON.stringify(lock, null, 2)}\n`),
+    artifacts.summaryFixtures
+      ? fs.writeFile(path.join(output, "summary-fixtures.json"), artifacts.summaryFixtures.bytes)
+      : fs.rm(path.join(output, "summary-fixtures.json"), { force: true }),
+  ])
+}
+
 export async function importPlatformContracts({ source, output, sourceRepository, sourceCommit }) {
   validateSourceIdentity(sourceRepository, sourceCommit)
   const { bytes: manifestBytes, value: manifest } = await readJson(path.join(source, "manifest.json"), "source manifest")
@@ -250,18 +278,13 @@ export async function importPlatformContracts({ source, output, sourceRepository
   validateErrorCodeArtifact(artifacts.errorCodes.bytes)
   validateSourceCommit(source, sourceRepository, sourceCommit, [
     ["manifest.json", manifestBytes],
-    ...SOURCE_ARTIFACTS.map(([name, file]) => [file, artifacts[name].bytes]),
+    ...sourceArtifactEntries(manifest).map(([name, file]) => [file, artifacts[name].bytes]),
   ])
 
   const lock = createLock(manifest, artifacts, sourceRepository, sourceCommit)
   validateLock(lock)
 
-  await fs.mkdir(output, { recursive: true })
-  await Promise.all([
-    fs.writeFile(path.join(output, "openapi.json"), artifacts.openapi.bytes),
-    fs.writeFile(path.join(output, "error-codes.json"), artifacts.errorCodes.bytes),
-    fs.writeFile(path.join(output, "manifest.lock.json"), `${JSON.stringify(lock, null, 2)}\n`),
-  ])
+  await writeOutput(output, artifacts, lock)
 }
 
 // The receiver obtains immutable bytes through the Platform Contents API.  Keep this path
@@ -271,6 +294,7 @@ export async function importPlatformContractBytes({
   manifestBytes,
   openapiBytes,
   errorCodesBytes,
+  summaryFixturesBytes,
   output,
   sourceRepository,
   sourceCommit,
@@ -291,6 +315,7 @@ export async function importPlatformContractBytes({
   const artifacts = readArtifactBytes(manifest, {
     openapi: openapiBytes,
     errorCodes: errorCodesBytes,
+    summaryFixtures: summaryFixturesBytes,
   })
   validateOpenApi(artifacts.openapi.bytes)
   validateErrorCodeArtifact(artifacts.errorCodes.bytes)
@@ -298,16 +323,11 @@ export async function importPlatformContractBytes({
   const lock = createLock(manifest, artifacts, sourceRepository, sourceCommit)
   validateLock(lock)
 
-  await fs.mkdir(output, { recursive: true })
-  await Promise.all([
-    fs.writeFile(path.join(output, "openapi.json"), artifacts.openapi.bytes),
-    fs.writeFile(path.join(output, "error-codes.json"), artifacts.errorCodes.bytes),
-    fs.writeFile(path.join(output, "manifest.lock.json"), `${JSON.stringify(lock, null, 2)}\n`),
-  ])
+  await writeOutput(output, artifacts, lock)
 }
 
 function usage() {
-  fail("Usage: node scripts/contracts/import-platform-contracts.mjs (--source <dir> | --manifest <file> --openapi <file> --error-codes <file>) --output <dir> --source-repository AquilaXk/aquila-blog --source-commit <40-hex>")
+  fail("Usage: node scripts/contracts/import-platform-contracts.mjs (--source <dir> | --manifest <file> --openapi <file> --error-codes <file> [--summary-fixtures <file>]) --output <dir> --source-repository AquilaXk/aquila-blog --source-commit <40-hex>")
 }
 
 function parseArgs(args) {
@@ -315,7 +335,7 @@ function parseArgs(args) {
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index]
     const value = args[index + 1]
-    const known = ["--source", "--manifest", "--openapi", "--error-codes", "--output", "--source-repository", "--source-commit"].includes(key)
+    const known = ["--source", "--manifest", "--openapi", "--error-codes", "--summary-fixtures", "--output", "--source-repository", "--source-commit"].includes(key)
     if (!known || !value || values[key]) {
       usage()
     }
@@ -323,7 +343,7 @@ function parseArgs(args) {
   }
   const gitBacked = ["--source", "--output", "--source-repository", "--source-commit"].every((key) => values[key])
   const byteBacked = ["--manifest", "--openapi", "--error-codes", "--output", "--source-repository", "--source-commit"].every((key) => values[key])
-  if ((gitBacked && Object.keys(values).length !== 4) || (byteBacked && Object.keys(values).length !== 6) || (!gitBacked && !byteBacked)) {
+  if ((gitBacked && Object.keys(values).length !== 4) || (byteBacked && ![6, 7].includes(Object.keys(values).length)) || (!gitBacked && !byteBacked)) {
     usage()
   }
   return {
@@ -331,6 +351,7 @@ function parseArgs(args) {
     manifest: values["--manifest"] && path.resolve(values["--manifest"]),
     openapi: values["--openapi"] && path.resolve(values["--openapi"]),
     errorCodes: values["--error-codes"] && path.resolve(values["--error-codes"]),
+    summaryFixtures: values["--summary-fixtures"] && path.resolve(values["--summary-fixtures"]),
     output: path.resolve(values["--output"]),
     sourceRepository: values["--source-repository"],
     sourceCommit: values["--source-commit"],
@@ -341,12 +362,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const options = parseArgs(process.argv.slice(2))
   const importOperation = options.source
     ? importPlatformContracts(options)
-    : Promise.all([fs.readFile(options.manifest), fs.readFile(options.openapi), fs.readFile(options.errorCodes)])
-      .then(([manifestBytes, openapiBytes, errorCodesBytes]) => importPlatformContractBytes({
+    : Promise.all([fs.readFile(options.manifest), fs.readFile(options.openapi), fs.readFile(options.errorCodes), options.summaryFixtures && fs.readFile(options.summaryFixtures)])
+      .then(([manifestBytes, openapiBytes, errorCodesBytes, summaryFixturesBytes]) => importPlatformContractBytes({
         ...options,
         manifestBytes,
         openapiBytes,
         errorCodesBytes,
+        summaryFixturesBytes,
       }))
   importOperation
     .then(() => console.log("[platform-contracts] imported"))

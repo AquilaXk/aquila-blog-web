@@ -23,6 +23,7 @@ import { deriveComposeViewModel, deriveEditorContentMetrics, deriveEditorPersist
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
 import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue, makePreviewSummary } from "./editorStudioMetaModel"
+import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, SHOW_LEGACY_UTILITY_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
 
@@ -47,12 +48,15 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     commentId,
     commitPreviewThumbTransform,
     copyPostDetailLink,
+    customCategoryCatalog,
     deferredPostContent,
     deferredContentDerived,
     deleteConfirmNotice,
     deleteConfirmState,
     deletePostsFromList,
     deletedListNotice,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
     deleteTagFromCatalog,
     disabled,
     editorMode,
@@ -75,6 +79,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleListPageSizeChange,
     handleListSortChange,
     handleLoadOrCreateTempPost,
+    commitPostCategory,
+    handlePostCategoryChange,
     handleModifyComment,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
@@ -122,7 +128,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     loadAdminPosts,
     loadPostForEditor,
     loadingKey,
+    localDraftCandidate,
     localDraftSavedAt,
+    localDraftSource,
     localDraftSlotLabel,
     member,
     metaNotice,
@@ -164,6 +172,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     removeTagFromPost,
     restoreDeletedPostFromList,
     restoreLocalDraft,
+    restoredLocalDraft,
     result,
     safePreviewThumbnail,
     saveLocalDraft,
@@ -319,6 +328,14 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     localDraftFingerprint: lastLocalDraftFingerprintRef.current,
     localDraftSavedAt,
     pristineCreateFingerprint,
+  })
+  const isLocalDraftRestoreSuggestionVisible = isLocalDraftRestoreSuggestionEligible({
+    candidate: localDraftCandidate,
+    currentSource: localDraftSource,
+    editorFingerprint: editorStateFingerprint,
+    serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
+    restored: restoredLocalDraft,
+    dismissed: dismissedLocalDraft,
   })
   const getIsEditorUnsavedDirty = useCallback(() => {
     const liveContent =
@@ -676,12 +693,21 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         postContent={postContent}
         postSummary={postSummary}
         onPostSummaryChange={setPostSummary}
+        postCategory={postCategory}
+        onPostCategoryChange={handlePostCategoryChange}
+        onCommitPostCategory={commitPostCategory}
+        categorySuggestions={customCategoryCatalog}
         postVisibility={postVisibility}
         onPostVisibilityChange={setPostVisibility}
         editorCanvas={dedicatedEditorCanvas}
         showPublishNotice={shouldShowPublishNotice}
         publishNoticeTone={publishNotice.tone}
         publishNoticeText={publishNotice.text}
+        isLocalDraftRestoreSuggestionVisible={isLocalDraftRestoreSuggestionVisible}
+        isLocalDraftRestoreSuggestionActionsDisabled={loadingKey.length > 0}
+        onRestoreLocalDraft={restoreLocalDraft}
+        onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
+        onClearLocalDraft={clearLocalDraft}
         resultPanel={dedicatedEditorResultPanel}
         publishModal={
           isPublishModalOpen ? (
