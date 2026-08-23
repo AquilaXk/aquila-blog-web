@@ -44,7 +44,7 @@ test("receiver admits only the exact App-owned nine-key Platform payload", () =>
   assert.match(admit.run, /expectedDelivery/)
 })
 
-test("receiver reads exactly three immutable Platform bytes before any Web write capability", () => {
+test("receiver reads the manifest-declared immutable Platform bytes before any Web write capability", () => {
   const { source, document } = workflow()
   const job = document.jobs.receive
   const token = step(job, "Create Platform read token")
@@ -56,6 +56,9 @@ test("receiver reads exactly three immutable Platform bytes before any Web write
   assert.match(fetch.run, /\/contents\/contracts\/public-api\/manifest\.json\?ref=/)
   assert.match(fetch.run, /\/contents\/contracts\/public-api\/openapi\.json\?ref=/)
   assert.match(fetch.run, /\/contents\/contracts\/public-api\/error-codes\.json\?ref=/)
+  assert.match(fetch.run, /summary-fixtures\.json/)
+  assert.match(fetch.run, /summaryFixtures/)
+  assert.match(fetch.run, /summary_fixtures_sha256/)
   assert.doesNotMatch(source, /repository:\s*AquilaXk\/aquila-blog/)
   assert.doesNotMatch(source, /path:\s*platform/)
   assert.doesNotMatch(source, /git -C platform|git clone|actions\/checkout[^\n]*aquila-blog/)
@@ -202,4 +205,20 @@ test("sourceCommit-only manifest provenance changes are a Web receiver no-op", (
   assert.equal(detectChanges(detect.run, openApiHashChanged, current), "changed=true")
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/platform/openapi.json": "{\"openapi\":\"3.1.1\"}\n" }, current), "changed=true")
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/generated/backend-openapi.d.ts": "export type paths = { changed: true }\n" }, current), "changed=true")
+})
+
+test("summary fixture presence, removal, and bytes are Web-local candidate changes", () => {
+  const { document } = workflow()
+  const detect = step(document.jobs.receive, "Detect Web-local contract changes")
+  const commit = step(document.jobs.receive, "Commit Web-local contract candidate")
+  const pr = step(document.jobs.receive, "Create or update the Web draft PR")
+
+  assert.match(detect.run, /summary-fixtures\.json/)
+  assert.match(detect.run, /summary-fixtures candidate presence is invalid/)
+  assert.match(commit.run, /rm -f contracts\/platform\/summary-fixtures\.json/)
+  assert.match(commit.run, /git add -A -- contracts\/platform/)
+  assert.match(pr.run, /Refs #35/)
+  assert.match(pr.run, /#1520/)
+  assert.match(pr.run, /transport-only/)
+  assert.doesNotMatch(pr.run, /Refs #70/)
 })

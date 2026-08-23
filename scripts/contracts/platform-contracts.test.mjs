@@ -25,21 +25,28 @@ const git = (cwd, args, env = process.env) => execFileSync(
   { encoding: "utf8", env: gitEnvWithoutInheritedRepository(env) },
 )
 
-async function fixture(env = process.env) {
+async function fixture(env = process.env, { withSummaryFixtures = false } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "platform-contracts-"))
   const source = path.join(root, "contracts", "public-api")
   const output = path.join(root, "output")
   await fs.mkdir(source, { recursive: true })
   const openapi = Buffer.from('{"openapi":"3.0.1","paths":{}}\n')
   const errorCodes = Buffer.from('[{"code":"NOT_FOUND","httpStatus":404,"defaultUserMessage":"missing","kind":"USER"}]\n')
+  const summaryFixtures = Buffer.from('{"fixture":"transport-only"}\n')
   await fs.writeFile(path.join(source, "openapi.json"), openapi)
   await fs.writeFile(path.join(source, "error-codes.json"), errorCodes)
+  if (withSummaryFixtures) {
+    await fs.writeFile(path.join(source, "summary-fixtures.json"), summaryFixtures)
+  }
   await fs.writeFile(path.join(source, "manifest.json"), `${JSON.stringify({
     version: 1,
     contract: "aquila-public-api",
     artifacts: {
       openapi: { path: "openapi.json", sha256: sha256(openapi) },
       errorCodes: { path: "error-codes.json", sha256: sha256(errorCodes) },
+      ...(withSummaryFixtures ? {
+        summaryFixtures: { path: "summary-fixtures.json", sha256: sha256(summaryFixtures) },
+      } : {}),
     },
   }, null, 2)}\n`)
   git(root, ["init", "--initial-branch=main"], env)
@@ -49,7 +56,7 @@ async function fixture(env = process.env) {
   git(root, ["add", "contracts/public-api"], env)
   git(root, ["commit", "-m", "public contract"], env)
   const sourceCommit = git(root, ["rev-parse", "HEAD"], env).trim()
-  return { root, source, output, sourceCommit }
+  return { root, source, output, sourceCommit, summaryFixtures }
 }
 
 async function decoyRepository() {
@@ -134,6 +141,52 @@ test("imports verified API bytes without requiring a Platform checkout", async (
   })
 
   await verifyPlatformContracts({ directory: output })
+})
+
+test("imports an exact three-artifact manifest and hash-locks raw summary fixture bytes", async (t) => {
+  const { root, source, output, sourceCommit, summaryFixtures } = await fixture(process.env, { withSummaryFixtures: true })
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+
+  await importPlatformContractBytes({
+    manifestBytes: await fs.readFile(path.join(source, "manifest.json")),
+    openapiBytes: await fs.readFile(path.join(source, "openapi.json")),
+    errorCodesBytes: await fs.readFile(path.join(source, "error-codes.json")),
+    summaryFixturesBytes: await fs.readFile(path.join(source, "summary-fixtures.json")),
+    output,
+    sourceRepository,
+    sourceCommit,
+  })
+
+  assert.deepEqual(await fs.readFile(path.join(output, "summary-fixtures.json")), summaryFixtures)
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(output, "manifest.lock.json"), "utf8")).artifacts.summaryFixtures, {
+    path: "summary-fixtures.json",
+    sha256: sha256(summaryFixtures),
+  })
+  await verifyPlatformContracts({ directory: output })
+})
+
+test("rejects unknown artifacts and replaces a three-artifact output with the exact two-artifact output", async (t) => {
+  const three = await fixture(process.env, { withSummaryFixtures: true })
+  const two = await fixture()
+  t.after(() => Promise.all([
+    fs.rm(three.root, { recursive: true, force: true }),
+    fs.rm(two.root, { recursive: true, force: true }),
+  ]))
+
+  await importPlatformContracts({ source: three.source, output: three.output, sourceRepository, sourceCommit: three.sourceCommit })
+  await importPlatformContracts({ source: two.source, output: three.output, sourceRepository, sourceCommit: two.sourceCommit })
+  await assert.rejects(fs.access(path.join(three.output, "summary-fixtures.json")))
+  await verifyPlatformContracts({ directory: three.output })
+
+  const manifest = JSON.parse(await fs.readFile(path.join(two.source, "manifest.json"), "utf8"))
+  manifest.artifacts.unexpected = { path: "unexpected.json", sha256: "0".repeat(64) }
+  await fs.writeFile(path.join(two.source, "manifest.json"), `${JSON.stringify(manifest)}\n`)
+  await assert.rejects(
+    importPlatformContracts({ source: two.source, output: three.output, sourceRepository, sourceCommit: two.sourceCommit }),
+    /source manifest has an invalid identity or shape/,
+  )
+  await fs.writeFile(path.join(three.output, "unexpected.json"), "unexpected\n")
+  await assert.rejects(verifyPlatformContracts({ directory: three.output }), /unexpected output file/)
 })
 
 test("rejects invalid byte input before changing the output", async (t) => {
