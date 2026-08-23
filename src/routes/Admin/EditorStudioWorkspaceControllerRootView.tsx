@@ -23,6 +23,7 @@ import { deriveComposeViewModel, deriveEditorContentMetrics, deriveEditorPersist
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
 import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue, makePreviewSummary } from "./editorStudioMetaModel"
+import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, SHOW_LEGACY_UTILITY_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
 
@@ -47,12 +48,15 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     commentId,
     commitPreviewThumbTransform,
     copyPostDetailLink,
+    customCategoryCatalog,
     deferredPostContent,
     deferredContentDerived,
     deleteConfirmNotice,
     deleteConfirmState,
     deletePostsFromList,
     deletedListNotice,
+    dismissedLocalDraftFingerprint,
+    dismissLocalDraftRestoreSuggestion,
     deleteTagFromCatalog,
     disabled,
     editorMode,
@@ -75,6 +79,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleListPageSizeChange,
     handleListSortChange,
     handleLoadOrCreateTempPost,
+    handlePostCategoryChange,
     handleModifyComment,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
@@ -122,6 +127,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     loadAdminPosts,
     loadPostForEditor,
     loadingKey,
+    localDraftCandidateFingerprint,
     localDraftSavedAt,
     localDraftSlotLabel,
     member,
@@ -164,6 +170,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     removeTagFromPost,
     restoreDeletedPostFromList,
     restoreLocalDraft,
+    restoredLocalDraftFingerprint,
     result,
     safePreviewThumbnail,
     saveLocalDraft,
@@ -319,6 +326,13 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     localDraftFingerprint: lastLocalDraftFingerprintRef.current,
     localDraftSavedAt,
     pristineCreateFingerprint,
+  })
+  const isLocalDraftRestoreSuggestionVisible = isLocalDraftRestoreSuggestionEligible({
+    candidateFingerprint: localDraftCandidateFingerprint,
+    editorFingerprint: editorStateFingerprint,
+    serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
+    restoredFingerprint: restoredLocalDraftFingerprint,
+    dismissedFingerprint: dismissedLocalDraftFingerprint,
   })
   const getIsEditorUnsavedDirty = useCallback(() => {
     const liveContent =
@@ -676,12 +690,18 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         postContent={postContent}
         postSummary={postSummary}
         onPostSummaryChange={setPostSummary}
+        postCategory={postCategory}
+        onPostCategoryChange={handlePostCategoryChange}
+        categorySuggestions={customCategoryCatalog}
         postVisibility={postVisibility}
         onPostVisibilityChange={setPostVisibility}
         editorCanvas={dedicatedEditorCanvas}
         showPublishNotice={shouldShowPublishNotice}
         publishNoticeTone={publishNotice.tone}
         publishNoticeText={publishNotice.text}
+        isLocalDraftRestoreSuggestionVisible={isLocalDraftRestoreSuggestionVisible}
+        onRestoreLocalDraft={restoreLocalDraft}
+        onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
         resultPanel={dedicatedEditorResultPanel}
         publishModal={
           isPublishModalOpen ? (

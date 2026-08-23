@@ -67,12 +67,18 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   postContent: string
   postSummary: string
   onPostSummaryChange: (value: string) => void
+  postCategory: string
+  onPostCategoryChange: (value: string) => void
+  categorySuggestions: string[]
   postVisibility: PostVisibility
   onPostVisibilityChange: (value: PostVisibility) => void
   editorCanvas: ReactNode
   showPublishNotice: boolean
   publishNoticeTone: NoticeTone
   publishNoticeText: string
+  isLocalDraftRestoreSuggestionVisible: boolean
+  onRestoreLocalDraft: () => void
+  onDismissLocalDraftRestoreSuggestion: () => void
   resultPanel: ReactNode
   publishModal: ReactNode
 }
@@ -166,12 +172,18 @@ export const EditorStudioDedicatedEditorSurface = ({
   postContent,
   postSummary,
   onPostSummaryChange,
+  postCategory,
+  onPostCategoryChange,
+  categorySuggestions,
   postVisibility,
   onPostVisibilityChange,
   editorCanvas,
   showPublishNotice,
   publishNoticeTone,
   publishNoticeText,
+  isLocalDraftRestoreSuggestionVisible,
+  onRestoreLocalDraft,
+  onDismissLocalDraftRestoreSuggestion,
   resultPanel,
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
@@ -312,6 +324,33 @@ export const EditorStudioDedicatedEditorSurface = ({
               {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
             </small>
           </label>
+          <label>
+            <span>Category</span>
+            <EditorInspectorTagInputRow>
+              <input
+                list="editor-category-suggestions"
+                value={postCategory}
+                onChange={(event) => onPostCategoryChange(event.target.value)}
+              />
+              <SecondaryButton type="button" onClick={() => onPostCategoryChange("")} disabled={!postCategory}>
+                지우기
+              </SecondaryButton>
+            </EditorInspectorTagInputRow>
+            <datalist id="editor-category-suggestions">
+              {categorySuggestions.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
+          </label>
+          {isLocalDraftRestoreSuggestionVisible ? (
+            <PublishNotice role="status" aria-live="polite" data-tone="idle">
+              브라우저 임시글이 있습니다.
+              <SecondaryButton type="button" onClick={onRestoreLocalDraft}>복구</SecondaryButton>
+              <SecondaryButton type="button" onClick={onDismissLocalDraftRestoreSuggestion}>
+                이번 세션에 표시 안 함
+              </SecondaryButton>
+            </PublishNotice>
+          ) : null}
           <section>
             <span>Tags</span>
             <EditorTagRow aria-label="발행 태그" $compact>
