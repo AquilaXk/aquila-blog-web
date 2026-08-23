@@ -310,7 +310,7 @@ test("container-build fails closed when a NEXT_PUBLIC build arg is missing or em
   const { loadContract, validateEnvText } = await import("./validate-env.mjs")
   const contract = loadContract(contractPath)
   const complete = [
-    "NEXT_PUBLIC_BACKEND_URL=https://api.blog.aquilaxk.site",
+    "NEXT_PUBLIC_BACKEND_URL=https://blog.aquilaxk.site",
     "NEXT_PUBLIC_SITE_URL=https://blog.aquilaxk.site",
     "NEXT_PUBLIC_SIGNUP_ENABLED=false",
     "NEXT_PUBLIC_RUM_SAMPLE_RATE=0",
@@ -331,7 +331,7 @@ test("BACKEND_INTERNAL_URL accepts container-internal http but still rejects pla
   const { loadContract, validateEnvText } = await import("./validate-env.mjs")
   const contract = loadContract(contractPath)
 
-  for (const internalUrl of ["http://back_blue:8080", "http://127.0.0.1:1", "http://localhost:3000", "https://api.blog.aquilaxk.site"]) {
+  for (const internalUrl of ["http://back_blue:8080", "http://127.0.0.1:1", "http://localhost:3000", "https://backend.example.test"]) {
     const result = validateEnvText({
       contract,
       target: "production",
