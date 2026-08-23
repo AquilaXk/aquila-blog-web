@@ -236,6 +236,65 @@ export const useEditorStudioPersistence = ({
     uploadWithConflictRetry,
   })
 
+  const applyCanonicalWriteResponse = useCallback(
+    (response: RsData<PostWriteResult>) => {
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
+        { summary: response.data?.summary, source: response.data?.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
+        setPublishStatus({ tone: "error", text: message })
+        setResult(pretty({ error: message, response }))
+        return null
+      }
+
+      const canonicalSummary = resolvedSummary.state
+      setPostSummary(canonicalSummary.summary)
+      setPostSummarySource(canonicalSummary.summarySource)
+      setSummaryIntent(canonicalSummary.intent)
+      return canonicalSummary
+    },
+    [
+      postSummary,
+      postSummarySource,
+      pretty,
+      setPostSummary,
+      setPostSummarySource,
+      setPublishStatus,
+      setResult,
+      setSummaryIntent,
+      summaryIntent,
+    ],
+  )
+
+  const buildSuccessfulWriteFingerprintPayload = useCallback(
+    (content: string, canonicalSummary: CanonicalSummaryState): EditorFingerprintPayload => ({
+      title: postTitle,
+      content,
+      summary: canonicalSummary.summary,
+      summarySource: canonicalSummary.summarySource,
+      summaryIntent: canonicalSummary.intent,
+      thumbnailUrl: postThumbnailUrl,
+      thumbnailFocusX: postThumbnailFocusX,
+      thumbnailFocusY: postThumbnailFocusY,
+      thumbnailZoom: postThumbnailZoom,
+      tags: postTags,
+      category: postCategory,
+      visibility: postVisibility,
+    }),
+    [
+      postCategory,
+      postTags,
+      postThumbnailFocusX,
+      postThumbnailFocusY,
+      postThumbnailUrl,
+      postThumbnailZoom,
+      postTitle,
+      postVisibility,
+    ],
+  )
+
   const handleWritePost = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode === "edit" || postId.trim()) {
@@ -308,39 +367,15 @@ export const useEditorStudioPersistence = ({
         return false
       }
 
-      const resolvedSummary = resolvePersistedSummaryResult(
-        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
-        { summary: response.data?.summary, source: response.data?.summarySource },
-      )
-      if (!resolvedSummary.ok) {
-        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
-        setPublishStatus({ tone: "error", text: message })
-        setResult(pretty({ error: message, response }))
-        return false
-      }
-      const canonicalSummary = resolvedSummary.state
+      const canonicalSummary = applyCanonicalWriteResponse(response)
+      if (!canonicalSummary) return false
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
 
       setPostId(createWritePostId.postId)
       setPostVersion(typeof response.data?.version === "number" ? response.data.version : null)
       setEditorMode("edit")
       setIsTempDraftMode(false)
-      setPostSummary(canonicalSummary.summary)
-      setPostSummarySource(canonicalSummary.summarySource)
-      setSummaryIntent(canonicalSummary.intent)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
-        title: postTitle,
-        content: currentPostContent,
-        summary: canonicalSummary.summary,
-        summarySource: canonicalSummary.summarySource,
-        summaryIntent: canonicalSummary.intent,
-        thumbnailUrl: postThumbnailUrl,
-        thumbnailFocusX: postThumbnailFocusX,
-        thumbnailFocusY: postThumbnailFocusY,
-        thumbnailZoom: postThumbnailZoom,
-        tags: postTags,
-        category: postCategory,
-        visibility: postVisibility,
-      })
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       lastWriteFingerprintRef.current = ""
       lastWriteIdempotencyKeyRef.current = ""
       await refreshPublicPostReadViews(createWritePostId.postId)
@@ -356,20 +391,7 @@ export const useEditorStudioPersistence = ({
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
-          {
-            title: postTitle,
-            content: currentPostContent,
-            summary: canonicalSummary.summary,
-            summarySource: canonicalSummary.summarySource,
-            summaryIntent: canonicalSummary.intent,
-            thumbnailUrl: postThumbnailUrl,
-            thumbnailFocusX: postThumbnailFocusX,
-            thumbnailFocusY: postThumbnailFocusY,
-            thumbnailZoom: postThumbnailZoom,
-            tags: postTags,
-            category: postCategory,
-            visibility: postVisibility,
-          },
+          fingerprintPayload,
           dedupeStrings
         ),
       })
@@ -397,7 +419,9 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
+    applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
     detectPublishPlaceholderIssue,
@@ -410,14 +434,8 @@ export const useEditorStudioPersistence = ({
     lastWriteIdempotencyKeyRef,
     postCategory,
     postId,
-    postSummary,
-    postSummarySource,
     summaryIntent,
     postTags,
-    postThumbnailFocusX,
-    postThumbnailFocusY,
-    postThumbnailUrl,
-    postThumbnailZoom,
     postTitle,
     postVisibility,
     pretty,
@@ -432,9 +450,6 @@ export const useEditorStudioPersistence = ({
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
     setPostId,
-    setPostSummary,
-    setPostSummarySource,
-    setSummaryIntent,
     setPostVersion,
     setPublishStatus,
     setResult,
@@ -496,57 +511,20 @@ export const useEditorStudioPersistence = ({
         }),
       })
 
-      const resolvedSummary = resolvePersistedSummaryResult(
-        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
-        { summary: response.data?.summary, source: response.data?.summarySource },
-      )
-      if (!resolvedSummary.ok) {
-        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
-        setPublishStatus({ tone: "error", text: message })
-        setResult(pretty({ error: message, response }))
-        return false
-      }
-      const canonicalSummary = resolvedSummary.state
+      const canonicalSummary = applyCanonicalWriteResponse(response)
+      if (!canonicalSummary) return false
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
 
       setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
-      setPostSummary(canonicalSummary.summary)
-      setPostSummarySource(canonicalSummary.summarySource)
-      setSummaryIntent(canonicalSummary.intent)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
-        title: postTitle,
-        content: currentPostContent,
-        summary: canonicalSummary.summary,
-        summarySource: canonicalSummary.summarySource,
-        summaryIntent: canonicalSummary.intent,
-        thumbnailUrl: postThumbnailUrl,
-        thumbnailFocusX: postThumbnailFocusX,
-        thumbnailFocusY: postThumbnailFocusY,
-        thumbnailZoom: postThumbnailZoom,
-        tags: postTags,
-        category: postCategory,
-        visibility: postVisibility,
-      })
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       await refreshPublicPostReadViews(postId)
       removeLocalDraft({ kind: "post", postId: postId.trim() })
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
-          {
-            title: postTitle,
-            content: currentPostContent,
-            summary: canonicalSummary.summary,
-            summarySource: canonicalSummary.summarySource,
-            summaryIntent: canonicalSummary.intent,
-            thumbnailUrl: postThumbnailUrl,
-            thumbnailFocusX: postThumbnailFocusX,
-            thumbnailFocusY: postThumbnailFocusY,
-            thumbnailZoom: postThumbnailZoom,
-            tags: postTags,
-            category: postCategory,
-            visibility: postVisibility,
-          },
+          fingerprintPayload,
           dedupeStrings
         ),
       })
@@ -567,7 +545,9 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
+    applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
     detectPublishPlaceholderIssue,
@@ -577,14 +557,8 @@ export const useEditorStudioPersistence = ({
     lastLocalDraftFingerprintRef,
     postCategory,
     postId,
-    postSummary,
-    postSummarySource,
     summaryIntent,
     postTags,
-    postThumbnailFocusX,
-    postThumbnailFocusY,
-    postThumbnailUrl,
-    postThumbnailZoom,
     postTitle,
     postVersion,
     postVisibility,
@@ -598,9 +572,6 @@ export const useEditorStudioPersistence = ({
     setLoadingKey,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
-    setPostSummary,
-    setPostSummarySource,
-    setSummaryIntent,
     setPostVersion,
     setPublishStatus,
     setResult,
@@ -661,57 +632,20 @@ export const useEditorStudioPersistence = ({
           version: postVersion,
         }),
       })
-      const resolvedSummary = resolvePersistedSummaryResult(
-        { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
-        { summary: response.data?.summary, source: response.data?.summarySource },
-      )
-      if (!resolvedSummary.ok) {
-        const message = "저장된 canonical summary 응답이 올바르지 않습니다."
-        setPublishStatus({ tone: "error", text: message })
-        setResult(pretty({ error: message, response }))
-        return false
-      }
-      const canonicalSummary = resolvedSummary.state
+      const canonicalSummary = applyCanonicalWriteResponse(response)
+      if (!canonicalSummary) return false
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
       setPostVisibility(postVisibility)
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
-      setPostSummary(canonicalSummary.summary)
-      setPostSummarySource(canonicalSummary.summarySource)
-      setSummaryIntent(canonicalSummary.intent)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint({
-        title: postTitle,
-        content: currentPostContent,
-        summary: canonicalSummary.summary,
-        summarySource: canonicalSummary.summarySource,
-        summaryIntent: canonicalSummary.intent,
-        thumbnailUrl: postThumbnailUrl,
-        thumbnailFocusX: postThumbnailFocusX,
-        thumbnailFocusY: postThumbnailFocusY,
-        thumbnailZoom: postThumbnailZoom,
-        tags: postTags,
-        category: postCategory,
-        visibility: postVisibility,
-      })
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       await refreshPublicPostReadViews(postId)
       // Temp posts autosave into the post slot; do not wipe an unrelated create-slot draft.
       removeLocalDraft({ kind: "post", postId: postId.trim() })
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
-          {
-            title: postTitle,
-            content: currentPostContent,
-            summary: canonicalSummary.summary,
-            summarySource: canonicalSummary.summarySource,
-            summaryIntent: canonicalSummary.intent,
-            thumbnailUrl: postThumbnailUrl,
-            thumbnailFocusX: postThumbnailFocusX,
-            thumbnailFocusY: postThumbnailFocusY,
-            thumbnailZoom: postThumbnailZoom,
-            tags: postTags,
-            category: postCategory,
-            visibility: postVisibility,
-          },
+          fingerprintPayload,
           dedupeStrings
         ),
       })
@@ -732,7 +666,9 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
+    applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
     detectPublishPlaceholderIssue,
@@ -741,14 +677,8 @@ export const useEditorStudioPersistence = ({
     getCurrentPostContent,
     postCategory,
     postId,
-    postSummary,
-    postSummarySource,
     summaryIntent,
     postTags,
-    postThumbnailFocusX,
-    postThumbnailFocusY,
-    postThumbnailUrl,
-    postThumbnailZoom,
     postTitle,
     postVersion,
     postVisibility,
@@ -762,9 +692,6 @@ export const useEditorStudioPersistence = ({
     setLoadingKey,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
-    setPostSummary,
-    setPostSummarySource,
-    setSummaryIntent,
     setPostVersion,
     setPostVisibility,
     setPublishStatus,
