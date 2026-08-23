@@ -1083,6 +1083,78 @@
         ]
       }
     },
+    "/post/api/v1/adm/posts/summary-backfill": {
+      "post": {
+        "tags": [
+          "ApiV1AdmPostController"
+        ],
+        "summary": "canonical summary bounded backfill",
+        "operationId": "backfillSummary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostSummaryBackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSummaryBackfillResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/post/api/v1/adm/posts/preview-summary": {
+      "post": {
+        "tags": [
+          "ApiV1AdmPostController"
+        ],
+        "summary": "canonical summary 미리보기",
+        "operationId": "previewSummary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostSummaryPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSummaryPreviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/member/api/v1/signup/social/pending": {
       "post": {
         "tags": [
@@ -3655,11 +3727,17 @@
             "format": "date-time"
           },
           "completedFileId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "failureReason": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -3702,18 +3780,46 @@
             "minLength": 2
           },
           "contentHtml": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "published": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "listed": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "version": {
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "summaryMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "AUTO",
+              "MANUAL",
+              null
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "minLength": 0
           }
         },
         "required": [
@@ -3740,6 +3846,19 @@
           },
           "listed": {
             "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "summarySource": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "LEADING_BLOCK",
+              "EXTRACTED",
+              "MIGRATED",
+              "NONE"
+            ]
           }
         }
       },
@@ -3938,12 +4057,18 @@
             "minLength": 0
           },
           "blogDesign": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 20,
             "minLength": 0
           },
           "legacyBlogScheme": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 20,
             "minLength": 0
           },
@@ -4097,11 +4222,17 @@
             "$ref": "#/components/schemas/MemberProfileWorkspaceContentDto"
           },
           "lastDraftSavedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "lastPublishedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "dirtyFromPublished": {
@@ -4113,7 +4244,10 @@
         "type": "object",
         "properties": {
           "taskType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "limit": {
             "type": "integer",
@@ -4142,7 +4276,10 @@
         "type": "object",
         "properties": {
           "taskType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "requestedLimit": {
             "type": "integer",
@@ -4168,7 +4305,10 @@
         "type": "object",
         "properties": {
           "forceControl": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         }
       },
@@ -4346,17 +4486,29 @@
         "type": "object",
         "properties": {
           "originalFilename": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "contentType": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "byteSize": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "folderPath": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -4388,13 +4540,41 @@
             "minLength": 2
           },
           "contentHtml": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "published": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "listed": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "summaryMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "AUTO",
+              "MANUAL",
+              null
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "minLength": 0
           }
         },
         "required": [
@@ -4434,7 +4614,10 @@
             "type": "string"
           },
           "thumbnail": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "summary": {
             "type": "string"
@@ -4478,6 +4661,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "summarySource": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "LEADING_BLOCK",
+              "EXTRACTED",
+              "MIGRATED",
+              "NONE"
+            ]
           }
         }
       },
@@ -4504,7 +4697,10 @@
             "minLength": 2
           },
           "parentCommentId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           }
         },
@@ -4548,7 +4744,10 @@
             "format": "int64"
           },
           "parentCommentId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "content": {
@@ -4637,7 +4836,10 @@
             "type": "string"
           },
           "contentHtml": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "version": {
             "type": "integer",
@@ -4672,6 +4874,19 @@
           },
           "actorCanDelete": {
             "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "summarySource": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "LEADING_BLOCK",
+              "EXTRACTED",
+              "MIGRATED",
+              "NONE"
+            ]
           }
         }
       },
@@ -4745,6 +4960,95 @@
           }
         }
       },
+      "PostSummaryBackfillRequest": {
+        "type": "object",
+        "properties": {
+          "afterId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 500,
+            "minimum": 1
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PostSummaryBackfillResponse": {
+        "type": "object",
+        "properties": {
+          "scanned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextAfterId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PostSummaryPreviewRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 2
+          }
+        },
+        "required": [
+          "content",
+          "title"
+        ]
+      },
+      "PostSummaryPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "LEADING_BLOCK",
+              "EXTRACTED",
+              "MIGRATED",
+              "NONE"
+            ]
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "algorithmVersion": {
+            "type": "string"
+          }
+        }
+      },
       "SocialSignupPendingRequest": {
         "type": "object",
         "properties": {
@@ -4767,7 +5071,10 @@
             "type": "string"
           },
           "profileImgUrl": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expiresAt": {
             "type": "string",
@@ -4797,7 +5104,10 @@
             "minLength": 1
           },
           "nickname": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 30,
             "minLength": 2
           },
@@ -4947,7 +5257,10 @@
             "minLength": 1
           },
           "nextPath": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -4983,7 +5296,10 @@
         "type": "object",
         "properties": {
           "username": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "pattern": "^$"
           },
           "password": {
@@ -5057,7 +5373,10 @@
             ]
           },
           "message": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 1000,
             "minLength": 0
           }
@@ -5097,7 +5416,10 @@
             ]
           },
           "message": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "requestedAt": {
             "type": "string",
@@ -5108,7 +5430,10 @@
             "format": "date-time"
           },
           "completedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         }
@@ -5200,7 +5525,10 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 320,
             "minLength": 2
           },
@@ -5319,7 +5647,10 @@
             "type": "string"
           },
           "acceptedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "refusalGuidePath": {
@@ -5469,17 +5800,26 @@
             "minLength": 0
           },
           "aboutRole": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 100,
             "minLength": 0
           },
           "aboutBio": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 2000,
             "minLength": 0
           },
           "aboutDetails": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 12000,
             "minLength": 0
           },
@@ -5499,12 +5839,18 @@
             "minLength": 0
           },
           "blogDesign": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 20,
             "minLength": 0
           },
           "legacyBlogScheme": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 20,
             "minLength": 0
           },
@@ -5565,7 +5911,8 @@
               "PENDING",
               "PROCESSING",
               "COMPLETED",
-              "FAILED"
+              "FAILED",
+              "QUARANTINED"
             ]
           },
           "retryCount": {
@@ -5585,7 +5932,10 @@
             "format": "date-time"
           },
           "errorMessage": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -5621,19 +5971,31 @@
             "format": "int64"
           },
           "oldestReadyPendingAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "oldestProcessingAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "oldestReadyPendingAgeSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "oldestProcessingAgeSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "processingTimeoutSeconds": {
@@ -5714,7 +6076,10 @@
             "format": "int64"
           },
           "queueLagSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "failedCount": {
@@ -5726,19 +6091,31 @@
             "format": "int64"
           },
           "oldestReadyPendingAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "oldestReadyPendingAgeSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "latestFailureAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "latestFailureMessage": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "retryPolicy": {
             "$ref": "#/components/schemas/TaskRetryPolicy"
@@ -5776,7 +6153,10 @@
             "type": "boolean"
           },
           "oldestEligiblePurgeAfter": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "sampleEligibleObjectKeys": {
@@ -5903,6 +6283,18 @@
             "type": "integer",
             "format": "int64"
           },
+          "replayUnavailableNotificationCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "replayFailureCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unreadUnavailableCount": {
+            "type": "integer",
+            "format": "int64"
+          },
           "heartbeatSentCount": {
             "type": "integer",
             "format": "int64"
@@ -5910,6 +6302,14 @@
           "sendFailureCount": {
             "type": "integer",
             "format": "int64"
+          },
+          "sendFailureRemovedEmitterCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "emitterStateMismatchCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -5923,14 +6323,23 @@
             "type": "string"
           },
           "host": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "port": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32"
           },
           "mailFrom": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "usernameConfigured": {
             "type": "boolean"
@@ -5951,10 +6360,16 @@
             }
           },
           "canConnect": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "connectionError": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "checkedAt": {
             "type": "string",
@@ -5987,7 +6402,10 @@
             "type": "boolean"
           },
           "processTasksLockTtlSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "legacyOrphanLikely": {
@@ -6042,11 +6460,17 @@
             "format": "int32"
           },
           "latestEventAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "latestBlockedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         }
@@ -6058,15 +6482,24 @@
             "type": "string"
           },
           "queueLagSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "latestFailureAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "latestFailureMessage": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -6102,7 +6535,10 @@
             "type": "boolean"
           },
           "oldestEligiblePurgeAfter": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         }
@@ -6131,15 +6567,24 @@
             "format": "int64"
           },
           "oldestReadyPendingAgeSeconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "latestFailureAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "latestFailureMessage": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -6182,7 +6627,14 @@
             "type": "string"
           },
           "legalReconsent": {
-            "$ref": "#/components/schemas/LegalReconsentStatus"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LegalReconsentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "isAdmin": {
             "type": "boolean"
@@ -6204,11 +6656,17 @@
             "type": "string"
           },
           "memberId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64"
           },
           "loginIdentifier": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "rememberLoginEnabled": {
             "type": "boolean"
@@ -6217,13 +6675,22 @@
             "type": "boolean"
           },
           "clientIpFingerprint": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "requestPath": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "reason": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -6317,7 +6784,10 @@
             "type": "string"
           },
           "thumbnail": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "summary": {
             "type": "string"
@@ -6385,7 +6855,10 @@
             "type": "boolean"
           },
           "nextCursor": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -6488,7 +6961,10 @@
             "format": "int64"
           },
           "email": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "username": {
             "type": "string"
@@ -6517,7 +6993,14 @@
             "$ref": "#/components/schemas/PrivacyExportMemberSnapshot"
           },
           "latestLegalAcceptance": {
-            "$ref": "#/components/schemas/PrivacyLegalAcceptanceSnapshot"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PrivacyLegalAcceptanceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -6779,7 +7262,10 @@
         "type": "object",
         "properties": {
           "password": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 128,
             "minLength": 1
           },
@@ -6787,7 +7273,10 @@
             "type": "boolean"
           },
           "reason": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 500,
             "minLength": 0
           }
