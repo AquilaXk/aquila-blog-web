@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceRepository": "AquilaXk/aquila-blog",
-  "sourceCommit": "843d94261860f996f7491a564d525aada03d2488",
+  "sourceCommit": "6e1957de8f792aeec89f7c8da715fb6065e6e99d",
   "contract": "aquila-public-api",
   "artifacts": {
     "openapi": {
