@@ -144,6 +144,42 @@ const countMarkdownLinkWarnings = (markdown: string) =>
     return !href || /^https?:\/\/$/.test(href)
   }).length
 
+const getCategoryInputValue = (category: string) =>
+  category.trim() ? splitCategoryDisplay(category).label : ""
+
+type LocalDraftRestoreSuggestionProps = {
+  visible: boolean
+  disabled: boolean
+  onRestore: () => void
+  onClear: () => void
+  onDismiss: () => void
+}
+
+const LocalDraftRestoreSuggestion = ({
+  visible,
+  disabled,
+  onRestore,
+  onClear,
+  onDismiss,
+}: LocalDraftRestoreSuggestionProps) => {
+  if (!visible) return null
+
+  return (
+    <PublishNotice role="status" aria-live="polite" data-tone="idle">
+      브라우저 임시글이 있습니다.
+      <SecondaryButton type="button" disabled={disabled} onClick={onRestore}>
+        복구
+      </SecondaryButton>
+      <SecondaryButton type="button" disabled={disabled} onClick={onClear}>
+        삭제
+      </SecondaryButton>
+      <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
+        이번 세션에 표시 안 함
+      </SecondaryButton>
+    </PublishNotice>
+  )
+}
+
 export const EditorStudioDedicatedEditorLoadingState = () => (
   <EditorStudioRoot>
     <EditorStudioLoadingState>
@@ -336,7 +372,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             <EditorInspectorTagInputRow>
               <input
                 list="editor-category-suggestions"
-                value={postCategory.trim() ? splitCategoryDisplay(postCategory).label : ""}
+                value={getCategoryInputValue(postCategory)}
                 onChange={(event) => onPostCategoryChange(event.target.value)}
                 onBlur={onCommitPostCategory}
               />
@@ -355,20 +391,13 @@ export const EditorStudioDedicatedEditorSurface = ({
               ))}
             </datalist>
           </label>
-          {isLocalDraftRestoreSuggestionVisible ? (
-            <PublishNotice role="status" aria-live="polite" data-tone="idle">
-              브라우저 임시글이 있습니다.
-              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onRestoreLocalDraft}>
-                복구
-              </SecondaryButton>
-              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onClearLocalDraft}>
-                삭제
-              </SecondaryButton>
-              <SecondaryButton type="button" disabled={isLocalDraftRestoreSuggestionActionsDisabled} onClick={onDismissLocalDraftRestoreSuggestion}>
-                이번 세션에 표시 안 함
-              </SecondaryButton>
-            </PublishNotice>
-          ) : null}
+          <LocalDraftRestoreSuggestion
+            visible={isLocalDraftRestoreSuggestionVisible}
+            disabled={isLocalDraftRestoreSuggestionActionsDisabled}
+            onRestore={onRestoreLocalDraft}
+            onClear={onClearLocalDraft}
+            onDismiss={onDismissLocalDraftRestoreSuggestion}
+          />
           <section>
             <span>Tags</span>
             <EditorTagRow aria-label="발행 태그" $compact>
