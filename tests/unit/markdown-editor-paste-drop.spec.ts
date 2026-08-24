@@ -210,13 +210,14 @@ test.describe("markdown editor paste/drop model", () => {
     const placeholder = buildUploadingImagePlaceholder("shot.png", "upload-1")
     const before = `intro ${placeholder} outro`
     const resolved = resolveMarkdownImageEmbed(
-      { url: "https://cdn.example.test/shot.png" },
-      "shot.png"
+      { url: "https://blog.aquilaxk.site/post/api/v1/images/shot.png" },
+      "shot.png",
+      { publicApiOrigin: "https://blog.aquilaxk.site" },
     )
     if ("error" in resolved) throw new Error(resolved.error)
 
     const inline = toInlineMarkdownSnippet(resolved.markdown)
-    expect(inline).toBe("![shot.png](https://cdn.example.test/shot.png)")
+    expect(inline).toBe("![shot.png](https://blog.aquilaxk.site/post/api/v1/images/shot.png)")
 
     const matchedPlan = planReplaceExactSubstring(before, placeholder, inline, 0, 0)
     expect(matchedPlan).not.toBeNull()
