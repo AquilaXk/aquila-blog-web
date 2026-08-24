@@ -17,6 +17,7 @@ import {
   EditorToolbar,
   ToolbarGroup,
   ToolbarButton,
+  ToolbarSelect,
   ToolbarUploadButton,
   ToolbarError,
   EditorBody,
@@ -35,6 +36,12 @@ import {
   type PlannedTextMutation,
 } from "./markdownEditorTextMutation"
 import { planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
+import {
+  createMarkdownEditorTable,
+  isMarkdownEditorTableSelection,
+  planMarkdownEditorTableEdit,
+  type MarkdownEditorTableEdit,
+} from "./markdownEditorTableModel"
 import {
   emptyPendingToolbarInsertQueue,
   queuePendingToolbarInsert,
@@ -78,7 +85,7 @@ type TextareaSelection = {
 }
 
 const TEXTAREA_KEYBOARD_HELP =
-  "Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다."
+  "표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다."
 
 export const MarkdownEditor = ({
   value,
@@ -97,6 +104,9 @@ export const MarkdownEditor = ({
   const [mode, setMode] = useState<MarkdownEditorMode>(DEFAULT_MARKDOWN_EDITOR_MODE)
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
+  const [tableRows, setTableRows] = useState(2)
+  const [tableColumns, setTableColumns] = useState(2)
+  const [activeTableSelection, setActiveTableSelection] = useState<TextareaSelection | null>(null)
   const editorDomId = useId()
   const writePanelId = `${editorDomId}-write-panel`
   const previewPanelId = `${editorDomId}-preview-panel`
@@ -134,6 +144,7 @@ export const MarkdownEditor = ({
     if (value === valueRef.current) return
     valueRef.current = value
     setDraftValue(value)
+    setActiveTableSelection(null)
     // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
@@ -185,6 +196,12 @@ export const MarkdownEditor = ({
     [onChange]
   )
 
+  const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
+    setActiveTableSelection(
+      isMarkdownEditorTableSelection(nextValue, selection.from, selection.to) ? selection : null
+    )
+  }, [])
+
   const rememberTextareaSelection = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return selectionRef.current
@@ -193,8 +210,9 @@ export const MarkdownEditor = ({
       from: textarea.selectionStart,
       to: textarea.selectionEnd,
     }
+    updateActiveTableSelection(valueRef.current, selectionRef.current)
     return selectionRef.current
-  }, [])
+  }, [updateActiveTableSelection])
 
   const setTextareaSelection = useCallback((from: number, to = from) => {
     const textarea = textareaRef.current
@@ -207,7 +225,8 @@ export const MarkdownEditor = ({
     }
     textarea.setSelectionRange(nextSelection.from, nextSelection.to)
     selectionRef.current = nextSelection
-  }, [])
+    updateActiveTableSelection(valueRef.current, nextSelection)
+  }, [updateActiveTableSelection])
 
   const applyMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
@@ -216,6 +235,7 @@ export const MarkdownEditor = ({
       textarea.focus()
       const nextMarkdown = applyPlannedTextMutation(textarea, plan)
       selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
+      updateActiveTableSelection(nextMarkdown, selectionRef.current)
       commitMarkdown(nextMarkdown, true, options)
       const nextFrom = plan.selectionStart
       const nextTo = plan.selectionEnd
@@ -228,7 +248,7 @@ export const MarkdownEditor = ({
       })
       return true
     },
-    [commitMarkdown, disabled]
+    [commitMarkdown, disabled, updateActiveTableSelection]
   )
 
   const { handleWriteScroll, handlePreviewScroll, handlePreviewWheel } = useMarkdownEditorScrollSync({
@@ -252,10 +272,11 @@ export const MarkdownEditor = ({
 
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
       selectionRef.current = { from: next.selectionStart, to: next.selectionEnd }
+      updateActiveTableSelection(next.value, selectionRef.current)
       commitMarkdown(next.value, true, options)
       return true
     },
-    [applyMutationPlan, commitMarkdown]
+    [applyMutationPlan, commitMarkdown, updateActiveTableSelection]
   )
 
   /**
@@ -415,6 +436,34 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, disabled, queueToolbarInsertForPreviewMode, resolveActiveSelection]
   )
 
+  const insertTable = useCallback(() => {
+    if (disabled) return
+    const table = createMarkdownEditorTable(tableRows, tableColumns)
+    if (!table) return
+    applyBlockSnippet(table)
+  }, [applyBlockSnippet, disabled, tableColumns, tableRows])
+
+  const applyTableEdit = useCallback(
+    (edit: MarkdownEditorTableEdit) => {
+      if (disabled || modeRef.current === "preview") return
+      const { from, to } = resolveActiveSelection()
+      const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
+      if (plan) applyPlannedMarkdownMutation(plan)
+    },
+    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
+  )
+
+  const isTableEditDisabled = (edit: MarkdownEditorTableEdit) =>
+    disabled ||
+    mode === "preview" ||
+    !activeTableSelection ||
+    !planMarkdownEditorTableEdit(
+      draftValue,
+      activeTableSelection.from,
+      activeTableSelection.to,
+      edit
+    )
+
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
       if (disabled) return
@@ -511,7 +560,7 @@ export const MarkdownEditor = ({
               {snippet.label}
             </ToolbarButton>
           ))}
-          {blockMarkdownSnippets.map((snippet) => (
+          {blockMarkdownSnippets.filter((snippet) => snippet.title !== "표").map((snippet) => (
             <ToolbarButton
               key={snippet.title}
               type="button"
@@ -522,6 +571,57 @@ export const MarkdownEditor = ({
               onClick={() => applyBlockSnippet(snippet)}
             >
               {snippet.label}
+            </ToolbarButton>
+          ))}
+          <ToolbarSelect
+            aria-label="표 행"
+            value={tableRows}
+            disabled={disabled}
+            onChange={(event) => setTableRows(Number(event.currentTarget.value))}
+          >
+            {[2, 3, 4, 5, 6].map((rows) => (
+              <option key={rows} value={rows}>{`${rows}행`}</option>
+            ))}
+          </ToolbarSelect>
+          <ToolbarSelect
+            aria-label="표 열"
+            value={tableColumns}
+            disabled={disabled}
+            onChange={(event) => setTableColumns(Number(event.currentTarget.value))}
+          >
+            {[2, 3, 4, 5, 6].map((columns) => (
+              <option key={columns} value={columns}>{`${columns}열`}</option>
+            ))}
+          </ToolbarSelect>
+          <ToolbarButton
+            type="button"
+            aria-label="표 삽입"
+            title="표 삽입"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={insertTable}
+          >
+            Table
+          </ToolbarButton>
+          {([
+            ["표 행 추가", { kind: "add-row" }],
+            ["표 행 삭제", { kind: "delete-row" }],
+            ["표 열 추가", { kind: "add-column" }],
+            ["표 열 삭제", { kind: "delete-column" }],
+            ["표 열 왼쪽 정렬", { kind: "set-alignment", alignment: "left" }],
+            ["표 열 가운데 정렬", { kind: "set-alignment", alignment: "center" }],
+            ["표 열 오른쪽 정렬", { kind: "set-alignment", alignment: "right" }],
+          ] as const).map(([label, edit]) => (
+            <ToolbarButton
+              key={label}
+              type="button"
+              aria-label={label}
+              title={label}
+              disabled={isTableEditDisabled(edit)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyTableEdit(edit)}
+            >
+              {label}
             </ToolbarButton>
           ))}
           <ToolbarUploadButton title="이미지" aria-label="이미지" aria-disabled={disabled || !onUploadImage}>
@@ -594,6 +694,7 @@ export const MarkdownEditor = ({
                     from: event.currentTarget.selectionStart,
                     to: event.currentTarget.selectionEnd,
                   }
+                  updateActiveTableSelection(event.currentTarget.value, selectionRef.current)
                   commitMarkdown(event.currentTarget.value, true)
                 }}
                 onFocus={rememberTextareaSelection}

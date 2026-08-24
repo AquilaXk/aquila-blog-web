@@ -224,7 +224,41 @@ type ExtractedTableLayouts = {
   layouts: Array<MarkdownTableLayout | null>
 }
 
+type FencedCodeBlockMarker = {
+  marker: "`" | "~"
+  length: number
+}
+
 const isIndentedCodeLine = (line: string) => /^(?: {4}|\t)/.test(line)
+
+const parseFencedCodeBlockMarker = (line: string): FencedCodeBlockMarker | null => {
+  if (isIndentedCodeLine(line)) return null
+  const match = line.trim().match(/^(`{3,}|~{3,})/)
+  if (!match) return null
+
+  const fence = match[1] || ""
+  return {
+    marker: fence[0] as FencedCodeBlockMarker["marker"],
+    length: fence.length,
+  }
+}
+
+const isFencedCodeBlockClosingLine = (
+  line: string,
+  openingMarker: FencedCodeBlockMarker
+) => {
+  const trimmedLine = line.trim()
+  let markerLength = 0
+
+  while (trimmedLine[markerLength] === openingMarker.marker) {
+    markerLength += 1
+  }
+
+  return (
+    markerLength >= openingMarker.length &&
+    trimmedLine.slice(markerLength).trim().length === 0
+  )
+}
 
 const countUnescapedPipeDelimiters = (line: string) => {
   let count = 0
@@ -279,20 +313,23 @@ export const extractMarkdownTableLayouts = (
   const cleanedLines: string[] = []
   const layouts: Array<MarkdownTableLayout | null> = []
   const tableHeaderLinesWithExplicitLayout = new Set<number>()
-  let inFencedCodeBlock = false
+  let fencedCodeBlockMarker: FencedCodeBlockMarker | null = null
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] || ""
-    const trimmedLine = line.trim()
 
-    if (/^(```|~~~)/.test(trimmedLine)) {
-      inFencedCodeBlock = !inFencedCodeBlock
+    if (fencedCodeBlockMarker) {
       cleanedLines.push(line)
+      if (isFencedCodeBlockClosingLine(line, fencedCodeBlockMarker)) {
+        fencedCodeBlockMarker = null
+      }
       continue
     }
 
-    if (inFencedCodeBlock) {
+    const openingMarker = parseFencedCodeBlockMarker(line)
+    if (openingMarker) {
       cleanedLines.push(line)
+      fencedCodeBlockMarker = openingMarker
       continue
     }
 

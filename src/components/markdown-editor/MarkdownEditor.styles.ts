@@ -74,6 +74,28 @@ export const ToolbarButton = styled.button`
   }
 `
 
+export const ToolbarSelect = styled.select`
+  box-sizing: border-box;
+  height: 31px;
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  border-radius: 4px;
+  padding: 0 6px;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+  color: ${({ theme }) => theme.colors.gray10};
+  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.blue8};
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+`
+
 export const ToolbarUploadButton = styled.label`
   border: 1px solid transparent;
   border-radius: 4px;

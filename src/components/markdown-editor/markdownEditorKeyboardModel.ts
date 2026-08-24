@@ -7,6 +7,10 @@ import {
   planToggleWrapSelection,
   type PlannedTextMutation,
 } from "./markdownEditorTextMutation"
+import {
+  isMarkdownEditorTableSelection,
+  planMarkdownEditorTableTab,
+} from "./markdownEditorTableModel"
 
 export type MarkdownFormatShortcut =
   | "bold"
@@ -211,6 +215,30 @@ export const planTabIndentMutation = (
     return planOutdentLines(value, selectionStart, selectionEnd)
   }
   return planIndentLines(value, selectionStart, selectionEnd)
+}
+
+export type TableCellTabMutationPlan = {
+  handledTable: boolean
+  mutation: PlannedTextMutation | null
+}
+
+export const planTableCellTabMutation = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  shiftKey: boolean
+): TableCellTabMutationPlan => {
+  if (isMarkdownEditorTableSelection(value, selectionStart, selectionEnd)) {
+    return {
+      handledTable: true,
+      mutation: planMarkdownEditorTableTab(value, selectionStart, selectionEnd, shiftKey ? "previous" : "next"),
+    }
+  }
+
+  return {
+    handledTable: false,
+    mutation: planTabIndentMutation(value, selectionStart, selectionEnd, shiftKey),
+  }
 }
 
 export { planHardBreak }

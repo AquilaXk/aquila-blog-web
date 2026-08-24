@@ -1489,13 +1489,84 @@ test.describe("Markdown editor replacement", () => {
     await writePane.locator("textarea").click()
     await page.keyboard.press(process.platform === "darwin" ? "Meta+Home" : "Control+Home")
     await page.keyboard.press("ArrowRight")
-    await page.getByRole("button", { name: "표" }).click()
+    await page.getByRole("button", { name: "표 삽입", exact: true }).click()
 
     const editorText = await writePane.locator("textarea").inputValue()
     const tableMarker = "|  |  |"
     expect(editorText.indexOf(tableMarker)).toBeGreaterThan(-1)
     expect(editorText.indexOf(tableMarker)).toBeLessThan(editorText.indexOf("omega"))
     await expect(page.getByTestId("markdown-editor-preview-pane").locator("table")).toBeVisible()
+  })
+
+  test("bounded table controls insert, edit, navigate, and preview a table", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "")
+    await page.goto("/editor/new?source=local-draft")
+
+    const writePane = page.getByTestId("markdown-editor-write-pane")
+    const textarea = writePane.locator("textarea")
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 열 가운데 정렬" })).toBeDisabled()
+    await page.getByRole("combobox", { name: "표 행", exact: true }).selectOption("3")
+    await page.getByRole("combobox", { name: "표 열", exact: true }).selectOption("3")
+    await page.getByRole("button", { name: "표 삽입" }).click()
+    const insertedRows = (await textarea.inputValue()).split("\n").filter((line) => line.startsWith("|"))
+    expect(insertedRows).toHaveLength(4)
+    expect(insertedRows).toEqual([
+      "|  |  |  |",
+      "| --- | --- | --- |",
+      "|  |  |  |",
+      "|  |  |  |",
+    ])
+
+    await page.getByRole("button", { name: "표 열 가운데 정렬" }).click()
+    await page.getByRole("button", { name: "표 행 추가" }).click()
+    await textarea.press("Tab")
+    await textarea.press("Shift+Tab")
+    const logicalRowCountBeforeAppend = await textarea.evaluate((element) => {
+      const rows = element.value.split("\n").filter((line) => line.startsWith("|"))
+      const lastRow = rows.at(-1)
+      if (!lastRow) throw new Error("expected a table body row")
+      const lastRowStart = element.value.lastIndexOf(lastRow)
+      const lastCell = lastRowStart + lastRow.lastIndexOf("|") - 1
+      element.setSelectionRange(lastCell, lastCell)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+      return rows.length - 1
+    })
+    await textarea.press("Tab")
+    const logicalRowCountAfterAppend = (await textarea.inputValue()).split("\n").filter((line) => line.startsWith("|")).length - 1
+    expect(logicalRowCountAfterAppend).toBe(logicalRowCountBeforeAppend + 1)
+    await expect(textarea).toHaveValue(/\| :---: \| --- \| --- \|/)
+    await expect(page.getByTestId("markdown-editor-preview-pane").locator("table")).toBeVisible()
+  })
+
+  test("table action buttons reflect edit bounds", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "")
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    await page.getByRole("combobox", { name: "표 행", exact: true }).selectOption("6")
+    await page.getByRole("combobox", { name: "표 열", exact: true }).selectOption("6")
+    await page.getByRole("button", { name: "표 삽입" }).click()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 열 추가" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeEnabled()
+
+    const minimumTable = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
+    await textarea.fill(minimumTable)
+    await textarea.evaluate((element) => {
+      const caret = element.value.indexOf("one")
+      element.setSelectionRange(caret, caret)
+    })
+    await textarea.press("ArrowRight")
+    await expect(page.getByRole("button", { name: "표 행 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "표 열 추가" })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeEnabled()
+
+    await page.getByRole("button", { name: "표 열 삭제" }).click()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeEnabled()
   })
 
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {

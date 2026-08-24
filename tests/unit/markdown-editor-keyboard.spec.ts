@@ -7,6 +7,7 @@ import {
   planFormatShortcutMutation,
   planHardBreak,
   planListEnterContinuation,
+  planTableCellTabMutation,
   planTabIndentMutation,
   resolveFormatShortcut,
 } from "../../src/components/markdown-editor/markdownEditorKeyboardModel"
@@ -122,6 +123,25 @@ test.describe("markdown editor keyboard model", () => {
 
     const outdented = planTabIndentMutation(indented!.replacement, 0, indented!.replacement.length, true)
     expect(outdented?.replacement).toBe(value)
+  })
+
+  test("table cell Tab plans cell navigation before generic indentation", () => {
+    const table = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
+    const firstCell = table.indexOf("A")
+    const lastCell = table.indexOf("two")
+
+    expect(planTableCellTabMutation(table, firstCell, firstCell, true)).toEqual({
+      handledTable: true,
+      mutation: null,
+    })
+    expect(planTableCellTabMutation(table, lastCell, lastCell, false)).toMatchObject({
+      handledTable: true,
+      mutation: { replacement: expect.stringContaining("|  |  |") },
+    })
+    expect(planTableCellTabMutation("alpha", 0, 0, false)).toMatchObject({
+      handledTable: false,
+      mutation: { replacement: "  alpha" },
+    })
   })
 
   test("adjusts selection by indent applied only before each selection edge", () => {
