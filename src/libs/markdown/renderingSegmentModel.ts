@@ -9,18 +9,34 @@ type ParsedCalloutHeader = {
   emoji: string
 }
 
+const isAsciiLetter = (character: string) => {
+  const code = character.charCodeAt(0)
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+}
+
+const parseBlockquoteCalloutToken = (raw: string) => {
+  const line = raw.trim()
+  if (!line.startsWith("[!")) return null
+
+  const closingBracketIndex = line.indexOf("]", 2)
+  if (closingBracketIndex < 0) return null
+
+  const token = line.slice(2, closingBracketIndex)
+  if (!token || !token.split("").every(isAsciiLetter)) return null
+  return { token, title: line.slice(closingBracketIndex + 1).trim() }
+}
+
 const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   const line = raw.trim()
   if (!line) return null
 
-  const blockquoteMatch = line.match(/^\[!([A-Za-z]+)\](?:\s*(.*))?$/)
-  if (blockquoteMatch) {
-    const blockquoteCallout = resolveCalloutBlockquote(blockquoteMatch[1] || "")
+  const blockquoteToken = parseBlockquoteCalloutToken(line)
+  if (blockquoteToken) {
+    const blockquoteCallout = resolveCalloutBlockquote(blockquoteToken.token)
     if (!blockquoteCallout) return null
-    const customTitle = blockquoteMatch?.[2]?.trim() || ""
     return {
       kind: blockquoteCallout.kind,
-      title: customTitle,
+      title: blockquoteToken.title,
       emoji: blockquoteCallout.callout.marker,
     }
   }
@@ -39,11 +55,11 @@ const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   const header = parseCalloutHeader(raw)
   if (header) return header
 
-  const blockquoteMatch = raw.trim().match(/^\[!([A-Za-z]+)\](?:\s*(.*))?$/)
-  if (!blockquoteMatch) return null
+  const blockquoteToken = parseBlockquoteCalloutToken(raw)
+  if (!blockquoteToken) return null
   return {
     kind: "info",
-    title: blockquoteMatch[2]?.trim() || "",
+    title: blockquoteToken.title,
     emoji: infoCalloutMarker,
   }
 }
