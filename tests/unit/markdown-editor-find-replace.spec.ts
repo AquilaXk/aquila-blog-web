@@ -21,6 +21,12 @@ test.describe("markdown editor find and replace model", () => {
     expect(findMarkdownEditorMatches("text", "")).toEqual([])
   })
 
+  test("case-insensitive literal matching handles Greek final sigma without folding accents", () => {
+    expect(findMarkdownEditorMatches("ΟΣ", "οσ")).toEqual([{ start: 0, end: 2 }])
+    expect(findMarkdownEditorMatches("ΟΣ", "οσ", { caseSensitive: true })).toEqual([])
+    expect(findMarkdownEditorMatches("café", "cafe")).toEqual([])
+  })
+
   test("clamps an optional captured scope and never searches outside it", () => {
     const value = "before hit hit after"
     expect(findMarkdownEditorMatches(value, "hit", { scope: { start: 7, end: 11 } })).toEqual([{ start: 7, end: 10 }])

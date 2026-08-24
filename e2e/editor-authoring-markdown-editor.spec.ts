@@ -1617,6 +1617,7 @@ test.describe("Markdown editor replacement", () => {
 
     await page.getByRole("button", { name: "다음 찾기" }).click()
     expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("Cat")
+    await expect(textarea).toBeFocused()
     await page.getByRole("button", { name: "다음 찾기" }).click()
     expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("cat")
     await page.getByRole("button", { name: "이전 찾기" }).click()
@@ -1638,6 +1639,10 @@ test.describe("Markdown editor replacement", () => {
     await textarea.press(redoShortcut)
     await expect(textarea).toHaveValue(replaced)
     expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("dog dog")
+    await findReplaceToggle.click()
+    await page.getByRole("textbox", { name: "찾을 내용" }).fill("dog")
+    await page.getByRole("button", { name: /굵게/ }).click()
+    await expect(page.getByRole("textbox", { name: "찾을 내용" })).toBeDisabled()
   })
 
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {

@@ -39,8 +39,10 @@ const normalizeScope = (
   return start <= end ? { start, end } : null
 }
 
+const caseInsensitiveSearchCollator = new Intl.Collator("en", { usage: "search", sensitivity: "accent" })
+
 const matchesQuery = (candidate: string, query: string, caseSensitive: boolean) =>
-  caseSensitive ? candidate === query : candidate.toLowerCase() === query.toLowerCase()
+  caseSensitive ? candidate === query : caseInsensitiveSearchCollator.compare(candidate, query) === 0
 
 export const findMarkdownEditorMatches = (
   value: string,

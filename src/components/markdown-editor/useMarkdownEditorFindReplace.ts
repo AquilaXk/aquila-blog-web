@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   findMarkdownEditorMatches,
   planMarkdownEditorReplaceAll,
@@ -52,6 +52,13 @@ export const useMarkdownEditorFindReplace = ({
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [panel, setPanel] = useState<FindPanelSession | null>(null)
   const [history, setHistory] = useState<FindHistory | null>(null)
+
+  useEffect(() => {
+    setPanel((current) =>
+      current && current.documentValue !== draftValue ? { ...current, activeMatch: null, stale: true } : current
+    )
+    setHistory((current) => (current && current.documentValue !== draftValue ? null : current))
+  }, [draftValue])
 
   const matches = useMemo(
     () =>

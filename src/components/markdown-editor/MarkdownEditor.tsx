@@ -252,12 +252,17 @@ export const MarkdownEditor = ({
     }
   }, [])
 
+  const selectFindReplaceRange = useCallback((from: number, to?: number) => {
+    setTextareaSelection(from, to)
+    textareaRef.current?.focus()
+  }, [setTextareaSelection])
+
   const findReplace = useMarkdownEditorFindReplace({
     disabled,
     preview: mode === "preview",
     draftValue,
     readSnapshot: readEditorSnapshot,
-    selectRange: setTextareaSelection,
+    selectRange: selectFindReplaceRange,
     applyMutation: applyMutationPlan,
   })
   const {
