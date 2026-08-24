@@ -6,6 +6,7 @@ import {
   useRef,
 } from "react"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import { convertSafeHtmlPasteToMarkdown } from "./markdownEditorHtmlPasteModel"
 import {
   buildUploadingImagePlaceholder,
   createUploadPlaceholderId,
@@ -16,6 +17,7 @@ import {
   planReplaceExactSubstring,
   planTransferFileReservations,
   readClipboardPlainText,
+  readClipboardHtml,
   resolvePasteMediaRoute,
   shouldAppendMissingPlaceholder,
   toInlineMarkdownSnippet,
@@ -48,11 +50,12 @@ type UseMarkdownEditorMediaTransfersArgs = {
   onUploadImage?: (file: File) => Promise<MarkdownImageUploadResult>
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
   applyPlannedMarkdownMutation: (plan: PlannedTextMutation, options?: MarkdownMutationOptions) => boolean
+  applyRecordedMarkdownMutation: (plan: PlannedTextMutation) => boolean
   /** Placeholder replace/remove after async upload — must not steal focus from other controls. */
   applyBackgroundMarkdownMutation: (plan: PlannedTextMutation) => boolean
   resolveActiveSelection: () => TextareaSelection
   setUploadInFlight: (delta: number) => void
-  setUploadError: (message: string) => void
+  setEditorError: (message: string) => void
   insertUploadedMarkdown: (markdown: string) => void
 }
 
@@ -64,26 +67,27 @@ export const useMarkdownEditorMediaTransfers = ({
   onUploadImage,
   onUploadFile,
   applyPlannedMarkdownMutation,
+  applyRecordedMarkdownMutation,
   applyBackgroundMarkdownMutation,
   resolveActiveSelection,
   setUploadInFlight,
-  setUploadError,
+  setEditorError,
   insertUploadedMarkdown,
 }: UseMarkdownEditorMediaTransfersArgs) => {
   const retainedUploadErrorRef = useRef("")
 
   const clearUploadError = useCallback(() => {
     retainedUploadErrorRef.current = ""
-    setUploadError("")
-  }, [setUploadError])
+    setEditorError("")
+  }, [setEditorError])
 
   const reportUploadError = useCallback(
     (message: string) => {
       if (retainedUploadErrorRef.current) return
       retainedUploadErrorRef.current = message
-      setUploadError(message)
+      setEditorError(message)
     },
-    [setUploadError]
+    [setEditorError]
   )
 
   const insertAtActiveSelection = useCallback(
@@ -274,19 +278,19 @@ export const useMarkdownEditorMediaTransfers = ({
       try {
         uploaded = await onUploadImage(file)
       } catch {
-        setUploadError(MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE)
+        setEditorError(MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE)
         return
       } finally {
         setUploadInFlight(-1)
       }
       const resolved = resolveMarkdownImageEmbed(uploaded, file.name)
       if ("error" in resolved) {
-        setUploadError(resolved.error)
+        setEditorError(resolved.error)
         return
       }
       insertUploadedMarkdown(resolved.markdown)
     },
-    [clearUploadError, insertUploadedMarkdown, onUploadImage, setUploadError, setUploadInFlight]
+    [clearUploadError, insertUploadedMarkdown, onUploadImage, setEditorError, setUploadInFlight]
   )
 
   const handleFileInput = useCallback(
@@ -295,7 +299,7 @@ export const useMarkdownEditorMediaTransfers = ({
       clearUploadError()
       const sizeError = validateMarkdownAttachmentSize(file)
       if (sizeError) {
-        setUploadError(sizeError)
+        setEditorError(sizeError)
         return
       }
 
@@ -304,7 +308,7 @@ export const useMarkdownEditorMediaTransfers = ({
       try {
         uploaded = await onUploadFile(file)
       } catch {
-        setUploadError(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
+        setEditorError(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
         return
       } finally {
         setUploadInFlight(-1)
@@ -312,12 +316,12 @@ export const useMarkdownEditorMediaTransfers = ({
 
       const resolved = resolveMarkdownAttachmentLink(uploaded, file.name)
       if ("error" in resolved) {
-        setUploadError(resolved.error)
+        setEditorError(resolved.error)
         return
       }
       insertUploadedMarkdown(resolved.markdown)
     },
-    [clearUploadError, insertUploadedMarkdown, onUploadFile, setUploadError, setUploadInFlight]
+    [clearUploadError, insertUploadedMarkdown, onUploadFile, setEditorError, setUploadInFlight]
   )
 
   const processTransferFiles = useCallback(
@@ -385,6 +389,21 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
+      const html = readClipboardHtml(event.clipboardData)
+      if (html !== null) {
+        const imported = convertSafeHtmlPasteToMarkdown(html)
+        event.preventDefault()
+        if (imported.kind === "error") {
+          setEditorError(imported.message)
+          return
+        }
+        if (imported.kind === "markdown") {
+          const { from, to } = resolveActiveSelection()
+          applyRecordedMarkdownMutation(planReplaceSelection(from, to, imported.markdown))
+        }
+        return
+      }
+
       const { from, to } = resolveActiveSelection()
       if (from === to) return
 
@@ -397,11 +416,13 @@ export const useMarkdownEditorMediaTransfers = ({
     },
     [
       applyPlannedMarkdownMutation,
+      applyRecordedMarkdownMutation,
       disabled,
       onUploadFile,
       onUploadImage,
       processTransferFiles,
       resolveActiveSelection,
+      setEditorError,
       uploadImageWithPlaceholder,
       valueRef,
     ]
