@@ -1645,6 +1645,108 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByRole("textbox", { name: "찾을 내용" })).toBeDisabled()
   })
 
+  test("line commands preserve selection and undo", async ({ page }) => {
+    const content = ["first", "second", "third"].join("\n")
+    await routeAuthenticatedEditor(page, content)
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    const selectedText = "eco"
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const start = element.value.indexOf("eco")
+      if (start < 0) throw new Error("line command fixture is missing")
+      element.focus()
+      element.setSelectionRange(start, start + "eco".length)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+
+    await textarea.evaluate((element) => {
+      element.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "ArrowDown",
+          altKey: true,
+          isComposing: true,
+        })
+      )
+    })
+    await expect(textarea).toHaveValue(content)
+
+    await page.getByRole("tab", { name: "Preview" }).click()
+    await page.keyboard.press("Alt+ArrowDown")
+    await expect(textarea).toHaveCount(0)
+    await page.getByRole("tab", { name: "Write" }).click()
+    await expect(textarea).toHaveValue(content)
+
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const start = element.value.indexOf("eco")
+      if (start < 0) throw new Error("line command fixture is missing after Preview")
+      element.focus()
+      element.setSelectionRange(start, start + "eco".length)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+
+    await textarea.press("Alt+ArrowDown")
+    await expect(textarea).toHaveValue(["first", "third", "second"].join("\n"))
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe(
+      selectedText
+    )
+
+    await textarea.press("Alt+Shift+ArrowDown")
+    await expect(textarea).toHaveValue(["first", "third", "second", "second"].join("\n"))
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe(
+      selectedText
+    )
+
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const caret = element.value.lastIndexOf("second") + 2
+      element.focus()
+      element.setSelectionRange(caret, caret)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    const duplicateCaret = await textarea.evaluate((element) => element.selectionStart)
+    await textarea.press(process.platform === "darwin" ? "Meta+Shift+k" : "Control+Shift+k")
+    const afterDelete = ["first", "third", "second"].join("\n")
+    await expect(textarea).toHaveValue(afterDelete)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([
+      afterDelete.length,
+      afterDelete.length,
+    ])
+
+    const undoShortcut = process.platform === "darwin" ? "Meta+z" : "Control+z"
+    const redoShortcut = process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z"
+    const findReplaceToggle = page.getByRole("button", { name: "찾기 및 바꾸기", exact: true })
+    await findReplaceToggle.click()
+    await expect(page.getByRole("region", { name: "찾기 및 바꾸기" })).toBeVisible()
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue(["first", "third", "second", "second"].join("\n"))
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([
+      duplicateCaret,
+      duplicateCaret,
+    ])
+    await expect(page.getByRole("region", { name: "찾기 및 바꾸기" })).toHaveCount(0)
+    await textarea.press(redoShortcut)
+    await expect(textarea).toHaveValue(afterDelete)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([
+      afterDelete.length,
+      afterDelete.length,
+    ])
+
+    await textarea.press("x")
+    await expect(textarea).toHaveValue(`${afterDelete}x`)
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue(afterDelete)
+
+    await textarea.fill("only")
+    await textarea.press(process.platform === "darwin" ? "Meta+Shift+k" : "Control+Shift+k")
+    await expect(textarea).toHaveValue("")
+    await textarea.press(process.platform === "darwin" ? "Meta+Shift+k" : "Control+Shift+k")
+    await expect(textarea).toHaveValue("")
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue("only")
+  })
+
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {
     await routeAuthenticatedEditor(page, ["alpha", "omega"].join("\n"))
     let uploadCalled = false

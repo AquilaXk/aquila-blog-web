@@ -7,7 +7,7 @@ export type PlannedTextMutation = {
 }
 
 /**
- * Programmatic textarea edits that preserve the browser native undo stack.
+ * Programmatic textarea edits through setRangeText with explicit selection restoration.
  * Prefer this over replacing React controlled `value` then restoring selection.
  */
 export const applyPlannedTextMutation = (
