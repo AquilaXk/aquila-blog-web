@@ -7,6 +7,7 @@ import {
   createUploadPlaceholderId,
   extractImageFileFromClipboard,
   findExactSubstringIndex,
+  hasClipboardHtml,
   isImageFile,
   listFilesFromDataTransfer,
   parseSingleHttpUrl,
@@ -17,6 +18,7 @@ import {
   planReplaceExactSubstring,
   planTransferFileReservations,
   readClipboardPlainText,
+  readClipboardHtml,
   resolvePasteMediaRoute,
   sanitizeUploadPlaceholderFileName,
   shouldAppendMissingPlaceholder,
@@ -128,6 +130,22 @@ test.describe("markdown editor paste/drop model", () => {
     expect(listFilesFromDataTransfer(transfer)).toEqual([pdf])
     expect(readClipboardPlainText(transfer)).toBe("https://example.com/docs")
     expect(readClipboardPlainText(null)).toBe("")
+  })
+
+  test("distinguishes absent HTML MIME from present empty HTML clipboard data", () => {
+    const plainOnly = {
+      types: ["text/plain"],
+      getData: (type: string) => (type === "text/plain" ? "plain" : ""),
+    } as unknown as DataTransfer
+    const htmlPresent = {
+      types: ["text/plain", "text/html"],
+      getData: (type: string) => (type === "text/html" ? "" : "https://example.com"),
+    } as unknown as DataTransfer
+
+    expect(hasClipboardHtml(plainOnly)).toBe(false)
+    expect(readClipboardHtml(plainOnly)).toBeNull()
+    expect(hasClipboardHtml(htmlPresent)).toBe(true)
+    expect(readClipboardHtml(htmlPresent)).toBe("")
   })
 
   test("parses a single http(s) URL and rejects mixed clipboard text", () => {

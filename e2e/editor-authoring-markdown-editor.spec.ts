@@ -1798,6 +1798,87 @@ test.describe("Markdown editor replacement", () => {
     expect(composingResult.value).toBe(composingResult.before)
   })
 
+  test("safe HTML paste replaces selection, preserves undo, and rejects active-only HTML", async ({ page }) => {
+    const source = "prefix target suffix"
+    const html = [
+      "<h2>Heading</h2>",
+      '<p>safe <strong>bold</strong> <a href="https://example.com/docs">docs</a> <a href="javascript:alert(1)">bad</a> <code>a`b</code></p>',
+      "<div>Hello <strong>world</strong>!</div>",
+      "<pre>line 1\nline 2</pre>",
+      "<p><strong>bold </strong><em>soft </em><s>gone </s>tail</p>",
+      "<ul><li>parent<ul><li>child</li></ul></li><li><div>one</div><div>two</div></li></ul>",
+      "<script>window.__htmlPasteActive = true</script>",
+    ].join("")
+    const imported = [
+      "## Heading",
+      "",
+      "safe **bold** [docs](https://example.com/docs) bad ``a`b``",
+      "",
+      "Hello **world**\\!",
+      "",
+      "line 1 line 2",
+      "",
+      "**bold** *soft* ~~gone~~ tail",
+      "",
+      "- parent",
+      "  - child",
+      "- one",
+      "",
+      "  two",
+    ].join("\n")
+    await routeAuthenticatedEditor(page, source)
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const start = element.value.indexOf("target")
+      element.focus()
+      element.setSelectionRange(start, start + "target".length)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    const paste = async (htmlValue: string, plainText: string) =>
+      textarea.evaluate((element, payload) => {
+        const clipboard = new DataTransfer()
+        clipboard.setData("text/html", payload.htmlValue)
+        clipboard.setData("text/plain", payload.plainText)
+        const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: clipboard })
+        element.dispatchEvent(event)
+        return event.defaultPrevented
+      }, { htmlValue, plainText })
+
+    expect(await paste(html, "https://plain.example.test/fallback")).toBe(true)
+    const expected = `prefix ${imported} suffix`
+    await expect(textarea).toHaveValue(expected)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([
+      "prefix ".length + imported.length,
+      "prefix ".length + imported.length,
+    ])
+    await expect(page.getByTestId("markdown-editor-preview-pane").locator("script")).toHaveCount(0)
+    expect(await page.evaluate(() => Boolean((window as unknown as { __htmlPasteActive?: boolean }).__htmlPasteActive))).toBe(false)
+    expect(await textarea.inputValue()).not.toContain("javascript:")
+    expect(await textarea.inputValue()).not.toContain("plain.example.test")
+
+    const undoShortcut = process.platform === "darwin" ? "Meta+z" : "Control+z"
+    const redoShortcut = process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z"
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue(source)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([7, 13])
+    await textarea.press(redoShortcut)
+    await expect(textarea).toHaveValue(expected)
+
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      element.focus()
+      element.setSelectionRange(0, 6)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    expect(await paste("<script>window.__htmlPasteActive = true</script>", "benign plain fallback")).toBe(true)
+    await expect(textarea).toHaveValue(expected)
+    await expect(page.getByTestId("markdown-editor").getByRole("alert")).toHaveText(
+      "붙여넣을 수 있는 안전한 HTML 내용이 없습니다."
+    )
+  })
+
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {
     await routeAuthenticatedEditor(page, ["alpha", "omega"].join("\n"))
     let uploadCalled = false
@@ -1807,8 +1888,8 @@ test.describe("Markdown editor replacement", () => {
         resultCode: "201-1",
         msg: "이미지가 업로드되었습니다.",
         data: {
-          key: "post-images/body-image.png",
-          url: "https://cdn.example.test/post-images/body-image.png",
+          key: "posts/body-image.png",
+          url: "http://127.0.0.1:3000/post/api/v1/images/posts/body-image.png",
         },
       })
     })
@@ -1836,12 +1917,12 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByText(/이미지 업로드 실패:/)).toHaveCount(0)
 
     const editorText = await textarea.inputValue()
-    const imageMarkdown = "![본문 이미지.png](https://cdn.example.test/post-images/body-image.png)"
+    const imageMarkdown = "![본문 이미지.png](http://127.0.0.1:3000/post/api/v1/images/posts/body-image.png)"
     expect(editorText).toContain(imageMarkdown)
     expect(editorText.indexOf(imageMarkdown)).toBeLessThan(editorText.indexOf("omega"))
     await expect(page.getByTestId("markdown-editor-preview-pane").locator("img")).toHaveAttribute(
       "src",
-      "https://cdn.example.test/post-images/body-image.png"
+      "http://127.0.0.1:3000/post/api/v1/images/posts/body-image.png"
     )
   })
 

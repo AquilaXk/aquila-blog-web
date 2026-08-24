@@ -144,6 +144,15 @@ export const readClipboardPlainText = (clipboardData: DataTransfer | null): stri
   return String(clipboardData.getData("text/plain") || "")
 }
 
+export const hasClipboardHtml = (clipboardData: DataTransfer | null): boolean =>
+  Boolean(clipboardData && Array.from(clipboardData.types || []).includes("text/html"))
+
+/** `null` means the HTML MIME type is absent; an empty string is present-but-invalid HTML. */
+export const readClipboardHtml = (clipboardData: DataTransfer | null): string | null => {
+  if (!hasClipboardHtml(clipboardData)) return null
+  return String(clipboardData?.getData("text/html") || "")
+}
+
 /** True when clipboard text is a single http(s) URL with no surrounding whitespace tokens. */
 export const parseSingleHttpUrl = (text: string): string | null => {
   const trimmed = text.trim()

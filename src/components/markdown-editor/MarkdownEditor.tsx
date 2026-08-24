@@ -590,10 +590,11 @@ export const MarkdownEditor = ({
       onUploadImage,
       onUploadFile,
       applyPlannedMarkdownMutation,
+      applyRecordedMarkdownMutation: applyRecordedMutation,
       applyBackgroundMarkdownMutation,
       resolveActiveSelection,
       setUploadInFlight,
-      setUploadError,
+      setEditorError: setUploadError,
       insertUploadedMarkdown,
     })
 
