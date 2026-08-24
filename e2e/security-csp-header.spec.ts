@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test"
-import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 
 type NextHeader = {
   key: string
@@ -134,16 +133,6 @@ test.describe("frontend security headers", () => {
         expect(remoteHosts).not.toContain(blockedPattern)
       }
     }
-  })
-
-  test("markdown image sanitizer rejects external placeholder providers only", () => {
-    const placeholderImageUrl = `https://${["placehold", "co"].join(".")}/600x600?text=U_U`
-    const placeholderSubdomainImageUrl = `https://img.${["placehold", "co"].join(".")}/600x600?text=U_U`
-    const supportedExternalImageUrl = "https://cdn.example.com/post-image.png"
-
-    expect(normalizeSafeMarkdownImageSrc(placeholderImageUrl)).toBe("")
-    expect(normalizeSafeMarkdownImageSrc(placeholderSubdomainImageUrl)).toBe("")
-    expect(normalizeSafeMarkdownImageSrc(supportedExternalImageUrl)).toBe(supportedExternalImageUrl)
   })
 
   test("CSP connect-src keeps documented local backend fallback available in development", async () => {

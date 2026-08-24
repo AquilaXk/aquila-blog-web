@@ -5,6 +5,7 @@ import {
   MARKDOWN_ATTACHMENT_MAX_BYTES,
   MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE,
   MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE,
+  MARKDOWN_IMAGE_URL_MISSING_MESSAGE,
   resolveMarkdownAttachmentLink,
   resolveMarkdownImageEmbed,
   validateMarkdownAttachmentSize,
@@ -58,17 +59,25 @@ test.describe("markdown editor attachment upload model", () => {
     })
   })
 
-  test("keeps the image embed contract for url-only image uploads", () => {
+  test("accepts only canonical post-image upload URLs", () => {
     expect(
       resolveMarkdownImageEmbed(
         {
-          url: "https://cdn.example.test/post-images/body.png",
+          url: "https://blog.aquilaxk.site/post/api/v1/images/posts/body.png",
         },
-        "body.png"
+        "body.png",
+        { publicApiOrigin: "https://blog.aquilaxk.site" },
       )
     ).toEqual({
-      markdown: "\n\n![body.png](https://cdn.example.test/post-images/body.png)\n",
+      markdown: "\n\n![body.png](https://blog.aquilaxk.site/post/api/v1/images/posts/body.png)\n",
     })
+    expect(
+      resolveMarkdownImageEmbed(
+        { url: "https://cdn.example.test/post-images/body.png" },
+        "body.png",
+        { publicApiOrigin: "https://blog.aquilaxk.site" },
+      ),
+    ).toEqual({ error: MARKDOWN_IMAGE_URL_MISSING_MESSAGE })
   })
 
   test("writer host forwards onFileUpload into MarkdownEditor onUploadFile", () => {

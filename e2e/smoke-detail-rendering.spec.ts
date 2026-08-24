@@ -58,7 +58,26 @@ test.describe("core smoke detail rendering", () => {
   })
 
   test("HTML-only trusted payload는 public detail의 단일 renderer에서 렌더된다", async ({ page }) => {
-    const contentHtml = "<p>신뢰된 HTML 전용 본문</p>"
+    const contentHtml = [
+      "<p>신뢰된 HTML 전용 본문</p>",
+      '<img src="https://cdn.example.invalid/trusted.png" alt="외부 HTML">',
+      '<img src="/post/api/v1/images/trusted.png" alt="정본 HTML">',
+    ].join("")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/trusted.png", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    await page.route("**/post/api/v1/images/trusted.png", async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
 
     await page.route("**/post/api/v1/posts/1645", async (route) => {
       await route.fulfill({
@@ -100,6 +119,130 @@ test.describe("core smoke detail rendering", () => {
 
     await expect(page.getByRole("heading", { name: "신뢰 HTML 본문" })).toBeVisible()
     await expect(page.locator(".aq-markdown")).toContainText("신뢰된 HTML 전용 본문")
+    await expect(page.getByRole("img", { name: "외부 HTML" })).toHaveCount(1)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/trusted.png"]')).toHaveCount(1)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(1)
+  })
+
+  test("bookmark thumbnail은 canonical post image만 요청한다", async ({ page }) => {
+    const content = [
+      '<!-- aq-bookmark {"thumbnailUrl":"https://cdn.example.invalid/bookmark.png"} -->',
+      ":::bookmark /posts/1",
+      "외부 카드",
+      ":::",
+      "",
+      '<!-- aq-bookmark {"thumbnailUrl":"/post/api/v1/images/bookmark.png"} -->',
+      ":::bookmark /posts/2",
+      "정본 카드",
+      ":::",
+    ].join("\n")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/bookmark.png", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    await page.route("**/post/api/v1/images/bookmark.png", async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
+    await page.route("**/post/api/v1/posts/1646", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1646,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "북마크 이미지 정책",
+          content,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          commentsCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+
+    await page.goto("/posts/1646")
+
+    await expect(page.locator(".aq-bookmark-card")).toHaveCount(2)
+    await expect(page.locator('.aq-bookmark-card img[src="https://cdn.example.invalid/bookmark.png"]')).toHaveCount(0)
+    await expect(page.locator('.aq-bookmark-card img[src="/post/api/v1/images/bookmark.png"]')).toHaveCount(1)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(1)
+  })
+
+  test("Markdown body와 detail thumbnail은 external image를 요청하지 않는다", async ({ page }) => {
+    const content = [
+      "본문 inline ![외부 inline](https://cdn.example.invalid/inline.png) 이미지",
+      "",
+      "![외부 standalone](https://cdn.example.invalid/standalone.png)",
+      "",
+      "![정본 body](/post/api/v1/images/body.png)",
+    ].join("\n")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/**", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    await page.route("**/post/api/v1/images/body.png", async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
+    await page.route("**/post/api/v1/posts/1647", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1647,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "Markdown 이미지 정책",
+          thumbnail: "https://cdn.example.invalid/header.png",
+          content,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          commentsCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+
+    await page.goto("/posts/1647")
+
+    await expect(page.getByRole("img", { name: "외부 inline" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "외부 standalone" })).toHaveCount(1)
+    await expect(page.locator('img[src="https://cdn.example.invalid/header.png"]')).toHaveCount(0)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/body.png"]')).toHaveCount(1)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(1)
   })
 
   test("상세 본문은 legacy inline code html을 인라인 코드로 정규화한다", async ({ page }) => {

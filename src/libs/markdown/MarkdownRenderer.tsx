@@ -130,7 +130,10 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         },
         img({ src, alt }) {
           const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
-          if (!imageSrc) return null
+          if (!imageSrc) {
+            const blockedLabel = alt || "차단된 이미지"
+            return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
+          }
           const isFirstImage = imageRenderOrderRef.current === 0
           imageRenderOrderRef.current += 1
 

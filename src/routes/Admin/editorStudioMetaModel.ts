@@ -1,4 +1,8 @@
 import { getApiBaseUrl } from "src/apis/backend/client"
+import {
+  hasNonCanonicalPostImageSource,
+  isCanonicalPostImageUploadUrl,
+} from "src/libs/markdown/postImageUrlPolicy"
 import { convertHtmlToMarkdown as convertHtmlClipboardToMarkdown } from "src/libs/markdown/htmlToMarkdown"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
@@ -113,27 +117,7 @@ export const computeContentFingerprint = (content: string): string => {
 }
 
 export const normalizeSafeImageUrl = (raw: string): string => {
-  const value = raw.trim()
-  if (!value) return ""
-
-  if (value.startsWith("/")) {
-    return value.startsWith("//") ? "" : value
-  }
-
-  if (value.startsWith("./") || value.startsWith("../")) {
-    return value
-  }
-
-  try {
-    const parsed = new URL(value)
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return parsed.toString()
-    }
-  } catch {
-    return ""
-  }
-
-  return ""
+  return isCanonicalPostImageUploadUrl(raw) ? raw.trim() : ""
 }
 
 const toSafePreviewThumbnailPath = (pathname: string, search: string): string => {
@@ -528,18 +512,21 @@ export const buildLocalDraftFingerprint = (payload: LocalDraftFingerprintPayload
   JSON.stringify(payload)
 
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
-  let inFence = false
+  let fenceMarker: "`" | "~" | null = null
 
   for (const rawLine of content.replace(/\r\n/g, "\n").split("\n")) {
     const trimmed = rawLine.trim()
     if (!trimmed) continue
 
-    if (/^```/.test(trimmed)) {
-      inFence = !inFence
+    const fenceMatch = trimmed.match(/^(`{3,}|~{3,})/)
+    if (fenceMatch) {
+      const nextMarker = fenceMatch[1][0] as "`" | "~"
+      if (!fenceMarker) fenceMarker = nextMarker
+      else if (fenceMarker === nextMarker) fenceMarker = null
       continue
     }
 
-    if (inFence || trimmed.startsWith(">")) continue
+    if (fenceMarker || trimmed.startsWith(">")) continue
 
     if (trimmed === EDITOR_BODY_PLACEHOLDER) {
       return "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
@@ -548,6 +535,10 @@ export const detectPublishPlaceholderIssue = (content: string): string | null =>
     if (trimmed === `:::toggle ${EDITOR_TOGGLE_TITLE_PLACEHOLDER}`) {
       return "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
     }
+  }
+
+  if (hasNonCanonicalPostImageSource(content)) {
+    return "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
   }
 
   return null

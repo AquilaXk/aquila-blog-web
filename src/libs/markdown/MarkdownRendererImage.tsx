@@ -20,7 +20,10 @@ export const MarkdownImageFigure = memo(
       ? ({ "--aq-image-width": `${effectiveWidthPx}px` } as CSSProperties)
       : undefined
 
-    if (!safeSrc) return null
+    if (!safeSrc) {
+      const blockedLabel = alt || "차단된 이미지"
+      return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
+    }
 
     return (
       <figure

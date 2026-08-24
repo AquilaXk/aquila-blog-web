@@ -2,6 +2,7 @@ import {
   extractNormalizedMermaidSource,
   normalizeEscapedMermaidFences,
 } from "src/libs/markdown/mermaid"
+import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
 
 const MERMAID_SOURCE_PATTERN =
@@ -375,3 +376,14 @@ export const shouldPreferMarkdownPipeline = (markdown: string) => {
   if (HAS_MERMAID_BLOCK_REGEX.test(markdown)) return true
   return HAS_FENCED_CODE_BLOCK_REGEX.test(markdown)
 }
+const getHtmlImageAttribute = (tag: string, attribute: string) => {
+  const match = tag.match(new RegExp(`\\b${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`, "i"))
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? ""
+}
+
+export const filterTrustedPostImageHtml = (html: string) => html.replace(/<img\b[^>]*>/gi, (tag) => {
+  const safeSrc = normalizePublicPostImageUrl(getHtmlImageAttribute(tag, "src"))
+  if (safeSrc) return tag.replace(/\bsrc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/i, `src="${safeSrc}"`)
+  const blockedLabel = getHtmlImageAttribute(tag, "alt") || "차단된 이미지"
+  return `<span class="aq-image-blocked" role="img" aria-label="${escapeHtmlAttribute(blockedLabel)}">${escapeHtml(blockedLabel)}</span>`
+})

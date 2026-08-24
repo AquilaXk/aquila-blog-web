@@ -12,6 +12,7 @@ import {
   parseThumbnailZoomFromUrl,
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
+import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 import { TPost } from "src/types"
 import { StyledWrapper } from "./PostHeader.styles"
 
@@ -81,7 +82,7 @@ const PostHeader: React.FC<Props> = ({
     data.modifiedTime && data.modifiedTime !== data.createdTime
       ? formatDateTime(data.modifiedTime, CONFIG.lang)
       : ""
-  const thumbnailSrc = data.thumbnail ? stripThumbnailFocusFromUrl(data.thumbnail) : ""
+  const thumbnailSrc = data.thumbnail ? normalizePublicPostImageUrl(stripThumbnailFocusFromUrl(data.thumbnail)) : ""
   const thumbnailFocusX = parseThumbnailFocusXFromUrl(data.thumbnail || "")
   const thumbnailFocusY = parseThumbnailFocusYFromUrl(data.thumbnail || "")
   const thumbnailZoom = parseThumbnailZoomFromUrl(data.thumbnail || "")

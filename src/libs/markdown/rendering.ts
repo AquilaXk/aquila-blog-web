@@ -1,6 +1,6 @@
 import { extractMarkdownTableLayouts } from "src/libs/markdown/tableMetadata"
 import { hashString } from "src/libs/markdown/renderingCodeModel"
-import { normalizeContentHtmlForMermaid } from "src/libs/markdown/renderingHtmlModel"
+import { filterTrustedPostImageHtml, normalizeContentHtmlForMermaid } from "src/libs/markdown/renderingHtmlModel"
 import { normalizeMarkdownForRender, parseMarkdownSegments } from "src/libs/markdown/renderingMarkdownModel"
 import type { MarkdownRenderModel } from "src/libs/markdown/renderingTypes"
 import type { TrustedContentHtml } from "src/types"
@@ -44,7 +44,7 @@ export const resolveMarkdownRenderModel = ({
   const normalizedContent = normalizeMarkdownForRender(content || "")
   const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
   const normalizedContentHtml = trustedContentHtml?.html.trim() || ""
-  const sanitizedContentHtml = normalizeContentHtmlForMermaid(normalizedContentHtml)
+  const sanitizedContentHtml = filterTrustedPostImageHtml(normalizeContentHtmlForMermaid(normalizedContentHtml))
 
   // 원문 markdown이 있으면 interactive block 책임은 항상 클라이언트 markdown 파이프라인에 둔다.
   const resolvedContentHtml = normalizedContent ? "" : sanitizedContentHtml
