@@ -51,16 +51,19 @@ const isInFencedCode = (value: string, selectionStart: number, selectionEnd: num
   isOffsetInsideFencedCodeBlock(value, selectionStart) ||
   (selectionEnd > selectionStart && isOffsetInsideFencedCodeBlock(value, selectionEnd - 1))
 
-const createsFenceAtLineStart = (value: string, selectionStart: number, key: string): boolean =>
-  key === "`" && isLineLeadingWhitespace(value, selectionStart)
+const isBacktickFenceContext = (value: string, selectionStart: number, key: string): boolean => {
+  if (key !== "`") return false
+  if (isLineLeadingWhitespace(value, selectionStart)) return true
+  const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1
+  return /^[ \t]*`/.test(value.slice(lineStart, selectionStart))
+}
 
 const canAutoPair = (value: string, selectionStart: number, selectionEnd: number, key: string): boolean =>
   hasValidSelection(value, selectionStart, selectionEnd) &&
   isSingleLineSelection(value, selectionStart, selectionEnd) &&
   !isInFencedCode(value, selectionStart, selectionEnd) &&
   !isEscapedAt(value, selectionStart) &&
-  !createsFenceAtLineStart(value, selectionStart, key) &&
-  !(key === "'" && isApostropheInsideWord(value, selectionStart, selectionEnd))
+  !isBacktickFenceContext(value, selectionStart, key)
 
 export const planMarkdownEditorAutoPairInsert = (
   value: string,
@@ -77,9 +80,10 @@ export const planMarkdownEditorAutoPairInsert = (
   const closer = OPEN_TO_CLOSE[key]
   if (!closer) return null
 
-  if (selectionStart === selectionEnd && value[selectionStart] === closer) {
+  if (selectionStart === selectionEnd && key === closer && value[selectionStart] === closer) {
     return { kind: "select", selectionStart: selectionStart + 1, selectionEnd: selectionStart + 1 }
   }
+  if (key === "'" && isApostropheInsideWord(value, selectionStart, selectionEnd)) return null
 
   const selected = value.slice(selectionStart, selectionEnd)
   return {
@@ -112,7 +116,7 @@ export const planMarkdownEditorAutoPairBackspace = (
   const opener = value[openerIndex]
   const closer = value[selectionStart]
   if (!opener || !closer || OPEN_TO_CLOSE[opener] !== closer || isEscapedAt(value, openerIndex)) return null
-  if (opener === "`" && isLineLeadingWhitespace(value, openerIndex)) return null
+  if (isBacktickFenceContext(value, selectionStart, opener)) return null
 
   return {
     kind: "mutation",

@@ -21,6 +21,16 @@ test.describe("markdown editor auto pair model", () => {
       selectionStart: 4,
       selectionEnd: 4,
     })
+    expect(planMarkdownEditorAutoPairInsert("()", 1, 1, "(")).toEqual({
+      kind: "mutation",
+      mutation: {
+        rangeStart: 1,
+        rangeEnd: 1,
+        replacement: "()",
+        selectionStart: 2,
+        selectionEnd: 2,
+      },
+    })
   })
 
   test("wraps a single-line selection while preserving its inner selection", () => {
@@ -87,6 +97,13 @@ test.describe("markdown editor auto pair model", () => {
     expect(planMarkdownEditorAutoPairInsert("   ", 3, 3, "`")).toBeNull()
     expect(planMarkdownEditorAutoPairInsert("cant", 3, 3, "'")).toBeNull()
     expect(planMarkdownEditorAutoPairInsert("can", 3, 3, "'")).toBeNull()
+    expect(planMarkdownEditorAutoPairInsert("can''", 3, 3, "'")).toEqual({
+      kind: "select",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+    expect(planMarkdownEditorAutoPairInsert(" `", 2, 2, "`")).toBeNull()
+    expect(planMarkdownEditorAutoPairInsert("`", 1, 1, "`")).toBeNull()
     expect(planMarkdownEditorAutoPairInsert("text", 2, 2, "Escape")).toBeNull()
   })
 })
