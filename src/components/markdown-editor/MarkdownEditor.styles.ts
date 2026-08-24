@@ -137,6 +137,83 @@ export const ToolbarError = styled.div`
   font-weight: 600;
 `
 
+export const FindReplaceRegion = styled.section`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+`
+
+export const FindReplaceField = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: ${({ theme }) => theme.colors.gray10};
+  font-size: 12px;
+  font-weight: 700;
+`
+
+export const FindReplaceInput = styled.input`
+  width: 132px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  border-radius: 4px;
+  padding: 0 8px;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+  color: ${({ theme }) => theme.colors.gray12};
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.blue8};
+    outline-offset: 1px;
+  }
+`
+
+export const FindReplaceCheckbox = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: ${({ theme }) => theme.colors.gray10};
+  font-size: 12px;
+  font-weight: 700;
+`
+
+export const FindReplaceStatus = styled.output`
+  color: ${({ theme }) => theme.colors.gray10};
+  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+`
+
+export const FindReplaceActions = styled.div`
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  button {
+    height: 30px;
+    border: 1px solid ${({ theme }) => theme.colors.gray6};
+    border-radius: 4px;
+    padding: 0 8px;
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
+    color: ${({ theme }) => theme.colors.gray10};
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.blue8};
+    outline-offset: 1px;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+`
+
 export const EditorBody = styled.div`
   flex: 1 1 auto;
   min-width: 0;

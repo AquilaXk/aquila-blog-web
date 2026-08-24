@@ -42,6 +42,8 @@ import {
   planMarkdownEditorTableEdit,
   type MarkdownEditorTableEdit,
 } from "./markdownEditorTableModel"
+import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
+import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
 import {
   emptyPendingToolbarInsertQueue,
   queuePendingToolbarInsert,
@@ -123,6 +125,7 @@ export const MarkdownEditor = ({
   const modeRef = useRef<MarkdownEditorMode>(mode)
   const pendingBodyFocusRef = useRef(false)
   const pendingToolbarInsertQueueRef = useRef<PendingToolbarInsertQueue>(emptyPendingToolbarInsertQueue())
+  const pendingFindReplaceInvalidationRef = useRef(false)
   modeRef.current = mode
 
   const setUploadInFlight = useCallback(
@@ -145,6 +148,7 @@ export const MarkdownEditor = ({
     valueRef.current = value
     setDraftValue(value)
     setActiveTableSelection(null)
+    pendingFindReplaceInvalidationRef.current = true
     // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
@@ -202,18 +206,6 @@ export const MarkdownEditor = ({
     )
   }, [])
 
-  const rememberTextareaSelection = useCallback(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return selectionRef.current
-
-    selectionRef.current = {
-      from: textarea.selectionStart,
-      to: textarea.selectionEnd,
-    }
-    updateActiveTableSelection(valueRef.current, selectionRef.current)
-    return selectionRef.current
-  }, [updateActiveTableSelection])
-
   const setTextareaSelection = useCallback((from: number, to = from) => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -250,6 +242,53 @@ export const MarkdownEditor = ({
     },
     [commitMarkdown, disabled, updateActiveTableSelection]
   )
+
+  const readEditorSnapshot = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return null
+    return {
+      documentValue: textarea.value,
+      selection: { from: textarea.selectionStart, to: textarea.selectionEnd },
+    }
+  }, [])
+
+  const findReplace = useMarkdownEditorFindReplace({
+    disabled,
+    preview: mode === "preview",
+    draftValue,
+    readSnapshot: readEditorSnapshot,
+    selectRange: setTextareaSelection,
+    applyMutation: applyMutationPlan,
+  })
+  const {
+    closePanel: closeFindReplacePanel,
+    handleUndoRedo: handleFindReplaceUndoRedo,
+    invalidate: invalidateFindReplace,
+    onSelectionChange: handleFindReplaceSelectionChange,
+  } = findReplace
+
+  useEffect(() => {
+    if (!pendingFindReplaceInvalidationRef.current) return
+    pendingFindReplaceInvalidationRef.current = false
+    invalidateFindReplace(true)
+  }, [invalidateFindReplace, value])
+
+  useEffect(() => {
+    if (mode === "preview") closeFindReplacePanel()
+  }, [closeFindReplacePanel, mode])
+
+  const rememberTextareaSelection = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return selectionRef.current
+
+    selectionRef.current = {
+      from: textarea.selectionStart,
+      to: textarea.selectionEnd,
+    }
+    handleFindReplaceSelectionChange(selectionRef.current)
+    updateActiveTableSelection(valueRef.current, selectionRef.current)
+    return selectionRef.current
+  }, [handleFindReplaceSelectionChange, updateActiveTableSelection])
 
   const { handleWriteScroll, handlePreviewScroll, handlePreviewWheel } = useMarkdownEditorScrollSync({
     textareaRef,
@@ -539,6 +578,17 @@ export const MarkdownEditor = ({
     onRequestSave,
   })
 
+  const handleFindReplaceTextareaKeyDown = useCallback(
+    (event: Parameters<typeof handleTextareaKeyDown>[0]) => {
+      if (handleFindReplaceUndoRedo(event)) {
+        event.preventDefault()
+        return
+      }
+      handleTextareaKeyDown(event)
+    },
+    [handleFindReplaceUndoRedo, handleTextareaKeyDown]
+  )
+
   return (
     <EditorRoot data-testid="markdown-editor">
       <EditorToolbar aria-label="Markdown 작성 도구">
@@ -659,6 +709,16 @@ export const MarkdownEditor = ({
           >
             Link
           </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            aria-label="찾기 및 바꾸기"
+            title="찾기 및 바꾸기"
+            disabled={disabled || mode === "preview"}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={findReplace.open}
+          >
+            찾기
+          </ToolbarButton>
         </ToolbarGroup>
         <MarkdownEditorModeTabs
           mode={mode}
@@ -671,6 +731,26 @@ export const MarkdownEditor = ({
         />
       </EditorToolbar>
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
+      {findReplace.panel && mode !== "preview" ? (
+        <MarkdownEditorFindReplace
+          caseSensitive={findReplace.caseSensitive}
+          currentMatch={findReplace.currentMatch}
+          disabled={findReplace.panelDisabled}
+          onCaseSensitiveChange={findReplace.updateCaseSensitive}
+          onClose={findReplace.closePanel}
+          onNext={() => findReplace.move("next")}
+          onPrevious={() => findReplace.move("previous")}
+          onQueryChange={findReplace.updateQuery}
+          onReplaceAll={findReplace.replaceAll}
+          onReplaceCurrent={findReplace.replaceCurrent}
+          onReplacementChange={findReplace.updateReplacement}
+          replacement={findReplace.replacement}
+          replaceCurrentDisabled={findReplace.replaceCurrentDisabled}
+          scopeLabel={findReplace.panel.scope ? "선택 영역" : "전체 문서"}
+          totalMatches={findReplace.totalMatches}
+          query={findReplace.query}
+        />
+      ) : null}
       <EditorBody data-mode={mode}>
         {mode !== "preview" ? (
           <WritePane
@@ -695,10 +775,11 @@ export const MarkdownEditor = ({
                     to: event.currentTarget.selectionEnd,
                   }
                   updateActiveTableSelection(event.currentTarget.value, selectionRef.current)
+                  invalidateFindReplace()
                   commitMarkdown(event.currentTarget.value, true)
                 }}
                 onFocus={rememberTextareaSelection}
-                onKeyDown={handleTextareaKeyDown}
+                onKeyDown={handleFindReplaceTextareaKeyDown}
                 onKeyUp={rememberTextareaSelection}
                 onMouseUp={rememberTextareaSelection}
                 onSelect={rememberTextareaSelection}
