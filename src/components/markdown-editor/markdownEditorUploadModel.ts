@@ -1,3 +1,5 @@
+import { isCanonicalPostImageUploadUrl } from "src/libs/markdown/postImageUrlPolicy"
+
 export const MARKDOWN_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
 export const MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE = "첨부 파일은 10MB 이하여야 합니다."
@@ -47,10 +49,11 @@ export const resolveMarkdownAttachmentLink = (
 
 export const resolveMarkdownImageEmbed = (
   uploaded: MarkdownImageUploadResult,
-  fallbackName: string
+  fallbackName: string,
+  options?: { publicApiOrigin?: string },
 ): { markdown: string } | { error: string } => {
   const src = String(uploaded.url || uploaded.src || "").trim()
-  if (!src) {
+  if (!src || !isCanonicalPostImageUploadUrl(src, options)) {
     return { error: MARKDOWN_IMAGE_URL_MISSING_MESSAGE }
   }
 

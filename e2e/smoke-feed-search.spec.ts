@@ -88,6 +88,7 @@ test.describe("core smoke feed and search", () => {
 })
 
   test("피드 카드 thumbnail 로드 실패는 빈 사각형 대신 fallback cover를 렌더한다", async ({ page }) => {
+  let externalImageRequests = 0
   await mockFeedEndpoints(page)
   await page.route("**/post/api/v1/posts/feed**", async (route) => {
     await route.fulfill({
@@ -98,13 +99,17 @@ test.describe("core smoke feed and search", () => {
       ),
     })
   })
-  await page.route("https://cdn.example.invalid/broken.png", async (route) => route.abort("failed"))
+  await page.route("https://cdn.example.invalid/broken.png", async (route) => {
+    externalImageRequests += 1
+    await route.abort("blockedbyclient")
+  })
 
   await page.goto("/")
 
   const firstCard = page.locator('[data-ui="feed-post-card"]').first()
   await expect(firstCard.locator(".imageFallback")).toBeVisible()
   await expect(firstCard.locator(".imageFallback")).toContainText("깨진 썸네일 fallback")
+  expect(externalImageRequests).toBe(0)
 })
 
   test("피드 카드는 빈 summary/category placeholder를 실제 데이터처럼 렌더링하지 않는다", async ({ page }) => {

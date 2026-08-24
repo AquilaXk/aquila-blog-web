@@ -14,6 +14,7 @@ import {
   parseThumbnailZoomFromUrl,
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
+import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 
 type Props = {
   data: TPost
@@ -51,7 +52,7 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular", index = 0 }) => {
   const { thumbnailSrc, thumbnailFocusX, thumbnailFocusY, thumbnailZoom } = useMemo(() => {
     const rawThumbnail = data.thumbnail || ""
     return {
-      thumbnailSrc: rawThumbnail ? stripThumbnailFocusFromUrl(rawThumbnail) : "",
+      thumbnailSrc: rawThumbnail ? normalizePublicPostImageUrl(stripThumbnailFocusFromUrl(rawThumbnail)) : "",
       thumbnailFocusX: parseThumbnailFocusXFromUrl(rawThumbnail),
       thumbnailFocusY: parseThumbnailFocusYFromUrl(rawThumbnail),
       thumbnailZoom: parseThumbnailZoomFromUrl(rawThumbnail),

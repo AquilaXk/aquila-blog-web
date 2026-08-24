@@ -15,7 +15,7 @@ const createAdaptivityExplorePage = () => {
   const page = createExplorePage("adaptivity 카드 overflow 회귀 점검")
   page.content = page.content.map((item) => ({
     ...item,
-    thumbnail: "/avatar.png",
+    thumbnail: "/post/api/v1/images/avatar.png",
   }))
   return page
 }

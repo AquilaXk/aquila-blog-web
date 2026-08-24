@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import type { MarkdownSegment } from "src/libs/markdown/rendering"
 import FormulaRender from "src/libs/markdown/FormulaRender"
 import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
+import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 import type { MarkdownImageWidthCommitPayload } from "src/libs/markdown/MarkdownRenderer.types"
 import { formatReadableFileSize, inferLinkProvider, resolveEmbedPreviewUrl } from "src/libs/unfurl/extractMeta"
 
@@ -57,13 +58,14 @@ export const renderMarkdownSegment = ({
 
   if (segment.type === "bookmark") {
     const providerLabel = segment.provider || segment.siteName || inferLinkProvider(segment.url)
+    const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
     return (
       <div key={`bookmark-${index}`} className="aq-bookmark-card">
         <a href={segment.url} target="_blank" rel="noreferrer">
-          {segment.thumbnailUrl ? (
+          {thumbnailSrc ? (
             <div className="aq-link-card-thumb" aria-hidden="true">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={segment.thumbnailUrl} alt="" loading="lazy" decoding="async" />
+              <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
             </div>
           ) : null}
           <div className="aq-link-card-copy">
@@ -80,6 +82,7 @@ export const renderMarkdownSegment = ({
   if (segment.type === "embed") {
     const previewUrl = segment.embedUrl || resolveEmbedPreviewUrl(segment.url)
     const providerLabel = segment.provider || segment.siteName || inferLinkProvider(segment.url)
+    const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
     return (
       <div key={`embed-${index}`} className="aq-embed-card">
         <div className="aq-embed-header">
@@ -106,10 +109,10 @@ export const renderMarkdownSegment = ({
             <p>이 사이트는 인라인 임베드를 지원하지 않아 링크 카드로 대체했습니다.</p>
           </div>
         )}
-        {segment.thumbnailUrl && !previewUrl ? (
+        {thumbnailSrc && !previewUrl ? (
           <div className="aq-embed-thumb" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={segment.thumbnailUrl} alt="" loading="lazy" decoding="async" />
+            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
           </div>
         ) : null}
         {segment.caption ? <p className="aq-embed-caption">{segment.caption}</p> : null}
