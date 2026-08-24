@@ -1,56 +1,12 @@
 import type { CalloutKind, MarkdownSegment } from "src/libs/markdown/renderingTypes"
+import { getCallout, resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "src/libs/markdown/calloutRegistry"
 import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
-
-const CALLOUT_KIND_MAP: Record<string, CalloutKind> = {
-  TIP: "tip",
-  INFO: "info",
-  NOTE: "info",
-  WARNING: "warning",
-  CAUTION: "warning",
-  OUTLINE: "outline",
-  EXAMPLE: "example",
-  SUMMARY: "summary",
-  IMPORTANT: "summary",
-}
-
-// 패밀리룩(1224): 콜아웃 표시 글리프를 이모지 → 모노 텍스트 마커로. (작성 시
-// 이모지로 콜아웃을 만드는 CALLOUT_EMOJI_MAP 파싱은 그대로 유지)
-const CALLOUT_EMOJI_BY_KIND: Record<CalloutKind, string> = {
-  tip: "T",
-  info: "i",
-  warning: "!",
-  outline: "≡",
-  example: "✓",
-  summary: "§",
-}
-
-const CALLOUT_EMOJI_MAP: Array<{ marker: string; kind: CalloutKind }> = [
-  { marker: "💡", kind: "tip" },
-  { marker: "✨", kind: "tip" },
-  { marker: "ℹ️", kind: "info" },
-  { marker: "ℹ", kind: "info" },
-  { marker: "⚠️", kind: "warning" },
-  { marker: "⚠", kind: "warning" },
-  { marker: "🚨", kind: "warning" },
-  { marker: "❗", kind: "warning" },
-  { marker: "⛔", kind: "warning" },
-  { marker: "📋", kind: "outline" },
-  { marker: "📝", kind: "outline" },
-  { marker: "📌", kind: "outline" },
-  { marker: "🗒️", kind: "outline" },
-  { marker: "✅", kind: "example" },
-  { marker: "✔️", kind: "example" },
-  { marker: "☑️", kind: "example" },
-  { marker: "📚", kind: "summary" },
-  { marker: "🧾", kind: "summary" },
-]
 
 type ParsedCalloutHeader = {
   kind: CalloutKind
   title: string
   emoji: string
-  label?: string
 }
 
 const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
@@ -58,26 +14,37 @@ const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   if (!line) return null
 
   const blockquoteMatch = line.match(/^\[!([A-Za-z]+)\](?:\s*(.*))?$/)
-  const rawKind = blockquoteMatch?.[1]?.toUpperCase() || ""
   if (blockquoteMatch) {
-    const mappedKind = CALLOUT_KIND_MAP[rawKind] || "info"
+    const blockquoteCallout = resolveCalloutBlockquote(blockquoteMatch[1] || "")
+    if (!blockquoteCallout) return null
     const customTitle = blockquoteMatch?.[2]?.trim() || ""
     return {
-      kind: mappedKind,
+      kind: blockquoteCallout.kind,
       title: customTitle,
-      emoji: CALLOUT_EMOJI_BY_KIND[mappedKind],
-      ...(CALLOUT_KIND_MAP[rawKind] ? {} : { label: rawKind }),
+      emoji: blockquoteCallout.callout.marker,
     }
   }
 
-  const emojiMatch = CALLOUT_EMOJI_MAP.find(({ marker }) => line === marker || line.startsWith(`${marker} `))
-  if (!emojiMatch) return null
-
-  const inlineTitle = line.slice(emojiMatch.marker.length).trim()
+  const legacyMatch = resolveCalloutLegacyEmoji(line)
+  if (!legacyMatch) return null
+  const inlineTitle = line.slice(legacyMatch.emoji.length).trim()
   return {
-    kind: emojiMatch.kind,
+    kind: legacyMatch.kind,
     title: inlineTitle,
-    emoji: CALLOUT_EMOJI_BY_KIND[emojiMatch.kind],
+    emoji: legacyMatch.callout.marker,
+  }
+}
+
+const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
+  const header = parseCalloutHeader(raw)
+  if (header) return header
+
+  const blockquoteMatch = raw.trim().match(/^\[!([A-Za-z]+)\](?:\s*(.*))?$/)
+  if (!blockquoteMatch) return null
+  return {
+    kind: "info",
+    title: blockquoteMatch[2]?.trim() || "",
+    emoji: infoCalloutMarker,
   }
 }
 
@@ -131,7 +98,6 @@ const buildCalloutSegment = (
     title: resolvedTitle,
     emoji: header.emoji,
     content: promoted.bodyLines.join("\n").trim() || "내용을 입력하세요.",
-    ...(header.label ? { label: header.label } : {}),
   }
 }
 
@@ -151,6 +117,7 @@ const CARD_METADATA_COMMENT_PATTERN =
   /^\s*<!--\s*aq-(bookmark|embed|file)\s+(\{[\s\S]*\})\s*-->\s*$/
 
 const FORMULA_BLOCK_START_PATTERN = /^\s*\$\$\s*$/
+const infoCalloutMarker = getCallout("info").marker
 
 const normalizeOptionalCardUrl = (value: unknown): string | undefined => {
   if (typeof value !== "string" || !value.trim()) return undefined
@@ -436,7 +403,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
         const normalizedBodyLines = bodyLines
           .map((row) => row.replace(/^\s+|\s+$/g, ""))
         const firstContentIndex = normalizedBodyLines.findIndex((row) => row.length > 0)
-        const header = firstContentIndex >= 0 ? parseCalloutHeader(normalizedBodyLines[firstContentIndex]) : null
+        const header = firstContentIndex >= 0 ? parseAsideCalloutHeader(normalizedBodyLines[firstContentIndex]) : null
 
         flushMarkdown()
         if (header) {
@@ -446,7 +413,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
             type: "callout",
             kind: "info",
             title: "",
-            emoji: CALLOUT_EMOJI_BY_KIND.info,
+            emoji: infoCalloutMarker,
             content: normalizedBodyLines.join("\n").trim() || "내용을 입력하세요.",
           })
         }
