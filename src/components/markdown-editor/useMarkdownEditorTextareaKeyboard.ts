@@ -10,6 +10,10 @@ import {
   resolveMarkdownEditorLineCommand,
 } from "./markdownEditorKeyboardModel"
 import { planMarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
+import {
+  planMarkdownEditorAutoPairBackspace,
+  planMarkdownEditorAutoPairInsert,
+} from "./markdownEditorAutoPairModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
@@ -23,7 +27,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   allowNativeTabAfterEscapeRef: MutableRefObject<boolean>
   rememberTextareaSelection: () => TextareaSelection
   applyMutationPlan: (plan: PlannedTextMutation) => boolean
-  applyLineCommandMutation: (plan: PlannedTextMutation) => boolean
+  applyRecordedMutation: (plan: PlannedTextMutation) => boolean
   setTextareaSelection: (from: number, to?: number) => void
   onRequestSave?: () => void
 }
@@ -34,7 +38,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   allowNativeTabAfterEscapeRef,
   rememberTextareaSelection,
   applyMutationPlan,
-  applyLineCommandMutation,
+  applyRecordedMutation,
   setTextareaSelection,
   onRequestSave,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
@@ -116,10 +120,28 @@ export const useMarkdownEditorTextareaKeyboard = ({
       event.preventDefault()
       const { from, to } = rememberTextareaSelection()
       const plan = planMarkdownEditorLineCommand(valueRef.current, from, to, command)
-      if (plan) applyLineCommandMutation(plan)
+      if (plan) applyRecordedMutation(plan)
       return true
     },
-    [applyLineCommandMutation, rememberTextareaSelection, valueRef]
+    [applyRecordedMutation, rememberTextareaSelection, valueRef]
+  )
+
+  const handleAutoPairKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return false
+
+      const { from, to } = rememberTextareaSelection()
+      const action = event.key === "Backspace"
+        ? planMarkdownEditorAutoPairBackspace(valueRef.current, from, to)
+        : planMarkdownEditorAutoPairInsert(valueRef.current, from, to, event.key)
+      if (!action) return false
+
+      event.preventDefault()
+      if (action.kind === "mutation") applyRecordedMutation(action.mutation)
+      else setTextareaSelection(action.selectionStart, action.selectionEnd)
+      return true
+    },
+    [applyRecordedMutation, rememberTextareaSelection, setTextareaSelection, valueRef]
   )
 
   const handleHomeEndKeyDown = useCallback(
@@ -160,6 +182,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (handleSaveShortcutKeyDown(event)) return
       if (handleFormatShortcutKeyDown(event)) return
       if (handleLineCommandKeyDown(event)) return
+      if (handleAutoPairKeyDown(event)) return
       handleHomeEndKeyDown(event)
     },
     [
@@ -169,6 +192,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       handleFormatShortcutKeyDown,
       handleHomeEndKeyDown,
       handleLineCommandKeyDown,
+      handleAutoPairKeyDown,
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
     ]

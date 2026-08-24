@@ -88,7 +88,7 @@ type TextareaSelection = {
 }
 
 const TEXTAREA_KEYBOARD_HELP =
-  `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
+  `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
 
 export const MarkdownEditor = ({
   value,
@@ -603,7 +603,7 @@ export const MarkdownEditor = ({
     allowNativeTabAfterEscapeRef,
     rememberTextareaSelection,
     applyMutationPlan,
-    applyLineCommandMutation: applyRecordedMutation,
+    applyRecordedMutation,
     setTextareaSelection,
     onRequestSave,
   })
