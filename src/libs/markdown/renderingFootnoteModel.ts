@@ -1,6 +1,8 @@
 import { gfmToMarkdown } from "mdast-util-gfm"
+import { mathToMarkdown } from "mdast-util-math"
 import { toMarkdown } from "mdast-util-to-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
 import remarkParse from "remark-parse"
 import { hashString } from "src/libs/markdown/renderingCodeModel"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
@@ -17,6 +19,7 @@ type MarkdownCapableSegment = Extract<MarkdownSegment, { content: string }>
 type ParsedSegment = { index: number; segment: MarkdownCapableSegment; tree: MarkdownAstNode }
 type DefinitionRecord = { node: MarkdownAstNode }
 type ReferenceRecord = { segmentIndex: number; node: MarkdownAstNode }
+type CombinedSegmentRange = { segmentIndex: number; start: number; end: number }
 type SourcePatch = { start: number; end: number; replacement: string }
 
 export type MarkdownFootnote = Readonly<{
@@ -35,6 +38,10 @@ export type DocumentFootnoteModel = Readonly<{
 
 const footnoteTargetId = (number: number) => `aq-footnote-${number}`
 const footnoteReferenceId = (number: number, occurrence: number) => `aq-footnote-ref-${number}-${occurrence}`
+const combinedSegmentBoundary = "\n\n---\n\n"
+
+const parseMarkdownAst = (markdown: string) =>
+  unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(markdown) as MarkdownAstNode
 
 const getOffsets = (node: MarkdownAstNode) => {
   const start = node.position?.start.offset
@@ -45,9 +52,9 @@ const getOffsets = (node: MarkdownAstNode) => {
 const isMarkdownCapableSegment = (segment: MarkdownSegment): segment is MarkdownCapableSegment =>
   segment.type === "markdown" || segment.type === "toggle" || segment.type === "callout"
 
-const visitDefinitionNodes = (node: MarkdownAstNode, callback: (candidate: MarkdownAstNode) => void) => {
-  if (node.type === "footnoteDefinition") callback(node)
-  node.children?.forEach((child) => visitDefinitionNodes(child, callback))
+const visitNodes = (node: MarkdownAstNode, callback: (candidate: MarkdownAstNode) => void) => {
+  callback(node)
+  node.children?.forEach((child) => visitNodes(child, callback))
 }
 
 const visitRootVisibleNodes = (node: MarkdownAstNode, callback: (candidate: MarkdownAstNode) => void) => {
@@ -61,11 +68,13 @@ const applySourcePatches = (markdown: string, patches: SourcePatch[]) =>
     .sort((left, right) => right.start - left.start)
     .reduce((result, patch) => `${result.slice(0, patch.start)}${patch.replacement}${result.slice(patch.end)}`, markdown)
 
+const markdownExtensions = [gfmToMarkdown(), mathToMarkdown()]
+
 const serializeDefinitionContent = (definition: MarkdownAstNode) =>
   (definition.children || [])
     .map((child) =>
       toMarkdown({ type: "root", children: [child] } as Parameters<typeof toMarkdown>[0], {
-        extensions: [gfmToMarkdown()],
+        extensions: markdownExtensions,
       }).trim()
     )
     .filter(Boolean)
@@ -73,8 +82,43 @@ const serializeDefinitionContent = (definition: MarkdownAstNode) =>
 
 const serializeDefinition = (definition: MarkdownAstNode) =>
   toMarkdown({ type: "root", children: [definition] } as Parameters<typeof toMarkdown>[0], {
-    extensions: [gfmToMarkdown()],
+    extensions: markdownExtensions,
   }).trim()
+
+const collectReferencedDefinitionIdentifiers = (definition: MarkdownAstNode) => {
+  const identifiers = new Set<string>()
+  visitNodes(definition, (node) => {
+    if (node.type === "linkReference" && node.identifier) {
+      identifiers.add(node.identifier)
+    }
+  })
+  return identifiers
+}
+
+const appendReferencedDefinitions = (
+  content: string,
+  definition: MarkdownAstNode,
+  ordinaryDefinitions: ReadonlyMap<string, DefinitionRecord>
+) => {
+  const supportingDefinitions = [...collectReferencedDefinitionIdentifiers(definition)]
+    .map((identifier) => ordinaryDefinitions.get(identifier)?.node)
+    .filter((node): node is MarkdownAstNode => Boolean(node))
+    .map(serializeDefinition)
+    .filter(Boolean)
+  return [content, ...supportingDefinitions].filter(Boolean).join("\n\n")
+}
+
+const buildCombinedSource = (parsedSegments: ParsedSegment[]) => {
+  const ranges: CombinedSegmentRange[] = []
+  let combinedSource = ""
+  parsedSegments.forEach((parsed, index) => {
+    if (index > 0) combinedSource += combinedSegmentBoundary
+    const start = combinedSource.length
+    combinedSource += parsed.segment.content
+    ranges.push({ segmentIndex: parsed.index, start, end: combinedSource.length })
+  })
+  return { combinedSource, ranges }
+}
 
 export const createDocumentFootnoteModel = ({
   source,
@@ -86,38 +130,44 @@ export const createDocumentFootnoteModel = ({
   const marker = `aq-footnote:${source.length}:${hashString(source)}`
   const parsedSegments: ParsedSegment[] = segments.flatMap((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return []
-    return [{
-      index,
-      segment,
-      tree: unified().use(remarkParse).use(remarkGfm).parse(segment.content) as MarkdownAstNode,
-    }]
+    return [{ index, segment, tree: parseMarkdownAst(segment.content) }]
   })
-  const definitions = new Map<string, DefinitionRecord>()
+  const footnoteDefinitions = new Map<string, DefinitionRecord>()
+  const ordinaryDefinitions = new Map<string, DefinitionRecord>()
   const references: ReferenceRecord[] = []
 
   for (const parsed of parsedSegments) {
-    visitDefinitionNodes(parsed.tree, (node) => {
-      if (node.identifier && !definitions.has(node.identifier)) definitions.set(node.identifier, { node })
-    })
-  }
-
-  const registryDefinitionMarkdown = [...definitions.values()]
-    .map(({ node }) => serializeDefinition(node))
-    .filter(Boolean)
-    .join("\n\n")
-  for (const parsed of parsedSegments) {
-    const originalLength = parsed.segment.content.length
-    const tree = unified()
-      .use(remarkParse)
-      .use(remarkGfm)
-      .parse(`${parsed.segment.content}\n\n${registryDefinitionMarkdown}`) as MarkdownAstNode
-    visitRootVisibleNodes(tree, (node) => {
-      const offsets = getOffsets(node)
-      if (node.type === "footnoteReference" && node.identifier && offsets && offsets.end <= originalLength) {
-        references.push({ segmentIndex: parsed.index, node })
+    visitNodes(parsed.tree, (node) => {
+      if (node.type === "footnoteDefinition" && node.identifier && !footnoteDefinitions.has(node.identifier)) {
+        footnoteDefinitions.set(node.identifier, { node })
+      }
+      if (node.type === "definition" && node.identifier && !ordinaryDefinitions.has(node.identifier)) {
+        ordinaryDefinitions.set(node.identifier, { node })
       }
     })
   }
+
+  const { combinedSource, ranges } = buildCombinedSource(parsedSegments)
+  const combinedTree = parseMarkdownAst(combinedSource)
+  let rangeCursor = 0
+  visitRootVisibleNodes(combinedTree, (node) => {
+    if (node.type !== "footnoteReference" || !node.identifier) return
+    const offsets = getOffsets(node)
+    if (!offsets) return
+    while (rangeCursor < ranges.length && offsets.start >= ranges[rangeCursor].end) rangeCursor += 1
+    const range = ranges[rangeCursor]
+    if (!range || offsets.start < range.start || offsets.end > range.end) return
+    references.push({
+      segmentIndex: range.segmentIndex,
+      node: {
+        ...node,
+        position: {
+          start: { offset: offsets.start - range.start },
+          end: { offset: offsets.end - range.start },
+        },
+      },
+    })
+  })
 
   const patchesBySegment = new Map<number, SourcePatch[]>()
   const addPatch = (segmentIndex: number, patch: SourcePatch) => {
@@ -126,7 +176,8 @@ export const createDocumentFootnoteModel = ({
     patchesBySegment.set(segmentIndex, patches)
   }
   for (const parsed of parsedSegments) {
-    visitDefinitionNodes(parsed.tree, (node) => {
+    visitNodes(parsed.tree, (node) => {
+      if (node.type !== "footnoteDefinition") return
       const offsets = getOffsets(node)
       if (offsets) addPatch(parsed.index, { ...offsets, replacement: "" })
     })
@@ -144,7 +195,7 @@ export const createDocumentFootnoteModel = ({
 
   for (const reference of references) {
     const identifier = reference.node.identifier
-    const definition = identifier ? definitions.get(identifier) : undefined
+    const definition = identifier ? footnoteDefinitions.get(identifier) : undefined
     const offsets = getOffsets(reference.node)
     if (!identifier || !definition || !offsets) continue
 
@@ -153,7 +204,11 @@ export const createDocumentFootnoteModel = ({
       footnote = {
         identifier,
         number: footnotes.length + 1,
-        content: serializeDefinitionContent(definition.node),
+        content: appendReferencedDefinitions(
+          serializeDefinitionContent(definition.node),
+          definition.node,
+          ordinaryDefinitions
+        ),
         targetId: footnoteTargetId(footnotes.length + 1),
         referenceIds: [],
       }

@@ -68,7 +68,9 @@ test.describe("core smoke detail rendering", () => {
       "토글은 비어 있지 않은 본문을 유지합니다.",
       ":::",
       "",
-      "[^policy]: 문서 끝의 정책 근거",
+      "[^policy]: [가이드 문서][guide]",
+      "",
+      "[guide]: /guide",
     ].join("\n")
     await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
       await route.fulfill({
@@ -111,7 +113,8 @@ test.describe("core smoke detail rendering", () => {
 
     const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
     await expect(target).toHaveCount(1)
-    await expect(target).toContainText("문서 끝의 정책 근거")
+    await expect(target).toContainText("가이드 문서")
+    await expect(target.locator('a[href="/guide"]')).toHaveCount(1)
     await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
   })
 

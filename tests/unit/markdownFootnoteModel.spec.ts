@@ -85,3 +85,27 @@ test("serializes multi-block definitions without converting their list into inde
   expect(model.footnotes[0]?.content).toMatch(/^[*-] 목록 항목/m)
   expect(model.footnotes[0]?.content).not.toMatch(/^    [*-] 목록 항목/m)
 })
+
+test("keeps a footnote-looking token inside inline math outside the registry", () => {
+  const model = createModel([
+    "수식 $x[^math]$ 는 원문으로 유지한다.",
+    "",
+    "[^math]: 수식 안에서는 참조가 아니다.",
+  ].join("\n"))
+
+  expect(model.footnotes).toEqual([])
+  expect(getTransformedMarkdown(model)).toContain("$x[^math]$")
+})
+
+test("preserves an ordinary definition required by a footnote reference-style link", () => {
+  const model = createModel([
+    "본문 참조입니다.[^note]",
+    "",
+    "[^note]: [문서][guide]",
+    "",
+    "[guide]: /guide",
+  ].join("\n"))
+
+  expect(model.footnotes[0]?.content).toContain("[문서][guide]")
+  expect(model.footnotes[0]?.content).toContain("[guide]: /guide")
+})
