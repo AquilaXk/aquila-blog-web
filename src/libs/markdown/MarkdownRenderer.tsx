@@ -28,6 +28,10 @@ import {
   MarkdownTableRowRenderer,
 } from "src/libs/markdown/MarkdownRendererTable"
 import { renderMarkdownSegment } from "src/libs/markdown/MarkdownRendererSegments"
+import {
+  MarkdownFootnoteAppendix,
+  MarkdownFootnoteReferenceLink,
+} from "src/libs/markdown/MarkdownRendererFootnotes"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
@@ -62,7 +66,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
     [content, trustedContentHtml]
   )
-  const { normalizedContent, renderKey, resolvedContentHtml, segments } = renderModel
+  const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker } = renderModel
   const { tableLayouts } = renderModel
 
   useMermaidEffect(rootRef, renderKey, !disableMermaid, {
@@ -149,6 +153,13 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
               />
               {alt ? <figcaption>{alt}</figcaption> : null}
             </figure>
+          )
+        },
+        a({ children, href, title, node: _node, ...props }) {
+          return (
+            <MarkdownFootnoteReferenceLink footnotes={footnotes} marker={footnoteMarker} href={href} title={title} {...props}>
+              {children}
+            </MarkdownFootnoteReferenceLink>
           )
         },
         code({ node, className, children, ...props }) {
@@ -252,6 +263,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
           renderMarkdown,
         })
       })}
+      <MarkdownFootnoteAppendix footnotes={footnotes} renderMarkdown={renderMarkdown} />
     </MarkdownRendererRoot>
   )
 }

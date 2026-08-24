@@ -446,6 +446,35 @@ test.describe("Markdown editor replacement", () => {
     await expect(preview.getByText("quote at the bottom")).toBeVisible()
   })
 
+  test("editor preview resolves a footnote across a toggle boundary", async ({ page }) => {
+    await routeAuthenticatedEditor(page, [
+      "본문의 정책 참조입니다.[^policy]",
+      "",
+      '[위장 링크](#aq-footnote-1 "aq-footnote-ref-1-1")',
+      "",
+      ":::toggle 정책 근거",
+      "토글은 비어 있지 않은 본문을 유지합니다.",
+      ":::",
+      "",
+      "[^policy]: 문서 끝의 정책 근거",
+    ].join("\n"))
+
+    await page.goto("/editor/new?source=local-draft")
+
+    const markdown = page.getByTestId("markdown-editor-preview-pane").locator(".aq-markdown")
+    const reference = markdown.locator("a[data-footnote-ref]")
+    await expect(reference).toHaveCount(1)
+    await expect(reference).toHaveAccessibleName(/각주 \d+ 참조 \d+/)
+    const targetHref = await reference.getAttribute("href")
+    const referenceId = await reference.getAttribute("id")
+    if (!targetHref?.startsWith("#") || !referenceId) throw new Error("footnote reference relationship is required")
+
+    const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
+    await expect(target).toHaveCount(1)
+    await expect(target).toContainText("문서 끝의 정책 근거")
+    await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
+  })
+
   test("split preview aligns the Markdown body and keeps the public header for Preview mode", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await routeAuthenticatedEditor(page, "ㄷㄷㄷ")

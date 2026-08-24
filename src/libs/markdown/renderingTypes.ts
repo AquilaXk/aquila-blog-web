@@ -1,4 +1,5 @@
 import type { MarkdownTableLayout } from "src/libs/markdown/tableMetadata"
+import type { MarkdownFootnote } from "src/libs/markdown/renderingFootnoteModel"
 
 export type CalloutKind = "tip" | "info" | "warning" | "outline" | "example" | "summary"
 
@@ -49,6 +50,8 @@ export type MarkdownRenderModel = {
   renderKey: string
   segments: MarkdownSegment[]
   tableLayouts: Array<MarkdownTableLayout | null>
+  footnotes: readonly MarkdownFootnote[]
+  footnoteMarker: string
 }
 
 export const markdownGuide = `### 작성 가이드
