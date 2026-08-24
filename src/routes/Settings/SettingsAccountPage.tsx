@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { FormEvent, useRef, useState } from "react"
+import css from "styled-jsx/css"
 import { deletePrivacyAccount } from "src/apis/backend/privacy"
 import { ConfirmDialog } from "src/design-system/ConfirmDialog"
 import useAuthSession from "src/hooks/useAuthSession"
@@ -116,7 +117,7 @@ const SettingsAccountPage = () => {
         <section className="panel" aria-label="계정 탈퇴">
           <h2>계정 탈퇴</h2>
           <p className="notice">
-            탈퇴하면 로그인 세션이 폐기되고 계정은 삭제 상태로 전환됩니다. 법적 의무와 보안 감사에 필요한 최소 기록는
+            탈퇴하면 로그인 세션이 폐기되고 계정은 삭제 상태로 전환됩니다. 법적 의무와 보안 감사에 필요한 최소 기록은
             제한된 접근으로 보관될 수 있습니다.
           </p>
           <form className="deleteForm" onSubmit={openConfirm}>
@@ -205,7 +206,7 @@ const SettingsAccountPage = () => {
   )
 }
 
-const accountPageStyles = `
+const accountPageStyles = css`
   .notice {
     margin: 0 0 18px;
     color: var(--aq-text-secondary);
