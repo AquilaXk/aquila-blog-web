@@ -66,11 +66,25 @@ export const normalizeHtmlPasteText = (value: string): string => {
   return /\S/.test(normalized) ? normalized : ""
 }
 
+const collapseExcessNewlines = (value: string): string => {
+  let result = ""
+  let consecutiveNewlines = 0
+  for (const character of value) {
+    if (character === "\n") {
+      consecutiveNewlines += 1
+      if (consecutiveNewlines <= 2) result += character
+      continue
+    }
+    consecutiveNewlines = 0
+    result += character
+  }
+  return result
+}
+
 const normalizeMarkdown = (value: string): string =>
-  value
+  collapseExcessNewlines(value
     .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n"))
     .trim()
 
 export const createHtmlPasteEmptyResult = (): HtmlPasteImportResult => ({
@@ -127,9 +141,12 @@ const serializeCode = (element: HTMLElement): string => {
 }
 
 const wrapInlineFormatting = (inner: string, delimiter: string): string => {
-  const match = inner.match(/^(\s*)([\s\S]*?)(\s*)$/)
-  if (!match?.[2]) return inner
-  return `${match[1]}${delimiter}${match[2]}${delimiter}${match[3]}`
+  let start = 0
+  while (start < inner.length && !inner[start].trim()) start += 1
+  let end = inner.length
+  while (end > start && !inner[end - 1].trim()) end -= 1
+  if (start === end) return inner
+  return `${inner.slice(0, start)}${delimiter}${inner.slice(start, end)}${delimiter}${inner.slice(end)}`
 }
 
 const serializeInline = (node: Node): string => {
