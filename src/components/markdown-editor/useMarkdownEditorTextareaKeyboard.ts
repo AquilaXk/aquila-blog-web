@@ -5,7 +5,7 @@ import {
   planFormatShortcutMutation,
   planHardBreak,
   planListEnterContinuation,
-  planTabIndentMutation,
+  planTableCellTabMutation,
   resolveFormatShortcut,
 } from "./markdownEditorKeyboardModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
@@ -41,14 +41,19 @@ export const useMarkdownEditorTextareaKeyboard = ({
         return
       }
       const { from, to } = rememberTextareaSelection()
-      const tabPlan = planTabIndentMutation(valueRef.current, from, to, event.shiftKey)
-      if (!tabPlan) {
+      const tableTabPlan = planTableCellTabMutation(valueRef.current, from, to, event.shiftKey)
+      if (tableTabPlan.handledTable) {
+        event.preventDefault()
+        if (tableTabPlan.mutation) applyMutationPlan(tableTabPlan.mutation)
+        return
+      }
+      if (!tableTabPlan.mutation) {
         if (event.shiftKey) return
         event.preventDefault()
         return
       }
       event.preventDefault()
-      applyMutationPlan(tabPlan)
+      applyMutationPlan(tableTabPlan.mutation)
     },
     [allowNativeTabAfterEscapeRef, applyMutationPlan, rememberTextareaSelection, valueRef]
   )
