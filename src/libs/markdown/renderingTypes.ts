@@ -1,12 +1,13 @@
 import type { MarkdownTableLayout } from "src/libs/markdown/tableMetadata"
 import type { MarkdownFootnote } from "src/libs/markdown/renderingFootnoteModel"
+import type { CalloutKind } from "src/libs/markdown/calloutRegistry"
 
-export type CalloutKind = "tip" | "info" | "warning" | "outline" | "example" | "summary"
+export type { CalloutKind } from "src/libs/markdown/calloutRegistry"
 
 export type MarkdownSegment =
   | { type: "markdown"; content: string }
   | { type: "toggle"; title: string; content: string }
-  | { type: "callout"; kind: CalloutKind; title: string; emoji: string; content: string; label?: string }
+  | { type: "callout"; kind: CalloutKind; title: string; emoji: string; content: string }
   | {
       type: "bookmark"
       url: string

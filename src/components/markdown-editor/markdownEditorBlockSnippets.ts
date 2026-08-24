@@ -1,4 +1,5 @@
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import { defaultCalloutBlockquoteToken } from "src/libs/markdown/calloutRegistry"
 
 export type BlockSnippetSpec = {
   snippet: string
@@ -41,10 +42,11 @@ export const mermaidBlockSnippet: BlockSnippetSpec = (() => {
 })()
 
 export const calloutBlockSnippet: BlockSnippetSpec = (() => {
-  const snippet = joinSnippetLines(["", "> [!TIP]", "> ", ""])
+  const marker = `> [!${defaultCalloutBlockquoteToken}]`
+  const snippet = joinSnippetLines(["", marker, "> ", ""])
   return {
     snippet,
-    cursorOffset: cursorAfter(snippet, "> [!TIP]\n> ") ,
+    cursorOffset: cursorAfter(snippet, `${marker}\n> `),
   }
 })()
 
