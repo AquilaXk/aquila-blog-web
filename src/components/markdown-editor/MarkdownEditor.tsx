@@ -44,6 +44,7 @@ import {
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
+import { useMarkdownEditorOperationHistory } from "./useMarkdownEditorOperationHistory"
 import {
   emptyPendingToolbarInsertQueue,
   queuePendingToolbarInsert,
@@ -87,7 +88,7 @@ type TextareaSelection = {
 }
 
 const TEXTAREA_KEYBOARD_HELP =
-  "표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다."
+  `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
 
 export const MarkdownEditor = ({
   value,
@@ -126,6 +127,7 @@ export const MarkdownEditor = ({
   const pendingBodyFocusRef = useRef(false)
   const pendingToolbarInsertQueueRef = useRef<PendingToolbarInsertQueue>(emptyPendingToolbarInsertQueue())
   const pendingFindReplaceInvalidationRef = useRef(false)
+  const pendingOperationHistoryInvalidationRef = useRef(false)
   modeRef.current = mode
 
   const setUploadInFlight = useCallback(
@@ -149,6 +151,7 @@ export const MarkdownEditor = ({
     setDraftValue(value)
     setActiveTableSelection(null)
     pendingFindReplaceInvalidationRef.current = true
+    pendingOperationHistoryInvalidationRef.current = true
     // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
@@ -220,7 +223,7 @@ export const MarkdownEditor = ({
     updateActiveTableSelection(valueRef.current, nextSelection)
   }, [updateActiveTableSelection])
 
-  const applyMutationPlan = useCallback(
+  const applyRawMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
       const textarea = textareaRef.current
       if (!textarea || disabled) return false
@@ -252,6 +255,23 @@ export const MarkdownEditor = ({
     }
   }, [])
 
+  const {
+    applyRecordedMutation,
+    invalidate: invalidateOperationHistory,
+    handleUndoRedo,
+  } = useMarkdownEditorOperationHistory({
+    readSnapshot: readEditorSnapshot,
+    applyRawMutationPlan,
+  })
+
+  const applyMutationPlan = useCallback(
+    (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
+      invalidateOperationHistory()
+      return applyRawMutationPlan(plan, options)
+    },
+    [applyRawMutationPlan, invalidateOperationHistory]
+  )
+
   const selectFindReplaceRange = useCallback((from: number, to?: number) => {
     setTextareaSelection(from, to)
     textareaRef.current?.focus()
@@ -263,20 +283,21 @@ export const MarkdownEditor = ({
     draftValue,
     readSnapshot: readEditorSnapshot,
     selectRange: selectFindReplaceRange,
-    applyMutation: applyMutationPlan,
+    applyRecordedMutation,
   })
   const {
     closePanel: closeFindReplacePanel,
-    handleUndoRedo: handleFindReplaceUndoRedo,
     invalidate: invalidateFindReplace,
     onSelectionChange: handleFindReplaceSelectionChange,
   } = findReplace
 
   useEffect(() => {
-    if (!pendingFindReplaceInvalidationRef.current) return
+    if (!pendingFindReplaceInvalidationRef.current && !pendingOperationHistoryInvalidationRef.current) return
     pendingFindReplaceInvalidationRef.current = false
+    pendingOperationHistoryInvalidationRef.current = false
+    invalidateOperationHistory()
     invalidateFindReplace(true)
-  }, [invalidateFindReplace, value])
+  }, [invalidateFindReplace, invalidateOperationHistory, value])
 
   useEffect(() => {
     if (mode === "preview") closeFindReplacePanel()
@@ -324,12 +345,14 @@ export const MarkdownEditor = ({
   )
 
   /**
-   * Async upload placeholder swap/remove — keep undo via setRangeText, never steal focus/errors.
+   * Async upload placeholder swap/remove — update only the verified placeholder range, preserve focus/error state,
+   * and invalidate shared editor history before the asynchronous document change.
    * Must proceed even when the editor UI is temporarily disabled (e.g. loadingKey), so in-flight
    * upload completions can still replace/remove placeholders. New user inserts stay blocked elsewhere.
    */
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
+      invalidateOperationHistory()
       const textarea = textareaRef.current
       const wasFocused = Boolean(textarea && !disabled && document.activeElement === textarea)
       const commitOptions = { clearUploadError: false as const }
@@ -356,7 +379,7 @@ export const MarkdownEditor = ({
       commitMarkdown(next.value, false, commitOptions)
       return true
     },
-    [commitMarkdown, disabled]
+    [commitMarkdown, disabled, invalidateOperationHistory]
   )
 
   const planPendingToolbarInsert = useCallback(
@@ -552,9 +575,10 @@ export const MarkdownEditor = ({
   const insertUploadedMarkdown = useCallback(
     (markdown: string) => {
       if (insertMarkdownAtEditorSelection(markdown)) return
+      invalidateOperationHistory()
       commitMarkdown(`${valueRef.current}${markdown}`, true)
     },
-    [commitMarkdown, insertMarkdownAtEditorSelection]
+    [commitMarkdown, insertMarkdownAtEditorSelection, invalidateOperationHistory]
   )
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
@@ -579,19 +603,26 @@ export const MarkdownEditor = ({
     allowNativeTabAfterEscapeRef,
     rememberTextareaSelection,
     applyMutationPlan,
+    applyLineCommandMutation: applyRecordedMutation,
     setTextareaSelection,
     onRequestSave,
   })
 
   const handleFindReplaceTextareaKeyDown = useCallback(
     (event: Parameters<typeof handleTextareaKeyDown>[0]) => {
-      if (handleFindReplaceUndoRedo(event)) {
+      const result = handleUndoRedo(event)
+      if (result === "applied") {
+        event.preventDefault()
+        closeFindReplacePanel()
+        return
+      }
+      if (result === "consume") {
         event.preventDefault()
         return
       }
       handleTextareaKeyDown(event)
     },
-    [handleFindReplaceUndoRedo, handleTextareaKeyDown]
+    [closeFindReplacePanel, handleTextareaKeyDown, handleUndoRedo]
   )
 
   return (
@@ -780,6 +811,7 @@ export const MarkdownEditor = ({
                     to: event.currentTarget.selectionEnd,
                   }
                   updateActiveTableSelection(event.currentTarget.value, selectionRef.current)
+                  invalidateOperationHistory()
                   invalidateFindReplace()
                   commitMarkdown(event.currentTarget.value, true)
                 }}

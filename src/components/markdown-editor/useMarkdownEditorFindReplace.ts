@@ -6,7 +6,6 @@ import {
   selectMarkdownEditorMatch,
   type MarkdownEditorTextRange,
 } from "./markdownEditorFindReplaceModel"
-import { isComposingEditorKeyboardEvent } from "./markdownEditorKeyboardModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = { from: number; to: number }
@@ -16,10 +15,11 @@ type EditorSnapshot = {
   selection: TextareaSelection
 }
 
-type HistorySnapshot = EditorSnapshot & { scope?: MarkdownEditorTextRange }
-type HistoryEntry = { before: HistorySnapshot; after: HistorySnapshot }
-type FindPanelSession = HistorySnapshot & { activeMatch: MarkdownEditorTextRange | null; stale: boolean }
-type FindHistory = { documentValue: string; undoStack: HistoryEntry[]; redoStack: HistoryEntry[] }
+type FindPanelSession = EditorSnapshot & {
+  scope?: MarkdownEditorTextRange
+  activeMatch: MarkdownEditorTextRange | null
+  stale: boolean
+}
 
 type UseMarkdownEditorFindReplaceArgs = {
   disabled: boolean
@@ -27,13 +27,13 @@ type UseMarkdownEditorFindReplaceArgs = {
   draftValue: string
   readSnapshot: () => EditorSnapshot | null
   selectRange: (from: number, to?: number) => void
-  applyMutation: (plan: PlannedTextMutation) => boolean
+  applyRecordedMutation: (plan: PlannedTextMutation) => boolean
 }
 
 const matchMatchesSelection = (match: MarkdownEditorTextRange, selection: TextareaSelection) =>
   match.start === selection.from && match.end === selection.to
 
-const makeSnapshot = (documentValue: string, selection: TextareaSelection, scope?: MarkdownEditorTextRange): HistorySnapshot => ({
+const makeSnapshot = (documentValue: string, selection: TextareaSelection, scope?: MarkdownEditorTextRange) => ({
   documentValue,
   selection,
   ...(scope ? { scope } : {}),
@@ -45,19 +45,17 @@ export const useMarkdownEditorFindReplace = ({
   draftValue,
   readSnapshot,
   selectRange,
-  applyMutation,
+  applyRecordedMutation,
 }: UseMarkdownEditorFindReplaceArgs) => {
   const [query, setQuery] = useState("")
   const [replacement, setReplacement] = useState("")
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [panel, setPanel] = useState<FindPanelSession | null>(null)
-  const [history, setHistory] = useState<FindHistory | null>(null)
 
   useEffect(() => {
     setPanel((current) =>
       current && current.documentValue !== draftValue ? { ...current, activeMatch: null, stale: true } : current
     )
-    setHistory((current) => (current && current.documentValue !== draftValue ? null : current))
   }, [draftValue])
 
   const matches = useMemo(
@@ -74,7 +72,6 @@ export const useMarkdownEditorFindReplace = ({
   const closePanel = useCallback(() => setPanel(null), [])
 
   const invalidate = useCallback((external = false) => {
-    setHistory(null)
     setPanel((current) => (external || !current ? null : { ...current, activeMatch: null, stale: true }))
   }, [])
 
@@ -156,65 +153,14 @@ export const useMarkdownEditorFindReplace = ({
               caseSensitive,
               scope: panel.scope,
             })
-      if (!planned || !applyMutation(planned.mutation)) return
+      if (!planned || !applyRecordedMutation(planned.mutation)) return
 
       const { rangeStart, rangeEnd, replacement: nextReplacement, selectionStart, selectionEnd } = planned.mutation
       const nextDocument = `${panel.documentValue.slice(0, rangeStart)}${nextReplacement}${panel.documentValue.slice(rangeEnd)}`
-      const before = makeSnapshot(panel.documentValue, snapshot.selection, panel.scope)
       const after = makeSnapshot(nextDocument, { from: selectionStart, to: selectionEnd }, planned.scope)
-      const base = history && history.documentValue === panel.documentValue ? history : { documentValue: panel.documentValue, undoStack: [], redoStack: [] }
-      setHistory({ documentValue: nextDocument, undoStack: [...base.undoStack, { before, after }], redoStack: [] })
       setPanel({ ...after, activeMatch: null, stale: false })
     },
-    [applyMutation, caseSensitive, history, isCurrentPanel, panel, query, readSnapshot, replacement]
-  )
-
-  const handleUndoRedo = useCallback(
-    (event: {
-      metaKey: boolean
-      ctrlKey: boolean
-      altKey: boolean
-      shiftKey: boolean
-      key: string
-      nativeEvent: { isComposing?: boolean; keyCode?: number }
-    }) => {
-      if (
-        isComposingEditorKeyboardEvent(event) ||
-        (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") ||
-        !history
-      ) {
-        return false
-      }
-      const snapshot = readSnapshot()
-      if (!snapshot || snapshot.documentValue !== history.documentValue || snapshot.documentValue !== draftValue) return false
-      const undo = !event.shiftKey
-      const entry = undo ? history.undoStack.at(-1) : history.redoStack[0]
-      if (!entry) return false
-      const target = undo ? entry.before : entry.after
-      if (
-        !applyMutation({
-          rangeStart: 0,
-          rangeEnd: snapshot.documentValue.length,
-          replacement: target.documentValue,
-          selectionStart: target.selection.from,
-          selectionEnd: target.selection.to,
-        })
-      ) {
-        return false
-      }
-      setHistory({
-        documentValue: target.documentValue,
-        undoStack: undo ? history.undoStack.slice(0, -1) : [...history.undoStack, entry],
-        redoStack: undo ? [entry, ...history.redoStack] : history.redoStack.slice(1),
-      })
-      setPanel((current) =>
-        current && current.documentValue === snapshot.documentValue
-          ? { ...makeSnapshot(target.documentValue, target.selection, target.scope), activeMatch: null, stale: false }
-          : current
-      )
-      return true
-    },
-    [applyMutation, draftValue, history, readSnapshot]
+    [applyRecordedMutation, caseSensitive, isCurrentPanel, panel, query, readSnapshot, replacement]
   )
 
   return {
@@ -236,6 +182,5 @@ export const useMarkdownEditorFindReplace = ({
     move,
     replaceCurrent: () => applyReplacement("current"),
     replaceAll: () => applyReplacement("all"),
-    handleUndoRedo,
   }
 }

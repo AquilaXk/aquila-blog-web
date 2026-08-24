@@ -11,6 +11,7 @@ import {
   isMarkdownEditorTableSelection,
   planMarkdownEditorTableTab,
 } from "./markdownEditorTableModel"
+import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 
 export type MarkdownFormatShortcut =
   | "bold"
@@ -190,6 +191,24 @@ export const resolveFormatShortcut = (event: {
   if (!event.shiftKey && key === "k") return "link"
   if (!event.shiftKey && key === "e") return "inlineCode"
   if (event.shiftKey && (key === "x" || key === "X")) return "strikethrough"
+  return null
+}
+
+export const resolveMarkdownEditorLineCommand = (event: {
+  key: string
+  metaKey: boolean
+  ctrlKey: boolean
+  shiftKey: boolean
+  altKey: boolean
+}): MarkdownEditorLineCommand | null => {
+  const hasOnlyAlt = event.altKey && !event.metaKey && !event.ctrlKey
+  if (hasOnlyAlt && event.key === "ArrowUp" && !event.shiftKey) return "move-up"
+  if (hasOnlyAlt && event.key === "ArrowDown" && !event.shiftKey) return "move-down"
+  if (hasOnlyAlt && event.key === "ArrowDown" && event.shiftKey) return "duplicate"
+
+  const hasSingleMod = event.metaKey !== event.ctrlKey
+  if (hasSingleMod && event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") return "delete"
+
   return null
 }
 

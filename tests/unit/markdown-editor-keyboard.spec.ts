@@ -10,6 +10,7 @@ import {
   planTableCellTabMutation,
   planTabIndentMutation,
   resolveFormatShortcut,
+  resolveMarkdownEditorLineCommand,
 } from "../../src/components/markdown-editor/markdownEditorKeyboardModel"
 import { resolveModeForBodyFocus } from "../../src/components/markdown-editor/markdownEditorModeTabs"
 import {
@@ -74,6 +75,31 @@ test.describe("markdown editor keyboard model", () => {
     expect(resolveFormatShortcut({ key: "x", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })).toBe(
       "strikethrough"
     )
+  })
+
+  test("maps only the supported line command shortcut chords", () => {
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowUp", metaKey: false, ctrlKey: false, shiftKey: false, altKey: true })).toBe(
+      "move-up"
+    )
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowDown", metaKey: false, ctrlKey: false, shiftKey: false, altKey: true })).toBe(
+      "move-down"
+    )
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowDown", metaKey: false, ctrlKey: false, shiftKey: true, altKey: true })).toBe(
+      "duplicate"
+    )
+    expect(resolveMarkdownEditorLineCommand({ key: "k", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })).toBe(
+      "delete"
+    )
+    expect(resolveMarkdownEditorLineCommand({ key: "K", metaKey: false, ctrlKey: true, shiftKey: true, altKey: false })).toBe(
+      "delete"
+    )
+
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowDown", metaKey: true, ctrlKey: false, shiftKey: false, altKey: true })).toBeNull()
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowDown", metaKey: false, ctrlKey: true, shiftKey: false, altKey: true })).toBeNull()
+    expect(resolveMarkdownEditorLineCommand({ key: "ArrowUp", metaKey: false, ctrlKey: false, shiftKey: true, altKey: true })).toBeNull()
+    expect(resolveMarkdownEditorLineCommand({ key: "k", metaKey: true, ctrlKey: true, shiftKey: true, altKey: false })).toBeNull()
+    expect(resolveMarkdownEditorLineCommand({ key: "k", metaKey: true, ctrlKey: false, shiftKey: true, altKey: true })).toBeNull()
+    expect(resolveMarkdownEditorLineCommand({ key: "q", metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })).toBeNull()
   })
 
   test("Shift+Enter plans a hard break with two trailing spaces", () => {
@@ -183,7 +209,7 @@ test.describe("markdown editor keyboard model", () => {
     expect(editorSource).toContain("pendingBodyFocusRef")
   })
 
-  test("mutation helper uses setRangeText to preserve native undo", () => {
+  test("mutation helper uses setRangeText with explicit selection restoration", () => {
     const mutationSource = readFileSync(sourcePath("components", "markdown-editor", "markdownEditorTextMutation.ts"), "utf8")
     const editorSource = readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"), "utf8")
     const keyboardHookSource = readFileSync(

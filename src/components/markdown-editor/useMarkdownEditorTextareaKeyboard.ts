@@ -7,7 +7,9 @@ import {
   planListEnterContinuation,
   planTableCellTabMutation,
   resolveFormatShortcut,
+  resolveMarkdownEditorLineCommand,
 } from "./markdownEditorKeyboardModel"
+import { planMarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
@@ -21,6 +23,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   allowNativeTabAfterEscapeRef: MutableRefObject<boolean>
   rememberTextareaSelection: () => TextareaSelection
   applyMutationPlan: (plan: PlannedTextMutation) => boolean
+  applyLineCommandMutation: (plan: PlannedTextMutation) => boolean
   setTextareaSelection: (from: number, to?: number) => void
   onRequestSave?: () => void
 }
@@ -31,6 +34,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   allowNativeTabAfterEscapeRef,
   rememberTextareaSelection,
   applyMutationPlan,
+  applyLineCommandMutation,
   setTextareaSelection,
   onRequestSave,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
@@ -104,6 +108,20 @@ export const useMarkdownEditorTextareaKeyboard = ({
     [applyMutationPlan, rememberTextareaSelection, valueRef]
   )
 
+  const handleLineCommandKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+      const command = resolveMarkdownEditorLineCommand(event)
+      if (!command) return false
+
+      event.preventDefault()
+      const { from, to } = rememberTextareaSelection()
+      const plan = planMarkdownEditorLineCommand(valueRef.current, from, to, command)
+      if (plan) applyLineCommandMutation(plan)
+      return true
+    },
+    [applyLineCommandMutation, rememberTextareaSelection, valueRef]
+  )
+
   const handleHomeEndKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
       if (event.shiftKey || (!event.metaKey && !event.ctrlKey)) return false
@@ -141,6 +159,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (handleEnterKeyDown(event)) return
       if (handleSaveShortcutKeyDown(event)) return
       if (handleFormatShortcutKeyDown(event)) return
+      if (handleLineCommandKeyDown(event)) return
       handleHomeEndKeyDown(event)
     },
     [
@@ -149,6 +168,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       handleEnterKeyDown,
       handleFormatShortcutKeyDown,
       handleHomeEndKeyDown,
+      handleLineCommandKeyDown,
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
     ]
