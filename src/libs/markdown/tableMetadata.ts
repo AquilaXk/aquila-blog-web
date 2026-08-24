@@ -232,6 +232,7 @@ type FencedCodeBlockMarker = {
 const isIndentedCodeLine = (line: string) => /^(?: {4}|\t)/.test(line)
 
 const parseFencedCodeBlockMarker = (line: string): FencedCodeBlockMarker | null => {
+  if (isIndentedCodeLine(line)) return null
   const match = line.trim().match(/^(`{3,}|~{3,})/)
   if (!match) return null
 

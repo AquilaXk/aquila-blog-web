@@ -106,7 +106,7 @@ export const MarkdownEditor = ({
   const [draftValue, setDraftValue] = useState(value)
   const [tableRows, setTableRows] = useState(2)
   const [tableColumns, setTableColumns] = useState(2)
-  const [hasActiveTableSelection, setHasActiveTableSelection] = useState(false)
+  const [activeTableSelection, setActiveTableSelection] = useState<TextareaSelection | null>(null)
   const editorDomId = useId()
   const writePanelId = `${editorDomId}-write-panel`
   const previewPanelId = `${editorDomId}-preview-panel`
@@ -144,7 +144,7 @@ export const MarkdownEditor = ({
     if (value === valueRef.current) return
     valueRef.current = value
     setDraftValue(value)
-    setHasActiveTableSelection(false)
+    setActiveTableSelection(null)
     // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
@@ -196,6 +196,12 @@ export const MarkdownEditor = ({
     [onChange]
   )
 
+  const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
+    setActiveTableSelection(
+      isMarkdownEditorTableSelection(nextValue, selection.from, selection.to) ? selection : null
+    )
+  }, [])
+
   const rememberTextareaSelection = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return selectionRef.current
@@ -204,15 +210,9 @@ export const MarkdownEditor = ({
       from: textarea.selectionStart,
       to: textarea.selectionEnd,
     }
-    setHasActiveTableSelection(
-      isMarkdownEditorTableSelection(valueRef.current, selectionRef.current.from, selectionRef.current.to)
-    )
+    updateActiveTableSelection(valueRef.current, selectionRef.current)
     return selectionRef.current
-  }, [])
-
-  const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
-    setHasActiveTableSelection(isMarkdownEditorTableSelection(nextValue, selection.from, selection.to))
-  }, [])
+  }, [updateActiveTableSelection])
 
   const setTextareaSelection = useCallback((from: number, to = from) => {
     const textarea = textareaRef.current
@@ -453,6 +453,17 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
+  const isTableEditDisabled = (edit: MarkdownEditorTableEdit) =>
+    disabled ||
+    mode === "preview" ||
+    !activeTableSelection ||
+    !planMarkdownEditorTableEdit(
+      draftValue,
+      activeTableSelection.from,
+      activeTableSelection.to,
+      edit
+    )
+
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
       if (disabled) return
@@ -606,7 +617,7 @@ export const MarkdownEditor = ({
               type="button"
               aria-label={label}
               title={label}
-              disabled={disabled || mode === "preview" || !hasActiveTableSelection}
+              disabled={isTableEditDisabled(edit)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => applyTableEdit(edit)}
             >

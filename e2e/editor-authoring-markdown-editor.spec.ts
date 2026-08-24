@@ -1539,6 +1539,36 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByTestId("markdown-editor-preview-pane").locator("table")).toBeVisible()
   })
 
+  test("table action buttons reflect edit bounds", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "")
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    await page.getByRole("combobox", { name: "표 행", exact: true }).selectOption("6")
+    await page.getByRole("combobox", { name: "표 열", exact: true }).selectOption("6")
+    await page.getByRole("button", { name: "표 삽입" }).click()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 열 추가" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeEnabled()
+
+    const minimumTable = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
+    await textarea.fill(minimumTable)
+    await textarea.evaluate((element) => {
+      const caret = element.value.indexOf("one")
+      element.setSelectionRange(caret, caret)
+    })
+    await textarea.press("ArrowRight")
+    await expect(page.getByRole("button", { name: "표 행 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "표 열 추가" })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeEnabled()
+
+    await page.getByRole("button", { name: "표 열 삭제" }).click()
+    await expect(page.getByRole("button", { name: "표 열 삭제" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "표 행 추가" })).toBeEnabled()
+  })
+
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {
     await routeAuthenticatedEditor(page, ["alpha", "omega"].join("\n"))
     let uploadCalled = false
