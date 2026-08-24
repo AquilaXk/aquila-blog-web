@@ -1,4 +1,5 @@
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import { createMarkdownEditorTable } from "./markdownEditorTableModel"
 import { defaultCalloutBlockquoteToken } from "src/libs/markdown/calloutRegistry"
 
 export type BlockSnippetSpec = {
@@ -16,14 +17,11 @@ const cursorAfter = (snippet: string, marker: string) => {
   return index + marker.length
 }
 
-export const tableBlockSnippet: BlockSnippetSpec = (() => {
-  const snippet = joinSnippetLines(["", "|  |  |", "| --- | --- |", "|  |  |", ""])
-  const headerRowStart = snippet.indexOf("|  |  |")
-  return {
-    snippet,
-    cursorOffset: headerRowStart + "| ".length,
-  }
-})()
+const defaultTableBlockSnippet = createMarkdownEditorTable(2, 2)
+if (!defaultTableBlockSnippet) {
+  throw new Error("Default table snippet is outside the supported bounds")
+}
+export const tableBlockSnippet: BlockSnippetSpec = defaultTableBlockSnippet
 
 export const codeBlockSnippet: BlockSnippetSpec = (() => {
   const snippet = joinSnippetLines(["", "```", "", "```", ""])
