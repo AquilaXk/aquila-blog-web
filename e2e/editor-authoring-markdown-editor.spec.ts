@@ -1699,6 +1699,7 @@ test.describe("Markdown editor replacement", () => {
       selectedText
     )
 
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
     await textarea.evaluate((element: HTMLTextAreaElement) => {
       const caret = element.value.lastIndexOf("second") + 2
       element.focus()
@@ -1745,6 +1746,56 @@ test.describe("Markdown editor replacement", () => {
     await expect(textarea).toHaveValue("")
     await textarea.press(undoShortcut)
     await expect(textarea).toHaveValue("only")
+  })
+
+  test("auto pair preserves selection, shared undo, and IME/fence boundaries", async ({ page }) => {
+    const content = ["word", "```ts", "const value = ", "```"].join("\n")
+    await routeAuthenticatedEditor(page, content)
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      element.focus()
+      element.setSelectionRange(0, 4)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    await textarea.press("[")
+    const paired = ["[word]", "```ts", "const value = ", "```"].join("\n")
+    await expect(textarea).toHaveValue(paired)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([1, 5])
+
+    const undoShortcut = process.platform === "darwin" ? "Meta+z" : "Control+z"
+    const redoShortcut = process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z"
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue(content)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([0, 4])
+    await textarea.press(redoShortcut)
+    await expect(textarea).toHaveValue(paired)
+    expect(await textarea.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([1, 5])
+
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const caret = element.value.indexOf("const value = ") + "const value = ".length
+      element.focus()
+      element.setSelectionRange(caret, caret)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    await textarea.press("(")
+    await expect(textarea).toHaveValue(["[word]", "```ts", "const value = (", "```"].join("\n"))
+
+    const composingResult = await textarea.evaluate((element) => {
+      const before = element.value
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "(",
+        isComposing: true,
+      })
+      element.dispatchEvent(event)
+      return { defaultPrevented: event.defaultPrevented, value: element.value, before }
+    })
+    expect(composingResult.defaultPrevented).toBe(false)
+    expect(composingResult.value).toBe(composingResult.before)
   })
 
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {
