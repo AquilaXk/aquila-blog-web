@@ -1569,6 +1569,82 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByRole("button", { name: "표 행 추가" })).toBeEnabled()
   })
 
+  test("literal find and replace preserves selection scope and editor undo", async ({ page }) => {
+    const content = ["outside cat", "Cat cat", "outside cat"].join("\n")
+    await routeAuthenticatedEditor(page, content)
+    await page.goto("/editor/new?source=local-draft")
+
+    const writePane = page.getByTestId("markdown-editor-write-pane")
+    const textarea = writePane.locator("textarea")
+    const findReplaceToggle = page.getByRole("button", { name: "찾기 및 바꾸기", exact: true })
+
+    await page.getByRole("tab", { name: "Preview" }).click()
+    await expect(findReplaceToggle).toBeDisabled()
+    const preview = page.getByTestId("markdown-editor-preview-pane")
+    await expect(preview).toContainText("Cat cat")
+    await expect(preview).toContainText("outside cat")
+
+    await page.getByRole("tab", { name: "Write" }).click()
+    await expect(textarea).toHaveValue(content)
+    await textarea.evaluate((element: HTMLTextAreaElement) => {
+      const selection = "Cat cat"
+      const start = element.value.indexOf(selection)
+      if (start < 0) throw new Error("selection fixture is missing")
+      element.focus()
+      element.setSelectionRange(start, start + selection.length)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    await expect(textarea).toHaveJSProperty("selectionStart", content.indexOf("Cat cat"))
+    await findReplaceToggle.click()
+
+    const findReplace = page.getByRole("region", { name: "찾기 및 바꾸기" })
+    await expect(findReplace).toBeVisible()
+    await expect(findReplace).toContainText("선택 영역")
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("Cat cat")
+
+    const query = page.getByRole("textbox", { name: "찾을 내용" })
+    const replacement = page.getByRole("textbox", { name: "바꿀 내용" })
+    await query.fill("cat")
+    await replacement.fill("dog")
+    await expect(textarea).toHaveValue(content)
+
+    const status = findReplace.getByRole("status")
+    await expect(status).toHaveText(/0\s*\/\s*2/)
+    await page.getByRole("checkbox", { name: "대/소문자 구분" }).check()
+    await expect(status).toHaveText(/0\s*\/\s*1/)
+    await page.getByRole("checkbox", { name: "대/소문자 구분" }).uncheck()
+    await expect(status).toHaveText(/0\s*\/\s*2/)
+
+    await page.getByRole("button", { name: "다음 찾기" }).click()
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("Cat")
+    await expect(textarea).toBeFocused()
+    await page.getByRole("button", { name: "다음 찾기" }).click()
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("cat")
+    await page.getByRole("button", { name: "이전 찾기" }).click()
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("Cat")
+
+    await page.getByRole("button", { name: "현재 바꾸기" }).click()
+    await expect(textarea).toHaveValue(["outside cat", "dog cat", "outside cat"].join("\n"))
+    await page.getByRole("button", { name: "모두 바꾸기" }).click()
+    const replaced = ["outside cat", "dog dog", "outside cat"].join("\n")
+    await expect(textarea).toHaveValue(replaced)
+    await page.getByRole("button", { name: "닫기" }).click()
+    await expect(findReplace).toHaveCount(0)
+
+    const undoShortcut = process.platform === "darwin" ? "Meta+z" : "Control+z"
+    const redoShortcut = process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z"
+    await textarea.press(undoShortcut)
+    await expect(textarea).toHaveValue(["outside cat", "dog cat", "outside cat"].join("\n"))
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("dog")
+    await textarea.press(redoShortcut)
+    await expect(textarea).toHaveValue(replaced)
+    expect(await textarea.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("dog dog")
+    await findReplaceToggle.click()
+    await page.getByRole("textbox", { name: "찾을 내용" }).fill("dog")
+    await page.getByRole("button", { name: /굵게/ }).click()
+    await expect(page.getByRole("textbox", { name: "찾을 내용" })).toBeDisabled()
+  })
+
   test("image upload inserts a url-only upload response at the textarea caret", async ({ page }) => {
     await routeAuthenticatedEditor(page, ["alpha", "omega"].join("\n"))
     let uploadCalled = false
