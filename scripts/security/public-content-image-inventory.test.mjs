@@ -81,6 +81,14 @@ test("aggregates public sources across pages and fetches each post detail once",
 
 test("fails closed without raw response data for HTTP, shape, and bound failures", async () => {
   const sentinel = "https://private.example/should-not-leak"
+  const sanitizedErrorMessages = new Set([
+    "public API returned a non-success status",
+    "feed response shape is invalid",
+    "inventory page bound reached",
+    "feed pagination is inconsistent",
+    "feed post shape is invalid",
+    "post response shape is invalid",
+  ])
   const non200 = () => runInventory({ baseUrl, fetchImpl: async () => response(503, { sentinel }) })
   const badShape = () => runInventory({ baseUrl, fetchImpl: async () => response(200, { content: sentinel }) })
   const bound = () => runInventory({
@@ -109,7 +117,7 @@ test("fails closed without raw response data for HTTP, shape, and bound failures
   for (const operation of [non200, badShape, bound, duplicateShift, badFeedThumbnail, badDetailThumbnail]) {
     await assert.rejects(operation, (error) => {
       assert.ok(error instanceof InventoryError)
-      assert.equal(error.message.includes(sentinel), false)
+      assert.equal(sanitizedErrorMessages.has(error.message), true)
       return true
     })
   }
