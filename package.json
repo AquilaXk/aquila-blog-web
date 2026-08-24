@@ -40,6 +40,7 @@
     "check:refactor-boundaries": "node scripts/check-refactor-boundaries.mjs",
     "check:runtime-image-payload": "node --test scripts/check-runtime-image-payload.test.mjs && node scripts/check-runtime-image-payload.mjs",
     "check:runtime-guard": "node scripts/compare-runtime-guard-metrics.mjs",
+    "inventory:public-images": "node scripts/security/public-content-image-inventory.mjs",
     "postbuild": "echo \"skip next-sitemap (handled by pages/sitemap.xml.tsx)\"",
     "lint": "next lint"
   },
