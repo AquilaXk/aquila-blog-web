@@ -2,6 +2,7 @@ import { extractMarkdownTableLayouts } from "src/libs/markdown/tableMetadata"
 import { hashString } from "src/libs/markdown/renderingCodeModel"
 import { filterTrustedPostImageHtml, normalizeContentHtmlForMermaid } from "src/libs/markdown/renderingHtmlModel"
 import { normalizeMarkdownForRender, parseMarkdownSegments } from "src/libs/markdown/renderingMarkdownModel"
+import { createDocumentFootnoteModel } from "src/libs/markdown/renderingFootnoteModel"
 import type { MarkdownRenderModel } from "src/libs/markdown/renderingTypes"
 import type { TrustedContentHtml } from "src/types"
 
@@ -48,10 +49,13 @@ export const resolveMarkdownRenderModel = ({
 
   // 원문 markdown이 있으면 interactive block 책임은 항상 클라이언트 markdown 파이프라인에 둔다.
   const resolvedContentHtml = normalizedContent ? "" : sanitizedContentHtml
-  const segments = resolvedContentHtml ? [] : parseMarkdownSegments(cleanedMarkdown)
+  const footnoteModel = resolvedContentHtml
+    ? { footnotes: [], marker: "", segments: [] }
+    : createDocumentFootnoteModel({ source: cleanedMarkdown, segments: parseMarkdownSegments(cleanedMarkdown) })
+  const segments = footnoteModel.segments
   const renderKeySeed = resolvedContentHtml
     ? `html:${resolvedContentHtml}`
-    : `md:${cleanedMarkdown}::table:${JSON.stringify(tableLayouts)}`
+    : `md:${cleanedMarkdown}::footnote:${footnoteModel.marker}::table:${JSON.stringify(tableLayouts)}`
 
   return {
     normalizedContent: cleanedMarkdown,
@@ -59,5 +63,7 @@ export const resolveMarkdownRenderModel = ({
     renderKey: `${renderKeySeed.length}:${hashString(renderKeySeed)}`,
     segments,
     tableLayouts,
+    footnotes: footnoteModel.footnotes,
+    footnoteMarker: footnoteModel.marker,
   }
 }

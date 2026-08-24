@@ -57,6 +57,67 @@ test.describe("core smoke detail rendering", () => {
     await expect(page.locator(".deck")).toHaveCount(0)
   })
 
+  test("public detail resolves a footnote across a toggle boundary", async ({ page }) => {
+    const postId = 1680
+    const content = [
+      "본문의 정책 참조입니다.[^policy]",
+      "",
+      '[위장 링크](#aq-footnote-1 "aq-footnote-ref-1-1")',
+      "",
+      ":::toggle 정책 근거",
+      "토글은 비어 있지 않은 본문을 유지합니다.",
+      ":::",
+      "",
+      "[^policy]: [가이드 문서][guide]",
+      "",
+      "[guide]: /guide",
+    ].join("\n")
+    await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: postId,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "문서 전체 각주",
+          content,
+          contentHtml: null,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          commentsCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+    await page.route(`**/post/api/v1/posts/${postId}/hit`, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { hitCount: 1 } }) })
+    })
+
+    await page.goto(`/posts/${postId}`)
+
+    const markdown = page.locator(".aq-markdown")
+    const reference = markdown.locator("a[data-footnote-ref]")
+    await expect(reference).toHaveCount(1)
+    await expect(reference).toHaveAccessibleName(/각주 \d+ 참조 \d+/)
+    const targetHref = await reference.getAttribute("href")
+    const referenceId = await reference.getAttribute("id")
+    if (!targetHref?.startsWith("#") || !referenceId) throw new Error("footnote reference relationship is required")
+
+    const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
+    await expect(target).toHaveCount(1)
+    await expect(target).toContainText("가이드 문서")
+    await expect(target.locator('a[href="/guide"]')).toHaveCount(1)
+    await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
+  })
+
   test("HTML-only trusted payload는 public detail의 단일 renderer에서 렌더된다", async ({ page }) => {
     const contentHtml = [
       "<p>신뢰된 HTML 전용 본문</p>",
