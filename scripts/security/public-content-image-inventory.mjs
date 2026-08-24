@@ -1,3 +1,7 @@
+import { realpathSync } from "node:fs"
+import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+
 const PAGE_SIZE = 30
 const DEFAULT_MAX_PAGES = 20
 const DEFAULT_MAX_POSTS = 600
@@ -28,6 +32,11 @@ const emptyAggregate = () => ({
 
 const isPositiveInteger = (value) => Number.isSafeInteger(value) && value > 0
 const isNonNegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0
+const isEscapedMarkdownMarker = (content, index) => {
+  let slashCount = 0
+  for (let cursor = index - 1; cursor >= 0 && content[cursor] === "\\"; cursor -= 1) slashCount += 1
+  return slashCount % 2 === 1
+}
 const stripBlockquotePrefixes = (line) => {
   let value = line
   while (/^\s{0,3}>\s?/.test(value)) value = value.replace(/^\s{0,3}>\s?/, "")
@@ -86,22 +95,26 @@ const classifySource = (value, baseOrigin, aggregate) => {
 const markdownImageSources = (content) => {
   if (typeof content !== "string") return []
   const visibleLines = []
-  let fenceMarker = null
+  let fence = null
   for (const line of content.replace(/\r\n?/g, "\n").split("\n")) {
     const containerLine = stripBlockquotePrefixes(line)
     const fenceMatch = containerLine.trim().match(/^(`{3,}|~{3,})/)
-    if (fenceMatch) {
-      const marker = fenceMatch[1][0]
-      if (!fenceMarker) fenceMarker = marker
-      else if (fenceMarker === marker) fenceMarker = null
+    if (!fence && fenceMatch) {
+      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length }
       continue
     }
-    if (!fenceMarker && !/^( {4}|\t)/.test(containerLine)) {
+    if (fence) {
+      const closingMatch = containerLine.trim().match(/^(`+|~+)\s*$/)
+      if (closingMatch && closingMatch[1][0] === fence.marker && closingMatch[1].length >= fence.length) fence = null
+      continue
+    }
+    if (!/^( {4}|\t)/.test(containerLine)) {
       visibleLines.push(line.replace(/(`+)[^`]*\1/g, ""))
     }
   }
   const visibleContent = visibleLines.join("\n")
   const sources = [...visibleContent.matchAll(/!\[[^\]]*]\(<?([^\s)>]+)>?(?:\s+["'][^)]*["'])?\)/g)]
+    .filter((match) => !isEscapedMarkdownMarker(visibleContent, match.index ?? 0))
     .map((match) => match[1])
   let pendingMetadata = null
   const lines = visibleContent.split("\n")
@@ -137,11 +150,13 @@ const markdownImageSources = (content) => {
     if (!definitions.has(label)) definitions.set(label, match[2])
   }
   for (const match of visibleContent.matchAll(/!\[([^\]]*)]\[([^\]]*)]/g)) {
+    if (isEscapedMarkdownMarker(visibleContent, match.index ?? 0)) continue
     const reference = (match[2] || match[1]).trim().replace(/\s+/g, " ").toLowerCase()
     const destination = definitions.get(reference)
     if (destination) sources.push(destination)
   }
   for (const match of visibleContent.matchAll(/!\[([^\]]+)](?![\[(])/g)) {
+    if (isEscapedMarkdownMarker(visibleContent, match.index ?? 0)) continue
     const reference = match[1].trim().replace(/\s+/g, " ").toLowerCase()
     const destination = definitions.get(reference)
     if (destination) sources.push(destination)
@@ -151,7 +166,18 @@ const markdownImageSources = (content) => {
 
 const htmlImageSources = (contentHtml) => {
   if (typeof contentHtml !== "string") return []
-  return [...contentHtml.matchAll(/<img\b[^>]*\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/gi)].map((match) => match[2])
+  const sources = []
+  for (const tagMatch of contentHtml.matchAll(/<img\b(?:"[^"]*"|'[^']*'|[^'">])*?>/gi)) {
+    const tag = tagMatch[0]
+    const attributePattern = /\s([^\s=/>]+)\s*=\s*(["'])(.*?)\2/g
+    for (const attribute of tag.matchAll(attributePattern)) {
+      if (attribute[1].toLowerCase() === "src") {
+        sources.push(attribute[3])
+        break
+      }
+    }
+  }
+  return sources
 }
 
 const assertPage = (payload, expectedPage) => {
@@ -287,7 +313,7 @@ const parseCliArgs = (argv) => {
   }
 }
 
-const isCli = process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]
+const isCli = process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1]))
 if (isCli) {
   try {
     process.stdout.write(`${JSON.stringify(await runInventory(parseCliArgs(process.argv.slice(2))))}\n`)

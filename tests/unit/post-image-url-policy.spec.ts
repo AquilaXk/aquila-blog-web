@@ -58,8 +58,17 @@ test.describe("post image URL policy", () => {
       expect(detectPublishPlaceholderIssue('<!-- aq-bookmark {"thumbnailUrl":"javascript:alert(1)"} -->\n:::bookmark /posts/1\n제거되는 카드\n:::')).toBeNull()
       expect(detectPublishPlaceholderIssue("```md\n![example](https://cdn.example.test/post.png)\n```\n")).toBeNull()
       expect(detectPublishPlaceholderIssue("~~~md\n![example](https://cdn.example.test/post.png)\n~~~\n")).toBeNull()
+      expect(detectPublishPlaceholderIssue("````md\n![example](https://cdn.example.test/post.png)\n```\n![outside](https://cdn.example.test/post.png)\n````")).toBeNull()
       expect(detectPublishPlaceholderIssue("    ![example](https://cdn.example.test/post.png)")).toBeNull()
       expect(detectPublishPlaceholderIssue("`![example](https://cdn.example.test/post.png)`")).toBeNull()
+      expect(detectPublishPlaceholderIssue(String.raw`\![escaped](https://cdn.example.test/post.png)`)).toBeNull()
+      expect(detectPublishPlaceholderIssue(String.raw`\![escaped][external]
+[external]: https://cdn.example.test/post.png`)).toBeNull()
+      expect(detectPublishPlaceholderIssue(String.raw`\![external][]
+[external]: https://cdn.example.test/post.png`)).toBeNull()
+      expect(detectPublishPlaceholderIssue(String.raw`\![external]
+[external]: https://cdn.example.test/post.png`)).toBeNull()
+      expect(detectPublishPlaceholderIssue(String.raw`\\![unescaped](https://cdn.example.test/post.png)`)).toContain("Aquila 이미지 URL")
       expect(detectPublishPlaceholderIssue(`![published](${canonicalImage})`)).toBeNull()
       expect(detectPublishPlaceholderIssue(`![canonical]\n[canonical]: ${canonicalImage}`)).toBeNull()
       expect(detectPublishPlaceholderIssue(`![canonical][]\n[canonical]: ${canonicalImage}`)).toBeNull()

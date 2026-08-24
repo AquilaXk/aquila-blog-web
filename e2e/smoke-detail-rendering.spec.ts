@@ -62,22 +62,27 @@ test.describe("core smoke detail rendering", () => {
       "<p>신뢰된 HTML 전용 본문</p>",
       '<img src="https://cdn.example.invalid/trusted.png" alt="외부 HTML">',
       '<img src="/post/api/v1/images/trusted.png" alt="정본 HTML">',
+      '<img data-src="/post/api/v1/images/decoy.png" src="https://cdn.example.invalid/data-src-bypass.png" alt="data-src 우회">',
+      '<img alt="quoted decoy src=/post/api/v1/images/decoy.png" src="https://cdn.example.invalid/quoted-attr-bypass.png">',
+      '<picture><source srcset="https://cdn.example.invalid/source.png 1x"><img src="/post/api/v1/images/picture.png" srcset="https://cdn.example.invalid/img-srcset.png 2x" alt="정본 responsive"></picture>',
     ].join("")
     let externalImageRequests = 0
     let canonicalImageRequests = 0
 
-    await page.route("https://cdn.example.invalid/trusted.png", async (route) => {
+    await page.route("https://cdn.example.invalid/**", async (route) => {
       externalImageRequests += 1
       await route.abort("blockedbyclient")
     })
-    await page.route("**/post/api/v1/images/trusted.png", async (route) => {
-      canonicalImageRequests += 1
-      await route.fulfill({
-        status: 200,
-        contentType: "image/svg+xml",
-        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+    for (const imageName of ["trusted.png", "picture.png"]) {
+      await page.route(`**/post/api/v1/images/${imageName}`, async (route) => {
+        canonicalImageRequests += 1
+        await route.fulfill({
+          status: 200,
+          contentType: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+        })
       })
-    })
+    }
 
     await page.route("**/post/api/v1/posts/1645", async (route) => {
       await route.fulfill({
@@ -120,9 +125,13 @@ test.describe("core smoke detail rendering", () => {
     await expect(page.getByRole("heading", { name: "신뢰 HTML 본문" })).toBeVisible()
     await expect(page.locator(".aq-markdown")).toContainText("신뢰된 HTML 전용 본문")
     await expect(page.getByRole("img", { name: "외부 HTML" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "data-src 우회" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "quoted decoy src=/post/api/v1/images/decoy.png" })).toHaveCount(1)
     await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/trusted.png"]')).toHaveCount(1)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/picture.png"]')).toHaveCount(1)
+    await expect(page.locator(".aq-markdown img[srcset], .aq-markdown source[srcset]")).toHaveCount(0)
     expect(externalImageRequests).toBe(0)
-    expect(canonicalImageRequests).toBe(1)
+    expect(canonicalImageRequests).toBe(2)
   })
 
   test("bookmark thumbnail은 canonical post image만 요청한다", async ({ page }) => {

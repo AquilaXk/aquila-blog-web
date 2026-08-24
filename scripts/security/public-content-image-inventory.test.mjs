@@ -1,4 +1,8 @@
 import assert from "node:assert/strict"
+import { spawnSync } from "node:child_process"
+import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import test from "node:test"
 
 import { InventoryError, runInventory } from "./public-content-image-inventory.mjs"
@@ -39,7 +43,25 @@ test("aggregates public sources across pages and fetches each post detail once",
         "```md",
         "![ignored](https://code.invalid/image)",
         "```",
+        "````md",
+        "```",
+        "![still ignored](https://code.invalid/short-close)",
+        "````",
         "    ![also ignored](https://code.invalid/indented)",
+        "\\![odd direct](https://outside.invalid/odd-direct)",
+        "\\\\![even direct](https://outside.invalid/even-direct)",
+        "\\![odd full][odd-full]",
+        "\\\\![even full][even-full]",
+        "\\![odd collapsed][]",
+        "\\\\![even collapsed][]",
+        "\\![odd-short]",
+        "\\\\![even-short]",
+        "[odd-full]: https://outside.invalid/odd-full",
+        "[even-full]: https://outside.invalid/even-full",
+        "[odd collapsed]: https://outside.invalid/odd-collapsed",
+        "[even collapsed]: https://outside.invalid/even-collapsed",
+        "[odd-short]: https://outside.invalid/odd-short",
+        "[even-short]: https://outside.invalid/even-short",
         "![x][outside]",
         "[outside]: https://outside.invalid/body",
         "[outside]: /post/api/v1/images/duplicate",
@@ -54,7 +76,7 @@ test("aggregates public sources across pages and fetches each post detail once",
         "제거되는 카드",
         ":::",
       ].join("\n"),
-      contentHtml: '<img src="/post/api/v1/images/html">',
+      contentHtml: '<img data-src="/post/api/v1/images/decoy" alt="src=\'/post/api/v1/images/alt-decoy\'" src="https://outside.invalid/html">',
     })
     if (url.endsWith("/31")) return response(200, { id: 31, content: "![x](not-a-url)", contentHtml: "" })
     const detailId = Number(url.split("/").at(-1))
@@ -68,8 +90,8 @@ test("aggregates public sources across pages and fetches each post detail once",
     scannedPosts: 31,
     scannedPages: 2,
     canonicalAbsolute: 1,
-    canonicalRelative: 3,
-    external: 4,
+    canonicalRelative: 2,
+    external: 9,
     protocolRelative: 0,
     data: 1,
     blob: 1,
@@ -141,4 +163,19 @@ test("accepts an empty terminal feed without inventing detail requests", async (
     malformed: 0,
     truncated: false,
   })
+})
+
+test("runs as a CLI from a checkout path containing spaces and non-ASCII characters", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "image inventory 한글 "))
+  const scriptPath = join(directory, "inventory script.mjs")
+  try {
+    await copyFile(new URL("./public-content-image-inventory.mjs", import.meta.url), scriptPath)
+    const result = spawnSync(process.execPath, [scriptPath], { encoding: "utf8" })
+
+    assert.equal(result.status, 1)
+    assert.equal(result.stdout, "")
+    assert.equal(result.stderr, "Inventory failed: base URL is required\n")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

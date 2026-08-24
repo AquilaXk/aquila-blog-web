@@ -376,14 +376,67 @@ export const shouldPreferMarkdownPipeline = (markdown: string) => {
   if (HAS_MERMAID_BLOCK_REGEX.test(markdown)) return true
   return HAS_FENCED_CODE_BLOCK_REGEX.test(markdown)
 }
-const getHtmlImageAttribute = (tag: string, attribute: string) => {
-  const match = tag.match(new RegExp(`\\b${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`, "i"))
-  return match?.[1] ?? match?.[2] ?? match?.[3] ?? ""
+const findHtmlTagAttribute = (tag: string, attribute: string) => {
+  const tagName = tag.match(/^<[^\s/>]+/)
+  if (!tagName) return null
+
+  let cursor = tagName[0].length
+  while (cursor < tag.length) {
+    const start = cursor
+    while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+    if (!tag[cursor] || tag[cursor] === ">" || tag[cursor] === "/") break
+
+    const nameStart = cursor
+    while (tag[cursor] && !/[\s=/>]/.test(tag[cursor])) cursor += 1
+    const name = tag.slice(nameStart, cursor)
+    while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+
+    let value = ""
+    if (tag[cursor] === "=") {
+      cursor += 1
+      while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+      const quote = tag[cursor] === '"' || tag[cursor] === "'" ? tag[cursor] : null
+      if (quote) {
+        cursor += 1
+        const valueStart = cursor
+        while (tag[cursor] && tag[cursor] !== quote) cursor += 1
+        value = tag.slice(valueStart, cursor)
+        if (tag[cursor] === quote) cursor += 1
+      } else {
+        const valueStart = cursor
+        while (tag[cursor] && !/[\s>]/.test(tag[cursor])) cursor += 1
+        value = tag.slice(valueStart, cursor)
+      }
+    }
+    if (name.toLowerCase() === attribute.toLowerCase()) return { start, end: cursor, value }
+  }
+  return null
 }
 
-export const filterTrustedPostImageHtml = (html: string) => html.replace(/<img\b[^>]*>/gi, (tag) => {
-  const safeSrc = normalizePublicPostImageUrl(getHtmlImageAttribute(tag, "src"))
-  if (safeSrc) return tag.replace(/\bsrc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/i, `src="${safeSrc}"`)
-  const blockedLabel = getHtmlImageAttribute(tag, "alt") || "차단된 이미지"
-  return `<span class="aq-image-blocked" role="img" aria-label="${escapeHtmlAttribute(blockedLabel)}">${escapeHtml(blockedLabel)}</span>`
-})
+const getHtmlTagAttribute = (tag: string, attribute: string) =>
+  findHtmlTagAttribute(tag, attribute)?.value ?? ""
+
+const removeHtmlTagAttribute = (tag: string, attribute: string) => {
+  let filteredTag = tag
+  let match = findHtmlTagAttribute(filteredTag, attribute)
+  while (match) {
+    filteredTag = `${filteredTag.slice(0, match.start)}${filteredTag.slice(match.end)}`
+    match = findHtmlTagAttribute(filteredTag, attribute)
+  }
+  return filteredTag
+}
+
+const rewriteHtmlTagSrc = (tag: string, safeSrc: string) =>
+  removeHtmlTagAttribute(tag, "src").replace(/(\s*\/?>)$/, ` src="${safeSrc}"$1`)
+
+export const filterTrustedPostImageHtml = (html: string) => {
+  const withoutResponsiveSources = html.replace(/<source\b[^>]*>/gi, (tag) =>
+    getHtmlTagAttribute(tag, "srcset") ? "" : tag)
+
+  return withoutResponsiveSources.replace(/<img\b[^>]*>/gi, (tag) => {
+    const safeSrc = normalizePublicPostImageUrl(getHtmlTagAttribute(tag, "src"))
+    if (safeSrc) return rewriteHtmlTagSrc(removeHtmlTagAttribute(tag, "srcset"), safeSrc)
+    const blockedLabel = getHtmlTagAttribute(tag, "alt") || "차단된 이미지"
+    return `<span class="aq-image-blocked" role="img" aria-label="${escapeHtmlAttribute(blockedLabel)}">${escapeHtml(blockedLabel)}</span>`
+  })
+}
