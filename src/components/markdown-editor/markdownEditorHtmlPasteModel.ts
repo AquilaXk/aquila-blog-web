@@ -67,24 +67,24 @@ export const normalizeHtmlPasteText = (value: string): string => {
 }
 
 const collapseExcessNewlines = (value: string): string => {
-  let result = ""
+  const result: string[] = []
   let consecutiveNewlines = 0
   for (const character of value) {
     if (character === "\n") {
+      while (result.at(-1) === " " || result.at(-1) === "\t") result.pop()
       consecutiveNewlines += 1
-      if (consecutiveNewlines <= 2) result += character
+      if (consecutiveNewlines <= 2) result.push(character)
       continue
     }
     consecutiveNewlines = 0
-    result += character
+    result.push(character)
   }
-  return result
+  return result.join("")
 }
 
 const normalizeMarkdown = (value: string): string =>
   collapseExcessNewlines(value
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n"))
+    .replace(/\r\n?/g, "\n"))
     .trim()
 
 export const createHtmlPasteEmptyResult = (): HtmlPasteImportResult => ({
