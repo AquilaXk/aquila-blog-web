@@ -126,6 +126,12 @@ const serializeCode = (element: HTMLElement): string => {
   return `${delimiter}${source}${delimiter}`
 }
 
+const wrapInlineFormatting = (inner: string, delimiter: string): string => {
+  const match = inner.match(/^(\s*)([\s\S]*?)(\s*)$/)
+  if (!match?.[2]) return inner
+  return `${match[1]}${delimiter}${match[2]}${delimiter}${match[3]}`
+}
+
 const serializeInline = (node: Node): string => {
   if (node.nodeType === Node.TEXT_NODE) return inlineText(node.textContent || "")
   if (node.nodeType !== Node.ELEMENT_NODE || isActiveNode(node)) return ""
@@ -134,9 +140,9 @@ const serializeInline = (node: Node): string => {
   const tag = element.tagName.toLowerCase()
   const inner = Array.from(element.childNodes).map(serializeInline).join("")
   if (tag === "br") return "\n"
-  if (tag === "strong" || tag === "b") return inner ? `**${inner}**` : ""
-  if (tag === "em" || tag === "i") return inner ? `*${inner}*` : ""
-  if (tag === "s" || tag === "del" || tag === "strike") return inner ? `~~${inner}~~` : ""
+  if (tag === "strong" || tag === "b") return wrapInlineFormatting(inner, "**")
+  if (tag === "em" || tag === "i") return wrapInlineFormatting(inner, "*")
+  if (tag === "s" || tag === "del" || tag === "strike") return wrapInlineFormatting(inner, "~~")
   if (tag === "code") return serializeCode(element)
   if (tag === "a") {
     const href = resolveSafeHtmlPasteHref(element.getAttribute("href") || "")
@@ -218,10 +224,25 @@ const serializeBlock = (node: Node): string => {
   if (tag === "ul" || tag === "ol") return serializeList(element, tag === "ol")
   if (!BLOCK_TAGS.has(tag)) return serializeInline(element).trim()
 
-  return Array.from(element.childNodes)
-    .map((child) => (BLOCK_TAGS.has(elementTag(child)) ? serializeBlock(child) : serializeInline(child).trim()))
-    .filter(Boolean)
-    .join("\n\n")
+  const blocks: string[] = []
+  let inlineRun = ""
+  const flushInlineRun = () => {
+    const value = inlineRun.trim()
+    if (value) blocks.push(value)
+    inlineRun = ""
+  }
+
+  for (const child of Array.from(element.childNodes)) {
+    if (!BLOCK_TAGS.has(elementTag(child))) {
+      inlineRun += serializeInline(child)
+      continue
+    }
+    flushInlineRun()
+    const value = serializeBlock(child)
+    if (value) blocks.push(value)
+  }
+  flushInlineRun()
+  return blocks.join("\n\n")
 }
 
 /** Converts only the HTML clipboard allowlist; unsupported markup becomes safe text. */

@@ -1803,6 +1803,9 @@ test.describe("Markdown editor replacement", () => {
     const html = [
       "<h2>Heading</h2>",
       '<p>safe <strong>bold</strong> <a href="https://example.com/docs">docs</a> <a href="javascript:alert(1)">bad</a> <code>a`b</code></p>',
+      "<div>Hello <strong>world</strong>!</div>",
+      "<pre>line 1\nline 2</pre>",
+      "<p><strong>bold </strong><em>soft </em><s>gone </s>tail</p>",
       "<ul><li>parent<ul><li>child</li></ul></li><li><div>one</div><div>two</div></li></ul>",
       "<script>window.__htmlPasteActive = true</script>",
     ].join("")
@@ -1810,6 +1813,12 @@ test.describe("Markdown editor replacement", () => {
       "## Heading",
       "",
       "safe **bold** [docs](https://example.com/docs) bad ``a`b``",
+      "",
+      "Hello **world**\\!",
+      "",
+      "line 1 line 2",
+      "",
+      "**bold** *soft* ~~gone~~ tail",
       "",
       "- parent",
       "  - child",
