@@ -1,5 +1,5 @@
 import type { GetServerSideProps, GetServerSidePropsResult, PreviewData } from "next"
-import type { ParsedUrlQuery } from "querystring"
+import type { ParsedUrlQuery } from "node:querystring"
 import { registerServerApiFetchMetrics, runWithSsrApiFetchContext } from "src/libs/server/apiFetchMetrics"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { getRuntimeMetrics, type RuntimeMetrics } from "src/libs/server/runtimeMetrics"

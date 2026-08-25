@@ -1,5 +1,5 @@
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
-import type { IncomingMessage } from "http"
+import type { IncomingMessage } from "node:http"
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,120}$/
 

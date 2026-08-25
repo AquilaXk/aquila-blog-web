@@ -1,4 +1,4 @@
-import type { IncomingMessage } from "http"
+import type { IncomingMessage } from "node:http"
 import {
   ApiError,
   ApiNetworkError,
@@ -69,7 +69,6 @@ type ServerApiExchange = {
   response: Response
   requestId: string
   url: string
-  timeoutMs: number
   observe: ServerApiFetchMetricsContext["observe"]
   observeStatus: ServerApiFetchMetricsContext["observeStatus"]
 }
@@ -115,7 +114,7 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
     cleanup()
   }
 
-  return { response, requestId, url: `${baseUrl}${safePath}`, timeoutMs, observe, observeStatus }
+  return { response, requestId, url: `${baseUrl}${safePath}`, observe, observeStatus }
 }
 
 export const serverApiFetch = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
@@ -160,7 +159,7 @@ export const serverApiFetchJson = async <T>(
     throw error
   }
 
-  const { response, requestId, url, timeoutMs, observe, observeStatus } = exchange
+  const { response, requestId, url, observe, observeStatus } = exchange
 
   if (!response.ok) {
     const body = await response.text().catch(() => "")
