@@ -30,6 +30,7 @@ export const mockAnonymousSession = async (page: Page) => {
 }
 
 export const addPublicAboutSnapshotCookie = async (page: Page) => {
+  await mockPublicAdminProfile(page)
   await page.context().addCookies([
     {
       name: "admin_profile_snapshot_v1",

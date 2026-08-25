@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test"
+import type { AdminProfile } from "src/hooks/useAdminProfile"
 
 export const AVATAR_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0WkAAAAASUVORK5CYII="
@@ -53,7 +54,7 @@ export const PUBLIC_ADMIN_PROFILE_FIXTURE = {
     { icon: "service", label: "aquila-blog", href: "https://github.com/AquilaXk/aquila-blog" },
   ],
   contactLinks: [{ icon: "github", label: "GitHub", href: "https://github.com/AquilaXk" }],
-}
+} satisfies AdminProfile
 
 export const createPublicAdminProfileSnapshotFixture = () => ({
   ...PUBLIC_ADMIN_PROFILE_FIXTURE,
@@ -81,6 +82,7 @@ export const mockAvatarAsset = async (page: Page) => {
 }
 
 export const addPublicAboutSnapshotCookie = async (page: Page) => {
+  await mockPublicAdminProfile(page)
   await page.context().addCookies([
     {
       name: "admin_profile_snapshot_v1",
