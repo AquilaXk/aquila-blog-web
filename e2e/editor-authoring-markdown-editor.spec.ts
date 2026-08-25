@@ -1498,6 +1498,60 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByTestId("markdown-editor-preview-pane").locator("table")).toBeVisible()
   })
 
+  test("ordered list toolbar transforms mixed nested lines with shared undo and redo", async ({ page }) => {
+    const original = ["plain", "  - nested", "- [x] task"].join("\n")
+    const transformed = ["1. plain", "  1. nested", "2. task"].join("\n")
+    await routeAuthenticatedEditor(page, original)
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    await textarea.click()
+    await textarea.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual([0, original.length])
+    await page.getByRole("tab", { name: "Preview" }).click()
+    await expect(page.getByTestId("markdown-editor-write-pane")).toHaveCount(0)
+    await page.getByRole("button", { name: "순서 목록", exact: true }).click()
+
+    await expect(page.getByTestId("markdown-editor-write-pane")).toBeVisible()
+    await expect(textarea).toHaveValue(transformed)
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual(["1. ".length, transformed.length])
+
+    await textarea.press(process.platform === "darwin" ? "Meta+Z" : "Control+Z")
+    await expect(textarea).toHaveValue(original)
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual([0, original.length])
+
+    await textarea.press(process.platform === "darwin" ? "Meta+Shift+Z" : "Control+Shift+Z")
+    await expect(textarea).toHaveValue(transformed)
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual(["1. ".length, transformed.length])
+
+    const quotedFenced = ["> ```js", "> const alpha = 1", "> ```"].join("\n")
+    await textarea.fill(quotedFenced)
+    await textarea.evaluate((element, selectionEnd) => {
+      element.focus()
+      element.setSelectionRange(0, selectionEnd)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    }, quotedFenced.length)
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual([0, quotedFenced.length])
+    await page.getByRole("tab", { name: "Preview" }).click()
+    await page.getByRole("button", { name: "목록", exact: true }).click()
+
+    await expect(page.getByTestId("markdown-editor-write-pane")).toBeVisible()
+    await expect(textarea).toHaveValue(quotedFenced)
+    await expect
+      .poll(() => textarea.evaluate((element) => [element.selectionStart, element.selectionEnd]))
+      .toEqual([0, quotedFenced.length])
+  })
+
   test("bounded table controls insert, edit, navigate, and preview a table", async ({ page }) => {
     await routeAuthenticatedEditor(page, "")
     await page.goto("/editor/new?source=local-draft")

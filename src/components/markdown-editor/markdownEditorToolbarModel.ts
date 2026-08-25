@@ -1,4 +1,5 @@
 import type { WheelEvent as ReactWheelEvent } from "react"
+import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 
 export { blockMarkdownSnippets } from "./markdownEditorBlockSnippets"
 
@@ -16,9 +17,17 @@ export const toolbarMarkdownSnippets = [
   { label: "S", title: `취소선 (${modShortcutLabel}Shift+X)`, before: "~~", after: "~~", toggle: true },
   { label: "`", title: `인라인 코드 (${modShortcutLabel}E)`, before: "`", after: "`", toggle: true },
   { label: ">", title: "인용문", before: "> ", after: "" },
-  { label: "List", title: "목록", before: "- ", after: "" },
-  { label: "Task", title: "작업 목록", before: "- [ ] ", after: "" },
 ] as const
+
+export const toolbarListCommands: ReadonlyArray<{
+  label: string
+  title: string
+  command: MarkdownEditorListCommand
+}> = [
+  { label: "List", title: "목록", command: "unordered" },
+  { label: "Ordered List", title: "순서 목록", command: "ordered" },
+  { label: "Task", title: "작업 목록", command: "task" },
+]
 
 export const WHEEL_DELTA_PIXEL = 0
 export const WHEEL_DELTA_LINE = 1
