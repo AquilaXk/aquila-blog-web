@@ -16,6 +16,7 @@ import type { StaticAdminProfileSeedSource } from "src/libs/adminProfileSource"
 import type { TPost } from "src/types"
 import { FEED_EXPLORE_PAGE_SIZE } from "src/constants/feed"
 import { setAdminProfileCache } from "src/hooks/useAdminProfile"
+import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 
 const HOME_ISR_REVALIDATE_SECONDS = 60
 const HOME_DEGRADED_REVALIDATE_SECONDS = 30
@@ -26,6 +27,7 @@ const fetchPublicAdminProfile = async (): Promise<AdminProfile> =>
   await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
 
 export const getStaticProps: GetStaticProps = async () => {
+  registerServerApiFetchMetrics()
   const queryClient = createQueryClient()
   const currentTag = ""
   const adminProfileSeed = await resolveStaticAdminProfileSeed(fetchPublicAdminProfile)

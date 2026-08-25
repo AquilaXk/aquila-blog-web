@@ -12,10 +12,14 @@ test.describe("legacy /page route", () => {
     expect(source).not.toContain("getStaticProps")
     expect(source).not.toContain("getStaticPaths")
 
-    const res = { statusCode: 200 } as { statusCode: number }
+    const responseHeaders = new Map<string, string>()
+    const res = {
+      statusCode: 200,
+      setHeader: (key: string, value: string) => responseHeaders.set(key.toLowerCase(), value),
+    } as { statusCode: number; setHeader: (key: string, value: string) => void }
     const result = await getServerSideProps({
       params: { pageId: "legacy-non-post" },
-      req: {} as never,
+      req: { headers: { "x-request-id": "req-legacy-1" } } as never,
       res: res as never,
       query: {},
       resolvedUrl: "/page/legacy-non-post",
@@ -31,5 +35,6 @@ test.describe("legacy /page route", () => {
       expect(result.props).toEqual({ notFoundLegacy: true })
     }
     expect(res.statusCode).toBe(404)
+    expect(responseHeaders.get("x-request-id")).toBe("req-legacy-1")
   })
 })

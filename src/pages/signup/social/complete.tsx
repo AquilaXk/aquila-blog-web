@@ -10,6 +10,7 @@ import AuthShell from "src/components/auth/AuthShell"
 import { setOptionalTrackingConsent } from "src/libs/privacy/optionalTrackingConsentCore"
 import { normalizeNextPath, replaceRoute, toLoginPath, toSignupPath } from "src/libs/router"
 import { GuestPageProps, getGuestPageProps } from "src/libs/server/guestPage"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
 type RsData<T> = {
   resultCode: string
@@ -32,9 +33,9 @@ type SocialSignupFragment = {
 
 const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true"
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics("auth", async ({ req }) => {
   return await getGuestPageProps(req)
-}
+})
 
 const readSocialSignupFragment = (): SocialSignupFragment => {
   if (typeof window === "undefined") {

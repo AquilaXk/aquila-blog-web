@@ -3,6 +3,7 @@ import { getServerSideSitemapLegacy } from "next-sitemap"
 import { GetServerSideProps } from "next"
 import { isPublicSurfaceHost } from "src/libs/publicSurfaceUrl"
 import { buildSitemapFields, collectSitemapPosts } from "src/libs/sitemapPosts"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
 /**
  * 이 sitemap은 블로그 표면 하나만 설명한다 - `loc`가 전부 `CONFIG.link` 파생이다.
@@ -10,7 +11,7 @@ import { buildSitemapFields, collectSitemapPosts } from "src/libs/sitemapPosts"
  * 다른 호스트의 URL 목록을 자기 sitemap으로 광고하는 상태가 된다. 그래서 전용 호스트에서는 404다.
  * 그 호스트들의 robots.txt는 Caddy vhost가 응답하며 이 sitemap을 광고하지 않는다.
  */
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
+export const getServerSideProps: GetServerSideProps = withSsrMetrics("system", async (ctx) => {
   const requestHost = ctx.req.headers.host
   if (isPublicSurfaceHost("company", requestHost) || isPublicSurfaceHost("product", requestHost)) {
     return { notFound: true }
@@ -20,7 +21,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const fields = buildSitemapFields(posts, CONFIG.link, `${CONFIG.since}-01-01T00:00:00.000Z`)
 
   return getServerSideSitemapLegacy(ctx, fields)
-}
+})
 
 const Sitemap = () => null
 

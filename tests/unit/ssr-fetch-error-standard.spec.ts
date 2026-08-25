@@ -33,12 +33,17 @@ test.afterEach(() => {
 })
 
 test("serverApiFetchJson returns parsed JSON on success", async () => {
-  globalThis.fetch = (async () => jsonResponse(200, { ok: true, value: 1 })) as typeof fetch
+  let requestHeaders: Headers | undefined
+  globalThis.fetch = (async (_input, init) => {
+    requestHeaders = new Headers(init?.headers)
+    return jsonResponse(200, { ok: true, value: 1 })
+  }) as typeof fetch
 
   await expect(serverApiFetchJson<{ ok: boolean; value: number }>(createReq(), "/member/api/v1/auth/me")).resolves.toEqual({
     ok: true,
     value: 1,
   })
+  expect(requestHeaders?.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/i)
 })
 
 test("serverApiFetchJson normalizes empty success responses to null", async () => {
@@ -72,6 +77,7 @@ test("serverApiFetchJson throws ApiError with status/body/userMessage on HTTP fa
     expect(apiError.status).toBe(403)
     expect(apiError.userMessage).toBe("권한이 없습니다.")
     expect(apiError.body).toContain("권한이 없습니다.")
+    expect(apiError.requestId).toMatch(/^[0-9a-f-]{36}$/i)
   }
 })
 

@@ -2,6 +2,7 @@ import type { GetServerSideProps } from "next"
 import MetaConfig from "src/components/MetaConfig"
 import { getPostsBootstrap } from "src/apis/backend/posts"
 import { resolvePublicSurfaceUrl } from "src/libs/publicSurfaceUrl"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import CompanyPageView from "src/routes/Company/CompanyPageView"
 import {
   BLOG_URL,
@@ -73,7 +74,7 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
   }
 }
 
-export const getServerSideProps: GetServerSideProps<CompanyPageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<CompanyPageProps> = withSsrMetrics("public", async ({ req, res }) => {
   res.setHeader("Cache-Control", CACHE_CONTROL)
 
   return {
@@ -82,7 +83,7 @@ export const getServerSideProps: GetServerSideProps<CompanyPageProps> = async ({
       news: await withDeadline(loadCompanyNews(), NEWS_DEADLINE_MS, []),
     },
   }
-}
+})
 
 const CompanyPage: NextPageWithLayout<CompanyPageProps> = ({ canonicalUrl, news }) => (
   <>

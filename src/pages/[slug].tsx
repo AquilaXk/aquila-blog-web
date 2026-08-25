@@ -2,6 +2,7 @@ import { GetServerSideProps } from "next"
 import { getPostDetailById } from "src/apis"
 import CustomError from "src/routes/Error"
 import { extractPostIdFromLegacySlug, toCanonicalPostPath } from "src/libs/utils/postPath"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { NextPageWithLayout, type PostDetail } from "src/types"
 
 type LegacySlugRouteProps = {
@@ -48,7 +49,7 @@ export const createLegacySlugServerSideProps =
     }
   }
 
-export const getServerSideProps = createLegacySlugServerSideProps()
+export const getServerSideProps = withSsrMetrics("public", createLegacySlugServerSideProps())
 
 const LegacyPostRedirectPage: NextPageWithLayout<LegacySlugRouteProps> = () => <CustomError />
 

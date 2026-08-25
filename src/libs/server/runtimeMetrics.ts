@@ -16,9 +16,9 @@ export const BACKEND_FETCH_RESULT_VALUES = [
 
 type SsrRouteClass = (typeof SSR_ROUTE_CLASS_VALUES)[number]
 type SsrResult = (typeof SSR_RESULT_VALUES)[number]
-type BackendRouteClass = (typeof BACKEND_ROUTE_CLASS_VALUES)[number]
-type BackendFetchResult = (typeof BACKEND_FETCH_RESULT_VALUES)[number]
-type BackendFetchSource = "ssr" | "isr" | "proxy"
+export type BackendRouteClass = (typeof BACKEND_ROUTE_CLASS_VALUES)[number]
+export type BackendFetchResult = (typeof BACKEND_FETCH_RESULT_VALUES)[number]
+export type BackendFetchSource = "ssr" | "isr" | "proxy"
 
 type SsrObservation = {
   routeClass: SsrRouteClass
@@ -39,6 +39,7 @@ export type RuntimeMetrics = {
   observeBackendFetch: (observation: BackendFetchObservation) => void
 }
 
+
 const hasValue = <T extends readonly string[]>(values: T, value: string): value is T[number] =>
   values.includes(value as T[number])
 
@@ -46,6 +47,22 @@ const assertFiniteDuration = (durationSeconds: number) => {
   if (!Number.isFinite(durationSeconds) || durationSeconds < 0) {
     throw new Error("Metric duration must be a non-negative finite number")
   }
+}
+
+export const classifyBackendHttpResult = (status: number): BackendFetchResult => {
+  if (status >= 200 && status < 300) return "2xx"
+  if (status >= 300 && status < 400) return "3xx"
+  if (status >= 400 && status < 500) return "4xx"
+  if (status >= 500 && status < 600) return "5xx"
+  return "other_error"
+}
+
+export const classifyBackendRoute = (path: string): BackendRouteClass => {
+  const normalizedPath = path.toLowerCase()
+  if (normalizedPath.startsWith("/member/api/v1/auth/") || normalizedPath.startsWith("/member/api/v1/signup/") || normalizedPath.startsWith("/signup")) return "auth"
+  if (normalizedPath.startsWith("/post/api/v1/")) return "post"
+  if (normalizedPath.startsWith("/system/api/v1/adm/cloud/")) return "cloud"
+  return "other"
 }
 
 export const createRuntimeMetrics = (): RuntimeMetrics => {

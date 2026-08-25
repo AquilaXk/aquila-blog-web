@@ -13,6 +13,7 @@ import { formatSignupCooldown, useSignupMailCooldown } from "src/hooks/useSignup
 import { legalPolicyCurrentPaths } from "src/libs/legal/policyLinks"
 import { normalizeNextPath, toLoginPath, toSignupPath } from "src/libs/router"
 import { GuestPageProps, getGuestPageProps } from "src/libs/server/guestPage"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { isValidAuthEmail, normalizeAuthEmail } from "src/libs/validation/auth"
 
 type RsData<T> = {
@@ -27,9 +28,9 @@ type SignupEmailStartResult = {
 
 const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true"
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics("auth", async ({ req }) => {
   return await getGuestPageProps(req)
-}
+})
 
 const SignupPage = () => {
   const router = useRouter()

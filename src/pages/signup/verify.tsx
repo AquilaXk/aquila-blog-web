@@ -11,6 +11,7 @@ import AppIcon from "src/components/icons/AppIcon"
 import { setOptionalTrackingConsent } from "src/libs/privacy/optionalTrackingConsentCore"
 import { normalizeNextPath, replaceRoute, toLoginPath, toSignupPath } from "src/libs/router"
 import { GuestPageProps, getGuestPageProps } from "src/libs/server/guestPage"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { evaluatePasswordPolicy } from "src/libs/validation/auth"
 
 type RsData<T> = {
@@ -26,9 +27,9 @@ type SignupVerifyResult = {
 
 const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true"
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics("auth", async ({ req }) => {
   return await getGuestPageProps(req)
-}
+})
 
 const readSignupVerificationTokenFromFragment = () => {
   if (typeof window === "undefined") return null

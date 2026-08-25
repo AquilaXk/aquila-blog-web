@@ -6,6 +6,7 @@ import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { readServerSnapshot } from "src/libs/server/serverSnapshotCache"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import {
   type SystemHealthPayload,
   type TaskRetryPolicy,
@@ -255,7 +256,7 @@ async function readJsonIfOk<T>(req: IncomingMessage, path: string): Promise<T | 
   }
 }
 
-export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withSsrMetrics("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const bootstrapResultPromise =
     hasServerAuthCookie(req)
@@ -393,6 +394,6 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = async
       },
     },
   }
-}
+})
 
 export { default } from "src/routes/Admin/AdminToolsWorkspacePage"

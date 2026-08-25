@@ -2,6 +2,8 @@ import { Readable } from "node:stream"
 import type { NextApiRequest, NextApiResponse } from "next"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import { resolveServerApiBaseUrl } from "src/libs/server/backend"
+import { getRequestIdForRequest } from "src/libs/server/requestId"
+import { classifyBackendHttpResult, classifyBackendRoute, getRuntimeMetrics, type BackendFetchResult } from "src/libs/server/runtimeMetrics"
 
 export const config = {
   api: {
@@ -183,11 +185,20 @@ const readProxyBody = async (
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const requestId = getRequestIdForRequest(req)
+  const startedAt = performance.now()
+  res.setHeader("X-Request-Id", requestId)
   let safePath: string
   try {
     safePath = resolveProxyPath(req)
   } catch {
-    res.status(400).json({ message: "Invalid backend proxy path." })
+    getRuntimeMetrics().observeBackendFetch({
+      source: "proxy",
+      routeClass: "other",
+      result: "4xx",
+      durationSeconds: (performance.now() - startedAt) / 1_000,
+    })
+    res.status(400).json({ message: "Invalid backend proxy path.", requestId })
     return
   }
 
@@ -198,10 +209,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   headers.set("X-Forwarded-Proto", "https")
   const clientIp = req.socket?.remoteAddress || ""
   if (clientIp) headers.set("X-Forwarded-For", clientIp)
+  headers.set("X-Request-Id", requestId)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), BACKEND_PROXY_TIMEOUT_MS)
   let proxyBodyRead: ProxyBodyReadResult | undefined
+  let metricResult: BackendFetchResult = "other_error"
 
   try {
     proxyBodyRead = await readProxyBody(req, method, controller.signal)
@@ -214,12 +227,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (proxyBodyRead.body) upstreamRequestInit.duplex = "half"
     const upstreamResponse = await fetch(`${resolveServerApiBaseUrl(req)}${safePath}`, upstreamRequestInit)
+    metricResult = classifyBackendHttpResult(upstreamResponse.status)
 
     res.status(upstreamResponse.status)
     upstreamResponse.headers.forEach((value, key) => {
       const normalizedKey = key.toLowerCase()
       if (HOP_BY_HOP_HEADERS.has(normalizedKey)) return
       if (DECODED_RESPONSE_HEADERS.has(normalizedKey)) return
+      if (normalizedKey === "x-request-id") return
       if (normalizedKey === "set-cookie") return
       res.setHeader(key, value)
     })
@@ -237,23 +252,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.end()
   } catch (error) {
     if (error instanceof ProxyBodyTooLargeError) {
+      metricResult = "4xx"
       const maxMb = Math.floor(resolveMaxProxyBodyBytes() / (1024 * 1024))
       res.status(413).json({
         message: `파일 용량이 너무 큽니다. ${maxMb}MB 이하 파일로 다시 시도해주세요.`,
+        requestId,
       })
       return
     }
     if (error instanceof ProxyBodyCapacityExceededError) {
-      res.status(503).json({ message: "동시에 처리 중인 업로드가 많습니다. 잠시 후 다시 시도해주세요." })
+      metricResult = "5xx"
+      res.status(503).json({ message: "동시에 처리 중인 업로드가 많습니다. 잠시 후 다시 시도해주세요.", requestId })
       return
     }
     if (error instanceof ProxyBodyTimeoutError || controller.signal.aborted || isAbortLikeError(error)) {
-      res.status(504).json({ message: "Backend proxy request timed out." })
+      metricResult = "timeout"
+      res.status(504).json({ message: "Backend proxy request timed out.", requestId })
       return
     }
 
-    res.status(502).json({ message: "Backend proxy request failed." })
+    metricResult = error instanceof TypeError ? "network_error" : "other_error"
+    res.status(502).json({ message: "Backend proxy request failed.", requestId })
   } finally {
+    getRuntimeMetrics().observeBackendFetch({
+      source: "proxy",
+      routeClass: classifyBackendRoute(safePath),
+      result: metricResult,
+      durationSeconds: (performance.now() - startedAt) / 1_000,
+    })
     proxyBodyRead?.releaseReservation()
     clearTimeout(timeoutId)
   }

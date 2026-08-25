@@ -11,6 +11,7 @@ import {
 } from "src/libs/server/adminProfile"
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import AdminShell from "src/routes/Admin/AdminShell"
 
 const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface"), {
@@ -148,7 +149,7 @@ const getDependencyStatusTone = (value: string | null | undefined) => {
   return "warn" as const
 }
 
-export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsrMetrics("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const hasAuthCookie = hasServerAuthCookie(req)
   const fallbackProfileSnapshot = resolvePublicAdminProfileSnapshot(req)
@@ -262,7 +263,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = async (
       initialOperationalSnapshot: operationalSnapshot,
     },
   }
-}
+})
 
 const AdminHubPage: NextPage<AdminHubPageProps> = ({
   initialMember,

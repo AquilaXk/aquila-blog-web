@@ -26,9 +26,10 @@ import {
 } from "src/libs/server/adminProfile"
 import { shouldRefetchAdminProfileSource, type PublicAdminProfileSource } from "src/libs/adminProfileSource"
 import { appendSsrDebugTiming, isSsrDebugEnabled, timed } from "src/libs/server/serverTiming"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { resolveContactLinks, resolveRenderableProfileLinkHref, resolveServiceLinks } from "src/libs/utils/profileCardLinks"
 
-export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const hasAuthCookie = hasServerAuthCookie(req)
   const debugSsr = isSsrDebugEnabled(req)
@@ -79,7 +80,7 @@ export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
       initialAdminProfileSource,
     },
   }
-}
+})
 
 type AboutPageProps = {
   initialAdminProfile: AdminProfile | null

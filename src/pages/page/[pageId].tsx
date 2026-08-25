@@ -2,13 +2,14 @@ import { GetServerSideProps } from "next"
 import { getPostDetailById } from "src/apis"
 import CustomError from "src/routes/Error"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { NextPageWithLayout } from "src/types"
 
 type LegacyPageRouteProps = {
   notFoundLegacy: true
 }
 
-export const getServerSideProps: GetServerSideProps<LegacyPageRouteProps> = async ({ params, res }) => {
+export const getServerSideProps: GetServerSideProps<LegacyPageRouteProps> = withSsrMetrics("public", async ({ params, res }) => {
   const rawPageId = Array.isArray(params?.pageId) ? params?.pageId[0] : params?.pageId
   const pageId = typeof rawPageId === "string" ? rawPageId.trim() : ""
 
@@ -38,7 +39,7 @@ export const getServerSideProps: GetServerSideProps<LegacyPageRouteProps> = asyn
       notFoundLegacy: true,
     },
   }
-}
+})
 
 const LegacyPageRoute: NextPageWithLayout<LegacyPageRouteProps> = () => <CustomError />
 

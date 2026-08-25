@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test"
 import {
   BACKEND_FETCH_RESULT_VALUES,
   BACKEND_ROUTE_CLASS_VALUES,
+  classifyBackendHttpResult,
+  classifyBackendRoute,
   createRuntimeMetrics,
   SSR_RESULT_VALUES,
   SSR_ROUTE_CLASS_VALUES,
@@ -50,6 +52,17 @@ test("runtime metric enums reject unbounded labels", () => {
   expect(() =>
     metrics.observeBackendFetch({ source: "ssr", routeClass: "post", result: "418" as never, durationSeconds: 0.1 })
   ).toThrow("Invalid backend fetch result")
+})
+
+test("backend classifiers keep route and HTTP labels in their fixed enums", () => {
+  expect(classifyBackendRoute("/member/api/v1/signup/verify")).toBe("auth")
+  expect(classifyBackendRoute("/post/api/v1/posts/bootstrap")).toBe("post")
+  expect(classifyBackendRoute("/system/api/v1/adm/cloud/files")).toBe("cloud")
+  expect(classifyBackendRoute("/system/api/v1/adm/health")).toBe("other")
+  expect(classifyBackendHttpResult(204)).toBe("2xx")
+  expect(classifyBackendHttpResult(302)).toBe("3xx")
+  expect(classifyBackendHttpResult(404)).toBe("4xx")
+  expect(classifyBackendHttpResult(503)).toBe("5xx")
 })
 
 test("node instrumentation dynamically delegates initialization without swallowing errors", async () => {

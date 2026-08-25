@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events"
 import { expect, test } from "@playwright/test"
 import handler from "../src/pages/api/backend/[...path]"
+import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 
 type CapturedFetch = {
   url: string
@@ -11,6 +12,7 @@ const createMockResponse = () => {
   const response = {
     statusCode: 200,
     headers: new Map<string, string | string[]>(),
+    jsonBody: undefined as unknown,
     ended: false,
     status(code: number) {
       this.statusCode = code
@@ -28,6 +30,7 @@ const createMockResponse = () => {
       return this
     },
     json(body: unknown) {
+      this.jsonBody = body
       this.setHeader("content-type", "application/json")
       this.end()
       return body
@@ -39,9 +42,11 @@ const createMockResponse = () => {
 const invokeBackendProxy = async ({
   method = "GET",
   headers,
+  path = ["member", "api", "v1", "auth", "login"],
 }: {
   method?: string
   headers: Record<string, string | string[]>
+  path?: string[]
 }) => {
   const previousBackendUrl = process.env.BACKEND_INTERNAL_URL
   const previousFetch = globalThis.fetch
@@ -52,15 +57,15 @@ const invokeBackendProxy = async ({
       url: String(url),
       headers: new Headers(init?.headers),
     })
-    return new Response(null, { status: 204 })
+    return new Response(null, { status: 204, headers: { "x-request-id": "upstream-mismatch-id" } })
   }) as typeof fetch
 
   try {
     const req = Object.assign(new EventEmitter(), {
       method,
       headers,
-      query: { path: ["member", "api", "v1", "auth", "login"] },
-      url: "/api/backend/member/api/v1/auth/login",
+      query: { path },
+      url: `/api/backend/${path.join("/")}`,
       socket: { remoteAddress: "10.0.0.8" },
       pause() {
         return this
@@ -84,6 +89,7 @@ test.describe("backend proxy forwarded header boundary", () => {
       headers: {
         host: "blog.aquilaxk.site",
         cookie: "accessToken=token",
+        "x-request-id": "req-proxy-1",
         "x-forwarded-for": "203.0.113.9",
         "x-forwarded-host": "evil.example",
         "x-forwarded-proto": "http",
@@ -99,6 +105,8 @@ test.describe("backend proxy forwarded header boundary", () => {
     const headers = captured[0].headers
 
     expect(headers.get("cookie")).toBe("accessToken=token")
+    expect(headers.get("x-request-id")).toBe("req-proxy-1")
+    expect(res.headers.get("X-Request-Id")).toBe("req-proxy-1")
     expect(headers.get("x-forwarded-host")).toBe("blog.aquilaxk.site")
     expect(headers.get("x-forwarded-proto")).toBe("https")
     expect(headers.get("x-forwarded-for")).toBe("10.0.0.8")
@@ -120,5 +128,22 @@ test.describe("backend proxy forwarded header boundary", () => {
 
     expect(res.statusCode).toBe(413)
     expect(captured).toHaveLength(0)
+  })
+
+  test("rejects an invalid proxy path without upstream traffic and records the canonical request ID", async () => {
+    const before = await getRuntimeMetrics().registry.metrics()
+    const beforeCount = Number(before.match(/aquila_web_backend_fetch_duration_seconds_count\{source="proxy",route_class="other",result="4xx"\} (\d+)/)?.[1] || 0)
+    const { captured, res } = await invokeBackendProxy({
+      headers: { host: "blog.aquilaxk.site", "x-request-id": "req-invalid-proxy-1" },
+      path: ["invalid"],
+    })
+
+    expect(captured).toHaveLength(0)
+    expect(res.statusCode).toBe(400)
+    expect(res.headers.get("X-Request-Id")).toBe("req-invalid-proxy-1")
+    expect(res.jsonBody).toEqual({ message: "Invalid backend proxy path.", requestId: "req-invalid-proxy-1" })
+    const after = await getRuntimeMetrics().registry.metrics()
+    const afterCount = Number(after.match(/aquila_web_backend_fetch_duration_seconds_count\{source="proxy",route_class="other",result="4xx"\} (\d+)/)?.[1] || 0)
+    expect(afterCount).toBe(beforeCount + 1)
   })
 })
