@@ -6,6 +6,7 @@ import { getPostsBootstrap } from "src/apis/backend/posts"
 import { queryKey } from "src/constants/queryKey"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
 import { createQueryClient } from "src/libs/react-query"
+import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 import {
   resolveStaticAdminProfileSeed,
 } from "src/libs/server/adminProfile"
@@ -40,6 +41,7 @@ const fetchPublicAdminProfile: FetchStaticAdminProfile = async () => {
 export const buildCanonicalPostDetailStaticProps = async (
   postId: string
 ): Promise<GetStaticPropsResult<DetailPageProps>> => {
+  registerServerApiFetchMetrics()
   const queryClient = createQueryClient()
   const adminProfileSeed = await resolveStaticAdminProfileSeed(fetchPublicAdminProfile)
   const initialAdminProfile = adminProfileSeed.profile
@@ -94,6 +96,7 @@ export const buildCanonicalPostDetailStaticProps = async (
 }
 
 export const buildCanonicalPostDetailStaticPaths = async (): Promise<GetStaticPathsResult> => {
+  registerServerApiFetchMetrics()
   if (IS_QA_STATIC_RECOVERY_MODE) {
     return {
       paths: [],

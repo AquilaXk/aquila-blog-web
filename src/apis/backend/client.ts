@@ -5,6 +5,10 @@ import {
   refreshRevalidateCacheEntry,
   setRevalidateCacheEntry,
 } from "./clientRevalidateCache"
+import {
+  createServerApiFetchMetricsContext,
+  type ServerApiFetchMetricsContext,
+} from "./serverMetricsBridge"
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080"
 const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"
@@ -137,6 +141,19 @@ const reportApiFailure = (error: unknown) => {
 }
 
 const browserInFlightGetRequests = new Map<string, Promise<unknown>>()
+
+const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null | undefined) => {
+  if (error instanceof ApiError) {
+    if (error.status >= 400 && error.status < 500) return "4xx" as const
+    if (error.status >= 500 && error.status < 600) return "5xx" as const
+    if (error.status >= 300 && error.status < 400) return "3xx" as const
+    return "other_error" as const
+  }
+  if (error instanceof ApiTimeoutError) return "timeout" as const
+  if (signal?.aborted) return "aborted" as const
+  if (error instanceof ApiNetworkError || error instanceof TypeError || error instanceof DOMException) return "network_error" as const
+  return "other_error" as const
+}
 
 export const evictBrowserRevalidateCacheEntries = (predicate: (url: string) => boolean) => {
   if (isServer) return
@@ -272,27 +289,29 @@ export class ApiError extends Error {
 export class ApiTimeoutError extends Error {
   url: string
   timeoutMs: number
-  requestId: null
+  requestId: string | null
 
-  constructor(url: string, timeoutMs: number) {
+  constructor(url: string, timeoutMs: number, requestId: string | null = null) {
     super("요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
     this.name = "ApiTimeoutError"
     this.url = url
     this.timeoutMs = timeoutMs
-    this.requestId = null
+    this.requestId = normalizeRequestId(requestId)
   }
 }
 
 export class ApiNetworkError extends Error {
   url: string
   userMessage: string
+  requestId: string | null
 
-  constructor(url: string) {
+  constructor(url: string, requestId: string | null = null) {
     const userMessage = "네트워크 연결에 실패했습니다. 잠시 후 다시 시도해주세요."
     super(userMessage)
     this.name = "ApiNetworkError"
     this.url = url
     this.userMessage = userMessage
+    this.requestId = normalizeRequestId(requestId)
   }
 }
 
@@ -386,6 +405,13 @@ export const apiFetch = async <T>(
   const { timeoutMs: _timeoutMs, backendProxy = "auto", ...requestInit } = init
   const url = getApiRequestUrl(safePath, { backendProxy })
   const headers = new Headers(requestInit.headers || {})
+  const serverMetrics = isServer ? createServerApiFetchMetricsContext(safePath, headers) : null
+  let serverOutcomeObserved = false
+  const observeServerOutcome = (result: Parameters<ServerApiFetchMetricsContext["observe"]>[0]) => {
+    if (!serverMetrics) return
+    serverOutcomeObserved = true
+    serverMetrics.observe(result)
+  }
   const hasBody = requestInit.body !== undefined && requestInit.body !== null
   const isFormLikeBody =
     typeof FormData !== "undefined" && requestInit.body instanceof FormData
@@ -426,6 +452,7 @@ export const apiFetch = async <T>(
   }
 
   const executeRequest = async (): Promise<T> => {
+    try {
     const resolvedTimeoutMs = resolveTimeoutMs(safePath, init)
     const getRetryCount = getRequestPolicy?.retryCount ?? 0
     const canRetryTransientRead =
@@ -465,13 +492,13 @@ export const apiFetch = async <T>(
         }
 
         if (timedOut) {
-          const timeoutError = new ApiTimeoutError(url, resolvedTimeoutMs)
+          const timeoutError = new ApiTimeoutError(url, resolvedTimeoutMs, serverMetrics?.requestId)
           reportApiFailure(timeoutError)
           throw timeoutError
         }
 
         if (error instanceof TypeError || error instanceof DOMException) {
-          const networkError = new ApiNetworkError(url)
+          const networkError = new ApiNetworkError(url, serverMetrics?.requestId)
           reportApiFailure(networkError)
           throw networkError
         }
@@ -501,6 +528,7 @@ export const apiFetch = async <T>(
         response.headers.get("etag"),
         response.headers.get("cache-control"),
       )
+      observeServerOutcome("2xx")
       return revalidateCacheEntry.payload as T
     }
 
@@ -510,18 +538,20 @@ export const apiFetch = async <T>(
         response.status,
         url,
         body,
-        normalizeRequestId(response.headers.get("x-request-id")),
+        serverMetrics?.requestId ?? normalizeRequestId(response.headers.get("x-request-id")),
       )
       reportApiFailure(apiError)
       throw apiError
     }
 
     if (response.status === 204) {
+      observeServerOutcome("2xx")
       return undefined as T
     }
 
     const contentLength = response.headers.get("content-length")
     if (contentLength === "0") {
+      observeServerOutcome("2xx")
       return undefined as T
     }
 
@@ -533,6 +563,7 @@ export const apiFetch = async <T>(
       if (canUseRevalidateCache && etag) {
         setRevalidateCacheEntry(url, etag, payload, response.headers.get("cache-control"))
       }
+      observeServerOutcome("2xx")
       return payload
     }
 
@@ -540,7 +571,12 @@ export const apiFetch = async <T>(
     if (canUseRevalidateCache && etag) {
       setRevalidateCacheEntry(url, etag, body, response.headers.get("cache-control"))
     }
+    observeServerOutcome("2xx")
     return body as unknown as T
+    } catch (error) {
+      if (!serverOutcomeObserved) observeServerOutcome(classifyServerApiFetchError(error, requestInit.signal))
+      throw error
+    }
   }
 
   if (!inFlightKey) {

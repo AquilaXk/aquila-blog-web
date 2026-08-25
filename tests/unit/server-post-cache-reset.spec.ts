@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { ApiError } from "../../src/apis/backend/client"
+import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 import {
   getPostDetailById,
   getPostsBootstrap,
@@ -58,6 +59,7 @@ const createDetail = (title: string) => ({
 })
 
 test.beforeEach(() => {
+  registerServerApiFetchMetrics()
   process.env.BACKEND_INTERNAL_URL = "http://backend.test"
   resetPostsRequestCaches()
 })

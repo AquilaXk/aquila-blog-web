@@ -9,6 +9,7 @@ import { guardAdminRequest } from "src/libs/server/adminGuard"
 import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { fetchServerProfileWorkspace } from "src/libs/server/profileWorkspace"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import type { AdminProfileWorkspacePageProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 
 type AdminProfileBootstrapPayload = {
@@ -16,7 +17,7 @@ type AdminProfileBootstrapPayload = {
   workspace: ProfileWorkspaceResponse
 }
 
-export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePageProps> = withSsrMetrics<AdminProfileWorkspacePageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const queryClient = createQueryClient()
   const bootstrapResultPromise =
@@ -109,6 +110,6 @@ export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePagePro
       initialWorkspace,
     },
   }
-}
+})
 
 export { default } from "src/routes/Admin/AdminProfileWorkspacePage"

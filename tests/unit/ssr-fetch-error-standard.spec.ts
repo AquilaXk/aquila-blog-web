@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test"
 import type { IncomingMessage } from "http"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "../../src/apis/backend/client"
 import { readAdminProtectedBootstrap } from "../../src/libs/server/adminPage"
 import { serverApiFetchJson } from "../../src/libs/server/backend"
+import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
+import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 
 const originalFetch = globalThis.fetch
 const originalBackendInternalUrl = process.env.BACKEND_INTERNAL_URL
@@ -23,6 +27,7 @@ const jsonResponse = (status: number, body: unknown) =>
 test.beforeEach(() => {
   process.env.BACKEND_INTERNAL_URL = "http://backend.test"
   process.env.NODE_ENV = "test"
+  registerServerApiFetchMetrics()
 })
 
 test.afterEach(() => {
@@ -32,13 +37,30 @@ test.afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv
 })
 
+test("server metrics boundaries have no static runtime metrics dependency", () => {
+  const sourcePaths = [
+    "../../src/libs/server/backend.ts",
+    "../../src/apis/backend/serverMetricsBridge.ts",
+  ]
+  for (const sourcePath of sourcePaths) {
+    const source = readFileSync(path.resolve(__dirname, sourcePath), "utf8")
+    expect(source).not.toContain('from "src/libs/server/runtimeMetrics"')
+    expect(source).not.toContain("prom-client")
+  }
+})
+
 test("serverApiFetchJson returns parsed JSON on success", async () => {
-  globalThis.fetch = (async () => jsonResponse(200, { ok: true, value: 1 })) as typeof fetch
+  let requestHeaders: Headers | undefined
+  globalThis.fetch = (async (_input, init) => {
+    requestHeaders = new Headers(init?.headers)
+    return jsonResponse(200, { ok: true, value: 1 })
+  }) as typeof fetch
 
   await expect(serverApiFetchJson<{ ok: boolean; value: number }>(createReq(), "/member/api/v1/auth/me")).resolves.toEqual({
     ok: true,
     value: 1,
   })
+  expect(requestHeaders?.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/i)
 })
 
 test("serverApiFetchJson normalizes empty success responses to null", async () => {
@@ -72,10 +94,17 @@ test("serverApiFetchJson throws ApiError with status/body/userMessage on HTTP fa
     expect(apiError.status).toBe(403)
     expect(apiError.userMessage).toBe("권한이 없습니다.")
     expect(apiError.body).toContain("권한이 없습니다.")
+    expect(apiError.requestId).toMatch(/^[0-9a-f-]{36}$/i)
   }
 })
 
 test("serverApiFetchJson wraps JSON Content-Type parse failure as ApiError", async () => {
+  const count = async (result: string) => {
+    const exposition = await getRuntimeMetrics().registry.metrics()
+    return Number(exposition.match(new RegExp(`aquila_web_backend_fetch_duration_seconds_count\\{source="ssr",route_class="auth",result="${result}"\\} (\\d+)`))?.[1] || 0)
+  }
+  const beforeOther = await count("other_error")
+  const beforeSuccess = await count("2xx")
   globalThis.fetch = (async () =>
     new Response("{not-json", {
       status: 200,
@@ -88,6 +117,28 @@ test("serverApiFetchJson wraps JSON Content-Type parse failure as ApiError", asy
   } catch (error) {
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).status).toBe(200)
+    expect((error as ApiError).requestId).toMatch(/^[0-9a-f-]{36}$/i)
+  }
+  expect(await count("other_error")).toBe(beforeOther + 1)
+  expect(await count("2xx")).toBe(beforeSuccess)
+})
+
+test("serverApiFetchJson propagates an observer failure without retrying observation", async () => {
+  const runtimeMetrics = getRuntimeMetrics()
+  const originalObserve = runtimeMetrics.observeBackendFetch
+  const observerFailure = new Error("metrics observer failed")
+  let observeCalls = 0
+  runtimeMetrics.observeBackendFetch = () => {
+    observeCalls += 1
+    throw observerFailure
+  }
+  globalThis.fetch = (async () => jsonResponse(200, { ok: true })) as typeof fetch
+
+  try {
+    await expect(serverApiFetchJson(createReq(), "/member/api/v1/auth/me")).rejects.toBe(observerFailure)
+    expect(observeCalls).toBe(1)
+  } finally {
+    runtimeMetrics.observeBackendFetch = originalObserve
   }
 })
 

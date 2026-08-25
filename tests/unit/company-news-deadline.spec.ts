@@ -40,7 +40,11 @@ test("소식 백엔드가 멈춰도 회사 랜딩은 deadline 안에 빈 소식�
   const headers = new Map<string, string>()
   const context = {
     req: { headers: { host: CONFIG.surfaces.company.url.replace("https://", "") } },
-    res: { setHeader: (name: string, value: string) => headers.set(name, String(value)) },
+    res: {
+      setHeader: (name: string, value: string) => headers.set(name, String(value)),
+      getHeader: (name: string) => headers.get(name),
+      removeHeader: (name: string) => headers.delete(name),
+    },
   } as unknown as GetServerSidePropsContext
 
   const startedAt = Date.now()

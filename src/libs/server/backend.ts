@@ -1,6 +1,15 @@
-import { IncomingMessage } from "http"
-import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
+import type { IncomingMessage } from "node:http"
+import {
+  ApiError,
+  ApiNetworkError,
+  ApiTimeoutError,
+} from "src/apis/backend/client"
+import {
+  createServerApiFetchMetricsContext,
+  type ServerApiFetchMetricsContext,
+} from "src/apis/backend/serverMetricsBridge"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
+import { getRequestIdForRequest } from "src/libs/server/requestId"
 
 type ServerApiFetchInit = RequestInit & {
   timeoutMs?: number
@@ -56,20 +65,30 @@ export const resolveServerApiBaseUrl = (_req: IncomingMessage): string => {
   return "http://localhost:8080"
 }
 
-export const serverApiFetch = (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
+type ServerApiExchange = {
+  response: Response
+  requestId: string
+  url: string
+  observe: ServerApiFetchMetricsContext["observe"]
+  observeStatus: ServerApiFetchMetricsContext["observeStatus"]
+}
+
+const createServerApiExchange = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}): Promise<ServerApiExchange> => {
   const safePath = normalizeApiRequestPath(path)
   const baseUrl = resolveServerApiBaseUrl(req)
   const { timeoutMs: _timeoutMs, ...requestInit } = init
   const headers = new Headers(init.headers)
   const cookie = req.headers.cookie
   const timeoutMs = resolveServerTimeoutMs(safePath, init)
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  const onAbort = () => controller.abort()
 
   if (cookie) {
     headers.set("cookie", cookie)
   }
+  headers.set("X-Request-Id", getRequestIdForRequest(req))
+  const { requestId, observe, observeStatus } = createServerApiFetchMetricsContext(safePath, headers, "ssr")
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const onAbort = () => controller.abort()
 
   if (init.signal) {
     if (init.signal.aborted) controller.abort()
@@ -81,13 +100,27 @@ export const serverApiFetch = (req: IncomingMessage, path: string, init: ServerA
     if (init.signal) init.signal.removeEventListener("abort", onAbort)
   }
 
-  return fetch(`${baseUrl}${safePath}`, {
-    ...requestInit,
-    headers,
-    signal: controller.signal,
-  }).finally(() => {
+  let response: Response
+  try {
+    response = await fetch(`${baseUrl}${safePath}`, {
+      ...requestInit,
+      headers,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    observe(classifyServerFetchError(error, init.signal, controller.signal))
+    throw error
+  } finally {
     cleanup()
-  })
+  }
+
+  return { response, requestId, url: `${baseUrl}${safePath}`, observe, observeStatus }
+}
+
+export const serverApiFetch = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
+  const exchange = await createServerApiExchange(req, path, init)
+  exchange.observeStatus(exchange.response.status)
+  return exchange.response
 }
 
 /**
@@ -100,14 +133,14 @@ export const serverApiFetchJson = async <T>(
   path: string,
   init: ServerApiFetchInit = {}
 ): Promise<T> => {
-  const safePath = normalizeApiRequestPath(path)
-  const url = `${resolveServerApiBaseUrl(req)}${safePath}`
-  const timeoutMs = resolveServerTimeoutMs(safePath, init)
-
-  let response: Response
+  let exchange: ServerApiExchange
   try {
-    response = await serverApiFetch(req, path, init)
+    exchange = await createServerApiExchange(req, path, init)
   } catch (error) {
+    const safePath = normalizeApiRequestPath(path)
+    const url = `${resolveServerApiBaseUrl(req)}${safePath}`
+    const timeoutMs = resolveServerTimeoutMs(safePath, init)
+    const requestId = getRequestIdForRequest(req)
     if (init.signal?.aborted) {
       throw error
     }
@@ -116,47 +149,82 @@ export const serverApiFetchJson = async <T>(
       (error instanceof DOMException && error.name === "AbortError") ||
       (error instanceof Error && error.name === "AbortError")
     if (aborted) {
-      throw new ApiTimeoutError(url, timeoutMs)
+      throw new ApiTimeoutError(url, timeoutMs, requestId)
     }
 
     if (error instanceof TypeError) {
-      throw new ApiNetworkError(url)
+      throw new ApiNetworkError(url, requestId)
     }
 
     throw error
   }
 
+  const { response, requestId, url, observe, observeStatus } = exchange
+
   if (!response.ok) {
     const body = await response.text().catch(() => "")
-    throw new ApiError(response.status, url, body)
+    observeStatus(response.status)
+    throw new ApiError(response.status, url, body, requestId)
   }
 
   if (response.status === 204) {
+    observe("2xx")
     return null as T
   }
 
   const contentLength = response.headers.get("content-length")
   if (contentLength === "0") {
+    observe("2xx")
     return null as T
   }
 
   const contentType = response.headers.get("content-type")?.toLowerCase() || ""
   if (contentType.includes("application/json")) {
+    let value: T
     try {
-      return (await response.json()) as T
-    } catch {
-      throw new ApiError(response.status, url, "")
+      value = (await response.json()) as T
+    } catch (error) {
+      if (error instanceof TypeError) {
+        observe("network_error")
+        throw new ApiNetworkError(url, requestId)
+      }
+      observe("other_error")
+      throw new ApiError(response.status, url, "", requestId)
     }
+    observe("2xx")
+    return value
   }
 
-  const body = await response.text()
+  let body: string
+  try {
+    body = await response.text()
+  } catch (error) {
+    if (error instanceof TypeError) {
+      observe("network_error")
+      throw new ApiNetworkError(url, requestId)
+    }
+    observe("other_error")
+    throw error
+  }
   if (!body) {
+    observe("2xx")
     return null as T
   }
 
+  let value: T
   try {
-    return JSON.parse(body) as T
+    value = JSON.parse(body) as T
   } catch {
-    throw new ApiError(response.status, url, body)
+    observe("other_error")
+    throw new ApiError(response.status, url, body, requestId)
   }
+  observe("2xx")
+  return value
+}
+
+const classifyServerFetchError = (error: unknown, callerSignal: AbortSignal | null | undefined, signal: AbortSignal) => {
+  if (callerSignal?.aborted) return "aborted" as const
+  if (signal.aborted) return "timeout" as const
+  if (error instanceof TypeError || error instanceof DOMException) return "network_error" as const
+  return "other_error" as const
 }

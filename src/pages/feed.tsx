@@ -7,6 +7,7 @@ import {
   RSS_FEED_CONTENT_TYPE,
   type RssFeedPostPageLoader,
 } from "src/libs/rssFeed"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
 const RSS_SUCCESS_CACHE_CONTROL =
   "public, s-maxage=600, stale-while-revalidate=3600, stale-if-error=86400"
@@ -45,7 +46,7 @@ export const createFeedServerSideProps =
     }
   }
 
-export const getServerSideProps = createFeedServerSideProps()
+export const getServerSideProps = withSsrMetrics("system", createFeedServerSideProps())
 
 const FeedPage = () => null
 

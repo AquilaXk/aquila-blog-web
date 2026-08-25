@@ -5,6 +5,7 @@ import { AdminPageProps, buildAdminPagePropsFromMember, getAdminPageProps, readA
 import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import {
   type AdminDashboardInitialSnapshot,
   type DashboardSnapshotPayload,
@@ -30,7 +31,7 @@ async function readJsonIfOk<T>(req: IncomingMessage, path: string): Promise<T | 
   }
 }
 
-export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = withSsrMetrics<AdminDashboardPageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const bootstrapResultPromise =
     hasServerAuthCookie(req)
@@ -154,6 +155,6 @@ export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = a
       },
     },
   }
-}
+})
 
 export { default } from "src/routes/Admin/AdminDashboardWorkspacePage"

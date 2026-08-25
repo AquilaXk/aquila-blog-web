@@ -1,6 +1,7 @@
 import type { GetServerSideProps } from "next"
 import MetaConfig from "src/components/MetaConfig"
 import { resolvePublicSurfaceUrl } from "src/libs/publicSurfaceUrl"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import EasySubwayPageView from "src/routes/EasySubway/EasySubwayPageView"
 import { PRODUCT_SURFACE } from "src/routes/EasySubway/EasySubwayPageModel"
 import type { NextPageWithLayout } from "../../types"
@@ -11,7 +12,7 @@ type EasySubwayPageProps = {
   canonicalUrl: string
 }
 
-export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = withSsrMetrics<EasySubwayPageProps>("public", async ({ req, res }) => {
   res.setHeader("Cache-Control", CACHE_CONTROL)
 
   return {
@@ -19,7 +20,7 @@ export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = async
       canonicalUrl: resolvePublicSurfaceUrl("product", req.headers.host),
     },
   }
-}
+})
 
 const EasySubwayPage: NextPageWithLayout<EasySubwayPageProps> = ({ canonicalUrl }) => (
   <>

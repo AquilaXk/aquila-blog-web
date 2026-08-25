@@ -14,6 +14,7 @@ import type { AuthMember } from "src/hooks/useAuthSession"
 import { loadAuthLoginPolicyPrefs, saveAuthLoginPolicyPrefs } from "src/libs/authLoginPolicy"
 import { normalizeNextPath, replaceRoute, toLegalReconsentPath, toLoginPath, toSignupPath } from "src/libs/router"
 import { GuestPageProps, getGuestPageProps } from "src/libs/server/guestPage"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { isValidAuthEmail, normalizeAuthEmail } from "src/libs/validation/auth"
 
 type RsData<T> = {
@@ -22,9 +23,9 @@ type RsData<T> = {
   data: T
 }
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics<GuestPageProps>("auth", async ({ req }) => {
   return await getGuestPageProps(req)
-}
+})
 
 const LoginPage = () => {
   const router = useRouter()

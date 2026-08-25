@@ -1,6 +1,7 @@
 import { GetServerSideProps, NextPage } from "next"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
+export const getServerSideProps: GetServerSideProps = withSsrMetrics("admin", async (context) => {
   const postId = typeof context.query.postId === "string" ? context.query.postId.trim() : ""
   const source = typeof context.query.source === "string" ? context.query.source.trim() : ""
 
@@ -28,7 +29,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       permanent: false,
     },
   }
-}
+})
 
 const AdminPostsWriteRedirectPage: NextPage = () => null
 
