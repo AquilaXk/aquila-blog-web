@@ -5,7 +5,7 @@ import type {
   ReactNode,
   Ref,
 } from "react"
-import { useDeferredValue, useMemo, useState } from "react"
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
 import { CONFIG } from "site.config"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
@@ -63,6 +63,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onAddTag: (value: string) => void
   onRemoveTag: (value: string) => void
   titleInputRef: (node: HTMLTextAreaElement | null) => void
+  onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
   postTitle: string
   onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
   onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
@@ -88,49 +89,6 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onClearLocalDraft: () => void
   resultPanel: ReactNode
   publishModal: ReactNode
-}
-
-type OutlineItem = {
-  id: string
-  level: 1 | 2 | 3
-  text: string
-}
-
-const formatOutlineText = (text: string) => {
-  const codeSpans: string[] = []
-  return text
-    .replace(/`([^`]+)`/g, (_, code: string) => {
-      const token = `@@CODE_SPAN_${codeSpans.length}@@`
-      codeSpans.push(code)
-      return token
-    })
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1")
-    .replace(/(^|[^\p{L}\p{N}_])__([^_\s](?:[^_]*[^_\s])?)__(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
-    .replace(/(^|[^\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
-    .replace(/~~(.*?)~~/g, "$1")
-    .replace(/@@CODE_SPAN_(\d+)@@/g, (_, index: string) => codeSpans[Number(index)] ?? "")
-    .trim()
-}
-
-const extractEditorOutline = (title: string, markdown: string): OutlineItem[] => {
-  const items: OutlineItem[] = []
-  const normalizedTitle = title.trim()
-  if (normalizedTitle) items.push({ id: "title", level: 1, text: normalizedTitle })
-
-  markdown.split(/\r?\n/).forEach((line, index) => {
-    const match = /^(#{2,3})\s+(.+)$/.exec(line.trim())
-    if (!match) return
-    items.push({
-      id: `heading-${index}`,
-      level: match[1].length as 2 | 3,
-      text: formatOutlineText(match[2]),
-    })
-  })
-
-  return items.slice(0, 12)
 }
 
 const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -209,6 +167,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   onAddTag,
   onRemoveTag,
   titleInputRef,
+  onOutlineBodyHeadingActivate,
   postTitle,
   onPostTitleChange,
   onPostTitleKeyDown,
@@ -236,9 +195,22 @@ export const EditorStudioDedicatedEditorSurface = ({
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false)
+  const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const deferredPostContent = useDeferredValue(postContent)
   const documentInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
-  const outlineItems = useMemo(() => extractEditorOutline(postTitle, postContent), [postContent, postTitle])
+  const outlineInsights = useMemo(() => createMarkdownDocumentInsights(postContent), [postContent])
+  const outlineItems = useMemo(() => {
+    const title = postTitle.trim()
+    return [
+      ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
+      ...outlineInsights.headings.map((heading) => ({
+        id: `${heading.slug}:${heading.offset}`,
+        level: heading.level,
+        label: heading.label,
+        range: heading.range,
+      })),
+    ]
+  }, [outlineInsights.headings, postTitle])
   const projectRepository = CONFIG.projects?.[0]
   const hasTitleAndBody = Boolean(postTitle.trim() && postContent.trim())
   const hasMarkdownBody = Boolean(postContent.trim())
@@ -272,6 +244,10 @@ export const EditorStudioDedicatedEditorSurface = ({
       onAddTag(event.currentTarget.value)
     }
   }
+  const handleTitleInputRef = useCallback((node: HTMLTextAreaElement | null) => {
+    titleNodeRef.current = node
+    titleInputRef(node)
+  }, [titleInputRef])
 
   return (
     <EditorStudioRoot>
@@ -303,9 +279,21 @@ export const EditorStudioDedicatedEditorSurface = ({
           <h3>Document outline</h3>
           {outlineItems.length > 0 ? (
             outlineItems.map((item, index) => (
-              <EditorOutlineItem key={item.id} data-level={item.level} data-active={index === 0 ? "true" : "false"}>
+              <EditorOutlineItem
+                key={item.id}
+                type="button"
+                data-level={item.level}
+                data-active={index === 0 ? "true" : "false"}
+                onClick={() => {
+                  if (item.range) {
+                    onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
+                    return
+                  }
+                  titleNodeRef.current?.focus()
+                }}
+              >
                 <span>H{item.level}</span>
-                <strong>{item.text}</strong>
+                <strong>{item.label}</strong>
               </EditorOutlineItem>
             ))
           ) : (
@@ -317,7 +305,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           <EditorStudioDedicatedMetaSection $compact={isCompactSplitPreview}>
             <TitleInput
               $compact={isCompactSplitPreview}
-              ref={titleInputRef}
+              ref={handleTitleInputRef}
               id="post-title"
               placeholder="제목을 입력하세요"
               rows={1}

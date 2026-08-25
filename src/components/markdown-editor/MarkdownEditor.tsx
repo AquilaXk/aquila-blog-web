@@ -81,6 +81,13 @@ type MarkdownChangeMeta = {
   editorFocused: boolean
 }
 
+export type MarkdownEditorFocusSelection = {
+  from: number
+  to: number
+}
+
+export type MarkdownEditorFocusRequest = (selection?: MarkdownEditorFocusSelection) => void
+
 type MarkdownEditorProps = {
   value: string
   previewTitle?: string
@@ -89,17 +96,14 @@ type MarkdownEditorProps = {
   disableMermaid?: boolean
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
-  onFocusRequestReady?: (focus: (() => void) | null) => void
+  onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
   onRequestSave?: () => void
   onUploadingChange?: (isUploading: boolean) => void
   onUploadImage?: (file: File) => Promise<MarkdownImageUploadResult>
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
 }
 
-type TextareaSelection = {
-  from: number
-  to: number
-}
+type TextareaSelection = MarkdownEditorFocusSelection
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
@@ -140,7 +144,7 @@ export const MarkdownEditor = ({
   const uploadInFlightCountRef = useRef(0)
   const allowNativeTabAfterEscapeRef = useRef(false)
   const modeRef = useRef<MarkdownEditorMode>(mode)
-  const pendingBodyFocusRef = useRef(false)
+  const pendingBodyFocusRef = useRef<TextareaSelection | true | null>(null)
   const pendingToolbarInsertQueueRef = useRef<PendingToolbarInsertQueue>(emptyPendingToolbarInsertQueue())
   const pendingFindReplaceInvalidationRef = useRef(false)
   const pendingOperationHistoryInvalidationRef = useRef(false)
@@ -177,36 +181,6 @@ export const MarkdownEditor = ({
     return () => onFlushMarkdownReady?.(null)
   }, [onFlushMarkdownReady])
 
-  useEffect(() => {
-    onFocusRequestReady?.(() => {
-      if (disabled) return
-      const nextMode = resolveModeForBodyFocus(modeRef.current)
-      if (nextMode !== modeRef.current) {
-        pendingBodyFocusRef.current = true
-        setMode(nextMode)
-        return
-      }
-      const textarea = textareaRef.current
-      if (textarea) {
-        textarea.focus()
-        return
-      }
-      pendingBodyFocusRef.current = true
-    })
-    return () => onFocusRequestReady?.(null)
-  }, [disabled, onFocusRequestReady])
-
-  useEffect(() => {
-    if (!pendingBodyFocusRef.current || disabled || mode === "preview") return
-    const frame = window.requestAnimationFrame(() => {
-      const textarea = textareaRef.current
-      if (!textarea) return
-      pendingBodyFocusRef.current = false
-      textarea.focus()
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [disabled, mode])
-
   const commitMarkdown = useCallback(
     (nextMarkdown: string, editorFocused = false, options?: { clearUploadError?: boolean }) => {
       valueRef.current = nextMarkdown
@@ -238,6 +212,46 @@ export const MarkdownEditor = ({
     selectionRef.current = nextSelection
     updateActiveTableSelection(valueRef.current, nextSelection)
   }, [updateActiveTableSelection])
+
+  useEffect(() => {
+    onFocusRequestReady?.((selection) => {
+      if (disabled) {
+        pendingBodyFocusRef.current = null
+        return
+      }
+      const nextMode = resolveModeForBodyFocus(modeRef.current)
+      if (nextMode !== modeRef.current) {
+        pendingBodyFocusRef.current = selection ?? true
+        setMode(nextMode)
+        return
+      }
+      const textarea = textareaRef.current
+      if (!textarea) {
+        pendingBodyFocusRef.current = selection ?? true
+        return
+      }
+      textarea.focus()
+      if (selection) setTextareaSelection(selection.from, selection.to)
+    })
+    return () => onFocusRequestReady?.(null)
+  }, [disabled, onFocusRequestReady, setTextareaSelection])
+
+  useEffect(() => {
+    const pendingFocus = pendingBodyFocusRef.current
+    if (!pendingFocus || mode === "preview") return
+    if (disabled) {
+      pendingBodyFocusRef.current = null
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      pendingBodyFocusRef.current = null
+      textarea.focus()
+      if (pendingFocus !== true) setTextareaSelection(pendingFocus.from, pendingFocus.to)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [disabled, mode, setTextareaSelection])
 
   const applyRawMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {

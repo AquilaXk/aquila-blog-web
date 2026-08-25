@@ -657,6 +657,72 @@ test.describe("Markdown editor replacement", () => {
     await expect(outline.locator("strong").filter({ hasText: /^__굵게__$/ })).toHaveCount(0)
   })
 
+  test("heading outline navigation and shared reading statistics parity", async ({ page }) => {
+    const title = "목차 이동과 통계"
+    const content = [
+      "## 중복 heading",
+      "",
+      "가".repeat(900),
+      "",
+      "#### 중복 heading",
+      "",
+      "한글 유니코드 본문",
+    ].join("\n")
+    const previewId = "outline-statistics"
+
+    await page.setViewportSize({ width: 2048, height: 1152 })
+    await routeAuthenticatedEditor(page, content, title)
+    await page.goto("/editor/new?source=local-draft")
+
+    const outline = page.getByLabel("문서 목차")
+    const titleInput = page.getByPlaceholder("제목을 입력하세요")
+    const textarea = page.getByLabel("Markdown 본문")
+    await outline.getByRole("button", { name: title }).click()
+    await expect(titleInput).toBeFocused()
+
+    const fourthLevelHeading = outline.getByRole("button", { name: "중복 heading" }).nth(1)
+    await fourthLevelHeading.focus()
+    await page.keyboard.press("Enter")
+    const headingStart = content.indexOf("#### 중복 heading")
+    await expect(textarea).toBeFocused()
+    await expect
+      .poll(() => textarea.evaluate((node) => ({ start: node.selectionStart, end: node.selectionEnd })))
+      .toEqual({ start: headingStart, end: headingStart + "#### 중복 heading".length })
+
+    await outline.getByRole("button", { name: "중복 heading" }).first().focus()
+    await page.keyboard.press("Space")
+    const secondLevelStart = content.indexOf("## 중복 heading")
+    await expect
+      .poll(() => textarea.evaluate((node) => ({ start: node.selectionStart, end: node.selectionEnd })))
+      .toEqual({ start: secondLevelStart, end: secondLevelStart + "## 중복 heading".length })
+    await expect(page.getByLabel("발행 설정").getByText(/2분/)).toBeVisible()
+
+    await page.addInitScript(
+      ({ content, previewId, title }) => {
+        window.localStorage.setItem(
+          `editor.actual-preview.v1:${previewId}`,
+          JSON.stringify({
+            id: previewId,
+            title,
+            content,
+            summary: "",
+            summarySource: "NONE",
+            tags: [],
+            visibility: "PUBLIC_LISTED",
+            thumbnailUrl: "",
+            authorName: "aquila",
+            authorImageUrl: "",
+            createdAt: "2026-08-24T00:00:00.000Z",
+          })
+        )
+      },
+      { content, previewId, title }
+    )
+    await page.goto(`/editor/preview/${previewId}`)
+    await expect(page.getByText("2분 READ", { exact: true })).toBeVisible()
+    await expect(page.getByText(/VIEWS/)).toHaveCount(0)
+  })
+
   test("preview matches supported table markdown for alignment, escaped pipes, and inline cell formatting", async ({
     page,
   }) => {

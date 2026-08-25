@@ -8,7 +8,10 @@ import {
 } from "src/libs/thumbnailFocus"
 import { POST_IMAGE_UPLOAD_RULE_LABEL, PROFILE_IMAGE_UPLOAD_RULE_LABEL } from "src/libs/profileImageUpload"
 import { WriterEditorHost } from "./WriterEditorHost"
-import { handleMarkdownEditorFocusRequestReady } from "./useEditorStudioWorkspaceControllerRuntime"
+import {
+  handleMarkdownEditorFocusRequestReady,
+  requestMarkdownEditorFocus,
+} from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioLegacyProfileSection } from "./EditorStudioLegacyProfileSection"
@@ -698,6 +701,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onAddTag={addTagToPost}
         onRemoveTag={removeTagFromPost}
         titleInputRef={handleTitleFieldRef}
+        onOutlineBodyHeadingActivate={requestMarkdownEditorFocus}
         postTitle={postTitle}
         onPostTitleChange={handleTitleChange}
         onPostTitleKeyDown={handleTitleKeyDown}
