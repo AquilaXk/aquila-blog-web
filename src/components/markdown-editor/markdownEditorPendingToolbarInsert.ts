@@ -1,11 +1,13 @@
 import type { BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import type { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
+import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import type { MarkdownEditorMode } from "./markdownEditorModeTabs"
 
 export type PendingToolbarInsert =
   | { kind: "block"; spec: BlockSnippetSpec }
   | { kind: "wrap"; before: string; after: string; toggle?: boolean }
   | { kind: "format"; shortcut: Parameters<typeof planFormatShortcutMutation>[3] }
+  | { kind: "list"; command: MarkdownEditorListCommand }
 
 export type PendingToolbarInsertQueue = {
   pending: PendingToolbarInsert | null

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react"
 import MarkdownRenderer from "src/libs/markdown/MarkdownRenderer"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
+  planToggleListCommand,
+  type MarkdownEditorListCommand,
+} from "./markdownEditorListCommandsModel"
+import {
   MarkdownEditorModeTabs,
   resolveModeForBodyFocus,
   resolveModeForToolbarInsert,
@@ -58,7 +62,12 @@ import {
   type MarkdownFileUploadResult,
   type MarkdownImageUploadResult,
 } from "./markdownEditorUploadModel"
-import { blockMarkdownSnippets, modShortcutLabel, toolbarMarkdownSnippets } from "./markdownEditorToolbarModel"
+import {
+  blockMarkdownSnippets,
+  modShortcutLabel,
+  toolbarListCommands,
+  toolbarMarkdownSnippets,
+} from "./markdownEditorToolbarModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorScrollSync } from "./useMarkdownEditorScrollSync"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
@@ -383,7 +392,7 @@ export const MarkdownEditor = ({
   )
 
   const planPendingToolbarInsert = useCallback(
-    (insert: PendingToolbarInsert): PlannedTextMutation => {
+    (insert: PendingToolbarInsert): PlannedTextMutation | null => {
       const { from, to } = resolveActiveSelection()
 
       if (insert.kind === "block") {
@@ -392,6 +401,10 @@ export const MarkdownEditor = ({
 
       if (insert.kind === "format") {
         return planFormatShortcutMutation(valueRef.current, from, to, insert.shortcut)
+      }
+
+      if (insert.kind === "list") {
+        return planToggleListCommand(valueRef.current, from, to, insert.command)
       }
 
       return insert.toggle
@@ -433,8 +446,23 @@ export const MarkdownEditor = ({
 
     const pending = queue.pending
     clearPendingToolbarInsert()
-    applyPlannedMarkdownMutation(planPendingToolbarInsert(pending))
-  }, [applyPlannedMarkdownMutation, clearPendingToolbarInsert, disabled, planPendingToolbarInsert])
+    const plan = planPendingToolbarInsert(pending)
+    if (pending.kind === "list") {
+      setTextareaSelection(selectionRef.current.from, selectionRef.current.to)
+      if (!plan) return
+      applyRecordedMutation(plan)
+      return
+    }
+    if (!plan) return
+    applyPlannedMarkdownMutation(plan)
+  }, [
+    applyPlannedMarkdownMutation,
+    applyRecordedMutation,
+    clearPendingToolbarInsert,
+    disabled,
+    planPendingToolbarInsert,
+    setTextareaSelection,
+  ])
 
   const queueToolbarInsertForPreviewMode = useCallback((insert: PendingToolbarInsert) => {
       pendingToolbarInsertQueueRef.current = queuePendingToolbarInsert(insert)
@@ -484,9 +512,10 @@ export const MarkdownEditor = ({
   )
 
   const handleModeChange = useCallback((nextMode: MarkdownEditorMode) => {
+    rememberTextareaSelection()
     setMode(nextMode)
     writeMarkdownEditorModePreference(nextMode)
-  }, [])
+  }, [rememberTextareaSelection])
 
   const applyBlockSnippet = useCallback(
     (spec: BlockSnippetSpec) => {
@@ -555,6 +584,22 @@ export const MarkdownEditor = ({
       queueToolbarInsertForPreviewMode,
       resolveActiveSelection,
     ]
+  )
+
+  const applyListCommand = useCallback(
+    (command: MarkdownEditorListCommand) => {
+      if (disabled) return
+
+      if (modeRef.current === "preview") {
+        queueToolbarInsertForPreviewMode({ kind: "list", command })
+        return
+      }
+
+      const { from, to } = resolveActiveSelection()
+      const plan = planToggleListCommand(valueRef.current, from, to, command)
+      if (plan) applyRecordedMutation(plan)
+    },
+    [applyRecordedMutation, disabled, queueToolbarInsertForPreviewMode, resolveActiveSelection]
   )
 
   const applyFormatShortcutOrAppend = useCallback(
@@ -645,6 +690,19 @@ export const MarkdownEditor = ({
               }
             >
               {snippet.label}
+            </ToolbarButton>
+          ))}
+          {toolbarListCommands.map((command) => (
+            <ToolbarButton
+              key={command.command}
+              type="button"
+              title={command.title}
+              aria-label={command.title}
+              disabled={disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyListCommand(command.command)}
+            >
+              {command.label}
             </ToolbarButton>
           ))}
           {blockMarkdownSnippets.filter((snippet) => snippet.title !== "표").map((snippet) => (
