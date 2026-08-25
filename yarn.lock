@@ -1021,6 +1021,11 @@
   resolved "https://registry.yarnpkg.com/@next/env/-/env-15.5.21.tgz#782aa4d6b08ddfd12ac7e17ca85b7ee1b61c500b"
   integrity sha512-hjJI/GfrjWHgNguRIBzItjRRu0m3Nrz17GhxsjuHfjIvg9hyg3239REd2dpI+bpMTFuVrVprHzEQ19m++cDtbw==
 
+"@next/env@16.3.2":
+  version "16.3.2"
+  resolved "https://registry.yarnpkg.com/@next/env/-/env-16.3.2.tgz#f7c611913413f2b7a287d62e75a95aa25b01d283"
+  integrity sha512-8k4YoG8cM7LWlkfzGNYCRBbFNlernLiMw4s0btVl+CmmWqn3VpYypA72/5Feb1UWdxe6tHqr5KHP4p4Y4m9luA==
+
 "@next/env@^13.4.3":
   version "13.5.11"
   resolved "https://registry.yarnpkg.com/@next/env/-/env-13.5.11.tgz#6712d907e2682199aa1e8229b5ce028ee5a8001b"
