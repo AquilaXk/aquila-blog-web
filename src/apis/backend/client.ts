@@ -138,12 +138,20 @@ const reportApiFailure = (error: unknown) => {
 
 const browserInFlightGetRequests = new Map<string, Promise<unknown>>()
 
+export type ServerApiFetchMetricsResult = "2xx" | "3xx" | "4xx" | "5xx" | "timeout" | "network_error" | "aborted" | "other_error"
+export type ServerApiFetchMetricsSource = "ssr"
+
 export type ServerApiFetchMetricsContext = {
   requestId: string
-  observe: (result: "2xx" | "3xx" | "4xx" | "5xx" | "timeout" | "network_error" | "aborted" | "other_error") => void
+  observe: (result: ServerApiFetchMetricsResult) => void
+  observeStatus: (status: number) => void
 }
 
-export type ServerApiFetchMetricsFactory = (path: string, headers: Headers) => ServerApiFetchMetricsContext
+export type ServerApiFetchMetricsFactory = (
+  path: string,
+  headers: Headers,
+  source?: ServerApiFetchMetricsSource
+) => ServerApiFetchMetricsContext
 
 type ServerApiFetchMetricsGlobal = typeof globalThis & {
   __aquilaServerApiFetchMetricsFactory?: ServerApiFetchMetricsFactory
@@ -155,10 +163,14 @@ export const registerServerApiFetchMetricsFactory = (factory: ServerApiFetchMetr
   serverApiFetchMetricsGlobal.__aquilaServerApiFetchMetricsFactory = factory
 }
 
-const createServerMetricsContext = (path: string, headers: Headers): ServerApiFetchMetricsContext => {
+export const createServerApiFetchMetricsContext = (
+  path: string,
+  headers: Headers,
+  source?: ServerApiFetchMetricsSource
+): ServerApiFetchMetricsContext => {
   const factory = serverApiFetchMetricsGlobal.__aquilaServerApiFetchMetricsFactory
   if (!factory) throw new Error("Server apiFetch metrics factory is unavailable")
-  return factory(path, headers)
+  return factory(path, headers, source)
 }
 
 const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null | undefined) => {
@@ -424,7 +436,7 @@ export const apiFetch = async <T>(
   const { timeoutMs: _timeoutMs, backendProxy = "auto", ...requestInit } = init
   const url = getApiRequestUrl(safePath, { backendProxy })
   const headers = new Headers(requestInit.headers || {})
-  const serverMetrics = isServer ? createServerMetricsContext(safePath, headers) : null
+  const serverMetrics = isServer ? createServerApiFetchMetricsContext(safePath, headers) : null
   let serverOutcomeObserved = false
   const observeServerOutcome = (result: Parameters<ServerApiFetchMetricsContext["observe"]>[0]) => {
     if (!serverMetrics) return

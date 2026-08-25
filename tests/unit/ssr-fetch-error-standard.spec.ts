@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test"
 import type { IncomingMessage } from "http"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "../../src/apis/backend/client"
 import { readAdminProtectedBootstrap } from "../../src/libs/server/adminPage"
 import { serverApiFetchJson } from "../../src/libs/server/backend"
+import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 
 const originalFetch = globalThis.fetch
@@ -24,6 +27,7 @@ const jsonResponse = (status: number, body: unknown) =>
 test.beforeEach(() => {
   process.env.BACKEND_INTERNAL_URL = "http://backend.test"
   process.env.NODE_ENV = "test"
+  registerServerApiFetchMetrics()
 })
 
 test.afterEach(() => {
@@ -31,6 +35,12 @@ test.afterEach(() => {
   if (originalBackendInternalUrl === undefined) delete process.env.BACKEND_INTERNAL_URL
   else process.env.BACKEND_INTERNAL_URL = originalBackendInternalUrl
   process.env.NODE_ENV = originalNodeEnv
+})
+
+test("server backend boundary has no static runtime metrics dependency", () => {
+  const source = readFileSync(path.resolve(__dirname, "../../src/libs/server/backend.ts"), "utf8")
+  expect(source).not.toContain('from "src/libs/server/runtimeMetrics"')
+  expect(source).not.toContain("prom-client")
 })
 
 test("serverApiFetchJson returns parsed JSON on success", async () => {

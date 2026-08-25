@@ -1,8 +1,13 @@
-import { IncomingMessage } from "http"
-import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
+import type { IncomingMessage } from "http"
+import {
+  ApiError,
+  ApiNetworkError,
+  ApiTimeoutError,
+  createServerApiFetchMetricsContext,
+  type ServerApiFetchMetricsContext,
+} from "src/apis/backend/client"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
-import { classifyBackendHttpResult, classifyBackendRoute, getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 
 type ServerApiFetchInit = RequestInit & {
   timeoutMs?: number
@@ -63,7 +68,8 @@ type ServerApiExchange = {
   requestId: string
   url: string
   timeoutMs: number
-  observe: (result: ReturnType<typeof classifyBackendHttpResult>) => void
+  observe: ServerApiFetchMetricsContext["observe"]
+  observeStatus: ServerApiFetchMetricsContext["observeStatus"]
 }
 
 const createServerApiExchange = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}): Promise<ServerApiExchange> => {
@@ -73,27 +79,15 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
   const headers = new Headers(init.headers)
   const cookie = req.headers.cookie
   const timeoutMs = resolveServerTimeoutMs(safePath, init)
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  const onAbort = () => controller.abort()
-  const requestId = getRequestIdForRequest(req)
-  const startedAt = performance.now()
-  let observed = false
-  const observe = (result: ReturnType<typeof classifyBackendHttpResult>) => {
-    if (observed) throw new Error("Server API metrics outcome was already observed")
-    observed = true
-    getRuntimeMetrics().observeBackendFetch({
-      source: "ssr",
-      routeClass: classifyBackendRoute(safePath),
-      result,
-      durationSeconds: (performance.now() - startedAt) / 1_000,
-    })
-  }
 
   if (cookie) {
     headers.set("cookie", cookie)
   }
-  headers.set("X-Request-Id", requestId)
+  headers.set("X-Request-Id", getRequestIdForRequest(req))
+  const { requestId, observe, observeStatus } = createServerApiFetchMetricsContext(safePath, headers, "ssr")
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const onAbort = () => controller.abort()
 
   if (init.signal) {
     if (init.signal.aborted) controller.abort()
@@ -119,12 +113,12 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
     cleanup()
   }
 
-  return { response, requestId, url: `${baseUrl}${safePath}`, timeoutMs, observe }
+  return { response, requestId, url: `${baseUrl}${safePath}`, timeoutMs, observe, observeStatus }
 }
 
 export const serverApiFetch = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
   const exchange = await createServerApiExchange(req, path, init)
-  exchange.observe(classifyBackendHttpResult(exchange.response.status))
+  exchange.observeStatus(exchange.response.status)
   return exchange.response
 }
 
@@ -164,11 +158,11 @@ export const serverApiFetchJson = async <T>(
     throw error
   }
 
-  const { response, requestId, url, timeoutMs, observe } = exchange
+  const { response, requestId, url, timeoutMs, observe, observeStatus } = exchange
 
   if (!response.ok) {
     const body = await response.text().catch(() => "")
-    observe(classifyBackendHttpResult(response.status))
+    observeStatus(response.status)
     throw new ApiError(response.status, url, body, requestId)
   }
 
