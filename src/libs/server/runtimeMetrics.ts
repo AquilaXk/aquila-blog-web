@@ -68,14 +68,15 @@ export const classifyBackendRoute = (path: string): BackendRouteClass => {
 export const createRuntimeMetrics = (): RuntimeMetrics => {
   const registry = new Registry()
   collectDefaultMetrics({ register: registry, prefix: "aquila_web_" })
-  new Gauge({
+  const processUptime = new Gauge({
     name: "aquila_web_process_uptime_seconds",
     help: "Process uptime in seconds.",
-    registers: [registry],
+    registers: [],
     collect() {
       this.set(process.uptime())
     },
   })
+  registry.registerMetric(processUptime)
 
   const ssrRequestDuration = new Histogram({
     name: "aquila_web_ssr_request_duration_seconds",
