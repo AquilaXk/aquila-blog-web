@@ -12,7 +12,6 @@ export const toolbarMarkdownSnippets = [
   { label: "H1", title: "제목 1", before: "# ", after: "" },
   { label: "H2", title: "제목 2", before: "## ", after: "" },
   { label: "H3", title: "제목 3", before: "### ", after: "" },
-  { label: "B", title: `굵게 (${modShortcutLabel}B)`, before: "**", after: "**", toggle: true },
   { label: "I", title: `기울임 (${modShortcutLabel}I)`, before: "_", after: "_", toggle: true },
   { label: "S", title: `취소선 (${modShortcutLabel}Shift+X)`, before: "~~", after: "~~", toggle: true },
   { label: "`", title: `인라인 코드 (${modShortcutLabel}E)`, before: "`", after: "`", toggle: true },

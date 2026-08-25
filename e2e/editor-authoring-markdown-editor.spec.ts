@@ -1498,6 +1498,62 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByTestId("markdown-editor-preview-pane").locator("table")).toBeVisible()
   })
 
+  test("command registry toolbar menu and keyboard parity", async ({ page }) => {
+    const tableMarkdown = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
+    await routeAuthenticatedEditor(page, tableMarkdown)
+    await page.goto("/editor/new?source=local-draft")
+
+    const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
+    const commandMenu = page.getByRole("combobox", { name: "명령 메뉴", exact: true })
+    await expect(commandMenu).toBeVisible()
+    const boldButton = page.getByRole("button", { name: /굵게 \((⌘|Ctrl\+)B\)/ })
+    await expect(boldButton).toHaveCount(1)
+    await expect(page.getByRole("button", { name: "코드 블록", exact: true })).toHaveCount(1)
+    await expect(page.getByRole("button", { name: "표 행 추가", exact: true })).toHaveCount(1)
+    await expect(commandMenu.getByRole("option", { name: "표 행 추가", exact: true })).toBeDisabled()
+
+    await textarea.click()
+    await textarea.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+    await textarea.press(process.platform === "darwin" ? "Meta+B" : "Control+B")
+    await expect(textarea).toHaveValue(`**${tableMarkdown}**`)
+
+    await boldButton.click()
+    await expect(textarea).toHaveValue(tableMarkdown)
+
+    await textarea.evaluate((element) => {
+      element.focus()
+      element.setSelectionRange(element.value.length, element.value.length)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    await textarea.press("Enter")
+    await textarea.press(process.platform === "darwin" ? "Meta+B" : "Control+B")
+    await expect(textarea).toHaveValue(`${tableMarkdown}\n****`)
+
+    await page.getByRole("tab", { name: "Preview" }).click()
+    await commandMenu.selectOption("block.code")
+    await expect(page.getByTestId("markdown-editor-write-pane")).toBeVisible()
+    await expect.poll(() => textarea.inputValue()).toContain(tableMarkdown)
+    await expect.poll(() => textarea.inputValue()).toContain("```\n\n```")
+
+    await textarea.evaluate((element) => {
+      const caret = element.value.indexOf("one")
+      element.focus()
+      element.setSelectionRange(caret, caret)
+      element.dispatchEvent(new Event("select", { bubbles: true }))
+    })
+    await textarea.press("ArrowRight")
+    await expect(commandMenu.getByRole("option", { name: "표 행 추가", exact: true })).toBeEnabled()
+    const logicalRowCountBeforeAdd = await textarea.evaluate((element) =>
+      element.value.split("\n").filter((line) => line.startsWith("|")).length
+    )
+    await commandMenu.selectOption("table.add-row")
+    await expect
+      .poll(() =>
+        textarea.evaluate((element) => element.value.split("\n").filter((line) => line.startsWith("|")).length)
+      )
+      .toBe(logicalRowCountBeforeAdd + 1)
+  })
+
   test("ordered list toolbar transforms mixed nested lines with shared undo and redo", async ({ page }) => {
     const original = ["plain", "  - nested", "- [x] task"].join("\n")
     const transformed = ["1. plain", "  1. nested", "2. task"].join("\n")
