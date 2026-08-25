@@ -1,39 +1,13 @@
-import { setCookie } from "cookies-next/client"
 import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query"
-import { apiFetch } from "src/apis/backend/client"
 import type { ProfileCardLinkItem } from "src/constants/profileCardLinks"
 import { queryKey } from "src/constants/queryKey"
 import { normalizeBlogDesign, normalizeLegacyBlogScheme } from "src/libs/profileWorkspace"
 import type { AboutProjectBlock, AboutSectionBlock } from "src/libs/profileWorkspace"
+import { fetchPublicAdminProfile } from "src/libs/publicAdminProfileClient"
 import type { BlogDesignType, LegacyBlogScheme } from "src/types"
+import type { AdminProfile } from "src/types/adminProfile"
 
-const ADMIN_PROFILE_SNAPSHOT_COOKIE = "admin_profile_snapshot_v1"
-const ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30
-
-export type AdminProfile = {
-  username: string
-  name: string
-  nickname: string
-  modifiedAt?: string
-  profileImageUrl: string
-  profileImageDirectUrl?: string
-  profileRole?: string
-  profileBio?: string
-  aboutHeadline?: string
-  aboutRole?: string
-  aboutBio?: string
-  aboutDetails?: string
-  aboutSections?: AboutSectionBlock[]
-  aboutProjectSectionTitle?: string
-  aboutProjects?: AboutProjectBlock[]
-  blogTitle?: string
-  homeIntroTitle?: string
-  homeIntroDescription?: string
-  blogDesign?: BlogDesignType
-  legacyBlogScheme?: LegacyBlogScheme
-  serviceLinks?: ProfileCardLinkItem[]
-  contactLinks?: ProfileCardLinkItem[]
-}
+export type { AdminProfile } from "src/types/adminProfile"
 
 type AdminProfileLike = {
   username: string
@@ -95,15 +69,6 @@ export const setAdminProfileCache = (queryClient: QueryClient, profile: AdminPro
   queryClient.setQueryData(queryKey.adminProfile(), profile)
 }
 
-const persistAdminProfileSnapshotCookie = (profile: AdminProfile) => {
-  setCookie(ADMIN_PROFILE_SNAPSHOT_COOKIE, JSON.stringify(toAdminProfile(profile)), {
-    path: "/",
-    sameSite: "lax",
-    maxAge: ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS,
-    secure: typeof window !== "undefined" && window.location.protocol === "https:",
-  })
-}
-
 export const useAdminProfile = (initialProfile: AdminProfile | null = null, options: UseAdminProfileOptions = {}) => {
   const isBrowser = typeof window !== "undefined"
   const canFetch = options.enabled ?? true
@@ -115,11 +80,7 @@ export const useAdminProfile = (initialProfile: AdminProfile | null = null, opti
 
   const query = useQuery<AdminProfile | null>({
     queryKey: cacheKey,
-    queryFn: async () => {
-      const nextProfile = await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
-      persistAdminProfileSnapshotCookie(nextProfile)
-      return nextProfile
-    },
+    queryFn: fetchPublicAdminProfile,
     enabled: isBrowser && canFetch,
     throwOnError: true,
     initialData: seededProfile ?? undefined,

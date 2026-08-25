@@ -2,11 +2,18 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
 
-test("admin profile query propagates API failures instead of returning retained data", () => {
-  const source = readFileSync(path.resolve(__dirname, "../../src/hooks/useAdminProfile.ts"), "utf8")
+test("admin profile readers share the fail-closed request contract", () => {
+  const hookSource = readFileSync(path.resolve(__dirname, "../../src/hooks/useAdminProfile.ts"), "utf8")
+  const rootLayoutSource = readFileSync(path.resolve(__dirname, "../../src/layouts/RootLayout/index.tsx"), "utf8")
+  const requestSource = readFileSync(path.resolve(__dirname, "../../src/libs/publicAdminProfileClient.ts"), "utf8")
 
-  expect(source).toContain('const nextProfile = await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")')
-  expect(source).toContain("throwOnError: true")
-  expect(source).not.toContain("catch {")
-  expect(source).not.toContain("return initialProfile ?? null")
+  for (const source of [hookSource, rootLayoutSource]) {
+    expect(source).toContain("fetchPublicAdminProfile")
+    expect(source).toContain("throwOnError: true")
+  }
+  expect(requestSource).toContain('await import("src/apis/backend/client")')
+  expect(requestSource).toContain("const profile = await apiFetch<AdminProfile>(PUBLIC_ADMIN_PROFILE_PATH)")
+  expect(requestSource).toContain("await persistAdminProfileSnapshotCookie(profile)")
+  expect(hookSource).not.toContain("return initialProfile ?? null")
+  expect(rootLayoutSource).not.toContain("if (!response.ok) return null")
 })
