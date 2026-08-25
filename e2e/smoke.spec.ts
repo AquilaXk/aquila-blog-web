@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import path from "path"
 import { resolveStaticAdminProfileSeed } from "../src/libs/server/postDetailPage"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.describe("core smoke source boundaries", () => {
   test("Markdown renderer pipeline은 facade/component/parser/style module로 분리된다", () => {
@@ -614,5 +615,6 @@ const mockFeedEndpoints = async (page: Page) => {
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 })

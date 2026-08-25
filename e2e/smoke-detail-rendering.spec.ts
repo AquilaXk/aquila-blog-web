@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { createHash } from "node:crypto"
 import summaryFixtures from "../contracts/platform/summary-fixtures.json"
 import { markdownImplementedFeatureFixture } from "../tests/fixtures/markdownImplementedFeatureFixture"
-import { mockAvatarAsset } from "./helpers/smokeFixtures"
+import { mockAvatarAsset, mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 const leadingBlockFixture = summaryFixtures.fixtures.find((fixture) => fixture.id === "leading-block")
 if (!leadingBlockFixture) throw new Error("missing imported summary fixture: leading-block")
@@ -14,6 +14,7 @@ const leadingBlockBodyLines = leadingBlockFixture.content
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("core smoke detail rendering", () => {

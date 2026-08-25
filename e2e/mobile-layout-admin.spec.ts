@@ -5,6 +5,7 @@ import {
   mockAdminPostsWorkspaceEndpoints,
   mockAvatarAsset,
 } from "./helpers/mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.use({
   viewport: MOBILE_VIEWPORT,
@@ -15,6 +16,7 @@ test.use({
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
   await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("모바일 관리자 레이아웃", () => {

@@ -6,10 +6,12 @@ import {
   addPublicAboutSnapshotCookie,
   mockAvatarAsset,
   mockFeedEndpoints,
+  mockPublicAdminProfile,
 } from "./helpers/smokeFixtures"
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("core smoke public shell", () => {

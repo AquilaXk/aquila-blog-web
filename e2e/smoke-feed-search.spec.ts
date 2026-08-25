@@ -4,6 +4,7 @@ import {
   createExplorePost,
   mockAvatarAsset,
   mockFeedEndpoints,
+  mockPublicAdminProfile,
 } from "./helpers/smokeFixtures"
 
 const triggerSearchShortcut = async (page: Page) => {
@@ -42,6 +43,7 @@ const mockAnonymousSession = async (page: Page) => {
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("core smoke feed and search", () => {
