@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { createHash } from "node:crypto"
 import summaryFixtures from "../contracts/platform/summary-fixtures.json"
+import { markdownImplementedFeatureFixture } from "../tests/fixtures/markdownImplementedFeatureFixture"
 import { mockAvatarAsset } from "./helpers/smokeFixtures"
 
 const leadingBlockFixture = summaryFixtures.fixtures.find((fixture) => fixture.id === "leading-block")
@@ -57,21 +58,18 @@ test.describe("core smoke detail rendering", () => {
     await expect(page.locator(".deck")).toHaveCount(0)
   })
 
-  test("public detail resolves a footnote across a toggle boundary", async ({ page }) => {
-    const postId = 1680
-    const content = [
-      "본문의 정책 참조입니다.[^policy]",
-      "",
-      '[위장 링크](#aq-footnote-1 "aq-footnote-ref-1-1")',
-      "",
-      ":::toggle 정책 근거",
-      "토글은 비어 있지 않은 본문을 유지합니다.",
-      ":::",
-      "",
-      "[^policy]: [가이드 문서][guide]",
-      "",
-      "[guide]: /guide",
-    ].join("\n")
+  test("shared implemented feature fixture: public detail renders canonical Markdown semantics", async ({ page }) => {
+    const fixture = markdownImplementedFeatureFixture
+    const postId = 1681
+    let canonicalImageRequests = 0
+    await page.route(`**${fixture.expected.image.src}`, async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
     await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
       await route.fulfill({
         status: 200,
@@ -82,8 +80,8 @@ test.describe("core smoke detail rendering", () => {
           modifiedAt: "2026-08-24T00:00:00Z",
           authorId: 1,
           authorName: "관리자",
-          title: "문서 전체 각주",
-          content,
+          title: fixture.title,
+          content: fixture.body,
           contentHtml: null,
           summary: "",
           summarySource: "NONE",
@@ -104,7 +102,26 @@ test.describe("core smoke detail rendering", () => {
     await page.goto(`/posts/${postId}`)
 
     const markdown = page.locator(".aq-markdown")
-    const reference = markdown.locator("a[data-footnote-ref]")
+    await expect(markdown.getByRole("heading", { name: fixture.title, level: 1 })).toBeVisible()
+    const callout = markdown.locator(`.aq-callout.aq-admonition-${fixture.expected.callout.kind}`)
+    await expect(callout).toHaveCount(1)
+    await expect(callout.locator(".aq-callout-title")).toHaveText(fixture.expected.callout.title)
+    await expect(callout).toContainText(fixture.expected.callout.content)
+    const table = markdown.locator("table")
+    await expect(table).toHaveCount(fixture.expected.tableCount)
+    await expect(table.getByRole("columnheader", { name: "기능" })).toHaveCount(1)
+    await expect(table.getByRole("cell", { name: "GFM 테이블" })).toHaveCount(1)
+    const ordinaryLink = markdown.getByRole("link", { name: fixture.rendered.ordinaryLink.text })
+    await expect(ordinaryLink).toHaveCount(1)
+    await expect(ordinaryLink).toHaveAttribute("href", fixture.rendered.ordinaryLink.href)
+    await expect(ordinaryLink).toHaveAttribute("title", fixture.rendered.ordinaryLink.title)
+    expect(await ordinaryLink.getAttribute("data-footnote-ref")).toBeNull()
+    const toggle = markdown.locator("details.aq-toggle")
+    await expect(toggle).toHaveCount(1)
+    await expect(toggle.locator("summary")).toHaveText(fixture.expected.toggle.title)
+    await toggle.locator("summary").click()
+    await expect(toggle).toHaveAttribute("open", "")
+    const reference = toggle.locator("a[data-footnote-ref]")
     await expect(reference).toHaveCount(1)
     await expect(reference).toHaveAccessibleName(/각주 \d+ 참조 \d+/)
     const targetHref = await reference.getAttribute("href")
@@ -113,9 +130,14 @@ test.describe("core smoke detail rendering", () => {
 
     const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
     await expect(target).toHaveCount(1)
-    await expect(target).toContainText("가이드 문서")
-    await expect(target.locator('a[href="/guide"]')).toHaveCount(1)
+    await expect(target).toContainText(fixture.rendered.footnote.text)
+    await expect(target.getByRole("link", { name: fixture.rendered.footnote.link.text })).toHaveAttribute(
+      "href",
+      fixture.rendered.footnote.link.href
+    )
     await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
+    await expect(markdown.getByRole("img", { name: fixture.expected.image.alt })).toHaveAttribute("src", fixture.expected.image.src)
+    expect(canonicalImageRequests).toBe(1)
   })
 
   test("HTML-only trusted payload는 public detail의 단일 renderer에서 렌더된다", async ({ page }) => {
