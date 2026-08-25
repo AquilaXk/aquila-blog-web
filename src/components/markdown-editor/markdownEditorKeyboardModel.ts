@@ -12,6 +12,7 @@ import {
   planMarkdownEditorTableTab,
 } from "./markdownEditorTableModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
+import { matchListMarkerLine } from "./markdownEditorListCommandsModel"
 
 export type MarkdownFormatShortcut =
   | "bold"
@@ -20,9 +21,7 @@ export type MarkdownFormatShortcut =
   | "strikethrough"
   | "inlineCode"
 
-export type ListMarkerMatch =
-  | { kind: "unordered" | "task" | "quote"; indent: string; marker: string; content: string }
-  | { kind: "ordered"; indent: string; marker: string; content: string; number: number }
+export type { ListMarkerMatch } from "./markdownEditorListCommandsModel"
 
 const FORMAT_WRAP: Record<Exclude<MarkdownFormatShortcut, "link">, { before: string; after: string }> = {
   bold: { before: "**", after: "**" },
@@ -84,50 +83,7 @@ export const isOffsetInsideFencedCodeBlock = (value: string, offset: number): bo
   return inFence
 }
 
-export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
-  const task = /^(?<indent>\s*)(?<marker>- \[[ xX]\] )(?<content>.*)$/.exec(line)
-  if (task?.groups) {
-    return {
-      kind: "task",
-      indent: task.groups.indent ?? "",
-      marker: "- [ ] ",
-      content: task.groups.content ?? "",
-    }
-  }
-
-  const unordered = /^(?<indent>\s*)(?<marker>- |\* )(?<content>.*)$/.exec(line)
-  if (unordered?.groups) {
-    return {
-      kind: "unordered",
-      indent: unordered.groups.indent ?? "",
-      marker: unordered.groups.marker ?? "- ",
-      content: unordered.groups.content ?? "",
-    }
-  }
-
-  const ordered = /^(?<indent>\s*)(?<marker>(?<number>\d+)\. )(?<content>.*)$/.exec(line)
-  if (ordered?.groups) {
-    return {
-      kind: "ordered",
-      indent: ordered.groups.indent ?? "",
-      marker: ordered.groups.marker ?? "1. ",
-      content: ordered.groups.content ?? "",
-      number: Number.parseInt(ordered.groups.number ?? "1", 10) || 1,
-    }
-  }
-
-  const quote = /^(?<indent>\s*)(?<marker>> )(?<content>.*)$/.exec(line)
-  if (quote?.groups) {
-    return {
-      kind: "quote",
-      indent: quote.groups.indent ?? "",
-      marker: "> ",
-      content: quote.groups.content ?? "",
-    }
-  }
-
-  return null
-}
+export { matchListMarkerLine }
 
 export const planListEnterContinuation = (
   value: string,
