@@ -116,18 +116,12 @@ export const useAdminProfile = (initialProfile: AdminProfile | null = null, opti
   const query = useQuery<AdminProfile | null>({
     queryKey: cacheKey,
     queryFn: async () => {
-      try {
-        const nextProfile = await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
-        persistAdminProfileSnapshotCookie(nextProfile)
-        return nextProfile
-      } catch {
-        // 일시적인 네트워크 실패 시 기존 문구가 흔들리지 않도록 마지막 성공 캐시를 우선 유지한다.
-        const cached = queryClient.getQueryData<AdminProfile | null>(cacheKey)
-        if (cached !== undefined) return cached
-        return initialProfile ?? null
-      }
+      const nextProfile = await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
+      persistAdminProfileSnapshotCookie(nextProfile)
+      return nextProfile
     },
     enabled: isBrowser && canFetch,
+    throwOnError: true,
     initialData: seededProfile ?? undefined,
     staleTime: options.staleTimeMs ?? (hasSeedProfile ? 5 * 60 * 1000 : 0),
     retry: false,
