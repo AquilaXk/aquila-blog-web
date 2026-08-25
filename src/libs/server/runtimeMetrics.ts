@@ -108,11 +108,14 @@ export const createRuntimeMetrics = (): RuntimeMetrics => {
   }
 }
 
-let runtimeMetrics: RuntimeMetrics | undefined
+type RuntimeMetricsGlobal = typeof globalThis & {
+  __aquilaRuntimeMetrics?: RuntimeMetrics
+}
 
 export const initializeRuntimeMetrics = (): RuntimeMetrics => {
-  runtimeMetrics ??= createRuntimeMetrics()
-  return runtimeMetrics
+  const authority = globalThis as RuntimeMetricsGlobal
+  authority.__aquilaRuntimeMetrics ??= createRuntimeMetrics()
+  return authority.__aquilaRuntimeMetrics
 }
 
 export const getRuntimeMetrics = (): RuntimeMetrics => initializeRuntimeMetrics()

@@ -8,13 +8,14 @@ import test from "node:test"
 const frontRoot = path.resolve(import.meta.dirname, "../..")
 const contractPath = path.join(frontRoot, "config/env.contract.json")
 const validatorPath = path.join(frontRoot, "scripts/env/validate-env.mjs")
+const webMetricsToken = "web-metrics-token-for-contract-validation"
 
 const productionEnv = [
   "NEXT_PUBLIC_BACKEND_URL=https://api.example.test",
   "BACKEND_INTERNAL_URL=https://api.example.test",
   "NEXT_PUBLIC_SITE_URL=https://www.example.test",
   "TOKEN_FOR_REVALIDATE=web-revalidate-token",
-  "WEB_METRICS_TOKEN=web-metrics-test-token",
+  `WEB_METRICS_TOKEN=${webMetricsToken}`,
   "BACKEND_PROXY_MAX_BODY_BYTES=104857600",
   "BACKEND_PROXY_MAX_IN_FLIGHT_BODY_BYTES=268435456",
   "NEXT_PUBLIC_SIGNUP_ENABLED=false",
@@ -35,7 +36,7 @@ test("production rejects missing secret, non-HTTPS URLs, and non-positive proxy 
     target: "production",
     text: productionEnv
       .replace("TOKEN_FOR_REVALIDATE=web-revalidate-token\n", "")
-      .replace("WEB_METRICS_TOKEN=web-metrics-test-token\n", "")
+      .replace(`WEB_METRICS_TOKEN=${webMetricsToken}\n`, "")
       .replace("NEXT_PUBLIC_BACKEND_URL=https://api.example.test", "NEXT_PUBLIC_BACKEND_URL=http://api.example.test")
       .replace("BACKEND_PROXY_MAX_BODY_BYTES=104857600", "BACKEND_PROXY_MAX_BODY_BYTES=0")
       .replace("NEXT_PUBLIC_SIGNUP_ENABLED=false", "NEXT_PUBLIC_SIGNUP_ENABLED=true")
@@ -83,6 +84,17 @@ test("production rejects short and placeholder revalidation tokens", async () =>
     assert.equal(result.ok, false, token)
     assert(result.errors.some((error) => error.key === "TOKEN_FOR_REVALIDATE"), token)
   }
+})
+
+test("production rejects a short metrics bearer token", async () => {
+  const { loadContract, validateEnvText } = await import("./validate-env.mjs")
+  const result = validateEnvText({
+    contract: loadContract(contractPath),
+    target: "production",
+    text: productionEnv.replace(`WEB_METRICS_TOKEN=${webMetricsToken}`, "WEB_METRICS_TOKEN=short-metrics-token"),
+  })
+  assert.equal(result.ok, false)
+  assert(result.errors.some((error) => error.key === "WEB_METRICS_TOKEN" && error.message.includes("32")))
 })
 
 test("test target allows both disabled and enabled public feature branches without production inputs", async () => {

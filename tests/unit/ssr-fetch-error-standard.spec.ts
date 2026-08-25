@@ -3,6 +3,7 @@ import type { IncomingMessage } from "http"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "../../src/apis/backend/client"
 import { readAdminProtectedBootstrap } from "../../src/libs/server/adminPage"
 import { serverApiFetchJson } from "../../src/libs/server/backend"
+import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 
 const originalFetch = globalThis.fetch
 const originalBackendInternalUrl = process.env.BACKEND_INTERNAL_URL
@@ -82,6 +83,12 @@ test("serverApiFetchJson throws ApiError with status/body/userMessage on HTTP fa
 })
 
 test("serverApiFetchJson wraps JSON Content-Type parse failure as ApiError", async () => {
+  const count = async (result: string) => {
+    const exposition = await getRuntimeMetrics().registry.metrics()
+    return Number(exposition.match(new RegExp(`aquila_web_backend_fetch_duration_seconds_count\\{source="ssr",route_class="auth",result="${result}"\\} (\\d+)`))?.[1] || 0)
+  }
+  const beforeOther = await count("other_error")
+  const beforeSuccess = await count("2xx")
   globalThis.fetch = (async () =>
     new Response("{not-json", {
       status: 200,
@@ -94,6 +101,28 @@ test("serverApiFetchJson wraps JSON Content-Type parse failure as ApiError", asy
   } catch (error) {
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).status).toBe(200)
+    expect((error as ApiError).requestId).toMatch(/^[0-9a-f-]{36}$/i)
+  }
+  expect(await count("other_error")).toBe(beforeOther + 1)
+  expect(await count("2xx")).toBe(beforeSuccess)
+})
+
+test("serverApiFetchJson propagates an observer failure without retrying observation", async () => {
+  const runtimeMetrics = getRuntimeMetrics()
+  const originalObserve = runtimeMetrics.observeBackendFetch
+  const observerFailure = new Error("metrics observer failed")
+  let observeCalls = 0
+  runtimeMetrics.observeBackendFetch = () => {
+    observeCalls += 1
+    throw observerFailure
+  }
+  globalThis.fetch = (async () => jsonResponse(200, { ok: true })) as typeof fetch
+
+  try {
+    await expect(serverApiFetchJson(createReq(), "/member/api/v1/auth/me")).rejects.toBe(observerFailure)
+    expect(observeCalls).toBe(1)
+  } finally {
+    runtimeMetrics.observeBackendFetch = originalObserve
   }
 })
 

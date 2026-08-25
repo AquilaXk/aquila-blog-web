@@ -58,7 +58,15 @@ export const resolveServerApiBaseUrl = (_req: IncomingMessage): string => {
   return "http://localhost:8080"
 }
 
-export const serverApiFetch = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
+type ServerApiExchange = {
+  response: Response
+  requestId: string
+  url: string
+  timeoutMs: number
+  observe: (result: ReturnType<typeof classifyBackendHttpResult>) => void
+}
+
+const createServerApiExchange = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}): Promise<ServerApiExchange> => {
   const safePath = normalizeApiRequestPath(path)
   const baseUrl = resolveServerApiBaseUrl(req)
   const { timeoutMs: _timeoutMs, ...requestInit } = init
@@ -70,6 +78,17 @@ export const serverApiFetch = async (req: IncomingMessage, path: string, init: S
   const onAbort = () => controller.abort()
   const requestId = getRequestIdForRequest(req)
   const startedAt = performance.now()
+  let observed = false
+  const observe = (result: ReturnType<typeof classifyBackendHttpResult>) => {
+    if (observed) throw new Error("Server API metrics outcome was already observed")
+    observed = true
+    getRuntimeMetrics().observeBackendFetch({
+      source: "ssr",
+      routeClass: classifyBackendRoute(safePath),
+      result,
+      durationSeconds: (performance.now() - startedAt) / 1_000,
+    })
+  }
 
   if (cookie) {
     headers.set("cookie", cookie)
@@ -94,24 +113,19 @@ export const serverApiFetch = async (req: IncomingMessage, path: string, init: S
       signal: controller.signal,
     })
   } catch (error) {
-    getRuntimeMetrics().observeBackendFetch({
-      source: "ssr",
-      routeClass: classifyBackendRoute(safePath),
-      result: classifyServerFetchError(error, init.signal, controller.signal),
-      durationSeconds: (performance.now() - startedAt) / 1_000,
-    })
+    observe(classifyServerFetchError(error, init.signal, controller.signal))
     throw error
   } finally {
     cleanup()
   }
 
-  getRuntimeMetrics().observeBackendFetch({
-    source: "ssr",
-    routeClass: classifyBackendRoute(safePath),
-    result: classifyBackendHttpResult(response.status),
-    durationSeconds: (performance.now() - startedAt) / 1_000,
-  })
-  return response
+  return { response, requestId, url: `${baseUrl}${safePath}`, timeoutMs, observe }
+}
+
+export const serverApiFetch = async (req: IncomingMessage, path: string, init: ServerApiFetchInit = {}) => {
+  const exchange = await createServerApiExchange(req, path, init)
+  exchange.observe(classifyBackendHttpResult(exchange.response.status))
+  return exchange.response
 }
 
 /**
@@ -124,15 +138,14 @@ export const serverApiFetchJson = async <T>(
   path: string,
   init: ServerApiFetchInit = {}
 ): Promise<T> => {
-  const safePath = normalizeApiRequestPath(path)
-  const url = `${resolveServerApiBaseUrl(req)}${safePath}`
-  const timeoutMs = resolveServerTimeoutMs(safePath, init)
-  const requestId = getRequestIdForRequest(req)
-
-  let response: Response
+  let exchange: ServerApiExchange
   try {
-    response = await serverApiFetch(req, path, init)
+    exchange = await createServerApiExchange(req, path, init)
   } catch (error) {
+    const safePath = normalizeApiRequestPath(path)
+    const url = `${resolveServerApiBaseUrl(req)}${safePath}`
+    const timeoutMs = resolveServerTimeoutMs(safePath, init)
+    const requestId = getRequestIdForRequest(req)
     if (init.signal?.aborted) {
       throw error
     }
@@ -151,39 +164,67 @@ export const serverApiFetchJson = async <T>(
     throw error
   }
 
+  const { response, requestId, url, timeoutMs, observe } = exchange
+
   if (!response.ok) {
     const body = await response.text().catch(() => "")
+    observe(classifyBackendHttpResult(response.status))
     throw new ApiError(response.status, url, body, requestId)
   }
 
   if (response.status === 204) {
+    observe("2xx")
     return null as T
   }
 
   const contentLength = response.headers.get("content-length")
   if (contentLength === "0") {
+    observe("2xx")
     return null as T
   }
 
   const contentType = response.headers.get("content-type")?.toLowerCase() || ""
   if (contentType.includes("application/json")) {
+    let value: T
     try {
-      return (await response.json()) as T
-    } catch {
+      value = (await response.json()) as T
+    } catch (error) {
+      if (error instanceof TypeError) {
+        observe("network_error")
+        throw new ApiNetworkError(url, requestId)
+      }
+      observe("other_error")
       throw new ApiError(response.status, url, "", requestId)
     }
+    observe("2xx")
+    return value
   }
 
-  const body = await response.text()
+  let body: string
+  try {
+    body = await response.text()
+  } catch (error) {
+    if (error instanceof TypeError) {
+      observe("network_error")
+      throw new ApiNetworkError(url, requestId)
+    }
+    observe("other_error")
+    throw error
+  }
   if (!body) {
+    observe("2xx")
     return null as T
   }
 
+  let value: T
   try {
-    return JSON.parse(body) as T
+    value = JSON.parse(body) as T
   } catch {
+    observe("other_error")
     throw new ApiError(response.status, url, body, requestId)
   }
+  observe("2xx")
+  return value
 }
 
 const classifyServerFetchError = (error: unknown, callerSignal: AbortSignal | null | undefined, signal: AbortSignal) => {

@@ -44,6 +44,9 @@ jobs:
       - run: yarn legal:check
       - run: yarn lint
       - run: yarn build
+      - run: yarn check:runtime-metrics-standalone
+        env:
+          WEB_METRICS_TOKEN: ci-metrics-${{ github.run_id }}-${{ github.run_attempt }}-standalone-contract
       - run: yarn test:unit
 
   storybook-bundle:
