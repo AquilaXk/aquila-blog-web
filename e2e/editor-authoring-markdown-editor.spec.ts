@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer"
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { resolve } from "node:path"
 import summaryFixtures from "../contracts/platform/summary-fixtures.json"
+import { markdownImplementedFeatureFixture } from "../tests/fixtures/markdownImplementedFeatureFixture"
 import type { Page, Route } from "./helpers/authoringPlaywright"
 import { expect, test } from "./helpers/authoringPlaywright"
 
@@ -446,23 +447,29 @@ test.describe("Markdown editor replacement", () => {
     await expect(preview.getByText("quote at the bottom")).toBeVisible()
   })
 
-  test("editor preview resolves a footnote across a toggle boundary", async ({ page }) => {
-    await routeAuthenticatedEditor(page, [
-      "본문의 정책 참조입니다.[^policy]",
-      "",
-      '[위장 링크](#aq-footnote-1 "aq-footnote-ref-1-1")',
-      "",
-      ":::toggle 정책 근거",
-      "토글은 비어 있지 않은 본문을 유지합니다.",
-      ":::",
-      "",
-      "[^policy]: 문서 끝의 정책 근거",
-    ].join("\n"))
+  test("shared implemented feature fixture: editor preview renders canonical Markdown semantics", async ({ page }) => {
+    const fixture = markdownImplementedFeatureFixture
+    await routeAuthenticatedEditor(page, fixture.body, fixture.title)
 
     await page.goto("/editor/new?source=local-draft")
 
+    await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toHaveValue(fixture.body)
     const markdown = page.getByTestId("markdown-editor-preview-pane").locator(".aq-markdown")
-    const reference = markdown.locator("a[data-footnote-ref]")
+    await expect(markdown.getByRole("heading", { name: fixture.title, level: 1 })).toBeVisible()
+    const callout = markdown.locator(`.aq-callout.aq-admonition-${fixture.expected.callout.kind}`)
+    await expect(callout).toHaveCount(1)
+    await expect(callout.locator(".aq-callout-title")).toHaveText(fixture.expected.callout.title)
+    await expect(callout).toContainText(fixture.expected.callout.content)
+    const table = markdown.locator("table")
+    await expect(table).toHaveCount(fixture.expected.tableCount)
+    await expect(table.getByRole("columnheader", { name: "기능" })).toHaveCount(1)
+    await expect(table.getByRole("cell", { name: "GFM 테이블" })).toHaveCount(1)
+    const toggle = markdown.locator("details.aq-toggle")
+    await expect(toggle).toHaveCount(1)
+    await expect(toggle.locator("summary")).toHaveText(fixture.expected.toggle.title)
+    await toggle.locator("summary").click()
+    await expect(toggle).toHaveAttribute("open", "")
+    const reference = toggle.locator("a[data-footnote-ref]")
     await expect(reference).toHaveCount(1)
     await expect(reference).toHaveAccessibleName(/각주 \d+ 참조 \d+/)
     const targetHref = await reference.getAttribute("href")
@@ -471,8 +478,9 @@ test.describe("Markdown editor replacement", () => {
 
     const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
     await expect(target).toHaveCount(1)
-    await expect(target).toContainText("문서 끝의 정책 근거")
+    await expect(target).toContainText(fixture.expected.footnotes[0].content)
     await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
+    await expect(markdown.getByRole("img", { name: fixture.expected.image.alt })).toHaveAttribute("src", fixture.expected.image.src)
   })
 
   test("split preview aligns the Markdown body and keeps the public header for Preview mode", async ({ page }) => {
