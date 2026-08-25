@@ -7,6 +7,7 @@ import {
   mockAvatarAsset,
   mockFeedEndpoints,
   mockPublicAdminProfile,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "./helpers/smokeFixtures"
 
 test.beforeEach(async ({ page }) => {
@@ -291,7 +292,7 @@ test.describe("core smoke public shell", () => {
       body: JSON.stringify({ resultCode: "401-1", msg: "unauthorized" }),
     })
   })
-  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+  await page.route(PUBLIC_ADMIN_PROFILE_ROUTE, async (route) => {
     await route.fulfill({
       status: 503,
       contentType: "application/json",

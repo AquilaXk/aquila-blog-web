@@ -3,13 +3,14 @@ import { mockAnonymousSession } from "./helpers/mobileLayoutFixtures"
 import {
   addPublicAboutSnapshotCookie,
   mockFeedEndpoints,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "./helpers/smokeFixtures"
 
 test("seeded public profile 503 reaches the global error boundary", async ({ page }) => {
   await addPublicAboutSnapshotCookie(page)
   await mockAnonymousSession(page)
   await mockFeedEndpoints(page)
-  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+  await page.route(PUBLIC_ADMIN_PROFILE_ROUTE, async (route) => {
     await route.fulfill({
       status: 503,
       headers: { "x-request-id": "req-profile-503" },

@@ -2,11 +2,13 @@ import type { Page } from "@playwright/test"
 import {
   createPublicAdminProfileSnapshotFixture,
   PUBLIC_ADMIN_PROFILE_FIXTURE,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "../../tests/fixtures/publicAdminProfileFixture"
 
 export {
   createPublicAdminProfileSnapshotFixture,
   PUBLIC_ADMIN_PROFILE_FIXTURE,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "../../tests/fixtures/publicAdminProfileFixture"
 
 export const AVATAR_PNG_BASE64 =
@@ -14,7 +16,7 @@ export const AVATAR_PNG_BASE64 =
 export const AVATAR_PNG = Buffer.from(AVATAR_PNG_BASE64, "base64")
 
 export const mockPublicAdminProfile = async (page: Page) => {
-  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+  await page.route(PUBLIC_ADMIN_PROFILE_ROUTE, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
