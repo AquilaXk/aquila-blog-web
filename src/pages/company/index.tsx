@@ -74,7 +74,7 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
   }
 }
 
-export const getServerSideProps: GetServerSideProps<CompanyPageProps> = withSsrMetrics("public", async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<CompanyPageProps> = withSsrMetrics<CompanyPageProps>("public", async ({ req, res }) => {
   res.setHeader("Cache-Control", CACHE_CONTROL)
 
   return {

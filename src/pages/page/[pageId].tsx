@@ -9,7 +9,7 @@ type LegacyPageRouteProps = {
   notFoundLegacy: true
 }
 
-export const getServerSideProps: GetServerSideProps<LegacyPageRouteProps> = withSsrMetrics("public", async ({ params, res }) => {
+export const getServerSideProps: GetServerSideProps<LegacyPageRouteProps> = withSsrMetrics<LegacyPageRouteProps>("public", async ({ params, res }) => {
   const rawPageId = Array.isArray(params?.pageId) ? params?.pageId[0] : params?.pageId
   const pageId = typeof rawPageId === "string" ? rawPageId.trim() : ""
 

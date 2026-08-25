@@ -31,7 +31,7 @@ async function readJsonIfOk<T>(req: IncomingMessage, path: string): Promise<T | 
   }
 }
 
-export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = withSsrMetrics("admin", async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = withSsrMetrics<AdminDashboardPageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const bootstrapResultPromise =
     hasServerAuthCookie(req)

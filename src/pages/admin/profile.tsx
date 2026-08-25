@@ -17,7 +17,7 @@ type AdminProfileBootstrapPayload = {
   workspace: ProfileWorkspaceResponse
 }
 
-export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePageProps> = withSsrMetrics("admin", async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePageProps> = withSsrMetrics<AdminProfileWorkspacePageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const queryClient = createQueryClient()
   const bootstrapResultPromise =

@@ -41,7 +41,7 @@ test("every production GSSP export has one fixed SSR route class", () => {
 
   for (const [relativePath, routeClass] of Object.entries(pageRouteClasses)) {
     const source = readFileSync(path.join(pagesRoot, relativePath), "utf8")
-    expect(source).toContain(`withSsrMetrics("${routeClass}"`)
+    expect(source).toMatch(new RegExp(`withSsrMetrics(?:<[^>]+>)?\\("${routeClass}"`))
   }
   expect(exportedGsspFiles).toEqual(Object.keys(pageRouteClasses).sort())
 })

@@ -12,7 +12,7 @@ type EasySubwayPageProps = {
   canonicalUrl: string
 }
 
-export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = withSsrMetrics("public", async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = withSsrMetrics<EasySubwayPageProps>("public", async ({ req, res }) => {
   res.setHeader("Cache-Control", CACHE_CONTROL)
 
   return {

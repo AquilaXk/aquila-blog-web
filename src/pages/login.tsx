@@ -23,7 +23,7 @@ type RsData<T> = {
   data: T
 }
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics("auth", async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics<GuestPageProps>("auth", async ({ req }) => {
   return await getGuestPageProps(req)
 })
 

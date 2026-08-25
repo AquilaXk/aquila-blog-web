@@ -149,7 +149,7 @@ const getDependencyStatusTone = (value: string | null | undefined) => {
   return "warn" as const
 }
 
-export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsrMetrics("admin", async ({ req, res }) => {
+export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsrMetrics<AdminHubPageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const hasAuthCookie = hasServerAuthCookie(req)
   const fallbackProfileSnapshot = resolvePublicAdminProfileSnapshot(req)

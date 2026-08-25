@@ -33,7 +33,7 @@ type SocialSignupFragment = {
 
 const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true"
 
-export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics("auth", async ({ req }) => {
+export const getServerSideProps: GetServerSideProps<GuestPageProps> = withSsrMetrics<GuestPageProps>("auth", async ({ req }) => {
   return await getGuestPageProps(req)
 })
 
