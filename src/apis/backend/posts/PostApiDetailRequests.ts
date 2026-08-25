@@ -2,7 +2,6 @@ import type { PostDetail } from "src/types"
 import { ApiError, apiFetch } from "../client"
 import type { ApiPostWithContentDto } from "./PostApiDtos"
 import { extractPostIdFromSlug, mapPostDetail } from "./PostApiMappers"
-import { withoutTrustedContentHtml } from "./contentHtmlTrust"
 import {
   getFreshServerSnapshot,
   isServerRuntime,
@@ -45,15 +44,17 @@ export const getPostDetailById = async (id: string): Promise<PostDetail | null> 
   const postId = Number(id)
   if (!Number.isInteger(postId) || postId <= 0) return null
   const endpoint = `/post/api/v1/posts/${postId}`
+  const snapshotCache = postDetailSsrCache
+  const pendingSnapshots = pendingPostDetailPromises
   const canUseServerSnapshot = isServerRuntime
   const cachedSnapshot =
     canUseServerSnapshot
-      ? getFreshServerSnapshot(postDetailSsrCache, endpoint, POST_DETAIL_SSR_CACHE_TTL_MS)
+      ? getFreshServerSnapshot(snapshotCache, endpoint, POST_DETAIL_SSR_CACHE_TTL_MS)
       : null
   if (cachedSnapshot) return cachedSnapshot
 
   if (canUseServerSnapshot) {
-    const pendingSnapshot = pendingPostDetailPromises.get(endpoint)
+    const pendingSnapshot = pendingSnapshots.get(endpoint)
     if (pendingSnapshot) {
       return pendingSnapshot
     }
@@ -79,21 +80,19 @@ export const getPostDetailById = async (id: string): Promise<PostDetail | null> 
     try {
       const nextDetail = await loadPostDetail()
       if (nextDetail) {
-        setServerSnapshot(postDetailSsrCache, endpoint, nextDetail, POST_DETAIL_SSR_CACHE_MAX_ENTRIES)
+        setServerSnapshot(snapshotCache, endpoint, nextDetail, POST_DETAIL_SSR_CACHE_MAX_ENTRIES)
       }
       return nextDetail
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         return null
       }
-      const staleSnapshot = postDetailSsrCache.get(endpoint)?.value
-      if (staleSnapshot) return withoutTrustedContentHtml(staleSnapshot)
       throw error
     } finally {
-      pendingPostDetailPromises.delete(endpoint)
+      pendingSnapshots.delete(endpoint)
     }
   })()
 
-  pendingPostDetailPromises.set(endpoint, snapshotPromise)
+  pendingSnapshots.set(endpoint, snapshotPromise)
   return snapshotPromise
 }

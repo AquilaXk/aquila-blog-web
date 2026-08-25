@@ -111,16 +111,18 @@ export const getPostsBootstrap = async ({
   signal?: AbortSignal
 }): Promise<PostsBootstrapResult> => {
   const endpoint = buildBootstrapPath({ tag, order, pageSize })
+  const snapshotCache = postsBootstrapSsrCache
+  const pendingSnapshots = pendingPostsBootstrapPromises
   recordRuntimeEndpoint(endpoint, "cursor")
   const canUseServerSnapshot = isServerRuntime && !signal
   const cachedSnapshot =
     canUseServerSnapshot
-      ? getFreshServerSnapshot(postsBootstrapSsrCache, endpoint, POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS)
+      ? getFreshServerSnapshot(snapshotCache, endpoint, POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS)
       : null
   if (cachedSnapshot) return cachedSnapshot
 
   if (canUseServerSnapshot) {
-    const pendingSnapshot = pendingPostsBootstrapPromises.get(endpoint)
+    const pendingSnapshot = pendingSnapshots.get(endpoint)
     if (pendingSnapshot) return pendingSnapshot
   }
 
@@ -149,22 +151,18 @@ export const getPostsBootstrap = async ({
     try {
       const nextSnapshot = await loadBootstrap()
       setServerSnapshot(
-        postsBootstrapSsrCache,
+        snapshotCache,
         endpoint,
         nextSnapshot,
         POSTS_BOOTSTRAP_SSR_CACHE_MAX_ENTRIES
       )
       return nextSnapshot
-    } catch (error) {
-      const staleSnapshot = postsBootstrapSsrCache.get(endpoint)?.value
-      if (staleSnapshot) return staleSnapshot
-      throw error
     } finally {
-      pendingPostsBootstrapPromises.delete(endpoint)
+      pendingSnapshots.delete(endpoint)
     }
   })()
 
-  pendingPostsBootstrapPromises.set(endpoint, snapshotPromise)
+  pendingSnapshots.set(endpoint, snapshotPromise)
   return snapshotPromise
 }
 
