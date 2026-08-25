@@ -176,7 +176,7 @@ test("notification snapshot과 stream URL은 stale·relative fallback 없이 실
   )
 
   expect(snapshotPolicy).toContain('cacheMode: "no-store"')
-  expect(snapshotPolicy).toContain("staleIfError: false")
+  expect(snapshotPolicy).not.toContain("staleIfError")
   expect(streamBuilder).not.toContain("try {")
   expect(streamBuilder).not.toContain("catch {")
 })
