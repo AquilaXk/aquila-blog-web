@@ -5,8 +5,9 @@ import type {
   ReactNode,
   Ref,
 } from "react"
-import { useMemo, useState } from "react"
+import { useDeferredValue, useMemo, useState } from "react"
 import { CONFIG } from "site.config"
+import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
 import {
   EditorGuideBackdrop,
@@ -235,13 +236,15 @@ export const EditorStudioDedicatedEditorSurface = ({
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false)
+  const deferredPostContent = useDeferredValue(postContent)
+  const documentInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
   const outlineItems = useMemo(() => extractEditorOutline(postTitle, postContent), [postContent, postTitle])
   const projectRepository = CONFIG.projects?.[0]
   const hasTitleAndBody = Boolean(postTitle.trim() && postContent.trim())
   const hasMarkdownBody = Boolean(postContent.trim())
   const linkWarningCount = countMarkdownLinkWarnings(postContent)
   const primaryTag = postTags[0] || "태그 없음"
-  const readTimeText = postContent.trim() ? `${Math.max(1, Math.ceil(postContent.trim().length / 500))}분` : "읽기 시간"
+  const readTimeText = documentInsights.readingMinutes ? `${documentInsights.readingMinutes}분` : "읽기 시간"
   const thumbnailPreviewLabel =
     (postTags.length > 0 ? postTags : postTitle.trim().split(/\s+/))
       .map((label) => label.trim())
@@ -436,7 +439,9 @@ export const EditorStudioDedicatedEditorSurface = ({
           <EditorInspectorPreview>
             <div>{thumbnailPreviewLabel}</div>
             <strong>{postTitle.trim() || "제목을 입력하세요"}</strong>
-            <span>{primaryTag} · {readTimeText}</span>
+            <span>
+              {primaryTag} · {readTimeText} · {documentInsights.wordCount}단어 · {documentInsights.characterCount}자
+            </span>
           </EditorInspectorPreview>
           <section>
             <span>Quality checks</span>

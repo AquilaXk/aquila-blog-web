@@ -390,8 +390,6 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerSource).not.toContain("CONFIG.profile.role ? <div className=\"metaText\">")
     expect(metadataSource).toContain('post.author?.find((author) => author.name.trim().length > 0)?.name.trim() ||\n  "익명"')
     expect(metadataSource).not.toContain("CONFIG.profile.name")
-    expect(headerSource).toContain("const readTimeText =")
-    expect(headerSource).toContain("data.content || data.summary || data.title")
     expect(headerSource).toContain("const viewText =")
     expect(headerSource).toContain("Intl.NumberFormat(CONFIG.lang).format(viewCount)")
     expect(headerSource).toContain("<span className=\"statChip\">{publishedAt}</span>")

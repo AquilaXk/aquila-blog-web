@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import AppIcon from "src/components/icons/AppIcon";
 import { AdminPageProps } from "src/libs/server/adminPage";
-import type { TPost } from "src/types";
+import type { PostDetail } from "src/types";
 import PostHeader from "src/routes/Detail/PostDetail/PostHeader";
 import { readEditorActualPreviewSnapshot, toEditorActualPreviewRoute, toPreviewPostStatus, type EditorActualPreviewSnapshot, } from "./editorActualPreview";
 const LazyMarkdownRenderer = dynamic(() => import("src/routes/Detail/components/MarkdownRenderer"), {
@@ -31,7 +31,7 @@ export const EditorActualPreviewPage: NextPage<AdminPageProps> = ({ initialMembe
         window.addEventListener("storage", handleStorage);
         return () => window.removeEventListener("storage", handleStorage);
     }, [previewId]);
-    const previewPost = useMemo<TPost | null>(() => {
+    const previewPost = useMemo<PostDetail | null>(() => {
         if (!snapshot)
             return null;
         return {
@@ -40,6 +40,7 @@ export const EditorActualPreviewPage: NextPage<AdminPageProps> = ({ initialMembe
             type: ["Post"],
             title: snapshot.title.trim() || "제목을 입력하세요",
             summary: snapshot.summary,
+            content: snapshot.content,
             summarySource: snapshot.summarySource,
             tags: snapshot.tags,
             author: [
@@ -77,7 +78,7 @@ export const EditorActualPreviewPage: NextPage<AdminPageProps> = ({ initialMembe
 
       {previewPost && snapshot ? (<PreviewLayout>
           <PreviewArticle>
-            <PostHeader data={previewPost} deckSummary={snapshot.summarySource === "LEADING_BLOCK" ? "" : undefined} interactiveTags={false} showEngagement={false}/>
+            <PostHeader data={previewPost} deckSummary={snapshot.summarySource === "LEADING_BLOCK" ? "" : undefined} interactiveTags={false} showEngagement={false} showReadingTime/>
             <PreviewBody>
               <LazyMarkdownRenderer content={snapshot.content}/>
             </PreviewBody>
