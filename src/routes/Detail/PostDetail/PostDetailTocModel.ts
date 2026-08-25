@@ -1,3 +1,5 @@
+import { createMarkdownHeadingSlugAllocator } from "../../../libs/markdown/markdownDocumentInsights"
+
 export type TocItem = {
   id: string
   text: string
@@ -12,18 +14,11 @@ const normalizeHeadingText = (value: string): string =>
     .replace(/\u200B/g, "")
     .trim()
 
-const toHeadingSlug = (value: string): string => {
-  const normalized = value.trim().toLowerCase()
-  const stripped = normalized.replace(/[^\p{L}\p{N}\s-]/gu, "")
-  const dashed = stripped.replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "")
-  return dashed || "section"
-}
-
 export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
   const headings = Array.from(article.querySelectorAll<HTMLElement>(TOC_SELECTOR))
   if (!headings.length) return []
 
-  const slugCounts = new Map<string, number>()
+  const slugAllocator = createMarkdownHeadingSlugAllocator()
   const toc: TocItem[] = []
 
   headings.forEach((heading) => {
@@ -33,22 +28,8 @@ export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
     const level = Number(heading.tagName.replace("H", "")) as TocItem["level"]
     if (![2, 3, 4].includes(level)) return
 
-    const existingId = heading.id?.trim()
-    let id = existingId
-    if (!id) {
-      const base = toHeadingSlug(text)
-      const count = slugCounts.get(base) ?? 0
-      slugCounts.set(base, count + 1)
-      id = count === 0 ? base : `${base}-${count + 1}`
-      heading.id = id
-    } else {
-      const count = slugCounts.get(existingId) ?? 0
-      slugCounts.set(existingId, count + 1)
-      if (count > 0) {
-        id = `${existingId}-${count + 1}`
-        heading.id = id
-      }
-    }
+    const id = slugAllocator.allocate(text, heading.id)
+    if (heading.id !== id) heading.id = id
 
     toc.push({ id, text, level })
   })
