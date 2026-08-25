@@ -7,7 +7,7 @@ export type ListMarkerMatch =
   | { kind: "ordered"; indent: string; marker: string; content: string; number: number }
 
 export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
-  const task = /^(?<indent>\s*)(?<marker>- \[[ xX]\] )(?<content>.*)$/.exec(line)
+  const task = /^(?<indent>\s*)(?<marker>[-*+] \[[ xX]\] )(?<content>.*)$/.exec(line)
   if (task?.groups) {
     return {
       kind: "task",
@@ -17,7 +17,7 @@ export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
     }
   }
 
-  const unordered = /^(?<indent>\s*)(?<marker>- |\* )(?<content>.*)$/.exec(line)
+  const unordered = /^(?<indent>\s*)(?<marker>[-*+] )(?<content>.*)$/.exec(line)
   if (unordered?.groups) {
     return {
       kind: "unordered",
@@ -58,7 +58,7 @@ type LogicalLine = {
   intersectsFence: boolean
 }
 
-const fenceLine = /^(?:(?: {0,3}> ?)+)?( {0,3})(`{3,}|~{3,})(.*)$/
+const fenceLine = /^(?:(?: {0,3}> ?)+)?(?:[ \t]*(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 
 const logicalLines = (value: string): LogicalLine[] => {
   const lines = value.split("\n")

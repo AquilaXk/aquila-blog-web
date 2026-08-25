@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { planToggleListCommand } from "../../src/components/markdown-editor/markdownEditorListCommandsModel"
+import { matchListMarkerLine, planToggleListCommand } from "../../src/components/markdown-editor/markdownEditorListCommandsModel"
 
 test.describe("markdown editor list commands model", () => {
   test("toggles the collapsed current logical line and rebases a caret inside a marker", () => {
@@ -50,5 +50,26 @@ test.describe("markdown editor list commands model", () => {
     expect(planToggleListCommand(quotedFenced, 0, quotedFenced.length, "unordered")).toBeNull()
     const nestedQuotedFence = ["> > ````", "> > alpha", "> > ````"].join("\n")
     expect(planToggleListCommand(nestedQuotedFence, 0, nestedQuotedFence.length, "unordered")).toBeNull()
+  })
+
+  test("fails closed for a fenced block opened from a list container", () => {
+    const fenced = ["- ```ts", "  const alpha = 1", "  ```"].join("\n")
+    const caret = fenced.indexOf("const alpha") + 3
+
+    expect(planToggleListCommand(fenced, caret, caret, "unordered")).toBeNull()
+  })
+
+  test("recognizes every supported bullet form for task removal and canonicalization", () => {
+    const allTasks = ["* [x] done", "+ [ ] todo"].join("\n")
+    expect(planToggleListCommand(allTasks, 0, allTasks.length, "task")?.replacement).toBe("done\ntodo")
+
+    const mixed = ["+ alpha", "* [x] done", "plain"].join("\n")
+    expect(planToggleListCommand(mixed, 0, mixed.length, "task")?.replacement).toBe(
+      ["- [ ] alpha", "- [ ] done", "- [ ] plain"].join("\n")
+    )
+  })
+
+  test("canonicalizes task markers used by Enter continuation", () => {
+    expect(matchListMarkerLine("* [x] done")?.marker).toBe("- [ ] ")
   })
 })
