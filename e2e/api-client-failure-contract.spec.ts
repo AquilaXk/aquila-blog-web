@@ -1,4 +1,27 @@
 import { expect, test } from "@playwright/test"
+import { mockAnonymousSession } from "./helpers/mobileLayoutFixtures"
+import {
+  addPublicAboutSnapshotCookie,
+  mockFeedEndpoints,
+} from "./helpers/smokeFixtures"
+
+test("seeded public profile 503 reaches the global error boundary", async ({ page }) => {
+  await addPublicAboutSnapshotCookie(page)
+  await mockAnonymousSession(page)
+  await mockFeedEndpoints(page)
+  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+    await route.fulfill({
+      status: 503,
+      headers: { "x-request-id": "req-profile-503" },
+      body: "unavailable",
+    })
+  })
+
+  await page.goto("/")
+
+  await expect(page.getByRole("heading", { name: "문제가 발생했습니다" })).toBeVisible()
+  await expect(page.locator('[data-ui="feed-home-product-shell"]')).toHaveCount(0)
+})
 
 test("cached browser representation does not become success after a 503", async ({
   page,

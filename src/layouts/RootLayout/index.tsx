@@ -6,56 +6,16 @@ import styled from "@emotion/styled"
 import Scripts from "src/layouts/RootLayout/Scripts"
 import useGtagEffect from "./useGtagEffect"
 import { useRouter } from "next/router"
-import { useQuery } from "@tanstack/react-query"
 import { CONFIG } from "site.config"
-import type { AdminProfile } from "src/hooks/useAdminProfile"
+import { useAdminProfile, type AdminProfile } from "src/hooks/useAdminProfile"
 import { isNavigationCancelledError, isRequestCancelledError } from "src/libs/router"
 import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import { FLUID_LAYOUT_MAX_PX } from "./layoutTiers"
 
-const PUBLIC_ADMIN_PROFILE_QUERY_KEY = ["member", "adminProfile"] as const
 const INITIAL_PROPS_CANCELLED_MESSAGE = "loading initial props cancelled"
 const RootAdminProfileContext = React.createContext<AdminProfile | null>(null)
 
 export const useRootAdminProfile = () => React.useContext(RootAdminProfileContext)
-
-type UsePublicAdminProfileOptions = {
-  enabled: boolean
-  refetchOnMount: boolean
-  staleTimeMs?: number
-}
-
-const resolvePublicApiBaseUrl = () => {
-  const publicUrl = process.env.NEXT_PUBLIC_BACKEND_URL
-  return (publicUrl || "http://localhost:8080").replace(/\/+$/, "")
-}
-
-const fetchPublicAdminProfile = async (): Promise<AdminProfile | null> => {
-  const response = await fetch(`${resolvePublicApiBaseUrl()}/member/api/v1/members/adminProfile`, {
-    credentials: "include",
-  })
-  if (!response.ok) return null
-  return (await response.json()) as AdminProfile
-}
-
-const usePublicAdminProfile = (
-  initialProfile: AdminProfile | null,
-  options: UsePublicAdminProfileOptions
-): AdminProfile | null => {
-  const hasSeedProfile = initialProfile != null
-  const query = useQuery<AdminProfile | null>({
-    queryKey: PUBLIC_ADMIN_PROFILE_QUERY_KEY,
-    queryFn: fetchPublicAdminProfile,
-    enabled: typeof window !== "undefined" && options.enabled,
-    initialData: initialProfile ?? undefined,
-    staleTime: options.staleTimeMs ?? (hasSeedProfile ? 5 * 60 * 1000 : 0),
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnMount: options.enabled && (options.refetchOnMount || !hasSeedProfile),
-  })
-
-  return query.data ?? initialProfile
-}
 
 type Props = {
   children: ReactNode
@@ -84,7 +44,7 @@ const RootLayout = ({
   // 역할을 잃는다. 이 라우트에서만 껍데기를 div로 내려 main을 하나로 유지한다.
   const LayoutShell = isStandaloneSurfaceRoute ? StandaloneShell : StyledMain
   const isDesignAwareRoute = pathname[1] !== "_" && pathname !== "/sitemap.xml"
-  const adminProfile = usePublicAdminProfile(initialAdminProfile, {
+  const adminProfile = useAdminProfile(initialAdminProfile, {
     // 독립 표면은 관리자 프로필을 전혀 읽지 않는다. 여기서 켜 두면 blog 호스트 백엔드로 credentialed
     // XHR이 나가는데, 회사·제품 호스트에서는 그것이 cross-origin이고 edge에 그 origin을 허용하는
     // CORS가 없다 - 아무 화면 효과 없이 실패하는 요청만 남는다.
