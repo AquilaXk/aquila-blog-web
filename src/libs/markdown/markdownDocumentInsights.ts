@@ -76,12 +76,11 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
   const wordCount = body ? body.split(/\s+/u).length : 0
   const headings: MarkdownDocumentHeading[] = []
   const slugAllocator = createMarkdownHeadingSlugAllocator()
-  const lines = markdown.split("\n")
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
   let offset = 0
   let activeFence: { marker: "`" | "~"; length: number } | null = null
 
-  for (const rawLine of lines) {
-    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine
+  for (const line of lines) {
     const fenceMatch = FENCE_OPEN_PATTERN.exec(line)
     if (fenceMatch) {
       const fence = fenceMatch[1]
@@ -111,7 +110,7 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
         }
       }
     }
-    offset += rawLine.length + 1
+    offset += line.length + 1
   }
 
   return {

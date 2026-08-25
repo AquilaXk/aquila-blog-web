@@ -74,3 +74,19 @@ test("advances past cross-base slug suffix collisions", () => {
   expect(allocator.allocate("Foo-2")).toBe("foo-2-2")
   expect(allocator.allocate("Foo")).toBe("foo-3")
 })
+
+test("computes heading ranges in textarea-normalized coordinates for CRLF source", () => {
+  const markdown = "body\r\n## second\r\n#### third"
+  const normalizedTextareaValue = markdown.replace(/\r\n/g, "\n")
+
+  const headings = createMarkdownDocumentInsights(markdown).headings
+
+  expect(headings.map(({ range }) => normalizedTextareaValue.slice(range.start, range.end))).toEqual([
+    "## second",
+    "#### third",
+  ])
+  expect(headings.map(({ offset, range }) => ({ offset, range }))).toEqual([
+    { offset: 5, range: { start: 5, end: 14 } },
+    { offset: 15, range: { start: 15, end: 25 } },
+  ])
+})
