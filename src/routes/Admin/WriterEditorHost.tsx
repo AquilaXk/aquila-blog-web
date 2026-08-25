@@ -1,6 +1,9 @@
 import { Profiler } from "react"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
-import { MarkdownEditor } from "src/components/markdown-editor/MarkdownEditor"
+import {
+  MarkdownEditor,
+  type MarkdownEditorFocusRequest,
+} from "src/components/markdown-editor/MarkdownEditor"
 
 type WriterEditorHostProps = {
   canvasId: string
@@ -9,7 +12,7 @@ type WriterEditorHostProps = {
   previewSummary?: string
   onMarkdownChange: (markdown: string, meta?: { editorFocused: boolean }) => void
   onFlushMarkdownReady: (flush: (() => string) | null) => void
-  onFocusRequestReady?: (focus: (() => void) | null) => void
+  onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
   onRequestSave?: () => void
   onUploadingChange?: (isUploading: boolean) => void
   onImageUpload: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>

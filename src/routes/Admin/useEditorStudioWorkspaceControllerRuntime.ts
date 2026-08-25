@@ -21,14 +21,19 @@ import {
   type NoticeState,
 } from "./EditorStudioWorkspaceControllerRootModel"
 import type { EditorMode, PublishActionType } from "./editorStudioState"
+import type { MarkdownEditorFocusRequest } from "src/components/markdown-editor/MarkdownEditor"
 
 type PublishNoticeTarget = "auto" | "page" | "modal"
 
-const markdownEditorFocusRequestRef: { current: (() => void) | null } = { current: null }
+const markdownEditorFocusRequestRef: { current: MarkdownEditorFocusRequest | null } = { current: null }
 
 /** Bound from WriterEditorHost without threading through Root.tsx props. */
-export const handleMarkdownEditorFocusRequestReady = (focus: (() => void) | null) => {
+export const handleMarkdownEditorFocusRequestReady = (focus: MarkdownEditorFocusRequest | null) => {
   markdownEditorFocusRequestRef.current = focus
+}
+
+export const requestMarkdownEditorFocus = (selection?: { from: number; to: number }) => {
+  markdownEditorFocusRequestRef.current?.(selection)
 }
 
 type UseEditorStudioWorkspaceControllerRuntimeArgs = {

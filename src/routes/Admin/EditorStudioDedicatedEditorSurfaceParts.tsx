@@ -531,7 +531,12 @@ export const EditorOutline = styled.aside`
   }
 `;
 
-export const EditorOutlineItem = styled.div`
+export const EditorOutlineItem = styled.button`
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -545,6 +550,15 @@ export const EditorOutlineItem = styled.div`
 
   &[data-level="3"] {
     padding-left: 34px;
+  }
+
+  &[data-level="4"] {
+    padding-left: 48px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.publicDesign.accent};
+    outline-offset: 2px;
   }
 
   &[data-active="true"] {

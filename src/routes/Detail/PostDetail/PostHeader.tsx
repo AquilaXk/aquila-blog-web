@@ -13,11 +13,12 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
-import { TPost } from "src/types"
+import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
+import { PostDetail } from "src/types"
 import { StyledWrapper } from "./PostHeader.styles"
 
 type Props = {
-  data: TPost & { content?: string }
+  data: PostDetail
   likesCount?: number
   hitCount?: number
   actorHasLiked?: boolean
@@ -38,6 +39,7 @@ type Props = {
   deckSummary?: string
   interactiveTags?: boolean
   showEngagement?: boolean
+  showReadingTime?: boolean
   showThumbnail?: boolean
 }
 
@@ -62,6 +64,7 @@ const PostHeader: React.FC<Props> = ({
   onDeletePost,
   deckSummary,
   showEngagement = true,
+  showReadingTime = showEngagement,
   showThumbnail = true,
 }) => {
   const adminProfile = useRootAdminProfile()
@@ -98,8 +101,8 @@ const PostHeader: React.FC<Props> = ({
         ? "복사 완료"
         : "복사 완료"
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
-  const readSource = (data.content || data.summary || data.title).trim()
-  const readTimeText = `${Math.max(1, Math.ceil(readSource.length / 500))}분 READ`
+  const readingMinutes = createMarkdownDocumentInsights(data.content).readingMinutes
+  const readTimeText = readingMinutes ? `${readingMinutes}분 READ` : ""
   const viewCount = hitCount ?? data.hitCount ?? 0
   const viewText = `${Intl.NumberFormat(CONFIG.lang).format(viewCount)} VIEWS`
   const authorRole = usingAdminFallback ? adminProfile?.profileRole?.trim() || "" : ""
@@ -147,7 +150,7 @@ const PostHeader: React.FC<Props> = ({
           </div>
         )}
 
-        {shouldRenderAuthorUtilities || showEngagement ? (
+        {shouldRenderAuthorUtilities || showEngagement || showReadingTime ? (
           <div className="metaUtilities">
             {shouldRenderAuthorUtilities && (
               <div className="authorUtilities" data-shell-only={authorUtilitiesShellOnly ? "true" : "false"}>
@@ -178,16 +181,16 @@ const PostHeader: React.FC<Props> = ({
               </div>
             )}
 
-            {showEngagement ? (
+            {showEngagement || showReadingTime ? (
               <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
                 <div className="engagementRow" aria-label="post engagement">
                   <div className="stats" aria-label="post stats">
-                    <span className="statChip">{publishedAt}</span>
-                    <span className="statChip">{readTimeText}</span>
-                    <span className="statChip">{viewText}</span>
-                    {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
+                    {showEngagement ? <span className="statChip">{publishedAt}</span> : null}
+                    {showReadingTime && readTimeText ? <span className="statChip">{readTimeText}</span> : null}
+                    {showEngagement ? <span className="statChip">{viewText}</span> : null}
+                    {showEngagement && modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
                   </div>
-                  <button
+                  {showEngagement ? <button
                     type="button"
                     className="likeButton"
                     aria-pressed={actorHasLiked}
@@ -199,9 +202,9 @@ const PostHeader: React.FC<Props> = ({
                   >
                     <AppIcon name={actorHasLiked ? "heart-filled" : "heart"} />
                     <span>좋아요 {likesCount ?? data.likesCount ?? 0}</span>
-                  </button>
+                  </button> : null}
 
-                  {onSharePost && (
+                  {showEngagement && onSharePost && (
                     <button
                       type="button"
                       className="shareButton"
