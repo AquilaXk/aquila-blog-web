@@ -9,6 +9,7 @@ import {
   planListEnterContinuation,
   planTableCellTabMutation,
   planTabIndentMutation,
+  resolveMarkdownEditorCommandShortcut,
   resolveFormatShortcut,
   resolveMarkdownEditorLineCommand,
 } from "../../src/components/markdown-editor/markdownEditorKeyboardModel"
@@ -60,9 +61,6 @@ test.describe("markdown editor keyboard model", () => {
   })
 
   test("maps common format shortcut chords", () => {
-    expect(resolveFormatShortcut({ key: "b", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })).toBe(
-      "bold"
-    )
     expect(resolveFormatShortcut({ key: "i", metaKey: false, ctrlKey: true, shiftKey: false, altKey: false })).toBe(
       "italic"
     )
@@ -74,6 +72,27 @@ test.describe("markdown editor keyboard model", () => {
     )
     expect(resolveFormatShortcut({ key: "x", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })).toBe(
       "strikethrough"
+    )
+  })
+
+  test("routes Mod+B through the shared command descriptor while retaining other format shortcuts", () => {
+    const bold = resolveMarkdownEditorCommandShortcut({
+      key: "b",
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+    })
+    expect(bold?.id).toBe("format.bold")
+    expect(bold?.execute({
+      disabled: false,
+      mode: "write",
+      selectionStart: 0,
+      selectionEnd: 5,
+      isTableSelection: false,
+    })).toEqual({ kind: "format", shortcut: "bold" })
+    expect(resolveFormatShortcut({ key: "i", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })).toBe(
+      "italic"
     )
   })
 
@@ -229,6 +248,7 @@ test.describe("markdown editor keyboard model", () => {
     expect(editorSource).toContain("current.setSelectionRange(nextFrom, nextTo)")
     expect(keyboardHookSource).toContain("handleTabKeyDown")
     expect(keyboardHookSource).toContain("handleEnterKeyDown")
+    expect(keyboardHookSource).toContain("resolveMarkdownEditorCommandShortcut")
     expect(editorSource).toContain("applyFormatShortcutOrAppend")
     expect(stylesSource).toContain("&:focus-visible")
     expect(stylesSource).toContain("theme.colors.blue8")

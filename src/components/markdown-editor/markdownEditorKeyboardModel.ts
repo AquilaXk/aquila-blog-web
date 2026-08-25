@@ -13,6 +13,7 @@ import {
 } from "./markdownEditorTableModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import { matchListMarkerLine } from "./markdownEditorListCommandsModel"
+import { resolveMarkdownEditorCommandShortcut } from "./markdownEditorCommandRegistryModel"
 
 export type MarkdownFormatShortcut =
   | "bold"
@@ -142,13 +143,14 @@ export const resolveFormatShortcut = (event: {
 
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
 
-  if (!event.shiftKey && key === "b") return "bold"
   if (!event.shiftKey && key === "i") return "italic"
   if (!event.shiftKey && key === "k") return "link"
   if (!event.shiftKey && key === "e") return "inlineCode"
   if (event.shiftKey && (key === "x" || key === "X")) return "strikethrough"
   return null
 }
+
+export { resolveMarkdownEditorCommandShortcut }
 
 export const resolveMarkdownEditorLineCommand = (event: {
   key: string
