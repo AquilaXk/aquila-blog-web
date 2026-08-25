@@ -1,6 +1,10 @@
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { expect, type Locator, type Page, type Route } from "@playwright/test"
+import {
+  PUBLIC_ADMIN_PROFILE_FIXTURE,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
+} from "../../tests/fixtures/publicAdminProfileFixture"
 
 export const clsBudget = Number(process.env.CLS_BUDGET || 0.1)
 export const homeClsBudget = Number(process.env.CLS_BUDGET_HOME || 0.12)
@@ -234,22 +238,12 @@ export const mockFeedEndpoints = async (
     })
   })
 
-  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+  await page.route(PUBLIC_ADMIN_PROFILE_ROUTE, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        id: 1,
-        name: "관리자",
-        nickname: "aquila",
-        profileImageUrl: "/avatar.png",
-        profileImageDirectUrl: "/avatar.png",
-        profileRole: "Backend Developer",
-        profileBio: "Hello World!",
-        blogDesign: "legacy",
-        legacyBlogScheme: "dark",
-        serviceLinks: [],
-        contactLinks: [],
+        ...PUBLIC_ADMIN_PROFILE_FIXTURE,
         ...options?.adminProfile,
       }),
     })

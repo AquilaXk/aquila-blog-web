@@ -1,5 +1,7 @@
 import type { AdminProfile } from "src/types/adminProfile"
 
+export const PUBLIC_ADMIN_PROFILE_ROUTE = "**/member/api/v1/members/adminProfile"
+
 export const PUBLIC_ADMIN_PROFILE_FIXTURE = {
   username: "aquila",
   name: "aquila",

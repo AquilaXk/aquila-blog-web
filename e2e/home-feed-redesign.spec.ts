@@ -3,8 +3,10 @@ import { readFileSync } from "fs"
 import path from "path"
 import {
   addPublicAboutSnapshotCookie,
+  createPublicAdminProfileSnapshotFixture,
   createExplorePost,
   mockAvatarAsset,
+  PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "./helpers/smokeFixtures"
 
 const TAGS = [
@@ -97,18 +99,12 @@ const mockHomeFeedRedesignEndpoints = async (page: Page, posts = POSTS) => {
 
 const addEmptyProfileLinksCookie = async (page: Page) => {
   const profile = {
-    username: "aquila",
-    name: "aquila",
-    nickname: "aquila",
-    modifiedAt: new Date().toISOString(),
-    profileImageUrl: "/avatar.png",
-    profileImageDirectUrl: "/avatar.png",
-    profileRole: "Backend Developer",
+    ...createPublicAdminProfileSnapshotFixture(),
     contactLinks: [],
     serviceLinks: [],
   }
 
-  await page.route("**/member/api/v1/members/adminProfile", async (route) => {
+  await page.route(PUBLIC_ADMIN_PROFILE_ROUTE, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
