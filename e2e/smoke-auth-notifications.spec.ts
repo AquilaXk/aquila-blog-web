@@ -4,10 +4,12 @@ import path from "path"
 import {
   mockAvatarAsset,
   mockFeedEndpoints,
+  mockPublicAdminProfile,
 } from "./helpers/smokeFixtures"
 
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("core smoke auth and notifications", () => {

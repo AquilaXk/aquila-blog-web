@@ -1,5 +1,5 @@
 import type { PostDetail } from "src/types"
-import { ApiError, apiFetchWithMeta, type ApiFetchMeta } from "../client"
+import { ApiError, apiFetch } from "../client"
 import type { ApiPostWithContentDto } from "./PostApiDtos"
 import { extractPostIdFromSlug, mapPostDetail } from "./PostApiMappers"
 import { withoutTrustedContentHtml } from "./contentHtmlTrust"
@@ -14,11 +14,6 @@ import {
 let postDetailSsrCache = new Map<string, { value: PostDetail; cachedAt: number }>()
 let pendingPostDetailPromises = new Map<string, Promise<PostDetail | null>>()
 
-type PostDetailResult = {
-  data: PostDetail | null
-  meta: ApiFetchMeta
-}
-
 export const resetPostDetailRequestCaches = () => {
   postDetailSsrCache = new Map()
   pendingPostDetailPromises = new Map()
@@ -29,9 +24,9 @@ export const getPostDetailBySlug = async (slug: string): Promise<PostDetail | nu
   if (!postId) return null
 
   try {
-    const post = await apiFetchWithMeta<ApiPostWithContentDto>(`/post/api/v1/posts/${postId}`)
-    const mapped = await mapPostDetail(post.data, {
-      allowTrustedContentHtml: !post.meta.stale,
+    const post = await apiFetch<ApiPostWithContentDto>(`/post/api/v1/posts/${postId}`)
+    const mapped = await mapPostDetail(post, {
+      allowTrustedContentHtml: true,
     })
 
     // slug mismatch should 404 to avoid duplicate-url indexing.
@@ -46,35 +41,27 @@ export const getPostDetailBySlug = async (slug: string): Promise<PostDetail | nu
   }
 }
 
-export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailResult> => {
+export const getPostDetailById = async (id: string): Promise<PostDetail | null> => {
   const postId = Number(id)
-  if (!Number.isInteger(postId) || postId <= 0) return { data: null, meta: { stale: false } }
+  if (!Number.isInteger(postId) || postId <= 0) return null
   const endpoint = `/post/api/v1/posts/${postId}`
   const canUseServerSnapshot = isServerRuntime
   const cachedSnapshot =
     canUseServerSnapshot
       ? getFreshServerSnapshot(postDetailSsrCache, endpoint, POST_DETAIL_SSR_CACHE_TTL_MS)
       : null
-  if (cachedSnapshot) return { data: cachedSnapshot, meta: { stale: false } }
+  if (cachedSnapshot) return cachedSnapshot
 
   if (canUseServerSnapshot) {
     const pendingSnapshot = pendingPostDetailPromises.get(endpoint)
     if (pendingSnapshot) {
-      return {
-        data: await pendingSnapshot,
-        meta: { stale: false },
-      }
+      return pendingSnapshot
     }
   }
 
   const loadPostDetail = async () => {
-    const post = await apiFetchWithMeta<ApiPostWithContentDto>(endpoint)
-    return {
-      data: await mapPostDetail(post.data, {
-        allowTrustedContentHtml: !post.meta.stale,
-      }),
-      meta: post.meta,
-    }
+    const post = await apiFetch<ApiPostWithContentDto>(endpoint)
+    return mapPostDetail(post, { allowTrustedContentHtml: true })
   }
 
   if (!canUseServerSnapshot) {
@@ -82,7 +69,7 @@ export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailR
       return await loadPostDetail()
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        return { data: null, meta: { stale: false } }
+        return null
       }
       throw error
     }
@@ -91,10 +78,10 @@ export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailR
   const snapshotPromise = (async () => {
     try {
       const nextDetail = await loadPostDetail()
-      if (nextDetail.data) {
-        setServerSnapshot(postDetailSsrCache, endpoint, nextDetail.data, POST_DETAIL_SSR_CACHE_MAX_ENTRIES)
+      if (nextDetail) {
+        setServerSnapshot(postDetailSsrCache, endpoint, nextDetail, POST_DETAIL_SSR_CACHE_MAX_ENTRIES)
       }
-      return nextDetail.data
+      return nextDetail
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         return null
@@ -108,11 +95,5 @@ export const getPostDetailByIdWithMeta = async (id: string): Promise<PostDetailR
   })()
 
   pendingPostDetailPromises.set(endpoint, snapshotPromise)
-  return {
-    data: await snapshotPromise,
-    meta: { stale: false },
-  }
+  return snapshotPromise
 }
-
-export const getPostDetailById = async (id: string): Promise<PostDetail | null> =>
-  (await getPostDetailByIdWithMeta(id)).data

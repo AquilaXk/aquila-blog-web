@@ -7,6 +7,7 @@ import {
   MOBILE_TAG_ENTRIES,
   MOBILE_VIEWPORT,
 } from "./mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./smokeFixtures"
 
 export const TOUCH_TARGET_MIN_PX = 44
 export const DESKTOP_VIEWPORT = { width: 1440, height: 900 }
@@ -55,6 +56,7 @@ const mockAdaptivityFeedEndpoints = async (page: Page) => {
 export const preparePublicHome = async (page: Page) => {
   await mockAvatarAsset(page)
   await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
   await mockAdaptivityFeedEndpoints(page)
 }
 

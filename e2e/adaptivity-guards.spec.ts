@@ -11,6 +11,7 @@ import {
   readMotionBudget,
 } from "./helpers/adaptivityFixtures"
 import { mockAvatarAsset, mockAnonymousSession } from "./helpers/mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.describe("adaptivity hit-area", () => {
   test("모바일 홈 핵심 컨트롤은 44px 이상 터치 타깃을 유지한다", async ({ page }) => {
@@ -134,6 +135,7 @@ test.describe("adaptivity font-scale", () => {
     await page.setViewportSize(DESKTOP_VIEWPORT)
     await mockAvatarAsset(page)
     await mockAnonymousSession(page)
+    await mockPublicAdminProfile(page)
     await page.route("**/post/api/v1/posts/991", async (route) => {
       await route.fulfill({
         status: 200,

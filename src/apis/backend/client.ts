@@ -1,13 +1,9 @@
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import {
-  buildFreshResult,
-  buildStaleResult,
-  canUseStaleRevalidateCacheEntry,
   evictBrowserRevalidatePayloadCacheEntries,
   getRevalidateCacheEntry,
   refreshRevalidateCacheEntry,
   setRevalidateCacheEntry,
-  type ApiFetchResult,
 } from "./clientRevalidateCache"
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080"
@@ -17,7 +13,6 @@ const DEFAULT_GET_TRANSIENT_RETRY_COUNT = 1
 const DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS = 120
 const CSRF_PREFLIGHT_HEADER = "X-Aquila-CSRF"
 const GET_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
-const STALE_IF_ERROR_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 type GetCacheMode = "revalidate" | "no-store"
 type ApiRequestCredentials = "include" | "omit"
@@ -27,13 +22,9 @@ type ApiRequestUrlOptions = {
   backendProxy?: BackendProxyMode
 }
 
-export type { ApiFetchMeta, ApiFetchResult } from "./clientRevalidateCache"
-
 type GetRequestPolicy = {
   cacheMode: GetCacheMode
   retryCount: number
-  staleIfError: boolean
-  maxStaleAgeMs?: number
   timeoutMs?: number
   credentials: ApiRequestCredentials
 }
@@ -41,7 +32,6 @@ type GetRequestPolicy = {
 const DEFAULT_GET_REQUEST_POLICY: GetRequestPolicy = {
   cacheMode: "no-store",
   retryCount: 0,
-  staleIfError: false,
   credentials: "include",
 }
 
@@ -51,47 +41,45 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
 }> = [
   {
     matcher: /^\/member\/api\/v1\/auth\/me$/i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 4_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 4_000 },
   },
   {
     matcher: /^\/member\/api\/v1\/auth\//i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 5_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
   },
   {
     matcher: /^\/member\/api\/v1\/notifications\/snapshot/i,
     policy: {
       cacheMode: "no-store",
       retryCount: 0,
-      staleIfError: false,
       timeoutMs: 4_000,
     },
   },
   {
     matcher: /^\/member\/api\/v1\/notifications(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 5_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
   },
   {
     matcher: /^\/(member|post)\/api\/v1\/adm\//i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
     matcher: /^\/system\/api\/v1\/adm\//i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
     matcher: /^\/post\/api\/v1\/posts\/mine(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
     matcher: /^\/post\/api\/v1\/posts\/[0-9]+\/comments(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
     matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|bootstrap)(\/|$)/i,
     policy: {
       cacheMode: "revalidate",
       retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
-      staleIfError: true,
       timeoutMs: 8_000,
       credentials: "omit",
     },
@@ -101,17 +89,16 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: {
       cacheMode: "revalidate",
       retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
-      staleIfError: true,
       timeoutMs: 8_000,
     },
   },
   {
     matcher: /^\/(member|post|system)\/api\/v1\//i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
     matcher: /^\/signup(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, staleIfError: false, timeoutMs: 8_000 },
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
 ]
 
@@ -123,8 +110,6 @@ const resolveGetRequestPolicy = (path: string): GetRequestPolicy => {
   return {
     cacheMode: matched.policy.cacheMode ?? DEFAULT_GET_REQUEST_POLICY.cacheMode,
     retryCount: matched.policy.retryCount ?? DEFAULT_GET_REQUEST_POLICY.retryCount,
-    staleIfError: matched.policy.staleIfError ?? DEFAULT_GET_REQUEST_POLICY.staleIfError,
-    maxStaleAgeMs: matched.policy.maxStaleAgeMs,
     timeoutMs: matched.policy.timeoutMs,
     credentials: matched.policy.credentials ?? DEFAULT_GET_REQUEST_POLICY.credentials,
   }
@@ -393,13 +378,10 @@ export const getApiRequestUrl = (path: string, options: ApiRequestUrlOptions = {
   return `${getApiBaseUrl()}${safePath}`
 }
 
-export const apiFetch = async <T>(path: string, init: ApiFetchOptions = {}): Promise<T> =>
-  (await apiFetchWithMeta<T>(path, init)).data
-
-export const apiFetchWithMeta = async <T>(
+export const apiFetch = async <T>(
   path: string,
   init: ApiFetchOptions = {}
-): Promise<ApiFetchResult<T>> => {
+): Promise<T> => {
   const safePath = normalizeApiRequestPath(path)
   const { timeoutMs: _timeoutMs, backendProxy = "auto", ...requestInit } = init
   const url = getApiRequestUrl(safePath, { backendProxy })
@@ -440,10 +422,10 @@ export const apiFetchWithMeta = async <T>(
 
   if (inFlightKey) {
     const existing = browserInFlightGetRequests.get(inFlightKey)
-    if (existing) return existing as Promise<ApiFetchResult<T>>
+    if (existing) return existing as Promise<T>
   }
 
-  const executeRequest = async (): Promise<ApiFetchResult<T>> => {
+  const executeRequest = async (): Promise<T> => {
     const resolvedTimeoutMs = resolveTimeoutMs(safePath, init)
     const getRetryCount = getRequestPolicy?.retryCount ?? 0
     const canRetryTransientRead =
@@ -480,18 +462,6 @@ export const apiFetchWithMeta = async <T>(
         if (canRetryTransientRead && transientTransportError && hasNextAttempt) {
           await sleep(DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
           continue
-        }
-
-        if (
-          canUseRevalidateCache &&
-          revalidateCacheEntry &&
-          canUseStaleRevalidateCacheEntry(revalidateCacheEntry, getRequestPolicy)
-        ) {
-          return buildStaleResult<T>({
-            path: safePath,
-            entry: revalidateCacheEntry,
-            reason: timedOut ? "timeout" : "transport",
-          })
         }
 
         if (timedOut) {
@@ -531,24 +501,10 @@ export const apiFetchWithMeta = async <T>(
         response.headers.get("etag"),
         response.headers.get("cache-control"),
       )
-      return buildFreshResult(revalidateCacheEntry.payload as T)
+      return revalidateCacheEntry.payload as T
     }
 
     if (!response.ok) {
-      if (
-        canUseRevalidateCache &&
-        revalidateCacheEntry &&
-        canUseStaleRevalidateCacheEntry(revalidateCacheEntry, getRequestPolicy) &&
-        STALE_IF_ERROR_STATUS_CODES.has(response.status)
-      ) {
-        return buildStaleResult<T>({
-          path: safePath,
-          entry: revalidateCacheEntry,
-          reason: "http-status",
-          status: response.status,
-        })
-      }
-
       const body = await response.text().catch(() => "")
       const apiError = new ApiError(
         response.status,
@@ -561,12 +517,12 @@ export const apiFetchWithMeta = async <T>(
     }
 
     if (response.status === 204) {
-      return buildFreshResult(undefined as T)
+      return undefined as T
     }
 
     const contentLength = response.headers.get("content-length")
     if (contentLength === "0") {
-      return buildFreshResult(undefined as T)
+      return undefined as T
     }
 
     const contentType = response.headers.get("content-type")?.toLowerCase() || ""
@@ -577,14 +533,14 @@ export const apiFetchWithMeta = async <T>(
       if (canUseRevalidateCache && etag) {
         setRevalidateCacheEntry(url, etag, payload, response.headers.get("cache-control"))
       }
-      return buildFreshResult(payload)
+      return payload
     }
 
     const body = await response.text()
     if (canUseRevalidateCache && etag) {
       setRevalidateCacheEntry(url, etag, body, response.headers.get("cache-control"))
     }
-    return buildFreshResult(body as unknown as T)
+    return body as unknown as T
   }
 
   if (!inFlightKey) {

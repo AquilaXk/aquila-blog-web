@@ -12,6 +12,7 @@ test("admin cookie client contract", () => {
   }
   const lockfile = readProjectFile("yarn.lock")
   const adminProfileSource = readProjectFile("src/hooks/useAdminProfile.ts")
+  const publicAdminProfileClientSource = readProjectFile("src/libs/publicAdminProfileClient.ts")
   const adminToolsSource = readProjectFile("src/routes/Admin/AdminToolsWorkspacePageState.ts")
 
   expect(packageJson.dependencies["cookies-next"]).toBe("6.1.1")
@@ -20,17 +21,22 @@ test("admin cookie client contract", () => {
   expect(lockfile).toContain('cookie "^1.0.1"')
   expect(lockfile).toMatch(/cookie@\^1\.0\.1:\n  version "1\.\d+\.\d+"/)
 
-  for (const source of [adminProfileSource, adminToolsSource]) {
-    expect(source).toContain('import { setCookie } from "cookies-next/client"')
+  expect(adminProfileSource).not.toContain("cookies-next/client")
+  expect(publicAdminProfileClientSource).not.toContain('import { setCookie } from "cookies-next/client"')
+  expect(publicAdminProfileClientSource).toContain('await import("cookies-next/client")')
+
+  for (const source of [publicAdminProfileClientSource, adminToolsSource]) {
     expect(source).toContain('sameSite: "lax"')
     expect(source).toContain("maxAge:")
     expect(source).toContain('secure: typeof window !== "undefined" && window.location.protocol === "https:"')
   }
 
-  expect(adminProfileSource).toContain('const ADMIN_PROFILE_SNAPSHOT_COOKIE = "admin_profile_snapshot_v1"')
-  expect(adminProfileSource).toContain("const ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30")
-  expect(adminProfileSource).toContain('path: "/"')
-  expect(adminProfileSource).toContain("maxAge: ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS")
+  expect(adminToolsSource).toContain('import { setCookie } from "cookies-next/client"')
+
+  expect(publicAdminProfileClientSource).toContain('const ADMIN_PROFILE_SNAPSHOT_COOKIE = "admin_profile_snapshot_v1"')
+  expect(publicAdminProfileClientSource).toContain("const ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30")
+  expect(publicAdminProfileClientSource).toContain('path: "/"')
+  expect(publicAdminProfileClientSource).toContain("maxAge: ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS")
 
   expect(adminToolsSource).toContain('const ADMIN_TOOLS_MAIL_SNAPSHOT_COOKIE = "admin_tools_mail_snapshot_v1"')
   expect(adminToolsSource).toContain("const ADMIN_TOOLS_MAIL_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30")

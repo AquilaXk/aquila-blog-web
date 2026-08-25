@@ -107,6 +107,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     hasNextPage,
     isInitialLoading,
     isInitialLoadError,
+    isRetainedDataError,
     hasInitialLoadSucceeded,
     isFetchingNextPage,
     isFetchNextPageError,
@@ -463,7 +464,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   }, [])
 
   const hasFilter = Boolean(normalizedQuery || currentTag)
-  const resultCount = pinnedPosts.length + regularPosts.length
+  const visiblePosts = resolveFeedVisiblePosts(pinnedPosts, regularPosts, isRetainedDataError)
+  const resultCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
   const showBootstrapDegraded = initialBootstrapDegraded && !hasInitialLoadSucceeded
   const hasQueryFilter = normalizedQuery.length > 0
   const hasTagFilter = Boolean(currentTag)
@@ -556,7 +558,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
 
   return (
     <>
-      <PinnedPosts posts={pinnedPosts} />
+      <PinnedPosts posts={visiblePosts.pinnedPosts} />
       <FeedBody data-sticky-rail-safe="true">
         <aside className="tagColumn">
           <TagList />
@@ -649,12 +651,12 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
             </FilterContextBar>
           )}
           <PostList
-            posts={regularPosts}
+            posts={visiblePosts.regularPosts}
             hasFilter={hasFilter}
-            hasExternalResults={pinnedPosts.length > 0}
+            hasExternalResults={visiblePosts.pinnedPosts.length > 0}
             onClearFilters={handleClearFilters}
             isInitialLoading={isInitialLoading}
-            isInitialLoadError={isInitialLoadError || (showBootstrapDegraded && resultCount === 0)}
+            isInitialLoadError={isInitialLoadError || isRetainedDataError || (showBootstrapDegraded && resultCount === 0)}
             isFetchingNextPage={isFetchingNextPage}
             isFetchNextPageError={isFetchNextPageError}
             hasNextPage={hasNextPage}
@@ -670,3 +672,5 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
 }
 
 export default FeedExplorer
+export const resolveFeedVisiblePosts = <T,>(pinnedPosts: T[], regularPosts: T[], isRetainedDataError: boolean) =>
+  isRetainedDataError ? { pinnedPosts: [] as T[], regularPosts: [] as T[] } : { pinnedPosts, regularPosts }

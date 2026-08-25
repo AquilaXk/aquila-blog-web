@@ -172,19 +172,14 @@ const useExplorePostsQuery = ({
     }
   }, [query.data])
 
-  const staleMeta =
-    query.data?.pages.find((page) => page.staleMeta?.stale)?.staleMeta ??
-    query.data?.pages.find((page) => page.staleMeta)?.staleMeta ??
-    null
-
   return {
     pinnedPosts,
     regularPosts,
-    staleMeta,
     loadedPagesCount: query.data?.pages.length ?? 0,
     hasNextPage: query.hasNextPage ?? false,
     isInitialLoading: query.isLoading,
     isInitialLoadError: query.isError && !(query.data?.pages.length),
+    isRetainedDataError: query.isRefetchError,
     hasInitialLoadSucceeded: query.isSuccess && query.isFetchedAfterMount,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,

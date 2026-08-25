@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { DESKTOP_VIEWPORT, prepareAdminPosts, preparePublicHome } from "./helpers/adaptivityFixtures"
 import { mockAnonymousSession, mockAvatarAsset } from "./helpers/mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.describe("residual keyboard paths", () => {
   test("관리자 글 목록은 Arrow로 행 primary 포커스를 이동한다", async ({ page }) => {
@@ -106,6 +107,7 @@ test.describe("residual keyboard paths", () => {
 
   test("Legal TOC jump 후 대상 h2로 포커스가 이동한다", async ({ page }) => {
     await page.setViewportSize(DESKTOP_VIEWPORT)
+    await mockPublicAdminProfile(page)
     await page.goto("/privacy")
     await expect(page.getByRole("heading", { name: "개인정보처리방침", level: 1 })).toBeVisible()
 

@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test"
-import { mockAvatarAsset } from "./helpers/smokeFixtures"
+import { mockAvatarAsset, mockPublicAdminProfile } from "./helpers/smokeFixtures"
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("core smoke detail mermaid", () => {

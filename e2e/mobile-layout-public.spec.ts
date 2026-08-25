@@ -8,6 +8,7 @@ import {
   mockDetailEndpoint,
   mockFeedEndpoints,
 } from "./helpers/mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.use({
   viewport: MOBILE_VIEWPORT,
@@ -18,6 +19,7 @@ test.use({
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
   await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
 })
 
 test.describe("mobile layout public", () => {

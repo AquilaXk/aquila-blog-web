@@ -1,6 +1,5 @@
 import type { TPost } from "src/types"
 import type { components } from "@shared/contracts"
-import type { ApiFetchMeta } from "../client"
 
 type GeneratedPostWithContentDto = components["schemas"]["PostWithContentDto"]
 type GeneratedPostDto = components["schemas"]["PostDto"]
@@ -119,7 +118,6 @@ export type PostsBootstrapResult = {
   nextCursor: string | null
   pageSize: number
   tagCounts: Record<string, number>
-  staleMeta?: ApiFetchMeta
 }
 
 export type ExplorePostsPage = {
@@ -130,5 +128,4 @@ export type ExplorePostsPage = {
   hasNext?: boolean
   nextCursor?: string | null
   paginationMode?: "cursor" | "page"
-  staleMeta?: ApiFetchMeta
 }

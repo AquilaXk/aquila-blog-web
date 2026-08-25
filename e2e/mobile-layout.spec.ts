@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 const readSourceFile = (sourcePath: string) => readFileSync(path.resolve(__dirname, "..", sourcePath), "utf8")
 
@@ -499,5 +500,6 @@ const captureLayoutSnapshot = async (page: Page) =>
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
   await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
 })
 })

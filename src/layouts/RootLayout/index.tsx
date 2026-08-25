@@ -9,11 +9,12 @@ import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
 import { CONFIG } from "site.config"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
+import { queryKey } from "src/constants/queryKey"
+import { fetchPublicAdminProfile } from "src/libs/publicAdminProfileClient"
 import { isNavigationCancelledError, isRequestCancelledError } from "src/libs/router"
 import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import { FLUID_LAYOUT_MAX_PX } from "./layoutTiers"
 
-const PUBLIC_ADMIN_PROFILE_QUERY_KEY = ["member", "adminProfile"] as const
 const INITIAL_PROPS_CANCELLED_MESSAGE = "loading initial props cancelled"
 const RootAdminProfileContext = React.createContext<AdminProfile | null>(null)
 
@@ -25,28 +26,16 @@ type UsePublicAdminProfileOptions = {
   staleTimeMs?: number
 }
 
-const resolvePublicApiBaseUrl = () => {
-  const publicUrl = process.env.NEXT_PUBLIC_BACKEND_URL
-  return (publicUrl || "http://localhost:8080").replace(/\/+$/, "")
-}
-
-const fetchPublicAdminProfile = async (): Promise<AdminProfile | null> => {
-  const response = await fetch(`${resolvePublicApiBaseUrl()}/member/api/v1/members/adminProfile`, {
-    credentials: "include",
-  })
-  if (!response.ok) return null
-  return (await response.json()) as AdminProfile
-}
-
 const usePublicAdminProfile = (
   initialProfile: AdminProfile | null,
   options: UsePublicAdminProfileOptions
 ): AdminProfile | null => {
   const hasSeedProfile = initialProfile != null
-  const query = useQuery<AdminProfile | null>({
-    queryKey: PUBLIC_ADMIN_PROFILE_QUERY_KEY,
+  const query = useQuery<AdminProfile>({
+    queryKey: queryKey.adminProfile(),
     queryFn: fetchPublicAdminProfile,
     enabled: typeof window !== "undefined" && options.enabled,
+    throwOnError: true,
     initialData: initialProfile ?? undefined,
     staleTime: options.staleTimeMs ?? (hasSeedProfile ? 5 * 60 * 1000 : 0),
     retry: false,
