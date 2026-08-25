@@ -3,9 +3,11 @@ import {
   ApiError,
   ApiNetworkError,
   ApiTimeoutError,
+} from "src/apis/backend/client"
+import {
   createServerApiFetchMetricsContext,
   type ServerApiFetchMetricsContext,
-} from "src/apis/backend/client"
+} from "src/apis/backend/serverMetricsBridge"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 

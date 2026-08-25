@@ -37,10 +37,16 @@ test.afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv
 })
 
-test("server backend boundary has no static runtime metrics dependency", () => {
-  const source = readFileSync(path.resolve(__dirname, "../../src/libs/server/backend.ts"), "utf8")
-  expect(source).not.toContain('from "src/libs/server/runtimeMetrics"')
-  expect(source).not.toContain("prom-client")
+test("server metrics boundaries have no static runtime metrics dependency", () => {
+  const sourcePaths = [
+    "../../src/libs/server/backend.ts",
+    "../../src/apis/backend/serverMetricsBridge.ts",
+  ]
+  for (const sourcePath of sourcePaths) {
+    const source = readFileSync(path.resolve(__dirname, sourcePath), "utf8")
+    expect(source).not.toContain('from "src/libs/server/runtimeMetrics"')
+    expect(source).not.toContain("prom-client")
+  }
 })
 
 test("serverApiFetchJson returns parsed JSON on success", async () => {

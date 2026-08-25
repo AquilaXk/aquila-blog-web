@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks"
-import { registerServerApiFetchMetricsFactory } from "src/apis/backend/client"
+import { registerServerApiFetchMetricsFactory } from "src/apis/backend/serverMetricsBridge"
 import { resolveRequestId } from "src/libs/server/requestId"
 import {
   classifyBackendHttpResult,
