@@ -14,6 +14,7 @@ const productionEnv = [
   "BACKEND_INTERNAL_URL=https://api.example.test",
   "NEXT_PUBLIC_SITE_URL=https://www.example.test",
   "TOKEN_FOR_REVALIDATE=web-revalidate-token",
+  "WEB_METRICS_TOKEN=web-metrics-test-token",
   "BACKEND_PROXY_MAX_BODY_BYTES=104857600",
   "BACKEND_PROXY_MAX_IN_FLIGHT_BODY_BYTES=268435456",
   "NEXT_PUBLIC_SIGNUP_ENABLED=false",
@@ -34,6 +35,7 @@ test("production rejects missing secret, non-HTTPS URLs, and non-positive proxy 
     target: "production",
     text: productionEnv
       .replace("TOKEN_FOR_REVALIDATE=web-revalidate-token\n", "")
+      .replace("WEB_METRICS_TOKEN=web-metrics-test-token\n", "")
       .replace("NEXT_PUBLIC_BACKEND_URL=https://api.example.test", "NEXT_PUBLIC_BACKEND_URL=http://api.example.test")
       .replace("BACKEND_PROXY_MAX_BODY_BYTES=104857600", "BACKEND_PROXY_MAX_BODY_BYTES=0")
       .replace("NEXT_PUBLIC_SIGNUP_ENABLED=false", "NEXT_PUBLIC_SIGNUP_ENABLED=true")
@@ -42,6 +44,7 @@ test("production rejects missing secret, non-HTTPS URLs, and non-positive proxy 
 
   assert.equal(result.ok, false)
   assert(result.errors.some((error) => error.key === "TOKEN_FOR_REVALIDATE" && error.message === "is required"))
+  assert(result.errors.some((error) => error.key === "WEB_METRICS_TOKEN" && error.message === "is required"))
   assert(result.errors.some((error) => error.key === "NEXT_PUBLIC_BACKEND_URL" && error.message.includes("https")))
   assert(result.errors.some((error) => error.key === "BACKEND_PROXY_MAX_BODY_BYTES" && error.message.includes("positive decimal")))
   assert(result.errors.some((error) => error.key === "NEXT_PUBLIC_SIGNUP_ENABLED" && error.message.includes("false")))
@@ -64,6 +67,7 @@ test("only the container build target validates a production build", async () =>
   const strictResult = validateEnvText({ contract, target: "production", text: productionBuildEnv })
   assert.equal(strictResult.ok, false)
   assert(strictResult.errors.some((error) => error.key === "TOKEN_FOR_REVALIDATE" && error.message === "is required"))
+  assert(strictResult.errors.some((error) => error.key === "WEB_METRICS_TOKEN" && error.message === "is required"))
 })
 
 test("production rejects short and placeholder revalidation tokens", async () => {
