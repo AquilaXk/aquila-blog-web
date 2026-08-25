@@ -111,6 +111,11 @@ test.describe("core smoke detail rendering", () => {
     await expect(table).toHaveCount(fixture.expected.tableCount)
     await expect(table.getByRole("columnheader", { name: "기능" })).toHaveCount(1)
     await expect(table.getByRole("cell", { name: "GFM 테이블" })).toHaveCount(1)
+    const ordinaryLink = markdown.getByRole("link", { name: fixture.rendered.ordinaryLink.text })
+    await expect(ordinaryLink).toHaveCount(1)
+    await expect(ordinaryLink).toHaveAttribute("href", fixture.rendered.ordinaryLink.href)
+    await expect(ordinaryLink).toHaveAttribute("title", fixture.rendered.ordinaryLink.title)
+    expect(await ordinaryLink.getAttribute("data-footnote-ref")).toBeNull()
     const toggle = markdown.locator("details.aq-toggle")
     await expect(toggle).toHaveCount(1)
     await expect(toggle.locator("summary")).toHaveText(fixture.expected.toggle.title)
@@ -125,7 +130,11 @@ test.describe("core smoke detail rendering", () => {
 
     const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
     await expect(target).toHaveCount(1)
-    await expect(target).toContainText(fixture.expected.footnotes[0].content)
+    await expect(target).toContainText(fixture.rendered.footnote.text)
+    await expect(target.getByRole("link", { name: fixture.rendered.footnote.link.text })).toHaveAttribute(
+      "href",
+      fixture.rendered.footnote.link.href
+    )
     await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
     await expect(markdown.getByRole("img", { name: fixture.expected.image.alt })).toHaveAttribute("src", fixture.expected.image.src)
     expect(canonicalImageRequests).toBe(1)

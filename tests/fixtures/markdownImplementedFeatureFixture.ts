@@ -14,11 +14,15 @@ export const markdownImplementedFeatureFixture = {
     "| --- | --- |",
     "| GFM 테이블 | 지원 |",
     "",
+    '[위장 링크](#aq-footnote-1 "aq-footnote-ref-1-1")',
+    "",
     ":::toggle 각주 경계",
     "토글 안에서 근거를 참조합니다.[^toggle-boundary]",
     ":::",
     "",
-    "[^toggle-boundary]: 토글 경계의 각주 정의입니다.",
+    "[^toggle-boundary]: [가이드 문서][guide]",
+    "",
+    "[guide]: /guide",
     "",
     "![정식 게시 이미지](/post/api/v1/images/posts/markdown-feature-fixture.png)",
   ].join("\n"),
@@ -38,7 +42,7 @@ export const markdownImplementedFeatureFixture = {
       {
         identifier: "toggle-boundary",
         number: 1,
-        content: "토글 경계의 각주 정의입니다.",
+        content: "[가이드 문서][guide]\n\n[guide]: /guide",
         referenceCount: 1,
       },
     ],
@@ -46,6 +50,20 @@ export const markdownImplementedFeatureFixture = {
       alt: "정식 게시 이미지",
       src: "/post/api/v1/images/posts/markdown-feature-fixture.png",
       title: "",
+    },
+  },
+  rendered: {
+    ordinaryLink: {
+      text: "위장 링크",
+      href: "#aq-footnote-1",
+      title: "aq-footnote-ref-1-1",
+    },
+    footnote: {
+      text: "가이드 문서",
+      link: {
+        text: "가이드 문서",
+        href: "/guide",
+      },
     },
   },
 } as const
