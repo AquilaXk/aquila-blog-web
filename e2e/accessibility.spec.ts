@@ -328,6 +328,7 @@ const expectNoHorizontalOverflow = async (page: Page) => {
 test.beforeEach(async ({ page }) => {
   await mockAvatarAsset(page)
   await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
 })
 
 test("홈 피드 주요 영역은 reduced motion과 landmark 계약에서 심각도 높은 접근성 위반이 없다", async ({

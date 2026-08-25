@@ -107,6 +107,8 @@ export const createAdminPostPage = () => ({
 })
 
 export const mockAdminPostsWorkspaceEndpoints = async (page: Page) => {
+  await mockPublicAdminProfile(page)
+
   await page.route("**/member/api/v1/auth/me", async (route) => {
     await route.fulfill({
       status: 200,
