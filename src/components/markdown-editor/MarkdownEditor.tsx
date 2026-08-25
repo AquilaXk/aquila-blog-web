@@ -39,7 +39,12 @@ import {
   planWrapSelection,
   type PlannedTextMutation,
 } from "./markdownEditorTextMutation"
-import { planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
+import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
+import {
+  groupMarkdownEditorCommands,
+  projectMarkdownEditorToolbarCommands,
+  type MarkdownEditorCommandDescriptor,
+} from "./markdownEditorCommandRegistryModel"
 import {
   createMarkdownEditorTable,
   isMarkdownEditorTableSelection,
@@ -95,6 +100,8 @@ type TextareaSelection = {
   from: number
   to: number
 }
+
+const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
@@ -560,6 +567,30 @@ export const MarkdownEditor = ({
       edit
     )
 
+  const commandContext = {
+    disabled,
+    mode,
+    selectionStart: selectionRef.current.from,
+    selectionEnd: selectionRef.current.to,
+    isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
+  }
+  const toolbarCommands = projectMarkdownEditorToolbarCommands()
+
+  const applyMarkdownEditorCommand = (command: MarkdownEditorCommandDescriptor) => {
+    const action = command.execute(commandContext)
+    if (!action) return
+
+    if (action.kind === "format") {
+      applyFormatShortcutOrAppend(action.shortcut)
+      return
+    }
+    if (action.kind === "block") {
+      applyBlockSnippet(codeBlockSnippet)
+      return
+    }
+    applyTableEdit(TABLE_ADD_ROW_EDIT)
+  }
+
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
       if (disabled) return
@@ -692,6 +723,24 @@ export const MarkdownEditor = ({
               {snippet.label}
             </ToolbarButton>
           ))}
+          {toolbarCommands.map((command) => {
+            const label = "shortcut" in command
+              ? `${command.label} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
+              : command.label
+            return (
+              <ToolbarButton
+                key={command.id}
+                type="button"
+                title={label}
+                aria-label={label}
+                disabled={!command.isEnabled(commandContext)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyMarkdownEditorCommand(command)}
+              >
+                {command.toolbarLabel}
+              </ToolbarButton>
+            )
+          })}
           {toolbarListCommands.map((command) => (
             <ToolbarButton
               key={command.command}
@@ -705,7 +754,7 @@ export const MarkdownEditor = ({
               {command.label}
             </ToolbarButton>
           ))}
-          {blockMarkdownSnippets.filter((snippet) => snippet.title !== "표").map((snippet) => (
+          {blockMarkdownSnippets.filter((snippet) => snippet.title !== "표" && snippet.title !== "코드 블록").map((snippet) => (
             <ToolbarButton
               key={snippet.title}
               type="button"
@@ -749,7 +798,6 @@ export const MarkdownEditor = ({
             Table
           </ToolbarButton>
           {([
-            ["표 행 추가", { kind: "add-row" }],
             ["표 행 삭제", { kind: "delete-row" }],
             ["표 열 추가", { kind: "add-column" }],
             ["표 열 삭제", { kind: "delete-column" }],
@@ -769,6 +817,26 @@ export const MarkdownEditor = ({
               {label}
             </ToolbarButton>
           ))}
+          <ToolbarSelect
+            aria-label="명령 메뉴"
+            value=""
+            disabled={disabled}
+            onChange={(event) => {
+              const command = toolbarCommands.find((candidate) => candidate.id === event.currentTarget.value)
+              if (command) applyMarkdownEditorCommand(command)
+            }}
+          >
+            <option value="">명령 선택</option>
+            {groupMarkdownEditorCommands().map((group) => (
+              <optgroup key={group.category} label={group.label}>
+                {group.commands.map((command) => (
+                  <option key={command.id} value={command.id} disabled={!command.isEnabled(commandContext)}>
+                    {command.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </ToolbarSelect>
           <ToolbarUploadButton title="이미지" aria-label="이미지" aria-disabled={disabled || !onUploadImage}>
             Image
             <input

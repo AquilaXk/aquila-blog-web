@@ -6,6 +6,7 @@ import {
   planHardBreak,
   planListEnterContinuation,
   planTableCellTabMutation,
+  resolveMarkdownEditorCommandShortcut,
   resolveFormatShortcut,
   resolveMarkdownEditorLineCommand,
 } from "./markdownEditorKeyboardModel"
@@ -102,6 +103,22 @@ export const useMarkdownEditorTextareaKeyboard = ({
 
   const handleFormatShortcutKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+      const command = resolveMarkdownEditorCommandShortcut(event)
+      if (command) {
+        event.preventDefault()
+        const { from, to } = rememberTextareaSelection()
+        const action = command.execute({
+          disabled,
+          mode: "write",
+          selectionStart: from,
+          selectionEnd: to,
+          isTableSelection: false,
+        })
+        if (action?.kind === "format") {
+          applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, action.shortcut))
+        }
+        return true
+      }
       const formatShortcut = resolveFormatShortcut(event)
       if (!formatShortcut) return false
       event.preventDefault()
@@ -109,7 +126,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, formatShortcut))
       return true
     },
-    [applyMutationPlan, rememberTextareaSelection, valueRef]
+    [applyMutationPlan, disabled, rememberTextareaSelection, valueRef]
   )
 
   const handleLineCommandKeyDown = useCallback(
