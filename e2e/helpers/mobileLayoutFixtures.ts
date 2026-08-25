@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test"
+import { mockPublicAdminProfile } from "./smokeFixtures"
 
 export const MOBILE_VIEWPORT = { width: 393, height: 852 }
 export const AVATAR_PNG_BASE64 =
@@ -195,6 +196,8 @@ export const mockAdminPostsWorkspaceEndpoints = async (page: Page) => {
 }
 
 export const mockFeedEndpoints = async (page: Page) => {
+  await mockPublicAdminProfile(page)
+
   await page.route("**/post/api/v1/posts/feed**", async (route) => {
     await route.fulfill({
       status: 200,
