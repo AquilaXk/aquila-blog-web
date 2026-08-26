@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright"
 import { expect, test, type Page } from "@playwright/test"
 import { ACTIVE_LEGAL_DOCUMENTS } from "src/apis/backend/legal"
+import { ADMIN_TASK_DLQ_REPLAY_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
 import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import type { TaskQueueDiagnostics } from "src/routes/Admin/AdminToolsWorkspacePageState"
 import { expectNoHorizontalOverflow } from "./helpers/adaptivityFixtures"
@@ -331,12 +332,33 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await submit.dblclick()
   await firstPostTimedOut
 
-  await expect.poll(() => counters.post).toBe(1)
-  await expect.poll(() => counters.get).toBe(0)
   const retrySameRequest = region.getByRole("button", {
     name: "Retry same request",
   })
-  await expect(retrySameRequest).toBeVisible()
+  await expect
+    .poll(async () => ({
+      post: counters.post,
+      get: counters.get,
+      sessionPresent: await page.evaluate(
+        (key) => sessionStorage.getItem(key) !== null,
+        ADMIN_TASK_DLQ_REPLAY_SESSION_KEY
+      ),
+      regionText: await region.innerText(),
+      buttons: await region.getByRole("button").evaluateAll((buttons) =>
+        buttons.map((button) => ({
+          label: button.textContent?.trim() || "",
+          disabled: (button as HTMLButtonElement).disabled,
+        }))
+      ),
+    }))
+    .toMatchObject({
+      post: 1,
+      get: 0,
+      sessionPresent: true,
+      buttons: expect.arrayContaining([
+        { label: "Retry same request", disabled: false },
+      ]),
+    })
   await retrySameRequest.click()
   await expect.poll(() => counters.post).toBe(2)
   expect(counters.requests[1]).toEqual(counters.requests[0])
