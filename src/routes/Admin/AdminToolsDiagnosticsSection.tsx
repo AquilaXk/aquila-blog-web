@@ -27,6 +27,7 @@ import {
   formatInstant,
   formatRetryPolicy,
 } from "src/routes/Admin/AdminToolsWorkspaceModel"
+import { AdminTaskDlqReplaySection } from "src/routes/Admin/AdminTaskDlqReplaySection"
 
 export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
   const {
@@ -303,6 +304,12 @@ export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
               </CompactList>
             </DetailsPanel>
           )}
+
+          <AdminTaskDlqReplaySection
+            disabled={isBusy}
+            taskTypeSuggestions={taskQueueDiagnostics?.taskTypes.map((taskType: any) => taskType.taskType) || []}
+            onTerminalReceipt={() => void fetchTaskQueueDiagnostics()}
+          />
         </DiagnosticPanel>
       ) : null}
     </WorkspaceSection>
