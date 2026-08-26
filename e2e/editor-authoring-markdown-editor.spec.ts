@@ -685,7 +685,6 @@ test.describe("Markdown editor replacement", () => {
       "",
       "한글 유니코드 본문",
     ].join("\n")
-    const previewId = "outline-statistics"
 
     await page.setViewportSize({ width: 2048, height: 1152 })
     await routeAuthenticatedEditor(page, content, title)
@@ -714,30 +713,6 @@ test.describe("Markdown editor replacement", () => {
       .toEqual({ start: secondLevelStart, end: secondLevelStart + "## 중복 heading".length })
     await expect(page.getByLabel("발행 설정").getByText(/2분/)).toBeVisible()
 
-    await page.addInitScript(
-      ({ content, previewId, title }) => {
-        window.localStorage.setItem(
-          `editor.actual-preview.v1:${previewId}`,
-          JSON.stringify({
-            id: previewId,
-            title,
-            content,
-            summary: "",
-            summarySource: "NONE",
-            tags: [],
-            visibility: "PUBLIC_LISTED",
-            thumbnailUrl: "",
-            authorName: "aquila",
-            authorImageUrl: "",
-            createdAt: "2026-08-24T00:00:00.000Z",
-          })
-        )
-      },
-      { content, previewId, title }
-    )
-    await page.goto(`/editor/preview/${previewId}`)
-    await expect(page.getByText("2분 READ", { exact: true })).toBeVisible()
-    await expect(page.getByText(/VIEWS/)).toHaveCount(0)
   })
 
   test("preview matches supported table markdown for alignment, escaped pipes, and inline cell formatting", async ({
@@ -2442,34 +2417,4 @@ test.describe("Markdown editor replacement", () => {
     await expect(page.getByLabel("Summary")).toHaveValue("")
   })
 
-  test("actual preview renders a leading summary block only in the body", async ({ page }) => {
-    const { content, expected } = leadingBlockSummaryFixture
-    const previewId = "leading-summary"
-    await routeAuthenticatedEditor(page)
-    await page.addInitScript(
-      ({ content, previewId, summary, summarySource }) => {
-        window.localStorage.setItem(
-          `editor.actual-preview.v1:${previewId}`,
-          JSON.stringify({
-            id: previewId,
-            title: "LEADING_BLOCK 실제 보기",
-            content,
-            summary,
-            summarySource,
-            tags: [],
-            visibility: "PUBLIC_LISTED",
-            thumbnailUrl: "",
-            authorName: "aquila",
-            authorImageUrl: "",
-            createdAt: "2026-08-24T00:00:00.000Z",
-          })
-        )
-      },
-      { content, previewId, summary: expected.summary, summarySource: expected.source }
-    )
-
-    await page.goto(`/editor/preview/${previewId}`)
-    await expect(page.locator(".deck")).toHaveCount(0)
-    await expect(page.locator(".aq-markdown").getByText("OIDC는 그 위에 인증 계층을 추가합니다.", { exact: false })).toHaveCount(1)
-  })
 })

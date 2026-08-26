@@ -206,15 +206,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "localStorage",
-    key: "editor.actual-preview.v1:",
-    purpose: "editor-preview-prefix",
-    required: false,
-    retention: "until preview snapshot is replaced or browser storage is cleared",
-    deletion: "preview overwrite or browser storage deletion",
-    stores: "editor actual-preview snapshot by post id",
-  },
-  {
-    area: "localStorage",
     key: "aquila-cloud-video-upload-session",
     purpose: "cloud-video-upload-session-prefix",
     required: false,
