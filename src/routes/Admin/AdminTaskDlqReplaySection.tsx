@@ -80,6 +80,7 @@ export const AdminTaskDlqReplaySection = ({
   const [notice, setNotice] = useState("")
   const [conflict, setConflict] = useState(false)
   const [busy, setBusy] = useState(false)
+  const activeRecordRef = useRef<TaskDlqReplaySessionRecord | null>(null)
   const postInFlight = useRef(false)
   const statusInFlight = useRef(false)
   const refreshedOperationIds = useRef(new Set<string>())
@@ -145,6 +146,7 @@ export const AdminTaskDlqReplaySection = ({
     if (!restored || restoredOperationId.current === restored.operationId)
       return
     restoredOperationId.current = restored.operationId
+    activeRecordRef.current = restored
     setRecord(restored)
     void checkStatus(restored)
     // Reload restoration performs one explicit current-result read for the saved operation.
@@ -175,7 +177,13 @@ export const AdminTaskDlqReplaySection = ({
   }
 
   const submit = async () => {
-    if (disabled || postInFlight.current || !confirmed) return
+    if (
+      disabled ||
+      postInFlight.current ||
+      activeRecordRef.current ||
+      !confirmed
+    )
+      return
     const requestedLimit = limit.trim() ? Number(limit) : undefined
     const validation = AdminTaskDlqReplayModel.validateRequest({
       operationId: createSecureRandomUuid(),
@@ -202,17 +210,20 @@ export const AdminTaskDlqReplaySection = ({
       )
       return
     }
+    activeRecordRef.current = nextRecord
     setRecord(nextRecord)
     await postRecord(nextRecord)
   }
 
   const clearForNewCommand = () => {
+    if (postInFlight.current || statusInFlight.current) return
     try {
       sessionStorage.removeItem(ADMIN_TASK_DLQ_REPLAY_SESSION_KEY)
     } catch {
       setNotice("The saved operation request could not be cleared.")
       return
     }
+    activeRecordRef.current = null
     setRecord(null)
     setDisplay(null)
     setNotice("")
