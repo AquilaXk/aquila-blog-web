@@ -382,6 +382,11 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
       buttons: expect.arrayContaining([
         { label: "Retry same request", disabled: false },
       ]),
+      regionCount: 1,
+      applicationErrorCount: 0,
+      pageErrorCount: 0,
+      queueTabSelected: ["true"],
+      clientErrorReports: [],
     })
   await retrySameRequest.click()
   await expect.poll(() => counters.post).toBe(2)
