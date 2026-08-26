@@ -115,7 +115,11 @@ const taskQueueDiagnostics: TaskQueueDiagnostics = {
   staleProcessingSamples: [],
 }
 
-const installAdminToolsMocks = async (page: Page, counters: ReplayCounters) => {
+const installAdminToolsMocks = async (
+  page: Page,
+  counters: ReplayCounters,
+  firstResponseGate: Promise<void>
+) => {
   await mockAvatarAsset(page)
   await mockPublicAdminProfile(page)
 
@@ -181,6 +185,7 @@ const installAdminToolsMocks = async (page: Page, counters: ReplayCounters) => {
       counters.operationId = String(request.operationId)
     expect(request.operationId).toBe(counters.operationId)
     if (counters.post === 1) {
+      await firstResponseGate
       await route.fulfill({
         status: UNCERTAIN_GATEWAY_STATUS,
         contentType: "application/json",
@@ -262,7 +267,13 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
     if (response.status() >= 400)
       failedResponses.push(`${response.status()} ${response.url()}`)
   })
-  await installAdminToolsMocks(page, counters)
+  const firstResponseGateHolder: { release: (() => void) | null } = {
+    release: null,
+  }
+  const firstResponseGate = new Promise<void>((resolve) => {
+    firstResponseGateHolder.release = resolve
+  })
+  await installAdminToolsMocks(page, counters, firstResponseGate)
   await page.goto("/admin/tools")
   const queueTab = page.getByRole("tab", { name: "작업 큐 진단" })
   const applicationError = page.getByRole("heading", {
@@ -330,9 +341,11 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
       response.status() === UNCERTAIN_GATEWAY_STATUS
   )
   await submit.dblclick()
+  if (!firstResponseGateHolder.release)
+    throw new Error("The first DLQ replay response gate was not registered.")
+  firstResponseGateHolder.release()
   await firstPostTimedOut
 
-  await queueTab.click()
   const retrySameRequest = region.getByRole("button", {
     name: "Retry same request",
   })

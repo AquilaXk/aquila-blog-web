@@ -240,7 +240,7 @@ export const AdminTaskDlqReplaySection = ({
         <strong>DLQ replay</strong>
         <small>Durable operation</small>
       </SubSectionHeading>
-      {!record ? (
+      {!record || (busy && !display && !notice) ? (
         <FieldGrid>
           <FieldBox className="wide">
             <FieldLabel htmlFor="admin-task-dlq-reason">Reason</FieldLabel>
