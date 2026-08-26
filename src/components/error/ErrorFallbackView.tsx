@@ -1,6 +1,7 @@
 import Link from "next/link"
 import styled from "@emotion/styled"
 import { ErrorState } from "src/design-system/StatePresenters"
+import { ThemeProvider } from "src/layouts/RootLayout/ThemeProvider"
 
 type ErrorFallbackVariant = "global" | "surface"
 
@@ -43,7 +44,7 @@ export const ErrorFallbackView = ({
     ? `오류 ID: ${errorId}\n요청 ID: ${requestId}`
     : `오류 ID: ${errorId}`
 
-  return (
+  const fallback = (
     <FallbackShell>
       <ErrorState
         data-error-boundary={variant}
@@ -66,4 +67,10 @@ export const ErrorFallbackView = ({
       />
     </FallbackShell>
   )
+
+  return variant === "global" ? (
+    <ThemeProvider scheme="light" blogDesign="legacy">
+      {fallback}
+    </ThemeProvider>
+  ) : fallback
 }

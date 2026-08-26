@@ -7,6 +7,7 @@ type ClientErrorReport = {
   boundary: string
   surface: string
   path: string
+  errorName: string
 }
 
 test.describe("error boundary launch gate", () => {
@@ -59,7 +60,9 @@ test.describe("error boundary launch gate", () => {
       boundary: "global",
       surface: "app",
       path: "/_qa/error-boundary",
+      errorName: "Error",
     })
+    expect(reports.some((report) => report.errorName === "TypeError")).toBe(false)
     expect(JSON.stringify(reports[0])).not.toContain("secret-token")
   })
 
