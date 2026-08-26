@@ -85,6 +85,7 @@ export const AdminTaskDlqReplaySection = ({
   const statusInFlight = useRef(false)
   const refreshedOperationIds = useRef(new Set<string>())
   const restoredOperationId = useRef<string | null>(null)
+  const restoredStatusRequestedOperationId = useRef<string | null>(null)
 
   const consumeReceipt = (
     response: unknown,
@@ -148,10 +149,21 @@ export const AdminTaskDlqReplaySection = ({
     restoredOperationId.current = restored.operationId
     activeRecordRef.current = restored
     setRecord(restored)
-    void checkStatus(restored)
+  }, [])
+
+  useEffect(() => {
+    if (
+      !record ||
+      disabled ||
+      restoredOperationId.current !== record.operationId ||
+      restoredStatusRequestedOperationId.current === record.operationId
+    )
+      return
+    restoredStatusRequestedOperationId.current = record.operationId
+    void checkStatus(record)
     // Reload restoration performs one explicit current-result read for the saved operation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [disabled, record])
 
   const postRecord = async (sessionRecord: TaskDlqReplaySessionRecord) => {
     if (disabled || postInFlight.current) return
@@ -196,6 +208,7 @@ export const AdminTaskDlqReplaySection = ({
       setNotice(validation.message)
       return
     }
+    setNotice("")
     const nextRecord = AdminTaskDlqReplayModel.createSessionRecord(
       validation.value
     )

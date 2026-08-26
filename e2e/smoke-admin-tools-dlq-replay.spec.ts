@@ -328,10 +328,16 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await expect(submit).toBeDisabled()
   await reason.fill("Recover this bounded queue batch.")
   await region.getByLabel("Task type").selectOption(TASK_TYPE)
-  await region.getByLabel("Replay limit").fill("5")
+  await region.getByLabel("Replay limit").fill("0")
   await region.getByLabel("Reset retry count").uncheck()
   await confirmation.check()
   await expect(submit).toBeEnabled()
+  await submit.click()
+  await expect(region.getByRole("alert")).toHaveText(
+    "Check the replay request fields."
+  )
+  expect(counters.post).toBe(0)
+  await region.getByLabel("Replay limit").fill("5")
   const firstPostTimedOut = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -341,6 +347,9 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
       response.status() === UNCERTAIN_GATEWAY_STATUS
   )
   await submit.dblclick()
+  await expect.poll(() => counters.post).toBe(1)
+  await expect(region.getByRole("alert")).toHaveCount(0)
+  await expect(submit).toBeDisabled()
   if (!firstResponseGateHolder.release)
     throw new Error("The first DLQ replay response gate was not registered.")
   firstResponseGateHolder.release()
@@ -408,11 +417,65 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await expect(region.getByText("Accepted and pending")).toBeVisible()
   await expect(region.getByText("Succeeded")).toHaveCount(0)
 
+  const mailDiagnosticsStartedHolder: { release: (() => void) | null } = {
+    release: null,
+  }
+  const mailDiagnosticsStarted = new Promise<void>((resolve) => {
+    mailDiagnosticsStartedHolder.release = resolve
+  })
+  const mailDiagnosticsReleaseHolder: { release: (() => void) | null } = {
+    release: null,
+  }
+  const mailDiagnosticsRelease = new Promise<void>((resolve) => {
+    mailDiagnosticsReleaseHolder.release = resolve
+  })
+  await page.route("**/system/api/v1/adm/mail/signup", async (route) => {
+    expect(route.request().method()).toBe("GET")
+    if (!mailDiagnosticsStartedHolder.release)
+      throw new Error("The mail diagnostics start gate was not registered.")
+    mailDiagnosticsStartedHolder.release()
+    await mailDiagnosticsRelease
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "READY",
+        adapter: "SMTP",
+        host: "smtp.example.test",
+        port: 587,
+        mailFrom: "noreply@example.test",
+        usernameConfigured: true,
+        passwordConfigured: true,
+        smtpAuth: true,
+        startTlsEnabled: true,
+        missing: [],
+        canConnect: true,
+        checkedAt: "2026-08-26T00:00:00Z",
+        verifyPath: "/signup/verify",
+        connectionError: null,
+        taskQueue: null,
+      }),
+    })
+  })
+  await page.getByRole("tab", { name: "메일 진단" }).click()
+  await page.getByRole("button", { name: "다시 확인", exact: true }).click()
+  await mailDiagnosticsStarted
+  await queueTab.click()
+  const checkStatus = region.getByRole("button", { name: "Check status" })
+  await expect(checkStatus).toBeVisible()
+  await expect(checkStatus).toBeDisabled()
+  expect(counters.get).toBe(0)
+  if (!mailDiagnosticsReleaseHolder.release)
+    throw new Error("The mail diagnostics release gate was not registered.")
+  mailDiagnosticsReleaseHolder.release()
+  await expect.poll(() => counters.get).toBe(1)
+  await expect(region.getByText("Partially completed")).toBeVisible()
+
   await page.reload()
   await page.getByRole("tab", { name: "작업 큐 진단" }).click()
   await expect(region.getByText("Partially completed")).toBeVisible()
   await expect.poll(() => counters.post).toBe(2)
-  await expect.poll(() => counters.get).toBe(1)
+  await expect.poll(() => counters.get).toBe(2)
   await expect(region.getByText("TASKS_PARTIALLY_REPLAYED")).toBeVisible()
   await expect(region.getByText("Selected 5")).toBeVisible()
   await expect(region.getByText("Replayed 3")).toBeVisible()
