@@ -335,30 +335,52 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   const retrySameRequest = region.getByRole("button", {
     name: "Retry same request",
   })
-  await expect
-    .poll(async () => ({
-      post: counters.post,
-      get: counters.get,
-      sessionPresent: await page.evaluate(
-        (key) => sessionStorage.getItem(key) !== null,
-        ADMIN_TASK_DLQ_REPLAY_SESSION_KEY
-      ),
-      regionText: await region.innerText(),
-      buttons: await region.getByRole("button").evaluateAll((buttons) =>
-        buttons.map((button) => ({
-          label: button.textContent?.trim() || "",
-          disabled: (button as HTMLButtonElement).disabled,
-        }))
-      ),
-    }))
-    .toMatchObject({
-      post: 1,
-      get: 0,
-      sessionPresent: true,
-      buttons: expect.arrayContaining([
-        { label: "Retry same request", disabled: false },
-      ]),
-    })
+  let lastPreRetrySnapshot:
+    | {
+        post: number
+        get: number
+        sessionPresent: boolean
+        buttons: { label: string; disabled: boolean }[]
+      }
+    | undefined
+  try {
+    await expect
+      .poll(async () => {
+        lastPreRetrySnapshot = {
+          post: counters.post,
+          get: counters.get,
+          sessionPresent: await page.evaluate(
+            (key) => sessionStorage.getItem(key) !== null,
+            ADMIN_TASK_DLQ_REPLAY_SESSION_KEY
+          ),
+          buttons: await region.getByRole("button").evaluateAll((buttons) =>
+            buttons.map((button) => ({
+              label: button.textContent?.trim() || "",
+              disabled: (button as HTMLButtonElement).disabled,
+            }))
+          ),
+        }
+        return lastPreRetrySnapshot
+      })
+      .toMatchObject({
+        post: 1,
+        get: 0,
+        sessionPresent: true,
+        buttons: expect.arrayContaining([
+          { label: "Retry same request", disabled: false },
+        ]),
+      })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /^Timeout \d+ms exceeded while waiting on the predicate$/.test(
+        error.message
+      )
+    ) {
+      throw new Error(JSON.stringify(lastPreRetrySnapshot))
+    }
+    throw error
+  }
   await retrySameRequest.click()
   await expect.poll(() => counters.post).toBe(2)
   expect(counters.requests[1]).toEqual(counters.requests[0])
