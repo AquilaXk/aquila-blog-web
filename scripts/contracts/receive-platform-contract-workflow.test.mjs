@@ -185,8 +185,8 @@ test("stable branch, write identity, and Draft PR stay exactly Web-owned", () =>
   assert.match(pr.run, /repos\/\$\{WEB_REPOSITORY\}\/pulls\?state=open&head=AquilaXk:\$\{SYNC_BRANCH\}&base=main/)
   assert.match(pr.run, /pr\.head\?\.repo\?\.full_name !== "AquilaXk\/aquila-blog-web"/)
   assert.match(String(pr.if), /steps\.commit\.outputs\.ready == 'true'/)
-  assert.match(pr.run, /\[Chore\] sync Platform public contract/)
-  for (const section of ["## Related Issue", "## Verification", "## Risk & Delivery", "## Evidence", "## Checklist"]) assert.ok(pr.run.includes(section))
+  assert.match(pr.run, /\[Chore\] Sync Platform public contract/)
+  for (const section of ["## Verified delivery", "## SHA-256", "## Generated scope", "## Verification"]) assert.ok(pr.run.includes(section))
 })
 
 test("a fresh unchanged candidate only opens the scoped stale-Draft-PR lifecycle when one exact PR exists", () => {
@@ -278,7 +278,7 @@ test("sourceCommit-only manifest provenance changes are a Web receiver no-op", (
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/generated/backend-openapi.d.ts": "export type paths = { changed: true }\n" }, current), "changed=true")
 })
 
-test("required summary fixture bytes are Web-local candidate changes", () => {
+test("generated Draft PR metadata records only signed delivery identity and generated paths", () => {
   const { document } = workflow()
   const detect = step(document.jobs.receive, "Detect Web-local contract changes")
   const commit = step(document.jobs.receive, "Commit Web-local contract candidate")
@@ -288,8 +288,15 @@ test("required summary fixture bytes are Web-local candidate changes", () => {
   assert.doesNotMatch(detect.run, /candidate presence/)
   assert.doesNotMatch(commit.run, /rm -f contracts\/platform\/summary-fixtures\.json/)
   assert.match(commit.run, /git add -A -- contracts\/platform/)
-  assert.match(pr.run, /Refs #35/)
-  assert.match(pr.run, /#1520/)
-  assert.match(pr.run, /transport-only/)
-  assert.doesNotMatch(pr.run, /Refs #70/)
+  assert.equal(pr.env.SOURCE_REPOSITORY, "${{ steps.delivery.outputs.source_repository }}")
+  assert.equal(pr.env.SOURCE_COMMIT, "${{ steps.delivery.outputs.source_commit }}")
+  assert.equal(pr.env.DELIVERY_ID, "${{ steps.delivery.outputs.delivery_id }}")
+  assert.equal(pr.env.MANIFEST_SHA256, "${{ steps.delivery.outputs.manifest_sha256 }}")
+  assert.equal(pr.env.OPENAPI_SHA256, "${{ steps.delivery.outputs.openapi_sha256 }}")
+  assert.equal(pr.env.ERROR_CODES_SHA256, "${{ steps.delivery.outputs.error_codes_sha256 }}")
+  assert.match(pr.run, /https:\/\/github\.com\/\$\{SOURCE_REPOSITORY\}\/commit\/\$\{SOURCE_COMMIT\}/)
+  for (const value of ["${DELIVERY_ID}", "${MANIFEST_SHA256}", "${OPENAPI_SHA256}", "${ERROR_CODES_SHA256}"]) assert.ok(pr.run.includes(value))
+  for (const generatedPath of ["contracts/platform/**", "packages/shared-contracts/src/generated/backend-openapi.d.ts"]) assert.ok(pr.run.includes(generatedPath))
+  for (const staleMetadata of [/Refs #35/, /Platform #1520/, /summary-only/, /transport-only/, /[가-힣]/]) assert.doesNotMatch(pr.run, staleMetadata)
+  assert.match(pr.run, /\[Chore\] Sync Platform public contract/)
 })

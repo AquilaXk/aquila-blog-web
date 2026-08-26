@@ -276,6 +276,12 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.web-token.outputs.token }}
           SYNC_BRANCH: ${{ env.SYNC_BRANCH }}
+          SOURCE_REPOSITORY: ${{ steps.delivery.outputs.source_repository }}
+          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          DELIVERY_ID: ${{ steps.delivery.outputs.delivery_id }}
+          MANIFEST_SHA256: ${{ steps.delivery.outputs.manifest_sha256 }}
+          OPENAPI_SHA256: ${{ steps.delivery.outputs.openapi_sha256 }}
+          ERROR_CODES_SHA256: ${{ steps.delivery.outputs.error_codes_sha256 }}
         run: |
           set -euo pipefail
           prs="$(gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
@@ -284,58 +290,12 @@ jobs:
           const pr = prs[0]; if (!pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated PR identity is invalid"); process.stdout.write(String(pr.number))
           NODE
           )"
-          body="$(mktemp)"; cat > "${body}" <<'BODY'
-          ## Related Issue
-
-          - Refs #35
-
-          ## Summary
-
-          Automated import from Platform #1520: https://github.com/AquilaXk/aquila-blog/issues/1520
-
-          ## Changes
-
-          - Import and hash-lock Platform manifest-declared summary fixture transport bytes.
-
-          ## Scope
-
-          ### Included
-
-          - `contracts/platform/**`
-          - `packages/shared-contracts/src/generated/backend-openapi.d.ts`
-
-          ### Excluded
-
-          - Platform repository writes, runtime deployment, fixture consumer semantics, and UI/editor changes.
-
-          This is transport-only; no Web consumer or UI behavior is enabled by this Draft PR.
-
-          ## Verification
-
-          | Check | Result / Evidence |
-          | --- | --- |
-          | Byte/hash/import validation | Receiver completed before branch write. |
-
-          ### Not Run
-
-          - Required CI owns full Web regression after this Draft PR.
-
-          ## Risk & Delivery
-
-          - Risk: Cross-repository
-          - Rollout / rollback / recovery: No runtime rollout; close this Draft PR if the contract is not accepted.
-
-          ## Evidence
-
-          - Immutable Platform source identity is recorded in the sync commit.
-
-          ## Checklist
-
-          - [x] 관련 이슈의 Acceptance Criteria와 PR 결과가 일치합니다.
-          - [x] 범위 밖 변경과 다른 저장소가 소유한 source를 포함하지 않았습니다.
-          - [x] 계약·문서가 바뀌었다면 같은 PR 또는 명시된 counterpart에서 반영했습니다.
-          - [x] 실행한 검증의 결과를 기록했습니다.
-          - [x] 민감 데이터, 임시 우회 경로 또는 hidden fallback을 추가하지 않았습니다.
-          - [x] 위험 작업이면 rollout·rollback·recovery가 명확합니다.
-          BODY
-          if [[ -n "${pr_number}" ]]; then gh pr edit "${pr_number}" --repo "${WEB_REPOSITORY}" --title "[Chore] sync Platform public contract" --body-file "${body}"; else gh pr create --repo "${WEB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --draft --title "[Chore] sync Platform public contract" --body-file "${body}"; fi
+          body="$(mktemp)"
+          {
+            printf '%s\n' "## Verified delivery" "" "Sync a verified Platform public contract delivery." ""
+            printf '%s\n' "- Source commit: https://github.com/${SOURCE_REPOSITORY}/commit/${SOURCE_COMMIT}" "- Delivery ID: ${DELIVERY_ID}" ""
+            printf '%s\n' "## SHA-256" "" "- Manifest: ${MANIFEST_SHA256}" "- OpenAPI: ${OPENAPI_SHA256}" "- Error codes: ${ERROR_CODES_SHA256}" ""
+            printf '%s\n' "## Generated scope" "" "- \`contracts/platform/**\`" "- \`packages/shared-contracts/src/generated/backend-openapi.d.ts\`" ""
+            printf '%s\n' "## Verification" "" "The receiver completed byte, hash, and import validation before writing the branch." "" "Required CI owns the full Web regression for this Draft PR."
+          } > "${body}"
+          if [[ -n "${pr_number}" ]]; then gh pr edit "${pr_number}" --repo "${WEB_REPOSITORY}" --title "[Chore] Sync Platform public contract" --body-file "${body}"; else gh pr create --repo "${WEB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --draft --title "[Chore] Sync Platform public contract" --body-file "${body}"; fi
