@@ -15,6 +15,7 @@ const DLQ_REGION_NAME = "DLQ replay"
 const TASK_TYPE = "MAIL_SIGNUP"
 const ADMIN_TASK_DLQ_REPLAY_ENDPOINT =
   "/system/api/v1/adm/operations/task-dlq-replay"
+const UNCERTAIN_GATEWAY_STATUS = 504
 
 type ReplayCounters = {
   post: number
@@ -179,7 +180,14 @@ const installAdminToolsMocks = async (page: Page, counters: ReplayCounters) => {
       counters.operationId = String(request.operationId)
     expect(request.operationId).toBe(counters.operationId)
     if (counters.post === 1) {
-      await route.abort()
+      await route.fulfill({
+        status: UNCERTAIN_GATEWAY_STATUS,
+        contentType: "application/json",
+        body: JSON.stringify({
+          resultCode: "504-00",
+          msg: "The gateway timed out before the operation result was known.",
+        }),
+      })
       return
     }
     await route.fulfill({
@@ -312,13 +320,16 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await region.getByLabel("Reset retry count").uncheck()
   await confirmation.check()
   await expect(submit).toBeEnabled()
-  const firstPostFailed = page.waitForEvent("requestfailed", {
-    predicate: (request) =>
-      request.method() === "POST" &&
-      new URL(request.url()).pathname.endsWith(ADMIN_TASK_DLQ_REPLAY_ENDPOINT),
-  })
+  const firstPostTimedOut = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname.endsWith(
+        ADMIN_TASK_DLQ_REPLAY_ENDPOINT
+      ) &&
+      response.status() === UNCERTAIN_GATEWAY_STATUS
+  )
   await submit.dblclick()
-  await firstPostFailed
+  await firstPostTimedOut
 
   await expect.poll(() => counters.post).toBe(1)
   await expect.poll(() => counters.get).toBe(0)
