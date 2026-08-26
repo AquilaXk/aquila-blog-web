@@ -84,22 +84,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/system/api/v1/adm/tasks/replay-failed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["replayFailedTasks"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/system/api/v1/adm/search/pipeline/force-control": {
         parameters: {
             query?: never;
@@ -126,6 +110,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["setSearchEngineMirrorForceDisable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/api/v1/adm/operations/task-dlq-replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submitTaskDlqReplay"];
         delete?: never;
         options?: never;
         head?: never;
@@ -687,6 +687,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getSearchRuntimeFlags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/api/v1/adm/operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOperation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1654,26 +1670,6 @@ export interface components {
             lastPublishedAt?: string | null;
             dirtyFromPublished?: boolean;
         };
-        TaskDlqReplayRequest: {
-            taskType?: string | null;
-            /** Format: int32 */
-            limit?: number;
-            resetRetryCount?: boolean;
-        };
-        RsDataTaskDlqReplayResult: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["TaskDlqReplayResult"];
-        };
-        TaskDlqReplayResult: {
-            taskType?: string | null;
-            /** Format: int32 */
-            requestedLimit?: number;
-            /** Format: int32 */
-            replayedCount?: number;
-            resetRetryCount?: boolean;
-            replayedTaskIds?: number[];
-        };
         SearchPipelineForceControlRequest: {
             forceControl?: boolean | null;
         };
@@ -1696,6 +1692,46 @@ export interface components {
         };
         SearchEngineMirrorForceDisableRequest: {
             forceDisabled?: boolean;
+        };
+        TaskDlqReplayOperationRequest: {
+            /** Format: uuid */
+            operationId: string;
+            reason: string;
+            taskType?: string | null;
+            /** Format: int32 */
+            limit?: number;
+            resetRetryCount?: boolean;
+        };
+        AdminOperationResBody: {
+            /** Format: uuid */
+            operationId?: string;
+            /** Format: int64 */
+            actorId?: number;
+            /** Format: int64 */
+            sessionRowId?: number | null;
+            /** @enum {string} */
+            action?: "TASK_DLQ_REPLAY";
+            target?: string;
+            reason?: string;
+            /** @enum {string} */
+            status?: "ACCEPTED" | "SUCCEEDED" | "PARTIAL" | "FAILED";
+            /** @enum {string|null} */
+            resultCode?: "NO_MATCHING_TASKS" | "ALL_TASKS_QUARANTINED" | "TASKS_REPLAYED" | "TASKS_PARTIALLY_REPLAYED" | null;
+            /** Format: int32 */
+            selectedCount?: number;
+            /** Format: int32 */
+            replayedCount?: number;
+            /** Format: int32 */
+            quarantinedCount?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            modifiedAt?: string;
+        };
+        RsDataAdminOperationResBody: {
+            resultCode?: string;
+            msg?: string;
+            data?: components["schemas"]["AdminOperationResBody"];
         };
         SignupMailTestRequest: {
             /** Format: email */
@@ -2935,30 +2971,6 @@ export interface operations {
             };
         };
     };
-    replayFailedTasks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskDlqReplayRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataTaskDlqReplayResult"];
-                };
-            };
-        };
-    };
     setSearchPipelineForceControl: {
         parameters: {
             query?: never;
@@ -3003,6 +3015,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataSearchRuntimeFlags"];
+                };
+            };
+        };
+    };
+    submitTaskDlqReplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskDlqReplayOperationRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataAdminOperationResBody"];
                 };
             };
         };
@@ -3971,6 +4007,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SearchRuntimeFlags"];
+                };
+            };
+        };
+    };
+    getOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataAdminOperationResBody"];
                 };
             };
         };
