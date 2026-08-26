@@ -18,6 +18,8 @@ export type {
 } from "src/libs/privacy/optionalTrackingConsentCore"
 import { OPTIONAL_TRACKING_CONSENT_STORAGE_KEY } from "src/libs/privacy/optionalTrackingConsentCore"
 
+export const ADMIN_TASK_DLQ_REPLAY_SESSION_KEY = "admin.tools.taskDlqReplay.v1"
+
 export type BrowserStorageArea = "cookie" | "localStorage" | "sessionStorage"
 
 export type BrowserStorageRegistryEntry = {
@@ -219,6 +221,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     retention: "until upload completes, is cancelled, becomes stale, or browser storage is cleared",
     deletion: "upload completion, cancellation, stale session cleanup, or browser storage deletion",
     stores: "resumable cloud video upload session id keyed by file metadata",
+  },
+  {
+    area: "sessionStorage",
+    key: ADMIN_TASK_DLQ_REPLAY_SESSION_KEY,
+    purpose: "admin-task-dlq-replay-request",
+    required: false,
+    retention: "browser tab session while an operation is pending or retained for explicit status checks",
+    deletion: "explicit new command, tab close, or browser storage deletion",
+    stores: "bounded DLQ replay request with operation UUID, reason, optional task type, limit, and retry-count choice",
   },
   {
     area: "sessionStorage",
