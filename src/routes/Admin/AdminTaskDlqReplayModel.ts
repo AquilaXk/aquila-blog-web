@@ -3,8 +3,6 @@ import type { components } from "@shared/contracts"
 type TaskDlqReplayRequest =
   components["schemas"]["TaskDlqReplayOperationRequest"]
 type AdminOperationReceipt = components["schemas"]["AdminOperationResBody"]
-type AdminOperationEnvelope =
-  components["schemas"]["RsDataAdminOperationResBody"]
 
 export type TaskDlqReplaySessionRecord = {
   operationId: string
@@ -136,15 +134,13 @@ export const AdminTaskDlqReplayModel = {
     }
   },
 
-  parseOperationReceipt(
-    envelope: AdminOperationEnvelope | unknown
-  ): AdminOperationReceipt | null {
+  parseOperationReceipt(envelope: unknown): AdminOperationReceipt | null {
     if (!isRecord(envelope) || !isReceipt(envelope.data)) return null
     return envelope.data
   },
 
   parseAcceptedOperationReceipt(
-    envelope: AdminOperationEnvelope | unknown
+    envelope: unknown
   ): AdminOperationReceipt | null {
     const receipt = this.parseOperationReceipt(envelope)
     return receipt && this.classifyReceipt(receipt) === "pending"

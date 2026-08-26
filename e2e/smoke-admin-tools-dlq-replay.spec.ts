@@ -13,6 +13,8 @@ import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 const RAW_CANARY = "task-id-raw-canary"
 const DLQ_REGION_NAME = "DLQ replay"
 const TASK_TYPE = "MAIL_SIGNUP"
+const ADMIN_TASK_DLQ_REPLAY_ENDPOINT =
+  "/system/api/v1/adm/operations/task-dlq-replay"
 
 type ReplayCounters = {
   post: number
@@ -161,45 +163,42 @@ const installAdminToolsMocks = async (page: Page, counters: ReplayCounters) => {
       body: JSON.stringify(taskQueueDiagnostics),
     })
   })
-  await page.route(
-    "**/system/api/v1/adm/operations/task-dlq-replay",
-    async (route) => {
-      expect(route.request().method()).toBe("POST")
-      counters.post += 1
-      const request = route.request().postDataJSON() as Record<string, unknown>
-      counters.requests.push(request)
-      expect(request).toMatchObject({
-        reason: "Recover this bounded queue batch.",
-        taskType: TASK_TYPE,
-        limit: 5,
-        resetRetryCount: false,
-      })
-      expect(request.operationId).toMatch(/^[0-9a-f-]{36}$/i)
-      if (!counters.operationId)
-        counters.operationId = String(request.operationId)
-      expect(request.operationId).toBe(counters.operationId)
-      if (counters.post === 1) {
-        await route.abort("connectionreset")
-        return
-      }
-      await route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify({
-          resultCode: "202-40",
-          msg: "accepted",
-          data: {
-            operationId: counters.operationId,
-            action: "TASK_DLQ_REPLAY",
-            status: "ACCEPTED",
-            selectedCount: 0,
-            replayedCount: 0,
-            quarantinedCount: 0,
-          },
-        }),
-      })
+  await page.route(`**${ADMIN_TASK_DLQ_REPLAY_ENDPOINT}`, async (route) => {
+    expect(route.request().method()).toBe("POST")
+    counters.post += 1
+    const request = route.request().postDataJSON() as Record<string, unknown>
+    counters.requests.push(request)
+    expect(request).toMatchObject({
+      reason: "Recover this bounded queue batch.",
+      taskType: TASK_TYPE,
+      limit: 5,
+      resetRetryCount: false,
+    })
+    expect(request.operationId).toMatch(/^[0-9a-f-]{36}$/i)
+    if (!counters.operationId)
+      counters.operationId = String(request.operationId)
+    expect(request.operationId).toBe(counters.operationId)
+    if (counters.post === 1) {
+      await route.abort()
+      return
     }
-  )
+    await route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "202-40",
+        msg: "accepted",
+        data: {
+          operationId: counters.operationId,
+          action: "TASK_DLQ_REPLAY",
+          status: "ACCEPTED",
+          selectedCount: 0,
+          replayedCount: 0,
+          quarantinedCount: 0,
+        },
+      }),
+    })
+  })
   await page.route(
     /\/system\/api\/v1\/adm\/operations\/[0-9a-f-]{36}(?:\?.*)?$/i,
     async (route) => {
@@ -313,7 +312,13 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await region.getByLabel("Reset retry count").uncheck()
   await confirmation.check()
   await expect(submit).toBeEnabled()
+  const firstPostFailed = page.waitForEvent("requestfailed", {
+    predicate: (request) =>
+      request.method() === "POST" &&
+      new URL(request.url()).pathname.endsWith(ADMIN_TASK_DLQ_REPLAY_ENDPOINT),
+  })
   await submit.dblclick()
+  await firstPostFailed
 
   await expect.poll(() => counters.post).toBe(1)
   await expect.poll(() => counters.get).toBe(0)

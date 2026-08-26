@@ -93,7 +93,7 @@ export const AdminTaskDlqReplaySection = ({
     const receipt = acceptedOnly
       ? AdminTaskDlqReplayModel.parseAcceptedOperationReceipt(response)
       : AdminTaskDlqReplayModel.parseOperationReceipt(response)
-    if (!receipt || receipt.operationId !== expectedOperationId) {
+    if (receipt?.operationId !== expectedOperationId) {
       setNotice("The operation response could not be verified.")
       return false
     }
@@ -272,7 +272,7 @@ export const AdminTaskDlqReplaySection = ({
               type="checkbox"
               checked={resetRetryCount}
               onChange={(event) => setResetRetryCount(event.target.checked)}
-            />
+            />{" "}
             Reset retry count
           </ConfirmDeleteRow>
           <ConfirmDeleteRow as="label">
@@ -280,7 +280,7 @@ export const AdminTaskDlqReplaySection = ({
               type="checkbox"
               checked={confirmed}
               onChange={(event) => setConfirmed(event.target.checked)}
-            />
+            />{" "}
             I confirm this DLQ replay
           </ConfirmDeleteRow>
           <ActionRow className="wide">
