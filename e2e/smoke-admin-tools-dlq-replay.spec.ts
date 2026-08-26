@@ -332,6 +332,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await submit.dblclick()
   await firstPostTimedOut
 
+  await queueTab.click()
   const retrySameRequest = region.getByRole("button", {
     name: "Retry same request",
   })
