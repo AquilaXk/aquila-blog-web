@@ -305,6 +305,56 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     }))
   }
 
+  const renderActiveActions = (isActive: boolean) => {
+    if (!isActive || !record) return null
+    return (
+      <>
+        <QuietButton
+          type="button"
+          disabled={disabled || busy}
+          onClick={() => void checkStatus()}
+        >
+          Check status
+        </QuietButton>
+        {!clearableFailure && !display && notice ? (
+          <QuietButton
+            type="button"
+            disabled={disabled || busy}
+            onClick={() => void postRecord(record)}
+          >
+            Retry same request
+          </QuietButton>
+        ) : null}
+        {display?.status === "SUCCEEDED" || clearableFailure ? (
+          <QuietButton
+            type="button"
+            disabled={disabled || busy}
+            onClick={clearForNewCommand}
+          >
+            New command
+          </QuietButton>
+        ) : null}
+      </>
+    )
+  }
+
+  const renderReceipt = (isActive: boolean) => {
+    if (!isActive || !display) return null
+    return (
+      <InlineNotice
+        data-tone={display.status === "SUCCEEDED" ? "success" : "warning"}
+        aria-live="polite"
+      >
+        <strong>{receiptLabel[display.status]}</strong>
+        {display.resultCode ? ` · ${display.resultCode}` : null}
+        {` · ${display.controlKey}: ${display.controlValue}`}
+        {display.status === "SUCCEEDED"
+          ? ` · version ${display.controlVersion}`
+          : null}
+      </InlineNotice>
+    )
+  }
+
   return (
     <DangerPanel
       as="section"
@@ -401,51 +451,9 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                 >
                   Request {labels[control].heading}
                 </DangerButton>
-                {isActive && record ? (
-                  <>
-                    <QuietButton
-                      type="button"
-                      disabled={disabled || busy}
-                      onClick={() => void checkStatus()}
-                    >
-                      Check status
-                    </QuietButton>
-                    {!clearableFailure && !display && notice ? (
-                      <QuietButton
-                        type="button"
-                        disabled={disabled || busy}
-                        onClick={() => void postRecord(record)}
-                      >
-                        Retry same request
-                      </QuietButton>
-                    ) : null}
-                    {display?.status === "SUCCEEDED" || clearableFailure ? (
-                      <QuietButton
-                        type="button"
-                        disabled={disabled || busy}
-                        onClick={clearForNewCommand}
-                      >
-                        New command
-                      </QuietButton>
-                    ) : null}
-                  </>
-                ) : null}
+                {renderActiveActions(isActive)}
               </ActionRow>
-              {isActive && display ? (
-                <InlineNotice
-                  data-tone={
-                    display.status === "SUCCEEDED" ? "success" : "warning"
-                  }
-                  aria-live="polite"
-                >
-                  <strong>{receiptLabel[display.status]}</strong>
-                  {display.resultCode ? ` · ${display.resultCode}` : null}
-                  {` · ${display.controlKey}: ${display.controlValue}`}
-                  {display.status === "SUCCEEDED"
-                    ? ` · version ${display.controlVersion}`
-                    : null}
-                </InlineNotice>
-              ) : null}
+              {renderReceipt(isActive)}
             </FieldGrid>
           </fieldset>
         )
