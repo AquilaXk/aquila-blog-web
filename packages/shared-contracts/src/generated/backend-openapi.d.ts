@@ -1671,36 +1671,10 @@ export interface components {
             dirtyFromPublished?: boolean;
         };
         SearchPipelineForceControlRequest: {
-            forceControl?: boolean | null;
-        };
-        RsDataSearchRuntimeFlags: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["SearchRuntimeFlags"];
-        };
-        SearchRuntimeFlags: {
-            searchPipelineForceControlEnabled?: boolean;
-            searchPipelineRuntimeOverride?: boolean;
-            searchEngineMirrorForceDisabled?: boolean;
-            searchEngineMirrorCircuitOpen?: boolean;
-            /** Format: int64 */
-            searchEngineMirrorCircuitRemainingSeconds?: number;
-            /** Format: int32 */
-            searchEngineMirrorConsecutiveFailures?: number;
-            /** Format: int32 */
-            searchEngineMirrorFailureThreshold?: number;
-        };
-        SearchEngineMirrorForceDisableRequest: {
-            forceDisabled?: boolean;
-        };
-        TaskDlqReplayOperationRequest: {
             /** Format: uuid */
-            operationId: string;
+            operationId: string | null;
             reason: string;
-            taskType?: string | null;
-            /** Format: int32 */
-            limit?: number;
-            resetRetryCount?: boolean;
+            forceControl?: boolean | null;
         };
         AdminOperationResBody: {
             /** Format: uuid */
@@ -1710,13 +1684,13 @@ export interface components {
             /** Format: int64 */
             sessionRowId?: number | null;
             /** @enum {string} */
-            action?: "TASK_DLQ_REPLAY";
+            action?: "TASK_DLQ_REPLAY" | "SEARCH_PIPELINE_FORCE_CONTROL" | "SEARCH_ENGINE_MIRROR_FORCE_DISABLE";
             target?: string;
             reason?: string;
             /** @enum {string} */
             status?: "ACCEPTED" | "SUCCEEDED" | "PARTIAL" | "FAILED";
             /** @enum {string|null} */
-            resultCode?: "NO_MATCHING_TASKS" | "ALL_TASKS_QUARANTINED" | "TASKS_REPLAYED" | "TASKS_PARTIALLY_REPLAYED" | null;
+            resultCode?: "NO_MATCHING_TASKS" | "ALL_TASKS_QUARANTINED" | "TASKS_REPLAYED" | "TASKS_PARTIALLY_REPLAYED" | "SEARCH_PIPELINE_FORCE_CONTROL_UPDATED" | "SEARCH_ENGINE_MIRROR_FORCE_DISABLE_UPDATED" | null;
             /** Format: int32 */
             selectedCount?: number;
             /** Format: int32 */
@@ -1727,11 +1701,32 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             modifiedAt?: string;
+            /** @enum {string|null} */
+            controlKey?: "PIPELINE_FORCE_CONTROL" | "MIRROR_FORCE_DISABLE" | null;
+            /** @enum {string|null} */
+            controlValue?: "UNSET" | "ENABLED" | "DISABLED" | null;
+            /** Format: int64 */
+            controlVersion?: number | null;
         };
         RsDataAdminOperationResBody: {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["AdminOperationResBody"];
+        };
+        SearchEngineMirrorForceDisableRequest: {
+            /** Format: uuid */
+            operationId: string | null;
+            reason: string;
+            forceDisabled?: boolean;
+        };
+        TaskDlqReplayOperationRequest: {
+            /** Format: uuid */
+            operationId: string;
+            reason: string;
+            taskType?: string | null;
+            /** Format: int32 */
+            limit?: number;
+            resetRetryCount?: boolean;
         };
         SignupMailTestRequest: {
             /** Format: email */
@@ -2330,6 +2325,29 @@ export interface components {
             longLivedPendingDeleteCount?: number;
             sampleLongLivedPendingDeleteObjectKeys?: string[];
             repairMode?: string;
+        };
+        SearchRuntimeControlStateResBody: {
+            /** @enum {string} */
+            controlKey?: "PIPELINE_FORCE_CONTROL" | "MIRROR_FORCE_DISABLE";
+            /** @enum {string} */
+            controlValue?: "UNSET" | "ENABLED" | "DISABLED";
+            /** Format: int64 */
+            version?: number;
+            /** Format: date-time */
+            modifiedAt?: string;
+        };
+        SearchRuntimeFlags: {
+            searchPipeline?: components["schemas"]["SearchRuntimeControlStateResBody"];
+            searchPipelineForceControlEnabled?: boolean;
+            searchEngineMirror?: components["schemas"]["SearchRuntimeControlStateResBody"];
+            searchEngineMirrorForceDisabled?: boolean;
+            searchEngineMirrorCircuitOpen?: boolean;
+            /** Format: int64 */
+            searchEngineMirrorCircuitRemainingSeconds?: number;
+            /** Format: int32 */
+            searchEngineMirrorConsecutiveFailures?: number;
+            /** Format: int32 */
+            searchEngineMirrorFailureThreshold?: number;
         };
         StreamDiagnostics: {
             /** Format: int32 */
@@ -2984,13 +3002,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Accepted */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["RsDataSearchRuntimeFlags"];
+                    "*/*": components["schemas"]["RsDataAdminOperationResBody"];
                 };
             };
         };
@@ -3008,13 +3026,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Accepted */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["RsDataSearchRuntimeFlags"];
+                    "*/*": components["schemas"]["RsDataAdminOperationResBody"];
                 };
             };
         };
