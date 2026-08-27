@@ -61,6 +61,22 @@ const initialForm = (): FormState => ({
   confirmed: false,
 })
 
+const getRestoredTarget = (
+  record: SearchRuntimeControlSessionRecord
+): boolean | null => {
+  if ("forceControl" in record.request) {
+    return typeof record.request.forceControl === "boolean"
+      ? record.request.forceControl
+      : null
+  }
+  if ("forceDisabled" in record.request) {
+    return typeof record.request.forceDisabled === "boolean"
+      ? record.request.forceDisabled
+      : null
+  }
+  return null
+}
+
 const isSemanticConflict = (error: unknown) =>
   error instanceof ApiError &&
   error.status === 409 &&
@@ -174,14 +190,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       if (!restored) return
       restoredOperationId.current = restored.operationId
       activeRecordRef.current = restored
-      const target =
-        "forceControl" in restored.request &&
-        typeof restored.request.forceControl === "boolean"
-          ? restored.request.forceControl
-          : "forceDisabled" in restored.request &&
-            typeof restored.request.forceDisabled === "boolean"
-          ? restored.request.forceDisabled
-          : null
+      const target = getRestoredTarget(restored)
       if (typeof target === "boolean")
         setForms((current) => ({
           ...current,
@@ -315,13 +324,9 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       {(["pipeline", "mirror"] as const).map((control) => {
         const form = forms[control]
         const isActive = record?.control === control
-        const blockedByOtherCommand = !!record && !isActive
+        const fieldsDisabled = disabled || busy || !!record
         const canSubmit =
-          !disabled &&
-          !busy &&
-          !record &&
-          form.confirmed &&
-          form.reason.trim().length > 0
+          !fieldsDisabled && form.confirmed && form.reason.trim().length > 0
         return (
           <fieldset key={control} aria-busy={busy || undefined}>
             <legend>{labels[control].heading}</legend>
@@ -334,7 +339,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                   id={`admin-search-${control}-reason`}
                   value={form.reason}
                   maxLength={AdminSearchRuntimeControlModel.limit.reasonMax}
-                  disabled={disabled || busy || !!record}
+                  disabled={fieldsDisabled}
                   onChange={(event) =>
                     setForms((current) => ({
                       ...current,
@@ -355,7 +360,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                   as="select"
                   id={`admin-search-${control}-target`}
                   value={form.target ? "true" : "false"}
-                  disabled={disabled || busy || !!record}
+                  disabled={fieldsDisabled}
                   onChange={(event) =>
                     setForms((current) => ({
                       ...current,
@@ -375,7 +380,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                 <input
                   type="checkbox"
                   checked={form.confirmed}
-                  disabled={disabled || busy || !!record}
+                  disabled={fieldsDisabled}
                   onChange={(event) =>
                     setForms((current) => ({
                       ...current,
@@ -391,7 +396,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
               <ActionRow className="wide">
                 <DangerButton
                   type="button"
-                  disabled={!canSubmit || blockedByOtherCommand}
+                  disabled={!canSubmit}
                   onClick={() => void submit(control)}
                 >
                   Request {labels[control].heading}
