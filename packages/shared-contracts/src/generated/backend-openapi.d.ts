@@ -2552,7 +2552,9 @@ export interface components {
             authorProfileImgUrl?: string;
             title?: string;
             thumbnail?: string | null;
-            summary?: string;
+            summary: string;
+            /** @enum {string} */
+            summarySource: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
             tags?: string[];
             category?: string[];
             published?: boolean;
