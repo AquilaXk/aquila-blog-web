@@ -5,7 +5,9 @@ on:
     branches: [main]
 
 permissions:
+  attestations: write
   contents: read
+  id-token: write
   packages: write
 
 concurrency:
@@ -106,7 +108,83 @@ jobs:
         run: |
           set -euo pipefail
           docker pull "${IMAGE_REF}"
-          trivy image --ignorefile .trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_REF}"
+          trivy image \
+            --ignorefile .trivyignore.yaml \
+            --format cosign-vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --output /tmp/web-image-vulnerability.json \
+            "${IMAGE_REF}"
+          trivy image \
+            --ignorefile .trivyignore.yaml \
+            --format spdx-json \
+            --output /tmp/web-image.spdx.json \
+            "${IMAGE_REF}"
+
+      - name: Attest Web image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-name: ghcr.io/aquilaxk/aquila-blog-web-front
+          subject-digest: ${{ steps.image.outputs.image_digest }}
+          push-to-registry: true
+
+      - name: Attest Web image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-name: ghcr.io/aquilaxk/aquila-blog-web-front
+          subject-digest: ${{ steps.image.outputs.image_digest }}
+          push-to-registry: true
+          predicate-type: https://spdx.dev/Document/v2.3
+          predicate-path: /tmp/web-image.spdx.json
+
+      - name: Attest Web image vulnerability scan
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-name: ghcr.io/aquilaxk/aquila-blog-web-front
+          subject-digest: ${{ steps.image.outputs.image_digest }}
+          push-to-registry: true
+          predicate-type: https://cosign.sigstore.dev/attestation/vuln/v1
+          predicate-path: /tmp/web-image-vulnerability.json
+
+      - name: Verify exact Web image attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          PRODUCER_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PRODUCER_RUN_ID: ${{ github.run_id }}
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${SOURCE_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            --format json > /tmp/web-image-provenance.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${SOURCE_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://spdx.dev/Document/v2.3 \
+            --format json > /tmp/web-image-sbom.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${SOURCE_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://cosign.sigstore.dev/attestation/vuln/v1 \
+            --format json > /tmp/web-image-vulnerability-attestation.json
+          node scripts/security/native-image-evidence.mjs verify-attestation-set \
+            /tmp/web-image-provenance.json \
+            /tmp/web-image-sbom.json \
+            /tmp/web-image-vulnerability-attestation.json \
+            "https://github.com/${SOURCE_REPOSITORY}/actions/runs/${PRODUCER_RUN_ID}/attempts/${PRODUCER_RUN_ATTEMPT}"
 
       - name: Check current Web source freshness
         id: freshness
