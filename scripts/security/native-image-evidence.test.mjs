@@ -52,9 +52,14 @@ test("rejects non-canonical records before they can become approved state", () =
     { ...valid, unexpected: "field" },
     Object.fromEntries(Object.entries(valid).filter(([key]) => key !== "policy_id")),
     { ...valid, web_sha: "A".repeat(40) },
+    { ...valid, web_sha: ["a".repeat(40)] },
     { ...valid, image_digest: `sha256:${"b".repeat(63)}` },
+    { ...valid, image_digest: [`sha256:${"b".repeat(64)}`] },
+    { ...valid, platform_sha: ["c".repeat(40)] },
     { ...valid, deploy_run_id: "0" },
+    { ...valid, deploy_run_id: 12345 },
     { ...valid, deployment_identity: "not-a-hash" },
+    { ...valid, deployment_identity: ["d".repeat(64)] },
     { ...valid, signer_workflow: "AquilaXk/aquila-blog-web/.github/workflows/other.yml@refs/heads/main" },
   ]
 

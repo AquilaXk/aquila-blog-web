@@ -45,6 +45,7 @@ const fail = (message) => {
 }
 
 const canonicalJson = (record) => JSON.stringify(record)
+const isMatchingString = (value, pattern) => typeof value === "string" && pattern.test(value)
 
 const assertExactKeys = (record) => {
   if (!record || typeof record !== "object" || Array.isArray(record)) fail("approved record must be an object")
@@ -59,11 +60,11 @@ const assertRecord = (record) => {
   for (const [key, value] of Object.entries(fixedValues)) {
     if (record[key] !== value) fail(`${key} is invalid`)
   }
-  if (!shaPattern.test(record.web_sha)) fail("web_sha is invalid")
-  if (!digestPattern.test(record.image_digest)) fail("image_digest is invalid")
-  if (!shaPattern.test(record.platform_sha)) fail("platform_sha is invalid")
-  if (!positiveIntegerPattern.test(record.deploy_run_id)) fail("deploy_run_id is invalid")
-  if (!identityPattern.test(record.deployment_identity)) fail("deployment_identity is invalid")
+  if (!isMatchingString(record.web_sha, shaPattern)) fail("web_sha is invalid")
+  if (!isMatchingString(record.image_digest, digestPattern)) fail("image_digest is invalid")
+  if (!isMatchingString(record.platform_sha, shaPattern)) fail("platform_sha is invalid")
+  if (!isMatchingString(record.deploy_run_id, positiveIntegerPattern)) fail("deploy_run_id is invalid")
+  if (!isMatchingString(record.deployment_identity, identityPattern)) fail("deployment_identity is invalid")
   return record
 }
 
