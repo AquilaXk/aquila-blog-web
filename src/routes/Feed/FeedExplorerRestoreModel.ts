@@ -231,6 +231,21 @@ export const toRestoredPageParams = (
   })
 }
 
+export const isCursorOnlyPublicFeedRestoreSnapshot = (
+  snapshot: FeedExplorerRestoreSnapshot
+): boolean => {
+  if (snapshot.pages.length === 0 || snapshot.pages.some((page) => page.paginationMode !== "cursor")) {
+    return false
+  }
+  if (snapshot.pageParams?.some((pageParam) => typeof pageParam === "number")) return false
+
+  return toRestoredPageParams(snapshot).every(
+    (pageParam, index) =>
+      (index === 0 && pageParam === null) ||
+      (index > 0 && typeof pageParam === "string" && pageParam.trim().length > 0)
+  )
+}
+
 export const scheduleIdleRevalidate = (callback: () => void) => {
   if (typeof window === "undefined") return () => {}
 

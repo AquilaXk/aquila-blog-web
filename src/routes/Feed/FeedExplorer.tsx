@@ -25,6 +25,7 @@ import {
   FEED_EXPLORER_SNAPSHOT_MAX_BYTES,
   getFeedExplorerRestoreKey,
   getFeedExplorerSnapshotKey,
+  isCursorOnlyPublicFeedRestoreSnapshot,
   parseFeedExplorerRestoreSnapshot,
   parseFeedExplorerRestoreState,
   pruneFeedExplorerStateStorage,
@@ -201,7 +202,10 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     const restoredSnapshot = parseFeedExplorerRestoreSnapshot(
       window.sessionStorage.getItem(restoreSnapshotStorageKey)
     )
-    if (restoredSnapshot?.pages?.length) {
+    if (
+      restoredSnapshot?.pages?.length &&
+      (restored.q.length > 0 || isCursorOnlyPublicFeedRestoreSnapshot(restoredSnapshot))
+    ) {
       const restoredPages = restoredSnapshot.pages.slice(0, resolveSnapshotPageCap())
       const restoredPageParams = toRestoredPageParams({
         ...restoredSnapshot,
