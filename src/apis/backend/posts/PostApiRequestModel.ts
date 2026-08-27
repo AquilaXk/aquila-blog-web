@@ -1,5 +1,4 @@
 import { normalizeKeywordQuery, normalizeTagQuery } from "src/libs/query/normalize"
-import { ApiError } from "../client"
 import { asOpenApiPath } from "../openapiContract"
 import type { ExplorePostsParams, FeedSortMode } from "./PostApiDtos"
 
@@ -13,7 +12,6 @@ export const isServerRuntime = typeof window === "undefined"
 
 export const POSTS_TAGS_API_PATH = asOpenApiPath("/post/api/v1/posts/tags")
 
-const PUBLIC_CURSOR_DISABLED_SESSION_KEY = "posts:public-cursor-disabled:v1"
 const POSTS_EXPLORE_API_PATH = asOpenApiPath("/post/api/v1/posts/explore")
 const POSTS_SEARCH_API_PATH = asOpenApiPath("/post/api/v1/posts/search")
 const POSTS_FEED_API_PATH = asOpenApiPath("/post/api/v1/posts/feed")
@@ -23,12 +21,6 @@ const POSTS_RELATED_AUTHOR_API_PATH = "/post/api/v1/posts/related/author"
 const POSTS_BOOTSTRAP_API_PATH = "/post/api/v1/posts/bootstrap"
 const POSTS_ENDPOINT_TRACE_KEY = "posts:runtime-endpoints:v1"
 const POSTS_ENDPOINT_TRACE_MAX = 60
-
-let isPublicCursorDisabledCache: boolean | null = null
-
-export const resetPostRequestRuntimeState = () => {
-  isPublicCursorDisabledCache = null
-}
 
 export const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === "AbortError"
 
@@ -59,30 +51,6 @@ export const setServerSnapshot = <T>(
   if (oldestKey) cache.delete(oldestKey)
 }
 
-export const readPublicCursorDisabled = () => {
-  if (isServerRuntime) return false
-  if (isPublicCursorDisabledCache !== null) return isPublicCursorDisabledCache
-
-  try {
-    isPublicCursorDisabledCache = window.sessionStorage.getItem(PUBLIC_CURSOR_DISABLED_SESSION_KEY) === "1"
-  } catch {
-    isPublicCursorDisabledCache = false
-  }
-
-  return isPublicCursorDisabledCache
-}
-
-export const markPublicCursorDisabled = () => {
-  isPublicCursorDisabledCache = true
-  if (isServerRuntime) return
-
-  try {
-    window.sessionStorage.setItem(PUBLIC_CURSOR_DISABLED_SESSION_KEY, "1")
-  } catch {
-    // ignore storage permission/quota errors
-  }
-}
-
 export const recordRuntimeEndpoint = (path: string, paginationMode: "page" | "cursor") => {
   if (isServerRuntime) return
   const now = new Date().toISOString()
@@ -105,9 +73,6 @@ export const recordRuntimeEndpoint = (path: string, paginationMode: "page" | "cu
     console.info("[posts-runtime-endpoint] cursor endpoint detected", path)
   }
 }
-
-export const isAuthRequiredError = (error: unknown) =>
-  error instanceof ApiError && (error.status === 401 || error.status === 403)
 
 const toSortParam = (order: "asc" | "desc" = "desc", sortMode: FeedSortMode = "latest") => {
   if (sortMode === "views") return "HIT_COUNT"

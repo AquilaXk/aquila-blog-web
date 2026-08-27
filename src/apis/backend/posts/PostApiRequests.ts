@@ -23,17 +23,13 @@ import {
   buildSearchPath,
   getFreshServerSnapshot,
   isAbortError,
-  isAuthRequiredError,
   isServerRuntime,
-  markPublicCursorDisabled,
   PAGE_SIZE,
   POSTS_BOOTSTRAP_SSR_CACHE_MAX_ENTRIES,
   POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS,
   POSTS_CACHE_TTL_MS,
   POSTS_TAGS_API_PATH,
-  readPublicCursorDisabled,
   recordRuntimeEndpoint,
-  resetPostRequestRuntimeState,
   setServerSnapshot,
   toValidPage,
   toValidPageSize,
@@ -96,7 +92,6 @@ export const resetPostsRequestCaches = () => {
   postsBootstrapSsrCache = new Map()
   pendingPostsBootstrapPromises = new Map()
   resetPostDetailRequestCaches()
-  resetPostRequestRuntimeState()
 }
 
 export const getPostsBootstrap = async ({
@@ -276,55 +271,23 @@ export const getFeedPostsCursorPage = async ({
 }): Promise<ExplorePostsPage> => {
   const safePageSize = toValidPageSize(pageSize)
   const normalizedCursor = typeof cursor === "string" && cursor.trim() ? cursor.trim() : undefined
-  if (!normalizedCursor && readPublicCursorDisabled()) {
-    const fallback = await getFeedPostsPage({ order, sortMode, page: 1, pageSize: safePageSize, signal })
-    return {
-      ...fallback,
-      hasNext: fallback.pageNumber * fallback.pageSize < fallback.totalCount,
-      nextCursor: null,
-      paginationMode: "page",
+  const response = await apiFetch<CursorPageDto<ApiPostDto>>(
+    (() => {
+      const endpoint = buildFeedCursorPath({
+        order,
+        sortMode,
+        pageSize: safePageSize,
+        cursor: normalizedCursor,
+      })
+      recordRuntimeEndpoint(endpoint, "cursor")
+      return endpoint
+    })(),
+    {
+      signal,
     }
-  }
+  )
 
-  try {
-    const response = await apiFetch<CursorPageDto<ApiPostDto>>(
-      (() => {
-        const endpoint = buildFeedCursorPath({
-          order,
-          sortMode,
-          pageSize: safePageSize,
-          cursor: normalizedCursor,
-        })
-        recordRuntimeEndpoint(endpoint, "cursor")
-        return endpoint
-      })(),
-      {
-        signal,
-      }
-    )
-
-    return toPostsCursorPageResult(response, safePageSize)
-  } catch (error) {
-    if (isAuthRequiredError(error)) {
-      markPublicCursorDisabled()
-    }
-
-    // 커서 모드가 불안정할 때 홈 첫 진입이 깨지지 않도록 1페이지 API로 복구한다.
-    if (!normalizedCursor) {
-      const fallback = await getFeedPostsPage({ order, sortMode, page: 1, pageSize: safePageSize, signal })
-      return {
-        ...fallback,
-        hasNext: fallback.pageNumber * fallback.pageSize < fallback.totalCount,
-        nextCursor: null,
-        paginationMode: "page",
-      }
-    }
-
-    if (isAbortError(error)) {
-      throw error
-    }
-    throw error
-  }
+  return toPostsCursorPageResult(response, safePageSize)
 }
 
 export const getExplorePostsCursorPage = async ({
@@ -344,72 +307,24 @@ export const getExplorePostsCursorPage = async ({
 }): Promise<ExplorePostsPage> => {
   const safePageSize = toValidPageSize(pageSize)
   const normalizedCursor = typeof cursor === "string" && cursor.trim() ? cursor.trim() : undefined
-  if (!normalizedCursor && readPublicCursorDisabled()) {
-    const fallback = await getExplorePostsPage({
-      kw: "",
-      tag,
-      order,
-      sortMode,
-      page: 1,
-      pageSize: safePageSize,
-      signal,
-    })
-    return {
-      ...fallback,
-      hasNext: fallback.pageNumber * fallback.pageSize < fallback.totalCount,
-      nextCursor: null,
-      paginationMode: "page",
-    }
-  }
-
-  try {
-    const response = await apiFetch<CursorPageDto<ApiPostDto>>(
-      (() => {
-        const endpoint = buildExploreCursorPath({
-          tag,
-          order,
-          sortMode,
-          pageSize: safePageSize,
-          cursor: normalizedCursor,
-        })
-        recordRuntimeEndpoint(endpoint, "cursor")
-        return endpoint
-      })(),
-      {
-        signal,
-      }
-    )
-
-    return toPostsCursorPageResult(response, safePageSize)
-  } catch (error) {
-    if (isAuthRequiredError(error)) {
-      markPublicCursorDisabled()
-    }
-
-    // 태그 탐색도 첫 진입 시 page API로 복구해 UX 단절을 막는다.
-    if (!normalizedCursor) {
-      const fallback = await getExplorePostsPage({
-        kw: "",
+  const response = await apiFetch<CursorPageDto<ApiPostDto>>(
+    (() => {
+      const endpoint = buildExploreCursorPath({
         tag,
         order,
         sortMode,
-        page: 1,
         pageSize: safePageSize,
-        signal,
+        cursor: normalizedCursor,
       })
-      return {
-        ...fallback,
-        hasNext: fallback.pageNumber * fallback.pageSize < fallback.totalCount,
-        nextCursor: null,
-        paginationMode: "page",
-      }
+      recordRuntimeEndpoint(endpoint, "cursor")
+      return endpoint
+    })(),
+    {
+      signal,
     }
+  )
 
-    if (isAbortError(error)) {
-      throw error
-    }
-    throw error
-  }
+  return toPostsCursorPageResult(response, safePageSize)
 }
 
 export const getSearchPostsPage = async ({

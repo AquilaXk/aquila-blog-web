@@ -278,15 +278,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "sessionStorage",
-    key: "posts:public-cursor-disabled:v1",
-    purpose: "public-posts-cursor-fallback",
-    required: false,
-    retention: "browser tab session",
-    deletion: "tab close or browser storage deletion",
-    stores: "boolean cursor endpoint fallback flag",
-  },
-  {
-    area: "sessionStorage",
     key: "posts:runtime-endpoints:v1",
     purpose: "posts-runtime-endpoint-trace",
     required: false,

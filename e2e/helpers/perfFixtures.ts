@@ -113,6 +113,7 @@ export const buildMockExploreItem = (id: number) => ({
   authorProfileImgUrl: "/avatar.png",
   title: `CLS 예산 점검 ${id}`,
   summary: "layout shift regression gate",
+  summarySource: "MANUAL",
   tags: ["perf"],
   category: ["backend"],
   published: true,

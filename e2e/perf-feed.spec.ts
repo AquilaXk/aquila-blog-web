@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import {
+  isCursorOnlyPublicFeedRestoreSnapshot,
   toRestoredPageParams,
   type FeedExplorerRestoreSnapshot,
 } from "../src/routes/Feed/FeedExplorerRestoreModel"
@@ -53,6 +54,14 @@ test.describe("perf feed scroll budgets", () => {
       null,
       "cursor-2",
     ])
+    expect(isCursorOnlyPublicFeedRestoreSnapshot(snapshot)).toBe(true)
+    expect(isCursorOnlyPublicFeedRestoreSnapshot({ ...snapshot, pageParams: [1, "cursor-2"] })).toBe(false)
+    expect(
+      isCursorOnlyPublicFeedRestoreSnapshot({
+        ...snapshot,
+        pages: snapshot.pages.map((page) => ({ ...page, paginationMode: "page" })),
+      })
+    ).toBe(false)
   })
 
   test("홈 피드는 초기 bootstrap/feed 실패를 빈 글 목록으로 숨기지 않는다", async ({ page }) => {
@@ -189,101 +198,97 @@ test.describe("perf feed scroll budgets", () => {
   expect(nextCursorAttempts).toBe(3)
 })
 
-  test("홈 피드는 cursor 첫 요청 fallback 이후 다음 page를 page API로 이어간다", async ({ page }) => {
-  const pageRequests: number[] = []
-  const firstPageIds = Array.from({ length: 16 }, (_, index) => 1301 + index)
-  const secondPageIds = [1351, 1352]
+  test("홈 피드는 malformed cursor 200을 page API로 숨기지 않고 cursor만 재시도한다", async ({ page }) => {
+    let cursorRequests = 0
+    const pageRequests: number[] = []
 
-  await mockFeedEndpoints(page, {
-    feedHandler: async (route) => {
-      const url = new URL(route.request().url())
-      const isCursorEndpoint = url.pathname.endsWith("/cursor")
-      const pageNumber = Number(url.searchParams.get("page") || "1")
-      const pageSize = Number(url.searchParams.get("pageSize") || "24")
+    await mockFeedEndpoints(page, {
+      feedHandler: async (route) => {
+        const url = new URL(route.request().url())
+        if (url.pathname.endsWith("/cursor")) {
+          cursorRequests += 1
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              content: [{ ...buildMockExploreItem(1301), summarySource: undefined }],
+              pageSize: 24,
+              hasNext: false,
+              nextCursor: null,
+            }),
+          })
+          return
+        }
 
-      if (isCursorEndpoint) {
+        pageRequests.push(Number(url.searchParams.get("page") || "1"))
         await route.fulfill({
-          status: 503,
+          status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ message: "cursor disabled for fallback regression" }),
+          body: JSON.stringify({
+            content: [buildMockExploreItem(1302)],
+            pageable: { pageNumber: 0, pageSize: 24, totalElements: 1, totalPages: 1 },
+          }),
         })
-        return
-      }
+      },
+    })
 
-      pageRequests.push(pageNumber)
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          content: (pageNumber === 1 ? firstPageIds : secondPageIds).map(buildMockExploreItem),
-          pageable: {
-            pageNumber: Math.max(pageNumber - 1, 0),
-            pageSize,
-            totalElements: pageSize * 2,
-            totalPages: 2,
-          },
-        }),
-      })
-    },
+    await page.goto("/")
+    await waitForPageReady(page)
+
+    await expect(page.getByText("게시글을 불러오지 못했습니다.")).toBeVisible()
+    expect(pageRequests).toEqual([])
+    const cursorRequestsBeforeRetry = cursorRequests
+
+    await page.getByRole("button", { name: "다시 시도" }).click()
+    await expect.poll(() => cursorRequests).toBeGreaterThan(cursorRequestsBeforeRetry)
+    expect(pageRequests).toEqual([])
   })
 
-  await page.goto("/")
-  await waitForPageReady(page)
-  await expect(page.getByRole("heading", { name: "CLS 예산 점검 1301" })).toBeVisible()
+  test("태그 피드는 malformed cursor 200을 page API로 숨기지 않고 cursor만 재시도한다", async ({ page }) => {
+    let cursorRequests = 0
+    const pageRequests: number[] = []
 
-  await page.getByRole("button", { name: "더보기" }).click()
+    await mockFeedEndpoints(page, {
+      exploreHandler: async (route) => {
+        const url = new URL(route.request().url())
+        if (url.pathname.endsWith("/cursor")) {
+          cursorRequests += 1
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              content: [{ ...buildMockExploreItem(1351), summarySource: undefined }],
+              pageSize: 24,
+              hasNext: false,
+              nextCursor: null,
+            }),
+          })
+          return
+        }
 
-  await expectDeferredPostHeadingVisible(page, "CLS 예산 점검 1351")
-  expect(pageRequests).toContain(2)
-  expect(pageRequests.filter((value) => value === 2)).toHaveLength(1)
-})
-
-  test("홈 피드 page fallback은 빈 page에서 추가 요청을 멈춘다", async ({ page }) => {
-  const pageRequests: number[] = []
-
-  await mockFeedEndpoints(page, {
-    feedHandler: async (route) => {
-      const url = new URL(route.request().url())
-      const isCursorEndpoint = url.pathname.endsWith("/cursor")
-      const pageNumber = Number(url.searchParams.get("page") || "1")
-      const pageSize = Number(url.searchParams.get("pageSize") || "24")
-
-      if (isCursorEndpoint) {
+        pageRequests.push(Number(url.searchParams.get("page") || "1"))
         await route.fulfill({
-          status: 503,
+          status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ message: "cursor disabled for empty-page guard regression" }),
+          body: JSON.stringify({
+            content: [buildMockExploreItem(1352)],
+            pageable: { pageNumber: 0, pageSize: 24, totalElements: 1, totalPages: 1 },
+          }),
         })
-        return
-      }
+      },
+    })
 
-      pageRequests.push(pageNumber)
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          content: pageNumber === 1 ? [buildMockExploreItem(1351)] : [],
-          pageable: {
-            pageNumber: Math.max(pageNumber - 1, 0),
-            pageSize,
-            totalElements: pageSize * 3,
-            totalPages: 3,
-          },
-        }),
-      })
-    },
+    await page.goto("/?tag=perf")
+    await waitForPageReady(page)
+
+    await expect(page.getByText("게시글을 불러오지 못했습니다.")).toBeVisible()
+    expect(pageRequests).toEqual([])
+    const cursorRequestsBeforeRetry = cursorRequests
+
+    await page.getByRole("button", { name: "다시 시도" }).click()
+    await expect.poll(() => cursorRequests).toBeGreaterThan(cursorRequestsBeforeRetry)
+    expect(pageRequests).toEqual([])
   })
-
-  await page.goto("/")
-  await waitForPageReady(page)
-  await expect(page.getByRole("heading", { name: "CLS 예산 점검 1351" })).toBeVisible()
-
-  await page.getByRole("button", { name: "더보기" }).click()
-
-  await expect(page.getByRole("button", { name: "더보기" })).toHaveCount(0)
-  expect(pageRequests).toContain(2)
-  expect(pageRequests).not.toContain(3)
-})
 
   test("태그와 keyword 조합은 explore page API에 keyword를 보존한다", async ({ page }) => {
   const capturedExploreRequests: Array<{ isCursorEndpoint: boolean; kw: string; tag: string }> = []

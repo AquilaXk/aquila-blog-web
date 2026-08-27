@@ -96,10 +96,6 @@ test("browser storage registry covers source storage constants", () => {
       name: "LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX",
       key: "admin.editor.localDraft.post.",
     }),
-    expect.objectContaining({
-      name: "PUBLIC_CURSOR_DISABLED_SESSION_KEY",
-      key: "posts:public-cursor-disabled:v1",
-    }),
     expect.objectContaining({ name: "CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX", key: "aquila-cloud-video-upload-session" }),
   ]))
 

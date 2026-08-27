@@ -4,7 +4,6 @@ import {
   getExplorePostsCursorPage,
   getExplorePostsPage,
   getFeedPostsCursorPage,
-  getFeedPostsPage,
   getSearchPostsPage,
 } from "src/apis/backend/posts"
 import type { FeedSortMode } from "src/apis/backend/posts/PostApiDtos"
@@ -70,15 +69,6 @@ const useExplorePostsQuery = ({
       const pageNumber = toSafeInt(pageParam, 1)
 
       if (feedMode) {
-        if (typeof pageParam === "number") {
-          return getFeedPostsPage({
-            order,
-            sortMode: normalizedSortMode,
-            page: pageNumber,
-            pageSize,
-            signal: signal ?? undefined,
-          })
-        }
         const cursor = typeof pageParam === "string" ? pageParam : undefined
         return getFeedPostsCursorPage({
           order,
@@ -99,7 +89,7 @@ const useExplorePostsQuery = ({
           signal: signal ?? undefined,
         })
       }
-      if (normalizedKw.length > 0 || typeof pageParam === "number") {
+      if (normalizedKw.length > 0) {
         return getExplorePostsPage({
           kw: normalizedKw,
           tag: normalizedTag,
