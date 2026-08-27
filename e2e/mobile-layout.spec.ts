@@ -52,7 +52,6 @@ test.describe("모바일 레이아웃 소스 경계", () => {
       readSourceFile("src/routes/Admin/EditorStudioDedicatedEditorSurface.tsx"),
       readSourceFile("src/routes/Admin/EditorStudioDedicatedEditorSurfaceParts.tsx"),
     ].join("\n")
-    const editorPreviewSource = readSourceFile("src/routes/Admin/EditorActualPreviewPage.tsx")
 
     expect(themeSource).toContain("createPublicDesignTokens")
     expect(themeSource).not.toContain('blogDesign === "grid"')
@@ -93,8 +92,7 @@ test.describe("모바일 레이아웃 소스 경계", () => {
     expect(errorSource).toContain("theme.colors.gray1")
     expect(editorComposeSource).toContain("theme.publicDesign")
     expect(editorDedicatedSource).toContain("theme.publicDesign")
-    expect(editorPreviewSource).toContain("theme.colors.gray1")
-    for (const source of [authShellSource, errorSource, editorComposeSource, editorDedicatedSource, editorPreviewSource]) {
+    for (const source of [authShellSource, errorSource, editorComposeSource, editorDedicatedSource]) {
       expect(source).not.toContain("theme.blogDesign")
     }
     for (const [sourcePath, source] of publicSurfaceSources) {

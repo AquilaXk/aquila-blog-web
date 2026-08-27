@@ -17,7 +17,6 @@ const pageRouteClasses = {
   "easysubway/index.tsx": "public",
   "editor/[id].tsx": "editor",
   "editor/new.tsx": "editor",
-  "editor/preview/[id].tsx": "editor",
   "feed.tsx": "system",
   "login.tsx": "auth",
   "page/[pageId].tsx": "public",
