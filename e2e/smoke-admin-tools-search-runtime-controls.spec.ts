@@ -131,7 +131,7 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
           action: "SEARCH_PIPELINE_FORCE_CONTROL",
           status: "ACCEPTED",
           controlKey: "PIPELINE_FORCE_CONTROL",
-          controlValue: "ENABLED",
+          controlValue: "DISABLED",
           controlVersion: null,
         },
       }),
@@ -144,6 +144,14 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
       if (!requests[0] || id !== requests[0].operationId)
         throw new Error("missing saved pipeline request")
       statusReads += 1
+      if (statusReads === 1) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ resultCode: "404-00", msg: "not found" }),
+        })
+        return
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -154,7 +162,7 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
             status: "SUCCEEDED",
             resultCode: "SEARCH_PIPELINE_FORCE_CONTROL_UPDATED",
             controlKey: "PIPELINE_FORCE_CONTROL",
-            controlValue: "ENABLED",
+            controlValue: "DISABLED",
             controlVersion: 1,
             actorId: 9,
             sessionRowId: 8,
@@ -172,6 +180,7 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
   await group
     .getByLabel("Search pipeline force control reason")
     .fill("repair pipeline")
+  await group.getByLabel("Desired state").selectOption("false")
   await group.getByRole("checkbox").check()
   await group
     .getByRole("button", { name: "Request Search pipeline force control" })
@@ -188,6 +197,15 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
   await page.reload()
   await page.getByRole("tab", { name: "작업 큐 진단" }).click()
   await expect.poll(() => statusReads).toBe(1)
+  await expect(group.getByLabel("Desired state")).toHaveValue("false")
+  await expect(
+    group.getByLabel("Desired state").locator("option:checked")
+  ).toHaveText("Force disabled")
+  await expect(group.getByRole("button", { name: "New command" })).toHaveCount(
+    0
+  )
+  await group.getByRole("button", { name: "Check status" }).click()
+  await expect.poll(() => statusReads).toBe(2)
   await expect(region.getByText("Succeeded")).toBeVisible()
   await expect(region.getByText("version 1")).toBeVisible()
   await expect(region).not.toContainText(RAW_CANARY)
@@ -238,11 +256,19 @@ test("mirror labels map to exact success and conflict requests", async ({
       return
     }
     expect(request).toMatchObject({ forceDisabled: true })
-    await route.fulfill({
-      status: 409,
-      contentType: "application/json",
-      body: JSON.stringify({ resultCode: "409-40", msg: "conflict" }),
-    })
+    await route.fulfill(
+      requests.length === 2
+        ? {
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ resultCode: "409-40", msg: "conflict" }),
+          }
+        : {
+            status: 422,
+            contentType: "application/json",
+            body: JSON.stringify({ resultCode: "422-00", msg: "rejected" }),
+          }
+    )
   })
   await page.route(
     /\/system\/api\/v1\/adm\/operations\/[0-9a-f-]{36}$/i,
@@ -308,5 +334,15 @@ test("mirror labels map to exact success and conflict requests", async ({
   ).toHaveCount(0)
   await group.getByRole("button", { name: "New command" }).click()
   await expect(reason).toBeEnabled()
+  await expect(confirmation).not.toBeChecked()
+  await confirmation.check()
+  await requestButton.click()
+  await expect.poll(() => requests.length).toBe(3)
+  await expect(region.getByRole("alert")).toContainText("was rejected")
+  await expect(group.getByRole("button", { name: "New command" })).toBeVisible()
+  await expect(
+    group.getByRole("button", { name: "Retry same request" })
+  ).toHaveCount(0)
+  await group.getByRole("button", { name: "New command" }).click()
   await expect(confirmation).not.toBeChecked()
 })

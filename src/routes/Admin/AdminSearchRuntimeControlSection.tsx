@@ -71,16 +71,28 @@ const receiptLabel: Record<"ACCEPTED" | "SUCCEEDED", string> = {
   SUCCEEDED: "Succeeded",
 }
 
-const describeFailure = (error: unknown) => {
-  if (isSemanticConflict(error))
+const describeFailure = (error: unknown, classifyPostRejection = false) => {
+  if (classifyPostRejection && isSemanticConflict(error))
     return {
-      conflict: true,
+      clearable: true,
       message:
         "This operation ID conflicts with a different command. Clear it before creating a new request.",
     }
+  if (
+    classifyPostRejection &&
+    error instanceof ApiError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    ![408, 425, 429].includes(error.status)
+  )
+    return {
+      clearable: true,
+      message:
+        "The request was rejected. Clear it before creating a new request.",
+    }
   const requestId = error instanceof ApiError ? error.requestId : null
   return {
-    conflict: false,
+    clearable: false,
     message: `${toUserFacingMessage(error)}${
       requestId ? ` Request ID: ${requestId}` : ""
     }`,
@@ -97,7 +109,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
   const [display, setDisplay] =
     useState<SafeSearchRuntimeControlDisplay | null>(null)
   const [notice, setNotice] = useState("")
-  const [conflict, setConflict] = useState(false)
+  const [clearableFailure, setClearableFailure] = useState(false)
   const [busy, setBusy] = useState(false)
   const activeRecordRef = useRef<SearchRuntimeControlSessionRecord | null>(null)
   const postInFlight = useRef(false)
@@ -130,7 +142,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     }
     setDisplay(AdminSearchRuntimeControlModel.toSafeDisplay(receipt))
     setNotice("")
-    setConflict(false)
+    setClearableFailure(false)
     return true
   }
 
@@ -146,7 +158,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       consumeReceipt(response, sessionRecord)
     } catch (error) {
       const failure = describeFailure(error)
-      setConflict(failure.conflict)
+      setClearableFailure(failure.clearable)
       setNotice(failure.message)
     } finally {
       statusInFlight.current = false
@@ -162,6 +174,19 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       if (!restored) return
       restoredOperationId.current = restored.operationId
       activeRecordRef.current = restored
+      const target =
+        "forceControl" in restored.request &&
+        typeof restored.request.forceControl === "boolean"
+          ? restored.request.forceControl
+          : "forceDisabled" in restored.request &&
+            typeof restored.request.forceDisabled === "boolean"
+          ? restored.request.forceDisabled
+          : null
+      if (typeof target === "boolean")
+        setForms((current) => ({
+          ...current,
+          [restored.control]: { ...current[restored.control], target },
+        }))
       setRecord(restored)
     } catch {
       setNotice(
@@ -196,8 +221,8 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       })
       consumeReceipt(response, sessionRecord, true)
     } catch (error) {
-      const failure = describeFailure(error)
-      setConflict(failure.conflict)
+      const failure = describeFailure(error, true)
+      setClearableFailure(failure.clearable)
       setNotice(failure.message)
     } finally {
       postInFlight.current = false
@@ -248,7 +273,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     setRecord(nextRecord)
     setDisplay(null)
     setNotice("")
-    setConflict(false)
+    setClearableFailure(false)
     await postRecord(nextRecord)
   }
 
@@ -264,7 +289,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     setRecord(null)
     setDisplay(null)
     setNotice("")
-    setConflict(false)
+    setClearableFailure(false)
     setForms((current) => ({
       pipeline: { ...current.pipeline, confirmed: false },
       mirror: { ...current.mirror, confirmed: false },
@@ -380,7 +405,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                     >
                       Check status
                     </QuietButton>
-                    {!conflict && !display && notice ? (
+                    {!clearableFailure && !display && notice ? (
                       <QuietButton
                         type="button"
                         disabled={disabled || busy}
@@ -389,7 +414,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                         Retry same request
                       </QuietButton>
                     ) : null}
-                    {display?.status === "SUCCEEDED" || conflict ? (
+                    {display?.status === "SUCCEEDED" || clearableFailure ? (
                       <QuietButton
                         type="button"
                         disabled={disabled || busy}
