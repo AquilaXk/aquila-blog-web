@@ -5,7 +5,9 @@ on:
     types: [platform_web_deployment_ready]
 
 permissions:
+  attestations: read
   contents: read
+  packages: read
 
 concurrency:
   group: platform-web-deployment-smoke
@@ -104,6 +106,58 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Verify exact Web image attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ghcr.io/aquilaxk/aquila-blog-web-front@${{ steps.delivery.outputs.image_digest }}
+          WEB_SHA: ${{ steps.delivery.outputs.web_sha }}
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+        run: |
+          set -euo pipefail
+          if ! CURRENT_WEB_MAIN_SHA="$(gh api "repos/AquilaXk/aquila-blog-web/commits/main" --jq '.sha')"; then
+            echo "Web main SHA lookup failed before native evidence verification" >&2
+            exit 1
+          fi
+          if [[ ! "${CURRENT_WEB_MAIN_SHA}" =~ ^[a-f0-9]{40}$ ]] || [ "${CURRENT_WEB_MAIN_SHA}" != "${WEB_SHA}" ]; then
+            echo "Web source is stale before native evidence verification" >&2
+            exit 1
+          fi
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            --format json > /tmp/web-image-provenance.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://spdx.dev/Document/v2.3 \
+            --format json > /tmp/web-image-sbom.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://cosign.sigstore.dev/attestation/vuln/v1 \
+            --format json > /tmp/web-image-vulnerability-attestation.json
+          node scripts/security/native-image-evidence.mjs verify-attestation-set \
+            /tmp/web-image-provenance.json \
+            /tmp/web-image-sbom.json \
+            /tmp/web-image-vulnerability-attestation.json
+
       - name: Set up Node.js 20
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -129,6 +183,71 @@ jobs:
         run: |
           set -euo pipefail
           env -u NO_COLOR timeout 5m yarn playwright test e2e/platform-deployment-smoke.spec.ts --project=chromium --workers=1
+
+      - name: Create approved deployment variable token
+        if: steps.smoke.outcome == 'success'
+        id: variable-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          owner: AquilaXk
+          repositories: aquila-blog-web
+          permission-contents: read
+          permission-variables: write
+
+      - name: Record approved Web deployment
+        if: steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.variable-token.outputs.token }}
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+          WEB_SHA: ${{ steps.delivery.outputs.web_sha }}
+          IMAGE_DIGEST: ${{ steps.delivery.outputs.image_digest }}
+          PLATFORM_SHA: ${{ steps.delivery.outputs.platform_sha }}
+          DEPLOY_RUN_ID: ${{ steps.delivery.outputs.deploy_run_id }}
+          DEPLOYMENT_IDENTITY: ${{ steps.delivery.outputs.deployment_identity }}
+        run: |
+          set -euo pipefail
+          if ! CURRENT_WEB_MAIN_SHA="$(gh api "repos/AquilaXk/aquila-blog-web/commits/main" --jq '.sha')"; then
+            echo "Web main SHA lookup failed before approved deployment recording" >&2
+            exit 1
+          fi
+          if [[ ! "${CURRENT_WEB_MAIN_SHA}" =~ ^[a-f0-9]{40}$ ]] || [ "${CURRENT_WEB_MAIN_SHA}" != "${WEB_SHA}" ]; then
+            echo "Web source is stale before approved deployment recording" >&2
+            exit 1
+          fi
+
+          CANDIDATE_RECORD="$(node scripts/security/native-image-evidence.mjs build-approved-record)"
+          EXISTING_APPROVED_RECORD="$(
+            gh api --paginate --slurp "repos/AquilaXk/aquila-blog-web/actions/variables?per_page=100" |
+              node -e '
+                const pages = JSON.parse(require("node:fs").readFileSync(0, "utf8"))
+                const matches = pages.flatMap((page) => page.variables || [])
+                  .filter((variable) => variable.name === "AQUILA_APPROVED_WEB_DEPLOYMENT_V1")
+                if (matches.length > 1) throw new Error("approved deployment variable is ambiguous")
+                if (matches.length === 1) process.stdout.write(matches[0].value)
+              '
+          )"
+          if [ -n "${EXISTING_APPROVED_RECORD}" ]; then
+            export EXISTING_APPROVED_RECORD
+          else
+            unset EXISTING_APPROVED_RECORD
+          fi
+          export CANDIDATE_APPROVED_RECORD="${CANDIDATE_RECORD}"
+          DECISION="$(node scripts/security/native-image-evidence.mjs authorize-replacement)"
+          case "${DECISION}" in
+            create|replace)
+              gh variable set AQUILA_APPROVED_WEB_DEPLOYMENT_V1 \
+                --repo AquilaXk/aquila-blog-web \
+                --body "${CANDIDATE_RECORD}"
+              ;;
+            idempotent)
+              ;;
+            *)
+              echo "approved deployment decision is invalid" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Record Platform deployment backlink
         if: ${{ always() && steps.delivery.outcome == 'success' }}

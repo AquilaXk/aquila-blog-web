@@ -230,7 +230,12 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
   const job = document.jobs.publish
 
   assert.deepEqual(document.true.push.branches, ["main"])
-  assert.deepEqual(document.permissions, { contents: "read", packages: "write" })
+  assert.deepEqual(document.permissions, {
+    attestations: "write",
+    contents: "read",
+    "id-token": "write",
+    packages: "write",
+  })
   assert.deepEqual(document.concurrency, { group: "web-frontend-image-main", "cancel-in-progress": false })
   assert.equal(String(job.if), "github.repository == 'AquilaXk/aquila-blog-web' && github.ref == 'refs/heads/main'")
 
@@ -267,15 +272,53 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
 
   const scan = step(job, "Pull and scan pushed immutable Web image")
   assert.match(scan.run, /docker pull "\$\{IMAGE_REF\}"/)
-  assert.match(scan.run, /trivy image .*--ignorefile \.trivyignore\.yaml .*--severity HIGH,CRITICAL .*--exit-code 1.*"\$\{IMAGE_REF\}"/)
+  assert.match(scan.run, /trivy image[\s\S]*--format cosign-vuln[\s\S]*--severity HIGH,CRITICAL[\s\S]*--exit-code 1[\s\S]*"\$\{IMAGE_REF\}"/)
+  assert.match(scan.run, /--output \/tmp\/web-image-vulnerability\.json/)
+  assert.match(scan.run, /trivy image[\s\S]*--format spdx-json[\s\S]*--output \/tmp\/web-image\.spdx\.json[\s\S]*"\$\{IMAGE_REF\}"/)
   assert.ok(job.steps.indexOf(digest) < job.steps.indexOf(scan))
+
+  const provenance = step(job, "Attest Web image provenance")
+  const sbom = step(job, "Attest Web image SBOM")
+  const vulnerability = step(job, "Attest Web image vulnerability scan")
+  for (const attestation of [provenance, sbom, vulnerability]) {
+    assert.equal(attestation.uses, "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6")
+    assert.equal(attestation.with["subject-name"], "ghcr.io/aquilaxk/aquila-blog-web-front")
+    assert.equal(attestation.with["subject-digest"], "${{ steps.image.outputs.image_digest }}")
+    assert.equal(attestation.with["push-to-registry"], true)
+  }
+  assert.equal(sbom.with["predicate-type"], "https://spdx.dev/Document/v2.3")
+  assert.equal(sbom.with["predicate-path"], "/tmp/web-image.spdx.json")
+  assert.equal(vulnerability.with["predicate-type"], "https://cosign.sigstore.dev/attestation/vuln/v1")
+  assert.equal(vulnerability.with["predicate-path"], "/tmp/web-image-vulnerability.json")
+  assert.ok(job.steps.indexOf(scan) < job.steps.indexOf(provenance))
+  assert.ok(job.steps.indexOf(provenance) < job.steps.indexOf(sbom))
+  assert.ok(job.steps.indexOf(sbom) < job.steps.indexOf(vulnerability))
+
+  const evidence = step(job, "Verify exact Web image attestations")
+  for (const predicateType of [
+    "https://slsa.dev/provenance/v1",
+    "https://spdx.dev/Document/v2.3",
+    "https://cosign.sigstore.dev/attestation/vuln/v1",
+  ]) {
+    assert.match(evidence.run, new RegExp(predicateType.replaceAll("/", "\\/")))
+  }
+  assert.match(evidence.run, /gh attestation verify "oci:\/\/\$\{IMAGE_REF\}"/)
+  assert.match(evidence.run, /--repo "\$\{SOURCE_REPOSITORY\}"/)
+  assert.match(evidence.run, /--source-digest "\$\{SOURCE_SHA\}"/)
+  assert.match(evidence.run, /--source-ref refs\/heads\/main/)
+  assert.match(evidence.run, /--signer-workflow AquilaXk\/aquila-blog-web\/.github\/workflows\/frontend-image\.yml/)
+  assert.match(evidence.run, /--deny-self-hosted-runners/)
+  assert.match(evidence.run, /--format json/)
+  assert.match(evidence.run, /native-image-evidence\.mjs verify-attestation-set/)
+  assert.match(evidence.run, /https:\/\/github\.com\/\$\{SOURCE_REPOSITORY\}\/actions\/runs\/\$\{PRODUCER_RUN_ID\}\/attempts\/\$\{PRODUCER_RUN_ATTEMPT\}/)
+  assert.ok(job.steps.indexOf(vulnerability) < job.steps.indexOf(evidence))
 
   const freshness = step(job, "Check current Web source freshness")
   assert.equal(freshness.env.WEB_GH_TOKEN, "${{ github.token }}")
   assert.equal(freshness.env.PLATFORM_GH_TOKEN, undefined)
   assert.match(freshness.run, /repos\/\$\{SOURCE_REPOSITORY\}\/commits\/main/)
   assert.doesNotMatch(freshness.run, /AquilaXk\/aquila-blog\/commits\/main|PLATFORM_GH_TOKEN/)
-  assert.ok(job.steps.indexOf(scan) < job.steps.indexOf(freshness))
+  assert.ok(job.steps.indexOf(evidence) < job.steps.indexOf(freshness))
 
   const token = step(job, "Create Platform dispatch token")
   assert.equal(token.if, "steps.freshness.outputs.should_dispatch == 'true'")

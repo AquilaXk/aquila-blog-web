@@ -40,6 +40,8 @@ jobs:
       - run: node --test scripts/contracts/receive-platform-deployment-workflow.test.mjs
       - run: PLAYWRIGHT_USE_WEBSERVER=false yarn playwright test e2e/platform-deployment-smoke.spec.ts --grep "rejects readiness fallback payloads" --workers=1
       - run: node --test scripts/contracts/frontend-image-workflow.test.mjs
+      - run: node --test scripts/contracts/rescan-approved-web-image-workflow.test.mjs
+      - run: node --test scripts/security/native-image-evidence.test.mjs
       - run: yarn contracts:check
       - run: yarn legal:check
       - run: yarn lint

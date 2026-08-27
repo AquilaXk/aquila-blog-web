@@ -1,0 +1,112 @@
+name: Rescan approved Web image
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  attestations: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: approved-web-image-daily-rescan
+  cancel-in-progress: false
+
+jobs:
+  rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout immutable current Web main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate approved Web deployment record
+        id: approved
+        env:
+          APPROVED_RECORD: ${{ vars.AQUILA_APPROVED_WEB_DEPLOYMENT_V1 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${APPROVED_RECORD}" |
+            node scripts/security/native-image-evidence.mjs validate-approved-record |
+            node -e '
+              const { appendFileSync, readFileSync } = require("node:fs")
+              const record = JSON.parse(readFileSync(0, "utf8"))
+              appendFileSync(
+                process.env.GITHUB_OUTPUT,
+                `web_sha=${record.web_sha}\nimage_digest=${record.image_digest}\nimage_ref=${record.image_subject}@${record.image_digest}\n`,
+              )
+            '
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Verify exact Web image attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ steps.approved.outputs.image_ref }}
+          SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
+          WEB_SHA: ${{ steps.approved.outputs.web_sha }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            --format json > /tmp/web-image-provenance.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://spdx.dev/Document/v2.3 \
+            --format json > /tmp/web-image-sbom.json
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${SOURCE_REPOSITORY}" \
+            --source-digest "${WEB_SHA}" \
+            --source-ref refs/heads/main \
+            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
+            --deny-self-hosted-runners \
+            --predicate-type https://cosign.sigstore.dev/attestation/vuln/v1 \
+            --format json > /tmp/web-image-vulnerability-attestation.json
+          node scripts/security/native-image-evidence.mjs verify-attestation-set \
+            /tmp/web-image-provenance.json \
+            /tmp/web-image-sbom.json \
+            /tmp/web-image-vulnerability-attestation.json
+
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.72.0"
+          TRIVY_SHA256: "bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea"
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          printf '%s  %s\n' "${TRIVY_SHA256}" /tmp/trivy.tgz | sha256sum --check -
+          tar -xzf /tmp/trivy.tgz -C /tmp trivy
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+
+      - name: Rescan approved immutable Web image
+        env:
+          IMAGE_REF: ${{ steps.approved.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE_REF}"
+          trivy image \
+            --ignorefile .trivyignore.yaml \
+            --format cosign-vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --output /tmp/approved-web-image-vulnerability.json \
+            "${IMAGE_REF}"
