@@ -81,7 +81,7 @@ test("receiver admits only the verified Platform deployment event before any exp
   const { source, document } = workflow()
   const job = document.jobs.receive
   assert.match(source, /^  repository_dispatch:\n    types: \[platform_web_deployment_ready\]/m)
-  assert.deepEqual(document.permissions, { contents: "read" })
+  assert.deepEqual(document.permissions, { attestations: "read", contents: "read", packages: "read" })
   assert.equal(job.if, undefined, "untrusted dispatches must fail in admission, not be silently skipped")
 
   const admission = step(job, "Validate verified Platform deployment")
@@ -101,7 +101,7 @@ test("receiver admits only the verified Platform deployment event before any exp
   const checkout = step(job, "Checkout immutable Web receiver")
   assert.equal(checkout.with.ref, "${{ steps.delivery.outputs.web_sha }}")
   assert.equal(checkout.with["persist-credentials"], false)
-  assert.doesNotMatch(source, /create-github-app-token|gh api|curl .*dispatch/i)
+  assert.doesNotMatch(admission.run, /create-github-app-token|gh api|curl/i)
 })
 
 test("the executable admission heredoc rejects representative untrusted deliveries without outputs", () => {
@@ -125,7 +125,7 @@ test("the executable admission heredoc rejects representative untrusted deliveri
   }
 })
 
-test("receiver performs one bounded Chromium smoke and records deployment provenance without write lifecycle", () => {
+test("receiver verifies native evidence, smokes, and records only the approved deployment", () => {
   const { source, document } = workflow()
   const job = document.jobs.receive
   const smoke = step(job, "Run served Platform deployment smoke")
@@ -134,12 +134,53 @@ test("receiver performs one bounded Chromium smoke and records deployment proven
   assert.match(smoke.run, /--workers=1/)
   assert.match(smoke.run, /timeout 5m/)
   assert.ok(job["timeout-minutes"] <= 15, "the complete receiver job must remain bounded")
+
+  const evidence = step(job, "Verify exact Web image attestations")
+  const registryLogin = step(job, "Log in to GitHub Container Registry")
+  assert.match(registryLogin.uses, /^docker\/login-action@[a-f0-9]{40}$/)
+  assert.equal(registryLogin.with.registry, "ghcr.io")
+  assert.equal(registryLogin.with.password, "${{ github.token }}")
+  assert.equal(evidence.env.GH_TOKEN, "${{ github.token }}")
+  assert.match(evidence.run, /gh attestation verify "oci:\/\/\$\{IMAGE_REF\}"/)
+  assert.match(evidence.run, /--source-digest "\$\{WEB_SHA\}"/)
+  assert.match(evidence.run, /--source-ref refs\/heads\/main/)
+  assert.match(evidence.run, /--signer-workflow AquilaXk\/aquila-blog-web\/.github\/workflows\/frontend-image\.yml/)
+  assert.match(evidence.run, /https:\/\/slsa\.dev\/provenance\/v1/)
+  assert.match(evidence.run, /https:\/\/spdx\.dev\/Document\/v2\.3/)
+  assert.match(evidence.run, /https:\/\/cosign\.sigstore\.dev\/attestation\/vuln\/v1/)
+  assert.match(
+    evidence.run,
+    /native-image-evidence\.mjs verify-attestation-set \\\n\s+\/tmp\/web-image-provenance\.json \\\n\s+\/tmp\/web-image-sbom\.json \\\n\s+\/tmp\/web-image-vulnerability-attestation\.json/,
+  )
+  assert.ok(job.steps.indexOf(registryLogin) < job.steps.indexOf(evidence))
+  assert.ok(job.steps.indexOf(evidence) < job.steps.indexOf(smoke))
+
+  const variableToken = step(job, "Create approved deployment variable token")
+  assert.equal(variableToken.if, "steps.smoke.outcome == 'success'")
+  assert.equal(variableToken.with.owner, "AquilaXk")
+  assert.equal(variableToken.with.repositories, "aquila-blog-web")
+  assert.equal(variableToken.with["permission-contents"], "read")
+  assert.equal(variableToken.with["permission-variables"], "write")
+  assert.match(variableToken.uses, /^actions\/create-github-app-token@[a-f0-9]{40}$/)
+
+  const approved = step(job, "Record approved Web deployment")
+  assert.equal(approved.if, "steps.smoke.outcome == 'success'")
+  assert.equal(approved.env.GH_TOKEN, "${{ steps.variable-token.outputs.token }}")
+  assert.match(approved.run, /repos\/AquilaXk\/aquila-blog-web\/commits\/main/)
+  assert.match(approved.run, /repos\/AquilaXk\/aquila-blog-web\/actions\/variables/)
+  assert.match(approved.run, /AQUILA_APPROVED_WEB_DEPLOYMENT_V1/)
+  assert.match(approved.run, /native-image-evidence\.mjs build-approved-record/)
+  assert.match(approved.run, /native-image-evidence\.mjs authorize-replacement/)
+  assert.match(approved.run, /gh variable set AQUILA_APPROVED_WEB_DEPLOYMENT_V1/)
+  assert.ok(job.steps.indexOf(smoke) < job.steps.indexOf(variableToken))
+  assert.ok(job.steps.indexOf(variableToken) < job.steps.indexOf(approved))
+
   const summary = step(job, "Record Platform deployment backlink")
   assert.equal(summary.env.PLATFORM_REPOSITORY, "${{ steps.delivery.outputs.platform_repository }}")
   assert.match(summary.run, /https:\/\/github\.com\/\$\{PLATFORM_REPOSITORY\}\/actions\/runs\/\$\{DEPLOY_RUN_ID\}/)
   assert.match(source, /GITHUB_STEP_SUMMARY/)
   assert.match(source, /deployment_identity/)
-  assert.doesNotMatch(source, /pull-requests:|git push|gh pr |--draft|callback|dedup/i)
+  assert.doesNotMatch(source, /pull-requests:|git push|gh pr |--draft|web_frontend_image_ready/i)
 
   const ci = readFileSync(ciPath, "utf8")
   assert.match(ci, /node --test scripts\/contracts\/receive-platform-deployment-workflow\.test\.mjs/)
