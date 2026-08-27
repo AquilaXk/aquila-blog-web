@@ -28,6 +28,7 @@ import {
   formatRetryPolicy,
 } from "src/routes/Admin/AdminToolsWorkspaceModel"
 import { AdminTaskDlqReplaySection } from "src/routes/Admin/AdminTaskDlqReplaySection"
+import { AdminSearchRuntimeControlSection } from "src/routes/Admin/AdminSearchRuntimeControlSection"
 
 export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
   const {
@@ -310,6 +311,7 @@ export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
             taskTypeSuggestions={taskQueueDiagnostics?.taskTypes.map((taskType: any) => taskType.taskType) || []}
             onTerminalReceipt={() => void fetchTaskQueueDiagnostics()}
           />
+          <AdminSearchRuntimeControlSection disabled={isBusy} />
         </DiagnosticPanel>
       ) : null}
     </WorkspaceSection>
