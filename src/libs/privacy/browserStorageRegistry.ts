@@ -19,6 +19,8 @@ export type {
 import { OPTIONAL_TRACKING_CONSENT_STORAGE_KEY } from "src/libs/privacy/optionalTrackingConsentCore"
 
 export const ADMIN_TASK_DLQ_REPLAY_SESSION_KEY = "admin.tools.taskDlqReplay.v1"
+export const ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY =
+  "admin.tools.searchRuntimeControl.v1"
 
 export type BrowserStorageArea = "cookie" | "localStorage" | "sessionStorage"
 
@@ -221,6 +223,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     retention: "browser tab session while an operation is pending or retained for explicit status checks",
     deletion: "explicit new command, tab close, or browser storage deletion",
     stores: "bounded DLQ replay request with operation UUID, reason, optional task type, limit, and retry-count choice",
+  },
+  {
+    area: "sessionStorage",
+    key: ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY,
+    purpose: "admin-search-runtime-control-request",
+    required: false,
+    retention: "browser tab session while one search control operation is pending or retained for explicit status checks",
+    deletion: "explicit new command, tab close, or browser storage deletion",
+    stores: "one bounded search control request with operation UUID, control name, reason, and explicit boolean target",
   },
   {
     area: "sessionStorage",
