@@ -42,7 +42,6 @@ test.describe("모바일 레이아웃 소스 경계", () => {
       readSourceFile("src/routes/Admin/AdminDashboardWorkspace.styles.layout.ts"),
       readSourceFile("src/routes/Admin/AdminDashboardWorkspace.styles.priority.ts"),
     ].join("\n")
-    const authShellSource = readSourceFile("src/components/auth/AuthShell.tsx")
     const errorSource = readSourceFile("src/routes/Error/index.tsx")
     const editorComposeSource = [
       readSourceFile("src/routes/Admin/EditorStudioComposeWritingSurface.tsx"),
@@ -88,11 +87,10 @@ test.describe("모바일 레이아웃 소스 경계", () => {
     expect(adminToolsSource).toContain("adminSurface")
     expect(adminToolsSource).toContain("adminSurfaceRaised")
     expect(adminDashboardSource).toContain("adminSurface")
-    expect(authShellSource).toContain("theme.colors.gray1")
     expect(errorSource).toContain("theme.colors.gray1")
     expect(editorComposeSource).toContain("theme.publicDesign")
     expect(editorDedicatedSource).toContain("theme.publicDesign")
-    for (const source of [authShellSource, errorSource, editorComposeSource, editorDedicatedSource]) {
+    for (const source of [errorSource, editorComposeSource, editorDedicatedSource]) {
       expect(source).not.toContain("theme.blogDesign")
     }
     for (const [sourcePath, source] of publicSurfaceSources) {

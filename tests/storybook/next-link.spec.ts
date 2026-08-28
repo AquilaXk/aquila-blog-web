@@ -23,14 +23,6 @@ const expectStoryLinkRouteWithoutNavigation = async (page: Page, storyId: string
   expect(page.url()).toBe(new URL(storyUrl, page.url()).toString())
 }
 
-test("AuthShell Login renders its signup link", async ({ page }) => {
-  await expectStoryLink(page, "auth-authshell--login", "/signup")
-})
-
-test("AuthShell Login records its signup route without leaving the story", async ({ page }) => {
-  await expectStoryLinkRouteWithoutNavigation(page, "auth-authshell--login", "/signup")
-})
-
 test("AdminHubSurface Default renders its admin posts link", async ({ page }) => {
   await expectStoryLink(page, "admin-adminhubsurface--default", "/admin/posts")
 })

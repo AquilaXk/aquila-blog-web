@@ -303,11 +303,8 @@ test.describe("core smoke source boundaries", () => {
   test("app shell and auth file boundaries는 data/view/style module로 분리된다", () => {
   const sourceRoot = path.resolve(__dirname, "../src")
   const headerRoot = path.join(sourceRoot, "layouts/RootLayout/Header")
-  const authRoot = path.join(sourceRoot, "components/auth")
   const adminRoot = path.join(sourceRoot, "routes/Admin")
   const requiredModules = [
-    path.join(authRoot, "AuthEntryModalModel.ts"),
-    path.join(authRoot, "AuthEntryModal.styles.ts"),
     path.join(sourceRoot, "routes/About/AboutPageModel.ts"),
     path.join(sourceRoot, "routes/About/AboutPageView.tsx"),
     path.join(sourceRoot, "routes/About/AboutPage.styles.ts"),
@@ -330,7 +327,6 @@ test.describe("core smoke source boundaries", () => {
 
   const boundedSourceFiles = [
     path.join(headerRoot, "NavBar.tsx"),
-    path.join(authRoot, "AuthEntryModal.tsx"),
     path.join(sourceRoot, "pages/login.tsx"),
     path.join(sourceRoot, "pages/signup.tsx"),
     path.join(sourceRoot, "pages/signup/verify.tsx"),
@@ -361,7 +357,6 @@ test.describe("core smoke source boundaries", () => {
 
   const appShellAuthFilesOverThousand = [
     ...collectSourceFiles(headerRoot),
-    ...collectSourceFiles(authRoot),
     path.join(sourceRoot, "pages/about.tsx"),
     path.join(sourceRoot, "pages/login.tsx"),
     path.join(sourceRoot, "pages/signup.tsx"),
@@ -382,13 +377,10 @@ test.describe("core smoke source boundaries", () => {
 
   expect(appShellAuthFilesOverThousand).toEqual([])
 
-  const authModalSource = readFileSync(path.join(authRoot, "AuthEntryModal.tsx"), "utf8")
   const aboutPageSource = readFileSync(path.join(sourceRoot, "pages/about.tsx"), "utf8")
   const adminProfilePageSource = readFileSync(path.join(adminRoot, "AdminProfileWorkspacePage.tsx"), "utf8")
   const adminProfileSectionsSource = readFileSync(path.join(adminRoot, "AdminProfileWorkspaceSections.tsx"), "utf8")
 
-  expect(authModalSource).toContain("AuthEntryModalModel")
-  expect(authModalSource).not.toContain("const Backdrop = styled.div")
   expect(aboutPageSource).toContain("AboutPageView")
   expect(aboutPageSource).not.toContain("const StyledWrapper = styled.div")
   expect(adminProfilePageSource).toContain("AdminProfileWorkspacePageModel")
