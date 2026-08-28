@@ -52,18 +52,6 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
   },
   {
-    matcher: /^\/member\/api\/v1\/notifications\/snapshot/i,
-    policy: {
-      cacheMode: "no-store",
-      retryCount: 0,
-      timeoutMs: 4_000,
-    },
-  },
-  {
-    matcher: /^\/member\/api\/v1\/notifications(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
-  },
-  {
     matcher: /^\/(member|post)\/api\/v1\/adm\//i,
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },

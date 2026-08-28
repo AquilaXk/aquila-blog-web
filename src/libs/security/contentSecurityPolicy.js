@@ -2,7 +2,6 @@ const crypto = require("crypto")
 const {
   AQUILA_SCHEME_BOOTSTRAP_SCRIPT,
   CLIENT_RUNTIME_RECOVERY_SCRIPT,
-  HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT,
 } = require("./documentInlineScripts")
 
 /**
@@ -49,7 +48,6 @@ const scriptSrcHash = (source) =>
 const documentInlineScriptHashes = () =>
   uniqueSources([
     scriptSrcHash(AQUILA_SCHEME_BOOTSTRAP_SCRIPT),
-    scriptSrcHash(HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT),
     scriptSrcHash(CLIENT_RUNTIME_RECOVERY_SCRIPT),
   ])
 

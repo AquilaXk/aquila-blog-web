@@ -77,16 +77,19 @@ const RootLayout = ({
   // 역할을 잃는다. 이 라우트에서만 껍데기를 div로 내려 main을 하나로 유지한다.
   const LayoutShell = isStandaloneSurfaceRoute ? StandaloneShell : StyledMain
   const isDesignAwareRoute = pathname[1] !== "_" && pathname !== "/sitemap.xml"
+  const shouldLoadAdminProfile =
+    !isStandaloneSurfaceRoute &&
+    !isAdminLoginRoute &&
+    (isPublicBlogRoute ||
+      isAdminRoute ||
+      (initialAdminProfile != null && initialAdminProfileShouldRefetch))
   const adminProfile = usePublicAdminProfile(initialAdminProfile, {
     // 독립 표면은 관리자 프로필을 전혀 읽지 않는다. 여기서 켜 두면 blog 호스트 백엔드로 credentialed
     // XHR이 나가는데, 회사·제품 호스트에서는 그것이 cross-origin이고 edge에 그 origin을 허용하는
     // CORS가 없다 - 아무 화면 효과 없이 실패하는 요청만 남는다.
-    enabled:
-      !isStandaloneSurfaceRoute &&
-      !isAdminLoginRoute &&
-      (isDesignAwareRoute || initialAdminProfileShouldRefetch),
-    refetchOnMount: isDesignAwareRoute && !isAdminLoginRoute,
-    staleTimeMs: isDesignAwareRoute && !isAdminLoginRoute ? 0 : undefined,
+    enabled: shouldLoadAdminProfile,
+    refetchOnMount: shouldLoadAdminProfile,
+    staleTimeMs: shouldLoadAdminProfile ? 0 : undefined,
   })
   const effectiveScheme = "light" // intentional light-only; do not wire dark/toggle
   const effectiveBlogDesign = isAdminRoute ? adminProfile?.blogDesign || "legacy" : "legacy"

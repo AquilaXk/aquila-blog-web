@@ -4,7 +4,6 @@ import Link from "next/link"
 import PostCard from "src/routes/Feed/PostList/PostCard"
 import InitialLoadErrorState from "src/routes/Feed/PostList/InitialLoadErrorState"
 import AppIcon from "src/components/icons/AppIcon"
-import useAuthSession from "src/hooks/useAuthSession"
 import { TPost } from "src/types"
 
 type Props = {
@@ -36,38 +35,23 @@ const DEFERRED_MOUNT_BATCH_COUNT = 8
 const DEFERRED_MOUNT_ROOT_MARGIN = "680px 0px"
 
 const EmptyPostStateInner: React.FC<EmptyPostStateProps> = ({ hasFilter, onClearFilters }) => {
-  const { me, authStatus } = useAuthSession()
-  const isAdmin = authStatus === "authenticated" && Boolean(me?.isAdmin)
-  const emptyStateMessage = isAdmin ? "첫 글을 발행해보세요." : "곧 새로운 글을 준비하겠습니다."
-
   return (
     <section className="emptyState" aria-live="polite">
       <div className="emptyIcon" aria-hidden="true">
         <AppIcon name={hasFilter ? "search" : "edit"} />
       </div>
       <h3>{hasFilter ? "검색 결과가 없습니다." : "아직 게시글이 없습니다."}</h3>
-      <p>{hasFilter ? "다른 검색어를 입력해보세요." : emptyStateMessage}</p>
+      <p>{hasFilter ? "다른 검색어를 입력해보세요." : "곧 새로운 글을 준비하겠습니다."}</p>
       <div className="emptyActions">
         {hasFilter ? (
           <button type="button" onClick={onClearFilters} className="actionBtn actionBtn--primary">
             <AppIcon name="search" />
             초기화
           </button>
-        ) : isAdmin ? (
-          <Link href="/admin/editor/new" className="actionBtn actionBtn--primary">
-            <AppIcon name="edit" />
-            첫 글 작성
-          </Link>
         ) : (
           <Link href="/about" className="actionBtn actionBtn--primary">
             <AppIcon name="service" />
             블로그 소개
-          </Link>
-        )}
-        {!hasFilter && isAdmin && (
-          <Link href="/admin" className="actionBtn">
-            <AppIcon name="service" />
-            관리자 허브
           </Link>
         )}
       </div>

@@ -1,13 +1,10 @@
 import styled from "@emotion/styled"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
-import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/router"
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import useAuthSession from "src/hooks/useAuthSession"
-import { normalizeNextPath, replaceRoute, toLoginPath } from "src/libs/router"
 import { waitForFeedSearchInputFocus } from "src/routes/Feed/feedSearchFocus"
 import { zIndexes } from "src/styles/zIndexes"
 
@@ -16,18 +13,6 @@ const primaryLinks = [
   ["topics", "Topics", "/#topics"],
   ["about", "About", "/about"],
 ] as const
-
-const NotificationBell = lazy(() => import("./NotificationBell"))
-const AuthEntryModal = dynamic(() => import("src/components/auth/AuthEntryModal"), {
-  ssr: false,
-  loading: () => null,
-})
-
-const preloadAuthEntryModal = () => {
-  void import("src/components/auth/AuthEntryModal").then((module) => {
-    module.preloadAuthEntryPanels?.("login")
-  })
-}
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -66,21 +51,11 @@ const waitForFocusTrapRestore = () =>
 
 const NavBar = () => {
   const router = useRouter()
-  const { me, authStatus, logout } = useAuthSession()
-  const [authModalOpen, setAuthModalOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null)
-  const authReturnFocusRef = useRef<HTMLElement | null>(null)
-  const authModalOpenRef = useRef(authModalOpen)
-  const isAuthenticated = authStatus === "authenticated"
-  const isAdmin = authStatus === "authenticated" && Boolean(me?.isAdmin)
-  const showLogin = authStatus !== "authenticated"
-  const nextPath = normalizeNextPath(router.asPath)
   const [activeHash, setActiveHash] = useState<string | null>(null)
   const focusFeedSearchInFlightRef = useRef<Promise<void> | null>(null)
-
-  authModalOpenRef.current = authModalOpen
 
   const closeMobileMenu = useCallback(() => {
     setMobileMenuOpen(false)
@@ -91,7 +66,7 @@ const NavBar = () => {
     onClose: closeMobileMenu,
     containerRef: mobileMenuPanelRef,
     returnFocusRef: mobileMenuButtonRef,
-    paused: authModalOpen,
+    paused: false,
   })
 
   useEffect(() => {
@@ -156,19 +131,9 @@ const NavBar = () => {
         })
       }
 
-      if (authModalOpenRef.current) {
-        throw new Error("feed search focus aborted: auth modal open")
-      }
-
       const focused = await waitForFeedSearchInputFocus()
       if (!focused) {
         throw new Error("Failed to focus feed search input")
-      }
-      if (authModalOpenRef.current) {
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur()
-        }
-        throw new Error("feed search focus aborted: auth modal open")
       }
     })()
 
@@ -187,7 +152,6 @@ const NavBar = () => {
   }, [router])
 
   const requestFocusFeedSearch = useCallback(() => {
-    if (authModalOpen) return
     const wasMenuOpen = mobileMenuOpen
     setMobileMenuOpen(false)
     void (async () => {
@@ -196,7 +160,7 @@ const NavBar = () => {
       }
       await focusFeedSearch()
     })().catch(reportFocusFeedSearchFailure)
-  }, [authModalOpen, focusFeedSearch, mobileMenuOpen])
+  }, [focusFeedSearch, mobileMenuOpen])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -206,7 +170,7 @@ const NavBar = () => {
         (event.metaKey || event.ctrlKey) &&
         (event.key.toLowerCase() === "k" || event.code === "KeyK")
       if (!isSearchShortcut) return
-      if (authModalOpen || event.defaultPrevented || isTypingTarget(event.target)) return
+      if (event.defaultPrevented || isTypingTarget(event.target)) return
 
       event.preventDefault()
       requestFocusFeedSearch()
@@ -214,17 +178,7 @@ const NavBar = () => {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [authModalOpen, requestFocusFeedSearch])
-
-  const handleLogout = async () => {
-    await logout()
-
-    const isProtectedAuthoringRoute = router.pathname.startsWith("/admin") || router.pathname.startsWith("/editor")
-    if (!isProtectedAuthoringRoute) return
-
-    const fallbackPath = router.pathname.startsWith("/editor") ? "/editor/new" : "/admin"
-    await replaceRoute(router, toLoginPath(nextPath, fallbackPath), { preferHardNavigation: true })
-  }
+  }, [requestFocusFeedSearch])
 
   const mobileMenu =
     typeof document !== "undefined" && mobileMenuOpen
@@ -253,35 +207,6 @@ const NavBar = () => {
                   {name}
                 </Link>
               ))}
-              {isAdmin ? (
-                <Link href="/admin" onClick={closeMobileMenu}>
-                  Admin
-                </Link>
-              ) : null}
-              {showLogin ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    authReturnFocusRef.current = mobileMenuButtonRef.current
-                    setMobileMenuOpen(false)
-                    preloadAuthEntryModal()
-                    setAuthModalOpen(true)
-                  }}
-                >
-                  Login
-                </button>
-              ) : null}
-              {isAuthenticated ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    void handleLogout()
-                  }}
-                >
-                  Logout
-                </button>
-              ) : null}
             </MobileMenuPanel>
           </MobileMenuLayer>,
           document.body
@@ -323,43 +248,6 @@ const NavBar = () => {
           <kbd>⌘ K</kbd>
         </button>
 
-        {showLogin ? (
-          <button
-            type="button"
-            data-ui="nav-control"
-            className="loginLink"
-            onMouseEnter={preloadAuthEntryModal}
-            onFocus={preloadAuthEntryModal}
-            onClick={(event) => {
-              authReturnFocusRef.current = event.currentTarget
-              preloadAuthEntryModal()
-              setAuthModalOpen(true)
-            }}
-          >
-            Login
-          </button>
-        ) : null}
-
-        {isAuthenticated ? (
-          <div className="bellSlot">
-            <Suspense fallback={null}>
-              <NotificationBell enabled />
-            </Suspense>
-          </div>
-        ) : null}
-
-        {isAdmin ? (
-          <Link href="/admin" data-ui="nav-control" className="adminLink">
-            Admin
-          </Link>
-        ) : null}
-
-        {isAuthenticated ? (
-          <button type="button" data-ui="nav-control" className="logoutBtn" onClick={() => void handleLogout()}>
-            Logout
-          </button>
-        ) : null}
-
         <button
           ref={mobileMenuButtonRef}
           type="button"
@@ -374,14 +262,6 @@ const NavBar = () => {
       </div>
 
       {mobileMenu}
-
-      <AuthEntryModal
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        nextPath={nextPath}
-        title="로그인"
-        returnFocusRef={authReturnFocusRef}
-      />
     </StyledWrapper>
   )
 }
