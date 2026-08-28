@@ -20,7 +20,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/post/api/v1/posts/{postId}/comments/{id}": {
+    "/post/api/v1/posts/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -31,38 +31,6 @@ export interface paths {
         put: operations["modify"];
         post?: never;
         delete: operations["delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/post/api/v1/posts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getItem_1"];
-        put: operations["modify_1"];
-        post?: never;
-        delete: operations["delete_1"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/post/api/v1/posts/{id}/like": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["like"];
-        post?: never;
-        delete: operations["unlike"];
         options?: never;
         head?: never;
         patch?: never;
@@ -228,22 +196,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/post/api/v1/posts/{postId}/comments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getItems_1"];
-        put?: never;
-        post: operations["write_1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/post/api/v1/posts/{id}/hit": {
         parameters: {
             query?: never;
@@ -359,86 +311,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/signup/social/pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["pending"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/signup/social/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["complete"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/signup/email/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["verifyLegacyGet"];
-        put?: never;
-        post: operations["verify"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/signup/email/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["start"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/signup/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["complete_1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/privacy/requests": {
         parameters: {
             query?: never;
@@ -455,54 +327,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/notifications/{id}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["markRead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/notifications/read-all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["markAllRead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["join"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -513,22 +337,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/auth/legal-reconsent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["legalReconsent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -801,7 +609,7 @@ export interface paths {
         get: operations["getFile"];
         put?: never;
         post?: never;
-        delete: operations["delete_2"];
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1056,7 +864,7 @@ export interface paths {
             cookie?: never;
         };
         /** 관리자용 전체 글 목록 (숨김글 포함) */
-        get: operations["getItems_2"];
+        get: operations["getItems_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1073,7 +881,7 @@ export interface paths {
             cookie?: never;
         };
         /** 관리자용 글 상세 (숨김글 포함) */
-        get: operations["getItem_2"];
+        get: operations["getItem_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1165,102 +973,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getItems_3"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/notifications/unread-count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["unreadCount"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/notifications/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["stream"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/notifications/snapshot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSnapshot"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/members/{id}/redirectToProfileImg": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["redirectToProfileImg"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/members/randomSecureTip": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["randomSecureTip"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/members/adminProfile": {
         parameters: {
             query?: never;
@@ -1316,7 +1028,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getItems_4"];
+        get: operations["getItems_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1332,7 +1044,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getItem_3"];
+        get: operations["getItem_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1540,14 +1252,6 @@ export interface components {
             completedFileId?: number | null;
             failureReason?: string | null;
         };
-        PostCommentModifyRequest: {
-            content: string;
-        };
-        RsDataVoid: {
-            resultCode?: string;
-            msg?: string;
-            data?: unknown;
-        };
         PostModifyRequest: {
             title: string;
             content: string;
@@ -1576,16 +1280,6 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["PostWriteResultDto"];
-        };
-        PostLikeToggleResBody: {
-            liked?: boolean;
-            /** Format: int32 */
-            likesCount?: number;
-        };
-        RsDataPostLikeToggleResBody: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["PostLikeToggleResBody"];
         };
         ProfileCardLinkItemRequest: {
             icon?: string;
@@ -1833,37 +1527,6 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["PostDto"];
         };
-        PostCommentWriteRequest: {
-            content: string;
-            /** Format: int64 */
-            parentCommentId?: number | null;
-        };
-        PostCommentDto: {
-            /** Format: int64 */
-            id?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            modifiedAt?: string;
-            /** Format: int64 */
-            authorId?: number;
-            authorName?: string;
-            authorUsername?: string;
-            authorProfileImageUrl?: string;
-            authorProfileImageDirectUrl?: string;
-            /** Format: int64 */
-            postId?: number;
-            /** Format: int64 */
-            parentCommentId?: number | null;
-            content?: string;
-            actorCanModify?: boolean;
-            actorCanDelete?: boolean;
-        };
-        RsDataPostCommentDto: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["PostCommentDto"];
-        };
         PostHitResBody: {
             /** Format: int32 */
             hitCount?: number;
@@ -1969,92 +1632,6 @@ export interface components {
             contentHash?: string;
             algorithmVersion?: string;
         };
-        SocialSignupPendingRequest: {
-            token: string;
-        };
-        OAuthSignupPendingDetails: {
-            provider?: string;
-            nickname?: string;
-            profileImgUrl?: string | null;
-            /** Format: date-time */
-            expiresAt?: string;
-        };
-        RsDataOAuthSignupPendingDetails: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["OAuthSignupPendingDetails"];
-        };
-        SocialSignupCompleteRequest: {
-            token: string;
-            nickname?: string | null;
-            termsVersion: string;
-            termsContentSha256: string;
-            privacyVersion: string;
-            privacyContentSha256: string;
-            age14OrOlder: boolean;
-            requiredPrivacyConfirmed: boolean;
-            analyticsConsent: boolean;
-            overseasTransferAcknowledged: boolean;
-        };
-        MemberDto: {
-            isAdmin?: boolean;
-            /** Format: int64 */
-            id?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            modifiedAt?: string;
-            name?: string;
-            profileImageUrl?: string;
-            admin?: boolean;
-        };
-        RsDataMemberDto: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["MemberDto"];
-        };
-        SignupEmailVerifyRequest: {
-            token: string;
-        };
-        RsDataSignupEmailVerifyResult: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["SignupEmailVerifyResult"];
-        };
-        SignupEmailVerifyResult: {
-            email?: string;
-            /** Format: date-time */
-            expiresAt?: string;
-        };
-        SignupEmailStartRequest: {
-            /** Format: email */
-            email: string;
-            termsAccepted: boolean;
-            privacyAccepted: boolean;
-            legalPolicyVersion: string;
-            nextPath?: string | null;
-        };
-        RsDataSignupEmailStartResult: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["SignupEmailStartResult"];
-        };
-        SignupEmailStartResult: {
-            email?: string;
-        };
-        SignupCompleteRequest: {
-            username?: string | null;
-            password: string;
-            nickname: string;
-            termsVersion: string;
-            termsContentSha256: string;
-            privacyVersion: string;
-            privacyContentSha256: string;
-            age14OrOlder: boolean;
-            requiredPrivacyConfirmed: boolean;
-            analyticsConsent: boolean;
-            overseasTransferAcknowledged: boolean;
-        };
         PrivacyRequestCreateRequest: {
             /** @enum {string} */
             type: "EXPORT" | "CORRECTION" | "DELETION" | "PROCESSING_RESTRICTION" | "CONSENT_WITHDRAWAL";
@@ -2085,30 +1662,23 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["PrivacyRequestResBody"];
         };
-        RsDataMapStringBoolean: {
-            resultCode?: string;
-            msg?: string;
-            data?: {
-                [key: string]: boolean;
-            };
-        };
-        RsDataMapStringInteger: {
-            resultCode?: string;
-            msg?: string;
-            data?: {
-                [key: string]: number;
-            };
-        };
-        MemberJoinRequest: {
-            username: string;
-            password: string;
-            nickname: string;
-        };
         MemberLoginRequest: {
             email?: string | null;
             password: string;
             rememberMe?: boolean;
             ipSecurity?: boolean;
+        };
+        MemberDto: {
+            isAdmin?: boolean;
+            /** Format: int64 */
+            id?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            modifiedAt?: string;
+            name?: string;
+            profileImageUrl?: string;
+            admin?: boolean;
         };
         MemberLoginResBody: {
             item?: components["schemas"]["MemberDto"];
@@ -2117,37 +1687,6 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["MemberLoginResBody"];
-        };
-        LegalReconsentRequest: {
-            termsVersion: string;
-            termsContentSha256: string;
-            privacyVersion: string;
-            privacyContentSha256: string;
-            age14OrOlder: boolean;
-            requiredPrivacyConfirmed: boolean;
-            analyticsConsent: boolean;
-            overseasTransferAcknowledged: boolean;
-        };
-        LegalReconsentResponse: {
-            legalReconsent?: components["schemas"]["LegalReconsentStatus"];
-        };
-        LegalReconsentStatus: {
-            status?: string;
-            required?: boolean;
-            termsVersion?: string;
-            termsContentSha256?: string;
-            privacyVersion?: string;
-            privacyContentSha256?: string;
-            /** Format: date-time */
-            acceptedAt?: string | null;
-            refusalGuidePath?: string;
-            exportGuidePath?: string;
-            deletionGuidePath?: string;
-        };
-        RsDataLegalReconsentResponse: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["LegalReconsentResponse"];
         };
         MemberWithUsernameDto: {
             /** Format: int64 */
@@ -2496,7 +2035,6 @@ export interface components {
             id?: number;
             username?: string;
             nickname?: string;
-            legalReconsent?: components["schemas"]["LegalReconsentStatus"] | null;
             isAdmin?: boolean;
         };
         AuthSecurityEventDto: {
@@ -2646,40 +2184,6 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["PrivacyExportResponse"];
         };
-        MemberNotificationDto: {
-            /** Format: int64 */
-            id?: number;
-            /** @enum {string} */
-            type?: "COMMENT_REPLY" | "POST_COMMENT";
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: int64 */
-            actorId?: number;
-            actorName?: string;
-            actorProfileImageDirectUrl?: string;
-            actorProfileImageUrl?: string;
-            /** Format: int64 */
-            postId?: number;
-            /** Format: int64 */
-            commentId?: number;
-            postTitle?: string;
-            commentPreview?: string;
-            message?: string;
-            read?: boolean;
-        };
-        UnreadCountResBody: {
-            /** Format: int32 */
-            unreadCount?: number;
-        };
-        SseEmitter: {
-            /** Format: int64 */
-            timeout?: number;
-        };
-        SnapshotResBody: {
-            items?: components["schemas"]["MemberNotificationDto"][];
-            /** Format: int32 */
-            unreadCount?: number;
-        };
         PageDtoMemberWithUsernameDto: {
             content?: components["schemas"]["MemberWithUsernameDto"][];
             pageable?: components["schemas"]["PageableDto"];
@@ -2723,6 +2227,11 @@ export interface components {
         AdminHubBootstrapResponse: {
             member?: components["schemas"]["AuthSessionMemberDto"];
             profile?: components["schemas"]["MemberWithUsernameDto"];
+        };
+        RsDataVoid: {
+            resultCode?: string;
+            msg?: string;
+            data?: unknown;
         };
         AccountDeletionRequest: {
             password?: string | null;
@@ -2783,79 +2292,6 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                postId: number;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PostCommentDto"];
-                };
-            };
-        };
-    };
-    modify: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                postId: number;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PostCommentModifyRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataVoid"];
-                };
-            };
-        };
-    };
-    delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                postId: number;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataVoid"];
-                };
-            };
-        };
-    };
-    getItem_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
                 id: number;
             };
             cookie?: never;
@@ -2873,7 +2309,7 @@ export interface operations {
             };
         };
     };
-    modify_1: {
+    modify: {
         parameters: {
             query?: never;
             header?: never;
@@ -2899,7 +2335,7 @@ export interface operations {
             };
         };
     };
-    delete_1: {
+    delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2917,50 +2353,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataVoid"];
-                };
-            };
-        };
-    };
-    like: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPostLikeToggleResBody"];
-                };
-            };
-        };
-    };
-    unlike: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPostLikeToggleResBody"];
                 };
             };
         };
@@ -3260,56 +2652,6 @@ export interface operations {
             };
         };
     };
-    getItems_1: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                postId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PostCommentDto"][];
-                };
-            };
-        };
-    };
-    write_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                postId: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PostCommentWriteRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPostCommentDto"];
-                };
-            };
-        };
-    };
     incrementHit: {
         parameters: {
             query?: never;
@@ -3476,146 +2818,6 @@ export interface operations {
             };
         };
     };
-    pending: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SocialSignupPendingRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataOAuthSignupPendingDetails"];
-                };
-            };
-        };
-    };
-    complete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SocialSignupCompleteRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMemberDto"];
-                };
-            };
-        };
-    };
-    verifyLegacyGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Gone */
-            410: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataVoid"];
-                };
-            };
-        };
-    };
-    verify: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupEmailVerifyRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataSignupEmailVerifyResult"];
-                };
-            };
-        };
-    };
-    start: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupEmailStartRequest"];
-            };
-        };
-        responses: {
-            /** @description Accepted */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataSignupEmailStartResult"];
-                };
-            };
-        };
-    };
-    complete_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupCompleteRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMemberDto"];
-                };
-            };
-        };
-    };
     createRequest: {
         parameters: {
             query?: never;
@@ -3640,72 +2842,6 @@ export interface operations {
             };
         };
     };
-    markRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMapStringBoolean"];
-                };
-            };
-        };
-    };
-    markAllRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMapStringInteger"];
-                };
-            };
-        };
-    };
-    join: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MemberJoinRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMemberDto"];
-                };
-            };
-        };
-    };
     login: {
         parameters: {
             query?: never;
@@ -3726,30 +2862,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataMemberLoginResBody"];
-                };
-            };
-        };
-    };
-    legalReconsent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LegalReconsentRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataLegalReconsentResponse"];
                 };
             };
         };
@@ -4177,7 +3289,7 @@ export interface operations {
             };
         };
     };
-    delete_2: {
+    delete_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4564,7 +3676,7 @@ export interface operations {
             };
         };
     };
-    getItems_2: {
+    getItems_1: {
         parameters: {
             query?: {
                 page?: number;
@@ -4590,7 +3702,7 @@ export interface operations {
             };
         };
     };
-    getItem_2: {
+    getItem_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4718,130 +3830,6 @@ export interface operations {
             };
         };
     };
-    getItems_3: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MemberNotificationDto"][];
-                };
-            };
-        };
-    };
-    unreadCount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UnreadCountResBody"];
-                };
-            };
-        };
-    };
-    stream: {
-        parameters: {
-            query?: {
-                lastEventId?: string;
-            };
-            header?: {
-                "Last-Event-ID"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": components["schemas"]["SseEmitter"];
-                };
-            };
-        };
-    };
-    getSnapshot: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SnapshotResBody"];
-                };
-            };
-        };
-    };
-    redirectToProfileImg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Found */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    randomSecureTip: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": string;
-                };
-            };
-        };
-    };
     getAdminProfile: {
         parameters: {
             query?: never;
@@ -4902,7 +3890,7 @@ export interface operations {
             };
         };
     };
-    getItems_4: {
+    getItems_2: {
         parameters: {
             query?: {
                 page?: number;
@@ -4927,7 +3915,7 @@ export interface operations {
             };
         };
     };
-    getItem_3: {
+    getItem_2: {
         parameters: {
             query?: never;
             header?: never;
