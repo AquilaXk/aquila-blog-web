@@ -29,7 +29,7 @@ import {
   OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
   readOptionalTrackingConsent,
 } from "../../src/libs/privacy/optionalTrackingConsentCore"
-import { normalizeNextPath } from "../../src/libs/router"
+import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
 import {
   isCloudSearchPending,
   resolveCloudEmptyTitle,
@@ -107,6 +107,18 @@ test.describe("frontend pure logic contracts", () => {
     expect(normalizeNextPath("/_next/data/build-id/posts/42.json?next=https%3A%2F%2Fevil.example&tag=qa")).toBe(
       "/posts/42?tag=qa"
     )
+  })
+
+  test("admin login next paths remain within the admin surface", () => {
+    expect(normalizeAdminNextPath("/admin/editor/42?surface=compose")).toBe(
+      "/admin/editor/42?surface=compose"
+    )
+    expect(normalizeAdminNextPath("/posts/42", "/admin")).toBe("/admin")
+    expect(normalizeAdminNextPath("https://evil.example/admin", "/admin")).toBe("/admin")
+    expect(toAdminLoginPath("/admin/editor/new")).toBe(
+      "/admin/login?next=%2Fadmin%2Feditor%2Fnew"
+    )
+    expect(toAdminLoginPath("/posts/42", "/admin")).toBe("/admin/login?next=%2Fadmin")
   })
 
   test("backend request paths stay allow-listed and relative", () => {

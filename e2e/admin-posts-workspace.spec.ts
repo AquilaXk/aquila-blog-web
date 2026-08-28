@@ -98,9 +98,8 @@ test.describe("admin posts workspace link contract", () => {
       path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.styles.ts"),
       "utf8"
     )
-    const editorNewPageSource = readFileSync(path.resolve(__dirname, "../src/pages/editor/new.tsx"), "utf8")
-    const editorPostPageSource = readFileSync(path.resolve(__dirname, "../src/pages/editor/[id].tsx"), "utf8")
-    const legacyWriteRedirectSource = readFileSync(path.resolve(__dirname, "../src/pages/admin/posts/write.tsx"), "utf8")
+    const editorNewPageSource = readFileSync(path.resolve(__dirname, "../src/pages/admin/editor/new.tsx"), "utf8")
+    const editorPostPageSource = readFileSync(path.resolve(__dirname, "../src/pages/admin/editor/[id].tsx"), "utf8")
     const controllerRootSource = readFileSync(
       path.resolve(__dirname, "../src/routes/Admin/EditorStudioWorkspaceControllerRoot.tsx"),
       "utf8"
@@ -146,9 +145,7 @@ test.describe("admin posts workspace link contract", () => {
 
     expect(editorNewPageSource).toContain("getEditorStudioPageProps")
     expect(editorPostPageSource).toContain("getEditorStudioPageProps")
-    expect(legacyWriteRedirectSource).toContain('destination: "/editor/new"')
-    expect(legacyWriteRedirectSource).toContain("destination: `/editor/${encodeURIComponent(postId)}`")
-    expect(controllerRootSource).toContain('const isDedicatedEditorRoute = router.pathname.startsWith("/editor")')
+    expect(controllerRootSource).toContain('const isDedicatedEditorRoute = router.pathname.startsWith("/admin/editor")')
     expect(controllerSource).toContain("if (isDedicatedEditorRoute) {")
     expect(controllerSource).toContain("<EditorStudioDedicatedEditorSurface")
     expect(controllerSource).toContain("editorCanvas={dedicatedEditorCanvas}")

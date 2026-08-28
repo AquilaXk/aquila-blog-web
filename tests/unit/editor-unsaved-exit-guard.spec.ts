@@ -79,8 +79,8 @@ test.describe("editor unsaved exit guard helpers", () => {
       })
     ).toBe(false)
 
-    // Unrestored local draft metadata must not make pristine /editor/new dirty
-    // (that would block the automatic replace to /editor/{id}).
+    // Unrestored local draft metadata must not make pristine /admin/editor/new dirty
+    // (that would block the automatic replace to /admin/editor/{id}).
     expect(
       isEditorUnsavedDirtyByFingerprint({
         isSaving: false,
@@ -123,9 +123,9 @@ test.describe("editor unsaved exit guard helpers", () => {
 
   test("allows forced login redirects without blocking", () => {
     clearForcedEditorExitUrl()
-    expect(isForcedEditorExitUrl("/login")).toBe(true)
-    expect(isForcedEditorExitUrl("/login?next=%2Feditor%2F1")).toBe(true)
-    expect(isForcedEditorExitUrl("/editor/1")).toBe(false)
+    expect(isForcedEditorExitUrl("/admin/login")).toBe(true)
+    expect(isForcedEditorExitUrl("/admin/login?next=%2Fadmin%2Feditor%2F1")).toBe(true)
+    expect(isForcedEditorExitUrl("/admin/editor/1")).toBe(false)
     expect(isForcedEditorExitUrl("/admin/posts")).toBe(false)
   })
 
@@ -138,7 +138,7 @@ test.describe("editor unsaved exit guard helpers", () => {
     expect(isForcedEditorExitUrl("/")).toBe(true)
     expect(isForcedEditorExitUrl("/?utm=1")).toBe(true)
     expect(isForcedEditorExitUrl("/admin/posts")).toBe(false)
-    expect(isForcedEditorExitUrl("/login")).toBe(true)
+    expect(isForcedEditorExitUrl("/admin/login")).toBe(true)
 
     clearForcedEditorExitUrl()
     expect(isForcedEditorExitUrl("/")).toBe(false)
@@ -172,27 +172,27 @@ test.describe("editor unsaved exit guard helpers", () => {
   test("allows same-pathname surface query updates without treating them as leaving", () => {
     expect(
       isSamePathEditorSurfaceNavigation(
-        "/editor/1?surface=compose",
-        "/editor/1?surface=manage"
+        "/admin/editor/1?surface=compose",
+        "/admin/editor/1?surface=manage"
       )
     ).toBe(true)
     expect(
-      isSamePathEditorSurfaceNavigation("/editor/1?surface=compose", "/editor/1")
+      isSamePathEditorSurfaceNavigation("/admin/editor/1?surface=compose", "/admin/editor/1")
     ).toBe(true)
     expect(
-      isSamePathEditorSurfaceNavigation("/editor/1?surface=compose", "/editor/2?surface=manage")
+      isSamePathEditorSurfaceNavigation("/admin/editor/1?surface=compose", "/admin/editor/2?surface=manage")
     ).toBe(false)
-    expect(isSamePathEditorSurfaceNavigation("/editor/1", "/admin/posts")).toBe(false)
+    expect(isSamePathEditorSurfaceNavigation("/admin/editor/1", "/admin/posts")).toBe(false)
   })
 
-  test("allows studio bootstrap navigation from /editor/new to /editor/{id}", () => {
-    expect(isEditorStudioBootstrapNavigation("/editor/new", "/editor/42")).toBe(true)
+  test("allows studio bootstrap navigation from /admin/editor/new to /admin/editor/{id}", () => {
+    expect(isEditorStudioBootstrapNavigation("/admin/editor/new", "/admin/editor/42")).toBe(true)
     expect(
-      isEditorStudioBootstrapNavigation("/editor/new?source=local-draft", "/editor/42?returnTo=%2Fadmin%2Fposts")
+      isEditorStudioBootstrapNavigation("/admin/editor/new?source=local-draft", "/admin/editor/42?returnTo=%2Fadmin%2Fposts")
     ).toBe(true)
-    expect(isEditorStudioBootstrapNavigation("/editor/new", "/editor/new")).toBe(false)
-    expect(isEditorStudioBootstrapNavigation("/editor/new", "/admin/posts")).toBe(false)
-    expect(isEditorStudioBootstrapNavigation("/editor/1", "/editor/2")).toBe(false)
+    expect(isEditorStudioBootstrapNavigation("/admin/editor/new", "/admin/editor/new")).toBe(false)
+    expect(isEditorStudioBootstrapNavigation("/admin/editor/new", "/admin/posts")).toBe(false)
+    expect(isEditorStudioBootstrapNavigation("/admin/editor/1", "/admin/editor/2")).toBe(false)
   })
 
   test("active clear on route abort preserves scheduled forced-exit marks", () => {
@@ -229,20 +229,20 @@ test.describe("editor unsaved exit guard helpers", () => {
       options: {},
     })
     expect(
-      resolveEditorRouteNavigationRetry("/editor/1?panel=preview", {
+      resolveEditorRouteNavigationRetry("/admin/editor/1?panel=preview", {
         method: "replace",
         shallow: true,
         scroll: false,
       })
     ).toEqual({
-      url: "/editor/1?panel=preview",
+      url: "/admin/editor/1?panel=preview",
       method: "replace",
       options: { shallow: true, scroll: false },
     })
     expect(
-      resolveEditorRouteNavigationRetry("/editor/2", defaultEditorRouteNavigationIntent())
+      resolveEditorRouteNavigationRetry("/admin/editor/2", defaultEditorRouteNavigationIntent())
     ).toEqual({
-      url: "/editor/2",
+      url: "/admin/editor/2",
       method: "push",
       options: {},
     })
@@ -272,8 +272,8 @@ test.describe("editor unsaved exit guard helpers", () => {
   test("restores editor URL after a blocked history pop with preserved Next history state", () => {
     const calls: Array<{ state: unknown; url: string }> = []
     const editorNextState = {
-      url: "/editor/1?surface=compose",
-      as: "/editor/1?surface=compose",
+      url: "/admin/editor/1?surface=compose",
+      as: "/admin/editor/1?surface=compose",
       options: {},
       __N: true,
       key: "editor-key",
@@ -293,16 +293,16 @@ test.describe("editor unsaved exit guard helpers", () => {
     }
 
     restoreEditorUrlAfterBlockedHistoryPop(
-      "/editor/1?surface=compose",
+      "/admin/editor/1?surface=compose",
       history,
       editorNextState
     )
-    expect(calls).toEqual([{ state: editorNextState, url: "/editor/1?surface=compose" }])
+    expect(calls).toEqual([{ state: editorNextState, url: "/admin/editor/1?surface=compose" }])
 
     calls.length = 0
-    restoreEditorUrlAfterBlockedHistoryPop("/editor/1", history)
-    expect(calls).toEqual([{ state: destinationState, url: "/editor/1" }])
+    restoreEditorUrlAfterBlockedHistoryPop("/admin/editor/1", history)
+    expect(calls).toEqual([{ state: destinationState, url: "/admin/editor/1" }])
 
-    expect(() => restoreEditorUrlAfterBlockedHistoryPop("/editor/1", null)).not.toThrow()
+    expect(() => restoreEditorUrlAfterBlockedHistoryPop("/admin/editor/1", null)).not.toThrow()
   })
 })

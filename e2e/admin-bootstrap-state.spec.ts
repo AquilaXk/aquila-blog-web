@@ -41,8 +41,9 @@ test.describe("admin bootstrap state contract", () => {
     expect(adminPageSource).toContain("import { serverApiFetchJson } from \"./backend\"")
     expect(adminPageSource).toContain("const value = await serverApiFetchJson<T>(req, path)")
     expect(adminPageSource).toContain("const shouldDeferRedirectToFallback = hasServerAuthCookie(req)")
+    expect(adminPageSource).toContain('import { normalizeAdminNextPath, toAdminLoginPath } from "src/libs/router"')
     expect(adminPageSource).toMatch(
-      /destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*toLoginPath\(normalizeNextPath\(req\.url, fallbackPath\), fallbackPath\)/
+      /destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*toAdminLoginPath\(normalizeAdminNextPath\(req\.url, fallbackPath\), fallbackPath\)/
     )
     expect(adminPageSource).toMatch(/destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*"\/"/)
     expect(adminPageSource).not.toMatch(/if\s*\(\s*!response\.ok\s*\)\s*\{\s*return\s*\{\s*ok:\s*false,\s*destination:\s*null/)

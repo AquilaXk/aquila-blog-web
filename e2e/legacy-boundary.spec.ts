@@ -58,4 +58,13 @@ test.describe("frontend legacy boundary", () => {
     expect(frontPathExists("src/routes/Detail/index.tsx")).toBe(false)
     expect(frontPathExists("src/routes/Detail/PageDetail/index.tsx")).toBe(false)
   })
+
+  test("public auth and legacy editor page entrypoints are removed without redirects", () => {
+    expect(frontPathExists("src/pages/login.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/editor")).toBe(false)
+    expect(frontPathExists("src/pages/admin/posts/write.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/admin/editor/index.tsx")).toBe(true)
+    expect(frontPathExists("src/pages/admin/editor/new.tsx")).toBe(true)
+    expect(frontPathExists("src/pages/admin/editor/[id].tsx")).toBe(true)
+  })
 })
