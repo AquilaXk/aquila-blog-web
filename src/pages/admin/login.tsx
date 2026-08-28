@@ -1,7 +1,7 @@
 import styled from "@emotion/styled"
 import type { GetServerSideProps, NextPage } from "next"
 import { useRouter } from "next/router"
-import { type FormEvent, useMemo, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { toAuthErrorMessage } from "src/apis/backend/errorMessages"
 import type { AuthMember } from "src/hooks/useAuthSession"
@@ -13,6 +13,9 @@ import { isValidAuthEmail, normalizeAuthEmail } from "src/libs/validation/auth"
 type AdminLoginPageProps = {
   nextPath: string
 }
+
+const ADMIN_SAVED_EMAIL_STORAGE_KEY = "auth.admin.savedEmail.v1"
+const ADMIN_KEEP_SIGNED_IN_STORAGE_KEY = "auth.admin.keepSignedIn.v1"
 
 export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> = withSsrMetrics<AdminLoginPageProps>(
   "auth",
@@ -47,8 +50,50 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   )
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [saveEmail, setSaveEmail] = useState(false)
+  const [keepSignedIn, setKeepSignedIn] = useState(true)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    try {
+      const savedEmail = window.localStorage.getItem(ADMIN_SAVED_EMAIL_STORAGE_KEY)
+      const savedKeepSignedIn = window.localStorage.getItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY)
+      if (savedEmail) {
+        setEmail(normalizeAuthEmail(savedEmail))
+        setSaveEmail(true)
+      }
+      if (savedKeepSignedIn === "true" || savedKeepSignedIn === "false") {
+        setKeepSignedIn(savedKeepSignedIn === "true")
+      } else {
+        window.localStorage.setItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY, "true")
+      }
+    } catch {
+      // Browser storage is optional for login preferences.
+    }
+  }, [])
+
+  const updateSavedEmail = (value: string, shouldSave: boolean) => {
+    try {
+      const normalizedEmail = normalizeAuthEmail(value)
+      if (shouldSave && normalizedEmail && isValidAuthEmail(normalizedEmail)) {
+        window.localStorage.setItem(ADMIN_SAVED_EMAIL_STORAGE_KEY, normalizedEmail)
+        return
+      }
+      window.localStorage.removeItem(ADMIN_SAVED_EMAIL_STORAGE_KEY)
+    } catch {
+      // Browser storage is optional for login preferences.
+    }
+  }
+
+  const updateKeepSignedIn = (value: boolean) => {
+    setKeepSignedIn(value)
+    try {
+      window.localStorage.setItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY, String(value))
+    } catch {
+      // Browser storage is optional for login preferences.
+    }
+  }
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -66,9 +111,10 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
 
     setLoading(true)
     try {
+      updateSavedEmail(normalizedEmail, saveEmail)
       await apiFetch("/member/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email: normalizedEmail, password }),
+        body: JSON.stringify({ email: normalizedEmail, password, rememberMe: keepSignedIn }),
       })
 
       let member: AuthMember & { admin?: boolean }
@@ -108,7 +154,10 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
             <LoginInput
               autoComplete="email"
               disabled={loading}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value)
+                updateSavedEmail(event.target.value, saveEmail)
+              }}
               type="email"
               value={email}
             />
@@ -123,6 +172,27 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
               value={password}
             />
           </LoginField>
+          <LoginPreference>
+            <input
+              checked={saveEmail}
+              disabled={loading}
+              onChange={(event) => {
+                setSaveEmail(event.target.checked)
+                updateSavedEmail(email, event.target.checked)
+              }}
+              type="checkbox"
+            />
+            <span>아이디 저장</span>
+          </LoginPreference>
+          <LoginPreference>
+            <input
+              checked={keepSignedIn}
+              disabled={loading}
+              onChange={(event) => updateKeepSignedIn(event.target.checked)}
+              type="checkbox"
+            />
+            <span>로그인 유지</span>
+          </LoginPreference>
           {error ? <LoginError role="alert">{error}</LoginError> : null}
           <LoginSubmit disabled={loading} type="submit">
             {loading ? "로그인 중..." : "로그인"}
@@ -193,6 +263,14 @@ const LoginInput = styled.input`
 const LoginError = styled.p`
   margin: 0;
   color: ${({ theme }) => theme.colors.red11};
+  font-size: 0.9rem;
+`
+
+const LoginPreference = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.9rem;
 `
 

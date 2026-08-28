@@ -34,6 +34,13 @@ export type BrowserStorageRegistryEntry = {
   stores: string
 }
 
+const retiredPublicLoginPreferenceMetadata = {
+  area: "localStorage" as const,
+  required: false,
+  retention: "until login preference changes or browser storage is cleared",
+  deletion: "login preference change or browser storage deletion",
+}
+
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   {
     area: "cookie",
@@ -117,22 +124,34 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "JSON consent record with version, granted or denied state, timestamp, source, and analytics/RUM categories",
   },
   {
-    area: "localStorage",
+    ...retiredPublicLoginPreferenceMetadata,
     key: "auth.login.keepSignedIn",
     purpose: "login-preference",
+    stores: "boolean remember-login preference",
+  },
+  {
+    ...retiredPublicLoginPreferenceMetadata,
+    key: "auth.login.ipSecurityOn",
+    purpose: "login-security-preference",
+    stores: "boolean IP security preference",
+  },
+  {
+    area: "localStorage",
+    key: "auth.admin.savedEmail.v1",
+    purpose: "admin-login-saved-email",
+    required: false,
+    retention: "until saved email changes, is deselected, or browser storage is cleared",
+    deletion: "saved email deselection, replacement, or browser storage deletion",
+    stores: "normalized administrator email address only",
+  },
+  {
+    area: "localStorage",
+    key: "auth.admin.keepSignedIn.v1",
+    purpose: "admin-login-persistence-preference",
     required: false,
     retention: "until login preference changes or browser storage is cleared",
     deletion: "login preference change or browser storage deletion",
     stores: "boolean remember-login preference",
-  },
-  {
-    area: "localStorage",
-    key: "auth.login.ipSecurityOn",
-    purpose: "login-security-preference",
-    required: false,
-    retention: "until login preference changes or browser storage is cleared",
-    deletion: "login preference change or browser storage deletion",
-    stores: "boolean IP security preference",
   },
   {
     area: "localStorage",
