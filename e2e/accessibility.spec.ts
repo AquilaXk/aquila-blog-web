@@ -398,7 +398,7 @@ test("상세 본문의 200% zoom 상태는 심각도 높은 접근성 위반이 
   await expectLaunchGateAccessibility(page, testInfo, "detail-content-zoom")
 })
 
-test("모바일 header와 login modal은 keyboard-only 진입에서 심각도 높은 접근성 위반이 없다", async ({
+test("모바일 header와 관리자 로그인은 keyboard-only 진입에서 심각도 높은 접근성 위반이 없다", async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 393, height: 852 })
@@ -420,13 +420,23 @@ test("모바일 header와 login modal은 keyboard-only 진입에서 심각도 �
   await expect(menuButton).toHaveAttribute("aria-expanded", "false")
 
   await page.setViewportSize({ width: 1024, height: 768 })
-  await page.locator('[data-ui="nav-control"].loginLink').click()
+  await page.goto("/admin/login")
 
-  const loginDialog = page.getByRole("dialog", { name: "로그인" })
-  await expect(loginDialog).toBeVisible()
-  await expect(loginDialog.getByLabel("이메일")).toBeVisible()
+  const adminLoginHeading = page.getByRole("heading", { name: "관리자 로그인" })
+  const emailField = page.getByLabel("이메일")
+  const passwordField = page.getByLabel("비밀번호")
+  const submitButton = page.getByRole("button", { name: "로그인", exact: true })
+  await expect(adminLoginHeading).toBeVisible()
+  await expect(emailField).toBeVisible()
+  await emailField.focus()
+  await expect(emailField).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(passwordField).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(submitButton).toBeFocused()
+  await expectPrimaryLandmarks(page)
   await expectNoHorizontalOverflow(page)
-  await expectLaunchGateAccessibility(page, testInfo, "login-modal")
+  await expectLaunchGateAccessibility(page, testInfo, "admin-login")
 })
 
 test("관리자 글 목록 surface는 심각도 높은 접근성 위반이 없다", async ({ page }, testInfo) => {

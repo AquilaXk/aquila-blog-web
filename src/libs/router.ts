@@ -117,17 +117,25 @@ export const normalizeNextPath = (input: NextPathInput, fallback = "/"): string 
   return value
 }
 
-const isAdminNextPath = (value: string) => {
-  const pathname = value.split(/[?#]/, 1)[0] || ""
-  if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) return false
-  return pathname === "/admin" || pathname.startsWith("/admin/")
+const canonicalizeAdminNextPath = (value: string): string | null => {
+  let url: URL
+  try {
+    url = new URL(value, "https://admin.invalid")
+  } catch {
+    return null
+  }
+
+  const pathname = url.pathname
+  if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) return null
+  if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return null
+  return `${pathname}${url.search}${url.hash}`
 }
 
 export const normalizeAdminNextPath = (input: NextPathInput, fallback = "/admin"): string => {
   const normalizedFallback = normalizeNextPath(fallback, "/admin")
-  const safeFallback = isAdminNextPath(normalizedFallback) ? normalizedFallback : "/admin"
+  const safeFallback = canonicalizeAdminNextPath(normalizedFallback) ?? "/admin"
   const normalized = normalizeNextPath(input, safeFallback)
-  return isAdminNextPath(normalized) ? normalized : safeFallback
+  return canonicalizeAdminNextPath(normalized) ?? safeFallback
 }
 
 export const toAdminLoginPath = (nextPath: NextPathInput, fallback = "/admin") =>

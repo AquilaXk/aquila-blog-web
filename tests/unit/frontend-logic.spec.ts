@@ -119,6 +119,11 @@ test.describe("frontend pure logic contracts", () => {
       "/admin/login?next=%2Fadmin%2Feditor%2Fnew"
     )
     expect(toAdminLoginPath("/posts/42", "/admin")).toBe("/admin/login?next=%2Fadmin")
+    expect(normalizeAdminNextPath("/admin/./login")).toBe("/admin")
+    expect(normalizeAdminNextPath("/admin/../posts/42")).toBe("/admin")
+    expect(normalizeAdminNextPath("/admin/posts/../editor/new?draft=1#title")).toBe(
+      "/admin/editor/new?draft=1#title"
+    )
   })
 
   test("backend request paths stay allow-listed and relative", () => {

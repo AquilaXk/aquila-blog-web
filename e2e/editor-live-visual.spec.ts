@@ -23,8 +23,11 @@ import {
 
 const uiLoginId = adminEmail || adminLegacyLoginId
 const hasUiLoginCredentials = Boolean(uiLoginId && adminPassword)
-const editorOrAdminUrlPattern = /\/(admin|editor)(\/|$|\?)/
-const editorUrlPattern = /\/admin/editor(\/|$|\?)/
+const editorOrAdminUrlPattern = /\/admin(\/|$|\?)/
+const adminLoginUrlPattern = /\/admin\/login(\/|$|\?)/
+const isAuthenticatedEditorOrAdminUrl = (value: string) =>
+  editorOrAdminUrlPattern.test(value) && !adminLoginUrlPattern.test(value)
+const editorUrlPattern = /\/admin\/editor(\/|$|\?)/
 const expectedFrontendCommitSha = process.env.E2E_EXPECTED_FRONT_COMMIT_SHA?.trim() || ""
 const liveEditor507CanaryEnabled = process.env.E2E_LIVE_EDITOR_507_CANARY === "true"
 const liveEditor507SeededHosts = new Set(
@@ -90,7 +93,7 @@ const gotoLoginForEditor = async (page: Page, timeoutMs: number) => {
   }
 
   if (editorUrlPattern.test(page.url())) return "editor" as const
-  if (/\/admin/login(\/|$|\?)/.test(page.url())) return "login" as const
+  if (/\/admin\/login(\/|$|\?)/.test(page.url())) return "login" as const
 
   try {
     await page.waitForURL(/\/(admin\/login|admin\/editor)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
@@ -129,7 +132,7 @@ const waitForUiLoginOutcome = async (
   while (Date.now() - startedAt < timeoutMs) {
     const observedLoginResponse = getObservedLoginResponse()
     if (observedLoginResponse) return { kind: "response", ...observedLoginResponse }
-    if (editorOrAdminUrlPattern.test(page.url())) return { kind: "editor-url" }
+    if (isAuthenticatedEditorOrAdminUrl(page.url())) return { kind: "editor-url" }
     if (await hasAuthCookie(page)) return { kind: "auth-cookie" }
 
     const loginError = await getVisibleUiLoginError(page)
@@ -140,7 +143,7 @@ const waitForUiLoginOutcome = async (
 
   const observedLoginResponse = getObservedLoginResponse()
   if (observedLoginResponse) return { kind: "response", ...observedLoginResponse }
-  if (editorOrAdminUrlPattern.test(page.url())) return { kind: "editor-url" }
+  if (isAuthenticatedEditorOrAdminUrl(page.url())) return { kind: "editor-url" }
   if (await hasAuthCookie(page)) return { kind: "auth-cookie" }
 
   const loginError = await getVisibleUiLoginError(page)
@@ -395,7 +398,7 @@ test.describe("editor live visual regression", () => {
       liveUiRedirectTimeoutMs,
       quickReconsentProbeTimeoutMs
     )
-    await page.waitForURL(/\/admin/editor(\/|$)/, { timeout: 30_000 })
+    await page.waitForURL(/\/admin\/editor(\/|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
     await expectMarkdownEditorShell(page)
     await expect(page.getByRole("tab", { name: "Split" })).toHaveAttribute("aria-selected", "true")

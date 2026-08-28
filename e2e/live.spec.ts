@@ -32,6 +32,9 @@ const adminProfileHeadingPattern = /^개인정보와 계정 설정$/
 const adminToolsHeadingPattern = /^운영 상태와 복구$/
 const adminPostsHeadingPattern = /^글 관리$/
 const adminUrlPattern = /\/admin(\/|$|\?)/
+const adminLoginUrlPattern = /\/admin\/login(\/|$|\?)/
+const isAuthenticatedAdminUrl = (value: string) =>
+  adminUrlPattern.test(value) && !adminLoginUrlPattern.test(value)
 
 
 const isWebKitCorsAccessControlNoise = (message: string) =>
@@ -51,10 +54,10 @@ const tryEnterAdminRoute = async (page: Page, timeoutMs: number) => {
     }
 
     if (await completeLegalReconsentIfRequired(page, "/admin", timeoutMs, quickReconsentProbeTimeoutMs)) return true
-    if (adminUrlPattern.test(page.url())) return true
+    if (isAuthenticatedAdminUrl(page.url())) return true
 
     try {
-      await page.waitForURL(adminUrlPattern, { timeout: perTryTimeout })
+      await page.waitForURL((url) => isAuthenticatedAdminUrl(url.toString()), { timeout: perTryTimeout })
       if (await completeLegalReconsentIfRequired(page, "/admin", timeoutMs, quickReconsentProbeTimeoutMs)) return true
       return true
     } catch {
@@ -74,8 +77,8 @@ const gotoLoginForAdmin = async (page: Page, timeoutMs: number) => {
     if (!isNavigationInterruptedError(error)) throw error
   }
 
-  if (/\/admin(\/|$)/.test(page.url())) return "admin" as const
-  if (/\/admin/login(\/|$|\?)/.test(page.url())) return "login" as const
+  if (isAuthenticatedAdminUrl(page.url())) return "admin" as const
+  if (/\/admin\/login(\/|$|\?)/.test(page.url())) return "login" as const
 
   try {
     await page.waitForURL(/\/(admin\/login|admin)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
@@ -83,7 +86,7 @@ const gotoLoginForAdmin = async (page: Page, timeoutMs: number) => {
     // keep current url and let caller decide by assertion/retry.
   }
 
-  if (/\/admin(\/|$)/.test(page.url())) return "admin" as const
+  if (isAuthenticatedAdminUrl(page.url())) return "admin" as const
   return "login" as const
 }
 
@@ -117,7 +120,7 @@ const waitForUiLoginOutcome = async (
       return { kind: "response", response: observedLoginResponse }
     }
 
-    if (adminUrlPattern.test(page.url())) {
+    if (isAuthenticatedAdminUrl(page.url())) {
       return { kind: "admin-url" }
     }
 
@@ -138,7 +141,7 @@ const waitForUiLoginOutcome = async (
     return { kind: "response", response: observedLoginResponse }
   }
 
-  if (adminUrlPattern.test(page.url())) {
+  if (isAuthenticatedAdminUrl(page.url())) {
     return { kind: "admin-url" }
   }
 
@@ -367,7 +370,7 @@ const loginThroughUi = async (
         throw new Error(`UI login request failed. ${lastFailure}`)
       }
 
-      if (adminUrlPattern.test(page.url())) {
+      if (isAuthenticatedAdminUrl(page.url())) {
         await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
         return
       }
@@ -433,7 +436,7 @@ const authenticateLiveAdmin = async (page: Page, apiBaseUrl: string) => {
 }
 
 const isVisibleLoginPage = async (page: Page) => {
-  if (/\/admin/login(\/|$|\?)/.test(page.url())) return true
+  if (/\/admin\/login(\/|$|\?)/.test(page.url())) return true
   return page.getByRole("heading", { name: "로그인" }).isVisible().catch(() => false)
 }
 
@@ -578,7 +581,7 @@ test.describe("live production e2e", () => {
 
   test("비로그인 사용자는 /admin 접근 시 로그인 페이지로 이동한다", async ({ page }) => {
     await page.goto("/admin")
-    await expect(page).toHaveURL(/\/admin/login/)
+    await expect(page).toHaveURL(/\/admin\/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
   })
 
@@ -591,7 +594,7 @@ test.describe("live production e2e", () => {
     await expect(page.getByRole("heading", { name: adminLandingHeadingPattern })).toBeVisible()
 
     await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/admin/login/)
+    await expect(page).toHaveURL(/\/admin\/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
   })
 
@@ -735,7 +738,7 @@ test.describe("live production e2e", () => {
     }
 
     await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/admin/login/)
+    await expect(page).toHaveURL(/\/admin\/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
 
     const ignorablePatterns = [

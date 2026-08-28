@@ -385,7 +385,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   }
 })
 
-  test("공개와 인증 핵심 화면은 system light V4 표면 계층을 유지한다", async ({ page }) => {
+  test("공개와 관리자 로그인 화면은 system light V4 표면 계층을 유지한다", async ({ page }) => {
   test.setTimeout(60_000)
   await mockFeedEndpoints(page, {
     adminProfile: {
@@ -403,7 +403,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     { route: "/posts/991", viewport: { width: 393, height: 852 } },
     { route: "/posts/991", viewport: { width: 768, height: 1024 } },
   ] as const
-  const authScenarios = [
+  const adminLoginScenarios = [
     { route: "/admin/login", viewport: { width: 1440, height: 900 } },
     { route: "/admin/login", viewport: { width: 393, height: 852 } },
     { route: "/admin/login", viewport: { width: 768, height: 1024 } },
@@ -443,7 +443,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     }
   }
 
-  for (const scenario of authScenarios) {
+  for (const scenario of adminLoginScenarios) {
     await applySchemePreference(page, "light")
     await page.setViewportSize(scenario.viewport)
     await gotoForPerf(page, scenario.route)
@@ -453,14 +453,27 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       })
       .toBe(v4PaperBackground)
     const fingerprint = await getThemeSurfaceFingerprint(page)
+    const loginPanel = page.getByRole("heading", { name: "관리자 로그인" }).locator("..")
+    await expect(loginPanel).toBeVisible()
+    const loginSurface = await loginPanel.evaluate((panel) => {
+      const style = getComputedStyle(panel)
+      return {
+        background: style.backgroundColor,
+        width: panel.getBoundingClientRect().width,
+        viewportWidth: window.innerWidth,
+        htmlScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+      }
+    })
     expect(fingerprint.route).toBe(scenario.route)
     expect(fingerprint.bodyBg).toBe(v4PaperBackground)
-    expect(fingerprint.headerBg).not.toBeNull()
-    expect(fingerprint.headerBg).not.toBe("rgb(255, 255, 255)")
-    expect(fingerprint.headerBg).not.toBe(fingerprint.bodyBg)
+    expect(fingerprint.headerBg).toBeNull()
     expect(fingerprint.themeToggleLabel).toBeNull()
-    // 패밀리룩(1219): 인증 셸은 라운드 카드 → 투명 에디토리얼 컬럼. 카드 면/보더가 없어야 한다.
-    expect(fingerprint.authShellBg).toBe("rgba(0, 0, 0, 0)")
+    expect(fingerprint.authShellBg).toBeNull()
+    expect(loginSurface.background).not.toBe("rgba(0, 0, 0, 0)")
+    expect(loginSurface.width).toBeLessThanOrEqual(loginSurface.viewportWidth)
+    expect(loginSurface.htmlScrollWidth).toBeLessThanOrEqual(loginSurface.viewportWidth)
+    expect(loginSurface.bodyScrollWidth).toBeLessThanOrEqual(loginSurface.viewportWidth)
   }
 })
 })

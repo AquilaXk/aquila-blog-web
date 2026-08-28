@@ -5,7 +5,7 @@ import { type FormEvent, useMemo, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { toAuthErrorMessage } from "src/apis/backend/errorMessages"
 import type { AuthMember } from "src/hooks/useAuthSession"
-import { normalizeAdminNextPath } from "src/libs/router"
+import { normalizeAdminNextPath, toLegalReconsentPath } from "src/libs/router"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { isValidAuthEmail, normalizeAuthEmail } from "src/libs/validation/auth"
@@ -87,6 +87,15 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           return
         }
         setError("관리자 권한이 필요한 페이지입니다.")
+        return
+      }
+
+      if (!member.legalReconsent) {
+        setError("법적 동의 상태를 확인하지 못했습니다. 다시 로그인해주세요.")
+        return
+      }
+      if (member.legalReconsent.required) {
+        window.location.assign(toLegalReconsentPath(destination, "/admin"))
         return
       }
 
