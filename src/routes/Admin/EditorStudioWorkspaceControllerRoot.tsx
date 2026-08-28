@@ -129,8 +129,6 @@ export const EditorStudioWorkspaceController = ({
   const [postVersion, setPostVersion] = useState<number | null>(null)
   const [editorMode, setEditorMode] = useState<EditorMode>("create")
   const [isTempDraftMode, setIsTempDraftMode] = useState(false)
-  const [commentId, setCommentId] = useState("1")
-  const [commentContent, setCommentContent] = useState("")
   const [postTitle, setPostTitle] = useState("")
   const [postContent, setPostContent] = useState("")
   const deferredPostContent = useDeferredValue(postContent)
@@ -359,18 +357,10 @@ export const EditorStudioWorkspaceController = ({
   })
 
   const {
-    handleDeleteComment,
     handleHitPost,
-    handleLikePost,
-    handleListComments,
-    handleModifyComment,
-    handleReadComment,
     handleReadPostCount,
     handleReadSystemHealth,
-    handleWriteComment,
   } = useEditorStudioUtilityCommands({
-    commentContent,
-    commentId,
     postId,
     run,
   })
@@ -912,17 +902,17 @@ export const EditorStudioWorkspaceController = ({
       props={{
         activeMetaPanel, addTagsToPost, addTagToPost, adminPostRows, adminPostTotal,
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
-        closePublishModal, commentContent, commentId, commitPreviewThumbTransform, copyPostDetailLink,
+        closePublishModal, commitPreviewThumbTransform, copyPostDetailLink,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePreviewSummary, handlePostSummaryChange,
-        handleCreateNewPostFromSelectedPanel, handleDeleteComment, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
-        handleLikePost, handleListComments, handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
-        handleLoadOrCreateTempPost, handleModifyComment, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
-        handleReadComment, handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
+        handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
+        handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
+        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
+        handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
         handleSelectedPostIdChange, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange, handleTitleChange,
-        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard, handleWriteComment,
+        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard,
         hardDeleteDeletedPostFromList, isAllVisiblePostsSelected, isCompactMobileLayout, isComposeAssistOpen, isComposeUtilityOpen,
         isDedicatedEditorRoute, isDedicatedNewEditorRoute, isDirectLoadOpen, isListAdvancedOpen, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen,
@@ -940,7 +930,7 @@ export const EditorStudioWorkspaceController = ({
         removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
         saveLocalDraft,
         selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
-        setCommentContent, setCommentId, setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
+        setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
         setIsMobileMetaEditorOpen,
         setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
         setMobileComposeStep,

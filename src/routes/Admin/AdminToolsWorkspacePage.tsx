@@ -36,7 +36,6 @@ import {
   type AdminToolsPageProps,
   type ApiRsData,
   type AuthSecurityEvent,
-  type PageDto,
   type SignupMailDiagnostics,
   type TaskQueueDiagnostics,
   type UploadedFileCleanupDiagnostics,
@@ -51,9 +50,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
   const [executions, setExecutions] = useState<ExecutionEntry[]>([])
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null)
   const [resultsFilter, setResultsFilter] = useState<ExecutionResultFilter>("all")
-  const [postId, setPostId] = useState(initialSnapshot.seedPostId)
-  const [commentId, setCommentId] = useState("1")
-  const [commentContent, setCommentContent] = useState("운영 테스트 댓글")
   const [mailDiagnostics, setMailDiagnostics] = useState<SignupMailDiagnostics | null>(initialSnapshot.mailDiagnostics)
   const [mailDiagnosticsError, setMailDiagnosticsError] = useState("")
   const [taskQueueDiagnostics, setTaskQueueDiagnostics] = useState<TaskQueueDiagnostics | null>(
@@ -79,9 +75,7 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
     text: "",
   })
   const [freshnessClock, setFreshnessClock] = useState<number | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [advancedToolsOpen, setAdvancedToolsOpen] = useState(false)
-  const [isMutationExpanded, setIsMutationExpanded] = useState(false)
   const systemHealthQuery = useQuery({
     queryKey: SYSTEM_HEALTH_QUERY_KEY,
     queryFn: async (): Promise<SystemHealthPayload> => apiFetch<SystemHealthPayload>("/system/api/v1/adm/health"),
@@ -161,22 +155,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
       setLoadingKey("")
     }
   }, [pushExecution])
-
-  const parsePositiveInt = (value: string, label: string) => {
-    const parsed = Number(value)
-    if (!Number.isInteger(parsed) || parsed < 1) {
-      throw new Error(`${label}는 1 이상의 정수여야 합니다.`)
-    }
-    return parsed
-  }
-
-  const requireCommentContent = () => {
-    const content = commentContent.trim()
-    if (content.length < 2) {
-      throw new Error("댓글 내용은 2자 이상 입력해주세요.")
-    }
-    return content
-  }
 
   const fetchSignupMailDiagnostics = useCallback(async (checkConnection = false) => {
     const actionKey = checkConnection ? "mailConnectivity" : "mailStatus"
@@ -289,31 +267,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
     sessionMember?.isAdmin,
     taskQueueDiagnostics,
   ])
-
-  useEffect(() => {
-    if (!sessionMember?.isAdmin || postId.trim() || activeSection !== "execution" || !isMutationExpanded || loadingKey === "seedPostId") return
-
-    void executeAction(
-      "seedPostId",
-      async () => {
-        const [publicPostsResult, adminPostsResult] = await Promise.allSettled([
-          apiFetch<PageDto<{ id: number }>>("/post/api/v1/posts?page=1&pageSize=1&sort=CREATED_AT"),
-          apiFetch<PageDto<{ id: number }>>("/post/api/v1/adm/posts?page=1&pageSize=1&sort=CREATED_AT"),
-        ])
-        const firstPublicPostId =
-          publicPostsResult.status === "fulfilled" ? publicPostsResult.value?.content?.[0]?.id : undefined
-        const firstAdminPostId =
-          adminPostsResult.status === "fulfilled" ? adminPostsResult.value?.content?.[0]?.id : undefined
-
-        return { id: firstPublicPostId ?? firstAdminPostId ?? null }
-      },
-      {
-        onSuccess: (result) => {
-          if (result?.id != null) setPostId(String(result.id))
-        },
-      }
-    )
-  }, [activeSection, executeAction, isMutationExpanded, loadingKey, postId, sessionMember?.isAdmin])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -551,12 +504,11 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
 
   const focusSection = (section: SectionKey, tab?: DiagnosticTab) => {
     if (tab) setActiveDiagnosticTab(tab)
-    if (section === "mutation") setIsMutationExpanded(true)
     setActiveSection(section)
     setSectionJumpTarget(section)
   }
   if (!sessionMember) return null
-  const toolsWorkspaceSectionProps = { queryClient, sessionMember, loadingKey, setLoadingKey, executions, setExecutions, selectedExecutionId, setSelectedExecutionId, resultsFilter, setResultsFilter, postId, setPostId, commentId, setCommentId, commentContent, setCommentContent, mailDiagnostics, setMailDiagnostics, mailDiagnosticsError, setMailDiagnosticsError, taskQueueDiagnostics, setTaskQueueDiagnostics, taskQueueDiagnosticsError, setTaskQueueDiagnosticsError, taskQueueCheckedAt, setTaskQueueCheckedAt, cleanupDiagnostics, setCleanupDiagnostics, cleanupDiagnosticsError, setCleanupDiagnosticsError, cleanupCheckedAt, setCleanupCheckedAt, authSecurityEvents, setAuthSecurityEvents, authSecurityEventsError, setAuthSecurityEventsError, authSecurityCheckedAt, setAuthSecurityCheckedAt, systemHealthCheckedAt, setSystemHealthCheckedAt, activeSection, setActiveSection, sectionJumpTarget, setSectionJumpTarget, activeDiagnosticTab, setActiveDiagnosticTab, testEmail, setTestEmail, mailTestNotice, setMailTestNotice, freshnessClock, setFreshnessClock, confirmDelete, setConfirmDelete, advancedToolsOpen, setAdvancedToolsOpen, isMutationExpanded, setIsMutationExpanded, systemHealthQuery, dashboardSnapshot: dashboardSnapshotQuery.data ?? null, fetchSystemHealthCached, pushExecution, executeAction, parsePositiveInt, requireCommentContent, fetchSignupMailDiagnostics, sendSignupTestMail, fetchTaskQueueDiagnostics, fetchCleanupDiagnostics, fetchAuthSecurityEvents, filteredExecutions, resultFilterCounts, selectedExecution, rawSystemHealthStatus, hasSystemHealthStatus, isSystemHealthConnectionUnavailable, systemHealthStatus, mailFreshness, taskQueueFreshness, cleanupFreshness, authFreshness, systemHealthFreshness, systemHealthSummary, systemHealthFetchedAt, isMailLoading, isQueueLoading, isCleanupLoading, isAuthLoading, hasMailDiagnostics, hasTaskQueueDiagnostics, hasCleanupDiagnostics, hasAuthDiagnostics, mailStatusLabel, signupMailTaskQueue, signupMailQueueStatusLabel, signupMailQueueStatusMessage, queueStatusLabel, cleanupStatusLabel, authSecurityStatusLabel, recentCheckedLabel, overviewStatusLabel, attentionItems, quickLinks, focusSection }
+  const toolsWorkspaceSectionProps = { queryClient, sessionMember, loadingKey, setLoadingKey, executions, setExecutions, selectedExecutionId, setSelectedExecutionId, resultsFilter, setResultsFilter, mailDiagnostics, setMailDiagnostics, mailDiagnosticsError, setMailDiagnosticsError, taskQueueDiagnostics, setTaskQueueDiagnostics, taskQueueDiagnosticsError, setTaskQueueDiagnosticsError, taskQueueCheckedAt, setTaskQueueCheckedAt, cleanupDiagnostics, setCleanupDiagnostics, cleanupDiagnosticsError, setCleanupDiagnosticsError, cleanupCheckedAt, setCleanupCheckedAt, authSecurityEvents, setAuthSecurityEvents, authSecurityEventsError, setAuthSecurityEventsError, authSecurityCheckedAt, setAuthSecurityCheckedAt, systemHealthCheckedAt, setSystemHealthCheckedAt, activeSection, setActiveSection, sectionJumpTarget, setSectionJumpTarget, activeDiagnosticTab, setActiveDiagnosticTab, testEmail, setTestEmail, mailTestNotice, setMailTestNotice, freshnessClock, setFreshnessClock, advancedToolsOpen, setAdvancedToolsOpen, systemHealthQuery, dashboardSnapshot: dashboardSnapshotQuery.data ?? null, fetchSystemHealthCached, pushExecution, executeAction, fetchSignupMailDiagnostics, sendSignupTestMail, fetchTaskQueueDiagnostics, fetchCleanupDiagnostics, fetchAuthSecurityEvents, filteredExecutions, resultFilterCounts, selectedExecution, rawSystemHealthStatus, hasSystemHealthStatus, isSystemHealthConnectionUnavailable, systemHealthStatus, mailFreshness, taskQueueFreshness, cleanupFreshness, authFreshness, systemHealthFreshness, systemHealthSummary, systemHealthFetchedAt, isMailLoading, isQueueLoading, isCleanupLoading, isAuthLoading, hasMailDiagnostics, hasTaskQueueDiagnostics, hasAuthDiagnostics, hasCleanupDiagnostics, mailStatusLabel, signupMailTaskQueue, signupMailQueueStatusLabel, signupMailQueueStatusMessage, queueStatusLabel, cleanupStatusLabel, authSecurityStatusLabel, recentCheckedLabel, overviewStatusLabel, attentionItems, quickLinks, focusSection }
   return <AdminToolsWorkspaceSections {...toolsWorkspaceSectionProps} />
 }
 

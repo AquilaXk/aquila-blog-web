@@ -16,7 +16,6 @@ const basePost: TPost = {
   fullWidth: false,
   thumbnail: "https://blog.aquilaxk.site/avatar.png",
   likesCount: 12,
-  commentsCount: 3,
   hitCount: 920,
   author: [
     {

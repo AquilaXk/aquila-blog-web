@@ -66,9 +66,7 @@ export type ApiPostDto = PostSummaryFields & {
   published: boolean
   listed: boolean
   likesCount?: number
-  commentsCount?: number
   hitCount?: number
-  actorHasLiked?: boolean
 }
 
 export type ApiPostWithContentDto = ContentHtmlTrustFields & PostWithContentSummaryFields & {
@@ -88,9 +86,7 @@ export type ApiPostWithContentDto = ContentHtmlTrustFields & PostWithContentSumm
   published: boolean
   listed: boolean
   likesCount: number
-  commentsCount: number
   hitCount: number
-  actorHasLiked?: boolean
   actorCanModify?: boolean
   actorCanDelete?: boolean
 }

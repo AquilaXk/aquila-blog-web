@@ -21,21 +21,10 @@ type Props = {
   data: PostDetail
   likesCount?: number
   hitCount?: number
-  actorHasLiked?: boolean
-  likePending?: boolean
-  likeFeedback?: string | null
-  hideLikeActionOnDesktop?: boolean
   hideShareActionOnDesktop?: boolean
   hideActionButtonsOnMobile?: boolean
   shareFeedback?: "copied" | "shared" | "failed" | null
-  onToggleLike?: () => void
   onSharePost?: () => void
-  showModifyAction?: boolean
-  showDeleteAction?: boolean
-  useAdminShellFallback?: boolean
-  adminActionPending?: boolean
-  onEditPost?: () => void
-  onDeletePost?: () => void
   deckSummary?: string
   interactiveTags?: boolean
   showEngagement?: boolean
@@ -47,21 +36,10 @@ const PostHeader: React.FC<Props> = ({
   data,
   likesCount,
   hitCount,
-  actorHasLiked = false,
-  likePending = false,
-  likeFeedback = null,
-  hideLikeActionOnDesktop = false,
   hideShareActionOnDesktop = false,
   hideActionButtonsOnMobile = false,
   shareFeedback = null,
-  onToggleLike,
   onSharePost,
-  showModifyAction = false,
-  showDeleteAction = false,
-  useAdminShellFallback = false,
-  adminActionPending = false,
-  onEditPost,
-  onDeletePost,
   deckSummary,
   showEngagement = true,
   showReadingTime = showEngagement,
@@ -89,11 +67,6 @@ const PostHeader: React.FC<Props> = ({
   const thumbnailFocusX = parseThumbnailFocusXFromUrl(data.thumbnail || "")
   const thumbnailFocusY = parseThumbnailFocusYFromUrl(data.thumbnail || "")
   const thumbnailZoom = parseThumbnailZoomFromUrl(data.thumbnail || "")
-  const shellModifyFallback = useAdminShellFallback && Boolean(onEditPost) && !showModifyAction
-  const shellDeleteFallback = useAdminShellFallback && Boolean(onDeletePost) && !showDeleteAction
-  const shouldRenderAuthorUtilities =
-    showModifyAction || showDeleteAction || shellModifyFallback || shellDeleteFallback
-  const authorUtilitiesShellOnly = !showModifyAction && !showDeleteAction && (shellModifyFallback || shellDeleteFallback)
   const shareFeedbackMessage =
     shareFeedback === "failed"
       ? "공유에 실패했습니다."
@@ -150,37 +123,8 @@ const PostHeader: React.FC<Props> = ({
           </div>
         )}
 
-        {shouldRenderAuthorUtilities || showEngagement || showReadingTime ? (
+        {showEngagement || showReadingTime ? (
           <div className="metaUtilities">
-            {shouldRenderAuthorUtilities && (
-              <div className="authorUtilities" data-shell-only={authorUtilitiesShellOnly ? "true" : "false"}>
-                {(showModifyAction || shellModifyFallback) && (
-                  <button
-                    type="button"
-                    className="adminButton"
-                    data-shell-fallback={shellModifyFallback ? "true" : "false"}
-                    onClick={onEditPost}
-                    disabled={adminActionPending}
-                  >
-                    <AppIcon name="edit" />
-                    <span>수정</span>
-                  </button>
-                )}
-                {(showDeleteAction || shellDeleteFallback) && (
-                  <button
-                    type="button"
-                    className="adminButton dangerButton"
-                    data-shell-fallback={shellDeleteFallback ? "true" : "false"}
-                    onClick={onDeletePost}
-                    disabled={adminActionPending}
-                  >
-                    <AppIcon name="trash" />
-                    <span>{adminActionPending ? "삭제 중..." : "삭제"}</span>
-                  </button>
-                )}
-              </div>
-            )}
-
             {showEngagement || showReadingTime ? (
               <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
                 <div className="engagementRow" aria-label="post engagement">
@@ -190,19 +134,13 @@ const PostHeader: React.FC<Props> = ({
                     {showEngagement ? <span className="statChip">{viewText}</span> : null}
                     {showEngagement && modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
                   </div>
-                  {showEngagement ? <button
-                    type="button"
+                  {showEngagement ? <span
                     className="likeButton"
-                    aria-pressed={actorHasLiked}
-                    data-active={actorHasLiked}
-                    data-hide-desktop={hideLikeActionOnDesktop}
                     data-hide-mobile={hideActionButtonsOnMobile}
-                    disabled={likePending}
-                    onClick={onToggleLike}
                   >
-                    <AppIcon name={actorHasLiked ? "heart-filled" : "heart"} />
+                    <AppIcon name="heart" />
                     <span>좋아요 {likesCount ?? data.likesCount ?? 0}</span>
-                  </button> : null}
+                  </span> : null}
 
                   {showEngagement && onSharePost && (
                     <button
@@ -218,17 +156,6 @@ const PostHeader: React.FC<Props> = ({
                     </button>
                   )}
                 </div>
-                {likeFeedback ? (
-                  <span
-                    className="shareFeedbackPill"
-                    data-hide-desktop={hideLikeActionOnDesktop}
-                    data-hide-mobile={hideActionButtonsOnMobile}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {likeFeedback}
-                  </span>
-                ) : null}
                 {shareFeedback && (
                   <span
                     className="shareFeedbackPill"

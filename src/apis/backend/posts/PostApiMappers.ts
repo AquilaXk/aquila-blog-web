@@ -164,8 +164,6 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     post.authorProfileImgUrl,
     post.authorProfileImageUrl
   )
-  const hasActorHasLiked = typeof post.actorHasLiked === "boolean"
-
   return {
     id: String(post.id),
     date: { start_date: post.createdAt.slice(0, 10) },
@@ -189,9 +187,7 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     modifiedTime: post.modifiedAt,
     fullWidth: false,
     likesCount: post.likesCount ?? 0,
-    commentsCount: post.commentsCount ?? 0,
     hitCount: post.hitCount ?? 0,
-    ...(hasActorHasLiked ? { actorHasLiked: post.actorHasLiked } : {}),
   }
 }
 
@@ -206,7 +202,6 @@ export const mapPostDetail = async (
   const category = dtoCategories.length > 0 ? dtoCategories : parsed.category
   const normalizedContent = parsed.content
 
-  const hasActorHasLiked = typeof post.actorHasLiked === "boolean"
   const hasActorCanModify = typeof post.actorCanModify === "boolean"
   const hasActorCanDelete = typeof post.actorCanDelete === "boolean"
   const trustedContentHtml = !allowTrustedContentHtml || post.content.trim()
@@ -237,9 +232,7 @@ export const mapPostDetail = async (
     ...(trustedContentHtml ? { trustedContentHtml } : {}),
     modifiedTime: post.modifiedAt,
     likesCount: post.likesCount,
-    commentsCount: post.commentsCount,
     hitCount: post.hitCount,
-    ...(hasActorHasLiked ? { actorHasLiked: post.actorHasLiked } : {}),
     ...(hasActorCanModify ? { actorCanModify: post.actorCanModify } : {}),
     ...(hasActorCanDelete ? { actorCanDelete: post.actorCanDelete } : {}),
   }

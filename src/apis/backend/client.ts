@@ -64,10 +64,6 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
-    matcher: /^\/post\/api\/v1\/posts\/[0-9]+\/comments(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
-  },
-  {
     matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|bootstrap)(\/|$)/i,
     policy: {
       cacheMode: "revalidate",
@@ -363,7 +359,6 @@ const shouldUseBrowserBackendProxy = (safePath: string) => {
   return (
     safePath.startsWith("/member/api/v1/auth/") ||
     safePath.startsWith("/member/api/v1/privacy/") ||
-    safePath.startsWith("/member/api/v1/notifications/snapshot") ||
     safePath.startsWith("/member/api/v1/adm/") ||
     safePath.startsWith("/post/api/v1/posts/temp") ||
     safePath.startsWith("/post/api/v1/adm/") ||

@@ -48,7 +48,6 @@ export type FeedExplorerSnapshotPost = {
     profile_photo?: string
   }[]
   likesCount?: number
-  commentsCount?: number
   hitCount?: number
 }
 
@@ -132,7 +131,6 @@ export const toSnapshotPost = (post: TPost): FeedExplorerSnapshotPost => {
         }
       : {}),
     ...(typeof post.likesCount === "number" ? { likesCount: post.likesCount } : {}),
-    ...(typeof post.commentsCount === "number" ? { commentsCount: post.commentsCount } : {}),
     ...(typeof post.hitCount === "number" ? { hitCount: post.hitCount } : {}),
   }
 }
@@ -171,7 +169,6 @@ export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
     ...(post.category?.length ? { category: post.category } : {}),
     ...(post.author?.length ? { author: post.author } : {}),
     ...(typeof post.likesCount === "number" ? { likesCount: post.likesCount } : {}),
-    ...(typeof post.commentsCount === "number" ? { commentsCount: post.commentsCount } : {}),
     ...(typeof post.hitCount === "number" ? { hitCount: post.hitCount } : {}),
   }
 }

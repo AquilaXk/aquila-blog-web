@@ -41,9 +41,7 @@ export type TPost = {
   fullWidth: boolean
   thumbnail?: string
   likesCount?: number
-  commentsCount?: number
   hitCount?: number
-  actorHasLiked?: boolean
   actorCanModify?: boolean
   actorCanDelete?: boolean
 }
@@ -56,50 +54,6 @@ export type TrustedContentHtml = {
 export type PostDetail = TPost & {
   content: string
   trustedContentHtml?: TrustedContentHtml
-}
-
-export type TPostComment = {
-  id: number
-  createdAt: string
-  modifiedAt: string
-  authorId: number
-  authorName: string
-  authorUsername?: string
-  authorProfileImageUrl: string
-  authorProfileImageDirectUrl?: string
-  postId: number
-  parentCommentId?: number | null
-  content: string
-  actorCanModify: boolean
-  actorCanDelete: boolean
-}
-
-export type TMemberNotificationType = "COMMENT_REPLY" | "POST_COMMENT"
-
-export type TMemberNotification = {
-  id: number
-  type: TMemberNotificationType
-  createdAt: string
-  actorId: number
-  actorName: string
-  actorProfileImageDirectUrl?: string
-  actorProfileImageUrl: string
-  postId: number
-  commentId: number
-  postTitle: string
-  commentPreview: string
-  message: string
-  isRead: boolean
-}
-
-export type TMemberNotificationStreamPayload = {
-  notification: TMemberNotification
-  unreadCount: number
-}
-
-export type TMemberNotificationUnavailablePayload = {
-  notificationId: number
-  status: "UNAVAILABLE"
 }
 
 export type TPosts = TPost[]

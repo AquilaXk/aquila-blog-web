@@ -17,7 +17,7 @@ export type SystemHealthPayload = {
 export type ActionCardTone = "read" | "write" | "danger" | "infra"
 export type InlineNoticeTone = "warning" | "danger" | "success"
 export type DiagnosticTab = "mail" | "queue" | "cleanup" | "auth"
-export type ExecutionDomain = "overview" | "diagnostics" | "execution" | "mutation"
+export type ExecutionDomain = "overview" | "diagnostics" | "execution"
 export type ExecutionResultFilter = "all" | "success" | "error" | "stale"
 
 export type ExecutionEntry = {
@@ -46,7 +46,6 @@ export const SECTION_IDS = {
   overview: "ops-overview",
   diagnostics: "ops-diagnostics",
   execution: "ops-execution",
-  mutation: "ops-mutation",
   results: "ops-results",
 } as const
 
@@ -63,11 +62,6 @@ export const ACTION_META: Record<
     tone: ActionCardTone
   }
 > = {
-  commentList: { label: "댓글 목록 조회", domain: "mutation", tone: "read" },
-  commentOne: { label: "댓글 상세 조회", domain: "mutation", tone: "read" },
-  commentWrite: { label: "댓글 생성", domain: "mutation", tone: "write" },
-  commentModify: { label: "댓글 수정", domain: "mutation", tone: "write" },
-  commentDelete: { label: "댓글 삭제", domain: "mutation", tone: "danger" },
   admPostCount: { label: "전체 글 수 확인", domain: "execution", tone: "read" },
   systemHealth: { label: "서비스 상태 조회", domain: "execution", tone: "infra" },
   mailStatus: { label: "메일 진단", domain: "diagnostics", tone: "infra" },
@@ -76,7 +70,6 @@ export const ACTION_META: Record<
   taskQueueStatus: { label: "작업 큐 진단", domain: "diagnostics", tone: "infra" },
   cleanupStatus: { label: "파일 정리 진단", domain: "diagnostics", tone: "infra" },
   authSecurityEvents: { label: "인증 보안 기록 조회", domain: "diagnostics", tone: "infra" },
-  seedPostId: { label: "실데이터 테스트 대상 글 준비", domain: "mutation", tone: "read" },
 }
 
 export const formatInstant = (value: string | null | undefined) => {
@@ -182,16 +175,6 @@ export const buildExecutionSummary = (key: string, status: "success" | "error", 
     }
     case "admPostCount":
       return typeof payload === "number" ? `전체 글 ${payload}건을 확인했습니다.` : getResultMessage(payload) || "전체 글 수를 확인했습니다."
-    case "commentList":
-      return Array.isArray(payload) ? `댓글 ${payload.length}건을 불러왔습니다.` : "댓글 목록을 불러왔습니다."
-    case "commentOne":
-      return "댓글 상세를 불러왔습니다."
-    case "commentWrite":
-      return getResultMessage(payload) || "댓글을 생성했습니다."
-    case "commentModify":
-      return getResultMessage(payload) || "댓글을 수정했습니다."
-    case "commentDelete":
-      return getResultMessage(payload) || "댓글을 삭제했습니다."
     case "mailStatus":
       return "메일 준비 상태를 다시 확인했습니다."
     case "mailConnectivity":

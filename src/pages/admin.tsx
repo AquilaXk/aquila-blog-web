@@ -35,7 +35,6 @@ type AdminHubPostListItem = {
   listed: boolean
   tempDraft?: boolean
   modifiedAt: string
-  commentsCount?: number
   hitCount?: number
 }
 
@@ -306,7 +305,6 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
   const publishedRows = postRows.filter((post) => post.published && post.tempDraft !== true)
   const draftRows = postRows.filter((post) => !post.published || post.tempDraft === true)
   const loadedViewsCount = postRows.reduce((sum, post) => sum + (post.hitCount ?? 0), 0)
-  const loadedCommentsCount = postRows.reduce((sum, post) => sum + (post.commentsCount ?? 0), 0)
   const recentContentItems = postRows
     .slice()
     .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
@@ -337,12 +335,6 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
       value: String(loadedViewsCount),
       detail: "loaded rows",
       tone: loadedViewsCount > 0 ? ("good" as const) : ("neutral" as const),
-    },
-    {
-      label: "COMMENTS",
-      value: String(loadedCommentsCount),
-      detail: "loaded rows",
-      tone: loadedCommentsCount > 0 ? ("good" as const) : ("neutral" as const),
     },
   ]
   const healthChecks = initialOperationalSnapshot.systemHealth?.checks

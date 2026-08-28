@@ -1,15 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/router"
 import dynamic from "next/dynamic"
 import PostHeader from "./PostHeader"
 import usePostQuery from "src/hooks/usePostQuery"
-import useAuthSession from "src/hooks/useAuthSession"
-import { ConfirmDialog } from "src/design-system/ConfirmDialog"
-import { toLoginPath } from "src/libs/router"
-import { readHeaderAuthShellSnapshot } from "src/libs/headerAuthShell"
-import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import { TPostComment } from "src/types"
-import DeferredCommentBox from "./DeferredCommentBox"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
 import { RelatedPostsSection } from "./PostDetailRelatedSection"
 import { collectTocFromArticle, createObserverRegistry, createRafScheduler, isSameToc, type TocItem } from "./PostDetailTocModel"
@@ -20,19 +12,12 @@ import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions
 import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
-type Props = {
-  initialComments?: TPostComment[] | null
-}
-
 const MarkdownRenderer = dynamic(() => import("../components/MarkdownRenderer"))
 
-const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
+const PostDetail: React.FC = () => {
   const { post: data } = usePostQuery()
-  const router = useRouter()
-  const { me, authStatus } = useAuthSession()
   const postId = data?.id ?? ""
   const articleRef = useRef<HTMLElement | null>(null)
-  const commentsSectionRef = useRef<HTMLElement | null>(null)
   const relatedPrefetchTriggerRef = useRef<HTMLDivElement | null>(null)
   const leftRailRef = useRef<HTMLElement | null>(null)
   const leftRailInnerRef = useRef<HTMLDivElement | null>(null)
@@ -42,14 +27,12 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
   const readProgressRef = useRef<HTMLSpanElement | null>(null)
   const [tocItems, setTocItems] = useState<TocItem[]>([])
   const [activeTocId, setActiveTocId] = useState<string>("")
-  const [commentsRailActive, setCommentsRailActive] = useState(false)
   const [showDetailedToc, setShowDetailedToc] = useState(false)
   const [leftHybridRailActive, setLeftHybridRailActive] = useState(false)
   const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
   const visibleTocItemsRef = useRef<TocItem[]>([])
   const showFloatingLikeRef = useRef(false)
   const showStickyTocRef = useRef(false)
-  const commentsRailActiveRef = useRef(false)
   const leftHybridRailActiveRef = useRef(false)
   const rightHybridRailActiveRef = useRef(false)
   const hybridRailMetricsRef = useRef({
@@ -73,36 +56,15 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
     },
   })
 
-  const loginHref = useMemo(() => {
-    const next = router.asPath || toCanonicalPostPath(postId)
-    return toLoginPath(next, toCanonicalPostPath(postId))
-  }, [postId, router.asPath])
-  const [authShellSnapshot] = useState(() => readHeaderAuthShellSnapshot())
-  const shellAdmin = authStatus === "loading" ? authShellSnapshot?.admin === true : Boolean(me?.isAdmin)
-  const canModifyPost = Boolean(shellAdmin || data?.actorCanModify)
-  const canDeletePost = Boolean(shellAdmin || data?.actorCanDelete)
   const showFloatingLike = data?.type[0] === "Post"
   const {
-    adminActionPending,
-    closeDeleteConfirm,
-    confirmDeletePost,
-    deleteConfirmOpen,
-    deleteErrorNotice,
-    engagement,
-    handleEditPost,
+    hitCount,
     handleSharePost,
-    handleToggleLike,
-    likeFeedback,
-    likePending,
-    openDeleteConfirm,
     shareFeedback,
     shareProgressLabel,
   } = usePostDetailEngagementActions({
     data,
     postId,
-    loginHref,
-    me,
-    router,
   })
   const hasDepth4Toc = useMemo(() => tocItems.some((item) => item.level === 4), [tocItems])
   const visibleTocItems = useMemo(
@@ -110,8 +72,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
     [showDetailedToc, tocItems]
   )
   const showStickyToc = visibleTocItems.length >= 2
-  const commentsCount = typeof data?.commentsCount === "number" ? data.commentsCount : 0
-  const commentsProgressLabel = commentsRailActive ? "읽는 중" : `${commentsCount}`
   const headerDeckSummaryText =
     data?.summarySource === "LEADING_BLOCK" || data?.summarySource === "NONE"
       ? ""
@@ -169,10 +129,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
 
     return () => window.cancelAnimationFrame(frame)
   }, [activeTocId, showDetailedToc, showStickyToc, visibleTocItems.length])
-
-  useEffect(() => {
-    commentsRailActiveRef.current = commentsRailActive
-  }, [commentsRailActive])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -337,28 +293,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
     })
     const registry = createObserverRegistry()
 
-    const commentsNode = commentsSectionRef.current
-    if (commentsNode) {
-      registry.addIntersectionObserver(
-        [commentsNode],
-        (entries) => {
-          const [entry] = entries
-          if (!entry) return
-          const nextCommentsActive = entry.isIntersecting && entry.intersectionRatio > 0.22
-          if (commentsRailActiveRef.current !== nextCommentsActive) {
-            commentsRailActiveRef.current = nextCommentsActive
-            setCommentsRailActive(nextCommentsActive)
-          }
-          scheduler.schedule()
-        },
-        {
-          root: null,
-          rootMargin: "-24% 0px -48% 0px",
-          threshold: [0, 0.22, 0.5],
-        }
-      )
-    }
-
     registry.addWindowEvent(
       "scroll",
       () => {
@@ -427,13 +361,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
     window.scrollTo({ top: targetTop, behavior: "smooth" })
   }
 
-  const scrollSectionIntoView = (target: HTMLElement | null) => {
-    if (!target) return
-    const targetTop =
-      target.getBoundingClientRect().top + window.scrollY - (resolveRailTopOffset() + 20)
-    window.scrollTo({ top: targetTop, behavior: "smooth" })
-  }
-
   return (
     <StyledWrapper data-sticky-rail-safe="true">
       <div className="detailReadProgress" aria-hidden="true">
@@ -443,51 +370,16 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
         <section className="detailHero" data-rum-section="header">
           <PostHeader
             data={data}
-            likesCount={engagement.likesCount}
-            hitCount={engagement.hitCount}
-            actorHasLiked={engagement.actorHasLiked}
-            likePending={likePending}
-            hideLikeActionOnDesktop={showFloatingLike}
+            likesCount={data.likesCount}
+            hitCount={hitCount}
             hideShareActionOnDesktop={showFloatingLike}
             hideActionButtonsOnMobile
-            likeFeedback={likeFeedback}
             shareFeedback={shareFeedback}
-            onToggleLike={handleToggleLike}
             onSharePost={handleSharePost}
-            showModifyAction={canModifyPost}
-            showDeleteAction={canDeletePost}
-            useAdminShellFallback
-            adminActionPending={adminActionPending}
-            onEditPost={handleEditPost}
-            onDeletePost={openDeleteConfirm}
             deckSummary={headerDeckSummaryText}
           />
         </section>
       )}
-      <ConfirmDialog
-        open={deleteConfirmOpen}
-        titleId="post-detail-delete-title"
-        descriptionId="post-detail-delete-description"
-        title="글을 삭제할까요?"
-        description={
-          <>
-            <span>삭제 후에는 삭제 글 목록에서 복구할 수 있습니다.</span>
-            <span className="rowTitle">{data.title}</span>
-            {deleteErrorNotice ? (
-              <span role="alert" data-tone="error">
-                {deleteErrorNotice}
-              </span>
-            ) : null}
-          </>
-        }
-        confirmLabel={adminActionPending ? "삭제 중..." : "삭제 확정"}
-        cancelLabel="취소"
-        confirmTone="danger"
-        onConfirm={() => {
-          void confirmDeletePost()
-        }}
-        onCancel={closeDeleteConfirm}
-      />
       <div
         className="detailLayout"
         data-left-hybrid={leftHybridRailActive}
@@ -500,30 +392,18 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
           innerRef={leftRailInnerRef}
           active={leftHybridRailActive}
           showFloatingLike={showFloatingLike}
-          engagement={engagement}
-          likeFeedback={likeFeedback}
-          likePending={likePending}
+          likesCount={data.likesCount ?? 0}
           shareFeedback={shareFeedback}
-          onToggleLike={handleToggleLike}
           onSharePost={handleSharePost}
-          onScrollToComments={() => scrollSectionIntoView(commentsSectionRef.current)}
-          commentsCount={commentsCount}
         />
 
         <article ref={articleRef}>
           {data.type[0] === "Post" ? (
             <MobileSummaryActions
-              engagement={engagement}
-              likeFeedback={likeFeedback}
-              likePending={likePending}
+              likesCount={data.likesCount ?? 0}
               shareFeedback={shareFeedback}
               shareProgressLabel={shareProgressLabel}
-              commentsRailActive={commentsRailActive}
-              commentsCount={commentsCount}
-              commentsProgressLabel={commentsProgressLabel}
-              onToggleLike={handleToggleLike}
               onSharePost={handleSharePost}
-              onScrollToComments={() => scrollSectionIntoView(commentsSectionRef.current)}
             />
           ) : null}
           {showStickyToc ? (
@@ -552,13 +432,6 @@ const PostDetail: React.FC<Props> = ({ initialComments = null }) => {
               relatedByAuthorPosts={relatedByAuthorPosts}
             />
           ) : null}
-          {data.type[0] === "Post" && (
-            <>
-              <section ref={commentsSectionRef} data-rum-section="comments">
-                <DeferredCommentBox data={data} initialComments={initialComments} />
-              </section>
-            </>
-          )}
         </article>
 
         <RightTocRail
