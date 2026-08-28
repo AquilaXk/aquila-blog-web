@@ -76,6 +76,7 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(page.locator("#work")).toBeVisible()
     await expect(page.locator("#approach")).toBeVisible()
     await expect(page.getByRole("heading", { name: "함께 만들 이야기가 있다면" })).toBeVisible()
+    await expect(page.getByText("EasySubway 전국 정식 출시 준비 중")).toBeVisible()
     await expect(page.getByRole("link", { name: "aquila@aquilaxk.site" })).toHaveAttribute(
       "href",
       "mailto:aquila@aquilaxk.site"
@@ -184,13 +185,16 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("#overview")).toBeVisible()
     await expect(page.locator("#features")).toBeVisible()
     await expect(page.locator("#scope")).toBeVisible()
-    // 출시 상태는 과장 없이 준비 중으로만 표기한다.
-    await expect(page.getByText("Android 출시 준비 중").first()).toBeVisible()
+    await expect(page.getByText("전국 정식 출시 준비 중").first()).toBeVisible()
     await expect(page.locator("[data-ui='app-header']")).toHaveCount(0)
 
     const canonical = page.locator("link[rel='canonical']")
     await expect(canonical).toHaveAttribute("href", `${baseURL}/easysubway`)
     await expect(page.locator("meta[property='og:site_name']")).toHaveAttribute("content", "EasySubway")
+    const description = page.locator("meta[name='description']")
+    await expect(description).toHaveAttribute("content", /Android\/iOS/)
+    await expect(description).toHaveAttribute("content", /Journey V3/)
+    await expect(description).toHaveAttribute("content", /전국 정식 출시를 준비/)
   })
 
   test("390px 헤더의 내비 링크와 문의 CTA가 뷰포트 안에 남는다", async ({ page }) => {
@@ -226,10 +230,17 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("link[rel='alternate'][type='application/rss+xml']")).toHaveCount(0)
   })
 
-  test("파일럿 범위는 검증한 역만 사실대로 노출한다", async ({ page }) => {
+  test("전국 정식 출시 범위와 fail-closed 경로 안내를 노출한다", async ({ page }) => {
     await page.goto("/easysubway")
-    await expect(page.locator("#scope")).toContainText("상록수")
-    await expect(page.locator("#scope")).toContainText("사당")
+    const scope = page.locator("#scope")
+    await expect(scope).toContainText("전국 기준")
+    for (const staleScopeCopy of ["파일럿", "상록수", "사당", "2역"]) {
+      await expect(scope).not.toContainText(staleScopeCopy)
+    }
+
+    const routeFailureCopy = "현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요."
+    await expect(page.getByText(routeFailureCopy, { exact: true })).toBeVisible()
+    await expect(page.locator("main")).not.toContainText("경로 검색은 계속")
   })
 
   for (const viewport of VIEWPORTS) {
