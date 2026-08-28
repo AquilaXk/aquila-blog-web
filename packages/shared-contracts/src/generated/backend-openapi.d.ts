@@ -100,22 +100,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/system/api/v1/adm/mail/signup/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["sendSignupTestMail"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/system/api/v1/adm/cloud/files": {
         parameters: {
             query?: never;
@@ -511,38 +495,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getOperation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/system/api/v1/adm/notifications/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["notificationStreamDiagnostics"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/system/api/v1/adm/mail/signup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["signupMailDiagnostics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1422,17 +1374,6 @@ export interface components {
             limit?: number;
             resetRetryCount?: boolean;
         };
-        SignupMailTestRequest: {
-            /** Format: email */
-            email: string;
-        };
-        RsDataMapStringString: {
-            resultCode?: string;
-            msg?: string;
-            data?: {
-                [key: string]: string;
-            };
-        };
         CloudFileDto: {
             /** Format: int64 */
             id?: number;
@@ -1513,10 +1454,7 @@ export interface components {
             /** Format: int32 */
             likesCount?: number;
             /** Format: int32 */
-            commentsCount?: number;
-            /** Format: int32 */
             hitCount?: number;
-            actorHasLiked?: boolean;
             tags?: string[];
             category?: string[];
             /** @enum {string} */
@@ -1560,10 +1498,7 @@ export interface components {
             /** Format: int32 */
             likesCount?: number;
             /** Format: int32 */
-            commentsCount?: number;
-            /** Format: int32 */
             hitCount?: number;
-            actorHasLiked?: boolean;
             actorCanModify?: boolean;
             actorCanDelete?: boolean;
             summary?: string;
@@ -1888,81 +1823,9 @@ export interface components {
             /** Format: int32 */
             searchEngineMirrorFailureThreshold?: number;
         };
-        StreamDiagnostics: {
-            /** Format: int32 */
-            memberEmitterCount?: number;
-            /** Format: int32 */
-            globalEmitterCount?: number;
-            /** Format: int64 */
-            oldestEmitterAgeSeconds?: number;
-            /** Format: int32 */
-            maxEmittersPerMember?: number;
-            /** Format: int32 */
-            maxGlobalEmitters?: number;
-            /** Format: int64 */
-            heartbeatSeconds?: number;
-            /** Format: int64 */
-            replayProbeSeconds?: number;
-            /** Format: int32 */
-            replayBatchSize?: number;
-            /** Format: int64 */
-            connectedCount?: number;
-            /** Format: int64 */
-            reconnectSubscribeCount?: number;
-            /** Format: int64 */
-            disconnectCount?: number;
-            /** Format: int64 */
-            replayBatchCount?: number;
-            /** Format: int64 */
-            replayNotificationCount?: number;
-            /** Format: int64 */
-            replayUnavailableNotificationCount?: number;
-            /** Format: int64 */
-            replayFailureCount?: number;
-            /** Format: int64 */
-            unreadUnavailableCount?: number;
-            /** Format: int64 */
-            heartbeatSentCount?: number;
-            /** Format: int64 */
-            sendFailureCount?: number;
-            /** Format: int64 */
-            sendFailureRemovedEmitterCount?: number;
-            /** Format: int32 */
-            emitterStateMismatchCount?: number;
-        };
-        SignupMailDiagnostics: {
-            status?: string;
-            adapter?: string;
-            host?: string | null;
-            /** Format: int32 */
-            port?: number | null;
-            mailFrom?: string | null;
-            usernameConfigured?: boolean;
-            passwordConfigured?: boolean;
-            smtpAuth?: boolean;
-            startTlsEnabled?: boolean;
-            missing?: string[];
-            canConnect?: boolean | null;
-            connectionError?: string | null;
-            /** Format: date-time */
-            checkedAt?: string;
-            verifyPath?: string;
-            taskQueue?: components["schemas"]["TaskTypeDiagnostics"];
-            queueRuntime?: components["schemas"]["TaskProcessingLockDiagnostics"];
-        };
-        TaskProcessingLockDiagnostics: {
-            currentNodeWorkerEnabled?: boolean;
-            currentNodeApiMode?: string;
-            processTasksLockKey?: string;
-            processTasksLockExists?: boolean;
-            /** Format: int64 */
-            processTasksLockTtlSeconds?: number | null;
-            legacyOrphanLikely?: boolean;
-        };
         HealthChecks: {
             db?: string;
             redis?: string;
-            signupMail?: string;
         };
         HealthResBody: {
             status?: string;
@@ -1982,19 +1845,10 @@ export interface components {
             /** Format: date-time */
             latestBlockedAt?: string | null;
         };
-        AdminDashboardSignupMailSnapshot: {
-            status?: string;
-            /** Format: int64 */
-            queueLagSeconds?: number | null;
-            /** Format: date-time */
-            latestFailureAt?: string | null;
-            latestFailureMessage?: string | null;
-        };
         AdminDashboardSnapshot: {
             /** Format: date-time */
             generatedAt?: string;
             taskQueue?: components["schemas"]["AdminDashboardTaskQueueSnapshot"];
-            signupMail?: components["schemas"]["AdminDashboardSignupMailSnapshot"];
             authSecurity?: components["schemas"]["AdminDashboardAuthSecuritySnapshot"];
             storageCleanup?: components["schemas"]["AdminDashboardStorageCleanupSnapshot"];
         };
@@ -2099,8 +1953,6 @@ export interface components {
             listed?: boolean;
             /** Format: int32 */
             likesCount?: number;
-            /** Format: int32 */
-            commentsCount?: number;
             /** Format: int32 */
             hitCount?: number;
         };
@@ -2451,30 +2303,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataAdminOperationResBody"];
-                };
-            };
-        };
-    };
-    sendSignupTestMail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupMailTestRequest"];
-            };
-        };
-        responses: {
-            /** @description Accepted */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMapStringString"];
                 };
             };
         };
@@ -3161,48 +2989,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataAdminOperationResBody"];
-                };
-            };
-        };
-    };
-    notificationStreamDiagnostics: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["StreamDiagnostics"];
-                };
-            };
-        };
-    };
-    signupMailDiagnostics: {
-        parameters: {
-            query?: {
-                checkConnection?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SignupMailDiagnostics"];
                 };
             };
         };
