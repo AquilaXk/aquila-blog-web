@@ -5,7 +5,6 @@ import {
   adminPassword,
   buildLoginPayloadCandidates,
   cleanupLiveEditorPost,
-  completeLegalReconsentIfRequired,
   hasAuthCookie,
   isInvalidLoginRequestBody,
   isNavigationInterruptedError,
@@ -15,7 +14,6 @@ import {
   liveLoginTimeoutMs,
   liveRetryBaseDelayMs,
   liveUiRedirectTimeoutMs,
-  quickReconsentProbeTimeoutMs,
   resolveApiBaseUrl,
   sleep,
   waitForApiReachability,
@@ -70,12 +68,10 @@ const tryEnterEditorRoute = async (page: Page, timeoutMs: number) => {
       if (!isNavigationInterruptedError(error)) throw error
     }
 
-    if (await completeLegalReconsentIfRequired(page, "/admin/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
     if (editorUrlPattern.test(page.url())) return true
 
     try {
       await page.waitForURL(editorUrlPattern, { timeout: perTryTimeout })
-      if (await completeLegalReconsentIfRequired(page, "/admin/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
       return true
     } catch {
       if (attempt < tries) await sleep(400 * attempt)
@@ -206,20 +202,8 @@ const loginWithRetry = async (page: Page, apiBaseUrl: string) => {
 const loginThroughUi = async (page: Page) => {
   const route = await gotoLoginForEditor(page, liveUiRedirectTimeoutMs)
   if (route === "editor") {
-    await completeLegalReconsentIfRequired(
-      page,
-      "/admin/editor/new",
-      liveUiRedirectTimeoutMs,
-      quickReconsentProbeTimeoutMs
-    )
     return
   }
-  if (await completeLegalReconsentIfRequired(
-    page,
-    "/admin/editor/new",
-    liveUiRedirectTimeoutMs,
-    quickReconsentProbeTimeoutMs
-  )) return
 
   const apiBaseUrl = resolveApiBaseUrl(page.url())
   await waitForApiReachability(page, apiBaseUrl)
@@ -258,12 +242,6 @@ const loginThroughUi = async (page: Page) => {
     if (outcome.kind === "response") {
       if (outcome.status < 400) {
         if (editorUrlPattern.test(page.url())) {
-          await completeLegalReconsentIfRequired(
-            page,
-            "/admin/editor/new",
-            liveUiRedirectTimeoutMs,
-            quickReconsentProbeTimeoutMs
-          )
           return
         }
         if (await tryEnterEditorRoute(page, liveUiRedirectTimeoutMs)) return
@@ -281,12 +259,6 @@ const loginThroughUi = async (page: Page) => {
     }
 
     if (outcome.kind === "editor-url") {
-      await completeLegalReconsentIfRequired(
-        page,
-        "/admin/editor/new",
-        liveUiRedirectTimeoutMs,
-        quickReconsentProbeTimeoutMs
-      )
       return
     }
 
@@ -392,12 +364,6 @@ test.describe("editor live visual regression", () => {
     await loginThroughUi(page)
 
     await page.goto("/admin/editor/new")
-    await completeLegalReconsentIfRequired(
-      page,
-      "/admin/editor/new",
-      liveUiRedirectTimeoutMs,
-      quickReconsentProbeTimeoutMs
-    )
     await page.waitForURL(/\/admin\/editor(\/|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
     await expectMarkdownEditorShell(page)
@@ -426,12 +392,6 @@ test.describe("editor live visual regression", () => {
 
     try {
       await page.goto(`/admin/editor/${postId}`)
-      await completeLegalReconsentIfRequired(
-        page,
-        `/admin/editor/${postId}`,
-        liveUiRedirectTimeoutMs,
-        quickReconsentProbeTimeoutMs
-      )
       await page.waitForURL(new RegExp(`/admin/editor/${postId}(\\?|$)`), { timeout: 30_000 })
       await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue(title)
       await expectMarkdownEditorShell(page)
@@ -467,7 +427,6 @@ test.describe("editor live visual regression", () => {
     )
 
     await page.goto("/admin/editor/507")
-    await completeLegalReconsentIfRequired(page, "/admin/editor/507", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
     await page.waitForURL(/\/admin\/editor\/507(\?|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
 

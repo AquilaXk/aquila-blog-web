@@ -87,9 +87,6 @@ test("browser storage registry covers source storage constants", () => {
   const sourceConstants = collectStorageConstants()
 
   expect(sourceConstants).toEqual(expect.arrayContaining([
-    expect.objectContaining({ name: "KEEP_SIGNED_IN_KEY", key: "auth.login.keepSignedIn" }),
-    expect.objectContaining({ name: "IP_SECURITY_KEY", key: "auth.login.ipSecurityOn" }),
-    expect.objectContaining({ name: "SIGNUP_MAIL_COOLDOWN_STORAGE_KEY", key: "auth.signupMailCooldown.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_V1_STORAGE_KEY", key: "admin.editor.localDraft.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_CREATE_STORAGE_KEY", key: "admin.editor.localDraft.create.v3" }),
     expect.objectContaining({
@@ -142,27 +139,6 @@ test("browser storage registry records retention and deletion metadata for every
     expect(entry.deletion).toBeTruthy()
     expect(entry.stores).toBeTruthy()
   }
-})
-
-test("signup cooldown registry documents hashed storage instead of raw email identifiers", () => {
-  const cooldownEntry = registeredBrowserStorageKeys.find((entry) => entry.key === "auth.signupMailCooldown.v1")
-  const hookSource = readFileSync(path.join(srcRoot, "hooks/useSignupMailCooldown.ts"), "utf8")
-  const authEntryModalSource = readFileSync(path.join(srcRoot, "components/auth/AuthEntryModal.tsx"), "utf8")
-
-  expect(cooldownEntry).toEqual(
-    expect.objectContaining({
-      area: "sessionStorage",
-      stores: expect.stringContaining("hashed email key"),
-    })
-  )
-  expect(hookSource).toContain("hashCooldownEmail")
-  expect(hookSource).toContain("current[targetEmailKey]")
-  expect(hookSource).toContain("isCooldownPending || remainingSeconds > 0")
-  expect(authEntryModalSource).toContain("await startCooldown(response.data.email)")
-  expect(hookSource).not.toContain("fallbackHash")
-  expect(hookSource).not.toContain("fnv1a")
-  expect(hookSource).not.toContain("current[targetEmail] =")
-  expect(hookSource).not.toContain("current[normalizedEmail]")
 })
 
 test("legal history lists same-day cookie policies newest version first", () => {

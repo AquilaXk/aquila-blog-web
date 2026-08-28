@@ -1,6 +1,5 @@
 import AxeBuilder from "@axe-core/playwright"
 import { expect, test, type Page } from "@playwright/test"
-import { ACTIVE_LEGAL_DOCUMENTS } from "src/apis/backend/legal"
 import { ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
 import { expectNoHorizontalOverflow } from "./helpers/adaptivityFixtures"
 import {
@@ -13,17 +12,7 @@ const PIPELINE_ENDPOINT = "/system/api/v1/adm/search/pipeline/force-control"
 const MIRROR_ENDPOINT = "/system/api/v1/adm/search-engine/mirror/force-disable"
 const RAW_CANARY = "search-control-raw-canary"
 
-const adminMember = {
-  ...ADMIN_MEMBER_FIXTURE,
-  legalReconsent: {
-    status: "CURRENT",
-    required: false,
-    termsVersion: ACTIVE_LEGAL_DOCUMENTS.terms.version,
-    termsContentSha256: ACTIVE_LEGAL_DOCUMENTS.terms.contentSha256,
-    privacyVersion: ACTIVE_LEGAL_DOCUMENTS.privacy.version,
-    privacyContentSha256: ACTIVE_LEGAL_DOCUMENTS.privacy.contentSha256,
-  },
-}
+const adminMember = ADMIN_MEMBER_FIXTURE
 
 const dashboard = {
   generatedAt: "2026-08-27T00:00:00Z",
@@ -83,10 +72,6 @@ const setupAdmin = async (page: Page) => {
   }
   for (const [path, body] of [
     ["**/member/api/v1/auth/me", adminMember],
-    [
-      "**/member/api/v1/auth/session",
-      { legalReconsent: adminMember.legalReconsent },
-    ],
     [
       "**/system/api/v1/adm/bootstrap",
       { member: adminMember, health, dashboard },

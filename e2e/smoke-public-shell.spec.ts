@@ -237,9 +237,6 @@ test.describe("core smoke public shell", () => {
   expect(rootLayoutSource).toContain('pathname[1] !== "_"')
   expect(rootLayoutSource).toContain('pathname !== "/sitemap.xml"')
   expect(appSource).toContain("initialProfileSnapshot?: AdminProfile | null")
-  expect(readFileSync(path.resolve(__dirname, "../src/libs/server/guestPage.ts"), "utf8")).toContain(
-    "initialProfileSnapshot"
-  )
   expect(useAdminProfileSource).toContain("enabled?: boolean")
   expect(useAdminProfileSource).toContain("refetchOnMount?: boolean")
   expect(useAdminProfileSource).toContain("staleTimeMs?: number")

@@ -198,7 +198,7 @@ test.describe("legal policy public pages", () => {
     await expect(page.getByRole("heading", { name: "이용약관" })).toBeVisible()
   })
 
-  test("footer links to legal policies and privacy settings", async ({ page }) => {
+  test("footer links to legal policies and public cookie settings", async ({ page }) => {
     await mockAvatarAsset(page)
     await addPublicAboutSnapshotCookie(page)
     await mockFeedEndpoints(page)
@@ -215,6 +215,9 @@ test.describe("legal policy public pages", () => {
       "/terms",
     )
     await expect(footer.getByRole("link", { name: "쿠키 정책" })).toHaveAttribute("href", "/cookies")
-    await expect(footer.getByRole("link", { name: "쿠키 설정" })).toHaveAttribute("href", "/settings/privacy")
+    await expect(footer.getByRole("link", { name: "쿠키 설정" })).toHaveAttribute(
+      "href",
+      "/cookies#cookie-settings",
+    )
   })
 })

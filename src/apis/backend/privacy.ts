@@ -39,12 +39,6 @@ export type PrivacyRequestItem = {
   completedAt: string | null
 }
 
-export type AccountDeletionResult = {
-  memberId: number
-  deletedAt: string
-  revokedSessionCount: number
-}
-
 type RsData<T> = {
   resultCode: string
   msg: string
@@ -53,7 +47,6 @@ type RsData<T> = {
 
 const PRIVACY_EXPORT_PATH = "/member/api/v1/privacy/export"
 const PRIVACY_REQUESTS_PATH = "/member/api/v1/privacy/requests"
-const PRIVACY_ACCOUNT_PATH = "/member/api/v1/privacy/account"
 
 export const getPrivacyExport = () => apiFetch<RsData<PrivacyExportResponse>>(PRIVACY_EXPORT_PATH)
 
@@ -63,15 +56,5 @@ export const createPrivacyRequest = (input: {
 }) =>
   apiFetch<RsData<{ item: PrivacyRequestItem }>>(PRIVACY_REQUESTS_PATH, {
     method: "POST",
-    body: JSON.stringify(input),
-  })
-
-export const deletePrivacyAccount = (input: {
-  password?: string
-  oauthAccountDeletionConfirmed?: boolean
-  reason?: string
-}) =>
-  apiFetch<RsData<AccountDeletionResult>>(PRIVACY_ACCOUNT_PATH, {
-    method: "DELETE",
     body: JSON.stringify(input),
   })

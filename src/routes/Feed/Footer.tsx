@@ -26,7 +26,7 @@ const Footer: React.FC<Props> = ({ className }) => {
         <Link href={legalPolicyCurrentPaths.privacy}>개인정보처리방침</Link>
         <Link href={legalPolicyCurrentPaths.terms}>이용약관</Link>
         <Link href={legalPolicyCurrentPaths.cookies}>쿠키 정책</Link>
-        <Link href="/settings/privacy">쿠키 설정</Link>
+        <Link href="/cookies#cookie-settings">쿠키 설정</Link>
       </div>
     </StyledWrapper>
   )

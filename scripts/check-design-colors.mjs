@@ -8,7 +8,6 @@ const TARGET_PATHS = [
   "src/routes/EasySubway",
   "src/routes/Feed",
   "src/routes/Settings",
-  "src/components/auth",
   "src/layouts/RootLayout",
 ]
 

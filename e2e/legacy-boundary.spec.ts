@@ -72,6 +72,18 @@ test.describe("frontend legacy boundary", () => {
     expect(frontPathExists("src/pages/admin/editor/[id].tsx")).toBe(true)
   })
 
+  test("retired public account entrypoint is absent so Next serves its normal 404", () => {
+    expect(frontPathExists("src/pages/settings/account.tsx")).toBe(false)
+  })
+
+  test("production-orphan public auth sources are removed", () => {
+    expect(frontPathExists("src/components/auth")).toBe(false)
+    expect(frontPathExists("src/hooks/useSignupMailCooldown.ts")).toBe(false)
+    expect(frontPathExists("src/libs/authLoginPolicy.ts")).toBe(false)
+    expect(frontPathExists("src/libs/server/guestPage.ts")).toBe(false)
+    expect(frontPathExists("public/images/auth/kakao_login_simple_medium.png")).toBe(false)
+  })
+
   test("public comment and notification legacy modules are removed", () => {
     expect(frontPathExists("src/routes/Detail/PostDetail/CommentBox")).toBe(false)
     expect(frontPathExists("src/routes/Detail/PostDetail/DeferredCommentBox.tsx")).toBe(false)

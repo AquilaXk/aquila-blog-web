@@ -1,7 +1,5 @@
 import Link from "next/link"
-import { useRouter } from "next/router"
-import { FormEvent, useEffect, useRef, useState } from "react"
-import { getLegalReconsentStatus, LegalReconsentStatus, submitLegalReconsent } from "src/apis/backend/legal"
+import { FormEvent, useEffect, useState } from "react"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
 import {
   createPrivacyRequest,
@@ -18,7 +16,6 @@ import {
   readOptionalTrackingConsent,
   setOptionalTrackingConsent,
 } from "src/libs/privacy/optionalTrackingConsentCore"
-import { normalizeNextPath, replaceRoute } from "src/libs/router"
 import { EmptyState, Skeleton } from "src/design-system/StatePresenters"
 import SettingsLayout from "./SettingsLayout"
 import { privacyPageStyles } from "./SettingsPrivacyPage.styles"
@@ -43,35 +40,20 @@ const formatDateTime = (value?: string | null) => {
 
 const optionalTrackingSourceLabels: Record<OptionalTrackingConsentRecord["source"], string> = {
   settings: "개인정보 설정",
-  "signup-email": "이메일 회원가입",
-  "signup-social": "소셜 회원가입",
   "privacy-request": "개인정보 처리 요청",
-  "legal-reconsent": "법적 문서 재동의",
-  "legacy-string": "이전 저장 형식",
 }
 
-const RECONSENT_INCOMPLETE_MESSAGE = "세 항목을 모두 확인해야 계속 이용할 수 있습니다."
-
 const SettingsPrivacyPage = () => {
-  const router = useRouter()
   const [snapshot, setSnapshot] = useState<PrivacyExportResponse | null>(null)
   const [requestType, setRequestType] = useState<PrivacyRequestType>("EXPORT")
   const [message, setMessage] = useState("")
   const [createdRequest, setCreatedRequest] = useState<PrivacyRequestItem | null>(null)
-  const [legalReconsent, setLegalReconsent] = useState<LegalReconsentStatus | null>(null)
-  const [ageConfirmed, setAgeConfirmed] = useState(false)
-  const [privacyConfirmed, setPrivacyConfirmed] = useState(false)
-  const [overseasConfirmed, setOverseasConfirmed] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
-  const [legalFeedback, setLegalFeedback] = useState<FeedbackState | null>(null)
   const [trackingConsent, setTrackingConsent] = useState<OptionalTrackingConsentRecord | null>(null)
   const [trackingAllowed, setTrackingAllowed] = useState(false)
   const [browserPrivacySignal, setBrowserPrivacySignal] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [legalLoading, setLegalLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [legalSubmitting, setLegalSubmitting] = useState(false)
-  const reconsentFormRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -90,21 +72,6 @@ const SettingsPrivacyPage = () => {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
-      })
-    getLegalReconsentStatus()
-      .then((status) => {
-        if (!cancelled) setLegalReconsent(status)
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLegalFeedback({
-            tone: "danger",
-            text: toUserFacingMessage(error),
-          })
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLegalLoading(false)
       })
     return () => {
       cancelled = true
@@ -158,63 +125,6 @@ const SettingsPrivacyPage = () => {
     }
   }
 
-  const submitReconsent = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (legalSubmitting) return
-    if (!ageConfirmed || !privacyConfirmed || !overseasConfirmed) {
-      // 필수 3항목이 비면 서버 400을 만들지 않고 화면에서 먼저 되돌려 첫 미확인 항목으로 포커스를 옮긴다.
-      setLegalFeedback({ tone: "danger", text: RECONSENT_INCOMPLETE_MESSAGE })
-      reconsentFormRef.current?.querySelector<HTMLInputElement>('input[type="checkbox"]:not(:checked)')?.focus()
-      return
-    }
-    setLegalSubmitting(true)
-    setLegalFeedback(null)
-    try {
-      const response = await submitLegalReconsent({
-        age14OrOlder: ageConfirmed,
-        requiredPrivacyConfirmed: privacyConfirmed,
-        analyticsConsent: false,
-        overseasTransferAcknowledged: overseasConfirmed,
-      })
-      setLegalReconsent(response.data.legalReconsent)
-      setOptionalTrackingConsent(false, "legal-reconsent")
-      setLegalFeedback({ tone: "success", text: response.msg })
-      await replaceRoute(router, normalizeNextPath(router.query.next, "/"))
-    } catch (error) {
-      setLegalFeedback({
-        tone: "danger",
-        text: toUserFacingMessage(error),
-      })
-    } finally {
-      setLegalSubmitting(false)
-    }
-  }
-
-  const reconsentRequired = legalReconsent?.required === true
-  const nextPath = normalizeNextPath(router.query.next, "/")
-  const nextLabel = nextPath === "/" ? "홈" : nextPath
-  // 법무 문구 고정: 세 항목의 라벨은 회원가입 동의와 같은 문장을 그대로 유지해야 감사 기록이 일치한다.
-  const consentItems = [
-    {
-      id: "reconsent-age",
-      label: "만 14세 이상입니다.",
-      checked: ageConfirmed,
-      onChange: setAgeConfirmed,
-    },
-    {
-      id: "reconsent-privacy",
-      label: "필수 개인정보 처리 안내를 확인했습니다.",
-      checked: privacyConfirmed,
-      onChange: setPrivacyConfirmed,
-    },
-    {
-      id: "reconsent-overseas",
-      label: "국외 이전 및 외부 처리자 안내를 확인했습니다.",
-      checked: overseasConfirmed,
-      onChange: setOverseasConfirmed,
-    },
-  ]
-  const confirmedCount = consentItems.filter((item) => item.checked).length
   const trackingSummary = trackingAllowed ? "켜짐" : "꺼짐"
   const trackingConsentGranted = trackingConsent?.state === "granted"
   const trackingRecordLabel = trackingConsent
@@ -226,96 +136,6 @@ const SettingsPrivacyPage = () => {
   return (
     <SettingsLayout active="privacy" title="개인정보 관리">
       <div className="settingsGrid">
-        <section
-          className={reconsentRequired ? "panel gatePanel" : "panel"}
-          aria-label="법적 문서 재동의"
-          data-gate={reconsentRequired ? "required" : undefined}
-        >
-          {legalLoading ? (
-            <>
-              <h2>약관·개인정보처리방침 동의</h2>
-              <div className="statusSkeleton" aria-busy="true" aria-label="법적 문서 동의 상태 확인 중">
-                <Skeleton height="1rem" width="42%" />
-                <Skeleton height="1rem" width="66%" />
-              </div>
-            </>
-          ) : reconsentRequired && legalReconsent ? (
-            <>
-              <p className="sectionLabel">RECONSENT</p>
-              <h2 className="gateTitle">계속 이용하려면 다시 동의해 주세요</h2>
-              <p className="lead">
-                이용약관과 개인정보처리방침이 최신 버전(이용약관 {legalReconsent.termsVersion} · 개인정보처리방침{" "}
-                {legalReconsent.privacyVersion})으로 갱신되어, 아래 세 항목을 다시 확인해야 합니다.
-              </p>
-              {router.isReady ? (
-                <p className="gateReturn">
-                  동의를 마치면 <span className="gateReturnPath">{nextLabel}</span> 화면으로 자동으로 돌아갑니다.
-                </p>
-              ) : null}
-              <form className="consentForm" ref={reconsentFormRef} onSubmit={submitReconsent} noValidate>
-                <ul className="consentList">
-                  {consentItems.map((item) => (
-                    <li key={item.id}>
-                      <label className="consentRow">
-                        <input
-                          id={item.id}
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(event) => item.onChange(event.target.checked)}
-                        />
-                        <span className="consentText">{item.label}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-                <div className="actionRow">
-                  <button type="submit" className="actionPrimary" disabled={legalSubmitting}>
-                    {legalSubmitting ? "저장 중" : "동의하고 계속 이용"}
-                  </button>
-                  <p className="actionHint" role="status" aria-live="polite">
-                    필수 {confirmedCount}/{consentItems.length} 확인
-                  </p>
-                </div>
-              </form>
-              <p className="muted">
-                최신 문서는 <Link href="/terms">이용약관</Link>과 <Link href="/privacy">개인정보처리방침</Link>에서
-                확인할 수 있습니다. 동의하지 않으려면 아래 <a href="#privacy-requests">처리 요청</a>에서 내보내기 또는
-                삭제를 접수할 수 있습니다.
-              </p>
-            </>
-          ) : legalReconsent ? (
-            <>
-              <h2>약관·개인정보처리방침 동의</h2>
-              <p className="statusLine" data-tone="success">
-                <span className="statusDot" aria-hidden="true" />
-                최신 문서에 동의한 상태입니다.
-              </p>
-              <p className="muted">
-                {legalReconsent.acceptedAt ? `${formatDateTime(legalReconsent.acceptedAt)} 동의 · ` : ""}이용약관{" "}
-                {legalReconsent.termsVersion} · 개인정보처리방침 {legalReconsent.privacyVersion}
-              </p>
-              <p className="muted">
-                <Link href="/terms">이용약관</Link> · <Link href="/privacy">개인정보처리방침</Link>
-              </p>
-            </>
-          ) : (
-            <>
-              <h2>약관·개인정보처리방침 동의</h2>
-              <p className="muted">동의 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
-            </>
-          )}
-          {legalFeedback ? (
-            <p
-              className="feedback"
-              data-tone={legalFeedback.tone}
-              role={legalFeedback.tone === "danger" ? "alert" : "status"}
-              aria-live={legalFeedback.tone === "danger" ? undefined : "polite"}
-            >
-              {legalFeedback.text}
-            </p>
-          ) : null}
-        </section>
-
         <section className="panel" aria-label="선택 analytics와 RUM 설정">
           <h2>선택 분석</h2>
           <p className="lead">

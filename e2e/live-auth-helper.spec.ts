@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { isLegalReconsentGateUrl, isNavigationInterruptedError, resolveApiBaseUrl } from "./helpers/liveAuth"
+import { isNavigationInterruptedError, resolveApiBaseUrl } from "./helpers/liveAuth"
 
 test.describe("live auth navigation helper", () => {
   test("treats Playwright net ERR_ABORTED as a retriable navigation interruption", () => {
@@ -19,12 +19,6 @@ test.describe("live auth navigation helper", () => {
     const error = new Error("page.goto: net::ERR_NAME_NOT_RESOLVED at https://blog.aquilaxk.site/admin/editor/new")
 
     expect(isNavigationInterruptedError(error)).toBe(false)
-  })
-
-  test("detects legal reconsent gate urls", () => {
-    expect(isLegalReconsentGateUrl("https://blog.aquilaxk.site/settings/privacy?reconsent=required")).toBe(true)
-    expect(isLegalReconsentGateUrl("https://blog.aquilaxk.site/settings/privacy")).toBe(false)
-    expect(isLegalReconsentGateUrl("https://blog.aquilaxk.site/admin/editor/new")).toBe(false)
   })
 
   test("uses the production web origin for the API while preserving localhost's explicit port", () => {
