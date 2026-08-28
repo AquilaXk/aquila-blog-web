@@ -328,18 +328,18 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(snapshot.viewport.width).toBe(768)
       expect(snapshot.viewport.height).toBe(1024)
 
-      // admin/dashboard는 SSR auth guard를 통과하지 못하면 /login fallback을 탈 수 있다.
+      // admin/dashboard는 SSR auth guard를 통과하지 못하면 /admin/login fallback을 탈 수 있다.
       // (예: perf CI의 backend 단절 모드, 로컬 미로그인 상태, SSR auth backend 비가용)
       // 단, 이 fallback 허용은 명시 플래그(PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true) 또는
       // backend 단절 perf 모드에서만 허용한다. 기본은 dashboard 진입 실패를 테스트 실패로 본다.
-      if (snapshot.route === "/login") {
+      if (snapshot.route === "/admin/login") {
         if (!allowAdminDashboardLoginFallback) {
           throw new Error(
-            `[perf] admin-dashboard unexpected fallback=/login (set PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true only when intentionally testing auth fallback)`
+            `[perf] admin-dashboard unexpected fallback=/admin/login (set PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true only when intentionally testing auth fallback)`
           )
         }
         console.info(
-          `[perf] admin-dashboard fallback=/login backendDisconnected=${String(isSsrAuthBackendDisconnectedForPerf)} allowFallback=${String(allowAdminDashboardLoginFallback)}`
+          `[perf] admin-dashboard fallback=/admin/login backendDisconnected=${String(isSsrAuthBackendDisconnectedForPerf)} allowFallback=${String(allowAdminDashboardLoginFallback)}`
         )
         const htmlScrollWidth = snapshot.scrollWidth?.html ?? 0
         const bodyScrollWidth = snapshot.scrollWidth?.body ?? 0
@@ -385,7 +385,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   }
 })
 
-  test("공개와 인증 핵심 화면은 system light V4 표면 계층을 유지한다", async ({ page }) => {
+  test("공개와 관리자 로그인 화면은 system light V4 표면 계층을 유지한다", async ({ page }) => {
   test.setTimeout(60_000)
   await mockFeedEndpoints(page, {
     adminProfile: {
@@ -403,10 +403,10 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     { route: "/posts/991", viewport: { width: 393, height: 852 } },
     { route: "/posts/991", viewport: { width: 768, height: 1024 } },
   ] as const
-  const authScenarios = [
-    { route: "/login", viewport: { width: 1440, height: 900 } },
-    { route: "/login", viewport: { width: 393, height: 852 } },
-    { route: "/login", viewport: { width: 768, height: 1024 } },
+  const adminLoginScenarios = [
+    { route: "/admin/login", viewport: { width: 1440, height: 900 } },
+    { route: "/admin/login", viewport: { width: 393, height: 852 } },
+    { route: "/admin/login", viewport: { width: 768, height: 1024 } },
   ] as const
   const v4PaperBackground = "rgb(247, 247, 245)"
 
@@ -443,7 +443,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     }
   }
 
-  for (const scenario of authScenarios) {
+  for (const scenario of adminLoginScenarios) {
     await applySchemePreference(page, "light")
     await page.setViewportSize(scenario.viewport)
     await gotoForPerf(page, scenario.route)
@@ -453,14 +453,27 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       })
       .toBe(v4PaperBackground)
     const fingerprint = await getThemeSurfaceFingerprint(page)
+    const loginPanel = page.getByRole("heading", { name: "관리자 로그인" }).locator("..")
+    await expect(loginPanel).toBeVisible()
+    const loginSurface = await loginPanel.evaluate((panel) => {
+      const style = getComputedStyle(panel)
+      return {
+        background: style.backgroundColor,
+        width: panel.getBoundingClientRect().width,
+        viewportWidth: window.innerWidth,
+        htmlScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+      }
+    })
     expect(fingerprint.route).toBe(scenario.route)
     expect(fingerprint.bodyBg).toBe(v4PaperBackground)
-    expect(fingerprint.headerBg).not.toBeNull()
-    expect(fingerprint.headerBg).not.toBe("rgb(255, 255, 255)")
-    expect(fingerprint.headerBg).not.toBe(fingerprint.bodyBg)
+    expect(fingerprint.headerBg).toBeNull()
     expect(fingerprint.themeToggleLabel).toBeNull()
-    // 패밀리룩(1219): 인증 셸은 라운드 카드 → 투명 에디토리얼 컬럼. 카드 면/보더가 없어야 한다.
-    expect(fingerprint.authShellBg).toBe("rgba(0, 0, 0, 0)")
+    expect(fingerprint.authShellBg).toBeNull()
+    expect(loginSurface.background).not.toBe("rgba(0, 0, 0, 0)")
+    expect(loginSurface.width).toBeLessThanOrEqual(loginSurface.viewportWidth)
+    expect(loginSurface.htmlScrollWidth).toBeLessThanOrEqual(loginSurface.viewportWidth)
+    expect(loginSurface.bodyScrollWidth).toBeLessThanOrEqual(loginSurface.viewportWidth)
   }
 })
 })

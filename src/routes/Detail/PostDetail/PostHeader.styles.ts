@@ -1,6 +1,5 @@
 import styled from "@emotion/styled";
 import { control } from "src/design-system/tokens";
-import { HEADER_AUTH_ADMIN_ATTR } from "src/libs/headerAuthShell";
 export const StyledWrapper = styled.header `
   width: min(100%, 880px);
   margin: 0 auto;
@@ -171,21 +170,6 @@ export const StyledWrapper = styled.header `
     font-weight: 600;
   }
 
-  .authorUtilities {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-  }
-
-  .authorUtilities[data-shell-only="true"] {
-    display: none;
-  }
-
-  html[${HEADER_AUTH_ADMIN_ATTR}="true"] & .authorUtilities[data-shell-only="true"] {
-    display: inline-flex;
-  }
-
   .actions {
     display: inline-flex;
     align-items: center;
@@ -215,44 +199,6 @@ export const StyledWrapper = styled.header `
     font-size: 0.82rem;
     font-weight: 650;
     line-height: 1;
-  }
-
-  .adminButton {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.42rem;
-    min-height: 40px;
-    padding: 0 0.9rem;
-    border-radius: 6px;
-    border: 1px solid #dfe1e5;
-    background: transparent;
-    color: #111216;
-    font-size: 0.9rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition:
-      border-color 0.18s ease,
-      background-color 0.18s ease,
-      color 0.18s ease;
-
-    :disabled {
-      opacity: 0.72;
-      cursor: not-allowed;
-    }
-  }
-
-  .adminButton[data-shell-fallback="true"] {
-    display: none;
-  }
-
-  html[${HEADER_AUTH_ADMIN_ATTR}="true"] & .adminButton[data-shell-fallback="true"] {
-    display: inline-flex;
-  }
-
-  .dangerButton {
-    border-color: #ead0d0;
-    background: transparent;
-    color: #c33a3a;
   }
 
   .likeButton {
@@ -371,7 +317,6 @@ export const StyledWrapper = styled.header `
     }
 
     .shareFeedbackPill,
-    .adminButton,
     .likeButton,
     .shareButton {
       min-height: ${control.lg}px;

@@ -15,7 +15,6 @@ import {
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioLegacyProfileSection } from "./EditorStudioLegacyProfileSection"
-import { EditorStudioLegacyUtilityPanel } from "./EditorStudioLegacyUtilityPanel"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDeleteConfirmDialog } from "./EditorStudioDeleteConfirmDialog"
 import { EditorStudioComposeWorkspace } from "./EditorStudioComposeWorkspace"
@@ -28,7 +27,7 @@ import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGua
 import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
 import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
-import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, SHOW_LEGACY_UTILITY_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
+import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
 
 type EditorStudioWorkspaceControllerRootViewProps = {
   props: Record<string, any>
@@ -47,8 +46,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     clearLocalDraft,
     closeDeleteConfirm,
     closePublishModal,
-    commentContent,
-    commentId,
     commitPreviewThumbTransform,
     copyPostDetailLink,
     customCategoryCatalog,
@@ -71,13 +68,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleConfirmPublish,
     handleContinueSelectedPostEditing,
     handleCreateNewPostFromSelectedPanel,
-    handleDeleteComment,
     handleDeleteSelectedPost,
     handleExitDedicatedEditor,
     handleFlushMarkdownReady,
     handleHitPost,
-    handleLikePost,
-    handleListComments,
     handleListPageChange,
     handleListPageSizeChange,
     handleListSortChange,
@@ -86,11 +80,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handlePostCategoryChange,
     handlePostSummaryChange,
     handlePreviewSummary,
-    handleModifyComment,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
     handleProfileImageSelected,
-    handleReadComment,
     handleReadPostCount,
     handleReadSystemHealth,
     handleRefreshAdminProfile,
@@ -103,7 +95,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleTitleKeyDown,
     handleUndoSoftDelete,
     handleUpdateMemberProfileCard,
-    handleWriteComment,
     hardDeleteDeletedPostFromList,
     isAllVisiblePostsSelected,
     isCompactMobileLayout,
@@ -188,8 +179,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     serverBaselineEditorFingerprintRef,
     sessionMember,
     setActiveMetaPanel,
-    setCommentContent,
-    setCommentId,
     setIsComposeAssistOpen,
     setIsComposeUtilityOpen,
     setIsDirectLoadOpen,
@@ -921,10 +910,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
               onRunHitPost={() =>
                 handleHitPost()
               }
-              isLikePostDisabled={disabled("likePost")}
-              onRunLikePost={() =>
-                handleLikePost()
-              }
               softDeleteUndoMessage={softDeleteUndoState?.message || ""}
               isSoftDeleteUndoVisible={Boolean(softDeleteUndoState)}
               isUndoDisabled={disabled("undoDeletePost")}
@@ -1069,30 +1054,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
           />
         ) : null}
 
-          {SHOW_LEGACY_UTILITY_STUDIO && (
-            <EditorStudioLegacyUtilityPanel
-              commentContent={commentContent}
-              commentId={commentId}
-              isCommentDeleteDisabled={disabled("commentDelete")}
-              isCommentListDisabled={disabled("commentList")}
-              isCommentModifyDisabled={disabled("commentModify")}
-              isCommentOneDisabled={disabled("commentOne")}
-              isCommentWriteDisabled={disabled("commentWrite")}
-              isPostCountDisabled={disabled("admPostCount")}
-              isSystemHealthDisabled={disabled("systemHealth")}
-              postId={postId}
-              onCommentContentChange={setCommentContent}
-              onCommentIdChange={setCommentId}
-              onDeleteComment={handleDeleteComment}
-              onListComments={handleListComments}
-              onModifyComment={handleModifyComment}
-              onPostIdChange={setPostId}
-              onReadComment={handleReadComment}
-              onReadPostCount={handleReadPostCount}
-              onReadSystemHealth={handleReadSystemHealth}
-              onWriteComment={handleWriteComment}
-            />
-          )}
         </WorkspaceMain>
 
       </WorkspaceGrid>

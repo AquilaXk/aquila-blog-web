@@ -32,7 +32,6 @@ const POSTS = Array.from({ length: 9 }, (_, index) =>
     category: [index === 0 ? "Security" : TAGS[index % TAGS.length].tag],
     thumbnail: index % 3 === 0 ? "" : `/mock-cover-${index}.png`,
     hitCount: 1200 + index * 137,
-    commentsCount: index,
     likesCount: index + 1,
     createdAt: `2026-06-${String(10 + index).padStart(2, "0")}T00:00:00Z`,
     modifiedAt: `2026-06-${String(10 + index).padStart(2, "0")}T00:00:00Z`,

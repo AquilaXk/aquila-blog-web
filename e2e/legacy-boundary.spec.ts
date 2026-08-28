@@ -14,8 +14,8 @@ test.describe("frontend legacy boundary", () => {
       }
     }
 
-    expect(packageJson.name).toBe("aquila-blog")
-    expect(packageJson.repository?.url).toBe("https://github.com/AquilaXk/aquila-blog.git")
+    expect(packageJson.name).toBe("aquila-blog-web")
+    expect(packageJson.repository?.url).toBe("https://github.com/AquilaXk/aquila-blog-web.git")
     expect(JSON.stringify(packageJson)).not.toContain("morethan-log")
     expect(JSON.stringify(packageJson)).not.toContain("morethanmin")
   })
@@ -57,5 +57,32 @@ test.describe("frontend legacy boundary", () => {
     expect(canonicalPostPage).toContain('import PostDetail from "src/routes/Detail/PostDetail"')
     expect(frontPathExists("src/routes/Detail/index.tsx")).toBe(false)
     expect(frontPathExists("src/routes/Detail/PageDetail/index.tsx")).toBe(false)
+  })
+
+  test("public auth and legacy editor page entrypoints are removed without redirects", () => {
+    expect(frontPathExists("src/pages/login.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/signup.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/signup/verify.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/signup/social/complete.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/editor")).toBe(false)
+    expect(frontPathExists("src/pages/admin/posts/write.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/admin/posts/new.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/admin/editor/index.tsx")).toBe(true)
+    expect(frontPathExists("src/pages/admin/editor/new.tsx")).toBe(true)
+    expect(frontPathExists("src/pages/admin/editor/[id].tsx")).toBe(true)
+  })
+
+  test("public comment and notification legacy modules are removed", () => {
+    expect(frontPathExists("src/routes/Detail/PostDetail/CommentBox")).toBe(false)
+    expect(frontPathExists("src/routes/Detail/PostDetail/DeferredCommentBox.tsx")).toBe(false)
+    expect(frontPathExists("src/layouts/RootLayout/Header/NotificationBell.tsx")).toBe(false)
+    expect(frontPathExists("src/layouts/RootLayout/Header/useNotificationBellState.ts")).toBe(false)
+    expect(frontPathExists("src/apis/backend/notifications.ts")).toBe(false)
+
+    expect(readFrontText("src/types/index.ts")).not.toContain("TPostComment")
+
+    const backendClient = readFrontText("src/apis/backend/client.ts")
+    expect(backendClient).not.toContain("/member/api/v1/notifications/snapshot")
+    expect(backendClient).not.toContain("/member/api/v1/notifications(\\/|$)")
   })
 })

@@ -55,7 +55,7 @@ export const RECENT_POSTS_UNAVAILABLE_MESSAGE = "목록 연결 후 최근 수정
 
 const toEditorRoute = (query?: Record<string, string>) => {
   if (query?.postId) {
-    return `/editor/${encodeURIComponent(query.postId)}`
+    return `/admin/editor/${encodeURIComponent(query.postId)}`
   }
 
   const search = query ? new URLSearchParams(query).toString() : ""

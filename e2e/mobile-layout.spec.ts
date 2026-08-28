@@ -158,7 +158,6 @@ const createExplorePage = (title: string, tag = "모바일테스트") => ({
       published: true,
       listed: true,
       likesCount: 0,
-      commentsCount: 0,
       hitCount: 0,
     },
   ],
@@ -293,9 +292,7 @@ type MockDetailOverrides = {
   title?: string
   content?: string
   likesCount?: number
-  commentsCount?: number
   hitCount?: number
-  actorHasLiked?: boolean
   actorCanModify?: boolean
   actorCanDelete?: boolean
 }
@@ -322,9 +319,7 @@ const mockDetailEndpoint = async (page: Page, overrides: MockDetailOverrides = {
     title: overrideTitle,
     content: overrideContent,
     likesCount: overrideLikesCount,
-    commentsCount: overrideCommentsCount,
     hitCount: overrideHitCount,
-    actorHasLiked: overrideActorHasLiked,
     actorCanModify: overrideActorCanModify,
     actorCanDelete: overrideActorCanDelete,
   } = overrides
@@ -350,9 +345,7 @@ const mockDetailEndpoint = async (page: Page, overrides: MockDetailOverrides = {
         published: true,
         listed: true,
         likesCount: overrideLikesCount ?? 0,
-        commentsCount: overrideCommentsCount ?? 0,
         hitCount: overrideHitCount ?? 0,
-        actorHasLiked: overrideActorHasLiked ?? false,
         actorCanModify: overrideActorCanModify ?? false,
         actorCanDelete: overrideActorCanDelete ?? false,
       }),

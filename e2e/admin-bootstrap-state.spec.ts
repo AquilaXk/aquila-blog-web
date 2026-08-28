@@ -3,6 +3,18 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 test.describe("admin bootstrap state contract", () => {
+  test("관리자 로그인은 기존 비관리자 세션의 계정 전환을 허용하고 새 비관리자 세션을 종료한다", () => {
+    const loginSource = readFileSync(
+      path.resolve(__dirname, "../src/pages/admin/login.tsx"),
+      "utf8"
+    )
+
+    expect(loginSource).toContain("if (member?.isAdmin)")
+    expect(loginSource).not.toMatch(/if \(member\) \{[\s\S]*?destination: "\/"/)
+    expect(loginSource).toContain('await apiFetch("/member/api/v1/auth/logout", { method: "POST" })')
+    expect(loginSource).toContain('setError("관리자 권한이 필요한 페이지입니다.")')
+  })
+
   test("관리자 허브는 auth/session 선조회 대신 protected bootstrap으로 first paint 프로필을 구성한다", () => {
     const adminSource = readFileSync(path.resolve(__dirname, "../src/pages/admin.tsx"), "utf8")
 
@@ -41,8 +53,9 @@ test.describe("admin bootstrap state contract", () => {
     expect(adminPageSource).toContain("import { serverApiFetchJson } from \"./backend\"")
     expect(adminPageSource).toContain("const value = await serverApiFetchJson<T>(req, path)")
     expect(adminPageSource).toContain("const shouldDeferRedirectToFallback = hasServerAuthCookie(req)")
+    expect(adminPageSource).toContain('import { normalizeAdminNextPath, toAdminLoginPath } from "src/libs/router"')
     expect(adminPageSource).toMatch(
-      /destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*toLoginPath\(normalizeNextPath\(req\.url, fallbackPath\), fallbackPath\)/
+      /destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*toAdminLoginPath\(normalizeAdminNextPath\(req\.url, fallbackPath\), fallbackPath\)/
     )
     expect(adminPageSource).toMatch(/destination:\s*shouldDeferRedirectToFallback\s*\?\s*null\s*:\s*"\/"/)
     expect(adminPageSource).not.toMatch(/if\s*\(\s*!response\.ok\s*\)\s*\{\s*return\s*\{\s*ok:\s*false,\s*destination:\s*null/)

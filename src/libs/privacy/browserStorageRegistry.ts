@@ -253,15 +253,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "sessionStorage",
-    key: "header.auth-shell.v1",
-    purpose: "header-auth-shell-snapshot",
-    required: false,
-    retention: "browser tab session",
-    deletion: "tab close, auth state refresh, or browser storage deletion",
-    stores: "authenticated/admin booleans for first paint",
-  },
-  {
-    area: "sessionStorage",
     key: "member.notification.lastEventId.v1",
     purpose: "notification-sse-resume",
     required: false,

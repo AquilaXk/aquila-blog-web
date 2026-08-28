@@ -12,8 +12,6 @@ type EditorStudioSelectedPostToolsPanelProps = {
   onLoadPost: () => void
   isHitPostDisabled: boolean
   onRunHitPost: () => void
-  isLikePostDisabled: boolean
-  onRunLikePost: () => void
 }
 
 export const EditorStudioSelectedPostToolsPanel = ({
@@ -28,8 +26,6 @@ export const EditorStudioSelectedPostToolsPanel = ({
   onLoadPost,
   isHitPostDisabled,
   onRunHitPost,
-  isLikePostDisabled,
-  onRunLikePost,
 }: EditorStudioSelectedPostToolsPanelProps) => {
   const directLoadTitle = hasSelectedManagedPost ? "다른 글 직접 불러오기" : "post id 직접 불러오기"
   const directLoadHint = hasSelectedManagedPost
@@ -96,13 +92,6 @@ export const EditorStudioSelectedPostToolsPanel = ({
                   onClick={onRunHitPost}
                 >
                   조회수 테스트
-                </Button>
-                <Button
-                  type="button"
-                  disabled={isLikePostDisabled}
-                  onClick={onRunLikePost}
-                >
-                  좋아요 반영 테스트
                 </Button>
               </SubActionRow>
             </div>

@@ -24,7 +24,6 @@ const postPayload = (overrides: Record<string, unknown> = {}): ApiPostWithConten
     published: true,
     listed: true,
     likesCount: 0,
-    commentsCount: 0,
     hitCount: 0,
     ...overrides,
   }) as ApiPostWithContentDto

@@ -15,7 +15,6 @@ import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import {
   AQUILA_SCHEME_BOOTSTRAP_SCRIPT,
   CLIENT_RUNTIME_RECOVERY_SCRIPT,
-  HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT,
 } from "src/libs/security/documentInlineScripts"
 
 // 런타임 주입(AQUILA_BUILD_SHA) → 빌드 시점 인라인(NEXT_PUBLIC_AQUILA_BUILD_SHA) → CI(GITHUB_SHA) 순으로 읽는다.
@@ -71,7 +70,7 @@ class MyDocument extends Document<SurfaceAwareDocumentProps> {
     const { hasBlogFeedAlternate } = this.props
 
     return (
-      <Html lang={CONFIG.lang} data-header-auth-shell="anonymous" data-header-auth-admin="false">
+      <Html lang={CONFIG.lang}>
         <Head>
           <script dangerouslySetInnerHTML={{ __html: AQUILA_SCHEME_BOOTSTRAP_SCRIPT }} />
           <link rel="icon" href="/favicon.ico" />
@@ -109,7 +108,6 @@ class MyDocument extends Document<SurfaceAwareDocumentProps> {
           )}
         </Head>
         <body className={pretendard.className}>
-          <script dangerouslySetInnerHTML={{ __html: HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT }} />
           <script dangerouslySetInnerHTML={{ __html: CLIENT_RUNTIME_RECOVERY_SCRIPT }} />
           <Main />
           <NextScript />

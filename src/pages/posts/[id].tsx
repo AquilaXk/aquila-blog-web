@@ -6,7 +6,6 @@ import MetaConfig from "src/components/MetaConfig"
 import PostDetail from "src/routes/Detail/PostDetail"
 import usePostQuery from "src/hooks/usePostQuery"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
-import { TPostComment } from "src/types"
 import {
   buildCanonicalPostDetailStaticPaths,
   buildCanonicalPostDetailStaticProps,
@@ -26,14 +25,11 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
 }
 
 type DetailPageProps = {
-  initialComments: TPostComment[] | null
   initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: PublicAdminProfileSource
 }
 
-const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = ({
-  initialComments,
-}) => {
+const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = () => {
   const { post, isNotFound, isError, isPending, refetch } = usePostQuery()
   const renderState = resolvePostDetailRenderState({
     isNotFound,
@@ -80,12 +76,6 @@ const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = ({
             <div className="line wide" />
             <div className="line medium" />
             <div className="line narrow" />
-            <div className="commentShell">
-              <div className="commentHead" />
-              <div className="commentComposer" />
-              <div className="commentRow" />
-              <div className="commentRow" />
-            </div>
           </div>
           <div className="rail" aria-hidden="true">
             <div className="railCard" />
@@ -104,7 +94,7 @@ const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = ({
     <>
       <MetaConfig {...meta} />
       <DetailShell data-type={post.type}>
-        <PostDetail initialComments={initialComments} />
+        <PostDetail />
       </DetailShell>
     </>
   )
@@ -213,28 +203,6 @@ const LoadingShell = styled.section`
 
   .line.narrow {
     width: min(70%, 620px);
-  }
-
-  .commentShell {
-    display: grid;
-    gap: 0.75rem;
-    padding-top: 1.1rem;
-    border-top: 1px solid ${({ theme }) => theme.colors.gray5};
-  }
-
-  .commentHead {
-    height: 24px;
-    width: min(28%, 180px);
-  }
-
-  .commentComposer {
-    height: 108px;
-    width: 100%;
-  }
-
-  .commentRow {
-    height: 72px;
-    width: 100%;
   }
 
   @keyframes detail-skeleton-pulse {

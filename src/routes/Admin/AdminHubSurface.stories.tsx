@@ -9,7 +9,7 @@ const meta: Meta<typeof AdminHubSurface> = {
     displayName: "aquila",
     recentWorkSummary: "최근 업데이트 2026-03-24 14:05 · 프로필 80% · 연결 4개",
     primaryAction: {
-      href: "/editor/new",
+      href: "/admin/editor/new",
       cta: "작성",
       secondaryHref: "/admin/posts",
     },
@@ -20,8 +20,8 @@ const meta: Meta<typeof AdminHubSurface> = {
       { label: "EVENTS", value: "0", detail: "security events", tone: "neutral" },
     ],
     contentItems: [
-      { href: "/editor/1", title: "Spring Boot 운영 기록", meta: "2026-03-24 14:05 · #1", status: "PUBLISHED", tone: "good" },
-      { href: "/editor/2", title: "Kotlin 트레이드오프 정리", meta: "2026-03-23 09:10 · #2", status: "DRAFT" },
+      { href: "/admin/editor/1", title: "Spring Boot 운영 기록", meta: "2026-03-24 14:05 · #1", status: "PUBLISHED", tone: "good" },
+      { href: "/admin/editor/2", title: "Kotlin 트레이드오프 정리", meta: "2026-03-23 09:10 · #2", status: "DRAFT" },
     ],
     serviceStatusItems: [
       { label: "Public API", value: "서비스 정상", tone: "good" },

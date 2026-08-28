@@ -157,9 +157,7 @@ test.describe("adaptivity font-scale", () => {
           published: true,
           listed: true,
           likesCount: 1,
-          commentsCount: 0,
           hitCount: 10,
-          actorHasLiked: false,
           actorCanModify: false,
           actorCanDelete: false,
         }),
@@ -172,14 +170,6 @@ test.describe("adaptivity font-scale", () => {
         body: JSON.stringify({ resultCode: "200-1", msg: "ok", data: { hitCount: 11 } }),
       })
     })
-    await page.route("**/post/api/v1/posts/991/comments", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([]),
-      })
-    })
-
     await prepareRootFontScale(page, 125)
     await page.goto("/posts/991")
     await expect(page.locator("main")).toBeVisible()

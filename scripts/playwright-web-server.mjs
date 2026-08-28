@@ -6,6 +6,8 @@ import { fileURLToPath } from "url"
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const buildIdPath = path.join(projectRoot, ".next", "BUILD_ID")
 const buildSignaturePath = path.join(projectRoot, ".next", "playwright-build-signature.json")
+const standaloneRoot = path.join(projectRoot, ".next", "standalone")
+const standaloneServerPath = path.join(standaloneRoot, "server.js")
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000"
 const resolvedPort = (() => {
   try {
@@ -86,10 +88,27 @@ if (resolveNeedsBuild()) {
   fs.writeFileSync(buildSignaturePath, JSON.stringify(buildSignature))
 }
 
-const startResult = spawnSync("yarn", ["start", "-H", "127.0.0.1", "-p", resolvedPort], {
-  cwd: projectRoot,
+if (!fs.existsSync(standaloneServerPath)) {
+  throw new Error("Playwright standalone server output is missing")
+}
+
+fs.cpSync(path.join(projectRoot, ".next", "static"), path.join(standaloneRoot, ".next", "static"), {
+  recursive: true,
+  force: true,
+})
+fs.cpSync(path.join(projectRoot, "public"), path.join(standaloneRoot, "public"), {
+  recursive: true,
+  force: true,
+})
+
+const startResult = spawnSync(process.execPath, [standaloneServerPath], {
+  cwd: standaloneRoot,
   stdio: "inherit",
-  env: process.env,
+  env: {
+    ...process.env,
+    HOSTNAME: "127.0.0.1",
+    PORT: resolvedPort,
+  },
 })
 
 process.exit(startResult.status ?? 0)

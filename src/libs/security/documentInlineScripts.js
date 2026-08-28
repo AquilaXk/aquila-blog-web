@@ -3,10 +3,6 @@
  * CSP `script-src` hashes must match these strings byte-for-byte.
  */
 
-const HEADER_AUTH_SHELL_STORAGE_KEY = "header.auth-shell.v1"
-const HEADER_AUTH_SHELL_ATTR = "data-header-auth-shell"
-const HEADER_AUTH_ADMIN_ATTR = "data-header-auth-admin"
-
 /** @type {string} */
 const AQUILA_SCHEME_BOOTSTRAP_SCRIPT = `
 (function () {
@@ -25,39 +21,6 @@ const AQUILA_SCHEME_BOOTSTRAP_SCRIPT = `
   style.setAttribute("data-aquila-scheme-bootstrap-style", "true");
   style.textContent = "html[data-aquila-scheme-bootstrap]{background:" + background + ";color-scheme:" + nextScheme + ";}html[data-aquila-scheme-bootstrap] body{background:" + background + ";color:" + foreground + ";color-scheme:" + nextScheme + ";}";
   document.head.appendChild(style);
-})();
-`
-
-/** @type {string} */
-const HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT = `
-(function () {
-  if (typeof window === "undefined" || typeof document === "undefined") return;
-  var storageKey = "${HEADER_AUTH_SHELL_STORAGE_KEY}";
-  var shellAttr = "${HEADER_AUTH_SHELL_ATTR}";
-  var adminAttr = "${HEADER_AUTH_ADMIN_ATTR}";
-  var normalize = function (value) {
-    if (!value || typeof value.authenticated !== "boolean" || typeof value.admin !== "boolean") {
-      return null;
-    }
-    return {
-      authenticated: value.authenticated,
-      admin: value.admin
-    };
-  };
-  var apply = function (snapshot) {
-    var normalized = normalize(snapshot);
-    var shell = normalized && normalized.authenticated ? "authenticated" : "anonymous";
-    var admin = normalized && normalized.authenticated && normalized.admin ? "true" : "false";
-    document.documentElement.setAttribute(shellAttr, shell);
-    document.documentElement.setAttribute(adminAttr, admin);
-    window.__AQ_HEADER_AUTH_SHELL__ = normalized;
-  };
-  try {
-    var raw = window.sessionStorage.getItem(storageKey);
-    apply(raw ? JSON.parse(raw) : null);
-  } catch (_) {
-    apply(null);
-  }
 })();
 `
 
@@ -142,6 +105,5 @@ const CLIENT_RUNTIME_RECOVERY_SCRIPT = `
 
 module.exports = {
   AQUILA_SCHEME_BOOTSTRAP_SCRIPT,
-  HEADER_AUTH_SHELL_BOOTSTRAP_SCRIPT,
   CLIENT_RUNTIME_RECOVERY_SCRIPT,
 }

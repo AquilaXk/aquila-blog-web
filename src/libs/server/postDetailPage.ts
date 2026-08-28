@@ -11,13 +11,11 @@ import {
   resolveStaticAdminProfileSeed,
 } from "src/libs/server/adminProfile"
 import type { StaticAdminProfileSeedSource } from "src/libs/adminProfileSource"
-import { TPostComment } from "src/types"
 
 export { resolveStaticAdminProfileSeed } from "src/libs/server/adminProfile"
 
 type DetailPageProps = {
   dehydratedState: unknown
-  initialComments: TPostComment[] | null
   initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: StaticAdminProfileSeedSource
 }
@@ -52,7 +50,6 @@ export const buildCanonicalPostDetailStaticProps = async (
     return {
       props: {
         dehydratedState: toSerializableState(dehydrate(queryClient)),
-        initialComments: null,
         initialAdminProfile,
         initialAdminProfileSource,
       },
@@ -74,17 +71,9 @@ export const buildCanonicalPostDetailStaticProps = async (
   if (postDetail) {
     queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
   }
-  const initialComments =
-    postDetail && postDetail.type[0] === "Post"
-      ? typeof postDetail.commentsCount === "number" && postDetail.commentsCount === 0
-        ? []
-        : null
-      : null
-
   return {
     props: {
       dehydratedState: toSerializableState(dehydrate(queryClient)),
-      initialComments,
       initialAdminProfile,
       initialAdminProfileSource,
     },

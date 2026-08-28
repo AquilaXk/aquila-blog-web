@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { readFileSync } from "fs"
+import { existsSync, readFileSync } from "fs"
 import path from "path"
 import { resolveStaticAdminProfileSeed } from "../src/libs/server/postDetailPage"
 import {
@@ -113,14 +113,6 @@ test.describe("core smoke public shell", () => {
   const headerSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/index.tsx"), "utf8")
   const navBarSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/NavBar.tsx"), "utf8")
   const logoSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/Logo.tsx"), "utf8")
-  const notificationBellStyleSource = readFileSync(
-    path.resolve(__dirname, "../src/layouts/RootLayout/Header/NotificationBell.styles.ts"),
-    "utf8"
-  )
-  const notificationBellStateSource = readFileSync(
-    path.resolve(__dirname, "../src/layouts/RootLayout/Header/useNotificationBellState.ts"),
-    "utf8"
-  )
   const adminShellSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminShell.tsx"), "utf8")
   const adminPageSource = readFileSync(path.resolve(__dirname, "../src/libs/server/adminPage.ts"), "utf8")
   const appSource = readFileSync(path.resolve(__dirname, "../src/pages/_app.tsx"), "utf8")
@@ -204,17 +196,9 @@ test.describe("core smoke public shell", () => {
   expect(navBarSource).toContain(".searchTrigger {\n      height: ${control.lg}px;\n      min-height: ${control.lg}px;")
   expect(navBarSource).toContain(".mobileMenuButton {\n      display: grid;")
   expect(navBarSource).not.toContain(".mobileMenuPanel {\n      display: grid;")
-  expect(notificationBellStyleSource).toContain("@media (max-width: ${layoutBreakpoint.navCompact}px)")
-  expect(notificationBellStyleSource).toContain("width: ${control.lg}px;")
-  expect(notificationBellStyleSource).toContain("height: ${control.lg}px;")
-  expect(notificationBellStyleSource).toContain("border-radius: 6px;")
-  expect(notificationBellStyleSource).not.toContain("@media (max-width: 720px)")
-  expect(notificationBellStyleSource).not.toContain("transform: translateY(-1px);")
-  expect(notificationBellStyleSource).not.toContain("theme.variables.navControl.height")
-  expect(notificationBellStateSource).toContain(
-    "window.matchMedia(`(max-width: ${layoutBreakpoint.navCompact}px)`)"
-  )
-  expect(notificationBellStateSource).not.toContain('window.matchMedia("(max-width: 720px)")')
+  expect(existsSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/NotificationBell.tsx"))).toBe(false)
+  expect(existsSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/NotificationBell.styles.ts"))).toBe(false)
+  expect(existsSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/useNotificationBellState.ts"))).toBe(false)
   expect(headerSource).not.toContain('blogDesign === "grid"')
   expect(logoSource).not.toContain("useAdminProfile")
   expect(logoSource).not.toContain('blogDesign === "grid"')
@@ -247,8 +231,9 @@ test.describe("core smoke public shell", () => {
   expect(rootLayoutSource).toContain("useScheme()")
   expect(rootLayoutSource).toContain('const effectiveScheme = "light"')
   expect(rootLayoutSource).not.toContain("showThemeToggle")
-  expect(rootLayoutSource).toContain("refetchOnMount: isDesignAwareRoute")
-  expect(rootLayoutSource).toContain("staleTimeMs: isDesignAwareRoute ? 0 : undefined")
+  expect(rootLayoutSource).toContain("enabled: shouldLoadAdminProfile")
+  expect(rootLayoutSource).toContain("refetchOnMount: shouldLoadAdminProfile")
+  expect(rootLayoutSource).toContain("staleTimeMs: shouldLoadAdminProfile ? 0 : undefined")
   expect(rootLayoutSource).toContain('pathname[1] !== "_"')
   expect(rootLayoutSource).toContain('pathname !== "/sitemap.xml"')
   expect(appSource).toContain("initialProfileSnapshot?: AdminProfile | null")
@@ -460,8 +445,10 @@ test.describe("core smoke public shell", () => {
   }
 })
 
-  test("상세 페이지는 클라이언트 복구 요청으로 렌더되고 조회수 hit는 1회 반영된다", async ({ page }) => {
+  test("상세 페이지는 조회수만 1회 기록하고 공개 반응·댓글 요청을 만들지 않는다", async ({ page }) => {
   let hitCountRequest = 0
+  let commentRequestCount = 0
+  let likeRequestCount = 0
   const runtimeErrors: string[] = []
   const isHydrationRuntimeSignal = (value: string) =>
     /minified react error|hydration|did not match/i.test(value)
@@ -473,6 +460,16 @@ test.describe("core smoke public shell", () => {
   page.on("console", (message) => {
     if (message.type() === "error" && isHydrationRuntimeSignal(message.text())) {
       runtimeErrors.push(message.text())
+    }
+  })
+
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname
+    if (/^\/post\/api\/v1\/posts\/101\/comments(?:\/|$)/.test(pathname)) {
+      commentRequestCount += 1
+    }
+    if (/^\/post\/api\/v1\/posts\/101\/like(?:\/|$)/.test(pathname)) {
+      likeRequestCount += 1
     }
   })
 
@@ -497,9 +494,7 @@ test.describe("core smoke public shell", () => {
         published: true,
         listed: true,
         likesCount: 3,
-        commentsCount: 1,
         hitCount: 7,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -524,7 +519,16 @@ test.describe("core smoke public shell", () => {
   await expect.poll(() => hitCountRequest).toBe(1)
   const viewStatChip = page.locator(".stats .statChip").filter({ hasText: "8 VIEWS" })
   await expect(viewStatChip).toBeVisible()
+  await expect(
+    page.getByLabel("post engagement").getByText("좋아요 3", { exact: true })
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: /좋아요/ })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "게시글 공유" })).toBeVisible()
+  await expect(page.getByRole("button", { name: /댓글/ })).toHaveCount(0)
+  await expect(page.getByText(/^댓글(?:\s|$)/)).toHaveCount(0)
   await page.waitForTimeout(300)
+  expect(commentRequestCount).toBe(0)
+  expect(likeRequestCount).toBe(0)
   expect(runtimeErrors).toEqual([])
 })
 })

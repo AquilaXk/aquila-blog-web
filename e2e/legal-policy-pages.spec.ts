@@ -182,62 +182,27 @@ test.describe("legal policy public pages", () => {
     expect(unsupportedResponse?.status()).toBe(404)
   })
 
-  test("auth, signup, modal, and footer surfaces link to privacy and terms", async ({ page }) => {
-    await page.goto("/login", { waitUntil: "domcontentloaded" })
+  test("public auth routes are absent while legal policies remain available", async ({ page }) => {
+    const loginResponse = await page.goto("/login", { waitUntil: "domcontentloaded" })
+    expect(loginResponse?.status()).toBe(404)
 
-    await expect(page.getByRole("link", { name: "개인정보처리방침" })).toHaveAttribute("href", "/privacy")
-    await expect(page.getByRole("link", { name: "이용약관" })).toHaveAttribute("href", "/terms")
+    const signupResponse = await page.goto("/signup", { waitUntil: "domcontentloaded" })
+    expect(signupResponse?.status()).toBe(404)
 
-    await page.goto("/login?oauthError=signup-required", { waitUntil: "domcontentloaded" })
-    await expect(page.getByText("소셜 로그인 신규 가입은 현재 지원하지 않습니다.")).toBeVisible()
+    const privacyResponse = await page.goto("/privacy", { waitUntil: "domcontentloaded" })
+    expect(privacyResponse?.status()).toBe(200)
+    await expect(page.getByRole("heading", { name: "개인정보처리방침" })).toBeVisible()
 
-    await page.goto("/signup", { waitUntil: "domcontentloaded" })
+    const termsResponse = await page.goto("/terms", { waitUntil: "domcontentloaded" })
+    expect(termsResponse?.status()).toBe(200)
+    await expect(page.getByRole("heading", { name: "이용약관" })).toBeVisible()
+  })
 
-    if (await page.getByRole("heading", { name: "회원가입 준비 중" }).isVisible()) {
-      await expect(page.getByText("회원가입은 출시 전 개인정보 처리 점검이 완료될 때까지 사용할 수 없습니다.")).toBeVisible()
-      await expect(page.getByRole("link", { name: "개인정보처리방침" })).toHaveAttribute("href", "/privacy")
-      await expect(page.getByRole("link", { name: "이용약관" })).toHaveAttribute("href", "/terms")
-      return
-    }
-
-    const signupForm = page.locator("form")
-    const signupSubmitButton = signupForm.getByRole("button", { name: "인증 메일 보내기" })
-
-    await expect(page.getByText("회원가입을 진행하려면 필수 약관과 개인정보처리방침에 동의해야 합니다.")).toBeVisible()
-    await expect(signupSubmitButton).toBeDisabled()
-    await expect(signupForm.getByRole("button", { name: "카카오로 로그인" })).toHaveCount(0)
-    await expect(signupForm.getByRole("link", { name: "개인정보처리방침" })).toHaveAttribute("href", "/privacy")
-    await expect(signupForm.getByRole("link", { name: "이용약관" })).toHaveAttribute("href", "/terms")
-    await signupForm.getByRole("checkbox", { name: /이용약관/ }).check()
-    await expect(signupSubmitButton).toBeDisabled()
-    await signupForm.getByRole("checkbox", { name: /개인정보처리방침/ }).check()
-    await expect(signupSubmitButton).toBeEnabled()
-
+  test("footer links to legal policies and privacy settings", async ({ page }) => {
     await mockAvatarAsset(page)
     await addPublicAboutSnapshotCookie(page)
     await mockFeedEndpoints(page)
     await page.goto("/", { waitUntil: "domcontentloaded" })
-
-    const loginButton = page.getByRole("button", { name: "Login" })
-    if (await loginButton.isVisible()) {
-      await loginButton.click()
-      const authDialog = page.getByRole("dialog")
-      await authDialog.getByRole("button", { name: "회원가입" }).click()
-      const modalSignupButton = authDialog.getByRole("button", { name: "인증 메일 보내기" })
-
-      await expect(authDialog.getByText("회원가입을 진행하려면 필수 약관과 개인정보처리방침에 동의해야 합니다.")).toBeVisible()
-      await expect(modalSignupButton).toBeDisabled()
-      await expect(authDialog.getByRole("button", { name: "카카오로 로그인" })).toHaveCount(0)
-      await expect(authDialog.getByRole("link", { name: "개인정보처리방침" })).toHaveAttribute("href", "/privacy")
-      await expect(authDialog.getByRole("link", { name: "이용약관" })).toHaveAttribute("href", "/terms")
-      await authDialog.getByRole("checkbox", { name: /이용약관/ }).check()
-      await expect(modalSignupButton).toBeDisabled()
-      await authDialog.getByRole("checkbox", { name: /개인정보처리방침/ }).check()
-      await expect(modalSignupButton).toBeEnabled()
-      await authDialog.getByRole("button", { name: "닫기" }).click()
-    } else {
-      await expect(page.getByRole("link", { name: "Admin" }).or(loginButton)).toBeVisible()
-    }
 
     const footer = page.locator("footer")
 

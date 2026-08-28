@@ -52,18 +52,6 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
   },
   {
-    matcher: /^\/member\/api\/v1\/notifications\/snapshot/i,
-    policy: {
-      cacheMode: "no-store",
-      retryCount: 0,
-      timeoutMs: 4_000,
-    },
-  },
-  {
-    matcher: /^\/member\/api\/v1\/notifications(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
-  },
-  {
     matcher: /^\/(member|post)\/api\/v1\/adm\//i,
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
@@ -73,10 +61,6 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
   },
   {
     matcher: /^\/post\/api\/v1\/posts\/mine(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
-  },
-  {
-    matcher: /^\/post\/api\/v1\/posts\/[0-9]+\/comments(\/|$)/i,
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
@@ -375,7 +359,6 @@ const shouldUseBrowserBackendProxy = (safePath: string) => {
   return (
     safePath.startsWith("/member/api/v1/auth/") ||
     safePath.startsWith("/member/api/v1/privacy/") ||
-    safePath.startsWith("/member/api/v1/notifications/snapshot") ||
     safePath.startsWith("/member/api/v1/adm/") ||
     safePath.startsWith("/post/api/v1/posts/temp") ||
     safePath.startsWith("/post/api/v1/adm/") ||

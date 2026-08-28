@@ -60,7 +60,7 @@ import {
   type MetaUsageMap,
   type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
-import { replaceShallowRoutePreservingScroll } from "src/libs/router"
+import { replaceShallowRoutePreservingScroll, toAdminLoginPath } from "src/libs/router"
 import type { AdminPageProps } from "src/libs/server/adminPage"
 import {
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -129,8 +129,6 @@ export const EditorStudioWorkspaceController = ({
   const [postVersion, setPostVersion] = useState<number | null>(null)
   const [editorMode, setEditorMode] = useState<EditorMode>("create")
   const [isTempDraftMode, setIsTempDraftMode] = useState(false)
-  const [commentId, setCommentId] = useState("1")
-  const [commentContent, setCommentContent] = useState("")
   const [postTitle, setPostTitle] = useState("")
   const [postContent, setPostContent] = useState("")
   const deferredPostContent = useDeferredValue(postContent)
@@ -287,7 +285,7 @@ export const EditorStudioWorkspaceController = ({
   const [isDirectLoadOpen, setIsDirectLoadOpen] = useState(false)
   const [isSelectedToolsOpen, setIsSelectedToolsOpen] = useState(false)
 
-  const isDedicatedEditorRoute = router.pathname.startsWith("/editor")
+  const isDedicatedEditorRoute = router.pathname.startsWith("/admin/editor")
   const isDedicatedNewEditorRoute = isDedicatedEditorRoute && router.pathname === EDITOR_NEW_ROUTE_PATH
   const [isNewEditorBootstrapPending, setIsNewEditorBootstrapPending] = useState(isDedicatedNewEditorRoute)
   const redirectingRef = useRef(false)
@@ -359,18 +357,10 @@ export const EditorStudioWorkspaceController = ({
   })
 
   const {
-    handleDeleteComment,
     handleHitPost,
-    handleLikePost,
-    handleListComments,
-    handleModifyComment,
-    handleReadComment,
     handleReadPostCount,
     handleReadSystemHealth,
-    handleWriteComment,
   } = useEditorStudioUtilityCommands({
-    commentContent,
-    commentId,
     postId,
     run,
   })
@@ -900,8 +890,7 @@ export const EditorStudioWorkspaceController = ({
     await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
     setMe(null)
     const rawNextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-    const nextPath = rawNextPath.startsWith("/") && !rawNextPath.startsWith("//") ? rawNextPath : "/editor/new"
-    window.location.href = `/login?next=${encodeURIComponent(nextPath)}`
+    window.location.href = toAdminLoginPath(rawNextPath, "/admin/editor/new")
   }, [setMe])
 
   const handleDeleteSelectedPost = useCallback(() => {
@@ -913,17 +902,17 @@ export const EditorStudioWorkspaceController = ({
       props={{
         activeMetaPanel, addTagsToPost, addTagToPost, adminPostRows, adminPostTotal,
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
-        closePublishModal, commentContent, commentId, commitPreviewThumbTransform, copyPostDetailLink,
+        closePublishModal, commitPreviewThumbTransform, copyPostDetailLink,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePreviewSummary, handlePostSummaryChange,
-        handleCreateNewPostFromSelectedPanel, handleDeleteComment, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
-        handleLikePost, handleListComments, handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
-        handleLoadOrCreateTempPost, handleModifyComment, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
-        handleReadComment, handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
+        handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
+        handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
+        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
+        handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
         handleSelectedPostIdChange, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange, handleTitleChange,
-        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard, handleWriteComment,
+        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard,
         hardDeleteDeletedPostFromList, isAllVisiblePostsSelected, isCompactMobileLayout, isComposeAssistOpen, isComposeUtilityOpen,
         isDedicatedEditorRoute, isDedicatedNewEditorRoute, isDirectLoadOpen, isListAdvancedOpen, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen,
@@ -941,7 +930,7 @@ export const EditorStudioWorkspaceController = ({
         removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
         saveLocalDraft,
         selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
-        setCommentContent, setCommentId, setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
+        setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
         setIsMobileMetaEditorOpen,
         setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
         setMobileComposeStep,

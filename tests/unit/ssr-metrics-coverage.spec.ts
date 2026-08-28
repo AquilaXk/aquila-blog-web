@@ -8,21 +8,17 @@ const pageRouteClasses = {
   "admin.tsx": "admin",
   "admin/cloud.tsx": "admin",
   "admin/dashboard.tsx": "admin",
+  "admin/editor/[id].tsx": "editor",
+  "admin/editor/index.tsx": "editor",
+  "admin/editor/new.tsx": "editor",
+  "admin/login.tsx": "auth",
   "admin/posts/index.tsx": "admin",
-  "admin/posts/new.tsx": "admin",
-  "admin/posts/write.tsx": "admin",
   "admin/profile.tsx": "admin",
   "admin/tools.tsx": "admin",
   "company/index.tsx": "public",
   "easysubway/index.tsx": "public",
-  "editor/[id].tsx": "editor",
-  "editor/new.tsx": "editor",
   "feed.tsx": "system",
-  "login.tsx": "auth",
   "page/[pageId].tsx": "public",
-  "signup.tsx": "auth",
-  "signup/social/complete.tsx": "auth",
-  "signup/verify.tsx": "auth",
   "sitemap.xml.tsx": "system",
 } as const
 
@@ -40,7 +36,7 @@ test("every production GSSP export has one fixed SSR route class", () => {
 
   for (const [relativePath, routeClass] of Object.entries(pageRouteClasses)) {
     const source = readFileSync(path.join(pagesRoot, relativePath), "utf8")
-    expect(source).toMatch(new RegExp(`withSsrMetrics(?:<[^>]+>)?\\("${routeClass}"`))
+    expect(source).toMatch(new RegExp(`withSsrMetrics(?:<[^>]+>)?\\(\\s*"${routeClass}"`))
   }
   expect(exportedGsspFiles).toEqual(Object.keys(pageRouteClasses).sort())
 })

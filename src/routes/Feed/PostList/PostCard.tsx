@@ -43,7 +43,6 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular", index = 0 }) => {
   )
   const summary = data.summary ?? ""
   const likesCount = data.likesCount ?? 0
-  const commentsCount = data.commentsCount ?? 0
   const categoryLabels = toDisplayCategoryLabels(data)
   const coverCategoryLabel = categoryLabels[0]
   const viewsCount = data.hitCount ?? 0
@@ -112,11 +111,6 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular", index = 0 }) => {
             <span className="like">
               <AppIcon name="heart" />
               {likesCount}개의 좋아요
-            </span>
-            <span className="dot">·</span>
-            <span className="comment">
-              <AppIcon name="message" />
-              {commentsCount}개의 댓글
             </span>
           </div>
         </div>
@@ -281,8 +275,7 @@ const StyledWrapper = styled.a`
           opacity: 0.56;
         }
 
-        .like,
-        .comment {
+        .like {
           display: inline-flex;
           align-items: center;
           gap: 0.3rem;
@@ -458,8 +451,7 @@ const StyledWrapper = styled.a`
       > .content > .meta {
         font-size: 0.66rem;
 
-        .like,
-        .comment {
+        .like {
           svg {
             width: 0.78rem;
             height: 0.78rem;

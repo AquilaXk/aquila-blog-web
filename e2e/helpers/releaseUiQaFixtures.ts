@@ -37,22 +37,6 @@ export const RELEASE_UI_QA_IMAGE_PATHS = Array.from(
   (_, index) => `/qa/release-image-${String(index + 1).padStart(2, "0")}.png`
 )
 
-export const RELEASE_UI_QA_COMMENTS = Array.from({ length: 100 }, (_, index) => ({
-  id: 9000 + index,
-  authorId: 2000 + index,
-  authorName: `QA 댓글 작성자 ${String(index + 1).padStart(3, "0")}`,
-  authorProfileImageDirectUrl: "/avatar.png",
-  content:
-    index % 10 === 0
-      ? `긴 댓글 ${index + 1}: 모바일 줄바꿈과 comment list virtualization 없이도 overflow가 없어야 합니다. ${RELEASE_UI_QA_LONG_URL}`
-      : `댓글 ${index + 1}: release UI QA matrix fixture`,
-  createdAt: "2026-06-20T00:00:00Z",
-  modifiedAt: "2026-06-20T00:00:00Z",
-  parentCommentId: null,
-  actorCanModify: false,
-  actorCanDelete: false,
-}))
-
 const releaseUiQaImageMarkdown = RELEASE_UI_QA_IMAGE_PATHS.map(
   (imagePath, index) => `![release QA image ${index + 1}](${imagePath})`
 ).join("\n\n")
@@ -67,7 +51,6 @@ export const RELEASE_UI_QA_DETAIL_CONTENT = [
   "| viewport | flow | expected | owner | note |",
   "| --- | --- | --- | --- | --- |",
   "| 320 | public detail | table scroll shell keeps content inside viewport | frontend | narrow mobile |",
-  "| 390 | comments | 100 comments preserve readable rhythm | frontend | iPhone class |",
   "| 768 | editor preview | markdown preview keeps two-pane controls reachable | frontend | tablet |",
   "| 1440 | home rail | dense tags do not create orphan columns | frontend | desktop |",
   "",
@@ -99,16 +82,14 @@ export const RELEASE_UI_QA_DETAIL_POST = {
   title:
     "출시 전 실제 기기 UI QA 매트릭스 긴 제목 줄바꿈 회귀 확인용 제목입니다 ".repeat(3).trim(),
   summary:
-    "긴 summary, tag 20개, 긴 URL, 넓은 table, Mermaid, 수식, 이미지 20개, 댓글 100개 fixture를 모두 포함한 release QA 게시글입니다.",
+    "긴 summary, tag 20개, 긴 URL, 넓은 table, Mermaid, 수식, 이미지 20개 fixture를 모두 포함한 release QA 게시글입니다.",
   content: RELEASE_UI_QA_DETAIL_CONTENT,
   tags: RELEASE_UI_QA_TAGS,
   category: ["Release QA"],
   published: true,
   listed: true,
   likesCount: 3,
-  commentsCount: RELEASE_UI_QA_COMMENTS.length,
   hitCount: 100,
-  actorHasLiked: false,
   actorCanModify: false,
   actorCanDelete: false,
 }
@@ -200,11 +181,4 @@ export const mockReleaseUiQaEndpoints = async (page: Page) => {
     })
   })
 
-  await page.route(`**/post/api/v1/posts/${RELEASE_UI_QA_POST_ID}/comments`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(RELEASE_UI_QA_COMMENTS),
-    })
-  })
 }

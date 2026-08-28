@@ -115,19 +115,19 @@ try {
   const missing = await request("GET", "/api/internal/metrics", undefined, deadline)
   const wrong = await request("GET", "/api/internal/metrics", "Bearer invalid-metrics-token", deadline)
   const wrongMethod = await request("POST", "/api/internal/metrics", `Bearer ${token}`, deadline)
-  const adminRedirect = await request("GET", "/admin/posts/new", undefined, deadline)
+  const publicPage = await request("GET", "/about", undefined, deadline)
   const valid = await request("GET", "/api/internal/metrics", `Bearer ${token}`, deadline)
 
   if (missing.status !== 401 || wrong.status !== 401) throw new Error("Metrics endpoint authentication contract failed")
   if (wrongMethod.status !== 405 || wrongMethod.headers.allow !== "GET") throw new Error("Metrics endpoint method contract failed")
-  if (!adminRedirect.status || adminRedirect.status < 300 || adminRedirect.status >= 400) throw new Error("Standalone SSR redirect contract failed")
+  if (publicPage.status !== 200) throw new Error("Standalone SSR page contract failed")
   if (valid.status !== 200 || !/^text\/(plain|openmetrics)/i.test(String(valid.headers["content-type"] || ""))) {
     throw new Error("Metrics endpoint exposition contract failed")
   }
   if (!["aquila_web_process_resident_memory_bytes", "aquila_web_process_uptime_seconds"].every((name) => valid.body.includes(name))) {
     throw new Error("Metrics endpoint process evidence is incomplete")
   }
-  if (!/aquila_web_ssr_request_duration_seconds_count\{route_class="admin",result="redirect"\} [1-9]\d*/.test(valid.body)) {
+  if (!/aquila_web_ssr_request_duration_seconds_count\{route_class="public",result="props"\} [1-9]\d*/.test(valid.body)) {
     throw new Error("Metrics endpoint cross-bundle SSR evidence is incomplete")
   }
   if (/\b(request_id|path|status)=/.test(valid.body)) throw new Error("Metrics endpoint exposed a sensitive label")

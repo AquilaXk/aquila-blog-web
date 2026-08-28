@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
 import {
@@ -21,16 +21,8 @@ test.describe("core smoke detail layout", () => {
       path.resolve(__dirname, "../src/routes/Detail/PostDetail/PostDetailSection.styles.ts"),
       "utf8"
     )
-    const commentStyles = readFileSync(
-      path.resolve(__dirname, "../src/routes/Detail/PostDetail/CommentBox/CommentBox.styles.ts"),
-      "utf8"
-    )
     const headerStyles = readFileSync(
       path.resolve(__dirname, "../src/routes/Detail/PostDetail/PostHeader.styles.ts"),
-      "utf8"
-    )
-    const commentSource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Detail/PostDetail/CommentBox/index.tsx"),
       "utf8"
     )
     const relatedSource = readFileSync(
@@ -116,16 +108,12 @@ test.describe("core smoke detail layout", () => {
     expect(sectionStyles).not.toContain("padding-top: 32px;")
     expect(sectionStyles).not.toContain("border-radius: 10px;")
     expect(sectionStyles).not.toContain("reasonChip")
-    expect(commentStyles).toContain("margin-top: 64px;")
-    expect(commentStyles).toContain("padding: 28px 0 0;")
-    expect(commentStyles).toContain("border-top: 2px solid #111216;")
-    expect(commentStyles).toContain("min-height: 110px;")
-    expect(commentSource).toContain('placeholder="질문이나 의견을 남겨주세요."')
-    expect(commentSource).toContain("const imageSrc = profileImageDirectUrl || profileImageUrl")
-    expect(commentSource).toContain('<span className="avatarFallback" aria-hidden="true" />')
-    expect(commentStyles).toContain(".avatarFallback::before")
-    expect(commentStyles).toContain(".avatarFallback::after")
-    expect(commentSource).not.toContain("CONFIG.profile.image")
+    expect(
+      existsSync(path.resolve(__dirname, "../src/routes/Detail/PostDetail/CommentBox"))
+    ).toBe(false)
+    expect(
+      existsSync(path.resolve(__dirname, "../src/routes/Detail/PostDetail/DeferredCommentBox.tsx"))
+    ).toBe(false)
   })
 
   test("404 robots 정책은 noindex이고 canonical은 생략하며 정상 페이지 기본값은 유지한다", async ({ page }) => {
@@ -170,9 +158,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 0,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -240,9 +226,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 0,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -322,9 +306,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 0,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -390,9 +372,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 0,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -517,9 +497,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 2,
-        commentsCount: 3,
         hitCount: 5,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -544,13 +522,13 @@ test.describe("core smoke detail layout", () => {
   const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "6 VIEWS" })
   const mobileToc = page.locator('[aria-label="접이식 목차"]')
   await expect(page.getByRole("button", { name: /공유/ })).toHaveCount(1)
-  await expect(page.getByRole("button", { name: /^좋아요/ })).toHaveCount(1)
+  await expect(page.getByRole("button", { name: /^좋아요/ })).toHaveCount(0)
   await expect(engagementRow).toBeHidden()
   await expect(metaViewStat).toHaveText("6 VIEWS")
   await expect(metaViewStat).toBeHidden()
-  await expect(compactActionBar.getByRole("button", { name: /^좋아요/ })).toBeVisible()
+  await expect(compactActionBar.getByLabel("좋아요 2", { exact: true })).toBeVisible()
   await expect(compactActionBar.getByRole("button", { name: /^공유/ })).toBeVisible()
-  await expect(compactActionBar.getByRole("button", { name: /^댓글/ })).toBeVisible()
+  await expect(compactActionBar.getByRole("button", { name: /^댓글/ })).toHaveCount(0)
   await expect(page.locator("aside.rightRail")).toBeHidden()
   await expect(mobileToc).toBeVisible()
   await mobileToc.locator("summary").click()
@@ -611,9 +589,7 @@ test.describe("core smoke detail layout", () => {
         published: true,
         listed: true,
         likesCount: 0,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
