@@ -22,10 +22,7 @@ const formatDateTime = (value?: string | null) => {
 
 const sourceLabels: Record<OptionalTrackingConsentRecord["source"], string> = {
   settings: "쿠키 설정",
-  "signup-email": "이메일 회원가입",
-  "signup-social": "소셜 회원가입",
   "privacy-request": "개인정보 처리 요청",
-  "legacy-string": "이전 저장 형식",
 }
 
 const OptionalTrackingConsentSettings = () => {

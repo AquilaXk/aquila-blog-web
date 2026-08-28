@@ -2,12 +2,7 @@ export const OPTIONAL_TRACKING_CONSENT_STORAGE_KEY = "privacy.optionalTrackingCo
 export const OPTIONAL_TRACKING_CONSENT_CHANGE_EVENT = "aquila:optional-tracking-consent-change"
 
 export type OptionalTrackingConsentState = "granted" | "denied"
-export type OptionalTrackingConsentSource =
-  | "settings"
-  | "signup-email"
-  | "signup-social"
-  | "privacy-request"
-  | "legacy-string"
+export type OptionalTrackingConsentSource = "settings" | "privacy-request"
 
 export type OptionalTrackingConsentRecord = {
   version: 1
@@ -61,8 +56,8 @@ let originalFetch: typeof window.fetch | null = null
 let originalSendBeacon: typeof window.navigator.sendBeacon | null = null
 let denyGuardInstalled = false
 
-const parseLegacyConsentState = (raw: string): OptionalTrackingConsentState | null =>
-  raw === "granted" || raw === "denied" ? raw : null
+const isOptionalTrackingConsentSource = (value: unknown): value is OptionalTrackingConsentSource =>
+  value === "settings" || value === "privacy-request"
 
 const createOptionalTrackingConsentRecord = (
   state: OptionalTrackingConsentState,
@@ -86,23 +81,18 @@ export const readOptionalTrackingConsent = (): OptionalTrackingConsentRecord | n
     const raw = window.localStorage.getItem(OPTIONAL_TRACKING_CONSENT_STORAGE_KEY)
     if (!raw) return null
 
-    const legacyState = parseLegacyConsentState(raw)
-    if (legacyState) {
-      return createOptionalTrackingConsentRecord(legacyState, "legacy-string", "")
-    }
-
     const parsed = JSON.parse(raw) as Partial<OptionalTrackingConsentRecord>
     if (parsed.version !== 1) return null
     if (parsed.state !== "granted" && parsed.state !== "denied") return null
     if (typeof parsed.updatedAt !== "string") return null
-    if (typeof parsed.source !== "string") return null
+    if (!isOptionalTrackingConsentSource(parsed.source)) return null
     if (typeof parsed.categories?.analytics !== "boolean" || typeof parsed.categories?.rum !== "boolean") return null
 
     return {
       version: 1,
       state: parsed.state,
       updatedAt: parsed.updatedAt,
-      source: parsed.source as OptionalTrackingConsentSource,
+      source: parsed.source,
       categories: {
         analytics: parsed.categories.analytics,
         rum: parsed.categories.rum,

@@ -192,6 +192,24 @@ caption
 
       expect(readOptionalTrackingConsent()).toMatchObject({ state: "granted" })
       expect(hasOptionalTrackingConsent()).toBe(true)
+
+      storage.setItem(
+        OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
+        JSON.stringify({
+          categories: { analytics: true, rum: true },
+          source: "legal-reconsent",
+          state: "granted",
+          updatedAt: "2026-06-29T00:00:00.000Z",
+          version: 1,
+        })
+      )
+      expect(readOptionalTrackingConsent()).toBeNull()
+      expect(hasOptionalTrackingConsent()).toBe(false)
+
+      storage.setItem(OPTIONAL_TRACKING_CONSENT_STORAGE_KEY, "granted")
+      expect(readOptionalTrackingConsent()).toBeNull()
+      expect(hasOptionalTrackingConsent()).toBe(false)
+
       navigatorValue.globalPrivacyControl = true
       expect(hasOptionalTrackingConsent()).toBe(false)
     })
