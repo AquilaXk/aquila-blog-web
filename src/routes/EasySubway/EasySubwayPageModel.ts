@@ -15,7 +15,7 @@ export const CONTACT_MAILTO = `mailto:${PRODUCT_SURFACE.contactEmail}`
  */
 export const COMPANY_URL = COMPANY_SURFACE.url
 
-export const PRODUCT_RELEASE_STATUS = "Android 출시 준비 중"
+export const PRODUCT_RELEASE_STATUS = PRODUCT_SURFACE.releaseStatus
 
 /**
  * 공개할 수 있는 실기기 검수본은 이 한 장이다. 같은 랜딩 자산의 다른 컷은 개발용 광고 자리표시가
@@ -23,9 +23,12 @@ export const PRODUCT_RELEASE_STATUS = "Android 출시 준비 중"
  * 1회 + 확대 1회로만 쓰고, 나머지 섹션은 타이포와 단색 패널로 만든다 - 자리를 채우는 이미지를
  * 만들지 않는다.
  */
-export const PRODUCT_SCREENSHOT = "/easysubway/station-detail.png"
-export const PRODUCT_SCREENSHOT_ALT =
-  "EasySubway 노선도 화면. 수도권 노선도에서 상록수역을 선택해 출발·경유·도착을 고르는 상태."
+export const PRODUCT_SCREENSHOT = PRODUCT_SURFACE.screenshot.src
+export const PRODUCT_SCREENSHOT_ALT = PRODUCT_SURFACE.screenshot.alt
+export const PRODUCT_SCREENSHOT_SIZE = {
+  width: PRODUCT_SURFACE.screenshot.width,
+  height: PRODUCT_SURFACE.screenshot.height,
+} as const
 
 export type ProductMetaFact = {
   id: string
@@ -53,9 +56,9 @@ export type ProductScopeChip = {
  * 사실만 적는다. 검증 범위·출시 상태는 제품의 공개 서술과 같은 값이며 늘리거나 앞당기지 않는다.
  */
 export const PRODUCT_META_FACTS: ProductMetaFact[] = [
-  { id: "platform", label: "플랫폼", value: "Android" },
-  { id: "status", label: "상태", value: "출시 준비 중", accent: true },
-  { id: "region", label: "지역", value: "수도권 파일럿" },
+  { id: "platform", label: "플랫폼", value: "Android · iOS" },
+  { id: "status", label: "상태", value: "정식 출시 준비 중", accent: true },
+  { id: "region", label: "지역", value: "전국 출시 기준" },
   { id: "account", label: "계정", value: "가입 없이 이용" },
 ]
 
@@ -70,21 +73,22 @@ export const PRODUCT_FEATURES: ProductFeature[] = [
     tail: " 끝나므로 목록과 지도를 왕복하지 않습니다.",
   },
   {
-    id: "offline",
+    id: "server-route-calculation",
     index: "02",
-    name: "실시간이 끊겨도 멈추지 않습니다",
-    lead: "실시간 정보를 받지 못하면 그 사실을 화면에 그대로 적고, 역 정보와 경로 검색은 계속 동작합니다.",
-    keyword: "연결이 불안정한 지하",
-    tail: "에서 필요한 것은 이미 받아 둔 정보이기 때문입니다.",
+    name: "경로는 서버 기준으로 계산합니다",
+    lead:
+      "노선도와 역 검색은 기기에서 확인할 수 있습니다. 경로 계산은 Journey V3 서버가 제공할 때만 이용할 수 있으며,",
+    keyword: "현재 서버 권한이 없으면",
+    tail: " 경로를 안내하지 않습니다.",
   },
 ]
 
 export const PRODUCT_SCOPE_CHIPS: ProductScopeChip[] = [
-  { id: "sangnoksu", label: "4호선 상록수", accent: true },
-  { id: "sadang", label: "4호선 사당", accent: true },
-  { id: "region", label: "수도권 노선도" },
-  { id: "pick", label: "출발·경유·도착 지정" },
-  { id: "offline", label: "실시간 없이도 조회" },
+  { id: "platform", label: "Android · iOS", accent: true },
+  { id: "nationwide-release", label: "전국 출시 기준", accent: true },
+  { id: "map-and-station-search", label: "노선도·역 검색" },
+  { id: "journey-v3-route-calculation", label: "Journey V3 경로 계산" },
+  { id: "guest-access", label: "가입 없이 이용" },
   { id: "tracking", label: "추적 없음" },
 ]
 

@@ -2,6 +2,8 @@ import { CONFIG } from "site.config"
 
 export const COMPANY_SURFACE = CONFIG.surfaces.company
 export const PRODUCT_SURFACE = CONFIG.surfaces.product
+export const PRODUCT_SCREENSHOT = PRODUCT_SURFACE.screenshot.src
+export const PRODUCT_SCREENSHOT_ALT = PRODUCT_SURFACE.screenshot.alt
 
 /** 블로그는 별개의 canonical 표면이라 회사 표면에서는 절대 URL로 나간다. */
 export const BLOG_URL = CONFIG.link
@@ -73,9 +75,9 @@ export type CompanyNewsItem = {
   thumbnail: string
 }
 
-/** 헤더 위 공지 스트립. 제품 출시 상태는 과장 없이 준비 중으로만 적는다. */
+/** 헤더 위 공지 스트립. 제품 출시 상태는 제품 모델의 단일 값을 쓴다. */
 export const COMPANY_NOTICE: CompanyNoticeLink = {
-  label: "EasySubway Android 출시 준비 중 — 제품 소개 보기",
+  label: `EasySubway ${PRODUCT_SURFACE.releaseStatus} — 제품 소개 보기`,
   href: PRODUCT_URL,
 }
 
@@ -96,10 +98,10 @@ export const BLOG_CAPTURE_SIZE = { width: 1920, height: 733 } as const
  * 자리표시가 찍혀 있어 공개 페이지에 쓸 수 없다. 회사 표면에서는 히어로 카드 위 작은 폰으로
  * 한 번만 쓴다 - 같은 이미지를 여러 섹션에 반복하지 않는다.
  */
-export const PRODUCT_SCREENSHOT = "/easysubway/station-detail.png"
-export const PRODUCT_SCREENSHOT_ALT =
-  "EasySubway 노선도 화면. 수도권 노선도에서 상록수역을 선택해 출발·경유·도착을 고르는 상태."
-export const PRODUCT_SCREENSHOT_SIZE = { width: 1080, height: 2340 } as const
+export const PRODUCT_SCREENSHOT_SIZE = {
+  width: PRODUCT_SURFACE.screenshot.width,
+  height: PRODUCT_SURFACE.screenshot.height,
+} as const
 
 /** 모노크롬 워드마크 스트립. 우리가 실제로 만들고 운영하는 것만 적는다. */
 export const COMPANY_WORDMARKS: CompanyWordmark[] = [
@@ -139,8 +141,8 @@ export const COMPANY_FEATURE_CARDS: CompanyFeatureCard[] = [
     id: "resilience",
     tag: "RESILIENCE",
     icon: "wifi-off",
-    title: "실시간이 끊겨도 멈추지 않습니다",
-    body: "받지 못한 사실을 화면에 적고, 역 정보와 경로 검색은 계속 동작합니다.",
+    title: "경로는 서버 기준으로 계산합니다",
+    body: "노선도와 역 검색은 기기에서 확인할 수 있습니다. 경로 계산은 Journey V3 서버가 제공할 때만 이용할 수 있습니다.",
   },
   {
     id: "operations",
@@ -174,7 +176,7 @@ export const COMPANY_WORK_TILES: CompanyWorkTile[] = [
  */
 export const COMPANY_STATS: CompanyStat[] = [
   { id: "services", value: "2", label: "운영 중인 공개 서비스" },
-  { id: "stations", value: "2역", label: "공개 검증을 마친 파일럿 역" },
+  { id: "stations", value: "전국 기준", label: "정식 출시를 위한 데이터 검증" },
   { id: "ops", value: "자체 운영", label: "빌드 · 배포 · 모니터링" },
   { id: "account", value: "가입 없이", label: "제품 이용 조건" },
 ]

@@ -12,6 +12,7 @@ import {
   PRODUCT_SCOPE_CHIPS,
   PRODUCT_SCREENSHOT,
   PRODUCT_SCREENSHOT_ALT,
+  PRODUCT_SCREENSHOT_SIZE,
   PRODUCT_SURFACE,
 } from "src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
@@ -22,7 +23,7 @@ import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
  * 패널과 타이포로 구성한다 - 같은 이미지를 세 번째로 반복하거나 자리를 채우는 이미지를 만드는
  * 것보다 정직하고 덜 지루하다.
  */
-const [PICK_FEATURE, OFFLINE_FEATURE] = PRODUCT_FEATURES
+const [PICK_FEATURE, ROUTE_FEATURE] = PRODUCT_FEATURES
 
 /**
  * `surfaceUrl`은 요청 호스트로 resolve한 이 표면의 공개 URL이다(페이지의 canonical과 같은 값).
@@ -77,8 +78,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
             <img
               src={PRODUCT_SCREENSHOT}
               alt={PRODUCT_SCREENSHOT_ALT}
-              width={1080}
-              height={2340}
+              width={PRODUCT_SCREENSHOT_SIZE.width}
+              height={PRODUCT_SCREENSHOT_SIZE.height}
               loading="eager"
               fetchPriority="high"
               decoding="async"
@@ -98,8 +99,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.DisplayHeading>
             </div>
             <S.IntroAside>
-              수도권 일부 역에서 검증을 진행하는 파일럿 단계입니다. <strong>확인한 범위</strong>만 제품에
-              넣고, 확인 일자를 함께 남깁니다.
+              전국 정식 출시를 준비하며 <strong>확인한 데이터와 접근성 근거</strong>만 제품에 반영합니다.
             </S.IntroAside>
           </S.IntroLayout>
           <S.MetaFactRow>
@@ -147,8 +147,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
                     <img
                       src={PRODUCT_SCREENSHOT}
                       alt="노선도에서 역을 선택하면 출발·경유·도착 버튼이 함께 열린 모습."
-                      width={1080}
-                      height={2340}
+                      width={PRODUCT_SCREENSHOT_SIZE.width}
+                      height={PRODUCT_SCREENSHOT_SIZE.height}
                       loading="lazy"
                       decoding="async"
                     />
@@ -161,17 +161,17 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
           <S.FeatureBlock $reverse>
             <div>
-              <S.GhostIndex aria-hidden="true">{OFFLINE_FEATURE.index}</S.GhostIndex>
-              <S.FeatureName>{OFFLINE_FEATURE.name}</S.FeatureName>
+              <S.GhostIndex aria-hidden="true">{ROUTE_FEATURE.index}</S.GhostIndex>
+              <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
-                {OFFLINE_FEATURE.lead} <S.InlineHighlight>{OFFLINE_FEATURE.keyword}</S.InlineHighlight>
-                {OFFLINE_FEATURE.tail}
+                {ROUTE_FEATURE.lead} <S.InlineHighlight>{ROUTE_FEATURE.keyword}</S.InlineHighlight>
+                {ROUTE_FEATURE.tail}
               </S.FeatureBody>
             </div>
             <div>
               <S.StatementPanel>
                 <span>화면에 적히는 문장</span>
-                <p>&ldquo;실시간 정보를 불러오지 못했어요. 역 정보와 경로 검색은 계속 이용할 수 있습니다.&rdquo;</p>
+                <p>현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요.</p>
               </S.StatementPanel>
             </div>
           </S.FeatureBlock>
@@ -183,13 +183,13 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           <EasySubwayLineArt />
         </S.LineArtLayer>
         <p>
-          연결이 끊기는 곳에서 필요한 정보는, <strong>이미 화면에 있어야 합니다.</strong>
+          경로가 필요할 때는, <strong>현재 서버 기준의 결과만 안내합니다.</strong>
         </p>
       </S.BreakCut>
 
       <S.Section $tone="raised" id="scope">
         <S.SectionInner>
-          <S.Eyebrow>현재 제공 범위</S.Eyebrow>
+          <S.Eyebrow>정식 출시 기준</S.Eyebrow>
           <S.DisplayHeading>
             넓히기 전에
             <strong>확인부터 합니다</strong>
@@ -197,7 +197,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           <S.ScopeLayout>
             <div>
               <S.IntroAside>
-                공개 검증을 마친 역만 파일럿 범위에 넣습니다. 범위를 넓히는 일보다{" "}
+                전국 출시 기준을 통과한 데이터만 제품에 반영합니다. 범위를 넓히는 일보다{" "}
                 <strong>틀린 정보를 내보내지 않는 일</strong>이 먼저입니다.
               </S.IntroAside>
               <S.ChipCluster>
@@ -209,8 +209,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.ChipCluster>
             </div>
             <S.StatCard>
-              <strong>2역</strong>
-              <span>공개 검증을 마친 파일럿 역 — 4호선 상록수·사당</span>
+              <strong>전국 기준</strong>
+              <span>정식 출시를 위한 데이터와 접근성 근거 검증</span>
             </S.StatCard>
           </S.ScopeLayout>
         </S.SectionInner>

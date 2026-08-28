@@ -72,7 +72,7 @@ const ICON_PATHS: Record<CompanyIconName, React.ReactNode> = {
       <path d="m14 20 2 2 4-4" />
     </>
   ),
-  /** 끊긴 연결 = 실시간이 끊겨도 멈추지 않는다는 사실. */
+  /** 끊긴 연결 = 현재 서버 경로를 제공할 수 없음을 숨기지 않는다는 사실. */
   "wifi-off": (
     <>
       <path d="M12 20h.01" />
