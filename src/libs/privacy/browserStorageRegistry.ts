@@ -34,6 +34,13 @@ export type BrowserStorageRegistryEntry = {
   stores: string
 }
 
+const retiredPublicLoginPreferenceMetadata = {
+  area: "localStorage" as const,
+  required: false,
+  retention: "until login preference changes or browser storage is cleared",
+  deletion: "login preference change or browser storage deletion",
+}
+
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   {
     area: "cookie",
@@ -117,21 +124,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "JSON consent record with version, granted or denied state, timestamp, source, and analytics/RUM categories",
   },
   {
-    area: "localStorage",
+    ...retiredPublicLoginPreferenceMetadata,
     key: "auth.login.keepSignedIn",
     purpose: "login-preference",
-    required: false,
-    retention: "until login preference changes or browser storage is cleared",
-    deletion: "login preference change or browser storage deletion",
     stores: "boolean remember-login preference",
   },
   {
-    area: "localStorage",
+    ...retiredPublicLoginPreferenceMetadata,
     key: "auth.login.ipSecurityOn",
     purpose: "login-security-preference",
-    required: false,
-    retention: "until login preference changes or browser storage is cleared",
-    deletion: "login preference change or browser storage deletion",
     stores: "boolean IP security preference",
   },
   {
