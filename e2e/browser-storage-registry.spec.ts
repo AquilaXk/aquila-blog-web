@@ -60,6 +60,8 @@ test("browser storage registry includes privacy and runtime keys used by public 
         key: OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
         stores: expect.stringContaining("version"),
       }),
+      expect.objectContaining({ area: "localStorage", key: "auth.login.keepSignedIn" }),
+      expect.objectContaining({ area: "localStorage", key: "auth.login.ipSecurityOn" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.keepSignedIn.v1" }),
       expect.objectContaining({

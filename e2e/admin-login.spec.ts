@@ -35,16 +35,16 @@ test("관리자 로그인은 저장한 정규화 이메일을 다음 방문에 �
 })
 
 test("관리자 로그인은 선택한 로그인 유지 값을 요청에 그대로 보낸다", async ({ page }) => {
-  let loginPayload: unknown
   await page.route("**/member/api/v1/auth/login", async (route) => {
-    loginPayload = route.request().postDataJSON()
     await route.fulfill({ contentType: "application/json", status: 401, body: "{}" })
   })
 
   await page.goto("/admin/login")
   await expect(page.getByLabel("로그인 유지")).toBeChecked()
   await page.getByLabel("로그인 유지").uncheck()
+  const loginRequestPromise = page.waitForRequest("**/member/api/v1/auth/login")
   await submitAdminLogin(page)
+  const loginPayload = (await loginRequestPromise).postDataJSON()
 
   expect(loginPayload).toEqual(
     expect.objectContaining({ email: "admin@example.com", password: "password", rememberMe: false })
