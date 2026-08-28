@@ -61,8 +61,12 @@ const RootLayout = ({
   useScheme()
   const { pathname } = useRouter()
   const isPublicBlogRoute = pathname === "/" || pathname === "/about" || pathname === "/posts/[id]"
-  const isDedicatedEditorRoute = pathname === "/editor/[id]" || pathname === "/editor/new"
+  const isDedicatedEditorRoute =
+    pathname === "/admin/editor" ||
+    pathname === "/admin/editor/[id]" ||
+    pathname === "/admin/editor/new"
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  const isAdminLoginRoute = pathname === "/admin/login"
   // 회사·제품 표면은 전용 호스트의 루트로 서빙되는 독립 랜딩이다. 블로그 헤더와 본문 폭 컨테이너를
   // 쓰지 않고 자기 헤더·풀블리드 섹션을 소유한다. 판정은 표면 정본 표에서 파생한 공용 helper가
   // 소유한다 - `_document`의 블로그 메타 분기도 같은 목록을 봐야 한다.
@@ -77,9 +81,12 @@ const RootLayout = ({
     // 독립 표면은 관리자 프로필을 전혀 읽지 않는다. 여기서 켜 두면 blog 호스트 백엔드로 credentialed
     // XHR이 나가는데, 회사·제품 호스트에서는 그것이 cross-origin이고 edge에 그 origin을 허용하는
     // CORS가 없다 - 아무 화면 효과 없이 실패하는 요청만 남는다.
-    enabled: !isStandaloneSurfaceRoute && (isDesignAwareRoute || initialAdminProfileShouldRefetch),
-    refetchOnMount: isDesignAwareRoute,
-    staleTimeMs: isDesignAwareRoute ? 0 : undefined,
+    enabled:
+      !isStandaloneSurfaceRoute &&
+      !isAdminLoginRoute &&
+      (isDesignAwareRoute || initialAdminProfileShouldRefetch),
+    refetchOnMount: isDesignAwareRoute && !isAdminLoginRoute,
+    staleTimeMs: isDesignAwareRoute && !isAdminLoginRoute ? 0 : undefined,
   })
   const effectiveScheme = "light" // intentional light-only; do not wire dark/toggle
   const effectiveBlogDesign = isAdminRoute ? adminProfile?.blogDesign || "legacy" : "legacy"

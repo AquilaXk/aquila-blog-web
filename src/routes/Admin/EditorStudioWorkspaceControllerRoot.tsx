@@ -60,7 +60,7 @@ import {
   type MetaUsageMap,
   type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
-import { replaceShallowRoutePreservingScroll } from "src/libs/router"
+import { replaceShallowRoutePreservingScroll, toAdminLoginPath } from "src/libs/router"
 import type { AdminPageProps } from "src/libs/server/adminPage"
 import {
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -287,7 +287,7 @@ export const EditorStudioWorkspaceController = ({
   const [isDirectLoadOpen, setIsDirectLoadOpen] = useState(false)
   const [isSelectedToolsOpen, setIsSelectedToolsOpen] = useState(false)
 
-  const isDedicatedEditorRoute = router.pathname.startsWith("/editor")
+  const isDedicatedEditorRoute = router.pathname.startsWith("/admin/editor")
   const isDedicatedNewEditorRoute = isDedicatedEditorRoute && router.pathname === EDITOR_NEW_ROUTE_PATH
   const [isNewEditorBootstrapPending, setIsNewEditorBootstrapPending] = useState(isDedicatedNewEditorRoute)
   const redirectingRef = useRef(false)
@@ -900,8 +900,7 @@ export const EditorStudioWorkspaceController = ({
     await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
     setMe(null)
     const rawNextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-    const nextPath = rawNextPath.startsWith("/") && !rawNextPath.startsWith("//") ? rawNextPath : "/editor/new"
-    window.location.href = `/login?next=${encodeURIComponent(nextPath)}`
+    window.location.href = toAdminLoginPath(rawNextPath, "/admin/editor/new")
   }, [setMe])
 
   const handleDeleteSelectedPost = useCallback(() => {

@@ -117,6 +117,22 @@ export const normalizeNextPath = (input: NextPathInput, fallback = "/"): string 
   return value
 }
 
+const isAdminNextPath = (value: string) => {
+  const pathname = value.split(/[?#]/, 1)[0] || ""
+  if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) return false
+  return pathname === "/admin" || pathname.startsWith("/admin/")
+}
+
+export const normalizeAdminNextPath = (input: NextPathInput, fallback = "/admin"): string => {
+  const normalizedFallback = normalizeNextPath(fallback, "/admin")
+  const safeFallback = isAdminNextPath(normalizedFallback) ? normalizedFallback : "/admin"
+  const normalized = normalizeNextPath(input, safeFallback)
+  return isAdminNextPath(normalized) ? normalized : safeFallback
+}
+
+export const toAdminLoginPath = (nextPath: NextPathInput, fallback = "/admin") =>
+  `/admin/login?next=${encodeURIComponent(normalizeAdminNextPath(nextPath, fallback))}`
+
 export const toLoginPath = (nextPath: NextPathInput, fallback = "/") =>
   `/login?next=${encodeURIComponent(normalizeNextPath(nextPath, fallback))}`
 

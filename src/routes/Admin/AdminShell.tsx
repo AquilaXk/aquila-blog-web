@@ -1,11 +1,12 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
-import { type ReactNode, useEffect } from "react"
+import { type ReactNode } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import AppIcon, { type IconName } from "src/components/icons/AppIcon"
 import BrandLogoMark from "src/components/branding/BrandMark"
 import ProfileImage from "src/components/ProfileImage"
 import type { AuthMember } from "src/hooks/useAuthSession"
+import { toAdminLoginPath } from "src/libs/router"
 import { CONFIG } from "site.config"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
 import {
@@ -74,7 +75,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: "write",
-    href: "/editor/new",
+    href: "/admin/editor/new",
     label: "새 글 작성",
     shortLabel: "작성",
     icon: "file",
@@ -124,38 +125,10 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
   const brandTitle = (profileSnapshot?.blogTitle || member.blogTitle || CONFIG.blog.title || "AquilaLog").trim()
   const currentTitle = SECTION_TITLES[currentSection]
 
-  useEffect(() => {
-    if (!member?.isAdmin) return
-    if (typeof window === "undefined") return
-    if (currentSection === "cloud") return
-
-    const refreshSnapshot = () => {
-      void window.fetch("/api/backend/member/api/v1/notifications/snapshot", {
-        credentials: "include",
-      }).catch(() => undefined)
-    }
-    const idleWindow = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
-      cancelIdleCallback?: (handle: number) => void
-    }
-    const idleHandle = idleWindow.requestIdleCallback
-      ? idleWindow.requestIdleCallback(refreshSnapshot, { timeout: 1_500 })
-      : window.setTimeout(refreshSnapshot, 0)
-
-    return () => {
-      if (idleWindow.cancelIdleCallback && typeof idleHandle === "number") {
-        idleWindow.cancelIdleCallback(idleHandle)
-      } else {
-        window.clearTimeout(idleHandle)
-      }
-    }
-  }, [currentSection, member?.isAdmin])
-
   const handleLogout = async () => {
     await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
     const rawNextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-    const nextPath = rawNextPath.startsWith("/") && !rawNextPath.startsWith("//") ? rawNextPath : "/admin"
-    window.location.href = `/login?next=${encodeURIComponent(nextPath)}`
+    window.location.href = toAdminLoginPath(rawNextPath, "/admin")
   }
 
   return (
@@ -225,7 +198,7 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
             <Link href="/" passHref legacyBehavior>
               <SecondaryTopAction>블로그 보기</SecondaryTopAction>
             </Link>
-            <Link href="/editor/new" passHref legacyBehavior>
+            <Link href="/admin/editor/new" passHref legacyBehavior>
               <PrimaryTopAction>새 글</PrimaryTopAction>
             </Link>
             <ResponsiveLogoutAction type="button" aria-label="Logout" onClick={() => void handleLogout()}>

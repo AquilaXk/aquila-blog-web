@@ -112,7 +112,7 @@ export const consumeForcedEditorExitUrl = (url: string) => {
 /** Next router / hard login / marked forced redirects that must not be blocked. */
 export const isForcedEditorExitUrl = (url: string) => {
   const path = editorRoutePathname(url)
-  if (path === "/login" || path.startsWith("/login/")) return true
+  if (path === "/admin/login" || path.startsWith("/admin/login/")) return true
   return activeForcedEditorExitPath !== null && path === activeForcedEditorExitPath
 }
 
@@ -132,15 +132,15 @@ export const isSamePathEditorSurfaceNavigation = (currentUrl: string, nextUrl: s
   editorRoutePathname(currentUrl) === editorRoutePathname(nextUrl)
 
 /**
- * Internal studio bootstrap: automatic replace from `/editor/new` → `/editor/{id}`
+ * Internal studio bootstrap: automatic replace from `/admin/editor/new` → `/admin/editor/{id}`
  * after temp-post create. Must not be blocked by a dirty exit guard.
  */
 export const isEditorStudioBootstrapNavigation = (currentUrl: string, nextUrl: string) => {
   const current = editorRoutePathname(currentUrl)
   const next = editorRoutePathname(nextUrl)
-  if (current !== "/editor/new") return false
-  if (!next.startsWith("/editor/")) return false
-  const segment = next.slice("/editor/".length)
+  if (current !== "/admin/editor/new") return false
+  if (!next.startsWith("/admin/editor/")) return false
+  const segment = next.slice("/admin/editor/".length)
   return segment.length > 0 && segment !== "new" && !segment.includes("/")
 }
 

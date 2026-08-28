@@ -312,7 +312,7 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
     .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
     .slice(0, 5)
     .map((post) => ({
-      href: `/editor/${post.id}`,
+      href: `/admin/editor/${post.id}`,
       title: post.title?.trim() || "제목 없는 글",
       meta: `${formatAdminHubDateTime(post.modifiedAt)} · #${post.id}`,
       status: post.tempDraft ? "DRAFT" : post.published ? "PUBLISHED" : "PRIVATE",
@@ -381,7 +381,7 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
     },
   ]
   const primaryAction = {
-    href: "/editor/new",
+    href: "/admin/editor/new",
     cta: "작성",
     secondaryHref: "/admin/posts",
   }

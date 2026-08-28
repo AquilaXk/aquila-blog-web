@@ -11,7 +11,7 @@ import {
   isNavigationCancelledError,
   replaceRoute,
   replaceShallowRoutePreservingScroll,
-  toLoginPath,
+  toAdminLoginPath,
 } from "src/libs/router"
 import {
   clearScheduledForcedEditorExitUrl,
@@ -94,7 +94,7 @@ export const useEditorStudioRouting = ({
     if (authStatus === "loading" || authStatus === "unavailable") return
 
     if (!sessionMember) {
-      const target = toLoginPath(router.asPath || activeEditorRoute, activeEditorRoute)
+      const target = toAdminLoginPath(router.asPath || activeEditorRoute, activeEditorRoute)
       if (!redirectingRef.current && router.asPath !== target) {
         redirectingRef.current = true
         void (async () => {

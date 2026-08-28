@@ -11,7 +11,7 @@ import { serverApiFetchJson } from "src/libs/server/backend"
 import type { PostForEditor } from "./EditorStudioWorkspaceControllerRootModel"
 import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceController"
 
-const EDITOR_NEW_ROUTE_PATH = "/editor/new"
+const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 
 export type EditorStudioPageProps = AdminPageProps & {
   initialEditorPost?: PostForEditor | null

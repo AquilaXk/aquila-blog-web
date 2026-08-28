@@ -6,7 +6,7 @@ import { queryKey } from "src/constants/queryKey"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { createQueryClient } from "src/libs/react-query"
-import { normalizeNextPath, toLoginPath } from "src/libs/router"
+import { normalizeAdminNextPath, toAdminLoginPath } from "src/libs/router"
 import { serverApiFetchJson } from "./backend"
 import { guardAdminRequest } from "./adminGuard"
 import { hasServerAuthCookie } from "./authSession"
@@ -98,7 +98,7 @@ export const readAdminProtectedBootstrap = async <T>(
         ok: false,
         destination: shouldDeferRedirectToFallback
           ? null
-          : toLoginPath(normalizeNextPath(req.url, fallbackPath), fallbackPath),
+          : toAdminLoginPath(normalizeAdminNextPath(req.url, fallbackPath), fallbackPath),
       }
     }
     if (error.status === 403) {

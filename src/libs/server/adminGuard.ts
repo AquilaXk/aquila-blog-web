@@ -1,6 +1,6 @@
 import { IncomingMessage } from "http"
 import type { AuthMember } from "src/hooks/useAuthSession"
-import { normalizeNextPath, toLoginPath } from "src/libs/router"
+import { normalizeAdminNextPath, toAdminLoginPath } from "src/libs/router"
 import { fetchServerAdminSession } from "./authSession"
 
 type AdminGuardResult =
@@ -39,7 +39,7 @@ export const shouldBypassAdminGuardForQa = () => {
 }
 
 export const guardAdminRequest = async (req: IncomingMessage): Promise<AdminGuardResult> => {
-  const requestedPath = normalizeNextPath(req.url, "/admin")
+  const requestedPath = normalizeAdminNextPath(req.url, "/admin")
   let member: AuthMember | null | undefined
 
   try {
@@ -51,22 +51,21 @@ export const guardAdminRequest = async (req: IncomingMessage): Promise<AdminGuar
       return { ok: true, member: QA_ADMIN_MEMBER }
     }
 
-    // 인증 확인 API 일시 오류 시 500으로 터뜨리지 않고 로그인 경로로 안전하게 유도한다.
-    return { ok: false, destination: toLoginPath(requestedPath, "/admin") }
+    throw new Error("Unable to verify the administrator session.")
   }
 
   if (member === null) {
     if (shouldBypassAdminGuardForQa()) {
       return { ok: true, member: QA_ADMIN_MEMBER }
     }
-    return { ok: false, destination: toLoginPath(requestedPath, "/admin") }
+    return { ok: false, destination: toAdminLoginPath(requestedPath, "/admin") }
   }
 
-  if (!member) {
+  if (member === undefined) {
     if (shouldBypassAdminGuardForQa()) {
       return { ok: true, member: QA_ADMIN_MEMBER }
     }
-    return { ok: false, destination: toLoginPath(requestedPath, "/admin") }
+    throw new Error("Unable to verify the administrator session.")
   }
 
   if (!member?.isAdmin) {

@@ -243,7 +243,7 @@ export const usePostDetailEngagementActions = ({
     const returnTo = router.asPath || toCanonicalPostPath(data.id)
     await pushRoute(
       router,
-      `/editor/${encodeURIComponent(String(data.id))}?returnTo=${encodeURIComponent(returnTo)}`
+      `/admin/editor/${encodeURIComponent(String(data.id))}?returnTo=${encodeURIComponent(returnTo)}`
     )
   }, [data, router])
 

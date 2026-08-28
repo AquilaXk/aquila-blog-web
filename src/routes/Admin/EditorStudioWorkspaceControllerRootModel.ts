@@ -26,9 +26,9 @@ import type {
 
 export const MARKDOWN_EDITOR_MERMAID_ENABLED = process.env.NEXT_PUBLIC_EDITOR_V2_MERMAID_ENABLED !== "false"
 export const ADMIN_POSTS_WORKSPACE_ROUTE = "/admin/posts"
-export const EDITOR_NEW_ROUTE_PATH = "/editor/new"
+export const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 
-export const toEditorPostRoute = (id: string | number) => `/editor/${encodeURIComponent(String(id))}`
+export const toEditorPostRoute = (id: string | number) => `/admin/editor/${encodeURIComponent(String(id))}`
 
 export const buildCanonicalPostUrl = (postId: string | number) => {
   const path = toCanonicalPostPath(postId)
@@ -43,7 +43,7 @@ export const normalizeEditorReturnRoute = (value: string) => {
   if (!normalized.startsWith("/") || normalized.startsWith("//")) return ""
   if (/[\r\n]/.test(normalized)) return ""
   if (/^\/(?:https?:|javascript:)/i.test(normalized)) return ""
-  if (normalized.startsWith("/editor")) return ""
+  if (normalized.startsWith("/admin/editor")) return ""
   return normalized
 }
 

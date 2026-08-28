@@ -99,7 +99,7 @@ export type ListState = {
   loadedAt: string
 }
 
-export const EDITOR_NEW_ROUTE_PATH = "/editor/new"
+export const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 export const DEFAULT_PAGE = "1"
 export const DEFAULT_PAGE_SIZE = "20"
 export const DEFAULT_SORT: ListSort = "MODIFIED_AT"
