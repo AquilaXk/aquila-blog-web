@@ -71,6 +71,13 @@ const CONFIG = {
       url: PRODUCT_SITE_URL,
       route: "/easysubway",
       contactEmail: CONTACT_EMAIL,
+      releaseStatus: "전국 정식 출시 준비 중",
+      screenshot: {
+        src: "/easysubway/station-detail.png",
+        alt: "EasySubway 노선도 화면. 역을 선택해 출발·경유·도착을 고르는 상태.",
+        width: 1080,
+        height: 2340,
+      },
     },
   },
 
