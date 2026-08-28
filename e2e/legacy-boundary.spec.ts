@@ -72,6 +72,10 @@ test.describe("frontend legacy boundary", () => {
     expect(frontPathExists("src/pages/admin/editor/[id].tsx")).toBe(true)
   })
 
+  test("retired public account entrypoint is absent so Next serves its normal 404", () => {
+    expect(frontPathExists("src/pages/settings/account.tsx")).toBe(false)
+  })
+
   test("production-orphan public auth sources are removed", () => {
     expect(frontPathExists("src/components/auth")).toBe(false)
     expect(frontPathExists("src/hooks/useSignupMailCooldown.ts")).toBe(false)

@@ -8,7 +8,7 @@ test("reportClientError payload includes truncated requestId", () => {
     configurable: true,
     writable: true,
     value: {
-      location: { pathname: "/settings/account" },
+      location: { pathname: "/settings/privacy" },
       __AQUILA_CLIENT_ERROR_REPORTS__: [] as Array<{ requestId?: string }>,
     },
   })

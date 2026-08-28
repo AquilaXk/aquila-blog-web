@@ -6,7 +6,7 @@ import useAuthSession from "src/hooks/useAuthSession"
 import { colors } from "src/styles/colors"
 
 type SettingsLayoutProps = {
-  active: "privacy" | "account"
+  active: "privacy"
   title: string
   children: ReactNode
 }
@@ -62,13 +62,6 @@ const SettingsLayout = ({ active, title, children }: SettingsLayoutProps) => {
             href="/settings/privacy"
           >
             개인정보
-          </Link>
-          <Link
-            className={active === "account" ? "active" : ""}
-            aria-current={active === "account" ? "page" : undefined}
-            href="/settings/account"
-          >
-            계정 보안
           </Link>
         </nav>
       </header>

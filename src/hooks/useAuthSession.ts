@@ -161,7 +161,7 @@ const useAuthSession = () => {
     if (!isMounted || authStatus !== "authenticated" || !me) return
     const pathname = router.asPath.split("?")[0] || router.pathname
     const canReadLegalDocument =
-      ["/settings/privacy", "/settings/account", "/terms", "/privacy"].includes(pathname) ||
+      ["/settings/privacy", "/terms", "/privacy"].includes(pathname) ||
       pathname.startsWith("/legal/")
     if (canReadLegalDocument) return
 
