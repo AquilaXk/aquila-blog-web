@@ -19,6 +19,41 @@ const submitAdminLogin = async (page: Page) => {
   await page.getByRole("button", { name: "로그인" }).click()
 }
 
+test("관리자 로그인은 저장한 정규화 이메일을 다음 방문에 복원하고 해제하면 제거한다", async ({ page }) => {
+  await page.goto("/admin/login")
+
+  await page.getByLabel("이메일").fill("  ADMIN@example.com  ")
+  await page.getByLabel("아이디 저장").check()
+  await page.reload()
+
+  await expect(page.getByLabel("이메일")).toHaveValue("admin@example.com")
+
+  await page.getByLabel("아이디 저장").uncheck()
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("auth.admin.savedEmail.v1")))
+    .toBeNull()
+})
+
+test("관리자 로그인은 선택한 로그인 유지 값을 요청에 그대로 보낸다", async ({ page }) => {
+  let loginPayload: unknown
+  await page.route("**/member/api/v1/auth/login", async (route) => {
+    loginPayload = route.request().postDataJSON()
+    await route.fulfill({ contentType: "application/json", status: 401, body: "{}" })
+  })
+
+  await page.goto("/admin/login")
+  await expect(page.getByLabel("로그인 유지")).toBeChecked()
+  await page.getByLabel("로그인 유지").uncheck()
+  await submitAdminLogin(page)
+
+  expect(loginPayload).toEqual(
+    expect.objectContaining({ email: "admin@example.com", password: "password", rememberMe: false })
+  )
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("auth.admin.keepSignedIn.v1")))
+    .toBe("false")
+})
+
 test("관리자 로그인은 재동의가 필요해도 요청한 관리자 경로로 이동한다", async ({ page }) => {
   const navigationPaths: string[] = []
   page.on("request", (request) => {
