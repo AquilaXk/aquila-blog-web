@@ -19,7 +19,7 @@ const submitAdminLogin = async (page: Page) => {
   await page.getByRole("button", { name: "로그인" }).click()
 }
 
-test("관리자 로그인은 기존 세션 응답의 법적 재동의 상태를 보존한다", async ({ page }) => {
+test("관리자 로그인은 재동의가 필요해도 요청한 관리자 경로로 이동한다", async ({ page }) => {
   const navigationPaths: string[] = []
   page.on("request", (request) => {
     if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return
@@ -43,15 +43,11 @@ test("관리자 로그인은 기존 세션 응답의 법적 재동의 상태를 
   navigationPaths.length = 0
   await submitAdminLogin(page)
 
-  await expect(page).toHaveURL(
-    /\/settings\/privacy\?reconsent=required&next=%2Fadmin%2Feditor%2Fnew/
-  )
-  expect(navigationPaths[0]).toBe(
-    "/settings/privacy?reconsent=required&next=%2Fadmin%2Feditor%2Fnew"
-  )
+  await expect(page).toHaveURL(/\/admin\/editor\/new$/)
+  expect(navigationPaths[0]).toBe("/admin/editor/new")
 })
 
-test("관리자 로그인은 법적 재동의 상태가 없으면 fail closed 한다", async ({ page }) => {
+test("관리자 로그인은 법적 재동의 상태가 없어도 요청한 관리자 경로로 이동한다", async ({ page }) => {
   await fulfillLogin(page)
   await page.route("**/member/api/v1/auth/session", async (route) => {
     await route.fulfill({
@@ -64,8 +60,20 @@ test("관리자 로그인은 법적 재동의 상태가 없으면 fail closed �
   await page.goto("/admin/login?next=%2Fadmin%2Feditor%2Fnew")
   await submitAdminLogin(page)
 
+  await expect(page).toHaveURL(/\/admin\/editor\/new$/)
+})
+
+test("관리자 로그인은 세션을 확인하지 못하면 로그인 페이지에 오류를 표시한다", async ({ page }) => {
+  await fulfillLogin(page)
+  await page.route("**/member/api/v1/auth/session", async (route) => {
+    await route.fulfill({ contentType: "application/json", status: 503, body: "{}" })
+  })
+
+  await page.goto("/admin/login?next=%2Fadmin%2Feditor%2Fnew")
+  await submitAdminLogin(page)
+
   await expect(page).toHaveURL(/\/admin\/login/)
   await expect(
-    page.getByText("법적 동의 상태를 확인하지 못했습니다. 다시 로그인해주세요.")
+    page.getByText("관리자 세션을 확인하지 못했습니다. 다시 로그인해주세요.")
   ).toBeVisible()
 })

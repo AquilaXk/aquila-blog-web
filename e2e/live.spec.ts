@@ -5,7 +5,6 @@ import {
   adminPassword,
   buildLoginPayloadCandidates,
   cleanupLiveEditorPost,
-  completeLegalReconsentIfRequired,
   hasAuthCookie,
   isInvalidLoginRequestBody,
   isNavigationInterruptedError,
@@ -15,7 +14,6 @@ import {
   liveLoginTimeoutMs,
   liveRetryBaseDelayMs,
   liveUiRedirectTimeoutMs,
-  quickReconsentProbeTimeoutMs,
   resolveApiBaseUrl,
   sleep,
   waitForApiReachability,
@@ -53,12 +51,10 @@ const tryEnterAdminRoute = async (page: Page, timeoutMs: number) => {
       if (!isNavigationInterruptedError(error)) throw error
     }
 
-    if (await completeLegalReconsentIfRequired(page, "/admin", timeoutMs, quickReconsentProbeTimeoutMs)) return true
     if (isAuthenticatedAdminUrl(page.url())) return true
 
     try {
       await page.waitForURL((url) => isAuthenticatedAdminUrl(url.toString()), { timeout: perTryTimeout })
-      if (await completeLegalReconsentIfRequired(page, "/admin", timeoutMs, quickReconsentProbeTimeoutMs)) return true
       return true
     } catch {
       if (attempt < tries) {
@@ -315,10 +311,8 @@ const loginThroughUi = async (
   for (let attempt = 1; attempt <= liveLoginAttempts; attempt += 1) {
     const route = await gotoLoginForAdmin(page, liveUiRedirectTimeoutMs)
     if (route === "admin") {
-      await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
       return
     }
-    if (await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)) return
 
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
     await page.getByLabel("이메일").fill(loginEmail)
@@ -358,7 +352,6 @@ const loginThroughUi = async (
         if (isInvalidLoginRequestBody(status, bodyPreview)) {
           await loginWithRetry(page, apiBaseUrl, loginEmail, legacyLoginId, password)
           await page.goto("/admin")
-          await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
           await expect(page).toHaveURL(/\/admin(\/|$)/, { timeout: liveUiRedirectTimeoutMs })
           return
         }
@@ -371,14 +364,12 @@ const loginThroughUi = async (
       }
 
       if (isAuthenticatedAdminUrl(page.url())) {
-        await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
         return
       }
       if (await tryEnterAdminRoute(page, liveUiRedirectTimeoutMs)) return
     }
 
     if (outcome.kind === "admin-url") {
-      await completeLegalReconsentIfRequired(page, "/admin", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
       return
     }
 
@@ -459,7 +450,6 @@ const expectLiveAdminRoute = async (
       continue
     }
 
-    await completeLegalReconsentIfRequired(page, path, liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
     await expect(page, `${label} route url`).toHaveURL(routePattern, { timeout: 20_000 })
     await expect(page.getByRole("heading", { name: headingPattern }), `${label} heading`).toBeVisible()
     return

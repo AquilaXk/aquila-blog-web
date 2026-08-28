@@ -25,7 +25,6 @@ const sourceLabels: Record<OptionalTrackingConsentRecord["source"], string> = {
   "signup-email": "이메일 회원가입",
   "signup-social": "소셜 회원가입",
   "privacy-request": "개인정보 처리 요청",
-  "legal-reconsent": "법적 문서 재동의",
   "legacy-string": "이전 저장 형식",
 }
 

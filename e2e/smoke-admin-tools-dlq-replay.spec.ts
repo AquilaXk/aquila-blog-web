@@ -1,6 +1,5 @@
 import AxeBuilder from "@axe-core/playwright"
 import { expect, test, type Page } from "@playwright/test"
-import { ACTIVE_LEGAL_DOCUMENTS } from "src/apis/backend/legal"
 import { ADMIN_TASK_DLQ_REPLAY_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
 import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import type { TaskQueueDiagnostics } from "src/routes/Admin/AdminToolsWorkspacePageState"
@@ -25,17 +24,7 @@ type ReplayCounters = {
   requests: Record<string, unknown>[]
 }
 
-const adminMember = {
-  ...ADMIN_MEMBER_FIXTURE,
-  legalReconsent: {
-    status: "CURRENT",
-    required: false,
-    termsVersion: ACTIVE_LEGAL_DOCUMENTS.terms.version,
-    termsContentSha256: ACTIVE_LEGAL_DOCUMENTS.terms.contentSha256,
-    privacyVersion: ACTIVE_LEGAL_DOCUMENTS.privacy.version,
-    privacyContentSha256: ACTIVE_LEGAL_DOCUMENTS.privacy.contentSha256,
-  },
-}
+const adminMember = ADMIN_MEMBER_FIXTURE
 
 const systemHealth = {
   status: "UP",
@@ -128,13 +117,6 @@ const installAdminToolsMocks = async (
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(adminMember),
-    })
-  })
-  await page.route("**/member/api/v1/auth/session", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ legalReconsent: adminMember.legalReconsent }),
     })
   })
   await page.route("**/system/api/v1/adm/bootstrap", async (route) => {

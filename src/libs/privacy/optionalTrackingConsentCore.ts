@@ -7,7 +7,6 @@ export type OptionalTrackingConsentSource =
   | "signup-email"
   | "signup-social"
   | "privacy-request"
-  | "legal-reconsent"
   | "legacy-string"
 
 export type OptionalTrackingConsentRecord = {

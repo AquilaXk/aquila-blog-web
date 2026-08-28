@@ -1,78 +1,13 @@
 import css from "styled-jsx/css"
-import { control, editorialLabel, layoutBreakpoint } from "src/design-system/tokens"
+import { control, layoutBreakpoint } from "src/design-system/tokens"
 
 // styled-jsx 외부 스타일은 반드시 css 태그로 감싼다. 평범한 문자열을 <style jsx>에 넘기면
 // scope hash가 undefined가 되고 같은 페이지의 <style jsx global>까지 주입되지 않는다.
 export const privacyPageStyles = css`
-  /* 패밀리룩(1597): 재동의 게이트는 면 채색 없이 잉크 룰 + 모노 라벨로만 일반 방문 상태와 구분한다. */
-  .gatePanel {
-    border-top: 2px solid var(--aq-text);
-  }
-
-  .sectionLabel {
-    margin: 0 0 10px;
-    color: var(--aq-muted);
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-  }
-
-  .gateTitle {
-    font-size: 1.45rem;
-    line-height: 1.3;
-  }
-
-  .lead,
-  .gateReturn {
+  .lead {
     margin: 0 0 14px;
     color: var(--aq-text-secondary);
     line-height: 1.65;
-  }
-
-  .gateReturn {
-    margin-bottom: 18px;
-  }
-
-  .gateReturnPath {
-    color: var(--aq-text);
-    font-weight: 700;
-    overflow-wrap: anywhere;
-  }
-
-  .consentList {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--aq-border);
-  }
-
-  .consentList li {
-    border-bottom: 1px solid var(--aq-border);
-  }
-
-  .consentRow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: ${control.lg}px;
-    padding: 10px 0;
-    cursor: pointer;
-  }
-
-  .consentRow input {
-    width: 20px;
-    height: 20px;
-    flex: 0 0 auto;
-    accent-color: var(--aq-accent);
-    cursor: pointer;
-  }
-
-  .consentText {
-    color: var(--aq-text);
-    font-weight: 600;
-    line-height: 1.5;
   }
 
   .actionRow {
@@ -99,13 +34,6 @@ export const privacyPageStyles = css`
     background: transparent;
     border-color: var(--aq-border);
     color: var(--aq-muted);
-  }
-
-  .actionHint {
-    margin: 0;
-    color: var(--aq-muted);
-    font-size: 0.9rem;
-    font-weight: 700;
   }
 
   .statusLine {
@@ -168,7 +96,6 @@ export const privacyPageStyles = css`
     transform: translateY(1px) rotate(-135deg);
   }
 
-  .statusSkeleton,
   .snapshotSkeleton {
     display: grid;
     gap: 12px;
@@ -271,8 +198,7 @@ export const privacyPageStyles = css`
 
   @media (max-width: ${layoutBreakpoint.editorCompact}px) {
     .actionPrimary,
-    .actionSecondary,
-    .actionHint {
+    .actionSecondary {
       width: 100%;
     }
   }
