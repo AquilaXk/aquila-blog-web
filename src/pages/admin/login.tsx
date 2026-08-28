@@ -182,7 +182,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
               }}
               type="checkbox"
             />
-            아이디 저장
+            <span>아이디 저장</span>
           </LoginPreference>
           <LoginPreference>
             <input
@@ -191,7 +191,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
               onChange={(event) => updateKeepSignedIn(event.target.checked)}
               type="checkbox"
             />
-            로그인 유지
+            <span>로그인 유지</span>
           </LoginPreference>
           {error ? <LoginError role="alert">{error}</LoginError> : null}
           <LoginSubmit disabled={loading} type="submit">
