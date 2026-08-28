@@ -69,16 +69,16 @@ const tryEnterAdminRoute = async (page: Page, timeoutMs: number) => {
 
 const gotoLoginForAdmin = async (page: Page, timeoutMs: number) => {
   try {
-    await page.goto("/login?next=%2Fadmin")
+    await page.goto("/admin/login?next=%2Fadmin")
   } catch (error) {
     if (!isNavigationInterruptedError(error)) throw error
   }
 
   if (/\/admin(\/|$)/.test(page.url())) return "admin" as const
-  if (/\/login(\/|$|\?)/.test(page.url())) return "login" as const
+  if (/\/admin/login(\/|$|\?)/.test(page.url())) return "login" as const
 
   try {
-    await page.waitForURL(/\/(login|admin)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
+    await page.waitForURL(/\/(admin\/login|admin)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
   } catch {
     // keep current url and let caller decide by assertion/retry.
   }
@@ -319,7 +319,7 @@ const loginThroughUi = async (
 
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
     await page.getByLabel("이메일").fill(loginEmail)
-    await page.locator("#password").fill(password)
+    await page.getByLabel("비밀번호").fill(password)
 
     let observedLoginResponse: Response | null = null
     const loginResponsePromise = page
@@ -433,7 +433,7 @@ const authenticateLiveAdmin = async (page: Page, apiBaseUrl: string) => {
 }
 
 const isVisibleLoginPage = async (page: Page) => {
-  if (/\/login(\/|$|\?)/.test(page.url())) return true
+  if (/\/admin/login(\/|$|\?)/.test(page.url())) return true
   return page.getByRole("heading", { name: "로그인" }).isVisible().catch(() => false)
 }
 
@@ -488,7 +488,7 @@ test.describe("live frontend build metadata", () => {
   test("custom domain이 배포 대상 commit의 front build를 서빙한다", async ({ page }) => {
     test.skip(!expectedFrontendCommitSha, "E2E_EXPECTED_FRONT_COMMIT_SHA is required")
 
-    await page.goto("/login?next=%2Fadmin")
+    await page.goto("/admin/login?next=%2Fadmin")
 
     const buildSha = await page.evaluate(() =>
       document.querySelector('meta[name="aquila-build-sha"]')?.getAttribute("content") ?? null
@@ -578,20 +578,20 @@ test.describe("live production e2e", () => {
 
   test("비로그인 사용자는 /admin 접근 시 로그인 페이지로 이동한다", async ({ page }) => {
     await page.goto("/admin")
-    await expect(page).toHaveURL(/\/login/)
+    await expect(page).toHaveURL(/\/admin/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
   })
 
   test("관리자 UI 로그인 경로가 정상 동작한다", async ({ page }) => {
     test.skip(!hasUiLoginCredentials, "UI 로그인 검증에는 E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD가 필요합니다.")
-    await page.goto("/login")
+    await page.goto("/admin/login")
     const apiBaseUrl = resolveApiBaseUrl(page.url())
     await waitForApiReachability(page, apiBaseUrl)
     await loginThroughUi(page, apiBaseUrl, adminEmail, adminLegacyLoginId, adminPassword)
     await expect(page.getByRole("heading", { name: adminLandingHeadingPattern })).toBeVisible()
 
     await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/login/)
+    await expect(page).toHaveURL(/\/admin/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
   })
 
@@ -601,7 +601,7 @@ test.describe("live production e2e", () => {
       runtimeErrors.push(error.message)
     })
 
-    await page.goto("/login?next=%2Fadmin")
+    await page.goto("/admin/login?next=%2Fadmin")
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
 
     const apiBaseUrl = resolveApiBaseUrl(page.url())
@@ -683,8 +683,8 @@ test.describe("live production e2e", () => {
         await route.continue()
       }
 
-      await page.goto(`/editor/${postId}`)
-      await expect(page).toHaveURL(new RegExp(`/editor/${postId}(\\?|$)`))
+      await page.goto(`/admin/editor/${postId}`)
+      await expect(page).toHaveURL(new RegExp(`/admin/editor/${postId}(\\?|$)`))
 
       const titleInput = page.getByPlaceholder("제목을 입력하세요").first()
       await expect(titleInput).toBeVisible()
@@ -714,8 +714,8 @@ test.describe("live production e2e", () => {
       isPostWriteRouteActive = false
       expect(response.ok()).toBe(true)
 
-      await page.goto(`/editor/${postId}`)
-      await expect(page).toHaveURL(new RegExp(`/editor/${postId}(\\?|$)`))
+      await page.goto(`/admin/editor/${postId}`)
+      await expect(page).toHaveURL(new RegExp(`/admin/editor/${postId}(\\?|$)`))
       await expect(titleInput).toHaveValue(savedTitle)
       await expect(editorContent).toHaveValue(new RegExp(canarySeedContent))
       await expect(editorContent).toHaveValue(/라이브 E2E 편집 확인/)
@@ -735,7 +735,7 @@ test.describe("live production e2e", () => {
     }
 
     await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/login/)
+    await expect(page).toHaveURL(/\/admin/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
 
     const ignorablePatterns = [

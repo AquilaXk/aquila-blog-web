@@ -24,7 +24,7 @@ import {
 const uiLoginId = adminEmail || adminLegacyLoginId
 const hasUiLoginCredentials = Boolean(uiLoginId && adminPassword)
 const editorOrAdminUrlPattern = /\/(admin|editor)(\/|$|\?)/
-const editorUrlPattern = /\/editor(\/|$|\?)/
+const editorUrlPattern = /\/admin/editor(\/|$|\?)/
 const expectedFrontendCommitSha = process.env.E2E_EXPECTED_FRONT_COMMIT_SHA?.trim() || ""
 const liveEditor507CanaryEnabled = process.env.E2E_LIVE_EDITOR_507_CANARY === "true"
 const liveEditor507SeededHosts = new Set(
@@ -62,17 +62,17 @@ const tryEnterEditorRoute = async (page: Page, timeoutMs: number) => {
 
   for (let attempt = 1; attempt <= tries; attempt += 1) {
     try {
-      await page.goto("/editor/new")
+      await page.goto("/admin/editor/new")
     } catch (error) {
       if (!isNavigationInterruptedError(error)) throw error
     }
 
-    if (await completeLegalReconsentIfRequired(page, "/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
+    if (await completeLegalReconsentIfRequired(page, "/admin/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
     if (editorUrlPattern.test(page.url())) return true
 
     try {
       await page.waitForURL(editorUrlPattern, { timeout: perTryTimeout })
-      if (await completeLegalReconsentIfRequired(page, "/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
+      if (await completeLegalReconsentIfRequired(page, "/admin/editor/new", timeoutMs, quickReconsentProbeTimeoutMs)) return true
       return true
     } catch {
       if (attempt < tries) await sleep(400 * attempt)
@@ -84,16 +84,16 @@ const tryEnterEditorRoute = async (page: Page, timeoutMs: number) => {
 
 const gotoLoginForEditor = async (page: Page, timeoutMs: number) => {
   try {
-    await page.goto("/login?next=%2Feditor%2Fnew")
+    await page.goto("/admin/login?next=%2Fadmin%2Feditor%2Fnew")
   } catch (error) {
     if (!isNavigationInterruptedError(error)) throw error
   }
 
   if (editorUrlPattern.test(page.url())) return "editor" as const
-  if (/\/login(\/|$|\?)/.test(page.url())) return "login" as const
+  if (/\/admin/login(\/|$|\?)/.test(page.url())) return "login" as const
 
   try {
-    await page.waitForURL(/\/(login|editor)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
+    await page.waitForURL(/\/(admin\/login|admin\/editor)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
   } catch {
     // Keep current URL and let the caller decide.
   }
@@ -205,7 +205,7 @@ const loginThroughUi = async (page: Page) => {
   if (route === "editor") {
     await completeLegalReconsentIfRequired(
       page,
-      "/editor/new",
+      "/admin/editor/new",
       liveUiRedirectTimeoutMs,
       quickReconsentProbeTimeoutMs
     )
@@ -213,7 +213,7 @@ const loginThroughUi = async (page: Page) => {
   }
   if (await completeLegalReconsentIfRequired(
     page,
-    "/editor/new",
+    "/admin/editor/new",
     liveUiRedirectTimeoutMs,
     quickReconsentProbeTimeoutMs
   )) return
@@ -226,7 +226,7 @@ const loginThroughUi = async (page: Page) => {
   for (let attempt = 1; attempt <= liveLoginAttempts; attempt += 1) {
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
     await page.getByLabel("이메일").fill(uiLoginId)
-    await page.locator("#password").fill(adminPassword)
+    await page.getByLabel("비밀번호").fill(adminPassword)
 
     let observedLoginResponse: { status: number; bodyPreview: string } | null = null
     const loginResponsePromise = page
@@ -257,7 +257,7 @@ const loginThroughUi = async (page: Page) => {
         if (editorUrlPattern.test(page.url())) {
           await completeLegalReconsentIfRequired(
             page,
-            "/editor/new",
+            "/admin/editor/new",
             liveUiRedirectTimeoutMs,
             quickReconsentProbeTimeoutMs
           )
@@ -280,7 +280,7 @@ const loginThroughUi = async (page: Page) => {
     if (outcome.kind === "editor-url") {
       await completeLegalReconsentIfRequired(
         page,
-        "/editor/new",
+        "/admin/editor/new",
         liveUiRedirectTimeoutMs,
         quickReconsentProbeTimeoutMs
       )
@@ -381,21 +381,21 @@ const readEditorSelection = async (page: Page) =>
 test.describe("editor live visual regression", () => {
   test.skip(!hasUiLoginCredentials, "E2E_ADMIN_EMAIL 또는 E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD가 필요합니다.")
 
-  test("실제 /editor/new는 Markdown write/preview 셸을 렌더하고 legacy block affordance를 노출하지 않는다", async ({
+  test("실제 /admin/editor/new는 Markdown write/preview 셸을 렌더하고 legacy block affordance를 노출하지 않는다", async ({
     page,
   }) => {
     test.slow()
     await page.setViewportSize({ width: 1512, height: 982 })
     await loginThroughUi(page)
 
-    await page.goto("/editor/new")
+    await page.goto("/admin/editor/new")
     await completeLegalReconsentIfRequired(
       page,
-      "/editor/new",
+      "/admin/editor/new",
       liveUiRedirectTimeoutMs,
       quickReconsentProbeTimeoutMs
     )
-    await page.waitForURL(/\/editor(\/|$)/, { timeout: 30_000 })
+    await page.waitForURL(/\/admin/editor(\/|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
     await expectMarkdownEditorShell(page)
     await expect(page.getByRole("tab", { name: "Split" })).toHaveAttribute("aria-selected", "true")
@@ -411,7 +411,7 @@ test.describe("editor live visual regression", () => {
     await expect(page.locator("[data-table-affordance]")).toHaveCount(0)
   })
 
-  test("실제 /editor/[id]는 저장된 Markdown table/code/list를 write/preview에 같은 내용으로 로드한다", async ({
+  test("실제 /admin/editor/[id]는 저장된 Markdown table/code/list를 write/preview에 같은 내용으로 로드한다", async ({
     page,
   }) => {
     test.slow()
@@ -422,14 +422,14 @@ test.describe("editor live visual regression", () => {
     const postId = await createHiddenEditorPost(page, title, markdownCanary)
 
     try {
-      await page.goto(`/editor/${postId}`)
+      await page.goto(`/admin/editor/${postId}`)
       await completeLegalReconsentIfRequired(
         page,
-        `/editor/${postId}`,
+        `/admin/editor/${postId}`,
         liveUiRedirectTimeoutMs,
         quickReconsentProbeTimeoutMs
       )
-      await page.waitForURL(new RegExp(`/editor/${postId}(\\?|$)`), { timeout: 30_000 })
+      await page.waitForURL(new RegExp(`/admin/editor/${postId}(\\?|$)`), { timeout: 30_000 })
       await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue(title)
       await expectMarkdownEditorShell(page)
 
@@ -451,7 +451,7 @@ test.describe("editor live visual regression", () => {
     }
   })
 
-  test("실제 /editor/507 canary는 Markdown editor와 상세 렌더 preview 기준으로 하단 table/code/list를 표시한다", async ({
+  test("실제 /admin/editor/507 canary는 Markdown editor와 상세 렌더 preview 기준으로 하단 table/code/list를 표시한다", async ({
     page,
   }) => {
     test.skip(!liveEditor507CanaryEnabled, "E2E_LIVE_EDITOR_507_CANARY=true일 때만 실제 507 seeded live canary를 실행합니다.")
@@ -463,9 +463,9 @@ test.describe("editor live visual regression", () => {
       "실제 507 seeded content가 있는 live host에서만 canary를 실행합니다."
     )
 
-    await page.goto("/editor/507")
-    await completeLegalReconsentIfRequired(page, "/editor/507", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
-    await page.waitForURL(/\/editor\/507(\?|$)/, { timeout: 30_000 })
+    await page.goto("/admin/editor/507")
+    await completeLegalReconsentIfRequired(page, "/admin/editor/507", liveUiRedirectTimeoutMs, quickReconsentProbeTimeoutMs)
+    await page.waitForURL(/\/admin\/editor\/507(\?|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
 
     const buildSha = await page.evaluate(() =>

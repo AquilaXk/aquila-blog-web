@@ -127,7 +127,6 @@ const mockFeedEndpoints = async (page: Page) => {
             published: true,
             listed: true,
             likesCount: 1,
-            commentsCount: 1,
             hitCount: 10,
           },
         ],
@@ -231,9 +230,7 @@ const mockDetailEndpoint = async (page: Page) => {
         published: true,
         listed: true,
         likesCount: 1,
-        commentsCount: 1,
         hitCount: 10,
-        actorHasLiked: false,
         actorCanModify: false,
         actorCanDelete: false,
       }),
@@ -252,9 +249,6 @@ const mockDetailEndpoint = async (page: Page) => {
     })
   })
 
-  await page.route("**/post/api/v1/posts/991/comments", async (route) => {
-    await fulfillJson(route, [])
-  })
 }
 
 const expectLaunchGateAccessibility = async (page: Page, testInfo: TestInfo, label: string) => {
@@ -392,19 +386,16 @@ test("홈 피드 PostCard는 keyboard focus ring을 pointer capability와 무관
   }
 })
 
-test("상세 댓글 composer와 200% zoom 상태는 심각도 높은 접근성 위반이 없다", async ({
+test("상세 본문의 200% zoom 상태는 심각도 높은 접근성 위반이 없다", async ({
   page,
 }, testInfo) => {
   await mockDetailEndpoint(page)
   await page.goto("/posts/991")
   await expect(page.getByRole("heading", { name: "접근성 상세 점검" })).toBeVisible()
-  await page.locator('[data-rum-section="comments"]').scrollIntoViewIfNeeded()
-  await expect(page.getByText("첫 댓글을 남겨보세요.")).toBeVisible()
-  await expect(page.getByRole("button", { name: "로그인하고 댓글 작성" })).toBeVisible()
   await page.addStyleTag({ content: "html { zoom: 2; }" })
   await expectNoHorizontalOverflow(page)
   await expectPrimaryLandmarks(page)
-  await expectLaunchGateAccessibility(page, testInfo, "detail-comments-zoom")
+  await expectLaunchGateAccessibility(page, testInfo, "detail-content-zoom")
 })
 
 test("모바일 header와 login modal은 keyboard-only 진입에서 심각도 높은 접근성 위반이 없다", async ({
@@ -462,7 +453,7 @@ test("editor 작성 surface는 keyboard landmark와 심각도 높은 접근성 �
   await setSchemeCookie(page, "dark")
   await mockAuthenticatedEditor(page)
 
-  await page.goto("/editor/new?source=local-draft")
+  await page.goto("/admin/editor/new?source=local-draft")
   await expect(page.locator("html")).toHaveAttribute("data-aquila-scheme", "light")
   await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue("접근성 launch gate 작성 테스트")
   await expect(page.getByTestId("markdown-editor")).toBeVisible()

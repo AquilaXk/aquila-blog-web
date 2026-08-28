@@ -328,18 +328,18 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(snapshot.viewport.width).toBe(768)
       expect(snapshot.viewport.height).toBe(1024)
 
-      // admin/dashboard는 SSR auth guard를 통과하지 못하면 /login fallback을 탈 수 있다.
+      // admin/dashboard는 SSR auth guard를 통과하지 못하면 /admin/login fallback을 탈 수 있다.
       // (예: perf CI의 backend 단절 모드, 로컬 미로그인 상태, SSR auth backend 비가용)
       // 단, 이 fallback 허용은 명시 플래그(PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true) 또는
       // backend 단절 perf 모드에서만 허용한다. 기본은 dashboard 진입 실패를 테스트 실패로 본다.
-      if (snapshot.route === "/login") {
+      if (snapshot.route === "/admin/login") {
         if (!allowAdminDashboardLoginFallback) {
           throw new Error(
-            `[perf] admin-dashboard unexpected fallback=/login (set PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true only when intentionally testing auth fallback)`
+            `[perf] admin-dashboard unexpected fallback=/admin/login (set PERF_ALLOW_ADMIN_LOGIN_FALLBACK=true only when intentionally testing auth fallback)`
           )
         }
         console.info(
-          `[perf] admin-dashboard fallback=/login backendDisconnected=${String(isSsrAuthBackendDisconnectedForPerf)} allowFallback=${String(allowAdminDashboardLoginFallback)}`
+          `[perf] admin-dashboard fallback=/admin/login backendDisconnected=${String(isSsrAuthBackendDisconnectedForPerf)} allowFallback=${String(allowAdminDashboardLoginFallback)}`
         )
         const htmlScrollWidth = snapshot.scrollWidth?.html ?? 0
         const bodyScrollWidth = snapshot.scrollWidth?.body ?? 0
@@ -404,9 +404,9 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     { route: "/posts/991", viewport: { width: 768, height: 1024 } },
   ] as const
   const authScenarios = [
-    { route: "/login", viewport: { width: 1440, height: 900 } },
-    { route: "/login", viewport: { width: 393, height: 852 } },
-    { route: "/login", viewport: { width: 768, height: 1024 } },
+    { route: "/admin/login", viewport: { width: 1440, height: 900 } },
+    { route: "/admin/login", viewport: { width: 393, height: 852 } },
+    { route: "/admin/login", viewport: { width: 768, height: 1024 } },
   ] as const
   const v4PaperBackground = "rgb(247, 247, 245)"
 

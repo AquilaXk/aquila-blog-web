@@ -194,7 +194,6 @@ test.describe("core smoke source boundaries", () => {
     "PostDetailRailModel.ts",
     "PostDetailRelatedSection.tsx",
     "PostDetail.styles.ts",
-    "CommentBox/CommentBox.styles.ts",
   ]
   const requiredFeedModules = [
     "FeedExplorerRestoreModel.ts",
@@ -207,10 +206,11 @@ test.describe("core smoke source boundaries", () => {
   for (const sourcePath of requiredFeedModules) {
     expect(existsSync(path.join(feedRoot, sourcePath)), sourcePath).toBe(true)
   }
+  expect(existsSync(path.join(detailRoot, "CommentBox"))).toBe(false)
+  expect(existsSync(path.join(detailRoot, "DeferredCommentBox.tsx"))).toBe(false)
 
   const boundedSourceFiles = [
     path.join(detailRoot, "index.tsx"),
-    path.join(detailRoot, "CommentBox/index.tsx"),
     path.join(detailRoot, "PostHeader.tsx"),
     path.join(feedRoot, "FeedExplorer.tsx"),
     path.join(feedRoot, "PostList/index.tsx"),
@@ -246,14 +246,11 @@ test.describe("core smoke source boundaries", () => {
   expect(publicFilesOverThousand).toEqual([])
 
   const detailPageSource = readFileSync(path.join(detailRoot, "index.tsx"), "utf8")
-  const commentBoxSource = readFileSync(path.join(detailRoot, "CommentBox/index.tsx"), "utf8")
   const feedExplorerSource = readFileSync(path.join(feedRoot, "FeedExplorer.tsx"), "utf8")
 
   expect(detailPageSource).toContain("collectTocFromArticle")
   expect(detailPageSource).toContain("RelatedPostsSection")
   expect(detailPageSource).not.toContain("const StyledWrapper = styled.div")
-  expect(commentBoxSource).toContain("CommentBox.styles")
-  expect(commentBoxSource).not.toContain("const StyledWrapper = styled.section")
   expect(feedExplorerSource).toContain("FeedExplorerRestoreModel")
   expect(feedExplorerSource).not.toContain("const ExplorerCard = styled.section")
 })
@@ -278,7 +275,6 @@ test.describe("core smoke source boundaries", () => {
     path.join(detailRoot, "PostHeader.tsx"),
     path.join(detailRoot, "PostDetailSection.styles.ts"),
     path.join(detailRoot, "PostHeader.styles.ts"),
-    path.join(detailRoot, "CommentBox/index.tsx"),
     path.join(feedPostListRoot, "index.tsx"),
   ]
 
@@ -310,9 +306,6 @@ test.describe("core smoke source boundaries", () => {
   const authRoot = path.join(sourceRoot, "components/auth")
   const adminRoot = path.join(sourceRoot, "routes/Admin")
   const requiredModules = [
-    path.join(headerRoot, "NotificationBellModel.ts"),
-    path.join(headerRoot, "NotificationBellPanel.tsx"),
-    path.join(headerRoot, "NotificationBell.styles.ts"),
     path.join(authRoot, "AuthEntryModalModel.ts"),
     path.join(authRoot, "AuthEntryModal.styles.ts"),
     path.join(sourceRoot, "routes/About/AboutPageModel.ts"),
@@ -325,9 +318,17 @@ test.describe("core smoke source boundaries", () => {
   for (const sourcePath of requiredModules) {
     expect(existsSync(sourcePath), path.relative(sourceRoot, sourcePath)).toBe(true)
   }
+  for (const sourcePath of [
+    "NotificationBell.tsx",
+    "NotificationBellModel.ts",
+    "NotificationBellPanel.tsx",
+    "NotificationBell.styles.ts",
+    "useNotificationBellState.ts",
+  ]) {
+    expect(existsSync(path.join(headerRoot, sourcePath)), sourcePath).toBe(false)
+  }
 
   const boundedSourceFiles = [
-    path.join(headerRoot, "NotificationBell.tsx"),
     path.join(headerRoot, "NavBar.tsx"),
     path.join(authRoot, "AuthEntryModal.tsx"),
     path.join(sourceRoot, "pages/login.tsx"),
@@ -381,16 +382,11 @@ test.describe("core smoke source boundaries", () => {
 
   expect(appShellAuthFilesOverThousand).toEqual([])
 
-  const notificationSource = readFileSync(path.join(headerRoot, "NotificationBell.tsx"), "utf8")
-  const notificationStateSource = readFileSync(path.join(headerRoot, "useNotificationBellState.ts"), "utf8")
   const authModalSource = readFileSync(path.join(authRoot, "AuthEntryModal.tsx"), "utf8")
   const aboutPageSource = readFileSync(path.join(sourceRoot, "pages/about.tsx"), "utf8")
   const adminProfilePageSource = readFileSync(path.join(adminRoot, "AdminProfileWorkspacePage.tsx"), "utf8")
   const adminProfileSectionsSource = readFileSync(path.join(adminRoot, "AdminProfileWorkspaceSections.tsx"), "utf8")
 
-  expect(notificationSource).toContain("NotificationBellPanel")
-  expect(notificationStateSource).toContain("NotificationBellModel")
-  expect(notificationSource).not.toContain("const StyledWrapper = styled.div")
   expect(authModalSource).toContain("AuthEntryModalModel")
   expect(authModalSource).not.toContain("const Backdrop = styled.div")
   expect(aboutPageSource).toContain("AboutPageView")
@@ -491,7 +487,6 @@ const createExplorePost = (overrides: Partial<Record<string, unknown>> & { title
   published: true,
   listed: true,
   likesCount: 0,
-  commentsCount: 0,
   hitCount: 0,
   ...overrides,
 })

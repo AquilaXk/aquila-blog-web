@@ -345,7 +345,7 @@ test.describe("Markdown editor replacement", () => {
   test("publish confirmation modal follows the admin neutral dialog contract", async ({ page }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
     await page.getByRole("button", { name: /^(발행 설정|발행|새 글 작성|수정 반영)$/ }).first().click()
 
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|새 글 작성|수정 설정)$/ })
@@ -370,7 +370,7 @@ test.describe("Markdown editor replacement", () => {
   test("publish modal uses an admin workflow layout instead of stacked explanation cards", async ({ page }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
     await page.getByRole("button", { name: /^(발행 설정|발행|새 글 작성|수정 반영)$/ }).first().click()
 
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|새 글 작성|수정 설정)$/ })
@@ -425,12 +425,12 @@ test.describe("Markdown editor replacement", () => {
     expect(publishModalShellStylesSource).toContain("export const PublishModalFooter")
   })
 
-  test("/editor/new renders Markdown write and preview panes for 507-style bottom content", async ({
+  test("/admin/editor/new renders Markdown write and preview panes for 507-style bottom content", async ({
     page,
   }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue("Markdown 작성 테스트")
     await expect(page.getByTestId("markdown-editor")).toBeVisible()
@@ -451,7 +451,7 @@ test.describe("Markdown editor replacement", () => {
     const fixture = markdownImplementedFeatureFixture
     await routeAuthenticatedEditor(page, fixture.body, fixture.title)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toHaveValue(fixture.body)
     const markdown = page.getByTestId("markdown-editor-preview-pane").locator(".aq-markdown")
@@ -496,7 +496,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await routeAuthenticatedEditor(page, "ㄷㄷㄷ")
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const previewPane = page.getByTestId("markdown-editor-preview-pane")
@@ -545,7 +545,7 @@ test.describe("Markdown editor replacement", () => {
   test("preview mode keeps the public reading padding of the full public preview", async ({ page }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await page.getByRole("tab", { name: "Preview" }).click()
     await expect(page.getByTestId("markdown-editor-write-pane")).toHaveCount(0)
@@ -573,7 +573,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 2048, height: 1152 })
     await routeAuthenticatedEditor(page, "본문이 없습니다.")
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const editor = page.getByTestId("markdown-editor")
     const exitButton = page.getByRole("button", { name: "← 글 관리" })
@@ -618,7 +618,7 @@ test.describe("Markdown editor replacement", () => {
   test("keeps a dismissed local draft candidate in storage and offers it again after reload", async ({ page }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new")
+    await page.goto("/admin/editor/new")
     const restoreSuggestion = page.getByRole("status").filter({ hasText: "브라우저 임시글이 있습니다." })
     await expect(restoreSuggestion).toBeVisible()
     await restoreSuggestion.getByRole("button", { name: "이번 세션에 표시 안 함" }).click()
@@ -657,7 +657,7 @@ test.describe("Markdown editor replacement", () => {
       "Using **kwargs** in Python"
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const outline = page.getByLabel("문서 목차")
     await expect(outline.locator("strong").filter({ hasText: /^Using \*\*kwargs\*\* in Python$/ })).toBeVisible()
@@ -688,7 +688,7 @@ test.describe("Markdown editor replacement", () => {
 
     await page.setViewportSize({ width: 2048, height: 1152 })
     await routeAuthenticatedEditor(page, content, title)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const outline = page.getByLabel("문서 목차")
     const titleInput = page.getByPlaceholder("제목을 입력하세요")
@@ -757,7 +757,7 @@ test.describe("Markdown editor replacement", () => {
       ].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const preview = page.getByTestId("markdown-editor-preview-pane")
     await expect(preview.locator("pre").filter({ hasText: "| example | only |" })).toBeVisible()
@@ -823,7 +823,7 @@ test.describe("Markdown editor replacement", () => {
       ].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const styles = await page.getByTestId("markdown-editor-write-pane").evaluate((pane) => {
       const gutterTestId = ["markdown", "editor", "line", "number", "gutter"].join("-")
@@ -860,7 +860,7 @@ test.describe("Markdown editor replacement", () => {
       ].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await expect(textarea).toBeVisible()
@@ -907,7 +907,7 @@ test.describe("Markdown editor replacement", () => {
       ].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     await expect(writePane).toBeVisible()
@@ -955,7 +955,7 @@ test.describe("Markdown editor replacement", () => {
   }) => {
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const previewContract = await page
       .getByTestId("markdown-editor-preview-pane")
@@ -994,7 +994,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 760, height: 900 })
     await routeAuthenticatedEditor(page)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const previewPane = page.getByTestId("markdown-editor-preview-pane")
@@ -1024,7 +1024,7 @@ test.describe("Markdown editor replacement", () => {
     await routeScrollSyncImage(page)
     await routeAuthenticatedEditor(page, buildScrollSyncMarkdown())
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toBeVisible()
     await expect(page.getByTestId("markdown-editor-preview-pane")).toBeVisible()
@@ -1040,7 +1040,7 @@ test.describe("Markdown editor replacement", () => {
     await routeScrollSyncImage(page)
     await routeAuthenticatedEditor(page, buildScrollSyncMarkdown())
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toBeVisible()
     await expect(page.getByTestId("markdown-editor-preview-pane")).toBeVisible()
@@ -1052,7 +1052,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 1024, height: 900 })
     await routeAuthenticatedEditor(page, "ㄷㄷㄷ")
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const previewPane = page.getByTestId("markdown-editor-preview-pane")
@@ -1099,13 +1099,13 @@ test.describe("Markdown editor replacement", () => {
     expect(stackedContract.previewStartLeft).toBeGreaterThanOrEqual(stackedContract.writeStartLeft)
   })
 
-  test("/editor/[id] split keeps matching headings aligned in both scroll directions", async ({ page }) => {
+  test("/admin/editor/[id] split keeps matching headings aligned in both scroll directions", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await routeScrollSyncImage(page)
     await routeAuthenticatedEditor(page)
     await routeEditorPost(page, 770, buildScrollSyncMarkdown())
 
-    await page.goto("/editor/770")
+    await page.goto("/admin/editor/770")
 
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toBeVisible()
     await expect(page.getByTestId("markdown-editor-preview-pane")).toBeVisible()
@@ -1120,7 +1120,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await routeAuthenticatedEditor(page, buildScrollSyncMarkdown(32))
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await expect(textarea).toBeVisible()
@@ -1169,7 +1169,7 @@ test.describe("Markdown editor replacement", () => {
 
     await routeAuthenticatedEditor(page, wrappedMarkdown)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await expect(textarea).toBeVisible()
@@ -1296,7 +1296,7 @@ test.describe("Markdown editor replacement", () => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await routeAuthenticatedEditor(page, buildScrollSyncMarkdown(48))
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toBeVisible()
     await expect(page.getByTestId("markdown-editor-preview-pane")).toBeVisible()
@@ -1342,7 +1342,7 @@ test.describe("Markdown editor replacement", () => {
 
     await routeAuthenticatedEditor(page, longMarkdown)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const previewScroll = page.getByTestId("markdown-editor-preview-pane")
     await expect(previewScroll).toBeVisible()
@@ -1387,7 +1387,7 @@ test.describe("Markdown editor replacement", () => {
 
     await routeAuthenticatedEditor(page, longMarkdown)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const previewScroll = page.getByTestId("markdown-editor-preview-pane")
     await expect(previewScroll).toBeVisible()
@@ -1434,7 +1434,7 @@ test.describe("Markdown editor replacement", () => {
 
     await routeAuthenticatedEditor(page, longMarkdown)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const previewScroll = page.getByTestId("markdown-editor-preview-pane")
     await expect(previewScroll).toBeVisible()
@@ -1492,7 +1492,7 @@ test.describe("Markdown editor replacement", () => {
 
     await routeAuthenticatedEditor(page, longMarkdown)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const previewScroll = page.getByTestId("markdown-editor-preview-pane")
     await expect(previewScroll).toBeVisible()
@@ -1540,7 +1540,7 @@ test.describe("Markdown editor replacement", () => {
   }) => {
     await routeAuthenticatedEditor(page, ["alpha", "omega"].join("\n"))
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     await expect(writePane).toBeVisible()
@@ -1559,7 +1559,7 @@ test.describe("Markdown editor replacement", () => {
   test("command registry toolbar menu and keyboard parity", async ({ page }) => {
     const tableMarkdown = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
     await routeAuthenticatedEditor(page, tableMarkdown)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     const commandMenu = page.getByRole("combobox", { name: "명령 메뉴", exact: true })
@@ -1616,7 +1616,7 @@ test.describe("Markdown editor replacement", () => {
     const original = ["plain", "  - nested", "- [x] task"].join("\n")
     const transformed = ["1. plain", "  1. nested", "2. task"].join("\n")
     await routeAuthenticatedEditor(page, original)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await textarea.click()
@@ -1668,7 +1668,7 @@ test.describe("Markdown editor replacement", () => {
 
   test("bounded table controls insert, edit, navigate, and preview a table", async ({ page }) => {
     await routeAuthenticatedEditor(page, "")
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const textarea = writePane.locator("textarea")
@@ -1709,7 +1709,7 @@ test.describe("Markdown editor replacement", () => {
 
   test("table action buttons reflect edit bounds", async ({ page }) => {
     await routeAuthenticatedEditor(page, "")
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await page.getByRole("combobox", { name: "표 행", exact: true }).selectOption("6")
@@ -1740,7 +1740,7 @@ test.describe("Markdown editor replacement", () => {
   test("literal find and replace preserves selection scope and editor undo", async ({ page }) => {
     const content = ["outside cat", "Cat cat", "outside cat"].join("\n")
     await routeAuthenticatedEditor(page, content)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const textarea = writePane.locator("textarea")
@@ -1816,7 +1816,7 @@ test.describe("Markdown editor replacement", () => {
   test("line commands preserve selection and undo", async ({ page }) => {
     const content = ["first", "second", "third"].join("\n")
     await routeAuthenticatedEditor(page, content)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     const selectedText = "eco"
@@ -1919,7 +1919,7 @@ test.describe("Markdown editor replacement", () => {
   test("auto pair preserves selection, shared undo, and IME/fence boundaries", async ({ page }) => {
     const content = ["word", "```ts", "const value = ", "```"].join("\n")
     await routeAuthenticatedEditor(page, content)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await textarea.evaluate((element: HTMLTextAreaElement) => {
@@ -1995,7 +1995,7 @@ test.describe("Markdown editor replacement", () => {
       "  two",
     ].join("\n")
     await routeAuthenticatedEditor(page, source)
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const textarea = page.getByTestId("markdown-editor-write-pane").locator("textarea")
     await textarea.evaluate((element: HTMLTextAreaElement) => {
@@ -2062,7 +2062,7 @@ test.describe("Markdown editor replacement", () => {
       })
     })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const textarea = writePane.locator("textarea")
@@ -2110,7 +2110,7 @@ test.describe("Markdown editor replacement", () => {
       })
     })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const writePane = page.getByTestId("markdown-editor-write-pane")
     const textarea = writePane.locator("textarea")
@@ -2154,7 +2154,7 @@ test.describe("Markdown editor replacement", () => {
       await route.fulfill({ status: 500, body: "should not upload" })
     })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const oversized = Buffer.alloc(10 * 1024 * 1024 + 1, 1)
     await page
@@ -2188,7 +2188,7 @@ test.describe("Markdown editor replacement", () => {
       ].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const preview = page.getByTestId("markdown-editor-preview-pane")
     await expect(preview).toBeVisible()
@@ -2240,7 +2240,7 @@ test.describe("Markdown editor replacement", () => {
         .join("\n\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const codeTitles = page
       .getByTestId("markdown-editor-preview-pane")
@@ -2255,7 +2255,7 @@ test.describe("Markdown editor replacement", () => {
       ["```kotlin title=\"UserService.kt\"", "fun login(): Token = token", "```"].join("\n")
     )
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const preview = page.getByTestId("markdown-editor-preview-pane")
     const codeBlock = preview.locator(".aq-code-block").first()
@@ -2282,7 +2282,7 @@ test.describe("Markdown editor replacement", () => {
       await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({}) })
     })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const summaryInput = page.getByRole("textbox", { name: /^Summary/ })
     const previewButton = page.getByRole("button", { name: "본문 기준으로 채우기" })
@@ -2322,7 +2322,7 @@ test.describe("Markdown editor replacement", () => {
       await fulfillJson(route, { summary: expected.summary, source: expected.source })
     })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
 
     const summaryInput = page.getByRole("textbox", { name: /^Summary/ })
     const previewResponse = page.waitForResponse((response) =>
@@ -2345,7 +2345,7 @@ test.describe("Markdown editor replacement", () => {
     await routeAuthenticatedEditor(page)
     await routeEditorPost(page, postId, leadingBlockSummaryFixture.content)
 
-    await page.goto(`/editor/${postId}`)
+    await page.goto(`/admin/editor/${postId}`)
     await expect(page.locator("#post-title")).toHaveValue("Markdown 수정 테스트")
 
     await page.getByRole("button", { name: "← 글 관리" }).click()
@@ -2359,7 +2359,7 @@ test.describe("Markdown editor replacement", () => {
     const manualSummary = "공백 전 수동 요약"
     await routeAuthenticatedEditor(page, content, title, false)
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
     await page.locator("#post-title").fill(title)
     await page.getByTestId("markdown-editor-write-pane").locator("textarea").fill(content)
     await page.getByLabel("Summary").fill(manualSummary)
@@ -2411,7 +2411,7 @@ test.describe("Markdown editor replacement", () => {
       )
       .toEqual({ savedAtChanged: true, summary: "", summarySource: "NONE", intentKind: "auto" })
 
-    await page.goto("/editor/new?source=local-draft")
+    await page.goto("/admin/editor/new?source=local-draft")
     await expect(page.locator("#post-title")).toHaveValue(title)
     await expect(page.getByTestId("markdown-editor-write-pane").locator("textarea")).toHaveValue(content)
     await expect(page.getByLabel("Summary")).toHaveValue("")

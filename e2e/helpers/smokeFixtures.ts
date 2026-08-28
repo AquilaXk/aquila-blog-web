@@ -61,7 +61,6 @@ export const createExplorePost = (overrides: Partial<Record<string, unknown>> & 
   published: true,
   listed: true,
   likesCount: 0,
-  commentsCount: 0,
   hitCount: 0,
   ...overrides,
 })

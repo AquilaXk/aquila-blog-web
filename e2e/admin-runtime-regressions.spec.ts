@@ -6,21 +6,21 @@ const readFrontSource = (relativePath: string) =>
   readFileSync(path.resolve(__dirname, "../src", relativePath), "utf8")
 
 test.describe("관리자 런타임 회귀 계약", () => {
-  test("운영 브라우저 API는 로그인과 관리자 요청, 알림 snapshot, 작성 temp draft를 same-origin 백엔드 프록시로 보낸다", () => {
+  test("운영 브라우저 API는 로그인과 관리자 요청, 작성 temp draft를 same-origin 백엔드 프록시로 보낸다", () => {
     const clientSource = readFrontSource("apis/backend/client.ts")
-    const notificationsSource = readFrontSource("apis/backend/notifications.ts")
     const editorRootModelSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts")
     const proxySourcePath = path.resolve(__dirname, "../src/pages/api/backend/[...path].ts")
+    const notificationsSourcePath = path.resolve(__dirname, "../src/apis/backend/notifications.ts")
 
     expect(clientSource).toContain('const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"')
     expect(clientSource).toContain("const shouldUseBrowserBackendProxy = (safePath: string) =>")
     expect(clientSource).toContain('process.env.NODE_ENV === "production"')
     expect(clientSource).toContain("safePath.startsWith(\"/member/api/v1/auth/\")")
-    expect(clientSource).toContain("safePath.startsWith(\"/member/api/v1/notifications/snapshot\")")
+    expect(clientSource).not.toContain("safePath.startsWith(\"/member/api/v1/notifications/snapshot\")")
     expect(clientSource).toContain("safePath.startsWith(\"/post/api/v1/posts/temp\")")
     expect(clientSource).toContain("safePath.startsWith(\"/system/api/v1/adm/\")")
     expect(clientSource).toContain("return `${BROWSER_BACKEND_PROXY_PREFIX}${safePath}`")
-    expect(notificationsSource).toContain("return new URL(NOTIFICATIONS_STREAM_API_PATH, `${apiBaseUrl}/`).toString()")
+    expect(existsSync(notificationsSourcePath)).toBe(false)
     expect(editorRootModelSource).toContain('import { ApiError, apiFetch } from "src/apis/backend/client"')
     expect(editorRootModelSource).toContain('apiFetch<RsData<PostForEditor>>("/post/api/v1/posts/temp", {')
     expect(editorRootModelSource).not.toContain('fetch(getApiRequestUrl("/post/api/v1/posts/temp"), {')

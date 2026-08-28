@@ -39,7 +39,6 @@ const createPost = (title: string) => ({
   published: true,
   listed: true,
   likesCount: 0,
-  commentsCount: 0,
   hitCount: 0,
 })
 

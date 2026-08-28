@@ -1,6 +1,5 @@
 import { expect, type Page, test } from "@playwright/test"
 import {
-  RELEASE_UI_QA_COMMENTS,
   RELEASE_UI_QA_DETAIL_CONTENT,
   RELEASE_UI_QA_FLOW_GROUPS,
   RELEASE_UI_QA_IMAGE_PATHS,
@@ -29,7 +28,6 @@ test.describe("release UI QA matrix", () => {
     expect(RELEASE_UI_QA_VIEWPORTS.map((viewport) => viewport.width)).toEqual(expectedViewportWidths)
     expect(RELEASE_UI_QA_TAGS).toHaveLength(20)
     expect(RELEASE_UI_QA_IMAGE_PATHS).toHaveLength(20)
-    expect(RELEASE_UI_QA_COMMENTS).toHaveLength(100)
     expect(RELEASE_UI_QA_FLOW_GROUPS).toEqual([
       "anonymous-public-navigation",
       "author-new-post-autosave-refresh-recover-upload-preview-publish-edit-cache",
@@ -74,9 +72,6 @@ test.describe("release UI QA matrix", () => {
       await expect(page.locator("table").first()).toBeVisible()
       await expect(page.locator(".aq-markdown a", { hasText: RELEASE_UI_QA_LONG_URL }).first()).toBeVisible()
       await expect(page.locator(".aq-markdown img")).toHaveCount(RELEASE_UI_QA_IMAGE_PATHS.length)
-      await page.locator('[data-rum-section="comments"]').scrollIntoViewIfNeeded()
-      await expect(page.locator(".commentList > li")).toHaveCount(RELEASE_UI_QA_COMMENTS.length)
-
       const snapshot = await page.evaluate(() => {
         const html = document.documentElement
         const body = document.body

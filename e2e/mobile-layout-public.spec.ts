@@ -262,12 +262,11 @@ test.describe("mobile layout public", () => {
   expect(titleWrapSnapshot?.bodyScrollWidth).toBeLessThanOrEqual(titleWrapSnapshot?.viewportWidth ?? 0)
 })
 
-  test("iPhone 15 Pro 상세 액션은 메타/공유/댓글/작성자 유틸리티 순서를 유지한다", async ({ page }) => {
+  test("iPhone 15 Pro 상세는 정적 좋아요 수와 공유만 노출한다", async ({ page }) => {
   await mockDetailEndpoint(page, {
     id: 991,
     title: "모바일 액션 위계 테스트",
     likesCount: 1,
-    commentsCount: 4,
     hitCount: 24,
     actorCanModify: true,
     actorCanDelete: true,
@@ -278,42 +277,32 @@ test.describe("mobile layout public", () => {
   const engagementRow = page.locator('[aria-label="post engagement"]')
   const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "25 VIEWS" })
   const compactActionBar = page.getByLabel("빠른 이동 및 반응")
-  const likeButton = compactActionBar.getByRole("button", { name: "좋아요 1" })
+  const historicalLikeCount = compactActionBar.getByText("좋아요 1", { exact: true })
   const shareButton = compactActionBar.getByRole("button", { name: /^공유/ })
-  const commentButton = compactActionBar.getByRole("button", { name: /^댓글/ })
   const editButton = page.getByRole("button", { name: "수정" }).first()
   const deleteButton = page.getByRole("button", { name: "삭제" }).first()
 
   await expect(engagementRow).toBeHidden()
   await expect(metaViewStat).toHaveText("25 VIEWS")
   await expect(metaViewStat).toBeHidden()
-  await expect(likeButton).toBeVisible()
+  await expect(historicalLikeCount).toBeVisible()
   await expect(shareButton).toBeVisible()
-  await expect(commentButton).toBeVisible()
-  await expect(editButton).toBeVisible()
-  await expect(deleteButton).toBeVisible()
+  await expect(compactActionBar.getByRole("button", { name: /좋아요/ })).toHaveCount(0)
+  await expect(compactActionBar.getByRole("button", { name: /댓글/ })).toHaveCount(0)
+  await expect(page.getByText(/^댓글(?:\s|$)/)).toHaveCount(0)
+  await expect(editButton).toHaveCount(0)
+  await expect(deleteButton).toHaveCount(0)
 
-  const [likeBox, shareBox, commentActionBox, editBox, deleteBox] = await Promise.all([
-    likeButton.boundingBox(),
+  const [historicalLikeCountBox, shareBox] = await Promise.all([
+    historicalLikeCount.boundingBox(),
     shareButton.boundingBox(),
-    commentButton.boundingBox(),
-    editButton.boundingBox(),
-    deleteButton.boundingBox(),
   ])
 
-  expect(likeBox).not.toBeNull()
+  expect(historicalLikeCountBox).not.toBeNull()
   expect(shareBox).not.toBeNull()
-  expect(commentActionBox).not.toBeNull()
-  expect(editBox).not.toBeNull()
-  expect(deleteBox).not.toBeNull()
 
-  expect((likeBox?.height ?? 0)).toBeLessThanOrEqual(72)
-  expect(Math.abs((likeBox?.y ?? 0) - (shareBox?.y ?? 0))).toBeLessThanOrEqual(4)
-  expect(Math.abs((shareBox?.y ?? 0) - (commentActionBox?.y ?? 0))).toBeLessThanOrEqual(4)
-  expect(Math.abs((likeBox?.width ?? 0) - (shareBox?.width ?? 0))).toBeLessThanOrEqual(20)
-  expect(Math.abs((commentActionBox?.width ?? 0) - (shareBox?.width ?? 0))).toBeLessThanOrEqual(20)
-  expect((editBox?.y ?? 0)).toBeLessThan((likeBox?.y ?? 0))
-  expect((deleteBox?.y ?? 0)).toBeLessThan((likeBox?.y ?? 0))
+  expect((historicalLikeCountBox?.height ?? 0)).toBeLessThanOrEqual(72)
+  expect(Math.abs((historicalLikeCountBox?.y ?? 0) - (shareBox?.y ?? 0))).toBeLessThanOrEqual(4)
 })
 
 test.describe("데스크톱 상세 floating reaction 액션", () => {
@@ -323,12 +312,11 @@ test.describe("데스크톱 상세 floating reaction 액션", () => {
     hasTouch: false,
   })
 
-  test("하트/공유 아이콘은 V4 square rail 버튼 크기에 맞는 시각 크기를 유지한다", async ({ page }) => {
+  test("공유 아이콘은 V4 square rail 버튼 크기에 맞는 시각 크기를 유지한다", async ({ page }) => {
     await mockDetailEndpoint(page, {
       id: 993,
       title: "반응 버튼 아이콘 크기 테스트",
       likesCount: 0,
-      commentsCount: 0,
       hitCount: 10,
     })
 
@@ -353,20 +341,14 @@ test.describe("데스크톱 상세 floating reaction 액션", () => {
       }
 
       return {
-        like: readMetric(".floatingLikeButton"),
         share: readMetric(".floatingShareButton"),
       }
     })
 
-    expect(metrics.like.buttonWidth).toBeGreaterThanOrEqual(41.5)
-    expect(metrics.like.buttonHeight).toBeGreaterThanOrEqual(41.5)
     expect(metrics.share.buttonWidth).toBeGreaterThanOrEqual(41.5)
     expect(metrics.share.buttonHeight).toBeGreaterThanOrEqual(41.5)
-    expect(metrics.like.iconWidth).toBeGreaterThanOrEqual(17.5)
-    expect(metrics.like.iconHeight).toBeGreaterThanOrEqual(17.5)
     expect(metrics.share.iconWidth).toBeGreaterThanOrEqual(17.5)
     expect(metrics.share.iconHeight).toBeGreaterThanOrEqual(17.5)
-    expect(metrics.like.iconFontSize).toBeGreaterThanOrEqual(17.5)
     expect(metrics.share.iconFontSize).toBeGreaterThanOrEqual(17.5)
   })
 })

@@ -248,7 +248,7 @@ test("관리자 대시보드 모바일은 V4 steady-state guard heading을 first
   expect(snapshot.bodyScrollWidth).toBeLessThanOrEqual(snapshot.viewportWidth)
 })
 
-test("관리자 대시보드는 알림 snapshot 백그라운드 갱신을 유지한다", async ({ page }) => {
+test("관리자 대시보드는 comment-notification snapshot을 요청하지 않는다", async ({ page }) => {
   let snapshotRequestCount = 0
   await page.addInitScript(() => {
     window.requestIdleCallback = (callback) => {
@@ -270,7 +270,8 @@ test("관리자 대시보드는 알림 snapshot 백그라운드 갱신을 유지
   await page.goto("/admin/dashboard")
   await expect(page.getByRole("heading", { name: "Steady-state guard" })).toBeVisible()
 
-  await expect.poll(() => snapshotRequestCount).toBeGreaterThan(0)
+  await page.waitForTimeout(250)
+  expect(snapshotRequestCount).toBe(0)
 })
 
 test("관리자 허브 모바일 first fold의 글 작성 진입점은 상단 V4 액션을 유지한다", async ({ page }) => {

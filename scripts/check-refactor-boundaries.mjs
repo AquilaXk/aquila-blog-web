@@ -356,14 +356,10 @@ const ownershipRules = [
     hint: "Admin posts workspace page must keep command/model/view responsibilities split.",
   },
   {
-    file: "src/layouts/RootLayout/Header/NotificationBell.tsx",
-    required: [
-      'from "./NotificationBellPanel"',
-      'from "./NotificationBell.styles"',
-      'from "./useNotificationBellState"',
-    ],
-    forbidden: [/\bEventSource\b/, /\blocalStorage\b/, /\bfetch\(/],
-    hint: "NotificationBell must assemble state, panel, and styles without owning transport/storage.",
+    file: "src/layouts/RootLayout/Header/NavBar.tsx",
+    required: ['from "src/routes/Feed/feedSearchFocus"'],
+    forbidden: [/\bNotificationBell\b/, /\bAuthEntryModal\b/, /\buseAuthSession\b/, /\btoLoginPath\b/],
+    hint: "The public navigation must stay independent from authentication and notifications.",
   },
   {
     file: "src/apis/backend/posts.ts",

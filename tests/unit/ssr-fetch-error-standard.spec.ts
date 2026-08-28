@@ -168,7 +168,7 @@ test("admin bootstrap 401 without auth cookie redirects to login", async () => {
 
   await expect(readAdminProtectedBootstrap(createReq(), "/member/api/v1/adm/members/bootstrap", "/admin")).resolves.toEqual({
     ok: false,
-    destination: "/login?next=%2Fadmin",
+    destination: "/admin/login?next=%2Fadmin",
   })
 })
 

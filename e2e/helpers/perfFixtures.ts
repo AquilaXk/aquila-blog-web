@@ -119,7 +119,6 @@ export const buildMockExploreItem = (id: number) => ({
   published: true,
   listed: true,
   likesCount: 0,
-  commentsCount: 0,
   hitCount: 0,
 })
 
@@ -305,9 +304,7 @@ export const mockDetailRailEndpoint = async (page: Page, postId: number) => {
         published: true,
         listed: true,
         likesCount: 2,
-        commentsCount: 0,
         hitCount: 0,
-        actorHasLiked: false,
         actorCanModify: true,
         actorCanDelete: true,
         type: ["Post"],
@@ -324,18 +321,6 @@ export const mockDetailRailEndpoint = async (page: Page, postId: number) => {
         resultCode: "200-1",
         msg: "ok",
         data: { hitCount: 1 },
-      }),
-    })
-  })
-
-  await page.route(`**/post/api/v1/posts/${postId}/like`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        resultCode: "200-1",
-        msg: "ok",
-        data: { liked: true, likesCount: 3 },
       }),
     })
   })

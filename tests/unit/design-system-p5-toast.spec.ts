@@ -53,8 +53,3 @@ test("Admin derived controls keep compact touch min-height", () => {
   expect(source).toMatch(/export const MiniButton[\s\S]*@media \(max-width: 1100px\) \{\s*min-height: \$\{control\.lg\}px;/)
   expect(source).toMatch(/export const PreviewAnchor[\s\S]*@media \(max-width: 1100px\) \{\s*min-height: \$\{control\.lg\}px;/)
 })
-
-test("signup clear button reserves input end padding on compact widths", () => {
-  const source = readSrc("pages/signup.tsx")
-  expect(source).toContain("padding-inline-end: calc(${control.lg}px + 1rem)")
-})

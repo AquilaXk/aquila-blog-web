@@ -28,7 +28,7 @@ test("live spec pins the same-origin image preflight and editor save cleanup", (
   assert.match(liveSpec, /createResponse\.status\(\) !== 201 \|\| typeof createBody\?\.data\?\.id !== "number"/)
   assert.match(liveSpec, /postId = createBody\.data\.id/)
   assert.doesNotMatch(liveSpec, /posts\/temp|tempResponse\.ok\(\)|waitForResponse\([\s\S]*?posts\\\/temp|openAdminNewPostEntry/)
-  assert.match(liveSpec, /toHaveURL\(new RegExp\(`\/editor\/\$\{postId\}/)
+  assert.match(liveSpec, /toHaveURL\(new RegExp\(`\/admin\/editor\/\$\{postId\}/)
   assert.match(
     liveSpec,
     /expect\(titleInput\)\.toHaveValue\(canaryTitle\)[\s\S]*?expect\(editorContent\)\.toHaveValue\(canarySeedContent\)[\s\S]*?Visibility"\)\)\.toHaveValue\("PRIVATE"\)[\s\S]*?titleInput\.fill\(savedTitle\)/
@@ -49,7 +49,7 @@ test("live spec pins the same-origin image preflight and editor save cleanup", (
   assert.doesNotMatch(liveSpec, /route\.abort\(/)
   assert.match(liveSpec, /response\.request\(\)\.method\(\) === "PUT"[\s\S]*?pathname === `\/post\/api\/v1\/posts\/\$\{postId\}`/)
   assert.match(liveSpec, /await page\.unroute\(postWriteUrl, postWriteRoute\)/)
-  assert.match(liveSpec, /await page\.goto\(`\/editor\/\$\{postId\}`\)/)
+  assert.match(liveSpec, /await page\.goto\(`\/admin\/editor\/\$\{postId\}`\)/)
   assert.match(liveSpec, /expect\(page\.getByLabel\("Visibility"\)\)\.toHaveValue\("PRIVATE"\)/)
   assert.match(
     liveSpec,

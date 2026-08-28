@@ -353,7 +353,6 @@ test.describe("core smoke feed and search", () => {
             createdAt: "2026-03-16T00:00:00Z",
             modifiedAt: "2026-03-16T00:00:00Z",
             likesCount: 80,
-            commentsCount: 20,
             hitCount: 4000,
           }),
           createExplorePost({
