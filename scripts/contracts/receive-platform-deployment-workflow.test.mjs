@@ -160,7 +160,8 @@ test("receiver verifies native evidence, smokes, and records only the approved d
   assert.equal(variableToken.with.owner, "AquilaXk")
   assert.equal(variableToken.with.repositories, "aquila-blog-web")
   assert.equal(variableToken.with["permission-contents"], "read")
-  assert.equal(variableToken.with["permission-variables"], "write")
+  assert.equal(variableToken.with["permission-actions-variables"], "write")
+  assert.equal(variableToken.with["permission-variables"], undefined)
   assert.match(variableToken.uses, /^actions\/create-github-app-token@[a-f0-9]{40}$/)
 
   const approved = step(job, "Record approved Web deployment")

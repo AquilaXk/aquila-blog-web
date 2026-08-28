@@ -194,7 +194,7 @@ jobs:
           owner: AquilaXk
           repositories: aquila-blog-web
           permission-contents: read
-          permission-variables: write
+          permission-actions-variables: write
 
       - name: Record approved Web deployment
         if: steps.smoke.outcome == 'success'
