@@ -228,22 +228,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/post/api/v1/posts/files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["uploadPostFile"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/post/api/v1/adm/posts/{id}/restore": {
         parameters: {
             query?: never;
@@ -784,22 +768,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getPostImage"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/post/api/v1/files/**": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getPostFile"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1524,16 +1492,6 @@ export interface components {
             key?: string;
             url?: string;
             markdown?: string;
-        };
-        RsDataUploadPostFileResBody: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["UploadPostFileResBody"];
-        };
-        UploadPostFileResBody: {
-            key?: string;
-            url?: string;
-            name?: string;
         };
         PostSummaryBackfillRequest: {
             /** Format: int64 */
@@ -2549,33 +2507,6 @@ export interface operations {
             };
         };
     };
-    uploadPostFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataUploadPostFileResBody"];
-                };
-            };
-        };
-    };
     restoreDeletedItem: {
         parameters: {
             query?: never;
@@ -3423,26 +3354,6 @@ export interface operations {
         };
     };
     getPostImage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": string;
-                };
-            };
-        };
-    };
-    getPostFile: {
         parameters: {
             query?: never;
             header?: never;
