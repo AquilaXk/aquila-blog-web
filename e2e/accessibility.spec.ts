@@ -420,26 +420,45 @@ test("모바일 header와 관리자 로그인은 keyboard-only 진입에서 심�
   await expect(menuButton).toHaveAttribute("aria-expanded", "false")
 
   await page.setViewportSize({ width: 1024, height: 768 })
+  await page.route("**/member/api/v1/auth/admin-email/request", async (route) => {
+    await fulfillJson(route, {
+      data: {
+        challengeId: "accessibility-challenge-1234567890",
+        expiresInSeconds: 600,
+      },
+    })
+  })
   await page.goto("/admin/login")
 
   const adminLoginHeading = page.getByRole("heading", { name: "관리자 로그인" })
   const emailField = page.getByLabel("이메일")
-  const passwordField = page.getByLabel("비밀번호")
   const saveEmailCheckbox = page.getByLabel("아이디 저장")
   const keepSignedInCheckbox = page.getByLabel("로그인 유지")
-  const submitButton = page.getByRole("button", { name: "로그인", exact: true })
+  const requestCodeButton = page.getByRole("button", { name: "인증 코드 받기" })
   await expect(adminLoginHeading).toBeVisible()
   await expect(emailField).toBeVisible()
   await emailField.focus()
   await expect(emailField).toBeFocused()
   await page.keyboard.press("Tab")
-  await expect(passwordField).toBeFocused()
-  await page.keyboard.press("Tab")
   await expect(saveEmailCheckbox).toBeFocused()
   await page.keyboard.press("Tab")
   await expect(keepSignedInCheckbox).toBeFocused()
   await page.keyboard.press("Tab")
-  await expect(submitButton).toBeFocused()
+  await expect(requestCodeButton).toBeFocused()
+
+  await emailField.fill("admin@example.com")
+  await requestCodeButton.click()
+
+  const codeField = page.getByLabel("인증 코드")
+  const resetEmailButton = page.getByRole("button", { name: "이메일 다시 입력" })
+  const loginButton = page.getByRole("button", { name: "로그인", exact: true })
+  await expect(codeField).toBeVisible()
+  await codeField.focus()
+  await expect(codeField).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(resetEmailButton).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(loginButton).toBeFocused()
   await expectPrimaryLandmarks(page)
   await expectNoHorizontalOverflow(page)
   await expectLaunchGateAccessibility(page, testInfo, "admin-login")
