@@ -289,7 +289,6 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
                   autoComplete="one-time-code"
                   disabled={!hydrated || loading}
                   inputMode="numeric"
-                  maxLength={8}
                   onChange={(event) =>
                     setCode(event.target.value.replace(/\D/g, "").slice(0, 8))
                   }

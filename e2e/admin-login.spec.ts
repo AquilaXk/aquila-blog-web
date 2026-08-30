@@ -223,6 +223,19 @@ test("1~7자리 관리자 이메일 코드는 제출 후 검증 오류를 표시
   ).toBeVisible()
 })
 
+test("구분자가 포함된 8자리 관리자 이메일 코드를 붙여넣을 수 있다", async ({
+  page,
+}) => {
+  await fulfillAdminEmailChallenge(page)
+
+  await page.goto("/admin/login")
+  await requestAdminEmailCode(page)
+  await page.getByLabel("인증 코드").focus()
+  await page.keyboard.insertText("1234 5678")
+
+  await expect(page.getByLabel("인증 코드")).toHaveValue("12345678")
+})
+
 test("관리자 이메일 코드 검증 뒤 세션을 확인하지 못하면 세션을 종료하고 요청 단계로 돌아간다", async ({
   page,
 }) => {
