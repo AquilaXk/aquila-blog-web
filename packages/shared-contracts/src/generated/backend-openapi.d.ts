@@ -277,6 +277,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/member/api/v1/auth/admin-email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["verifyAdminEmailCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/member/api/v1/auth/admin-email/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestAdminEmailCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/member/api/v1/adm/members/{id}/profileWorkspace/publish": {
         parameters: {
             query?: never;
@@ -1019,6 +1051,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/health/admin-email-auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["verifyReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -1514,6 +1562,24 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["MemberLoginResBody"];
+        };
+        AdminEmailCodeVerifyRequest: {
+            challengeId: string;
+            code: string;
+        };
+        AdminEmailCodeRequest: {
+            email: string;
+            rememberMe?: boolean;
+        };
+        AdminEmailCodeRequestResBody: {
+            challengeId?: string;
+            /** Format: int64 */
+            expiresInSeconds?: number;
+        };
+        RsDataAdminEmailCodeRequestResBody: {
+            resultCode?: string;
+            msg?: string;
+            data?: components["schemas"]["AdminEmailCodeRequestResBody"];
         };
         MemberWithUsernameDto: {
             /** Format: int64 */
@@ -2507,6 +2573,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataMemberLoginResBody"];
+                };
+            };
+        };
+    };
+    verifyAdminEmailCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEmailCodeVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataMemberLoginResBody"];
+                };
+            };
+        };
+    };
+    requestAdminEmailCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEmailCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataAdminEmailCodeRequestResBody"];
                 };
             };
         };
@@ -3621,6 +3735,24 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AdminHubBootstrapResponse"];
                 };
+            };
+        };
+    };
+    verifyReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
