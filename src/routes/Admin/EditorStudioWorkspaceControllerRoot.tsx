@@ -10,7 +10,6 @@ import {
   useTransition,
 } from "react"
 import { apiFetch } from "src/apis/backend/client"
-import type { ApiPostSummaryPreviewRequest, ApiPostSummaryPreviewResponse } from "src/apis/backend/posts/PostApiDtos"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import useAuthSession from "src/hooks/useAuthSession"
 import {
@@ -97,7 +96,6 @@ import {
   type PostForEditor,
   type CanonicalSummaryState,
   type SummaryIntent,
-  resolveSummaryPreviewResult,
   type PreviewViewportMode,
   type RsData,
   type StudioSurface,
@@ -136,7 +134,6 @@ export const EditorStudioWorkspaceController = ({
   const [postSummary, setPostSummary] = useState("")
   const [postSummarySource, setPostSummarySource] = useState<CanonicalSummaryState["summarySource"]>("NONE")
   const [summaryIntent, setSummaryIntent] = useState<SummaryIntent>({ kind: "auto" })
-  const postSummaryRevisionRef = useRef(0)
   const [postThumbnailUrl, setPostThumbnailUrl] = useState("")
   const [postThumbnailFocusX, setPostThumbnailFocusX] = useState(DEFAULT_THUMBNAIL_FOCUS_X)
   const [postThumbnailFocusY, setPostThumbnailFocusY] = useState(DEFAULT_THUMBNAIL_FOCUS_Y)
@@ -532,7 +529,6 @@ export const EditorStudioWorkspaceController = ({
   const resolvedPreviewSummary = postSummary
 
   const handlePostSummaryChange = useCallback((summary: string) => {
-    postSummaryRevisionRef.current += 1
     if (summary.trim()) {
       setPostSummary(summary)
       setPostSummarySource("MANUAL")
@@ -543,39 +539,6 @@ export const EditorStudioWorkspaceController = ({
       setSummaryIntent({ kind: "auto" })
     }
   }, [])
-
-  const handlePreviewSummary = useCallback(async () => {
-    const summaryRevision = postSummaryRevisionRef.current
-    const current: CanonicalSummaryState = {
-      summary: postSummary,
-      summarySource: postSummarySource,
-      intent: summaryIntent,
-    }
-    try {
-      setLoadingKey("previewSummary")
-      setPublishStatus({ tone: "loading", text: "요약 미리보기를 불러오는 중입니다." })
-      const response = await apiFetch<ApiPostSummaryPreviewResponse>("/post/api/v1/adm/posts/preview-summary", {
-        method: "POST",
-        body: JSON.stringify({ title: postTitle, content: getCurrentPostContent() } satisfies ApiPostSummaryPreviewRequest),
-      })
-      const resolved = resolveSummaryPreviewResult(current, response)
-      if (!resolved.ok) throw new Error("canonical summary preview response is malformed")
-      if (postSummaryRevisionRef.current !== summaryRevision) {
-        setPublishStatus({ tone: "error", text: "요약이 변경되어 미리보기 결과를 반영하지 않았습니다." })
-        return
-      }
-      setPostSummary(resolved.state.summary)
-      setPostSummarySource(resolved.state.summarySource)
-      setSummaryIntent(resolved.state.intent)
-      setPublishStatus({ tone: "success", text: "canonical 요약 미리보기를 반영했습니다." })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      setPublishStatus({ tone: "error", text: "요약 미리보기를 불러오지 못했습니다." })
-      setResult(pretty({ error: message }))
-    } finally {
-      setLoadingKey("")
-    }
-  }, [getCurrentPostContent, postSummary, postSummarySource, postTitle, setPublishStatus, summaryIntent])
 
   const resolvedPreviewThumbnail = useMemo(() => {
     const manual = stripThumbnailFocusFromUrl(normalizeSafeImageUrl(postThumbnailUrl))
@@ -906,7 +869,7 @@ export const EditorStudioWorkspaceController = ({
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
-        handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePreviewSummary, handlePostSummaryChange,
+        handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePostSummaryChange,
         handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
         handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
         handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,

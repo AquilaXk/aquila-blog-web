@@ -4,7 +4,6 @@ import { mapPostDetail, mapPostDto } from "../../src/apis/backend/posts/PostApiM
 import { toCompanyNewsSummary } from "../../src/routes/Company/CompanyPageModel"
 import {
   resolvePersistedSummaryResult,
-  resolveSummaryPreviewResult,
   toSummaryWriteFields,
   type CanonicalSummaryState,
   type SummaryIntent,
@@ -98,7 +97,7 @@ test("imported AUTO intent는 입력 지우기에도 같은 canonical recompute 
   expect(toSummaryWriteFields(automaticIntent)).toEqual(automatic.request)
 })
 
-test("canonical preview는 AUTO로 전이하고 failure는 persisted manual value를 보존한다", () => {
+test("persisted canonical summary response는 unchanged intent로 전이하고 malformed value를 거부한다", () => {
   const fixture = fixtureById("manual-create")
   const expected = expectedSummary(fixture)
   const currentState: CanonicalSummaryState = {
@@ -108,28 +107,6 @@ test("canonical preview는 AUTO로 전이하고 failure는 persisted manual valu
   }
 
   expect(
-    resolveSummaryPreviewResult(currentState, {
-      summary: expected.summary,
-      source: expected.source,
-    }),
-  ).toEqual({
-    ok: true,
-    state: {
-      summary: expected.summary,
-      summarySource: expected.source,
-      intent: { kind: "auto" },
-    },
-  })
-  expect(resolveSummaryPreviewResult(currentState, { summary: null, source: null })).toEqual({
-    ok: false,
-    state: currentState,
-  })
-  expect(resolveSummaryPreviewResult(currentState, { summary: "", source: "MANUAL" })).toEqual({
-    ok: false,
-    state: currentState,
-  })
-
-  expect(
     resolvePersistedSummaryResult(currentState, {
       summary: expected.summary,
       source: expected.source,
@@ -137,5 +114,13 @@ test("canonical preview는 AUTO로 전이하고 failure는 persisted manual valu
   ).toEqual({
     ok: true,
     state: { ...currentState, intent: { kind: "unchanged" } },
+  })
+  expect(resolvePersistedSummaryResult(currentState, { summary: null, source: null })).toEqual({
+    ok: false,
+    state: currentState,
+  })
+  expect(resolvePersistedSummaryResult(currentState, { summary: "", source: "MANUAL" })).toEqual({
+    ok: false,
+    state: currentState,
   })
 })

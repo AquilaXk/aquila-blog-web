@@ -47,8 +47,6 @@ type EditorStudioComposeWritingSurfaceProps = {
   postSummary: string
   postSummaryMaxLength: number
   onPostSummaryChange: (value: string) => void
-  isFillSummaryFromBodyDisabled: boolean
-  onFillSummaryFromBody: () => void
   postTags: string[]
   tagDraft: string
   onTagDraftChange: (value: string) => void
@@ -91,8 +89,6 @@ export const EditorStudioComposeWritingSurface = ({
   postSummary,
   postSummaryMaxLength,
   onPostSummaryChange,
-  isFillSummaryFromBodyDisabled,
-  onFillSummaryFromBody,
   postTags,
   tagDraft,
   onTagDraftChange,
@@ -172,9 +168,6 @@ export const EditorStudioComposeWritingSurface = ({
             <SummaryCounter>
               {postSummary.length}/{postSummaryMaxLength}
             </SummaryCounter>
-            <Button type="button" disabled={isFillSummaryFromBodyDisabled} onClick={onFillSummaryFromBody}>
-              본문 기준으로 채우기
-            </Button>
           </ComposeSummaryMeta>
         </ComposeSummaryField>
         <InlineTagComposer>

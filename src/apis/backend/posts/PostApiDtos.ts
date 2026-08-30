@@ -6,8 +6,6 @@ type GeneratedPostDto = components["schemas"]["PostDto"]
 type GeneratedPostWriteRequest = components["schemas"]["PostWriteRequest"]
 type GeneratedPostModifyRequest = components["schemas"]["PostModifyRequest"]
 type GeneratedPostWriteResult = components["schemas"]["PostWriteResultDto"]
-type GeneratedPostSummaryPreviewRequest = components["schemas"]["PostSummaryPreviewRequest"]
-type GeneratedPostSummaryPreviewResponse = components["schemas"]["PostSummaryPreviewResponse"]
 
 type PostSummaryFields = Pick<GeneratedPostDto, "summary" | "summarySource">
 type PostWithContentSummaryFields = Pick<GeneratedPostWithContentDto, "summary" | "summarySource">
@@ -19,8 +17,6 @@ export type ApiEditorPostDto = Pick<
 export type ApiPostWriteRequest = GeneratedPostWriteRequest
 export type ApiPostModifyRequest = GeneratedPostModifyRequest
 export type ApiPostWriteResult = GeneratedPostWriteResult
-export type ApiPostSummaryPreviewRequest = GeneratedPostSummaryPreviewRequest
-export type ApiPostSummaryPreviewResponse = GeneratedPostSummaryPreviewResponse
 
 export type ContentHtmlTrustFields = Pick<
   GeneratedPostWithContentDto,

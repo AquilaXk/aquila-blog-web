@@ -20,7 +20,6 @@ import type {
 } from "./editorStudioMetaModel"
 import type {
   ApiEditorPostDto,
-  ApiPostSummaryPreviewResponse,
   ApiPostWriteRequest,
 } from "src/apis/backend/posts/PostApiDtos"
 
@@ -90,7 +89,7 @@ const resolveCanonicalSummaryResult = (
   intent: SummaryIntent,
 ): { ok: true; state: CanonicalSummaryState } | { ok: false; state: CanonicalSummaryState } => {
   if (response == null || typeof response !== "object") return { ok: false, state: current }
-  const { summary, source } = response as Partial<ApiPostSummaryPreviewResponse>
+  const { summary, source } = response as { summary?: unknown; source?: unknown }
   if (typeof summary !== "string" || !SUMMARY_SOURCES.has(source as CanonicalSummaryState["summarySource"])) {
     return { ok: false, state: current }
   }
@@ -106,9 +105,6 @@ const resolveCanonicalSummaryResult = (
     },
   }
 }
-
-export const resolveSummaryPreviewResult = (current: CanonicalSummaryState, response: unknown) =>
-  resolveCanonicalSummaryResult(current, response, { kind: "auto" })
 
 export const resolvePersistedSummaryResult = (current: CanonicalSummaryState, response: unknown) =>
   resolveCanonicalSummaryResult(current, response, { kind: "unchanged" })
