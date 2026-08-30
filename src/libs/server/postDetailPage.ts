@@ -2,7 +2,6 @@ import { dehydrate } from "@tanstack/react-query"
 import { GetStaticPathsResult, GetStaticPropsResult } from "next"
 import { getPostDetailById } from "src/apis"
 import { apiFetch } from "src/apis/backend/client"
-import { getPostsBootstrap } from "src/apis/backend/posts"
 import { queryKey } from "src/constants/queryKey"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
 import { createQueryClient } from "src/libs/react-query"
@@ -23,7 +22,6 @@ type DetailPageProps = {
 type FetchStaticAdminProfile = () => Promise<AdminProfile>
 
 const DETAIL_ISR_REVALIDATE_SECONDS = 60 * 60
-const DETAIL_PREBUILD_COUNT = 16
 const DETAIL_RECOVERY_REVALIDATE_SECONDS = 30
 const IS_QA_STATIC_RECOVERY_MODE = process.env.ENABLE_QA_ROUTES === "true"
 
@@ -93,16 +91,8 @@ export const buildCanonicalPostDetailStaticPaths = async (): Promise<GetStaticPa
     }
   }
 
-  const bootstrap = await getPostsBootstrap({
-    pageSize: DETAIL_PREBUILD_COUNT,
-  })
-
   return {
-    paths: bootstrap.posts.map((post: { id: string | number }) => ({
-      params: {
-        id: String(post.id),
-      },
-    })),
+    paths: [],
     fallback: "blocking",
   }
 }
