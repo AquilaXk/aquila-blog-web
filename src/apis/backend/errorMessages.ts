@@ -1,14 +1,36 @@
 import { ApiError, ApiTimeoutError } from "./client"
 
-type AuthAction = "login" | "signupStart" | "signupVerify" | "signupComplete"
+type AuthAction =
+  | "login"
+  | "adminEmailRequest"
+  | "adminEmailVerify"
+  | "signupStart"
+  | "signupVerify"
+  | "signupComplete"
 
-const authStatusMessages: Record<AuthAction, Partial<Record<number, string>>> = {
+const authStatusMessages: Record<
+  AuthAction,
+  Partial<Record<number, string>>
+> = {
   login: {
     400: "이메일 또는 비밀번호가 올바르지 않습니다.",
     401: "이메일 또는 비밀번호가 올바르지 않습니다.",
     404: "이메일 또는 비밀번호가 올바르지 않습니다.",
     429: "로그인 시도가 많습니다. 잠시 후 다시 시도해주세요.",
     500: "로그인 처리 중 서버 오류가 발생했습니다.",
+  },
+  adminEmailRequest: {
+    400: "이메일 형식을 확인해주세요.",
+    429: "인증 코드 요청이 많습니다. 잠시 후 다시 시도해주세요.",
+    500: "인증 코드 전송 중 서버 오류가 발생했습니다.",
+    503: "이메일 인증을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
+  },
+  adminEmailVerify: {
+    400: "인증 코드 형식을 확인해주세요.",
+    401: "인증 코드가 올바르지 않거나 만료되었습니다.",
+    429: "인증 코드 확인 요청이 많습니다. 잠시 후 다시 시도해주세요.",
+    500: "인증 코드 확인 중 서버 오류가 발생했습니다.",
+    503: "이메일 인증을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
   },
   signupStart: {
     400: "이메일 형식을 확인해주세요.",
@@ -31,7 +53,11 @@ const authStatusMessages: Record<AuthAction, Partial<Record<number, string>>> = 
 const signupPolicyChangedMessage =
   "약관 또는 개인정보처리방침이 변경되었습니다. 최신 내용을 확인하고 다시 동의해주세요."
 
-export const toAuthErrorMessage = (action: AuthAction, error: unknown, fallback: string) => {
+export const toAuthErrorMessage = (
+  action: AuthAction,
+  error: unknown,
+  fallback: string
+) => {
   if (error instanceof ApiTimeoutError) {
     return "응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
   }
