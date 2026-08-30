@@ -93,18 +93,9 @@ export const buildCanonicalPostDetailStaticPaths = async (): Promise<GetStaticPa
     }
   }
 
-  const bootstrap = await (async () => {
-    try {
-      return await getPostsBootstrap({
-        pageSize: DETAIL_PREBUILD_COUNT,
-      })
-    } catch {
-      console.warn("[post-detail-static-paths] bootstrap failed; using blocking fallback only")
-      return {
-        posts: [],
-      }
-    }
-  })()
+  const bootstrap = await getPostsBootstrap({
+    pageSize: DETAIL_PREBUILD_COUNT,
+  })
 
   return {
     paths: bootstrap.posts.map((post: { id: string | number }) => ({
