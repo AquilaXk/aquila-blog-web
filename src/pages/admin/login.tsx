@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import type { components } from "@shared/contracts"
 import type { GetServerSideProps, NextPage } from "next"
 import { useRouter } from "next/router"
 import { type FormEvent, useEffect, useMemo, useState } from "react"
@@ -16,12 +17,11 @@ type AdminLoginPageProps = {
 
 const ADMIN_SAVED_EMAIL_STORAGE_KEY = "auth.admin.savedEmail.v1"
 
-type AdminEmailChallengeResponse = {
-  data?: {
-    challengeId?: string
-    expiresInSeconds?: number
-  }
-}
+type AdminEmailCodeRequest = components["schemas"]["AdminEmailCodeRequest"]
+type AdminEmailCodeVerifyRequest =
+  components["schemas"]["AdminEmailCodeVerifyRequest"]
+type AdminEmailChallengeResponse =
+  components["schemas"]["RsDataAdminEmailCodeRequestResBody"]
 
 type LoginStep = "request" | "verify"
 
@@ -119,14 +119,15 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     setLoading(true)
     try {
       updateSavedEmail(normalizedEmail, saveEmail)
+      const requestBody: AdminEmailCodeRequest = {
+        email: normalizedEmail,
+        rememberMe: keepSignedIn,
+      }
       const response = await apiFetch<AdminEmailChallengeResponse>(
         "/member/api/v1/auth/admin-email/request",
         {
           method: "POST",
-          body: JSON.stringify({
-            email: normalizedEmail,
-            rememberMe: keepSignedIn,
-          }),
+          body: JSON.stringify(requestBody),
         }
       )
       const nextChallengeId = response.data?.challengeId?.trim() || ""
@@ -174,9 +175,10 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
 
     setLoading(true)
     try {
+      const requestBody: AdminEmailCodeVerifyRequest = { challengeId, code }
       await apiFetch("/member/api/v1/auth/admin-email/verify", {
         method: "POST",
-        body: JSON.stringify({ challengeId, code }),
+        body: JSON.stringify(requestBody),
       })
 
       let member: AuthMember
