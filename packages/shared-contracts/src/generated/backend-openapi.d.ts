@@ -245,40 +245,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/post/api/v1/adm/posts/summary-backfill": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** canonical summary bounded backfill */
-        post: operations["backfillSummary"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/post/api/v1/adm/posts/preview-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** canonical summary 미리보기 */
-        post: operations["previewSummary"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/privacy/requests": {
         parameters: {
             query?: never;
@@ -1395,8 +1361,8 @@ export interface components {
             contentHtml?: string | null;
             published?: boolean | null;
             listed?: boolean | null;
-            /** @enum {string|null} */
-            summaryMode?: "AUTO" | "MANUAL" | null;
+            /** @enum {string} */
+            summaryMode: "AUTO" | "MANUAL";
             summary?: string | null;
         };
         PostDto: {
@@ -1492,38 +1458,6 @@ export interface components {
             key?: string;
             url?: string;
             markdown?: string;
-        };
-        PostSummaryBackfillRequest: {
-            /** Format: int64 */
-            afterId?: number;
-            /** Format: int64 */
-            maxId: number;
-            /** Format: int32 */
-            limit?: number;
-            dryRun?: boolean;
-        };
-        PostSummaryBackfillResponse: {
-            /** Format: int32 */
-            scanned?: number;
-            /** Format: int32 */
-            updated?: number;
-            /** Format: int32 */
-            skipped?: number;
-            /** Format: int64 */
-            nextAfterId?: number;
-            hasMore?: boolean;
-            dryRun?: boolean;
-        };
-        PostSummaryPreviewRequest: {
-            title: string;
-            content: string;
-        };
-        PostSummaryPreviewResponse: {
-            summary?: string;
-            /** @enum {string} */
-            source?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
-            contentHash?: string;
-            algorithmVersion?: string;
         };
         PrivacyRequestCreateRequest: {
             /** @enum {string} */
@@ -2525,54 +2459,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataPostDto"];
-                };
-            };
-        };
-    };
-    backfillSummary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PostSummaryBackfillRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PostSummaryBackfillResponse"];
-                };
-            };
-        };
-    };
-    previewSummary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PostSummaryPreviewRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PostSummaryPreviewResponse"];
                 };
             };
         };

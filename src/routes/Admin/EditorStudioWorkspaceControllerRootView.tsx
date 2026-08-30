@@ -79,7 +79,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     commitPostCategory,
     handlePostCategoryChange,
     handlePostSummaryChange,
-    handlePreviewSummary,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
     handleProfileImageSelected,
@@ -697,8 +696,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         postContent={postContent}
         postSummary={postSummary}
         onPostSummaryChange={handlePostSummaryChange}
-        isFillSummaryFromBodyDisabled={!postContent.trim() || loadingKey === "previewSummary"}
-        onFillSummaryFromBody={() => void handlePreviewSummary()}
         postCategory={postCategory}
         onPostCategoryChange={handlePostCategoryChange}
         onCommitPostCategory={commitPostCategory}
@@ -947,8 +944,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
             postSummary={postSummary}
             postSummaryMaxLength={PREVIEW_SUMMARY_MAX_LENGTH}
             onPostSummaryChange={handlePostSummaryChange}
-            isFillSummaryFromBodyDisabled={!postContent.trim() || loadingKey === "previewSummary"}
-            onFillSummaryFromBody={() => void handlePreviewSummary()}
             postTags={postTags}
             tagDraft={tagDraft}
             onTagDraftChange={setTagDraft}

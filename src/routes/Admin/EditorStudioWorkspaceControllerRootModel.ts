@@ -20,7 +20,7 @@ import type {
 } from "./editorStudioMetaModel"
 import type {
   ApiEditorPostDto,
-  ApiPostSummaryPreviewResponse,
+  ApiPostModifyRequest,
   ApiPostWriteRequest,
 } from "src/apis/backend/posts/PostApiDtos"
 
@@ -76,12 +76,21 @@ const SUMMARY_SOURCES = new Set<CanonicalSummaryState["summarySource"]>([
   "NONE",
 ])
 
-export const toSummaryWriteFields = (
+export const toCreateSummaryWriteFields = (
   intent: SummaryIntent,
 ): Pick<ApiPostWriteRequest, "summaryMode" | "summary"> => {
-  if (intent.kind === "unchanged") return { summaryMode: null, summary: null }
+  if (intent.kind === "unchanged") {
+    throw new Error("create summary intent must be AUTO or MANUAL")
+  }
   if (intent.kind === "manual") return { summaryMode: "MANUAL", summary: intent.summary }
   return { summaryMode: "AUTO", summary: null }
+}
+
+export const toModifySummaryWriteFields = (
+  intent: SummaryIntent,
+): Pick<ApiPostModifyRequest, "summaryMode" | "summary"> => {
+  if (intent.kind === "unchanged") return { summaryMode: null, summary: null }
+  return toCreateSummaryWriteFields(intent)
 }
 
 const resolveCanonicalSummaryResult = (
@@ -90,7 +99,7 @@ const resolveCanonicalSummaryResult = (
   intent: SummaryIntent,
 ): { ok: true; state: CanonicalSummaryState } | { ok: false; state: CanonicalSummaryState } => {
   if (response == null || typeof response !== "object") return { ok: false, state: current }
-  const { summary, source } = response as Partial<ApiPostSummaryPreviewResponse>
+  const { summary, source } = response as { summary?: unknown; source?: unknown }
   if (typeof summary !== "string" || !SUMMARY_SOURCES.has(source as CanonicalSummaryState["summarySource"])) {
     return { ok: false, state: current }
   }
@@ -106,9 +115,6 @@ const resolveCanonicalSummaryResult = (
     },
   }
 }
-
-export const resolveSummaryPreviewResult = (current: CanonicalSummaryState, response: unknown) =>
-  resolveCanonicalSummaryResult(current, response, { kind: "auto" })
 
 export const resolvePersistedSummaryResult = (current: CanonicalSummaryState, response: unknown) =>
   resolveCanonicalSummaryResult(current, response, { kind: "unchanged" })

@@ -4,8 +4,8 @@ import { mapPostDetail, mapPostDto } from "../../src/apis/backend/posts/PostApiM
 import { toCompanyNewsSummary } from "../../src/routes/Company/CompanyPageModel"
 import {
   resolvePersistedSummaryResult,
-  resolveSummaryPreviewResult,
-  toSummaryWriteFields,
+  toCreateSummaryWriteFields,
+  toModifySummaryWriteFields,
   type CanonicalSummaryState,
   type SummaryIntent,
 } from "../../src/routes/Admin/EditorStudioWorkspaceControllerRootModel"
@@ -15,6 +15,16 @@ const fixtureById = (
 ) => {
   const fixture = summaryFixtures.fixtures.find((candidate) => candidate.id === id)
   if (!fixture) throw new Error(`missing imported summary fixture: ${id}`)
+  return fixture
+}
+
+const requestFixtureById = (
+  id: "manual-create" | "manual-preserve-omitted" | "auto-recompute",
+) => {
+  const fixture = fixtureById(id)
+  if (!("request" in fixture) || fixture.request == null) {
+    throw new Error(`missing request in imported summary fixture: ${id}`)
+  }
   return fixture
 }
 
@@ -79,26 +89,32 @@ test("Company news도 canonical summary를 공백 정규화나 JS 절단 없이 
 })
 
 test("imported manual intent와 unchanged intent를 write fields로 그대로 전달한다", () => {
-  const manual = fixtureById("manual-create")
-  const unchanged = fixtureById("manual-preserve-omitted")
+  const manual = requestFixtureById("manual-create")
+  const unchanged = requestFixtureById("manual-preserve-omitted")
   const manualSummary = manual.request.summary
   if (typeof manualSummary !== "string") throw new Error("manual fixture summary must be a string")
 
   const manualIntent: SummaryIntent = { kind: "manual", summary: manualSummary }
   const unchangedIntent: SummaryIntent = { kind: "unchanged" }
 
-  expect(toSummaryWriteFields(manualIntent)).toEqual(manual.request)
-  expect(toSummaryWriteFields(unchangedIntent)).toEqual(unchanged.request)
+  expect(toCreateSummaryWriteFields(manualIntent)).toEqual(manual.request)
+  expect(toModifySummaryWriteFields(unchangedIntent)).toEqual(unchanged.request)
 })
 
 test("imported AUTO intent는 입력 지우기에도 같은 canonical recompute request를 사용한다", () => {
-  const automatic = fixtureById("auto-recompute")
+  const automatic = requestFixtureById("auto-recompute")
   const automaticIntent: SummaryIntent = { kind: "auto" }
 
-  expect(toSummaryWriteFields(automaticIntent)).toEqual(automatic.request)
+  expect(toCreateSummaryWriteFields(automaticIntent)).toEqual(automatic.request)
 })
 
-test("canonical preview는 AUTO로 전이하고 failure는 persisted manual value를 보존한다", () => {
+test("create summary request는 unchanged intent를 허용하지 않는다", () => {
+  expect(() => toCreateSummaryWriteFields({ kind: "unchanged" })).toThrow(
+    "create summary intent must be AUTO or MANUAL",
+  )
+})
+
+test("persisted canonical summary response는 unchanged intent로 전이하고 malformed value를 거부한다", () => {
   const fixture = fixtureById("manual-create")
   const expected = expectedSummary(fixture)
   const currentState: CanonicalSummaryState = {
@@ -108,28 +124,6 @@ test("canonical preview는 AUTO로 전이하고 failure는 persisted manual valu
   }
 
   expect(
-    resolveSummaryPreviewResult(currentState, {
-      summary: expected.summary,
-      source: expected.source,
-    }),
-  ).toEqual({
-    ok: true,
-    state: {
-      summary: expected.summary,
-      summarySource: expected.source,
-      intent: { kind: "auto" },
-    },
-  })
-  expect(resolveSummaryPreviewResult(currentState, { summary: null, source: null })).toEqual({
-    ok: false,
-    state: currentState,
-  })
-  expect(resolveSummaryPreviewResult(currentState, { summary: "", source: "MANUAL" })).toEqual({
-    ok: false,
-    state: currentState,
-  })
-
-  expect(
     resolvePersistedSummaryResult(currentState, {
       summary: expected.summary,
       source: expected.source,
@@ -137,5 +131,13 @@ test("canonical preview는 AUTO로 전이하고 failure는 persisted manual valu
   ).toEqual({
     ok: true,
     state: { ...currentState, intent: { kind: "unchanged" } },
+  })
+  expect(resolvePersistedSummaryResult(currentState, { summary: null, source: null })).toEqual({
+    ok: false,
+    state: currentState,
+  })
+  expect(resolvePersistedSummaryResult(currentState, { summary: "", source: "MANUAL" })).toEqual({
+    ok: false,
+    state: currentState,
   })
 })

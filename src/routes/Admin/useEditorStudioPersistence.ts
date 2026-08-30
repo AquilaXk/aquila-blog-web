@@ -14,7 +14,13 @@ import {
   resolveCreateWritePostId,
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
-import { resolvePersistedSummaryResult, toSummaryWriteFields, type CanonicalSummaryState, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
+import {
+  resolvePersistedSummaryResult,
+  toCreateSummaryWriteFields,
+  toModifySummaryWriteFields,
+  type CanonicalSummaryState,
+  type SummaryIntent,
+} from "./EditorStudioWorkspaceControllerRootModel"
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
@@ -295,6 +301,30 @@ export const useEditorStudioPersistence = ({
     ],
   )
 
+  const buildModifyPostRequestBody = useCallback(
+    (content: string) => ({
+      title: postTitle,
+      content: composeEditorContent(content, postTags, {
+        category: postCategory,
+        thumbnail: effectiveThumbnailUrl,
+      }),
+      ...toModifySummaryWriteFields(summaryIntent),
+      ...toFlags(postVisibility),
+      version: postVersion,
+    }),
+    [
+      composeEditorContent,
+      effectiveThumbnailUrl,
+      postCategory,
+      postTags,
+      postTitle,
+      postVersion,
+      postVisibility,
+      summaryIntent,
+      toFlags,
+    ],
+  )
+
   const handleWritePost = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode === "edit" || postId.trim()) {
@@ -333,7 +363,7 @@ export const useEditorStudioPersistence = ({
         thumbnail: effectiveThumbnailUrl,
       })
 
-      const summaryWriteFields = toSummaryWriteFields(summaryIntent)
+      const summaryWriteFields = toCreateSummaryWriteFields(summaryIntent)
       const fingerprint = JSON.stringify({
         title: postTitle,
         content: contentWithMetadata,
@@ -499,16 +529,7 @@ export const useEditorStudioPersistence = ({
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          title: postTitle,
-          content: composeEditorContent(currentPostContent, postTags, {
-            category: postCategory,
-            thumbnail: effectiveThumbnailUrl,
-          }),
-          ...toSummaryWriteFields(summaryIntent),
-          ...toFlags(postVisibility),
-          version: postVersion,
-        }),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
       })
 
       const canonicalSummary = applyCanonicalWriteResponse(response)
@@ -547,6 +568,7 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
@@ -621,16 +643,7 @@ export const useEditorStudioPersistence = ({
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          title: postTitle,
-          content: composeEditorContent(currentPostContent, postTags, {
-            category: postCategory,
-            thumbnail: effectiveThumbnailUrl,
-          }),
-          ...toSummaryWriteFields(summaryIntent),
-          ...toFlags(postVisibility),
-          version: postVersion,
-        }),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
       })
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
@@ -668,6 +681,7 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
