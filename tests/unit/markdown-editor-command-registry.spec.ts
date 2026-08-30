@@ -10,7 +10,6 @@ import {
 
 const writeContext = {
   disabled: false,
-  mode: "write" as const,
   selectionStart: 0,
   selectionEnd: 0,
   isTableSelection: false,
@@ -51,11 +50,8 @@ test.describe("markdown editor command registry", () => {
     const addRow = getMarkdownEditorCommand("table.add-row")!
 
     expect(bold.isEnabled(writeContext)).toBe(true)
-    expect(bold.isEnabled({ ...writeContext, mode: "preview" })).toBe(true)
-    expect(code.isEnabled({ ...writeContext, mode: "preview" })).toBe(true)
     expect(addRow.isEnabled({ ...writeContext, isTableSelection: false })).toBe(false)
     expect(addRow.isEnabled({ ...writeContext, isTableSelection: true })).toBe(true)
-    expect(addRow.isEnabled({ ...writeContext, mode: "preview", isTableSelection: true })).toBe(false)
     expect(code.isEnabled({ ...writeContext, disabled: true })).toBe(false)
   })
 

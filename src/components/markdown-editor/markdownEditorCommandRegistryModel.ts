@@ -4,7 +4,6 @@ export type MarkdownEditorCommandCategory = "format" | "block" | "table"
 
 export type MarkdownEditorCommandContext = {
   disabled: boolean
-  mode: "write" | "split" | "preview"
   selectionStart: number
   selectionEnd: number
   isTableSelection: boolean
@@ -25,9 +24,7 @@ export type MarkdownEditorCommandDescriptor = {
   execute: (context: MarkdownEditorCommandContext) => MarkdownEditorCommandAction | null
 }
 
-const canUsePreviewTransition = (context: MarkdownEditorCommandContext) => !context.disabled
-
-const canEdit = (context: MarkdownEditorCommandContext) => canUsePreviewTransition(context) && context.mode !== "preview"
+const canEdit = (context: MarkdownEditorCommandContext) => !context.disabled
 
 export const markdownEditorCommands = [
   {
@@ -36,16 +33,16 @@ export const markdownEditorCommands = [
     label: "굵게",
     toolbarLabel: "B",
     shortcut: "Mod+B",
-    isEnabled: canUsePreviewTransition,
-    execute: (context) => (canUsePreviewTransition(context) ? { kind: "format", shortcut: "bold" } : null),
+    isEnabled: canEdit,
+    execute: (context) => (canEdit(context) ? { kind: "format", shortcut: "bold" } : null),
   },
   {
     id: "block.code",
     category: "block",
     label: "코드 블록",
     toolbarLabel: "Code",
-    isEnabled: canUsePreviewTransition,
-    execute: (context) => (canUsePreviewTransition(context) ? { kind: "block", block: "code" } : null),
+    isEnabled: canEdit,
+    execute: (context) => (canEdit(context) ? { kind: "block", block: "code" } : null),
   },
   {
     id: "table.add-row",

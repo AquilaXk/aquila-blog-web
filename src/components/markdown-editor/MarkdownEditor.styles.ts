@@ -214,174 +214,146 @@ export const FindReplaceActions = styled.div`
   }
 `
 
-export const EditorBody = styled.div`
+export const LiveEditorBody = styled.div`
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
-
-  &[data-mode="write"],
-  &[data-mode="preview"] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  &[data-mode="preview"] [data-testid="markdown-editor-preview-scroll"] {
-    max-width: 820px;
-  }
-
-  &[data-mode="split"] [data-testid="markdown-editor-preview-scroll"] {
-    padding: 30px 32px 110px;
-  }
-
-  &[data-mode="split"] [data-testid="markdown-editor-preview-scroll"] > header {
-    display: none;
-  }
-
-  @media (max-width: 1100px) {
-    grid-template-columns: minmax(0, 1fr);
-
-    &[data-mode="split"] [data-pane="write"] {
-      height: 46vh;
-      border-right: 0;
-      border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
-    }
-
-    &[data-mode="split"] [data-pane="preview"] {
-      height: auto;
-    }
-  }
-
-  @media (max-width: 820px) {
-    &[data-mode="split"] [data-testid="markdown-editor-preview-scroll"] {
-      padding: 22px 18px 90px;
-    }
-  }
-`
-
-export const WritePane = styled.div`
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow: auto;
-  border-right: 1px solid ${({ theme }) => theme.colors.gray6};
-  background: #0f1728;
-`
-
-export const WriteEditorFrame = styled.div`
-  min-height: 100%;
-  background: #0f1728;
-  color: #dbe7ff;
-`
-
-export const MarkdownTextarea = styled.textarea`
-  width: 100%;
-  height: 100%;
-  min-height: 640px;
-  max-width: none;
-  padding: 30px 32px;
-  border: 0;
-  outline: none;
-  resize: none;
+  overflow: hidden;
   background: #0f1728;
   color: #d9e4f7;
-  caret-color: #dbe7ff;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.78;
   tab-size: 2;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 
-  &::selection {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(56, 139, 253, 0.45)" : "rgba(9, 105, 218, 0.24)")};
+  [data-testid="markdown-editor-live-surface"] {
+    height: 100%;
   }
 
-  &:focus {
-    outline: 0;
-    box-shadow: none;
+  .cm-editor {
+    height: 100%;
+    background: #0f1728;
+    color: #d9e4f7;
   }
 
-  &:focus-visible {
+  .cm-editor.cm-focused {
     outline: 2px solid ${({ theme }) => theme.colors.blue8};
     outline-offset: -2px;
   }
 
-  &:disabled {
+  .cm-scroller {
+    overscroll-behavior: contain;
+  }
+
+  .cm-content {
+    caret-color: #dbe7ff;
+  }
+
+  .cm-content ::selection,
+  .cm-selectionBackground,
+  & .cm-focused .cm-selectionBackground {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(56, 139, 253, 0.45)" : "rgba(9, 105, 218, 0.32)")};
+  }
+
+  .cm-cursor {
+    border-left-color: #dbe7ff;
+  }
+
+  .cm-live-heading {
+    color: #f3f7ff;
+    font-family: Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+  }
+
+  .cm-live-heading-1 {
+    font-size: 1.9em;
+    line-height: 1.28;
+  }
+
+  .cm-live-heading-2 {
+    font-size: 1.55em;
+    line-height: 1.34;
+  }
+
+  .cm-live-heading-3,
+  .cm-live-heading-4,
+  .cm-live-heading-5,
+  .cm-live-heading-6 {
+    font-size: 1.24em;
+    line-height: 1.42;
+  }
+
+  .cm-live-strong {
+    color: #f3f7ff;
+    font-weight: 800;
+  }
+
+  .cm-live-emphasis {
+    font-style: italic;
+  }
+
+  .cm-live-strikethrough {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .cm-live-inline-code {
+    border: 1px solid rgba(155, 189, 255, 0.2);
+    border-radius: 4px;
+    padding: 0.08em 0.3em;
+    background: rgba(120, 167, 255, 0.1);
+    color: #b9d1ff;
+  }
+
+  .cm-live-link {
+    color: ${({ theme }) => theme.publicDesign.accent};
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .cm-live-quote {
+    color: #b9c8df;
+  }
+
+  .cm-live-quote-marker {
+    display: inline-block;
+    width: 3px;
+    height: 1.25em;
+    margin-right: 0.7em;
+    vertical-align: -0.2em;
+    background: ${({ theme }) => theme.publicDesign.accent};
+  }
+
+  .cm-live-list-marker {
+    display: inline-block;
+    min-width: 1.3em;
+    color: ${({ theme }) => theme.publicDesign.accent};
+    font-weight: 800;
+  }
+
+  .cm-live-task-checkbox {
+    box-sizing: border-box;
+    display: inline-flex;
+    width: 1em;
+    height: 1em;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.45em;
+    border: 1px solid #78a7ff;
+    color: #dbe7ff;
+    font: 800 0.75em/1 ui-monospace, monospace;
+    vertical-align: -0.08em;
+  }
+
+  .cm-live-fenced-code {
+    color: #cbd9ee;
+  }
+
+  &[aria-disabled="true"] .cm-editor {
     cursor: not-allowed;
     opacity: 0.7;
-  }
-
-  @media (max-width: 820px) {
-    padding: 22px 18px;
-  }
-`
-
-export const PreviewPane = styled.div`
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
-`
-
-export const PreviewArticle = styled.article`
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 48px 44px 110px;
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
-
-  .aq-markdown {
-    width: min(100%, 760px);
-    max-width: 760px;
-    margin-top: 0;
-    margin-inline: auto;
-    color: ${({ theme }) => theme.colors.gray12};
-  }
-
-  .aq-markdown > :first-child {
-    margin-top: 0;
-  }
-
-  @media (max-width: 820px) {
-    padding: 34px 20px 90px;
-  }
-`
-
-export const PreviewHeader = styled.header`
-  width: min(100%, 760px);
-  max-width: 760px;
-  margin: 0 auto 34px;
-
-  span {
-    display: block;
-    margin-bottom: 14px;
-    color: ${({ theme }) => theme.publicDesign.accent};
-    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  h1 {
-    margin: 12px 0 18px;
-    color: ${({ theme }) => theme.colors.gray12};
-    font-size: 43px;
-    font-weight: 850;
-    line-height: 1.13;
-    letter-spacing: -0.055em;
-  }
-
-  p {
-    margin: 0;
-    padding: 4px 0 4px 20px;
-    border-left: 3px solid ${({ theme }) => theme.publicDesign.accent};
-    color: ${({ theme }) => theme.colors.gray10};
-    font-size: 18px;
-    line-height: 1.75;
   }
 `

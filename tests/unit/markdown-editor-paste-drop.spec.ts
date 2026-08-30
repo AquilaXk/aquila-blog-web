@@ -335,9 +335,9 @@ test.describe("markdown editor paste/drop model", () => {
       "utf8"
     )
 
-    expect(editorSource).toContain("onPaste={handlePaste}")
+    expect(editorSource).toContain("onPasteCapture={handlePaste}")
     expect(editorSource).toContain("onDragOver={handleDragOver}")
-    expect(editorSource).toContain("onDrop={handleDrop}")
+    expect(editorSource).toContain("onDropCapture={handleDrop}")
     expect(editorSource).toContain("useMarkdownEditorMediaTransfers")
     expect(editorSource).toContain("applyBackgroundMarkdownMutation")
     expect(editorSource).toContain("clearUploadError")

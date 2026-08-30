@@ -28,6 +28,7 @@ import {
   EditorStudioDedicatedTopBar,
   EditorStudioFrame,
   EditorStudioLoadingState,
+  EditorStudioPageHeading,
   EditorStudioRoot,
   EditorStudioSaveState,
   EditorStudioTopBarActions,
@@ -247,6 +248,7 @@ export const EditorStudioDedicatedEditorSurface = ({
 
   return (
     <EditorStudioRoot>
+      <EditorStudioPageHeading>글 편집</EditorStudioPageHeading>
       <input
         ref={thumbnailImageFileInputRef}
         type="file"

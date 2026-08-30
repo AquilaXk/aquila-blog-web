@@ -6,7 +6,6 @@ import {
   OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
   registeredBrowserStorageKeys,
 } from "../src/libs/privacy/browserStorageRegistry"
-import { MARKDOWN_EDITOR_MODE_STORAGE_KEY } from "../src/components/markdown-editor/markdownEditorModePreference"
 import { getLegalPolicyHistoryStaticProps } from "../src/libs/legal/serverPolicySource"
 import { isLocalDraftExpired, LOCAL_DRAFT_MAX_AGE_MS } from "../src/routes/Admin/editorStudioStorageModel"
 
@@ -64,11 +63,6 @@ test("browser storage registry includes privacy and runtime keys used by public 
       expect.objectContaining({ area: "localStorage", key: "auth.login.ipSecurityOn" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.keepSignedIn.v1" }),
-      expect.objectContaining({
-        area: "localStorage",
-        key: MARKDOWN_EDITOR_MODE_STORAGE_KEY,
-        purpose: "markdown-editor-mode-preference",
-      }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v2" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
@@ -108,30 +102,6 @@ test("browser storage registry covers source storage constants", () => {
   }
 
   expect(registeredKeys.has("scheme"), "theme scheme cookie is read from document.cookie and must be registered").toBe(true)
-  expect(
-    registeredKeys.has(MARKDOWN_EDITOR_MODE_STORAGE_KEY),
-    "markdown editor mode preference uses window.localStorage and must be registered",
-  ).toBe(true)
-})
-
-test("markdown editor mode preference storage key records adapter-backed localStorage usage", () => {
-  const modePreferenceSource = readFileSync(
-    path.join(srcRoot, "components/markdown-editor/markdownEditorModePreference.ts"),
-    "utf8",
-  )
-
-  expect(
-    registeredBrowserStorageKeys.find((entry) => entry.key === MARKDOWN_EDITOR_MODE_STORAGE_KEY),
-  ).toEqual(
-    expect.objectContaining({
-      area: "localStorage",
-      purpose: "markdown-editor-mode-preference",
-      stores: expect.stringContaining("write"),
-    }),
-  )
-  expect(modePreferenceSource).toContain("window.localStorage")
-  expect(modePreferenceSource).toContain("storage.setItem(MARKDOWN_EDITOR_MODE_STORAGE_KEY")
-  expect(modePreferenceSource).toContain("storage.getItem(MARKDOWN_EDITOR_MODE_STORAGE_KEY")
 })
 
 test("browser storage registry records retention and deletion metadata for every entry", () => {

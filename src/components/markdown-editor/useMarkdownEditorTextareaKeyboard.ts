@@ -44,7 +44,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   onRequestSave,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
   const handleTabKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    (event: ReactKeyboardEvent<HTMLElement>) => {
       if (allowNativeTabAfterEscapeRef.current) {
         allowNativeTabAfterEscapeRef.current = false
         return
@@ -68,7 +68,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleEnterKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.key !== "Enter") return false
 
       if (event.shiftKey) {
@@ -91,7 +91,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleSaveShortcutKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (!isSaveShortcut(event)) return false
       if (!onRequestSave) return true
       event.preventDefault()
@@ -102,14 +102,13 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleFormatShortcutKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       const command = resolveMarkdownEditorCommandShortcut(event)
       if (command) {
         event.preventDefault()
         const { from, to } = rememberTextareaSelection()
         const action = command.execute({
           disabled,
-          mode: "write",
           selectionStart: from,
           selectionEnd: to,
           isTableSelection: false,
@@ -130,7 +129,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleLineCommandKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       const command = resolveMarkdownEditorLineCommand(event)
       if (!command) return false
 
@@ -144,7 +143,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleAutoPairKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.metaKey || event.ctrlKey || event.altKey) return false
 
       const { from, to } = rememberTextareaSelection()
@@ -162,7 +161,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleHomeEndKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.shiftKey || (!event.metaKey && !event.ctrlKey)) return false
       if (event.key === "Home") {
         event.preventDefault()
@@ -180,7 +179,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   )
 
   const handleTextareaKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    (event: ReactKeyboardEvent<HTMLElement>) => {
       if (disabled || isComposingEditorKeyboardEvent(event)) return
 
       if (event.key === "Escape") {

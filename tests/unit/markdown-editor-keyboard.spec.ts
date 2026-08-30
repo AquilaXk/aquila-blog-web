@@ -1,6 +1,4 @@
 import { expect, test } from "@playwright/test"
-import { readFileSync } from "fs"
-import path from "path"
 import {
   isOffsetInsideFencedCodeBlock,
   matchListMarkerLine,
@@ -13,15 +11,11 @@ import {
   resolveFormatShortcut,
   resolveMarkdownEditorLineCommand,
 } from "../../src/components/markdown-editor/markdownEditorKeyboardModel"
-import { resolveModeForBodyFocus } from "../../src/components/markdown-editor/markdownEditorModeTabs"
 import {
-  applyPlannedTextMutation,
   planIndentLines,
   planOutdentLines,
   planToggleWrapSelection,
 } from "../../src/components/markdown-editor/markdownEditorTextMutation"
-
-const sourcePath = (...parts: string[]) => path.resolve(__dirname, "../../src", ...parts)
 
 test.describe("markdown editor keyboard model", () => {
   test("toggles bold wrap and unwrap around a selection", () => {
@@ -86,7 +80,6 @@ test.describe("markdown editor keyboard model", () => {
     expect(bold?.id).toBe("format.bold")
     expect(bold?.execute({
       disabled: false,
-      mode: "write",
       selectionStart: 0,
       selectionEnd: 5,
       isTableSelection: false,
@@ -218,69 +211,4 @@ test.describe("markdown editor keyboard model", () => {
     })
   })
 
-  test("body focus from title switches preview mode to write", () => {
-    expect(resolveModeForBodyFocus("preview")).toBe("write")
-    expect(resolveModeForBodyFocus("write")).toBe("write")
-    expect(resolveModeForBodyFocus("split")).toBe("split")
-
-    const editorSource = readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"), "utf8")
-    expect(editorSource).toContain("resolveModeForBodyFocus")
-    expect(editorSource).toContain("pendingBodyFocusRef")
-  })
-
-  test("mutation helper uses setRangeText with explicit selection restoration", () => {
-    const mutationSource = readFileSync(sourcePath("components", "markdown-editor", "markdownEditorTextMutation.ts"), "utf8")
-    const editorSource = readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"), "utf8")
-    const keyboardHookSource = readFileSync(
-      sourcePath("components", "markdown-editor", "useMarkdownEditorTextareaKeyboard.ts"),
-      "utf8"
-    )
-    const stylesSource = readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.styles.ts"), "utf8")
-
-    expect(mutationSource).toContain("textarea.setRangeText(")
-    expect(mutationSource).toContain("export const applyPlannedTextMutation")
-    expect(editorSource).toContain("applyPlannedTextMutation")
-    expect(editorSource).toContain("onRequestSave")
-    expect(editorSource).toContain("onFocusRequestReady")
-    expect(editorSource).toContain("allowNativeTabAfterEscapeRef")
-    expect(editorSource).toContain("aria-description")
-    expect(editorSource).toContain("window.requestAnimationFrame")
-    expect(editorSource).toContain("current.setSelectionRange(nextFrom, nextTo)")
-    expect(keyboardHookSource).toContain("handleTabKeyDown")
-    expect(keyboardHookSource).toContain("handleEnterKeyDown")
-    expect(keyboardHookSource).toContain("resolveMarkdownEditorCommandShortcut")
-    expect(editorSource).toContain("applyFormatShortcutOrAppend")
-    expect(stylesSource).toContain("&:focus-visible")
-    expect(stylesSource).toContain("theme.colors.blue8")
-
-    const textarea = {
-      value: "hello",
-      selectionStart: 0,
-      selectionEnd: 5,
-      setRangeText(replacement: string, start: number, end: number) {
-        this.value = `${this.value.slice(0, start)}${replacement}${this.value.slice(end)}`
-      },
-      setSelectionRange(start: number, end: number) {
-        this.selectionStart = start
-        this.selectionEnd = end
-      },
-    } as unknown as HTMLTextAreaElement
-
-    const next = applyPlannedTextMutation(textarea, planToggleWrapSelection("hello", 0, 5, "**", "**"))
-    expect(next).toBe("**hello**")
-    expect(textarea.selectionStart).toBe(2)
-    expect(textarea.selectionEnd).toBe(7)
-  })
-
-  test("ModeTabs expose arrow-key a11y contracts", () => {
-    const modeTabsSource = readFileSync(
-      sourcePath("components", "markdown-editor", "markdownEditorModeTabs.tsx"),
-      "utf8"
-    )
-    expect(modeTabsSource).toContain('role="tablist"')
-    expect(modeTabsSource).toContain("ArrowRight")
-    expect(modeTabsSource).toContain("ArrowLeft")
-    expect(modeTabsSource).toContain("aria-controls")
-    expect(modeTabsSource).toContain("tabIndex={selected ? 0 : -1}")
-  })
 })

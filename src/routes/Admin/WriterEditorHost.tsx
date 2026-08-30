@@ -8,8 +8,6 @@ import {
 type WriterEditorHostProps = {
   canvasId: string
   markdown: string
-  previewTitle?: string
-  previewSummary?: string
   onMarkdownChange: (markdown: string, meta?: { editorFocused: boolean }) => void
   onFlushMarkdownReady: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
@@ -31,8 +29,6 @@ type WriterEditorHostProps = {
 export const WriterEditorHost = ({
   canvasId,
   markdown,
-  previewTitle,
-  previewSummary,
   onMarkdownChange,
   onFlushMarkdownReady,
   onFocusRequestReady,
@@ -53,8 +49,6 @@ export const WriterEditorHost = ({
     <RecoverableSurfaceBoundary surface="editor" resetKey={canvasId}>
       <MarkdownEditor
         value={markdown}
-        previewTitle={previewTitle}
-        previewSummary={previewSummary}
         onChange={onMarkdownChange}
         onFlushMarkdownReady={onFlushMarkdownReady}
         onFocusRequestReady={onFocusRequestReady}

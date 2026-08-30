@@ -574,8 +574,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       <WriterEditorHost
         canvasId="editor-dedicated-canvas"
         markdown={postContent}
-        previewTitle={postTitle}
-        previewSummary={resolvedPreviewSummary}
         onMarkdownChange={handleMarkdownEditorChange}
         onFlushMarkdownReady={handleFlushMarkdownReady}
         onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
@@ -598,8 +596,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       handleMarkdownUploadingChange,
       isMarkdownEditorDisabled,
       postContent,
-      postTitle,
-      resolvedPreviewSummary,
     ]
   )
   const composeEditorCanvas = useMemo(
@@ -607,8 +603,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       <WriterEditorHost
         canvasId="editor-compose-canvas"
         markdown={postContent}
-        previewTitle={postTitle}
-        previewSummary={resolvedPreviewSummary}
         onMarkdownChange={handleMarkdownEditorChange}
         onFlushMarkdownReady={handleFlushMarkdownReady}
         onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
@@ -631,8 +625,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       handleMarkdownUploadingChange,
       isMarkdownEditorDisabled,
       postContent,
-      postTitle,
-      resolvedPreviewSummary,
     ]
   )
   const shouldShowEditorLoadingState =

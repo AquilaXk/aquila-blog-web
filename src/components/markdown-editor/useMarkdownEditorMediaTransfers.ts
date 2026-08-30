@@ -371,7 +371,7 @@ export const useMarkdownEditorMediaTransfers = ({
   )
 
   const handlePaste = useCallback(
-    (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    (event: ReactClipboardEvent<HTMLElement>) => {
       if (disabled) return
 
       const mediaRoute = resolvePasteMediaRoute(event.clipboardData, {
@@ -429,7 +429,7 @@ export const useMarkdownEditorMediaTransfers = ({
   )
 
   const handleDragOver = useCallback(
-    (event: ReactDragEvent<HTMLTextAreaElement>) => {
+    (event: ReactDragEvent<HTMLElement>) => {
       if (disabled || (!onUploadImage && !onUploadFile)) return
       if (!event.dataTransfer?.types?.includes("Files")) return
       event.preventDefault()
@@ -439,7 +439,7 @@ export const useMarkdownEditorMediaTransfers = ({
   )
 
   const handleDrop = useCallback(
-    (event: ReactDragEvent<HTMLTextAreaElement>) => {
+    (event: ReactDragEvent<HTMLElement>) => {
       if (disabled || (!onUploadImage && !onUploadFile)) return
       const files = listFilesFromDataTransfer(event.dataTransfer)
       if (files.length === 0) return

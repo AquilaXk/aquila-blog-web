@@ -8,11 +8,11 @@ import {
 } from "./markdownEditorFindReplaceModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
-type TextareaSelection = { from: number; to: number }
+type EditorSelection = { from: number; to: number }
 
 type EditorSnapshot = {
   documentValue: string
-  selection: TextareaSelection
+  selection: EditorSelection
 }
 
 type FindPanelSession = EditorSnapshot & {
@@ -23,17 +23,16 @@ type FindPanelSession = EditorSnapshot & {
 
 type UseMarkdownEditorFindReplaceArgs = {
   disabled: boolean
-  preview: boolean
   draftValue: string
   readSnapshot: () => EditorSnapshot | null
   selectRange: (from: number, to?: number) => void
   applyRecordedMutation: (plan: PlannedTextMutation) => boolean
 }
 
-const matchMatchesSelection = (match: MarkdownEditorTextRange, selection: TextareaSelection) =>
+const matchMatchesSelection = (match: MarkdownEditorTextRange, selection: EditorSelection) =>
   match.start === selection.from && match.end === selection.to
 
-const makeSnapshot = (documentValue: string, selection: TextareaSelection, scope?: MarkdownEditorTextRange) => ({
+const makeSnapshot = (documentValue: string, selection: EditorSelection, scope?: MarkdownEditorTextRange) => ({
   documentValue,
   selection,
   ...(scope ? { scope } : {}),
@@ -41,7 +40,6 @@ const makeSnapshot = (documentValue: string, selection: TextareaSelection, scope
 
 export const useMarkdownEditorFindReplace = ({
   disabled,
-  preview,
   draftValue,
   readSnapshot,
   selectRange,
@@ -75,7 +73,7 @@ export const useMarkdownEditorFindReplace = ({
     setPanel((current) => (external || !current ? null : { ...current, activeMatch: null, stale: true }))
   }, [])
 
-  const onSelectionChange = useCallback((selection: TextareaSelection) => {
+  const onSelectionChange = useCallback((selection: EditorSelection) => {
     const activeMatch = panel?.activeMatch
     if (!activeMatch || matchMatchesSelection(activeMatch, selection)) return
     setPanel((current) => {
@@ -85,14 +83,14 @@ export const useMarkdownEditorFindReplace = ({
   }, [panel])
 
   const open = useCallback(() => {
-    if (disabled || preview) return
+    if (disabled) return
     const snapshot = readSnapshot()
     if (!snapshot) return
     const scope = snapshot.selection.from === snapshot.selection.to
       ? undefined
       : { start: snapshot.selection.from, end: snapshot.selection.to }
     setPanel({ ...makeSnapshot(snapshot.documentValue, snapshot.selection, scope), activeMatch: null, stale: false })
-  }, [disabled, preview, readSnapshot])
+  }, [disabled, readSnapshot])
 
   const updateQuery = useCallback((value: string) => {
     setQuery(value)
@@ -107,11 +105,10 @@ export const useMarkdownEditorFindReplace = ({
   const isCurrentPanel = useCallback(
     (current: FindPanelSession, snapshot: EditorSnapshot | null) =>
       !disabled &&
-      !preview &&
       !current.stale &&
       current.documentValue === draftValue &&
       Boolean(snapshot && snapshot.documentValue === current.documentValue),
-    [disabled, draftValue, preview]
+    [disabled, draftValue]
   )
 
   const move = useCallback(
@@ -120,7 +117,7 @@ export const useMarkdownEditorFindReplace = ({
       const snapshot = readSnapshot()
       if (!isCurrentPanel(panel, snapshot) || !snapshot) return
       const activeMatch = panel.activeMatch
-      const anchor: TextareaSelection =
+      const anchor: EditorSelection =
         activeMatch && matchMatchesSelection(activeMatch, snapshot.selection)
           ? { from: activeMatch.start, to: activeMatch.end }
           : snapshot.selection
