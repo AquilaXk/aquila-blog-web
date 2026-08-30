@@ -301,6 +301,30 @@ export const useEditorStudioPersistence = ({
     ],
   )
 
+  const buildModifyPostRequestBody = useCallback(
+    (content: string) => ({
+      title: postTitle,
+      content: composeEditorContent(content, postTags, {
+        category: postCategory,
+        thumbnail: effectiveThumbnailUrl,
+      }),
+      ...toModifySummaryWriteFields(summaryIntent),
+      ...toFlags(postVisibility),
+      version: postVersion,
+    }),
+    [
+      composeEditorContent,
+      effectiveThumbnailUrl,
+      postCategory,
+      postTags,
+      postTitle,
+      postVersion,
+      postVisibility,
+      summaryIntent,
+      toFlags,
+    ],
+  )
+
   const handleWritePost = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode === "edit" || postId.trim()) {
@@ -505,16 +529,7 @@ export const useEditorStudioPersistence = ({
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          title: postTitle,
-          content: composeEditorContent(currentPostContent, postTags, {
-            category: postCategory,
-            thumbnail: effectiveThumbnailUrl,
-          }),
-          ...toModifySummaryWriteFields(summaryIntent),
-          ...toFlags(postVisibility),
-          version: postVersion,
-        }),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
       })
 
       const canonicalSummary = applyCanonicalWriteResponse(response)
@@ -553,6 +568,7 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
@@ -627,16 +643,7 @@ export const useEditorStudioPersistence = ({
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          title: postTitle,
-          content: composeEditorContent(currentPostContent, postTags, {
-            category: postCategory,
-            thumbnail: effectiveThumbnailUrl,
-          }),
-          ...toModifySummaryWriteFields(summaryIntent),
-          ...toFlags(postVisibility),
-          version: postVersion,
-        }),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
       })
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
@@ -674,6 +681,7 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse,
     buildEditorStateFingerprint,
+    buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload,
     composeEditorContent,
     dedupeStrings,
