@@ -31,7 +31,7 @@ test("live spec pins the same-origin image preflight and editor save cleanup", (
   assert.match(liveSpec, /toHaveURL\(new RegExp\(`\/admin\/editor\/\$\{postId\}/)
   assert.match(
     liveSpec,
-    /expect\(titleInput\)\.toHaveValue\(canaryTitle\)[\s\S]*?expect\(editorContent\)\.toHaveValue\(canarySeedContent\)[\s\S]*?Visibility"\)\)\.toHaveValue\("PRIVATE"\)[\s\S]*?titleInput\.fill\(savedTitle\)/
+    /expect\(titleInput\)\.toHaveValue\(canaryTitle\)[\s\S]*?editorContent\.press\(process\.platform === "darwin" \? "Meta\+A" : "Control\+A"\)[\s\S]*?window\.getSelection\(\)\?\.toString\(\) \?\? ""\)[\s\S]*?toBe\(canarySeedContent\)[\s\S]*?Visibility"\)\)\.toHaveValue\("PRIVATE"\)[\s\S]*?titleInput\.fill\(savedTitle\)/
   )
   assert.match(liveSpec, /publishDialog = page\.getByRole\("dialog", \{ name: "수정 설정" \}\)/)
   assert.match(liveSpec, /publishDialog\.getByRole\("button", \{ name: "변경 반영", exact: true \}\)\.click\(\)/)

@@ -326,6 +326,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
       ],
     })
     const view = new EditorView({ state, parent: host })
+    view.scrollDOM.tabIndex = 0
     viewRef.current = view
     const selection = view.state.selection.main
     onSelectionChangeRef.current({ from: selection.from, to: selection.to })
