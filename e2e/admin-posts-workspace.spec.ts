@@ -92,7 +92,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(editorSurfaceSource).not.toContain("링크 복사")
   })
 
-  test("V4 markdown editor는 code title snippet과 모바일 split preview를 유지한다", () => {
+  test("V4 markdown editor는 code title snippet과 단일 live surface를 유지한다", () => {
     const source = readFileSync(path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.tsx"), "utf8")
     const styleSource = readFileSync(
       path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.styles.ts"),
@@ -116,6 +116,7 @@ test.describe("admin posts workspace link contract", () => {
       path.resolve(__dirname, "../src/routes/Admin/EditorStudioWorkspaceControllerRootView.tsx"),
       "utf8"
     )
+    const writerHostCalls = controllerSource.match(/<WriterEditorHost[\s\S]*?\/>/g) ?? []
     const editorRootStyle = editorPartsSource.match(/export const EditorStudioRoot[\s\S]*?`;/)?.[0] ?? ""
     const editorFrameStyle = editorPartsSource.match(/export const EditorStudioFrame[\s\S]*?`;/)?.[0] ?? ""
     const editorWritingColumnStyle =
@@ -134,14 +135,10 @@ test.describe("admin posts workspace link contract", () => {
       editorPartsSource.match(/export const EditorInspectorTagInputRow[\s\S]*?`;/)?.[0] ?? ""
     const inspectorFullWidthActionStyle =
       editorPartsSource.match(/export const EditorInspectorFullWidthAction[\s\S]*?`;/)?.[0] ?? ""
-    const markdownEditorRootStyle = styleSource.match(/const EditorRoot = styled\.section`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownEditorToolbarStyle = styleSource.match(/const EditorToolbar = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownToolbarGroupStyle = styleSource.match(/const ToolbarGroup = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownEditorBodyStyle = styleSource.match(/const EditorBody = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownWritePaneStyle = styleSource.match(/const WritePane = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownTextareaStyle = styleSource.match(/const MarkdownTextarea = styled\.textarea`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownPreviewPaneStyle = styleSource.match(/const PreviewPane = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const markdownPreviewArticleStyle = styleSource.match(/const PreviewArticle = styled\.article`[\s\S]*?\n`/)?.[0] ?? ""
+    const markdownEditorRootStyle = styleSource.match(/export const EditorRoot = styled\.section`[\s\S]*?\n`/)?.[0] ?? ""
+    const markdownEditorToolbarStyle = styleSource.match(/export const EditorToolbar = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
+    const markdownToolbarGroupStyle = styleSource.match(/export const ToolbarGroup = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
+    const liveEditorBodyStyle = styleSource.match(/export const LiveEditorBody = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
 
     expect(editorNewPageSource).toContain("getEditorStudioPageProps")
     expect(editorPostPageSource).toContain("getEditorStudioPageProps")
@@ -154,20 +151,18 @@ test.describe("admin posts workspace link contract", () => {
     expect(source).toContain('<ToolbarUploadButton title="이미지" aria-label="이미지" aria-disabled={disabled || !onUploadImage}>')
     expect(source).toContain('<ToolbarUploadButton title="파일" aria-label="파일" aria-disabled={disabled || !onUploadFile}>')
     expect(source).toContain("onUploadFile")
-    expect(source).toContain("previewTitle?: string")
-    expect(source).toContain("previewSummary?: string")
-    expect(source).toContain("<PreviewHeader>")
-    expect(source).toContain("{previewTitle ? <h1>{previewTitle}</h1> : null}")
-    expect(source).toContain("{previewSummary ? <p>{previewSummary}</p> : null}")
+    expect(source).toContain("<MarkdownEditorLiveSurface")
+    expect(source).not.toContain("previewTitle?: string")
+    expect(source).not.toContain("previewSummary?: string")
+    expect(source).not.toContain("MarkdownRenderer")
+    expect(source).not.toContain("markdown-editor-preview-pane")
     expect(source).not.toContain("<h1>캐시가 빨라질수록")
-    expect(styleSource).toContain("padding: 48px 44px 110px;")
     expect(styleSource).toContain("@media (max-width: 820px)")
-    expect(styleSource).toContain("@media (max-width: 1100px)")
     expect(styleSource).not.toContain("@media (max-width: 980px)")
-    expect(styleSource).toContain('&[data-mode="split"] [data-pane="preview"]')
-    expect(source).toContain("ref={previewScrollRef}")
-    expect(source).toContain("onScroll={handlePreviewScroll}")
-    expect(source).toContain("onWheel={handlePreviewWheel}")
+    expect(styleSource).not.toContain('[data-mode="split"]')
+    expect(source).not.toContain("previewScrollRef")
+    expect(source).not.toContain("handlePreviewScroll")
+    expect(source).not.toContain("handlePreviewWheel")
     expect(markdownEditorRootStyle).toContain("box-sizing: border-box;")
     expect(markdownEditorRootStyle).toContain("width: 100%;")
     expect(markdownEditorRootStyle).toContain("max-width: 100%;")
@@ -179,35 +174,22 @@ test.describe("admin posts workspace link contract", () => {
     expect(markdownToolbarGroupStyle).toContain("min-width: 0;")
     expect(markdownToolbarGroupStyle).toContain("max-width: 100%;")
     expect(markdownToolbarGroupStyle).toContain("overflow-x: auto;")
-    expect(markdownEditorBodyStyle).toContain("min-height: 0;")
-    expect(markdownEditorBodyStyle).toContain("min-width: 0;")
-    expect(markdownEditorBodyStyle).toContain("max-width: 100%;")
-    expect(markdownEditorBodyStyle).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);")
-    expect(markdownEditorBodyStyle).toContain("theme.publicDesign.readableSurface")
-    expect(markdownEditorBodyStyle).toContain('max-width: 820px;')
-    expect(markdownEditorBodyStyle).toContain("height: 46vh;")
-    expect(markdownEditorBodyStyle).toContain("border-right: 0;")
-    expect(markdownEditorBodyStyle).toContain("border-bottom: 1px solid")
-    expect(markdownWritePaneStyle).toContain("min-height: 0;")
-    expect(markdownWritePaneStyle).toContain("overflow: auto;")
-    expect(markdownTextareaStyle).toContain("height: 100%;")
-    expect(markdownTextareaStyle).toContain("min-height: 640px;")
-    expect(markdownTextareaStyle).toContain("padding: 30px 32px;")
-    expect(markdownTextareaStyle).toContain("resize: none;")
-    expect(markdownPreviewPaneStyle).toContain("min-height: 0;")
-    expect(markdownPreviewPaneStyle).toContain("overflow-y: auto;")
-    expect(markdownPreviewPaneStyle).toContain("overscroll-behavior: contain;")
-    expect(markdownPreviewArticleStyle).toContain("max-width: 760px;")
-    expect(markdownPreviewArticleStyle).toContain("margin: 0 auto;")
-    expect(controllerSource).toContain("previewTitle={postTitle}")
-    expect(controllerSource).toContain("previewSummary={resolvedPreviewSummary}")
+    expect(liveEditorBodyStyle).toContain("min-height: 0;")
+    expect(liveEditorBodyStyle).toContain("min-width: 0;")
+    expect(liveEditorBodyStyle).toContain("max-width: 100%;")
+    expect(liveEditorBodyStyle).toContain("background: #0f1728;")
+    expect(liveEditorBodyStyle).toContain("min-height: 640px;")
+    expect(liveEditorBodyStyle).toContain("overscroll-behavior: contain;")
+    expect(liveEditorBodyStyle).toContain(".cm-editor.cm-focused")
+    expect(writerHostCalls).toHaveLength(2)
+    expect(writerHostCalls.every((call) => !call.includes("previewTitle") && !call.includes("previewSummary"))).toBe(true)
     expect(controllerSource).not.toContain("캐시가 빨라질수록")
     expect(controllerSource).not.toContain("ETag, Redis, CDN")
     expect(controllerSource).toContain("postTags={postTags}")
     expect(controllerSource).toContain("postTitle={postTitle}")
     expect(controllerSource).toContain("postSummary={postSummary}")
     expect(controllerSource).toContain("postVisibility={postVisibility}")
-    expect(controllerSource).toContain("onPostSummaryChange={setPostSummary}")
+    expect(controllerSource).toContain("onPostSummaryChange={handlePostSummaryChange}")
     expect(controllerSource).toContain("onPostVisibilityChange={setPostVisibility}")
     expect(controllerSource).not.toContain("handleRecommend")
     expect(controllerSource).not.toContain('loadingKey === "recommend')
@@ -225,7 +207,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(guideSource).not.toContain("isRecommend")
     expect(guideSource).toContain("placeholder=\"태그 추가\"")
     expect(guideSource).toContain("<strong>{postTitle.trim() || \"제목을 입력하세요\"}</strong>")
-    expect(guideSource).toContain("<span>{primaryTag} · {readTimeText}</span>")
+    expect(guideSource).toContain("{primaryTag} · {readTimeText} · {documentInsights.wordCount}단어")
     expect(guideSource).not.toContain("캐시가 빨라질수록 더 중요해지는 무효화 전략")
     expect(guideSource).not.toContain("ETag, Redis, CDN surrogate key")
     expect(guideSource).not.toContain("2026.06.19")

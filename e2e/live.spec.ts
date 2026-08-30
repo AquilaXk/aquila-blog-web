@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page, type Response, type Route } from "@playwright/test"
+import { expect, test, type Page, type Response, type Route } from "@playwright/test"
 import {
   adminEmail,
   adminLegacyLoginId,
@@ -174,71 +174,29 @@ type LiveWriteResponse = {
 
 const appendMarkdownToEditor = async (page: Page, markdown: string) => {
   const editorRoot = page.getByTestId("markdown-editor")
-  const writePane = page.getByTestId("markdown-editor-write-pane")
-  const previewPane = page.getByTestId("markdown-editor-preview-pane")
-  const editorContent = writePane.locator("textarea").first()
+  const editorContent = page.getByTestId("markdown-editor-content")
 
   await expect(editorRoot).toBeVisible()
-  await expect(writePane).toBeVisible()
-  await expect(previewPane).toBeVisible()
   await expect(editorContent).toBeVisible()
+  await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
+  await expect(page.getByTestId("markdown-editor-write-pane")).toHaveCount(0)
+  await expect(page.getByTestId("markdown-editor-preview-pane")).toHaveCount(0)
 
   await editorContent.click()
   await page.keyboard.press(process.platform === "darwin" ? "Meta+End" : "Control+End")
   await page.keyboard.insertText(`\n\n${markdown}`)
 
-  await expect(editorContent).toHaveValue(/라이브 E2E 편집 확인/)
-  await expect(previewPane.locator("pre").first()).toContainText("const liveHoverWheel = true")
-  await expect(previewPane.locator("table").first()).toContainText("aa")
-
-  return previewPane
-}
-
-const readDocumentScrollTop = (page: Page) =>
-  page.evaluate(() => document.scrollingElement?.scrollTop ?? window.scrollY)
-
-const expectHoverWheelChainsToPageScroll = async (page: Page, target: Locator, label: string) => {
-  await page.evaluate(() => {
-    if (document.querySelector("[data-testid='live-hover-wheel-scroll-spacer']")) return
-    const spacer = document.createElement("div")
-    spacer.setAttribute("data-testid", "live-hover-wheel-scroll-spacer")
-    spacer.style.height = "2400px"
-    document.body.appendChild(spacer)
-  })
-
-  await target.scrollIntoViewIfNeeded()
-  const box = await target.boundingBox()
-  if (!box) {
-    throw new Error(`${label} metrics are missing before wheel`)
-  }
-
-  const overflowContract = await target.evaluate((element) => {
-    const style = window.getComputedStyle(element as HTMLElement)
-    return {
-      overscrollY: (style as CSSStyleDeclaration & { overscrollBehaviorY?: string }).overscrollBehaviorY || "",
-      touchAction: style.touchAction,
-    }
-  })
-  expect(overflowContract.overscrollY || "auto").toBe("auto")
-  expect(overflowContract.touchAction === "auto" || overflowContract.touchAction.includes("pan-y")).toBe(true)
-
-  await page.mouse.move(box.x + Math.min(box.width / 2, 120), box.y + Math.min(box.height / 2, 40))
-
-  const beforeScrollTop = await readDocumentScrollTop(page)
-  await page.mouse.wheel(0, 420)
-
-  await expect.poll(() => readDocumentScrollTop(page)).toBeGreaterThan(beforeScrollTop + 80)
-}
-
-const expectLiveEditorHoverWheelScrollChain = async (page: Page, previewPane: Locator) => {
-  await expectHoverWheelChainsToPageScroll(
-    page,
-    previewPane.locator("pre").first(),
-    "live code block"
+  expect(await page.locator(".cm-live-fenced-code").count()).toBeGreaterThan(0)
+  await expect(page.getByTestId("markdown-editor-live-surface").locator(".cm-scroller")).toHaveCSS(
+    "overscroll-behavior-y",
+    "contain"
   )
-  await expectHoverWheelChainsToPageScroll(page, previewPane.locator("table").first(), "live table")
+  await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+  const selectedMarkdown = await editorContent.evaluate(() => window.getSelection()?.toString() ?? "")
+  expect(selectedMarkdown).toContain("라이브 E2E 편집 확인")
+  expect(selectedMarkdown).toContain("const liveHoverWheel = true")
+  expect(selectedMarkdown).toContain("aa")
 }
-
 
 const loginWithRetry = async (
   page: Page,
@@ -681,14 +639,15 @@ test.describe("live production e2e", () => {
 
       const titleInput = page.getByPlaceholder("제목을 입력하세요").first()
       await expect(titleInput).toBeVisible()
-      const editorContent = page.getByTestId("markdown-editor-write-pane").locator("textarea").first()
+      const editorContent = page.getByTestId("markdown-editor-content")
       await expect(titleInput).toHaveValue(canaryTitle)
-      await expect(editorContent).toHaveValue(canarySeedContent)
+      await editorContent.click()
+      await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+      await expect.poll(() => editorContent.evaluate(() => window.getSelection()?.toString() ?? "")).toBe(canarySeedContent)
       await expect(page.getByLabel("Visibility")).toHaveValue("PRIVATE")
 
       await titleInput.fill(savedTitle)
-      const previewPane = await appendMarkdownToEditor(page, liveEditorSmokeMarkdown)
-      await expectLiveEditorHoverWheelScrollChain(page, previewPane)
+      await appendMarkdownToEditor(page, liveEditorSmokeMarkdown)
 
       await page.getByRole("button", { name: "발행 설정", exact: true }).click()
       const publishDialog = page.getByRole("dialog", { name: "수정 설정" })
@@ -710,12 +669,14 @@ test.describe("live production e2e", () => {
       await page.goto(`/admin/editor/${postId}`)
       await expect(page).toHaveURL(new RegExp(`/admin/editor/${postId}(\\?|$)`))
       await expect(titleInput).toHaveValue(savedTitle)
-      await expect(editorContent).toHaveValue(new RegExp(canarySeedContent))
-      await expect(editorContent).toHaveValue(/라이브 E2E 편집 확인/)
+      await editorContent.click()
+      await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+      const reloadedMarkdown = await editorContent.evaluate(() => window.getSelection()?.toString() ?? "")
+      expect(reloadedMarkdown).toContain(canarySeedContent)
+      expect(reloadedMarkdown).toContain("라이브 E2E 편집 확인")
+      expect(reloadedMarkdown).toContain("const liveHoverWheel = true")
+      expect(reloadedMarkdown).toContain("aa")
       await expect(page.getByLabel("Visibility")).toHaveValue("PRIVATE")
-      const reloadedPreview = page.getByTestId("markdown-editor-preview-pane")
-      await expect(reloadedPreview.locator("pre").first()).toContainText("const liveHoverWheel = true")
-      await expect(reloadedPreview.locator("table").first()).toContainText("aa")
     } finally {
       if (isPostWriteRouteActive && postWriteRoute) await page.unroute(postWriteUrl, postWriteRoute)
       if (postId !== null) await cleanupLiveEditorPost(page, postId)

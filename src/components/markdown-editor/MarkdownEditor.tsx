@@ -1,21 +1,9 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react"
-import MarkdownRenderer from "src/libs/markdown/MarkdownRenderer"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
   planToggleListCommand,
   type MarkdownEditorListCommand,
 } from "./markdownEditorListCommandsModel"
-import {
-  MarkdownEditorModeTabs,
-  resolveModeForBodyFocus,
-  resolveModeForToolbarInsert,
-  type MarkdownEditorMode,
-} from "./markdownEditorModeTabs"
-import {
-  DEFAULT_MARKDOWN_EDITOR_MODE,
-  readMarkdownEditorModePreference,
-  writeMarkdownEditorModePreference,
-} from "./markdownEditorModePreference"
 import {
   EditorRoot,
   EditorToolbar,
@@ -24,16 +12,9 @@ import {
   ToolbarSelect,
   ToolbarUploadButton,
   ToolbarError,
-  EditorBody,
-  WritePane,
-  WriteEditorFrame,
-  MarkdownTextarea,
-  PreviewPane,
-  PreviewArticle,
-  PreviewHeader,
+  LiveEditorBody,
 } from "./MarkdownEditor.styles"
 import {
-  applyPlannedTextMutation,
   applyPlannedTextMutationToValue,
   planToggleWrapSelection,
   planWrapSelection,
@@ -53,16 +34,6 @@ import {
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
-import { useMarkdownEditorOperationHistory } from "./useMarkdownEditorOperationHistory"
-import {
-  emptyPendingToolbarInsertQueue,
-  queuePendingToolbarInsert,
-  resolvePendingToolbarInsertAfterFlushSkip,
-  resolvePendingToolbarInsertWhenModeChanges,
-  shouldSchedulePendingToolbarInsertFlush,
-  type PendingToolbarInsert,
-  type PendingToolbarInsertQueue,
-} from "./markdownEditorPendingToolbarInsert"
 import {
   type MarkdownFileUploadResult,
   type MarkdownImageUploadResult,
@@ -74,8 +45,11 @@ import {
   toolbarMarkdownSnippets,
 } from "./markdownEditorToolbarModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
-import { useMarkdownEditorScrollSync } from "./useMarkdownEditorScrollSync"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
+import {
+  MarkdownEditorLiveSurface,
+  type MarkdownEditorLiveSurfaceHandle,
+} from "./MarkdownEditorLiveSurface"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -90,8 +64,6 @@ export type MarkdownEditorFocusRequest = (selection?: MarkdownEditorFocusSelecti
 
 type MarkdownEditorProps = {
   value: string
-  previewTitle?: string
-  previewSummary?: string
   disabled?: boolean
   disableMermaid?: boolean
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
@@ -112,8 +84,6 @@ const TEXTAREA_KEYBOARD_HELP =
 
 export const MarkdownEditor = ({
   value,
-  previewTitle = "",
-  previewSummary = "",
   disabled = false,
   disableMermaid = false,
   onChange,
@@ -124,31 +94,18 @@ export const MarkdownEditor = ({
   onUploadImage,
   onUploadFile,
 }: MarkdownEditorProps) => {
-  const [mode, setMode] = useState<MarkdownEditorMode>(DEFAULT_MARKDOWN_EDITOR_MODE)
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
   const [tableRows, setTableRows] = useState(2)
   const [tableColumns, setTableColumns] = useState(2)
   const [activeTableSelection, setActiveTableSelection] = useState<TextareaSelection | null>(null)
-  const editorDomId = useId()
-  const writePanelId = `${editorDomId}-write-panel`
-  const previewPanelId = `${editorDomId}-preview-panel`
-  const writeTabId = `${editorDomId}-write-tab`
-  const previewTabId = `${editorDomId}-preview-tab`
-  const splitTabId = `${editorDomId}-split-tab`
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const previewScrollRef = useRef<HTMLDivElement | null>(null)
+  const liveSurfaceRef = useRef<MarkdownEditorLiveSurfaceHandle | null>(null)
   const valueRef = useRef(value)
   const selectionRef = useRef<TextareaSelection>({ from: 0, to: 0 })
   const documentGenerationRef = useRef(0)
   const uploadInFlightCountRef = useRef(0)
   const allowNativeTabAfterEscapeRef = useRef(false)
-  const modeRef = useRef<MarkdownEditorMode>(mode)
-  const pendingBodyFocusRef = useRef<TextareaSelection | true | null>(null)
-  const pendingToolbarInsertQueueRef = useRef<PendingToolbarInsertQueue>(emptyPendingToolbarInsertQueue())
   const pendingFindReplaceInvalidationRef = useRef(false)
-  const pendingOperationHistoryInvalidationRef = useRef(false)
-  modeRef.current = mode
 
   const setUploadInFlight = useCallback(
     (delta: number) => {
@@ -159,19 +116,11 @@ export const MarkdownEditor = ({
   )
 
   useEffect(() => {
-    setMode((current) => {
-      const storedMode = readMarkdownEditorModePreference()
-      return current === storedMode ? current : storedMode
-    })
-  }, [])
-
-  useEffect(() => {
     if (value === valueRef.current) return
     valueRef.current = value
     setDraftValue(value)
     setActiveTableSelection(null)
     pendingFindReplaceInvalidationRef.current = true
-    pendingOperationHistoryInvalidationRef.current = true
     // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
@@ -199,167 +148,78 @@ export const MarkdownEditor = ({
     )
   }, [])
 
-  const setTextareaSelection = useCallback((from: number, to = from) => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
+  const setEditorSelection = useCallback((from: number, to = from) => {
     const length = valueRef.current.length
     const nextSelection = {
       from: Math.max(0, Math.min(from, length)),
       to: Math.max(0, Math.min(to, length)),
     }
-    textarea.setSelectionRange(nextSelection.from, nextSelection.to)
     selectionRef.current = nextSelection
     updateActiveTableSelection(valueRef.current, nextSelection)
+    liveSurfaceRef.current?.focus(nextSelection)
   }, [updateActiveTableSelection])
 
   useEffect(() => {
     onFocusRequestReady?.((selection) => {
-      if (disabled) {
-        pendingBodyFocusRef.current = null
-        return
-      }
-      const nextMode = resolveModeForBodyFocus(modeRef.current)
-      if (nextMode !== modeRef.current) {
-        pendingBodyFocusRef.current = selection ?? true
-        setMode(nextMode)
-        return
-      }
-      const textarea = textareaRef.current
-      if (!textarea) {
-        pendingBodyFocusRef.current = selection ?? true
-        return
-      }
-      textarea.focus()
-      if (selection) setTextareaSelection(selection.from, selection.to)
+      if (disabled) return
+      liveSurfaceRef.current?.focus(selection)
     })
     return () => onFocusRequestReady?.(null)
-  }, [disabled, onFocusRequestReady, setTextareaSelection])
-
-  useEffect(() => {
-    const pendingFocus = pendingBodyFocusRef.current
-    if (!pendingFocus || mode === "preview") return
-    if (disabled) {
-      pendingBodyFocusRef.current = null
-      return
-    }
-    const frame = window.requestAnimationFrame(() => {
-      const textarea = textareaRef.current
-      if (!textarea) return
-      pendingBodyFocusRef.current = null
-      textarea.focus()
-      if (pendingFocus !== true) setTextareaSelection(pendingFocus.from, pendingFocus.to)
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [disabled, mode, setTextareaSelection])
+  }, [disabled, onFocusRequestReady])
 
   const applyRawMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
-      const textarea = textareaRef.current
-      if (!textarea || disabled) return false
-      textarea.focus()
-      const nextMarkdown = applyPlannedTextMutation(textarea, plan)
+      const surface = liveSurfaceRef.current
+      if (!surface || disabled) return false
       selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
-      updateActiveTableSelection(nextMarkdown, selectionRef.current)
-      commitMarkdown(nextMarkdown, true, options)
-      const nextFrom = plan.selectionStart
-      const nextTo = plan.selectionEnd
-      window.requestAnimationFrame(() => {
-        const current = textareaRef.current
-        if (!current) return
-        current.focus()
-        current.setSelectionRange(nextFrom, nextTo)
-        selectionRef.current = { from: nextFrom, to: nextTo }
-      })
-      return true
+      if (options?.clearUploadError !== false) setUploadError("")
+      return surface.applyMutation(plan)
     },
-    [commitMarkdown, disabled, updateActiveTableSelection]
+    [disabled]
   )
 
-  const readEditorSnapshot = useCallback(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return null
-    return {
-      documentValue: textarea.value,
-      selection: { from: textarea.selectionStart, to: textarea.selectionEnd },
-    }
-  }, [])
-
-  const {
-    applyRecordedMutation,
-    invalidate: invalidateOperationHistory,
-    handleUndoRedo,
-  } = useMarkdownEditorOperationHistory({
-    readSnapshot: readEditorSnapshot,
-    applyRawMutationPlan,
-  })
+  const readEditorSnapshot = useCallback(() => liveSurfaceRef.current?.readSnapshot() ?? null, [])
 
   const applyMutationPlan = useCallback(
-    (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
-      invalidateOperationHistory()
-      return applyRawMutationPlan(plan, options)
-    },
-    [applyRawMutationPlan, invalidateOperationHistory]
+    (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) =>
+      applyRawMutationPlan(plan, options),
+    [applyRawMutationPlan]
   )
 
   const selectFindReplaceRange = useCallback((from: number, to?: number) => {
-    setTextareaSelection(from, to)
-    textareaRef.current?.focus()
-  }, [setTextareaSelection])
+    setEditorSelection(from, to)
+  }, [setEditorSelection])
 
   const findReplace = useMarkdownEditorFindReplace({
     disabled,
-    preview: mode === "preview",
     draftValue,
     readSnapshot: readEditorSnapshot,
     selectRange: selectFindReplaceRange,
-    applyRecordedMutation,
+    applyRecordedMutation: applyMutationPlan,
   })
   const {
-    closePanel: closeFindReplacePanel,
     invalidate: invalidateFindReplace,
     onSelectionChange: handleFindReplaceSelectionChange,
   } = findReplace
 
   useEffect(() => {
-    if (!pendingFindReplaceInvalidationRef.current && !pendingOperationHistoryInvalidationRef.current) return
+    if (!pendingFindReplaceInvalidationRef.current) return
     pendingFindReplaceInvalidationRef.current = false
-    pendingOperationHistoryInvalidationRef.current = false
-    invalidateOperationHistory()
     invalidateFindReplace(true)
-  }, [invalidateFindReplace, invalidateOperationHistory, value])
-
-  useEffect(() => {
-    if (mode === "preview") closeFindReplacePanel()
-  }, [closeFindReplacePanel, mode])
+  }, [invalidateFindReplace, value])
 
   const rememberTextareaSelection = useCallback(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return selectionRef.current
-
-    selectionRef.current = {
-      from: textarea.selectionStart,
-      to: textarea.selectionEnd,
-    }
+    const snapshot = liveSurfaceRef.current?.readSnapshot()
+    if (snapshot) selectionRef.current = snapshot.selection
     handleFindReplaceSelectionChange(selectionRef.current)
     updateActiveTableSelection(valueRef.current, selectionRef.current)
     return selectionRef.current
   }, [handleFindReplaceSelectionChange, updateActiveTableSelection])
 
-  const { handleWriteScroll, handlePreviewScroll, handlePreviewWheel } = useMarkdownEditorScrollSync({
-    textareaRef,
-    previewScrollRef,
-    previewContent: value,
-    splitActive: mode === "split",
-  })
-
-  const resolveActiveSelection = useCallback(() => {
-    const textarea = textareaRef.current
-    if (textarea && document.activeElement === textarea) {
-      return rememberTextareaSelection()
-    }
-    return selectionRef.current
-  }, [rememberTextareaSelection])
+  const resolveActiveSelection = useCallback(
+    () => liveSurfaceRef.current ? rememberTextareaSelection() : selectionRef.current,
+    [rememberTextareaSelection]
+  )
 
   const applyPlannedMarkdownMutation = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
@@ -376,32 +236,17 @@ export const MarkdownEditor = ({
 
   /**
    * Async upload placeholder swap/remove — update only the verified placeholder range, preserve focus/error state,
-   * and invalidate shared editor history before the asynchronous document change.
+   * and preserve the active selection without moving focus.
    * Must proceed even when the editor UI is temporarily disabled (e.g. loadingKey), so in-flight
    * upload completions can still replace/remove placeholders. New user inserts stay blocked elsewhere.
    */
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
-      invalidateOperationHistory()
-      const textarea = textareaRef.current
-      const wasFocused = Boolean(textarea && !disabled && document.activeElement === textarea)
       const commitOptions = { clearUploadError: false as const }
-      // Prefer setRangeText while interactive; when disabled, commit via value path.
-      if (textarea && !disabled) {
-        const nextMarkdown = applyPlannedTextMutation(textarea, plan)
+      const surface = liveSurfaceRef.current
+      if (surface) {
         selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
-        commitMarkdown(nextMarkdown, wasFocused, commitOptions)
-        if (wasFocused) {
-          const nextFrom = plan.selectionStart
-          const nextTo = plan.selectionEnd
-          window.requestAnimationFrame(() => {
-            const current = textareaRef.current
-            if (!current || document.activeElement !== current) return
-            current.setSelectionRange(nextFrom, nextTo)
-            selectionRef.current = { from: nextFrom, to: nextTo }
-          })
-        }
-        return true
+        return surface.applyMutation(plan, { focus: false, scrollIntoView: false })
       }
 
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
@@ -409,118 +254,12 @@ export const MarkdownEditor = ({
       commitMarkdown(next.value, false, commitOptions)
       return true
     },
-    [commitMarkdown, disabled, invalidateOperationHistory]
+    [commitMarkdown]
   )
-
-  const planPendingToolbarInsert = useCallback(
-    (insert: PendingToolbarInsert): PlannedTextMutation | null => {
-      const { from, to } = resolveActiveSelection()
-
-      if (insert.kind === "block") {
-        return planInsertBlockSnippet(from, to, insert.spec)
-      }
-
-      if (insert.kind === "format") {
-        return planFormatShortcutMutation(valueRef.current, from, to, insert.shortcut)
-      }
-
-      if (insert.kind === "list") {
-        return planToggleListCommand(valueRef.current, from, to, insert.command)
-      }
-
-      return insert.toggle
-        ? planToggleWrapSelection(valueRef.current, from, to, insert.before, insert.after)
-        : planWrapSelection(valueRef.current, from, to, insert.before, insert.after)
-    },
-    [resolveActiveSelection]
-  )
-
-  const clearPendingToolbarInsert = useCallback(() => {
-    pendingToolbarInsertQueueRef.current = emptyPendingToolbarInsertQueue()
-  }, [])
-
-  const flushPendingToolbarInsert = useCallback(() => {
-    const queue = pendingToolbarInsertQueueRef.current
-    if (!queue.pending) return
-
-    if (disabled) {
-      pendingToolbarInsertQueueRef.current = resolvePendingToolbarInsertAfterFlushSkip(queue, "disabled")
-      return
-    }
-
-    if (modeRef.current === "preview") {
-      pendingToolbarInsertQueueRef.current = resolvePendingToolbarInsertAfterFlushSkip(queue, "preview")
-      return
-    }
-
-    const textarea = textareaRef.current
-    if (!textarea) {
-      const nextQueue = resolvePendingToolbarInsertAfterFlushSkip(queue, "missing-textarea")
-      pendingToolbarInsertQueueRef.current = nextQueue
-      if (shouldSchedulePendingToolbarInsertFlush(nextQueue)) {
-        window.requestAnimationFrame(() => {
-          flushPendingToolbarInsert()
-        })
-      }
-      return
-    }
-
-    const pending = queue.pending
-    clearPendingToolbarInsert()
-    const plan = planPendingToolbarInsert(pending)
-    if (pending.kind === "list") {
-      setTextareaSelection(selectionRef.current.from, selectionRef.current.to)
-      if (!plan) return
-      applyRecordedMutation(plan)
-      return
-    }
-    if (!plan) return
-    applyPlannedMarkdownMutation(plan)
-  }, [
-    applyPlannedMarkdownMutation,
-    applyRecordedMutation,
-    clearPendingToolbarInsert,
-    disabled,
-    planPendingToolbarInsert,
-    setTextareaSelection,
-  ])
-
-  const queueToolbarInsertForPreviewMode = useCallback((insert: PendingToolbarInsert) => {
-      pendingToolbarInsertQueueRef.current = queuePendingToolbarInsert(insert)
-      setMode(resolveModeForToolbarInsert(modeRef.current))
-  }, [])
-
-  useEffect(() => {
-    pendingToolbarInsertQueueRef.current = resolvePendingToolbarInsertWhenModeChanges(
-      pendingToolbarInsertQueueRef.current,
-      mode
-    )
-  }, [mode])
-
-  useEffect(() => {
-    if (!disabled) return
-    pendingToolbarInsertQueueRef.current = resolvePendingToolbarInsertAfterFlushSkip(
-      pendingToolbarInsertQueueRef.current,
-      "disabled"
-    )
-  }, [disabled])
-
-  useEffect(() => {
-    if (disabled || mode === "preview") return
-    if (!shouldSchedulePendingToolbarInsertFlush(pendingToolbarInsertQueueRef.current)) return
-
-    const frame = window.requestAnimationFrame(() => {
-      flushPendingToolbarInsert()
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-    }
-  }, [disabled, flushPendingToolbarInsert, mode])
 
   const insertMarkdownAtEditorSelection = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
-      const textarea = textareaRef.current
-      if (!textarea || disabled) return false
+      if (!liveSurfaceRef.current || disabled) return false
 
       const { from: selectionStart, to: selectionEnd } = resolveActiveSelection()
       const plan = options?.toggle
@@ -532,25 +271,13 @@ export const MarkdownEditor = ({
     [applyMutationPlan, disabled, resolveActiveSelection]
   )
 
-  const handleModeChange = useCallback((nextMode: MarkdownEditorMode) => {
-    rememberTextareaSelection()
-    setMode(nextMode)
-    writeMarkdownEditorModePreference(nextMode)
-  }, [rememberTextareaSelection])
-
   const applyBlockSnippet = useCallback(
     (spec: BlockSnippetSpec) => {
       if (disabled) return
-
-      if (modeRef.current === "preview") {
-        queueToolbarInsertForPreviewMode({ kind: "block", spec })
-        return
-      }
-
       const { from, to } = resolveActiveSelection()
       applyPlannedMarkdownMutation(planInsertBlockSnippet(from, to, spec))
     },
-    [applyPlannedMarkdownMutation, disabled, queueToolbarInsertForPreviewMode, resolveActiveSelection]
+    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
   const insertTable = useCallback(() => {
@@ -562,7 +289,7 @@ export const MarkdownEditor = ({
 
   const applyTableEdit = useCallback(
     (edit: MarkdownEditorTableEdit) => {
-      if (disabled || modeRef.current === "preview") return
+      if (disabled) return
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
       if (plan) applyPlannedMarkdownMutation(plan)
@@ -572,7 +299,6 @@ export const MarkdownEditor = ({
 
   const isTableEditDisabled = (edit: MarkdownEditorTableEdit) =>
     disabled ||
-    mode === "preview" ||
     !activeTableSelection ||
     !planMarkdownEditorTableEdit(
       draftValue,
@@ -583,7 +309,6 @@ export const MarkdownEditor = ({
 
   const commandContext = {
     disabled,
-    mode,
     selectionStart: selectionRef.current.from,
     selectionEnd: selectionRef.current.to,
     isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
@@ -608,12 +333,6 @@ export const MarkdownEditor = ({
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
       if (disabled) return
-
-      if (modeRef.current === "preview") {
-        queueToolbarInsertForPreviewMode({ kind: "wrap", before, after, toggle: options?.toggle })
-        return
-      }
-
       if (insertMarkdownAtEditorSelection(before, after, options)) return
 
       const { from, to } = resolveActiveSelection()
@@ -626,7 +345,6 @@ export const MarkdownEditor = ({
       applyPlannedMarkdownMutation,
       disabled,
       insertMarkdownAtEditorSelection,
-      queueToolbarInsertForPreviewMode,
       resolveActiveSelection,
     ]
   )
@@ -634,41 +352,28 @@ export const MarkdownEditor = ({
   const applyListCommand = useCallback(
     (command: MarkdownEditorListCommand) => {
       if (disabled) return
-
-      if (modeRef.current === "preview") {
-        queueToolbarInsertForPreviewMode({ kind: "list", command })
-        return
-      }
-
       const { from, to } = resolveActiveSelection()
       const plan = planToggleListCommand(valueRef.current, from, to, command)
-      if (plan) applyRecordedMutation(plan)
+      if (plan) applyMutationPlan(plan)
     },
-    [applyRecordedMutation, disabled, queueToolbarInsertForPreviewMode, resolveActiveSelection]
+    [applyMutationPlan, disabled, resolveActiveSelection]
   )
 
   const applyFormatShortcutOrAppend = useCallback(
     (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {
       if (disabled) return
-
-      if (modeRef.current === "preview") {
-        queueToolbarInsertForPreviewMode({ kind: "format", shortcut })
-        return
-      }
-
       const { from, to } = resolveActiveSelection()
       applyPlannedMarkdownMutation(planFormatShortcutMutation(valueRef.current, from, to, shortcut))
     },
-    [applyPlannedMarkdownMutation, disabled, queueToolbarInsertForPreviewMode, resolveActiveSelection]
+    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
   const insertUploadedMarkdown = useCallback(
     (markdown: string) => {
       if (insertMarkdownAtEditorSelection(markdown)) return
-      invalidateOperationHistory()
       commitMarkdown(`${valueRef.current}${markdown}`, true)
     },
-    [commitMarkdown, insertMarkdownAtEditorSelection, invalidateOperationHistory]
+    [commitMarkdown, insertMarkdownAtEditorSelection]
   )
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
@@ -680,7 +385,7 @@ export const MarkdownEditor = ({
       onUploadImage,
       onUploadFile,
       applyPlannedMarkdownMutation,
-      applyRecordedMarkdownMutation: applyRecordedMutation,
+      applyRecordedMarkdownMutation: applyMutationPlan,
       applyBackgroundMarkdownMutation,
       resolveActiveSelection,
       setUploadInFlight,
@@ -694,26 +399,26 @@ export const MarkdownEditor = ({
     allowNativeTabAfterEscapeRef,
     rememberTextareaSelection,
     applyMutationPlan,
-    applyRecordedMutation,
-    setTextareaSelection,
+    applyRecordedMutation: applyMutationPlan,
+    setTextareaSelection: setEditorSelection,
     onRequestSave,
   })
 
-  const handleFindReplaceTextareaKeyDown = useCallback(
-    (event: Parameters<typeof handleTextareaKeyDown>[0]) => {
-      const result = handleUndoRedo(event)
-      if (result === "applied") {
-        event.preventDefault()
-        closeFindReplacePanel()
-        return
-      }
-      if (result === "consume") {
-        event.preventDefault()
-        return
-      }
-      handleTextareaKeyDown(event)
+  const handleLiveSelectionChange = useCallback(
+    (selection: TextareaSelection) => {
+      selectionRef.current = selection
+      handleFindReplaceSelectionChange(selection)
+      updateActiveTableSelection(valueRef.current, selection)
     },
-    [closeFindReplacePanel, handleTextareaKeyDown, handleUndoRedo]
+    [handleFindReplaceSelectionChange, updateActiveTableSelection]
+  )
+
+  const handleLiveChange = useCallback(
+    (nextMarkdown: string, editorFocused: boolean) => {
+      invalidateFindReplace()
+      commitMarkdown(nextMarkdown, editorFocused)
+    },
+    [commitMarkdown, invalidateFindReplace]
   )
 
   return (
@@ -890,25 +595,16 @@ export const MarkdownEditor = ({
             type="button"
             aria-label="찾기 및 바꾸기"
             title="찾기 및 바꾸기"
-            disabled={disabled || mode === "preview"}
+            disabled={disabled}
             onMouseDown={(event) => event.preventDefault()}
             onClick={findReplace.open}
           >
             찾기
           </ToolbarButton>
         </ToolbarGroup>
-        <MarkdownEditorModeTabs
-          mode={mode}
-          onModeChange={handleModeChange}
-          writePanelId={writePanelId}
-          previewPanelId={previewPanelId}
-          writeTabId={writeTabId}
-          previewTabId={previewTabId}
-          splitTabId={splitTabId}
-        />
       </EditorToolbar>
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
-      {findReplace.panel && mode !== "preview" ? (
+      {findReplace.panel ? (
         <MarkdownEditorFindReplace
           caseSensitive={findReplace.caseSensitive}
           currentMatch={findReplace.currentMatch}
@@ -928,73 +624,20 @@ export const MarkdownEditor = ({
           query={findReplace.query}
         />
       ) : null}
-      <EditorBody data-mode={mode}>
-        {mode !== "preview" ? (
-          <WritePane
-            id={writePanelId}
-            role="tabpanel"
-            aria-labelledby={mode === "split" ? `${writeTabId} ${splitTabId}` : writeTabId}
-            data-pane="write"
-            data-testid="markdown-editor-write-pane"
-          >
-            <WriteEditorFrame data-testid="markdown-textarea-frame">
-              <MarkdownTextarea
-                ref={textareaRef}
-                aria-label="Markdown 본문"
-                aria-description={TEXTAREA_KEYBOARD_HELP}
-                title={TEXTAREA_KEYBOARD_HELP}
-                spellCheck={false}
-                disabled={disabled}
-                value={draftValue}
-                onChange={(event) => {
-                  selectionRef.current = {
-                    from: event.currentTarget.selectionStart,
-                    to: event.currentTarget.selectionEnd,
-                  }
-                  updateActiveTableSelection(event.currentTarget.value, selectionRef.current)
-                  invalidateOperationHistory()
-                  invalidateFindReplace()
-                  commitMarkdown(event.currentTarget.value, true)
-                }}
-                onFocus={rememberTextareaSelection}
-                onKeyDown={handleFindReplaceTextareaKeyDown}
-                onKeyUp={rememberTextareaSelection}
-                onMouseUp={rememberTextareaSelection}
-                onSelect={rememberTextareaSelection}
-                onPaste={handlePaste}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onScroll={handleWriteScroll}
-              />
-            </WriteEditorFrame>
-          </WritePane>
-        ) : null}
-        {mode !== "write" ? (
-          <PreviewPane
-            id={previewPanelId}
-            role="tabpanel"
-            aria-labelledby={mode === "split" ? `${previewTabId} ${splitTabId}` : previewTabId}
-            ref={previewScrollRef}
-            data-pane="preview"
-            data-testid="markdown-editor-preview-pane"
-            aria-label="Markdown 미리보기"
-            tabIndex={0}
-            onScroll={handlePreviewScroll}
-            onWheel={handlePreviewWheel}
-          >
-            <PreviewArticle data-testid="markdown-editor-preview-scroll">
-              {previewTitle || previewSummary ? (
-                <PreviewHeader>
-                  <span>Public preview</span>
-                  {previewTitle ? <h1>{previewTitle}</h1> : null}
-                  {previewSummary ? <p>{previewSummary}</p> : null}
-                </PreviewHeader>
-              ) : null}
-              <MarkdownRenderer content={value} disableMermaid={disableMermaid} />
-            </PreviewArticle>
-          </PreviewPane>
-        ) : null}
-      </EditorBody>
+      <LiveEditorBody aria-disabled={disabled}>
+        <MarkdownEditorLiveSurface
+          ref={liveSurfaceRef}
+          value={draftValue}
+          disabled={disabled}
+          ariaDescription={TEXTAREA_KEYBOARD_HELP}
+          onChange={handleLiveChange}
+          onSelectionChange={handleLiveSelectionChange}
+          onKeyDownCapture={handleTextareaKeyDown}
+          onPasteCapture={handlePaste}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        />
+      </LiveEditorBody>
     </EditorRoot>
   )
 }

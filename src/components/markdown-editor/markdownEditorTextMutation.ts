@@ -6,19 +6,6 @@ export type PlannedTextMutation = {
   selectionEnd: number
 }
 
-/**
- * Programmatic textarea edits through setRangeText with explicit selection restoration.
- * Prefer this over replacing React controlled `value` then restoring selection.
- */
-export const applyPlannedTextMutation = (
-  textarea: HTMLTextAreaElement,
-  plan: PlannedTextMutation
-): string => {
-  textarea.setRangeText(plan.replacement, plan.rangeStart, plan.rangeEnd, "select")
-  textarea.setSelectionRange(plan.selectionStart, plan.selectionEnd)
-  return textarea.value
-}
-
 export const applyPlannedTextMutationToValue = (
   value: string,
   plan: PlannedTextMutation

@@ -43,7 +43,7 @@ const post507ListText = "세션이랑 JWT"
 const markdownCanary = [
   "# Live Markdown editor",
   "",
-  "507 하단 복합 선택 회귀를 Markdown write/preview 경로에서 검증한다.",
+  "507 하단 복합 선택 회귀를 단일 Markdown surface에서 검증한다.",
   "",
   "- 세션이랑 JWT",
   "- [ ] task item",
@@ -325,17 +325,18 @@ const createHiddenEditorPost = async (page: Page, title: string, content: string
 
 const expectMarkdownEditorShell = async (page: Page) => {
   await expect(page.getByTestId("markdown-editor")).toBeVisible()
-  await expect(page.getByTestId("markdown-editor-write-pane")).toBeVisible()
-  await expect(page.getByTestId("markdown-editor-preview-pane")).toBeVisible()
+  await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
+  await expect(page.getByTestId("markdown-editor-content")).toBeVisible()
+  await expect(page.getByTestId("markdown-editor-write-pane")).toHaveCount(0)
+  await expect(page.getByTestId("markdown-editor-preview-pane")).toHaveCount(0)
   await expect(page.locator("[data-testid='keyboard-block-selection-overlay']")).toHaveCount(0)
   await expect(page.locator("[data-testid='block-drag-handle']")).toHaveCount(0)
   await expect(page.locator("[data-table-affordance]")).toHaveCount(0)
 }
 
 const focusMarkdownEditor = async (page: Page) => {
-  const writePane = page.getByTestId("markdown-editor-write-pane")
-  await expect(writePane).toBeVisible()
-  const content = writePane.locator("textarea")
+  const content = page.getByTestId("markdown-editor-content")
+  await expect(content).toBeVisible()
   await content.click()
   await expect(content).toBeFocused()
   return content
@@ -348,15 +349,14 @@ const replaceMarkdown = async (page: Page, markdown: string) => {
 }
 
 const readEditorSelection = async (page: Page) =>
-  page.getByTestId("markdown-editor-write-pane").locator("textarea").evaluate((textarea) => {
-    const element = textarea as HTMLTextAreaElement
-    return element.value.slice(element.selectionStart, element.selectionEnd).replace(/\s+/g, " ").trim()
-  })
+  page.getByTestId("markdown-editor-content").evaluate(() =>
+    (window.getSelection()?.toString() ?? "").replace(/\s+/g, " ").trim()
+  )
 
 test.describe("editor live visual regression", () => {
   test.skip(!hasUiLoginCredentials, "E2E_ADMIN_EMAIL 또는 E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD가 필요합니다.")
 
-  test("실제 /admin/editor/new는 Markdown write/preview 셸을 렌더하고 legacy block affordance를 노출하지 않는다", async ({
+  test("실제 /admin/editor/new는 단일 Markdown live surface를 렌더하고 legacy block affordance를 노출하지 않는다", async ({
     page,
   }) => {
     test.slow()
@@ -367,20 +367,20 @@ test.describe("editor live visual regression", () => {
     await page.waitForURL(/\/admin\/editor(\/|$)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("제목을 입력하세요").first()).toBeVisible()
     await expectMarkdownEditorShell(page)
-    await expect(page.getByRole("tab", { name: "Split" })).toHaveAttribute("aria-selected", "true")
+    await expect(page.getByRole("tab")).toHaveCount(0)
 
     await page.getByPlaceholder("제목을 입력하세요").first().fill("실화면 Markdown editor 회귀 점검")
     await replaceMarkdown(page, markdownCanary)
 
-    const preview = page.getByTestId("markdown-editor-preview-pane")
-    await expect(preview.getByRole("heading", { name: "Live Markdown editor" })).toBeVisible()
-    await expect(preview.locator("table")).toContainText(post507FinalTableTargetCell)
-    await expect(preview.locator("pre")).toContainText(post507CodeText)
-    await expect(preview.getByRole("listitem").filter({ hasText: post507ListText })).toBeVisible()
+    await focusMarkdownEditor(page)
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+    await expect.poll(() => readEditorSelection(page)).toContain(post507FinalTableTargetCell)
+    await expect.poll(() => readEditorSelection(page)).toContain(post507CodeText)
+    await expect.poll(() => readEditorSelection(page)).toContain(post507ListText)
     await expect(page.locator("[data-table-affordance]")).toHaveCount(0)
   })
 
-  test("실제 /admin/editor/[id]는 저장된 Markdown table/code/list를 write/preview에 같은 내용으로 로드한다", async ({
+  test("실제 /admin/editor/[id]는 저장된 Markdown table/code/list를 단일 surface에 같은 내용으로 로드한다", async ({
     page,
   }) => {
     test.slow()
@@ -396,25 +396,18 @@ test.describe("editor live visual regression", () => {
       await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue(title)
       await expectMarkdownEditorShell(page)
 
-      const writePane = page.getByTestId("markdown-editor-write-pane")
-      await expect(writePane.locator("textarea")).toHaveValue(new RegExp(post507FinalTableTargetCell))
-      await expect(writePane.locator("textarea")).toHaveValue(new RegExp(post507CodeText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
-
-      const preview = page.getByTestId("markdown-editor-preview-pane")
-      await expect(preview.locator("table")).toContainText(post507FinalTableSelectAllNeedle)
-      await expect(preview.locator("pre")).toContainText(post507CodeText)
-      await expect(preview.getByRole("listitem").filter({ hasText: post507ListText })).toBeVisible()
-
       await focusMarkdownEditor(page)
       await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
       await expect.poll(() => readEditorSelection(page)).toContain(post507FinalTableTargetCell)
+      await expect.poll(() => readEditorSelection(page)).toContain(post507FinalTableSelectAllNeedle)
       await expect.poll(() => readEditorSelection(page)).toContain(post507CodeText)
+      await expect.poll(() => readEditorSelection(page)).toContain(post507ListText)
     } finally {
       await cleanupLiveEditorPost(page, postId)
     }
   })
 
-  test("실제 /admin/editor/507 canary는 Markdown editor와 상세 렌더 preview 기준으로 하단 table/code/list를 표시한다", async ({
+  test("실제 /admin/editor/507 canary는 단일 Markdown surface에 하단 table/code/list를 표시한다", async ({
     page,
   }) => {
     test.skip(!liveEditor507CanaryEnabled, "E2E_LIVE_EDITOR_507_CANARY=true일 때만 실제 507 seeded live canary를 실행합니다.")
@@ -438,13 +431,12 @@ test.describe("editor live visual regression", () => {
     }
 
     await expectMarkdownEditorShell(page)
-    const preview = page.getByTestId("markdown-editor-preview-pane")
-    const finalReferenceTable = preview.locator("table").filter({ hasText: post507FinalTableTargetCell }).first()
-    const tokenCodeBlock = preview.locator("pre").filter({ hasText: post507CodeText }).first()
-    await expect(finalReferenceTable).toContainText(post507FinalTableTargetCell, { timeout: 30_000 })
-    await expect(finalReferenceTable).toContainText(post507FinalTableSelectAllNeedle)
-    await expect(tokenCodeBlock).toContainText(post507CodeText)
-    await expect(preview.getByRole("listitem").filter({ hasText: post507ListText })).toBeVisible()
+    await focusMarkdownEditor(page)
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
+    await expect.poll(() => readEditorSelection(page), { timeout: 30_000 }).toContain(post507FinalTableTargetCell)
+    await expect.poll(() => readEditorSelection(page)).toContain(post507FinalTableSelectAllNeedle)
+    await expect.poll(() => readEditorSelection(page)).toContain(post507CodeText)
+    await expect.poll(() => readEditorSelection(page)).toContain(post507ListText)
 
     await expect(page.locator("[data-table-affordance]")).toHaveCount(0)
   })
