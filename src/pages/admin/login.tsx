@@ -234,6 +234,9 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     await verifyCode()
   }
 
+  const submitLabel = step === "request" ? "인증 코드 받기" : "로그인"
+  const loadingLabel = step === "request" ? "전송 중..." : "확인 중..."
+
   return (
     <LoginSection aria-labelledby="admin-login-title">
       <LoginPanel>
@@ -305,13 +308,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           ) : null}
           {error ? <LoginError role="alert">{error}</LoginError> : null}
           <LoginSubmit disabled={!hydrated || loading} type="submit">
-            {loading
-              ? step === "request"
-                ? "전송 중..."
-                : "확인 중..."
-              : step === "request"
-              ? "인증 코드 받기"
-              : "로그인"}
+            {loading ? loadingLabel : submitLabel}
           </LoginSubmit>
         </LoginForm>
       </LoginPanel>
