@@ -129,7 +129,7 @@ const decorationForNode = (
   if (HIDDEN_MARK_NODES.has(node.name)) {
     return { from: node.from, to: node.to, kind: "hide-mark" }
   }
-  if (node.name === "URL" && parent?.name === "Link") {
+  if (node.name === "URL" && (parent?.name === "Link" || parent?.name === "Image")) {
     return { from: node.from, to: node.to, kind: "hide-mark" }
   }
   if (/^ATXHeading[1-6]$/.test(node.name)) {

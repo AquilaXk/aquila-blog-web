@@ -244,6 +244,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
   const editableCompartmentRef = useRef(new Compartment())
+  const historyCompartmentRef = useRef(new Compartment())
   const initialStateRef = useRef({ value, disabled, ariaDescription })
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
@@ -253,12 +254,13 @@ export const MarkdownEditorLiveSurface = forwardRef<
     if (!host) return
 
     const editableCompartment = editableCompartmentRef.current
+    const historyCompartment = historyCompartmentRef.current
     const initialState = initialStateRef.current
     const state = EditorState.create({
       doc: initialState.value,
       extensions: [
         markdown({ extensions: GFM }),
-        history(),
+        historyCompartment.of(history()),
         keymap.of([...historyKeymap, ...defaultKeymap]),
         EditorView.lineWrapping,
         compositionField,
@@ -353,14 +355,17 @@ export const MarkdownEditorLiveSurface = forwardRef<
     const selection = view.state.selection.main
     const nextAnchor = Math.min(selection.anchor, value.length)
     const nextHead = Math.min(selection.head, value.length)
+    const historyCompartment = historyCompartmentRef.current
     view.dispatch({
       annotations: [
         externalDocumentChange.of(true),
         Transaction.addToHistory.of(false),
       ],
+      effects: historyCompartment.reconfigure([]),
       changes: { from: 0, to: view.state.doc.length, insert: value },
       selection: EditorSelection.range(nextAnchor, nextHead),
     })
+    view.dispatch({ effects: historyCompartment.reconfigure(history()) })
   }, [value])
 
   useImperativeHandle(ref, () => ({
@@ -375,7 +380,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         view.dispatch({
           annotations: [Transaction.addToHistory.of(false), ...preservedAnnotations],
           changes: { from: plan.rangeStart, to: plan.rangeEnd, insert: "" },
-          selection: EditorSelection.cursor(plan.rangeStart),
+          selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd),
         })
         if (plan.replacement) {
           view.dispatch({

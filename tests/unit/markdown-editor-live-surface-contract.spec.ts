@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
-import { history, undo } from "@codemirror/commands"
-import { EditorState, Transaction } from "@codemirror/state"
+import { history, undo, undoDepth } from "@codemirror/commands"
+import { Compartment, EditorState, Transaction } from "@codemirror/state"
 import { readFileSync } from "fs"
 import path from "path"
 import { registeredBrowserStorageKeys } from "../../src/libs/privacy/browserStorageRegistry"
@@ -38,22 +38,47 @@ test.describe("markdown editor live surface contract", () => {
     )
   })
 
-  test("keeps an external document replacement outside the previous undo history", () => {
-    let state = EditorState.create({ doc: "initial", extensions: [history()] })
+  test("clears previous undo history when the controlled document is restored", () => {
+    const historyCompartment = new Compartment()
+    let state = EditorState.create({
+      doc: "initial",
+      extensions: [historyCompartment.of(history())],
+    })
     state = state.update({ changes: { from: state.doc.length, insert: " edit" } }).state
     state = state.update({
       changes: { from: 0, to: state.doc.length, insert: "restored" },
       annotations: Transaction.addToHistory.of(false),
+      effects: historyCompartment.reconfigure([]),
     }).state
+    state = state.update({ effects: historyCompartment.reconfigure(history()) }).state
 
-    let undoState = state
-    undo({
+    expect(undoDepth(state)).toBe(0)
+    expect(undo({
       state,
-      dispatch: (transaction) => {
-        undoState = transaction.state
+      dispatch: () => {
+        throw new Error("A restored document must not retain stale undo events")
       },
-    })
-    expect(undoState.doc.toString()).toBe("restored")
+    })).toBe(false)
+
+    const surfaceSource = readFileSync(
+      sourcePath("components", "markdown-editor", "MarkdownEditorLiveSurface.tsx"),
+      "utf8"
+    )
+    expect(surfaceSource).toContain("historyCompartmentRef")
+    expect(surfaceSource).toContain("historyCompartment.reconfigure([])")
+    expect(surfaceSource).toContain("historyCompartment.reconfigure(history())")
+  })
+
+  test("keeps the planned selection when a failed upload removes its placeholder", () => {
+    const surfaceSource = readFileSync(
+      sourcePath("components", "markdown-editor", "MarkdownEditorLiveSurface.tsx"),
+      "utf8"
+    )
+
+    expect(surfaceSource).toContain(
+      "selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd)"
+    )
+    expect(surfaceSource).not.toContain("selection: EditorSelection.cursor(plan.rangeStart)")
   })
 
   test("keeps toolbar, find, focus, paste, drop, and upload paths on the live surface", () => {
