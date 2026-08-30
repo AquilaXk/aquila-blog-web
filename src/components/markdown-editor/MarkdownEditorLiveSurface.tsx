@@ -17,6 +17,7 @@ import {
   EditorState,
   StateEffect,
   StateField,
+  Transaction,
 } from "@codemirror/state"
 import {
   Decoration,
@@ -42,24 +43,37 @@ type MarkdownEditorLiveSurfaceProps = {
   value: string
   disabled: boolean
   ariaDescription: string
-  onChange: (value: string, editorFocused: boolean) => void
+  onChange: (
+    value: string,
+    editorFocused: boolean,
+    options?: { clearUploadError?: boolean }
+  ) => void
   onSelectionChange: (selection: MarkdownLiveSelection) => void
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement>
   onPasteCapture?: ClipboardEventHandler<HTMLDivElement>
   onDragOver?: DragEventHandler<HTMLDivElement>
-  onDrop?: DragEventHandler<HTMLDivElement>
+  onDropCapture?: DragEventHandler<HTMLDivElement>
+}
+
+type MarkdownEditorLiveMutationOptions = {
+  focus?: boolean
+  scrollIntoView?: boolean
+  addToHistory?: boolean
+  clearUploadError?: boolean
+  replaceTransientContent?: boolean
 }
 
 export type MarkdownEditorLiveSurfaceHandle = {
   applyMutation: (
     plan: PlannedTextMutation,
-    options?: { focus?: boolean; scrollIntoView?: boolean }
+    options?: MarkdownEditorLiveMutationOptions
   ) => boolean
   focus: (selection?: MarkdownLiveSelection) => void
   readSnapshot: () => MarkdownEditorSnapshot
 }
 
 const externalDocumentChange = Annotation.define<boolean>()
+const preserveUploadError = Annotation.define<boolean>()
 const setComposition = StateEffect.define<boolean>()
 const setPointerSelecting = StateEffect.define<boolean>()
 
@@ -199,7 +213,7 @@ const decorationField = StateField.define<DecorationSet>({
 })
 
 const liveSurfaceTheme = EditorView.theme({
-  "&": { height: "100%", minHeight: "640px" },
+  "&": { height: "100%" },
   ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
   ".cm-content": { minHeight: "640px", padding: "30px 32px" },
   ".cm-line": { padding: "0" },
@@ -221,7 +235,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
     onKeyDownCapture,
     onPasteCapture,
     onDragOver,
-    onDrop,
+    onDropCapture,
   },
   ref
 ) {
@@ -291,15 +305,22 @@ export const MarkdownEditorLiveSurface = forwardRef<
           },
         }),
         EditorView.updateListener.of((update) => {
-          if (update.selectionSet || update.docChanged) {
-            const selection = update.state.selection.main
-            onSelectionChangeRef.current({ from: selection.from, to: selection.to })
-          }
           if (
             update.docChanged &&
             !update.transactions.some((transaction) => transaction.annotation(externalDocumentChange))
           ) {
-            onChangeRef.current(update.state.doc.toString(), update.view.hasFocus)
+            const shouldPreserveUploadError = update.transactions.some((transaction) =>
+              transaction.annotation(preserveUploadError)
+            )
+            onChangeRef.current(
+              update.state.doc.toString(),
+              update.view.hasFocus,
+              shouldPreserveUploadError ? { clearUploadError: false } : undefined
+            )
+          }
+          if (update.selectionSet || update.docChanged) {
+            const selection = update.state.selection.main
+            onSelectionChangeRef.current({ from: selection.from, to: selection.to })
           }
         }),
       ],
@@ -332,7 +353,10 @@ export const MarkdownEditorLiveSurface = forwardRef<
     const nextAnchor = Math.min(selection.anchor, value.length)
     const nextHead = Math.min(selection.head, value.length)
     view.dispatch({
-      annotations: externalDocumentChange.of(true),
+      annotations: [
+        externalDocumentChange.of(true),
+        Transaction.addToHistory.of(false),
+      ],
       changes: { from: 0, to: view.state.doc.length, insert: value },
       selection: EditorSelection.range(nextAnchor, nextHead),
     })
@@ -342,7 +366,35 @@ export const MarkdownEditorLiveSurface = forwardRef<
     applyMutation: (plan, options) => {
       const view = viewRef.current
       if (!view) return false
+
+      const preservedAnnotations = options?.clearUploadError === false
+        ? [preserveUploadError.of(true)]
+        : []
+      if (options?.replaceTransientContent && plan.rangeStart < plan.rangeEnd) {
+        view.dispatch({
+          annotations: [Transaction.addToHistory.of(false), ...preservedAnnotations],
+          changes: { from: plan.rangeStart, to: plan.rangeEnd, insert: "" },
+          selection: EditorSelection.cursor(plan.rangeStart),
+        })
+        if (plan.replacement) {
+          view.dispatch({
+            annotations: preservedAnnotations,
+            changes: { from: plan.rangeStart, insert: plan.replacement },
+            selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd),
+            scrollIntoView: options.scrollIntoView !== false,
+          })
+        }
+        if (options.focus !== false && !disabled) view.focus()
+        return true
+      }
+
       view.dispatch({
+        annotations: [
+          ...(options?.addToHistory === false && !options.replaceTransientContent
+            ? [Transaction.addToHistory.of(false)]
+            : []),
+          ...preservedAnnotations,
+        ],
         changes: {
           from: plan.rangeStart,
           to: plan.rangeEnd,
@@ -381,7 +433,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
       onKeyDownCapture={onKeyDownCapture}
       onPasteCapture={onPasteCapture}
       onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDropCapture={onDropCapture}
     />
   )
 })

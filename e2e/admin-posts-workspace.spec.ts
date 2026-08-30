@@ -178,7 +178,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(liveEditorBodyStyle).toContain("min-width: 0;")
     expect(liveEditorBodyStyle).toContain("max-width: 100%;")
     expect(liveEditorBodyStyle).toContain("background: #0f1728;")
-    expect(liveEditorBodyStyle).toContain("min-height: 640px;")
+    expect(liveEditorBodyStyle).not.toContain("min-height: 640px;")
     expect(liveEditorBodyStyle).toContain("overscroll-behavior: contain;")
     expect(liveEditorBodyStyle).toContain(".cm-editor.cm-focused")
     expect(writerHostCalls).toHaveLength(2)

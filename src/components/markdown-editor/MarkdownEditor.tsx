@@ -245,8 +245,14 @@ export const MarkdownEditor = ({
       const commitOptions = { clearUploadError: false as const }
       const surface = liveSurfaceRef.current
       if (surface) {
-        selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
-        return surface.applyMutation(plan, { focus: false, scrollIntoView: false })
+            selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
+            return surface.applyMutation(plan, {
+              focus: false,
+              scrollIntoView: false,
+              addToHistory: false,
+              clearUploadError: false,
+              replaceTransientContent: true,
+            })
       }
 
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
@@ -414,9 +420,13 @@ export const MarkdownEditor = ({
   )
 
   const handleLiveChange = useCallback(
-    (nextMarkdown: string, editorFocused: boolean) => {
+    (
+      nextMarkdown: string,
+      editorFocused: boolean,
+      options?: { clearUploadError?: boolean }
+    ) => {
       invalidateFindReplace()
-      commitMarkdown(nextMarkdown, editorFocused)
+      commitMarkdown(nextMarkdown, editorFocused, options)
     },
     [commitMarkdown, invalidateFindReplace]
   )
@@ -635,7 +645,7 @@ export const MarkdownEditor = ({
           onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste}
           onDragOver={handleDragOver}
-          onDrop={handleDrop}
+          onDropCapture={handleDrop}
         />
       </LiveEditorBody>
     </EditorRoot>

@@ -383,6 +383,17 @@ test.describe("live Markdown writing surface", () => {
     await expect.poll(() => readMarkdown(page)).toBe(lines)
   })
 
+  test("new table insertion enables table commands immediately", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "")
+    await page.goto("/admin/editor/new?source=local-draft")
+
+    await page.getByRole("button", { name: "표 삽입" }).click()
+    const commandMenu = page.getByRole("combobox", { name: "명령 메뉴", exact: true })
+    await expect(commandMenu.getByRole("option", { name: "표 행 추가", exact: true })).toBeEnabled()
+    await commandMenu.selectOption("table.add-row")
+    expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
+  })
+
   test("paired input preserves a selected range and remains undoable", async ({ page }) => {
     await routeAuthenticatedEditor(page, "word")
     await page.goto("/admin/editor/new?source=local-draft")
@@ -486,6 +497,85 @@ test.describe("live Markdown writing surface", () => {
     const result = await readMarkdown(page)
     expect(result.indexOf("report.pdf")).toBeLessThan(result.indexOf("omega"))
     expect(result.indexOf("body.png")).toBeLessThan(result.indexOf("omega"))
+  })
+
+  test("file drops upload once without inserting raw file text", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "drop here")
+    await page.route("**/post/api/v1/posts/files", async (route) => {
+      await fulfillJson(route, {
+        resultCode: "201-1",
+        msg: "uploaded",
+        data: {
+          key: "post-files/note.txt",
+          name: "note.txt",
+          url: "https://cdn.example.test/post-files/note.txt",
+        },
+      })
+    })
+    await page.goto("/admin/editor/new?source=local-draft")
+
+    await editorContent(page).evaluate((element) => {
+      const transfer = new DataTransfer()
+      transfer.setData("text/plain", "RAW FILE BODY")
+      transfer.items.add(new File(["RAW FILE BODY"], "note.txt", { type: "text/plain" }))
+      element.dispatchEvent(new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: transfer,
+      }))
+    })
+
+    await expect.poll(() => readMarkdown(page)).toContain(
+      "[note.txt](https://cdn.example.test/post-files/note.txt)"
+    )
+    expect(await readMarkdown(page)).not.toContain("RAW FILE BODY")
+  })
+
+  test("upload batch keeps an earlier failure and undo never restores placeholders", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "body")
+    let uploadRequest = 0
+    await page.route("**/post/api/v1/posts/files", async (route) => {
+      uploadRequest += 1
+      if (uploadRequest === 1) {
+        await route.fulfill({ status: 500, body: "failed" })
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 650))
+      await fulfillJson(route, {
+        resultCode: "201-1",
+        msg: "uploaded",
+        data: {
+          key: "post-files/kept.txt",
+          name: "kept.txt",
+          url: "https://cdn.example.test/post-files/kept.txt",
+        },
+      })
+    })
+    await page.goto("/admin/editor/new?source=local-draft")
+
+    await editorContent(page).evaluate((element) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(["first"], "failed.txt", { type: "text/plain" }))
+      transfer.items.add(new File(["second"], "kept.txt", { type: "text/plain" }))
+      element.dispatchEvent(new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: transfer,
+      }))
+    })
+
+    await expect(page.getByTestId("markdown-editor").getByRole("alert")).toHaveText(
+      "첨부 파일 업로드에 실패했습니다."
+    )
+    await expect.poll(() => readMarkdown(page)).toContain(
+      "[kept.txt](https://cdn.example.test/post-files/kept.txt)"
+    )
+    await expect(page.getByTestId("markdown-editor").getByRole("alert")).toHaveText(
+      "첨부 파일 업로드에 실패했습니다."
+    )
+    await editorContent(page).press(undoShortcut)
+    await expect.poll(() => readMarkdown(page)).toBe("body")
+    expect(await readMarkdown(page)).not.toContain("uploading:")
   })
 
   test("oversized attachments fail before the upload boundary", async ({ page }) => {
@@ -612,5 +702,30 @@ test.describe("live Markdown writing surface", () => {
     await editorContent(page).focus()
     await editorContent(page).type("한글")
     await expect.poll(() => readMarkdown(page)).toContain("한글")
+  })
+
+  test("constrained editor height can scroll the final line into view", async ({ page }) => {
+    const markdown = Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join("\n")
+    await routeAuthenticatedEditor(page, markdown)
+    await page.goto("/admin/editor/new?source=local-draft")
+    await page.getByTestId("markdown-editor").evaluate((element) => {
+      element.style.height = "280px"
+    })
+
+    const scroller = page.locator(".cm-scroller")
+    await scroller.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    const finalLine = editorContent(page).locator(".cm-line").last()
+    await expect(finalLine).toBeVisible()
+    const [bodyBox, lineBox] = await Promise.all([
+      page.getByTestId("markdown-editor-live-surface").boundingBox(),
+      finalLine.boundingBox(),
+    ])
+    expect(bodyBox).not.toBeNull()
+    expect(lineBox).not.toBeNull()
+    expect((lineBox?.y ?? Number.POSITIVE_INFINITY) + (lineBox?.height ?? 0)).toBeLessThanOrEqual(
+      (bodyBox?.y ?? 0) + (bodyBox?.height ?? 0) + 1
+    )
   })
 })

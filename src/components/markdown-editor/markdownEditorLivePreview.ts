@@ -38,7 +38,6 @@ const HIDDEN_MARK_NODES = new Set([
   "EmphasisMark",
   "StrikethroughMark",
   "LinkMark",
-  "URL",
   "CodeMark",
   "CodeInfo",
   "TaskMarker",
@@ -113,7 +112,8 @@ const isInsideSourceRange = (node: MarkdownSyntaxNode, sourceRanges: readonly Ma
 
 const decorationForNode = (
   markdown: string,
-  node: MarkdownSyntaxNode
+  node: MarkdownSyntaxNode,
+  parent: MarkdownSyntaxNode | null
 ): MarkdownLivePreviewDecoration | null => {
   if (node.name === "ListMark") {
     return { from: node.from, to: node.to, kind: "list-marker" }
@@ -127,6 +127,9 @@ const decorationForNode = (
     return { from: node.from, to, kind: "hide-mark" }
   }
   if (HIDDEN_MARK_NODES.has(node.name)) {
+    return { from: node.from, to: node.to, kind: "hide-mark" }
+  }
+  if (node.name === "URL" && parent?.name === "Link") {
     return { from: node.from, to: node.to, kind: "hide-mark" }
   }
   if (/^ATXHeading[1-6]$/.test(node.name)) {
@@ -160,12 +163,12 @@ export const buildMarkdownLivePreviewPlan = (
   const sourceRanges = resolveMarkdownLiveSourceRanges(markdown, documentNode, selections)
   const decorations: MarkdownLivePreviewDecoration[] = []
 
-  const visit = (node: MarkdownSyntaxNode) => {
+  const visit = (node: MarkdownSyntaxNode, parent: MarkdownSyntaxNode | null) => {
     if (node !== documentNode && isInsideSourceRange(node, sourceRanges)) return
-    const decoration = decorationForNode(markdown, node)
+    const decoration = decorationForNode(markdown, node, parent)
     if (decoration) decorations.push(decoration)
-    for (const child of listChildren(node)) visit(child)
+    for (const child of listChildren(node)) visit(child, node)
   }
-  visit(documentNode)
+  visit(documentNode, null)
   return decorations
 }

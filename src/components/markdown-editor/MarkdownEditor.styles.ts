@@ -230,12 +230,10 @@ export const LiveEditorBody = styled.div`
 
   [data-testid="markdown-editor-live-surface"] {
     height: 100%;
-    min-height: 640px;
   }
 
   .cm-editor {
     height: 100%;
-    min-height: 640px;
     background: #0f1728;
     color: #d9e4f7;
   }

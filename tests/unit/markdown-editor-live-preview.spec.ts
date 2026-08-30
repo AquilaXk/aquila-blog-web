@@ -85,4 +85,23 @@ test.describe("markdown editor live preview model", () => {
       expect.objectContaining({ kind: "fenced-code" }),
     ]))
   })
+
+  test("keeps bare autolink text visible while hiding an explicit link destination", () => {
+    const bareUrl = "https://bare.example.test"
+    const explicitUrl = "https://target.example.test"
+    const markdown = ["Active paragraph.", "", bareUrl, "", `[label](${explicitUrl})`].join("\n")
+    const tree = markdownParser.parse(markdown)
+    const plan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+
+    expect(plan).not.toContainEqual({
+      kind: "hide-mark",
+      from: markdown.indexOf(bareUrl),
+      to: markdown.indexOf(bareUrl) + bareUrl.length,
+    })
+    expect(plan).toContainEqual({
+      kind: "hide-mark",
+      from: markdown.indexOf(explicitUrl),
+      to: markdown.indexOf(explicitUrl) + explicitUrl.length,
+    })
+  })
 })
