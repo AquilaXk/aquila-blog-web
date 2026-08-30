@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import type { components } from "@shared/contracts"
 import type { GetServerSideProps, NextPage } from "next"
 import { useRouter } from "next/router"
 import { type FormEvent, useEffect, useMemo, useState } from "react"
@@ -15,11 +16,17 @@ type AdminLoginPageProps = {
 }
 
 const ADMIN_SAVED_EMAIL_STORAGE_KEY = "auth.admin.savedEmail.v1"
-const ADMIN_KEEP_SIGNED_IN_STORAGE_KEY = "auth.admin.keepSignedIn.v1"
 
-export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> = withSsrMetrics<AdminLoginPageProps>(
-  "auth",
-  async ({ req, query }) => {
+type AdminEmailCodeRequest = components["schemas"]["AdminEmailCodeRequest"]
+type AdminEmailCodeVerifyRequest =
+  components["schemas"]["AdminEmailCodeVerifyRequest"]
+type AdminEmailChallengeResponse =
+  components["schemas"]["RsDataAdminEmailCodeRequestResBody"]
+
+type LoginStep = "request" | "verify"
+
+export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> =
+  withSsrMetrics<AdminLoginPageProps>("auth", async ({ req, query }) => {
     const member = await fetchServerAdminSession(req)
     if (member === undefined) {
       throw new Error("Unable to verify the administrator session.")
@@ -39,8 +46,7 @@ export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> = withS
         nextPath: normalizeAdminNextPath(query.next, "/admin"),
       },
     }
-  }
-)
+  })
 
 const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   const router = useRouter()
@@ -49,35 +55,39 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     [nextPath, router.query.next]
   )
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [saveEmail, setSaveEmail] = useState(false)
-  const [keepSignedIn, setKeepSignedIn] = useState(true)
+  const [keepSignedIn, setKeepSignedIn] = useState(false)
+  const [step, setStep] = useState<LoginStep>("request")
+  const [challengeId, setChallengeId] = useState("")
+  const [code, setCode] = useState("")
+  const [statusMessage, setStatusMessage] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     try {
-      const savedEmail = window.localStorage.getItem(ADMIN_SAVED_EMAIL_STORAGE_KEY)
-      const savedKeepSignedIn = window.localStorage.getItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY)
+      const savedEmail = window.localStorage.getItem(
+        ADMIN_SAVED_EMAIL_STORAGE_KEY
+      )
       if (savedEmail) {
         setEmail(normalizeAuthEmail(savedEmail))
         setSaveEmail(true)
       }
-      if (savedKeepSignedIn === "true" || savedKeepSignedIn === "false") {
-        setKeepSignedIn(savedKeepSignedIn === "true")
-      } else {
-        window.localStorage.setItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY, "true")
-      }
     } catch {
       // Browser storage is optional for login preferences.
     }
+    setHydrated(true)
   }, [])
 
   const updateSavedEmail = (value: string, shouldSave: boolean) => {
     try {
       const normalizedEmail = normalizeAuthEmail(value)
       if (shouldSave && normalizedEmail && isValidAuthEmail(normalizedEmail)) {
-        window.localStorage.setItem(ADMIN_SAVED_EMAIL_STORAGE_KEY, normalizedEmail)
+        window.localStorage.setItem(
+          ADMIN_SAVED_EMAIL_STORAGE_KEY,
+          normalizedEmail
+        )
         return
       }
       window.localStorage.removeItem(ADMIN_SAVED_EMAIL_STORAGE_KEY)
@@ -86,22 +96,19 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     }
   }
 
-  const updateKeepSignedIn = (value: boolean) => {
-    setKeepSignedIn(value)
-    try {
-      window.localStorage.setItem(ADMIN_KEEP_SIGNED_IN_STORAGE_KEY, String(value))
-    } catch {
-      // Browser storage is optional for login preferences.
-    }
+  const resetChallenge = () => {
+    setStep("request")
+    setChallengeId("")
+    setCode("")
+    setStatusMessage("")
+    setError("")
   }
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setError("")
+  const requestCode = async () => {
     const normalizedEmail = normalizeAuthEmail(email)
 
-    if (!normalizedEmail || !password.trim()) {
-      setError("이메일과 비밀번호를 입력해주세요.")
+    if (!normalizedEmail) {
+      setError("이메일을 입력해주세요.")
       return
     }
     if (!isValidAuthEmail(normalizedEmail)) {
@@ -112,37 +119,125 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     setLoading(true)
     try {
       updateSavedEmail(normalizedEmail, saveEmail)
-      await apiFetch("/member/api/v1/auth/login", {
+      const requestBody: AdminEmailCodeRequest = {
+        email: normalizedEmail,
+        rememberMe: keepSignedIn,
+      }
+      const response = await apiFetch<AdminEmailChallengeResponse>(
+        "/member/api/v1/auth/admin-email/request",
+        {
+          method: "POST",
+          body: JSON.stringify(requestBody),
+        }
+      )
+      const nextChallengeId = response.data?.challengeId?.trim() || ""
+      const nextExpiresInSeconds = response.data?.expiresInSeconds
+      if (
+        !nextChallengeId ||
+        typeof nextExpiresInSeconds !== "number" ||
+        nextExpiresInSeconds <= 0
+      ) {
+        throw new Error("Invalid administrator email challenge response.")
+      }
+
+      setEmail(normalizedEmail)
+      setChallengeId(nextChallengeId)
+      setCode("")
+      setStep("verify")
+      setStatusMessage(
+        `인증 코드를 보냈습니다. ${Math.ceil(
+          nextExpiresInSeconds / 60
+        )}분 안에 입력해주세요.`
+      )
+    } catch (requestError) {
+      setError(
+        toAuthErrorMessage(
+          "adminEmailRequest",
+          requestError,
+          "인증 코드를 전송하지 못했습니다."
+        )
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const verifyCode = async () => {
+    if (!/^\d{8}$/.test(code)) {
+      setError("8자리 인증 코드를 입력해주세요.")
+      return
+    }
+    if (!challengeId) {
+      resetChallenge()
+      setError("새 인증 코드를 요청해주세요.")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const requestBody: AdminEmailCodeVerifyRequest = { challengeId, code }
+      await apiFetch("/member/api/v1/auth/admin-email/verify", {
         method: "POST",
-        body: JSON.stringify({ email: normalizedEmail, password, rememberMe: keepSignedIn }),
+        body: JSON.stringify(requestBody),
       })
 
-      let member: AuthMember & { admin?: boolean }
+      let member: AuthMember
       try {
-        member = await apiFetch<AuthMember & { admin?: boolean }>("/member/api/v1/auth/session")
+        member = await apiFetch<AuthMember>("/member/api/v1/auth/session")
       } catch {
-        setError("관리자 세션을 확인하지 못했습니다. 다시 로그인해주세요.")
+        try {
+          await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })
+        } catch {
+          resetChallenge()
+          setError("관리자 세션을 종료하지 못했습니다. 새 코드를 요청해주세요.")
+          return
+        }
+        resetChallenge()
+        setError("관리자 세션을 확인하지 못했습니다. 새 코드를 요청해주세요.")
         return
       }
 
-      if (!(member.isAdmin ?? member.admin ?? false)) {
+      if (member.isAdmin !== true) {
         try {
-          await apiFetch("/member/api/v1/auth/logout", { method: "POST" })
+          await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })
         } catch {
-          setError("비관리자 세션을 종료하지 못했습니다. 다시 시도해주세요.")
+          resetChallenge()
+          setError(
+            "비관리자 세션을 종료하지 못했습니다. 새 코드를 요청해주세요."
+          )
           return
         }
+        resetChallenge()
         setError("관리자 권한이 필요한 페이지입니다.")
         return
       }
 
       window.location.assign(destination)
-    } catch (authError) {
-      setError(toAuthErrorMessage("login", authError, "로그인에 실패했습니다."))
+    } catch (verifyError) {
+      setError(
+        toAuthErrorMessage(
+          "adminEmailVerify",
+          verifyError,
+          "인증 코드를 확인하지 못했습니다."
+        )
+      )
     } finally {
       setLoading(false)
     }
   }
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError("")
+    if (step === "request") {
+      await requestCode()
+      return
+    }
+    await verifyCode()
+  }
+
+  const submitLabel = step === "request" ? "인증 코드 받기" : "로그인"
+  const loadingLabel = step === "request" ? "전송 중..." : "확인 중..."
 
   return (
     <LoginSection aria-labelledby="admin-login-title">
@@ -153,7 +248,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
             <span>이메일</span>
             <LoginInput
               autoComplete="email"
-              disabled={loading}
+              disabled={!hydrated || loading || step === "verify"}
               onChange={(event) => {
                 setEmail(event.target.value)
                 updateSavedEmail(event.target.value, saveEmail)
@@ -162,40 +257,59 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
               value={email}
             />
           </LoginField>
-          <LoginField>
-            <span>비밀번호</span>
-            <LoginInput
-              autoComplete="current-password"
-              disabled={loading}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              value={password}
-            />
-          </LoginField>
-          <LoginPreference>
-            <input
-              checked={saveEmail}
-              disabled={loading}
-              onChange={(event) => {
-                setSaveEmail(event.target.checked)
-                updateSavedEmail(email, event.target.checked)
-              }}
-              type="checkbox"
-            />
-            <span>아이디 저장</span>
-          </LoginPreference>
-          <LoginPreference>
-            <input
-              checked={keepSignedIn}
-              disabled={loading}
-              onChange={(event) => updateKeepSignedIn(event.target.checked)}
-              type="checkbox"
-            />
-            <span>로그인 유지</span>
-          </LoginPreference>
+          {step === "request" ? (
+            <>
+              <LoginPreference>
+                <input
+                  checked={saveEmail}
+                  disabled={!hydrated || loading}
+                  onChange={(event) => {
+                    setSaveEmail(event.target.checked)
+                    updateSavedEmail(email, event.target.checked)
+                  }}
+                  type="checkbox"
+                />
+                <span>아이디 저장</span>
+              </LoginPreference>
+              <LoginPreference>
+                <input
+                  checked={keepSignedIn}
+                  disabled={!hydrated || loading}
+                  onChange={(event) => setKeepSignedIn(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>로그인 유지</span>
+              </LoginPreference>
+            </>
+          ) : (
+            <>
+              <LoginField>
+                <span>인증 코드</span>
+                <LoginInput
+                  autoComplete="one-time-code"
+                  disabled={!hydrated || loading}
+                  inputMode="numeric"
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, "").slice(0, 8))
+                  }
+                  value={code}
+                />
+              </LoginField>
+              <LoginSecondaryButton
+                disabled={!hydrated || loading}
+                onClick={resetChallenge}
+                type="button"
+              >
+                이메일 다시 입력
+              </LoginSecondaryButton>
+            </>
+          )}
+          {statusMessage ? (
+            <LoginStatus aria-live="polite">{statusMessage}</LoginStatus>
+          ) : null}
           {error ? <LoginError role="alert">{error}</LoginError> : null}
-          <LoginSubmit disabled={loading} type="submit">
-            {loading ? "로그인 중..." : "로그인"}
+          <LoginSubmit disabled={!hydrated || loading} type="submit">
+            {loading ? loadingLabel : submitLabel}
           </LoginSubmit>
         </LoginForm>
       </LoginPanel>
@@ -266,12 +380,39 @@ const LoginError = styled.p`
   font-size: 0.9rem;
 `
 
+const LoginStatus = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.gray11};
+  font-size: 0.9rem;
+  line-height: 1.5;
+`
+
 const LoginPreference = styled.label`
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.9rem;
+`
+
+const LoginSecondaryButton = styled.button`
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid ${({ theme }) => theme.colors.gray7};
+  border-radius: 8px;
+  background: ${({ theme }) => theme.colors.gray1};
+  color: ${({ theme }) => theme.colors.gray11};
+  font: inherit;
+
+  &:focus-visible {
+    outline: 3px solid ${({ theme }) => theme.colors.blue5};
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
 `
 
 const LoginSubmit = styled.button`
