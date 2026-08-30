@@ -14,7 +14,13 @@ import {
   resolveCreateWritePostId,
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
-import { resolvePersistedSummaryResult, toSummaryWriteFields, type CanonicalSummaryState, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
+import {
+  resolvePersistedSummaryResult,
+  toCreateSummaryWriteFields,
+  toModifySummaryWriteFields,
+  type CanonicalSummaryState,
+  type SummaryIntent,
+} from "./EditorStudioWorkspaceControllerRootModel"
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
@@ -333,7 +339,7 @@ export const useEditorStudioPersistence = ({
         thumbnail: effectiveThumbnailUrl,
       })
 
-      const summaryWriteFields = toSummaryWriteFields(summaryIntent)
+      const summaryWriteFields = toCreateSummaryWriteFields(summaryIntent)
       const fingerprint = JSON.stringify({
         title: postTitle,
         content: contentWithMetadata,
@@ -505,7 +511,7 @@ export const useEditorStudioPersistence = ({
             category: postCategory,
             thumbnail: effectiveThumbnailUrl,
           }),
-          ...toSummaryWriteFields(summaryIntent),
+          ...toModifySummaryWriteFields(summaryIntent),
           ...toFlags(postVisibility),
           version: postVersion,
         }),
@@ -627,7 +633,7 @@ export const useEditorStudioPersistence = ({
             category: postCategory,
             thumbnail: effectiveThumbnailUrl,
           }),
-          ...toSummaryWriteFields(summaryIntent),
+          ...toModifySummaryWriteFields(summaryIntent),
           ...toFlags(postVisibility),
           version: postVersion,
         }),

@@ -20,6 +20,7 @@ import type {
 } from "./editorStudioMetaModel"
 import type {
   ApiEditorPostDto,
+  ApiPostModifyRequest,
   ApiPostWriteRequest,
 } from "src/apis/backend/posts/PostApiDtos"
 
@@ -75,12 +76,21 @@ const SUMMARY_SOURCES = new Set<CanonicalSummaryState["summarySource"]>([
   "NONE",
 ])
 
-export const toSummaryWriteFields = (
+export const toCreateSummaryWriteFields = (
   intent: SummaryIntent,
 ): Pick<ApiPostWriteRequest, "summaryMode" | "summary"> => {
-  if (intent.kind === "unchanged") return { summaryMode: null, summary: null }
+  if (intent.kind === "unchanged") {
+    throw new Error("create summary intent must be AUTO or MANUAL")
+  }
   if (intent.kind === "manual") return { summaryMode: "MANUAL", summary: intent.summary }
   return { summaryMode: "AUTO", summary: null }
+}
+
+export const toModifySummaryWriteFields = (
+  intent: SummaryIntent,
+): Pick<ApiPostModifyRequest, "summaryMode" | "summary"> => {
+  if (intent.kind === "unchanged") return { summaryMode: null, summary: null }
+  return toCreateSummaryWriteFields(intent)
 }
 
 const resolveCanonicalSummaryResult = (
