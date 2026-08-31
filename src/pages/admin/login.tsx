@@ -24,6 +24,7 @@ type AdminEmailChallengeResponse =
   components["schemas"]["RsDataAdminEmailCodeRequestResBody"]
 
 type LoginStep = "request" | "verify"
+type LoginPhase = "idle" | "requesting" | "verifying" | "navigating"
 
 export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> =
   withSsrMetrics<AdminLoginPageProps>("auth", async ({ req, query }) => {
@@ -62,7 +63,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   const [code, setCode] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<LoginPhase>("idle")
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
@@ -97,6 +98,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   }
 
   const resetChallenge = () => {
+    setPhase("idle")
     setStep("request")
     setChallengeId("")
     setCode("")
@@ -116,7 +118,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       return
     }
 
-    setLoading(true)
+    setPhase("requesting")
+    setStatusMessage("인증 코드를 전송하고 있습니다.")
     try {
       updateSavedEmail(normalizedEmail, saveEmail)
       const requestBody: AdminEmailCodeRequest = {
@@ -149,6 +152,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           nextExpiresInSeconds / 60
         )}분 안에 입력해주세요.`
       )
+      setPhase("idle")
     } catch (requestError) {
       setError(
         toAuthErrorMessage(
@@ -157,8 +161,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           "인증 코드를 전송하지 못했습니다."
         )
       )
-    } finally {
-      setLoading(false)
+      setStatusMessage("")
+      setPhase("idle")
     }
   }
 
@@ -173,7 +177,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       return
     }
 
-    setLoading(true)
+    setPhase("verifying")
+    setStatusMessage("인증 코드를 확인하고 있습니다.")
     try {
       const requestBody: AdminEmailCodeVerifyRequest = { challengeId, code }
       await apiFetch("/member/api/v1/auth/admin-email/verify", {
@@ -212,6 +217,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
         return
       }
 
+      setStatusMessage("관리자 페이지를 열고 있습니다.")
+      setPhase("navigating")
       window.location.assign(destination)
     } catch (verifyError) {
       setError(
@@ -221,8 +228,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           "인증 코드를 확인하지 못했습니다."
         )
       )
-    } finally {
-      setLoading(false)
+      setStatusMessage("")
+      setPhase("idle")
     }
   }
 
@@ -236,80 +243,102 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     await verifyCode()
   }
 
-  const submitLabel = step === "request" ? "인증 코드 받기" : "로그인"
-  const loadingLabel = step === "request" ? "전송 중..." : "확인 중..."
+  const isBusy = phase !== "idle"
+  const submitLabel =
+    phase === "requesting"
+      ? "전송 중..."
+      : phase === "verifying"
+      ? "확인 중..."
+      : phase === "navigating"
+      ? "관리자 페이지 여는 중..."
+      : step === "request"
+      ? "인증 코드 받기"
+      : "로그인"
 
   return (
     <LoginSection aria-labelledby="admin-login-title">
       <LoginPanel>
         <LoginHeading id="admin-login-title">관리자 로그인</LoginHeading>
         <LoginForm onSubmit={onSubmit}>
-          <LoginField>
-            <span>이메일</span>
-            <LoginInput
-              autoComplete="email"
-              disabled={!hydrated || loading || step === "verify"}
-              onChange={(event) => {
-                setEmail(event.target.value)
-                updateSavedEmail(event.target.value, saveEmail)
-              }}
-              type="email"
-              value={email}
-            />
-          </LoginField>
-          {step === "request" ? (
-            <>
-              <LoginPreference>
-                <input
-                  checked={saveEmail}
-                  disabled={!hydrated || loading}
-                  onChange={(event) => {
-                    setSaveEmail(event.target.checked)
-                    updateSavedEmail(email, event.target.checked)
-                  }}
-                  type="checkbox"
-                />
-                <span>아이디 저장</span>
-              </LoginPreference>
-              <LoginPreference>
-                <input
-                  checked={keepSignedIn}
-                  disabled={!hydrated || loading}
-                  onChange={(event) => setKeepSignedIn(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>로그인 유지</span>
-              </LoginPreference>
-            </>
-          ) : (
-            <>
-              <LoginField>
-                <span>인증 코드</span>
-                <LoginInput
-                  autoComplete="one-time-code"
-                  disabled={!hydrated || loading}
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setCode(event.target.value.replace(/\D/g, "").slice(0, 8))
-                  }
-                  value={code}
-                />
-              </LoginField>
-              <LoginSecondaryButton
-                disabled={!hydrated || loading}
-                onClick={resetChallenge}
-                type="button"
-              >
-                이메일 다시 입력
-              </LoginSecondaryButton>
-            </>
-          )}
+          <LoginFields
+            aria-busy={isBusy}
+            aria-label="관리자 로그인 입력"
+            role="group"
+          >
+            <LoginField>
+              <span>이메일</span>
+              <LoginInput
+                autoComplete="email"
+                disabled={!hydrated || isBusy || step === "verify"}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  updateSavedEmail(event.target.value, saveEmail)
+                }}
+                type="email"
+                value={email}
+              />
+            </LoginField>
+            <LoginStage key={step}>
+              {step === "request" ? (
+                <>
+                  <LoginPreference>
+                    <input
+                      checked={saveEmail}
+                      disabled={!hydrated || isBusy}
+                      onChange={(event) => {
+                        setSaveEmail(event.target.checked)
+                        updateSavedEmail(email, event.target.checked)
+                      }}
+                      type="checkbox"
+                    />
+                    <span>아이디 저장</span>
+                  </LoginPreference>
+                  <LoginPreference>
+                    <input
+                      checked={keepSignedIn}
+                      disabled={!hydrated || isBusy}
+                      onChange={(event) =>
+                        setKeepSignedIn(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>로그인 유지</span>
+                  </LoginPreference>
+                </>
+              ) : (
+                <>
+                  <LoginField>
+                    <span>인증 코드</span>
+                    <LoginInput
+                      autoFocus
+                      autoComplete="one-time-code"
+                      disabled={!hydrated || isBusy}
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setCode(
+                          event.target.value.replace(/\D/g, "").slice(0, 8)
+                        )
+                      }
+                      value={code}
+                    />
+                  </LoginField>
+                  <LoginSecondaryButton
+                    disabled={!hydrated || isBusy}
+                    onClick={resetChallenge}
+                    type="button"
+                  >
+                    이메일 다시 입력
+                  </LoginSecondaryButton>
+                </>
+              )}
+            </LoginStage>
+          </LoginFields>
           {statusMessage ? (
             <LoginStatus aria-live="polite">{statusMessage}</LoginStatus>
           ) : null}
           {error ? <LoginError role="alert">{error}</LoginError> : null}
-          <LoginSubmit disabled={!hydrated || loading} type="submit">
-            {loading ? loadingLabel : submitLabel}
+          <LoginSubmit disabled={!hydrated || isBusy} type="submit">
+            {submitLabel}
           </LoginSubmit>
         </LoginForm>
       </LoginPanel>
@@ -344,6 +373,35 @@ const LoginForm = styled.form`
   display: grid;
   gap: 1rem;
   margin-top: 1.5rem;
+`
+
+const LoginFields = styled.div`
+  display: grid;
+  gap: 1rem;
+`
+
+const LoginStage = styled.div`
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-height: 7.5rem;
+  animation: admin-login-stage-enter 160ms ease-out;
+
+  @keyframes admin-login-stage-enter {
+    from {
+      opacity: 0;
+      transform: translateY(0.25rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `
 
 const LoginField = styled.label`
