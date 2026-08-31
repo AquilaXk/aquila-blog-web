@@ -295,9 +295,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     ? "인증 코드가 만료되었습니다. 새 코드를 요청해주세요."
     : error
   const submitLabel =
-    phase === "requesting"
-      ? "전송 중..."
-      : phase === "verifying"
+    phase === "verifying"
       ? "확인 중..."
       : phase === "navigating"
       ? "관리자 페이지 여는 중..."

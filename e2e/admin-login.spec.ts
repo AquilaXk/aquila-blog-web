@@ -178,7 +178,9 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
   await expect(
     inputGroup.getByText("인증 코드를 전송하고 있습니다.")
   ).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "전송 중..." })).toBeDisabled()
+  const loginButton = page.getByRole("button", { name: "로그인" })
+  await expect(loginButton).toBeDisabled()
+  await expect(page.getByRole("button", { name: "전송 중..." })).toHaveCount(0)
   await expect(page.getByLabel("인증 코드")).toBeVisible()
   await expect(page.getByLabel("인증 코드")).toBeDisabled()
 
@@ -188,6 +190,7 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
   await expect(page.getByRole("timer")).toHaveText("05:00")
   await expect(page.getByLabel("인증 코드")).toBeEnabled()
   await expect(page.getByLabel("인증 코드")).toBeFocused()
+  await expect(loginButton).toBeEnabled()
 })
 
 test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page }) => {
