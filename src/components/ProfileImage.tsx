@@ -22,20 +22,36 @@ const ProfileImage: React.FC<Props> = ({
   const fallbackAttemptKey = typeof requestedSrc === "string" ? requestedSrc : fallbackSrc
   const [resolvedSrc, setResolvedSrc] = React.useState(requestedSrc)
   const fallbackAttemptSourceRef = React.useRef<string | undefined>(undefined)
+  const imageRef = React.useRef<HTMLImageElement | null>(null)
+
+  const attemptFallback = React.useCallback(() => {
+    if (!fallbackSrc || fallbackAttemptSourceRef.current === fallbackAttemptKey) return
+
+    fallbackAttemptSourceRef.current = fallbackAttemptKey
+    setResolvedSrc(fallbackSrc)
+  }, [fallbackAttemptKey, fallbackSrc])
 
   React.useEffect(() => {
     fallbackAttemptSourceRef.current = undefined
     setResolvedSrc(requestedSrc)
   }, [requestedSrc])
 
+  React.useEffect(() => {
+    const image = imageRef.current
+    if (
+      resolvedSrc !== requestedSrc ||
+      !image?.complete ||
+      image.naturalWidth !== 0
+    ) {
+      return
+    }
+
+    attemptFallback()
+  }, [attemptFallback, requestedSrc, resolvedSrc])
+
   const handleImageError: React.ReactEventHandler<HTMLImageElement> = (event) => {
     onError?.(event)
-
-    if (!fallbackSrc || fallbackAttemptSourceRef.current === fallbackAttemptKey) return
-
-    // Keep persisted broken profile URLs from leaving the UI with alt text only.
-    fallbackAttemptSourceRef.current = fallbackAttemptKey
-    setResolvedSrc(fallbackSrc)
+    attemptFallback()
   }
 
   return (
@@ -47,6 +63,7 @@ const ProfileImage: React.FC<Props> = ({
       decoding={priority ? "sync" : "async"}
       draggable={false}
       onError={handleImageError}
+      ref={imageRef}
       style={{
         display: "block",
         objectFit: "cover",

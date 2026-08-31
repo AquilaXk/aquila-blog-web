@@ -4,6 +4,43 @@ import { expect, test } from "@playwright/test"
 import { buildProfileWorkspaceAdminProfileCacheFields, normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
 
 test.describe("admin profile state contract", () => {
+  test("프로필 이미지는 hydration 시점에 이미 완료된 실패도 기본 이미지로 전환한다", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const completeDescriptor = Object.getOwnPropertyDescriptor(
+        HTMLImageElement.prototype,
+        "complete"
+      )
+      const naturalWidthDescriptor = Object.getOwnPropertyDescriptor(
+        HTMLImageElement.prototype,
+        "naturalWidth"
+      )
+      const isFailedPrimary = (image: HTMLImageElement) =>
+        image.getAttribute("src")?.includes("qa=already-complete-broken") === true
+
+      Object.defineProperty(HTMLImageElement.prototype, "complete", {
+        configurable: true,
+        get() {
+          return isFailedPrimary(this) || completeDescriptor?.get?.call(this) || false
+        },
+      })
+      Object.defineProperty(HTMLImageElement.prototype, "naturalWidth", {
+        configurable: true,
+        get() {
+          return isFailedPrimary(this) ? 0 : naturalWidthDescriptor?.get?.call(this) || 0
+        },
+      })
+    })
+
+    await page.goto("/_qa/profile-image-hydration")
+
+    await expect(page.getByTestId("qa-profile-image")).toHaveAttribute(
+      "src",
+      "/images/default-profile.svg"
+    )
+  })
+
   test("admin profile workspace residual file boundaries는 600 line companion budget을 유지한다", () => {
     const adminRoot = path.resolve(__dirname, "../src/routes/Admin")
     const requiredModules = [
