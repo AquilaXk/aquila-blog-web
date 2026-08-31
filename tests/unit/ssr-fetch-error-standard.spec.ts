@@ -114,6 +114,54 @@ test("serverApiFetchJson forwards rotated backend cookies through the SSR respon
   ])
 })
 
+test("serverApiFetchJson preserves untouched duplicate request cookies in order", async () => {
+  const req = createReq("duplicate=first; unrelated=keep; duplicate=second; refresh=old")
+  const res = createSsrResponse()
+  const observedCookies: string[] = []
+  let calls = 0
+  globalThis.fetch = (async (_input, init) => {
+    observedCookies.push(new Headers(init?.headers).get("cookie") || "")
+    calls += 1
+    const headers = new Headers({ "content-type": "application/json" })
+    if (calls === 1) headers.append("Set-Cookie", "refresh=new-token; Path=/; HttpOnly")
+    return new Response(JSON.stringify({ calls }), { status: 200, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async () => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/session")
+    await serverApiFetchJson(req, "/member/api/v1/auth/me")
+    return { props: {} }
+  })
+
+  await handler({ req, res } as any)
+
+  expect(observedCookies).toEqual([
+    "duplicate=first; unrelated=keep; duplicate=second; refresh=old",
+    "duplicate=first; unrelated=keep; duplicate=second; refresh=new-token",
+  ])
+})
+
+test("SSR cookie forwarding makes a later shared cache policy private", async () => {
+  const req = createReq()
+  const res = createSsrResponse()
+  globalThis.fetch = (async () => {
+    const headers = new Headers({ "content-type": "application/json" })
+    headers.append("Set-Cookie", "refresh=new-token; Path=/; HttpOnly")
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async (context) => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/session")
+    context.res.setHeader("Cache-Control", "public, s-maxage=60")
+    return { props: {} }
+  })
+
+  await handler({ req, res } as any)
+
+  expect(res.getHeader("Cache-Control")).toBe("private, no-store")
+  expect(res.getHeader("X-Request-Id")).toMatch(/^[0-9a-f-]{36}$/i)
+})
+
 test("serverApiFetchJson applies backend cookies before throwing ApiError", async () => {
   const req = createReq("unrelated=keep; refresh=old")
   const res = createSsrResponse()

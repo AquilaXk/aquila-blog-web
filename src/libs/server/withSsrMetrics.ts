@@ -19,6 +19,15 @@ const isSharedCacheable = (cacheControl: number | string | string[] | undefined)
 
 const applyRequestIdResponsePolicy = (response: ServerResponse, requestId: string) => {
   if (response.headersSent) return
+  const setCookie = response.getHeader("Set-Cookie")
+  if (
+    (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) &&
+    isSharedCacheable(response.getHeader("Cache-Control"))
+  ) {
+    response.setHeader("Cache-Control", "private, no-store")
+    response.setHeader("X-Request-Id", requestId)
+    return
+  }
   if (isSharedCacheable(response.getHeader("Cache-Control"))) {
     response.removeHeader("X-Request-Id")
     return

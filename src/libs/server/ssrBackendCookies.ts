@@ -20,12 +20,15 @@ const updateRequestCookies = (
   req: IncomingMessage,
   setCookieHeaders: string[]
 ) => {
-  const cookies = new Map<string, string>()
+  let cookies: Array<{ name: string; value: string }> = []
   for (const entry of (req.headers.cookie || "").split(";")) {
     const cookie = entry.trim()
     const separator = cookie.indexOf("=")
     if (separator > 0)
-      cookies.set(cookie.slice(0, separator), cookie.slice(separator + 1))
+      cookies.push({
+        name: cookie.slice(0, separator),
+        value: cookie.slice(separator + 1),
+      })
   }
 
   for (const setCookie of setCookieHeaders) {
@@ -37,13 +40,18 @@ const updateRequestCookies = (
     const deleted = attributes.some((attribute) =>
       /^\s*max-age\s*=\s*0\s*$/i.test(attribute)
     )
-    if (deleted) cookies.delete(name)
-    else cookies.set(name, value)
+    if (deleted) {
+      cookies = cookies.filter((cookie) => cookie.name !== name)
+    } else if (cookies.some((cookie) => cookie.name === name)) {
+      cookies = cookies.map((cookie) =>
+        cookie.name === name ? { name, value } : cookie
+      )
+    } else {
+      cookies.push({ name, value })
+    }
   }
 
-  const cookie = [...cookies]
-    .map(([name, value]) => `${name}=${value}`)
-    .join("; ")
+  const cookie = cookies.map(({ name, value }) => `${name}=${value}`).join("; ")
   if (cookie) req.headers.cookie = cookie
   else delete req.headers.cookie
 }
