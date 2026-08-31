@@ -7,6 +7,7 @@ const meta: Meta<typeof AdminHubSurface> = {
   tags: ["autodocs"],
   args: {
     displayName: "aquila",
+    greeting: "좋은 오후예요",
     recentWorkSummary: "최근 업데이트 2026-03-24 14:05 · 프로필 80% · 연결 4개",
     primaryAction: {
       href: "/admin/editor/new",

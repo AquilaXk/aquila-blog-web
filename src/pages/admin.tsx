@@ -12,6 +12,7 @@ import {
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
+import { resolveAdminHubGreeting } from "src/routes/Admin/AdminHubSurfaceModel"
 import AdminShell from "src/routes/Admin/AdminShell"
 
 const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface"), {
@@ -19,6 +20,7 @@ const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface")
 })
 
 type AdminHubPageProps = AdminPageProps & {
+  initialGreeting: string
   initialProfileSnapshot: AdminProfile
   initialOperationalSnapshot: AdminHubOperationalSnapshot
 }
@@ -150,6 +152,7 @@ const getDependencyStatusTone = (value: string | null | undefined) => {
 
 export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsrMetrics<AdminHubPageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
+  const requestInstant = new Date()
   const hasAuthCookie = hasServerAuthCookie(req)
   const fallbackProfileSnapshot = resolvePublicAdminProfileSnapshot(req)
   const bootstrapResultPromise =
@@ -258,6 +261,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
   return {
     props: {
       ...baseProps,
+      initialGreeting: resolveAdminHubGreeting(requestInstant),
       initialProfileSnapshot: profileSnapshot,
       initialOperationalSnapshot: operationalSnapshot,
     },
@@ -266,6 +270,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
 
 const AdminHubPage: NextPage<AdminHubPageProps> = ({
   initialMember,
+  initialGreeting,
   initialProfileSnapshot,
   initialOperationalSnapshot,
 }) => {
@@ -384,6 +389,7 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
     <AdminShell currentSection="hub" member={sessionMember} profileSnapshot={initialProfileSnapshot}>
       <AdminHubSurface
         displayName={displayName}
+        greeting={initialGreeting}
         recentWorkSummary={recentWorkSummary}
         primaryAction={primaryAction}
         metrics={metrics}
