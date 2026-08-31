@@ -259,70 +259,80 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     <LoginSection aria-labelledby="admin-login-title">
       <LoginPanel>
         <LoginHeading id="admin-login-title">관리자 로그인</LoginHeading>
-        <LoginForm aria-busy={isBusy} onSubmit={onSubmit}>
-          <LoginField>
-            <span>이메일</span>
-            <LoginInput
-              autoComplete="email"
-              disabled={!hydrated || isBusy || step === "verify"}
-              onChange={(event) => {
-                setEmail(event.target.value)
-                updateSavedEmail(event.target.value, saveEmail)
-              }}
-              type="email"
-              value={email}
-            />
-          </LoginField>
-          <LoginStage key={step}>
-            {step === "request" ? (
-              <>
-                <LoginPreference>
-                  <input
-                    checked={saveEmail}
+        <LoginForm onSubmit={onSubmit}>
+          <LoginFields
+            aria-busy={isBusy}
+            aria-label="관리자 로그인 입력"
+            role="group"
+          >
+            <LoginField>
+              <span>이메일</span>
+              <LoginInput
+                autoComplete="email"
+                disabled={!hydrated || isBusy || step === "verify"}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  updateSavedEmail(event.target.value, saveEmail)
+                }}
+                type="email"
+                value={email}
+              />
+            </LoginField>
+            <LoginStage key={step}>
+              {step === "request" ? (
+                <>
+                  <LoginPreference>
+                    <input
+                      checked={saveEmail}
+                      disabled={!hydrated || isBusy}
+                      onChange={(event) => {
+                        setSaveEmail(event.target.checked)
+                        updateSavedEmail(email, event.target.checked)
+                      }}
+                      type="checkbox"
+                    />
+                    <span>아이디 저장</span>
+                  </LoginPreference>
+                  <LoginPreference>
+                    <input
+                      checked={keepSignedIn}
+                      disabled={!hydrated || isBusy}
+                      onChange={(event) =>
+                        setKeepSignedIn(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>로그인 유지</span>
+                  </LoginPreference>
+                </>
+              ) : (
+                <>
+                  <LoginField>
+                    <span>인증 코드</span>
+                    <LoginInput
+                      autoFocus
+                      autoComplete="one-time-code"
+                      disabled={!hydrated || isBusy}
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setCode(
+                          event.target.value.replace(/\D/g, "").slice(0, 8)
+                        )
+                      }
+                      value={code}
+                    />
+                  </LoginField>
+                  <LoginSecondaryButton
                     disabled={!hydrated || isBusy}
-                    onChange={(event) => {
-                      setSaveEmail(event.target.checked)
-                      updateSavedEmail(email, event.target.checked)
-                    }}
-                    type="checkbox"
-                  />
-                  <span>아이디 저장</span>
-                </LoginPreference>
-                <LoginPreference>
-                  <input
-                    checked={keepSignedIn}
-                    disabled={!hydrated || isBusy}
-                    onChange={(event) => setKeepSignedIn(event.target.checked)}
-                    type="checkbox"
-                  />
-                  <span>로그인 유지</span>
-                </LoginPreference>
-              </>
-            ) : (
-              <>
-                <LoginField>
-                  <span>인증 코드</span>
-                  <LoginInput
-                    autoFocus
-                    autoComplete="one-time-code"
-                    disabled={!hydrated || isBusy}
-                    inputMode="numeric"
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, "").slice(0, 8))
-                    }
-                    value={code}
-                  />
-                </LoginField>
-                <LoginSecondaryButton
-                  disabled={!hydrated || isBusy}
-                  onClick={resetChallenge}
-                  type="button"
-                >
-                  이메일 다시 입력
-                </LoginSecondaryButton>
-              </>
-            )}
-          </LoginStage>
+                    onClick={resetChallenge}
+                    type="button"
+                  >
+                    이메일 다시 입력
+                  </LoginSecondaryButton>
+                </>
+              )}
+            </LoginStage>
+          </LoginFields>
           {statusMessage ? (
             <LoginStatus aria-live="polite">{statusMessage}</LoginStatus>
           ) : null}
@@ -363,6 +373,11 @@ const LoginForm = styled.form`
   display: grid;
   gap: 1rem;
   margin-top: 1.5rem;
+`
+
+const LoginFields = styled.div`
+  display: grid;
+  gap: 1rem;
 `
 
 const LoginStage = styled.div`

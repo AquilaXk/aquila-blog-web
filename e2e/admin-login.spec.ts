@@ -166,17 +166,21 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
   await page.getByLabel("이메일").fill("admin@example.com")
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
 
-  await expect(page.locator("form")).toHaveAttribute("aria-busy", "true")
+  const inputGroup = page.getByRole("group", { name: "관리자 로그인 입력" })
+  await expect(inputGroup).toHaveAttribute("aria-busy", "true")
   const requestStatus = page.getByText("인증 코드를 전송하고 있습니다.", {
     exact: true,
   })
   await expect(requestStatus).toHaveAttribute("aria-live", "polite")
   await expect(requestStatus).toBeVisible()
+  await expect(
+    inputGroup.getByText("인증 코드를 전송하고 있습니다.")
+  ).toHaveCount(0)
   await expect(page.getByRole("button", { name: "전송 중..." })).toBeDisabled()
 
   releaseRequest()
 
-  await expect(page.locator("form")).toHaveAttribute("aria-busy", "false")
+  await expect(inputGroup).toHaveAttribute("aria-busy", "false")
   await expect(page.getByLabel("인증 코드")).toBeFocused()
 })
 
@@ -209,7 +213,8 @@ test("관리자 이메일 검증은 이동이 시작된 뒤에도 완료 상태�
   await requestAdminEmailCode(page)
   await verifyAdminEmailCode(page)
 
-  await expect(page.locator("form")).toHaveAttribute("aria-busy", "true")
+  const inputGroup = page.getByRole("group", { name: "관리자 로그인 입력" })
+  await expect(inputGroup).toHaveAttribute("aria-busy", "true")
   await expect(
     page.getByRole("button", { name: "관리자 페이지 여는 중..." })
   ).toBeDisabled()
