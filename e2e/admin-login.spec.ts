@@ -7,6 +7,8 @@ const adminMember = {
   isAdmin: true,
 }
 
+const adminCodeClockStart = new Date("2026-08-31T00:00:00.000Z")
+
 const fulfillAdminEmailChallenge = async (page: Page) => {
   await page.route(
     "**/member/api/v1/auth/admin-email/request",
@@ -189,6 +191,7 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
 })
 
 test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page }) => {
+  await page.clock.install({ time: adminCodeClockStart })
   await page.route(
     "**/member/api/v1/auth/admin-email/request",
     async (route) => {
@@ -210,9 +213,8 @@ test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page 
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
 
   await expect(page.getByRole("timer")).toHaveText("00:01")
-  await expect(page.getByRole("timer")).toHaveText("00:00", {
-    timeout: 3_000,
-  })
+  await page.clock.fastForward(1_000)
+  await expect(page.getByRole("timer")).toHaveText("00:00")
   await expect(page.getByLabel("인증 코드")).toBeDisabled()
   await expect(
     page.getByRole("button", { name: "인증 코드 만료됨" })
@@ -222,6 +224,54 @@ test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page 
       exact: true,
     })
   ).toBeVisible()
+})
+
+test("실제 만료 시각이 지나면 검증 요청을 보내지 않는다", async ({ page }) => {
+  await page.clock.install({ time: adminCodeClockStart })
+  await page.route(
+    "**/member/api/v1/auth/admin-email/request",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 200,
+        body: JSON.stringify({
+          data: {
+            challengeId: "challenge-id-1234567890",
+            expiresInSeconds: 1,
+          },
+        }),
+      })
+    }
+  )
+  let verifyRequestCount = 0
+  await page.route(
+    "**/member/api/v1/auth/admin-email/verify",
+    async (route) => {
+      verifyRequestCount += 1
+      await route.fulfill({ status: 500, body: "{}" })
+    }
+  )
+
+  await page.goto("/admin/login")
+  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByRole("button", { name: "인증 코드 받기" }).click()
+  await expect(page.getByRole("timer")).toHaveText("00:01")
+  await page.getByLabel("인증 코드").fill("12345678")
+
+  const challengeResponseTime = await page.evaluate(() => Date.now())
+  await page.clock.setSystemTime(challengeResponseTime + 1_001)
+  await page.getByRole("button", { name: "로그인" }).click()
+
+  await expect(
+    page.getByText("인증 코드가 만료되었습니다. 새 코드를 요청해주세요.", {
+      exact: true,
+    })
+  ).toBeVisible()
+  await expect(page.getByRole("timer")).toHaveText("00:00")
+  await expect(
+    page.getByRole("button", { name: "인증 코드 만료됨" })
+  ).toBeDisabled()
+  expect(verifyRequestCount).toBe(0)
 })
 
 test("관리자 이메일 검증은 이동이 시작된 뒤에도 완료 상태를 유지한다", async ({

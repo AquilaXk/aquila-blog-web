@@ -204,17 +204,18 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   }
 
   const verifyCode = async () => {
-    if (remainingSeconds === 0) {
+    if (!challengeId || challengeExpiresAt === null) {
+      resetChallenge()
+      setError("새 인증 코드를 요청해주세요.")
+      return
+    }
+    if (challengeExpiresAt <= Date.now() || remainingSeconds === 0) {
+      setRemainingSeconds(0)
       setError("인증 코드가 만료되었습니다. 새 코드를 요청해주세요.")
       return
     }
     if (!/^\d{8}$/.test(code)) {
       setError("8자리 인증 코드를 입력해주세요.")
-      return
-    }
-    if (!challengeId) {
-      resetChallenge()
-      setError("새 인증 코드를 요청해주세요.")
       return
     }
 
