@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Response, type Route } from "@playwright/test"
+import { ADMIN_HUB_GREETING_OPTIONS } from "../src/routes/Admin/AdminHubSurfaceModel"
 import {
   adminEmail,
   adminLegacyLoginId,
@@ -23,7 +24,9 @@ const hasLiveCredentials = Boolean((adminEmail || adminLegacyLoginId) && adminPa
 const hasUiLoginCredentials = Boolean(adminEmail && adminPassword)
 const expectedFrontendCommitSha = process.env.E2E_EXPECTED_FRONT_COMMIT_SHA?.trim() || ""
 const explicitLiveApiBaseUrl = process.env.E2E_API_BASE_URL?.trim() || ""
-const adminLandingHeadingPattern = /^좋은 아침이에요,/
+const adminLandingHeadingPattern = new RegExp(
+  `^(?:${Object.values(ADMIN_HUB_GREETING_OPTIONS).flat().join("|")}),`,
+)
 const adminDashboardHeadingPattern = /^운영 상태와 복구$/
 const adminCloudHeadingPattern = /^미디어 라이브러리$/
 const adminProfileHeadingPattern = /^개인정보와 계정 설정$/

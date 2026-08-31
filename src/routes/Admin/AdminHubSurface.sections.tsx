@@ -30,6 +30,7 @@ import {
 
 type AdminHubSurfaceSectionsProps = {
   displayName: string
+  greeting: string
   recentWorkSummary: string
   primaryAction: AdminHubPrimaryAction
   metrics: AdminHubMetricItem[]
@@ -40,6 +41,7 @@ type AdminHubSurfaceSectionsProps = {
 
 export const AdminHubSurfaceSections = ({
   displayName,
+  greeting,
   recentWorkSummary,
   primaryAction,
   metrics,
@@ -51,7 +53,7 @@ export const AdminHubSurfaceSections = ({
     <HeroHeader>
       <HeroCopy>
         <HeroKicker>WORKSPACE</HeroKicker>
-        <HeroHeading>좋은 아침이에요, {displayName}.</HeroHeading>
+        <HeroHeading>{greeting}, {displayName}.</HeroHeading>
         <p>{recentWorkSummary}</p>
       </HeroCopy>
       <HeroActions>

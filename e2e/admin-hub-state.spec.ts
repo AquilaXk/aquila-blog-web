@@ -1,6 +1,84 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { test, expect } from "@playwright/test"
+import {
+  ADMIN_HUB_GREETING_OPTIONS,
+  ADMIN_HUB_GREETING_VARIANT_COUNT,
+  resolveAdminHubGreeting,
+} from "../src/routes/Admin/AdminHubSurfaceModel"
+
+const expectedGreetingOptions = {
+  dawn: [
+    "고요한 새벽이에요",
+    "이른 시간에도 반가워요",
+    "차분한 새벽을 시작해요",
+    "새벽의 집중력을 이어가요",
+  ],
+  morning: [
+    "좋은 아침이에요",
+    "상쾌한 아침이에요",
+    "오늘도 기분 좋게 시작해요",
+    "아침의 첫 작업을 시작해요",
+  ],
+  lunch: [
+    "점심시간이에요",
+    "잠깐 숨을 돌릴 시간이에요",
+    "든든한 점심을 챙길 시간이에요",
+    "오후를 준비할 시간이에요",
+  ],
+  afternoon: [
+    "좋은 오후예요",
+    "오후의 흐름을 이어가요",
+    "오늘의 작업을 이어가요",
+    "차분하게 집중할 오후예요",
+  ],
+  evening: [
+    "좋은 저녁이에요",
+    "오늘 하루도 수고 많았어요",
+    "차분한 저녁이에요",
+    "오늘의 작업을 마무리해요",
+  ],
+} as const
+
+const periodInstants = {
+  dawn: "2026-08-30T15:00:00.000Z",
+  morning: "2026-08-30T21:00:00.000Z",
+  lunch: "2026-08-31T02:00:00.000Z",
+  afternoon: "2026-08-31T05:00:00.000Z",
+  evening: "2026-08-31T09:00:00.000Z",
+} as const
+
+test("관리자 허브 인사는 서울 시간대 경계를 정확히 나눈다", () => {
+  const boundaryCases = [
+    ["2026-08-30T15:00:00.000Z", "고요한 새벽이에요"],
+    ["2026-08-30T20:59:59.999Z", "고요한 새벽이에요"],
+    ["2026-08-30T21:00:00.000Z", "좋은 아침이에요"],
+    ["2026-08-31T01:59:59.999Z", "좋은 아침이에요"],
+    ["2026-08-31T02:00:00.000Z", "점심시간이에요"],
+    ["2026-08-31T04:59:59.999Z", "점심시간이에요"],
+    ["2026-08-31T05:00:00.000Z", "좋은 오후예요"],
+    ["2026-08-31T08:59:59.999Z", "좋은 오후예요"],
+    ["2026-08-31T09:00:00.000Z", "좋은 저녁이에요"],
+    ["2026-08-31T14:59:59.999Z", "좋은 저녁이에요"],
+  ] as const
+
+  for (const [instant, expected] of boundaryCases) {
+    expect(resolveAdminHubGreeting(new Date(instant), 0)).toBe(expected)
+  }
+})
+
+test("관리자 허브 인사는 각 시간대의 네 문구를 모두 선택할 수 있다", () => {
+  expect(ADMIN_HUB_GREETING_OPTIONS).toEqual(expectedGreetingOptions)
+  expect(ADMIN_HUB_GREETING_VARIANT_COUNT).toBe(4)
+
+  for (const [period, options] of Object.entries(expectedGreetingOptions) as Array<
+    [keyof typeof expectedGreetingOptions, readonly string[]]
+  >) {
+    options.forEach((expected, variantIndex) => {
+      expect(resolveAdminHubGreeting(new Date(periodInstants[period]), variantIndex)).toBe(expected)
+    })
+  }
+})
 
 test.describe("admin hub state contract", () => {
   test("관리자 허브는 live admin profile snapshot을 first paint seed로 사용한다", () => {
@@ -61,12 +139,22 @@ test.describe("admin hub state contract", () => {
   })
 
   test("관리자 허브는 V4 ADMIN HUB reference 구조를 사용한다", () => {
+    const pageSource = readFileSync(path.resolve(__dirname, "../src/pages/admin.tsx"), "utf8")
+    const modelSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurfaceModel.ts"), "utf8")
     const source = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.tsx"), "utf8")
     const sectionSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.sections.tsx"), "utf8")
     const styleSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.styles.ts"), "utf8")
 
     expect(sectionSource).toContain("<HeroKicker>WORKSPACE</HeroKicker>")
-    expect(sectionSource).toContain("<HeroHeading>좋은 아침이에요, {displayName}.</HeroHeading>")
+    expect(sectionSource).toContain("<HeroHeading>{greeting}, {displayName}.</HeroHeading>")
+    expect(sectionSource).not.toContain("<HeroHeading>좋은 아침이에요")
+    expect(source).toContain("greeting: string")
+    expect(source).toContain("greeting={greeting}")
+    expect(pageSource).toContain("initialGreeting: resolveAdminHubGreeting(requestInstant, greetingVariantIndex)")
+    expect(pageSource).toContain("greeting={initialGreeting}")
+    expect(pageSource).toContain('import { randomInt } from "node:crypto"')
+    expect(pageSource).toContain("randomInt(ADMIN_HUB_GREETING_VARIANT_COUNT)")
+    expect(modelSource).not.toContain("Math.random")
     expect(sectionSource).toContain('aria-label="관리자 핵심 지표"')
     expect(sectionSource).toContain("<h2>최근 콘텐츠</h2>")
     expect(sectionSource).toContain("<h2>서비스 상태</h2>")

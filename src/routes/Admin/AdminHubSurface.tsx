@@ -35,6 +35,7 @@ export type AdminHubStatusItem = {
 
 type Props = {
   displayName: string
+  greeting: string
   recentWorkSummary: string
   primaryAction: AdminHubPrimaryAction
   metrics: AdminHubMetricItem[]
@@ -45,6 +46,7 @@ type Props = {
 
 const AdminHubSurface = ({
   displayName,
+  greeting,
   recentWorkSummary,
   primaryAction,
   metrics,
@@ -55,6 +57,7 @@ const AdminHubSurface = ({
   return (
     <AdminHubSurfaceSections
       displayName={displayName}
+      greeting={greeting}
       recentWorkSummary={recentWorkSummary}
       primaryAction={primaryAction}
       metrics={metrics}

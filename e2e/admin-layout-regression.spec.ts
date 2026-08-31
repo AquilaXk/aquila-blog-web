@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
+import { ADMIN_HUB_GREETING_OPTIONS } from "../src/routes/Admin/AdminHubSurfaceModel"
+
+const ADMIN_HUB_GREETING_HEADING_PATTERN = new RegExp(
+  `^(?:${Object.values(ADMIN_HUB_GREETING_OPTIONS).flat().join("|")}),`,
+)
 
 const ADMIN_MEMBER_FIXTURE = {
   id: 1,
@@ -278,7 +283,7 @@ test("관리자 허브 모바일 first fold의 글 작성 진입점은 상단 V4
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto("/admin")
 
-  await expect(page.getByRole("heading", { name: /좋은 아침이에요/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: ADMIN_HUB_GREETING_HEADING_PATTERN })).toBeVisible()
   await expect(page.getByRole("button", { name: "Logout", exact: true })).toBeVisible()
 
   const ctaSnapshot = await page.evaluate(() => {
