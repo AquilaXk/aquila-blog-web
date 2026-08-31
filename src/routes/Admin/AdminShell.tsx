@@ -116,10 +116,10 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
   const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()
   const sidebarIdentityInitial = sidebarIdentityName.slice(0, 2).toUpperCase()
   const sidebarProfileImageSrc = (
-    member.profileImageDirectUrl ||
-    member.profileImageUrl ||
     profileSnapshot?.profileImageDirectUrl ||
     profileSnapshot?.profileImageUrl ||
+    member.profileImageDirectUrl ||
+    member.profileImageUrl ||
     ""
   ).trim()
   const brandTitle = (profileSnapshot?.blogTitle || member.blogTitle || CONFIG.blog.title || "AquilaLog").trim()
@@ -163,7 +163,12 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
           <SidebarProfileIdentity>
             <SidebarAvatar>
               {sidebarProfileImageSrc ? (
-                <ProfileImage src={sidebarProfileImageSrc} alt={`${sidebarIdentityName} 프로필 이미지`} fillContainer />
+                <ProfileImage
+                  src={sidebarProfileImageSrc}
+                  fallbackSrc={CONFIG.profile.image}
+                  alt={`${sidebarIdentityName} 프로필 이미지`}
+                  fillContainer
+                />
               ) : (
                 <span>{sidebarIdentityInitial}</span>
               )}
