@@ -1,6 +1,7 @@
 import { GetServerSideProps, NextPage } from "next"
 import dynamic from "next/dynamic"
 import { IncomingMessage } from "http"
+import { randomInt } from "node:crypto"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { type AdminProfile } from "src/hooks/useAdminProfile"
 import { AdminPageProps, buildAdminPagePropsFromMember, getAdminPageProps, readAdminProtectedBootstrap } from "src/libs/server/adminPage"
@@ -12,7 +13,10 @@ import {
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
-import { resolveAdminHubGreeting } from "src/routes/Admin/AdminHubSurfaceModel"
+import {
+  ADMIN_HUB_GREETING_VARIANT_COUNT,
+  resolveAdminHubGreeting,
+} from "src/routes/Admin/AdminHubSurfaceModel"
 import AdminShell from "src/routes/Admin/AdminShell"
 
 const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface"), {
@@ -153,6 +157,7 @@ const getDependencyStatusTone = (value: string | null | undefined) => {
 export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsrMetrics<AdminHubPageProps>("admin", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const requestInstant = new Date()
+  const greetingVariantIndex = randomInt(ADMIN_HUB_GREETING_VARIANT_COUNT)
   const hasAuthCookie = hasServerAuthCookie(req)
   const fallbackProfileSnapshot = resolvePublicAdminProfileSnapshot(req)
   const bootstrapResultPromise =
@@ -261,7 +266,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
   return {
     props: {
       ...baseProps,
-      initialGreeting: resolveAdminHubGreeting(requestInstant),
+      initialGreeting: resolveAdminHubGreeting(requestInstant, greetingVariantIndex),
       initialProfileSnapshot: profileSnapshot,
       initialOperationalSnapshot: operationalSnapshot,
     },

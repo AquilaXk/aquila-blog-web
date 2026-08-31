@@ -3,6 +3,7 @@ import path from "node:path"
 import { test, expect } from "@playwright/test"
 import {
   ADMIN_HUB_GREETING_OPTIONS,
+  ADMIN_HUB_GREETING_VARIANT_COUNT,
   resolveAdminHubGreeting,
 } from "../src/routes/Admin/AdminHubSurfaceModel"
 
@@ -68,13 +69,13 @@ test("관리자 허브 인사는 서울 시간대 경계를 정확히 나눈다"
 
 test("관리자 허브 인사는 각 시간대의 네 문구를 모두 선택할 수 있다", () => {
   expect(ADMIN_HUB_GREETING_OPTIONS).toEqual(expectedGreetingOptions)
+  expect(ADMIN_HUB_GREETING_VARIANT_COUNT).toBe(4)
 
-  const selections = [0, 0.25, 0.5, 0.999999] as const
   for (const [period, options] of Object.entries(expectedGreetingOptions) as Array<
     [keyof typeof expectedGreetingOptions, readonly string[]]
   >) {
-    selections.forEach((selection, index) => {
-      expect(resolveAdminHubGreeting(new Date(periodInstants[period]), selection)).toBe(options[index])
+    options.forEach((expected, variantIndex) => {
+      expect(resolveAdminHubGreeting(new Date(periodInstants[period]), variantIndex)).toBe(expected)
     })
   }
 })
@@ -139,6 +140,7 @@ test.describe("admin hub state contract", () => {
 
   test("관리자 허브는 V4 ADMIN HUB reference 구조를 사용한다", () => {
     const pageSource = readFileSync(path.resolve(__dirname, "../src/pages/admin.tsx"), "utf8")
+    const modelSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurfaceModel.ts"), "utf8")
     const source = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.tsx"), "utf8")
     const sectionSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.sections.tsx"), "utf8")
     const styleSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminHubSurface.styles.ts"), "utf8")
@@ -148,8 +150,11 @@ test.describe("admin hub state contract", () => {
     expect(sectionSource).not.toContain("<HeroHeading>좋은 아침이에요")
     expect(source).toContain("greeting: string")
     expect(source).toContain("greeting={greeting}")
-    expect(pageSource).toContain("initialGreeting: resolveAdminHubGreeting(requestInstant)")
+    expect(pageSource).toContain("initialGreeting: resolveAdminHubGreeting(requestInstant, greetingVariantIndex)")
     expect(pageSource).toContain("greeting={initialGreeting}")
+    expect(pageSource).toContain('import { randomInt } from "node:crypto"')
+    expect(pageSource).toContain("randomInt(ADMIN_HUB_GREETING_VARIANT_COUNT)")
+    expect(modelSource).not.toContain("Math.random")
     expect(sectionSource).toContain('aria-label="관리자 핵심 지표"')
     expect(sectionSource).toContain("<h2>최근 콘텐츠</h2>")
     expect(sectionSource).toContain("<h2>서비스 상태</h2>")

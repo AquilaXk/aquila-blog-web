@@ -33,6 +33,8 @@ export const ADMIN_HUB_GREETING_OPTIONS = {
   ],
 } as const
 
+export const ADMIN_HUB_GREETING_VARIANT_COUNT = ADMIN_HUB_GREETING_OPTIONS.dawn.length
+
 type AdminHubGreetingPeriod = keyof typeof ADMIN_HUB_GREETING_OPTIONS
 
 const seoulHourFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -49,7 +51,7 @@ const resolveGreetingPeriod = (hour: number): AdminHubGreetingPeriod => {
   return "evening"
 }
 
-export const resolveAdminHubGreeting = (instant: Date, selection = Math.random()): string => {
+export const resolveAdminHubGreeting = (instant: Date, variantIndex: number): string => {
   const hourPart = seoulHourFormatter
     .formatToParts(instant)
     .find((part) => part.type === "hour")
@@ -57,10 +59,10 @@ export const resolveAdminHubGreeting = (instant: Date, selection = Math.random()
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
     throw new RangeError("The administrator greeting requires a valid instant")
   }
-  if (!Number.isFinite(selection) || selection < 0 || selection >= 1) {
-    throw new RangeError("The administrator greeting selection must be within [0, 1)")
+  if (!Number.isInteger(variantIndex) || variantIndex < 0 || variantIndex >= ADMIN_HUB_GREETING_VARIANT_COUNT) {
+    throw new RangeError("The administrator greeting variant index is out of range")
   }
 
   const options = ADMIN_HUB_GREETING_OPTIONS[resolveGreetingPeriod(hour)]
-  return options[Math.floor(selection * options.length)]
+  return options[variantIndex]
 }
