@@ -4,6 +4,7 @@ import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import { resolveServerApiBaseUrl } from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { classifyBackendHttpResult, classifyBackendRoute, getRuntimeMetrics, type BackendFetchResult } from "src/libs/server/runtimeMetrics"
+import { getSetCookieHeaders } from "src/libs/server/ssrBackendCookies"
 
 export const config = {
   api: {
@@ -76,15 +77,6 @@ const reserveProxyBodyBytes = (byteCount: number, maxInFlightBodyBytes: number) 
 const releaseProxyBodyBytes = (byteCount: number) => {
   if (byteCount <= 0) return
   inFlightProxyBodyBytes = Math.max(0, inFlightProxyBodyBytes - byteCount)
-}
-
-const getSetCookieHeaders = (headers: Headers): string[] => {
-  const withCookieList = headers as Headers & { getSetCookie?: () => string[] }
-  const cookieList = withCookieList.getSetCookie?.()
-  if (cookieList?.length) return cookieList
-
-  const cookie = headers.get("set-cookie")
-  return cookie ? [cookie] : []
 }
 
 const appendIncomingHeader = (headers: Headers, key: string, value: string | string[] | undefined) => {

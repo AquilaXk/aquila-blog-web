@@ -4,6 +4,7 @@ import type { ParsedUrlQuery } from "node:querystring"
 import { registerServerApiFetchMetrics, runWithSsrApiFetchContext } from "src/libs/server/apiFetchMetrics"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { getRuntimeMetrics, type RuntimeMetrics } from "src/libs/server/runtimeMetrics"
+import { bindSsrResponse } from "src/libs/server/ssrBackendCookies"
 
 const resolveSsrResult = (result: GetServerSidePropsResult<unknown>) => {
   if ("redirect" in result) return "redirect" as const
@@ -38,6 +39,7 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
     return originalWriteHead.apply(this, args)
   } as typeof originalWriteHead
   const startedAt = performance.now()
+  const clearSsrResponse = bindSsrResponse(context.req, context.res)
 
   try {
     let result: GetServerSidePropsResult<Props>
@@ -62,5 +64,6 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
     return result
   } finally {
     context.res.writeHead = originalWriteHead
+    clearSsrResponse()
   }
 }
