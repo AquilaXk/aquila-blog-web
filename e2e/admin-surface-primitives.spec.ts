@@ -494,10 +494,11 @@ test.describe("관리자 표면 공통 계약", () => {
     expect(source).toContain("profileSnapshot?: AdminShellProfileSnapshot | null")
     expect(source).toContain('const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()')
     expect(source).toContain('const brandTitle = (profileSnapshot?.blogTitle || member.blogTitle || CONFIG.blog.title || "AquilaLog").trim()')
-    expect(source).toContain("member.profileImageDirectUrl ||")
-    expect(source.indexOf("member.profileImageDirectUrl ||")).toBeLessThan(
-      source.indexOf("profileSnapshot?.profileImageDirectUrl ||")
+    expect(source).toContain("profileSnapshot?.profileImageDirectUrl ||")
+    expect(source.indexOf("profileSnapshot?.profileImageDirectUrl ||")).toBeLessThan(
+      source.indexOf("member.profileImageDirectUrl ||")
     )
+    expect(source).toContain("fallbackSrc={CONFIG.profile.image}")
     expect(source).not.toContain('import { useAdminProfile } from "src/hooks/useAdminProfile"')
     expect(source).toContain('label: "허브"')
     expect(source).toContain('label: "운영 대시보드"')
