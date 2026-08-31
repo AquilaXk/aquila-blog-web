@@ -7,6 +7,7 @@ import { readAdminProtectedBootstrap } from "../../src/libs/server/adminPage"
 import { serverApiFetchJson } from "../../src/libs/server/backend"
 import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
 const originalFetch = globalThis.fetch
 const originalBackendInternalUrl = process.env.BACKEND_INTERNAL_URL
@@ -23,6 +24,17 @@ const jsonResponse = (status: number, body: unknown) =>
     status,
     headers: { "content-type": "application/json" },
   })
+
+const createSsrResponse = () => {
+  const headers = new Map<string, string | string[]>()
+  return {
+    headersSent: false,
+    setHeader: (name: string, value: string | string[]) => headers.set(name.toLowerCase(), value),
+    getHeader: (name: string) => headers.get(name.toLowerCase()),
+    removeHeader: (name: string) => headers.delete(name.toLowerCase()),
+    writeHead: () => undefined,
+  }
+}
 
 test.beforeEach(() => {
   process.env.BACKEND_INTERNAL_URL = "http://backend.test"
@@ -61,6 +73,112 @@ test("serverApiFetchJson returns parsed JSON on success", async () => {
     value: 1,
   })
   expect(requestHeaders?.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/i)
+})
+
+test("serverApiFetchJson forwards rotated backend cookies through the SSR response", async () => {
+  const req = createReq("unrelated=keep; refresh=old; remove=stale")
+  const res = createSsrResponse()
+  res.setHeader("Set-Cookie", "existing=keep; Path=/")
+  const observedCookies: string[] = []
+  let calls = 0
+  globalThis.fetch = (async (_input, init) => {
+    observedCookies.push(new Headers(init?.headers).get("cookie") || "")
+    calls += 1
+    const headers = new Headers({ "content-type": "application/json" })
+    if (calls === 1) {
+      headers.append("Set-Cookie", "refresh=new-token; Path=/; HttpOnly")
+      headers.append("Set-Cookie", "remove=; Max-Age=0; Path=/")
+    } else {
+      headers.append("Set-Cookie", "access=second-token; Path=/; Secure")
+    }
+    return new Response(JSON.stringify({ calls }), { status: 200, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async () => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/session")
+    await serverApiFetchJson(req, "/member/api/v1/auth/me")
+    return { props: {} }
+  })
+
+  await handler({ req, res } as any)
+
+  expect(observedCookies).toEqual([
+    "unrelated=keep; refresh=old; remove=stale",
+    "unrelated=keep; refresh=new-token",
+  ])
+  expect(res.getHeader("Set-Cookie")).toEqual([
+    "existing=keep; Path=/",
+    "refresh=new-token; Path=/; HttpOnly",
+    "remove=; Max-Age=0; Path=/",
+    "access=second-token; Path=/; Secure",
+  ])
+})
+
+test("serverApiFetchJson preserves untouched duplicate request cookies in order", async () => {
+  const req = createReq("duplicate=first; unrelated=keep; duplicate=second; refresh=old")
+  const res = createSsrResponse()
+  const observedCookies: string[] = []
+  let calls = 0
+  globalThis.fetch = (async (_input, init) => {
+    observedCookies.push(new Headers(init?.headers).get("cookie") || "")
+    calls += 1
+    const headers = new Headers({ "content-type": "application/json" })
+    if (calls === 1) headers.append("Set-Cookie", "refresh=new-token; Path=/; HttpOnly")
+    return new Response(JSON.stringify({ calls }), { status: 200, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async () => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/session")
+    await serverApiFetchJson(req, "/member/api/v1/auth/me")
+    return { props: {} }
+  })
+
+  await handler({ req, res } as any)
+
+  expect(observedCookies).toEqual([
+    "duplicate=first; unrelated=keep; duplicate=second; refresh=old",
+    "duplicate=first; unrelated=keep; duplicate=second; refresh=new-token",
+  ])
+})
+
+test("SSR cookie forwarding makes a later shared cache policy private", async () => {
+  const req = createReq()
+  const res = createSsrResponse()
+  globalThis.fetch = (async () => {
+    const headers = new Headers({ "content-type": "application/json" })
+    headers.append("Set-Cookie", "refresh=new-token; Path=/; HttpOnly")
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async (context) => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/session")
+    context.res.setHeader("Cache-Control", "public, s-maxage=60")
+    return { props: {} }
+  })
+
+  await handler({ req, res } as any)
+
+  expect(res.getHeader("Cache-Control")).toBe("private, no-store")
+  expect(res.getHeader("X-Request-Id")).toMatch(/^[0-9a-f-]{36}$/i)
+})
+
+test("serverApiFetchJson applies backend cookies before throwing ApiError", async () => {
+  const req = createReq("unrelated=keep; refresh=old")
+  const res = createSsrResponse()
+  globalThis.fetch = (async () => {
+    const headers = new Headers({ "content-type": "application/json" })
+    headers.append("Set-Cookie", "refresh=expired; Max-Age=0; Path=/; HttpOnly")
+    return new Response(JSON.stringify({ msg: "unauthorized" }), { status: 401, headers })
+  }) as typeof fetch
+
+  const handler = withSsrMetrics("auth", async () => {
+    await serverApiFetchJson(req, "/member/api/v1/auth/me")
+    return { props: {} }
+  })
+
+  await expect(handler({ req, res } as any)).rejects.toBeInstanceOf(ApiError)
+  expect(req.headers.cookie).toBe("unrelated=keep")
+  expect(res.getHeader("Set-Cookie")).toEqual(["refresh=expired; Max-Age=0; Path=/; HttpOnly"])
 })
 
 test("serverApiFetchJson normalizes empty success responses to null", async () => {

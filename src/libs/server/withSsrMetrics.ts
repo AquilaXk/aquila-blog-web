@@ -4,6 +4,7 @@ import type { ParsedUrlQuery } from "node:querystring"
 import { registerServerApiFetchMetrics, runWithSsrApiFetchContext } from "src/libs/server/apiFetchMetrics"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { getRuntimeMetrics, type RuntimeMetrics } from "src/libs/server/runtimeMetrics"
+import { bindSsrResponse } from "src/libs/server/ssrBackendCookies"
 
 const resolveSsrResult = (result: GetServerSidePropsResult<unknown>) => {
   if ("redirect" in result) return "redirect" as const
@@ -18,6 +19,15 @@ const isSharedCacheable = (cacheControl: number | string | string[] | undefined)
 
 const applyRequestIdResponsePolicy = (response: ServerResponse, requestId: string) => {
   if (response.headersSent) return
+  const setCookie = response.getHeader("Set-Cookie")
+  if (
+    (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) &&
+    isSharedCacheable(response.getHeader("Cache-Control"))
+  ) {
+    response.setHeader("Cache-Control", "private, no-store")
+    response.setHeader("X-Request-Id", requestId)
+    return
+  }
   if (isSharedCacheable(response.getHeader("Cache-Control"))) {
     response.removeHeader("X-Request-Id")
     return
@@ -38,6 +48,7 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
     return originalWriteHead.apply(this, args)
   } as typeof originalWriteHead
   const startedAt = performance.now()
+  const clearSsrResponse = bindSsrResponse(context.req, context.res)
 
   try {
     let result: GetServerSidePropsResult<Props>
@@ -62,5 +73,6 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
     return result
   } finally {
     context.res.writeHead = originalWriteHead
+    clearSsrResponse()
   }
 }

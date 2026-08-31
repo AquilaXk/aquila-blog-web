@@ -10,6 +10,7 @@ import {
 } from "src/apis/backend/serverMetricsBridge"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
+import { applySsrBackendCookies } from "src/libs/server/ssrBackendCookies"
 
 type ServerApiFetchInit = RequestInit & {
   timeoutMs?: number
@@ -114,6 +115,7 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
     cleanup()
   }
 
+  applySsrBackendCookies(req, response.headers)
   return { response, requestId, url: `${baseUrl}${safePath}`, observe, observeStatus }
 }
 
