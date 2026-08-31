@@ -17,7 +17,7 @@ const fulfillAdminEmailChallenge = async (page: Page) => {
         body: JSON.stringify({
           data: {
             challengeId: "challenge-id-1234567890",
-            expiresInSeconds: 600,
+            expiresInSeconds: 300,
           },
         }),
       })
@@ -155,7 +155,7 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
         body: JSON.stringify({
           data: {
             challengeId: "challenge-id-1234567890",
-            expiresInSeconds: 600,
+            expiresInSeconds: 300,
           },
         }),
       })
@@ -177,11 +177,51 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
     inputGroup.getByText("인증 코드를 전송하고 있습니다.")
   ).toHaveCount(0)
   await expect(page.getByRole("button", { name: "전송 중..." })).toBeDisabled()
+  await expect(page.getByLabel("인증 코드")).toBeVisible()
+  await expect(page.getByLabel("인증 코드")).toBeDisabled()
 
   releaseRequest()
 
   await expect(inputGroup).toHaveAttribute("aria-busy", "false")
+  await expect(page.getByRole("timer")).toHaveText("05:00")
+  await expect(page.getByLabel("인증 코드")).toBeEnabled()
   await expect(page.getByLabel("인증 코드")).toBeFocused()
+})
+
+test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page }) => {
+  await page.route(
+    "**/member/api/v1/auth/admin-email/request",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 200,
+        body: JSON.stringify({
+          data: {
+            challengeId: "challenge-id-1234567890",
+            expiresInSeconds: 1,
+          },
+        }),
+      })
+    }
+  )
+
+  await page.goto("/admin/login")
+  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByRole("button", { name: "인증 코드 받기" }).click()
+
+  await expect(page.getByRole("timer")).toHaveText("00:01")
+  await expect(page.getByRole("timer")).toHaveText("00:00", {
+    timeout: 3_000,
+  })
+  await expect(page.getByLabel("인증 코드")).toBeDisabled()
+  await expect(
+    page.getByRole("button", { name: "인증 코드 만료됨" })
+  ).toBeDisabled()
+  await expect(
+    page.getByText("인증 코드가 만료되었습니다. 새 코드를 요청해주세요.", {
+      exact: true,
+    })
+  ).toBeVisible()
 })
 
 test("관리자 이메일 검증은 이동이 시작된 뒤에도 완료 상태를 유지한다", async ({

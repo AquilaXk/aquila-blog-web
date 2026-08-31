@@ -26,6 +26,15 @@ type AdminEmailChallengeResponse =
 type LoginStep = "request" | "verify"
 type LoginPhase = "idle" | "requesting" | "verifying" | "navigating"
 
+const formatRemainingTime = (seconds: number | null) => {
+  if (seconds === null) return "--:--"
+  const minutes = Math.floor(seconds / 60)
+  const remainder = seconds % 60
+  return `${minutes.toString().padStart(2, "0")}:${remainder
+    .toString()
+    .padStart(2, "0")}`
+}
+
 export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> =
   withSsrMetrics<AdminLoginPageProps>("auth", async ({ req, query }) => {
     const member = await fetchServerAdminSession(req)
@@ -65,6 +74,10 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   const [error, setError] = useState("")
   const [phase, setPhase] = useState<LoginPhase>("idle")
   const [hydrated, setHydrated] = useState(false)
+  const [challengeExpiresAt, setChallengeExpiresAt] = useState<number | null>(
+    null
+  )
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
 
   useEffect(() => {
     try {
@@ -80,6 +93,21 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     }
     setHydrated(true)
   }, [])
+
+  useEffect(() => {
+    if (challengeExpiresAt === null) return
+
+    const updateRemainingSeconds = () => {
+      const nextRemainingSeconds = Math.max(
+        0,
+        Math.ceil((challengeExpiresAt - Date.now()) / 1_000)
+      )
+      setRemainingSeconds(nextRemainingSeconds)
+      if (nextRemainingSeconds === 0) window.clearInterval(intervalId)
+    }
+    const intervalId = window.setInterval(updateRemainingSeconds, 1_000)
+    return () => window.clearInterval(intervalId)
+  }, [challengeExpiresAt])
 
   const updateSavedEmail = (value: string, shouldSave: boolean) => {
     try {
@@ -102,6 +130,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     setStep("request")
     setChallengeId("")
     setCode("")
+    setChallengeExpiresAt(null)
+    setRemainingSeconds(null)
     setStatusMessage("")
     setError("")
   }
@@ -118,6 +148,11 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       return
     }
 
+    setChallengeId("")
+    setCode("")
+    setChallengeExpiresAt(null)
+    setRemainingSeconds(null)
+    setStep("verify")
     setPhase("requesting")
     setStatusMessage("인증 코드를 전송하고 있습니다.")
     try {
@@ -146,12 +181,10 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       setEmail(normalizedEmail)
       setChallengeId(nextChallengeId)
       setCode("")
-      setStep("verify")
-      setStatusMessage(
-        `인증 코드를 보냈습니다. ${Math.ceil(
-          nextExpiresInSeconds / 60
-        )}분 안에 입력해주세요.`
-      )
+      const normalizedExpiresInSeconds = Math.ceil(nextExpiresInSeconds)
+      setRemainingSeconds(normalizedExpiresInSeconds)
+      setChallengeExpiresAt(Date.now() + normalizedExpiresInSeconds * 1_000)
+      setStatusMessage("인증 코드를 보냈습니다.")
       setPhase("idle")
     } catch (requestError) {
       setError(
@@ -161,12 +194,20 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           "인증 코드를 전송하지 못했습니다."
         )
       )
+      setStep("request")
+      setChallengeId("")
+      setChallengeExpiresAt(null)
+      setRemainingSeconds(null)
       setStatusMessage("")
       setPhase("idle")
     }
   }
 
   const verifyCode = async () => {
+    if (remainingSeconds === 0) {
+      setError("인증 코드가 만료되었습니다. 새 코드를 요청해주세요.")
+      return
+    }
     if (!/^\d{8}$/.test(code)) {
       setError("8자리 인증 코드를 입력해주세요.")
       return
@@ -244,6 +285,14 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   }
 
   const isBusy = phase !== "idle"
+  const isChallengeExpired =
+    step === "verify" && Boolean(challengeId) && remainingSeconds === 0
+  const isVerificationUnavailable =
+    step === "verify" &&
+    (!challengeId || remainingSeconds === null || isChallengeExpired)
+  const displayedError = isChallengeExpired
+    ? "인증 코드가 만료되었습니다. 새 코드를 요청해주세요."
+    : error
   const submitLabel =
     phase === "requesting"
       ? "전송 중..."
@@ -253,6 +302,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       ? "관리자 페이지 여는 중..."
       : step === "request"
       ? "인증 코드 받기"
+      : isChallengeExpired
+      ? "인증 코드 만료됨"
       : "로그인"
 
   return (
@@ -308,12 +359,21 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
               ) : (
                 <>
                   <LoginField>
-                    <span>인증 코드</span>
+                    <LoginFieldHeading>
+                      <span>인증 코드</span>
+                      <LoginTimer aria-label="남은 시간" role="timer">
+                        {formatRemainingTime(remainingSeconds)}
+                      </LoginTimer>
+                    </LoginFieldHeading>
                     <LoginInput
+                      aria-label="인증 코드"
                       autoFocus
                       autoComplete="one-time-code"
-                      disabled={!hydrated || isBusy}
+                      disabled={
+                        !hydrated || isBusy || isVerificationUnavailable
+                      }
                       inputMode="numeric"
+                      key={challengeId || "pending"}
                       onChange={(event) =>
                         setCode(
                           event.target.value.replace(/\D/g, "").slice(0, 8)
@@ -336,8 +396,13 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           {statusMessage ? (
             <LoginStatus aria-live="polite">{statusMessage}</LoginStatus>
           ) : null}
-          {error ? <LoginError role="alert">{error}</LoginError> : null}
-          <LoginSubmit disabled={!hydrated || isBusy} type="submit">
+          {displayedError ? (
+            <LoginError role="alert">{displayedError}</LoginError>
+          ) : null}
+          <LoginSubmit
+            disabled={!hydrated || isBusy || isVerificationUnavailable}
+            type="submit"
+          >
             {submitLabel}
           </LoginSubmit>
         </LoginForm>
@@ -410,6 +475,19 @@ const LoginField = styled.label`
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.9rem;
   font-weight: 650;
+`
+
+const LoginFieldHeading = styled.span`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+`
+
+const LoginTimer = styled.span`
+  color: ${({ theme }) => theme.colors.gray12};
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 `
 
 const LoginInput = styled.input`
