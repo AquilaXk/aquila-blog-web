@@ -16,12 +16,6 @@ export type DashboardSnapshotPayload = {
     latestFailureAt: string | null
     latestFailureMessage: string | null
   }
-  signupMail: {
-    status: string
-    queueLagSeconds: number | null
-    latestFailureAt: string | null
-    latestFailureMessage: string | null
-  }
   authSecurity: {
     recentEventCount: number
     blockedEventCount: number
@@ -175,31 +169,6 @@ export const getSystemHealthTone = (value: string | null | undefined): Dashboard
   const normalized = value?.trim()
   if (!normalized || normalized === "UNKNOWN") return "neutral"
   return normalized === "UP" ? "good" : "warn"
-}
-
-export const getMailStatusLabel = (value: string | null | undefined) => {
-  const normalized = value?.trim()
-  switch (normalized) {
-    case "READY":
-      return "전송 준비"
-    case "TEST_MODE":
-      return "테스트 모드"
-    case "MISCONFIGURED":
-      return "설정 누락"
-    case "QUEUE_LOCKED":
-      return "큐 잠금"
-    case "CONNECTION_FAILED":
-      return "연결 실패"
-    case "UNAVAILABLE":
-      return "비활성"
-    default:
-      return normalized || DASHBOARD_DATA_MISSING_LABEL
-  }
-}
-
-export const getMailStatusTone = (value: string | null | undefined): DashboardKpiCard["tone"] => {
-  const normalized = value?.trim()
-  return normalized === "READY" || normalized === "TEST_MODE" ? "good" : normalized ? "warn" : "neutral"
 }
 
 export const getTaskQueueTone = (snapshot: DashboardSnapshotPayload | null | undefined): DashboardKpiCard["tone"] => {

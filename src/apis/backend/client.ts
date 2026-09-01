@@ -84,10 +84,6 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     matcher: /^\/(member|post|system)\/api\/v1\//i,
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
-  {
-    matcher: /^\/signup(\/|$)/i,
-    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
-  },
 ]
 
 const resolveGetRequestPolicy = (path: string): GetRequestPolicy => {
@@ -226,10 +222,6 @@ const resolveTimeoutMs = (path: string, init: ApiFetchOptions) => {
   }
   const isFormLikeBody = typeof FormData !== "undefined" && init.body instanceof FormData
 
-  if (normalizedPath.includes("/auth/login") || normalizedPath.includes("/signup/")) {
-    return 10_000
-  }
-
   if (normalizedPath.includes("/posts/images") || isFormLikeBody) {
     return 90_000
   }
@@ -358,12 +350,10 @@ const shouldUseBrowserBackendProxy = (safePath: string) => {
 
   return (
     safePath.startsWith("/member/api/v1/auth/") ||
-    safePath.startsWith("/member/api/v1/privacy/") ||
     safePath.startsWith("/member/api/v1/adm/") ||
     safePath.startsWith("/post/api/v1/posts/temp") ||
     safePath.startsWith("/post/api/v1/adm/") ||
-    safePath.startsWith("/system/api/v1/adm/") ||
-    safePath.startsWith("/signup")
+    safePath.startsWith("/system/api/v1/adm/")
   )
 }
 

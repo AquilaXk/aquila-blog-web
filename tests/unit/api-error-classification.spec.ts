@@ -19,7 +19,7 @@ test("readApiResultCode extracts body resultCode", () => {
 test("ApiError exposes resultCode from body JSON", () => {
   const error = new ApiError(
     409,
-    "/signup/complete",
+    "/member/api/v1/auth/me",
     JSON.stringify({ resultCode: "409-4", msg: "약관이 변경되었습니다." })
   )
   expect(error.resultCode).toBe("409-4")

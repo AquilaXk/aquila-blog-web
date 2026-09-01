@@ -2,7 +2,7 @@ export const OPTIONAL_TRACKING_CONSENT_STORAGE_KEY = "privacy.optionalTrackingCo
 export const OPTIONAL_TRACKING_CONSENT_CHANGE_EVENT = "aquila:optional-tracking-consent-change"
 
 export type OptionalTrackingConsentState = "granted" | "denied"
-export type OptionalTrackingConsentSource = "settings" | "privacy-request"
+export type OptionalTrackingConsentSource = "settings"
 
 export type OptionalTrackingConsentRecord = {
   version: 1
@@ -57,7 +57,7 @@ let originalSendBeacon: typeof window.navigator.sendBeacon | null = null
 let denyGuardInstalled = false
 
 const isOptionalTrackingConsentSource = (value: unknown): value is OptionalTrackingConsentSource =>
-  value === "settings" || value === "privacy-request"
+  value === "settings"
 
 const createOptionalTrackingConsentRecord = (
   state: OptionalTrackingConsentState,

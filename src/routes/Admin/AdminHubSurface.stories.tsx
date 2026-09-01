@@ -27,7 +27,7 @@ const meta: Meta<typeof AdminHubSurface> = {
     serviceStatusItems: [
       { label: "Public API", value: "서비스 정상", tone: "good" },
       { label: "Task Queue", value: "0 ready", tone: "good" },
-      { label: "Signup Mail", value: "전송 준비", tone: "good" },
+      { label: "Auth Security", value: "0 blocked", tone: "good" },
       { label: "Storage", value: "0 purge", tone: "neutral" },
     ],
     activityItems: [

@@ -22,8 +22,6 @@ test.describe("admin dashboard state contract", () => {
     expect(modelSource).toContain("export const ADMIN_DASHBOARD_DISPLAY_TIME_ZONE")
     expect(modelSource).toContain("export const formatInstant")
     expect(modelSource).toContain("export const formatAge")
-    expect(modelSource).toContain("export const getMailStatusLabel")
-    expect(modelSource).toContain("export const getMailStatusTone")
     expect(modelSource).toContain("export const getTaskQueueTone")
     expect(modelSource).toContain("export type DashboardSnapshotPayload")
     expect(modelSource).toContain("export type DashboardKpiCard")
@@ -31,7 +29,6 @@ test.describe("admin dashboard state contract", () => {
     expect(modelSource).toContain("export type DashboardQuickAction")
     expect(source).not.toContain("const ADMIN_DASHBOARD_DISPLAY_TIME_ZONE")
     expect(source).not.toContain("const formatInstant")
-    expect(source).not.toContain("const getMailStatusLabel")
     expect(source).not.toContain("const getTaskQueueTone")
   })
 

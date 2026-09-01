@@ -141,12 +141,6 @@ export const normalizeAdminNextPath = (input: NextPathInput, fallback = "/admin"
 export const toAdminLoginPath = (nextPath: NextPathInput, fallback = "/admin") =>
   `/admin/login?next=${encodeURIComponent(normalizeAdminNextPath(nextPath, fallback))}`
 
-export const toLoginPath = (nextPath: NextPathInput, fallback = "/") =>
-  `/login?next=${encodeURIComponent(normalizeNextPath(nextPath, fallback))}`
-
-export const toSignupPath = (nextPath: NextPathInput, fallback = "/") =>
-  `/signup?next=${encodeURIComponent(normalizeNextPath(nextPath, fallback))}`
-
 const toSafeClientRedirectTarget = (target: string, fallback = "/"): string => {
   if (typeof window === "undefined") return normalizeNextPath(target, fallback)
 

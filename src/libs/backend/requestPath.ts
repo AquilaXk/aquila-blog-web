@@ -1,5 +1,5 @@
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/
-const ALLOWED_API_PATH_PREFIXES = ["/post/api/v1", "/member/api/v1", "/system/api/v1", "/signup"]
+const ALLOWED_API_PATH_PREFIXES = ["/post/api/v1", "/member/api/v1", "/system/api/v1"]
 
 const hasPathTraversal = (pathname: string): boolean => {
   const segments = pathname.split("/")

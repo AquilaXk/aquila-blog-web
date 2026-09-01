@@ -18,11 +18,6 @@ export const privacyPageStyles = css`
     margin-top: 18px;
   }
 
-  /* 버튼 위계: 주 행동만 채운 컨트롤, 보조 행동은 테두리 컨트롤, 문서 이동은 링크. */
-  .actionPrimary {
-    min-width: 11rem;
-  }
-
   .actionSecondary {
     background: transparent;
     border: 1px solid var(--aq-border-strong);
@@ -96,26 +91,14 @@ export const privacyPageStyles = css`
     transform: translateY(1px) rotate(-135deg);
   }
 
-  .snapshotSkeleton {
-    display: grid;
-    gap: 12px;
-    margin-top: 4px;
-  }
-
-  .detailList,
-  .snapshotList {
+  .detailList {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
-    margin: 0;
+    margin: 0 0 16px;
   }
 
-  .detailList {
-    margin-bottom: 16px;
-  }
-
-  .detailList div,
-  .snapshotList div {
+  .detailList div {
     min-width: 0;
   }
 
@@ -132,30 +115,7 @@ export const privacyPageStyles = css`
     font-weight: 700;
   }
 
-  .requestForm {
-    display: grid;
-    gap: 14px;
-  }
-
-  .requestForm label {
-    display: grid;
-    gap: 7px;
-    color: var(--aq-text-secondary);
-    font-weight: 800;
-  }
-
-  select,
-  textarea {
-    width: 100%;
-    border: 1px solid var(--aq-border);
-    border-radius: 7px;
-    padding: 11px 12px;
-    color: var(--aq-text);
-    font: inherit;
-  }
-
-  .muted,
-  .requestResult {
+  .muted {
     margin: 12px 0 0;
     color: var(--aq-text-secondary);
     line-height: 1.6;
@@ -169,43 +129,14 @@ export const privacyPageStyles = css`
     text-underline-offset: 3px;
   }
 
-  .feedback {
-    margin: 12px 0 0;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-weight: 800;
-    line-height: 1.55;
-  }
-
-  .feedback::before {
-    content: "";
-    width: 8px;
-    height: 8px;
-    margin-top: 0.45em;
-    border-radius: 50%;
-    flex: 0 0 auto;
-    background: currentColor;
-  }
-
-  .feedback[data-tone="danger"] {
-    color: var(--aq-status-danger);
-  }
-
-  .feedback[data-tone="success"] {
-    color: var(--aq-status-success);
-  }
-
   @media (max-width: ${layoutBreakpoint.editorCompact}px) {
-    .actionPrimary,
     .actionSecondary {
       width: 100%;
     }
   }
 
   @media (max-width: 640px) {
-    .detailList,
-    .snapshotList {
+    .detailList {
       grid-template-columns: 1fr;
     }
   }

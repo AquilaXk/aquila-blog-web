@@ -92,7 +92,6 @@ const readHealthCheck = (
 
 const buildBars = (props: Props): OpsBar[] => {
   const dashboardSnapshot = props.dashboardSnapshot
-  const mailQueue = props.mailDiagnostics?.taskQueue
   const values = dashboardSnapshot
     ? [
         {
@@ -147,12 +146,6 @@ const buildBars = (props: Props): OpsBar[] => {
             ? ("warn" as OpsTone)
             : ("good" as OpsTone),
         },
-        {
-          key: "mail-lag",
-          label: "mail",
-          value: dashboardSnapshot.signupMail.queueLagSeconds ?? 0,
-          tone: toOpsTone(dashboardSnapshot.signupMail.status),
-        },
       ]
     : [
         {
@@ -199,29 +192,12 @@ const buildBars = (props: Props): OpsBar[] => {
             ? ("neutral" as OpsTone)
             : ("good" as OpsTone),
         },
-        {
-          key: "mail-backlog",
-          label: "mail",
-          value: mailQueue?.backlogCount ?? 0,
-          tone: mailQueue?.backlogCount
-            ? ("warn" as OpsTone)
-            : ("good" as OpsTone),
-        },
-        {
-          key: "mail-failed",
-          label: "mail-failed",
-          value: mailQueue?.failedCount ?? 0,
-          tone: mailQueue?.failedCount
-            ? ("warn" as OpsTone)
-            : ("good" as OpsTone),
-        },
       ]
   const hasCollectedData = Boolean(
     dashboardSnapshot ||
       props.taskQueueDiagnostics ||
       props.cleanupDiagnostics ||
-      props.authSecurityEvents.length ||
-      mailQueue
+      props.authSecurityEvents.length
   )
   if (!hasCollectedData) return []
   const maxValue = Math.max(...values.map((bar) => bar.value), 1)
@@ -243,8 +219,6 @@ export const AdminToolsOpsOverview = (props: Props) => {
   const redisStatus =
     readHealthCheck(health, "redis") || props.systemHealthStatus
   const dbStatus = readHealthCheck(health, "db") || props.systemHealthStatus
-  const signupMailStatus =
-    readHealthCheck(health, "signupMail") || props.mailStatusLabel
   const dashboardSnapshot = props.dashboardSnapshot
   const blockedAuthCount = props.authSecurityEvents.filter(
     (event: { eventType?: string }) =>
@@ -289,7 +263,7 @@ export const AdminToolsOpsOverview = (props: Props) => {
       key: "cache-hit",
       label: "Cache hit",
       value: redisStatus,
-      detail: `signup mail ${signupMailStatus}`,
+      detail: `db ${dbStatus}`,
       tone: toOpsTone(redisStatus),
     },
   ]
@@ -312,15 +286,6 @@ export const AdminToolsOpsOverview = (props: Props) => {
         ? `ready=${dashboardSnapshot.taskQueue.readyPendingCount} failed=${dashboardSnapshot.taskQueue.failedCount} stale=${dashboardSnapshot.taskQueue.staleProcessingCount}`
         : "snapshot=empty",
       tone: toOpsTone(props.queueStatusLabel),
-    },
-    {
-      key: "mail",
-      time: dashboardSnapshot?.signupMail.latestFailureAt
-        ? formatInstant(dashboardSnapshot.signupMail.latestFailureAt)
-        : props.recentCheckedLabel,
-      message: "signup.mail",
-      detail: `status=${signupMailStatus}`,
-      tone: toOpsTone(signupMailStatus),
     },
     {
       key: "storage",
@@ -453,7 +418,7 @@ export const AdminToolsOpsOverview = (props: Props) => {
               {
                 key: "readiness",
                 title: "Readiness",
-                summary: `db ${dbStatus} · mail ${signupMailStatus}`,
+                summary: `db ${dbStatus}`,
                 tone: toOpsTone(dbStatus),
                 value: dbStatus === "UP" ? "PASS" : dbStatus,
               },

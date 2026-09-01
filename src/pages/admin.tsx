@@ -64,9 +64,6 @@ type AdminHubDashboardSnapshotPayload = {
     recentEventCount: number
     blockedEventCount: number
   }
-  signupMail: {
-    status: string
-  }
   storageCleanup: {
     eligibleForPurgeCount: number
     blockedBySafetyThreshold: boolean

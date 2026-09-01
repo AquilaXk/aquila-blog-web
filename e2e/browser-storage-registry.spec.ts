@@ -52,22 +52,17 @@ test("browser storage registry includes privacy and runtime keys used by public 
       expect.objectContaining({ area: "cookie", key: "accessToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "refreshToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "sessionKey", purpose: "auth-session" }),
-      expect.objectContaining({ area: "cookie", key: "signup_session", purpose: "signup-verification-session" }),
       expect.objectContaining({ area: "cookie", key: "scheme", purpose: "theme-preference" }),
       expect.objectContaining({
         area: "localStorage",
         key: OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
         stores: expect.stringContaining("version"),
       }),
-      expect.objectContaining({ area: "localStorage", key: "auth.login.keepSignedIn" }),
-      expect.objectContaining({ area: "localStorage", key: "auth.login.ipSecurityOn" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
-      expect.objectContaining({ area: "localStorage", key: "auth.admin.keepSignedIn.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v2" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
-      expect.objectContaining({ area: "sessionStorage", key: "auth.signupMailCooldown.v1" }),
       expect.objectContaining({
         area: "sessionStorage",
         key: "auth:me:anon-probe-suppress-until:v1",
@@ -75,6 +70,20 @@ test("browser storage registry includes privacy and runtime keys used by public 
       expect.objectContaining({ area: "sessionStorage", key: "__aquila_client_runtime_recovery__" }),
       expect.objectContaining({ area: "sessionStorage", key: FEED_EXPLORER_RESTORE_KEY_PREFIX }),
     ])
+  )
+
+  const retiredKeys = [
+    "signup_session",
+    "admin_tools_mail_snapshot_v1",
+    "auth.login.keepSignedIn",
+    "auth.login.ipSecurityOn",
+    "auth.admin.keepSignedIn.v1",
+    "auth.signupMailCooldown.v1",
+    "member.notification.lastEventId.v1",
+    "member.notification.snapshot.v1",
+  ]
+  expect(registeredBrowserStorageKeys.map((entry) => entry.key)).not.toEqual(
+    expect.arrayContaining(retiredKeys)
   )
 })
 
@@ -84,7 +93,6 @@ test("browser storage registry covers source storage constants", () => {
 
   expect(sourceConstants).toEqual(expect.arrayContaining([
     expect.objectContaining({ name: "ADMIN_SAVED_EMAIL_STORAGE_KEY", key: "auth.admin.savedEmail.v1" }),
-    expect.objectContaining({ name: "ADMIN_KEEP_SIGNED_IN_STORAGE_KEY", key: "auth.admin.keepSignedIn.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_V1_STORAGE_KEY", key: "admin.editor.localDraft.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_CREATE_STORAGE_KEY", key: "admin.editor.localDraft.create.v3" }),
     expect.objectContaining({

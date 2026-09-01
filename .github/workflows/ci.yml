@@ -84,8 +84,6 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: npx playwright install --with-deps chromium
       - run: yarn test:e2e:smoke
-        env:
-          NEXT_PUBLIC_SIGNUP_ENABLED: "true"
 
   accessibility:
     runs-on: ubuntu-latest

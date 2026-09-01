@@ -76,6 +76,13 @@ test.describe("frontend legacy boundary", () => {
     expect(frontPathExists("src/pages/settings/account.tsx")).toBe(false)
   })
 
+  test("administrator remember-login stays server-scoped without a local preference fallback", () => {
+    const adminLogin = readFrontText("src/pages/admin/login.tsx")
+
+    expect(adminLogin).toContain("rememberMe: keepSignedIn")
+    expect(adminLogin).not.toContain("auth.admin.keepSignedIn.v1")
+  })
+
   test("production-orphan public auth sources are removed", () => {
     expect(frontPathExists("src/components/auth")).toBe(false)
     expect(frontPathExists("src/hooks/useSignupMailCooldown.ts")).toBe(false)
@@ -96,5 +103,65 @@ test.describe("frontend legacy boundary", () => {
     const backendClient = readFrontText("src/apis/backend/client.ts")
     expect(backendClient).not.toContain("/member/api/v1/notifications/snapshot")
     expect(backendClient).not.toContain("/member/api/v1/notifications(\\/|$)")
+  })
+
+  test("handwritten public-member compatibility inventory is retired from runtime, config, and admin tools", () => {
+    expect(frontPathExists("src/apis/backend/privacy.ts")).toBe(false)
+
+    const publicMemberCompatibilitySources = [
+      "config/env.contract.json",
+      "Dockerfile.runtime",
+      ".github/workflows/ci.yml",
+      "README.md",
+      "scripts/env/env-contract.test.mjs",
+      "src/apis/backend/client.ts",
+      "src/apis/backend/errorMessages.ts",
+      "src/apis/backend/legal.ts",
+      "src/libs/backend/requestPath.ts",
+      "src/libs/router.ts",
+      "src/libs/server/runtimeMetrics.ts",
+      "src/libs/privacy/browserStorageRegistry.ts",
+      "src/libs/privacy/optionalTrackingConsentCore.ts",
+      "src/styles/colors.ts",
+      "src/pages/admin.tsx",
+      "src/pages/admin/tools.tsx",
+      "src/routes/LegalPolicy/OptionalTrackingConsentSettings.tsx",
+      "src/routes/Settings/SettingsLayout.tsx",
+      "src/routes/Settings/SettingsPrivacyPage.tsx",
+      "src/routes/Admin/AdminDashboardWorkspaceModel.ts",
+      "src/routes/Admin/AdminDashboardWorkspacePage.tsx",
+      "src/routes/Admin/AdminHubSurface.stories.tsx",
+      "src/routes/Admin/AdminToolsDiagnosticsSection.tsx",
+      "src/routes/Admin/AdminToolsExecutionRail.tsx",
+      "src/routes/Admin/AdminToolsExecutionSection.tsx",
+      "src/routes/Admin/AdminToolsOpsOverview.tsx",
+      "src/routes/Admin/AdminToolsWorkspacePage.tsx",
+      "src/routes/Admin/AdminToolsWorkspacePageState.ts",
+      "src/routes/Admin/AdminToolsWorkspaceModel.ts",
+      "src/routes/Admin/useEditorStudioProfileCommands.ts",
+    ]
+    const retiredPublicMemberPatterns = [
+      /\/signup(?:\/|["'`])/i,
+      /social[-/]?login/i,
+      /comment-provider/i,
+      /auth\/login/i,
+      /to(?:Login|Signup)Path/,
+      /privacy\/(?:export|requests)/i,
+      /signup[- ]?mail/i,
+      /SignupMail|signupMail|MAIL_SIGNUP|mailStatus|mailConnectivity|mailTest/,
+      /getPrivacyExport|createPrivacyRequest|PrivacyExportResponse|PrivacyRequest(?:Item|Type)/,
+      /privacy-request|signupPolicyVersion|signupStart|signupVerify|signupComplete|signupPolicyChangedMessage/,
+      /signup_session|admin_tools_mail_snapshot_v1|auth\.login\.(?:keepSignedIn|ipSecurityOn)/,
+      /auth\.signupMailCooldown\.v1|member\.notification\.(?:lastEventId|snapshot)\.v1/,
+      /NEXT_PUBLIC_SIGNUP_ENABLED|kakaoLogin(?:Background|Text|FocusBorder)/,
+    ]
+
+    expect(readFrontText("src/routes/Settings/SettingsLayout.tsx")).not.toContain("useAuthSession")
+    for (const relativePath of publicMemberCompatibilitySources) {
+      const source = readFrontText(relativePath)
+      for (const pattern of retiredPublicMemberPatterns) {
+        expect(source, `${relativePath} must not retain ${pattern}`).not.toMatch(pattern)
+      }
+    }
   })
 })

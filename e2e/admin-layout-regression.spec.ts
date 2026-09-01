@@ -33,7 +33,6 @@ const SYSTEM_HEALTH_FIXTURE = {
   status: "UP",
   details: {
     db: { status: "UP" },
-    mail: { status: "READY" },
     queue: { status: "UP" },
     storage: { status: "UP" },
   },
@@ -50,12 +49,6 @@ const DASHBOARD_SNAPSHOT_FIXTURE = {
     oldestReadyPendingAgeSeconds: 480,
     latestFailureAt: "2026-05-21T08:10:00Z",
     latestFailureMessage: "thumbnail refresh timeout",
-  },
-  signupMail: {
-    status: "READY",
-    queueLagSeconds: 35,
-    latestFailureAt: null,
-    latestFailureMessage: null,
   },
   authSecurity: {
     recentEventCount: 18,

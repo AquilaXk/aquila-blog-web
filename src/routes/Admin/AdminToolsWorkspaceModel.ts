@@ -15,8 +15,7 @@ export type SystemHealthPayload = {
 }
 
 export type ActionCardTone = "read" | "write" | "danger" | "infra"
-export type InlineNoticeTone = "warning" | "danger" | "success"
-export type DiagnosticTab = "mail" | "queue" | "cleanup" | "auth"
+export type DiagnosticTab = "queue" | "cleanup" | "auth"
 export type ExecutionDomain = "overview" | "diagnostics" | "execution"
 export type ExecutionResultFilter = "all" | "success" | "error" | "stale"
 
@@ -64,9 +63,6 @@ export const ACTION_META: Record<
 > = {
   admPostCount: { label: "전체 글 수 확인", domain: "execution", tone: "read" },
   systemHealth: { label: "서비스 상태 조회", domain: "execution", tone: "infra" },
-  mailStatus: { label: "메일 진단", domain: "diagnostics", tone: "infra" },
-  mailConnectivity: { label: "SMTP 연결 확인", domain: "diagnostics", tone: "infra" },
-  mailTest: { label: "테스트 메일 발송", domain: "execution", tone: "write" },
   taskQueueStatus: { label: "작업 큐 진단", domain: "diagnostics", tone: "infra" },
   cleanupStatus: { label: "파일 정리 진단", domain: "diagnostics", tone: "infra" },
   authSecurityEvents: { label: "인증 보안 기록 조회", domain: "diagnostics", tone: "infra" },
@@ -175,12 +171,6 @@ export const buildExecutionSummary = (key: string, status: "success" | "error", 
     }
     case "admPostCount":
       return typeof payload === "number" ? `전체 글 ${payload}건을 확인했습니다.` : getResultMessage(payload) || "전체 글 수를 확인했습니다."
-    case "mailStatus":
-      return "메일 준비 상태를 다시 확인했습니다."
-    case "mailConnectivity":
-      return "SMTP 연결 상태를 다시 확인했습니다."
-    case "mailTest":
-      return getResultMessage(payload) || "테스트 메일 발송을 요청했습니다."
     case "taskQueueStatus":
       return "작업 큐 진단을 새로고침했습니다."
     case "cleanupStatus":

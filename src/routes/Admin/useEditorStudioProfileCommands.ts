@@ -90,18 +90,10 @@ export const useEditorStudioProfileCommands = ({
     applyProfileState(nextMember)
   }, [applyProfileState, queryClient, setMe])
 
-  const refreshAdminProfile = useCallback(async (memberId: number, fallback?: MemberMe) => {
-    try {
-      const detailed = await apiFetch<MemberMe>(`/member/api/v1/adm/members/${memberId}`)
-      syncProfileState(detailed)
-      return detailed
-    } catch (error) {
-      if (fallback) {
-        syncProfileState(fallback)
-        return fallback
-      }
-      throw error
-    }
+  const refreshAdminProfile = useCallback(async () => {
+    const detailed = await apiFetch<MemberMe>("/member/api/v1/auth/me")
+    syncProfileState(detailed)
+    return detailed
   }, [syncProfileState])
 
   const handleUploadMemberProfileImage = useCallback(async (selectedFile?: File) => {
@@ -230,13 +222,18 @@ export const useEditorStudioProfileCommands = ({
     void run("admMemberProfileRefresh", async () => {
       if (!member.id) throw new Error("현재 관리자 정보를 확인할 수 없습니다.")
       setProfileNotice({ tone: "loading", text: "현재 저장값을 다시 불러오는 중입니다..." })
-      const refreshed = await refreshAdminProfile(member.id, member)
-      if (!refreshed) throw new Error("현재 저장값을 불러오지 못했습니다.")
-      setProfileNotice({
-        tone: "success",
-        text: "현재 저장값을 다시 불러왔습니다. 입력창과 미리보기가 최신 상태입니다.",
-      })
-      return refreshed as unknown as JsonValue
+      try {
+        const refreshed = await refreshAdminProfile()
+        setProfileNotice({
+          tone: "success",
+          text: "현재 저장값을 다시 불러왔습니다. 입력창과 미리보기가 최신 상태입니다.",
+        })
+        return refreshed as unknown as JsonValue
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setProfileNotice({ tone: "error", text: `현재 저장값을 불러오지 못했습니다: ${message}` })
+        throw error
+      }
     })
   }, [member, refreshAdminProfile, run])
 

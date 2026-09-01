@@ -130,7 +130,7 @@ test.describe("frontend pure logic contracts", () => {
     expect(normalizeApiRequestPath("/post/api/v1/posts/feed/cursor?cursor=abc")).toBe(
       "/post/api/v1/posts/feed/cursor?cursor=abc"
     )
-    expect(normalizeApiRequestPath("/signup/api/v1/email/start")).toBe("/signup/api/v1/email/start")
+    expect(normalizeApiRequestPath("/member/api/v1/auth/me")).toBe("/member/api/v1/auth/me")
     expect(() => normalizeApiRequestPath("https://api.example.com/member/api/v1/auth/me")).toThrow(
       /Absolute URL/
     )

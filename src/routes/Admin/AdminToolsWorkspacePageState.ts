@@ -1,24 +1,5 @@
-import { setCookie } from "cookies-next/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import type { SystemHealthPayload, TaskRetryPolicy } from "src/routes/Admin/AdminToolsWorkspaceModel"
-
-export type SignupMailDiagnostics = {
-  status: string
-  adapter: string
-  host: string | null
-  port: number | null
-  mailFrom: string | null
-  usernameConfigured: boolean
-  passwordConfigured: boolean
-  smtpAuth: boolean
-  startTlsEnabled: boolean
-  missing: string[]
-  canConnect: boolean | null
-  checkedAt: string
-  verifyPath: string
-  connectionError?: string | null
-  taskQueue?: TaskTypeDiagnostics | null
-}
 
 export type TaskTypeDiagnostics = {
   taskType: string
@@ -104,7 +85,6 @@ export type ApiRsData<T> = {
 export type AdminToolsInitialSnapshot = {
   systemHealth: SystemHealthPayload | null
   systemHealthFetchedAt: string | null
-  mailDiagnostics: SignupMailDiagnostics | null
   taskQueueDiagnostics: TaskQueueDiagnostics | null
   taskQueueCheckedAt: string | null
   cleanupDiagnostics: UploadedFileCleanupDiagnostics | null
@@ -136,7 +116,6 @@ export type PageDto<T> = {
 export const EMPTY_INITIAL_SNAPSHOT: AdminToolsInitialSnapshot = {
   systemHealth: null,
   systemHealthFetchedAt: null,
-  mailDiagnostics: null,
   taskQueueDiagnostics: null,
   taskQueueCheckedAt: null,
   cleanupDiagnostics: null,
@@ -144,53 +123,4 @@ export const EMPTY_INITIAL_SNAPSHOT: AdminToolsInitialSnapshot = {
   authSecurityEvents: [],
   authSecurityCheckedAt: null,
   seedPostId: "",
-}
-
-const ADMIN_TOOLS_MAIL_SNAPSHOT_COOKIE = "admin_tools_mail_snapshot_v1"
-const ADMIN_TOOLS_MAIL_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30
-
-export const buildMailSnapshot = (diagnostics: SignupMailDiagnostics): SignupMailDiagnostics => ({
-  status: diagnostics.status,
-  adapter: diagnostics.adapter,
-  host: diagnostics.host,
-  port: diagnostics.port,
-  mailFrom: diagnostics.mailFrom,
-  usernameConfigured: diagnostics.usernameConfigured,
-  passwordConfigured: diagnostics.passwordConfigured,
-  smtpAuth: diagnostics.smtpAuth,
-  startTlsEnabled: diagnostics.startTlsEnabled,
-  missing: diagnostics.missing,
-  canConnect: diagnostics.canConnect,
-  checkedAt: diagnostics.checkedAt,
-  verifyPath: diagnostics.verifyPath,
-  connectionError: diagnostics.connectionError ?? null,
-  taskQueue: diagnostics.taskQueue
-    ? {
-        taskType: diagnostics.taskQueue.taskType,
-        pendingCount: diagnostics.taskQueue.pendingCount,
-        readyPendingCount: diagnostics.taskQueue.readyPendingCount,
-        delayedPendingCount: diagnostics.taskQueue.delayedPendingCount,
-        processingCount: diagnostics.taskQueue.processingCount,
-        backlogCount: diagnostics.taskQueue.backlogCount,
-        queueLagSeconds: diagnostics.taskQueue.queueLagSeconds,
-        failedCount: diagnostics.taskQueue.failedCount,
-        staleProcessingCount: diagnostics.taskQueue.staleProcessingCount,
-        label: diagnostics.taskQueue.label,
-        oldestReadyPendingAt: diagnostics.taskQueue.oldestReadyPendingAt,
-        oldestReadyPendingAgeSeconds: diagnostics.taskQueue.oldestReadyPendingAgeSeconds,
-        latestFailureAt: diagnostics.taskQueue.latestFailureAt,
-        latestFailureMessage: diagnostics.taskQueue.latestFailureMessage,
-        retryPolicy: diagnostics.taskQueue.retryPolicy,
-      }
-    : null,
-})
-
-export const persistMailSnapshotCookie = (diagnostics: SignupMailDiagnostics) => {
-  const snapshot = buildMailSnapshot(diagnostics)
-  setCookie(ADMIN_TOOLS_MAIL_SNAPSHOT_COOKIE, JSON.stringify(snapshot), {
-    path: "/admin/tools",
-    sameSite: "lax",
-    maxAge: ADMIN_TOOLS_MAIL_SNAPSHOT_MAX_AGE_SECONDS,
-    secure: typeof window !== "undefined" && window.location.protocol === "https:",
-  })
 }
