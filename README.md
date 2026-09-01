@@ -50,8 +50,6 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 | `PLAYWRIGHT_BASE_URL` | live E2E 대상 URL |
 | `BUNDLE_BUDGET_MARGIN_PERCENT` | 번들 예산 허용 오차(%) |
 | `BUNDLE_BUDGET_ENFORCEMENT` | `strict` 또는 `warn` |
-| `E2E_ADMIN_EMAIL` | live E2E 관리자 이메일 |
-| `E2E_ADMIN_PASSWORD` | live E2E 관리자 비밀번호 |
 
 ## 인증/세션 동작 요약
 

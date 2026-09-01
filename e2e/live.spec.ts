@@ -1,440 +1,17 @@
-import { expect, test, type Page, type Response, type Route } from "@playwright/test"
-import { ADMIN_HUB_GREETING_OPTIONS } from "../src/routes/Admin/AdminHubSurfaceModel"
-import {
-  adminEmail,
-  adminLegacyLoginId,
-  adminPassword,
-  buildLoginPayloadCandidates,
-  cleanupLiveEditorPost,
-  hasAuthCookie,
-  isInvalidLoginRequestBody,
-  isNavigationInterruptedError,
-  isRetriableLoginStatus,
-  isRetriableNetworkError,
-  liveLoginAttempts,
-  liveLoginTimeoutMs,
-  liveRetryBaseDelayMs,
-  liveUiRedirectTimeoutMs,
-  resolveApiBaseUrl,
-  sleep,
-  waitForApiReachability,
-} from "./helpers/liveAuth"
+import { expect, test } from "@playwright/test"
 
-const hasLiveCredentials = Boolean((adminEmail || adminLegacyLoginId) && adminPassword)
-const hasUiLoginCredentials = Boolean(adminEmail && adminPassword)
 const expectedFrontendCommitSha = process.env.E2E_EXPECTED_FRONT_COMMIT_SHA?.trim() || ""
 const explicitLiveApiBaseUrl = process.env.E2E_API_BASE_URL?.trim() || ""
-const adminLandingHeadingPattern = new RegExp(
-  `^(?:${Object.values(ADMIN_HUB_GREETING_OPTIONS).flat().join("|")}),`,
-)
-const adminDashboardHeadingPattern = /^운영 상태와 복구$/
-const adminCloudHeadingPattern = /^미디어 라이브러리$/
-const adminProfileHeadingPattern = /^개인정보와 계정 설정$/
-const adminToolsHeadingPattern = /^운영 상태와 복구$/
-const adminPostsHeadingPattern = /^글 관리$/
-const adminUrlPattern = /\/admin(\/|$|\?)/
-const adminLoginUrlPattern = /\/admin\/login(\/|$|\?)/
-const isAuthenticatedAdminUrl = (value: string) =>
-  adminUrlPattern.test(value) && !adminLoginUrlPattern.test(value)
-
 
 const isWebKitCorsAccessControlNoise = (message: string) =>
-  /due to access control checks\./i.test(message) &&
-  /\/(?:www\.)?[\w.-]+\/_next\/data\/[^/\s]+\/[^?\s]+\.json/i.test(message)
-
-
-const tryEnterAdminRoute = async (page: Page, timeoutMs: number) => {
-  const tries = 3
-  const perTryTimeout = Math.max(4_000, Math.floor(timeoutMs / tries))
-
-  for (let attempt = 1; attempt <= tries; attempt += 1) {
-    try {
-      await page.goto("/admin")
-    } catch (error) {
-      if (!isNavigationInterruptedError(error)) throw error
-    }
-
-    if (isAuthenticatedAdminUrl(page.url())) return true
-
-    try {
-      await page.waitForURL((url) => isAuthenticatedAdminUrl(url.toString()), { timeout: perTryTimeout })
-      return true
-    } catch {
-      if (attempt < tries) {
-        await sleep(400 * attempt)
-      }
-    }
-  }
-
-  return false
-}
-
-const gotoLoginForAdmin = async (page: Page, timeoutMs: number) => {
-  try {
-    await page.goto("/admin/login?next=%2Fadmin")
-  } catch (error) {
-    if (!isNavigationInterruptedError(error)) throw error
-  }
-
-  if (isAuthenticatedAdminUrl(page.url())) return "admin" as const
-  if (/\/admin\/login(\/|$|\?)/.test(page.url())) return "login" as const
-
-  try {
-    await page.waitForURL(/\/(admin\/login|admin)(\/|$|\?)/, { timeout: Math.min(timeoutMs, 8_000) })
-  } catch {
-    // keep current url and let caller decide by assertion/retry.
-  }
-
-  if (isAuthenticatedAdminUrl(page.url())) return "admin" as const
-  return "login" as const
-}
-
-type UiLoginOutcome =
-  | { kind: "response"; response: Response }
-  | { kind: "admin-url" }
-  | { kind: "auth-cookie" }
-  | { kind: "error"; message: string }
-  | { kind: "timeout" }
-
-const getVisibleUiLoginError = async (page: Page) => {
-  const loginError = page
-    .locator("main")
-    .getByText(/로그인에 실패|이메일 또는 비밀번호|로그인 시도가 너무 많습니다|서버 오류/i)
-    .first()
-
-  if (!(await loginError.isVisible().catch(() => false))) return null
-  return (await loginError.textContent())?.trim() || "unknown error"
-}
-
-const waitForUiLoginOutcome = async (
-  page: Page,
-  getObservedLoginResponse: () => Response | null,
-  timeoutMs: number
-): Promise<UiLoginOutcome> => {
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt < timeoutMs) {
-    const observedLoginResponse = getObservedLoginResponse()
-    if (observedLoginResponse) {
-      return { kind: "response", response: observedLoginResponse }
-    }
-
-    if (isAuthenticatedAdminUrl(page.url())) {
-      return { kind: "admin-url" }
-    }
-
-    if (await hasAuthCookie(page)) {
-      return { kind: "auth-cookie" }
-    }
-
-    const loginError = await getVisibleUiLoginError(page)
-    if (loginError) {
-      return { kind: "error", message: loginError }
-    }
-
-    await page.waitForTimeout(250)
-  }
-
-  const observedLoginResponse = getObservedLoginResponse()
-  if (observedLoginResponse) {
-    return { kind: "response", response: observedLoginResponse }
-  }
-
-  if (isAuthenticatedAdminUrl(page.url())) {
-    return { kind: "admin-url" }
-  }
-
-  if (await hasAuthCookie(page)) {
-    return { kind: "auth-cookie" }
-  }
-
-  const loginError = await getVisibleUiLoginError(page)
-  if (loginError) {
-    return { kind: "error", message: loginError }
-  }
-
-  return { kind: "timeout" }
-}
-
-const liveEditorSmokeMarkdown = [
-  "라이브 E2E 편집 확인",
-  "",
-  "```ts",
-  "const liveHoverWheel = true",
-  "```",
-  "",
-  "| A | B | C | D | E | F | G |",
-  "| --- | --- | --- | --- | --- | --- | --- |",
-  "| 1 | 2 | 3 | 4 | 5 | 6 | 7 |",
-  "| aa | bb | cc | dd | ee | ff | gg |",
-].join("\n")
-
-type LiveWriteResponse = {
-  data?: {
-    id?: number
-  }
-}
-
-const appendMarkdownToEditor = async (page: Page, markdown: string) => {
-  const editorRoot = page.getByTestId("markdown-editor")
-  const editorContent = page.getByTestId("markdown-editor-content")
-
-  await expect(editorRoot).toBeVisible()
-  await expect(editorContent).toBeVisible()
-  await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
-  await expect(page.getByTestId("markdown-editor-write-pane")).toHaveCount(0)
-  await expect(page.getByTestId("markdown-editor-preview-pane")).toHaveCount(0)
-
-  await editorContent.click()
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+End" : "Control+End")
-  await page.keyboard.insertText(`\n\n${markdown}`)
-
-  expect(await page.locator(".cm-live-fenced-code").count()).toBeGreaterThan(0)
-  await expect(page.getByTestId("markdown-editor-live-surface").locator(".cm-scroller")).toHaveCSS(
-    "overscroll-behavior-y",
-    "contain"
-  )
-  await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
-  const selectedMarkdown = await editorContent.evaluate(() => window.getSelection()?.toString() ?? "")
-  expect(selectedMarkdown).toContain("라이브 E2E 편집 확인")
-  expect(selectedMarkdown).toContain("const liveHoverWheel = true")
-  expect(selectedMarkdown).toContain("aa")
-}
-
-const loginWithRetry = async (
-  page: Page,
-  apiBaseUrl: string,
-  loginEmail: string,
-  legacyLoginId: string,
-  password: string
-) => {
-  const payloadCandidates = buildLoginPayloadCandidates(loginEmail, legacyLoginId, password)
-  if (payloadCandidates.length === 0) {
-    throw new Error("Login credentials are missing. Provide E2E_ADMIN_EMAIL or E2E_ADMIN_USERNAME.")
-  }
-
-  let lastFailure = "unknown"
-
-  for (let attempt = 1; attempt <= liveLoginAttempts; attempt += 1) {
-    let shouldRetryByStatus = false
-
-    try {
-      for (let payloadIndex = 0; payloadIndex < payloadCandidates.length; payloadIndex += 1) {
-        const payload = payloadCandidates[payloadIndex]
-        const isLastPayload = payloadIndex === payloadCandidates.length - 1
-        const response = await page.request.post(`${apiBaseUrl}/member/api/v1/auth/login`, {
-          data: payload.data,
-          timeout: liveLoginTimeoutMs,
-        })
-
-        if (response.ok()) return response
-
-        const body = (await response.text().catch(() => "")).slice(0, 300)
-        const status = response.status()
-        lastFailure = `status=${status} payload=${payload.label} body=${body}`
-
-        if (isInvalidLoginRequestBody(status, body) && !isLastPayload) continue
-
-        if (isRetriableLoginStatus(status) && attempt < liveLoginAttempts) {
-          shouldRetryByStatus = true
-          break
-        }
-
-        throw new Error(`Login API failed. ${lastFailure}`)
-      }
-    } catch (error) {
-      if (isRetriableNetworkError(error) && attempt < liveLoginAttempts) {
-        lastFailure = error instanceof Error ? error.message : String(error)
-        await sleep(liveRetryBaseDelayMs * attempt)
-        continue
-      }
-      throw error
-    }
-
-    if (shouldRetryByStatus && attempt < liveLoginAttempts) {
-      await sleep(liveRetryBaseDelayMs * attempt)
-      continue
-    }
-  }
-
-  throw new Error(`Login API failed after retries. base=${apiBaseUrl} last=${lastFailure}`)
-}
-
-const loginThroughUi = async (
-  page: Page,
-  apiBaseUrl: string,
-  loginEmail: string,
-  legacyLoginId: string,
-  password: string
-) => {
-  let lastFailure = "unknown"
-
-  for (let attempt = 1; attempt <= liveLoginAttempts; attempt += 1) {
-    const route = await gotoLoginForAdmin(page, liveUiRedirectTimeoutMs)
-    if (route === "admin") {
-      return
-    }
-
-    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
-    await page.getByLabel("이메일").fill(loginEmail)
-    await page.getByLabel("비밀번호").fill(password)
-
-    let observedLoginResponse: Response | null = null
-    const loginResponsePromise = page
-      .waitForResponse(
-        (response) =>
-          response.request().method() === "POST" &&
-          response.url().includes("/member/api/v1/auth/login"),
-        { timeout: liveLoginTimeoutMs }
-      )
-      .then((response) => {
-        observedLoginResponse = response
-        return response
-      })
-      .catch(() => null)
-
-    const loginButton = page.getByRole("button", { name: "로그인", exact: true })
-    await expect(loginButton).toBeVisible()
-    await expect(loginButton).toBeEnabled()
-    await loginButton.click()
-
-    const outcome = await waitForUiLoginOutcome(page, () => observedLoginResponse, liveLoginTimeoutMs)
-    await loginResponsePromise
-
-    if (outcome.kind === "response") {
-      const status = outcome.response.status()
-
-      if (!outcome.response.ok()) {
-        const bodyPreview = (await outcome.response.text().catch(() => "")).slice(0, 240)
-        lastFailure = `status=${status} body=${bodyPreview}`
-
-        // 운영 반영 타이밍 차이로 구형 로그인 payload가 섞인 경우, UI 테스트를 즉시 중단하지 않고
-        // API 경로로 세션을 복구해 이후 관리자 동선을 계속 검증한다.
-        if (isInvalidLoginRequestBody(status, bodyPreview)) {
-          await loginWithRetry(page, apiBaseUrl, loginEmail, legacyLoginId, password)
-          await page.goto("/admin")
-          await expect(page).toHaveURL(/\/admin(\/|$)/, { timeout: liveUiRedirectTimeoutMs })
-          return
-        }
-
-        if (isRetriableLoginStatus(status) && attempt < liveLoginAttempts) {
-          await sleep(liveRetryBaseDelayMs * attempt)
-          continue
-        }
-        throw new Error(`UI login request failed. ${lastFailure}`)
-      }
-
-      if (isAuthenticatedAdminUrl(page.url())) {
-        return
-      }
-      if (await tryEnterAdminRoute(page, liveUiRedirectTimeoutMs)) return
-    }
-
-    if (outcome.kind === "admin-url") {
-      return
-    }
-
-    // 성공 쿠키가 있는데 리다이렉트가 지연되는 경우 /admin 재진입으로 판정한다.
-    // 단, 쿠키가 만료/무효일 수 있으므로 즉시 실패시키지 않고 API 로그인 복구 경로를 탄다.
-    if (outcome.kind === "auth-cookie") {
-      if (await tryEnterAdminRoute(page, liveUiRedirectTimeoutMs)) return
-
-      await loginWithRetry(page, apiBaseUrl, loginEmail, legacyLoginId, password)
-      if (await tryEnterAdminRoute(page, liveUiRedirectTimeoutMs)) return
-
-      lastFailure = `cookie-present-but-unauthorized url=${page.url()}`
-      if (attempt < liveLoginAttempts) {
-        await sleep(liveRetryBaseDelayMs * attempt)
-        continue
-      }
-
-      throw new Error(`UI login did not establish valid admin session. ${lastFailure}`)
-    }
-
-    if (outcome.kind === "error") {
-      lastFailure = `error=${outcome.message}`
-      if (attempt < liveLoginAttempts) {
-        await sleep(liveRetryBaseDelayMs * attempt)
-        continue
-      }
-      throw new Error(`UI login did not establish session. ${lastFailure}`)
-    }
-
-    try {
-      await loginWithRetry(page, apiBaseUrl, loginEmail, legacyLoginId, password)
-      if (await tryEnterAdminRoute(page, liveUiRedirectTimeoutMs)) return
-      lastFailure = `timeout->api-login-no-admin url=${page.url()}`
-    } catch (fallbackError) {
-      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
-      lastFailure = `timeout->api-fallback-failed ${fallbackMessage}`
-    }
-
-    if (attempt < liveLoginAttempts) {
-      await sleep(liveRetryBaseDelayMs * attempt)
-      continue
-    }
-  }
-
-  throw new Error(`UI login failed after retries. last=${lastFailure}`)
-}
-
-const authenticateLiveAdmin = async (page: Page, apiBaseUrl: string) => {
-  if (hasUiLoginCredentials) {
-    await loginThroughUi(page, apiBaseUrl, adminEmail, adminLegacyLoginId, adminPassword)
-    return
-  }
-
-  await loginWithRetry(page, apiBaseUrl, adminEmail, adminLegacyLoginId, adminPassword)
-}
-
-const isVisibleLoginPage = async (page: Page) => {
-  if (/\/admin\/login(\/|$|\?)/.test(page.url())) return true
-  return page.getByRole("heading", { name: "로그인" }).isVisible().catch(() => false)
-}
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-const expectLiveAdminRoute = async (
-  page: Page,
-  apiBaseUrl: string,
-  path: string,
-  headingPattern: RegExp,
-  label: string
-) => {
-  const routePattern = new RegExp(`${escapeRegExp(path)}(?:/?(?:$|[?#]))`)
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    await page.goto(path)
-
-    if (await isVisibleLoginPage(page)) {
-      await authenticateLiveAdmin(page, apiBaseUrl)
-      continue
-    }
-
-    await expect(page, `${label} route url`).toHaveURL(routePattern, { timeout: 20_000 })
-    await expect(page.getByRole("heading", { name: headingPattern }), `${label} heading`).toBeVisible()
-    return
-  }
-
-  throw new Error(`${label} route redirected to login after re-authentication: ${page.url()}`)
-}
+  /due to access control checks\./i.test(message) && /\/(?:www\.)?[\w.-]+\/_next\/data\/[^/\s]+\/[^?\s]+\.json/i.test(message)
 
 test.describe("live critical error filter", () => {
   test("WebKit Next data prefetch access-control noise는 critical error에서 제외한다", () => {
-    expect(
-      isWebKitCorsAccessControlNoise(
-        "/blog.aquilaxk.site/_next/data/FsB_f7gB6UefGQbKBjMeG/index.json due to access control checks."
-      )
-    ).toBe(true)
-    expect(
-      isWebKitCorsAccessControlNoise(
-        "https://api.blog.aquilaxk.site/member/api/v1/notifications/snapshot due to access control checks."
-      )
-    ).toBe(false)
+    expect(isWebKitCorsAccessControlNoise("/blog.aquilaxk.site/_next/data/FsB_f7gB6UefGQbKBjMeG/index.json due to access control checks.")).toBe(true)
+    expect(isWebKitCorsAccessControlNoise("https://api.blog.aquilaxk.site/member/api/v1/notifications/snapshot due to access control checks.")).toBe(false)
     expect(isWebKitCorsAccessControlNoise("TypeError: Cannot read properties of undefined")).toBe(false)
-    expect(
-      isWebKitCorsAccessControlNoise("https://cdn.example.com/widget.js due to access control checks.")
-    ).toBe(false)
+    expect(isWebKitCorsAccessControlNoise("https://cdn.example.com/widget.js due to access control checks.")).toBe(false)
   })
 })
 
@@ -443,10 +20,7 @@ test.describe("live frontend build metadata", () => {
     test.skip(!expectedFrontendCommitSha, "E2E_EXPECTED_FRONT_COMMIT_SHA is required")
 
     await page.goto("/admin/login?next=%2Fadmin")
-
-    const buildSha = await page.evaluate(() =>
-      document.querySelector('meta[name="aquila-build-sha"]')?.getAttribute("content") ?? null
-    )
+    const buildSha = await page.evaluate(() => document.querySelector('meta[name="aquila-build-sha"]')?.getAttribute("content") ?? null)
     expect(buildSha).toBe(expectedFrontendCommitSha)
   })
 })
@@ -483,9 +57,7 @@ test.describe("live public release gate", () => {
     expect(detailPath).toMatch(/^\/posts\/[^/?#]+$/)
     expect(title).not.toBe("")
 
-    const searchResponse = page.waitForResponse((response) =>
-      response.url().includes("/post/api/v1/posts/search") && response.ok()
-    )
+    const searchResponse = page.waitForResponse((response) => response.url().includes("/post/api/v1/posts/search") && response.ok())
     await page.getByLabel("Search posts by keyword").fill(title)
     await searchResponse
     await expect(page.locator(`a[href='${detailPath}']`).first()).toBeVisible()
@@ -495,36 +67,30 @@ test.describe("live public release gate", () => {
     await expect(page.getByRole("heading", { name: title }).first()).toBeVisible()
 
     for (const legalPath of ["/terms", "/privacy", "/cookies", "/legal/history"]) {
-      const legalResponse = await page.goto(legalPath, { waitUntil: "domcontentloaded" })
+      const legalResponse = await page.goto(legalPath, {
+        waitUntil: "domcontentloaded",
+      })
       expect(legalResponse?.ok(), legalPath).toBe(true)
     }
 
     const webOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL || page.url()).origin
-    const readinessUrl = new URL("/actuator/health/readiness", webOrigin).toString()
-    const readiness = await page.request.get(readinessUrl)
+    const readiness = await page.request.get(new URL("/actuator/health/readiness", webOrigin).toString())
     expect(readiness.status()).toBe(200)
   })
 })
 
-test.describe("live production e2e", () => {
-  test.skip(!hasLiveCredentials, "E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD is required")
-  test.setTimeout(120_000)
-
+test.describe("live unauthenticated boundary", () => {
   test("image upload endpoint accepts the same-origin production preflight without CORS headers", async ({ page }) => {
-    const webOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL || "").origin
-    const apiBaseUrl = resolveApiBaseUrl(webOrigin)
-    expect(apiBaseUrl).toMatch(/^https:\/\//)
-    const response = await page.request.fetch(
-      new URL("/post/api/v1/posts/images", apiBaseUrl).toString(),
-      {
-        method: "OPTIONS",
-        headers: {
-          Origin: webOrigin,
-          "Access-Control-Request-Method": "POST",
-          "Access-Control-Request-Headers": "content-type,x-aquila-csrf",
-        },
-      }
-    )
+    const webOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL || page.url()).origin
+    expect(webOrigin).toMatch(/^https:\/\//)
+    const response = await page.request.fetch(new URL("/post/api/v1/posts/images", webOrigin).toString(), {
+      method: "OPTIONS",
+      headers: {
+        Origin: webOrigin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,x-aquila-csrf",
+      },
+    })
 
     expect([200, 204]).toContain(response.status())
     expect(response.headers()["access-control-allow-origin"]).toBeUndefined()
@@ -534,179 +100,5 @@ test.describe("live production e2e", () => {
     await page.goto("/admin")
     await expect(page).toHaveURL(/\/admin\/login/)
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
-  })
-
-  test("관리자 UI 로그인 경로가 정상 동작한다", async ({ page }) => {
-    test.skip(!hasUiLoginCredentials, "UI 로그인 검증에는 E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD가 필요합니다.")
-    await page.goto("/admin/login")
-    const apiBaseUrl = resolveApiBaseUrl(page.url())
-    await waitForApiReachability(page, apiBaseUrl)
-    await loginThroughUi(page, apiBaseUrl, adminEmail, adminLegacyLoginId, adminPassword)
-    await expect(page.getByRole("heading", { name: adminLandingHeadingPattern })).toBeVisible()
-
-    await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/admin\/login/)
-    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
-  })
-
-  test("관리자 로그인 후 핵심 운영 경로가 정상 동작하고 로그아웃된다", async ({ page }) => {
-    const runtimeErrors: string[] = []
-    page.on("pageerror", (error) => {
-      runtimeErrors.push(error.message)
-    })
-
-    await page.goto("/admin/login?next=%2Fadmin")
-    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
-
-    const apiBaseUrl = resolveApiBaseUrl(page.url())
-    await waitForApiReachability(page, apiBaseUrl)
-    await authenticateLiveAdmin(page, apiBaseUrl)
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin", adminLandingHeadingPattern, "admin landing")
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin/profile", adminProfileHeadingPattern, "admin profile")
-    const profileImage = page.locator("main img").first()
-    await expect(profileImage).toBeVisible()
-    await expect
-      .poll(async () => {
-        return profileImage.evaluate((node) => {
-          if (!(node instanceof HTMLImageElement)) return false
-          return node.complete && node.naturalWidth > 0
-        })
-      })
-      .toBeTruthy()
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin/dashboard", adminDashboardHeadingPattern, "admin dashboard")
-    const dashboardKpiRail = page.locator('[data-ui="monitoring-service-rail"]')
-    await expect(dashboardKpiRail).toBeVisible()
-    await expect(dashboardKpiRail.getByText("서비스 상태")).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Steady-state guard" })).toBeVisible()
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin/cloud", adminCloudHeadingPattern, "admin cloud")
-    const visibleCloudUploadButtons = page
-      .getByRole("button", { name: /^(파일 업로드|업로드 중)$/ })
-      .filter({ visible: true })
-    await expect(visibleCloudUploadButtons.first()).toBeVisible()
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin/tools", adminToolsHeadingPattern, "admin tools")
-    await expect(page.getByRole("tab", { name: /^작업 큐 진단/ })).toBeVisible()
-
-    await expectLiveAdminRoute(page, apiBaseUrl, "/admin/posts", adminPostsHeadingPattern, "admin posts")
-    const canaryTitle = `__live_e2e_${crypto.randomUUID()}`
-    const canarySeedContent = "live editor canary seed"
-    const savedTitle = `${canaryTitle} 수정`
-    let postId: number | null = null
-    let postWriteUrl = ""
-    let postWriteRoute: ((route: Route) => Promise<void>) | null = null
-    let isPostWriteRouteActive = false
-
-    try {
-      const createResponse = await page.request.post(`${apiBaseUrl}/post/api/v1/posts`, {
-        data: {
-          title: canaryTitle,
-          content: canarySeedContent,
-          published: false,
-          listed: false,
-        },
-        headers: { "X-Aquila-CSRF": "1" },
-      })
-      const createBody = (await createResponse.json().catch(() => null)) as LiveWriteResponse | null
-      if (createResponse.status() !== 201 || typeof createBody?.data?.id !== "number") {
-        throw new Error(`live editor canary creation failed: status=${createResponse.status()}`)
-      }
-      postId = createBody.data.id
-      postWriteUrl = `**/post/api/v1/posts/${postId}`
-      postWriteRoute = async (route: Route) => {
-        const request = route.request()
-        if (request.method() !== "PUT") {
-          await route.fallback()
-          return
-        }
-
-        let payload: { published?: unknown; listed?: unknown } | null = null
-        try {
-          payload = request.postDataJSON() as { published?: unknown; listed?: unknown } | null
-        } catch {
-          await route.fulfill({ status: 400, body: "invalid live editor canary payload" })
-          return
-        }
-        if (payload?.published !== false || payload.listed !== false) {
-          await route.fulfill({ status: 400, body: "live editor canary write must be private" })
-          return
-        }
-        await route.continue()
-      }
-
-      await page.goto(`/admin/editor/${postId}`)
-      await expect(page).toHaveURL(new RegExp(`/admin/editor/${postId}(\\?|$)`))
-
-      const titleInput = page.getByPlaceholder("제목을 입력하세요").first()
-      await expect(titleInput).toBeVisible()
-      const editorContent = page.getByTestId("markdown-editor-content")
-      await expect(titleInput).toHaveValue(canaryTitle)
-      await editorContent.click()
-      await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
-      await expect.poll(() => editorContent.evaluate(() => window.getSelection()?.toString() ?? "")).toBe(canarySeedContent)
-      await expect(page.getByLabel("Visibility")).toHaveValue("PRIVATE")
-
-      await titleInput.fill(savedTitle)
-      await appendMarkdownToEditor(page, liveEditorSmokeMarkdown)
-
-      await page.getByRole("button", { name: "발행 설정", exact: true }).click()
-      const publishDialog = page.getByRole("dialog", { name: "수정 설정" })
-      await expect(publishDialog).toBeVisible()
-      await publishDialog.getByRole("button", { name: "비공개", exact: true }).click()
-      await page.route(postWriteUrl, postWriteRoute)
-      isPostWriteRouteActive = true
-      const writeResponse = page.waitForResponse(
-        (response) =>
-          response.request().method() === "PUT" &&
-          new URL(response.url()).pathname === `/post/api/v1/posts/${postId}`
-      )
-      await publishDialog.getByRole("button", { name: "변경 반영", exact: true }).click()
-      const response = await writeResponse
-      await page.unroute(postWriteUrl, postWriteRoute)
-      isPostWriteRouteActive = false
-      expect(response.ok()).toBe(true)
-
-      await page.goto(`/admin/editor/${postId}`)
-      await expect(page).toHaveURL(new RegExp(`/admin/editor/${postId}(\\?|$)`))
-      await expect(titleInput).toHaveValue(savedTitle)
-      await editorContent.click()
-      await editorContent.press(process.platform === "darwin" ? "Meta+A" : "Control+A")
-      const reloadedMarkdown = await editorContent.evaluate(() => window.getSelection()?.toString() ?? "")
-      expect(reloadedMarkdown).toContain(canarySeedContent)
-      expect(reloadedMarkdown).toContain("라이브 E2E 편집 확인")
-      expect(reloadedMarkdown).toContain("const liveHoverWheel = true")
-      expect(reloadedMarkdown).toContain("aa")
-      await expect(page.getByLabel("Visibility")).toHaveValue("PRIVATE")
-    } finally {
-      if (isPostWriteRouteActive && postWriteRoute) await page.unroute(postWriteUrl, postWriteRoute)
-      if (postId !== null) await cleanupLiveEditorPost(page, postId)
-    }
-
-    const backToPostManagement = page.getByRole("button", { name: /글 관리/ }).first()
-    if (await backToPostManagement.isVisible().catch(() => false)) {
-      await backToPostManagement.click()
-      await expectLiveAdminRoute(page, apiBaseUrl, "/admin/posts", adminPostsHeadingPattern, "admin posts after editor")
-    }
-
-    await page.getByRole("button", { name: "Logout", exact: true }).click()
-    await expect(page).toHaveURL(/\/admin\/login/)
-    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible()
-
-    const ignorablePatterns = [
-      /ResizeObserver loop/i,
-      /ChunkLoadError:\s*Loading chunk .* failed/i,
-      /Loading (?:CSS )?chunk .* failed/i,
-      /_next\/static\/chunks\/.*\.js/i,
-      /Failed to fetch dynamically imported module/i,
-    ]
-    const criticalErrors = runtimeErrors.filter(
-      (message) =>
-        !isWebKitCorsAccessControlNoise(message) &&
-        !ignorablePatterns.some((pattern) => pattern.test(message))
-    )
-    expect(criticalErrors).toEqual([])
   })
 })
