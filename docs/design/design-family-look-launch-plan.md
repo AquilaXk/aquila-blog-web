@@ -61,7 +61,7 @@
 | 7 | 회원가입 계열 `/signup` `/signup/verify` `/signup/social/complete` | 40% | 동일 AuthShell 카드 + 초록 파스텔 안내 박스 |
 | 8 | 설정 `/settings/account` `/settings/privacy` | 45% | 자체 팔레트(#174ea6)와 라운드 박스 + 그림자. 세 번째 디자인 언어 |
 | 9 | 관리자 6종 `/admin` `/admin/dashboard` `/admin/posts` `/admin/cloud` `/admin/profile` `/admin/tools` | 35% | 자체 블루(#0969da) + 파스텔 상태 박스(연두/주황/하늘) + KPI 카드 나열 + 필터 box-in-box. AI 대시보드 문법의 전형. `/admin/tools`는 세로로 늘어난 캡슐 버튼, "데이터 없음" 빈 박스 다수로 완성도 자체가 낮음 |
-| 10 | 에디터 3종 `/editor/new` `/editor/[id]` `/editor/preview/[id]` | 70% | 구조는 담백. 파란 발행 버튼, 에디터 프레임 박스, 하단 빨간 알림 박스가 이탈. 툴바를 모노 라벨 + 헤어라인 문법으로 정합 필요 |
+| 10 | 관리자 에디터 단일 작성 화면 `/admin/editor` `/admin/editor/new` `/admin/editor/[id]` | 70% | 구조는 담백. 파란 발행 버튼, 에디터 프레임 박스, 하단 빨간 알림 박스가 이탈. 툴바를 모노 라벨 + 헤어라인 문법으로 정합 필요 |
 
 참고: `/feed`는 RSS XML 엔드포인트(의도된 동작)로 시각 디자인 대상이 아니다.
 
