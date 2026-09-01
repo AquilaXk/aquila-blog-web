@@ -95,7 +95,7 @@ test("exporter rejects output without a value with a controlled usage error", ()
   assert.match(result.stderr, /expected optional --check and --output <path>/)
 })
 
-test("rejects effective reviewRequired and frontend acceptance hash drift", () => {
+test("rejects effective reviewRequired, retired signup metadata, and frontend acceptance hash drift", () => {
   const directory = copyPolicies()
   const policyPath = path.join(directory, "privacy.ko-KR.v1.0.3.yaml")
   const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"))
@@ -105,4 +105,13 @@ test("rejects effective reviewRequired and frontend acceptance hash drift", () =
   const metadata = path.join(directory, "legal.ts")
   fs.writeFileSync(metadata, fs.readFileSync(frontendMetadataPath, "utf8").replace(/contentSha256: "[a-f0-9]{64}"/, `contentSha256: "${"0".repeat(64)}"`))
   assert.match(validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath: metadata }).errors.join("\n"), /terms contentSha256 mismatch/)
+  const retiredMetadata = path.join(directory, "retired-legal.ts")
+  fs.writeFileSync(
+    retiredMetadata,
+    fs.readFileSync(frontendMetadataPath, "utf8").replace(
+      "export const ACTIVE_LEGAL_DOCUMENTS = {",
+      'export const ACTIVE_LEGAL_DOCUMENTS = {\n  signupPolicyVersion: "1.0.3",',
+    ),
+  )
+  assert.match(validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath: retiredMetadata }).errors.join("\n"), /retired signupPolicyVersion/)
 })

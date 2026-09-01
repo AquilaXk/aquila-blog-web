@@ -12,8 +12,6 @@ import {
   formatAge,
   formatDashboardFreshnessLabel,
   formatInstant,
-  getMailStatusLabel,
-  getMailStatusTone,
   getSystemHealthStatusLabel,
   getSystemHealthTone,
   getTaskQueueTone,
@@ -112,7 +110,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
   const dashboardSnapshotGeneratedAt = hasSnapshot
     ? formatInstant(dashboardSnapshot.generatedAt)
     : snapshotCollectionLabel ?? DASHBOARD_DATA_MISSING_LABEL
-  const mailStatusLabel = getMailStatusLabel(dashboardSnapshot?.signupMail.status)
   const taskQueueDetail = hasSnapshot
     ? `실패 ${dashboardSnapshot.taskQueue.failedCount} · 정체 ${dashboardSnapshot.taskQueue.staleProcessingCount}`
     : snapshotCollectionLabel ?? DASHBOARD_DATA_MISSING_LABEL
@@ -146,19 +143,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       icon: "spark",
     },
     {
-      key: "mail",
-      label: "회원가입 메일",
-      value: hasSnapshot ? mailStatusLabel : missingOrFailedLabel,
-      detail:
-        hasSnapshot && dashboardSnapshot.signupMail.queueLagSeconds != null
-          ? `큐 지연 ${formatAge(dashboardSnapshot.signupMail.queueLagSeconds)}`
-          : hasSnapshot && dashboardSnapshot.signupMail.latestFailureAt
-            ? `최근 실패 ${formatInstant(dashboardSnapshot.signupMail.latestFailureAt)}`
-            : hasSnapshot ? "메일 큐 정상" : missingOrFailedLabel,
-      tone: hasSnapshot ? getMailStatusTone(dashboardSnapshot?.signupMail.status) : missingOrFailedTone,
-      icon: "edit",
-    },
-    {
       key: "auth-security",
       label: "인증 이상",
       value: hasSnapshot ? `${dashboardSnapshot.authSecurity.blockedEventCount}건` : missingOrFailedLabel,
@@ -176,18 +160,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       tone: getTaskQueueTone(dashboardSnapshot),
       href: "/admin/tools",
       actionLabel: "도구 열기",
-    },
-    {
-      key: "signup-mail",
-      title: "회원가입 메일",
-      summary:
-        dashboardSnapshot.signupMail.latestFailureMessage ??
-        (dashboardSnapshot.signupMail.queueLagSeconds != null
-          ? `큐 지연 ${formatAge(dashboardSnapshot.signupMail.queueLagSeconds)}`
-          : mailStatusLabel),
-      tone: getMailStatusTone(dashboardSnapshot?.signupMail.status),
-      href: "/admin/tools",
-      actionLabel: "메일 진단",
     },
     {
       key: "auth-security",
@@ -267,12 +239,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
           value: dashboardSnapshot.storageCleanup.eligibleForPurgeCount,
           tone: dashboardSnapshot.storageCleanup.eligibleForPurgeCount ? "warn" : "good",
         },
-        {
-          key: "mail-lag",
-          label: "mail",
-          value: dashboardSnapshot.signupMail.queueLagSeconds ?? 0,
-          tone: getMailStatusTone(dashboardSnapshot.signupMail.status),
-        },
       ] as Array<{ key: string; label: string; value: number; tone: DashboardChartBar["tone"] }>)
         .map((item, _index, items) => {
           const maxValue = Math.max(...items.map((bar) => bar.value), 1)
@@ -303,15 +269,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
           message: "작업 큐 상태",
           detail: `ready ${dashboardSnapshot.taskQueue.readyPendingCount} · failed ${dashboardSnapshot.taskQueue.failedCount} · stale ${dashboardSnapshot.taskQueue.staleProcessingCount}`,
           tone: getTaskQueueTone(dashboardSnapshot),
-        },
-        {
-          key: "signup-mail",
-          time: dashboardSnapshot.signupMail.latestFailureAt
-            ? formatInstant(dashboardSnapshot.signupMail.latestFailureAt)
-            : formatInstant(dashboardSnapshot.generatedAt),
-          message: "회원가입 메일",
-          detail: dashboardSnapshot.signupMail.latestFailureMessage ?? mailStatusLabel,
-          tone: getMailStatusTone(dashboardSnapshot.signupMail.status),
         },
         {
           key: "auth-security",

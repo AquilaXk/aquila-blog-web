@@ -91,7 +91,9 @@ test.describe("admin tools state contract", () => {
 
   test("운영 도구는 execution rail 렌더링을 Admin route component로 위임한다", () => {
     const source = readRouteSource("AdminToolsExecutionSection.tsx")
+    const dlqReplaySource = readRouteSource("AdminTaskDlqReplaySection.tsx")
     const executionRailPath = path.resolve(__dirname, "../src/routes/Admin/AdminToolsExecutionRail.tsx")
+    const searchControlSource = readRouteSource("AdminSearchRuntimeControlSection.tsx")
     expect(existsSync(executionRailPath)).toBe(true)
     const executionRailSource = existsSync(executionRailPath) ? readFileSync(executionRailPath, "utf8") : ""
 
@@ -102,13 +104,15 @@ test.describe("admin tools state contract", () => {
     expect(executionRailSource).toContain("<ExecutionRail")
     expect(executionRailSource).toContain("<ActionGroupCard")
     expect(executionRailSource).toContain("실행 전 체크")
-    expect(executionRailSource).toContain("위험 액션")
     expect(executionRailSource).toContain("런북/장애 문서")
     expect(source).not.toContain("<ExecutionRail")
     expect(source).not.toContain("<ActionGroupCard")
     expect(source).not.toContain("실행 전 체크")
-    expect(source).not.toContain("위험 액션")
     expect(source).not.toContain("런북/장애 문서")
+    expect(dlqReplaySource).toContain("confirmed && reason.trim().length > 0")
+    expect(dlqReplaySource).toContain("I confirm this DLQ replay")
+    expect(searchControlSource).toContain("form.confirmed && form.reason.trim().length > 0")
+    expect(searchControlSource).toContain("I confirm this search runtime control")
     expect(source.split("\n").length).toBeLessThan(1720)
   })
 
@@ -137,7 +141,6 @@ test.describe("admin tools state contract", () => {
     expect(modelSource).toContain('export const CHECK_REQUIRED_STATUS_LABEL = "점검 필요"')
     expect(modelSource).toContain("export const getDiagnosticFallbackStatusLabel =")
     expect(source).toContain("const isSystemHealthConnectionUnavailable = systemHealthQuery.isError && !hasSystemHealthStatus")
-    expect(source).toContain("getDiagnosticFallbackStatusLabel(isMailLoading, mailDiagnosticsError)")
     expect(source).toContain("getDiagnosticFallbackStatusLabel(isQueueLoading, taskQueueDiagnosticsError)")
     expect(source).toContain("getDiagnosticFallbackStatusLabel(isCleanupLoading, cleanupDiagnosticsError)")
     expect(source).toContain("getDiagnosticFallbackStatusLabel(isAuthLoading, authSecurityEventsError)")

@@ -22,7 +22,6 @@ const formatDateTime = (value?: string | null) => {
 
 const sourceLabels: Record<OptionalTrackingConsentRecord["source"], string> = {
   settings: "쿠키 설정",
-  "privacy-request": "개인정보 처리 요청",
 }
 
 const OptionalTrackingConsentSettings = () => {

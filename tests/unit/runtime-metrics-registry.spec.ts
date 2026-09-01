@@ -55,7 +55,7 @@ test("runtime metric enums reject unbounded labels", () => {
 })
 
 test("backend classifiers keep route and HTTP labels in their fixed enums", () => {
-  expect(classifyBackendRoute("/member/api/v1/signup/verify")).toBe("auth")
+  expect(classifyBackendRoute("/member/api/v1/auth/me")).toBe("auth")
   expect(classifyBackendRoute("/post/api/v1/posts/bootstrap")).toBe("post")
   expect(classifyBackendRoute("/system/api/v1/adm/cloud/files")).toBe("cloud")
   expect(classifyBackendRoute("/system/api/v1/adm/health")).toBe("other")

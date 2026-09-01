@@ -44,7 +44,6 @@ Node.js 20.x와 Yarn 1.22.22를 기준으로 실행합니다. `package.json`의 
 | `NEXT_PUBLIC_MONITORING_EMBED_URL` | 관리자 도구의 모니터링 iframe URL(예: Grafana kiosk URL) |
 | `NEXT_PUBLIC_LOGS_EMBED_URL` | 관리자 도구의 로그 iframe URL |
 | `NEXT_PUBLIC_PROMETHEUS_URL` | 관리자 도구의 Prometheus 바로가기 URL |
-| `NEXT_PUBLIC_SIGNUP_ENABLED` | 회원가입 화면 활성화 여부 |
 | `NEXT_PUBLIC_RUM_SAMPLE_RATE` | Web Vitals 수집 샘플 비율 |
 | `UPTIME_KUMA_PROXY_ORIGIN` | `/status/*` rewrite 대상 오리진 |
 | `PLAYWRIGHT_BASE_URL` | live E2E 대상 URL |

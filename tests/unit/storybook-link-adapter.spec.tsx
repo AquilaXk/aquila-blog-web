@@ -35,10 +35,10 @@ const createClickEvent = ({
 }
 
 test.describe("storybook link adapter", () => {
-  test("renders a modern signup anchor", () => {
-    const markup = renderToStaticMarkup(createElement(Link, { href: "/signup" }, "회원가입"))
+  test("renders a modern internal anchor", () => {
+    const markup = renderToStaticMarkup(createElement(Link, { href: "/about" }, "소개"))
 
-    expect(markup).toContain('href="/signup"')
+    expect(markup).toContain('href="/about"')
   })
 
   test("preserves a legacy admin posts anchor", () => {
@@ -89,7 +89,7 @@ test.describe("storybook link adapter", () => {
     const cancelled = createStorybookLinkClickHandler({
       callerOnClicks: [(event) => event.preventDefault()],
       download: undefined,
-      href: "/signup",
+      href: "/about",
       push,
       target: "_self",
     })
@@ -105,14 +105,14 @@ test.describe("storybook link adapter", () => {
       href: string
       target?: string
     }> = [
-      { event: createClickEvent({ altKey: true }), href: "/signup" },
-      { event: createClickEvent({ button: 1 }), href: "/signup" },
-      { event: createClickEvent({ ctrlKey: true }), href: "/signup" },
-      { event: createClickEvent({ metaKey: true }), href: "/signup" },
-      { event: createClickEvent({ shiftKey: true }), href: "/signup" },
+      { event: createClickEvent({ altKey: true }), href: "/about" },
+      { event: createClickEvent({ button: 1 }), href: "/about" },
+      { event: createClickEvent({ ctrlKey: true }), href: "/about" },
+      { event: createClickEvent({ metaKey: true }), href: "/about" },
+      { event: createClickEvent({ shiftKey: true }), href: "/about" },
       { event: createClickEvent(), href: "//example.test" },
-      { event: createClickEvent(), href: "/signup", target: "_blank" },
-      { event: createClickEvent(), href: "/signup", download: "signup.html" },
+      { event: createClickEvent(), href: "/about", target: "_blank" },
+      { event: createClickEvent(), href: "/about", download: "about.html" },
     ]
 
     for (const { download, event, href, target } of nonInterceptedClicks) {

@@ -33,13 +33,6 @@ export type BrowserStorageRegistryEntry = {
   stores: string
 }
 
-const retiredPublicLoginPreferenceMetadata = {
-  area: "localStorage" as const,
-  required: false,
-  retention: "until login preference changes or browser storage is cleared",
-  deletion: "login preference change or browser storage deletion",
-}
-
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   {
     area: "cookie",
@@ -79,15 +72,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "cookie",
-    key: "signup_session",
-    purpose: "signup-verification-session",
-    required: true,
-    retention: "signup verification TTL",
-    deletion: "signup completion, cancellation, expiry, or browser cookie deletion",
-    stores: "opaque signup verification session id",
-  },
-  {
-    area: "cookie",
     key: "scheme",
     purpose: "theme-preference",
     required: false,
@@ -105,15 +89,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "public admin profile display snapshot",
   },
   {
-    area: "cookie",
-    key: "admin_tools_mail_snapshot_v1",
-    purpose: "admin-mail-tool-snapshot",
-    required: false,
-    retention: "short-lived admin tool snapshot cache",
-    deletion: "snapshot refresh or browser cookie deletion",
-    stores: "admin mail tool diagnostic snapshot",
-  },
-  {
     area: "localStorage",
     key: OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
     purpose: "optional-tracking-consent",
@@ -123,18 +98,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "JSON consent record with version, granted or denied state, timestamp, source, and analytics/RUM categories",
   },
   {
-    ...retiredPublicLoginPreferenceMetadata,
-    key: "auth.login.keepSignedIn",
-    purpose: "login-preference",
-    stores: "boolean remember-login preference",
-  },
-  {
-    ...retiredPublicLoginPreferenceMetadata,
-    key: "auth.login.ipSecurityOn",
-    purpose: "login-security-preference",
-    stores: "boolean IP security preference",
-  },
-  {
     area: "localStorage",
     key: "auth.admin.savedEmail.v1",
     purpose: "admin-login-saved-email",
@@ -142,15 +105,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     retention: "until saved email changes, is deselected, or browser storage is cleared",
     deletion: "saved email deselection, replacement, or browser storage deletion",
     stores: "normalized administrator email address only",
-  },
-  {
-    area: "localStorage",
-    key: "auth.admin.keepSignedIn.v1",
-    purpose: "admin-login-persistence-preference",
-    required: false,
-    retention: "until login preference changes or browser storage is cleared",
-    deletion: "login preference change or browser storage deletion",
-    stores: "boolean remember-login preference",
   },
   {
     area: "localStorage",
@@ -244,39 +198,12 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "sessionStorage",
-    key: "auth.signupMailCooldown.v1",
-    purpose: "signup-mail-cooldown",
-    required: false,
-    retention: "until cooldown expiry or browser tab session ends",
-    deletion: "cooldown expiry, tab close, or browser storage deletion",
-    stores: "hashed email key to cooldown expiry timestamp map",
-  },
-  {
-    area: "sessionStorage",
     key: "auth:me:anon-probe-suppress-until:v1",
     purpose: "anonymous-auth-probe-suppression",
     required: false,
     retention: "5 minutes or browser tab session end",
     deletion: "auth success, TTL expiry, tab close, or browser storage deletion",
     stores: "timestamp until anonymous auth/me probe should be suppressed",
-  },
-  {
-    area: "sessionStorage",
-    key: "member.notification.lastEventId.v1",
-    purpose: "notification-sse-resume",
-    required: false,
-    retention: "browser tab session",
-    deletion: "tab close, logout, stream reset, or browser storage deletion",
-    stores: "last notification SSE event id",
-  },
-  {
-    area: "sessionStorage",
-    key: "member.notification.snapshot.v1",
-    purpose: "notification-legacy-snapshot-cleanup",
-    required: false,
-    retention: "removed on next notification initialization",
-    deletion: "notification initialization, tab close, or browser storage deletion",
-    stores: "no new data; legacy notification snapshot key removal only",
   },
   {
     area: "sessionStorage",

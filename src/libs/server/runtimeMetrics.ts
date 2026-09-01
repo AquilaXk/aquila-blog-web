@@ -59,7 +59,7 @@ export const classifyBackendHttpResult = (status: number): BackendFetchResult =>
 
 export const classifyBackendRoute = (path: string): BackendRouteClass => {
   const normalizedPath = path.toLowerCase()
-  if (normalizedPath.startsWith("/member/api/v1/auth/") || normalizedPath.startsWith("/member/api/v1/signup/") || normalizedPath.startsWith("/signup")) return "auth"
+  if (normalizedPath.startsWith("/member/api/v1/auth/")) return "auth"
   if (normalizedPath.startsWith("/post/api/v1/")) return "post"
   if (normalizedPath.startsWith("/system/api/v1/adm/cloud/")) return "cloud"
   return "other"

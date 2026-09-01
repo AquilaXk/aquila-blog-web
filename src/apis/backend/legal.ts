@@ -1,5 +1,4 @@
 export const ACTIVE_LEGAL_DOCUMENTS = {
-  signupPolicyVersion: "1.0.3",
   terms: {
     version: "1.0.2",
     contentSha256: "825642074982313f39c5d9bfbeffb20b12fc1a072addce8770b332652a75ad9b",

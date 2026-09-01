@@ -1,8 +1,6 @@
 import Link from "next/link"
 import { ReactNode } from "react"
-import { EmptyState, Skeleton } from "src/design-system/StatePresenters"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
-import useAuthSession from "src/hooks/useAuthSession"
 import { colors } from "src/styles/colors"
 
 type SettingsLayoutProps = {
@@ -12,43 +10,13 @@ type SettingsLayoutProps = {
 }
 
 const SettingsLayout = ({ active, title, children }: SettingsLayoutProps) => {
-  const { authStatus, me } = useAuthSession()
-
-  if (authStatus === "loading") {
-    return (
-      <main className="settingsPage" aria-busy="true">
-        <div className="stateBlock" role="status" aria-live="polite">
-          <p className="srOnly">인증 상태 확인 중</p>
-          <Skeleton height="0.75rem" width="6rem" aria-hidden="true" />
-          <Skeleton height="2rem" width="12rem" aria-hidden="true" />
-          <Skeleton height="1rem" width="70%" aria-hidden="true" />
-          <Skeleton height="1rem" width="48%" aria-hidden="true" />
-        </div>
-        <style jsx global>{settingsStyles}</style>
-      </main>
-    )
-  }
-
-  if (authStatus !== "authenticated" || !me) {
-    return (
-      <main className="settingsPage">
-        <EmptyState
-          label="SETTINGS"
-          title="개인정보 관리"
-          description="인증된 관리자만 개인정보 관리 기능을 이용할 수 있습니다."
-        />
-        <style jsx global>{settingsStyles}</style>
-      </main>
-    )
-  }
-
   return (
     <main className="settingsPage">
       <header className="pageHeader">
         <div>
           <p className="eyebrow">Settings</p>
           <h1>{title}</h1>
-          <p className="summary">{me.nickname || me.username} 계정의 개인정보와 보안 상태를 관리합니다.</p>
+          <p className="summary">브라우저의 선택 분석 설정과 공개 개인정보 문서를 관리합니다.</p>
         </div>
         <nav className="tabs" aria-label="설정 메뉴">
           <Link
@@ -156,25 +124,6 @@ export const settingsStyles = `
     letter-spacing: 0;
   }
 
-  .stateBlock {
-    display: grid;
-    gap: 12px;
-    margin-top: 48px;
-  }
-
-  .srOnly {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .settingsPage .primaryLink,
   .settingsPage button {
     min-height: 42px;
     padding: 0 16px;
@@ -188,17 +137,9 @@ export const settingsStyles = `
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     .settingsPage .tabs a,
-    .settingsPage .primaryLink,
     .settingsPage button {
       min-height: ${control.lg}px;
     }
-  }
-
-  .primaryLink {
-    display: inline-flex;
-    align-items: center;
-    margin-top: 12px;
-    text-decoration: none;
   }
 
   .settingsPage button:disabled {

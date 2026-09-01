@@ -1,7 +1,6 @@
 import { apiFetch } from "src/apis/backend/client"
 import AdminToolsExecutionRail from "src/routes/Admin/AdminToolsExecutionRail"
 import {
-  ActionList,
   ActionRow,
   ActionRowButton,
   CalmMessage,
@@ -32,7 +31,6 @@ import { SECTION_IDS, formatInstant } from "src/routes/Admin/AdminToolsWorkspace
 export const AdminToolsExecutionSection = (props: Record<string, any>) => {
   const {
     activeDiagnosticTab,
-    advancedToolsOpen,
     authFreshness,
     authSecurityEvents,
     authSecurityEventsError,
@@ -42,20 +40,14 @@ export const AdminToolsExecutionSection = (props: Record<string, any>) => {
     executeAction,
     fetchAuthSecurityEvents,
     fetchCleanupDiagnostics,
-    fetchSignupMailDiagnostics,
     fetchSystemHealthCached,
     hasAuthDiagnostics,
     hasCleanupDiagnostics,
     isAuthLoading,
     isBusy,
     isCleanupLoading,
-    mailTestNotice,
-    sendSignupTestMail,
     setActiveDiagnosticTab,
-    setAdvancedToolsOpen,
     setSystemHealthCheckedAt,
-    setTestEmail,
-    testEmail,
     focusSection,
   } = props
 
@@ -184,31 +176,12 @@ export const AdminToolsExecutionSection = (props: Record<string, any>) => {
             </DiagnosticPanel>
           ) : null}
 
-          <DetailsPanel open={advancedToolsOpen}>
-            <DetailsSummary onClick={(event) => {
-              event.preventDefault()
-              setAdvancedToolsOpen((prev: boolean) => !prev)
-            }}>
-              <span>고급 도구</span>
-              <small>{advancedToolsOpen ? "접기" : "열기"}</small>
-            </DetailsSummary>
-            {advancedToolsOpen ? (
-              <ActionList>
-                <ActionRowButton type="button" disabled={isBusy} onClick={() => void fetchSignupMailDiagnostics(true)}>
-                  <span>SMTP 연결 확인</span>
-                </ActionRowButton>
-              </ActionList>
-            ) : null}
-          </DetailsPanel>
-
         </ExecutionMain>
 
         <AdminToolsExecutionRail
           isBusy={isBusy}
-          mailTestNotice={mailTestNotice}
           onFocusSection={focusSection}
           onPostCountCheck={() => void executeAction("admPostCount", () => apiFetch("/post/api/v1/adm/posts/count"))}
-          onSendSignupTestMail={() => void sendSignupTestMail()}
           onSystemHealthCheck={() =>
             void executeAction("systemHealth", () => fetchSystemHealthCached(), {
               onSuccess: () => {
@@ -216,8 +189,6 @@ export const AdminToolsExecutionSection = (props: Record<string, any>) => {
               },
             })
           }
-          onTestEmailChange={setTestEmail}
-          testEmail={testEmail}
         />
       </ExecutionLayout>
     </WorkspaceSection>

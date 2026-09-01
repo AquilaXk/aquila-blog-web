@@ -13,7 +13,7 @@ const createRequest = (
 ): TaskDlqReplayRequest => ({
   operationId: OPERATION_ID,
   reason: "Recover a bounded dead-letter queue batch.",
-  taskType: "MAIL_SIGNUP",
+  taskType: "post.write.side-effect",
   limit: 25,
   resetRetryCount: false,
   ...overrides,

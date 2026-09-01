@@ -26,12 +26,6 @@ const dashboard = {
     latestFailureAt: null,
     latestFailureMessage: null,
   },
-  signupMail: {
-    status: "READY",
-    queueLagSeconds: null,
-    latestFailureAt: null,
-    latestFailureMessage: null,
-  },
   authSecurity: {
     recentEventCount: 0,
     blockedEventCount: 0,

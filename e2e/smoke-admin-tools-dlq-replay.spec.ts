@@ -12,7 +12,7 @@ import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 const RAW_CANARY = "task-id-raw-canary"
 const DLQ_REGION_NAME = "DLQ replay"
-const TASK_TYPE = "MAIL_SIGNUP"
+const TASK_TYPE = "post.write.side-effect"
 const ADMIN_TASK_DLQ_REPLAY_ENDPOINT =
   "/system/api/v1/adm/operations/task-dlq-replay"
 const UNCERTAIN_GATEWAY_STATUS = 504
@@ -40,12 +40,6 @@ const dashboardSnapshot: DashboardSnapshotPayload = {
     failedCount: 0,
     staleProcessingCount: 0,
     oldestReadyPendingAgeSeconds: null,
-    latestFailureAt: null,
-    latestFailureMessage: null,
-  },
-  signupMail: {
-    status: "READY",
-    queueLagSeconds: null,
     latestFailureAt: null,
     latestFailureMessage: null,
   },
@@ -86,15 +80,15 @@ const taskQueueDiagnostics: TaskQueueDiagnostics = {
       queueLagSeconds: null,
       failedCount: 0,
       staleProcessingCount: 0,
-      label: "Signup mail",
+      label: "게시글 쓰기 후속 작업",
       oldestReadyPendingAt: null,
       oldestReadyPendingAgeSeconds: null,
       latestFailureAt: null,
       latestFailureMessage: null,
       retryPolicy: {
         label: "bounded retry",
-        maxRetries: 3,
-        baseDelaySeconds: 30,
+        maxRetries: 5,
+        baseDelaySeconds: 10,
         backoffMultiplier: 2,
         maxDelaySeconds: 300,
       },
@@ -399,57 +393,50 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await expect(region.getByText("Accepted and pending")).toBeVisible()
   await expect(region.getByText("Succeeded")).toHaveCount(0)
 
-  const mailDiagnosticsStartedHolder: { release: (() => void) | null } = {
+  const cleanupDiagnosticsStartedHolder: { release: (() => void) | null } = {
     release: null,
   }
-  const mailDiagnosticsStarted = new Promise<void>((resolve) => {
-    mailDiagnosticsStartedHolder.release = resolve
+  const cleanupDiagnosticsStarted = new Promise<void>((resolve) => {
+    cleanupDiagnosticsStartedHolder.release = resolve
   })
-  const mailDiagnosticsReleaseHolder: { release: (() => void) | null } = {
+  const cleanupDiagnosticsReleaseHolder: { release: (() => void) | null } = {
     release: null,
   }
-  const mailDiagnosticsRelease = new Promise<void>((resolve) => {
-    mailDiagnosticsReleaseHolder.release = resolve
+  const cleanupDiagnosticsRelease = new Promise<void>((resolve) => {
+    cleanupDiagnosticsReleaseHolder.release = resolve
   })
-  await page.route("**/system/api/v1/adm/mail/signup", async (route) => {
+  await page.route("**/system/api/v1/adm/storage/cleanup", async (route) => {
     expect(route.request().method()).toBe("GET")
-    if (!mailDiagnosticsStartedHolder.release)
-      throw new Error("The mail diagnostics start gate was not registered.")
-    mailDiagnosticsStartedHolder.release()
-    await mailDiagnosticsRelease
+    if (!cleanupDiagnosticsStartedHolder.release)
+      throw new Error("The cleanup diagnostics start gate was not registered.")
+    cleanupDiagnosticsStartedHolder.release()
+    await cleanupDiagnosticsRelease
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        status: "READY",
-        adapter: "SMTP",
-        host: "smtp.example.test",
-        port: 587,
-        mailFrom: "noreply@example.test",
-        usernameConfigured: true,
-        passwordConfigured: true,
-        smtpAuth: true,
-        startTlsEnabled: true,
-        missing: [],
-        canConnect: true,
-        checkedAt: "2026-08-26T00:00:00Z",
-        verifyPath: "/signup/verify",
-        connectionError: null,
-        taskQueue: null,
+        tempCount: 0,
+        activeCount: 0,
+        pendingDeleteCount: 0,
+        deletedCount: 0,
+        eligibleForPurgeCount: 0,
+        cleanupSafetyThreshold: 100,
+        blockedBySafetyThreshold: false,
+        oldestEligiblePurgeAfter: null,
+        sampleEligibleObjectKeys: [],
       }),
     })
   })
-  await page.getByRole("tab", { name: "메일 진단" }).click()
-  await page.getByRole("button", { name: "다시 확인", exact: true }).click()
-  await mailDiagnosticsStarted
+  await page.getByRole("tab", { name: "파일 정리 진단" }).click()
+  await cleanupDiagnosticsStarted
   await queueTab.click()
   const checkStatus = region.getByRole("button", { name: "Check status" })
   await expect(checkStatus).toBeVisible()
   await expect(checkStatus).toBeDisabled()
   expect(counters.get).toBe(0)
-  if (!mailDiagnosticsReleaseHolder.release)
-    throw new Error("The mail diagnostics release gate was not registered.")
-  mailDiagnosticsReleaseHolder.release()
+  if (!cleanupDiagnosticsReleaseHolder.release)
+    throw new Error("The cleanup diagnostics release gate was not registered.")
+  cleanupDiagnosticsReleaseHolder.release()
   await expect.poll(() => counters.get).toBe(1)
   await expect(region.getByText("Partially completed")).toBeVisible()
 

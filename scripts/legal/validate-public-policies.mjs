@@ -161,12 +161,10 @@ const readFrontendActiveMetadata = () => {
   }
 
   const source = fs.readFileSync(frontendLegalMetadataPath, "utf8")
+  if (/\bsignupPolicyVersion\s*:/.test(source)) {
+    fail("frontend active legal metadata contains retired signupPolicyVersion")
+  }
   return {
-    signupPolicyVersion: extractQuotedValue(
-      source,
-      /signupPolicyVersion:\s*"([^"]+)"/,
-      "frontend signupPolicyVersion",
-    ),
     terms: {
       version: extractQuotedValue(source, /terms:\s*\{[\s\S]*?version:\s*"([^"]+)"/, "frontend terms version"),
       contentSha256: extractQuotedValue(
@@ -265,11 +263,6 @@ const setLatestEffectivePolicy = (map, policy) => {
 const assertActiveMetadataMatchesPolicies = (sourceName, metadata, termsPolicy, privacyPolicy) => {
   if (!metadata || !termsPolicy || !privacyPolicy) return
 
-  const expectedSignupPolicyVersion =
-    compareSemver(privacyPolicy.version, termsPolicy.version) > 0 ? privacyPolicy.version : termsPolicy.version
-  if (metadata.signupPolicyVersion !== expectedSignupPolicyVersion) {
-    fail(`${sourceName} signupPolicyVersion mismatch: expected ${expectedSignupPolicyVersion}`)
-  }
   if (metadata.terms.version !== termsPolicy.version) {
     fail(`${sourceName} terms version mismatch: expected ${termsPolicy.version}`)
   }
