@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -110,31 +110,6 @@ test("test target allows both disabled and enabled public feature branches witho
   }
 })
 
-test("live-e2e requires HTTPS endpoints, a password, and exactly one identity", async () => {
-  const { loadContract, validateEnvText } = await import("./validate-env.mjs")
-  const contract = loadContract(contractPath)
-  const valid = [
-    "PLAYWRIGHT_BASE_URL=https://www.example.test",
-    "E2E_API_BASE_URL=https://api.example.test",
-    "E2E_LIVE_ADMIN_EMAIL=admin@example.test",
-    "E2E_LIVE_ADMIN_PASSWORD=live-admin-password",
-  ].join("\n")
-
-  assert.equal(validateEnvText({ contract, target: "live-e2e", text: valid }).ok, true)
-  const invalid = validateEnvText({
-    contract,
-    target: "live-e2e",
-    text: valid
-      .replace("PLAYWRIGHT_BASE_URL=https://www.example.test", "PLAYWRIGHT_BASE_URL=http://www.example.test")
-      .replace("E2E_LIVE_ADMIN_PASSWORD=live-admin-password", "E2E_LIVE_ADMIN_PASSWORD=")
-      .concat("\nE2E_LIVE_ADMIN_USERNAME=admin"),
-  })
-  assert.equal(invalid.ok, false)
-  assert(invalid.errors.some((error) => error.key === "PLAYWRIGHT_BASE_URL" && error.message.includes("https")))
-  assert(invalid.errors.some((error) => error.key === "E2E_LIVE_ADMIN_PASSWORD" && error.message === "is required"))
-  assert(invalid.errors.some((error) => error.key === "E2E_LIVE_ADMIN_EMAIL" && error.message.includes("exactly one")))
-})
-
 test("live-ready requires only HTTPS Web and API targets", async () => {
   const { loadContract, validateEnvText } = await import("./validate-env.mjs")
   const contract = loadContract(contractPath)
@@ -156,17 +131,29 @@ test("live-ready requires only HTTPS Web and API targets", async () => {
 // 계약만 남으면 잠자는 게이트가 되므로, 남은 유일한 live 실행 경로가 실제로 이 계약을
 // 소비하는지 고정한다. 특히 playwright.config.ts는 PLAYWRIGHT_BASE_URL이 없으면 localhost로
 // 내려앉기 때문에, 이 검증이 빠지면 "live" 실행이 아무것도 보지 않고 통과한다.
-test("the manual live E2E runner consumes the live env targets and runs both live specs", () => {
+test("the manual live E2E runner consumes live-ready and runs the canonical live spec", () => {
   const runner = readFileSync(path.join(frontRoot, "scripts/run-live-e2e.mjs"), "utf8")
 
-  assert.match(runner, /assertEnvTarget\("live-ready"\)/)
-  assert.match(runner, /assertEnvTarget\("live-e2e"\)/)
-  assert.match(runner, /if \(hasLiveCredentials\) \{\s+normalizeLiveCredentialEnv\(\)\s+assertEnvTarget\("live-e2e"\)\s+\}/)
-  assert.match(runner, /const liveSpecs = \["e2e\/live\.spec\.ts", "e2e\/editor-live-visual\.spec\.ts"\]/)
+  assert.match(runner, /target: "live-ready"/)
+  assert.match(runner, /const liveSpecs = \["e2e\/live\.spec\.ts"\]/)
   assert.match(runner, /spawn\("yarn", \["playwright", "test", \.\.\.liveSpecs/)
 })
 
-test("the manual live E2E runner validates every supplied direct credential shape", () => {
+test("live E2E has no retired password or alternate-session path", () => {
+  const liveSpec = readFileSync(path.join(frontRoot, "e2e/live.spec.ts"), "utf8")
+  const runner = readFileSync(path.join(frontRoot, "scripts/run-live-e2e.mjs"), "utf8")
+  const source = [liveSpec, runner].join("\n")
+
+  assert.doesNotMatch(source, /E2E_(?:LIVE_)?ADMIN_(?:USERNAME|PASSWORD)/)
+  assert.doesNotMatch(source, /\/member\/api\/v1\/auth\/login/)
+  assert.doesNotMatch(source, /buildLoginPayloadCandidates|hasAuthCookie|loginWithRetry|password/i)
+  assert.match(runner, /const liveSpecs = \["e2e\/live\.spec\.ts"\]/)
+  assert.equal(existsSync(path.join(frontRoot, "e2e/helpers/liveAuth.ts")), false)
+  assert.equal(existsSync(path.join(frontRoot, "e2e/editor-live-visual.spec.ts")), false)
+  assert.equal(JSON.parse(readFileSync(contractPath, "utf8")).targets["live-e2e"], undefined)
+})
+
+test("the manual live E2E runner fails closed before spawning on an invalid target", () => {
   const sourceRunnerPath = path.join(frontRoot, "scripts/run-live-e2e.mjs")
   const tempRoot = mkdtempSync(path.join(tmpdir(), "aquila-live-e2e-"))
   const runnerPath = path.join(tempRoot, "scripts/run-live-e2e.mjs")
@@ -184,7 +171,7 @@ test("the manual live E2E runner validates every supplied direct credential shap
   writeFileSync(yarnPath, "#!/usr/bin/env node\nprocess.stdout.write('live-e2e-stub-ran\\n')\n")
   chmodSync(yarnPath, 0o755)
 
-  const run = (credentials) =>
+  const run = (overrides = {}) =>
     spawnSync(process.execPath, [runnerPath], {
       cwd: tempRoot,
       encoding: "utf8",
@@ -193,56 +180,35 @@ test("the manual live E2E runner validates every supplied direct credential shap
         PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
         PLAYWRIGHT_BASE_URL: "https://www.example.test",
         E2E_API_BASE_URL: "https://api.example.test",
-        E2E_ADMIN_EMAIL: "",
-        E2E_ADMIN_USERNAME: "",
-        E2E_ADMIN_PASSWORD: "",
-        E2E_LIVE_ADMIN_EMAIL: "",
-        E2E_LIVE_ADMIN_USERNAME: "",
-        E2E_LIVE_ADMIN_PASSWORD: "",
-        ...credentials,
+        ...overrides,
       },
     })
 
   try {
-    const valid = run({ E2E_ADMIN_EMAIL: "admin@example.test", E2E_ADMIN_PASSWORD: "live-admin-password" })
+    const valid = run()
     assert.equal(valid.status, 0, valid.stderr)
     assert.match(valid.stdout, /live-e2e-stub-ran/)
 
-    const placeholder = "change_me_live_admin_password"
-    const invalid = [
-      run({ E2E_ADMIN_EMAIL: "admin@example.test", E2E_ADMIN_PASSWORD: placeholder }),
-      run({ E2E_ADMIN_EMAIL: "admin@example.test", E2E_ADMIN_USERNAME: "admin", E2E_ADMIN_PASSWORD: "live-admin-password" }),
-      run({ E2E_ADMIN_PASSWORD: "live-admin-password" }),
-    ]
+    const invalid = [run({ PLAYWRIGHT_BASE_URL: "http://www.example.test" }), run({ E2E_API_BASE_URL: "" })]
     for (const result of invalid) {
       assert.equal(result.status, 1, result.stderr)
       assert.doesNotMatch(result.stdout, /live-e2e-stub-ran/)
     }
-    assert.doesNotMatch(invalid[0].stderr, new RegExp(placeholder))
-
-    const credentialFree = run({})
-    assert.equal(credentialFree.status, 0, credentialFree.stderr)
-    assert.match(credentialFree.stdout, /live-e2e-stub-ran/)
   } finally {
     rmSync(tempRoot, { recursive: true, force: true })
   }
 })
 
-test("live-e2e rejects placeholder credentials", async () => {
+test("live-ready rejects placeholder endpoints", async () => {
   const { loadContract, validateEnvText } = await import("./validate-env.mjs")
   const result = validateEnvText({
     contract: loadContract(contractPath),
-    target: "live-e2e",
-    text: [
-      "PLAYWRIGHT_BASE_URL=https://www.example.test",
-      "E2E_API_BASE_URL=https://api.example.test",
-      "E2E_LIVE_ADMIN_USERNAME=admin",
-      "E2E_LIVE_ADMIN_PASSWORD=change_me_live_admin_password",
-    ].join("\n"),
+    target: "live-ready",
+    text: ["PLAYWRIGHT_BASE_URL=https://www.example.com", "E2E_API_BASE_URL=https://api.example.test"].join("\n"),
   })
 
   assert.equal(result.ok, false)
-  assert(result.errors.some((error) => error.key === "E2E_LIVE_ADMIN_PASSWORD" && error.message.includes("placeholder")))
+  assert(result.errors.some((error) => error.key === "PLAYWRIGHT_BASE_URL" && error.message.includes("placeholder")))
 })
 
 test("prebuild validates the container build, and Web CI runs the contract suite", () => {
@@ -369,12 +335,12 @@ test("BACKEND_INTERNAL_URL accepts container-internal http but still rejects pla
 
 test("CLI failure exposes only key and message, never secret input", () => {
   const secret = "secret-that-must-not-leak"
-  const result = spawnSync(process.execPath, [validatorPath, "--target", "live-e2e", "--source-env-var", "WEB_ENV_TEST"], {
+  const result = spawnSync(process.execPath, [validatorPath, "--target", "production", "--source-env-var", "WEB_ENV_TEST"], {
     encoding: "utf8",
-    env: { ...process.env, WEB_ENV_TEST: `E2E_LIVE_ADMIN_PASSWORD=${secret}` },
+    env: { ...process.env, WEB_ENV_TEST: `TOKEN_FOR_REVALIDATE=${secret}` },
   })
 
   assert.equal(result.status, 1)
-  assert.match(result.stderr, /\{"key":"PLAYWRIGHT_BASE_URL","message":"is required"\}/)
+  assert.match(result.stderr, /\{"key":"NEXT_PUBLIC_BACKEND_URL","message":"is required"\}/)
   assert.doesNotMatch(result.stderr, new RegExp(secret))
 })
