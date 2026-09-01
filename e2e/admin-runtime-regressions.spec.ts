@@ -108,6 +108,8 @@ test.describe("관리자 런타임 회귀 계약", () => {
     expect(profileCommandsSource).not.toContain("syncProfileState(fallback)")
     expect(profileCommandsSource).not.toContain("return fallback")
     expect(profileCommandsSource).not.toContain("refreshAdminProfile(member.id, member)")
+    expect(profileCommandsSource).toContain("현재 저장값을 불러오지 못했습니다: ${message}")
+    expect(profileCommandsSource).toMatch(/setProfileNotice\(\{ tone: "error"[\s\S]*throw error/)
   })
 
   test("프로필 이미지 편집 모달은 과거 이미지 선택과 삭제 동선을 제공한다", () => {
