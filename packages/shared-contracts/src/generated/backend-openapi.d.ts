@@ -245,38 +245,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/privacy/requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createRequest"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/auth/admin-email/verify": {
         parameters: {
             query?: never;
@@ -859,38 +827,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/privacy/requests/{requestId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getRequest"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/privacy/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["export"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/members/adminProfile": {
         parameters: {
             query?: never;
@@ -931,38 +867,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["me"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/adm/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getItems_2"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/adm/members/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getItem_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1096,22 +1000,6 @@ export interface paths {
         post?: never;
         /** 관리자용 soft delete 글 영구삭제 */
         delete: operations["hardDeleteDeletedItem"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/member/api/v1/privacy/account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["deleteAccount"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1507,44 +1395,12 @@ export interface components {
             url?: string;
             markdown?: string;
         };
-        PrivacyRequestCreateRequest: {
-            /** @enum {string} */
-            type: "EXPORT" | "CORRECTION" | "DELETION" | "PROCESSING_RESTRICTION" | "CONSENT_WITHDRAWAL";
-            message?: string | null;
-        };
-        PrivacyRequestDto: {
-            /** Format: int64 */
-            id?: number;
-            /** Format: int64 */
-            memberId?: number;
-            /** @enum {string} */
-            type?: "EXPORT" | "CORRECTION" | "DELETION" | "PROCESSING_RESTRICTION" | "CONSENT_WITHDRAWAL";
-            /** @enum {string} */
-            status?: "RECEIVED" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
-            message?: string | null;
-            /** Format: date-time */
-            requestedAt?: string;
-            /** Format: date-time */
-            dueAt?: string;
-            /** Format: date-time */
-            completedAt?: string | null;
-        };
-        PrivacyRequestResBody: {
-            item?: components["schemas"]["PrivacyRequestDto"];
-        };
-        RsDataPrivacyRequestResBody: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["PrivacyRequestResBody"];
-        };
-        MemberLoginRequest: {
-            email?: string | null;
-            password: string;
-            rememberMe?: boolean;
-            ipSecurity?: boolean;
+        AdminEmailCodeVerifyRequest: {
+            challengeId: string;
+            code: string;
         };
         MemberDto: {
-            isAdmin?: boolean;
+            isAdmin: boolean;
             /** Format: int64 */
             id?: number;
             /** Format: date-time */
@@ -1553,7 +1409,6 @@ export interface components {
             modifiedAt?: string;
             name?: string;
             profileImageUrl?: string;
-            admin?: boolean;
         };
         MemberLoginResBody: {
             item?: components["schemas"]["MemberDto"];
@@ -1562,10 +1417,6 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["MemberLoginResBody"];
-        };
-        AdminEmailCodeVerifyRequest: {
-            challengeId: string;
-            code: string;
         };
         AdminEmailCodeRequest: {
             email: string;
@@ -1609,7 +1460,7 @@ export interface components {
             legacyBlogScheme?: string;
             serviceLinks?: components["schemas"]["MemberProfileLinkItemDto"][];
             contactLinks?: components["schemas"]["MemberProfileLinkItemDto"][];
-            admin?: boolean;
+            isAdmin: boolean;
         };
         UpdateProfileImgRequest: {
             profileImgUrl: string;
@@ -1847,7 +1698,7 @@ export interface components {
             id?: number;
             username?: string;
             nickname?: string;
-            isAdmin?: boolean;
+            isAdmin: boolean;
         };
         AuthSecurityEventDto: {
             /** Format: int64 */
@@ -1959,45 +1810,6 @@ export interface components {
             member?: components["schemas"]["AuthSessionMemberDto"];
             firstPage?: components["schemas"]["PageDtoPostDto"];
         };
-        PrivacyExportMemberSnapshot: {
-            /** Format: int64 */
-            id?: number;
-            email?: string | null;
-            username?: string;
-            nickname?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            modifiedAt?: string;
-        };
-        PrivacyExportResponse: {
-            /** Format: date-time */
-            generatedAt?: string;
-            member?: components["schemas"]["PrivacyExportMemberSnapshot"];
-            latestLegalAcceptance?: components["schemas"]["PrivacyLegalAcceptanceSnapshot"] | null;
-        };
-        PrivacyLegalAcceptanceSnapshot: {
-            termsVersion?: string;
-            termsContentSha256?: string;
-            privacyVersion?: string;
-            privacyContentSha256?: string;
-            age14OrOlder?: boolean;
-            requiredPrivacyConfirmed?: boolean;
-            analyticsConsent?: boolean;
-            overseasTransferAcknowledged?: boolean;
-            source?: string;
-            /** Format: date-time */
-            acceptedAt?: string;
-        };
-        RsDataPrivacyExportResponse: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["PrivacyExportResponse"];
-        };
-        PageDtoMemberWithUsernameDto: {
-            content?: components["schemas"]["MemberWithUsernameDto"][];
-            pageable?: components["schemas"]["PageableDto"];
-        };
         ProfileImageHistoryDto: {
             /** Format: int64 */
             id?: number;
@@ -2042,24 +1854,6 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: unknown;
-        };
-        AccountDeletionRequest: {
-            password?: string | null;
-            oauthAccountDeletionConfirmed?: boolean;
-            reason?: string | null;
-        };
-        AccountDeletionResult: {
-            /** Format: int64 */
-            memberId?: number;
-            /** Format: date-time */
-            deletedAt?: string;
-            /** Format: int32 */
-            revokedSessionCount?: number;
-        };
-        RsDataAccountDeletionResult: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["AccountDeletionResult"];
         };
     };
     responses: never;
@@ -2525,54 +2319,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataPostDto"];
-                };
-            };
-        };
-    };
-    createRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PrivacyRequestCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPrivacyRequestResBody"];
-                };
-            };
-        };
-    };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MemberLoginRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataMemberLoginResBody"];
                 };
             };
         };
@@ -3485,48 +3231,6 @@ export interface operations {
             };
         };
     };
-    getRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                requestId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPrivacyRequestResBody"];
-                };
-            };
-        };
-    };
-    export: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataPrivacyExportResponse"];
-                };
-            };
-        };
-    };
     getAdminProfile: {
         parameters: {
             query?: never;
@@ -3572,53 +3276,6 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MemberWithUsernameDto"];
-                };
-            };
-        };
-    };
-    getItems_2: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                kw?: string;
-                sort?: "CREATED_AT" | "CREATED_AT_ASC" | "USERNAME" | "USERNAME_ASC" | "NICKNAME" | "NICKNAME_ASC";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageDtoMemberWithUsernameDto"];
-                };
-            };
-        };
-    };
-    getItem_2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
             cookie?: never;
         };
         requestBody?: never;
@@ -3794,30 +3451,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RsDataVoid"];
-                };
-            };
-        };
-    };
-    deleteAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AccountDeletionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataAccountDeletionResult"];
                 };
             };
         };
