@@ -16,43 +16,45 @@ export type BrowserStorageRegistryEntry = {
   stores: string
 }
 
+type AdminAuthCookieEntry = Pick<
+  BrowserStorageRegistryEntry,
+  "key" | "retention" | "deletion" | "stores"
+>
+
+const adminAuthCookieEntry = (
+  entry: AdminAuthCookieEntry,
+): BrowserStorageRegistryEntry => ({
+  area: "cookie",
+  purpose: "auth-session",
+  required: true,
+  ...entry,
+})
+
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
-  {
-    area: "cookie",
+  adminAuthCookieEntry({
     key: "apiKey",
-    purpose: "auth-session",
-    required: true,
     retention: "session or 30 days when keep-signed-in is enabled",
     deletion: "logout, session revocation, or browser cookie deletion",
     stores: "administrator API key token value",
-  },
-  {
-    area: "cookie",
+  }),
+  adminAuthCookieEntry({
     key: "accessToken",
-    purpose: "auth-session",
-    required: true,
     retention: "session or access-token TTL when keep-signed-in is enabled",
     deletion: "logout, refresh rotation, session revocation, or browser cookie deletion",
     stores: "JWT access token",
-  },
-  {
-    area: "cookie",
+  }),
+  adminAuthCookieEntry({
     key: "refreshToken",
-    purpose: "auth-session",
-    required: true,
     retention: "session or 30 days when keep-signed-in is enabled",
     deletion: "logout, refresh rotation, session revocation, or browser cookie deletion",
     stores: "opaque refresh token; server stores only hash",
-  },
-  {
-    area: "cookie",
+  }),
+  adminAuthCookieEntry({
     key: "sessionKey",
-    purpose: "auth-session",
-    required: true,
     retention: "session or 30 days when keep-signed-in is enabled",
     deletion: "logout, session revocation, or browser cookie deletion",
     stores: "administrator session identifier",
-  },
+  }),
   {
     area: "cookie",
     key: "admin_profile_snapshot_v1",
