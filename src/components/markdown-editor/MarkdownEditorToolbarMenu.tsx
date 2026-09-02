@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   ToolbarMenuChevron,
   ToolbarMenuItem,
@@ -37,8 +45,11 @@ export const MarkdownEditorToolbarMenu = ({
 }: MarkdownEditorToolbarMenuProps) => {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [horizontalOffset, setHorizontalOffset] = useState(0)
+  const horizontalOffsetRef = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
   const menuId = useId()
   const disabledItems = useMemo(
@@ -49,6 +60,8 @@ export const MarkdownEditorToolbarMenu = ({
   const openMenu = useCallback((edge: "first" | "last") => {
     if (disabled) return
     onBeforeOpen?.()
+    horizontalOffsetRef.current = 0
+    setHorizontalOffset(0)
     setActiveIndex(resolveToolbarMenuInitialIndex(disabledItems, edge))
     setOpen(true)
   }, [disabled, disabledItems, onBeforeOpen])
@@ -79,6 +92,35 @@ export const MarkdownEditorToolbarMenu = ({
   useEffect(() => {
     if (disabled && open) closeMenu(false)
   }, [closeMenu, disabled, open])
+
+  const keepPanelInsideEditor = useCallback(() => {
+    const editor = rootRef.current?.closest<HTMLElement>("[data-testid='markdown-editor']")
+    const panel = panelRef.current
+    if (!editor || !panel) return
+
+    const editorBounds = editor.getBoundingClientRect()
+    const panelBounds = panel.getBoundingClientRect()
+    const baseLeft = panelBounds.left - horizontalOffsetRef.current
+    const baseRight = panelBounds.right - horizontalOffsetRef.current
+    let nextOffset = 0
+
+    if (baseLeft < editorBounds.left) {
+      nextOffset = editorBounds.left - baseLeft
+    }
+    if (baseRight + nextOffset > editorBounds.right) {
+      nextOffset += editorBounds.right - (baseRight + nextOffset)
+    }
+
+    horizontalOffsetRef.current = nextOffset
+    setHorizontalOffset(nextOffset)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    keepPanelInsideEditor()
+    window.addEventListener("resize", keepPanelInsideEditor)
+    return () => window.removeEventListener("resize", keepPanelInsideEditor)
+  }, [keepPanelInsideEditor, open])
 
   return (
     <ToolbarMenuRoot ref={rootRef}>
@@ -122,10 +164,12 @@ export const MarkdownEditorToolbarMenu = ({
       </ToolbarMenuTrigger>
       {open ? (
         <ToolbarMenuPanel
+          ref={panelRef}
           id={menuId}
           role="menu"
           aria-label={label}
           $align={align}
+          $horizontalOffset={horizontalOffset}
           onBlur={(event) => {
             if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
             closeMenu(false)

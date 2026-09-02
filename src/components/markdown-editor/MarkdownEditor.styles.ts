@@ -121,11 +121,15 @@ export const ToolbarMenuChevron = styled.span`
   line-height: 1;
 `
 
-export const ToolbarMenuPanel = styled.div<{ $align: "start" | "end" }>`
+export const ToolbarMenuPanel = styled.div<{
+  $align: "start" | "end"
+  $horizontalOffset: number
+}>`
   position: absolute;
   z-index: ${zIndexes.dropdownMenu};
   top: calc(100% + 6px);
   ${({ $align }) => ($align === "end" ? "right: 0;" : "left: 0;")}
+  transform: translateX(${({ $horizontalOffset }) => $horizontalOffset}px);
   display: grid;
   min-width: 172px;
   max-width: min(280px, calc(100vw - 24px));

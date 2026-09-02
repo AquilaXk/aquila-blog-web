@@ -313,6 +313,22 @@ test.describe("live Markdown writing surface", () => {
     }))
     expect(compactLayout.toolbarOverflow).toBe(0)
     expect(compactLayout.documentOverflow).toBe(0)
+
+    await page.setViewportSize({ width: 320, height: 844 })
+    const editor = page.getByTestId("markdown-editor")
+    const editorBounds = await editor.boundingBox()
+    expect(editorBounds).not.toBeNull()
+    for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
+      await page.getByRole("button", { name: `${label} 메뉴` }).click()
+      const menu = page.getByRole("menu", { name: label })
+      const menuBounds = await menu.boundingBox()
+      expect(menuBounds).not.toBeNull()
+      expect(menuBounds!.x).toBeGreaterThanOrEqual(editorBounds!.x)
+      expect(menuBounds!.x + menuBounds!.width).toBeLessThanOrEqual(
+        editorBounds!.x + editorBounds!.width
+      )
+      await menu.getByRole("menuitem").first().press("Escape")
+    }
   })
 
   test("selection reveals source for the active block and formats inactive blocks in place", async ({ page }) => {
