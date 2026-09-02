@@ -11,8 +11,6 @@ const requiredPaths = [
   "README.md",
   "docs",
   "e2e",
-  "legal/policies",
-  "legal/schemas",
   "package.json",
   "packages",
   "public",

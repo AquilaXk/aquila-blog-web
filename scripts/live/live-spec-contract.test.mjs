@@ -12,7 +12,6 @@ test("live gate pins credential-free public and unauthenticated checks", () => {
 
   assert.match(liveSpec, /page\.request\.get\("\/feed"\)[\s\S]*?application\/rss\+xml/)
   assert.match(liveSpec, /post\/api\/v1\/posts\/search/)
-  assert.match(liveSpec, /\["\/terms", "\/privacy", "\/cookies", "\/legal\/history"\]/)
   assert.match(
     liveSpec,
     /const webOrigin = new URL\(process\.env\.PLAYWRIGHT_BASE_URL \|\| page\.url\(\)\)\.origin[\s\S]*?new URL\("\/actuator\/health\/readiness", webOrigin\)/

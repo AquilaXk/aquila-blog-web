@@ -72,6 +72,16 @@ test.describe("frontend legacy boundary", () => {
     expect(frontPathExists("src/pages/admin/editor/[id].tsx")).toBe(true)
   })
 
+  test("retired public legal routes and producers are absent", () => {
+    for (const relativePath of [
+      "src/pages/privacy.tsx", "src/pages/terms.tsx", "src/pages/cookies.tsx", "src/pages/legal",
+      "src/routes/LegalPolicy", "src/libs/legal", "src/apis/backend/legal.ts", "legal",
+      "contracts/export/legal-policy-manifest.json", "scripts/legal",
+      "scripts/contracts/sync-legal-policy-workflow.test.mjs",
+      ".github/workflows/sync-legal-policy-to-platform.yml",
+    ]) expect(frontPathExists(relativePath), relativePath).toBe(false)
+  })
+
   test("retired public account entrypoint is absent so Next serves its normal 404", () => {
     expect(frontPathExists("src/pages/settings/account.tsx")).toBe(false)
     expect(frontPathExists("src/pages/settings/privacy.tsx")).toBe(false)
@@ -145,7 +155,6 @@ test.describe("frontend legacy boundary", () => {
       "scripts/env/env-contract.test.mjs",
       "src/apis/backend/client.ts",
       "src/apis/backend/errorMessages.ts",
-      "src/apis/backend/legal.ts",
       "src/libs/backend/requestPath.ts",
       "src/libs/router.ts",
       "src/libs/server/runtimeMetrics.ts",

@@ -198,14 +198,6 @@ export const COMPANY_FOOTER_LINK_GROUPS = [
       { label: "기술 블로그", href: BLOG_URL },
     ],
   },
-  {
-    id: "legal",
-    title: "약관",
-    links: [
-      { label: "개인정보처리방침", href: `${BLOG_URL}/privacy` },
-      { label: "이용약관", href: `${BLOG_URL}/terms` },
-    ],
-  },
 ] as const
 
 /** canonical 요약을 그대로 전달하고, 없는 값에는 별도 문구를 만들지 않는다. */

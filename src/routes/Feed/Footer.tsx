@@ -1,8 +1,6 @@
 import { CONFIG } from "site.config"
-import Link from "next/link"
 import React from "react"
 import styled from "@emotion/styled"
-import { legalPolicyCurrentPaths } from "src/libs/legal/policyLinks"
 
 const d = new Date()
 const y = d.getFullYear()
@@ -23,9 +21,6 @@ const Footer: React.FC<Props> = ({ className }) => {
         >
           © {CONFIG.profile.name} {from === y || !from ? y : `${from} - ${y}`}
         </a>
-        <Link href={legalPolicyCurrentPaths.privacy}>개인정보처리방침</Link>
-        <Link href={legalPolicyCurrentPaths.terms}>이용약관</Link>
-        <Link href={legalPolicyCurrentPaths.cookies}>쿠키 정책</Link>
       </div>
     </StyledWrapper>
   )

@@ -95,6 +95,4 @@ export const PRODUCT_SCOPE_CHIPS: ProductScopeChip[] = [
 export const PRODUCT_FOOTER_LINKS = [
   { label: "회사 소개", href: COMPANY_URL },
   { label: "기술 블로그", href: BLOG_URL },
-  { label: "개인정보처리방침", href: `${BLOG_URL}/privacy` },
-  { label: "이용약관", href: `${BLOG_URL}/terms` },
 ] as const
