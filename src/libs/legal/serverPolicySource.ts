@@ -13,9 +13,9 @@ import type { LegalPolicyDocument, LegalPolicyKind, LegalPolicyPageProps, LegalP
 const policyDir = path.resolve(process.cwd(), "legal", "policies")
 
 const publicPolicyVersionsByKind: Record<LegalPolicyKind, string[]> = {
-  privacy: ["1.0.0", "1.0.1", "1.0.2", ACTIVE_LEGAL_POLICY_VERSIONS.privacy],
-  terms: ["1.0.0", "1.0.1", ACTIVE_LEGAL_POLICY_VERSIONS.terms],
-  cookies: ["1.0.0", "1.0.1", "1.0.2", ACTIVE_LEGAL_POLICY_VERSIONS.cookies],
+  privacy: ["1.0.0", "1.0.1", "1.0.2", "1.0.3", ACTIVE_LEGAL_POLICY_VERSIONS.privacy],
+  terms: ["1.0.0", "1.0.1", "1.0.2", ACTIVE_LEGAL_POLICY_VERSIONS.terms],
+  cookies: ["1.0.0", "1.0.1", "1.0.2", "1.0.3", ACTIVE_LEGAL_POLICY_VERSIONS.cookies],
 }
 
 const policyFilePrefixes: Record<LegalPolicyKind, string> = {

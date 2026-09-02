@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import styled from "@emotion/styled"
-import { CONFIG } from "site.config"
 import type { LegalPolicyKind, LegalPolicyPageProps } from "src/libs/legal/policyTypes"
 import { legalPolicyCurrentPaths, legalPolicyHistoryPath, legalPolicyKindLabels } from "src/libs/legal/policyLinks"
 
-const policyContactSubjects: Record<LegalPolicyKind, string> = {
-  privacy: "AquilaLog 개인정보 문의 및 데이터 삭제 요청",
-  terms: "AquilaLog 이용약관 문의",
-  cookies: "AquilaLog 쿠키 및 브라우저 저장소 문의",
-}
+const policyContactSubject = "AquilaLog 문의"
 
 const policyDocumentLabels: Record<LegalPolicyKind, string> = {
   privacy: "개인정보 보호 문서",
@@ -17,8 +12,8 @@ const policyDocumentLabels: Record<LegalPolicyKind, string> = {
   cookies: "쿠키 및 브라우저 저장소 문서",
 }
 
-const buildPolicyContactMailto = (kind: LegalPolicyKind, email: string) =>
-  `mailto:${email}?subject=${encodeURIComponent(policyContactSubjects[kind])}`
+const buildPolicyContactMailto = (email: string) =>
+  `mailto:${email}?subject=${encodeURIComponent(policyContactSubject)}`
 
 const formatDate = (value: string) => value.slice(0, 10)
 
@@ -120,7 +115,7 @@ const LegalPolicyPage = ({
             <Link href={legalPolicyCurrentPaths.terms}>이용약관</Link>
             <Link href={legalPolicyCurrentPaths.cookies}>쿠키 정책</Link>
             <Link href={legalPolicyHistoryPath}>변경 이력</Link>
-            <a href={buildPolicyContactMailto(kind, CONFIG.profile.email)}>{policyContactSubjects[kind]}</a>
+            <a href={buildPolicyContactMailto(policy.contactEmail)}>{policyContactSubject}</a>
           </nav>
           <div className="actions">
             <button type="button" onClick={() => window.print()}>

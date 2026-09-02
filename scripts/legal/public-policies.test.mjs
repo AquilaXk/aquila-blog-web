@@ -19,7 +19,7 @@ const activePolicyExpectations = {
   },
   privacy: {
     supersedes: "1.0.3",
-    changeSummary: ["Remove retired public-member and optional-tracking processing, and publish privacy@aquilaxk.site."],
+    changeSummary: ["Remove retired public-member and optional-tracking processing, and publish aquila@aquilaxk.site."],
   },
   cookies: {
     supersedes: "1.0.3",
@@ -37,6 +37,9 @@ const retiredActivePolicyTokens = [
   "회원가입",
   "댓글",
   "OAuth",
+  "IP 주소",
+  "User-Agent",
+  "privacy@aquilaxk.site",
 ]
 const historicalPolicyRawSha256 = {
   "cookies.ko-KR.v1.0.0.yaml": "b1ac4dacabf5c9d7b2281fa577c5c26e238411207d5cc72b4e7d7ac88dc92905",
@@ -77,7 +80,7 @@ test("publishes the approved 1.0.4 public-policy cutover", () => {
     assert.equal(policy.publishedAt, "2026-09-01T12:43:19Z")
     assert.equal(policy.effectiveAt, "2026-09-01T12:43:19Z")
     assert.equal(policy.supersedes, expectation.supersedes)
-    assert.equal(policy.contactEmail, "privacy@aquilaxk.site")
+    assert.equal(policy.contactEmail, "aquila@aquilaxk.site")
     assert.deepEqual(policy.changeSummary, expectation.changeSummary)
     assert.equal(result.manifest.active[kind].contentSha256, policy.contentSha256)
     const activeText = JSON.stringify(policy)
