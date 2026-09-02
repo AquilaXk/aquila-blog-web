@@ -24,80 +24,12 @@ import {
 } from "../../src/routes/Admin/AdminDashboardWorkspaceModel"
 import { normalizeApiRequestPath } from "../../src/libs/backend/requestPath"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
-import {
-  hasOptionalTrackingConsent,
-  OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-  readOptionalTrackingConsent,
-} from "../../src/libs/privacy/optionalTrackingConsentCore"
 import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
 import {
   isCloudSearchPending,
   resolveCloudEmptyTitle,
   shouldShowCloudEmptyLoading,
 } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
-
-const createStorage = (): Storage => {
-  const store = new Map<string, string>()
-  return {
-    get length() {
-      return store.size
-    },
-    clear() {
-      store.clear()
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null
-    },
-    removeItem(key: string) {
-      store.delete(key)
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value)
-    },
-  }
-}
-
-const setGlobal = (key: "window" | "navigator", value: unknown) => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, key)
-  Object.defineProperty(globalThis, key, {
-    configurable: true,
-    value,
-    writable: true,
-  })
-  return () => {
-    if (previous) {
-      Object.defineProperty(globalThis, key, previous)
-    } else {
-      delete (globalThis as Record<string, unknown>)[key]
-    }
-  }
-}
-
-const withBrowserState = (run: (storage: Storage, navigatorValue: { globalPrivacyControl?: boolean }) => void) => {
-  const storage = createStorage()
-  const navigatorValue = {
-    doNotTrack: "0",
-    globalPrivacyControl: false,
-    sendBeacon: () => true,
-  }
-  const restoreWindow = setGlobal("window", {
-    dispatchEvent: () => true,
-    localStorage: storage,
-    location: { origin: "http://localhost" },
-    navigator: navigatorValue,
-  })
-  const restoreNavigator = setGlobal("navigator", navigatorValue)
-
-  try {
-    run(storage, navigatorValue)
-  } finally {
-    restoreNavigator()
-    restoreWindow()
-  }
-}
 
 test.describe("frontend pure logic contracts", () => {
   test("safe redirect paths reject external and data-route inputs", () => {
@@ -173,46 +105,6 @@ caption
     expect(isExplicitUploadAbort(new Error("network closed"), abortController.signal)).toBe(true)
     expect(isExplicitUploadAbort(new DOMException("Upload aborted", "AbortError"))).toBe(true)
     expect(isExplicitUploadAbort(new Error("network closed"))).toBe(false)
-  })
-
-  test("optional tracking consent respects stored state and browser opt-out", () => {
-    withBrowserState((storage, navigatorValue) => {
-      expect(readOptionalTrackingConsent()).toBeNull()
-
-      storage.setItem(
-        OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-        JSON.stringify({
-          categories: { analytics: true, rum: true },
-          source: "settings",
-          state: "granted",
-          updatedAt: "2026-06-29T00:00:00.000Z",
-          version: 1,
-        })
-      )
-
-      expect(readOptionalTrackingConsent()).toMatchObject({ state: "granted" })
-      expect(hasOptionalTrackingConsent()).toBe(true)
-
-      storage.setItem(
-        OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-        JSON.stringify({
-          categories: { analytics: true, rum: true },
-          source: "legal-reconsent",
-          state: "granted",
-          updatedAt: "2026-06-29T00:00:00.000Z",
-          version: 1,
-        })
-      )
-      expect(readOptionalTrackingConsent()).toBeNull()
-      expect(hasOptionalTrackingConsent()).toBe(false)
-
-      storage.setItem(OPTIONAL_TRACKING_CONSENT_STORAGE_KEY, "granted")
-      expect(readOptionalTrackingConsent()).toBeNull()
-      expect(hasOptionalTrackingConsent()).toBe(false)
-
-      navigatorValue.globalPrivacyControl = true
-      expect(hasOptionalTrackingConsent()).toBe(false)
-    })
   })
 
   test("auth session fetch decision preserves cached anonymous and member states", () => {

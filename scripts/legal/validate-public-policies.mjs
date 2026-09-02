@@ -28,66 +28,110 @@ const requiredFields = [
   "changeSummary",
   "sections",
 ]
-const requiredPrivacySections = [
-  "개인정보처리자 및 연락처",
-  "처리 목적",
-  "처리하는 개인정보 항목과 수집 방법",
-  "처리의 법적 근거",
-  "보유·이용기간",
-  "개인정보의 파기 절차와 방법",
-  "제3자 제공",
-  "개인정보 처리위탁",
-  "개인정보 국외이전",
-  "쿠키·로컬 저장소·온라인 식별자",
-  "Vercel Analytics·Speed Insights·자체 RUM",
-  "Kakao 로그인",
-  "Google Gemini 사용",
-  "이용자와 법정대리인의 권리 및 행사방법",
-  "만 14세 미만 이용자 정책",
-  "개인정보의 안전성 확보조치",
-  "자동화된 결정 여부",
-  "개인정보 침해·민원 구제 절차",
-  "개인정보 보호책임자 또는 담당자",
-  "정책 변경, 시행일, 이전 버전",
-]
-const requiredTermsSections = [
-  "목적",
-  "용어 정의",
-  "운영자 정보 및 적용 범위",
-  "약관 게시·변경·통지",
-  "이용계약 성립",
-  "이용 자격과 만 14세 미만 정책",
-  "계정 생성·관리·보안",
-  "서비스 내용",
-  "게시글·댓글·파일 등 이용자 콘텐츠",
-  "이용자 콘텐츠의 저작권과 서비스 이용허락",
-  "금지행위",
-  "신고·노출 제한·삭제·계정 제재 절차",
-  "서비스 변경·점검·중단",
-  "외부 서비스와 링크",
-  "AI 기능",
-  "회원 탈퇴와 계약 종료",
-  "개인정보 처리",
-  "책임의 범위",
-  "손해배상",
-  "통지",
-  "준거법·분쟁 해결",
-  "시행일·이전 버전",
-]
-const requiredVendors = [
+const requiredActiveSections = {
+  privacy: [
+    "개인정보처리자 및 연락처",
+    "처리 목적",
+    "처리하는 개인정보 항목과 수집 방법",
+    "처리의 법적 근거",
+    "보유·이용기간",
+    "개인정보의 파기 절차와 방법",
+    "제3자 제공",
+    "개인정보 처리위탁",
+    "개인정보 국외이전",
+    "쿠키·로컬 저장소·온라인 식별자",
+    "이용자와 법정대리인의 권리 및 행사방법",
+    "개인정보의 안전성 확보조치",
+    "자동화된 결정 여부",
+    "개인정보 침해·민원 구제 절차",
+    "개인정보 보호책임자 또는 담당자",
+    "정책 변경, 시행일, 이전 버전",
+  ],
+  terms: [
+    "목적과 적용 범위",
+    "서비스 내용",
+    "관리자 운영",
+    "콘텐츠와 지식재산권",
+    "금지행위",
+    "서비스 변경·점검·중단",
+    "외부 서비스와 링크",
+    "개인정보 처리",
+    "책임의 범위",
+    "통지",
+    "준거법·분쟁 해결",
+    "시행일·이전 버전",
+  ],
+  cookies: [
+    "쿠키 정책의 목적",
+    "필수 쿠키",
+    "설정과 관리자 저장소",
+    "현재 저장소 범위",
+    "관리 방법",
+    "보유기간",
+    "시행일·변경 이력",
+  ],
+}
+const activePolicyContract = {
+  publishedAt: "2026-09-01T12:43:19Z",
+  effectiveAt: "2026-09-01T12:43:19Z",
+  contactEmail: "aquila@aquilaxk.site",
+  version: "1.0.4",
+  summaries: {
+    terms: "Align the service with an anonymously readable technical blog and internal-only administration.",
+    privacy: "Remove retired public-member and optional-tracking processing, and publish aquila@aquilaxk.site.",
+    cookies: "Remove retired member, preview, notification, legacy editor-draft, and optional-tracking storage from the current inventory.",
+  },
+}
+const requiredCurrentPolicyTokens = {
+  privacy: ["익명", "관리자", "홈서버", "Cloudflare Tunnel", "SMTP", "GitHub Actions"],
+  terms: ["익명", "관리자", "고의 또는 중대한 과실", "부당하게 불리한 전속 관할"],
+  cookies: [
+    "apiKey",
+    "accessToken",
+    "refreshToken",
+    "sessionKey",
+    "admin_profile_snapshot_v1",
+    "auth.admin.savedEmail.v1",
+    "admin.editor.localDraft.create.v3",
+    "admin.editor.localDraft.post.",
+    "admin.editor.customTags",
+    "admin.editor.customCategories",
+    "admin.contentStudio.listConditions.v1",
+    "aquila-cloud-video-upload-session",
+    "admin.tools.taskDlqReplay.v1",
+    "admin.tools.searchRuntimeControl.v1",
+    "auth:me:anon-probe-suppress-until:v1",
+    "admin.tools.resultsFilter.v1",
+    "posts:runtime-endpoints:v1",
+    "__aquila_client_runtime_recovery__",
+    "feed:explorer:state:v2",
+  ],
+}
+const forbiddenActivePolicyTokens = [
   "Vercel",
-  "Cloudflare",
-  "Kakao",
-  "SMTP",
   "Google Analytics",
   "Google Gemini",
-  "GitHub Actions",
-  "GHCR",
-  "PostgreSQL",
-  "Redis",
-  "MinIO",
-  "Grafana",
-  "Loki",
+  "Kakao",
+  "OAuth",
+  "RUM",
+  "NEXT_PUBLIC_RUM_SAMPLE_RATE",
+  "privacy.optionalTrackingConsent.v1",
+  "editor.actual-preview.v1:",
+  "signup_session",
+  "admin_tools_mail_snapshot_v1",
+  "auth.login.keepSignedIn",
+  "auth.login.ipSecurityOn",
+  "auth.admin.keepSignedIn.v1",
+  "auth.signupMailCooldown.v1",
+  "member.notification.lastEventId.v1",
+  "member.notification.snapshot.v1",
+  "admin.editor.localDraft.v1",
+  "admin.editor.localDraft.create.v2",
+  "회원가입",
+  "댓글",
+  "IP 주소",
+  "User-Agent",
+  "privacy@aquilaxk.site",
 ]
 const legalPolicyStatuses = new Set(["draft", "effective", "superseded"])
 const publicPolicyStatuses = new Set(["effective", "superseded"])
@@ -198,7 +242,6 @@ const assertRequiredShape = (fileName, policy) => {
   if (Number.isNaN(Date.parse(policy.effectiveAt || ""))) fail(`${fileName} effectiveAt must be date-time`)
   if (!/^[a-f0-9]{64}$/.test(policy.contentSha256 || "")) fail(`${fileName} contentSha256 must be 64 lowercase hex`)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(policy.contactEmail || "")) fail(`${fileName} contactEmail must be email`)
-  if (policy.contactEmail !== "aquilaxk10@gmail.com") fail(`${fileName} contactEmail must be aquilaxk10@gmail.com`)
   if (!Array.isArray(policy.changeSummary) || policy.changeSummary.length === 0) fail(`${fileName} changeSummary is empty`)
   if ("reviewRequired" in policy && (!Array.isArray(policy.reviewRequired) || policy.reviewRequired.length === 0)) {
     fail(`${fileName} reviewRequired must be a non-empty string array when present`)
@@ -230,6 +273,29 @@ const assertTextIncludes = (fileName, policy, tokens) => {
   for (const token of tokens) {
     if (!text.includes(token)) fail(`${fileName} must mention ${token}`)
   }
+}
+
+const assertTextExcludes = (fileName, policy, tokens) => {
+  const text = JSON.stringify(policy)
+  for (const token of tokens) {
+    if (text.includes(token)) fail(`${fileName} must not mention retired token: ${token}`)
+  }
+}
+
+const assertActiveContract = (kind, policy) => {
+  if (!policy) return
+  const fileName = `${kind}.ko-KR.v${policy.version}.yaml`
+  for (const field of ["version", "publishedAt", "effectiveAt", "contactEmail"]) {
+    if (policy[field] !== activePolicyContract[field]) {
+      fail(`${fileName} ${field} mismatch: expected ${activePolicyContract[field]}`)
+    }
+  }
+  if (policy.changeSummary?.length !== 1 || policy.changeSummary[0] !== activePolicyContract.summaries[kind]) {
+    fail(`${fileName} changeSummary does not match the approved release summary`)
+  }
+  assertSectionTitles(fileName, policy, requiredActiveSections[kind])
+  assertTextIncludes(fileName, policy, requiredCurrentPolicyTokens[kind])
+  assertTextExcludes(fileName, policy, forbiddenActivePolicyTokens)
 }
 
 const assertPublicTextIsPublicReady = (fileName, policy) => {
@@ -309,9 +375,9 @@ export const validatePublicPolicies = ({ policiesDir: configuredPoliciesDir = po
   const privacy = latestEffectivePolicies.get("PRIVACY_POLICY")
   const terms = latestEffectivePolicies.get("TERMS_OF_SERVICE")
   const cookies = latestEffectivePolicies.get("COOKIE_POLICY")
-  if (privacy) { assertSectionTitles(`privacy.ko-KR.v${privacy.version}.yaml`, privacy, requiredPrivacySections); assertTextIncludes(`privacy.ko-KR.v${privacy.version}.yaml`, privacy, requiredVendors); assertTextIncludes(`privacy.ko-KR.v${privacy.version}.yaml`, privacy, ["apiKey", "refresh token", "NEXT_PUBLIC_RUM_SAMPLE_RATE"]) }
-  if (terms) { assertSectionTitles(`terms.ko-KR.v${terms.version}.yaml`, terms, requiredTermsSections); assertTextIncludes(`terms.ko-KR.v${terms.version}.yaml`, terms, ["고의 또는 중대한 과실", "부당하게 불리한 전속 관할"]) }
-  if (cookies) assertTextIncludes(`cookies.ko-KR.v${cookies.version}.yaml`, cookies, ["필수 쿠키", "Analytics", "RUM", "NEXT_PUBLIC_RUM_SAMPLE_RATE"])
+  assertActiveContract("privacy", privacy)
+  assertActiveContract("terms", terms)
+  assertActiveContract("cookies", cookies)
   for (const fileName of policyFiles) { const raw = readRawPolicy(fileName); if (raw?.includes("illusiveman7@gmail.com")) fail(`${fileName} contains stale contact email`) }
   assertActiveMetadataMatchesPolicies("frontend active legal metadata", readFrontendActiveMetadata(), terms, privacy)
   const active = terms && privacy && cookies ? { terms, privacy, cookies } : null

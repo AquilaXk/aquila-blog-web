@@ -21,9 +21,6 @@ import {
 
 export const TAG_CATALOG_STORAGE_KEY = "admin.editor.customTags"
 export const CATEGORY_CATALOG_STORAGE_KEY = "admin.editor.customCategories"
-export const LOCAL_DRAFT_V1_STORAGE_KEY = "admin.editor.localDraft.v1"
-/** @deprecated Use LOCAL_DRAFT_V1_STORAGE_KEY; retained for one-time migration callers. */
-export const LOCAL_DRAFT_STORAGE_KEY = LOCAL_DRAFT_V1_STORAGE_KEY
 export const LOCAL_DRAFT_CREATE_STORAGE_KEY = "admin.editor.localDraft.create.v3"
 export const LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX = "admin.editor.localDraft.post."
 export const LOCAL_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -221,47 +218,8 @@ const enforceLocalDraftPostSlotLimit = () => {
   }
 }
 
-export const migrateLocalDraftV1Once = () => {
-  if (typeof window === "undefined") return
-
-  const raw = window.localStorage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)
-  if (!raw) return
-
-  try {
-    const existingCreateRaw = window.localStorage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)
-    if (existingCreateRaw) {
-      const existingCreate = parseLocalDraftPayload(existingCreateRaw, { kind: "create" })
-      if (existingCreate) {
-        // Verified readable current create slot — safe to drop legacy v1.
-        window.localStorage.removeItem(LOCAL_DRAFT_V1_STORAGE_KEY)
-        return
-      }
-      // Corrupt/expired current slot: fall through and try migrating recoverable v1.
-    }
-
-    const migrated = parseLocalDraftPayload(raw, { kind: "create" })
-    if (!migrated) {
-      // Preserve an incompatible v1 payload; canonical summary semantics cannot be inferred safely.
-      return
-    }
-
-    window.localStorage.setItem(
-      LOCAL_DRAFT_CREATE_STORAGE_KEY,
-      JSON.stringify({
-        ...migrated,
-        source: { kind: "create" },
-      })
-    )
-    // Remove v1 only after the current-slot write succeeded.
-    window.localStorage.removeItem(LOCAL_DRAFT_V1_STORAGE_KEY)
-  } catch {
-    // Preserve recoverable legacy draft when current-slot persistence fails.
-  }
-}
-
 export const readLocalDraft = (source: LocalDraftSource): LocalDraftPayload | null => {
   if (typeof window === "undefined") return null
-  migrateLocalDraftV1Once()
 
   try {
     const storageKey = localDraftStorageKey(source)
@@ -288,7 +246,6 @@ export const readLocalDraft = (source: LocalDraftSource): LocalDraftPayload | nu
 
 export const persistLocalDraft = (payload: LocalDraftPayload) => {
   if (typeof window === "undefined") return
-  migrateLocalDraftV1Once()
 
   const source = payload.source
   const storageKey = localDraftStorageKey(source)

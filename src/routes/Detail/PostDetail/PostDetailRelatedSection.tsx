@@ -41,7 +41,7 @@ export const RelatedPostsSection = ({
   if (!showSkeleton && relatedPosts.length === 0) return null
 
   return (
-    <RelatedSection aria-label="관련 글" data-rum-section="related">
+    <RelatedSection aria-label="관련 글">
       <span className="monoLabel">Continue reading</span>
       <h3>관련 글</h3>
       <ul>

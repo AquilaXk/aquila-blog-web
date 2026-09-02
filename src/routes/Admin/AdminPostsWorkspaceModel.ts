@@ -1,7 +1,6 @@
 import { isServerTempDraftPost } from "./editorTempDraft"
 import {
   describeLocalDraftSlot,
-  migrateLocalDraftV1Once,
   readLocalDraft as readLocalDraftPayload,
 } from "./editorStudioStorageModel"
 
@@ -205,7 +204,6 @@ export const readLocalDraft = (): LocalDraftSummary | null => {
   if (typeof window === "undefined") return null
 
   try {
-    migrateLocalDraftV1Once()
     const parsed = readLocalDraftPayload({ kind: "create" })
     if (!parsed) return null
 

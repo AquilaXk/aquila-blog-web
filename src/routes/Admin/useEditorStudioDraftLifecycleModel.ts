@@ -17,7 +17,6 @@ import type { PostVisibility } from "./editorStudioState"
 import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   describeLocalDraftSlot,
-  migrateLocalDraftV1Once,
   resolveLocalDraftSource,
 } from "./editorStudioStorageModel"
 
@@ -111,7 +110,7 @@ export const isLocalDraftAutosaveGatedForPostIdTransition = (
 
 /**
  * Failed post load must not release the create-slot gate immediately — stale edit body
- * would autosave into create.v2. Release only when edit context restores or the user edits.
+ * would autosave into the create slot. Release only when edit context restores or the user edits.
  */
 export const shouldReleasePostIdTransitionGate = (input: {
   editorMode: EditorMode
@@ -231,7 +230,7 @@ export const decideLocalDraftAutosave = (
     return { action: "skip" }
   }
 
-  // ID-change create transition: do not autosave previous edit body into create.v2.
+  // ID-change create transition: do not autosave previous edit body into the create slot.
   if (input.isPostIdTransitionGated) {
     return { action: "skip" }
   }
@@ -493,7 +492,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     if (isPostLoadInFlightRef.current) {
       return
     }
-    // ID field changed to create+pending postId: do not write previous body into create.v2.
+    // ID field changed to create+pending postId: do not write previous body into the create slot.
     if (isPostIdTransitionGatedRef.current) {
       return
     }
@@ -552,7 +551,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
   ])
 
   const restoreLocalDraft = useCallback(() => {
-    migrateLocalDraftV1Once()
     const draft = readLocalDraft(draftSource)
     if (!draft) {
       setPublishStatus(
@@ -695,7 +693,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
   ])
 
   useEffect(() => {
-    migrateLocalDraftV1Once()
     const localDraft = readLocalDraft(draftSource)
     if (!localDraft?.savedAt) {
       // Do not reset lastArmedFingerprint to "" — that re-arms autosave after publish/clear.

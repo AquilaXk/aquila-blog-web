@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import styled from "@emotion/styled"
-import { CONFIG } from "site.config"
 import type { LegalPolicyKind, LegalPolicyPageProps } from "src/libs/legal/policyTypes"
 import { legalPolicyCurrentPaths, legalPolicyHistoryPath, legalPolicyKindLabels } from "src/libs/legal/policyLinks"
-import OptionalTrackingConsentSettings from "./OptionalTrackingConsentSettings"
 
-const policyContactSubjects: Record<LegalPolicyKind, string> = {
-  privacy: "AquilaLog 개인정보 문의 및 데이터 삭제 요청",
-  terms: "AquilaLog 이용약관 문의",
-  cookies: "AquilaLog 쿠키 및 브라우저 저장소 문의",
-}
+const policyContactSubject = "AquilaLog 문의"
 
 const policyDocumentLabels: Record<LegalPolicyKind, string> = {
   privacy: "개인정보 보호 문서",
@@ -18,8 +12,8 @@ const policyDocumentLabels: Record<LegalPolicyKind, string> = {
   cookies: "쿠키 및 브라우저 저장소 문서",
 }
 
-const buildPolicyContactMailto = (kind: LegalPolicyKind, email: string) =>
-  `mailto:${email}?subject=${encodeURIComponent(policyContactSubjects[kind])}`
+const buildPolicyContactMailto = (email: string) =>
+  `mailto:${email}?subject=${encodeURIComponent(policyContactSubject)}`
 
 const formatDate = (value: string) => value.slice(0, 10)
 
@@ -121,7 +115,7 @@ const LegalPolicyPage = ({
             <Link href={legalPolicyCurrentPaths.terms}>이용약관</Link>
             <Link href={legalPolicyCurrentPaths.cookies}>쿠키 정책</Link>
             <Link href={legalPolicyHistoryPath}>변경 이력</Link>
-            <a href={buildPolicyContactMailto(kind, CONFIG.profile.email)}>{policyContactSubjects[kind]}</a>
+            <a href={buildPolicyContactMailto(policy.contactEmail)}>{policyContactSubject}</a>
           </nav>
           <div className="actions">
             <button type="button" onClick={() => window.print()}>
@@ -216,7 +210,6 @@ const LegalPolicyPage = ({
             ) : null}
           </main>
         </div>
-        {kind === "cookies" && isCurrentRoute ? <OptionalTrackingConsentSettings /> : null}
       </div>
     </StyledWrapper>
   )
@@ -408,57 +401,6 @@ const StyledWrapper = styled.div`
     gap: 1.3rem;
   }
 
-  .cookieSettings {
-    margin: 2rem 0 0 17rem;
-    border: 1px solid ${({ theme }) => theme.colors.gray5};
-    border-radius: ${({ theme }) => `${theme.variables.ui.card.radius}px`};
-    padding: 1.4rem;
-    background: ${({ theme }) => theme.colors.gray2};
-  }
-
-  .cookieSettings h2 {
-    margin-bottom: 0.65rem;
-  }
-
-  .cookieSettingsStatus {
-    font-weight: 760;
-  }
-
-  .cookieSettings button {
-    min-height: ${({ theme }) => `${theme.variables.ui.button.minHeight}px`};
-    margin-top: 0.9rem;
-    border: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-radius: ${({ theme }) => `${theme.variables.ui.button.radius}px`};
-    padding: 0.45rem 0.8rem;
-    background: ${({ theme }) => theme.colors.gray1};
-    color: ${({ theme }) => theme.colors.gray12};
-    font: inherit;
-    font-weight: 760;
-    cursor: pointer;
-  }
-
-  .cookieSettings button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  .cookieSettings details {
-    margin-top: 0.9rem;
-  }
-
-  .cookieSettings summary {
-    width: fit-content;
-    color: ${({ theme }) => theme.colors.gray12};
-    font-weight: 720;
-    cursor: pointer;
-  }
-
-  .cookieSettings dl {
-    display: grid;
-    gap: 0.65rem;
-    margin: 0.8rem 0;
-  }
-
   section {
     scroll-margin-top: 5.25rem;
     padding-bottom: 1.3rem;
@@ -526,10 +468,6 @@ const StyledWrapper = styled.div`
 
     .tocRail {
       display: none;
-    }
-
-    .cookieSettings {
-      margin-left: 0;
     }
 
     .mobileSectionJump {

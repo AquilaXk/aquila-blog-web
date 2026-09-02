@@ -85,20 +85,11 @@ const CONFIG = {
   link: SITE_URL,
   since: 2026, // If leave this empty, current year will be used.
   lang: "ko-KR", // ['en-US', 'zh-CN', 'zh-HK', 'zh-TW', 'ja-JP', 'es-ES', 'ko-KR']
-  ogImageGenerateURL: "https://og-image-korean.vercel.app", // The link to generate OG image, don't end with a slash
-
   // notion configuration (required)
   notionConfig: {
     pageId: process.env.NOTION_PAGE_ID || "2ffdedd9d0ff81eaac21d05d868b6e2b",
   },
 
-  // plugin configuration (optional)
-  googleAnalytics: {
-    enable: false,
-    config: {
-      measurementId: process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID || "",
-    },
-  },
   googleSearchConsole: {
     enable: false,
     config: {

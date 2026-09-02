@@ -108,18 +108,6 @@ const isServer = typeof window === "undefined"
 
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, "")
 
-/** Lazy import avoids static cycle: client -> reportApiError -> client. */
-const reportApiFailure = (error: unknown) => {
-  if (isServer) return
-  void import("src/libs/rum/reportApiError")
-    .then(({ reportApiError }) => {
-      reportApiError(error)
-    })
-    .catch(() => {
-      // ignore reporter load failures
-    })
-}
-
 const browserInFlightGetRequests = new Map<string, Promise<unknown>>()
 
 const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null | undefined) => {
@@ -466,13 +454,11 @@ export const apiFetch = async <T>(
 
         if (timedOut) {
           const timeoutError = new ApiTimeoutError(url, resolvedTimeoutMs, serverMetrics?.requestId)
-          reportApiFailure(timeoutError)
           throw timeoutError
         }
 
         if (error instanceof TypeError || error instanceof DOMException) {
           const networkError = new ApiNetworkError(url, serverMetrics?.requestId)
-          reportApiFailure(networkError)
           throw networkError
         }
 
@@ -513,7 +499,6 @@ export const apiFetch = async <T>(
         body,
         serverMetrics?.requestId ?? normalizeRequestId(response.headers.get("x-request-id")),
       )
-      reportApiFailure(apiError)
       throw apiError
     }
 

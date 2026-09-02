@@ -2,10 +2,7 @@ import { expect, test } from "@playwright/test"
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { FEED_EXPLORER_RESTORE_KEY_PREFIX } from "../src/libs/feed/feedRestoreCache"
-import {
-  OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-  registeredBrowserStorageKeys,
-} from "../src/libs/privacy/browserStorageRegistry"
+import { registeredBrowserStorageKeys } from "../src/libs/privacy/browserStorageRegistry"
 import { getLegalPolicyHistoryStaticProps } from "../src/libs/legal/serverPolicySource"
 import { isLocalDraftExpired, LOCAL_DRAFT_MAX_AGE_MS } from "../src/routes/Admin/editorStudioStorageModel"
 
@@ -15,6 +12,7 @@ const sourceConstantPattern =
 const storageApiCallPattern =
   /\b(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(\s*([A-Za-z0-9_]+)/g
 const cookieApiCallPattern = /\b(?:setCookie|deleteCookie|getCookieValue)\(\s*([A-Za-z0-9_]+)/g
+const registryOwnedSourceConstantNames = new Set(["LOCAL_DRAFT_CREATE_STORAGE_KEY"])
 
 const listSourceFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -41,26 +39,19 @@ const collectStorageConstants = () =>
     })).filter(
       (sourceConstant) =>
         storageApiConstantNames.has(sourceConstant.name) ||
+        registryOwnedSourceConstantNames.has(sourceConstant.name) ||
         (hasBrowserStorageApi && sourceConstant.name.includes("PREFIX") && !sourceConstant.key.startsWith("/")),
     )
   })
 
-test("browser storage registry includes privacy and runtime keys used by public flows", () => {
+test("browser storage registry retains only current public and administrator keys", () => {
   expect(registeredBrowserStorageKeys).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ area: "cookie", key: "apiKey", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "accessToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "refreshToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "sessionKey", purpose: "auth-session" }),
-      expect.objectContaining({ area: "cookie", key: "scheme", purpose: "theme-preference" }),
-      expect.objectContaining({
-        area: "localStorage",
-        key: OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-        stores: expect.stringContaining("version"),
-      }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
-      expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.v1" }),
-      expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v2" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
       expect.objectContaining({
@@ -81,6 +72,10 @@ test("browser storage registry includes privacy and runtime keys used by public 
     "auth.signupMailCooldown.v1",
     "member.notification.lastEventId.v1",
     "member.notification.snapshot.v1",
+    "privacy.optionalTrackingConsent.v1",
+    "admin.editor.localDraft.v1",
+    "admin.editor.localDraft.create.v2",
+    "scheme",
   ]
   expect(registeredBrowserStorageKeys.map((entry) => entry.key)).not.toEqual(
     expect.arrayContaining(retiredKeys)
@@ -93,7 +88,6 @@ test("browser storage registry covers source storage constants", () => {
 
   expect(sourceConstants).toEqual(expect.arrayContaining([
     expect.objectContaining({ name: "ADMIN_SAVED_EMAIL_STORAGE_KEY", key: "auth.admin.savedEmail.v1" }),
-    expect.objectContaining({ name: "LOCAL_DRAFT_V1_STORAGE_KEY", key: "admin.editor.localDraft.v1" }),
     expect.objectContaining({ name: "LOCAL_DRAFT_CREATE_STORAGE_KEY", key: "admin.editor.localDraft.create.v3" }),
     expect.objectContaining({
       name: "LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX",
@@ -101,6 +95,12 @@ test("browser storage registry covers source storage constants", () => {
     }),
     expect.objectContaining({ name: "CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX", key: "aquila-cloud-video-upload-session" }),
   ]))
+  expect(sourceConstants.map(({ name }) => name)).not.toEqual(
+    expect.arrayContaining(["LOCAL_DRAFT_V1_STORAGE_KEY", "LOCAL_DRAFT_STORAGE_KEY"]),
+  )
+  expect(readFileSync(path.join(srcRoot, "routes/Admin/editorStudioStorageModel.ts"), "utf8")).not.toContain(
+    "migrateLocalDraftV1Once",
+  )
 
   for (const sourceConstant of sourceConstants) {
     expect(
@@ -109,7 +109,7 @@ test("browser storage registry covers source storage constants", () => {
     ).toBe(true)
   }
 
-  expect(registeredKeys.has("scheme"), "theme scheme cookie is read from document.cookie and must be registered").toBe(true)
+  expect(registeredKeys.has("scheme"), "light-only runtime must not retain a theme cookie").toBe(false)
 })
 
 test("browser storage registry records retention and deletion metadata for every entry", () => {

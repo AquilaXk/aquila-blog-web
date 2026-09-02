@@ -3,8 +3,6 @@ import { readFileSync } from "fs"
 import path from "path"
 import { createUploadPlaceholderId } from "../../src/components/markdown-editor/markdownEditorPasteDropModel"
 import { generateIdempotencyKey } from "../../src/routes/Admin/EditorStudioWorkspaceControllerRootModel"
-import { createApiErrorReportId } from "../../src/libs/rum/reportApiError"
-import { createClientErrorId } from "../../src/libs/rum/reportClientError"
 import { createSecureRandomUuid } from "../../src/libs/security/secureRandomUuid"
 
 const UUID_PATTERN =
@@ -23,30 +21,17 @@ test("secure UUID owner fails closed when Web Crypto randomUUID is unavailable",
   )
 })
 
-test("RUM, upload, and post-write identifiers use UUID values with their public format intact", () => {
-  const apiErrorId = createApiErrorReportId()
-  const clientErrorId = createClientErrorId()
+test("upload and post-write identifiers use UUID values with their public format intact", () => {
   const uploadIds = [createUploadPlaceholderId(), createUploadPlaceholderId()]
   const idempotencyKeys = [generateIdempotencyKey(), generateIdempotencyKey()]
 
-  expect(apiErrorId.startsWith("err_")).toBe(true)
-  expect(apiErrorId.length).toBeLessThanOrEqual(80)
-  expect(apiErrorId.slice(4)).toMatch(UUID_PATTERN)
-  expect(clientErrorId.startsWith("err_")).toBe(true)
-  expect(clientErrorId.length).toBeLessThanOrEqual(80)
-  expect(clientErrorId.slice(4)).toMatch(UUID_PATTERN)
   expect(uploadIds.every((value) => UUID_PATTERN.test(value))).toBe(true)
   expect(idempotencyKeys.every((value) => UUID_PATTERN.test(value))).toBe(true)
   expect(new Set([...uploadIds, ...idempotencyKeys]).size).toBe(4)
 })
 
 test("security identity generators have no timestamp or Math.random fallback", () => {
-  const apiErrorSource = readFileSync(
-    sourcePath("libs", "rum", "reportApiError.ts"),
-    "utf8"
-  )
   const identitySources = [
-    readFileSync(sourcePath("libs", "rum", "reportClientError.ts"), "utf8"),
     readFileSync(
       sourcePath(
         "components",
@@ -65,15 +50,11 @@ test("security identity generators have no timestamp or Math.random fallback", (
     ),
   ]
 
-  expect(apiErrorSource.match(/Math\.random/g)).toHaveLength(1)
-  expect(apiErrorSource).toContain("random: () => number = Math.random")
   for (const source of identitySources) {
     expect(source).not.toContain("Math.random")
   }
 
   for (const generator of [
-    createApiErrorReportId,
-    createClientErrorId,
     createUploadPlaceholderId,
     generateIdempotencyKey,
   ]) {

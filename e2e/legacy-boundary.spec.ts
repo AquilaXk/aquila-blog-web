@@ -74,6 +74,35 @@ test.describe("frontend legacy boundary", () => {
 
   test("retired public account entrypoint is absent so Next serves its normal 404", () => {
     expect(frontPathExists("src/pages/settings/account.tsx")).toBe(false)
+    expect(frontPathExists("src/pages/settings/privacy.tsx")).toBe(false)
+    expect(frontPathExists("src/routes/Settings/SettingsLayout.tsx")).toBe(false)
+    expect(frontPathExists("src/routes/Settings/SettingsPrivacyPage.tsx")).toBe(false)
+    expect(frontPathExists("src/routes/LegalPolicy/OptionalTrackingConsentSettings.tsx")).toBe(false)
+  })
+
+  test("retired public tracking and Vercel fallback owners are absent", () => {
+    const packageJson = readFrontText("package.json")
+    const sourceFiles = [
+      "site.config.js",
+      "src/pages/_app.tsx",
+      "src/apis/backend/client.ts",
+      "src/libs/security/contentSecurityPolicy.js",
+    ]
+
+    expect(frontPathExists("src/layouts/RootLayout/Scripts.tsx")).toBe(false)
+    expect(frontPathExists("src/layouts/RootLayout/useGtagEffect.ts")).toBe(false)
+    expect(frontPathExists("src/libs/privacy/optionalTrackingConsent.ts")).toBe(false)
+    expect(frontPathExists("src/libs/privacy/optionalTrackingConsentCore.ts")).toBe(false)
+    expect(frontPathExists("src/libs/privacy/OptionalVercelTelemetry.tsx")).toBe(false)
+    expect(frontPathExists("src/libs/gtag.ts")).toBe(false)
+    expect(frontPathExists("src/libs/rum")).toBe(false)
+    expect(frontPathExists("src/pages/api/rum")).toBe(false)
+    expect(packageJson).not.toMatch(/@vercel\/(?:analytics|speed-insights)|@types\/gtag\.js/)
+    for (const relativePath of sourceFiles) {
+      expect(readFrontText(relativePath), relativePath).not.toMatch(
+        /vercel|googleAnalytics|googletagmanager|optionalTracking|\/api\/rum|og-image-korean/i,
+      )
+    }
   })
 
   test("administrator remember-login stays server-scoped without a local preference fallback", () => {
@@ -121,13 +150,9 @@ test.describe("frontend legacy boundary", () => {
       "src/libs/router.ts",
       "src/libs/server/runtimeMetrics.ts",
       "src/libs/privacy/browserStorageRegistry.ts",
-      "src/libs/privacy/optionalTrackingConsentCore.ts",
       "src/styles/colors.ts",
       "src/pages/admin.tsx",
       "src/pages/admin/tools.tsx",
-      "src/routes/LegalPolicy/OptionalTrackingConsentSettings.tsx",
-      "src/routes/Settings/SettingsLayout.tsx",
-      "src/routes/Settings/SettingsPrivacyPage.tsx",
       "src/routes/Admin/AdminDashboardWorkspaceModel.ts",
       "src/routes/Admin/AdminDashboardWorkspacePage.tsx",
       "src/routes/Admin/AdminHubSurface.stories.tsx",
@@ -156,7 +181,7 @@ test.describe("frontend legacy boundary", () => {
       /NEXT_PUBLIC_SIGNUP_ENABLED|kakaoLogin(?:Background|Text|FocusBorder)/,
     ]
 
-    expect(readFrontText("src/routes/Settings/SettingsLayout.tsx")).not.toContain("useAuthSession")
+    expect(frontPathExists("src/routes/Settings/SettingsLayout.tsx")).toBe(false)
     for (const relativePath of publicMemberCompatibilitySources) {
       const source = readFrontText(relativePath)
       for (const pattern of retiredPublicMemberPatterns) {

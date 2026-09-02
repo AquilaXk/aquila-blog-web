@@ -1,9 +1,9 @@
 import type { LegalPolicyKind } from "./policyTypes"
 
 export const ACTIVE_LEGAL_POLICY_VERSIONS: Record<LegalPolicyKind, string> = {
-  privacy: "1.0.3",
-  terms: "1.0.2",
-  cookies: "1.0.3",
+  privacy: "1.0.4",
+  terms: "1.0.4",
+  cookies: "1.0.4",
 }
 
 export const legalPolicyKindLabels: Record<LegalPolicyKind, string> = {

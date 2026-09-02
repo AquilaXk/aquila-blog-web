@@ -7,10 +7,10 @@
 
 ## 현재 정책
 - `default-src 'self'`를 기본값으로 둔다.
-- `script-src`는 Next.js runtime(`'self'`), document inline script **sha256 hash**, Vercel Analytics/Toolbar, Google Analytics script source만 허용한다. **`'unsafe-inline'`은 사용하지 않는다** (HR-56: silent fallback 재도입 금지).
+- `script-src`는 Next.js runtime(`'self'`)와 document inline script **sha256 hash**만 허용한다. **`'unsafe-inline'`은 사용하지 않는다** (HR-56: silent fallback 재도입 금지).
 - document inline script 본문과 hash 계약은 `front/src/libs/security/documentInlineScripts.js` + `contentSecurityPolicy.js`가 owner다.
 - `style-src`는 Emotion/Next.js inline style 운용을 위해 `'unsafe-inline'`을 **유지**한다.
-- `img-src`, `connect-src`, `font-src`, `media-src`, `frame-src`는 현재 운영 image domain, same-origin API proxy, Vercel telemetry, Google Analytics, monitoring embed origin을 명시한다.
+- `img-src`, `connect-src`, `font-src`, `media-src`, `frame-src`는 현재 운영 image domain, same-origin API proxy, monitoring embed origin을 명시한다.
 - `img-src`의 `http:`/`https:` scheme source는 현재 markdown image와 unfurl thumbnail 입력 계약이 외부 image URL을 허용하기 때문에 유지한다. 별도 image proxy 또는 domain validation으로 좁히는 변경은 content validation 이슈로 분리한다.
 - `connect-src`의 `http://localhost:8080`, `http://127.0.0.1:8080`은 `NEXT_PUBLIC_BACKEND_URL`이 없을 때 쓰는 local backend fallback을 위해 development build에서만 포함한다.
 - per-request nonce + 전면 dynamic rendering은 SSG 비용이 커서 이번 전환에서는 hash enforce를 선택했다. nonce/`strict-dynamic` 전환이 필요하면 별도 이슈로 SSR 범위를 고정한 뒤 진행한다.
@@ -31,7 +31,7 @@
 - `script-src`: 새 script host가 필요한지 먼저 확인한다. 새 document inline script는 hash를 `documentInlineScripts.js`에 추가하고 `'unsafe-inline'`로 되돌리지 않는다.
 - `connect-src`: API, analytics, SSE/WebSocket endpoint인지 확인하고 credential 전송 범위를 함께 본다.
 - `img-src`: 사용자 콘텐츠/프로필/markdown image domain인지 확인하고 `data:`/`blob:` 확장이 필요한지 별도 판단한다.
-- `frame-src`: monitoring 또는 Vercel preview tooling처럼 실제 iframe이 필요한 origin만 추가한다.
+- `frame-src`: 실제 iframe이 필요한 monitoring origin만 추가한다.
 - `style-src`: Emotion 호환을 위한 `'unsafe-inline'` 유지는 허용한다. 완전 제거는 별도 이슈다.
 
 ## 검증

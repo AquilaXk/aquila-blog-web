@@ -14,9 +14,7 @@ const toIsoDate = (value: string | undefined) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const normalizePostImage = (post: TPost) =>
-  post.thumbnail?.trim() ||
-  `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(post.title)}.png`
+const normalizePostImage = (post: TPost) => post.thumbnail?.trim() || ""
 
 const normalizeAuthorName = (post: TPost) =>
   post.author?.find((author) => author.name.trim().length > 0)?.name.trim() ||
