@@ -76,17 +76,6 @@ export const getMarkdownEditorCommand = (id: MarkdownEditorCommandId) =>
 
 export const projectMarkdownEditorToolbarCommands = () => markdownEditorCommands
 
-export const groupMarkdownEditorCommands = () =>
-  ([
-    ["format", "서식"],
-    ["block", "블록"],
-    ["table", "표"],
-  ] as const).map(([category, label]) => ({
-    category,
-    label,
-    commands: markdownEditorCommands.filter((command) => command.category === category),
-  }))
-
 export const resolveMarkdownEditorCommandShortcut = (event: {
   key: string
   metaKey: boolean

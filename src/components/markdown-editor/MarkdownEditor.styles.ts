@@ -1,4 +1,6 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
+import { zIndexes } from "src/styles/zIndexes"
 
 export const EditorRoot = styled.section`
   box-sizing: border-box;
@@ -24,31 +26,27 @@ export const EditorToolbar = styled.div`
   min-height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: 12px;
   padding: 7px 12px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
   @media (max-width: 820px) {
-    align-items: flex-start;
-    flex-direction: column;
+    gap: 8px;
   }
 `
 
 export const ToolbarGroup = styled.div`
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 4px;
   min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-
-  @media (max-width: 820px) {
-    width: 100%;
-  }
+  overflow: visible;
 `
 
 export const ToolbarButton = styled.button`
@@ -56,11 +54,15 @@ export const ToolbarButton = styled.button`
   border-radius: 4px;
   height: 31px;
   min-width: 31px;
+  flex: 0 0 auto;
   padding: 0 8px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};
   font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   cursor: pointer;
+  white-space: nowrap;
+
+  ${focusVisibleRing}
 
   &:hover:not(:disabled) {
     border-color: ${({ theme }) => theme.colors.gray6};
@@ -84,6 +86,7 @@ export const ToolbarSelect = styled.select`
   color: ${({ theme }) => theme.colors.gray10};
   font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   cursor: pointer;
+  white-space: nowrap;
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.blue8};
@@ -96,36 +99,84 @@ export const ToolbarSelect = styled.select`
   }
 `
 
-export const ToolbarUploadButton = styled.label`
-  border: 1px solid transparent;
-  border-radius: 4px;
-  height: 31px;
-  min-width: 31px;
+export const ToolbarMenuRoot = styled.div`
+  position: relative;
+  flex: 0 0 auto;
+`
+
+export const ToolbarMenuTrigger = styled(ToolbarButton)`
   display: inline-flex;
   align-items: center;
-  padding: 0 8px;
-  color: ${({ theme }) => theme.colors.gray10};
-  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  gap: 6px;
+
+  &[aria-expanded="true"] {
+    border-color: ${({ theme }) => theme.colors.gray7};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+`
+
+export const ToolbarMenuChevron = styled.span`
+  font-size: 9px;
+  line-height: 1;
+`
+
+export const ToolbarMenuPanel = styled.div<{ $align: "start" | "end" }>`
+  position: absolute;
+  z-index: ${zIndexes.dropdownMenu};
+  top: calc(100% + 6px);
+  ${({ $align }) => ($align === "end" ? "right: 0;" : "left: 0;")}
+  display: grid;
+  min-width: 172px;
+  max-width: min(280px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 96px));
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  border-radius: 6px;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+`
+
+export const ToolbarMenuItem = styled.button`
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 10px;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.gray11};
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not([aria-disabled="true"]) {
-    border-color: ${({ theme }) => theme.colors.gray6};
+  ${focusVisibleRing}
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  &[aria-disabled="true"] {
-    opacity: 0.45;
+  &:disabled {
+    opacity: 0.42;
     cursor: not-allowed;
   }
 
-  input {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    opacity: 0;
-    pointer-events: none;
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
+`
+
+export const ToolbarHiddenInput = styled.input`
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
 `
 
 export const ToolbarError = styled.div`

@@ -10,7 +10,7 @@ import {
   ToolbarGroup,
   ToolbarButton,
   ToolbarSelect,
-  ToolbarUploadButton,
+  ToolbarHiddenInput,
   ToolbarError,
   LiveEditorBody,
 } from "./MarkdownEditor.styles"
@@ -22,7 +22,6 @@ import {
 } from "./markdownEditorTextMutation"
 import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import {
-  groupMarkdownEditorCommands,
   projectMarkdownEditorToolbarCommands,
   type MarkdownEditorCommandDescriptor,
 } from "./markdownEditorCommandRegistryModel"
@@ -50,6 +49,7 @@ import {
   MarkdownEditorLiveSurface,
   type MarkdownEditorLiveSurfaceHandle,
 } from "./MarkdownEditorLiveSurface"
+import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -79,6 +79,11 @@ type TextareaSelection = MarkdownEditorFocusSelection
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
+const getToolbarCommandLabel = (command: MarkdownEditorCommandDescriptor) =>
+  command.shortcut
+    ? `${command.label} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
+    : command.label
+
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
 
@@ -100,6 +105,8 @@ export const MarkdownEditor = ({
   const [tableColumns, setTableColumns] = useState(2)
   const [activeTableSelection, setActiveTableSelection] = useState<TextareaSelection | null>(null)
   const liveSurfaceRef = useRef<MarkdownEditorLiveSurfaceHandle | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const valueRef = useRef(value)
   const selectionRef = useRef<TextareaSelection>({ from: 0, to: 0 })
   const documentGenerationRef = useRef(0)
@@ -433,9 +440,25 @@ export const MarkdownEditor = ({
 
   return (
     <EditorRoot data-testid="markdown-editor">
-      <EditorToolbar aria-label="Markdown 작성 도구">
+      <EditorToolbar role="toolbar" aria-label="Markdown 작성 도구">
         <ToolbarGroup>
-          {toolbarMarkdownSnippets.map((snippet) => (
+          {toolbarCommands.filter((command) => command.category === "format").map((command) => {
+            const label = getToolbarCommandLabel(command)
+            return (
+              <ToolbarButton
+                key={command.id}
+                type="button"
+                title={label}
+                aria-label={label}
+                disabled={!command.isEnabled(commandContext)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyMarkdownEditorCommand(command)}
+              >
+                {command.toolbarLabel}
+              </ToolbarButton>
+            )
+          })}
+          {toolbarMarkdownSnippets.filter((snippet) => snippet.group === "primary").map((snippet) => (
             <ToolbarButton
               key={snippet.title}
               type="button"
@@ -452,50 +475,74 @@ export const MarkdownEditor = ({
               {snippet.label}
             </ToolbarButton>
           ))}
-          {toolbarCommands.map((command) => {
-            const label = "shortcut" in command
-              ? `${command.label} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
-              : command.label
-            return (
-              <ToolbarButton
-                key={command.id}
-                type="button"
-                title={label}
-                aria-label={label}
-                disabled={!command.isEnabled(commandContext)}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyMarkdownEditorCommand(command)}
-              >
-                {command.toolbarLabel}
-              </ToolbarButton>
-            )
-          })}
-          {toolbarListCommands.map((command) => (
-            <ToolbarButton
-              key={command.command}
-              type="button"
-              title={command.title}
-              aria-label={command.title}
-              disabled={disabled}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyListCommand(command.command)}
-            >
-              {command.label}
-            </ToolbarButton>
-          ))}
-          {blockMarkdownSnippets.filter((snippet) => snippet.title !== "표" && snippet.title !== "코드 블록").map((snippet) => (
-            <ToolbarButton
-              key={snippet.title}
-              type="button"
-              title={snippet.title}
-              aria-label={snippet.title}
-              disabled={disabled || ("disableWhenMermaid" in snippet && disableMermaid)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyBlockSnippet(snippet)}
-            >
-              {snippet.label}
-            </ToolbarButton>
-          ))}
+
+          <ToolbarButton
+            type="button"
+            title={`링크 (${modShortcutLabel}K)`}
+            aria-label={`링크 (${modShortcutLabel}K)`}
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applyFormatShortcutOrAppend("link")}
+          >
+            Link
+          </ToolbarButton>
+
+          <MarkdownEditorToolbarMenu
+            label="제목"
+            triggerLabel="H"
+            disabled={disabled}
+            onBeforeOpen={rememberTextareaSelection}
+            actions={toolbarMarkdownSnippets
+              .filter((snippet) => snippet.group === "heading")
+              .map((snippet) => ({
+                id: snippet.title,
+                label: snippet.title,
+                onSelect: () => applySnippet(snippet.before, snippet.after),
+              }))}
+          />
+          <MarkdownEditorToolbarMenu
+            label="목록"
+            triggerLabel="List"
+            disabled={disabled}
+            onBeforeOpen={rememberTextareaSelection}
+            actions={toolbarListCommands.map((command) => ({
+              id: command.command,
+              label: command.title,
+              onSelect: () => applyListCommand(command.command),
+            }))}
+          />
+          <MarkdownEditorToolbarMenu
+            label="삽입"
+            triggerLabel="+"
+            disabled={disabled}
+            onBeforeOpen={rememberTextareaSelection}
+            actions={[
+              ...toolbarMarkdownSnippets
+                .filter((snippet) => snippet.group === "structure")
+                .map((snippet) => ({
+                  id: snippet.title,
+                  label: snippet.title,
+                  onSelect: () => applySnippet(snippet.before, snippet.after),
+                })),
+              ...toolbarCommands
+                .filter((command) => command.category === "block")
+                .map((command) => ({
+                  id: command.id,
+                  label: command.label,
+                  disabled: !command.isEnabled(commandContext),
+                  onSelect: () => applyMarkdownEditorCommand(command),
+                })),
+              ...blockMarkdownSnippets
+                .filter((snippet) => snippet.title !== "표" && snippet.title !== "코드 블록")
+                .map((snippet) => ({
+                  id: snippet.title,
+                  label: snippet.title,
+                  disabled: "disableWhenMermaid" in snippet && disableMermaid,
+                  onSelect: () => applyBlockSnippet(snippet),
+                })),
+            ]}
+          />
+
           <ToolbarSelect
             aria-label="표 행"
             value={tableRows}
@@ -516,101 +563,100 @@ export const MarkdownEditor = ({
               <option key={columns} value={columns}>{`${columns}열`}</option>
             ))}
           </ToolbarSelect>
-          <ToolbarButton
-            type="button"
-            aria-label="표 삽입"
-            title="표 삽입"
+          <MarkdownEditorToolbarMenu
+            label="표"
+            triggerLabel="Table"
             disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={insertTable}
-          >
-            Table
-          </ToolbarButton>
-          {([
-            ["표 행 삭제", { kind: "delete-row" }],
-            ["표 열 추가", { kind: "add-column" }],
-            ["표 열 삭제", { kind: "delete-column" }],
-            ["표 열 왼쪽 정렬", { kind: "set-alignment", alignment: "left" }],
-            ["표 열 가운데 정렬", { kind: "set-alignment", alignment: "center" }],
-            ["표 열 오른쪽 정렬", { kind: "set-alignment", alignment: "right" }],
-          ] as const).map(([label, edit]) => (
-            <ToolbarButton
-              key={label}
-              type="button"
-              aria-label={label}
-              title={label}
-              disabled={isTableEditDisabled(edit)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyTableEdit(edit)}
-            >
-              {label}
-            </ToolbarButton>
-          ))}
-          <ToolbarSelect
-            aria-label="명령 메뉴"
-            value=""
+            onBeforeOpen={rememberTextareaSelection}
+            actions={[
+              {
+                id: "table.insert",
+                label: `표 삽입 (${tableRows}×${tableColumns})`,
+                onSelect: insertTable,
+              },
+              ...toolbarCommands
+                .filter((command) => command.category === "table")
+                .map((command) => ({
+                  id: command.id,
+                  label: command.label,
+                  disabled: !command.isEnabled(commandContext),
+                  onSelect: () => applyMarkdownEditorCommand(command),
+                })),
+              ...([
+                ["표 행 삭제", { kind: "delete-row" }],
+                ["표 열 추가", { kind: "add-column" }],
+                ["표 열 삭제", { kind: "delete-column" }],
+                ["표 열 왼쪽 정렬", { kind: "set-alignment", alignment: "left" }],
+                ["표 열 가운데 정렬", { kind: "set-alignment", alignment: "center" }],
+                ["표 열 오른쪽 정렬", { kind: "set-alignment", alignment: "right" }],
+              ] as const).map(([label, edit]) => ({
+                id: label,
+                label,
+                disabled: isTableEditDisabled(edit),
+                onSelect: () => applyTableEdit(edit),
+              })),
+            ]}
+          />
+          <MarkdownEditorToolbarMenu
+            label="더보기"
+            triggerLabel="⋯"
             disabled={disabled}
+            align="end"
+            onBeforeOpen={rememberTextareaSelection}
+            actions={[
+              ...toolbarMarkdownSnippets
+                .filter((snippet) => snippet.group === "more")
+                .map((snippet) => ({
+                  id: snippet.title,
+                  label: snippet.title,
+                  onSelect: () => applySnippet(snippet.before, snippet.after, {
+                    toggle: "toggle" in snippet && snippet.toggle,
+                  }),
+                })),
+              {
+                id: "media.image",
+                label: "이미지",
+                disabled: !onUploadImage,
+                onSelect: () => imageInputRef.current?.click(),
+              },
+              {
+                id: "media.file",
+                label: "파일",
+                disabled: !onUploadFile,
+                onSelect: () => fileInputRef.current?.click(),
+              },
+              {
+                id: "tool.find-replace",
+                label: "찾기 및 바꾸기",
+                onSelect: findReplace.open,
+              },
+            ]}
+          />
+          <ToolbarHiddenInput
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            aria-hidden="true"
+            tabIndex={-1}
+            disabled={disabled || !onUploadImage}
             onChange={(event) => {
-              const command = toolbarCommands.find((candidate) => candidate.id === event.currentTarget.value)
-              if (command) applyMarkdownEditorCommand(command)
+              const file = event.currentTarget.files?.[0] ?? null
+              void handleImageInput(file)
+              event.currentTarget.value = ""
             }}
-          >
-            <option value="">명령 선택</option>
-            {groupMarkdownEditorCommands().map((group) => (
-              <optgroup key={group.category} label={group.label}>
-                {group.commands.map((command) => (
-                  <option key={command.id} value={command.id} disabled={!command.isEnabled(commandContext)}>
-                    {command.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </ToolbarSelect>
-          <ToolbarUploadButton title="이미지" aria-label="이미지" aria-disabled={disabled || !onUploadImage}>
-            Image
-            <input
-              type="file"
-              accept="image/*"
-              disabled={disabled || !onUploadImage}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0] ?? null
-                void handleImageInput(file)
-                event.currentTarget.value = ""
-              }}
-            />
-          </ToolbarUploadButton>
-          <ToolbarUploadButton title="파일" aria-label="파일" aria-disabled={disabled || !onUploadFile}>
-            File
-            <input
-              type="file"
-              disabled={disabled || !onUploadFile}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0] ?? null
-                void handleFileInput(file)
-                event.currentTarget.value = ""
-              }}
-            />
-          </ToolbarUploadButton>
-          <ToolbarButton
-            type="button"
-            title={`링크 (${modShortcutLabel}K)`}
-            aria-label={`링크 (${modShortcutLabel}K)`}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applyFormatShortcutOrAppend("link")}
-          >
-            Link
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            aria-label="찾기 및 바꾸기"
-            title="찾기 및 바꾸기"
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={findReplace.open}
-          >
-            찾기
-          </ToolbarButton>
+          />
+          <ToolbarHiddenInput
+            ref={fileInputRef}
+            type="file"
+            aria-hidden="true"
+            tabIndex={-1}
+            disabled={disabled || !onUploadFile}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0] ?? null
+              void handleFileInput(file)
+              event.currentTarget.value = ""
+            }}
+          />
         </ToolbarGroup>
       </EditorToolbar>
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}

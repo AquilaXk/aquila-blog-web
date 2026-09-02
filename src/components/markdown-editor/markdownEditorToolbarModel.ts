@@ -9,13 +9,13 @@ export const modShortcutLabel =
     : "Ctrl+"
 
 export const toolbarMarkdownSnippets = [
-  { label: "H1", title: "제목 1", before: "# ", after: "" },
-  { label: "H2", title: "제목 2", before: "## ", after: "" },
-  { label: "H3", title: "제목 3", before: "### ", after: "" },
-  { label: "I", title: `기울임 (${modShortcutLabel}I)`, before: "_", after: "_", toggle: true },
-  { label: "S", title: `취소선 (${modShortcutLabel}Shift+X)`, before: "~~", after: "~~", toggle: true },
-  { label: "`", title: `인라인 코드 (${modShortcutLabel}E)`, before: "`", after: "`", toggle: true },
-  { label: ">", title: "인용문", before: "> ", after: "" },
+  { group: "heading", label: "H1", title: "제목 1", before: "# ", after: "" },
+  { group: "heading", label: "H2", title: "제목 2", before: "## ", after: "" },
+  { group: "heading", label: "H3", title: "제목 3", before: "### ", after: "" },
+  { group: "primary", label: "I", title: `기울임 (${modShortcutLabel}I)`, before: "_", after: "_", toggle: true },
+  { group: "more", label: "S", title: `취소선 (${modShortcutLabel}Shift+X)`, before: "~~", after: "~~", toggle: true },
+  { group: "primary", label: "`", title: `인라인 코드 (${modShortcutLabel}E)`, before: "`", after: "`", toggle: true },
+  { group: "structure", label: ">", title: "인용문", before: "> ", after: "" },
 ] as const
 
 export const toolbarListCommands: ReadonlyArray<{
