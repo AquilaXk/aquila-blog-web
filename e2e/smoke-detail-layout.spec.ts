@@ -94,7 +94,7 @@ test.describe("core smoke detail layout", () => {
     expect(sectionStyles).toContain("height: 44px;")
     expect(sectionStyles).toContain("min-width: 44px;")
     expect(sectionStyles).toContain("min-height: 44px;")
-    expect(relatedSource).toContain('data-rum-section="related"')
+    expect(relatedSource).not.toContain('data-rum-section="related"')
     expect(relatedSource).toContain("const getRelatedPostMeta = (post: TPost)")
     expect(relatedSource).toContain("post.tags?.[0] || post.category?.[0] || post.type?.[0]")
     expect(relatedSource).toContain("relatedByTagPosts, ...relatedByAuthorPosts")
