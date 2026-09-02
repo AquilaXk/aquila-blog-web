@@ -12,9 +12,9 @@ type LegalPolicyFixture = {
 }
 
 const currentLegalVersions = {
-  privacy: "1.0.3",
-  terms: "1.0.2",
-  cookies: "1.0.3",
+  privacy: "1.0.4",
+  terms: "1.0.4",
+  cookies: "1.0.4",
 } as const
 const internalPolicyTokens = [
   "법무·운영 확인 필요 항목",
@@ -81,7 +81,7 @@ test.describe("legal policy public pages", () => {
     await expectNoInternalPolicyTodos(page)
     await expect(page.getByRole("link", { name: "AquilaLog 개인정보 문의 및 데이터 삭제 요청" })).toHaveAttribute(
       "href",
-      "mailto:aquilaxk10@gmail.com?subject=AquilaLog%20%EA%B0%9C%EC%9D%B8%EC%A0%95%EB%B3%B4%20%EB%AC%B8%EC%9D%98%20%EB%B0%8F%20%EB%8D%B0%EC%9D%B4%ED%84%B0%20%EC%82%AD%EC%A0%9C%20%EC%9A%94%EC%B2%AD",
+      "mailto:privacy@aquilaxk.site?subject=AquilaLog%20%EA%B0%9C%EC%9D%B8%EC%A0%95%EB%B3%B4%20%EB%AC%B8%EC%9D%98%20%EB%B0%8F%20%EB%8D%B0%EC%9D%B4%ED%84%B0%20%EC%82%AD%EC%A0%9C%20%EC%9A%94%EC%B2%AD",
     )
     await expect(page.getByRole("link", { name: "현재 버전" })).toHaveCount(0)
     await expect(page.getByRole("navigation", { name: "정책 목차" }).getByRole("link")).toHaveCount(
@@ -109,7 +109,7 @@ test.describe("legal policy public pages", () => {
     ])
     await expect(page.getByRole("link", { name: "AquilaLog 이용약관 문의" })).toHaveAttribute(
       "href",
-      "mailto:aquilaxk10@gmail.com?subject=AquilaLog%20%EC%9D%B4%EC%9A%A9%EC%95%BD%EA%B4%80%20%EB%AC%B8%EC%9D%98",
+      "mailto:privacy@aquilaxk.site?subject=AquilaLog%20%EC%9D%B4%EC%9A%A9%EC%95%BD%EA%B4%80%20%EB%AC%B8%EC%9D%98",
     )
     await expect(page.getByText("illusiveman7@gmail.com")).toHaveCount(0)
     await expectNoInternalPolicyTodos(page)
@@ -123,7 +123,7 @@ test.describe("legal policy public pages", () => {
     await expect(page.getByRole("link", { name: "현재 버전" })).toHaveCount(0)
     await expect(page.getByRole("link", { name: "AquilaLog 쿠키 및 브라우저 저장소 문의" })).toHaveAttribute(
       "href",
-      "mailto:aquilaxk10@gmail.com?subject=AquilaLog%20%EC%BF%A0%ED%82%A4%20%EB%B0%8F%20%EB%B8%8C%EB%9D%BC%EC%9A%B0%EC%A0%80%20%EC%A0%80%EC%9E%A5%EC%86%8C%20%EB%AC%B8%EC%9D%98",
+      "mailto:privacy@aquilaxk.site?subject=AquilaLog%20%EC%BF%A0%ED%82%A4%20%EB%B0%8F%20%EB%B8%8C%EB%9D%BC%EC%9A%B0%EC%A0%80%20%EC%A0%80%EC%9E%A5%EC%86%8C%20%EB%AC%B8%EC%9D%98",
     )
     await expectCanonicalDownloadHash(page, cookiesPolicy.contentSha256)
     await page.goto(`/legal/cookies/${currentLegalVersions.cookies}`, { waitUntil: "domcontentloaded" })
@@ -139,6 +139,22 @@ test.describe("legal policy public pages", () => {
     await expect(currentPrivacyHistoryItem.getByRole("link", { name: "버전 문서" })).toHaveAttribute(
       "href",
       `/legal/privacy/${currentLegalVersions.privacy}`,
+    )
+    const retiredPrivacyHistoryItem = page
+      .locator("article")
+      .filter({ has: page.getByText("버전 1.0.3") })
+      .filter({ has: page.getByRole("heading", { name: "개인정보처리방침" }) })
+    await expect(retiredPrivacyHistoryItem.getByRole("link", { name: "버전 문서" })).toHaveAttribute(
+      "href",
+      "/legal/privacy/1.0.3",
+    )
+    const retiredCookieHistoryItem = page
+      .locator("article")
+      .filter({ has: page.getByText("버전 1.0.3") })
+      .filter({ has: page.getByRole("heading", { name: "쿠키 정책" }) })
+    await expect(retiredCookieHistoryItem.getByRole("link", { name: "버전 문서" })).toHaveAttribute(
+      "href",
+      "/legal/cookies/1.0.3",
     )
     const currentTermsHistoryItem = page
       .locator("article")
@@ -198,7 +214,7 @@ test.describe("legal policy public pages", () => {
     await expect(page.getByRole("heading", { name: "이용약관" })).toBeVisible()
   })
 
-  test("footer links to legal policies and public cookie settings", async ({ page }) => {
+  test("footer links to legal policies without an optional-tracking settings surface", async ({ page }) => {
     await mockAvatarAsset(page)
     await addPublicAboutSnapshotCookie(page)
     await mockFeedEndpoints(page)
@@ -215,9 +231,6 @@ test.describe("legal policy public pages", () => {
       "/terms",
     )
     await expect(footer.getByRole("link", { name: "쿠키 정책" })).toHaveAttribute("href", "/cookies")
-    await expect(footer.getByRole("link", { name: "쿠키 설정" })).toHaveAttribute(
-      "href",
-      "/cookies#cookie-settings",
-    )
+    await expect(footer.getByRole("link", { name: "쿠키 설정" })).toHaveCount(0)
   })
 })

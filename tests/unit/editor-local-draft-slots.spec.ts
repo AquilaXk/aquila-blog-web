@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test"
+import * as editorStudioStorageModel from "../../src/routes/Admin/editorStudioStorageModel"
 import {
   LOCAL_DRAFT_CREATE_STORAGE_KEY,
   LOCAL_DRAFT_MAX_AGE_MS,
   LOCAL_DRAFT_POST_SLOT_LIMIT,
   LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX,
-  LOCAL_DRAFT_V1_STORAGE_KEY,
   describeLocalDraftSlot,
   localDraftStorageKey,
-  migrateLocalDraftV1Once,
   persistLocalDraft,
   readLocalDraft,
   removeLocalDraft,
@@ -261,108 +260,28 @@ test.describe("editor local draft context slots", () => {
     })
   })
 
-  test("migrates v1 once into create slot then removes v1", () => {
+  test("never reads, deletes, migrates, expires, or counts retired v1 and v2 values", () => {
     withLocalStorage((storage) => {
-      storage.setItem(
-        LOCAL_DRAFT_V1_STORAGE_KEY,
-        JSON.stringify({
-          title: "legacy",
-          content: "legacy body",
-          summary: "",
-          summarySource: "NONE",
-          summaryIntent: { kind: "auto" },
-          thumbnailUrl: "",
-          tags: ["a"],
-          category: "",
-          visibility: "PRIVATE",
-          savedAt: new Date().toISOString(),
-        })
+      expect(editorStudioStorageModel).not.toHaveProperty("LOCAL_DRAFT_V1_STORAGE_KEY")
+      expect(editorStudioStorageModel).not.toHaveProperty("LOCAL_DRAFT_STORAGE_KEY")
+      expect(editorStudioStorageModel).not.toHaveProperty("migrateLocalDraftV1Once")
+
+      const legacyKeys = [
+        "admin.editor.localDraft.v1",
+        "admin.editor.localDraft.create.v2",
+        "admin.editor.localDraft.post.42.v2",
+      ]
+      const legacyValue = JSON.stringify(
+        baseDraft({ title: "legacy", source: { kind: "create" }, savedAt: new Date().toISOString() }),
       )
+      for (const key of legacyKeys) storage.setItem(key, legacyValue)
 
-      migrateLocalDraftV1Once()
-      const createDraft = readLocalDraft({ kind: "create" })
-      expect(createDraft?.title).toBe("legacy")
-      expect(createDraft?.source).toEqual({ kind: "create" })
-      expect(storage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)).toBeNull()
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      for (const key of legacyKeys) expect(storage.getItem(key)).not.toBeNull()
 
-      storage.setItem(LOCAL_DRAFT_V1_STORAGE_KEY, JSON.stringify({ title: "again", savedAt: new Date().toISOString() }))
-      migrateLocalDraftV1Once()
-      expect(readLocalDraft({ kind: "create" })?.title).toBe("legacy")
-      expect(storage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)).toBeNull()
-    })
-  })
-
-  test("keeps v1 legacy draft when current-slot write fails", () => {
-    withLocalStorage((storage) => {
-      const legacy = JSON.stringify({
-        title: "legacy-keep",
-        content: "legacy body",
-        summary: "",
-        summarySource: "NONE",
-        summaryIntent: { kind: "auto" },
-        thumbnailUrl: "",
-        tags: [],
-        category: "",
-        visibility: "PRIVATE",
-        savedAt: new Date().toISOString(),
-      })
-      storage.setItem(LOCAL_DRAFT_V1_STORAGE_KEY, legacy)
-      const originalSetItem = storage.setItem.bind(storage)
-      storage.setItem = (key: string, value: string) => {
-        if (key === LOCAL_DRAFT_CREATE_STORAGE_KEY) {
-          throw new Error("quota exceeded")
-        }
-        originalSetItem(key, value)
-      }
-
-      migrateLocalDraftV1Once()
-      expect(storage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)).toBe(legacy)
-      expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
-    })
-  })
-
-  test("keeps v1 when the current slot exists but is corrupt or expired", () => {
-    withLocalStorage((storage) => {
-      const legacy = JSON.stringify({
-        title: "legacy-recover",
-        content: "legacy body",
-        summary: "",
-        summarySource: "NONE",
-        summaryIntent: { kind: "auto" },
-        thumbnailUrl: "",
-        tags: [],
-        category: "",
-        visibility: "PRIVATE",
-        savedAt: new Date().toISOString(),
-      })
-      storage.setItem(LOCAL_DRAFT_V1_STORAGE_KEY, legacy)
-      storage.setItem(LOCAL_DRAFT_CREATE_STORAGE_KEY, "{not-json")
-
-      migrateLocalDraftV1Once()
-      expect(readLocalDraft({ kind: "create" })?.title).toBe("legacy-recover")
-      expect(storage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)).toBeNull()
-
-      storage.setItem(LOCAL_DRAFT_V1_STORAGE_KEY, legacy)
-      storage.setItem(
-        LOCAL_DRAFT_CREATE_STORAGE_KEY,
-        JSON.stringify({
-          title: "expired-create",
-          content: "expired",
-          summary: "",
-          summarySource: "NONE",
-          summaryIntent: { kind: "auto" },
-          thumbnailUrl: "",
-          tags: [],
-          category: "",
-          visibility: "PRIVATE",
-          savedAt: new Date(Date.now() - LOCAL_DRAFT_MAX_AGE_MS - 1).toISOString(),
-          source: { kind: "create" },
-        })
-      )
-
-      migrateLocalDraftV1Once()
-      expect(readLocalDraft({ kind: "create" })?.title).toBe("legacy-recover")
-      expect(storage.getItem(LOCAL_DRAFT_V1_STORAGE_KEY)).toBeNull()
+      persistLocalDraft(baseDraft({ title: "current", source: { kind: "create" }, savedAt: new Date().toISOString() }))
+      for (const key of legacyKeys) expect(storage.getItem(key)).toBe(legacyValue)
+      expect(storage.length).toBe(legacyKeys.length + 1)
     })
   })
 

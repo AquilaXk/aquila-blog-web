@@ -18,7 +18,6 @@ const productionEnv = [
   `WEB_METRICS_TOKEN=${webMetricsToken}`,
   "BACKEND_PROXY_MAX_BODY_BYTES=104857600",
   "BACKEND_PROXY_MAX_IN_FLIGHT_BODY_BYTES=268435456",
-  "NEXT_PUBLIC_RUM_SAMPLE_RATE=0",
 ].join("\n")
 
 const productionBuildEnv = [
@@ -37,8 +36,7 @@ test("production rejects missing secret, non-HTTPS URLs, and non-positive proxy 
       .replace("TOKEN_FOR_REVALIDATE=web-revalidate-token\n", "")
       .replace(`WEB_METRICS_TOKEN=${webMetricsToken}\n`, "")
       .replace("NEXT_PUBLIC_BACKEND_URL=https://api.example.test", "NEXT_PUBLIC_BACKEND_URL=http://api.example.test")
-      .replace("BACKEND_PROXY_MAX_BODY_BYTES=104857600", "BACKEND_PROXY_MAX_BODY_BYTES=0")
-      .replace("NEXT_PUBLIC_RUM_SAMPLE_RATE=0", "NEXT_PUBLIC_RUM_SAMPLE_RATE=1"),
+      .replace("BACKEND_PROXY_MAX_BODY_BYTES=104857600", "BACKEND_PROXY_MAX_BODY_BYTES=0"),
   })
 
   assert.equal(result.ok, false)
@@ -46,7 +44,6 @@ test("production rejects missing secret, non-HTTPS URLs, and non-positive proxy 
   assert(result.errors.some((error) => error.key === "WEB_METRICS_TOKEN" && error.message === "is required"))
   assert(result.errors.some((error) => error.key === "NEXT_PUBLIC_BACKEND_URL" && error.message.includes("https")))
   assert(result.errors.some((error) => error.key === "BACKEND_PROXY_MAX_BODY_BYTES" && error.message.includes("positive decimal")))
-  assert(result.errors.some((error) => error.key === "NEXT_PUBLIC_RUM_SAMPLE_RATE" && error.message.includes("0")))
 })
 
 // `production-build`는 독립적인 env 표면이 아니라 `production`을 그대로 복사해 대부분의 키를
@@ -94,14 +91,11 @@ test("production rejects a short metrics bearer token", async () => {
   assert(result.errors.some((error) => error.key === "WEB_METRICS_TOKEN" && error.message.includes("32")))
 })
 
-test("test target allows optional telemetry branches without production inputs", async () => {
+test("no environment target owns the retired public RUM sampling switch", async () => {
   const { loadContract, validateEnvText } = await import("./validate-env.mjs")
   const contract = loadContract(contractPath)
 
-  for (const text of ["NEXT_PUBLIC_RUM_SAMPLE_RATE=0\n", "NEXT_PUBLIC_RUM_SAMPLE_RATE=1\n"]) {
-    const result = validateEnvText({ contract, target: "test", text })
-    assert.equal(result.ok, true, result.errors.map((error) => `${error.key}: ${error.message}`).join("\n"))
-  }
+  assert.equal(JSON.stringify(contract).includes("NEXT_PUBLIC_RUM_SAMPLE_RATE"), false)
 })
 
 test("live-ready requires only HTTPS Web and API targets", async () => {

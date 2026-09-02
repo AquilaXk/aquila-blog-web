@@ -6,6 +6,7 @@ type PostFixture = {
   summary: string
   createdAt: string
   modifiedAt: string
+  thumbnail?: string
 }
 
 const fixtures: PostFixture[] = [
@@ -22,6 +23,7 @@ const fixtures: PostFixture[] = [
     summary: "두 번째 글 요약입니다.",
     createdAt: "2026-06-10T07:08:09Z",
     modifiedAt: "2026-06-11T10:11:12Z",
+    thumbnail: "https://images.example.test/thumbnail.png",
   },
 ]
 
@@ -56,6 +58,7 @@ const mockPost = async (page: Page, fixture: PostFixture) => {
         hitCount: 0,
         actorCanModify: false,
         actorCanDelete: false,
+        thumbnail: fixture.thumbnail,
       }),
     })
   })
@@ -73,9 +76,6 @@ const mockPost = async (page: Page, fixture: PostFixture) => {
 }
 
 const toExpectedIso = (value: string) => new Date(value).toISOString()
-
-const toExpectedFallbackImage = (title: string) =>
-  `https://og-image-korean.vercel.app/${encodeURIComponent(title)}.png`
 
 const readStructuredData = async (page: Page) => {
   return await page
@@ -108,7 +108,7 @@ test.describe("post detail structured metadata", () => {
       const canonicalUrl = `https://blog.aquilaxk.site/posts/${fixture.id}`
       const expectedCreatedAt = toExpectedIso(fixture.createdAt)
       const expectedModifiedAt = toExpectedIso(fixture.modifiedAt)
-      const expectedImage = toExpectedFallbackImage(fixture.title)
+      const expectedImage = fixture.thumbnail
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         "href",
         canonicalUrl
@@ -116,10 +116,11 @@ test.describe("post detail structured metadata", () => {
       await expect(
         page.locator('meta[property="og:site_name"]')
       ).toHaveAttribute("content", "AquilaLog")
-      await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
-        "content",
-        expectedImage
-      )
+      if (expectedImage) {
+        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", expectedImage)
+      } else {
+        await expect(page.locator('meta[property="og:image"]')).toHaveCount(0)
+      }
       await expect(
         page.locator('meta[property="article:published_time"]')
       ).toHaveAttribute("content", expectedCreatedAt)
@@ -144,8 +145,9 @@ test.describe("post detail structured metadata", () => {
         mainEntityOfPage: canonicalUrl,
         datePublished: expectedCreatedAt,
         dateModified: expectedModifiedAt,
-        image: [expectedImage],
       })
+      if (expectedImage) expect(blogPosting).toMatchObject({ image: [expectedImage] })
+      else expect(blogPosting).not.toHaveProperty("image")
       expect(blogPosting.author).toMatchObject({
         "@type": "Person",
         name: "관리자",

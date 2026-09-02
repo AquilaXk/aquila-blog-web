@@ -85,9 +85,8 @@ test.describe("frontend security headers", () => {
 
     expect(reportOnlyCsp).toBe(enforceCsp)
     expect(directives.get("default-src")).toEqual(["'self'"])
-    expect(directives.get("script-src")).toEqual(
-      expect.arrayContaining(["'self'", "https://va.vercel-scripts.com"]),
-    )
+    expect(directives.get("script-src")).toEqual(expect.arrayContaining(["'self'"]))
+    expect(directives.get("script-src")?.join(" ")).not.toMatch(/vercel|googletagmanager|google-analytics/i)
     expect(directives.get("script-src")).not.toContain("'unsafe-inline'")
     expect(hasScriptHashOrNonce(directives.get("script-src"))).toBe(true)
     // Emotion critical/runtime styles still require style-src unsafe-inline.
@@ -108,10 +107,9 @@ test.describe("frontend security headers", () => {
       expect.arrayContaining([
         "'self'",
         "https://*.aquilaxk.site",
-        "https://vitals.vercel-insights.com",
-        "https://vercel.live",
       ]),
     )
+    expect(directives.get("connect-src")?.join(" ")).not.toMatch(/vercel|google-analytics|googletagmanager/i)
     expect(directives.get("font-src")).toEqual(expect.arrayContaining(["'self'", "data:"]))
     expect(directives.get("media-src")).toEqual(
       expect.arrayContaining(["'self'", "blob:", "https://*.aquilaxk.site"]),
@@ -187,7 +185,7 @@ test.describe("frontend security headers", () => {
         expect.arrayContaining(["https://api.example.com", "https://grafana.example.com"]),
       )
       expect(directives.get("frame-src")).toEqual(
-        expect.arrayContaining(["'self'", "https://grafana.example.com", "https://vercel.live"]),
+        expect.arrayContaining(["'self'", "https://grafana.example.com"]),
       )
       expect(directives.get("connect-src")).not.toContain("https://api.example.com/member/api/v1")
       expect(directives.get("frame-src")).not.toContain("https://grafana.example.com/d/live?kiosk=1")

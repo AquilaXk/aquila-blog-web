@@ -12,6 +12,45 @@ const repoRoot = path.resolve(import.meta.dirname, "../..")
 const policySource = path.join(repoRoot, "legal/policies")
 const exporter = path.join(repoRoot, "scripts/legal/export-policy-manifest.mjs")
 const frontendMetadataPath = path.join(repoRoot, "src/apis/backend/legal.ts")
+const activePolicyExpectations = {
+  terms: {
+    supersedes: "1.0.2",
+    changeSummary: ["Align the service with an anonymously readable technical blog and internal-only administration."],
+  },
+  privacy: {
+    supersedes: "1.0.3",
+    changeSummary: ["Remove retired public-member and optional-tracking processing, and publish privacy@aquilaxk.site."],
+  },
+  cookies: {
+    supersedes: "1.0.3",
+    changeSummary: ["Remove retired member, preview, notification, legacy editor-draft, and optional-tracking storage from the current inventory."],
+  },
+}
+const retiredActivePolicyTokens = [
+  "Vercel",
+  "Google Analytics",
+  "NEXT_PUBLIC_RUM_SAMPLE_RATE",
+  "privacy.optionalTrackingConsent.v1",
+  "admin.editor.localDraft.v1",
+  "admin.editor.localDraft.create.v2",
+  "admin_tools_mail_snapshot_v1",
+  "회원가입",
+  "댓글",
+  "OAuth",
+]
+const historicalPolicyRawSha256 = {
+  "cookies.ko-KR.v1.0.0.yaml": "b1ac4dacabf5c9d7b2281fa577c5c26e238411207d5cc72b4e7d7ac88dc92905",
+  "cookies.ko-KR.v1.0.1.yaml": "e01de46d8384de6363f630186e82109d6359fc4a4ad5fe99be1b1d3f0bb54cb1",
+  "cookies.ko-KR.v1.0.2.yaml": "070c02bf222020c483e9cee6fe9c117d3dd03552e4e6a30d3af1355f9c851ae5",
+  "cookies.ko-KR.v1.0.3.yaml": "7e405fc9029271388c28610c8dd72c86629568498bae23f7ecc33f130cdcbffd",
+  "privacy.ko-KR.v1.0.0.yaml": "cbca98fdb182743566fed468a134ade8635b9a9a620f25546691e4a3d913ac71",
+  "privacy.ko-KR.v1.0.1.yaml": "16685867d67a92005c7f52a18ea3dd2c49aa1014f041150c4df4bd1b7de4ebd1",
+  "privacy.ko-KR.v1.0.2.yaml": "a92cb81a6a797662576202c9b57ffa76640faef5247279c1e2410408564d4ec5",
+  "privacy.ko-KR.v1.0.3.yaml": "65336e556a31f972df5ea666fc35e97b4e59a17f824f90990e4df344e0a16b34",
+  "terms.ko-KR.v1.0.0.yaml": "d4c985458cb998db8c1287f87b5d09abd2baa1a819d67301c6506b57ec89f5aa",
+  "terms.ko-KR.v1.0.1.yaml": "050c58c63e5313893a300985cbf421b43d0a2bb92ca21a0153162d3809c5ea17",
+  "terms.ko-KR.v1.0.2.yaml": "0d4a6b47e0707db8e39fc96dfbc25c18bb660b9bfda4149d08dfaf26c4d53b2e",
+}
 
 const copyPolicies = () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aquila-public-policies-"))
@@ -27,19 +66,30 @@ const writePolicy = (directory, name, policy) => {
   fs.writeFileSync(path.join(directory, name), `${JSON.stringify(policy, null, 2)}\n`)
 }
 
-test("selects the highest effective policy for every public document", () => {
+test("publishes the approved 1.0.4 public-policy cutover", () => {
   const result = validatePublicPolicies({ policiesDir: policySource, frontendMetadataPath })
 
   assert.equal(result.ok, true)
-  assert.deepEqual(result.manifest, {
-    version: 1,
-    contract: "aquila-public-legal-policies",
-    active: {
-      terms: { version: "1.0.2", contentSha256: "825642074982313f39c5d9bfbeffb20b12fc1a072addce8770b332652a75ad9b" },
-      privacy: { version: "1.0.3", contentSha256: "b1a9d7f800214aeab69e0185c2a4721dc394afd3c47a581a3190888a17d95827" },
-      cookies: { version: "1.0.3", contentSha256: "cc8be651603df0480886d6c258e16dd7228cbfe78fa2bf16ee07ae80359e0f99" },
-    },
-  })
+  for (const [kind, expectation] of Object.entries(activePolicyExpectations)) {
+    const policy = JSON.parse(fs.readFileSync(path.join(policySource, `${kind}.ko-KR.v1.0.4.yaml`), "utf8"))
+    assert.equal(result.active[kind].version, "1.0.4")
+    assert.equal(policy.status, "effective")
+    assert.equal(policy.publishedAt, "2026-09-01T12:43:19Z")
+    assert.equal(policy.effectiveAt, "2026-09-01T12:43:19Z")
+    assert.equal(policy.supersedes, expectation.supersedes)
+    assert.equal(policy.contactEmail, "privacy@aquilaxk.site")
+    assert.deepEqual(policy.changeSummary, expectation.changeSummary)
+    assert.equal(result.manifest.active[kind].contentSha256, policy.contentSha256)
+    const activeText = JSON.stringify(policy)
+    for (const token of retiredActivePolicyTokens) assert.equal(activeText.includes(token), false, `${kind}: ${token}`)
+  }
+})
+
+test("keeps every historical public-policy byte sequence immutable", () => {
+  for (const [name, expectedHash] of Object.entries(historicalPolicyRawSha256)) {
+    const bytes = fs.readFileSync(path.join(policySource, name))
+    assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), expectedHash, name)
+  }
 })
 
 test("a newer draft neither replaces active metadata nor changes the canonical manifest", () => {
