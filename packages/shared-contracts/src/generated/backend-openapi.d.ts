@@ -923,22 +923,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/adm/members/legal-reconsent/report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["legalReconsentReport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/member/api/v1/adm/members/bootstrap": {
         parameters: {
             query?: never;
@@ -1832,19 +1816,6 @@ export interface components {
         AdminProfileBootstrapResponse: {
             member?: components["schemas"]["AuthSessionMemberDto"];
             workspace?: components["schemas"]["MemberProfileWorkspaceResponseDto"];
-        };
-        LegalReconsentReport: {
-            /** Format: int64 */
-            currentAcceptedMembers?: number;
-            /** Format: int64 */
-            reconsentRequiredMembers?: number;
-            /** Format: int64 */
-            totalMembers?: number;
-            /** Format: double */
-            completionRate?: number;
-        };
-        LegalReconsentReportResponse: {
-            report?: components["schemas"]["LegalReconsentReport"];
         };
         AdminHubBootstrapResponse: {
             member?: components["schemas"]["AuthSessionMemberDto"];
@@ -3351,26 +3322,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdminProfileBootstrapResponse"];
-                };
-            };
-        };
-    };
-    legalReconsentReport: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LegalReconsentReportResponse"];
                 };
             };
         };
