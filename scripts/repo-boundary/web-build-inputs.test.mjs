@@ -25,7 +25,7 @@ const createBoundaryFixture = () => {
 
 test("Web build inputs stay inside the future Web root", () => {
   assert.equal(fs.existsSync(path.join(frontRoot, "quality/performance/runtime-guard-baseline.json")), true)
-  assert.doesNotMatch(runtimeGuardSource, /\.\.[/\\](back|deploy|infra|perf)/)
+  assert.doesNotMatch(runtimeGuardSource, /\.\.[/\\](legal|back|deploy|infra|perf)/)
 })
 
 test("Web boundary scanning checks and reads the same file descriptor", () => {
