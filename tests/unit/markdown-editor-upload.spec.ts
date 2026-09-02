@@ -100,7 +100,7 @@ test.describe("markdown editor attachment upload model", () => {
     expect(writerHostSource).toContain("onUploadingChange={onUploadingChange}")
     expect(markdownEditorSource).toContain("onUploadingChange?: (isUploading: boolean) => void")
     expect(markdownEditorSource).toContain("onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>")
-    expect(markdownEditorSource).toContain('aria-label="파일"')
+    expect(markdownEditorSource).toContain('id: "media.file"')
     expect(markdownEditorSource).toContain("handleFileInput")
     expect(markdownEditorSource).toContain("setUploadInFlight")
     expect(mediaTransfersSource).toContain("validateMarkdownAttachmentSize")

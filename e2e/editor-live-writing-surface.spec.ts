@@ -255,6 +255,82 @@ test.describe("live Markdown writing surface", () => {
     expect(await readMarkdown(page)).toBe(liveMarkdown)
   })
 
+  test("groups toolbar actions without overflow and preserves the editor selection", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "Hello", "Toolbar grouping")
+    await page.goto("/admin/editor/new?source=local-draft")
+
+    const toolbar = page.getByRole("toolbar", { name: "Markdown 작성 도구" })
+    await expect(toolbar).toBeVisible()
+    await expect(page.getByRole("combobox", { name: "명령 메뉴" })).toHaveCount(0)
+
+    const headingMenu = page.getByRole("button", { name: "제목 메뉴" })
+    await headingMenu.focus()
+    await headingMenu.press("ArrowDown")
+    await expect(page.getByRole("menu", { name: "제목" })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(headingMenu).toBeFocused()
+
+    await headingMenu.click()
+    await page.getByRole("button", { name: "목록 메뉴" }).click()
+    await expect(page.getByRole("menu", { name: "제목" })).toHaveCount(0)
+    const listMenu = page.getByRole("menu", { name: "목록" })
+    await expect(listMenu).toBeVisible()
+    await expect(listMenu.getByRole("menuitem").first()).toBeFocused()
+    await page.keyboard.press("Tab")
+    await expect(listMenu).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "삽입 메뉴" })).toBeFocused()
+
+    await headingMenu.click()
+    await page.locator("#post-title").click()
+    await expect(page.getByRole("menu", { name: "제목" })).toHaveCount(0)
+
+    await selectMarkdownRange(page, 0, 5)
+    await headingMenu.click()
+    await page.getByRole("menuitem", { name: "제목 2" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("## Hello")
+
+    await page.getByRole("button", { name: "표 메뉴" }).click()
+    await expect(page.getByRole("menuitem", { name: "표 행 추가" })).toBeDisabled()
+    await page.keyboard.press("Escape")
+
+    const layout = await toolbar.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      groupOverflowX: getComputedStyle(element.firstElementChild as HTMLElement).overflowX,
+      wrappedLabels: Array.from(element.querySelectorAll<HTMLElement>("button, select"))
+        .filter((control) => control.getClientRects().length > 0)
+        .filter((control) => getComputedStyle(control).whiteSpace === "normal")
+        .map((control) => control.getAttribute("aria-label") ?? control.textContent?.trim()),
+    }))
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth)
+    expect(layout.groupOverflowX).not.toBe("auto")
+    expect(layout.wrappedLabels).toEqual([])
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    const compactLayout = await toolbar.evaluate((element) => ({
+      toolbarOverflow: element.scrollWidth - element.clientWidth,
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }))
+    expect(compactLayout.toolbarOverflow).toBe(0)
+    expect(compactLayout.documentOverflow).toBe(0)
+
+    await page.setViewportSize({ width: 320, height: 844 })
+    const editor = page.getByTestId("markdown-editor")
+    const editorBounds = await editor.boundingBox()
+    expect(editorBounds).not.toBeNull()
+    for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
+      await page.getByRole("button", { name: `${label} 메뉴` }).click()
+      const menu = page.getByRole("menu", { name: label })
+      const menuBounds = await menu.boundingBox()
+      expect(menuBounds).not.toBeNull()
+      expect(menuBounds!.x).toBeGreaterThanOrEqual(editorBounds!.x)
+      expect(menuBounds!.x + menuBounds!.width).toBeLessThanOrEqual(
+        editorBounds!.x + editorBounds!.width
+      )
+      await menu.getByRole("menuitem").first().press("Escape")
+    }
+  })
+
   test("selection reveals source for the active block and formats inactive blocks in place", async ({ page }) => {
     const markdown = "# Heading\n\nParagraph with **bold** text."
     await routeAuthenticatedEditor(page, markdown)
@@ -352,7 +428,8 @@ test.describe("live Markdown writing surface", () => {
     await expect.poll(() => readMarkdown(page)).toBe("**hello**")
 
     await fillMarkdown(page, "Cat cat cat")
-    await page.getByRole("button", { name: "찾기 및 바꾸기" }).click()
+    await page.getByRole("button", { name: "더보기 메뉴" }).click()
+    await page.getByRole("menuitem", { name: "찾기 및 바꾸기" }).click()
     await page.getByLabel("찾을 내용").fill("cat")
     await page.getByLabel("바꿀 내용").fill("dog")
     await page.getByRole("button", { name: "모두 바꾸기" }).click()
@@ -368,9 +445,9 @@ test.describe("live Markdown writing surface", () => {
 
     const oneOffset = table.indexOf("one")
     await selectMarkdownRange(page, oneOffset, oneOffset)
-    const commandMenu = page.getByRole("combobox", { name: "명령 메뉴", exact: true })
-    await expect(commandMenu.getByRole("option", { name: "표 행 추가", exact: true })).toBeEnabled()
-    await commandMenu.selectOption("table.add-row")
+    await page.getByRole("button", { name: "표 메뉴" }).click()
+    await expect(page.getByRole("menuitem", { name: "표 행 추가", exact: true })).toBeEnabled()
+    await page.getByRole("menuitem", { name: "표 행 추가", exact: true }).click()
     expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
 
     const lines = ["first", "second", "third"].join("\n")
@@ -387,10 +464,11 @@ test.describe("live Markdown writing surface", () => {
     await routeAuthenticatedEditor(page, "")
     await page.goto("/admin/editor/new?source=local-draft")
 
-    await page.getByRole("button", { name: "표 삽입" }).click()
-    const commandMenu = page.getByRole("combobox", { name: "명령 메뉴", exact: true })
-    await expect(commandMenu.getByRole("option", { name: "표 행 추가", exact: true })).toBeEnabled()
-    await commandMenu.selectOption("table.add-row")
+    await page.getByRole("button", { name: "표 메뉴" }).click()
+    await page.getByRole("menuitem", { name: /^표 삽입/ }).click()
+    await page.getByRole("button", { name: "표 메뉴" }).click()
+    await expect(page.getByRole("menuitem", { name: "표 행 추가", exact: true })).toBeEnabled()
+    await page.getByRole("menuitem", { name: "표 행 추가", exact: true }).click()
     expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
   })
 

@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test"
 import {
   getMarkdownEditorCommand,
-  groupMarkdownEditorCommands,
   markdownEditorCommands,
   projectMarkdownEditorToolbarCommands,
   resolveMarkdownEditorCommandShortcut,
@@ -35,13 +34,10 @@ test.describe("markdown editor command registry", () => {
     ).toThrow(/duplicate command shortcut/i)
   })
 
-  test("toolbar and grouped menu projections retain descriptor identity", () => {
+  test("toolbar projection retains descriptor identity", () => {
     const bold = getMarkdownEditorCommand("format.bold")!
     expect(bold.toolbarLabel).toBe("B")
     expect(projectMarkdownEditorToolbarCommands()[0]).toBe(bold)
-    const format = groupMarkdownEditorCommands().find((group) => group.category === "format")
-    expect(format?.label).toBe("서식")
-    expect(format?.commands[0]).toBe(bold)
   })
 
   test("uses one enablement contract across representative contexts", () => {
