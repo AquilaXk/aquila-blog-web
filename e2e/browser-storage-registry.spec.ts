@@ -3,7 +3,6 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { FEED_EXPLORER_RESTORE_KEY_PREFIX } from "../src/libs/feed/feedRestoreCache"
 import { registeredBrowserStorageKeys } from "../src/libs/privacy/browserStorageRegistry"
-import { getLegalPolicyHistoryStaticProps } from "../src/libs/legal/serverPolicySource"
 import { isLocalDraftExpired, LOCAL_DRAFT_MAX_AGE_MS } from "../src/routes/Admin/editorStudioStorageModel"
 
 const srcRoot = path.resolve(__dirname, "../src")
@@ -123,20 +122,6 @@ test("browser storage registry records retention and deletion metadata for every
   }
 })
 
-test("legal history lists same-day cookie policies newest version first", () => {
-  const { props } = getLegalPolicyHistoryStaticProps()
-  const allCookieVersions = props.policies
-    .filter((policy) => policy.kind === "cookies")
-    .map((policy) => policy.version)
-  const cookieVersions = props.policies
-    .filter((policy) => policy.kind === "cookies" && policy.effectiveAt.startsWith("2026-06-22"))
-    .map((policy) => policy.version)
-
-  expect(allCookieVersions).toEqual(expect.arrayContaining(["1.0.0", "1.0.1", "1.0.2"]))
-  expect(cookieVersions.indexOf("1.0.2")).toBeGreaterThanOrEqual(0)
-  expect(cookieVersions.indexOf("1.0.1")).toBeGreaterThanOrEqual(0)
-  expect(cookieVersions.indexOf("1.0.2")).toBeLessThan(cookieVersions.indexOf("1.0.1"))
-})
 
 test("local draft expiry rejects malformed, future, and seven-day-old timestamps", () => {
   const nowMs = Date.parse("2026-06-22T12:00:00.000Z")

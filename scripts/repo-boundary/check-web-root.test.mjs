@@ -15,8 +15,6 @@ const requiredDirectories = [
   ".githooks",
   "docs",
   "e2e",
-  "legal/policies",
-  "legal/schemas",
   "packages",
   "public",
   "src",
@@ -67,12 +65,12 @@ test("Web root guard accepts the standalone required structure", (t) => {
 test("Web root guard fails closed when a required path is missing", (t) => {
   assert.equal(fs.existsSync(guardPath), true, "Web root guard must exist")
   const root = createWebRootFixture(t)
-  fs.rmSync(path.join(root, "legal/schemas"), { force: true, recursive: true })
+  fs.rmSync(path.join(root, "src"), { force: true, recursive: true })
 
   const result = runGuard(root)
 
   assert.equal(result.status, 1)
-  assert.match(result.stderr, /missing required path: legal\/schemas/)
+  assert.match(result.stderr, /missing required path: src/)
 })
 
 test("Web root guard fails closed when nested below the Git repository root", (t) => {

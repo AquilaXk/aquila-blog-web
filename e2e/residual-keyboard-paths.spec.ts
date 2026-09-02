@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test"
 import { DESKTOP_VIEWPORT, prepareAdminPosts } from "./helpers/adaptivityFixtures"
-import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.describe("residual keyboard paths", () => {
   test("관리자 글 목록은 Arrow로 행 primary 포커스를 이동한다", async ({ page }) => {
@@ -32,25 +31,4 @@ test.describe("residual keyboard paths", () => {
     await expect.poll(async () => page.evaluate(() => window.scrollY)).toBe(scrollBefore)
   })
 
-  test("Legal TOC jump 후 대상 h2로 포커스가 이동한다", async ({ page }) => {
-    await page.setViewportSize(DESKTOP_VIEWPORT)
-    await mockPublicAdminProfile(page)
-    await page.goto("/privacy")
-    await expect(page.getByRole("heading", { name: "개인정보처리방침", level: 1 })).toBeVisible()
-
-    const toc = page.getByRole("navigation", { name: "정책 목차" }).first()
-    const targetLink = toc.getByRole("link").nth(1)
-    const targetName = (await targetLink.innerText()).trim()
-    await targetLink.click()
-
-    const focusedHeading = page.locator("main.legalBody h2:focus")
-    await expect(focusedHeading).toHaveCount(1)
-    await expect(focusedHeading).toHaveText(targetName)
-
-    await page.evaluate(() => {
-      window.location.hash = "privacy-rights"
-    })
-    const hashHeading = page.locator("#privacy-rights h2")
-    await expect.poll(async () => hashHeading.evaluate((el) => el === document.activeElement)).toBe(true)
-  })
 })

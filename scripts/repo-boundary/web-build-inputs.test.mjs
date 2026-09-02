@@ -7,9 +7,7 @@ import test from "node:test"
 import { load as loadYaml } from "js-yaml"
 
 const frontRoot = path.resolve(import.meta.dirname, "../..")
-const policySource = fs.readFileSync(path.join(frontRoot, "src/libs/legal/serverPolicySource.ts"), "utf8")
 const runtimeGuardSource = fs.readFileSync(path.join(frontRoot, "scripts/compare-runtime-guard-metrics.mjs"), "utf8")
-const legalPolicyE2eSource = fs.readFileSync(path.join(frontRoot, "e2e/legal-policy-pages.spec.ts"), "utf8")
 const boundarySource = fs.readFileSync(path.join(frontRoot, "scripts/repo-boundary/check-web-boundary.mjs"), "utf8")
 
 const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8" })
@@ -26,12 +24,8 @@ const createBoundaryFixture = () => {
 }
 
 test("Web build inputs stay inside the future Web root", () => {
-  assert.equal(fs.existsSync(path.join(frontRoot, "legal/policies")), true)
-  assert.equal(fs.existsSync(path.join(frontRoot, "legal/schemas/legal-policy.schema.json")), true)
   assert.equal(fs.existsSync(path.join(frontRoot, "quality/performance/runtime-guard-baseline.json")), true)
-  assert.doesNotMatch(policySource, /\.\.[/\\](legal|back|deploy|infra|perf)/)
   assert.doesNotMatch(runtimeGuardSource, /\.\.[/\\](legal|back|deploy|infra|perf)/)
-  assert.doesNotMatch(legalPolicyE2eSource, /process\.cwd\(\),\s*"\.\.",\s*"legal"/)
 })
 
 test("Web boundary scanning checks and reads the same file descriptor", () => {
@@ -177,7 +171,6 @@ test("Web pre-commit runs from monorepo and extracted roots", (t) => {
       ".githooks",
       "scripts/repo-boundary",
       "contracts/platform",
-      "legal/policies",
     ]) {
       fs.mkdirSync(webPath(directory), { recursive: true })
     }
@@ -188,7 +181,6 @@ test("Web pre-commit runs from monorepo and extracted roots", (t) => {
       webPath("scripts/repo-boundary/check-web-boundary.mjs"),
     )
     fs.writeFileSync(webPath("contracts/platform/openapi.json"), "{}\n")
-    fs.writeFileSync(webPath("legal/policies/privacy.yaml"), "version: initial\n")
     fs.writeFileSync(
       path.join(root, "bin/yarn"),
       '#!/usr/bin/env bash\nprintf "%s:%s\\n" "$PWD" "$*" >> "$YARN_LOG"\n',
@@ -198,8 +190,7 @@ test("Web pre-commit runs from monorepo and extracted roots", (t) => {
     git(root, ["commit", "-m", "initial"])
 
     fs.writeFileSync(webPath("contracts/platform/openapi.json"), '{"openapi":"3.1.0"}\n')
-    fs.writeFileSync(webPath("legal/policies/privacy.yaml"), "version: changed\n")
-    git(root, ["add", path.join(webPrefix, "contracts/platform/openapi.json"), path.join(webPrefix, "legal/policies/privacy.yaml")])
+    git(root, ["add", path.join(webPrefix, "contracts/platform/openapi.json")])
 
     const yarnLog = path.join(root, "yarn.log")
     const result = spawnSync("bash", [path.join(webPrefix, ".githooks/pre-commit")], {
@@ -211,7 +202,7 @@ test("Web pre-commit runs from monorepo and extracted roots", (t) => {
     const resolvedWebRoot = fs.realpathSync(webPath())
     assert.equal(
       fs.readFileSync(yarnLog, "utf8"),
-      `${resolvedWebRoot}:contracts:check\n${resolvedWebRoot}:legal:check\n`,
+      `${resolvedWebRoot}:contracts:check\n`,
       webPrefix || "extracted",
     )
   }

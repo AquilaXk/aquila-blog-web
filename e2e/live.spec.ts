@@ -45,7 +45,7 @@ test.describe("live public release gate", () => {
   test.skip(!explicitLiveApiBaseUrl, "E2E_API_BASE_URL is required")
   test.setTimeout(90_000)
 
-  test("deployment URL serves feed, search, detail, legal, CSP, and HTTPS API readiness", async ({ page }) => {
+  test("deployment URL serves feed, search, detail, CSP, and HTTPS API readiness", async ({ page }) => {
     const homeResponse = await page.goto("/")
     expect(homeResponse?.ok()).toBe(true)
     expect(homeResponse?.headers()["content-security-policy"]).toContain("default-src")
@@ -65,13 +65,6 @@ test.describe("live public release gate", () => {
     const detailResponse = await page.goto(detailPath || "/")
     expect(detailResponse?.ok()).toBe(true)
     await expect(page.getByRole("heading", { name: title }).first()).toBeVisible()
-
-    for (const legalPath of ["/terms", "/privacy", "/cookies", "/legal/history"]) {
-      const legalResponse = await page.goto(legalPath, {
-        waitUntil: "domcontentloaded",
-      })
-      expect(legalResponse?.ok(), legalPath).toBe(true)
-    }
 
     const webOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL || page.url()).origin
     const readiness = await page.request.get(new URL("/actuator/health/readiness", webOrigin).toString())

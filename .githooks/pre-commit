@@ -21,7 +21,3 @@ node "${web_root}/scripts/repo-boundary/check-web-boundary.mjs" --staged
 if grep -Eq '^(front/)?(package\.json|yarn\.lock|contracts/platform/|packages/shared-contracts/src/generated/|scripts/contracts/|scripts/openapi/)' <<< "${staged_files}"; then
   (cd "${web_root}" && yarn contracts:check)
 fi
-
-if grep -Eq '^(front/)?(legal/policies/|contracts/export/legal-policy-manifest\.json|scripts/legal/)' <<< "${staged_files}"; then
-  (cd "${web_root}" && yarn legal:check)
-fi
