@@ -282,7 +282,6 @@ test("container-build fails closed when a NEXT_PUBLIC build arg is missing or em
   const complete = [
     "NEXT_PUBLIC_BACKEND_URL=https://blog.aquilaxk.site",
     "NEXT_PUBLIC_SITE_URL=https://blog.aquilaxk.site",
-    "NEXT_PUBLIC_RUM_SAMPLE_RATE=0",
   ]
 
   assert.equal(validateEnvText({ contract, target: "container-build", text: complete.join("\n") }).ok, true)

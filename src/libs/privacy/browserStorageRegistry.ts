@@ -1,21 +1,4 @@
 import { FEED_EXPLORER_RESTORE_KEY_PREFIX } from "src/libs/feed/feedRestoreCache"
-export {
-  OPTIONAL_TRACKING_CONSENT_CHANGE_EVENT,
-  OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-  disableOptionalTrackingRuntime,
-  hasBrowserPrivacyOptOutSignal,
-  hasOptionalTrackingConsent,
-  installOptionalTrackingDenyGuard,
-  readOptionalTrackingConsent,
-  setOptionalTrackingConsent,
-  writeOptionalTrackingConsent,
-} from "src/libs/privacy/optionalTrackingConsentCore"
-export type {
-  OptionalTrackingConsentRecord,
-  OptionalTrackingConsentSource,
-  OptionalTrackingConsentState,
-} from "src/libs/privacy/optionalTrackingConsentCore"
-import { OPTIONAL_TRACKING_CONSENT_STORAGE_KEY } from "src/libs/privacy/optionalTrackingConsentCore"
 
 export const ADMIN_TASK_DLQ_REPLAY_SESSION_KEY = "admin.tools.taskDlqReplay.v1"
 export const ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY =
@@ -40,8 +23,8 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     purpose: "auth-session",
     required: true,
     retention: "session or 30 days when keep-signed-in is enabled",
-    deletion: "logout, session revocation, account deletion, or browser cookie deletion",
-    stores: "member api key token value",
+    deletion: "logout, session revocation, or browser cookie deletion",
+    stores: "administrator API key token value",
   },
   {
     area: "cookie",
@@ -67,17 +50,8 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     purpose: "auth-session",
     required: true,
     retention: "session or 30 days when keep-signed-in is enabled",
-    deletion: "logout, session revocation, account deletion, or browser cookie deletion",
-    stores: "member session identifier",
-  },
-  {
-    area: "cookie",
-    key: "scheme",
-    purpose: "theme-preference",
-    required: false,
-    retention: "until changed or browser cookie deletion",
-    deletion: "theme toggle overwrite or browser cookie deletion",
-    stores: "light or dark theme preference",
+    deletion: "logout, session revocation, or browser cookie deletion",
+    stores: "administrator session identifier",
   },
   {
     area: "cookie",
@@ -90,39 +64,12 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "localStorage",
-    key: OPTIONAL_TRACKING_CONSENT_STORAGE_KEY,
-    purpose: "optional-tracking-consent",
-    required: false,
-    retention: "until consent is changed, withdrawn, or browser storage is cleared",
-    deletion: "privacy settings change or browser storage deletion",
-    stores: "JSON consent record with version, granted or denied state, timestamp, source, and analytics/RUM categories",
-  },
-  {
-    area: "localStorage",
     key: "auth.admin.savedEmail.v1",
     purpose: "admin-login-saved-email",
     required: false,
     retention: "until saved email changes, is deselected, or browser storage is cleared",
     deletion: "saved email deselection, replacement, or browser storage deletion",
     stores: "normalized administrator email address only",
-  },
-  {
-    area: "localStorage",
-    key: "admin.editor.localDraft.v1",
-    purpose: "editor-local-draft-legacy",
-    required: false,
-    retention: "preserved until a compatible one-time migration or browser storage deletion",
-    deletion: "compatible one-time migration to admin.editor.localDraft.create.v3 or browser storage deletion",
-    stores: "legacy draft payload before context-slot migration",
-  },
-  {
-    area: "localStorage",
-    key: "admin.editor.localDraft.create.v2",
-    purpose: "editor-local-draft-create-legacy",
-    required: false,
-    retention: "preserved for owner recovery; not read or overwritten by the v3 editor",
-    deletion: "browser storage deletion",
-    stores: "legacy create-context draft payload without canonical summary source and intent",
   },
   {
     area: "localStorage",
@@ -140,7 +87,7 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     required: false,
     retention: "7 days from savedAt, capped to latest 20 post slots, or until manually cleared",
     deletion: "manual clear, successful modify, slot-limit eviction, TTL expiry, or browser storage deletion",
-    stores: "per-post v2 legacy and v3 current draft payloads; v3 includes canonical summary source and intent",
+    stores: "per-post current draft payloads with canonical summary source and intent",
   },
   {
     area: "localStorage",

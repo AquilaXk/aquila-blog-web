@@ -16,7 +16,7 @@ const ServerErrorPage = () => {
         robots="noindex, follow"
         canonicalUrl={null}
       />
-      <ErrorFallbackView variant="global" errorId="err_server_500" onRetry={() => router.reload()} />
+      <ErrorFallbackView variant="global" onRetry={() => router.reload()} />
     </>
   )
 }

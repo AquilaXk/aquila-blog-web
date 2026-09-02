@@ -31,7 +31,7 @@ test.describe("error boundary launch gate", () => {
     await page.goto("/_qa/error-boundary?mode=global")
 
     await expect(page.getByRole("heading", { name: "문제가 발생했습니다" })).toBeVisible()
-    await expect(page.getByText(/오류 ID: err_/)).toBeVisible()
+    await expect(page.getByText(/오류 ID:/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible()
     await expect(page.getByRole("link", { name: "홈으로 이동" })).toBeVisible()
   })
@@ -41,7 +41,7 @@ test.describe("error boundary launch gate", () => {
 
     await expect(page.getByTestId("qa-error-boundary-shell")).toBeVisible()
     await expect(page.getByRole("heading", { name: "콘텐츠를 표시하지 못했습니다" })).toBeVisible()
-    await expect(page.getByText(/오류 ID: err_/)).toBeVisible()
+    await expect(page.getByText(/오류 ID:/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible()
     await expect(page.getByRole("link", { name: "홈으로 이동" })).toBeVisible()
   })
@@ -50,7 +50,7 @@ test.describe("error boundary launch gate", () => {
     await page.goto("/500")
 
     await expect(page.getByRole("heading", { name: "문제가 발생했습니다" })).toBeVisible()
-    await expect(page.getByText("오류 ID: err_server_500")).toBeVisible()
+    await expect(page.getByText(/오류 ID:/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible()
     await expect(page.getByRole("link", { name: "홈으로 이동" })).toBeVisible()
   })

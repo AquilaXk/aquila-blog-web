@@ -12,6 +12,7 @@ const sourceConstantPattern =
 const storageApiCallPattern =
   /\b(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(\s*([A-Za-z0-9_]+)/g
 const cookieApiCallPattern = /\b(?:setCookie|deleteCookie|getCookieValue)\(\s*([A-Za-z0-9_]+)/g
+const registryOwnedSourceConstantNames = new Set(["LOCAL_DRAFT_CREATE_STORAGE_KEY"])
 
 const listSourceFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -38,6 +39,7 @@ const collectStorageConstants = () =>
     })).filter(
       (sourceConstant) =>
         storageApiConstantNames.has(sourceConstant.name) ||
+        registryOwnedSourceConstantNames.has(sourceConstant.name) ||
         (hasBrowserStorageApi && sourceConstant.name.includes("PREFIX") && !sourceConstant.key.startsWith("/")),
     )
   })
@@ -49,7 +51,6 @@ test("browser storage registry retains only current public and administrator key
       expect.objectContaining({ area: "cookie", key: "accessToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "refreshToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "sessionKey", purpose: "auth-session" }),
-      expect.objectContaining({ area: "cookie", key: "scheme", purpose: "theme-preference" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
@@ -74,6 +75,7 @@ test("browser storage registry retains only current public and administrator key
     "privacy.optionalTrackingConsent.v1",
     "admin.editor.localDraft.v1",
     "admin.editor.localDraft.create.v2",
+    "scheme",
   ]
   expect(registeredBrowserStorageKeys.map((entry) => entry.key)).not.toEqual(
     expect.arrayContaining(retiredKeys)
@@ -107,7 +109,7 @@ test("browser storage registry covers source storage constants", () => {
     ).toBe(true)
   }
 
-  expect(registeredKeys.has("scheme"), "theme scheme cookie is read from document.cookie and must be registered").toBe(true)
+  expect(registeredKeys.has("scheme"), "light-only runtime must not retain a theme cookie").toBe(false)
 })
 
 test("browser storage registry records retention and deletion metadata for every entry", () => {

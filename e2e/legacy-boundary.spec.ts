@@ -85,12 +85,12 @@ test.describe("frontend legacy boundary", () => {
     const sourceFiles = [
       "site.config.js",
       "src/pages/_app.tsx",
-      "src/layouts/RootLayout/Scripts.tsx",
-      "src/layouts/RootLayout/useGtagEffect.ts",
       "src/apis/backend/client.ts",
       "src/libs/security/contentSecurityPolicy.js",
     ]
 
+    expect(frontPathExists("src/layouts/RootLayout/Scripts.tsx")).toBe(false)
+    expect(frontPathExists("src/layouts/RootLayout/useGtagEffect.ts")).toBe(false)
     expect(frontPathExists("src/libs/privacy/optionalTrackingConsent.ts")).toBe(false)
     expect(frontPathExists("src/libs/privacy/optionalTrackingConsentCore.ts")).toBe(false)
     expect(frontPathExists("src/libs/privacy/OptionalVercelTelemetry.tsx")).toBe(false)
@@ -181,7 +181,7 @@ test.describe("frontend legacy boundary", () => {
       /NEXT_PUBLIC_SIGNUP_ENABLED|kakaoLogin(?:Background|Text|FocusBorder)/,
     ]
 
-    expect(readFrontText("src/routes/Settings/SettingsLayout.tsx")).not.toContain("useAuthSession")
+    expect(frontPathExists("src/routes/Settings/SettingsLayout.tsx")).toBe(false)
     for (const relativePath of publicMemberCompatibilitySources) {
       const source = readFrontText(relativePath)
       for (const pattern of retiredPublicMemberPatterns) {

@@ -65,12 +65,6 @@ const buildContentSecurityPolicy = (options = {}) => {
   const includeUnsafeEval = options.includeUnsafeEval ?? isDev
   const runtimeOrigins = configuredRuntimeOrigins()
   const aquilaDomains = ["https://*.aquilaxk.site"]
-  const vercelScriptSources = ["https://va.vercel-scripts.com", "https://vercel.live"]
-  const vercelConnectSources = [
-    "https://vitals.vercel-insights.com",
-    "https://vercel.live",
-    "wss://ws-us3.pusher.com",
-  ]
   const localDevConnectSources = isDev ? ["http://localhost:8080", "http://127.0.0.1:8080"] : []
   const embedFrameSources = [
     "https://www.youtube.com",
@@ -79,13 +73,6 @@ const buildContentSecurityPolicy = (options = {}) => {
     "https://www.figma.com",
     "https://codepen.io",
     "https://codesandbox.io",
-  ]
-  const googleScriptSources = ["https://www.googletagmanager.com"]
-  const googleConnectSources = [
-    "https://www.google-analytics.com",
-    "https://analytics.google.com",
-    "https://region1.google-analytics.com",
-    "https://stats.g.doubleclick.net",
   ]
   const imageSources = [
     "'self'",
@@ -98,7 +85,6 @@ const buildContentSecurityPolicy = (options = {}) => {
     "https://lh5.googleusercontent.com",
     "https://s3-us-west-2.amazonaws.com",
     "https://avatars.githubusercontent.com",
-    ...googleConnectSources,
     ...runtimeOrigins,
   ]
 
@@ -109,8 +95,6 @@ const buildContentSecurityPolicy = (options = {}) => {
       "'self'",
       ...documentInlineScriptHashes(),
       ...(includeUnsafeEval ? ["'unsafe-eval'"] : []),
-      ...vercelScriptSources,
-      ...googleScriptSources,
     ],
     // Emotion critical CSS + runtime style injection still require unsafe-inline.
     ["style-src", "'self'", "'unsafe-inline'"],
@@ -121,12 +105,10 @@ const buildContentSecurityPolicy = (options = {}) => {
       ...aquilaDomains,
       ...runtimeOrigins,
       ...localDevConnectSources,
-      ...vercelConnectSources,
-      ...googleConnectSources,
     ],
     ["font-src", "'self'", "data:"],
     ["media-src", "'self'", "blob:", ...aquilaDomains, ...runtimeOrigins],
-    ["frame-src", "'self'", "https://vercel.live", ...runtimeOrigins, ...embedFrameSources],
+    ["frame-src", "'self'", ...runtimeOrigins, ...embedFrameSources],
     ["object-src", "'none'"],
     ["base-uri", "'self'"],
     ["form-action", "'self'"],

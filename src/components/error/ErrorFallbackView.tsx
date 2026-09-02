@@ -7,7 +7,6 @@ type ErrorFallbackVariant = "global" | "surface"
 
 type ErrorFallbackViewProps = {
   variant: ErrorFallbackVariant
-  errorId: string
   requestId?: string | null
   onRetry?: () => void
 }
@@ -17,7 +16,7 @@ const copyByVariant = {
     status: "ERROR · 500",
     title: "문제가 발생했습니다",
     description:
-      "예상하지 못한 오류로 화면을 표시하지 못했습니다. 오류 ID를 남겨두고 다시 시도하거나 홈으로 이동하세요.",
+      "예상하지 못한 오류로 화면을 표시하지 못했습니다. 다시 시도하거나 홈으로 이동하세요.",
   },
   surface: {
     status: "RENDER ERROR",
@@ -35,14 +34,11 @@ const FallbackShell = styled.div`
 
 export const ErrorFallbackView = ({
   variant,
-  errorId,
   requestId = null,
   onRetry,
 }: ErrorFallbackViewProps) => {
   const copy = copyByVariant[variant]
-  const meta = requestId
-    ? `오류 ID: ${errorId}\n요청 ID: ${requestId}`
-    : `오류 ID: ${errorId}`
+  const meta = requestId ? `요청 ID: ${requestId}` : undefined
 
   const fallback = (
     <FallbackShell>

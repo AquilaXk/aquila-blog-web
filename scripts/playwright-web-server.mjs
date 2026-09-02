@@ -30,7 +30,6 @@ const watchedEntries = [
 // 빠지면 production 모드를 재현하려는 e2e가 그렇지 않은 .next를 그대로 재사용한다.
 const buildSignature = {
   enableQaRoutes: process.env.ENABLE_QA_ROUTES === "true",
-  nextPublicRumSampleRate: process.env.NEXT_PUBLIC_RUM_SAMPLE_RATE || "",
   nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL || "",
 }
 

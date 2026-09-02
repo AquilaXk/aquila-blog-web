@@ -367,7 +367,7 @@ const PostDetail: React.FC = () => {
         <span ref={readProgressRef} />
       </div>
       {data.type[0] === "Post" && (
-        <section className="detailHero" data-rum-section="header">
+        <section className="detailHero">
           <PostHeader
             data={data}
             likesCount={data.likesCount}
@@ -413,7 +413,7 @@ const PostDetail: React.FC = () => {
               onNavigate={handleTocNavigate}
             />
           ) : null}
-          <BodySection data-rum-section="body">
+          <BodySection>
             <RecoverableSurfaceBoundary surface="markdown" resetKey={postId}>
               <MarkdownRenderer
                 content={renderedContent}

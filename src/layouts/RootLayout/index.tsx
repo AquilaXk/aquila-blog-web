@@ -3,8 +3,6 @@ import { ThemeProvider } from "./ThemeProvider"
 import useScheme from "src/hooks/useScheme"
 import Header from "./Header"
 import styled from "@emotion/styled"
-import Scripts from "src/layouts/RootLayout/Scripts"
-import useGtagEffect from "./useGtagEffect"
 import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
 import { CONFIG } from "site.config"
@@ -94,7 +92,6 @@ const RootLayout = ({
   const effectiveScheme = "light" // intentional light-only; do not wire dark/toggle
   const effectiveBlogDesign = isAdminRoute ? adminProfile?.blogDesign || "legacy" : "legacy"
   const headerBlogTitle = (isPublicBlogRoute && adminProfile?.blogTitle?.trim()) || CONFIG.blog.title
-  useGtagEffect()
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -164,7 +161,6 @@ const RootLayout = ({
   return (
     <ThemeProvider scheme={effectiveScheme} blogDesign={effectiveBlogDesign}>
       <RootAdminProfileContext.Provider value={adminProfile}>
-        <Scripts />
         {isAdminRoute || isDedicatedEditorRoute || isStandaloneSurfaceRoute ? null : (
           <Header fullWidth={false} blogTitle={headerBlogTitle} />
         )}

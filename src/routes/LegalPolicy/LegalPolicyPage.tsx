@@ -4,7 +4,6 @@ import styled from "@emotion/styled"
 import { CONFIG } from "site.config"
 import type { LegalPolicyKind, LegalPolicyPageProps } from "src/libs/legal/policyTypes"
 import { legalPolicyCurrentPaths, legalPolicyHistoryPath, legalPolicyKindLabels } from "src/libs/legal/policyLinks"
-import OptionalTrackingConsentSettings from "./OptionalTrackingConsentSettings"
 
 const policyContactSubjects: Record<LegalPolicyKind, string> = {
   privacy: "AquilaLog 개인정보 문의 및 데이터 삭제 요청",
@@ -216,7 +215,6 @@ const LegalPolicyPage = ({
             ) : null}
           </main>
         </div>
-        {kind === "cookies" && isCurrentRoute ? <OptionalTrackingConsentSettings /> : null}
       </div>
     </StyledWrapper>
   )
@@ -408,57 +406,6 @@ const StyledWrapper = styled.div`
     gap: 1.3rem;
   }
 
-  .cookieSettings {
-    margin: 2rem 0 0 17rem;
-    border: 1px solid ${({ theme }) => theme.colors.gray5};
-    border-radius: ${({ theme }) => `${theme.variables.ui.card.radius}px`};
-    padding: 1.4rem;
-    background: ${({ theme }) => theme.colors.gray2};
-  }
-
-  .cookieSettings h2 {
-    margin-bottom: 0.65rem;
-  }
-
-  .cookieSettingsStatus {
-    font-weight: 760;
-  }
-
-  .cookieSettings button {
-    min-height: ${({ theme }) => `${theme.variables.ui.button.minHeight}px`};
-    margin-top: 0.9rem;
-    border: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-radius: ${({ theme }) => `${theme.variables.ui.button.radius}px`};
-    padding: 0.45rem 0.8rem;
-    background: ${({ theme }) => theme.colors.gray1};
-    color: ${({ theme }) => theme.colors.gray12};
-    font: inherit;
-    font-weight: 760;
-    cursor: pointer;
-  }
-
-  .cookieSettings button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  .cookieSettings details {
-    margin-top: 0.9rem;
-  }
-
-  .cookieSettings summary {
-    width: fit-content;
-    color: ${({ theme }) => theme.colors.gray12};
-    font-weight: 720;
-    cursor: pointer;
-  }
-
-  .cookieSettings dl {
-    display: grid;
-    gap: 0.65rem;
-    margin: 0.8rem 0;
-  }
-
   section {
     scroll-margin-top: 5.25rem;
     padding-bottom: 1.3rem;
@@ -526,10 +473,6 @@ const StyledWrapper = styled.div`
 
     .tocRail {
       display: none;
-    }
-
-    .cookieSettings {
-      margin-left: 0;
     }
 
     .mobileSectionJump {
