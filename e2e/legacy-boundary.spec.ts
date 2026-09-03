@@ -20,26 +20,35 @@ test.describe("frontend legacy boundary", () => {
     expect(JSON.stringify(packageJson)).not.toContain("morethanmin")
   })
 
-  test("legacy post routes stay redirect or SSR 404 only", () => {
-    const legacySlugRoute = readFrontText("src/pages/[slug].tsx")
-    const legacyPageRoute = readFrontText("src/pages/page/[pageId].tsx")
+  test("retired post routes are absent without compatibility owners", () => {
+    expect(frontPathExists("src/pages/[slug].tsx")).toBe(false)
+    expect(frontPathExists("src/pages/page/[pageId].tsx")).toBe(false)
 
-    expect(legacySlugRoute).toContain("export const getServerSideProps")
-    expect(legacySlugRoute).toContain("extractPostIdFromLegacySlug")
-    expect(legacySlugRoute).toContain("toCanonicalPostPath(post.id)")
-    expect(legacySlugRoute).toContain("permanent: true")
-    expect(legacySlugRoute).toContain("res.statusCode = 404")
-    expect(legacySlugRoute).toContain("<CustomError />")
-    expect(legacySlugRoute).not.toContain("getStaticProps")
-    expect(legacySlugRoute).not.toContain("MarkdownRenderer")
+    const postPath = readFrontText("src/libs/utils/postPath.ts")
+    expect(postPath).not.toContain("extractPostIdFromLegacySlug")
+    expect(postPath).not.toContain("split(\"-\")")
+    expect(postPath).not.toContain("toCanonicalPostPath(post.id)")
+  })
 
-    expect(legacyPageRoute).toContain("export const getServerSideProps")
-    expect(legacyPageRoute).toContain("toCanonicalPostPath(post.id)")
-    expect(legacyPageRoute).toContain("permanent: true")
-    expect(legacyPageRoute).toContain("res.statusCode = 404")
-    expect(legacyPageRoute).toContain("<CustomError />")
-    expect(legacyPageRoute).not.toContain("getStaticProps")
-    expect(legacyPageRoute).not.toContain("MarkdownRenderer")
+  test("retired post URLs receive Next's direct normal 404 without fetches or redirects", async ({ page }) => {
+    const retiredPaths = ["/legacy-post-title-42", "/page/legacy-non-post"] as const
+    let postFetchCount = 0
+
+    page.on("request", (request) => {
+      if (/^\/post\/api\/v1\/posts(?:\/|$)/.test(new URL(request.url()).pathname)) {
+        postFetchCount += 1
+      }
+    })
+
+    for (const retiredPath of retiredPaths) {
+      const response = await page.goto(retiredPath, { waitUntil: "domcontentloaded" })
+
+      expect(response?.status(), retiredPath).toBe(404)
+      expect(page.url(), retiredPath).toBe(new URL(retiredPath, "http://127.0.0.1:3100").toString())
+      await expect(page.getByText("legacy-post-title-42", { exact: true })).toHaveCount(0)
+    }
+
+    expect(postFetchCount).toBe(0)
   })
 
   test("canonical post query hook does not own legacy slug fallback", () => {

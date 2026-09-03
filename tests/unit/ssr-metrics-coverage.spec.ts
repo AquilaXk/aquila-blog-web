@@ -3,7 +3,6 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 const pageRouteClasses = {
-  "[slug].tsx": "public",
   "about.tsx": "public",
   "admin.tsx": "admin",
   "admin/cloud.tsx": "admin",
@@ -18,7 +17,6 @@ const pageRouteClasses = {
   "company/index.tsx": "public",
   "easysubway/index.tsx": "public",
   "feed.tsx": "system",
-  "page/[pageId].tsx": "public",
   "sitemap.xml.tsx": "system",
 } as const
 
