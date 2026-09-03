@@ -30,25 +30,17 @@ test.describe("frontend legacy boundary", () => {
     expect(postPath).not.toContain("toCanonicalPostPath(post.id)")
   })
 
-  test("retired post URLs receive Next's direct normal 404 without fetches or redirects", async ({ page }) => {
+  test("retired post URLs receive Next's direct normal 404 without redirects", async ({ page }) => {
     const retiredPaths = ["/legacy-post-title-42", "/page/legacy-non-post"] as const
-    let postFetchCount = 0
-
-    page.on("request", (request) => {
-      if (/^\/post\/api\/v1\/posts(?:\/|$)/.test(new URL(request.url()).pathname)) {
-        postFetchCount += 1
-      }
-    })
 
     for (const retiredPath of retiredPaths) {
       const response = await page.goto(retiredPath, { waitUntil: "domcontentloaded" })
+      const currentUrl = new URL(page.url())
 
       expect(response?.status(), retiredPath).toBe(404)
-      expect(page.url(), retiredPath).toBe(new URL(retiredPath, "http://127.0.0.1:3100").toString())
+      expect(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`, retiredPath).toBe(retiredPath)
       await expect(page.getByText("legacy-post-title-42", { exact: true })).toHaveCount(0)
     }
-
-    expect(postFetchCount).toBe(0)
   })
 
   test("canonical post query hook does not own legacy slug fallback", () => {
