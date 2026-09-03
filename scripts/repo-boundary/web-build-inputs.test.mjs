@@ -9,6 +9,7 @@ import { load as loadYaml } from "js-yaml"
 const frontRoot = path.resolve(import.meta.dirname, "../..")
 const runtimeGuardSource = fs.readFileSync(path.join(frontRoot, "scripts/compare-runtime-guard-metrics.mjs"), "utf8")
 const boundarySource = fs.readFileSync(path.join(frontRoot, "scripts/repo-boundary/check-web-boundary.mjs"), "utf8")
+const storybookConfigSource = fs.readFileSync(path.join(frontRoot, ".storybook/main.ts"), "utf8")
 
 const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8" })
 
@@ -116,6 +117,8 @@ test("Web CI keeps the Storybook bundle gate strict", () => {
     smokeScript,
     /^STORYBOOK_GATE_ENFORCEMENT=strict yarn storybook:gate && playwright test --config=playwright\.storybook\.config\.ts$/
   )
+  assert.match(storybookConfigSource, /staticDirs:\s*\["\.\.\/public"\]/)
+  assert.match(storybookConfigSource, /publicDir:\s*false/)
 })
 
 test("Web CI runs repository extraction contract tests", () => {
