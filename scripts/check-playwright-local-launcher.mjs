@@ -4,8 +4,10 @@ import { fileURLToPath } from "url"
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const configPath = path.join(projectRoot, "playwright.config.ts")
+const nextConfigPath = path.join(projectRoot, "next.config.js")
 const packageJsonPath = path.join(projectRoot, "package.json")
 const configSource = fs.readFileSync(configPath, "utf8")
+const nextConfigSource = fs.readFileSync(nextConfigPath, "utf8")
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"))
 
 const requiredContracts = [
@@ -24,6 +26,11 @@ const requiredContracts = [
     id: "yarn-playwright-cft-opt-out",
     source: packageJson.scripts?.playwright || "",
     pattern: /PLAYWRIGHT_LOCAL_CHROMIUM_CHANNEL=false/,
+  },
+  {
+    id: "application-local-output-file-tracing-root",
+    source: nextConfigSource,
+    pattern: /outputFileTracingRoot:\s*__dirname/,
   },
 ]
 
