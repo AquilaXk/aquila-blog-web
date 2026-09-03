@@ -10,8 +10,13 @@ import {
   toUserFacingMessage,
 } from "../../src/apis/backend/errorClassification"
 
+const operationConflictCode = "409-40"
+const operationConflictMessage = "운영 작업 ID가 충돌했습니다."
+
 test("readApiResultCode extracts body resultCode", () => {
-  expect(readApiResultCode(JSON.stringify({ resultCode: "409-4", msg: "policy" }))).toBe("409-4")
+  expect(readApiResultCode(JSON.stringify({ resultCode: operationConflictCode, msg: operationConflictMessage }))).toBe(
+    operationConflictCode
+  )
   expect(readApiResultCode("")).toBe("")
   expect(readApiResultCode("{")).toBe("")
 })
@@ -19,11 +24,11 @@ test("readApiResultCode extracts body resultCode", () => {
 test("ApiError exposes resultCode from body JSON", () => {
   const error = new ApiError(
     409,
-    "/member/api/v1/auth/me",
-    JSON.stringify({ resultCode: "409-4", msg: "약관이 변경되었습니다." })
+    "/system/api/v1/adm/tasks",
+    JSON.stringify({ resultCode: operationConflictCode, msg: operationConflictMessage })
   )
-  expect(error.resultCode).toBe("409-4")
-  expect(error.userMessage).toContain("약관")
+  expect(error.resultCode).toBe(operationConflictCode)
+  expect(error.userMessage).toBe(operationConflictMessage)
 })
 
 test("classifyApiError maps timeout and network first", () => {

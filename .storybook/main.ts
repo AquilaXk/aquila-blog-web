@@ -23,6 +23,7 @@ const config: StorybookConfig = {
   viteFinal: async (config) =>
     mergeConfig(config, {
       plugins: [react()],
+      publicDir: false,
       resolve: {
         alias: {
           "next/font/local": nextFontLocalAdapterPath,
