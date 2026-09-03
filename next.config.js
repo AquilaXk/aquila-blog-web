@@ -61,6 +61,8 @@ const buildSecurityHeaders = () => {
 module.exports = {
   /** Homeserver container runs `.next/standalone/server.js`; traced deps only, no source tree. */
   output: "standalone",
+  /** Keep standalone output rooted in this application for linked worktrees. */
+  outputFileTracingRoot: __dirname,
   /**
    * The standalone tracer copies build-only toolchain into the runtime `node_modules`.
    * `next-server` 키는 next-server 기본 트레이스에만 매칭된다 — Next는 이 키를
