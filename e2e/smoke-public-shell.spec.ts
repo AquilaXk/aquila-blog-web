@@ -183,6 +183,7 @@ test.describe("core smoke public shell", () => {
   expect(navBarSource).toContain('data-ui="mobile-nav-search"')
   expect(navBarSource).toContain('aria-keyshortcuts="Meta+K Control+K"')
   expect(navBarSource).toContain(".primaryLinks,")
+  expect(navBarSource).toContain('router.pathname !== "/" && (')
   expect(navBarSource).toContain('className="searchTrigger"')
   expect(navBarSource).toContain("waitForFeedSearchInputFocus")
   expect(navBarSource).toContain('from "src/routes/Feed/feedSearchFocus"')

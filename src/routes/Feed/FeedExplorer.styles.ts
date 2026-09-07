@@ -33,7 +33,7 @@ export const ExplorerCard = styled.section`
     text-transform: uppercase;
   }
 
-  .feedTitle h2 {
+  .feedTitle h1 {
     margin: 0;
     color: var(--aq-text);
     margin: 4px 0 0;

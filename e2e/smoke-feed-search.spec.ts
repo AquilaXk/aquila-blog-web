@@ -60,6 +60,13 @@ test.describe("core smoke feed and search", () => {
 
   await page.goto("/")
   await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
+  await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
+  await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toHaveCount(0)
+  await expect(page.getByText("Focus", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Updated", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Repository", { exact: true })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "전체보기" })).toBeVisible()
   await expect(page.locator('[data-ui="feed-home-product-shell"]')).toBeVisible()
   await expect(page.locator('[data-ui="feed-profile-summary"]')).toHaveCount(0)
@@ -243,20 +250,22 @@ test.describe("core smoke feed and search", () => {
   await expect(topicRail.getByRole("button", { name: "전체보기" })).toBeVisible()
 })
 
-  test("홈 새로고침 이후에도 제품형 브랜드 문구를 유지한다", async ({ page }) => {
+  test("홈 새로고침 이후에도 피드 검색을 유지하고 intro hero를 렌더하지 않는다", async ({ page }) => {
   await mockFeedEndpoints(page)
 
   await page.goto("/")
-  await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toBeVisible()
-  await expect(page.locator('[data-ui="feed-brand-role"]')).toBeVisible()
-  await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toBeVisible()
-  await expect(page.getByText("aquilaXk's Blog")).toHaveCount(0)
+  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
+  await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
+  await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toHaveCount(0)
 
   await page.reload()
-  await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toBeVisible()
-  await expect(page.locator('[data-ui="feed-brand-role"]')).toBeVisible()
-  await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toBeVisible()
-  await expect(page.getByText("aquilaXk's Blog")).toHaveCount(0)
+  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
+  await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
+  await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toHaveCount(0)
 })
 
   test("피드 카드 canonical quote summary는 그대로 렌더된다", async ({ page }) => {
@@ -464,12 +473,13 @@ test.describe("core smoke feed and search", () => {
   expect(dataPrefetchRequests).toEqual([])
 })
 
-  test("header search button focuses feed search input", async ({ page }) => {
+  test("non-home header search button opens the feed search input", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
-    await page.goto("/")
+    await page.goto("/about")
     await page.getByRole("button", { name: "글과 태그 검색으로 이동" }).click()
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/")
     await waitForFeedSearchInputFocus(page)
   })
 

@@ -236,17 +236,19 @@ const NavBar = () => {
       </ul>
 
       <div className="authArea">
-        <button
-          type="button"
-          className="searchTrigger"
-          aria-label="글과 태그 검색으로 이동"
-          aria-keyshortcuts="Meta+K Control+K"
-          onClick={requestFocusFeedSearch}
-        >
-          <SearchIcon />
-          <span>글과 태그 검색</span>
-          <kbd>⌘ K</kbd>
-        </button>
+        {router.pathname !== "/" && (
+          <button
+            type="button"
+            className="searchTrigger"
+            aria-label="글과 태그 검색으로 이동"
+            aria-keyshortcuts="Meta+K Control+K"
+            onClick={requestFocusFeedSearch}
+          >
+            <SearchIcon />
+            <span>글과 태그 검색</span>
+            <kbd>⌘ K</kbd>
+          </button>
+        )}
 
         <button
           ref={mobileMenuButtonRef}

@@ -121,21 +121,21 @@ const addEmptyProfileLinksCookie = async (page: Page) => {
 }
 
 test.describe("home feed product redesign", () => {
-  test("1440px 이상 홈은 V4 intro·topics rail·list card 구조를 사용한다", async ({ page }) => {
+  test("1440px 이상 홈은 intro 없이 topics rail·list card 구조를 사용한다", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await mockHomeFeedRedesignEndpoints(page)
 
     await page.goto("/")
 
     await expect(page.locator('[data-ui="feed-home-product-shell"]')).toBeVisible()
-    await expect(page.locator('[data-ui="feed-brand-role"]')).toBeVisible()
+    await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
     await expect(page.getByRole("region", { name: "태그 목록" })).toBeVisible()
     await expect(page.locator('[data-ui="feed-tag-chip-rail"]')).toBeHidden()
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "AquilaLog")
     await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute("content", "AquilaLog")
     await expect(page.locator(".desktopPanel")).toBeVisible()
     await expect(page.locator(".rt")).toBeHidden()
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
+    await expect(page.getByRole("heading", { level: 1, name: "최근 글" })).toBeVisible()
     await expect(page.locator('[data-ui="feed-post-card"]').nth(2)).toBeVisible()
 
     const cardRects = await page.locator('[data-ui="feed-post-card"]').evaluateAll((cards) =>
@@ -278,7 +278,7 @@ test.describe("home feed product redesign", () => {
     await page.goto("/")
 
     await expect(page.locator('[data-ui="feed-tag-chip-rail"]')).toBeVisible()
-    await expect(page.locator('[data-ui="feed-brand-role"]')).toBeVisible()
+    await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
     await expect(page.locator(".desktopPanel")).toBeHidden()
     await expect(page.locator('[data-ui="feed-post-card"]').nth(2)).toBeVisible()
 
