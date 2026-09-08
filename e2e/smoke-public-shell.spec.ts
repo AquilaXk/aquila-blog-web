@@ -126,7 +126,7 @@ test.describe("core smoke public shell", () => {
   )
 
   expect(rootLayoutSource).not.toContain("resolvePublicBlogAppearance")
-  expect(rootLayoutSource).toContain("usePublicAdminProfile(initialAdminProfile")
+  expect(rootLayoutSource).toContain("useAdminProfile(initialAdminProfile")
   expect(headerSource).toContain('data-ui="app-header"')
   expect(headerSource).toContain("z-index: 50;")
   expect(headerSource).toContain("width: min(calc(100% - 40px), 1240px);")

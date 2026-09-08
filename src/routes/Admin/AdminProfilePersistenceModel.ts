@@ -1,10 +1,8 @@
 import { apiFetch, getApiBaseUrl } from "src/apis/backend/client"
-import type { AuthMember } from "src/hooks/useAuthSession"
 import type { ProfileImageSourceSize } from "src/libs/profileImageUpload"
 
 export const PROFILE_UNSAVED_CHANGES_MESSAGE = "저장하지 않은 변경 사항이 있습니다. 이 페이지를 떠날까요?"
 export const PROFILE_IMAGE_DRAFT_DEFAULT_SOURCE_SIZE: ProfileImageSourceSize = { width: 1, height: 1 }
-export const PROFILE_IMAGE_UPLOAD_RETRY_DELAY_MS = 700
 export const PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS = { "X-Aquila-CSRF": "1" } as const
 
 export type ProfileImageHistoryItem = {
@@ -22,11 +20,6 @@ export type ProfileImageHistoryItem = {
 type ProfileImageHistoryResponse = {
   images?: ProfileImageHistoryItem[]
 }
-
-export const sleep = (ms: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
 
 export const readImageSourceSizeFromFile = (file: File): Promise<ProfileImageSourceSize> =>
   new Promise((resolve, reject) => {
@@ -101,9 +94,3 @@ export const deletePreviousProfileImage = async (memberId: number, fileId: numbe
     method: "DELETE",
   })
 }
-
-export const selectPreviousProfileImage = async (memberId: number, imageUrl: string): Promise<AuthMember> =>
-  await apiFetch<AuthMember>(`/member/api/v1/adm/members/${memberId}/profileImgUrl`, {
-    method: "PATCH",
-    body: JSON.stringify({ profileImgUrl: imageUrl }),
-  })
