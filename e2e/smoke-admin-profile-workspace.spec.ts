@@ -26,7 +26,8 @@ for (const field of ["한 줄 역할", "계정 이름"]) {
     await page.goto("/admin/profile")
     await page.getByLabel(field, { exact: true }).fill("Unsaved value")
     await page.getByRole("button", { name: "초안 저장", exact: true }).click()
-    await expect(page.getByText(/저장 실패:.*Profile conflict/)).toBeVisible()
+    // 서버의 영문 원문 대신 API 클라이언트가 정제한 충돌 안내를 표시한다.
+    await expect(page.getByText(/저장 실패: 요청 충돌이 발생했습니다\. 다시 시도해주세요\./)).toBeVisible()
     await expect(page.getByRole("button", { name: "초안 저장", exact: true })).toBeEnabled()
     expect(requests).toEqual([field === "계정 이름" ? "PATCH" : "PUT"])
     await expect(page.getByLabel(field, { exact: true })).toHaveValue("Unsaved value")
