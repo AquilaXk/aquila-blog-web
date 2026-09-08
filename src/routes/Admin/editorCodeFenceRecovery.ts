@@ -272,27 +272,6 @@ export const hasEmptyFencedCodeBlockBody = (content: string) =>
 export const contentHasFencedCodeBlocks = (content: string) =>
   parseFencedCodeBlocks(content.replace(/\r\n?/g, "\n")).length > 0
 
-/**
- * Empty admin prose-only html is content replacement, not code-fence recovery.
- * Public API confirmation or restored fenced blocks are required for recovered:true.
- */
-export const shouldMarkCodeFenceRecovered = ({
-  adminWasEmpty,
-  content,
-  source,
-  publicFallbackSucceeded,
-}: {
-  adminWasEmpty: boolean
-  content: string
-  source: CodeFenceRecoverySource
-  publicFallbackSucceeded: boolean
-}) => {
-  if (!isCodeFenceRecoveryComplete(content)) return false
-  if (!adminWasEmpty) return true
-  if (source === "publicApi" && publicFallbackSucceeded) return true
-  return contentHasFencedCodeBlocks(content)
-}
-
 /** Fetch public detail only when admin markdown has empty fenced bodies (not wholly cleared). */
 export const shouldFetchPublicContentForCodeFenceRecovery = (adminContent: string) =>
   adminContent.trim().length > 0 && hasEmptyFencedCodeBlockBody(adminContent)
@@ -484,7 +463,15 @@ export const resolveEditorCodeFenceRecovery = ({
   publicFallbackSucceeded: boolean
 }): CodeFenceRecoveryAttempt => {
   const needsRecovery = adminContentNeedsCodeFenceRecovery(adminContent)
-  const adminWasEmpty = adminContent.trim().length === 0
+  if (adminContent.trim().length === 0) {
+    // 비운 정본 Markdown은 손상이 아니므로 파생된 HTML·공개 본문으로 되살리지 않는다.
+    return {
+      content: adminContent,
+      recovered: false,
+      source: "unrecovered",
+      rejectStoredContentHtml: true,
+    }
+  }
 
   if (!needsRecovery) {
     return {
@@ -521,12 +508,7 @@ export const resolveEditorCodeFenceRecovery = ({
     ) {
       return {
         content: metadataMerged,
-        recovered: shouldMarkCodeFenceRecovered({
-          adminWasEmpty,
-          content: metadataMerged,
-          source: "publicApi",
-          publicFallbackSucceeded: true,
-        }),
+        recovered: isCodeFenceRecoveryComplete(metadataMerged),
         source: "publicApi",
         rejectStoredContentHtml,
       }
@@ -537,7 +519,6 @@ export const resolveEditorCodeFenceRecovery = ({
     htmlRecoveryIsTrustworthy &&
     fromHtml.recovered &&
     isCodeFenceRecoveryComplete(fromHtml.content) &&
-    !adminWasEmpty &&
     !(
       publicFallbackSucceeded &&
       typeof publicContent === "string" &&
@@ -546,12 +527,7 @@ export const resolveEditorCodeFenceRecovery = ({
   ) {
     return {
       content: fromHtml.content,
-      recovered: shouldMarkCodeFenceRecovered({
-        adminWasEmpty,
-        content: fromHtml.content,
-        source: "contentHtml",
-        publicFallbackSucceeded,
-      }),
+      recovered: isCodeFenceRecoveryComplete(fromHtml.content),
       source: "contentHtml",
       rejectStoredContentHtml: false,
     }
@@ -566,12 +542,7 @@ export const resolveEditorCodeFenceRecovery = ({
     ) {
       return {
         content: fromPublic.content,
-        recovered: shouldMarkCodeFenceRecovered({
-          adminWasEmpty,
-          content: fromPublic.content,
-          source: "publicApi",
-          publicFallbackSucceeded: true,
-        }),
+        recovered: isCodeFenceRecoveryComplete(fromPublic.content),
         source: "publicApi",
         rejectStoredContentHtml,
       }
@@ -615,12 +586,7 @@ export const resolveEditorCodeFenceRecovery = ({
     if (bestCandidate) {
       return {
         content: bestCandidate.content,
-        recovered: shouldMarkCodeFenceRecovered({
-          adminWasEmpty,
-          content: bestCandidate.content,
-          source: bestCandidate.source,
-          publicFallbackSucceeded: true,
-        }),
+        recovered: isCodeFenceRecoveryComplete(bestCandidate.content),
         source: bestCandidate.source,
         rejectStoredContentHtml,
       }
@@ -633,12 +599,7 @@ export const resolveEditorCodeFenceRecovery = ({
   ) {
     return {
       content: fromHtml.content,
-      recovered: shouldMarkCodeFenceRecovered({
-        adminWasEmpty,
-        content: fromHtml.content,
-        source: "contentHtml",
-        publicFallbackSucceeded,
-      }),
+      recovered: isCodeFenceRecoveryComplete(fromHtml.content),
       source: "contentHtml",
       rejectStoredContentHtml: false,
     }

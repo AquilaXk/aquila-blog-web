@@ -130,9 +130,10 @@ test.describe("editor code fence recovery", () => {
       publicFallbackSucceeded: false,
     })
 
-    expect(result.source).toBe("contentHtml")
+    expect(result.source).toBe("unrecovered")
     expect(result.recovered).toBe(false)
-    expect(result.content).toBe(proseOnlyHtml)
+    expect(result.content).toBe("")
+    expect(result.rejectStoredContentHtml).toBe(true)
   })
 
   test("telemetry treats wholly empty admin content as hadEmptyFence", () => {
@@ -536,9 +537,10 @@ test.describe("editor code fence recovery", () => {
       publicFallbackSucceeded: false,
     })
 
-    expect(result.source).toBe("contentHtml")
+    expect(result.source).toBe("unrecovered")
     expect(result.recovered).toBe(false)
-    expect(result.content).toBe("intro without fenced code")
+    expect(result.content).toBe("")
+    expect(result.rejectStoredContentHtml).toBe(true)
   })
 
   test("fetches public only for empty-fence admin, not wholly cleared admin", () => {
@@ -582,11 +584,31 @@ test.describe("editor code fence recovery", () => {
       publicFallbackSucceeded: false,
     })
 
-    expect(result.source).toBe("contentHtml")
-    expect(result.recovered).toBe(true)
-    expect(result.content).toContain("fun example() = Unit")
-    expect(result.rejectStoredContentHtml).toBe(false)
+    expect(result.source).toBe("unrecovered")
+    expect(result.recovered).toBe(false)
+    expect(result.content).toBe("")
+    expect(result.rejectStoredContentHtml).toBe(true)
   })
+
+  for (const adminContent of ["", "   \n"]) {
+    test(`keeps cleared canonical Markdown through metadata loading (${JSON.stringify(adminContent)})`, () => {
+      const result = resolveEditorCodeFenceRecovery({
+        adminContent,
+        contentHtmlBodyCandidate: filledFenceContent,
+        publicContent: filledFenceContent,
+        publicFallbackSucceeded: true,
+      })
+      expect(result.content).toBe(adminContent)
+      expect(result.recovered).toBe(false)
+      const html = resolveLoadedPostContentHtml({
+        postContentHtml: "<pre><code>old code</code></pre>",
+        publicContentHtml: "<pre><code>old code</code></pre>",
+        fenceRecovery: result,
+      })
+      expect(html).toBeNull()
+      expect(resolveEditorMetaSnapshot(result.content, html).body.trim()).toBe("")
+    })
+  }
 
   test("treats missing public fence as html conflict for extra admin empty fences", () => {
     const adminWithExtraEmptyFence = [
