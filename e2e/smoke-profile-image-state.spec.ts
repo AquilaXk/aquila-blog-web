@@ -40,6 +40,41 @@ test("profile image renders a placeholder for an empty canonical source", async 
   await expect(page.getByTestId("qa-profile-image")).not.toHaveAttribute("src")
 })
 
+test("small profile image uses a bounded unavailable icon for empty and broken sources", async ({ page }) => {
+  await mockQaImage(page)
+  await page.goto(qaUrl())
+
+  for (const action of ["QA 이미지 비우기", "QA 이미지 실패"]) {
+    await page.getByRole("button", { name: action }).click()
+    const smallImage = page.getByTestId("qa-profile-image-small")
+    const icon = smallImage.locator("svg")
+
+    await expect(smallImage).toHaveAttribute("role", "img")
+    await expect(smallImage).toHaveAttribute(
+      "aria-label",
+      "QA small administrator profile 이미지를 불러올 수 없습니다."
+    )
+    await expect(icon).toHaveAttribute("aria-hidden", "true")
+    await expect(icon).toHaveAttribute("focusable", "false")
+    await expect(icon).toBeVisible()
+    await expect(smallImage.getByText("이미지 없음", { exact: true })).toHaveCount(0)
+
+    const bounds = await icon.evaluate((element) => {
+      const iconRect = element.getBoundingClientRect()
+      const avatarRect = element.parentElement!.getBoundingClientRect()
+      return {
+        width: iconRect.width,
+        height: iconRect.height,
+        fits: iconRect.left >= avatarRect.left && iconRect.right <= avatarRect.right &&
+          iconRect.top >= avatarRect.top && iconRect.bottom <= avatarRect.bottom,
+      }
+    })
+    expect(bounds.width).toBeGreaterThan(0)
+    expect(bounds.height).toBeGreaterThan(0)
+    expect(bounds.fits).toBe(true)
+  }
+})
+
 test("profile image does not request an alternate URL after a post-hydration failure", async ({ page }) => {
   const requests = await mockQaImage(page)
   const alternateRequests: string[] = []
