@@ -72,7 +72,7 @@ test.describe("core smoke feed and search", () => {
   await expect(page.locator('[data-ui="feed-profile-summary"]')).toHaveCount(0)
   await expect(page.locator('section[aria-label="태그 목록"]')).toBeVisible()
   await expect(page.locator('[data-ui="feed-tag-chip-rail"]')).toBeHidden()
-  await expect(page.locator(".thumbnail").first()).toBeVisible()
+  await expect(page.locator('[data-ui="feed-post-card"] img')).toHaveCount(0)
   await expect(page.locator(".rt")).toBeHidden()
 
   const homeStyles = await page.evaluate(() => {
@@ -92,11 +92,11 @@ test.describe("core smoke feed and search", () => {
     }
   })
 
-  expect(homeStyles.firstCard?.backgroundColor).toBe("rgb(247, 247, 245)")
-  expect(homeStyles.firstCard?.borderBottomWidth).toBe("1px")
+  expect(homeStyles.firstCard?.backgroundColor).toBe("rgba(0, 0, 0, 0)")
+  expect(homeStyles.firstCard?.borderBottomWidth).toBe("0px")
 })
 
-  test("피드 카드 thumbnail 로드 실패는 빈 사각형 대신 fallback cover를 렌더한다", async ({ page }) => {
+  test("editorial entries do not request thumbnails or render cover substitutes", async ({ page }) => {
   let externalImageRequests = 0
   await mockFeedEndpoints(page)
   await page.route("**/post/api/v1/posts/feed**", async (route) => {
@@ -116,8 +116,8 @@ test.describe("core smoke feed and search", () => {
   await page.goto("/")
 
   const firstCard = page.locator('[data-ui="feed-post-card"]').first()
-  await expect(firstCard.locator(".imageFallback")).toBeVisible()
-  await expect(firstCard.locator(".imageFallback")).toContainText("깨진 썸네일 fallback")
+  await expect(firstCard.getByRole("heading")).toContainText("깨진 썸네일 fallback")
+  await expect(firstCard.locator("img, .imageFallback")).toHaveCount(0)
   expect(externalImageRequests).toBe(0)
 })
 
@@ -145,9 +145,8 @@ test.describe("core smoke feed and search", () => {
   const firstCard = page.locator('[data-ui="feed-post-card"]').first()
   await expect(firstCard.locator(".tagRow")).toHaveCount(0)
   await expect(firstCard.locator(".summary")).toHaveCount(0)
-  await expect(firstCard.locator(".imageFallback")).toBeVisible()
-  await expect(firstCard.locator(".imageFallback")).toContainText("빈 표시값 카드")
-  await expect(firstCard.locator(".imageFallback")).not.toContainText("Engineering")
+  await expect(firstCard.locator("img, .imageFallback")).toHaveCount(0)
+  await expect(firstCard.getByRole("heading")).toContainText("빈 표시값 카드")
   await expect(firstCard).not.toContainText("핵심 내용을 정리 중입니다.")
 })
 

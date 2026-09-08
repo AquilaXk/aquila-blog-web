@@ -164,17 +164,32 @@ test.describe("home feed product redesign", () => {
     expect(new Set(cardRects.map((rect) => rect.left)).size).toBe(1)
     expect(Math.min(...cardRects.map((rect) => rect.width))).toBeGreaterThanOrEqual(420)
   })
-  test("브랜드 cover fallback은 썸네일 없는 글도 통일된 기술 블로그 카드로 보여준다", async ({ page }) => {
+  test("editorial entries show title, summary, date and author without card decoration", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await mockHomeFeedRedesignEndpoints(page)
 
     await page.goto("/")
 
-    const fallbackCover = page.locator('[data-ui="feed-card-brand-cover"]').filter({
+    const entry = page.locator('[data-ui="feed-post-card"]').filter({
       hasText: "JWT VS Session",
     })
-    await expect(fallbackCover).toBeVisible()
-    await expect(fallbackCover.getByText("Security", { exact: true })).toBeVisible()
+    await expect(entry).toBeVisible()
+    await expect(entry.getByRole("heading", { name: "JWT VS Session" })).toBeVisible()
+    await expect(entry.locator(".summary")).toBeVisible()
+    await expect(entry.locator(".meta")).toContainText("Date:")
+    await expect(entry.locator(".meta")).toContainText("Author:")
+    await expect(entry.locator("img, .rowIndex, .tagRow, .side, .arrowBtn, .like")).toHaveCount(0)
+    await expect(entry).not.toContainText("views")
+    await expect(entry).not.toContainText("Reading Time")
+    await expect(entry.getByRole("heading")).toHaveCSS("font-size", "24px")
+    await expect(entry.getByRole("heading")).toHaveCSS("font-weight", "600")
+    await expect(entry.locator(".summary")).toHaveCSS("font-size", "16px")
+    await expect(entry.locator(".summary")).toHaveCSS("line-height", "26.4px")
+    await expect(entry.locator(".summary")).toHaveCSS("-webkit-line-clamp", "5")
+    await expect(entry.locator(".meta")).toHaveCSS("font-size", "14px")
+    await expect(entry).toHaveCSS("box-shadow", "none")
+    await expect(entry).toHaveCSS("border-top-width", "0px")
+    await expect(page.locator("body")).toHaveCSS("font-family", /-apple-system/)
   })
 
   test("저장용 category prefix는 카드와 cover 라벨에 노출하지 않는다", async ({ page }) => {
@@ -197,8 +212,7 @@ test.describe("home feed product redesign", () => {
       hasText: "Spring 운영 패턴",
     })
     await expect(categorizedCard).toBeVisible()
-    await expect(categorizedCard.getByText("SPRING", { exact: true })).toBeVisible()
-    await expect(categorizedCard.getByText("Spring", { exact: true })).toBeVisible()
+    await expect(categorizedCard.locator(".tagRow")).toHaveCount(0)
     await expect(categorizedCard.getByText("monitor::Spring", { exact: true })).toHaveCount(0)
   })
 
@@ -218,11 +232,11 @@ test.describe("home feed product redesign", () => {
 
     await page.goto("/")
 
-    const pinnedCover = page.locator('[data-ui="feed-card-brand-cover"]').filter({
+    const pinnedCover = page.locator('[data-ui="feed-post-card"]').filter({
       hasText: "Pinned SSE 운영 노트",
     })
     await expect(pinnedCover).toBeVisible()
-    await expect(pinnedCover.getByText("SSE", { exact: true })).toBeVisible()
+    await expect(pinnedCover.locator("img, .tagRow")).toHaveCount(0)
     await expect(pinnedCover.getByText("Pinned", { exact: true })).toHaveCount(0)
   })
 
@@ -234,7 +248,7 @@ test.describe("home feed product redesign", () => {
     await page.goto("/")
 
     const intro = page.locator('[data-ui="feed-home-product-shell"] .introCopy')
-    await expect(intro).toBeVisible()
+    await expect(intro).toHaveCount(0)
     await expect(intro.locator("a")).toHaveCount(0)
     await expect(page.locator('[data-ui="feed-contact-links"]')).toHaveCount(0)
     await expect(page.locator('[data-ui="feed-service-links"]')).toHaveCount(0)
@@ -260,6 +274,7 @@ test.describe("home feed product redesign", () => {
     const restoreSource = readFileSync(path.join(feedRoot, "FeedExplorerRestoreModel.ts"), "utf8")
     const postListSource = readFileSync(path.join(feedRoot, "PostList/index.tsx"), "utf8")
     const postCardSource = readFileSync(path.join(feedRoot, "PostList/PostCard.tsx"), "utf8")
+    const pinnedPostsSource = readFileSync(path.join(feedRoot, "PostList/PinnedPosts.tsx"), "utf8")
 
     expect(restoreSource).toContain("category?: string[]")
     expect(restoreSource.match(/post\.category\?\.length \? \{ category: post\.category \}/g)).toHaveLength(2)
@@ -268,7 +283,9 @@ test.describe("home feed product redesign", () => {
     expect(postListSource).not.toContain("arePostsEqual")
     expect(postCardSource).toContain("export default memo(PostCard)")
     expect(postCardSource).not.toContain("arePostCardPropsEqual")
-    expect(postCardSource).toContain("INTERNAL_CATEGORY_TAGS")
+    expect(postCardSource).not.toContain("INTERNAL_CATEGORY_TAGS")
+    expect(pinnedPostsSource).toContain("export default memo(PinnedPosts)")
+    expect(pinnedPostsSource).not.toContain("arePinnedPostsEqual")
   })
 
   test("모바일 홈은 태그 칩과 카드 1열을 유지하고 가로 overflow를 만들지 않는다", async ({ page }) => {

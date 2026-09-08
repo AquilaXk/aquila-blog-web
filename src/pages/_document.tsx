@@ -9,7 +9,6 @@ import Document, {
 } from "next/document"
 import React from "react"
 import { CONFIG } from "site.config"
-import { pretendard } from "src/assets"
 import createEmotionCache from "src/libs/emotion/createEmotionCache"
 import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import {
@@ -107,7 +106,7 @@ class MyDocument extends Document<SurfaceAwareDocumentProps> {
             </>
           )}
         </Head>
-        <body className={pretendard.className}>
+        <body>
           <script dangerouslySetInnerHTML={{ __html: CLIENT_RUNTIME_RECOVERY_SCRIPT }} />
           <Main />
           <NextScript />

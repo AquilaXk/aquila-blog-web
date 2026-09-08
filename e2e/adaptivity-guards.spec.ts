@@ -23,7 +23,7 @@ test.describe("adaptivity hit-area", () => {
 
     const firstCard = page.locator('[data-ui="feed-post-card"]').first()
     await expect(firstCard).toBeVisible()
-    await expectMinTouchTarget(page, firstCard.locator(".arrowBtn").first(), "feed card arrow")
+    await expectMinTouchTarget(page, firstCard, "post entry link")
   })
 })
 
@@ -67,18 +67,18 @@ test.describe("adaptivity reduced-motion", () => {
       .poll(async () => page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches))
       .toBe(true)
 
-    const thumbnailBudget = await readMotionBudget(
+    const titleBudget = await readMotionBudget(
       page,
-      '[data-ui="feed-post-card"] article > .side .thumbnail img'
+      '[data-ui="feed-post-card"] h2'
     )
-    expect(thumbnailBudget, `thumbnail budget=${JSON.stringify(thumbnailBudget)}`).not.toBeNull()
+    expect(titleBudget, `title budget=${JSON.stringify(titleBudget)}`).not.toBeNull()
     expect(
-      isNearZeroDuration(thumbnailBudget!.transitionDuration),
-      `thumbnail transitionDuration=${thumbnailBudget!.transitionDuration}`
+      isNearZeroDuration(titleBudget!.transitionDuration),
+      `title transitionDuration=${titleBudget!.transitionDuration}`
     ).toBe(true)
     expect(
-      isNearZeroDuration(thumbnailBudget!.animationDuration),
-      `thumbnail animationDuration=${thumbnailBudget!.animationDuration}`
+      isNearZeroDuration(titleBudget!.animationDuration),
+      `title animationDuration=${titleBudget!.animationDuration}`
     ).toBe(true)
 
     const globalSample = await page.evaluate(() => {

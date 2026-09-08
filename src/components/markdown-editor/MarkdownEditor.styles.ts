@@ -318,8 +318,8 @@ export const LiveEditorBody = styled.div`
 
   .cm-live-heading {
     color: #f3f7ff;
-    font-family: Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-weight: 850;
+    font-family: var(--aq-font-sans);
+    font-weight: 600;
     letter-spacing: -0.035em;
   }
 

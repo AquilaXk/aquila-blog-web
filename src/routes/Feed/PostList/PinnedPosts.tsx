@@ -24,33 +24,7 @@ const PinnedPosts: React.FC<Props> = ({ posts }) => {
   )
 }
 
-const arePinnedPostsEqual = (prev: Props, next: Props) => {
-  if (prev.posts.length !== next.posts.length) return false
-  for (let i = 0; i < prev.posts.length; i += 1) {
-    const prevPost = prev.posts[i]
-    const nextPost = next.posts[i]
-    if (prevPost.id !== nextPost.id) return false
-    if (prevPost.modifiedTime !== nextPost.modifiedTime) return false
-    if (prevPost.likesCount !== nextPost.likesCount) return false
-    if (prevPost.hitCount !== nextPost.hitCount) return false
-    if (prevPost.title !== nextPost.title) return false
-    if (prevPost.summary !== nextPost.summary) return false
-    if (prevPost.thumbnail !== nextPost.thumbnail) return false
-    if (!areStringArraysEqual(prevPost.tags, nextPost.tags)) return false
-    if (!areStringArraysEqual(prevPost.category, nextPost.category)) return false
-  }
-  return true
-}
-
-const areStringArraysEqual = (prevValues?: string[], nextValues?: string[]) => {
-  if (prevValues === nextValues) return true
-  if (!prevValues || !nextValues) return !prevValues?.length && !nextValues?.length
-  if (prevValues.length !== nextValues.length) return false
-
-  return prevValues.every((value, index) => value === nextValues[index])
-}
-
-export default memo(PinnedPosts, arePinnedPostsEqual)
+export default memo(PinnedPosts)
 
 const StyledWrapper = styled.div`
   position: relative;
