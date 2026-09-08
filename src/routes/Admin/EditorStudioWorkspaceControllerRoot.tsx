@@ -17,14 +17,6 @@ import {
   normalizeCategoryValue,
 } from "src/libs/utils"
 import {
-  consumeGuardOnExpectedUpdate,
-  createMarkdownEditorLoadGuardState,
-  markGuardEmptyUpdateIgnored,
-  restoreMarkdownEditorCodeLossUpdate,
-  shouldIgnoreMarkdownEditorEmptyUpdate,
-  type MarkdownEditorLoadGuardState,
-} from "./markdownLoadSyncGuard"
-import {
   toFlags,
   toVisibility,
   type EditorMode,
@@ -170,11 +162,6 @@ export const EditorStudioWorkspaceController = ({
     fingerprint: "",
     firstImage: "",
   })
-  const markdownEditorLoadGuardStateRef = useRef<MarkdownEditorLoadGuardState>({
-    expectedBody: "",
-    ignoreUntilMs: 0,
-    ignoredInitialEmpty: false,
-  })
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
@@ -197,39 +184,8 @@ export const EditorStudioWorkspaceController = ({
       return
     }
 
-    let nextGuardState = consumeGuardOnExpectedUpdate(markdownEditorLoadGuardStateRef.current, nextMarkdown)
-
-    if (shouldIgnoreMarkdownEditorEmptyUpdate({
-      nextMarkdown,
-      currentMarkdown: previousMarkdown,
-      guardState: nextGuardState,
-    })) {
-      markdownEditorLoadGuardStateRef.current = markGuardEmptyUpdateIgnored(nextGuardState)
-      return
-    }
-
-    const restoredCodeLossUpdate = restoreMarkdownEditorCodeLossUpdate({
-      nextMarkdown,
-      currentMarkdown: previousMarkdown,
-      guardState: nextGuardState,
-      editorFocused: meta?.editorFocused === true,
-    })
-
-    if (restoredCodeLossUpdate.changed) {
-      const restoredMarkdown = restoredCodeLossUpdate.markdown
-      markdownEditorLoadGuardStateRef.current = consumeGuardOnExpectedUpdate(nextGuardState, restoredMarkdown)
-      postContentLiveRef.current = restoredMarkdown
-      setPostContent(restoredMarkdown)
-      return
-    }
-
+    // 외부 문서 동기화는 편집기에서 제외하므로 빈 문자열도 실제 입력으로 반영한다.
     if (meta?.editorFocused) {
-      nextGuardState = {
-        ...nextGuardState,
-        ignoreUntilMs: 0,
-        ignoredInitialEmpty: true,
-      }
-      markdownEditorLoadGuardStateRef.current = nextGuardState
       postContentLiveRef.current = nextMarkdown
       startPostContentTransition(() => {
         setPostContent(nextMarkdown)
@@ -237,7 +193,6 @@ export const EditorStudioWorkspaceController = ({
       return
     }
 
-    markdownEditorLoadGuardStateRef.current = nextGuardState
     postContentLiveRef.current = nextMarkdown
     setPostContent(nextMarkdown)
   }, [startPostContentTransition])
@@ -365,7 +320,6 @@ export const EditorStudioWorkspaceController = ({
 
   const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState, contentHtml?: string | null) => {
     const snapshot = resolveEditorMetaSnapshot(content, contentHtml)
-    markdownEditorLoadGuardStateRef.current = createMarkdownEditorLoadGuardState(snapshot.body)
     postContentLiveRef.current = snapshot.body
     setPostContent(snapshot.body)
     setPostSummary(canonicalSummary.summary)

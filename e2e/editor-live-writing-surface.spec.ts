@@ -256,6 +256,18 @@ test.describe("live Markdown writing surface", () => {
     expect(await readMarkdown(page)).toBe(liveMarkdown)
   })
 
+  test("preserves an intentional clear immediately after loading an existing post", async ({ page }) => {
+    await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
+    await routeEditorPost(page, 770, liveMarkdown)
+    await page.goto("/admin/editor/770")
+    await expect(page.locator("#post-title")).toHaveValue("Existing post")
+    await expect.poll(() => readMarkdown(page)).toBe(liveMarkdown)
+    await editorContent(page).fill("")
+    await expect.poll(() => readMarkdown(page)).toBe("")
+    await editorContent(page).fill("New manuscript")
+    await expect.poll(() => readMarkdown(page)).toBe("New manuscript")
+  })
+
   test("groups toolbar actions without overflow and preserves the editor selection", async ({ page }) => {
     await routeAuthenticatedEditor(page, "Hello", "Toolbar grouping")
     await page.goto("/admin/editor/new?source=local-draft")
