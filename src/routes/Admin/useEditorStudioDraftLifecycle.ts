@@ -1,6 +1,8 @@
 import type { NextRouter } from "next/router"
 import {
   useCallback,
+  useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -236,6 +238,13 @@ export const useEditorStudioDraftLifecycle = ({
   toEditorPostRoute,
   toVisibility,
 }: UseEditorStudioDraftLifecycleParams) => {
+  const loadGenerationRef = useRef(0)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
   const {
     localDraftFingerprint,
     localDraftSource,
@@ -245,7 +254,7 @@ export const useEditorStudioDraftLifecycle = ({
     dismissLocalDraftRestoreSuggestion,
     signalLocalDraftRemoved,
     saveLocalDraft,
-    restoreLocalDraft,
+    restoreLocalDraft: restoreStoredLocalDraft,
     clearLocalDraft,
     signalLocalDraftBaselineReady,
     beginLocalDraftPostLoad,
@@ -300,7 +309,15 @@ export const useEditorStudioDraftLifecycle = ({
     setPublishStatus,
   })
 
+  const restoreLocalDraft = useCallback(() => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
+    restoreStoredLocalDraft()
+  }, [restoreStoredLocalDraft, setLoadingKey])
+
   const switchToCreateMode = useCallback((options?: { keepContent?: boolean }) => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
     const keepContent = options?.keepContent ?? true
     activateComposeSurface()
     setEditorMode("create")
@@ -346,6 +363,7 @@ export const useEditorStudioDraftLifecycle = ({
     setEditorMode,
     setIsTempDraftMode,
     setMobileComposeStep,
+    setLoadingKey,
     setPostCategory,
     setPostContent,
     setPostId,
@@ -438,12 +456,16 @@ export const useEditorStudioDraftLifecycle = ({
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
   ) => {
+    // 늦은 응답은 새 조회·새 글·복원 작업이 소유한 원고와 상태를 변경하지 않는다.
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postOne")
       const normalizedTargetPostId = targetPostId.trim()
       // 빈 본문도 현재 원문이다. 조회 실패를 과거 SSR 본문으로 대체하지 않는다.
       const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
+      if (!isCurrentLoad()) return
       let resolvedPost = post
 
       const adminContent = resolvedPost.content ?? ""
@@ -481,6 +503,7 @@ export const useEditorStudioDraftLifecycle = ({
         }
       }
 
+      if (!isCurrentLoad()) return
       const fenceRecovery = resolveEditorCodeFenceRecovery({
         adminContent,
         adminBodyForSync: adminBodySnapshot.body,
@@ -518,11 +541,12 @@ export const useEditorStudioDraftLifecycle = ({
       signalLocalDraftBaselineReady()
       setResult(pretty(resolvedPost))
     } catch (error) {
+      if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
       setResult(pretty({ error: message }))
     } finally {
       endLocalDraftPostLoad()
-      setLoadingKey("")
+      if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
     applyLoadedPostContext,
@@ -559,6 +583,8 @@ export const useEditorStudioDraftLifecycle = ({
     source?: string
     returnTo?: string
   }) => {
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postTemp")
@@ -569,6 +595,7 @@ export const useEditorStudioDraftLifecycle = ({
         })
       }
       const response = await tempPostRequestRef.current
+      if (!isCurrentLoad()) return
       const tempPost = response.data
       if (options?.redirectToEditor && tempPost.id) {
         const query = new URLSearchParams()
@@ -604,13 +631,14 @@ export const useEditorStudioDraftLifecycle = ({
       }
       setResult(pretty(response))
     } catch (error) {
+      if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
       setPublishStatus({ tone: "error", text: `새 글 불러오기 실패: ${message}` }, "page")
       setResult(pretty({ error: message }))
       setIsNewEditorBootstrapPending(false)
     } finally {
       endLocalDraftPostLoad()
-      setLoadingKey("")
+      if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
     applyLoadedPostContext,
