@@ -104,7 +104,7 @@ const routeAuthenticatedEditor = async (
   )
 }
 
-const routeEditorPost = async (page: Page, postId: number, markdown: string) => {
+const routeEditorPost = async (page: Page, postId: number, markdown: string, tempDraft = false) => {
   const post = {
     id: postId,
     title: "Existing post",
@@ -114,7 +114,7 @@ const routeEditorPost = async (page: Page, postId: number, markdown: string) => 
     summaryIntent: { kind: "manual", summary: "Existing summary" },
     published: false,
     listed: false,
-    tempDraft: false,
+    tempDraft,
     version: 1,
   }
   await page.route(`**/post/api/v1/adm/posts/${postId}`, async (route) => fulfillJson(route, post))
@@ -828,6 +828,35 @@ test.describe("live Markdown writing surface", () => {
     await expect(dialog.getByRole("button", { name: "닫기" })).toBeVisible()
     await expect(dialog.getByRole("button", { name: /^(발행하기|새 글 작성|변경 반영)$/ })).toBeVisible()
     await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
+  })
+
+  test("a delayed temporary-post publish preserves a newer visibility selection", async ({ page }) => {
+    const postId = 771
+    await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
+    await routeEditorPost(page, postId, liveMarkdown, true)
+    await page.route("**/api/revalidate", (route) => fulfillJson(route, { revalidated: true }))
+    let pendingWrite: Route | undefined
+    await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback()
+        return
+      }
+      pendingWrite = route
+    })
+    await page.goto(`/admin/editor/${postId}`)
+    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
+    await dialog.getByRole("button", { name: /전체 공개/ }).click()
+    await dialog.getByRole("button", { name: /^(발행하기|새 글 작성)$/ }).click()
+    await expect.poll(() => pendingWrite?.request().postDataJSON().published).toBe(true)
+    await dialog.getByRole("button", { name: /비공개/ }).click()
+    await fulfillJson(pendingWrite!, {
+      resultCode: "200-1", msg: "saved",
+      data: { id: postId, version: 2, summary: "Existing summary", summarySource: "MANUAL" },
+    })
+    await expect(dialog).toHaveCount(0)
+    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    await expect(dialog.getByRole("button", { name: /비공개/ })).toHaveAttribute("aria-pressed", "true")
   })
 
   test("a failed public refresh does not report a committed update as a failed save", async ({ page }) => {

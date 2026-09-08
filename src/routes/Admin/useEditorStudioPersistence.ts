@@ -126,7 +126,6 @@ type UseEditorStudioPersistenceParams = {
   setPostSummary: StudioSetState<string>
   setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
   setSummaryIntent: StudioSetState<SummaryIntent>
-  setPostVisibility: StudioSetState<PostVisibility>
   setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
   setLocalDraftSlotLabel: StudioSetState<string>
@@ -211,7 +210,6 @@ export const useEditorStudioPersistence = ({
   setPostSummary,
   setPostSummarySource,
   setSummaryIntent,
-  setPostVisibility,
   setPreviewThumbnailSourceUrl,
   setPublishStatus,
   setResult,
@@ -659,7 +657,6 @@ export const useEditorStudioPersistence = ({
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
       const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
-      setPostVisibility(postVisibility)
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
@@ -720,7 +717,6 @@ export const useEditorStudioPersistence = ({
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
     setPostVersion,
-    setPostVisibility,
     setPublishStatus,
     setResult,
     toFlags,

@@ -661,7 +661,6 @@ export const EditorStudioWorkspaceController = ({
     setPostSummary,
     setPostSummarySource,
     setSummaryIntent,
-    setPostVisibility,
     setKnownTags,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
