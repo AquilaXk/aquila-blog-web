@@ -5,7 +5,7 @@ import type { AuthMember } from "src/hooks/useAuthSession"
 import type { ProfileWorkspaceResponse } from "src/libs/profileWorkspace"
 import { createQueryClient } from "src/libs/react-query"
 import { readAdminProtectedBootstrap } from "src/libs/server/adminPage"
-import { guardAdminRequest } from "src/libs/server/adminGuard"
+import { guardAdminRequest, shouldBypassAdminGuardForQa } from "src/libs/server/adminGuard"
 import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { fetchServerProfileWorkspace } from "src/libs/server/profileWorkspace"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
@@ -70,13 +70,19 @@ export const getServerSideProps: GetServerSideProps<AdminProfileWorkspacePagePro
 
     initialMember = guardResult.value.member
     authDurationMs = guardResult.durationMs
-    authDescription = "fallback"
+    authDescription = "guard"
 
-    const workspaceResult = await timed(() => fetchServerProfileWorkspace(req, initialMember.id))
-    if (!workspaceResult.ok) throw workspaceResult.error
-    initialWorkspace = workspaceResult.value
-    workspaceDurationMs = workspaceResult.durationMs
-    workspaceDescription = initialWorkspace ? "ok" : "empty"
+    if (shouldBypassAdminGuardForQa()) {
+      // 격리 QA는 브라우저 요청을 검증하며 실제 서버 조회 실패를 숨기지 않는다.
+      initialWorkspace = null
+      workspaceDescription = "isolated-qa"
+    } else {
+      const workspaceResult = await timed(() => fetchServerProfileWorkspace(req, initialMember.id))
+      if (!workspaceResult.ok) throw workspaceResult.error
+      initialWorkspace = workspaceResult.value
+      workspaceDurationMs = workspaceResult.durationMs
+      workspaceDescription = "ok"
+    }
   }
 
   queryClient.setQueryData(queryKey.authMeProbe(), true)
