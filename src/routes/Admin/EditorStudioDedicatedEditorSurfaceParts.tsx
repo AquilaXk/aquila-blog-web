@@ -686,36 +686,6 @@ export const EditorInspector = styled.aside`
   }
 `;
 
-export const EditorInspectorPreview = styled.div`
-  display: grid;
-  border: 1px solid ${({ theme }) => theme.publicDesign.border};
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
-
-  div {
-    height: 112px;
-    padding: 14px;
-    background: #0f1728;
-    color: #88a9e8;
-    font: 700 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    white-space: pre-line;
-    overflow-wrap: anywhere;
-  }
-
-  strong {
-    display: block;
-    padding: 12px 12px 0;
-    color: ${({ theme }) => theme.colors.gray12};
-    font-size: 0.92rem;
-    line-height: 1.4;
-  }
-
-  span {
-    padding: 6px 12px 12px;
-    color: ${({ theme }) => theme.colors.gray10};
-    font-size: 11px;
-  }
-`;
-
 export const EditorGuideBackdrop = styled.div`
   position: fixed;
   inset: 0;

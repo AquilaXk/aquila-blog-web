@@ -328,6 +328,10 @@ test.describe("live Markdown writing surface", () => {
     expect(canvasColors.contrast).toBeGreaterThanOrEqual(4.5)
 
     const inspector = page.getByLabel("발행 설정")
+    await expect(inspector.getByText("Live writing test", { exact: true })).toHaveCount(0)
+    await expect(inspector.getByText("Visibility", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("Summary", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("Tags", { exact: true })).toBeVisible()
     const summary = inspector.locator("textarea")
     const summaryCounter = inspector.locator("small")
     const categoryInput = inspector.locator('input[list="editor-category-suggestions"]')
