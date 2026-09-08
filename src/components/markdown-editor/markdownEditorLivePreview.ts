@@ -183,7 +183,8 @@ export const buildMarkdownLivePreviewPlan = (
   for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
     const from = match.index
     const to = from + match[0].length
-    if ([...sourceRanges, ...literalRanges].some((range) => from < range.to && to > range.from)) continue
+    if (sourceRanges.some((range) => from < range.to && to > range.from)) continue
+    if (literalRanges.some((range) => from >= range.from && to <= range.to)) continue
     const color = resolveInlineColorValue(match[1])
     if (!color) continue
     const bodyFrom = from + match[0].indexOf("|") + 1

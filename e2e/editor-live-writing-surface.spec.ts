@@ -333,7 +333,7 @@ test.describe("live Markdown writing surface", () => {
     await expect(inspector.getByText("요약", { exact: true })).toBeVisible()
     await expect(inspector.getByText("태그", { exact: true })).toBeVisible()
     const summary = inspector.locator("textarea")
-    const summaryCounter = inspector.locator("small")
+    const summaryCounter = inspector.locator("label").filter({ has: page.locator("textarea") }).locator("small")
     const categoryInput = inspector.locator('input[list="editor-category-suggestions"]')
     await categoryInput.fill("backend")
     const categoryClear = inspector.getByRole("button", { name: "카테고리 지우기" })

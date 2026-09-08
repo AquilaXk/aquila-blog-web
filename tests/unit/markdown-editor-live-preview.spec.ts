@@ -27,6 +27,14 @@ test.describe("markdown editor live preview model", () => {
     expect(plan).not.toContainEqual(expect.objectContaining({ kind: "inline-color" }))
     expect(plan).not.toContainEqual(expect.objectContaining({ kind: "horizontal-rule" }))
   })
+
+  test("renders color wrappers around supported links and inline code", () => {
+    const markdown = "Active\n\n{{color:green|[label](https://example.com)}}\n\n{{color:green|`code`}}"
+    const plan = buildMarkdownLivePreviewPlan(markdown, markdownParser.parse(markdown).topNode, [{ from: 0, to: 0 }])
+    expect(plan.filter(({ kind }) => kind === "inline-color")).toHaveLength(2)
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "link" }))
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "inline-code" }))
+  })
   test("reveals the complete active block while keeping other blocks formatted", () => {
     const markdown = ["# Heading", "", "Paragraph with **bold** text."].join("\n")
     const tree = markdownParser.parse(markdown)
