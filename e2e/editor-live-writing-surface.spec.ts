@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer"
 import type { Page, Route } from "./helpers/authoringPlaywright"
 import { expect, test } from "./helpers/authoringPlaywright"
+import { PUBLIC_ADMIN_PROFILE_FIXTURE } from "../tests/fixtures/publicAdminProfileFixture"
 
 const localDraftStorageKey = "admin.editor.localDraft.create.v3"
 const seededManuscripts = new WeakMap<Page, string>()
@@ -48,7 +49,7 @@ const routeAuthenticatedEditor = async (
   else seededManuscripts.delete(page)
   await page.route("**/member/api/v1/auth/me", async (route) => fulfillJson(route, adminMember))
   await page.route("**/member/api/v1/members/adminProfile", async (route) => {
-    await fulfillJson(route, adminMember)
+    await fulfillJson(route, PUBLIC_ADMIN_PROFILE_FIXTURE)
   })
   await page.route("**/post/api/v1/posts/tags", async (route) => fulfillJson(route, []))
   await page.route("**/post/api/v1/adm/posts/990", async (route) => {
