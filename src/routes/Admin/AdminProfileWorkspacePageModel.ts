@@ -12,7 +12,6 @@ import {
   ProfileWorkspaceResponse,
   serializeProfileWorkspaceContent,
 } from "src/libs/profileWorkspace"
-import { saveProfileCardWithConflictRetry } from "src/libs/profileCardSave"
 import { reconcileProfileWorkspaceDraft, saveProfileWorkspaceImage } from "src/libs/profileWorkspaceImage"
 import {
   WORKSPACE_SECTIONS,
@@ -300,12 +299,10 @@ export const useAdminProfileWorkspacePageModel = ({
 
   const persistDisplayName = useCallback(
     async (memberId: number, nickname: string) => {
-      const updatedMember = await saveProfileCardWithConflictRetry(() =>
-        apiFetch<AuthMember & AdminProfile>(`/member/api/v1/adm/members/${memberId}/nickname`, {
-          method: "PATCH",
-          body: JSON.stringify({ nickname }),
-        })
-      )
+      const updatedMember = await apiFetch<AuthMember & AdminProfile>(`/member/api/v1/adm/members/${memberId}/nickname`, {
+        method: "PATCH",
+        body: JSON.stringify({ nickname }),
+      })
       setMe(updatedMember)
       setAdminProfileCache(queryClient, updatedMember)
       return updatedMember
@@ -356,12 +353,10 @@ export const useAdminProfileWorkspacePageModel = ({
     }
 
     const normalizedDraft = buildDraftPayload()
-    return saveProfileCardWithConflictRetry(() =>
-      apiFetch<ProfileWorkspaceResponse>(`/member/api/v1/adm/members/${sessionMember.id}/profileWorkspace/draft`, {
-        method: "PUT",
-        body: JSON.stringify(normalizedDraft),
-      })
-    )
+    return apiFetch<ProfileWorkspaceResponse>(`/member/api/v1/adm/members/${sessionMember.id}/profileWorkspace/draft`, {
+      method: "PUT",
+      body: JSON.stringify(normalizedDraft),
+    })
   }, [buildDraftPayload, sessionMember?.id])
 
 

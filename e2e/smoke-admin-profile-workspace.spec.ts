@@ -2,13 +2,38 @@ import { expect, test } from "@playwright/test"
 import { mockAvatarAsset, mockPublicAdminProfile } from "./helpers/smokeFixtures"
 import type { ProfileWorkspaceContent } from "../src/libs/profileWorkspace"
 
-test("selecting a previous image saves the canonical draft without losing edits", async ({ page }) => {
-  const draft: ProfileWorkspaceContent = {
+const draft: ProfileWorkspaceContent = {
     profileImageUrl: "", profileRole: "", profileBio: "", aboutHeadline: "", aboutRole: "",
     aboutBio: "", aboutSections: [], aboutProjectSectionTitle: "", aboutProjects: [],
     blogTitle: "Aquila", homeIntroTitle: "", homeIntroDescription: "", blogDesign: "legacy",
     legacyBlogScheme: "light", serviceLinks: [], contactLinks: [],
-  }
+}
+
+for (const field of ["한 줄 역할", "계정 이름"]) {
+  test(`a ${field} save conflict preserves edits without replay`, async ({ page }) => {
+    await mockPublicAdminProfile(page)
+    await page.route("**/member/api/v1/auth/me", (route) => route.fulfill({
+      json: { id: 1, username: "owner", nickname: "Owner", isAdmin: true },
+    }))
+    await page.route("**/member/api/v1/adm/members/*/profileWorkspace", (route) => route.fulfill({
+      json: { draft, published: draft, dirtyFromPublished: false },
+    }))
+    const requests: string[] = []
+    await page.route(/\/member\/api\/v1\/adm\/members\/[^/]+\/(?:nickname|profileWorkspace\/draft)$/, (route) => {
+      requests.push(route.request().method())
+      return route.fulfill({ status: 409, json: { msg: "Profile conflict" } })
+    })
+    await page.goto("/admin/profile")
+    await page.getByLabel(field, { exact: true }).fill("Unsaved value")
+    await page.getByRole("button", { name: "초안 저장", exact: true }).click()
+    await expect(page.getByText(/저장 실패:.*Profile conflict/)).toBeVisible()
+    await expect(page.getByRole("button", { name: "초안 저장", exact: true })).toBeEnabled()
+    expect(requests).toEqual([field === "계정 이름" ? "PATCH" : "PUT"])
+    await expect(page.getByLabel(field, { exact: true })).toHaveValue("Unsaved value")
+  })
+}
+
+test("selecting a previous image saves the canonical draft without losing edits", async ({ page }) => {
   const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }
   const writes: ProfileWorkspaceContent[] = []
   const retiredRequests: string[] = []
