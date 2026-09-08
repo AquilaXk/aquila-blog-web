@@ -219,6 +219,8 @@ const decorationField = StateField.define<DecorationSet>({
     }
     return transaction.docChanged ||
       transaction.selection ||
+      // 비동기 파싱 완료는 본문·선택을 바꾸지 않아도 표시를 갱신해야 한다.
+      syntaxTree(transaction.startState) !== syntaxTree(transaction.state) ||
       transaction.effects.some(
         (effect) => effect.is(setComposition) || effect.is(setPointerSelecting)
       )
