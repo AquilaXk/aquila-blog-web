@@ -986,6 +986,44 @@ test.describe("live Markdown writing surface", () => {
     await expect(editorContent(page)).toBeEditable()
   })
 
+  test("failed candidate deletion preserves selection, stored draft and manuscript", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "Stored recovery manuscript")
+    await page.goto("/admin/editor/new?source=local-draft")
+    const candidates = page.getByLabel("복구할 브라우저 초안")
+    await candidates.selectOption(localDraftStorageKey)
+    await fillMarkdown(page, "Current unsaved manuscript")
+    const original = await page.evaluate((key) => {
+      const value = localStorage.getItem(key)
+      const removeItem = Storage.prototype.removeItem
+      Storage.prototype.removeItem = function (target) {
+        if (target === key) throw new DOMException("blocked", "SecurityError")
+        return removeItem.call(this, target)
+      }
+      return value
+    }, localDraftStorageKey)
+    await page.getByRole("button", { name: "삭제", exact: true }).click()
+    await expect(page.getByText("선택한 브라우저 임시글을 삭제하지 못했습니다.", { exact: false })).toBeVisible()
+    await expect(candidates).toHaveValue(localDraftStorageKey)
+    expect(await page.evaluate((key) => localStorage.getItem(key), localDraftStorageKey)).toBe(original)
+    await expect.poll(() => readMarkdown(page)).toBe("Current unsaved manuscript")
+  })
+
+  test("candidate list read failure keeps the selected manuscript", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "Selected recovery manuscript")
+    await openEditorDraft(page)
+    await expect.poll(() => readMarkdown(page)).toBe("Selected recovery manuscript")
+    await page.evaluate(() => {
+      const originalKey = Storage.prototype.key
+      Storage.prototype.key = function () {
+        throw new DOMException("blocked", "SecurityError")
+      }
+      window.dispatchEvent(new StorageEvent("storage", { storageArea: localStorage }))
+      window.setTimeout(() => { Storage.prototype.key = originalKey }, 0)
+    })
+    await expect(page.getByText("브라우저 임시글 목록을 읽지 못했습니다")).toBeVisible()
+    await expect.poll(() => readMarkdown(page)).toBe("Selected recovery manuscript")
+  })
+
   test("a delayed temporary-post publish preserves a newer visibility selection", async ({ page }) => {
     const postId = 771
     const title = "Publish visibility concurrency"

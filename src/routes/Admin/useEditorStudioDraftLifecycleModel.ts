@@ -571,7 +571,13 @@ export const useEditorStudioLocalDraftLifecycle = ({
   const restoreLocalDraft = useCallback((candidateKey?: string) => {
     const selectedKey = candidateKey || localDraftCandidate?.key
     if (!selectedKey) return
-    const draft = readLocalDraftCandidate(draftSource, selectedKey)
+    let draft: LocalDraftPayload | null
+    try {
+      draft = readLocalDraftCandidate(draftSource, selectedKey)
+    } catch {
+      setPublishStatus({ tone: "error", text: "브라우저 임시글을 읽지 못했습니다. 현재 원고와 선택한 초안은 유지됩니다." }, "page")
+      return
+    }
     if (!draft) {
       setPublishStatus(
         {
@@ -690,7 +696,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
   ])
 
   const clearLocalDraft = useCallback(() => {
-    removeLocalDraft(draftSource)
+    try {
+      removeLocalDraft(draftSource)
+    } catch {
+      setPublishStatus({ tone: "error", text: "브라우저 임시저장을 삭제하지 못했습니다. 현재 원고는 유지됩니다." }, "page")
+      return
+    }
     // Keep editor fingerprint as baseline so autosave does not recreate the cleared slot.
     lastLocalDraftFingerprintRef.current = localDraftFingerprint
     signalLocalDraftRemoved(draftSource)
@@ -727,7 +738,13 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
   useEffect(() => {
     const refresh = () => {
-      const candidates = refreshLocalDraftCandidates()
+      let candidates: LocalDraftFingerprintSnapshot[]
+      try {
+        candidates = refreshLocalDraftCandidates()
+      } catch {
+        setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 선택과 원고는 유지됩니다." }, "page")
+        return
+      }
       setLocalDraftCandidate((selected) => candidates.find((candidate) => candidate.key === selected?.key) || null)
     }
     refresh()
@@ -737,7 +754,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       window.removeEventListener("storage", refresh)
       window.removeEventListener("aquila-local-drafts-changed", refresh)
     }
-  }, [refreshLocalDraftCandidates])
+  }, [refreshLocalDraftCandidates, setPublishStatus])
 
   useEffect(() => {
     const shouldAdoptBaseline = resolveLocalDraftShouldAdoptBaseline({
@@ -845,10 +862,19 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
   const discardLocalDraftCandidate = useCallback(() => {
     if (!localDraftCandidate) return
-    removeLocalDraftCandidate(draftSource, localDraftCandidate.key)
+    try {
+      removeLocalDraftCandidate(draftSource, localDraftCandidate.key)
+    } catch {
+      setPublishStatus({ tone: "error", text: "선택한 브라우저 임시글을 삭제하지 못했습니다. 초안과 원고는 유지됩니다." }, "page")
+      return
+    }
     setLocalDraftCandidate(null)
-    refreshLocalDraftCandidates()
-  }, [draftSource, localDraftCandidate, refreshLocalDraftCandidates])
+    try {
+      refreshLocalDraftCandidates()
+    } catch {
+      setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 원고는 유지됩니다." }, "page")
+    }
+  }, [draftSource, localDraftCandidate, refreshLocalDraftCandidates, setPublishStatus])
 
   const dismissLocalDraftRestoreSuggestion = useCallback(() => {
     setDismissedLocalDraft((current) => [
