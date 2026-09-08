@@ -263,6 +263,30 @@ const selectMarkdownRangeWithoutAssertion = async (page: Page, from: number, to:
 }
 
 test.describe("live Markdown writing surface", () => {
+  test("renders asynchronously loaded Markdown without a selection change", async ({ page }) => {
+    const manuscript = [
+      "Intro",
+      "",
+      "## Loaded heading",
+      "",
+      "Text with **loaded emphasis**.",
+      "",
+      "---",
+      "",
+      ...Array.from({ length: 100 }, (_, index) => `Paragraph ${index} with **formatted text**.\n`),
+    ].join("\n")
+    await routeAuthenticatedEditor(page, manuscript, "Loaded document", false)
+    await routeEditorPost(page, 770, manuscript)
+    await page.goto("/admin/editor/770")
+
+    // 선택 변경으로 우연히 표시가 갱신되지 않도록 원문 읽기 helper를 호출하지 않는다.
+    const editor = editorContent(page)
+    await expect(editor.locator(".cm-live-heading-2")).toHaveText("Loaded heading")
+    await expect(editor.locator(".cm-live-strong").first()).toHaveText("loaded emphasis")
+    await expect(editor.locator(".cm-live-horizontal-rule")).toHaveCount(1)
+    await expect(editor).not.toBeFocused()
+  })
+
   test("new and existing editors mount one accessible document surface", async ({ page }) => {
     await routeAuthenticatedEditor(page)
     await openEditorDraft(page)
