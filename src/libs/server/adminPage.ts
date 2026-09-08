@@ -11,7 +11,6 @@ import { serverApiFetchJson } from "./backend"
 import { guardAdminRequest } from "./adminGuard"
 import { hasServerAuthCookie } from "./authSession"
 import {
-  buildStaticAdminProfileSnapshot,
   fetchServerAdminProfile,
   resolvePublicAdminProfileSnapshot,
 } from "./adminProfile"
@@ -26,32 +25,6 @@ type AdminProtectedBootstrapResult<T> =
   | { ok: true; value: T }
   | { ok: false; destination: string | null }
 
-const buildAdminProfileSnapshotFromMember = (member: AuthMember): AdminProfile => {
-  const fallback = buildStaticAdminProfileSnapshot()
-  return {
-    ...fallback,
-    username: member.username,
-    name: member.nickname || member.username,
-    nickname: member.nickname || member.username,
-    modifiedAt: member.modifiedAt,
-    profileImageUrl: member.profileImageUrl || fallback.profileImageUrl,
-    profileImageDirectUrl:
-      member.profileImageDirectUrl || member.profileImageUrl || fallback.profileImageDirectUrl,
-    profileRole: member.profileRole || fallback.profileRole,
-    profileBio: member.profileBio || fallback.profileBio,
-    aboutRole: member.aboutRole || fallback.aboutRole,
-    aboutBio: member.aboutBio || fallback.aboutBio,
-    aboutDetails: member.aboutDetails,
-    blogTitle: member.blogTitle || fallback.blogTitle,
-    homeIntroTitle: member.homeIntroTitle || fallback.homeIntroTitle,
-    homeIntroDescription: member.homeIntroDescription || fallback.homeIntroDescription,
-    blogDesign: member.blogDesign || fallback.blogDesign,
-    legacyBlogScheme: member.legacyBlogScheme || fallback.legacyBlogScheme,
-    serviceLinks: member.serviceLinks || fallback.serviceLinks,
-    contactLinks: member.contactLinks || fallback.contactLinks,
-  }
-}
-
 const resolveAdminInitialProfileSnapshot = async (req: IncomingMessage): Promise<AdminProfile> => {
   return (
     (await fetchServerAdminProfile(req, {
@@ -62,7 +35,7 @@ const resolveAdminInitialProfileSnapshot = async (req: IncomingMessage): Promise
 
 export const buildAdminPagePropsFromMember = (
   member: AuthMember,
-  initialProfileSnapshot: AdminProfile | null = buildAdminProfileSnapshotFromMember(member)
+  initialProfileSnapshot: AdminProfile | null = null
 ): AdminPageProps => {
   const queryClient = createQueryClient()
   queryClient.setQueryData(queryKey.authMeProbe(), true)

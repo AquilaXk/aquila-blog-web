@@ -32,7 +32,8 @@ test.describe("admin bootstrap state contract", () => {
 
     expect(adminPageSource).toContain("export const buildAdminPagePropsFromMember = (")
     expect(adminPageSource).toContain("member: AuthMember,")
-    expect(adminPageSource).toContain("initialProfileSnapshot: AdminProfile | null = buildAdminProfileSnapshotFromMember(member)")
+    expect(adminPageSource).toContain("initialProfileSnapshot: AdminProfile | null = null")
+    expect(adminPageSource).not.toContain("buildAdminProfileSnapshotFromMember")
     expect(adminPageSource).toContain("): AdminPageProps => {")
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMeProbe(), true)")
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMe(), member)")
