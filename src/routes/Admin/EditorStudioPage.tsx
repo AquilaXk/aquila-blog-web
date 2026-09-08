@@ -8,7 +8,7 @@ import {
 } from "src/libs/server/adminPage"
 import { hasServerAuthCookie } from "src/libs/server/authSession"
 import type { AdminProfile } from "src/types/adminProfile"
-import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceController"
+import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceControllerRoot"
 
 const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 

@@ -51,9 +51,7 @@ export default function AdminToolsExecutionRail({
           </div>
         </CardSectionHeading>
         <ActionList>
-          <Link href="/admin/dashboard" passHref legacyBehavior>
-            <ActionRowLink>운영 대시보드 열기</ActionRowLink>
-          </Link>
+          <ActionRowLink as={Link} href="/admin/dashboard">운영 대시보드 열기</ActionRowLink>
           <ActionRowButton type="button" disabled={isBusy} onClick={() => onFocusSection("diagnostics", "queue")}>
             <span>작업 큐 진단으로 이동</span>
           </ActionRowButton>

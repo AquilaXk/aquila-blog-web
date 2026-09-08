@@ -142,14 +142,12 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
         <SidebarNavSection>
           <SidebarNav>
             {NAV_ITEMS.map((item) => (
-              <Link key={item.id} href={item.href} passHref legacyBehavior>
-                <NavLink data-active={item.id === currentSection ? "true" : "false"}>
-                  <span>
-                    <AppIcon name={item.icon} />
-                  </span>
-                  <strong>{item.label}</strong>
-                </NavLink>
-              </Link>
+              <NavLink as={Link} key={item.id} href={item.href} data-active={item.id === currentSection ? "true" : "false"}>
+                <span>
+                  <AppIcon name={item.icon} />
+                </span>
+                <strong>{item.label}</strong>
+              </NavLink>
             ))}
           </SidebarNav>
         </SidebarNavSection>
@@ -189,24 +187,24 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
         <TopBar>
           <CompactNav aria-label="관리자 바로가기">
             {NAV_ITEMS.map((item) => (
-              <Link key={`compact-${item.id}`} href={item.href} passHref legacyBehavior>
-                <CompactNavLink data-active={item.id === currentSection ? "true" : "false"} aria-label={item.label}>
-                  <AppIcon name={item.icon} />
-                  <span>{item.shortLabel}</span>
-                </CompactNavLink>
-              </Link>
+              <CompactNavLink
+                as={Link}
+                key={`compact-${item.id}`}
+                href={item.href}
+                data-active={item.id === currentSection ? "true" : "false"}
+                aria-label={item.label}
+              >
+                <AppIcon name={item.icon} />
+                <span>{item.shortLabel}</span>
+              </CompactNavLink>
             ))}
           </CompactNav>
           <TopBarTitle>
             <strong>{currentTitle}</strong>
           </TopBarTitle>
           <TopBarActions>
-            <Link href="/" passHref legacyBehavior>
-              <SecondaryTopAction>블로그 보기</SecondaryTopAction>
-            </Link>
-            <Link href="/admin/editor/new" passHref legacyBehavior>
-              <PrimaryTopAction>새 글</PrimaryTopAction>
-            </Link>
+            <SecondaryTopAction as={Link} href="/">블로그 보기</SecondaryTopAction>
+            <PrimaryTopAction as={Link} href="/admin/editor/new">새 글</PrimaryTopAction>
             <ResponsiveLogoutAction type="button" aria-label="Logout" onClick={() => void handleLogout()}>
               <AppIcon name="log-out" />
             </ResponsiveLogoutAction>

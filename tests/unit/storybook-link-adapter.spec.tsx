@@ -41,23 +41,18 @@ test.describe("storybook link adapter", () => {
     expect(markup).toContain('href="/about"')
   })
 
-  test("preserves a legacy admin posts anchor", () => {
-    const markup = renderToStaticMarkup(
-      createElement(
-        Link,
-        {
-          href: "/admin/posts",
-          legacyBehavior: true,
-          children: createElement("a", { className: "admin-posts-link" }, "글 전체 보기"),
-        }
-      )
-    )
+  test("preserves modern caller classes and anchor attributes", () => {
+    const props = { href: "/admin/posts", className: "admin-posts-link",
+      "data-ui": "admin-posts-link", "aria-label": "글 전체 보기", children: "글 전체 보기" }
+    const markup = renderToStaticMarkup(createElement(Link, props))
 
     expect(markup).toContain('class="admin-posts-link"')
     expect(markup).toContain('href="/admin/posts"')
+    expect(markup).toContain('data-ui="admin-posts-link"')
+    expect(markup).toContain('aria-label="글 전체 보기"')
   })
 
-  test("runs legacy caller handlers before recording an internal route", async () => {
+  test("runs caller handlers before recording an internal route", async () => {
     const calls: string[] = []
     const push = async (href: string) => {
       calls.push(`push:${href}`)
@@ -66,7 +61,6 @@ test.describe("storybook link adapter", () => {
     const event = createClickEvent()
     const onClick = createStorybookLinkClickHandler({
       callerOnClicks: [
-        () => calls.push("child"),
         () => calls.push("link"),
       ],
       download: undefined,
@@ -78,7 +72,7 @@ test.describe("storybook link adapter", () => {
     onClick(event as never)
     await Promise.resolve()
 
-    expect(calls).toEqual(["child", "link", "push:/admin/posts"])
+    expect(calls).toEqual(["link", "push:/admin/posts"])
     expect(event.getDefaultPrevented()).toBe(true)
   })
 
