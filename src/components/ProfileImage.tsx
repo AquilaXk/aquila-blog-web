@@ -66,7 +66,18 @@ const ProfileImage: React.FC<Props> = ({
           placeItems: "center",
         }}
       >
-        이미지 없음
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          style={{ width: "min(24px, 60%)", height: "min(24px, 60%)" }}
+        >
+          <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.75" />
+          <path d="m7 16 3-3 2.5 2.5 2-2 2.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+          <circle cx="9" cy="9" r="1.25" fill="currentColor" />
+        </svg>
       </span>
     )
   }

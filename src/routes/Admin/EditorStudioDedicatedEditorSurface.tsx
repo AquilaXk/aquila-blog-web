@@ -5,7 +5,7 @@ import type {
   ReactNode,
   Ref,
 } from "react"
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { CONFIG } from "site.config"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
@@ -19,7 +19,6 @@ import {
   EditorHeaderMetaPill,
   EditorHeaderMetaRow,
   EditorInspector,
-  EditorInspectorPreview,
   EditorInspectorTagInputRow,
   EditorOutline,
   EditorOutlineItem,
@@ -213,8 +212,6 @@ export const EditorStudioDedicatedEditorSurface = ({
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
-  const deferredPostContent = useDeferredValue(postContent)
-  const documentInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(postContent), [postContent])
   const outlineItems = useMemo(() => {
     const title = postTitle.trim()
@@ -232,15 +229,6 @@ export const EditorStudioDedicatedEditorSurface = ({
   const hasTitleAndBody = Boolean(postTitle.trim() && postContent.trim())
   const hasMarkdownBody = Boolean(postContent.trim())
   const linkWarningCount = countMarkdownLinkWarnings(postContent)
-  const primaryTag = postTags[0] || "태그 없음"
-  const readTimeText = documentInsights.readingMinutes ? `${documentInsights.readingMinutes}분` : "읽기 시간"
-  const thumbnailPreviewLabel =
-    (postTags.length > 0 ? postTags : postTitle.trim().split(/\s+/))
-      .map((label) => label.trim())
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("\n")
-      .toUpperCase() || primaryTag
   const handleTagDraftChange = (nextValue: string) => {
     const commaSeparated = /[,，]/
     if (!commaSeparated.test(nextValue)) {
@@ -439,13 +427,6 @@ export const EditorStudioDedicatedEditorSurface = ({
               </button>
             </EditorInspectorTagInputRow>
           </section>
-          <EditorInspectorPreview>
-            <div>{thumbnailPreviewLabel}</div>
-            <strong>{postTitle.trim() || "제목을 입력하세요"}</strong>
-            <span>
-              {primaryTag} · {readTimeText} · {documentInsights.wordCount}단어 · {documentInsights.characterCount}자
-            </span>
-          </EditorInspectorPreview>
           <section>
             <span>Quality checks</span>
             <p>

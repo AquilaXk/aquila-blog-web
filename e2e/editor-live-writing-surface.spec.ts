@@ -299,6 +299,86 @@ test.describe("live Markdown writing surface", () => {
     await expect.poll(() => readMarkdown(page)).toBe("New manuscript")
   })
 
+  test("keeps the live canvas readable and inspector controls separated in light-only editor mode", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" })
+    await routeAuthenticatedEditor(page)
+    await openEditorDraft(page)
+
+    const liveEditor = page.locator(".cm-editor")
+    const canvasColors = await liveEditor.evaluate((element) => {
+      const parseColor = (value: string) => value.match(/\d+/g)?.map(Number) ?? []
+      const luminance = (color: number[]) => {
+        const [red, green, blue] = color.slice(0, 3).map((channel) => {
+          const normalized = channel / 255
+          return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+      }
+      const rootBackground = getComputedStyle(element.closest('[data-testid="markdown-editor"]') as HTMLElement).backgroundColor
+      const editorStyle = getComputedStyle(element)
+      const foreground = luminance(parseColor(editorStyle.color))
+      const background = luminance(parseColor(editorStyle.backgroundColor))
+      return {
+        rootBackground,
+        editorBackground: editorStyle.backgroundColor,
+        contrast: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
+      }
+    })
+    expect(canvasColors.editorBackground).toBe(canvasColors.rootBackground)
+    expect(canvasColors.contrast).toBeGreaterThanOrEqual(4.5)
+
+    const inspector = page.getByLabel("발행 설정")
+    await expect(inspector.getByText("Live writing test", { exact: true })).toHaveCount(0)
+    await expect(inspector.getByText("Visibility", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("Summary", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("Tags", { exact: true })).toBeVisible()
+    const summary = inspector.locator("textarea")
+    const summaryCounter = inspector.locator("small")
+    const categoryInput = inspector.locator('input[list="editor-category-suggestions"]')
+    await categoryInput.fill("backend")
+    const categoryClear = inspector.getByRole("button", { name: "카테고리 지우기" })
+    const tagSection = inspector.locator("section").filter({
+      has: page.getByText("Tags", { exact: true }),
+    })
+    const tagChip = tagSection.getByText("markdown", { exact: true })
+    const tagInput = tagSection.getByPlaceholder("태그 추가")
+    const tagAdd = tagSection.getByRole("button", { name: "태그 추가" })
+    const [summaryBox, counterBox, categoryInputBox, categoryClearBox, tagChipBox, tagInputBox, tagAddBox] = await Promise.all([
+      summary.boundingBox(),
+      summaryCounter.boundingBox(),
+      categoryInput.boundingBox(),
+      categoryClear.boundingBox(),
+      tagChip.boundingBox(),
+      tagInput.boundingBox(),
+      tagAdd.boundingBox(),
+    ])
+
+    expect(summaryBox).not.toBeNull()
+    expect(counterBox).not.toBeNull()
+    expect(categoryInputBox).not.toBeNull()
+    expect(categoryClearBox).not.toBeNull()
+    expect(tagChipBox).not.toBeNull()
+    expect(tagInputBox).not.toBeNull()
+    expect(tagAddBox).not.toBeNull()
+    expect(counterBox!.y).toBeGreaterThan(summaryBox!.y + summaryBox!.height)
+    expect(categoryClearBox!.y).toBe(categoryInputBox!.y)
+    expect(categoryClearBox!.x).toBeGreaterThan(categoryInputBox!.x + categoryInputBox!.width)
+    expect(tagInputBox!.y).toBeGreaterThan(tagChipBox!.y + tagChipBox!.height)
+    expect(tagAddBox!.y).toBe(tagInputBox!.y)
+    expect(tagAddBox!.x).toBeGreaterThan(tagInputBox!.x + tagInputBox!.width)
+    const categoryClearText = await categoryClear.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return {
+        lineCount: range.getClientRects().length,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      }
+    })
+    expect(categoryClearText.lineCount).toBeLessThanOrEqual(1)
+    expect(categoryClearText.scrollHeight).toBeLessThanOrEqual(categoryClearText.clientHeight)
+  })
+
   test("groups toolbar actions without overflow and preserves the editor selection", async ({ page }) => {
     await routeAuthenticatedEditor(page, "Hello", "Toolbar grouping")
     await openEditorDraft(page)
@@ -362,6 +442,16 @@ test.describe("live Markdown writing surface", () => {
     const editor = page.getByTestId("markdown-editor")
     const editorBounds = await editor.boundingBox()
     expect(editorBounds).not.toBeNull()
+    await expect.poll(() => toolbar.locator("button, select").evaluateAll((controls) =>
+      controls
+        .filter((control) => control.getClientRects().length > 0)
+        .map((control) => ({
+          label: control.getAttribute("aria-label") ?? control.textContent?.trim(),
+          height: control.getBoundingClientRect().height,
+          fontSize: Number.parseFloat(getComputedStyle(control).fontSize),
+        }))
+        .filter((control) => control.height < 36 || control.fontSize < 13)
+    )).toEqual([])
     for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
       await page.getByRole("button", { name: `${label} 메뉴` }).click()
       const menu = page.getByRole("menu", { name: label })
@@ -415,7 +505,7 @@ test.describe("live Markdown writing surface", () => {
       .toBe("#### `핵심` 포인트")
   })
 
-  test("dark editor focus and native mouse selection stay on the live surface", async ({ page }) => {
+  test("themed editor focus and native mouse selection stay on the live surface", async ({ page }) => {
     const markdown = ["# Drag Selection", "", "마우스 드래그로 이 문장을 선택합니다."].join("\n")
     await routeAuthenticatedEditor(page, markdown)
     await openEditorDraft(page)
@@ -424,10 +514,16 @@ test.describe("live Markdown writing surface", () => {
     const editor = surface.locator(".cm-editor")
     const colors = await editor.evaluate((element) => {
       const style = window.getComputedStyle(element)
-      return { backgroundColor: style.backgroundColor, color: style.color }
+      const root = window.getComputedStyle(element.closest('[data-testid="markdown-editor"]') as HTMLElement)
+      return {
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        rootBackground: root.backgroundColor,
+        rootColor: root.color,
+      }
     })
-    expect(colors.backgroundColor).toBe("rgb(15, 23, 40)")
-    expect(colors.color).toBe("rgb(217, 228, 247)")
+    expect(colors.backgroundColor).toBe(colors.rootBackground)
+    expect(colors.color).toBe(colors.rootColor)
 
     const targetLine = editorContent(page).locator(".cm-line").nth(2)
     const box = await targetLine.boundingBox()

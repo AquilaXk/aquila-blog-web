@@ -28,8 +28,8 @@ export const EditorToolbar = styled.div`
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 12px;
-  padding: 7px 12px;
+  gap: 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
@@ -52,13 +52,17 @@ export const ToolbarGroup = styled.div`
 export const ToolbarButton = styled.button`
   border: 1px solid transparent;
   border-radius: 4px;
-  height: 31px;
-  min-width: 31px;
+  height: 36px;
+  min-height: 36px;
+  min-width: 36px;
   flex: 0 0 auto;
-  padding: 0 8px;
+  padding: 0 9px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};
-  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: var(--aq-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
 
@@ -74,17 +78,27 @@ export const ToolbarButton = styled.button`
     opacity: 0.45;
     cursor: not-allowed;
   }
+
+  @media (pointer: coarse) {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
 `
 
 export const ToolbarSelect = styled.select`
   box-sizing: border-box;
-  height: 31px;
+  height: 36px;
+  min-height: 36px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   border-radius: 4px;
   padding: 0 6px;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   color: ${({ theme }) => theme.colors.gray10};
-  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: var(--aq-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
 
@@ -96,6 +110,11 @@ export const ToolbarSelect = styled.select`
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+
+  @media (pointer: coarse) {
+    height: 44px;
+    min-height: 44px;
   }
 `
 
@@ -275,8 +294,8 @@ export const LiveEditorBody = styled.div`
   max-width: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #0f1728;
-  color: #d9e4f7;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+  color: ${({ theme }) => theme.colors.gray12};
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 13px;
   font-weight: 500;
@@ -289,8 +308,8 @@ export const LiveEditorBody = styled.div`
 
   .cm-editor {
     height: 100%;
-    background: #0f1728;
-    color: #d9e4f7;
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
+    color: ${({ theme }) => theme.colors.gray12};
   }
 
   .cm-editor.cm-focused {
@@ -303,7 +322,7 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-content {
-    caret-color: #dbe7ff;
+    caret-color: ${({ theme }) => theme.colors.gray12};
   }
 
   .cm-content ::selection,
@@ -313,11 +332,11 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-cursor {
-    border-left-color: #dbe7ff;
+    border-left-color: ${({ theme }) => theme.colors.gray12};
   }
 
   .cm-live-heading {
-    color: #f3f7ff;
+    color: ${({ theme }) => theme.colors.gray12};
     font-family: var(--aq-font-sans);
     font-weight: 600;
     letter-spacing: -0.035em;
@@ -342,7 +361,7 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-live-strong {
-    color: #f3f7ff;
+    color: ${({ theme }) => theme.colors.gray12};
     font-weight: 800;
   }
 
@@ -356,11 +375,11 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-live-inline-code {
-    border: 1px solid rgba(155, 189, 255, 0.2);
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-radius: 4px;
     padding: 0.08em 0.3em;
-    background: rgba(120, 167, 255, 0.1);
-    color: #b9d1ff;
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    color: ${({ theme }) => theme.colors.gray11};
   }
 
   .cm-live-link {
@@ -370,7 +389,7 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-live-quote {
-    color: #b9c8df;
+    color: ${({ theme }) => theme.colors.gray10};
   }
 
   .cm-live-quote-marker {
@@ -397,14 +416,14 @@ export const LiveEditorBody = styled.div`
     align-items: center;
     justify-content: center;
     margin-right: 0.45em;
-    border: 1px solid #78a7ff;
-    color: #dbe7ff;
+    border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+    color: ${({ theme }) => theme.colors.gray12};
     font: 800 0.75em/1 ui-monospace, monospace;
     vertical-align: -0.08em;
   }
 
   .cm-live-fenced-code {
-    color: #cbd9ee;
+    color: ${({ theme }) => theme.colors.gray11};
   }
 
   &[aria-disabled="true"] .cm-editor {
