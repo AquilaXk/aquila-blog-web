@@ -97,7 +97,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
   const displayHeadline = adminProfile.aboutHeadline || ""
   const displayRole = adminProfile.aboutRole || ""
   const displayBio = adminProfile.aboutBio || ""
-  const profileImageSrc = adminProfile.profileImageDirectUrl || adminProfile.profileImageUrl
+  const profileImageSrc = adminProfile.profileImageUrl
   const aboutDetailSections = (adminProfile.aboutSections || []).map((section) => ({
     title: section.title,
     items: section.items,

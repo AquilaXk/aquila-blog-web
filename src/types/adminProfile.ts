@@ -8,13 +8,11 @@ export type AdminProfile = {
   nickname: string
   modifiedAt?: string
   profileImageUrl: string
-  profileImageDirectUrl?: string
   profileRole?: string
   profileBio?: string
   aboutHeadline?: string
   aboutRole?: string
   aboutBio?: string
-  aboutDetails?: string
   aboutSections?: AboutSectionBlock[]
   aboutProjectSectionTitle?: string
   aboutProjects?: AboutProjectBlock[]

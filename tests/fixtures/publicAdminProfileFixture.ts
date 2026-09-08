@@ -7,7 +7,6 @@ export const PUBLIC_ADMIN_PROFILE_FIXTURE = {
   name: "aquila",
   nickname: "aquila",
   profileImageUrl: "/avatar.png",
-  profileImageDirectUrl: "/avatar.png",
   profileRole: "Backend Developer",
   profileBio: "서버 안정성과 운영 복구를 함께 고민합니다.",
   aboutHeadline: "이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.",

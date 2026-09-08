@@ -1,13 +1,14 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
-import { type ReactNode } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import AppIcon, { type IconName } from "src/components/icons/AppIcon"
 import BrandLogoMark from "src/components/branding/BrandMark"
 import ProfileImage from "src/components/ProfileImage"
+import { useAdminShellProfile } from "src/hooks/useAdminShellProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { toAdminLoginPath } from "src/libs/router"
-import { CONFIG } from "site.config"
+import type { AdminProfile } from "src/types/adminProfile"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
 import {
   adminAccentText,
@@ -28,17 +29,12 @@ import {
   adminTextSecondary,
 } from "src/routes/Admin/adminColorTokens"
 
-type AdminShellProfileSnapshot = Pick<
-  AuthMember,
-  "blogTitle" | "profileImageDirectUrl" | "profileImageUrl"
->
-
 export type AdminShellSection = "hub" | "dashboard" | "posts" | "cloud" | "profile" | "tools"
 
 type AdminShellProps = {
   currentSection: AdminShellSection
   member: AuthMember
-  profileSnapshot?: AdminShellProfileSnapshot | null
+  profileSnapshot?: AdminProfile | null
   children: ReactNode
 }
 
@@ -115,14 +111,13 @@ const SECTION_TITLES: Record<AdminShellSection, string> = {
 const AdminShell = ({ currentSection, member, profileSnapshot = null, children }: AdminShellProps) => {
   const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()
   const sidebarIdentityInitial = sidebarIdentityName.slice(0, 2).toUpperCase()
-  const sidebarProfileImageSrc = (
-    profileSnapshot?.profileImageDirectUrl ||
-    profileSnapshot?.profileImageUrl ||
-    member.profileImageDirectUrl ||
-    member.profileImageUrl ||
-    ""
-  ).trim()
-  const brandTitle = (profileSnapshot?.blogTitle || member.blogTitle || CONFIG.blog.title || "AquilaLog").trim()
+  const { profile, isLoading: isProfileLoading, isError: isProfileError } = useAdminShellProfile(member.id, profileSnapshot)
+  const sidebarProfileImageSrc = profile?.profileImageUrl.trim() || ""
+  const [isProfileImageFailed, setIsProfileImageFailed] = useState(false)
+  useEffect(() => {
+    setIsProfileImageFailed(false)
+  }, [sidebarProfileImageSrc])
+  const brandTitle = profile?.blogTitle?.trim() || ""
   const currentTitle = SECTION_TITLES[currentSection]
 
   const handleLogout = async () => {
@@ -162,12 +157,12 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
         <SidebarProfile>
           <SidebarProfileIdentity>
             <SidebarAvatar>
-              {sidebarProfileImageSrc ? (
+              {sidebarProfileImageSrc && !isProfileImageFailed ? (
                 <ProfileImage
                   src={sidebarProfileImageSrc}
-                  fallbackSrc={CONFIG.profile.image}
                   alt={`${sidebarIdentityName} 프로필 이미지`}
                   fillContainer
+                  onError={() => setIsProfileImageFailed(true)}
                 />
               ) : (
                 <span>{sidebarIdentityInitial}</span>
@@ -175,7 +170,13 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
             </SidebarAvatar>
             <ProfileCopy>
               <strong>{sidebarIdentityName}</strong>
-              <span>관리자</span>
+              <span>
+                {isProfileError
+                  ? "프로필 정보를 불러올 수 없습니다."
+                  : isProfileLoading && !profile
+                    ? "프로필 정보를 불러오는 중입니다."
+                    : "관리자"}
+              </span>
             </ProfileCopy>
           </SidebarProfileIdentity>
           <SidebarLogoutAction type="button" aria-label="Logout" onClick={() => void handleLogout()}>

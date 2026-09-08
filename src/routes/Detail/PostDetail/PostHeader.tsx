@@ -51,7 +51,7 @@ const PostHeader: React.FC<Props> = ({
   const authorName =
     postAuthor?.name?.trim() || adminProfile?.nickname?.trim() || adminProfile?.name?.trim() || "익명"
   const authorImageSrc = usingAdminFallback
-    ? adminProfile?.profileImageDirectUrl || adminProfile?.profileImageUrl || ""
+    ? adminProfile?.profileImageUrl || ""
     : postAuthor?.profile_photo || ""
   const tags = (data.tags || []).map((tag) => tag.trim()).filter(Boolean)
   const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()

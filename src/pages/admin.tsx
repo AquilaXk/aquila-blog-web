@@ -252,7 +252,7 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
   const sessionMember = initialMember
   const adminProfile = initialProfileSnapshot
   const displayName = sessionMember?.nickname || sessionMember?.username || "관리자"
-  const profileSrc = adminProfile?.profileImageDirectUrl || adminProfile?.profileImageUrl || ""
+  const profileSrc = adminProfile?.profileImageUrl || ""
 
   const profileUpdatedText = adminProfile?.modifiedAt
     ? adminProfile.modifiedAt.slice(0, 16).replace("T", " ")

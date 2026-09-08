@@ -41,12 +41,10 @@ export type AuthMember = {
   nickname: string
   isAdmin?: boolean
   profileImageUrl?: string
-  profileImageDirectUrl?: string
   profileRole?: string
   profileBio?: string
   aboutRole?: string
   aboutBio?: string
-  aboutDetails?: string
   blogTitle?: string
   homeIntroTitle?: string
   homeIntroDescription?: string
