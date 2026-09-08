@@ -29,7 +29,7 @@ test.describe("markdown editor command registry", () => {
     expect(() =>
       validateMarkdownEditorCommands([
         bold,
-        { ...getMarkdownEditorCommand("block.code")!, shortcut: bold.shortcut },
+        { ...getMarkdownEditorCommand("block.code")!, shortcut: "Mod+B" },
       ])
     ).toThrow(/duplicate command shortcut/i)
   })

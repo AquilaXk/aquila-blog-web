@@ -134,10 +134,15 @@ test.describe("frontend security headers", () => {
   })
 
   test("CSP connect-src keeps documented local backend fallback available in development", async () => {
-    const previousNodeEnv = process.env.NODE_ENV
+    const previousNodeEnv = Object.getOwnPropertyDescriptor(process.env, "NODE_ENV")
     const previousBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
 
-    process.env.NODE_ENV = "development"
+    Object.defineProperty(process.env, "NODE_ENV", {
+      configurable: true,
+      enumerable: true,
+      value: "development",
+      writable: true,
+    })
     delete process.env.NEXT_PUBLIC_BACKEND_URL
 
     try {
@@ -147,8 +152,8 @@ test.describe("frontend security headers", () => {
         expect.arrayContaining(["http://localhost:8080", "http://127.0.0.1:8080"]),
       )
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV
-      else process.env.NODE_ENV = previousNodeEnv
+      if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV")
+      else Object.defineProperty(process.env, "NODE_ENV", previousNodeEnv)
 
       if (previousBackendUrl === undefined) delete process.env.NEXT_PUBLIC_BACKEND_URL
       else process.env.NEXT_PUBLIC_BACKEND_URL = previousBackendUrl

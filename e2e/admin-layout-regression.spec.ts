@@ -11,7 +11,16 @@ const ADMIN_MEMBER_FIXTURE = {
   nickname: "aquila",
   isAdmin: true,
   profileImageUrl: "/avatar.png",
-  profileImageDirectUrl: "/avatar.png",
+}
+
+const ADMIN_PROFILE_FIXTURE = {
+  id: 1,
+  username: "aquila",
+  name: "aquila",
+  nickname: "aquila",
+  profileImageUrl: "/avatar.png",
+  blogTitle: "Aquila",
+  isAdmin: true,
 }
 
 const ADMIN_POST_FIXTURES = Array.from({ length: 6 }, (_, index) => ({
@@ -82,6 +91,14 @@ const mockAdminDashboardEndpoints = async (page: Page) => {
     })
   })
 
+  await page.route("**/member/api/v1/adm/members/bootstrap", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ member: ADMIN_MEMBER_FIXTURE, profile: ADMIN_PROFILE_FIXTURE }),
+    })
+  })
+
   await page.route("**/system/api/v1/adm/bootstrap", async (route) => {
     await route.fulfill({
       status: 200,
@@ -117,6 +134,14 @@ const mockAdminPostsWorkspaceEndpoints = async (page: Page) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(ADMIN_MEMBER_FIXTURE),
+    })
+  })
+
+  await page.route("**/member/api/v1/adm/members/bootstrap", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ member: ADMIN_MEMBER_FIXTURE, profile: ADMIN_PROFILE_FIXTURE }),
     })
   })
 

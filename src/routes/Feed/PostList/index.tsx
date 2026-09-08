@@ -70,7 +70,7 @@ const FilterLoadingStateInner: React.FC = () => (
       </div>
       <div className="searchLoadingCopy">
         <h3>검색 결과를 불러오는 중...</h3>
-        <p>입력한 조건에 맞는 글을 카드 레이아웃 기준으로 정리하고 있습니다.</p>
+        <p>입력한 조건에 맞는 글을 불러오고 있습니다.</p>
       </div>
     </div>
     <div className="searchLoadingGrid skeletonGrid" aria-hidden="true">
@@ -185,7 +185,7 @@ const PostList: React.FC<Props> = ({
             className="deferredPostCardWrap"
           >
             {shouldMountCard ? (
-              <PostCard data={post} layout="regular" index={index} />
+              <PostCard data={post} layout="regular" />
             ) : (
               <article className="deferredPostCardPlaceholder" aria-hidden="true" />
             )}
@@ -469,30 +469,23 @@ const StyledWrapper = styled.div`
     position: relative;
     overflow: hidden;
     min-height: 11.5rem;
+    max-width: 760px;
+    padding: 20px 0;
     border-radius: 0;
     border: 0;
-    border-bottom: 1px solid ${({ theme }) => theme.colors.gray5};
     background: transparent;
 
     &::before,
     &::after {
       content: "";
       display: block;
-      background:
-        linear-gradient(
-          90deg,
-          ${({ theme }) => theme.colors.gray2} 0%,
-          ${({ theme }) => theme.colors.gray3} 50%,
-          ${({ theme }) => theme.colors.gray2} 100%
-        );
-      background-size: 240% 100%;
+      background: ${({ theme }) => theme.colors.gray3};
       animation: feed-card-skeleton-pulse 1.1s ease-in-out infinite;
     }
 
     &::before {
-      width: min(100%, 12rem);
-      aspect-ratio: 1.45 / 1;
-      margin-left: auto;
+      width: 65%;
+      height: 1.95rem;
     }
 
     &::after {
@@ -511,33 +504,15 @@ const StyledWrapper = styled.div`
     width: 100%;
     min-height: 11.5rem;
     border-radius: 0;
-    border-bottom: ${({ theme }) => `${theme.variables.ui.card.borderWidth}px solid ${theme.colors.gray4}`};
     background: transparent;
-  }
-
-  @media (max-width: 640px) {
-    .skeletonCard {
-      min-height: 24rem;
-      border-radius: 13px;
-
-      &::after {
-        margin: 0.86rem 0.9rem 0.86rem;
-        min-height: 9.6rem;
-      }
-    }
-
-    .deferredPostCardPlaceholder {
-      min-height: 24rem;
-      border-radius: 4px;
-    }
   }
 
   @keyframes feed-card-skeleton-pulse {
     0% {
-      background-position: 100% 0;
+      opacity: 0.45;
     }
     100% {
-      background-position: 0 0;
+      opacity: 0.8;
     }
   }
 `

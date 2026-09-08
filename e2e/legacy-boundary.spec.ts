@@ -173,7 +173,6 @@ test.describe("frontend legacy boundary", () => {
       "src/routes/Admin/AdminToolsWorkspacePage.tsx",
       "src/routes/Admin/AdminToolsWorkspacePageState.ts",
       "src/routes/Admin/AdminToolsWorkspaceModel.ts",
-      "src/routes/Admin/useEditorStudioProfileCommands.ts",
     ]
     const retiredPublicMemberPatterns = [
       /\/signup(?:\/|["'`])/i,

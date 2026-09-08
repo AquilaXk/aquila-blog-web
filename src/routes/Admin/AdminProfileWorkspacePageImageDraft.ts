@@ -1,5 +1,4 @@
 import { type ChangeEvent, type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react"
-import type { AuthMember } from "src/hooks/useAuthSession"
 import useViewportImageEditor from "src/libs/imageEditor/useViewportImageEditor"
 import {
   buildImageOptimizationSummary,
@@ -14,17 +13,15 @@ import {
   PROFILE_IMAGE_EDIT_MIN_ZOOM,
   resolveProfileImageEditDrawRatios,
 } from "src/libs/profileImageUpload"
+import { parseProfileImageUploadResponse } from "src/libs/profileWorkspaceImage"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 import {
   PROFILE_IMAGE_DRAFT_DEFAULT_SOURCE_SIZE,
-  PROFILE_IMAGE_UPLOAD_RETRY_DELAY_MS,
   deletePreviousProfileImage,
   listPreviousProfileImages,
   parseResponseErrorBody,
   readImageSourceSizeFromFile,
   requestProfileImageUpload,
-  selectPreviousProfileImage,
-  sleep,
   type ProfileImageHistoryItem,
 } from "src/routes/Admin/AdminProfilePersistenceModel"
 import type { NoticeTone } from "src/routes/Admin/AdminProfileWorkspacePageModel"
@@ -36,19 +33,17 @@ type ProfileImageDraftTransformState = {
 }
 
 type UseAdminProfileWorkspaceImageDraftArgs = {
-  refreshWorkspace: (memberId: number) => Promise<unknown>
+  saveProfileImage: (memberId: number, profileImageUrl: string) => Promise<void>
   sessionMemberId?: number
   setImageNotice: Dispatch<SetStateAction<{ tone: NoticeTone; text: string }>>
   setLoadingKey: Dispatch<SetStateAction<string>>
-  setMe: (member: AuthMember) => void
 }
 
 export const useAdminProfileWorkspaceImageDraft = ({
-  refreshWorkspace,
+  saveProfileImage,
   sessionMemberId,
   setImageNotice,
   setLoadingKey,
-  setMe,
 }: UseAdminProfileWorkspaceImageDraftArgs) => {
   const [profileImageFileName, setProfileImageFileName] = useState("")
   const [isProfileImageEditorOpen, setIsProfileImageEditorOpen] = useState(false)
@@ -287,31 +282,24 @@ export const useAdminProfileWorkspaceImageDraft = ({
         setLoadingKey("upload")
         setImageNotice({ tone: "loading", text: "프로필 이미지를 최적화하고 초안에 반영하고 있습니다..." })
         const prepared = await prepareProfileImageForUpload(file)
-        let uploadResponse = await requestProfileImageUpload(sessionMemberId, prepared.file)
-
-        if (uploadResponse.status === 409) {
-          const firstConflictBody = await parseResponseErrorBody(uploadResponse)
-          const retryMessage = "요청 충돌을 감지해 자동 재시도 중입니다..."
-          setImageNotice({ tone: "loading", text: retryMessage })
-          setProfileImageDraftNotice({ tone: "loading", text: retryMessage })
-          await sleep(PROFILE_IMAGE_UPLOAD_RETRY_DELAY_MS)
-          uploadResponse = await requestProfileImageUpload(sessionMemberId, prepared.file)
-          if (!uploadResponse.ok) {
-            const retryBody = await parseResponseErrorBody(uploadResponse)
-            throw new Error(`이미지 업로드 실패 (${uploadResponse.status}) ${retryBody || firstConflictBody}`.trim())
-          }
-        } else if (!uploadResponse.ok) {
+        const uploadResponse = await requestProfileImageUpload(sessionMemberId, prepared.file)
+        if (!uploadResponse.ok) {
           const body = await parseResponseErrorBody(uploadResponse)
           throw new Error(`이미지 업로드 실패 (${uploadResponse.status}) ${body}`.trim())
         }
 
-        const uploadData = (await uploadResponse.json()) as AuthMember
-        setMe(uploadData)
-        await refreshWorkspace(sessionMemberId)
-        await refreshPreviousProfileImages()
+        const { profileImageUrl } = parseProfileImageUploadResponse(await uploadResponse.json())
+        await saveProfileImage(sessionMemberId, profileImageUrl)
         const successMessage = `프로필 이미지가 초안에 반영되었습니다. ${buildImageOptimizationSummary(prepared)}`
-        setImageNotice({ tone: "success", text: successMessage })
-        setProfileImageDraftNotice({ tone: "success", text: successMessage })
+        try {
+          await refreshPreviousProfileImages()
+          setImageNotice({ tone: "success", text: successMessage })
+          setProfileImageDraftNotice({ tone: "success", text: successMessage })
+        } catch {
+          const partialSuccessMessage = `${successMessage} 이미지 이력은 새로고침하지 못했습니다.`
+          setImageNotice({ tone: "error", text: partialSuccessMessage })
+          setProfileImageDraftNotice({ tone: "error", text: partialSuccessMessage })
+        }
         return true
       } catch (error) {
         const message = normalizeProfileImageUploadError(error)
@@ -325,7 +313,7 @@ export const useAdminProfileWorkspaceImageDraft = ({
         setLoadingKey("")
       }
     },
-    [refreshPreviousProfileImages, refreshWorkspace, sessionMemberId, setImageNotice, setLoadingKey, setMe]
+    [refreshPreviousProfileImages, saveProfileImage, sessionMemberId, setImageNotice, setLoadingKey]
   )
 
   const handleSelectPreviousProfileImage = useCallback(
@@ -334,11 +322,16 @@ export const useAdminProfileWorkspaceImageDraft = ({
       try {
         setLoadingKey("upload")
         setProfileImageDraftNotice({ tone: "loading", text: "이전 프로필 이미지를 적용하고 있습니다..." })
-        const updatedMember = await selectPreviousProfileImage(sessionMemberId, image.imageUrl)
-        setMe(updatedMember)
-        await refreshWorkspace(sessionMemberId)
-        await refreshPreviousProfileImages()
-        setProfileImageDraftNotice({ tone: "success", text: "이전 프로필 이미지를 적용했습니다." })
+        await saveProfileImage(sessionMemberId, image.imageUrl)
+        try {
+          await refreshPreviousProfileImages()
+          setProfileImageDraftNotice({ tone: "success", text: "이전 프로필 이미지를 적용했습니다." })
+        } catch {
+          setProfileImageDraftNotice({
+            tone: "error",
+            text: "이전 프로필 이미지를 적용했지만 이미지 이력은 새로고침하지 못했습니다.",
+          })
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setProfileImageDraftNotice({ tone: "error", text: `프로필 이미지 적용 실패: ${message}` })
@@ -346,7 +339,7 @@ export const useAdminProfileWorkspaceImageDraft = ({
         setLoadingKey("")
       }
     },
-    [refreshPreviousProfileImages, refreshWorkspace, sessionMemberId, setLoadingKey, setMe]
+    [refreshPreviousProfileImages, saveProfileImage, sessionMemberId, setLoadingKey]
   )
 
   const handleDeletePreviousProfileImage = useCallback(

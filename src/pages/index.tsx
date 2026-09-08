@@ -131,7 +131,7 @@ export const getStaticProps: GetStaticProps = async () => {
       initialHomeBootstrapStatus: status,
     },
     revalidate:
-      IS_QA_STATIC_SHELL_MODE || !postsLoaded || initialAdminProfileSource === "static-fallback"
+      IS_QA_STATIC_SHELL_MODE || !postsLoaded || initialAdminProfileSource === "unavailable"
         ? HOME_DEGRADED_REVALIDATE_SECONDS
         : HOME_ISR_REVALIDATE_SECONDS,
   }

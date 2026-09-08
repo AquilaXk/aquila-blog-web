@@ -571,7 +571,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
           <ExplorerCard>
             <div className="feedTitle">
               <span>Latest Notes</span>
-              <h2>최근 글</h2>
+              <h1>최근 글</h1>
               <p className="feedDescription">실제 운영에서 마주친 문제와 선택, 검증 결과를 긴 글로 정리합니다.</p>
             </div>
             <div className="searchSlot">

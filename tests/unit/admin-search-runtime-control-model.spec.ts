@@ -7,6 +7,9 @@ type SearchPipelineRequest =
   components["schemas"]["SearchPipelineForceControlRequest"]
 type SearchMirrorRequest =
   components["schemas"]["SearchEngineMirrorForceDisableRequest"]
+type SearchOperationReceipt = NonNullable<
+  ReturnType<typeof AdminSearchRuntimeControlModel.parseOperationReceipt>
+>
 
 const OPERATION_ID = "8d39047c-7791-4c0f-9136-0fcdb021942d"
 
@@ -107,13 +110,13 @@ test("accepts only correctly paired receipts and keeps ACCEPTED nonterminal", ()
     status: "ACCEPTED",
     controlKey: "PIPELINE_FORCE_CONTROL",
     controlValue: "ENABLED",
-  }
+  } satisfies SearchOperationReceipt
   const succeeded = {
     ...accepted,
     status: "SUCCEEDED",
     resultCode: "SEARCH_PIPELINE_FORCE_CONTROL_UPDATED",
     controlVersion: 3,
-  }
+  } satisfies SearchOperationReceipt
 
   expect(
     AdminSearchRuntimeControlModel.parseAcceptedOperationReceipt("pipeline", {

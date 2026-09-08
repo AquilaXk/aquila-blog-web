@@ -1,46 +1,9 @@
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
-import { buildProfileWorkspaceAdminProfileCacheFields, normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
+import { normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
 
 test.describe("admin profile state contract", () => {
-  test("프로필 이미지는 hydration 시점에 이미 완료된 실패도 기본 이미지로 전환한다", async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      const completeDescriptor = Object.getOwnPropertyDescriptor(
-        HTMLImageElement.prototype,
-        "complete"
-      )
-      const naturalWidthDescriptor = Object.getOwnPropertyDescriptor(
-        HTMLImageElement.prototype,
-        "naturalWidth"
-      )
-      const isFailedPrimary = (image: HTMLImageElement) =>
-        image.getAttribute("src")?.includes("qa=already-complete-broken") === true
-
-      Object.defineProperty(HTMLImageElement.prototype, "complete", {
-        configurable: true,
-        get() {
-          return isFailedPrimary(this) || completeDescriptor?.get?.call(this) || false
-        },
-      })
-      Object.defineProperty(HTMLImageElement.prototype, "naturalWidth", {
-        configurable: true,
-        get() {
-          return isFailedPrimary(this) ? 0 : naturalWidthDescriptor?.get?.call(this) || 0
-        },
-      })
-    })
-
-    await page.goto("/_qa/profile-image-hydration")
-
-    await expect(page.getByTestId("qa-profile-image")).toHaveAttribute(
-      "src",
-      "/images/default-profile.svg"
-    )
-  })
-
   test("admin profile workspace residual file boundaries는 600 line companion budget을 유지한다", () => {
     const adminRoot = path.resolve(__dirname, "../src/routes/Admin")
     const requiredModules = [
@@ -102,40 +65,6 @@ test.describe("admin profile state contract", () => {
     expect(rendererSource).not.toContain("<AvatarWorkspaceCard>")
     expect(layoutSource).toContain("AdminProfileWorkspace.styles.links")
     expect(layoutSource).not.toContain("export const LinkRowCard = styled.div")
-  })
-
-  test("프로필 이미지는 저장된 URL 로드 실패 시 기본 이미지를 한 번만 fallback 한다", () => {
-    const profileImageSource = readFileSync(
-      path.resolve(__dirname, "../src/components/ProfileImage.tsx"),
-      "utf8"
-    )
-    const identitySource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/AdminProfileWorkspaceIdentitySection.tsx"),
-      "utf8"
-    )
-    const previewSource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/AdminProfilePreviewRail.tsx"),
-      "utf8"
-    )
-
-    expect(profileImageSource).not.toContain('import { CONFIG } from "site.config"')
-    expect(profileImageSource).toContain("fallbackSrc,")
-    expect(profileImageSource).toContain("const requestedSrc = src || fallbackSrc")
-    expect(profileImageSource).toContain('const fallbackAttemptKey = typeof requestedSrc === "string" ? requestedSrc : fallbackSrc')
-    expect(profileImageSource).toContain("const [resolvedSrc, setResolvedSrc] = React.useState(requestedSrc)")
-    expect(profileImageSource).toContain("const fallbackAttemptSourceRef = React.useRef<string | undefined>(undefined)")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current = undefined")
-    expect(profileImageSource).toContain("setResolvedSrc(requestedSrc)")
-    expect(profileImageSource).toContain("}, [requestedSrc])")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current === fallbackAttemptKey")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current = fallbackAttemptKey")
-    expect(profileImageSource).toContain("setResolvedSrc(fallbackSrc)")
-    expect(identitySource).toContain("src={draft.profileImageUrl || undefined}")
-    expect(identitySource).toContain("fallbackSrc={CONFIG.profile.image}")
-    expect(identitySource).not.toContain("<AvatarFallback>")
-    expect(previewSource).toContain("src={previewContent.profileImageUrl || undefined}")
-    expect(previewSource).toContain("fallbackSrc={CONFIG.profile.image}")
-    expect(previewSource).not.toContain("<AvatarFallback>")
   })
 
   test("profile 작업공간은 공통 section nav/action dock primitive 위에서 반응형 분기를 유지한다", () => {
@@ -213,7 +142,7 @@ test.describe("admin profile state contract", () => {
     expect(modelSource).toContain("export const createBlankLinkItem = (")
     expect(modelSource).toContain("export const validateLinkInputs = (")
     expect(modelSource).toContain("export const toPayloadLinks = (")
-    expect(modelSource).toContain("export const buildWorkspaceFallback = (")
+    expect(modelSource).not.toContain("buildWorkspaceFallback")
     expect(source).not.toContain("const WORKSPACE_SECTIONS:")
     expect(source).not.toContain("const pickWorkspaceSectionContent =")
     expect(source).not.toContain("const serializeWorkspaceSection =")
@@ -337,66 +266,19 @@ test.describe("admin profile state contract", () => {
     )
     const aboutSource = readFileSync(path.resolve(__dirname, "../src/pages/about.tsx"), "utf8")
 
-    expect(profileSource).toContain("syncPublishedAdminProfileCache(normalizeProfileWorkspaceContent(nextWorkspace.published))")
-    expect(profileSource).toContain("...buildProfileWorkspaceAdminProfileCacheFields(content)")
+    expect(profileSource).toContain("await refreshAdminProfileCache(queryClient)")
+    expect(profileSource).not.toContain("buildProfileWorkspaceAdminProfileCacheFields")
     expect(profileSource).not.toContain("buildLegacyAboutDetails")
     expect(profileSource).not.toContain("aboutDetails:")
-    expect(aboutSource).toContain("const displayHeadline = adminProfile?.aboutHeadline || DEFAULT_ABOUT_HEADLINE")
-    expect(aboutSource).toContain("const displayRole = adminProfile?.aboutRole || CONFIG.profile.role")
-    expect(aboutSource).toContain("const displayBio = adminProfile?.aboutBio || CONFIG.profile.bio")
-    expect(aboutSource).toContain("adminProfile?.aboutSections && adminProfile.aboutSections.length > 0")
-    expect(aboutSource).toContain("adminProfile?.aboutProjects && adminProfile.aboutProjects.length > 0")
+    expect(aboutSource).toContain("const displayHeadline = adminProfile.aboutHeadline || \"\"")
+    expect(aboutSource).toContain("const displayRole = adminProfile.aboutRole || \"\"")
+    expect(aboutSource).toContain("const displayBio = adminProfile.aboutBio || \"\"")
+    expect(aboutSource).toContain("(adminProfile.aboutSections || [])")
+    expect(aboutSource).toContain("(adminProfile.aboutProjects || [])")
     expect(aboutSource).not.toContain("PROJECT_PRESETS")
     expect(aboutSource).not.toContain("대표 글 보기")
   })
 
-  test("profile workspace legacy cache bridge는 structured about 필드와 aboutDetails를 함께 만든다", () => {
-    const bridge = buildProfileWorkspaceAdminProfileCacheFields({
-      profileImageUrl: "/profile.png",
-      profileRole: "Backend",
-      profileBio: "운영 가능한 시스템을 설계합니다.",
-      aboutHeadline: "이유를 먼저 따집니다.",
-      aboutRole: "Full-stack",
-      aboutBio: "문제와 운영을 같이 봅니다.",
-      aboutSections: [
-        {
-          id: "career",
-          title: "경력",
-          items: ["2026.03 Aquila Blog 운영"],
-          dividerBefore: false,
-        },
-      ],
-      aboutProjectSectionTitle: "프로젝트",
-      aboutProjects: [
-        {
-          id: "blog",
-          name: "aquila-blog",
-          summary: "관리자에서 직접 수정하는 프로젝트",
-          role: "Full-stack",
-          href: "https://github.com/AquilaXk/aquila-blog",
-          linkLabel: "GitHub",
-        },
-      ],
-      blogTitle: "AquilaLog",
-      homeIntroTitle: "비밀스러운 IT 공작소",
-      homeIntroDescription: "비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다",
-      blogDesign: "grid" as never,
-      legacyBlogScheme: "light",
-      serviceLinks: [],
-      contactLinks: [],
-    })
-
-    expect(bridge.profileImageUrl).toBe("/profile.png")
-    expect(bridge.profileImageDirectUrl).toBe("/profile.png")
-    expect(bridge.aboutHeadline).toBe("이유를 먼저 따집니다.")
-    expect(bridge.aboutSections.map((section) => section.title)).toEqual(["경력"])
-    expect(bridge.aboutProjectSectionTitle).toBe("프로젝트")
-    expect(bridge.aboutProjects.map((project) => project.name)).toEqual(["aquila-blog"])
-    expect(bridge.blogDesign).toBe("legacy")
-    expect(bridge.legacyBlogScheme).toBe("light")
-    expect(bridge.aboutDetails).toContain("## 경력")
-    expect(bridge.aboutDetails).toContain("- 2026.03 Aquila Blog 운영")
-  })
 
   test("profile workspace 정규화는 전역 블로그 디자인 fallback을 고정한다", () => {
     const normalized = normalizeProfileWorkspaceContent({

@@ -22,15 +22,7 @@ test("admin cookie client contract", () => {
 
   expect(adminProfileSource).not.toContain("cookies-next/client")
   expect(publicAdminProfileClientSource).not.toContain('import { setCookie } from "cookies-next/client"')
-  expect(publicAdminProfileClientSource).toContain('await import("cookies-next/client")')
-
-  expect(publicAdminProfileClientSource).toContain('sameSite: "lax"')
-  expect(publicAdminProfileClientSource).toContain("maxAge:")
-  expect(publicAdminProfileClientSource).toContain('secure: typeof window !== "undefined" && window.location.protocol === "https:"')
-
-  expect(publicAdminProfileClientSource).toContain('const ADMIN_PROFILE_SNAPSHOT_COOKIE = "admin_profile_snapshot_v1"')
-  expect(publicAdminProfileClientSource).toContain("const ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS = 60 * 30")
-  expect(publicAdminProfileClientSource).toContain('path: "/"')
-  expect(publicAdminProfileClientSource).toContain("maxAge: ADMIN_PROFILE_SNAPSHOT_MAX_AGE_SECONDS")
+  expect(publicAdminProfileClientSource).not.toContain("cookies-next/client")
+  expect(publicAdminProfileClientSource).not.toContain("admin_profile_snapshot_v1")
 
 })

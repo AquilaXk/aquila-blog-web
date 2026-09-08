@@ -57,9 +57,7 @@ export const AdminHubSurfaceSections = ({
         <p>{recentWorkSummary}</p>
       </HeroCopy>
       <HeroActions>
-        <Link href={primaryAction.secondaryHref} passHref legacyBehavior>
-          <SecondaryActionLink>글 전체 보기 →</SecondaryActionLink>
-        </Link>
+        <SecondaryActionLink as={Link} href={primaryAction.secondaryHref}>글 전체 보기 →</SecondaryActionLink>
       </HeroActions>
     </HeroHeader>
 
@@ -82,15 +80,13 @@ export const AdminHubSurfaceSections = ({
         {contentItems.length > 0 ? (
           <ContentList aria-label="최근 콘텐츠">
             {contentItems.map((item) => (
-              <Link key={`${item.href}-${item.title}`} href={item.href} passHref legacyBehavior>
-                <ContentRow data-tone={item.tone || "neutral"}>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>{item.meta}</span>
-                  </div>
-                  <small>{item.status}</small>
-                </ContentRow>
-              </Link>
+              <ContentRow as={Link} key={`${item.href}-${item.title}`} href={item.href} data-tone={item.tone || "neutral"}>
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.meta}</span>
+                </div>
+                <small>{item.status}</small>
+              </ContentRow>
             ))}
           </ContentList>
         ) : (

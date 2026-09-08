@@ -2,21 +2,6 @@ import type { PostDetail } from "src/types"
 import { ApiError, apiFetch } from "../client"
 import type { ApiPostWithContentDto } from "./PostApiDtos"
 import { extractPostIdFromSlug, mapPostDetail } from "./PostApiMappers"
-import {
-  getFreshServerSnapshot,
-  isServerRuntime,
-  POST_DETAIL_SSR_CACHE_MAX_ENTRIES,
-  POST_DETAIL_SSR_CACHE_TTL_MS,
-  setServerSnapshot,
-} from "./PostApiRequestModel"
-
-let postDetailSsrCache = new Map<string, { value: PostDetail; cachedAt: number }>()
-let pendingPostDetailPromises = new Map<string, Promise<PostDetail | null>>()
-
-export const resetPostDetailRequestCaches = () => {
-  postDetailSsrCache = new Map()
-  pendingPostDetailPromises = new Map()
-}
 
 export const getPostDetailBySlug = async (slug: string): Promise<PostDetail | null> => {
   const postId = extractPostIdFromSlug(slug)
@@ -44,55 +29,14 @@ export const getPostDetailById = async (id: string): Promise<PostDetail | null> 
   const postId = Number(id)
   if (!Number.isInteger(postId) || postId <= 0) return null
   const endpoint = `/post/api/v1/posts/${postId}`
-  const snapshotCache = postDetailSsrCache
-  const pendingSnapshots = pendingPostDetailPromises
-  const canUseServerSnapshot = isServerRuntime
-  const cachedSnapshot =
-    canUseServerSnapshot
-      ? getFreshServerSnapshot(snapshotCache, endpoint, POST_DETAIL_SSR_CACHE_TTL_MS)
-      : null
-  if (cachedSnapshot) return cachedSnapshot
-
-  if (canUseServerSnapshot) {
-    const pendingSnapshot = pendingSnapshots.get(endpoint)
-    if (pendingSnapshot) {
-      return pendingSnapshot
-    }
-  }
-
-  const loadPostDetail = async () => {
+  // 공개 범위는 변경될 수 있으므로 요청 간 본문·진행 중 응답을 공유하지 않는다.
+  try {
     const post = await apiFetch<ApiPostWithContentDto>(endpoint)
-    return mapPostDetail(post, { allowTrustedContentHtml: true })
-  }
-
-  if (!canUseServerSnapshot) {
-    try {
-      return await loadPostDetail()
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return null
-      }
-      throw error
+    return await mapPostDetail(post, { allowTrustedContentHtml: true })
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null
     }
+    throw error
   }
-
-  const snapshotPromise = (async () => {
-    try {
-      const nextDetail = await loadPostDetail()
-      if (nextDetail) {
-        setServerSnapshot(snapshotCache, endpoint, nextDetail, POST_DETAIL_SSR_CACHE_MAX_ENTRIES)
-      }
-      return nextDetail
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return null
-      }
-      throw error
-    } finally {
-      pendingSnapshots.delete(endpoint)
-    }
-  })()
-
-  pendingSnapshots.set(endpoint, snapshotPromise)
-  return snapshotPromise
 }

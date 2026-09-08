@@ -28,6 +28,7 @@ import {
 } from "@codemirror/view"
 import { GFM } from "@lezer/markdown"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
+import { buildUploadReplacementTransactions } from "./markdownEditorUploadReplacement"
 import {
   buildMarkdownLivePreviewPlan,
   type MarkdownLivePreviewDecoration,
@@ -377,19 +378,12 @@ export const MarkdownEditorLiveSurface = forwardRef<
         ? [preserveUploadError.of(true)]
         : []
       if (options?.replaceTransientContent && plan.rangeStart < plan.rangeEnd) {
-        view.dispatch({
-          annotations: [Transaction.addToHistory.of(false), ...preservedAnnotations],
-          changes: { from: plan.rangeStart, to: plan.rangeEnd, insert: "" },
-          selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd),
-        })
-        if (plan.replacement) {
-          view.dispatch({
-            annotations: preservedAnnotations,
-            changes: { from: plan.rangeStart, insert: plan.replacement },
-            selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd),
-            scrollIntoView: options.scrollIntoView !== false,
-          })
-        }
+        view.dispatch(buildUploadReplacementTransactions(
+          view.state,
+          plan,
+          preservedAnnotations,
+          options.scrollIntoView !== false
+        ))
         if (options.focus !== false && !disabled) view.focus()
         return true
       }

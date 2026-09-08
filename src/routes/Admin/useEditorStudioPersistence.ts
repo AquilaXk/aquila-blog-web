@@ -1,9 +1,11 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from "react"
+import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiPostWriteResult } from "src/apis/backend/posts/PostApiDtos"
 import { normalizeCategoryValue } from "src/libs/utils"
@@ -15,13 +17,14 @@ import {
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
 import {
-  resolvePersistedSummaryResult,
+  resolveSummaryWriteCompletion,
   toCreateSummaryWriteFields,
   toModifySummaryWriteFields,
   type CanonicalSummaryState,
   type SummaryIntent,
 } from "./EditorStudioWorkspaceControllerRootModel"
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
+import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
@@ -124,7 +127,6 @@ type UseEditorStudioPersistenceParams = {
   setPostSummary: StudioSetState<string>
   setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
   setSummaryIntent: StudioSetState<SummaryIntent>
-  setPostVisibility: StudioSetState<PostVisibility>
   setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
   setLocalDraftSlotLabel: StudioSetState<string>
@@ -150,7 +152,6 @@ type UseEditorStudioPersistenceParams = {
   refreshPublicPostReadViews: (affectedPostId?: string | number) => Promise<void>
   pretty: (value: unknown) => string
   generateIdempotencyKey: () => string
-  removeLocalDraft: (source: { kind: "create" } | { kind: "post"; postId: string }) => void
   signalLocalDraftBaselineReady: (signal?: LocalDraftBaselineReadySignal) => void
   uploadWithConflictRetry: (requestUpload: () => Promise<Response>) => Promise<Response>
   normalizeSafeImageUrl: (raw: string) => string
@@ -190,7 +191,6 @@ export const useEditorStudioPersistence = ({
   postVisibility,
   pretty,
   refreshPublicPostReadViews,
-  removeLocalDraft,
   serverBaselineEditorFingerprintRef,
   signalLocalDraftBaselineReady,
   setEditorMode,
@@ -209,7 +209,6 @@ export const useEditorStudioPersistence = ({
   setPostSummary,
   setPostSummarySource,
   setSummaryIntent,
-  setPostVisibility,
   setPreviewThumbnailSourceUrl,
   setPublishStatus,
   setResult,
@@ -242,11 +241,19 @@ export const useEditorStudioPersistence = ({
     uploadWithConflictRetry,
   })
 
+  const currentSummaryRef = useRef<CanonicalSummaryState>({
+    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+  })
+  currentSummaryRef.current = {
+    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+  }
+
   const applyCanonicalWriteResponse = useCallback(
     (response: RsData<PostWriteResult>) => {
-      const resolvedSummary = resolvePersistedSummaryResult(
+      const resolvedSummary = resolveSummaryWriteCompletion(
         { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
         { summary: response.data?.summary, source: response.data?.summarySource },
+        currentSummaryRef.current,
       )
       if (!resolvedSummary.ok) {
         const message = "저장된 canonical summary 응답이 올바르지 않습니다."
@@ -256,9 +263,9 @@ export const useEditorStudioPersistence = ({
       }
 
       const canonicalSummary = resolvedSummary.state
-      setPostSummary(canonicalSummary.summary)
-      setPostSummarySource(canonicalSummary.summarySource)
-      setSummaryIntent(canonicalSummary.intent)
+      setPostSummary(resolvedSummary.editorState.summary)
+      setPostSummarySource(resolvedSummary.editorState.summarySource)
+      setSummaryIntent(resolvedSummary.editorState.intent)
       return canonicalSummary
     },
     [
@@ -356,6 +363,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "create" })
       setLoadingKey("writePost")
       setPublishStatus({ tone: "loading", text: "글 작성 중입니다..." })
       const contentWithMetadata = composeEditorContent(currentPostContent, postTags, {
@@ -408,7 +416,6 @@ export const useEditorStudioPersistence = ({
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       lastWriteFingerprintRef.current = ""
       lastWriteIdempotencyKeyRef.current = ""
-      await refreshPublicPostReadViews(createWritePostId.postId)
 
       const visibilityText =
         postVisibility === "PUBLIC_LISTED"
@@ -417,7 +424,7 @@ export const useEditorStudioPersistence = ({
             ? "링크 공개(목록 미노출)"
             : "비공개"
 
-      removeLocalDraft({ kind: "create" })
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -425,14 +432,16 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
 
       setPublishStatus(
-        {
-          tone: "success",
-          text: `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`,
-        },
+        await resolvePostSaveRefresh(
+          () => refreshPublicPostReadViews(createWritePostId.postId),
+          `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`
+        ),
         "page"
       )
       setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
@@ -470,7 +479,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,
     setEditorMode,
@@ -524,6 +532,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
       setLoadingKey("modifyPost")
       setPublishStatus({ tone: "loading", text: "글 수정 중입니다..." })
 
@@ -540,8 +549,7 @@ export const useEditorStudioPersistence = ({
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      await refreshPublicPostReadViews(postId)
-      removeLocalDraft({ kind: "post", postId: postId.trim() })
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -549,9 +557,14 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
-      setPublishStatus({ tone: "success", text: `수정 완료: ${response.msg}` }, "page")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
+      setPublishStatus(await resolvePostSaveRefresh(
+        () => refreshPublicPostReadViews(postId),
+        `수정 완료: ${response.msg}`
+      ), "page")
       setResult(pretty(response))
       return true
     } catch (error) {
@@ -586,7 +599,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,
     setIsTempDraftMode,
@@ -638,6 +650,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
       setLoadingKey("publishTempPost")
       setPublishStatus({ tone: "loading", text: "새 글을 작성하는 중입니다..." })
 
@@ -648,13 +661,11 @@ export const useEditorStudioPersistence = ({
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
       const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
-      setPostVisibility(postVisibility)
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      await refreshPublicPostReadViews(postId)
-      // Temp posts autosave into the post slot; do not wipe an unrelated create-slot draft.
-      removeLocalDraft({ kind: "post", postId: postId.trim() })
+      // 임시글은 post 슬롯에 저장되므로 관계없는 create 초안은 지우지 않는다.
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -662,9 +673,14 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
-      setPublishStatus({ tone: "success", text: "새 글 작성이 완료되었습니다." }, "page")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
+      setPublishStatus(await resolvePostSaveRefresh(
+        () => refreshPublicPostReadViews(postId),
+        "새 글 작성이 완료되었습니다."
+      ), "page")
       setResult(pretty(response))
       return true
     } catch (error) {
@@ -698,7 +714,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     lastLocalDraftFingerprintRef,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,
@@ -707,7 +722,6 @@ export const useEditorStudioPersistence = ({
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
     setPostVersion,
-    setPostVisibility,
     setPublishStatus,
     setResult,
     toFlags,

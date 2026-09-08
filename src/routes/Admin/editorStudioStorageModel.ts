@@ -26,6 +26,16 @@ export const LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX = "admin.editor.localDraft.post
 export const LOCAL_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 export const LOCAL_DRAFT_POST_SLOT_LIMIT = 20
 
+let browserDocumentId: string | null = null
+
+export const getLocalDraftDocumentId = (): string => {
+  if (typeof window === "undefined") throw new Error("Draft document identity is browser-only")
+  if (browserDocumentId) return browserDocumentId
+  if (!globalThis.crypto?.randomUUID) throw new Error("Secure browser document identity is unavailable")
+  browserDocumentId = globalThis.crypto.randomUUID()
+  return browserDocumentId
+}
+
 export const isLocalDraftExpired = (savedAt: string, nowMs: number = Date.now()) => {
   const savedAtMs = Date.parse(savedAt)
   if (!Number.isFinite(savedAtMs)) return true
@@ -47,6 +57,13 @@ export const resolveLocalDraftSource = (
 export const localDraftStorageKey = (source: LocalDraftSource): string => {
   if (source.kind === "create") return LOCAL_DRAFT_CREATE_STORAGE_KEY
   return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.v3`
+}
+
+export const localDraftStorageKeyForDocument = (source: LocalDraftSource, documentId: string): string => {
+  const owner = documentId.trim()
+  if (!owner) throw new Error("Draft document identity is required")
+  if (source.kind === "create") return `admin.editor.localDraft.create.${owner}.v3`
+  return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.${owner}.v3`
 }
 
 export const describeLocalDraftSlot = (
@@ -81,22 +98,19 @@ export const persistCatalog = (storageKey: string, values: string[]) => {
   window.localStorage.setItem(storageKey, JSON.stringify(dedupeStrings(values)))
 }
 
-const normalizeLocalDraftSource = (
-  parsed: Partial<LocalDraftPayload>,
-  fallback: LocalDraftSource
-): LocalDraftSource | null => {
+const normalizeLocalDraftSource = (parsed: Partial<LocalDraftPayload>): LocalDraftSource | null => {
   const source = parsed.source
-  if (!source || typeof source !== "object") return fallback
+  if (!source || typeof source !== "object") return null
   if (source.kind === "create") return { kind: "create" }
   if (source.kind === "post" && typeof source.postId === "string" && source.postId.trim()) {
     return { kind: "post", postId: source.postId.trim() }
   }
-  return fallback
+  return null
 }
 
 const parseLocalDraftPayload = (
   raw: string,
-  fallbackSource: LocalDraftSource
+  expectedSource: LocalDraftSource
 ): LocalDraftPayload | null => {
   try {
     const parsed = JSON.parse(raw) as Partial<LocalDraftPayload>
@@ -104,8 +118,10 @@ const parseLocalDraftPayload = (
     const savedAt = typeof parsed.savedAt === "string" ? parsed.savedAt : ""
     if (isLocalDraftExpired(savedAt)) return null
 
-    const source = normalizeLocalDraftSource(parsed, fallbackSource)
+    const source = normalizeLocalDraftSource(parsed)
     if (!source) return null
+    if (source.kind !== expectedSource.kind) return null
+    if (source.kind === "post" && expectedSource.kind === "post" && source.postId !== expectedSource.postId) return null
 
     const visibility = parsed.visibility
     const isValidVisibility =
@@ -181,13 +197,14 @@ const parseLocalDraftPayload = (
   }
 }
 
-const listPostDraftEntries = (): Array<{ key: string; savedAtMs: number }> => {
+const listDraftEntries = (source: LocalDraftSource): Array<{ key: string; savedAtMs: number }> => {
   if (typeof window === "undefined") return []
   const entries: Array<{ key: string; savedAtMs: number }> = []
   const keys: string[] = []
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index)
-    if (!key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX) || !key.endsWith(".v3")) continue
+    const prefix = source.kind === "create" ? "admin.editor.localDraft.create" : LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX
+    if (!key?.startsWith(prefix) || !key.endsWith(".v3")) continue
     keys.push(key)
   }
   for (const key of keys) {
@@ -208,13 +225,12 @@ const listPostDraftEntries = (): Array<{ key: string; savedAtMs: number }> => {
   return entries
 }
 
-const enforceLocalDraftPostSlotLimit = () => {
+const admitLocalDraftSlot = (source: LocalDraftSource, storageKey: string) => {
   if (typeof window === "undefined") return
-  const entries = listPostDraftEntries().sort((left, right) => left.savedAtMs - right.savedAtMs)
-  const overflow = entries.length - LOCAL_DRAFT_POST_SLOT_LIMIT
-  if (overflow <= 0) return
-  for (const entry of entries.slice(0, overflow)) {
-    window.localStorage.removeItem(entry.key)
+  const entries = listDraftEntries(source)
+  // 만료된 슬롯만 정리하고, 아직 유효한 다른 원고를 지워 공간을 확보하지 않는다.
+  if (!entries.some((entry) => entry.key === storageKey) && entries.length >= LOCAL_DRAFT_POST_SLOT_LIMIT) {
+    throw new DOMException("Local draft slots are full", "QuotaExceededError")
   }
 }
 
@@ -222,19 +238,11 @@ export const readLocalDraft = (source: LocalDraftSource): LocalDraftPayload | nu
   if (typeof window === "undefined") return null
 
   try {
-    const storageKey = localDraftStorageKey(source)
+    const storageKey = localDraftStorageKeyForDocument(source, getLocalDraftDocumentId())
     const raw = window.localStorage.getItem(storageKey)
     if (!raw) return null
     const parsed = parseLocalDraftPayload(raw, source)
     if (!parsed) {
-      window.localStorage.removeItem(storageKey)
-      return null
-    }
-    if (parsed.source.kind !== source.kind) {
-      window.localStorage.removeItem(storageKey)
-      return null
-    }
-    if (source.kind === "post" && parsed.source.kind === "post" && parsed.source.postId !== source.postId) {
       window.localStorage.removeItem(storageKey)
       return null
     }
@@ -248,14 +256,70 @@ export const persistLocalDraft = (payload: LocalDraftPayload) => {
   if (typeof window === "undefined") return
 
   const source = payload.source
-  const storageKey = localDraftStorageKey(source)
+  const storageKey = localDraftStorageKeyForDocument(source, getLocalDraftDocumentId())
+  admitLocalDraftSlot(source, storageKey)
   window.localStorage.setItem(storageKey, JSON.stringify(payload))
-  if (source.kind === "post") {
-    enforceLocalDraftPostSlotLimit()
-  }
+  window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
 }
 
 export const removeLocalDraft = (source: LocalDraftSource) => {
   if (typeof window === "undefined") return
-  window.localStorage.removeItem(localDraftStorageKey(source))
+  window.localStorage.removeItem(localDraftStorageKeyForDocument(source, getLocalDraftDocumentId()))
+  window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+}
+
+export const captureLocalDraftCleanup = (source: LocalDraftSource): (() => boolean) => {
+  try {
+    const storage = window.localStorage
+    const key = localDraftStorageKeyForDocument(source, getLocalDraftDocumentId())
+    const submitted = storage.getItem(key)
+    return () => {
+      try {
+        // 같은 문서만 쓰는 슬롯에서 요청 이후 자동 저장된 원고는 보존한다.
+        if (submitted === null || storage.getItem(key) !== submitted) return false
+        storage.removeItem(key)
+        window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+        return true
+      } catch {
+        return false
+      }
+    }
+  } catch {
+    // 저장소 실패가 이미 완료된 서버 저장을 실패로 바꾸지 않는다.
+    return () => false
+  }
+}
+
+export type LocalDraftCandidate = { key: string; draft: LocalDraftPayload }
+
+export const listLocalDraftCandidates = (source: LocalDraftSource): LocalDraftCandidate[] => {
+  if (typeof window === "undefined") return []
+  const candidates: LocalDraftCandidate[] = []
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.endsWith(".v3")) continue
+    const isSourceKey = source.kind === "create"
+      ? key === LOCAL_DRAFT_CREATE_STORAGE_KEY || key.startsWith("admin.editor.localDraft.create.")
+      : key === localDraftStorageKey(source) || key.startsWith(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId}.`)
+    if (!isSourceKey) continue
+    const raw = window.localStorage.getItem(key)
+    if (!raw) continue
+    const draft = parseLocalDraftPayload(raw, source)
+    if (draft) candidates.push({ key, draft })
+  }
+  return candidates
+}
+
+export const readLocalDraftCandidate = (source: LocalDraftSource, key: string): LocalDraftPayload | null => {
+  if (typeof window === "undefined") return null
+  const candidate = listLocalDraftCandidates(source).find((entry) => entry.key === key)
+  return candidate?.draft ?? null
+}
+
+export const removeLocalDraftCandidate = (source: LocalDraftSource, key: string) => {
+  if (typeof window === "undefined") return
+  if (listLocalDraftCandidates(source).some((candidate) => candidate.key === key)) {
+    window.localStorage.removeItem(key)
+    window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+  }
 }

@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
 import {
-  addPublicAboutSnapshotCookie,
   mockAvatarAsset,
   mockPublicAdminProfile,
 } from "./helpers/smokeFixtures"
@@ -121,7 +120,7 @@ test.describe("core smoke detail layout", () => {
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, follow")
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
   await expect(page.locator('[data-ui="about-hero"] h1')).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "follow, index")
@@ -182,7 +181,7 @@ test.describe("core smoke detail layout", () => {
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "브라우저 title 회귀 테스트")
   await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute("content", "브라우저 title 회귀 테스트")
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
   await expect(page.locator('[data-ui="about-hero"] h1')).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
   await expect(page).toHaveTitle("About - AquilaLog")

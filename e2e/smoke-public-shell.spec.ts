@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "fs"
 import path from "path"
 import { resolveStaticAdminProfileSeed } from "../src/libs/server/postDetailPage"
 import {
-  addPublicAboutSnapshotCookie,
   mockAvatarAsset,
   mockFeedEndpoints,
   mockPublicAdminProfile,
@@ -127,7 +126,7 @@ test.describe("core smoke public shell", () => {
   )
 
   expect(rootLayoutSource).not.toContain("resolvePublicBlogAppearance")
-  expect(rootLayoutSource).toContain("usePublicAdminProfile(initialAdminProfile")
+  expect(rootLayoutSource).toContain("useAdminProfile(initialAdminProfile")
   expect(headerSource).toContain('data-ui="app-header"')
   expect(headerSource).toContain("z-index: 50;")
   expect(headerSource).toContain("width: min(calc(100% - 40px), 1240px);")
@@ -183,6 +182,7 @@ test.describe("core smoke public shell", () => {
   expect(navBarSource).toContain('data-ui="mobile-nav-search"')
   expect(navBarSource).toContain('aria-keyshortcuts="Meta+K Control+K"')
   expect(navBarSource).toContain(".primaryLinks,")
+  expect(navBarSource).toContain('router.pathname !== "/" && (')
   expect(navBarSource).toContain('className="searchTrigger"')
   expect(navBarSource).toContain("waitForFeedSearchInputFocus")
   expect(navBarSource).toContain('from "src/routes/Feed/feedSearchFocus"')
@@ -206,8 +206,8 @@ test.describe("core smoke public shell", () => {
   expect(logoSource).toContain("blogTitle")
   expect(adminShellSource).not.toContain("useAdminProfile")
   expect(adminPageSource).toContain("initialProfileSnapshot?: AdminProfile | null")
-  expect(adminPageSource).toContain("fetchServerAdminProfile(req")
-  expect(adminPageSource).toContain("resolvePublicAdminProfileSnapshot(req)")
+  expect(adminPageSource).not.toContain("fetchServerAdminProfile")
+  expect(adminPageSource).not.toContain("resolvePublicAdminProfileSnapshot")
   expect(appSource).toContain("initialAdminProfile={initialAdminProfile}")
   expect(appSource).toContain("initialProfileSnapshot?: AdminProfile | null")
   expect(appSource).toContain(
@@ -215,12 +215,13 @@ test.describe("core smoke public shell", () => {
   )
   expect(homePageSource).toContain("resolveStaticAdminProfileSeed")
   expect(homePageSource).toContain("initialAdminProfileSource")
-  expect(homePageSource).toContain('initialAdminProfileSource === "static-fallback"')
+  expect(homePageSource).toContain('initialAdminProfileSource === "unavailable"')
   expect(aboutPageSource).toContain("initialAdminProfileSource")
   expect(aboutPageSource).toContain("resolvePublicAdminProfileCacheControl")
   expect(postDetailPageSource).toContain("queryKey.adminProfile()")
   expect(postDetailPageSource).toContain("initialAdminProfile")
-  expect(postDetailPageSource).toContain('initialAdminProfileSource === "static-fallback"')
+  expect(postDetailPageSource).toContain('res.setHeader("Cache-Control", "private, no-store")')
+  expect(postDetailPageSource).not.toContain("revalidate:")
   expect(appSource).toContain("shouldRefetchAdminProfileSource")
   expect(appSource).toContain("initialAdminProfileShouldRefetch")
   expect(rootLayoutSource).toContain('pathname[1] !== "_"')
@@ -242,7 +243,7 @@ test.describe("core smoke public shell", () => {
   expect(useAdminProfileSource).toContain("staleTimeMs?: number")
 })
 
-  test("post detail adminProfile seed는 published와 fallback source를 구분한다", async () => {
+  test("post detail adminProfile seed는 published와 unavailable source를 구분한다", async () => {
   const publishedProfile = {
     username: "aquila",
     name: "aquila",
@@ -252,21 +253,14 @@ test.describe("core smoke public shell", () => {
     legacyBlogScheme: "light" as const,
   }
 
-  await expect(resolveStaticAdminProfileSeed(async () => publishedProfile)).resolves.toMatchObject({
-    profile: { blogDesign: "legacy", legacyBlogScheme: "light" },
-    source: "published",
-  })
-  await expect(
-    resolveStaticAdminProfileSeed(async () => {
-      throw new Error("admin profile unavailable")
-    })
-  ).resolves.toMatchObject({
-    profile: { blogDesign: "legacy", legacyBlogScheme: "dark" },
-    source: "static-fallback",
-  })
+  const publishedSeed = await resolveStaticAdminProfileSeed(async () => publishedProfile)
+  expect(publishedSeed).toEqual({ profile: publishedProfile, source: "published" })
+  await expect(resolveStaticAdminProfileSeed(async () => {
+    throw new Error("admin profile unavailable")
+  })).resolves.toEqual({ profile: null, source: "unavailable" })
 })
 
-  test("about fallback profile 응답은 public cache로 저장하지 않는다", async ({ page }) => {
+  test("about unavailable profile 응답은 public cache로 저장하지 않는다", async ({ page }) => {
   await page.route("**/member/api/v1/auth/me", async (route) => {
     await route.fulfill({
       status: 401,
@@ -282,14 +276,9 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  const staticFallbackResponse = await page.goto("/about")
-  expect(staticFallbackResponse?.headers()["cache-control"]).toBe("private, no-store")
-  expect(staticFallbackResponse?.headers()["server-timing"]).toContain('desc="static-fallback"')
-
-  await addPublicAboutSnapshotCookie(page)
-  const cookieSnapshotResponse = await page.goto("/about")
-  expect(cookieSnapshotResponse?.headers()["cache-control"]).toBe("private, no-store")
-  expect(cookieSnapshotResponse?.headers()["server-timing"]).toContain('desc="cookie-snapshot"')
+  const unavailableResponse = await page.goto("/about")
+  expect(unavailableResponse?.headers()["cache-control"]).toBe("private, no-store")
+  expect(unavailableResponse?.headers()["server-timing"]).toContain('desc="unavailable"')
 })
 
   test("about 자기소개 문구는 작성 개행을 유지하는 white-space 계약을 가진다", async ({ page }) => {
@@ -301,7 +290,7 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
   await expect(page.locator('[data-ui="about-hero"] h1')).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
 
@@ -328,7 +317,7 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
 
   await expect(page.getByRole("heading", { level: 1, name: "About Me" })).toHaveCount(0)

@@ -490,6 +490,8 @@ test("editor 작성 surface는 keyboard landmark와 심각도 높은 접근성 �
 
   await page.goto("/admin/editor/new?source=local-draft")
   await expect(page.locator("html")).toHaveAttribute("data-aquila-scheme", "light")
+  await page.getByLabel("복구할 브라우저 초안").selectOption(localDraftStorageKey)
+  await page.getByRole("button", { name: "복구", exact: true }).click()
   await expect(page.getByPlaceholder("제목을 입력하세요").first()).toHaveValue("접근성 launch gate 작성 테스트")
   await expect(page.getByRole("heading", { level: 1, name: "글 편집" })).toBeVisible()
   await expect(page.getByTestId("markdown-editor")).toBeVisible()

@@ -32,12 +32,10 @@ test("PostDetail styles no longer keep detail-v4 tokens", () => {
   expect(source).toContain("var(--aq-accent-link)")
 })
 
-test("Admin and Editor toast consumers import design-system Toast", () => {
+test("Active post management imports design-system Toast", () => {
   const adminFeedback = readSrc("routes/Admin/AdminPostsWorkspaceFeedbackLayer.tsx")
-  const editorUndo = readSrc("routes/Admin/EditorStudioUndoToast.tsx")
   expect(adminFeedback).toContain('from "src/design-system/Toast"')
   expect(adminFeedback).toContain("ConfirmDialog")
-  expect(editorUndo).toContain('from "src/design-system/Toast"')
 })
 
 test("paused modal close skips restoreFocus so nested dialog keeps focus", () => {

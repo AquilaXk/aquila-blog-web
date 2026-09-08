@@ -19,8 +19,8 @@ const uiTokens = {
     card: {
       titleLineHeight: 1.46,
       summaryLineHeight: 1.54,
-      summaryLines: 3,
-      metaFontSizeRem: 0.75,
+      summaryLines: 5,
+      metaFontSizeRem: 0.875,
     },
   },
 }

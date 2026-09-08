@@ -304,10 +304,10 @@ const MARKETING_REVERSE_HINT =
 
 const ownershipRules = [
   {
-    file: "src/routes/Admin/EditorStudioWorkspaceController.tsx",
+    file: "src/routes/Admin/EditorStudioPage.tsx",
     required: ['from "./EditorStudioWorkspaceControllerRoot"'],
     forbidden: [/\buseState\(/, /\buseEffect\(/, /\bapiFetch\b/],
-    hint: "EditorStudioWorkspaceController is a thin compatibility entry.",
+    hint: "EditorStudioPage delegates editor state and runtime work to the root controller.",
   },
   {
     file: "src/routes/Admin/EditorStudioWorkspaceControllerRoot.tsx",

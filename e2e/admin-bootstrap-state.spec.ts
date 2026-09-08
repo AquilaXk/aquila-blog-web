@@ -11,7 +11,7 @@ test.describe("admin bootstrap state contract", () => {
 
     expect(loginSource).toContain("if (member?.isAdmin)")
     expect(loginSource).not.toMatch(/if \(member\) \{[\s\S]*?destination: "\/"/)
-    expect(loginSource).toContain('await apiFetch("/member/api/v1/auth/logout", { method: "POST" })')
+    expect(loginSource).toContain('await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })')
     expect(loginSource).toContain('setError("관리자 권한이 필요한 페이지입니다.")')
   })
 
@@ -32,11 +32,16 @@ test.describe("admin bootstrap state contract", () => {
 
     expect(adminPageSource).toContain("export const buildAdminPagePropsFromMember = (")
     expect(adminPageSource).toContain("member: AuthMember,")
-    expect(adminPageSource).toContain("initialProfileSnapshot: AdminProfile | null = buildAdminProfileSnapshotFromMember(member)")
+    expect(adminPageSource).toContain("initialProfileSnapshot: AdminProfile | null = null")
+    expect(adminPageSource).not.toContain("buildAdminProfileSnapshotFromMember")
     expect(adminPageSource).toContain("): AdminPageProps => {")
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMeProbe(), true)")
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMe(), member)")
     expect(adminPageSource).toContain("export const readAdminProtectedBootstrap = async <T>(")
+    expect(adminPageSource).toContain("props: buildAdminPagePropsFromMember(guardResult.member)")
+    expect(adminPageSource).not.toContain("resolveAdminInitialProfileSnapshot")
+    expect(adminPageSource).not.toContain("fetchServerAdminProfile")
+    expect(adminPageSource).not.toContain("resolvePublicAdminProfileSnapshot")
 
     expect(postsSource).toContain('"/post/api/v1/adm/posts/bootstrap"')
     expect(postsSource).toContain("readAdminProtectedBootstrap<AdminPostsBootstrapPayload>(")
@@ -77,8 +82,8 @@ test.describe("admin bootstrap state contract", () => {
     expect(toolsSource).toContain("systemHealth: bootstrapResult.value.value.health")
     expect(toolsSource).toContain('source: "bootstrap"')
     expect(toolsWorkspaceSource).toContain("const [systemHealthCheckedAt, setSystemHealthCheckedAt] = useState<string | null>(initialSnapshot.systemHealthFetchedAt)")
-    expect(toolsSource).toContain("formatInstant,")
-    expect(toolsSource).toContain("getFreshnessMeta,")
+    expect(toolsWorkspaceSource).toContain("formatInstant,")
+    expect(toolsWorkspaceSource).toContain("getFreshnessMeta,")
     expect(toolsModelSource).toContain('export const ADMIN_TOOLS_DISPLAY_TIME_ZONE = "Asia/Seoul"')
     expect(toolsModelSource).toContain("timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE")
     expect(toolsWorkspaceSource).toContain("const [freshnessClock, setFreshnessClock] = useState<number | null>(null)")
@@ -123,6 +128,17 @@ test.describe("admin bootstrap state contract", () => {
       "utf8"
     )
 
+    const lifecycleSource = readFileSync(
+      path.resolve(__dirname, "../src/routes/Admin/useEditorStudioDraftLifecycle.ts"), "utf8"
+    )
+    const routingSource = readFileSync(
+      path.resolve(__dirname, "../src/routes/Admin/useEditorStudioRouting.ts"), "utf8"
+    )
+    expect(editorSource).not.toContain("initialEditorPost")
+    expect(editorSource).not.toContain("serverApiFetchJson")
+    expect(routingSource).not.toContain("initialEditorPost")
+    expect(lifecycleSource).not.toContain("initialPost")
+    expect(lifecycleSource).toContain('await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)')
     expect(editorSource).toContain('import { hasServerAuthCookie } from "src/libs/server/authSession"')
     expect(editorSource).toContain('"/member/api/v1/adm/members/bootstrap"')
     expect(editorSource).toContain("if (hasServerAuthCookie(req))")

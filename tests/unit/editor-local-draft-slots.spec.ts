@@ -7,6 +7,11 @@ import {
   LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX,
   describeLocalDraftSlot,
   localDraftStorageKey,
+  localDraftStorageKeyForDocument,
+  getLocalDraftDocumentId,
+  listLocalDraftCandidates,
+  readLocalDraftCandidate,
+  removeLocalDraftCandidate,
   persistLocalDraft,
   readLocalDraft,
   removeLocalDraft,
@@ -95,11 +100,38 @@ const baseDraft = (
 })
 
 test.describe("editor local draft context slots", () => {
+  test("explicit recovery preserves candidates and discards only the selected source slot", () => {
+    withLocalStorage((storage) => {
+      const source = { kind: "post", postId: "42" } as const
+      const first = localDraftStorageKey(source)
+      const second = localDraftStorageKeyForDocument(source, "other-document")
+      const mismatched = localDraftStorageKeyForDocument(source, "wrong-source")
+      const savedAt = new Date().toISOString()
+      const original = JSON.stringify(baseDraft({ source, savedAt, title: "First" }))
+      storage.setItem(first, original)
+      storage.setItem(second, JSON.stringify(baseDraft({ source, savedAt, title: "Second" })))
+      storage.setItem(mismatched, JSON.stringify(baseDraft({
+        source: { kind: "post", postId: "43" }, savedAt, title: "Different post",
+      })))
+
+      expect(listLocalDraftCandidates(source).map(({ key }) => key)).toEqual([first, second])
+      expect(readLocalDraftCandidate(source, first)?.title).toBe("First")
+      expect(storage.getItem(first)).toBe(original)
+      expect(readLocalDraftCandidate(source, mismatched)).toBeNull()
+      removeLocalDraftCandidate(source, mismatched)
+      expect(storage.getItem(mismatched)).not.toBeNull()
+      removeLocalDraftCandidate(source, second)
+      expect(storage.getItem(second)).toBeNull()
+      expect(storage.getItem(first)).toBe(original)
+      expect(listLocalDraftCandidates(source).map(({ key }) => key)).toEqual([first])
+    })
+  })
+
   test("shows a same-slot restore candidate only when it differs from editor and baseline", () => {
     const candidate = '{"title":"local"}'
     const createSource = { kind: "create" } as const
     const otherSource = { kind: "post", postId: "7" } as const
-    const candidateSnapshot = { source: createSource, fingerprint: candidate }
+    const candidateSnapshot = { key: "create-document-a", source: createSource, fingerprint: candidate }
 
     expect(
       isLocalDraftRestoreSuggestionEligible({
@@ -162,7 +194,7 @@ test.describe("editor local draft context slots", () => {
       })
     ).toBe(false)
 
-    const otherSnapshot = { source: otherSource, fingerprint: candidate }
+    const otherSnapshot = { key: "post-document-b", source: otherSource, fingerprint: candidate }
     expect(removeLocalDraftCandidateForSource(candidateSnapshot, createSource)).toBeNull()
     expect(removeLocalDraftCandidateForSource(candidateSnapshot, otherSource)).toEqual(candidateSnapshot)
 
@@ -255,8 +287,8 @@ test.describe("editor local draft context slots", () => {
 
       expect(readLocalDraft({ kind: "create" })?.title).toBe("create draft")
       expect(readLocalDraft({ kind: "post", postId: "7" })?.title).toBe("post draft")
-      expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toContain("create draft")
-      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}7.v3`)).toContain("post draft")
+      expect(storage.getItem(localDraftStorageKeyForDocument({ kind: "create" }, getLocalDraftDocumentId()))).toContain("create draft")
+      expect(storage.getItem(localDraftStorageKeyForDocument({ kind: "post", postId: "7" }, getLocalDraftDocumentId()))).toContain("post draft")
     })
   })
 
@@ -356,27 +388,25 @@ test.describe("editor local draft context slots", () => {
         )
       }
 
-      persistLocalDraft(
+      expect(() => persistLocalDraft(
         baseDraft({
           title: "trigger",
           source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) },
           savedAt: new Date(now).toISOString(),
         })
-      )
+      )).toThrow()
 
       const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
         (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
       )
       expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`)).toBeNull()
-      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
-      expect(readLocalDraft({ kind: "post", postId: "2" })).toBeNull()
-      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })?.title).toBe(
-        "trigger"
-      )
+      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT + 1)
+      expect(listLocalDraftCandidates({ kind: "post", postId: "2" })[0]?.draft.title).toBe("post-2")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })).toBeNull()
     })
   })
 
-  test("expires drafts older than 7 days and enforces post slot limit", () => {
+  test("expires drafts older than 7 days and rejects new slots without evicting valid manuscripts", () => {
     withLocalStorage((storage) => {
       const now = Date.now()
       persistLocalDraft(
@@ -389,7 +419,7 @@ test.describe("editor local draft context slots", () => {
       expect(readLocalDraft({ kind: "create" })).toBeNull()
       expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
 
-      for (let index = 0; index < LOCAL_DRAFT_POST_SLOT_LIMIT + 3; index += 1) {
+      for (let index = 0; index < LOCAL_DRAFT_POST_SLOT_LIMIT; index += 1) {
         persistLocalDraft(
           baseDraft({
             title: `post-${index}`,
@@ -399,14 +429,22 @@ test.describe("editor local draft context slots", () => {
         )
       }
 
+      expect(() => persistLocalDraft(baseDraft({
+        title: "overflow", source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 1) },
+        savedAt: new Date(now).toISOString(),
+      }))).toThrow()
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("post-0")
+      persistLocalDraft(baseDraft({
+        title: "updated", source: { kind: "post", postId: "1" }, savedAt: new Date(now).toISOString(),
+      }))
+
       const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
         (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
       )
       expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
-      expect(readLocalDraft({ kind: "post", postId: "1" })).toBeNull()
-      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })?.title).toBe(
-        `post-${LOCAL_DRAFT_POST_SLOT_LIMIT + 2}`
-      )
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("updated")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT) })?.title)
+        .toBe(`post-${LOCAL_DRAFT_POST_SLOT_LIMIT - 1}`)
     })
   })
 

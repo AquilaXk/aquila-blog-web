@@ -17,14 +17,6 @@ import {
   normalizeCategoryValue,
 } from "src/libs/utils"
 import {
-  consumeGuardOnExpectedUpdate,
-  createMarkdownEditorLoadGuardState,
-  markGuardEmptyUpdateIgnored,
-  restoreMarkdownEditorCodeLossUpdate,
-  shouldIgnoreMarkdownEditorEmptyUpdate,
-  type MarkdownEditorLoadGuardState,
-} from "./markdownLoadSyncGuard"
-import {
   toFlags,
   toVisibility,
   type EditorMode,
@@ -40,7 +32,6 @@ import { useEditorStudioThumbnailControls } from "./useEditorStudioThumbnailCont
 import { useEditorStudioThumbnailPreview } from "./useEditorStudioThumbnailPreview"
 import { useEditorStudioMetaCatalog } from "./useEditorStudioMetaCatalog"
 import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFlow"
-import { useEditorStudioProfileCommands } from "./useEditorStudioProfileCommands"
 import { useEditorStudioUtilityCommands } from "./useEditorStudioUtilityCommands"
 import { useEditorStudioWorkspaceControllerRuntime } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioWorkspaceControllerRootView } from "./EditorStudioWorkspaceControllerRootView"
@@ -96,7 +87,6 @@ import {
   type PostForEditor,
   type CanonicalSummaryState,
   type SummaryIntent,
-  type PreviewViewportMode,
   type RsData,
   type StudioSurface,
 } from "./EditorStudioWorkspaceControllerRootModel"
@@ -106,12 +96,9 @@ type MarkdownEditorChangeMeta = {
   editorFocused: boolean
 }
 
-type EditorStudioWorkspaceControllerProps = AdminPageProps & {
-  initialEditorPost?: PostForEditor | null
-}
+type EditorStudioWorkspaceControllerProps = AdminPageProps
 
 export const EditorStudioWorkspaceController = ({
-  initialEditorPost = null,
   initialMember,
 }: EditorStudioWorkspaceControllerProps) => {
   const router = useRouter()
@@ -175,15 +162,9 @@ export const EditorStudioWorkspaceController = ({
     fingerprint: "",
     firstImage: "",
   })
-  const markdownEditorLoadGuardStateRef = useRef<MarkdownEditorLoadGuardState>({
-    expectedBody: "",
-    ignoreUntilMs: 0,
-    ignoredInitialEmpty: false,
-  })
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
-  const [previewViewport, setPreviewViewport] = useState<PreviewViewportMode>("desktop")
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState("")
   const [localDraftSlotLabel, setLocalDraftSlotLabel] = useState("")
   const [mobileManageStep, setMobileManageStep] = useState<ManageMobileStudioStep>("query")
@@ -203,39 +184,8 @@ export const EditorStudioWorkspaceController = ({
       return
     }
 
-    let nextGuardState = consumeGuardOnExpectedUpdate(markdownEditorLoadGuardStateRef.current, nextMarkdown)
-
-    if (shouldIgnoreMarkdownEditorEmptyUpdate({
-      nextMarkdown,
-      currentMarkdown: previousMarkdown,
-      guardState: nextGuardState,
-    })) {
-      markdownEditorLoadGuardStateRef.current = markGuardEmptyUpdateIgnored(nextGuardState)
-      return
-    }
-
-    const restoredCodeLossUpdate = restoreMarkdownEditorCodeLossUpdate({
-      nextMarkdown,
-      currentMarkdown: previousMarkdown,
-      guardState: nextGuardState,
-      editorFocused: meta?.editorFocused === true,
-    })
-
-    if (restoredCodeLossUpdate.changed) {
-      const restoredMarkdown = restoredCodeLossUpdate.markdown
-      markdownEditorLoadGuardStateRef.current = consumeGuardOnExpectedUpdate(nextGuardState, restoredMarkdown)
-      postContentLiveRef.current = restoredMarkdown
-      setPostContent(restoredMarkdown)
-      return
-    }
-
+    // 외부 문서 동기화는 편집기에서 제외하므로 빈 문자열도 실제 입력으로 반영한다.
     if (meta?.editorFocused) {
-      nextGuardState = {
-        ...nextGuardState,
-        ignoreUntilMs: 0,
-        ignoredInitialEmpty: true,
-      }
-      markdownEditorLoadGuardStateRef.current = nextGuardState
       postContentLiveRef.current = nextMarkdown
       startPostContentTransition(() => {
         setPostContent(nextMarkdown)
@@ -243,7 +193,6 @@ export const EditorStudioWorkspaceController = ({
       return
     }
 
-    markdownEditorLoadGuardStateRef.current = nextGuardState
     postContentLiveRef.current = nextMarkdown
     setPostContent(nextMarkdown)
   }, [startPostContentTransition])
@@ -295,13 +244,11 @@ export const EditorStudioWorkspaceController = ({
   const lastLocalDraftFingerprintRef = useRef("")
   const serverBaselineEditorFingerprintRef = useRef("")
   const {
-    copyPostDetailLink,
     disabled,
     handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    openPostDetailRoute,
     publishModalHintByAction,
     refreshPublicPostReadViews,
     run,
@@ -312,7 +259,6 @@ export const EditorStudioWorkspaceController = ({
     postId,
     postTitle,
     queryClient,
-    router,
     setEditorMode,
     setGlobalNotice,
     setIsTempDraftMode,
@@ -323,34 +269,6 @@ export const EditorStudioWorkspaceController = ({
     setPublishModalNotice,
     setPublishNotice,
     setResult,
-  })
-
-  const {
-    applyProfileState,
-    handleProfileImageSelected,
-    handleRefreshAdminProfile,
-    handleUpdateMemberProfileCard,
-    member,
-    profileBioInput,
-    profileImageFileInputRef,
-    profileImageFileName,
-    profileImageNotice,
-    profileImgInputUrl,
-    profileNotice,
-    profileRoleInput,
-    setProfileBioInput,
-    setProfileNotice,
-    setProfileRoleInput,
-  } = useEditorStudioProfileCommands({
-    initialMember,
-    pretty,
-    queryClient,
-    run,
-    sessionMember,
-    setLoadingKey,
-    setMe,
-    setResult,
-    uploadWithConflictRetry,
   })
 
   const {
@@ -400,9 +318,8 @@ export const EditorStudioWorkspaceController = ({
     void replaceShallowRoutePreservingScroll(router, { query: nextQuery })
   }, [router])
 
-  const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState, contentHtml?: string | null) => {
-    const snapshot = resolveEditorMetaSnapshot(content, contentHtml)
-    markdownEditorLoadGuardStateRef.current = createMarkdownEditorLoadGuardState(snapshot.body)
+  const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState) => {
+    const snapshot = resolveEditorMetaSnapshot(content)
     postContentLiveRef.current = snapshot.body
     setPostContent(snapshot.body)
     setPostSummary(canonicalSummary.summary)
@@ -425,10 +342,13 @@ export const EditorStudioWorkspaceController = ({
     dismissLocalDraftRestoreSuggestion,
     handleLoadOrCreateTempPost,
     localDraftCandidate,
+    localDraftCandidates,
     localDraftSource,
     loadPostForEditor,
     restoredLocalDraft,
     restoreLocalDraft,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
     saveLocalDraft,
     signalLocalDraftBaselineReady,
     signalLocalDraftRemoved,
@@ -618,11 +538,6 @@ export const EditorStudioWorkspaceController = ({
     tagUsageMap,
   })
 
-  const removePersistedLocalDraft = useCallback((source: LocalDraftSource) => {
-    removeLocalDraft(source)
-    signalLocalDraftRemoved(source)
-  }, [signalLocalDraftRemoved])
-
   const {
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
@@ -663,7 +578,6 @@ export const EditorStudioWorkspaceController = ({
     setPostSummary,
     setPostSummarySource,
     setSummaryIntent,
-    setPostVisibility,
     setKnownTags,
     setLocalDraftSavedAt,
     setLocalDraftSlotLabel,
@@ -685,7 +599,6 @@ export const EditorStudioWorkspaceController = ({
     refreshPublicPostReadViews,
     pretty,
     generateIdempotencyKey,
-    removeLocalDraft: removePersistedLocalDraft,
     signalLocalDraftBaselineReady,
     uploadWithConflictRetry,
     normalizeSafeImageUrl,
@@ -739,7 +652,6 @@ export const EditorStudioWorkspaceController = ({
     router,
     authStatus,
     sessionMember,
-    initialEditorPost,
     postId,
     isDedicatedEditorRoute,
     isDedicatedNewEditorRoute,
@@ -807,15 +719,8 @@ export const EditorStudioWorkspaceController = ({
     if (hydratedAdminIdRef.current === sessionMember.id) return
 
     hydratedAdminIdRef.current = sessionMember.id
-    // auth/me 응답에는 관리자 프로필 카드 필드가 포함되어 있으므로,
-    // 관리자 상세 재조회가 끝날 때까지 패널을 비워두지 않고 즉시 화면을 채운다.
-    applyProfileState(sessionMember)
-    setProfileNotice({
-      tone: "idle",
-      text: "현재 로그인 세션의 관리자 프로필 값을 불러왔습니다. 필요하면 아래 버튼으로 저장값을 다시 조회할 수 있습니다.",
-    })
     void refreshEditorMetaCatalog()
-  }, [applyProfileState, refreshEditorMetaCatalog, sessionMember, setProfileNotice])
+  }, [refreshEditorMetaCatalog, sessionMember])
 
   const {
     closePublishModal,
@@ -836,7 +741,6 @@ export const EditorStudioWorkspaceController = ({
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
     setMobileComposeStep,
-    setPreviewViewport,
     setPublishActionType,
     setPublishModalNotice,
   })
@@ -865,32 +769,30 @@ export const EditorStudioWorkspaceController = ({
       props={{
         activeMetaPanel, addTagsToPost, addTagToPost, adminPostRows, adminPostTotal,
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
-        closePublishModal, commitPreviewThumbTransform, copyPostDetailLink,
+        closePublishModal, commitPreviewThumbTransform,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePostSummaryChange,
         handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
         handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
-        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
-        handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
+        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove,
+        handleReadPostCount, handleReadSystemHealth,
         handleSelectedPostIdChange, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange, handleTitleChange,
-        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard,
+        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete,
         hardDeleteDeletedPostFromList, isAllVisiblePostsSelected, isCompactMobileLayout, isComposeAssistOpen, isComposeUtilityOpen,
         isDedicatedEditorRoute, isDedicatedNewEditorRoute, isDirectLoadOpen, isListAdvancedOpen, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen,
         isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
-        mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
+        loadPostForEditor, loadingKey, localDraftCandidate, localDraftCandidates, localDraftSavedAt, localDraftSlotLabel, localDraftSource, metaNotice,
+        mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
-        postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,
-        profileImageFileInputRef, profileImageFileName, profileImageNotice, profileImgInputUrl, profileNotice,
-        profileRoleInput, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
-        previewThumbTransformRef, previewViewport, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
-        removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
+        postThumbnailZoom, postTitle, postVersion, postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
+        previewThumbTransformRef, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
+        removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, selectLocalDraftCandidate, discardLocalDraftCandidate, result, safePreviewThumbnail,
         saveLocalDraft,
         selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
         setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
@@ -898,7 +800,7 @@ export const EditorStudioWorkspaceController = ({
         setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
         setMobileComposeStep,
         setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
-        setPreviewViewport, setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
+        setSelectedPostIds, setTagDraft,
         softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
         thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
         commitPostCategory, handlePostCategoryChange,

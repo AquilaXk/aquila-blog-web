@@ -24,7 +24,7 @@ export const useProfileWorkspace = (
       return await apiFetch<ProfileWorkspaceResponse>(`/member/api/v1/adm/members/${memberId}/profileWorkspace`)
     },
     enabled: isBrowser && Boolean(memberId),
-    initialData: initialWorkspace,
+    initialData: initialWorkspace ?? undefined,
     staleTime: initialWorkspace ? 60 * 1000 : 0,
     retry: false,
     refetchOnWindowFocus: false,

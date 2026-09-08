@@ -5,9 +5,7 @@ import type { ExplorePostsParams, FeedSortMode } from "./PostApiDtos"
 export const PAGE_SIZE = 30
 export const POSTS_CACHE_TTL_MS = 90_000
 export const POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS = 60_000
-export const POST_DETAIL_SSR_CACHE_TTL_MS = 120_000
 export const POSTS_BOOTSTRAP_SSR_CACHE_MAX_ENTRIES = 6
-export const POST_DETAIL_SSR_CACHE_MAX_ENTRIES = 24
 export const isServerRuntime = typeof window === "undefined"
 
 export const POSTS_TAGS_API_PATH = asOpenApiPath("/post/api/v1/posts/tags")

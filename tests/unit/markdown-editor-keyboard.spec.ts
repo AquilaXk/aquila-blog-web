@@ -139,7 +139,10 @@ test.describe("markdown editor keyboard model", () => {
       selectionStart: 0,
       selectionEnd: 0,
     })
-    expect(matchListMarkerLine("1. ").kind).toBe("ordered")
+    const orderedMarker = matchListMarkerLine("1. ")
+    expect(orderedMarker).not.toBeNull()
+    if (!orderedMarker) throw new Error("expected an ordered list marker")
+    expect(orderedMarker.kind).toBe("ordered")
   })
 
   test("does not continue list markers inside fenced code blocks", () => {

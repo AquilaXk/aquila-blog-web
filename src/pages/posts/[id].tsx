@@ -1,4 +1,4 @@
-import { GetStaticPaths, GetStaticProps } from "next"
+import type { GetServerSideProps } from "next"
 import { NextPageWithLayout } from "../../types"
 import styled from "@emotion/styled"
 import CustomError from "src/routes/Error"
@@ -7,22 +7,18 @@ import PostDetail from "src/routes/Detail/PostDetail"
 import usePostQuery from "src/hooks/usePostQuery"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
 import {
-  buildCanonicalPostDetailStaticPaths,
-  buildCanonicalPostDetailStaticProps,
+  buildCanonicalPostDetailServerProps,
 } from "src/libs/server/postDetailPage"
+import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import type { PublicAdminProfileSource } from "src/libs/adminProfileSource"
 import { buildPostDetailMetadata } from "src/routes/Detail/PostDetail/postDetailMetadataModel"
 import { ErrorState } from "src/design-system/StatePresenters"
 import { resolvePostDetailRenderState } from "src/routes/Detail/postDetailRenderState"
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  return await buildCanonicalPostDetailStaticPaths()
-}
-
-export const getStaticProps: GetStaticProps = async ({ params }) => {
+export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ params, res }) => {
   const postId = params?.id as string
-  return await buildCanonicalPostDetailStaticProps(postId)
-}
+  return await buildCanonicalPostDetailServerProps(postId, res)
+})
 
 type DetailPageProps = {
   initialAdminProfile: AdminProfile | null

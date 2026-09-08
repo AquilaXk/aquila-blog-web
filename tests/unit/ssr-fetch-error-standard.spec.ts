@@ -38,7 +38,7 @@ const createSsrResponse = () => {
 
 test.beforeEach(() => {
   process.env.BACKEND_INTERNAL_URL = "http://backend.test"
-  process.env.NODE_ENV = "test"
+  Object.defineProperty(process.env, "NODE_ENV", { value: "test", configurable: true, enumerable: true, writable: true })
   registerServerApiFetchMetrics()
 })
 
@@ -46,7 +46,8 @@ test.afterEach(() => {
   globalThis.fetch = originalFetch
   if (originalBackendInternalUrl === undefined) delete process.env.BACKEND_INTERNAL_URL
   else process.env.BACKEND_INTERNAL_URL = originalBackendInternalUrl
-  process.env.NODE_ENV = originalNodeEnv
+  if (originalNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV")
+  else Object.defineProperty(process.env, "NODE_ENV", { value: originalNodeEnv, configurable: true, enumerable: true, writable: true })
 })
 
 test("server metrics boundaries have no static runtime metrics dependency", () => {

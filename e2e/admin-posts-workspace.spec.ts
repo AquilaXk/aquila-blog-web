@@ -83,8 +83,8 @@ test.describe("admin posts workspace link contract", () => {
       "utf8"
     )
 
-    expect(source).toContain("onOpenPostDetail={(id) => void openPostDetailRoute(id)}")
-    expect(source).toContain("onCopyPostDetailLink={(id, title) => void copyPostDetailLink(id, title)}")
+    expect(source).not.toContain("onOpenPostDetail")
+    expect(source).not.toContain("onCopyPostDetailLink")
     expect(editorSurfaceSource).toContain("본문 형식 · Markdown")
     expect(editorSurfaceSource).not.toContain("onOpenPostDetail")
     expect(editorSurfaceSource).not.toContain("onCopyPostDetailLink")
@@ -356,8 +356,8 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerSource).toContain('postAuthor?.name?.trim() || adminProfile?.nickname?.trim() || adminProfile?.name?.trim() || "익명"')
     expect(headerSource).toContain("const authorImageSrc = usingAdminFallback")
     expect(headerSource).toContain("const authorRole = usingAdminFallback")
-    expect(headerSource).toContain("adminProfile?.profileImageDirectUrl")
     expect(headerSource).toContain("adminProfile?.profileImageUrl")
+    expect(headerSource).not.toContain("profileImageDirectUrl")
     expect(headerSource).toContain('const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()')
     expect(headerSource).toContain("const heroLabels = primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]")
     expect(headerSource).not.toContain("CONFIG.profile.image")
@@ -387,16 +387,15 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerSource).not.toContain("11분")
   })
 
-  test("canonical detail static props는 ISR 생성 실패 시 recovery shell로 폴백한다", () => {
+  test("canonical detail uses request-time SSR without stored body recovery", () => {
     const source = readFileSync(path.resolve(__dirname, "../src/libs/server/postDetailPage.ts"), "utf8")
 
-    expect(source).toContain("export const buildCanonicalPostDetailStaticProps = async (")
-    expect(source).toContain("postDetail = await getPostDetailById(postId)")
-    expect(source).toContain("const shouldServeClientRecoveryShell = shouldClientRecover || (IS_QA_STATIC_RECOVERY_MODE && !postDetail)")
-    expect(source).toContain("if (!postDetail && !shouldServeClientRecoveryShell) return { notFound: true }")
-    expect(source).toContain("revalidate:")
-    expect(source).toContain('shouldServeClientRecoveryShell || initialAdminProfileSource === "static-fallback"')
-    expect(source).toContain("? DETAIL_RECOVERY_REVALIDATE_SECONDS")
-    expect(source).toContain(": DETAIL_ISR_REVALIDATE_SECONDS,")
+    const page = readFileSync(path.resolve(__dirname, "../src/pages/posts/[id].tsx"), "utf8")
+    expect(page).toContain("export const getServerSideProps")
+    expect(page).not.toContain("getStaticProps")
+    expect(page).not.toContain("getStaticPaths")
+    expect(source).toContain('res.setHeader("Cache-Control", "private, no-store")')
+    expect(source).not.toContain("revalidate:")
+    expect(source).not.toContain("shouldClientRecover")
   })
 })

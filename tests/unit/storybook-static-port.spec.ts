@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { createStorybookPlaywrightConfig } from "../../playwright.storybook.config"
-import { resolveStorybookStaticPort } from "../../.storybook/storybook-static-port"
+import { resolveStorybookStaticPort } from "../../.storybook/storybook-static-port.mjs"
 
 test.describe("storybook custom port config", () => {
   test("defaults only an undefined port and rejects noncanonical values", () => {

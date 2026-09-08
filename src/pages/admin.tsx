@@ -5,11 +5,7 @@ import { randomInt } from "node:crypto"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { type AdminProfile } from "src/hooks/useAdminProfile"
 import { AdminPageProps, buildAdminPagePropsFromMember, getAdminPageProps, readAdminProtectedBootstrap } from "src/libs/server/adminPage"
-import {
-  fetchServerAdminProfile,
-  hasServerAuthCookie,
-  resolvePublicAdminProfileSnapshot,
-} from "src/libs/server/adminProfile"
+import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { serverApiFetchJson } from "src/libs/server/backend"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
@@ -25,7 +21,7 @@ const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface")
 
 type AdminHubPageProps = AdminPageProps & {
   initialGreeting: string
-  initialProfileSnapshot: AdminProfile
+  initialProfileSnapshot: AdminProfile | null
   initialOperationalSnapshot: AdminHubOperationalSnapshot
 }
 
@@ -156,7 +152,6 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
   const requestInstant = new Date()
   const greetingVariantIndex = randomInt(ADMIN_HUB_GREETING_VARIANT_COUNT)
   const hasAuthCookie = hasServerAuthCookie(req)
-  const fallbackProfileSnapshot = resolvePublicAdminProfileSnapshot(req)
   const bootstrapResultPromise =
     hasAuthCookie
       ? timed(() =>
@@ -182,7 +177,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
   let authDescription: string = "bootstrap"
   let profileDurationMs = 0
   let profileDescription: string
-  let profileSnapshot: AdminProfile
+  let profileSnapshot: AdminProfile | null = null
   let operationalSnapshot = EMPTY_OPERATIONAL_SNAPSHOT
   let operationalDurationMs = 0
   let operationalDescription = hasAuthCookie ? "unavailable" : "no-auth-cookie"
@@ -193,36 +188,14 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
     profileDurationMs = bootstrapResult.durationMs
     profileDescription = "bootstrap"
   } else {
-    const baseResultPromise = timed(() => getAdminPageProps(req))
-    const adminProfileResultPromise = hasAuthCookie
-      ? timed(() =>
-          fetchServerAdminProfile(req, {
-            timeoutMs: 900,
-          })
-        )
-      : Promise.resolve({
-          ok: true as const,
-          value: fallbackProfileSnapshot.profile,
-          durationMs: 0,
-        })
-    const [baseResult, adminProfileResult] = await Promise.all([baseResultPromise, adminProfileResultPromise])
+    const baseResult = await timed(() => getAdminPageProps(req))
     if (!baseResult.ok) throw baseResult.error
     if ("redirect" in baseResult.value) return baseResult.value
     if (!("props" in baseResult.value)) return baseResult.value
     baseProps = await baseResult.value.props
     authDurationMs = baseResult.durationMs
     authDescription = "fallback"
-    profileSnapshot =
-      adminProfileResult.ok && adminProfileResult.value
-        ? adminProfileResult.value
-        : fallbackProfileSnapshot.profile
-    profileDurationMs = adminProfileResult.durationMs
-    profileDescription =
-      adminProfileResult.ok && adminProfileResult.value
-        ? hasAuthCookie
-          ? "ok"
-          : fallbackProfileSnapshot.source
-        : fallbackProfileSnapshot.source
+    profileDescription = "unavailable"
   }
 
   if (hasAuthCookie) {
@@ -278,36 +251,26 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
 }) => {
   const sessionMember = initialMember
   const adminProfile = initialProfileSnapshot
-  const displayName = sessionMember?.nickname || sessionMember?.username || adminProfile?.nickname || adminProfile?.username || "관리자"
-  const profileSnapshot = {
-    profileImageDirectUrl: adminProfile?.profileImageDirectUrl || sessionMember?.profileImageDirectUrl || "",
-    profileImageUrl: adminProfile?.profileImageUrl || sessionMember?.profileImageUrl || "",
-    profileRole: adminProfile?.profileRole || sessionMember?.profileRole || "",
-    profileBio: adminProfile?.profileBio || sessionMember?.profileBio || "",
-    homeIntroTitle: adminProfile?.homeIntroTitle || sessionMember?.homeIntroTitle || "",
-    homeIntroDescription:
-      adminProfile?.homeIntroDescription || sessionMember?.homeIntroDescription || "",
-    serviceLinks: adminProfile?.serviceLinks || sessionMember?.serviceLinks || [],
-    contactLinks: adminProfile?.contactLinks || sessionMember?.contactLinks || [],
-    modifiedAt: adminProfile?.modifiedAt || sessionMember?.modifiedAt,
-  }
-  const profileSrc = profileSnapshot.profileImageDirectUrl || profileSnapshot.profileImageUrl || ""
+  const displayName = sessionMember?.nickname || sessionMember?.username || "관리자"
+  const profileSrc = adminProfile?.profileImageUrl || ""
 
-  const profileUpdatedText = profileSnapshot.modifiedAt
-    ? profileSnapshot.modifiedAt.slice(0, 16).replace("T", " ")
+  const profileUpdatedText = adminProfile?.modifiedAt
+    ? adminProfile.modifiedAt.slice(0, 16).replace("T", " ")
     : "미확인"
   const profileChecklist = [
     Boolean(profileSrc),
-    Boolean(profileSnapshot.profileRole?.trim()),
-    Boolean(profileSnapshot.profileBio?.trim()),
-    Boolean(profileSnapshot.homeIntroTitle?.trim()),
-    Boolean(profileSnapshot.homeIntroDescription?.trim()),
+    Boolean(adminProfile?.profileRole?.trim()),
+    Boolean(adminProfile?.profileBio?.trim()),
+    Boolean(adminProfile?.homeIntroTitle?.trim()),
+    Boolean(adminProfile?.homeIntroDescription?.trim()),
   ]
   const profileCompletion = Math.round(
     (profileChecklist.filter(Boolean).length / Math.max(1, profileChecklist.length)) * 100
   )
-  const linkCount = (profileSnapshot.serviceLinks?.length || 0) + (profileSnapshot.contactLinks?.length || 0)
-  const recentWorkSummary = `최근 업데이트 ${profileUpdatedText} · 프로필 ${profileCompletion}% · 연결 ${linkCount}개`
+  const linkCount = (adminProfile?.serviceLinks?.length || 0) + (adminProfile?.contactLinks?.length || 0)
+  const recentWorkSummary = adminProfile
+    ? `최근 업데이트 ${profileUpdatedText} · 프로필 ${profileCompletion}% · 연결 ${linkCount}개`
+    : "프로필 정보를 불러올 수 없습니다."
   const postRows = initialOperationalSnapshot.posts?.content || []
   const publishedRows = postRows.filter((post) => post.published && post.tempDraft !== true)
   const draftRows = postRows.filter((post) => !post.published || post.tempDraft === true)

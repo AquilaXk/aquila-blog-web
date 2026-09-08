@@ -1,8 +1,5 @@
 import type { Page } from "@playwright/test"
-import {
-  createPublicAdminProfileSnapshotFixture,
-  mockPublicAdminProfile,
-} from "./smokeFixtures"
+import { mockPublicAdminProfile } from "./smokeFixtures"
 
 export const MOBILE_VIEWPORT = { width: 393, height: 852 }
 export const AVATAR_PNG_BASE64 =
@@ -27,17 +24,6 @@ export const mockAnonymousSession = async (page: Page) => {
       body: JSON.stringify({ resultCode: "401-1", msg: "로그인 후 이용해주세요.", data: null }),
     })
   })
-}
-
-export const addPublicAboutSnapshotCookie = async (page: Page) => {
-  await mockPublicAdminProfile(page)
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(createPublicAdminProfileSnapshotFixture())),
-      url: "http://127.0.0.1:3100",
-    },
-  ])
 }
 
 export const createExplorePage = (title: string, tag = "모바일테스트") => ({
@@ -80,7 +66,16 @@ export const ADMIN_MEMBER_FIXTURE = {
   nickname: "aquila",
   isAdmin: true,
   profileImageUrl: "/avatar.png",
-  profileImageDirectUrl: "/avatar.png",
+}
+
+const ADMIN_PROFILE_FIXTURE = {
+  id: 1,
+  username: "aquila",
+  name: "aquila",
+  nickname: "aquila",
+  profileImageUrl: "/avatar.png",
+  blogTitle: "Aquila",
+  isAdmin: true,
 }
 
 export const ADMIN_POST_FIXTURES = Array.from({ length: 6 }, (_, index) => ({
@@ -113,6 +108,14 @@ export const mockAdminPostsWorkspaceEndpoints = async (page: Page) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(ADMIN_MEMBER_FIXTURE),
+    })
+  })
+
+  await page.route("**/member/api/v1/adm/members/bootstrap", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ member: ADMIN_MEMBER_FIXTURE, profile: ADMIN_PROFILE_FIXTURE }),
     })
   })
 

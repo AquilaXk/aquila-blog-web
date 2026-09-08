@@ -6,7 +6,6 @@ type NoticeState = {
 }
 
 type PublishActionType = "create" | "modify" | "temp"
-type PreviewViewportMode = "desktop" | "tablet" | "mobile"
 
 type UseEditorStudioPublishModalFlowParams = {
   activateComposeSurface: () => void
@@ -23,7 +22,6 @@ type UseEditorStudioPublishModalFlowParams = {
   setIsMobileThumbnailEditorOpen: Dispatch<SetStateAction<boolean>>
   setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>
   setMobileComposeStep: Dispatch<SetStateAction<"edit" | "publish">>
-  setPreviewViewport: Dispatch<SetStateAction<PreviewViewportMode>>
   setPublishActionType: Dispatch<SetStateAction<PublishActionType>>
   setPublishModalNotice: Dispatch<SetStateAction<NoticeState>>
 }
@@ -43,7 +41,6 @@ export const useEditorStudioPublishModalFlow = ({
   setIsMobileThumbnailEditorOpen,
   setIsPublishModalOpen,
   setMobileComposeStep,
-  setPreviewViewport,
   setPublishActionType,
   setPublishModalNotice,
 }: UseEditorStudioPublishModalFlowParams) => {
@@ -54,13 +51,6 @@ export const useEditorStudioPublishModalFlow = ({
       tone: "idle",
       text: publishModalHintByAction(actionType),
     })
-    if (typeof window !== "undefined") {
-      const nextViewport: PreviewViewportMode =
-        window.innerWidth <= 480 ? "mobile" : window.innerWidth <= 1024 ? "tablet" : "desktop"
-      setPreviewViewport(nextViewport)
-    } else {
-      setPreviewViewport("desktop")
-    }
     const shouldOpenThumbnailEditorByDefault = Boolean(safePreviewThumbnail && !isPreviewThumbnailError)
     setIsMobileThumbnailEditorOpen(shouldOpenThumbnailEditorByDefault)
     setIsMobileMetaEditorOpen(!shouldOpenThumbnailEditorByDefault)
@@ -78,7 +68,6 @@ export const useEditorStudioPublishModalFlow = ({
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
     setMobileComposeStep,
-    setPreviewViewport,
     setPublishActionType,
     setPublishModalNotice,
   ])

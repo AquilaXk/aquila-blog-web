@@ -17,6 +17,7 @@ const pageRouteClasses = {
   "company/index.tsx": "public",
   "easysubway/index.tsx": "public",
   "feed.tsx": "system",
+  "posts/[id].tsx": "public",
   "sitemap.xml.tsx": "system",
 } as const
 

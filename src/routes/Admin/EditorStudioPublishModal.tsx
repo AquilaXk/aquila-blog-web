@@ -1,10 +1,8 @@
-import type { CSSProperties, ReactNode } from "react"
+import type { ReactNode } from "react"
 import type { PostVisibility } from "./editorStudioState"
 import {
   EditorStudioPublishCardSettings,
-  EditorStudioPublishPreviewCard,
   EditorStudioPublishVisibilitySection,
-  type EditorStudioPreviewViewportOption,
   type EditorStudioPublishVisibilityOption,
 } from "./EditorStudioPublishModalParts"
 import {
@@ -26,31 +24,15 @@ type PublishNoticeState = {
   text: string
 }
 
-type EditorStudioPublishModalProps<TViewport extends string> = {
+type EditorStudioPublishModalProps = {
   closeToggleLabel: string
-  displayName: string
-  displayNameInitial: string
   isCompactMobileLayout: boolean
   isMobileMetaEditorOpen: boolean
   isMobileThumbnailEditorOpen: boolean
   loadingKey: string
   modalNotice: PublishNoticeState
-  postThumbnailFocusX: number
-  postThumbnailFocusY: number
-  postThumbnailZoom: number
-  postTitle: string
   postVisibility: PostVisibility
-  previewAuthorAvatarSrc: string
-  previewDateText: string
-  previewFrameStyle: CSSProperties
-  previewKicker: string
   previewMetaEditorPanel: ReactNode
-  previewSummary: string
-  previewThumbnailSrc: string
-  previewViewport: TViewport
-  previewViewportLabel: string
-  previewViewportOptions: Array<EditorStudioPreviewViewportOption<TViewport>>
-  previewVisibilityLabel: string
   publishActionButtonDisabled: boolean
   publishActionButtonText: string
   publishActionTitle: string
@@ -61,38 +43,20 @@ type EditorStudioPublishModalProps<TViewport extends string> = {
   visibilityOptions: EditorStudioPublishVisibilityOption[]
   onClose: () => void
   onConfirmPublish: () => void
-  onPreviewThumbnailError: () => void
-  onPreviewViewportChange: (nextViewport: TViewport) => void
   onPostVisibilityChange: (nextVisibility: PostVisibility) => void
   onToggleMobileMetaEditor: () => void
   onToggleMobileThumbnailEditor: () => void
 }
 
-export const EditorStudioPublishModal = <TViewport extends string,>({
+export const EditorStudioPublishModal = ({
   closeToggleLabel,
-  displayName,
-  displayNameInitial,
   isCompactMobileLayout,
   isMobileMetaEditorOpen,
   isMobileThumbnailEditorOpen,
   loadingKey,
   modalNotice,
-  postThumbnailFocusX,
-  postThumbnailFocusY,
-  postThumbnailZoom,
-  postTitle,
   postVisibility,
-  previewAuthorAvatarSrc,
-  previewDateText,
-  previewFrameStyle,
-  previewKicker,
   previewMetaEditorPanel,
-  previewSummary,
-  previewThumbnailSrc,
-  previewViewport,
-  previewViewportLabel,
-  previewViewportOptions,
-  previewVisibilityLabel,
   publishActionButtonDisabled,
   publishActionButtonText,
   publishActionTitle,
@@ -103,12 +67,10 @@ export const EditorStudioPublishModal = <TViewport extends string,>({
   visibilityOptions,
   onClose,
   onConfirmPublish,
-  onPreviewThumbnailError,
-  onPreviewViewportChange,
   onPostVisibilityChange,
   onToggleMobileMetaEditor,
   onToggleMobileThumbnailEditor,
-}: EditorStudioPublishModalProps<TViewport>) => {
+}: EditorStudioPublishModalProps) => {
   const isCloseDisabled =
     loadingKey === "writePost" ||
     loadingKey === "modifyPost" ||
@@ -133,26 +95,6 @@ export const EditorStudioPublishModal = <TViewport extends string,>({
             <PublishModalNotice data-tone={modalNotice.tone}>{modalNotice.text}</PublishModalNotice>
           ) : null}
           <PublishOverviewGrid>
-            <EditorStudioPublishPreviewCard
-              displayName={displayName}
-              displayNameInitial={displayNameInitial}
-              postThumbnailFocusX={postThumbnailFocusX}
-              postThumbnailFocusY={postThumbnailFocusY}
-              postThumbnailZoom={postThumbnailZoom}
-              postTitle={postTitle}
-              previewAuthorAvatarSrc={previewAuthorAvatarSrc}
-              previewDateText={previewDateText}
-              previewFrameStyle={previewFrameStyle}
-              previewKicker={previewKicker}
-              previewSummary={previewSummary}
-              previewThumbnailSrc={previewThumbnailSrc}
-              previewViewport={previewViewport}
-              previewViewportLabel={previewViewportLabel}
-              previewViewportOptions={previewViewportOptions}
-              previewVisibilityLabel={previewVisibilityLabel}
-              onPreviewThumbnailError={onPreviewThumbnailError}
-              onPreviewViewportChange={onPreviewViewportChange}
-            />
             <EditorStudioPublishVisibilitySection
               postVisibility={postVisibility}
               visibilityOptions={visibilityOptions}

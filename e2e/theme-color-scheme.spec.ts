@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { readFileSync } from "fs"
 import path from "path"
-import { addPublicAboutSnapshotCookie, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
+import { mockPublicAdminProfile, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
 
 type SchemeCookie = "dark" | "light" | null
 
 const prepareHomeThemePage = async (page: Page, schemeCookie: SchemeCookie = "dark") => {
   await mockAvatarAsset(page)
   await mockFeedEndpoints(page)
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   if (!schemeCookie) return
   await page.context().addCookies([
     {
@@ -36,19 +36,14 @@ const readControlScheme = async (page: Page) =>
 const readLightFeedSurface = async (page: Page) =>
   page.evaluate(() => {
     const card = document.querySelector('[data-ui="feed-post-card"] article')
-    const category = card?.querySelector(".category")
-    const tag = card?.querySelector(".tag")
     const title = card?.querySelector("h2")
     const meta = card?.querySelector(".meta")
     const cardStyle = card ? window.getComputedStyle(card) : null
-    const categoryStyle = category ? window.getComputedStyle(category) : null
-    const tagStyle = tag ? window.getComputedStyle(tag) : null
     const titleStyle = title ? window.getComputedStyle(title) : null
     const metaStyle = meta ? window.getComputedStyle(meta) : null
 
     return {
       cardBackgroundColor: cardStyle?.backgroundColor ?? null,
-      categoryColor: categoryStyle?.color ?? tagStyle?.color ?? null,
       titleColor: titleStyle?.color ?? null,
       metaColor: metaStyle?.color ?? null,
     }
@@ -58,8 +53,7 @@ const expectLightFeedSurface = async (page: Page) => {
   await expect(page.locator('[data-ui="feed-post-card"] article').first()).toBeVisible()
   await expect(page.locator('[data-ui="feed-post-card"] .meta').first()).toBeVisible()
   await expect.poll(() => readLightFeedSurface(page)).toEqual({
-    cardBackgroundColor: "rgb(247, 247, 245)",
-    categoryColor: "rgb(86, 98, 115)",
+    cardBackgroundColor: "rgba(0, 0, 0, 0)",
     titleColor: "rgb(15, 23, 36)",
     metaColor: "rgb(86, 98, 115)",
   })
@@ -73,11 +67,9 @@ const installSchemeFrameSampler = async (page: Page) => {
       datasetScheme?: string
       feedBeforeBackground: string | null
       firstCardBackground: string | null
-      firstCardBorder: string | null
       headerBackground: string | null
       headerBorder: string | null
       metaColor: string | null
-      tagColor: string | null
       time: number
       titleColor: string | null
     }
@@ -96,7 +88,6 @@ const installSchemeFrameSampler = async (page: Page) => {
       const feed = document.querySelector('[data-ui="feed-home-product-shell"]')
       const header = document.querySelector('[data-ui="app-header"]')
       const card = document.querySelector('[data-ui="feed-post-card"] article')
-      const tag = card?.querySelector(".tag")
       const title = card?.querySelector("h2")
       const meta = card?.querySelector(".meta")
       const feedBeforeStyle = feed ? window.getComputedStyle(feed, "::before") : null
@@ -115,11 +106,9 @@ const installSchemeFrameSampler = async (page: Page) => {
         datasetScheme,
         feedBeforeBackground,
         firstCardBackground: cardStyle?.backgroundColor ?? null,
-        firstCardBorder: cardStyle?.borderBottomColor ?? null,
         headerBackground: headerStyle?.backgroundColor ?? null,
         headerBorder: headerStyle?.borderBottomColor ?? null,
         metaColor: meta ? window.getComputedStyle(meta).color : null,
-        tagColor: tag ? window.getComputedStyle(tag).color : null,
         time: Math.round(performance.now() - startedAt),
         titleColor: title ? window.getComputedStyle(title).color : null,
       })
@@ -141,11 +130,9 @@ const readSchemeFrameSamples = async (page: Page) =>
       datasetScheme?: string
       feedBeforeBackground: string | null
       firstCardBackground: string | null
-      firstCardBorder: string | null
       headerBackground: string | null
       headerBorder: string | null
       metaColor: string | null
-      tagColor: string | null
       time: number
       titleColor: string | null
     }
@@ -157,16 +144,19 @@ const readSchemeFrameSamples = async (page: Page) =>
     return (window as SchemeFrameWindow).__aquilaSchemeFrameSamples ?? []
   })
 
-const readRuntimeRecoveryReasonCount = async (page: Page) =>
+const readRuntimeRecoveryReasons = async (page: Page) =>
   page.evaluate(() => {
-    let count = 0
+    const reasons: string[] = []
     for (let index = 0; index < sessionStorage.length; index += 1) {
       const key = sessionStorage.key(index) ?? ""
       if (key.startsWith("__aquila_client_runtime_recovery__") && key.endsWith(":reason")) {
-        count += 1
+        const reason = sessionStorage.getItem(key) ?? ""
+        const category = reason.split(":")[0] || "unknown"
+        const reactCode = reason.match(/React error #\d+/)?.[0]
+        reasons.push(reactCode ? `${category}: ${reactCode}` : category)
       }
     }
-    return count
+    return reasons
   })
 
 const expectStableUniqueValue = <T,>(values: T[], expected: T) => {
@@ -274,12 +264,10 @@ test.describe("theme color-scheme", () => {
       expectStableUniqueValue(samples.map((sample) => sample.datasetScheme), "light")
       expectStableUniqueValue(samples.map((sample) => sample.bodyBackground), expectedBodyBackground)
       expectStableUniqueValue(readySamples.map((sample) => sample.feedBeforeBackground), expectedBodyBackground)
-      expectStableUniqueValue(readySamples.map((sample) => sample.firstCardBackground), expectedBodyBackground)
-      expectStableUniqueValue(readySamples.map((sample) => sample.firstCardBorder), expectedBorder)
+      expectStableUniqueValue(readySamples.map((sample) => sample.firstCardBackground), "rgba(0, 0, 0, 0)")
       expectStableUniqueValue(readySamples.map((sample) => sample.headerBackground), expectedHeaderBackground)
       expectStableUniqueValue(readySamples.map((sample) => sample.headerBorder), expectedBorder)
       expectStableUniqueValue(readySamples.map((sample) => sample.titleColor), expectedText)
-      expectStableUniqueValue(readySamples.map((sample) => sample.tagColor), expectedMuted)
       expectStableUniqueValue(readySamples.map((sample) => sample.metaColor), expectedMuted)
       expect(readySamples.at(-1)?.bootstrapStyleCount).toBe(0)
       await expect(page.locator("html")).toHaveAttribute("data-aquila-scheme", "light")
@@ -288,7 +276,7 @@ test.describe("theme color-scheme", () => {
         html: "light",
         input: "light",
       })
-      expect(await readRuntimeRecoveryReasonCount(page)).toBe(0)
+      expect(await readRuntimeRecoveryReasons(page)).toEqual([])
       expect(hydrationErrors).toEqual([])
     })
   }

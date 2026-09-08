@@ -1,6 +1,5 @@
 import { Global as _Global, css, useTheme } from "@emotion/react"
 
-import { pretendard } from "src/assets"
 import { colors, createPublicDesignTokens } from "src/styles"
 
 const lightDesign = createPublicDesignTokens("light")
@@ -20,7 +19,8 @@ export const Global = () => {
           -webkit-text-size-adjust: 100%;
           text-size-adjust: 100%;
           overflow-x: visible;
-          --article-readable-width: 48rem;
+          --article-readable-width: 47.5rem;
+          --aq-font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
           --editor-split-readable-width: 42rem;
           --aq-page-bg: ${lightDesign.pageBackgroundColor};
           --aq-page-bg-image: ${lightDesign.pageBackgroundImage};
@@ -75,13 +75,17 @@ export const Global = () => {
           color: var(--aq-text);
           background-color: var(--aq-page-bg);
           background-image: var(--aq-page-bg-image);
-          font-family: ${pretendard.style.fontFamily};
-          font-weight: ${pretendard.style.fontWeight};
-          font-style: ${pretendard.style.fontStyle};
+          font-family: var(--aq-font-sans);
+          font-size: 1rem;
+          line-height: 1.65;
+          font-weight: 400;
+          font-style: normal;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
-          /* Pretendard first-visit bundle uses regular+bold only; allow weight/style synthesis for mid weights. */
-          font-synthesis: weight style;
+        }
+
+        code, pre, kbd, samp {
+          font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
         }
 
         @media (max-width: 1199px) {

@@ -1,6 +1,8 @@
 import type { NextRouter } from "next/router"
 import {
   useCallback,
+  useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -8,14 +10,6 @@ import {
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { replaceRoute } from "src/libs/router"
-import {
-  adminContentHadEmptyFenceForTelemetry,
-  adminContentNeedsCodeFenceRecovery,
-  reportCodeFenceRecovery,
-  resolveEditorCodeFenceRecovery,
-  resolveLoadedPostContentHtml,
-  shouldFetchPublicContentForCodeFenceRecovery,
-} from "./editorCodeFenceRecovery"
 import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
 import { isServerTempDraftPost } from "./editorTempDraft"
 import { useEditorStudioLocalDraftLifecycle } from "./useEditorStudioDraftLifecycleModel"
@@ -71,10 +65,6 @@ type PageDto<T> = {
 type RsData<T> = {
   data: T
   msg: string
-}
-
-type LoadPostForEditorOptions = {
-  initialPost?: PostForEditor | null
 }
 
 type EditorFingerprintPayload = {
@@ -149,8 +139,8 @@ type UseEditorStudioDraftLifecycleParams = {
   removeLocalDraft: (source: LocalDraftSource) => void
   buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
   pretty: (value: unknown) => string
-  resolveEditorMetaSnapshot: (content: string, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
-  syncEditorMeta: (content: string, summary: CanonicalSummaryState, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
+  resolveEditorMetaSnapshot: (content: string) => ResolvedEditorMetaSnapshot
+  syncEditorMeta: (content: string, summary: CanonicalSummaryState) => ResolvedEditorMetaSnapshot
   buildEmptyEditorMetaSnapshot: () => ResolvedEditorMetaSnapshot
   isBlankServerTempDraft: (
     post: Pick<PostForEditor, "title" | "published" | "listed" | "tempDraft">,
@@ -240,16 +230,26 @@ export const useEditorStudioDraftLifecycle = ({
   toEditorPostRoute,
   toVisibility,
 }: UseEditorStudioDraftLifecycleParams) => {
+  const loadGenerationRef = useRef(0)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
   const {
     localDraftFingerprint,
     localDraftSource,
     localDraftCandidate,
+    localDraftCandidates,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
     restoredLocalDraft,
     dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,
     signalLocalDraftRemoved,
     saveLocalDraft,
-    restoreLocalDraft,
+    restoreLocalDraft: restoreStoredLocalDraft,
     clearLocalDraft,
     signalLocalDraftBaselineReady,
     beginLocalDraftPostLoad,
@@ -304,7 +304,15 @@ export const useEditorStudioDraftLifecycle = ({
     setPublishStatus,
   })
 
+  const restoreLocalDraft = useCallback(() => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
+    restoreStoredLocalDraft()
+  }, [restoreStoredLocalDraft, setLoadingKey])
+
   const switchToCreateMode = useCallback((options?: { keepContent?: boolean }) => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
     const keepContent = options?.keepContent ?? true
     activateComposeSurface()
     setEditorMode("create")
@@ -350,6 +358,7 @@ export const useEditorStudioDraftLifecycle = ({
     setEditorMode,
     setIsTempDraftMode,
     setMobileComposeStep,
+    setLoadingKey,
     setPostCategory,
     setPostContent,
     setPostId,
@@ -392,7 +401,8 @@ export const useEditorStudioDraftLifecycle = ({
 
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
-      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "", post.contentHtml)
+      // 저장된 HTML은 파생 데이터이므로 현재 Markdown을 복구·대체하지 않는다.
+      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
       const shouldMaskTempTitle = isServerTempDraftPost(post)
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
       const title = shouldMaskTempTitle ? "" : post.title ?? ""
@@ -409,7 +419,7 @@ export const useEditorStudioDraftLifecycle = ({
       const snapshot = shouldMaskTempPlaceholder
         ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
           buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(post.content ?? "", canonicalSummary, post.contentHtml)
+        : syncEditorMeta(post.content ?? "", canonicalSummary)
       return {
         shouldMaskTempPlaceholder,
         title,
@@ -441,92 +451,18 @@ export const useEditorStudioDraftLifecycle = ({
 
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
-    options: LoadPostForEditorOptions = {}
   ) => {
+    // 늦은 응답은 새 조회·새 글·복원 작업이 소유한 원고와 상태를 변경하지 않는다.
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postOne")
       const normalizedTargetPostId = targetPostId.trim()
-      const initialPost =
-        String(options.initialPost?.id ?? "") === normalizedTargetPostId
-          ? options.initialPost
-          : null
-      let post =
-        initialPost ??
-        (await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`))
-      if (initialPost) {
-        try {
-          const freshPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
-          if ((freshPost.content ?? "").trim().length > 0 || freshPost.contentHtml) {
-            post = freshPost
-          }
-        } catch {
-          // SSR initialPost is still a valid fallback when the client-side refresh fails.
-        }
-      }
-      let resolvedPost = post
-
-      const adminContent = resolvedPost.content ?? ""
-      const adminBodySnapshot = resolveEditorMetaSnapshot(adminContent, null)
-      const htmlRecoverySnapshot = resolveEditorMetaSnapshot(
-        adminContent,
-        resolvedPost.contentHtml
-      )
-      const needsCodeFenceRecovery = adminContentNeedsCodeFenceRecovery(adminContent)
-
-      let publicContent: string | undefined
-      let publicContentHtml: string | null | undefined
-      let publicFallbackSucceeded = false
-
-      // empty-fence complete만으로 public fetch를 건너뛰면 fence title/delimiter 등 메타데이터가 유실될 수 있다.
-      // 완전히 빈 admin은 stale-if-error 캐시 public 본문으로 되살리지 않는다.
-      const shouldFetchPublicContent = shouldFetchPublicContentForCodeFenceRecovery(adminContent)
-
-      if (shouldFetchPublicContent) {
-        try {
-          const publicPost = await apiFetch<Pick<PostForEditor, "content" | "contentHtml">>(
-            `/post/api/v1/posts/${normalizedTargetPostId}`
-          )
-          publicContentHtml = publicPost.contentHtml
-          const trimmedPublicMarkdown = (publicPost.content ?? "").trim()
-          if (trimmedPublicMarkdown.length > 0) {
-            publicContent = publicPost.content ?? ""
-            publicFallbackSucceeded = true
-          } else if (publicPost.contentHtml?.trim()) {
-            publicContent = resolveEditorMetaSnapshot("", publicPost.contentHtml).body
-            publicFallbackSucceeded = publicContent.trim().length > 0
-          }
-        } catch {
-          // 비공개/삭제 글 등 공개 읽기 폴백이 불가능한 경우 contentHtml 결과만 사용한다.
-        }
-      }
-
-      const fenceRecovery = resolveEditorCodeFenceRecovery({
-        adminContent,
-        adminBodyForSync: adminBodySnapshot.body,
-        contentHtmlBodyCandidate: htmlRecoverySnapshot.body,
-        publicContent,
-        publicFallbackSucceeded,
-      })
-
-      if (needsCodeFenceRecovery) {
-        reportCodeFenceRecovery({
-          postId: normalizedTargetPostId,
-          source: fenceRecovery.source,
-          hadEmptyFence: adminContentHadEmptyFenceForTelemetry(adminContent),
-          recovered: fenceRecovery.recovered,
-        })
-      }
-
-      resolvedPost = {
-        ...post,
-        content: fenceRecovery.content,
-        contentHtml: resolveLoadedPostContentHtml({
-          postContentHtml: post.contentHtml,
-          publicContentHtml,
-          fenceRecovery,
-        }),
-      }
+      // 빈 본문도 현재 원문이다. 조회 실패를 과거 SSR 본문으로 대체하지 않는다.
+      const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
+      if (!isCurrentLoad()) return
+      const resolvedPost = post
 
       const loadedPostState = resolveLoadedPostState(resolvedPost)
       setPostTitle(loadedPostState.title)
@@ -538,11 +474,12 @@ export const useEditorStudioDraftLifecycle = ({
       signalLocalDraftBaselineReady()
       setResult(pretty(resolvedPost))
     } catch (error) {
+      if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
       setResult(pretty({ error: message }))
     } finally {
       endLocalDraftPostLoad()
-      setLoadingKey("")
+      if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
     applyLoadedPostContext,
@@ -579,6 +516,8 @@ export const useEditorStudioDraftLifecycle = ({
     source?: string
     returnTo?: string
   }) => {
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postTemp")
@@ -589,6 +528,7 @@ export const useEditorStudioDraftLifecycle = ({
         })
       }
       const response = await tempPostRequestRef.current
+      if (!isCurrentLoad()) return
       const tempPost = response.data
       if (options?.redirectToEditor && tempPost.id) {
         const query = new URLSearchParams()
@@ -624,13 +564,14 @@ export const useEditorStudioDraftLifecycle = ({
       }
       setResult(pretty(response))
     } catch (error) {
+      if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
       setPublishStatus({ tone: "error", text: `새 글 불러오기 실패: ${message}` }, "page")
       setResult(pretty({ error: message }))
       setIsNewEditorBootstrapPending(false)
     } finally {
       endLocalDraftPostLoad()
-      setLoadingKey("")
+      if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
     applyLoadedPostContext,
@@ -661,6 +602,9 @@ export const useEditorStudioDraftLifecycle = ({
     localDraftFingerprint,
     localDraftSource,
     localDraftCandidate,
+    localDraftCandidates,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
     restoredLocalDraft,
     dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,

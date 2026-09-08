@@ -2,13 +2,11 @@
 import React from "react"
 
 type Props = React.ImgHTMLAttributes<HTMLImageElement> & {
-  fallbackSrc?: string
   fillContainer?: boolean
   priority?: boolean
 }
 
 const ProfileImage: React.FC<Props> = ({
-  fallbackSrc,
   fillContainer = false,
   priority = false,
   loading,
@@ -16,68 +14,76 @@ const ProfileImage: React.FC<Props> = ({
   onError,
   src,
   style,
+  width,
+  height,
   ...props
 }) => {
-  const requestedSrc = src || fallbackSrc
-  const fallbackAttemptKey = typeof requestedSrc === "string" ? requestedSrc : fallbackSrc
-  const [resolvedSrc, setResolvedSrc] = React.useState(requestedSrc)
-  const fallbackAttemptSourceRef = React.useRef<string | undefined>(undefined)
+  const requestedSrc = typeof src === "string" ? src : ""
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null)
   const imageRef = React.useRef<HTMLImageElement | null>(null)
 
-  const attemptFallback = React.useCallback(() => {
-    if (!fallbackSrc || fallbackAttemptSourceRef.current === fallbackAttemptKey) return
-
-    fallbackAttemptSourceRef.current = fallbackAttemptKey
-    setResolvedSrc(fallbackSrc)
-  }, [fallbackAttemptKey, fallbackSrc])
-
   React.useEffect(() => {
-    fallbackAttemptSourceRef.current = undefined
-    setResolvedSrc(requestedSrc)
+    setFailedSrc(null)
   }, [requestedSrc])
 
   React.useEffect(() => {
     const image = imageRef.current
-    if (
-      resolvedSrc !== requestedSrc ||
-      !image?.complete ||
-      image.naturalWidth !== 0
-    ) {
-      return
-    }
-
-    attemptFallback()
-  }, [attemptFallback, requestedSrc, resolvedSrc])
+    if (!requestedSrc || !image?.complete || image.naturalWidth !== 0) return
+    setFailedSrc(requestedSrc)
+  }, [requestedSrc])
 
   const handleImageError: React.ReactEventHandler<HTMLImageElement> = (event) => {
     onError?.(event)
-    attemptFallback()
+    setFailedSrc(requestedSrc)
+  }
+
+  const imageStyle: React.CSSProperties = {
+    display: "block",
+    objectFit: "cover",
+    objectPosition: "center 38%",
+    ...(fillContainer
+      ? {
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+        }
+      : {}),
+    ...style,
+  }
+
+  if (!requestedSrc || failedSrc === requestedSrc) {
+    return (
+      <span
+        {...props}
+        role="img"
+        aria-label={`${alt || "프로필"} 이미지를 불러올 수 없습니다.`}
+        style={{
+          width,
+          height,
+          ...imageStyle,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        이미지 없음
+      </span>
+    )
   }
 
   return (
     <img
       alt={alt}
-      src={resolvedSrc}
+      src={requestedSrc}
+      width={width}
+      height={height}
       loading={loading || (priority ? "eager" : "lazy")}
       {...({ fetchpriority: priority ? "high" : "auto" } as Record<string, string>)}
       decoding={priority ? "sync" : "async"}
       draggable={false}
       onError={handleImageError}
       ref={imageRef}
-      style={{
-        display: "block",
-        objectFit: "cover",
-        objectPosition: "center 38%",
-        ...(fillContainer
-          ? {
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-            }
-          : {}),
-        ...style,
-      }}
+      style={imageStyle}
       {...props}
     />
   )

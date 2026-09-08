@@ -3,12 +3,6 @@ import { CONFIG } from "site.config"
 import MetaConfig from "src/components/MetaConfig"
 import ProfileImage from "src/components/ProfileImage"
 import { AdminProfile, useAdminProfile } from "src/hooks/useAdminProfile"
-import {
-  DEFAULT_ABOUT_HEADLINE,
-  DEFAULT_ABOUT_PROJECT_SECTION_TITLE,
-  isAboutProjectSectionTitle,
-  parseLegacyAboutDetails,
-} from "src/libs/profileWorkspace"
 import { NextPageWithLayout } from "../types"
 import { AboutPageView } from "src/routes/About/AboutPageView"
 import {
@@ -17,23 +11,18 @@ import {
   parseTimelineItem,
   type AboutProjectItem,
 } from "src/routes/About/AboutPageModel"
-import {
-  buildStaticAdminProfileSnapshot,
-  fetchServerAdminProfile,
-  hasServerAuthCookie,
-  resolvePublicAdminProfileCacheControl,
-  resolvePublicAdminProfileSnapshot,
-} from "src/libs/server/adminProfile"
+import { ErrorState } from "src/design-system/StatePresenters"
+import { fetchServerAdminProfile, resolvePublicAdminProfileCacheControl } from "src/libs/server/adminProfile"
 import { shouldRefetchAdminProfileSource, type PublicAdminProfileSource } from "src/libs/adminProfileSource"
+import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { appendSsrDebugTiming, isSsrDebugEnabled, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
-import { resolveContactLinks, resolveRenderableProfileLinkHref, resolveServiceLinks } from "src/libs/utils/profileCardLinks"
+import { resolveRenderableProfileLinkHref } from "src/libs/utils/profileCardLinks"
 
 export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
   const hasAuthCookie = hasServerAuthCookie(req)
   const debugSsr = isSsrDebugEnabled(req)
-  const fallbackProfileSnapshot = !hasAuthCookie ? resolvePublicAdminProfileSnapshot(req) : null
   const adminProfileResult = await timed(() =>
     fetchServerAdminProfile(req, {
       timeoutMs: 1_800,
@@ -42,13 +31,11 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
   const initialAdminProfile =
     adminProfileResult.ok && adminProfileResult.value
       ? adminProfileResult.value
-      : hasAuthCookie
-        ? buildStaticAdminProfileSnapshot()
-        : fallbackProfileSnapshot?.profile || buildStaticAdminProfileSnapshot()
+      : null
   const initialAdminProfileSource: PublicAdminProfileSource =
     adminProfileResult.ok && adminProfileResult.value
       ? "published"
-      : fallbackProfileSnapshot?.source || "static-fallback"
+      : "unavailable"
 
   res.setHeader(
     "Cache-Control",
@@ -62,10 +49,7 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
     {
       name: "about-admin-profile",
       durationMs: adminProfileResult.durationMs,
-      description:
-        adminProfileResult.ok && adminProfileResult.value
-          ? "ok"
-          : fallbackProfileSnapshot?.source || "static-fallback",
+      description: adminProfileResult.ok && adminProfileResult.value ? "ok" : "unavailable",
     },
     {
       name: "about-ssr-total",
@@ -94,32 +78,39 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
     staleTimeMs: shouldRefreshProfile ? 0 : undefined,
   })
 
-  const displayName = adminProfile?.nickname || adminProfile?.name || CONFIG.profile.name
-  const displayHeadline = adminProfile?.aboutHeadline || DEFAULT_ABOUT_HEADLINE
-  const displayRole = adminProfile?.aboutRole || CONFIG.profile.role
-  const displayBio = adminProfile?.aboutBio || CONFIG.profile.bio
-  const profileImageSrc =
-    adminProfile?.profileImageDirectUrl || adminProfile?.profileImageUrl || CONFIG.profile.image
-  const aboutDetailSections =
-    adminProfile?.aboutSections && adminProfile.aboutSections.length > 0
-      ? adminProfile.aboutSections.map((section) => ({
-          title: section.title,
-          items: section.items,
-          hasDivider: section.dividerBefore,
-        }))
-      : parseLegacyAboutDetails(adminProfile?.aboutDetails || "").map((section) => ({
-          title: section.title,
-          items: section.items,
-          hasDivider: section.dividerBefore,
-        }))
-  const blogTitle = adminProfile?.blogTitle || CONFIG.blog.title
-  const contactLinks = resolveContactLinks(adminProfile)
+  if (!adminProfile) {
+    return (
+      <ErrorState
+        label="UNAVAILABLE"
+        title="프로필 정보를 불러올 수 없습니다"
+        description="잠시 후 다시 시도해주세요."
+        actions={
+          <button type="button" onClick={() => window.location.reload()}>
+            다시 시도
+          </button>
+        }
+      />
+    )
+  }
+
+  const displayName = adminProfile.nickname || adminProfile.name
+  const displayHeadline = adminProfile.aboutHeadline || ""
+  const displayRole = adminProfile.aboutRole || ""
+  const displayBio = adminProfile.aboutBio || ""
+  const profileImageSrc = adminProfile.profileImageUrl
+  const aboutDetailSections = (adminProfile.aboutSections || []).map((section) => ({
+    title: section.title,
+    items: section.items,
+    hasDivider: section.dividerBefore,
+  }))
+  const blogTitle = adminProfile.blogTitle || CONFIG.blog.title
+  const contactLinks = (adminProfile.contactLinks || [])
     .map((item) => {
       const safeHref = resolveRenderableProfileLinkHref("contact", item.href)
       return safeHref && isExternalHref(safeHref) ? { ...item, safeHref } : null
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
-  const serviceLinks = resolveServiceLinks(adminProfile)
+  const serviceLinks = (adminProfile.serviceLinks || [])
     .map((item) => {
       const safeHref = resolveRenderableProfileLinkHref("service", item.href)
       return safeHref && (safeHref.startsWith("https://") || safeHref.startsWith("http://"))
@@ -127,34 +118,18 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
         : null
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
-  const projectSection = aboutDetailSections.find((section) => isAboutProjectSectionTitle(section.title))
   const timelineSection = aboutDetailSections.find((section) => isTimelineSection(section.title))
-  const supplementalSections = aboutDetailSections.filter(
-    (section) => section !== projectSection && section !== timelineSection
-  )
+  const supplementalSections = aboutDetailSections.filter((section) => section !== timelineSection)
   const hasProfileLinks = contactLinks.length > 0 || serviceLinks.length > 0
-  const workspaceProjects =
-    adminProfile?.aboutProjects && adminProfile.aboutProjects.length > 0
-      ? adminProfile.aboutProjects
-      : (projectSection?.items || []).map((name, index) => ({
-          id: `legacy-project-${index + 1}`,
-          name,
-          summary: "",
-          role: "",
-          href: "",
-          linkLabel: "",
-        }))
-  const projectSectionTitle =
-    adminProfile?.aboutProjectSectionTitle || projectSection?.title || DEFAULT_ABOUT_PROJECT_SECTION_TITLE
-  const projectItems: AboutProjectItem[] = workspaceProjects.map((project) => {
-    const linkedService = serviceLinks.find((item) => item.label.toLowerCase() === project.name.toLowerCase())
-    const safeHref = resolveRenderableProfileLinkHref("service", project.href || linkedService?.safeHref || "") || ""
+  const projectSectionTitle = adminProfile.aboutProjectSectionTitle || ""
+  const projectItems: AboutProjectItem[] = (adminProfile.aboutProjects || []).map((project) => {
+    const safeHref = resolveRenderableProfileLinkHref("service", project.href) || ""
     return {
       name: project.name,
       summary: project.summary,
       role: project.role,
       safeHref,
-      linkLabel: project.linkLabel || linkedService?.label || (safeHref ? "링크 보기" : ""),
+      linkLabel: project.linkLabel || "",
     }
   })
   const timelineItems = (timelineSection?.items || []).map(parseTimelineItem)
@@ -237,7 +212,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
                 <div className="stack-list" data-ui="about-project-list">
                   {projectItems.map((item) => (
                     <div className="stack-row" key={item.name}>
-                      <strong>{item.role || item.linkLabel || "PROJECT"}</strong>
+                      <strong>{item.role || item.linkLabel}</strong>
                       {item.safeHref ? (
                         <a
                           href={item.safeHref}
@@ -257,7 +232,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
 
             {timelineItems.length > 0 ? (
               <section data-ui="about-timeline-section">
-                <h2>{timelineSection?.title || "이력"}</h2>
+                <h2>{timelineSection?.title}</h2>
                 <div className="stack-list" data-ui="about-timeline">
                   {timelineItems.map((item) => (
                     <div className="stack-row" key={`${item.label}-${item.date}`}>

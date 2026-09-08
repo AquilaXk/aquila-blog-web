@@ -82,6 +82,8 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: npx playwright install --with-deps chromium
       - run: yarn test:e2e:smoke
+      - run: yarn playwright test e2e/home-feed-redesign.spec.ts e2e/theme-color-scheme.spec.ts --workers=2
+      - run: yarn test:e2e:authoring
 
   accessibility:
     runs-on: ubuntu-latest

@@ -5,6 +5,9 @@ import { AdminTaskDlqReplayModel } from "../../src/routes/Admin/AdminTaskDlqRepl
 
 type TaskDlqReplayRequest =
   components["schemas"]["TaskDlqReplayOperationRequest"]
+type TaskDlqReplayOperationReceipt = NonNullable<
+  ReturnType<typeof AdminTaskDlqReplayModel.parseOperationReceipt>
+>
 
 const OPERATION_ID = "8d39047c-7791-4c0f-9136-0fcdb021942d"
 
@@ -26,7 +29,7 @@ const acceptedReceipt = {
   selectedCount: 0,
   replayedCount: 0,
   quarantinedCount: 0,
-}
+} satisfies TaskDlqReplayOperationReceipt
 
 const terminalReceipt = {
   ...acceptedReceipt,
@@ -39,7 +42,7 @@ const terminalReceipt = {
   sessionRowId: 72,
   target: "task-id-raw-canary",
   reason: "reason-raw-canary",
-}
+} satisfies TaskDlqReplayOperationReceipt
 
 test("validates the OpenAPI-bounded replay request without accepting client actor or session fields", () => {
   const openApi = JSON.parse(

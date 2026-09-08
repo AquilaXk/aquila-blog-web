@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test"
 import {
   MOBILE_VIEWPORT,
-  addPublicAboutSnapshotCookie,
   captureLayoutSnapshot,
   mockAnonymousSession,
   mockAvatarAsset,
@@ -102,7 +101,7 @@ test.describe("mobile layout public", () => {
   })
 
   test("iPhone 15 Pro about 페이지는 V4 프로필 본문과 원형 avatar 계약을 유지한다", async ({ page }) => {
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
   await expect(page.locator('[data-ui="about-hero"] h1')).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
   await expect(page.locator(".profile-copy")).toContainText("안녕하세요, 백엔드 개발자 아퀼라입니다.")

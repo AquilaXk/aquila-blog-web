@@ -7,123 +7,27 @@ import {
   type AdminPageProps,
 } from "src/libs/server/adminPage"
 import { hasServerAuthCookie } from "src/libs/server/authSession"
-import { serverApiFetchJson } from "src/libs/server/backend"
-import type { PostForEditor } from "./EditorStudioWorkspaceControllerRootModel"
-import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceController"
+import type { AdminProfile } from "src/types/adminProfile"
+import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceControllerRoot"
 
 const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 
-export type EditorStudioPageProps = AdminPageProps & {
-  initialEditorPost?: PostForEditor | null
-}
+export type EditorStudioPageProps = AdminPageProps
 
-const parseEditorPostId = (value: unknown) => {
-  if (typeof value !== "string") return ""
-  const normalized = value.trim()
-  return /^\d+$/.test(normalized) ? normalized : ""
-}
-
-const toRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : null
-
-const normalizeInitialEditorPost = (payload: unknown): PostForEditor | null => {
-  const root = toRecord(payload)
-  const candidate = toRecord(root?.data) ?? root
-  if (!candidate) return null
-
-  const rawId = candidate.id
-  const id = typeof rawId === "number" ? rawId : typeof rawId === "string" ? Number.parseInt(rawId, 10) : NaN
-  if (!Number.isInteger(id) || id <= 0) return null
-
-  const rawVersion = candidate.version
-  const version =
-    typeof rawVersion === "number" && Number.isFinite(rawVersion) ? rawVersion : undefined
-  const contentHtml = typeof candidate.contentHtml === "string" ? candidate.contentHtml : undefined
-  const summarySource =
-    candidate.summarySource === "MANUAL" ||
-    candidate.summarySource === "LEADING_BLOCK" ||
-    candidate.summarySource === "EXTRACTED" ||
-    candidate.summarySource === "MIGRATED" ||
-    candidate.summarySource === "NONE"
-      ? candidate.summarySource
-      : null
-  if (typeof candidate.summary !== "string" || summarySource == null) return null
-  if ((summarySource === "NONE") !== (candidate.summary.length === 0)) return null
-  if (summarySource !== "NONE" && candidate.summary.trim().length === 0) return null
-
-  return {
-    id,
-    title: typeof candidate.title === "string" ? candidate.title : "",
-    content: typeof candidate.content === "string" ? candidate.content : "",
-    ...(contentHtml === undefined ? {} : { contentHtml }),
-    ...(version === undefined ? {} : { version }),
-    published: candidate.published === true,
-    listed: candidate.listed === true,
-    ...(candidate.tempDraft === undefined ? {} : { tempDraft: candidate.tempDraft === true }),
-    summary: candidate.summary,
-    summarySource,
-  }
-}
-
-const fetchInitialEditorPost = async (req: Parameters<GetServerSideProps>[0]["req"], postId: string) => {
-  if (!postId) return null
-
-  try {
-    const payload = await serverApiFetchJson<unknown>(req, `/post/api/v1/adm/posts/${postId}`, {
-      cache: "no-store",
-      timeoutMs: 6_000,
-    })
-    return normalizeInitialEditorPost(payload)
-  } catch {
-    return null
-  }
-}
-
-export const getEditorStudioPageProps: GetServerSideProps<EditorStudioPageProps> = async ({ req, query }) => {
+export const getEditorStudioPageProps: GetServerSideProps<EditorStudioPageProps> = async ({ req }) => {
   // Playwright/QA는 BACKEND_INTERNAL_URL=127.0.0.1:1 단절 모드에서 cookie 없이
   // getAdminPageProps(QA bypass)로 editor shell을 띄운다. auth cookie가 없을 때
   // bootstrap을 호출하면 ApiNetworkError가 GSSP를 500으로 터뜨린다.
   if (hasServerAuthCookie(req)) {
     const bootstrapResult = await readAdminProtectedBootstrap<{
       member: AuthMember
-      profile: Partial<AuthMember>
+      profile: AdminProfile
     }>(req, "/member/api/v1/adm/members/bootstrap", EDITOR_NEW_ROUTE_PATH)
 
     if (bootstrapResult.ok) {
       const { member, profile } = bootstrapResult.value
-      const mergedMember: AuthMember = {
-        ...member,
-        profileImageDirectUrl:
-          profile.profileImageDirectUrl ||
-          profile.profileImageUrl ||
-          member.profileImageDirectUrl ||
-          member.profileImageUrl ||
-          "",
-        profileImageUrl:
-          profile.profileImageUrl ||
-          profile.profileImageDirectUrl ||
-          member.profileImageUrl ||
-          member.profileImageDirectUrl ||
-          "",
-        profileRole: profile.profileRole || member.profileRole || "",
-        profileBio: profile.profileBio || member.profileBio || "",
-        aboutRole: profile.aboutRole || member.aboutRole || "",
-        aboutBio: profile.aboutBio || member.aboutBio || "",
-        aboutDetails: profile.aboutDetails || member.aboutDetails || "",
-        blogTitle: profile.blogTitle || member.blogTitle || "",
-        homeIntroTitle: profile.homeIntroTitle || member.homeIntroTitle || "",
-        homeIntroDescription:
-          profile.homeIntroDescription || member.homeIntroDescription || "",
-      }
-
-      const initialEditorPost = await fetchInitialEditorPost(req, parseEditorPostId(query.id))
-      const baseProps = buildAdminPagePropsFromMember(mergedMember)
-
       return {
-        props: {
-          ...baseProps,
-          initialEditorPost,
-        },
+        props: buildAdminPagePropsFromMember(member, profile),
       }
     }
 

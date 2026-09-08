@@ -875,7 +875,10 @@ test.describe("core smoke detail rendering", () => {
   await reloadPromise
   await expect(page.getByText("runtime guard reload 회귀 방지")).toBeVisible()
   await expect.poll(async () => {
-    return page.evaluate(() => performance.getEntriesByType("navigation")[0]?.type || "")
+    return page.evaluate(() => {
+      const navigation = performance.getEntriesByType("navigation")[0]
+      return navigation instanceof PerformanceNavigationTiming ? navigation.type : ""
+    })
   }).toBe("reload")
   const recoveredTimeOrigin = await page.evaluate(() => performance.timeOrigin)
 
@@ -1054,7 +1057,7 @@ test.describe("core smoke detail rendering", () => {
   await expect(readTypography("h1.title")).resolves.toEqual({
     fontSize: "67.84px",
     lineHeight: "73.2672px",
-    fontWeight: "850",
+    fontWeight: "600",
   })
   await expect(readTypography(".aq-markdown h1")).resolves.toEqual({
     fontSize: "32px",
@@ -1072,8 +1075,8 @@ test.describe("core smoke detail rendering", () => {
     fontWeight: "600",
   })
   await expect(readTypography(".aq-markdown p")).resolves.toEqual({
-    fontSize: "17px",
-    lineHeight: "28px",
+    fontSize: "16px",
+    lineHeight: "26.4px",
     fontWeight: "400",
   })
   await expect(readTypography(".aq-code code, pre code")).resolves.toEqual({
@@ -1082,8 +1085,8 @@ test.describe("core smoke detail rendering", () => {
     fontWeight: "400",
   })
   await expect(readTypography(".aq-callout .aq-markdown-text")).resolves.toEqual({
-    fontSize: "17px",
-    lineHeight: "28px",
+    fontSize: "16px",
+    lineHeight: "26.4px",
     fontWeight: "400",
   })
 })

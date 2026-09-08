@@ -28,6 +28,8 @@ import {
 import { DashboardRefreshControls } from "src/routes/Admin/AdminDashboardWorkspaceSections"
 import AdminShell from "src/routes/Admin/AdminShell"
 
+const PrioritySummaryLink = PrioritySummary.withComponent(Link)
+
 export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
   const {
     chartBars,
@@ -64,12 +66,8 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
                   isRefreshing={isRefreshing}
                   onRefresh={onRefresh}
                 />
-                <Link href="/admin/tools" passHref legacyBehavior>
-                  <HeaderLink>Doctor 실행</HeaderLink>
-                </Link>
-                <Link href="/admin/tools" passHref legacyBehavior>
-                  <HeaderLink data-variant="primary">Rollback</HeaderLink>
-                </Link>
+                <HeaderLink as={Link} href="/admin/tools">Doctor 실행</HeaderLink>
+                <HeaderLink as={Link} href="/admin/tools" data-variant="primary">Rollback</HeaderLink>
               </HeroActions>
             </HeroTop>
           </HeroPanel>
@@ -131,11 +129,9 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
                       </span>
                     </span>
                     {row.href ? (
-                      <Link href={row.href} passHref legacyBehavior>
-                        <PrioritySummary as="a" data-tone={row.tone}>
-                          {row.actionLabel}
-                        </PrioritySummary>
-                      </Link>
+                      <PrioritySummaryLink href={row.href} data-tone={row.tone}>
+                        {row.actionLabel}
+                      </PrioritySummaryLink>
                     ) : (
                       <PrioritySummary data-tone={row.tone}>{row.actionLabel}</PrioritySummary>
                     )}

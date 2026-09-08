@@ -1,7 +1,6 @@
 import { normalizeTagQuery } from "src/libs/query/normalize"
 import type { TPost } from "src/types"
 import { ApiError, apiFetch } from "../client"
-import { resetPostDetailRequestCaches } from "./PostApiDetailRequests"
 import type {
   ApiPostDto,
   ApiTagCountDto,
@@ -91,7 +90,6 @@ export const resetPostsRequestCaches = () => {
   pendingPostsPromise = null
   postsBootstrapSsrCache = new Map()
   pendingPostsBootstrapPromises = new Map()
-  resetPostDetailRequestCaches()
 }
 
 export const getPostsBootstrap = async ({
