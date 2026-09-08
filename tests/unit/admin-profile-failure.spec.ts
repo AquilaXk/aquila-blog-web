@@ -7,10 +7,11 @@ test("admin profile readers share the fail-closed request contract", () => {
   const rootLayoutSource = readFileSync(path.resolve(__dirname, "../../src/layouts/RootLayout/index.tsx"), "utf8")
   const requestSource = readFileSync(path.resolve(__dirname, "../../src/libs/publicAdminProfileClient.ts"), "utf8")
 
-  for (const source of [hookSource, rootLayoutSource]) {
-    expect(source).toContain("fetchPublicAdminProfile")
-    expect(source).toContain("throwOnError: true")
-  }
+  expect(hookSource).toContain("queryFn: fetchPublicAdminProfile")
+  expect(hookSource).toContain("throwOnError: true")
+  expect(rootLayoutSource).toContain('from "src/hooks/useAdminProfile"')
+  expect(rootLayoutSource).toContain("useAdminProfile(initialAdminProfile,")
+  expect(rootLayoutSource).not.toContain("fetchPublicAdminProfile")
   expect(requestSource).toContain('await import("src/apis/backend/client")')
   expect(requestSource).toContain("return await apiFetch<AdminProfile>(PUBLIC_ADMIN_PROFILE_PATH)")
   expect(requestSource).not.toContain("persistAdminProfileSnapshotCookie")
