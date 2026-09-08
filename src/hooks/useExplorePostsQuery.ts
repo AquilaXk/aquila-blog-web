@@ -167,7 +167,8 @@ const useExplorePostsQuery = ({
     regularPosts,
     loadedPagesCount: query.data?.pages.length ?? 0,
     hasNextPage: query.hasNextPage ?? false,
-    isInitialLoading: query.isLoading,
+    // 첫 결과가 없으면 router 준비 전에도 로딩을 유지해 서버와 초기 화면을 맞춘다.
+    isInitialLoading: query.isPending,
     isInitialLoadError: query.isError && !(query.data?.pages.length),
     isRetainedDataError: query.isRefetchError,
     hasInitialLoadSucceeded: query.isSuccess && query.isFetchedAfterMount,
