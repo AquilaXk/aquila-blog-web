@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "src/apis/backend/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import type { AdminProfile } from "src/types/adminProfile"
+import { parseCanonicalAdminProfile } from "src/libs/canonicalAdminProfile"
 
 type AdminShellBootstrapPayload = {
   member: Pick<AuthMember, "id">
@@ -16,15 +17,7 @@ export const readAdminShellProfile = async (memberId: number): Promise<AdminProf
   if (!payload || payload.member?.id !== memberId) {
     throw new Error("Admin shell profile canonical member mismatch")
   }
-  if (
-    !payload.profile ||
-    typeof payload.profile.profileImageUrl !== "string" ||
-    (payload.profile.blogTitle !== undefined && typeof payload.profile.blogTitle !== "string")
-  ) {
-    throw new Error("Admin shell profile canonical profile is unavailable")
-  }
-
-  return payload.profile
+  return parseCanonicalAdminProfile(payload.profile)
 }
 
 export const useAdminShellProfile = (memberId: number, initialProfile: AdminProfile | null = null) => {

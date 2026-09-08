@@ -1,5 +1,6 @@
 import { IncomingMessage } from "http"
 import { AdminProfile } from "src/hooks/useAdminProfile"
+import { parseCanonicalAdminProfile } from "src/libs/canonicalAdminProfile"
 import type { PublicAdminProfileSource, StaticAdminProfileSeedSource } from "src/libs/adminProfileSource"
 import { serverApiFetchJson } from "./backend"
 
@@ -12,7 +13,7 @@ type StaticAdminProfileSeed = {
   source: StaticAdminProfileSeedSource
 }
 
-type FetchStaticAdminProfile = () => Promise<AdminProfile>
+type FetchStaticAdminProfile = () => Promise<unknown>
 
 const PUBLISHED_PROFILE_CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=300"
 const TRANSIENT_PROFILE_CACHE_CONTROL = "private, no-store"
@@ -35,9 +36,9 @@ export const fetchServerAdminProfile = async (
   options: FetchServerAdminProfileOptions = {}
 ): Promise<AdminProfile | null> => {
   try {
-    return await serverApiFetchJson<AdminProfile>(req, "/member/api/v1/members/adminProfile", {
+    return parseCanonicalAdminProfile(await serverApiFetchJson<unknown>(req, "/member/api/v1/members/adminProfile", {
       timeoutMs: options.timeoutMs,
-    })
+    }))
   } catch {
     return null
   }
@@ -48,7 +49,7 @@ export const resolveStaticAdminProfileSeed = async (
 ): Promise<StaticAdminProfileSeed> => {
   try {
     return {
-      profile: await fetchProfile(),
+      profile: parseCanonicalAdminProfile(await fetchProfile()),
       source: "published",
     }
   } catch {
