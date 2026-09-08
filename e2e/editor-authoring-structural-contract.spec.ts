@@ -66,4 +66,54 @@ test.describe("editor authoring structure", () => {
     expect(shellStylesSource).toContain("export const PublishDialog")
     expect(shellStylesSource).toContain("export const PublishModalFooter")
   })
+
+  test("removes card and viewport previews while preserving publish controls and content editing", () => {
+    const publishModalSource = readFileSync(
+      sourcePath("routes/Admin/EditorStudioPublishModal.tsx"),
+      "utf8"
+    )
+    const publishPartsSource = readFileSync(
+      sourcePath("routes/Admin/EditorStudioPublishModalParts.tsx"),
+      "utf8"
+    )
+    const publishStylesSource = readFileSync(
+      sourcePath("routes/Admin/EditorStudioPublishModalStyles.tsx"),
+      "utf8"
+    )
+    const controllerSource = readFileSync(
+      sourcePath("routes/Admin/EditorStudioWorkspaceControllerRootView.tsx"),
+      "utf8"
+    )
+    const controllerModelSource = readFileSync(
+      sourcePath("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts"),
+      "utf8"
+    )
+    const publishFlowSource = readFileSync(
+      sourcePath("routes/Admin/useEditorStudioPublishModalFlow.ts"),
+      "utf8"
+    )
+
+    expect(publishModalSource).toContain("EditorStudioPublishVisibilitySection")
+    expect(publishModalSource).toContain("EditorStudioPublishCardSettings")
+    expect(publishModalSource).toContain("thumbnailEditorPanel")
+    expect(publishModalSource).toContain("onConfirmPublish")
+    expect(publishPartsSource).toContain("EditorStudioPublishVisibilitySection")
+    expect(publishPartsSource).toContain("EditorStudioPublishCardSettings")
+    expect(controllerSource).toContain("WriterEditorHost")
+    expect(controllerSource).toContain("EditorStudioThumbnailEditorPanel")
+    expect(controllerSource).toContain("safePreviewThumbnail")
+    expect(publishFlowSource).toContain("handleConfirmPublish")
+
+    for (const source of [publishModalSource, publishPartsSource, publishStylesSource, controllerSource, controllerModelSource, publishFlowSource]) {
+      expect(source).not.toContain("PublishPreviewCard")
+      expect(source).not.toContain("PreviewResult")
+      expect(source).not.toContain("PreviewViewport")
+      expect(source).not.toContain("PreviewVisibilityBadge")
+    }
+    expect(controllerSource).not.toContain("SHOW_LEGACY_CONTENT_STUDIO")
+    expect(controllerModelSource).not.toContain("SHOW_LEGACY_CONTENT_STUDIO")
+    expect(existsSync(sourcePath("routes/Admin/EditorStudioComposeWorkspace.tsx"))).toBe(false)
+    expect(existsSync(sourcePath("routes/Admin/EditorStudioComposeAssistantPanel.tsx"))).toBe(false)
+    expect(existsSync(sourcePath("routes/Admin/EditorStudioComposeAssistantPanelParts.tsx"))).toBe(false)
+  })
 })

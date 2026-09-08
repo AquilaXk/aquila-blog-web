@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from "react"
-import { formatDate } from "src/libs/utils"
 import {
   clampThumbnailZoom,
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -17,17 +16,14 @@ import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioLegacyProfileSection } from "./EditorStudioLegacyProfileSection"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDeleteConfirmDialog } from "./EditorStudioDeleteConfirmDialog"
-import { EditorStudioComposeWorkspace } from "./EditorStudioComposeWorkspace"
-import { EditorStudioContentWorkspace } from "./EditorStudioContentWorkspace"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
-import { LIST_SORT_OPTIONS } from "./useEditorStudioListConditions"
-import { deriveComposeViewModel, deriveEditorContentMetrics, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PublishActionType } from "./editorStudioState"
+import { deriveComposeViewModel, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
-import { PREVIEW_SUMMARY_MAX_LENGTH, buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
+import { buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
 import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
-import { MARKDOWN_EDITOR_MERMAID_ENABLED, COMPOSE_MOBILE_STUDIO_STEPS, GLOBAL_NOTICE_IDLE_TEXT, MANAGE_MOBILE_STUDIO_STEPS, MOBILE_STUDIO_STEP_DESCRIPTION, MOBILE_STUDIO_STEP_LABEL, PREVIEW_CARD_VIEWPORT_ORDER, PREVIEW_CARD_VIEWPORTS, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_CONTENT_STUDIO, SHOW_LEGACY_PROFILE_STUDIO, getMobileStudioStepMoveLabel, recordEditorCommitDurationForRuntimeGuard, type MobileStudioStep, type NoticeTone, type PreviewViewportMode } from "./EditorStudioWorkspaceControllerRootModel"
+import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_PROFILE_STUDIO, recordEditorCommitDurationForRuntimeGuard } from "./EditorStudioWorkspaceControllerRootModel"
 
 type EditorStudioWorkspaceControllerRootViewProps = {
   props: Record<string, any>
@@ -35,105 +31,60 @@ type EditorStudioWorkspaceControllerRootViewProps = {
 
 export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioWorkspaceControllerRootViewProps) => {
   const {
-    activeMetaPanel,
     addTagsToPost,
     addTagToPost,
-    adminPostRows,
-    adminPostTotal,
-    adminPostViewRows,
     applyFirstBodyImageToThumbnail,
-    applyListQuickPreset,
     clearLocalDraft,
     closeDeleteConfirm,
     closePublishModal,
     commitPreviewThumbTransform,
-    copyPostDetailLink,
     customCategoryCatalog,
-    deferredPostContent,
     deferredContentDerived,
     deleteConfirmNotice,
     deleteConfirmState,
     deletePostsFromList,
-    deletedListNotice,
     dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,
-    deleteTagFromCatalog,
     disabled,
     editorMode,
     finalizePreviewThumbPointer,
-    globalNotice,
     handleMarkdownEditorChange,
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
     handleConfirmPublish,
-    handleContinueSelectedPostEditing,
-    handleCreateNewPostFromSelectedPanel,
-    handleDeleteSelectedPost,
     handleExitDedicatedEditor,
     handleFlushMarkdownReady,
-    handleHitPost,
-    handleListPageChange,
-    handleListPageSizeChange,
-    handleListSortChange,
-    handleLoadOrCreateTempPost,
     commitPostCategory,
     handlePostCategoryChange,
     handlePostSummaryChange,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
     handleProfileImageSelected,
-    handleReadPostCount,
-    handleReadSystemHealth,
     handleRefreshAdminProfile,
-    handleSelectedPostIdChange,
     handleThumbnailImageFileChange,
     handleThumbnailPaste,
     handleThumbnailUrlModalChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    handleUndoSoftDelete,
     handleUpdateMemberProfileCard,
-    hardDeleteDeletedPostFromList,
-    isAllVisiblePostsSelected,
     isCompactMobileLayout,
-    isComposeAssistOpen,
-    isComposeUtilityOpen,
     isDedicatedEditorRoute,
     isDedicatedNewEditorRoute,
-    isDirectLoadOpen,
-    isListAdvancedOpen,
     isMobileMetaEditorOpen,
     isMobileThumbnailEditorOpen,
     isNewEditorBootstrapPending,
     isPreviewThumbDragging,
     isPreviewThumbnailError,
     isPublishModalOpen,
-    isSelectedToolsOpen,
     isTempDraftMode,
-    knownTags,
     getCurrentPostContent,
     lastLocalDraftFingerprintRef,
-    listKw,
-    listPage,
-    listPageSize,
-    listQuickPreset,
-    listScope,
-    listSort,
-    loadAdminPosts,
-    loadPostForEditor,
     loadingKey,
     localDraftCandidate,
     localDraftSavedAt,
     localDraftSource,
-    localDraftSlotLabel,
     member,
-    metaNotice,
-    mobileComposeStep,
-    mobileManageStep,
-    modifiedSortOrder,
-    openDeleteConfirm,
-    openPostDetailRoute,
     openPublishModal,
     openThumbnailFileInput,
     postCategory,
@@ -148,7 +99,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     postThumbnailUrl,
     postThumbnailZoom,
     postTitle,
-    postVersion,
     postVisibility,
     profileBioInput,
     profileImageFileInputRef,
@@ -162,51 +112,25 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishNotice,
     previewThumbFrameRef,
     previewThumbTransformRef,
-    previewViewport,
-    resolvedPreviewSummary,
-    resetListFilters,
     resetThumbnailToAutoMode,
     removeTagFromPost,
-    restoreDeletedPostFromList,
     restoreLocalDraft,
     restoredLocalDraft,
     result,
     safePreviewThumbnail,
-    saveLocalDraft,
-    selectedPostIdSet,
-    selectedPostIds,
     serverBaselineEditorFingerprintRef,
     sessionMember,
-    setActiveMetaPanel,
-    setIsComposeAssistOpen,
-    setIsComposeUtilityOpen,
-    setIsDirectLoadOpen,
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,
     setIsPreviewThumbnailError,
-    setIsSelectedToolsOpen,
-    setListKw,
-    setListScope,
-    setMobileComposeStep,
-    setMobileManageStep,
-    setModifiedSortOrder,
-    setPostId,
-    setPostSummary,
     setPostVisibility,
-    setPreviewViewport,
     setProfileBioInput,
     setProfileRoleInput,
-    setSelectedPostIds,
     setTagDraft,
-    softDeleteUndoState,
     studioSurface,
     tagDraft,
-    tagUsageMap,
     thumbnailImageFileInputRef,
     thumbnailImageFileName,
-    toggleListAdvanced,
-    togglePostSelection,
-    toggleSelectAllVisiblePosts
   } = props
   const [isMarkdownUploading, setIsMarkdownUploading] = useState(false)
   const handleMarkdownUploadingChange = useCallback((nextIsUploading: boolean) => {
@@ -277,29 +201,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     [currentVisibilityText, editorMode, isTempDraftMode, postId, postSummary, postTags, postTitle]
   )
   const {
-    editorModeLabel,
     hasSelectedManagedPost,
     currentPostLabel,
-    selectedPostLabel,
-    tagSummaryText,
     composePageTitle,
-    composeSurfaceSubtitle,
-    composeHeroSummary,
-    composeCallToActionLabel,
   } = composeViewModel
-  const hasListFiltersApplied =
-    listKw.trim().length > 0 ||
-    listQuickPreset !== "none" ||
-    listPage !== "1" ||
-    listPageSize !== "30" ||
-    (listScope === "active" && listSort !== "CREATED_AT")
-  const deferredContentMetrics = useMemo(
-    () => deriveEditorContentMetrics(deferredPostContent),
-    [deferredPostContent]
-  )
-  const contentLength = deferredContentMetrics.trimmedLength
-  const lineCount = deferredContentMetrics.lineCount
-  const imageCount = deferredContentMetrics.imageCount
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
   const publishPlaceholderIssue = hasEditorMinimumFields
@@ -397,7 +302,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       handleExitDedicatedEditor()
     })
   }, [handleExitDedicatedEditor, requestGuardedAction])
-  const composeSummaryPreview = postSummary
   const profilePreviewSrc = profileImgInputUrl.trim()
   const profileImageStatus = profilePreviewSrc ? "설정됨" : "기본 이미지 사용 중"
   const profileRoleStatus = profileRoleInput.trim() || "미설정"
@@ -422,92 +326,13 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishActionButtonText,
     publishActionButtonDisabled,
     publishActionTriggerDisabled,
-    mobilePrimaryActionLabel,
-    mobilePrimaryActionDisabled,
   } = publishActionViewModel
-  const activeMobileStudioStep = studioSurface === "manage" ? mobileManageStep : mobileComposeStep
-  const mobileStudioSurfaceSteps =
-    studioSurface === "manage"
-      ? ([...MANAGE_MOBILE_STUDIO_STEPS] as MobileStudioStep[])
-      : ([...COMPOSE_MOBILE_STUDIO_STEPS] as MobileStudioStep[])
-  const mobileStudioStepIndex = mobileStudioSurfaceSteps.indexOf(activeMobileStudioStep)
-  const mobileStudioPrevStep: MobileStudioStep | null =
-    mobileStudioStepIndex > 0 ? mobileStudioSurfaceSteps[mobileStudioStepIndex - 1] ?? null : null
-  const mobileStudioNextStep: MobileStudioStep | null =
-    mobileStudioStepIndex < mobileStudioSurfaceSteps.length - 1
-      ? mobileStudioSurfaceSteps[mobileStudioStepIndex + 1] ?? null
-      : null
-  const mobileStudioPrevStepLabel =
-    mobileStudioPrevStep === null ? "이전 단계 없음" : getMobileStudioStepMoveLabel(mobileStudioPrevStep)
-  const mobileStudioNextStepLabel =
-    mobileStudioNextStep === null ? "마지막 단계" : `${MOBILE_STUDIO_STEP_LABEL[mobileStudioNextStep]} 단계로 이동`
-  const setActiveMobileStudioStep = (step: MobileStudioStep) => {
-    if (step === "query" || step === "list") {
-      setMobileManageStep(step)
-      return
-    }
-    setMobileComposeStep(step)
-  }
   const isCompactManageSurface = isCompactMobileLayout && studioSurface === "manage"
-  const showSelectedPanelInManageSurface = !isCompactMobileLayout || activeMobileStudioStep !== "list" || hasSelectedManagedPost
-  const [previewNowIso] = useState(() => new Date().toISOString())
   const displayName = member.nickname || member.username || "관리자"
   const displayNameInitial = displayName.slice(0, 2).toUpperCase()
-  const selectedPreviewViewport = previewViewport as PreviewViewportMode
-  const previewViewportConfig = PREVIEW_CARD_VIEWPORTS[selectedPreviewViewport]
-  const previewViewportOptions = PREVIEW_CARD_VIEWPORT_ORDER.map((viewport) => ({
-    value: viewport,
-    label: PREVIEW_CARD_VIEWPORTS[viewport].label,
-  }))
-  const previewVisibilityLabel = getVisibilityLabel(postVisibility)
-  const previewThumbnailSrc = safePreviewThumbnail && !isPreviewThumbnailError ? safePreviewThumbnail : ""
   const shouldShowPublishModalNotice = publishModalNotice.tone !== "idle"
-  const previewAuthorAvatarSrc = (
-    profileImgInputUrl.trim() ||
-    member.profileImageDirectUrl ||
-    member.profileImageUrl ||
-    ""
-  ).trim()
-  const previewDateText = formatDate(previewNowIso, "ko")
-
   const isCompactSplitPreview = false
-  const shouldShowGlobalNotice =
-    globalNotice.tone !== "idle" || globalNotice.text !== GLOBAL_NOTICE_IDLE_TEXT
   const shouldShowPublishNotice = publishNotice.tone !== "idle"
-  const composeStatusEntries = [
-    shouldShowPublishNotice
-      ? {
-          key: "publish",
-          label: "발행 상태",
-          tone: publishNotice.tone,
-          text: publishNotice.text,
-        }
-      : null,
-    {
-      key: "draft",
-      label: "브라우저 임시저장",
-      tone: localDraftSavedAt ? ("success" as NoticeTone) : ("idle" as NoticeTone),
-      text: localDraftSavedAt
-        ? `${localDraftSlotLabel || `${localDraftSavedAt.slice(11, 16)}`} 저장본이 있습니다.`
-        : "아직 브라우저 임시저장이 없습니다.",
-    },
-  ].filter(
-    (
-      item
-    ): item is {
-      key: string
-      label: string
-      tone: NoticeTone
-      text: string
-    } => Boolean(item)
-  )
-  const mobileComposeStatusPrimary = composeStatusEntries[0] ?? {
-    key: "visibility",
-    label: "공개 범위",
-    tone: "idle" as NoticeTone,
-    text: `${currentVisibilityText} · ${postSummary.trim() ? "요약 입력됨" : "요약 자동 생성"}`,
-  }
-  const mobileComposeStatusSecondary = composeStatusEntries.find((item) => item.key === "draft") ?? null
   const isThumbnailUploadDisabled = disabled("uploadThumbnail")
   const handleThumbnailZoomModalChange = useCallback(
     (nextZoom: number) => {
@@ -565,10 +390,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     openPublishModal(editorPrimaryActionType)
   }, [editorPrimaryActionType, openPublishModal, publishActionTriggerDisabled])
 
-  const handleComposeEditorRequestSave = useCallback(() => {
-    saveLocalDraft()
-  }, [saveLocalDraft])
-
   const dedicatedEditorCanvas = useMemo(
     () => (
       <WriterEditorHost
@@ -588,35 +409,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     ),
     [
       handleDedicatedEditorRequestSave,
-      handleMarkdownEditorChange,
-      handleMarkdownEditorFileUpload,
-      handleMarkdownEditorImageUpload,
-      handleFlushMarkdownReady,
-      handleEditorCommitDuration,
-      handleMarkdownUploadingChange,
-      isMarkdownEditorDisabled,
-      postContent,
-    ]
-  )
-  const composeEditorCanvas = useMemo(
-    () => (
-      <WriterEditorHost
-        canvasId="editor-compose-canvas"
-        markdown={postContent}
-        onMarkdownChange={handleMarkdownEditorChange}
-        onFlushMarkdownReady={handleFlushMarkdownReady}
-        onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
-        onRequestSave={handleComposeEditorRequestSave}
-        onUploadingChange={handleMarkdownUploadingChange}
-        onImageUpload={handleMarkdownEditorImageUpload}
-        onFileUpload={handleMarkdownEditorFileUpload}
-        mermaidEnabled={MARKDOWN_EDITOR_MERMAID_ENABLED}
-        disabled={isMarkdownEditorDisabled}
-        onCommitDuration={handleEditorCommitDuration}
-      />
-    ),
-    [
-      handleComposeEditorRequestSave,
       handleMarkdownEditorChange,
       handleMarkdownEditorFileUpload,
       handleMarkdownEditorImageUpload,
@@ -708,29 +500,13 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
           isPublishModalOpen ? (
             <EditorStudioPublishModal
               closeToggleLabel="닫기"
-              displayName={displayName}
-              displayNameInitial={displayNameInitial}
               isCompactMobileLayout={isCompactMobileLayout}
               isMobileMetaEditorOpen={isMobileMetaEditorOpen}
               isMobileThumbnailEditorOpen={isMobileThumbnailEditorOpen}
               loadingKey={loadingKey}
               modalNotice={publishModalNotice}
-              postThumbnailFocusX={postThumbnailFocusX}
-              postThumbnailFocusY={postThumbnailFocusY}
-              postThumbnailZoom={postThumbnailZoom}
-              postTitle={postTitle}
               postVisibility={postVisibility}
-              previewAuthorAvatarSrc={previewAuthorAvatarSrc}
-              previewDateText={previewDateText}
-              previewFrameStyle={{ maxWidth: `${previewViewportConfig.cardWidth}px` }}
-              previewKicker="카드 미리보기"
               previewMetaEditorPanel={previewMetaEditorPanel}
-              previewSummary={resolvedPreviewSummary}
-              previewThumbnailSrc={previewThumbnailSrc}
-              previewViewport={previewViewport}
-              previewViewportLabel={previewViewportConfig.label}
-              previewViewportOptions={previewViewportOptions}
-              previewVisibilityLabel={previewVisibilityLabel}
               publishActionButtonDisabled={publishActionButtonDisabled}
               publishActionButtonText={publishActionButtonText}
               publishActionTitle={publishActionTitle}
@@ -741,8 +517,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
               onClose={closePublishModal}
               onConfirmPublish={() => void handleConfirmPublish()}
               onPostVisibilityChange={setPostVisibility}
-              onPreviewThumbnailError={() => setIsPreviewThumbnailError(true)}
-              onPreviewViewportChange={setPreviewViewport}
               onToggleMobileMetaEditor={() => setIsMobileMetaEditorOpen((current: boolean) => !current)}
               onToggleMobileThumbnailEditor={() => setIsMobileThumbnailEditorOpen((current: boolean) => !current)}
             />
@@ -814,98 +588,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
             />
           )}
 
-          {SHOW_LEGACY_CONTENT_STUDIO && (
-            <EditorStudioContentWorkspace
-              shouldShowGlobalNotice={shouldShowGlobalNotice}
-              globalNotice={globalNotice}
-              mobileStudioSurfaceSteps={mobileStudioSurfaceSteps}
-              activeMobileStudioStep={activeMobileStudioStep}
-              mobileStudioStepLabels={MOBILE_STUDIO_STEP_LABEL}
-              mobileStudioStepDescriptions={MOBILE_STUDIO_STEP_DESCRIPTION}
-              mobileStudioPrevStep={mobileStudioPrevStep}
-              mobileStudioNextStep={mobileStudioNextStep}
-              mobileStudioPrevStepLabel={mobileStudioPrevStepLabel}
-              mobileStudioNextStepLabel={mobileStudioNextStepLabel}
-              isCompactMobileLayout={isCompactMobileLayout}
-              onMobileStepChange={setActiveMobileStudioStep}
-              listScope={listScope}
-              listKeyword={listKw}
-              listQuickPreset={listQuickPreset}
-              hasListFiltersApplied={hasListFiltersApplied}
-              isListAdvancedOpen={isListAdvancedOpen}
-              listPage={listPage}
-              listPageSize={listPageSize}
-              listSort={listSort}
-              listSortOptions={LIST_SORT_OPTIONS}
-              isListRefreshDisabled={disabled("postList")}
-              isTempPostDisabled={disabled("postTemp")}
-              onListScopeChange={setListScope}
-              onListKeywordChange={setListKw}
-              onRefreshList={() => void loadAdminPosts()}
-              onLoadOrCreateTempPost={() => void handleLoadOrCreateTempPost()}
-              onApplyQuickPreset={applyListQuickPreset}
-              onResetFilters={resetListFilters}
-              onToggleListAdvanced={toggleListAdvanced}
-              onListPageChange={handleListPageChange}
-              onListPageSizeChange={handleListPageSizeChange}
-              onListSortChange={handleListSortChange}
-              selectedPostIds={selectedPostIds}
-              adminPostTotal={adminPostTotal}
-              adminPostRows={adminPostRows}
-              adminPostViewRows={adminPostViewRows}
-              isAllVisiblePostsSelected={isAllVisiblePostsSelected}
-              selectedPostIdSet={selectedPostIdSet}
-              editorMode={editorMode}
-              postId={postId}
-              loadingKey={loadingKey}
-              modifiedSortOrder={modifiedSortOrder}
-              deletedListNotice={deletedListNotice}
-              onToggleSelectAllVisiblePosts={toggleSelectAllVisiblePosts}
-              onClearSelection={() => setSelectedPostIds([])}
-              onRequestDeletePosts={(ids, headline) => openDeleteConfirm(ids, headline)}
-              onTogglePostSelection={togglePostSelection}
-              onToggleModifiedSortOrder={() => setModifiedSortOrder((prev: "desc" | "asc") => (prev === "desc" ? "asc" : "desc"))}
-              onEditPost={(row) => {
-                setPostId(String(row.id))
-                void loadPostForEditor(String(row.id))
-              }}
-              onOpenPostDetail={(id) => void openPostDetailRoute(id)}
-              onCopyPostDetailLink={(id, title) => void copyPostDetailLink(id, title)}
-              onRestoreDeletedPost={(row) => void restoreDeletedPostFromList(row)}
-              onHardDeletePost={(row) => void hardDeleteDeletedPostFromList(row)}
-              showSelectedPanelInManageSurface={showSelectedPanelInManageSurface}
-              hasSelectedManagedPost={hasSelectedManagedPost}
-              editorModeLabel={editorModeLabel}
-              selectedPostLabel={selectedPostLabel}
-              postTitle={postTitle}
-              postVersion={postVersion}
-              isTempDraftMode={isTempDraftMode}
-              postVisibility={postVisibility}
-              currentVisibilityText={currentVisibilityText}
-              isContinueEditingDisabled={editorMode !== "edit" || disabled("modifyPost")}
-              isCreateNewPostDisabled={loadingKey.length > 0}
-              isDeletePostDisabled={disabled("deletePost")}
-              onContinueEditing={handleContinueSelectedPostEditing}
-              onCreateNewPost={handleCreateNewPostFromSelectedPanel}
-              onDeletePost={handleDeleteSelectedPost}
-              isDirectLoadOpen={isDirectLoadOpen}
-              onToggleDirectLoad={() => setIsDirectLoadOpen((prev: boolean) => !prev)}
-              isSelectedToolsOpen={isSelectedToolsOpen}
-              onToggleSelectedTools={() => setIsSelectedToolsOpen((prev: boolean) => !prev)}
-              onPostIdChange={handleSelectedPostIdChange}
-              isLoadPostDisabled={disabled("postOne")}
-              onLoadPost={() => void loadPostForEditor()}
-              isHitPostDisabled={disabled("hitPost")}
-              onRunHitPost={() =>
-                handleHitPost()
-              }
-              softDeleteUndoMessage={softDeleteUndoState?.message || ""}
-              isSoftDeleteUndoVisible={Boolean(softDeleteUndoState)}
-              isUndoDisabled={disabled("undoDeletePost")}
-              onUndoSoftDelete={() => void handleUndoSoftDelete()}
-            />
-          )}
-
         <EditorStudioDeleteConfirmDialog
           state={deleteConfirmState}
           noticeTone={deleteConfirmNotice.tone}
@@ -917,125 +599,27 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
             if (ok) closeDeleteConfirm()
           }}
         />
-        {studioSurface === "compose" && (
-          <EditorStudioComposeWorkspace
-            isCompactMobileLayout={isCompactMobileLayout}
-            isPublishModalOpen={isPublishModalOpen}
-            mobilePrimaryStatus={mobileComposeStatusPrimary}
-            mobileSecondaryStatusText={mobileComposeStatusSecondary?.text}
-            mobilePrimaryActionLabel={mobilePrimaryActionLabel}
-            composeCallToActionLabel={composeCallToActionLabel}
-            mobilePrimaryActionDisabled={mobilePrimaryActionDisabled}
-            onPrimaryAction={() => openPublishModal(editorPrimaryActionType)}
-            currentVisibilityText={currentVisibilityText}
-            editorModeLabel={editorModeLabel}
-            composePageTitle={composePageTitle}
-            composeSurfaceSubtitle={composeSurfaceSubtitle}
-            composeStatusText={composeStatusText}
-            composeStatusTone={composeStatusTone}
-            postSummary={postSummary}
-            postSummaryMaxLength={PREVIEW_SUMMARY_MAX_LENGTH}
-            onPostSummaryChange={handlePostSummaryChange}
-            postTags={postTags}
-            tagDraft={tagDraft}
-            onTagDraftChange={setTagDraft}
-            onAddTags={addTagsToPost}
-            onAddTag={addTagToPost}
-            onRemoveTag={removeTagFromPost}
-            titleInputRef={handleTitleFieldRef}
-            postTitle={postTitle}
-            onPostTitleChange={handleTitleChange}
-            onPostTitleKeyDown={handleTitleKeyDown}
-            thumbnailImageFileInputRef={thumbnailImageFileInputRef}
-            onThumbnailImageFileChange={handleThumbnailImageFileChange}
-            contentLength={contentLength}
-            lineCount={lineCount}
-            imageCount={imageCount}
-            editorCanvas={composeEditorCanvas}
-            tagSummaryText={tagSummaryText}
-            isSaveDraftDisabled={loadingKey.length > 0}
-            onSaveLocalDraft={saveLocalDraft}
-            composeHeroSummary={composeHeroSummary}
-            composeStatusEntries={composeStatusEntries}
-            activeVisibility={postVisibility}
-            visibilityOptions={PUBLISH_VISIBILITY_OPTIONS}
-            onVisibilityChange={setPostVisibility}
-            previewViewport={previewViewport}
-            previewViewportLabel={previewViewportConfig.label}
-            previewViewportOptions={previewViewportOptions}
-            onPreviewViewportChange={(viewport) => setPreviewViewport(viewport)}
-            previewFrameStyle={{ width: `min(100%, ${previewViewportConfig.cardWidth}px)` }}
-            previewThumbnailSrc={previewThumbnailSrc}
-            postThumbnailFocusX={postThumbnailFocusX}
-            postThumbnailFocusY={postThumbnailFocusY}
-            postThumbnailZoom={postThumbnailZoom}
-            onPreviewThumbnailError={() => setIsPreviewThumbnailError(true)}
-            previewVisibilityLabel={previewVisibilityLabel}
-            summaryPreview={composeSummaryPreview}
-            previewDateText={previewDateText}
-            previewAuthorAvatarSrc={previewAuthorAvatarSrc}
-            displayNameInitial={displayNameInitial}
-            displayName={displayName}
-            summaryLengthLabel={
-              postSummary.trim() ? `${postSummary.trim().length}/${PREVIEW_SUMMARY_MAX_LENGTH}` : "본문 기준 자동"
-            }
-            isComposeAssistOpen={isComposeAssistOpen}
-            onToggleComposeAssist={() => setIsComposeAssistOpen((prev: boolean) => !prev)}
-            thumbnailEditorPanel={thumbnailEditorPanel}
-            previewMetaEditorPanel={previewMetaEditorPanel}
-            isTagPanelOpen={activeMetaPanel === "tag"}
-            onToggleTagPanel={() => setActiveMetaPanel((prev: "tag" | "category" | null) => (prev === "tag" ? null : "tag"))}
-            isUtilityPanelOpen={isComposeUtilityOpen}
-            onToggleUtilityPanel={() => setIsComposeUtilityOpen((prev: boolean) => !prev)}
-            metaNotice={metaNotice}
-            knownTags={knownTags}
-            tagUsageMap={tagUsageMap}
-            onToggleKnownTag={(tag) => (postTags.includes(tag) ? removeTagFromPost(tag) : addTagToPost(tag))}
-            onDeleteKnownTag={deleteTagFromCatalog}
-            onRestoreLocalDraft={restoreLocalDraft}
-            onClearLocalDraft={clearLocalDraft}
-            isClearLocalDraftDisabled={loadingKey.length > 0 || !localDraftSavedAt}
-          />
-        )}
 
         {isPublishModalOpen ? (
           <EditorStudioPublishModal
             closeToggleLabel="접기"
-            displayName={displayName}
-            displayNameInitial={displayNameInitial}
             isCompactMobileLayout={isCompactMobileLayout}
             isMobileMetaEditorOpen={isMobileMetaEditorOpen}
             isMobileThumbnailEditorOpen={isMobileThumbnailEditorOpen}
             loadingKey={loadingKey}
             modalNotice={publishModalNotice}
-            postThumbnailFocusX={postThumbnailFocusX}
-            postThumbnailFocusY={postThumbnailFocusY}
-            postThumbnailZoom={postThumbnailZoom}
-            postTitle={postTitle}
             postVisibility={postVisibility}
-            previewAuthorAvatarSrc={previewAuthorAvatarSrc}
-            previewDateText={previewDateText}
-            previewFrameStyle={{ maxWidth: `${previewViewportConfig.cardWidth}px` }}
-            previewKicker="실제 카드 결과"
             previewMetaEditorPanel={previewMetaEditorPanel}
-            previewSummary={resolvedPreviewSummary}
-            previewThumbnailSrc={previewThumbnailSrc}
-            previewViewport={previewViewport}
-            previewViewportLabel={previewViewportConfig.label}
-            previewViewportOptions={previewViewportOptions}
-            previewVisibilityLabel={previewVisibilityLabel}
             publishActionButtonDisabled={publishActionButtonDisabled}
             publishActionButtonText={publishActionButtonText}
             publishActionTitle={publishActionTitle}
-            setupDescription="썸네일 위치와 카드 요약만 조정합니다. 결과는 위 카드에서 바로 확인됩니다."
+            setupDescription="썸네일 위치와 글 요약을 조정합니다."
             shouldShowNotice={shouldShowPublishModalNotice}
             thumbnailEditorPanel={thumbnailEditorPanel}
             visibilityOptions={PUBLISH_VISIBILITY_OPTIONS}
             onClose={closePublishModal}
             onConfirmPublish={() => void handleConfirmPublish()}
             onPostVisibilityChange={setPostVisibility}
-            onPreviewThumbnailError={() => setIsPreviewThumbnailError(true)}
-            onPreviewViewportChange={setPreviewViewport}
             onToggleMobileMetaEditor={() => setIsMobileMetaEditorOpen((current: boolean) => !current)}
             onToggleMobileThumbnailEditor={() => setIsMobileThumbnailEditorOpen((current: boolean) => !current)}
           />

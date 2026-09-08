@@ -776,6 +776,13 @@ test.describe("live Markdown writing surface", () => {
 
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|새 글 작성|수정 설정)$/ })
     await expect(dialog).toBeVisible()
+    await expect(dialog.getByTestId("publish-preview-panel")).toHaveCount(0)
+    await expect(dialog.getByRole("tablist", { name: "포스트 카드 미리보기 기기" })).toHaveCount(0)
+    const visibility = dialog.getByRole("group", { name: "노출 범위 선택" })
+    await expect(visibility).toBeVisible()
+    const privateOption = visibility.getByRole("button", { name: /비공개/ })
+    await privateOption.click()
+    await expect(privateOption).toHaveAttribute("aria-pressed", "true")
     await expect(dialog.getByRole("button", { name: "닫기" })).toBeVisible()
     await expect(dialog.getByRole("button", { name: /^(발행하기|새 글 작성|변경 반영)$/ })).toBeVisible()
     await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()

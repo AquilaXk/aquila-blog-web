@@ -96,7 +96,6 @@ import {
   type PostForEditor,
   type CanonicalSummaryState,
   type SummaryIntent,
-  type PreviewViewportMode,
   type RsData,
   type StudioSurface,
 } from "./EditorStudioWorkspaceControllerRootModel"
@@ -183,7 +182,6 @@ export const EditorStudioWorkspaceController = ({
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
-  const [previewViewport, setPreviewViewport] = useState<PreviewViewportMode>("desktop")
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState("")
   const [localDraftSlotLabel, setLocalDraftSlotLabel] = useState("")
   const [mobileManageStep, setMobileManageStep] = useState<ManageMobileStudioStep>("query")
@@ -836,7 +834,6 @@ export const EditorStudioWorkspaceController = ({
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
     setMobileComposeStep,
-    setPreviewViewport,
     setPublishActionType,
     setPublishModalNotice,
   })
@@ -889,7 +886,7 @@ export const EditorStudioWorkspaceController = ({
         postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,
         profileImageFileInputRef, profileImageFileName, profileImageNotice, profileImgInputUrl, profileNotice,
         profileRoleInput, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
-        previewThumbTransformRef, previewViewport, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
+        previewThumbTransformRef, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
         removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
         saveLocalDraft,
         selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
@@ -898,7 +895,7 @@ export const EditorStudioWorkspaceController = ({
         setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
         setMobileComposeStep,
         setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
-        setPreviewViewport, setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
+        setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
         softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
         thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
         commitPostCategory, handlePostCategoryChange,

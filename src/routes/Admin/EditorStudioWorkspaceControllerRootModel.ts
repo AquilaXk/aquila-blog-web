@@ -132,7 +132,6 @@ export type NoticeState = {
 }
 export type StudioSurface = "manage" | "compose"
 export type MobileStudioStep = "query" | "list" | "edit" | "publish"
-export type PreviewViewportMode = "desktop" | "tablet" | "mobile"
 export type ManageMobileStudioStep = "query" | "list"
 export type ComposeMobileStudioStep = "edit" | "publish"
 
@@ -167,31 +166,6 @@ export const syncTitleTextareaHeight = (element: HTMLTextAreaElement | null) => 
   element.style.height = `${Math.max(element.scrollHeight, 44)}px`
 }
 
-export const PREVIEW_CARD_VIEWPORTS: Record<
-  PreviewViewportMode,
-  {
-    label: string
-    description: string
-    cardWidth: number
-  }
-> = {
-  desktop: {
-    label: "Desktop",
-    description: "1440px 메인 카드 폭",
-    cardWidth: 368,
-  },
-  tablet: {
-    label: "iPad mini",
-    description: "768px 2열 카드 폭",
-    cardWidth: 320,
-  },
-  mobile: {
-    label: "iPhone 15 Pro",
-    description: "393px 1열 카드 폭",
-    cardWidth: 286,
-  },
-}
-
 const isTempDraftBodyPlaceholder = (value: string) => {
   const normalized = value.replace(/\r\n?/g, "\n").trim()
   return normalized === TEMP_DRAFT_BODY_PLACEHOLDER || normalized === EDITOR_BODY_PLACEHOLDER
@@ -211,8 +185,6 @@ export const buildEmptyEditorMetaSnapshot = (): ResolvedEditorMetaSnapshot => ({
   thumbnailFocusY: DEFAULT_THUMBNAIL_FOCUS_Y,
   thumbnailZoom: DEFAULT_THUMBNAIL_ZOOM,
 })
-
-export const PREVIEW_CARD_VIEWPORT_ORDER: PreviewViewportMode[] = ["desktop", "tablet", "mobile"]
 
 export const PUBLISH_VISIBILITY_OPTIONS: Array<{
   value: PostVisibility
@@ -237,7 +209,6 @@ export const PUBLISH_VISIBILITY_OPTIONS: Array<{
 ]
 
 export const SHOW_LEGACY_PROFILE_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_PROFILE_STUDIO === "true"
-export const SHOW_LEGACY_CONTENT_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_CONTENT_STUDIO === "true"
 export const SHOW_LEGACY_UTILITY_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_UTILITY_STUDIO === "true"
 
 export const pretty = (value: unknown) => JSON.stringify(value, null, 2)
