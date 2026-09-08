@@ -24,6 +24,21 @@ type ReplayCounters = {
   requests: Record<string, unknown>[]
 }
 
+type ClientErrorReport = {
+  boundary: unknown
+  surface: unknown
+  errorName: unknown
+  errorMessage: unknown
+  stackTop: unknown
+  category: unknown
+}
+
+declare global {
+  interface Window {
+    __AQUILA_CLIENT_ERROR_REPORTS__?: ClientErrorReport[]
+  }
+}
+
 const adminMember = ADMIN_MEMBER_FIXTURE
 
 const systemHealth = {

@@ -875,7 +875,10 @@ test.describe("core smoke detail rendering", () => {
   await reloadPromise
   await expect(page.getByText("runtime guard reload 회귀 방지")).toBeVisible()
   await expect.poll(async () => {
-    return page.evaluate(() => performance.getEntriesByType("navigation")[0]?.type || "")
+    return page.evaluate(() => {
+      const navigation = performance.getEntriesByType("navigation")[0]
+      return navigation instanceof PerformanceNavigationTiming ? navigation.type : ""
+    })
   }).toBe("reload")
   const recoveredTimeOrigin = await page.evaluate(() => performance.timeOrigin)
 

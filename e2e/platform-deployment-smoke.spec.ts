@@ -36,7 +36,7 @@ test.describe("verified Platform Web deployment", () => {
     expect(home?.ok(), "home response must be successful").toBe(true)
     expect(new URL(page.url()).origin).toBe(expectedOrigin)
 
-    for (let request = home?.request(); request; request = request.redirectedFrom()) {
+    for (let request = home?.request() ?? null; request; request = request.redirectedFrom()) {
       expect(new URL(request.url()).origin, "redirect chain must stay on the verified domain").toBe(expectedOrigin)
     }
 

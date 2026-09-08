@@ -1,22 +1,17 @@
 import { expect, test } from "@playwright/test"
-import type { IncomingMessage, ServerResponse } from "http"
+import { IncomingMessage, ServerResponse } from "http"
+import { Socket } from "node:net"
 import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 
 const createContext = (requestId?: string) => {
-  const headers = new Map<string, string>()
-  let headersSent = false
-  const response = {
-    get headersSent() { return headersSent },
-    setHeader: (key: string, value: string) => headers.set(key.toLowerCase(), value),
-    getHeader: (key: string) => headers.get(key.toLowerCase()),
-    removeHeader: (key: string) => headers.delete(key.toLowerCase()),
-    writeHead: () => { headersSent = true },
-    end: () => response.writeHead(),
-  }
+  const request = new IncomingMessage(new Socket())
+  request.headers = requestId ? { "x-request-id": requestId } : {}
+  const response = new ServerResponse(request)
+  const headers = { get: (key: string) => response.getHeader(key) }
   return {
-    req: { headers: requestId ? { "x-request-id": requestId } : {} } as IncomingMessage,
-    res: response as ServerResponse,
+    req: request,
+    res: response,
     headers,
   }
 }

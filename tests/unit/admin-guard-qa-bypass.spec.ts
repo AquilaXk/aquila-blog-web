@@ -3,6 +3,19 @@ import { shouldBypassAdminGuardForQa } from "../../src/libs/server/adminGuard"
 
 const ENV_KEYS = ["NODE_ENV", "ADMIN_GUARD_QA_BYPASS", "ENABLE_QA_ROUTES", "BACKEND_INTERNAL_URL"] as const
 
+const setEnv = (key: (typeof ENV_KEYS)[number], value: string | undefined) => {
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, key)
+    return
+  }
+  Object.defineProperty(process.env, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  })
+}
+
 const withEnv = (overrides: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>, run: () => void) => {
   const previous = new Map<string, string | undefined>()
   for (const key of ENV_KEYS) {
@@ -11,21 +24,13 @@ const withEnv = (overrides: Partial<Record<(typeof ENV_KEYS)[number], string | u
   try {
     for (const key of ENV_KEYS) {
       const value = overrides[key]
-      if (value === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = value
-      }
+      setEnv(key, value)
     }
     run()
   } finally {
     for (const key of ENV_KEYS) {
       const value = previous.get(key)
-      if (value === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = value
-      }
+      setEnv(key, value)
     }
   }
 }

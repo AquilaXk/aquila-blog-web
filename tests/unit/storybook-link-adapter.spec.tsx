@@ -36,7 +36,7 @@ const createClickEvent = ({
 
 test.describe("storybook link adapter", () => {
   test("renders a modern internal anchor", () => {
-    const markup = renderToStaticMarkup(createElement(Link, { href: "/about" }, "소개"))
+    const markup = renderToStaticMarkup(createElement(Link, { href: "/about", children: "소개" }))
 
     expect(markup).toContain('href="/about"')
   })
@@ -45,8 +45,11 @@ test.describe("storybook link adapter", () => {
     const markup = renderToStaticMarkup(
       createElement(
         Link,
-        { href: "/admin/posts", legacyBehavior: true },
-        createElement("a", { className: "admin-posts-link" }, "글 전체 보기")
+        {
+          href: "/admin/posts",
+          legacyBehavior: true,
+          children: createElement("a", { className: "admin-posts-link" }, "글 전체 보기"),
+        }
       )
     )
 
