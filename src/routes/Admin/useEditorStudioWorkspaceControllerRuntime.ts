@@ -9,7 +9,7 @@ import {
   useRef,
 } from "react"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
-import { toCanonicalPostPath } from "src/libs/utils/postPath"
+import { revalidateSavedPost } from "./editorPostSaveRefresh"
 import {
   isComposingKeyboardEvent,
   pretty,
@@ -81,21 +81,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     await invalidatePublicPostReadCaches(queryClient, resolvedPostId || undefined)
     if (!resolvedPostId) return
 
-    const revalidateResponse = await fetch("/api/revalidate", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        paths: [toCanonicalPostPath(resolvedPostId)],
-      }),
-    })
-
-    if (!revalidateResponse.ok) {
-      const reason = (await revalidateResponse.text().catch(() => "")).trim()
-      throw new Error(reason || "공개 상세 재검증 요청에 실패했습니다.")
-    }
+    await revalidateSavedPost(resolvedPostId)
   }, [postId, queryClient])
 
   const run = useCallback(async (key: string, fn: () => Promise<JsonValue>) => {
