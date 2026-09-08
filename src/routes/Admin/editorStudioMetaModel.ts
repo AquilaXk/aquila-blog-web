@@ -200,8 +200,14 @@ const splitFrontmatterBlock = (content: string) => {
 
   for (let index = 1; index < lines.length; index += 1) {
     if (!FRONTMATTER_DELIMITER_REGEX.test(lines[index] || "")) continue
+    const metadataLines = lines.slice(1, index)
+    const meaningfulLines = metadataLines.filter((line) => line.trim().length > 0)
+    const isSupportedMetadata = meaningfulLines.length > 0 && meaningfulLines.every((line) =>
+      /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
+    )
+    if (!isSupportedMetadata) return { metadataLines: [] as string[], body: normalized }
     return {
-      metadataLines: lines.slice(1, index),
+      metadataLines,
       body: lines
         .slice(index + 1)
         .join("\n")
