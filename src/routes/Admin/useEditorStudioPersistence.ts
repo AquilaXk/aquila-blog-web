@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -15,7 +16,7 @@ import {
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
 import {
-  resolvePersistedSummaryResult,
+  resolveSummaryWriteCompletion,
   toCreateSummaryWriteFields,
   toModifySummaryWriteFields,
   type CanonicalSummaryState,
@@ -242,11 +243,19 @@ export const useEditorStudioPersistence = ({
     uploadWithConflictRetry,
   })
 
+  const currentSummaryRef = useRef<CanonicalSummaryState>({
+    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+  })
+  currentSummaryRef.current = {
+    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+  }
+
   const applyCanonicalWriteResponse = useCallback(
     (response: RsData<PostWriteResult>) => {
-      const resolvedSummary = resolvePersistedSummaryResult(
+      const resolvedSummary = resolveSummaryWriteCompletion(
         { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
         { summary: response.data?.summary, source: response.data?.summarySource },
+        currentSummaryRef.current,
       )
       if (!resolvedSummary.ok) {
         const message = "저장된 canonical summary 응답이 올바르지 않습니다."
@@ -256,9 +265,9 @@ export const useEditorStudioPersistence = ({
       }
 
       const canonicalSummary = resolvedSummary.state
-      setPostSummary(canonicalSummary.summary)
-      setPostSummarySource(canonicalSummary.summarySource)
-      setSummaryIntent(canonicalSummary.intent)
+      setPostSummary(resolvedSummary.editorState.summary)
+      setPostSummarySource(resolvedSummary.editorState.summarySource)
+      setSummaryIntent(resolvedSummary.editorState.intent)
       return canonicalSummary
     },
     [

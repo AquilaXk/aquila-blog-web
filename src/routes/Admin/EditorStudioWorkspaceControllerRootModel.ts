@@ -119,6 +119,23 @@ const resolveCanonicalSummaryResult = (
 export const resolvePersistedSummaryResult = (current: CanonicalSummaryState, response: unknown) =>
   resolveCanonicalSummaryResult(current, response, { kind: "unchanged" })
 
+export const resolveSummaryWriteCompletion = (
+  request: CanonicalSummaryState,
+  response: unknown,
+  current: CanonicalSummaryState,
+) => {
+  const resolved = resolvePersistedSummaryResult(request, response)
+  if (!resolved.ok) return resolved
+
+  // 저장된 baseline과 요청 이후 입력은 별개다. 새 입력의 AUTO/MANUAL 의도도 보존한다.
+  const unchanged = request.summary === current.summary &&
+    request.summarySource === current.summarySource &&
+    request.intent.kind === current.intent.kind &&
+    (request.intent.kind !== "manual" ||
+      (current.intent.kind === "manual" && request.intent.summary === current.intent.summary))
+  return { ...resolved, editorState: unchanged ? resolved.state : current }
+}
+
 export type RsData<T> = {
   resultCode: string
   msg: string

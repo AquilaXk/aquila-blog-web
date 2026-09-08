@@ -4,6 +4,7 @@ import { mapPostDetail, mapPostDto } from "../../src/apis/backend/posts/PostApiM
 import { toCompanyNewsSummary } from "../../src/routes/Company/CompanyPageModel"
 import {
   resolvePersistedSummaryResult,
+  resolveSummaryWriteCompletion,
   toCreateSummaryWriteFields,
   toModifySummaryWriteFields,
   type CanonicalSummaryState,
@@ -17,6 +18,34 @@ const fixtureById = (
   if (!fixture) throw new Error(`missing imported summary fixture: ${id}`)
   return fixture
 }
+
+test("저장 응답은 baseline을 확정하면서 이후 요약 입력을 보존한다", () => {
+  const request: CanonicalSummaryState = {
+    summary: "Saved summary",
+    summarySource: "MANUAL",
+    intent: { kind: "manual", summary: "Saved summary" },
+  }
+  const response = { summary: request.summary, source: "MANUAL" }
+  const canonical = { ...request, intent: { kind: "unchanged" } }
+  const newerStates: CanonicalSummaryState[] = [
+    { summary: "New summary", summarySource: "MANUAL", intent: { kind: "manual", summary: "New summary" } },
+    { summary: "", summarySource: "NONE", intent: { kind: "auto" } },
+    { ...request, intent: { kind: "auto" } },
+  ]
+  for (const current of newerStates) {
+    expect(resolveSummaryWriteCompletion(request, response, current)).toEqual({
+      ok: true,
+      state: canonical,
+      editorState: current,
+    })
+  }
+  expect(resolveSummaryWriteCompletion(request, response, { ...request })).toEqual({
+    ok: true,
+    state: canonical,
+    editorState: canonical,
+  })
+  expect(resolveSummaryWriteCompletion(request, { summary: null }, newerStates[0]!)).toMatchObject({ ok: false })
+})
 
 const requestFixtureById = (
   id: "manual-create" | "manual-preserve-omitted" | "auto-recompute",

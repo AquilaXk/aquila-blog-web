@@ -769,6 +769,48 @@ test.describe("live Markdown writing surface", () => {
     await expect(page.getByLabel("Summary")).toHaveValue("")
   })
 
+  for (const nextSummary of ["Newer manual summary", ""]) {
+    test(`preserves newer summary intent after a delayed save: ${nextSummary ? "manual" : "auto"}`, async ({ page }) => {
+      const postId = 771
+      await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
+      await routeEditorPost(page, postId, liveMarkdown)
+      await page.route("**/api/revalidate", (route) => fulfillJson(route, { revalidated: true }))
+      let pendingWrite: Route | undefined
+      await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+        if (route.request().method() !== "PUT") {
+          await route.fallback()
+          return
+        }
+        pendingWrite = route
+      })
+      await page.goto(`/admin/editor/${postId}`)
+      const summary = page.getByLabel("Summary", { exact: true })
+      await summary.fill("Saved summary")
+      await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+      const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
+      await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
+      await expect.poll(() => pendingWrite?.request().postDataJSON().summary).toBe("Saved summary")
+      await expect(summary).toBeEnabled()
+      // 서랍이 열린 상태에서도 변경 이벤트를 받아들이는 입력의 지연 응답 경계를 검증한다.
+      await summary.fill(nextSummary, { force: true })
+      await fulfillJson(pendingWrite!, {
+        resultCode: "200-1", msg: "saved",
+        data: { id: postId, version: 2, summary: "Saved summary", summarySource: "MANUAL" },
+      })
+      await expect(dialog).toHaveCount(0)
+      await expect(summary).toHaveValue(nextSummary)
+      await expect.poll(() => page.evaluate((id) => {
+        const raw = localStorage.getItem(`admin.editor.localDraft.post.${id}.v3`)
+        if (!raw) return null
+        const draft = JSON.parse(raw)
+        return { summary: draft.summary, intent: draft.summaryIntent }
+      }, postId)).toEqual({
+        summary: nextSummary,
+        intent: nextSummary ? { kind: "manual", summary: nextSummary } : { kind: "auto" },
+      })
+    })
+  }
+
   test("publish workflow remains available from the unified editor", async ({ page }) => {
     await routeAuthenticatedEditor(page)
     await page.goto("/admin/editor/new?source=local-draft")
