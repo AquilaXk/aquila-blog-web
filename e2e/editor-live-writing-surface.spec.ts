@@ -784,7 +784,7 @@ test.describe("live Markdown writing surface", () => {
         pendingWrite = route
       })
       await page.goto(`/admin/editor/${postId}`)
-      const summary = page.getByLabel("Summary", { exact: true })
+      const summary = page.getByLabel(/^Summary/)
       await summary.fill("Saved summary")
       await page.getByRole("button", { name: "발행 설정", exact: true }).click()
       const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
