@@ -309,38 +309,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/member/api/v1/adm/members/{id}/profileImgUrl": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["updateProfileImg"];
-        trace?: never;
-    };
-    "/member/api/v1/adm/members/{id}/profileCard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["updateProfileCard"];
-        trace?: never;
-    };
     "/member/api/v1/adm/members/{id}/nickname": {
         parameters: {
             query?: never;
@@ -1119,8 +1087,8 @@ export interface components {
             blogTitle?: string;
             homeIntroTitle?: string;
             homeIntroDescription?: string;
-            blogDesign?: string | null;
-            legacyBlogScheme?: string | null;
+            blogDesign?: string;
+            legacyBlogScheme?: string;
             serviceLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
             contactLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
         };
@@ -1383,19 +1351,15 @@ export interface components {
             challengeId: string;
             code: string;
         };
-        MemberDto: {
-            isAdmin: boolean;
+        AuthSessionMemberDto: {
             /** Format: int64 */
             id?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            modifiedAt?: string;
-            name?: string;
-            profileImageUrl?: string;
+            username?: string;
+            nickname?: string;
+            isAdmin: boolean;
         };
         MemberLoginResBody: {
-            item?: components["schemas"]["MemberDto"];
+            item?: components["schemas"]["AuthSessionMemberDto"];
         };
         RsDataMemberLoginResBody: {
             resultCode?: string;
@@ -1416,6 +1380,12 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["AdminEmailCodeRequestResBody"];
         };
+        ProfileImageUploadResponse: {
+            profileImageUrl?: string;
+        };
+        UpdateProfileIdentityRequest: {
+            nickname: string;
+        };
         MemberWithUsernameDto: {
             /** Format: int64 */
             id?: number;
@@ -1427,13 +1397,11 @@ export interface components {
             name?: string;
             nickname?: string;
             profileImageUrl?: string;
-            profileImageDirectUrl?: string;
             profileRole?: string;
             profileBio?: string;
             aboutHeadline?: string;
             aboutRole?: string;
             aboutBio?: string;
-            aboutDetails?: string;
             aboutSections?: components["schemas"]["MemberProfileAboutSectionBlockDto"][];
             aboutProjectSectionTitle?: string;
             aboutProjects?: components["schemas"]["MemberProfileAboutProjectBlockDto"][];
@@ -1445,26 +1413,6 @@ export interface components {
             serviceLinks?: components["schemas"]["MemberProfileLinkItemDto"][];
             contactLinks?: components["schemas"]["MemberProfileLinkItemDto"][];
             isAdmin: boolean;
-        };
-        UpdateProfileImgRequest: {
-            profileImgUrl: string;
-        };
-        UpdateProfileCardRequest: {
-            role?: string;
-            bio?: string;
-            aboutRole?: string | null;
-            aboutBio?: string | null;
-            aboutDetails?: string | null;
-            blogTitle?: string;
-            homeIntroTitle?: string;
-            homeIntroDescription?: string;
-            blogDesign?: string | null;
-            legacyBlogScheme?: string | null;
-            serviceLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
-            contactLinks?: components["schemas"]["ProfileCardLinkItemRequest"][];
-        };
-        UpdateProfileIdentityRequest: {
-            nickname: string;
         };
         TaskExecutionSample: {
             /** Format: int64 */
@@ -1676,13 +1624,6 @@ export interface components {
             member?: components["schemas"]["AuthSessionMemberDto"];
             health?: components["schemas"]["HealthResBody"];
             dashboard?: components["schemas"]["AdminDashboardSnapshot"];
-        };
-        AuthSessionMemberDto: {
-            /** Format: int64 */
-            id?: number;
-            username?: string;
-            nickname?: string;
-            isAdmin: boolean;
         };
         AuthSecurityEventDto: {
             /** Format: int64 */
@@ -2388,59 +2329,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["MemberWithUsernameDto"];
-                };
-            };
-        };
-    };
-    updateProfileImg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateProfileImgRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MemberWithUsernameDto"];
-                };
-            };
-        };
-    };
-    updateProfileCard: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateProfileCardRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MemberWithUsernameDto"];
+                    "*/*": components["schemas"]["ProfileImageUploadResponse"];
                 };
             };
         };
