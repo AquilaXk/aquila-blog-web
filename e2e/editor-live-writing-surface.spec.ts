@@ -442,15 +442,16 @@ test.describe("live Markdown writing surface", () => {
     const editor = page.getByTestId("markdown-editor")
     const editorBounds = await editor.boundingBox()
     expect(editorBounds).not.toBeNull()
-    const compactControls = await toolbar.locator("button, select").evaluateAll((controls) =>
+    await expect.poll(() => toolbar.locator("button, select").evaluateAll((controls) =>
       controls
         .filter((control) => control.getClientRects().length > 0)
         .map((control) => ({
+          label: control.getAttribute("aria-label") ?? control.textContent?.trim(),
           height: control.getBoundingClientRect().height,
           fontSize: Number.parseFloat(getComputedStyle(control).fontSize),
         }))
-    )
-    expect(compactControls.every((control) => control.height >= 36 && control.fontSize >= 13)).toBe(true)
+        .filter((control) => control.height < 36 || control.fontSize < 13)
+    )).toEqual([])
     for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
       await page.getByRole("button", { name: `${label} 메뉴` }).click()
       const menu = page.getByRole("menu", { name: label })
@@ -504,7 +505,7 @@ test.describe("live Markdown writing surface", () => {
       .toBe("#### `핵심` 포인트")
   })
 
-  test("dark editor focus and native mouse selection stay on the live surface", async ({ page }) => {
+  test("themed editor focus and native mouse selection stay on the live surface", async ({ page }) => {
     const markdown = ["# Drag Selection", "", "마우스 드래그로 이 문장을 선택합니다."].join("\n")
     await routeAuthenticatedEditor(page, markdown)
     await openEditorDraft(page)
@@ -513,10 +514,16 @@ test.describe("live Markdown writing surface", () => {
     const editor = surface.locator(".cm-editor")
     const colors = await editor.evaluate((element) => {
       const style = window.getComputedStyle(element)
-      return { backgroundColor: style.backgroundColor, color: style.color }
+      const root = window.getComputedStyle(element.closest('[data-testid="markdown-editor"]') as HTMLElement)
+      return {
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        rootBackground: root.backgroundColor,
+        rootColor: root.color,
+      }
     })
-    expect(colors.backgroundColor).toBe("rgb(15, 23, 40)")
-    expect(colors.color).toBe("rgb(217, 228, 247)")
+    expect(colors.backgroundColor).toBe(colors.rootBackground)
+    expect(colors.color).toBe(colors.rootColor)
 
     const targetLine = editorContent(page).locator(".cm-line").nth(2)
     const box = await targetLine.boundingBox()
