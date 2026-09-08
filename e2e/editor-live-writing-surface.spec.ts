@@ -577,6 +577,34 @@ test.describe("live Markdown writing surface", () => {
     expect(result.indexOf("body.png")).toBeLessThan(result.indexOf("omega"))
   })
 
+  test("attachment replacement at document end preserves content and undo history", async ({ page }) => {
+    const source = "body"
+    const markdown = "[note.txt](https://cdn.example.test/post-files/note.txt)"
+    await routeAuthenticatedEditor(page, source)
+    await page.route("**/post/api/v1/posts/files", async (route) => {
+      await fulfillJson(route, {
+        resultCode: "201-1",
+        msg: "uploaded",
+        data: { key: "post-files/note.txt", name: "note.txt", url: "https://cdn.example.test/post-files/note.txt" },
+      })
+    })
+    await page.goto("/admin/editor/new?source=local-draft")
+    await selectMarkdownRangeWithoutAssertion(page, source.length, source.length)
+    await page.getByTestId("markdown-editor").locator("input[type='file']:not([accept])").setInputFiles({
+      name: "note.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("attachment"),
+    })
+    await expect.poll(() => readMarkdown(page)).toContain(markdown)
+    const completed = await readMarkdown(page)
+    expect(completed.startsWith(source)).toBe(true)
+    expect(completed).not.toContain("uploading:")
+    await editorContent(page).press(undoShortcut)
+    await expect.poll(() => readMarkdown(page)).toBe(source)
+    await editorContent(page).press(redoShortcut)
+    await expect.poll(() => readMarkdown(page)).toBe(completed)
+  })
+
   test("file drops upload once without inserting raw file text", async ({ page }) => {
     await routeAuthenticatedEditor(page, "drop here")
     await page.route("**/post/api/v1/posts/files", async (route) => {
