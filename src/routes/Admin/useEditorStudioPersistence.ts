@@ -5,6 +5,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react"
+import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiPostWriteResult } from "src/apis/backend/posts/PostApiDtos"
 import { normalizeCategoryValue } from "src/libs/utils"
@@ -151,7 +152,6 @@ type UseEditorStudioPersistenceParams = {
   refreshPublicPostReadViews: (affectedPostId?: string | number) => Promise<void>
   pretty: (value: unknown) => string
   generateIdempotencyKey: () => string
-  removeLocalDraft: (source: { kind: "create" } | { kind: "post"; postId: string }) => void
   signalLocalDraftBaselineReady: (signal?: LocalDraftBaselineReadySignal) => void
   uploadWithConflictRetry: (requestUpload: () => Promise<Response>) => Promise<Response>
   normalizeSafeImageUrl: (raw: string) => string
@@ -191,7 +191,6 @@ export const useEditorStudioPersistence = ({
   postVisibility,
   pretty,
   refreshPublicPostReadViews,
-  removeLocalDraft,
   serverBaselineEditorFingerprintRef,
   signalLocalDraftBaselineReady,
   setEditorMode,
@@ -364,6 +363,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "create" })
       setLoadingKey("writePost")
       setPublishStatus({ tone: "loading", text: "글 작성 중입니다..." })
       const contentWithMetadata = composeEditorContent(currentPostContent, postTags, {
@@ -424,7 +424,7 @@ export const useEditorStudioPersistence = ({
             ? "링크 공개(목록 미노출)"
             : "비공개"
 
-      removeLocalDraft({ kind: "create" })
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -432,8 +432,10 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
 
       setPublishStatus(
         await resolvePostSaveRefresh(
@@ -477,7 +479,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,
     setEditorMode,
@@ -531,6 +532,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
       setLoadingKey("modifyPost")
       setPublishStatus({ tone: "loading", text: "글 수정 중입니다..." })
 
@@ -547,7 +549,7 @@ export const useEditorStudioPersistence = ({
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      removeLocalDraft({ kind: "post", postId: postId.trim() })
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -555,8 +557,10 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
       setPublishStatus(await resolvePostSaveRefresh(
         () => refreshPublicPostReadViews(postId),
         `수정 완료: ${response.msg}`
@@ -595,7 +599,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,
     setIsTempDraftMode,
@@ -647,6 +650,7 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
       setLoadingKey("publishTempPost")
       setPublishStatus({ tone: "loading", text: "새 글을 작성하는 중입니다..." })
 
@@ -661,7 +665,7 @@ export const useEditorStudioPersistence = ({
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       // 임시글은 post 슬롯에 저장되므로 관계없는 create 초안은 지우지 않는다.
-      removeLocalDraft({ kind: "post", postId: postId.trim() })
+      const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
           lastLocalDraftFingerprintRef,
@@ -669,8 +673,10 @@ export const useEditorStudioPersistence = ({
           dedupeStrings
         ),
       })
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
+      if (removedSubmittedDraft) {
+        setLocalDraftSavedAt("")
+        setLocalDraftSlotLabel("")
+      }
       setPublishStatus(await resolvePostSaveRefresh(
         () => refreshPublicPostReadViews(postId),
         "새 글 작성이 완료되었습니다."
@@ -708,7 +714,6 @@ export const useEditorStudioPersistence = ({
     postVisibility,
     pretty,
     refreshPublicPostReadViews,
-    removeLocalDraft,
     lastLocalDraftFingerprintRef,
     serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady,

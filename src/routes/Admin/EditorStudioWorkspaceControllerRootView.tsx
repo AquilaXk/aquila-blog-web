@@ -34,6 +34,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     addTagToPost,
     applyFirstBodyImageToThumbnail,
     clearLocalDraft,
+    discardLocalDraftCandidate,
     closeDeleteConfirm,
     closePublishModal,
     commitPreviewThumbTransform,
@@ -78,6 +79,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     lastLocalDraftFingerprintRef,
     loadingKey,
     localDraftCandidate,
+    localDraftCandidates,
     localDraftSavedAt,
     localDraftSource,
     openPublishModal,
@@ -103,6 +105,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     resetThumbnailToAutoMode,
     removeTagFromPost,
     restoreLocalDraft,
+    selectLocalDraftCandidate,
     restoredLocalDraft,
     result,
     safePreviewThumbnail,
@@ -221,14 +224,18 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     localDraftSavedAt,
     pristineCreateFingerprint,
   })
-  const isLocalDraftRestoreSuggestionVisible = isLocalDraftRestoreSuggestionEligible({
-    candidate: localDraftCandidate,
+  const eligibleLocalDraftCandidates = localDraftCandidates.filter((candidate: any) => isLocalDraftRestoreSuggestionEligible({
+    candidate,
     currentSource: localDraftSource,
     editorFingerprint: editorStateFingerprint,
     serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
     restored: restoredLocalDraft,
     dismissed: dismissedLocalDraft,
-  })
+  }))
+  const isLocalDraftRestoreSuggestionVisible = eligibleLocalDraftCandidates.length > 0
+  const selectedLocalDraftCandidateKey = eligibleLocalDraftCandidates.some(
+    (candidate: any) => candidate.key === localDraftCandidate?.key
+  ) ? localDraftCandidate.key : ""
   const getIsEditorUnsavedDirty = useCallback(() => {
     const liveContent =
       typeof getCurrentPostContent === "function" ? getCurrentPostContent() : postContent
@@ -467,6 +474,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         isLocalDraftRestoreSuggestionVisible={isLocalDraftRestoreSuggestionVisible}
         isLocalDraftRestoreSuggestionActionsDisabled={loadingKey.length > 0}
         onRestoreLocalDraft={restoreLocalDraft}
+        localDraftCandidates={eligibleLocalDraftCandidates.map((candidate: any) => ({ key: candidate.key, label: candidate.label }))}
+        selectedLocalDraftCandidateKey={selectedLocalDraftCandidateKey}
+        onSelectLocalDraftCandidate={selectLocalDraftCandidate}
+        onDiscardLocalDraftCandidate={discardLocalDraftCandidate}
         onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
         onClearLocalDraft={clearLocalDraft}
         resultPanel={dedicatedEditorResultPanel}

@@ -17,6 +17,9 @@ import type { PostVisibility } from "./editorStudioState"
 import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   describeLocalDraftSlot,
+  listLocalDraftCandidates,
+  readLocalDraftCandidate,
+  removeLocalDraftCandidate,
   resolveLocalDraftSource,
 } from "./editorStudioStorageModel"
 
@@ -50,6 +53,8 @@ export const resolveLocalDraftShouldAdoptBaseline = (input: {
 }): boolean => input.loadingKey.length === 0 && input.pendingSuccessfulBaseline
 
 type LocalDraftFingerprintSnapshot = {
+  label?: string
+  key: string
   source: LocalDraftSource
   fingerprint: string
 }
@@ -71,11 +76,13 @@ export const isLocalDraftRestoreSuggestionEligible = (input: {
     candidate.fingerprint !== input.serverBaselineFingerprint &&
     !input.restored.some(
       (snapshot) =>
+        snapshot.key === candidate.key &&
         localDraftSourcesEqual(snapshot.source, candidate.source) &&
         snapshot.fingerprint === candidate.fingerprint
     ) &&
     !input.dismissed.some(
       (snapshot) =>
+        snapshot.key === candidate.key &&
         localDraftSourcesEqual(snapshot.source, candidate.source) &&
         snapshot.fingerprint === candidate.fingerprint
     )
@@ -372,6 +379,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
   const [postLoadInFlightEpoch, setPostLoadInFlightEpoch] = useState(0)
   const [postIdTransitionAwaitingLoad, setPostIdTransitionAwaitingLoad] = useState(false)
   const [localDraftCandidate, setLocalDraftCandidate] = useState<LocalDraftFingerprintSnapshot | null>(null)
+  const [localDraftCandidates, setLocalDraftCandidates] = useState<LocalDraftFingerprintSnapshot[]>([])
   const [restoredLocalDraft, setRestoredLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
   const [dismissedLocalDraft, setDismissedLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
   const postIdTransitionEditorFingerprintRef = useRef<string | null>(null)
@@ -537,7 +545,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
       return
     }
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
-    setLocalDraftCandidate({ source, fingerprint: currentLocalDraftFingerprint })
     setLocalDraftSavedAt(payload.savedAt)
     setLocalDraftSlotLabel(describeLocalDraftSlot(payload))
 
@@ -561,8 +568,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPublishStatus,
   ])
 
-  const restoreLocalDraft = useCallback(() => {
-    const draft = readLocalDraft(draftSource)
+  const restoreLocalDraft = useCallback((candidateKey?: string) => {
+    const selectedKey = candidateKey || localDraftCandidate?.key
+    if (!selectedKey) return
+    const draft = readLocalDraftCandidate(draftSource, selectedKey)
     if (!draft) {
       setPublishStatus(
         {
@@ -609,11 +618,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
       category: draft.category ? normalizeCategoryValue(draft.category) : "",
       visibility: draft.visibility,
     })
-    const restoredDraft = { source: draft.source, fingerprint: lastLocalDraftFingerprintRef.current }
+    const restoredDraft = { key: selectedKey, source: draft.source, fingerprint: lastLocalDraftFingerprintRef.current }
     setLocalDraftCandidate(restoredDraft)
     setRestoredLocalDraft((current) =>
       current.some(
         (snapshot) =>
+          snapshot.key === restoredDraft.key &&
           localDraftSourcesEqual(snapshot.source, restoredDraft.source) &&
           snapshot.fingerprint === restoredDraft.fingerprint
       )
@@ -654,7 +664,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
     lastWriteIdempotencyKeyRef,
     normalizeCategoryValue,
     postId,
-    readLocalDraft,
+    localDraftCandidate,
+    readLocalDraftCandidate,
     setEditorMode,
     setIsTempDraftMode,
     setKnownTags,
@@ -703,59 +714,30 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPublishStatus,
   ])
 
+  const refreshLocalDraftCandidates = useCallback(() => {
+    const candidates = listLocalDraftCandidates(draftSource).map(({ key, draft }) => ({
+      key,
+      label: describeLocalDraftSlot(draft),
+      source: draft.source,
+      fingerprint: buildLocalDraftFingerprint({ title: draft.title, content: draft.content, summary: draft.summary, summarySource: draft.summarySource, summaryIntent: draft.summaryIntent, thumbnailUrl: draft.thumbnailUrl, thumbnailFocusX: draft.thumbnailFocusX, thumbnailFocusY: draft.thumbnailFocusY, thumbnailZoom: draft.thumbnailZoom, tags: dedupeStrings(draft.tags), category: draft.category ? normalizeCategoryValue(draft.category) : "", visibility: draft.visibility }),
+    }))
+    setLocalDraftCandidates(candidates)
+    return candidates
+  }, [buildLocalDraftFingerprint, dedupeStrings, draftSource, normalizeCategoryValue])
+
   useEffect(() => {
-    const localDraft = readLocalDraft(draftSource)
-    if (!localDraft?.savedAt) {
-      // Do not reset lastArmedFingerprint to "" — that re-arms autosave after publish/clear.
-      setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
-      setLocalDraftCandidate(null)
-      return
+    const refresh = () => {
+      const candidates = refreshLocalDraftCandidates()
+      setLocalDraftCandidate((selected) => candidates.find((candidate) => candidate.key === selected?.key) || null)
     }
-
-    // Restore UI only. Do not point lastArmedFingerprint at the stored draft; that would
-    // make server-loaded editor content look dirty and overwrite the restorable slot.
-    setLocalDraftSavedAt(localDraft.savedAt)
-    setLocalDraftSlotLabel(describeLocalDraftSlot(localDraft))
-    setLocalDraftCandidate({
-      source: localDraft.source,
-      fingerprint: buildLocalDraftFingerprint({
-        title: localDraft.title,
-        content: localDraft.content,
-        summary: localDraft.summary,
-        summarySource: localDraft.summarySource,
-        summaryIntent: localDraft.summaryIntent,
-        thumbnailUrl: localDraft.thumbnailUrl,
-        thumbnailFocusX: localDraft.thumbnailFocusX,
-        thumbnailFocusY: localDraft.thumbnailFocusY,
-        thumbnailZoom: localDraft.thumbnailZoom,
-        tags: dedupeStrings(localDraft.tags),
-        category: localDraft.category ? normalizeCategoryValue(localDraft.category) : "",
-        visibility: localDraft.visibility,
-      }),
-    })
-  }, [
-    buildLocalDraftFingerprint,
-    dedupeStrings,
-    draftSource,
-    normalizeCategoryValue,
-    readLocalDraft,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-  ])
-
-  const dismissLocalDraftRestoreSuggestion = useCallback(() => {
-    if (localDraftCandidate == null) return
-    setDismissedLocalDraft((current) =>
-      current.some(
-        (snapshot) =>
-          localDraftSourcesEqual(snapshot.source, localDraftCandidate.source) &&
-          snapshot.fingerprint === localDraftCandidate.fingerprint
-      )
-        ? current
-        : [...current, localDraftCandidate]
-    )
-  }, [localDraftCandidate])
+    refresh()
+    window.addEventListener("storage", refresh)
+    window.addEventListener("aquila-local-drafts-changed", refresh)
+    return () => {
+      window.removeEventListener("storage", refresh)
+      window.removeEventListener("aquila-local-drafts-changed", refresh)
+    }
+  }, [refreshLocalDraftCandidates])
 
   useEffect(() => {
     const shouldAdoptBaseline = resolveLocalDraftShouldAdoptBaseline({
@@ -857,13 +839,35 @@ export const useEditorStudioLocalDraftLifecycle = ({
     saveLocalDraft,
   ])
 
+  const selectLocalDraftCandidate = useCallback((key: string) => {
+    setLocalDraftCandidate(localDraftCandidates.find((candidate) => candidate.key === key) || null)
+  }, [localDraftCandidates])
+
+  const discardLocalDraftCandidate = useCallback(() => {
+    if (!localDraftCandidate) return
+    removeLocalDraftCandidate(draftSource, localDraftCandidate.key)
+    setLocalDraftCandidate(null)
+    refreshLocalDraftCandidates()
+  }, [draftSource, localDraftCandidate, refreshLocalDraftCandidates])
+
+  const dismissLocalDraftRestoreSuggestion = useCallback(() => {
+    setDismissedLocalDraft((current) => [
+      ...current,
+      ...localDraftCandidates.filter((candidate) => !current.some((entry) =>
+        entry.key === candidate.key && entry.fingerprint === candidate.fingerprint)),
+    ])
+  }, [localDraftCandidates])
+
   return {
     localDraftFingerprint,
     localDraftSource: draftSource,
     localDraftCandidate,
+    localDraftCandidates,
     restoredLocalDraft,
     dismissedLocalDraft,
     dismissLocalDraftRestoreSuggestion,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
     signalLocalDraftRemoved,
     saveLocalDraft,
     restoreLocalDraft,

@@ -342,10 +342,13 @@ export const EditorStudioWorkspaceController = ({
     dismissLocalDraftRestoreSuggestion,
     handleLoadOrCreateTempPost,
     localDraftCandidate,
+    localDraftCandidates,
     localDraftSource,
     loadPostForEditor,
     restoredLocalDraft,
     restoreLocalDraft,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
     saveLocalDraft,
     signalLocalDraftBaselineReady,
     signalLocalDraftRemoved,
@@ -535,11 +538,6 @@ export const EditorStudioWorkspaceController = ({
     tagUsageMap,
   })
 
-  const removePersistedLocalDraft = useCallback((source: LocalDraftSource) => {
-    removeLocalDraft(source)
-    signalLocalDraftRemoved(source)
-  }, [signalLocalDraftRemoved])
-
   const {
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
@@ -601,7 +599,6 @@ export const EditorStudioWorkspaceController = ({
     refreshPublicPostReadViews,
     pretty,
     generateIdempotencyKey,
-    removeLocalDraft: removePersistedLocalDraft,
     signalLocalDraftBaselineReady,
     uploadWithConflictRetry,
     normalizeSafeImageUrl,
@@ -789,13 +786,13 @@ export const EditorStudioWorkspaceController = ({
         isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, metaNotice,
+        loadPostForEditor, loadingKey, localDraftCandidate, localDraftCandidates, localDraftSavedAt, localDraftSlotLabel, localDraftSource, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
         postThumbnailZoom, postTitle, postVersion, postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
         previewThumbTransformRef, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
-        removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
+        removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, selectLocalDraftCandidate, discardLocalDraftCandidate, result, safePreviewThumbnail,
         saveLocalDraft,
         selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
         setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,

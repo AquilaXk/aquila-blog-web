@@ -66,12 +66,12 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "localStorage",
-    key: "admin.editor.localDraft.create.v3",
-    purpose: "editor-local-draft-create",
+    key: "admin.editor.localDraft.create.",
+    purpose: "editor-local-draft-create-prefix",
     required: false,
-    retention: "7 days from savedAt or until manually cleared",
-    deletion: "manual clear, successful create publish, TTL expiry, or browser storage deletion",
-    stores: "create-context draft title, markdown, canonical summary source and intent, thumbnail, tags, category, visibility, source, savedAt",
+    retention: "7 days from savedAt or until the owning browser document clears its slot",
+    deletion: "owning-slot clear, successful create publish, TTL expiry, or browser storage deletion",
+    stores: "document-owned create-context draft title, markdown, canonical summary source and intent, thumbnail, tags, category, visibility, source, savedAt",
   },
   {
     area: "localStorage",

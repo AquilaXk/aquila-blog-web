@@ -156,7 +156,7 @@ export const useEditorStudioRouting = ({
     if (source !== "local-draft") return
     autoCreatedTempDraftRef.current = true
     setIsNewEditorBootstrapPending(false)
-    restoreLocalDraft()
+    // 복원 후보는 기존 안내에서 명시적으로 선택하며 최신 항목을 임의 복원하지 않는다.
     const nextQuery = { ...router.query }
     delete nextQuery.source
     void replaceShallowRoutePreservingScroll(router, { query: nextQuery })

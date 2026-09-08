@@ -51,7 +51,7 @@ test("browser storage registry retains only current public and administrator key
       expect.objectContaining({ area: "cookie", key: "refreshToken", purpose: "auth-session" }),
       expect.objectContaining({ area: "cookie", key: "sessionKey", purpose: "auth-session" }),
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
-      expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create.v3" }),
+      expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create." }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
       expect.objectContaining({
         area: "sessionStorage",

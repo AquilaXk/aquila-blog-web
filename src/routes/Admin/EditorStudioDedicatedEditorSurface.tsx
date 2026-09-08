@@ -84,6 +84,10 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   isLocalDraftRestoreSuggestionVisible: boolean
   isLocalDraftRestoreSuggestionActionsDisabled: boolean
   onRestoreLocalDraft: () => void
+  localDraftCandidates: Array<{ key: string; label: string }>
+  selectedLocalDraftCandidateKey: string
+  onSelectLocalDraftCandidate: (key: string) => void
+  onDiscardLocalDraftCandidate: () => void
   onDismissLocalDraftRestoreSuggestion: () => void
   onClearLocalDraft: () => void
   resultPanel: ReactNode
@@ -111,6 +115,10 @@ type LocalDraftRestoreSuggestionProps = {
   visible: boolean
   disabled: boolean
   onRestore: () => void
+  candidates: Array<{ key: string; label: string }>
+  selectedKey: string
+  onSelect: (key: string) => void
+  onDiscard: () => void
   onClear: () => void
   onDismiss: () => void
 }
@@ -119,6 +127,10 @@ const LocalDraftRestoreSuggestion = ({
   visible,
   disabled,
   onRestore,
+  candidates,
+  selectedKey,
+  onSelect,
+  onDiscard,
   onClear,
   onDismiss,
 }: LocalDraftRestoreSuggestionProps) => {
@@ -127,10 +139,14 @@ const LocalDraftRestoreSuggestion = ({
   return (
     <PublishNotice role="status" aria-live="polite" data-tone="idle">
       브라우저 임시글이 있습니다.
-      <SecondaryButton type="button" disabled={disabled} onClick={onRestore}>
+      <select aria-label="복구할 브라우저 초안" disabled={disabled} value={selectedKey} onChange={(event) => onSelect(event.target.value)}>
+        <option value="">초안을 선택하세요</option>
+        {candidates.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
+      </select>
+      <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
         복구
       </SecondaryButton>
-      <SecondaryButton type="button" disabled={disabled} onClick={onClear}>
+      <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onDiscard}>
         삭제
       </SecondaryButton>
       <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
@@ -186,6 +202,10 @@ export const EditorStudioDedicatedEditorSurface = ({
   isLocalDraftRestoreSuggestionVisible,
   isLocalDraftRestoreSuggestionActionsDisabled,
   onRestoreLocalDraft,
+  localDraftCandidates,
+  selectedLocalDraftCandidateKey,
+  onSelectLocalDraftCandidate,
+  onDiscardLocalDraftCandidate,
   onDismissLocalDraftRestoreSuggestion,
   onClearLocalDraft,
   resultPanel,
@@ -388,6 +408,10 @@ export const EditorStudioDedicatedEditorSurface = ({
             visible={isLocalDraftRestoreSuggestionVisible}
             disabled={isLocalDraftRestoreSuggestionActionsDisabled}
             onRestore={onRestoreLocalDraft}
+            candidates={localDraftCandidates}
+            selectedKey={selectedLocalDraftCandidateKey}
+            onSelect={onSelectLocalDraftCandidate}
+            onDiscard={onDiscardLocalDraftCandidate}
             onClear={onClearLocalDraft}
             onDismiss={onDismissLocalDraftRestoreSuggestion}
           />

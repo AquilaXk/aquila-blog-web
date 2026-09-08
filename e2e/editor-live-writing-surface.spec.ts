@@ -3,6 +3,8 @@ import type { Page, Route } from "./helpers/authoringPlaywright"
 import { expect, test } from "./helpers/authoringPlaywright"
 
 const localDraftStorageKey = "admin.editor.localDraft.create.v3"
+const seededManuscripts = new WeakMap<Page, string>()
+
 const selectAllShortcut = process.platform === "darwin" ? "Meta+A" : "Control+A"
 const undoShortcut = process.platform === "darwin" ? "Meta+Z" : "Control+Z"
 const redoShortcut = process.platform === "darwin" ? "Meta+Shift+Z" : "Control+Shift+Z"
@@ -42,6 +44,8 @@ const routeAuthenticatedEditor = async (
   title = "Live writing test",
   seedLocalDraft = true
 ) => {
+  if (seedLocalDraft) seededManuscripts.set(page, markdown)
+  else seededManuscripts.delete(page)
   await page.route("**/member/api/v1/auth/me", async (route) => fulfillJson(route, adminMember))
   await page.route("**/member/api/v1/members/adminProfile", async (route) => {
     await fulfillJson(route, adminMember)
@@ -142,6 +146,32 @@ const fillMarkdown = async (page: Page, markdown: string) => {
   await expect.poll(() => readMarkdown(page)).toBe(markdown)
 }
 
+const restoreSelectedLocalDraft = async (page: Page, content: string) => {
+  const candidates = page.getByLabel("복구할 브라우저 초안")
+  await expect(candidates).toBeVisible()
+  const matchingKey = await page.evaluate((expectedContent) => {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key?.endsWith(".v3")) continue
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      try {
+        const draft = JSON.parse(raw) as { content?: string; source?: { kind?: string } }
+        if (draft.source?.kind === "create" && draft.content === expectedContent) return key
+      } catch {}
+    }
+    return ""
+  }, content)
+  await candidates.selectOption(matchingKey)
+  await page.getByRole("button", { name: "복구" }).click()
+}
+
+const openEditorDraft = async (page: Page) => {
+  await page.goto("/admin/editor/new?source=local-draft")
+  const manuscript = seededManuscripts.get(page)
+  if (manuscript !== undefined) await restoreSelectedLocalDraft(page, manuscript)
+}
+
 const selectMarkdownRange = async (page: Page, from: number, to: number) => {
   const markdown = await readMarkdown(page)
   const editor = editorContent(page)
@@ -234,7 +264,7 @@ const selectMarkdownRangeWithoutAssertion = async (page: Page, from: number, to:
 test.describe("live Markdown writing surface", () => {
   test("new and existing editors mount one accessible document surface", async ({ page }) => {
     await routeAuthenticatedEditor(page)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
     await expect(editorContent(page)).toHaveAttribute("contenteditable", "true")
@@ -270,7 +300,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("groups toolbar actions without overflow and preserves the editor selection", async ({ page }) => {
     await routeAuthenticatedEditor(page, "Hello", "Toolbar grouping")
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const toolbar = page.getByRole("toolbar", { name: "Markdown 작성 도구" })
     await expect(toolbar).toBeVisible()
@@ -347,7 +377,7 @@ test.describe("live Markdown writing surface", () => {
   test("selection reveals source for the active block and formats inactive blocks in place", async ({ page }) => {
     const markdown = "# Heading\n\nParagraph with **bold** text."
     await routeAuthenticatedEditor(page, markdown)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const headingStart = markdown.indexOf("Heading")
     await selectMarkdownRangeWithoutAssertion(page, headingStart, headingStart)
@@ -373,7 +403,7 @@ test.describe("live Markdown writing surface", () => {
     const markdown = ["## **시작하며**", "", "본문", "", "#### `핵심` 포인트"].join("\n")
     await page.setViewportSize({ width: 1440, height: 900 })
     await routeAuthenticatedEditor(page, markdown, title)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const outline = page.getByLabel("문서 목차")
     await expect(outline.getByRole("button", { name: "시작하며" })).toBeVisible()
@@ -387,7 +417,7 @@ test.describe("live Markdown writing surface", () => {
   test("dark editor focus and native mouse selection stay on the live surface", async ({ page }) => {
     const markdown = ["# Drag Selection", "", "마우스 드래그로 이 문장을 선택합니다."].join("\n")
     await routeAuthenticatedEditor(page, markdown)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const surface = page.getByTestId("markdown-editor-live-surface")
     const editor = surface.locator(".cm-editor")
@@ -415,7 +445,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("composition keeps source visible without creating a second document", async ({ page }) => {
     await routeAuthenticatedEditor(page)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await selectMarkdownRangeWithoutAssertion(page, liveMarkdown.indexOf("Paragraph"), liveMarkdown.indexOf("Paragraph"))
 
     await editorContent(page).evaluate((element) => {
@@ -430,7 +460,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("toolbar mutations, undo, redo, and find/replace share CodeMirror history", async ({ page }) => {
     await routeAuthenticatedEditor(page, "hello")
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await selectMarkdownRange(page, 0, 5)
     await page.getByRole("button", { name: /^굵게/ }).click()
     await expect.poll(() => readMarkdown(page)).toBe("**hello**")
@@ -454,7 +484,7 @@ test.describe("live Markdown writing surface", () => {
   test("table and line commands keep their document selection and shared history", async ({ page }) => {
     const table = ["| A | B |", "| --- | --- |", "| one | two |"].join("\n")
     await routeAuthenticatedEditor(page, table)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const oneOffset = table.indexOf("one")
     await selectMarkdownRange(page, oneOffset, oneOffset)
@@ -475,7 +505,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("new table insertion enables table commands immediately", async ({ page }) => {
     await routeAuthenticatedEditor(page, "")
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await page.getByRole("button", { name: "표 메뉴" }).click()
     await page.getByRole("menuitem", { name: /^표 삽입/ }).click()
@@ -487,7 +517,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("paired input preserves a selected range and remains undoable", async ({ page }) => {
     await routeAuthenticatedEditor(page, "word")
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await selectMarkdownRange(page, 0, 4)
     await editorContent(page).press("[")
@@ -499,7 +529,7 @@ test.describe("live Markdown writing surface", () => {
   test("safe HTML paste preserves content and rejects executable input", async ({ page }) => {
     const source = "prefix target suffix"
     await routeAuthenticatedEditor(page, source)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     const start = source.indexOf("target")
     await selectMarkdownRange(page, start, start + "target".length)
 
@@ -564,7 +594,7 @@ test.describe("live Markdown writing surface", () => {
         },
       })
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await selectMarkdownRangeWithoutAssertion(page, source.indexOf("omega"), source.indexOf("omega"))
 
     await page.getByTestId("markdown-editor").locator("input[type='file'][accept='image/*']").setInputFiles({
@@ -601,7 +631,7 @@ test.describe("live Markdown writing surface", () => {
         data: { key: "post-files/note.txt", name: "note.txt", url: "https://cdn.example.test/post-files/note.txt" },
       })
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await selectMarkdownRangeWithoutAssertion(page, source.length, source.length)
     await page.getByTestId("markdown-editor").locator("input[type='file']:not([accept])").setInputFiles({
       name: "note.txt",
@@ -631,7 +661,7 @@ test.describe("live Markdown writing surface", () => {
         },
       })
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await editorContent(page).evaluate((element) => {
       const transfer = new DataTransfer()
@@ -670,7 +700,7 @@ test.describe("live Markdown writing surface", () => {
         },
       })
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await editorContent(page).evaluate((element) => {
       const transfer = new DataTransfer()
@@ -704,7 +734,7 @@ test.describe("live Markdown writing surface", () => {
       uploadCalled = true
       await route.fulfill({ status: 500, body: "unexpected upload" })
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     await page.getByTestId("markdown-editor").locator("input[type='file']:not([accept])").setInputFiles({
       name: "too-large.bin",
@@ -722,19 +752,24 @@ test.describe("live Markdown writing surface", () => {
     const title = "저장 계약"
     const content = "# 저장\n\n본문을 유지합니다."
     await routeAuthenticatedEditor(page, "", title, false)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await page.locator("#post-title").fill(title)
     await fillMarkdown(page, content)
     await editorContent(page).press(saveShortcut)
 
-    await expect.poll(() => page.evaluate((key) => {
-      const raw = window.localStorage.getItem(key)
-      if (!raw) return null
-      const draft = JSON.parse(raw) as { title: string; content: string }
-      return { title: draft.title, content: draft.content }
-    }, localDraftStorageKey)).toEqual({ title, content })
+    await expect.poll(() => page.evaluate(({ expectedTitle, expectedContent }) => {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index)
+        const raw = key ? localStorage.getItem(key) : null
+        if (!raw) continue
+        const draft = JSON.parse(raw) as { title: string; content: string; source?: { kind?: string } }
+        if (draft.source?.kind === "create" && draft.title === expectedTitle && draft.content === expectedContent) return true
+      }
+      return false
+    }, { expectedTitle: title, expectedContent: content })).toBe(true)
 
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
+    await restoreSelectedLocalDraft(page, content)
     await expect(page.locator("#post-title")).toHaveValue(title)
     await expect.poll(() => readMarkdown(page)).toBe(content)
   })
@@ -743,20 +778,22 @@ test.describe("live Markdown writing surface", () => {
     const title = "공백 요약 초안"
     const content = "공백 요약도 본문은 보존해야 합니다."
     await routeAuthenticatedEditor(page, "", title, false)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await page.locator("#post-title").fill(title)
     await fillMarkdown(page, content)
     await page.getByLabel("Summary").fill("수동 요약")
-    await expect.poll(() => page.evaluate((key) => {
-      const raw = window.localStorage.getItem(key)
+    await expect.poll(() => page.evaluate((expectedContent) => {
+      const key = Object.keys(localStorage).find((entry) => entry.startsWith("admin.editor.localDraft.create.") && JSON.parse(localStorage.getItem(entry) || "{}").content === expectedContent)
+      const raw = key ? window.localStorage.getItem(key) : null
       if (!raw) return null
       const draft = JSON.parse(raw) as { summary: string; summarySource: string }
       return { summary: draft.summary, summarySource: draft.summarySource }
-    }, localDraftStorageKey)).toEqual({ summary: "수동 요약", summarySource: "MANUAL" })
+    }, content)).toEqual({ summary: "수동 요약", summarySource: "MANUAL" })
 
     await page.getByLabel("Summary").fill("   ")
-    await expect.poll(() => page.evaluate((key) => {
-      const raw = window.localStorage.getItem(key)
+    await expect.poll(() => page.evaluate((expectedContent) => {
+      const key = Object.keys(localStorage).find((entry) => entry.startsWith("admin.editor.localDraft.create.") && JSON.parse(localStorage.getItem(entry) || "{}").content === expectedContent)
+      const raw = key ? window.localStorage.getItem(key) : null
       if (!raw) return null
       const draft = JSON.parse(raw) as {
         content: string
@@ -770,14 +807,15 @@ test.describe("live Markdown writing surface", () => {
         summarySource: draft.summarySource,
         intentKind: draft.summaryIntent.kind,
       }
-    }, localDraftStorageKey)).toEqual({
+    }, content)).toEqual({
       content,
       summary: "",
       summarySource: "NONE",
       intentKind: "auto",
     })
 
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
+    await restoreSelectedLocalDraft(page, content)
     await expect.poll(() => readMarkdown(page)).toBe(content)
     await expect(page.getByLabel("Summary")).toHaveValue("")
   })
@@ -830,7 +868,8 @@ test.describe("live Markdown writing surface", () => {
       await expect(dialog).toHaveCount(0)
       await expect(summary).toHaveValue(nextSummary)
       await expect.poll(() => page.evaluate((id) => {
-        const raw = localStorage.getItem(`admin.editor.localDraft.post.${id}.v3`)
+        const key = Object.keys(localStorage).find((entry) => entry.startsWith(`admin.editor.localDraft.post.${id}.`) && entry.endsWith(".v3"))
+        const raw = key ? localStorage.getItem(key) : null
         if (!raw) return null
         const draft = JSON.parse(raw)
         return { summary: draft.summary, intent: draft.summaryIntent }
@@ -841,9 +880,73 @@ test.describe("live Markdown writing surface", () => {
     })
   }
 
-  test("publish workflow remains available from the unified editor", async ({ page }) => {
+  test("dismissed recovery candidates stay hidden when another draft arrives", async ({ page }) => {
     await routeAuthenticatedEditor(page)
     await page.goto("/admin/editor/new?source=local-draft")
+    const candidates = page.getByLabel("복구할 브라우저 초안")
+    await expect(candidates).toBeVisible()
+    await page.getByRole("button", { name: "이번 세션에 표시 안 함", exact: true }).click()
+    await expect(candidates).toHaveCount(0)
+    const nextKey = await page.evaluate((originalKey) => {
+      const key = "admin.editor.localDraft.create.another-document.v3"
+      const draft = JSON.parse(localStorage.getItem(originalKey) || "null")
+      localStorage.setItem(key, JSON.stringify({ ...draft, content: "Another manuscript" }))
+      window.dispatchEvent(new StorageEvent("storage", { key, storageArea: localStorage }))
+      return key
+    }, localDraftStorageKey)
+    await expect(candidates).toBeVisible()
+    await expect(candidates.locator(`option[value="${localDraftStorageKey}"]`)).toHaveCount(0)
+    await expect(candidates.locator(`option[value="${nextKey}"]`)).toHaveCount(1)
+  })
+
+  test("saving one tab preserves the other tab manuscript for explicit recovery", async ({ page }) => {
+    const other = await page.context().newPage()
+    const postId = 776
+    try {
+      for (const tab of [page, other]) {
+        await routeAuthenticatedEditor(tab, liveMarkdown, "Existing post", false)
+        await routeEditorPost(tab, postId, liveMarkdown)
+        await tab.goto(`/admin/editor/${postId}`)
+        await expect(tab.locator("#post-title")).toHaveValue("Existing post")
+      }
+      await fillMarkdown(page, "Manuscript from A")
+      await fillMarkdown(other, "Unsaved manuscript from B")
+      await expect.poll(() => page.evaluate((id) => Object.keys(localStorage).some((key) =>
+        key.startsWith(`admin.editor.localDraft.post.${id}.`) &&
+        JSON.parse(localStorage.getItem(key) || "{}").content === "Manuscript from A"
+      ), postId)).toBe(true)
+      const readOtherKey = () => page.evaluate((id) => Object.keys(localStorage).find((key) => {
+        if (!key.startsWith(`admin.editor.localDraft.post.${id}.`)) return false
+        return JSON.parse(localStorage.getItem(key) || "{}").content === "Unsaved manuscript from B"
+      }) || "", postId)
+      await expect.poll(readOtherKey).not.toBe("")
+      const otherKey = await readOtherKey()
+      await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+        if (route.request().method() !== "PUT") return route.fallback()
+        await fulfillJson(route, { resultCode: "200-1", msg: "saved", data: {
+          id: postId, version: 2, summary: "Existing summary", summarySource: "MANUAL",
+        } })
+      })
+      await page.route("**/api/revalidate", (route) => fulfillJson(route, { revalidated: true }))
+      await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+      const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
+      await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+      expect(await readOtherKey()).toBe(otherKey)
+      await other.reload()
+      const candidates = other.getByLabel("복구할 브라우저 초안")
+      await candidates.selectOption(otherKey)
+      await other.getByRole("button", { name: "복구", exact: true }).click()
+      await expect.poll(() => readMarkdown(other)).toBe("Unsaved manuscript from B")
+      expect(await readOtherKey()).toBe(otherKey)
+    } finally {
+      await other.close()
+    }
+  })
+
+  test("publish workflow remains available from the unified editor", async ({ page }) => {
+    await routeAuthenticatedEditor(page)
+    await openEditorDraft(page)
     await page.getByRole("button", { name: /^(발행 설정|발행|새 글 작성|수정 반영)$/ }).first().click()
 
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|새 글 작성|수정 설정)$/ })
@@ -871,7 +974,7 @@ test.describe("live Markdown writing surface", () => {
         return setItem.call(this, key, value)
       }
     })
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     const manuscript = "원고는 저장소 오류가 나도 편집기에 남아 있어야 합니다."
     await page.locator("#post-title").fill("Storage failure")
     await fillMarkdown(page, manuscript)
@@ -963,7 +1066,7 @@ test.describe("live Markdown writing surface", () => {
   test("compact layout keeps one usable editor with no orphaned tabs or panels", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 })
     await routeAuthenticatedEditor(page)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
 
     const surface = page.getByTestId("markdown-editor-live-surface")
     await expect(surface).toBeVisible()
@@ -982,7 +1085,7 @@ test.describe("live Markdown writing surface", () => {
     const lines = Array.from({ length: 80 }, (_, index) => `line ${index + 1}`)
     const markdown = lines.join("\n")
     await routeAuthenticatedEditor(page, markdown)
-    await page.goto("/admin/editor/new?source=local-draft")
+    await openEditorDraft(page)
     await page.getByTestId("markdown-editor").evaluate((element) => {
       element.style.height = "280px"
     })
