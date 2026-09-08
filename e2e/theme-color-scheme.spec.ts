@@ -249,11 +249,12 @@ test.describe("theme color-scheme", () => {
       await expect(page.getByRole("button", { name: "테마 전환" })).toHaveCount(0)
       await expect(page.locator('[data-ui="feed-post-card"] article').first()).toBeVisible()
 
-      // SSR 본문 노출과 hydration의 초기 스타일 정리는 서로 다른 시점이다.
-      await expect.poll(async () =>
-        (await readSchemeFrameSamples(page)).at(-1)?.bootstrapStyleCount
-      ).toBe(0)
-      const samples = await readSchemeFrameSamples(page)
+      // 색상 검사와 동일한 본문 프레임에서 초기 스타일 제거를 확인한다.
+      let samples = await readSchemeFrameSamples(page)
+      await expect.poll(async () => {
+        samples = await readSchemeFrameSamples(page)
+        return samples.filter((sample) => sample.firstCardBackground !== null).at(-1)?.bootstrapStyleCount
+      }).toBe(0)
       const readySamples = samples.filter((sample) => sample.firstCardBackground !== null)
       const expectedBodyBackground = "rgb(247, 247, 245)"
       const expectedText = "rgb(15, 23, 36)"
