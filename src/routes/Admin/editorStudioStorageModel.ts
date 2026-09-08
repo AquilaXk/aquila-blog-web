@@ -208,13 +208,12 @@ const listPostDraftEntries = (): Array<{ key: string; savedAtMs: number }> => {
   return entries
 }
 
-const enforceLocalDraftPostSlotLimit = () => {
+const admitLocalDraftPostSlot = (storageKey: string) => {
   if (typeof window === "undefined") return
-  const entries = listPostDraftEntries().sort((left, right) => left.savedAtMs - right.savedAtMs)
-  const overflow = entries.length - LOCAL_DRAFT_POST_SLOT_LIMIT
-  if (overflow <= 0) return
-  for (const entry of entries.slice(0, overflow)) {
-    window.localStorage.removeItem(entry.key)
+  const entries = listPostDraftEntries()
+  // 만료된 슬롯만 정리하고, 아직 유효한 다른 원고를 지워 공간을 확보하지 않는다.
+  if (!entries.some((entry) => entry.key === storageKey) && entries.length >= LOCAL_DRAFT_POST_SLOT_LIMIT) {
+    throw new DOMException("Local draft slots are full", "QuotaExceededError")
   }
 }
 
@@ -249,10 +248,10 @@ export const persistLocalDraft = (payload: LocalDraftPayload) => {
 
   const source = payload.source
   const storageKey = localDraftStorageKey(source)
-  window.localStorage.setItem(storageKey, JSON.stringify(payload))
   if (source.kind === "post") {
-    enforceLocalDraftPostSlotLimit()
+    admitLocalDraftPostSlot(storageKey)
   }
+  window.localStorage.setItem(storageKey, JSON.stringify(payload))
 }
 
 export const removeLocalDraft = (source: LocalDraftSource) => {

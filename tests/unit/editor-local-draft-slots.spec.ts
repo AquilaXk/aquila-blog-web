@@ -356,27 +356,25 @@ test.describe("editor local draft context slots", () => {
         )
       }
 
-      persistLocalDraft(
+      expect(() => persistLocalDraft(
         baseDraft({
           title: "trigger",
           source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) },
           savedAt: new Date(now).toISOString(),
         })
-      )
+      )).toThrow()
 
       const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
         (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
       )
       expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`)).toBeNull()
-      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
-      expect(readLocalDraft({ kind: "post", postId: "2" })).toBeNull()
-      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })?.title).toBe(
-        "trigger"
-      )
+      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT + 1)
+      expect(readLocalDraft({ kind: "post", postId: "2" })?.title).toBe("post-2")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })).toBeNull()
     })
   })
 
-  test("expires drafts older than 7 days and enforces post slot limit", () => {
+  test("expires drafts older than 7 days and rejects new slots without evicting valid manuscripts", () => {
     withLocalStorage((storage) => {
       const now = Date.now()
       persistLocalDraft(
@@ -389,7 +387,7 @@ test.describe("editor local draft context slots", () => {
       expect(readLocalDraft({ kind: "create" })).toBeNull()
       expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
 
-      for (let index = 0; index < LOCAL_DRAFT_POST_SLOT_LIMIT + 3; index += 1) {
+      for (let index = 0; index < LOCAL_DRAFT_POST_SLOT_LIMIT; index += 1) {
         persistLocalDraft(
           baseDraft({
             title: `post-${index}`,
@@ -399,14 +397,22 @@ test.describe("editor local draft context slots", () => {
         )
       }
 
+      expect(() => persistLocalDraft(baseDraft({
+        title: "overflow", source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 1) },
+        savedAt: new Date(now).toISOString(),
+      }))).toThrow()
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("post-0")
+      persistLocalDraft(baseDraft({
+        title: "updated", source: { kind: "post", postId: "1" }, savedAt: new Date(now).toISOString(),
+      }))
+
       const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
         (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
       )
       expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
-      expect(readLocalDraft({ kind: "post", postId: "1" })).toBeNull()
-      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })?.title).toBe(
-        `post-${LOCAL_DRAFT_POST_SLOT_LIMIT + 2}`
-      )
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("updated")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT) })?.title)
+        .toBe(`post-${LOCAL_DRAFT_POST_SLOT_LIMIT - 1}`)
     })
   })
 

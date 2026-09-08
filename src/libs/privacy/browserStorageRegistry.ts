@@ -87,8 +87,8 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     key: "admin.editor.localDraft.post.",
     purpose: "editor-local-draft-post-prefix",
     required: false,
-    retention: "7 days from savedAt, capped to latest 20 post slots, or until manually cleared",
-    deletion: "manual clear, successful modify, slot-limit eviction, TTL expiry, or browser storage deletion",
+    retention: "7 days from savedAt or until manually cleared; reject new slots at 20 without evicting valid drafts",
+    deletion: "manual clear, successful modify, TTL expiry, or browser storage deletion",
     stores: "per-post current draft payloads with canonical summary source and intent",
   },
   {
