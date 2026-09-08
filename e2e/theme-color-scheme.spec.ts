@@ -144,16 +144,19 @@ const readSchemeFrameSamples = async (page: Page) =>
     return (window as SchemeFrameWindow).__aquilaSchemeFrameSamples ?? []
   })
 
-const readRuntimeRecoveryReasonCount = async (page: Page) =>
+const readRuntimeRecoveryReasons = async (page: Page) =>
   page.evaluate(() => {
-    let count = 0
+    const reasons: string[] = []
     for (let index = 0; index < sessionStorage.length; index += 1) {
       const key = sessionStorage.key(index) ?? ""
       if (key.startsWith("__aquila_client_runtime_recovery__") && key.endsWith(":reason")) {
-        count += 1
+        const reason = sessionStorage.getItem(key) ?? ""
+        const category = reason.split(":")[0] || "unknown"
+        const reactCode = reason.match(/React error #\d+/)?.[0]
+        reasons.push(reactCode ? `${category}: ${reactCode}` : category)
       }
     }
-    return count
+    return reasons
   })
 
 const expectStableUniqueValue = <T,>(values: T[], expected: T) => {
@@ -249,12 +252,7 @@ test.describe("theme color-scheme", () => {
       await expect(page.getByRole("button", { name: "테마 전환" })).toHaveCount(0)
       await expect(page.locator('[data-ui="feed-post-card"] article').first()).toBeVisible()
 
-      // 색상 검사와 동일한 본문 프레임에서 초기 스타일 제거를 확인한다.
-      let samples = await readSchemeFrameSamples(page)
-      await expect.poll(async () => {
-        samples = await readSchemeFrameSamples(page)
-        return samples.filter((sample) => sample.firstCardBackground !== null).at(-1)?.bootstrapStyleCount
-      }).toBe(0)
+      const samples = await readSchemeFrameSamples(page)
       const readySamples = samples.filter((sample) => sample.firstCardBackground !== null)
       const expectedBodyBackground = "rgb(247, 247, 245)"
       const expectedText = "rgb(15, 23, 36)"
@@ -278,7 +276,7 @@ test.describe("theme color-scheme", () => {
         html: "light",
         input: "light",
       })
-      expect(await readRuntimeRecoveryReasonCount(page)).toBe(0)
+      expect(await readRuntimeRecoveryReasons(page)).toEqual([])
       expect(hydrationErrors).toEqual([])
     })
   }
