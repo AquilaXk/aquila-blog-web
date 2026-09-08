@@ -363,12 +363,12 @@ export const InlineMetaInput = styled.input `
 
 export const EditorInspectorTagInputRow = styled.div`
   display: flex;
-  gap: 6px;
+  gap: 8px;
 
   input {
     min-width: 0;
     flex: 1 1 auto;
-    width: 100%;
+    width: auto;
     border: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-radius: 6px;
     background: ${({ theme }) => theme.publicDesign.readableSurface};
@@ -378,12 +378,16 @@ export const EditorInspectorTagInputRow = styled.div`
   }
 
   button {
-    width: 38px;
+    width: auto;
+    min-width: 38px;
+    flex: 0 0 auto;
     border: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-radius: 6px;
+    padding: 0 10px;
     background: ${({ theme }) => theme.publicDesign.readableSurface};
     color: ${({ theme }) => theme.colors.gray12};
     cursor: pointer;
+    white-space: nowrap;
   }
 `;
 
@@ -608,7 +612,7 @@ export const EditorInspector = styled.aside`
 
   label > span,
   section > span {
-    margin: 0 0 8px;
+    margin: 0;
     color: ${({ theme }) => theme.colors.gray10};
     font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     text-transform: uppercase;
@@ -617,7 +621,7 @@ export const EditorInspector = styled.aside`
   label,
   section {
     display: grid;
-    gap: 0;
+    gap: 8px;
     padding: 0 0 22px;
     margin-bottom: 22px;
     border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};

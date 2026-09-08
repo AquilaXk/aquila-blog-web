@@ -299,6 +299,82 @@ test.describe("live Markdown writing surface", () => {
     await expect.poll(() => readMarkdown(page)).toBe("New manuscript")
   })
 
+  test("keeps the live canvas readable and inspector controls separated in light-only editor mode", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" })
+    await routeAuthenticatedEditor(page)
+    await openEditorDraft(page)
+
+    const liveEditor = page.locator(".cm-editor")
+    const canvasColors = await liveEditor.evaluate((element) => {
+      const parseColor = (value: string) => value.match(/\d+/g)?.map(Number) ?? []
+      const luminance = (color: number[]) => {
+        const [red, green, blue] = color.slice(0, 3).map((channel) => {
+          const normalized = channel / 255
+          return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+      }
+      const rootBackground = getComputedStyle(element.closest('[data-testid="markdown-editor"]') as HTMLElement).backgroundColor
+      const editorStyle = getComputedStyle(element)
+      const foreground = luminance(parseColor(editorStyle.color))
+      const background = luminance(parseColor(editorStyle.backgroundColor))
+      return {
+        rootBackground,
+        editorBackground: editorStyle.backgroundColor,
+        contrast: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
+      }
+    })
+    expect(canvasColors.editorBackground).toBe(canvasColors.rootBackground)
+    expect(canvasColors.contrast).toBeGreaterThanOrEqual(4.5)
+
+    const inspector = page.getByLabel("발행 설정")
+    const summary = inspector.locator("textarea")
+    const summaryCounter = inspector.locator("small")
+    const categoryInput = inspector.locator('input[list="editor-category-suggestions"]')
+    await categoryInput.fill("backend")
+    const categoryClear = inspector.getByRole("button", { name: "카테고리 지우기" })
+    const tagSection = inspector.locator("section").filter({
+      has: page.getByText("Tags", { exact: true }),
+    })
+    const tagChip = tagSection.getByText("markdown", { exact: true })
+    const tagInput = tagSection.getByPlaceholder("태그 추가")
+    const tagAdd = tagSection.getByRole("button", { name: "태그 추가" })
+    const [summaryBox, counterBox, categoryInputBox, categoryClearBox, tagChipBox, tagInputBox, tagAddBox] = await Promise.all([
+      summary.boundingBox(),
+      summaryCounter.boundingBox(),
+      categoryInput.boundingBox(),
+      categoryClear.boundingBox(),
+      tagChip.boundingBox(),
+      tagInput.boundingBox(),
+      tagAdd.boundingBox(),
+    ])
+
+    expect(summaryBox).not.toBeNull()
+    expect(counterBox).not.toBeNull()
+    expect(categoryInputBox).not.toBeNull()
+    expect(categoryClearBox).not.toBeNull()
+    expect(tagChipBox).not.toBeNull()
+    expect(tagInputBox).not.toBeNull()
+    expect(tagAddBox).not.toBeNull()
+    expect(counterBox!.y).toBeGreaterThan(summaryBox!.y + summaryBox!.height)
+    expect(categoryClearBox!.y).toBe(categoryInputBox!.y)
+    expect(categoryClearBox!.x).toBeGreaterThan(categoryInputBox!.x + categoryInputBox!.width)
+    expect(tagInputBox!.y).toBeGreaterThan(tagChipBox!.y + tagChipBox!.height)
+    expect(tagAddBox!.y).toBe(tagInputBox!.y)
+    expect(tagAddBox!.x).toBeGreaterThan(tagInputBox!.x + tagInputBox!.width)
+    const categoryClearText = await categoryClear.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return {
+        lineCount: range.getClientRects().length,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      }
+    })
+    expect(categoryClearText.lineCount).toBeLessThanOrEqual(1)
+    expect(categoryClearText.scrollHeight).toBeLessThanOrEqual(categoryClearText.clientHeight)
+  })
+
   test("groups toolbar actions without overflow and preserves the editor selection", async ({ page }) => {
     await routeAuthenticatedEditor(page, "Hello", "Toolbar grouping")
     await openEditorDraft(page)
@@ -362,6 +438,15 @@ test.describe("live Markdown writing surface", () => {
     const editor = page.getByTestId("markdown-editor")
     const editorBounds = await editor.boundingBox()
     expect(editorBounds).not.toBeNull()
+    const compactControls = await toolbar.locator("button, select").evaluateAll((controls) =>
+      controls
+        .filter((control) => control.getClientRects().length > 0)
+        .map((control) => ({
+          height: control.getBoundingClientRect().height,
+          fontSize: Number.parseFloat(getComputedStyle(control).fontSize),
+        }))
+    )
+    expect(compactControls.every((control) => control.height >= 36 && control.fontSize >= 13)).toBe(true)
     for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
       await page.getByRole("button", { name: `${label} 메뉴` }).click()
       const menu = page.getByRole("menu", { name: label })
