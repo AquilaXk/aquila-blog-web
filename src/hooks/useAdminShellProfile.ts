@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { type QueryClient, useQuery } from "@tanstack/react-query"
 import { apiFetch } from "src/apis/backend/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import type { AdminProfile } from "src/types/adminProfile"
@@ -9,7 +9,13 @@ type AdminShellBootstrapPayload = {
   profile: AdminProfile | null
 }
 
-const ADMIN_SHELL_PROFILE_QUERY_KEY = (memberId: number) => ["admin", "shell-profile", memberId] as const
+export const adminShellProfileQueryKey = (memberId: number) => ["admin", "shell-profile", memberId] as const
+
+export const refreshAdminShellProfile = (queryClient: QueryClient, memberId: number) =>
+  queryClient.invalidateQueries({
+    queryKey: adminShellProfileQueryKey(memberId),
+    refetchType: "all",
+  })
 
 export const readAdminShellProfile = async (memberId: number): Promise<AdminProfile> => {
   const payload = await apiFetch<AdminShellBootstrapPayload>("/member/api/v1/adm/members/bootstrap")
@@ -23,7 +29,7 @@ export const readAdminShellProfile = async (memberId: number): Promise<AdminProf
 export const useAdminShellProfile = (memberId: number, initialProfile: AdminProfile | null = null) => {
   const isBrowser = typeof window !== "undefined"
   const query = useQuery<AdminProfile>({
-    queryKey: ADMIN_SHELL_PROFILE_QUERY_KEY(memberId),
+    queryKey: adminShellProfileQueryKey(memberId),
     queryFn: () => readAdminShellProfile(memberId),
     enabled: isBrowser,
     initialData: initialProfile ?? undefined,

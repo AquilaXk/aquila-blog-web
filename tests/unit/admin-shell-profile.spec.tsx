@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createElement } from "react"
 import { renderToString } from "react-dom/server"
-import { readAdminShellProfile, useAdminShellProfile } from "../../src/hooks/useAdminShellProfile"
+import {
+  adminShellProfileQueryKey,
+  readAdminShellProfile,
+  refreshAdminShellProfile,
+  useAdminShellProfile,
+} from "../../src/hooks/useAdminShellProfile"
 import { registerServerApiFetchMetrics } from "../../src/libs/server/apiFetchMetrics"
 
 const member = { id: 7, username: "owner", nickname: "Owner", isAdmin: true }
@@ -84,6 +89,38 @@ test("admin shell profile does not try an alternate request after an HTTP failur
       expect(requests[0]).not.toContain("adminProfile")
     }
   )
+})
+
+test("profile publication refetches the exact inactive member shell profile", async () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const refreshedProfile = { ...profile, blogTitle: "Refreshed journal" }
+  let memberProfileReads = 0
+  let otherMemberProfileReads = 0
+
+  try {
+    await queryClient.fetchQuery({
+      queryKey: adminShellProfileQueryKey(member.id),
+      queryFn: async () => {
+        memberProfileReads += 1
+        return memberProfileReads === 1 ? profile : refreshedProfile
+      },
+    })
+    await queryClient.fetchQuery({
+      queryKey: adminShellProfileQueryKey(8),
+      queryFn: async () => {
+        otherMemberProfileReads += 1
+        return { ...profile, id: 8 }
+      },
+    })
+
+    await refreshAdminShellProfile(queryClient, member.id)
+
+    expect(queryClient.getQueryData(adminShellProfileQueryKey(member.id))).toEqual(refreshedProfile)
+    expect(memberProfileReads).toBe(2)
+    expect(otherMemberProfileReads).toBe(1)
+  } finally {
+    queryClient.clear()
+  }
 })
 
 test("admin shell uses its canonical SSR seed without member or configuration synthesis", () => {

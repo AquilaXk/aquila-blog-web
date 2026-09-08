@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { mockAvatarAsset, mockPublicAdminProfile } from "./helpers/smokeFixtures"
+import { mockAvatarAsset, mockPublicAdminProfile, PUBLIC_ADMIN_PROFILE_FIXTURE } from "./helpers/smokeFixtures"
 import type { ProfileWorkspaceContent } from "../src/libs/profileWorkspace"
 
 const draft: ProfileWorkspaceContent = {
@@ -33,6 +33,74 @@ for (const field of ["한 줄 역할", "계정 이름"]) {
     await expect(page.getByLabel(field, { exact: true })).toHaveValue("Unsaved value")
   })
 }
+
+test("publishing refreshes the member shell profile through client navigation", async ({ page }) => {
+  const sidebar = page.locator("aside").filter({ has: page.getByText("ENGINEERING JOURNAL", { exact: true }) })
+  const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }
+  const published = { ...draft, blogTitle: "Cached journal" }
+  const nextDraft = { ...published, blogTitle: "Published journal" }
+  const nextWorkspace = { draft: nextDraft, published: nextDraft, dirtyFromPublished: false }
+  let shellProfile = { ...PUBLIC_ADMIN_PROFILE_FIXTURE, blogTitle: published.blogTitle }
+  let shellProfileReads = 0
+
+  await mockPublicAdminProfile(page)
+  await page.route("**/api/revalidate", (route) => route.fulfill({ json: { revalidated: true } }))
+  await page.route("**/member/api/v1/auth/me", (route) => route.fulfill({ json: member }))
+  await page.route("**/member/api/v1/adm/members/bootstrap", (route) => {
+    shellProfileReads += 1
+    return route.fulfill({ json: { member, profile: shellProfile } })
+  })
+  await page.route("**/member/api/v1/adm/members/*/profileWorkspace", (route) =>
+    route.fulfill({ json: { draft: nextDraft, published, dirtyFromPublished: true } })
+  )
+  await page.route("**/member/api/v1/adm/members/*/profileWorkspace/publish", (route) => {
+    expect(route.request().method()).toBe("POST")
+    shellProfile = { ...shellProfile, blogTitle: nextDraft.blogTitle }
+    return route.fulfill({ json: nextWorkspace })
+  })
+
+  await page.goto("/admin/profile")
+  await expect(sidebar.getByText(published.blogTitle, { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "공개 적용", exact: true }).click()
+  await expect(sidebar.getByText(nextDraft.blogTitle, { exact: true })).toBeVisible()
+  expect(shellProfileReads).toBe(2)
+
+  await sidebar.getByRole("link", { name: "허브", exact: true }).click()
+  await expect(page).toHaveURL(/\/admin$/)
+  await expect(sidebar.getByText(nextDraft.blogTitle, { exact: true })).toBeVisible()
+})
+
+test("failed publication retains the committed member shell profile cache", async ({ page }) => {
+  const sidebar = page.locator("aside").filter({ has: page.getByText("ENGINEERING JOURNAL", { exact: true }) })
+  const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }
+  const published = { ...draft, blogTitle: "Committed journal" }
+  const nextDraft = { ...published, blogTitle: "Unpublished journal" }
+  const shellProfile = { ...PUBLIC_ADMIN_PROFILE_FIXTURE, blogTitle: published.blogTitle }
+  let shellProfileReads = 0
+
+  await mockPublicAdminProfile(page)
+  await page.route("**/member/api/v1/auth/me", (route) => route.fulfill({ json: member }))
+  await page.route("**/member/api/v1/adm/members/bootstrap", (route) => {
+    shellProfileReads += 1
+    return route.fulfill({ json: { member, profile: shellProfile } })
+  })
+  await page.route("**/member/api/v1/adm/members/*/profileWorkspace", (route) =>
+    route.fulfill({ json: { draft: nextDraft, published, dirtyFromPublished: true } })
+  )
+  await page.route("**/member/api/v1/adm/members/*/profileWorkspace/publish", (route) =>
+    route.fulfill({ status: 503, json: { msg: "unavailable" } })
+  )
+
+  await page.goto("/admin/profile")
+  await expect(sidebar.getByText(published.blogTitle, { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "공개 적용", exact: true }).click()
+  await expect(page.getByText(/공개 적용 실패:/)).toBeVisible()
+  expect(shellProfileReads).toBe(1)
+
+  await sidebar.getByRole("link", { name: "허브", exact: true }).click()
+  await expect(page).toHaveURL(/\/admin$/)
+  await expect(sidebar.getByText(published.blogTitle, { exact: true })).toBeVisible()
+})
 
 test("selecting a previous image saves the canonical draft without losing edits", async ({ page }) => {
   const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }

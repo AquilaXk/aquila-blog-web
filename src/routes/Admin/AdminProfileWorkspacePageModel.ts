@@ -5,6 +5,7 @@ import { apiFetch } from "src/apis/backend/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import useAuthSession from "src/hooks/useAuthSession"
 import { setAdminProfileCache, refreshAdminProfileCache, type AdminProfile } from "src/hooks/useAdminProfile"
+import { refreshAdminShellProfile } from "src/hooks/useAdminShellProfile"
 import { setProfileWorkspaceCache, useProfileWorkspace } from "src/hooks/useProfileWorkspace"
 import {
   normalizeProfileWorkspaceContent,
@@ -478,6 +479,7 @@ export const useAdminProfileWorkspacePageModel = ({
           }
         )
         applyWorkspaceState(nextWorkspace)
+        await refreshAdminShellProfile(queryClient, sessionMember.id)
         const profileRefreshed = await refreshAdminProfileCache(queryClient)
         const appearanceRevalidated = await revalidatePublicBlogAppearance()
         const publicCacheRevalidated = profileRefreshed && appearanceRevalidated
