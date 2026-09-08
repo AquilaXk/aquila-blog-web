@@ -7,14 +7,11 @@ import {
   type ProfileCardLinkItem,
   type ProfileCardLinkSection,
 } from "src/constants/profileCardLinks"
-import type { AuthMember } from "src/hooks/useAuthSession"
 import {
   type AboutProjectBlock,
   type AboutSectionBlock,
-  buildProfileWorkspaceFromLegacy,
   normalizeProfileWorkspaceContent,
   type ProfileWorkspaceContent,
-  type ProfileWorkspaceResponse,
 } from "src/libs/profileWorkspace"
 
 export type WorkspaceSectionId = "identity" | "about" | "home" | "links"
@@ -168,38 +165,3 @@ export const toPayloadLinks = (
       href: normalizeProfileLinkHref(section, item.href),
     }))
     .filter((item) => item.label && item.href)
-
-export const buildWorkspaceFallback = (
-  member: AuthMember,
-  initialWorkspace: ProfileWorkspaceResponse | null
-): ProfileWorkspaceResponse => {
-  if (initialWorkspace) {
-    const draft = normalizeProfileWorkspaceContent({
-      ...initialWorkspace.draft,
-      blogDesign: initialWorkspace.draft.blogDesign || member.blogDesign || "legacy",
-      legacyBlogScheme: initialWorkspace.draft.legacyBlogScheme || member.legacyBlogScheme || "dark",
-    })
-    const published = normalizeProfileWorkspaceContent({
-      ...initialWorkspace.published,
-      blogDesign: initialWorkspace.published.blogDesign || member.blogDesign || "legacy",
-      legacyBlogScheme: initialWorkspace.published.legacyBlogScheme || member.legacyBlogScheme || "dark",
-    })
-
-    return {
-      draft,
-      published,
-      lastDraftSavedAt: initialWorkspace.lastDraftSavedAt || member.modifiedAt || null,
-      lastPublishedAt: initialWorkspace.lastPublishedAt || member.modifiedAt || null,
-      dirtyFromPublished: initialWorkspace.dirtyFromPublished,
-    }
-  }
-
-  const content = buildProfileWorkspaceFromLegacy(member)
-  return {
-    draft: content,
-    published: content,
-    lastDraftSavedAt: member.modifiedAt || null,
-    lastPublishedAt: member.modifiedAt || null,
-    dirtyFromPublished: false,
-  }
-}

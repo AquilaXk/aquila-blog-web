@@ -44,27 +44,6 @@ export type ProfileWorkspaceResponse = {
   dirtyFromPublished: boolean
 }
 
-type LegacyProfileLike = {
-  profileImageDirectUrl?: string
-  profileImageUrl?: string
-  profileRole?: string
-  profileBio?: string
-  aboutHeadline?: string
-  aboutRole?: string
-  aboutBio?: string
-  aboutDetails?: string
-  aboutSections?: AboutSectionBlock[]
-  aboutProjectSectionTitle?: string
-  aboutProjects?: AboutProjectBlock[]
-  blogTitle?: string
-  homeIntroTitle?: string
-  homeIntroDescription?: string
-  blogDesign?: BlogDesignType
-  legacyBlogScheme?: LegacyBlogScheme
-  serviceLinks?: ProfileCardLinkItem[]
-  contactLinks?: ProfileCardLinkItem[]
-}
-
 export const DEFAULT_ABOUT_HEADLINE = "이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다."
 export const DEFAULT_ABOUT_PROJECT_SECTION_TITLE = "프로젝트"
 export const normalizeBlogDesign = (_value: unknown): BlogDesignType => "legacy"
@@ -350,28 +329,3 @@ export const buildProfileWorkspaceAdminProfileCacheFields = (content: ProfileWor
     contactLinks: normalized.contactLinks,
   }
 }
-
-export const buildProfileWorkspaceFromLegacy = (
-  value: LegacyProfileLike | null | undefined
-): ProfileWorkspaceContent =>
-  normalizeProfileWorkspaceContent({
-    profileImageUrl: value?.profileImageDirectUrl || value?.profileImageUrl || "",
-    profileRole: value?.profileRole || "",
-    profileBio: value?.profileBio || "",
-    aboutHeadline: value?.aboutHeadline || "",
-    aboutRole: value?.aboutRole || "",
-    aboutBio: value?.aboutBio || "",
-    aboutSections:
-      value?.aboutSections && value.aboutSections.length > 0
-        ? value.aboutSections
-        : parseLegacyAboutDetails(value?.aboutDetails || ""),
-    aboutProjectSectionTitle: value?.aboutProjectSectionTitle || "",
-    aboutProjects: value?.aboutProjects || [],
-    blogTitle: value?.blogTitle || "",
-    homeIntroTitle: value?.homeIntroTitle || "",
-    homeIntroDescription: value?.homeIntroDescription || "",
-    blogDesign: normalizeBlogDesign(value?.blogDesign),
-    legacyBlogScheme: normalizeLegacyBlogScheme(value?.legacyBlogScheme),
-    serviceLinks: value?.serviceLinks || [],
-    contactLinks: value?.contactLinks || [],
-  })

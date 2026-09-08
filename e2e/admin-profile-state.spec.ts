@@ -213,7 +213,7 @@ test.describe("admin profile state contract", () => {
     expect(modelSource).toContain("export const createBlankLinkItem = (")
     expect(modelSource).toContain("export const validateLinkInputs = (")
     expect(modelSource).toContain("export const toPayloadLinks = (")
-    expect(modelSource).toContain("export const buildWorkspaceFallback = (")
+    expect(modelSource).not.toContain("buildWorkspaceFallback")
     expect(source).not.toContain("const WORKSPACE_SECTIONS:")
     expect(source).not.toContain("const pickWorkspaceSectionContent =")
     expect(source).not.toContain("const serializeWorkspaceSection =")
