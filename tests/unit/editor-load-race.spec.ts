@@ -3,6 +3,7 @@ import { createElement, type Dispatch, type SetStateAction } from "react"
 import { renderToString } from "react-dom/server"
 import { registerServerApiFetchMetrics } from "../../src/libs/server/apiFetchMetrics"
 import { useEditorStudioDraftLifecycle } from "../../src/routes/Admin/useEditorStudioDraftLifecycle"
+import { resolveEditorMetaSnapshot } from "../../src/routes/Admin/editorStudioMetaModel"
 
 type DraftLifecycleParams = Parameters<typeof useEditorStudioDraftLifecycle>[0]
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -45,7 +46,7 @@ const createPost = (id: string, title: string, content: string) => ({
   tempDraft: false,
 })
 
-const createHarness = () => {
+const createHarness = (useRealMetaParser = false) => {
   const state: EditorLoadState = {
     content: "",
     editorMode: "create",
@@ -162,6 +163,14 @@ const createHarness = () => {
     tempPostRequestRef,
   }
   let lifecycle!: ReturnType<typeof useEditorStudioDraftLifecycle>
+  if (useRealMetaParser) {
+    params.resolveEditorMetaSnapshot = resolveEditorMetaSnapshot
+    params.syncEditorMeta = (content, _summary, html) => {
+      const snapshot = resolveEditorMetaSnapshot(content, html)
+      setPostContent(snapshot.body)
+      return snapshot
+    }
+  }
   const Probe = () => {
     lifecycle = useEditorStudioDraftLifecycle(params)
     return null
@@ -173,6 +182,26 @@ const createHarness = () => {
 const originalFetch = globalThis.fetch
 test.beforeEach(() => { registerServerApiFetchMetrics() })
 test.afterEach(() => { globalThis.fetch = originalFetch })
+
+for (const content of ["Intro\n\n```ts\n\n```", ""]) {
+  test(`admin manuscript remains authoritative with stale HTML: ${content ? "empty fence" : "cleared body"}`, async () => {
+    const requests: string[] = []
+    globalThis.fetch = (async (url) => {
+      const pathname = new URL(String(url)).pathname
+      requests.push(pathname)
+      return jsonResponse({
+        ...createPost("A", "Title", pathname.includes("/adm/") ? content : "Intro\n\n```ts\noldCode()\n```"),
+        contentHtml: "<p>Intro</p><pre><code class=\"language-ts\">oldCode()</code></pre>",
+      })
+    }) as typeof fetch
+    const { baselineRef, lifecycle, state } = createHarness(true)
+    await lifecycle.loadPostForEditor("A")
+
+    expect(state.content).toBe(content)
+    expect(baselineRef.current).toBe(`Title:${content}`)
+    expect(requests).toEqual(["/post/api/v1/adm/posts/A"])
+  })
+}
 
 test("later editor load keeps title, content, id, and baseline when an earlier load resolves last", async () => {
   const first = createDeferredResponse()

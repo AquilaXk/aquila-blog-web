@@ -104,11 +104,12 @@ const routeAuthenticatedEditor = async (
   )
 }
 
-const routeEditorPost = async (page: Page, postId: number, markdown: string, tempDraft = false) => {
+const routeEditorPost = async (page: Page, postId: number, markdown: string, tempDraft = false, contentHtml: string | null = null) => {
   const post = {
     id: postId,
     title: "Existing post",
     content: markdown,
+    contentHtml,
     summary: "Existing summary",
     summarySource: "MANUAL",
     summaryIntent: { kind: "manual", summary: "Existing summary" },
@@ -769,10 +770,11 @@ test.describe("live Markdown writing surface", () => {
     await expect(page.getByLabel("Summary")).toHaveValue("")
   })
 
-  test("loads the current empty manuscript without restoring public content", async ({ page }) => {
+  for (const manuscript of ["", "Intro\n\n```ts\n\n```", "Intro\n\n~~~ts title=example.ts\n\n~~~"]) {
+  test(`preserves current manuscript without HTML or public recovery: ${manuscript || "empty"}`, async ({ page }) => {
     const postId = 774
     await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
-    await routeEditorPost(page, postId, "")
+    await routeEditorPost(page, postId, manuscript, false, "<p>Intro</p><pre><code>oldCode()</code></pre>")
     let publicReads = 0
     await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
       publicReads += 1
@@ -780,9 +782,10 @@ test.describe("live Markdown writing surface", () => {
     })
     await page.goto(`/admin/editor/${postId}`)
     await expect(page.getByPlaceholder("제목을 입력하세요", { exact: true })).toHaveValue("Existing post")
-    await expect.poll(() => readMarkdown(page)).toBe("")
+    await expect.poll(() => readMarkdown(page)).toBe(manuscript)
     expect(publicReads).toBe(0)
   })
+  }
 
   for (const nextSummary of ["Newer manual summary", ""]) {
     test(`preserves newer summary intent after a delayed save: ${nextSummary ? "manual" : "auto"}`, async ({ page }) => {

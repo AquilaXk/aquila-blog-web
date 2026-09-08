@@ -10,14 +10,6 @@ import {
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { replaceRoute } from "src/libs/router"
-import {
-  adminContentHadEmptyFenceForTelemetry,
-  adminContentNeedsCodeFenceRecovery,
-  reportCodeFenceRecovery,
-  resolveEditorCodeFenceRecovery,
-  resolveLoadedPostContentHtml,
-  shouldFetchPublicContentForCodeFenceRecovery,
-} from "./editorCodeFenceRecovery"
 import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
 import { isServerTempDraftPost } from "./editorTempDraft"
 import { useEditorStudioLocalDraftLifecycle } from "./useEditorStudioDraftLifecycleModel"
@@ -406,7 +398,8 @@ export const useEditorStudioDraftLifecycle = ({
 
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
-      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "", post.contentHtml)
+      // 저장된 HTML은 파생 데이터이므로 현재 Markdown을 복구·대체하지 않는다.
+      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "", null)
       const shouldMaskTempTitle = isServerTempDraftPost(post)
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
       const title = shouldMaskTempTitle ? "" : post.title ?? ""
@@ -423,7 +416,7 @@ export const useEditorStudioDraftLifecycle = ({
       const snapshot = shouldMaskTempPlaceholder
         ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
           buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(post.content ?? "", canonicalSummary, post.contentHtml)
+        : syncEditorMeta(post.content ?? "", canonicalSummary, null)
       return {
         shouldMaskTempPlaceholder,
         title,
@@ -466,70 +459,7 @@ export const useEditorStudioDraftLifecycle = ({
       // 빈 본문도 현재 원문이다. 조회 실패를 과거 SSR 본문으로 대체하지 않는다.
       const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       if (!isCurrentLoad()) return
-      let resolvedPost = post
-
-      const adminContent = resolvedPost.content ?? ""
-      const adminBodySnapshot = resolveEditorMetaSnapshot(adminContent, null)
-      const htmlRecoverySnapshot = resolveEditorMetaSnapshot(
-        adminContent,
-        resolvedPost.contentHtml
-      )
-      const needsCodeFenceRecovery = adminContentNeedsCodeFenceRecovery(adminContent)
-
-      let publicContent: string | undefined
-      let publicContentHtml: string | null | undefined
-      let publicFallbackSucceeded = false
-
-      // empty-fence complete만으로 public fetch를 건너뛰면 fence title/delimiter 등 메타데이터가 유실될 수 있다.
-      // 완전히 빈 admin은 stale-if-error 캐시 public 본문으로 되살리지 않는다.
-      const shouldFetchPublicContent = shouldFetchPublicContentForCodeFenceRecovery(adminContent)
-
-      if (shouldFetchPublicContent) {
-        try {
-          const publicPost = await apiFetch<Pick<PostForEditor, "content" | "contentHtml">>(
-            `/post/api/v1/posts/${normalizedTargetPostId}`
-          )
-          publicContentHtml = publicPost.contentHtml
-          const trimmedPublicMarkdown = (publicPost.content ?? "").trim()
-          if (trimmedPublicMarkdown.length > 0) {
-            publicContent = publicPost.content ?? ""
-            publicFallbackSucceeded = true
-          } else if (publicPost.contentHtml?.trim()) {
-            publicContent = resolveEditorMetaSnapshot("", publicPost.contentHtml).body
-            publicFallbackSucceeded = publicContent.trim().length > 0
-          }
-        } catch {
-          // 비공개/삭제 글 등 공개 읽기 폴백이 불가능한 경우 contentHtml 결과만 사용한다.
-        }
-      }
-
-      if (!isCurrentLoad()) return
-      const fenceRecovery = resolveEditorCodeFenceRecovery({
-        adminContent,
-        adminBodyForSync: adminBodySnapshot.body,
-        contentHtmlBodyCandidate: htmlRecoverySnapshot.body,
-        publicContent,
-        publicFallbackSucceeded,
-      })
-
-      if (needsCodeFenceRecovery) {
-        reportCodeFenceRecovery({
-          postId: normalizedTargetPostId,
-          source: fenceRecovery.source,
-          hadEmptyFence: adminContentHadEmptyFenceForTelemetry(adminContent),
-          recovered: fenceRecovery.recovered,
-        })
-      }
-
-      resolvedPost = {
-        ...post,
-        content: fenceRecovery.content,
-        contentHtml: resolveLoadedPostContentHtml({
-          postContentHtml: post.contentHtml,
-          publicContentHtml,
-          fenceRecovery,
-        }),
-      }
+      const resolvedPost = post
 
       const loadedPostState = resolveLoadedPostState(resolvedPost)
       setPostTitle(loadedPostState.title)
