@@ -207,8 +207,8 @@ test.describe("core smoke public shell", () => {
   expect(logoSource).toContain("blogTitle")
   expect(adminShellSource).not.toContain("useAdminProfile")
   expect(adminPageSource).toContain("initialProfileSnapshot?: AdminProfile | null")
-  expect(adminPageSource).toContain("fetchServerAdminProfile(req")
-  expect(adminPageSource).toContain("resolvePublicAdminProfileSnapshot(req)")
+  expect(adminPageSource).not.toContain("fetchServerAdminProfile")
+  expect(adminPageSource).not.toContain("resolvePublicAdminProfileSnapshot")
   expect(appSource).toContain("initialAdminProfile={initialAdminProfile}")
   expect(appSource).toContain("initialProfileSnapshot?: AdminProfile | null")
   expect(appSource).toContain(

@@ -38,6 +38,10 @@ test.describe("admin bootstrap state contract", () => {
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMeProbe(), true)")
     expect(adminPageSource).toContain("queryClient.setQueryData(queryKey.authMe(), member)")
     expect(adminPageSource).toContain("export const readAdminProtectedBootstrap = async <T>(")
+    expect(adminPageSource).toContain("props: buildAdminPagePropsFromMember(guardResult.member)")
+    expect(adminPageSource).not.toContain("resolveAdminInitialProfileSnapshot")
+    expect(adminPageSource).not.toContain("fetchServerAdminProfile")
+    expect(adminPageSource).not.toContain("resolvePublicAdminProfileSnapshot")
 
     expect(postsSource).toContain('"/post/api/v1/adm/posts/bootstrap"')
     expect(postsSource).toContain("readAdminProtectedBootstrap<AdminPostsBootstrapPayload>(")

@@ -10,10 +10,6 @@ import { normalizeAdminNextPath, toAdminLoginPath } from "src/libs/router"
 import { serverApiFetchJson } from "./backend"
 import { guardAdminRequest } from "./adminGuard"
 import { hasServerAuthCookie } from "./authSession"
-import {
-  fetchServerAdminProfile,
-  resolvePublicAdminProfileSnapshot,
-} from "./adminProfile"
 
 export type AdminPageProps = {
   dehydratedState: DehydratedState
@@ -24,14 +20,6 @@ export type AdminPageProps = {
 type AdminProtectedBootstrapResult<T> =
   | { ok: true; value: T }
   | { ok: false; destination: string | null }
-
-const resolveAdminInitialProfileSnapshot = async (req: IncomingMessage): Promise<AdminProfile> => {
-  return (
-    (await fetchServerAdminProfile(req, {
-      timeoutMs: 900,
-    })) || resolvePublicAdminProfileSnapshot(req).profile
-  )
-}
 
 export const buildAdminPagePropsFromMember = (
   member: AuthMember,
@@ -101,6 +89,6 @@ export const getAdminPageProps = async (
   }
 
   return {
-    props: buildAdminPagePropsFromMember(guardResult.member, await resolveAdminInitialProfileSnapshot(req)),
+    props: buildAdminPagePropsFromMember(guardResult.member),
   }
 }
