@@ -216,7 +216,7 @@ test.describe("core smoke public shell", () => {
   )
   expect(homePageSource).toContain("resolveStaticAdminProfileSeed")
   expect(homePageSource).toContain("initialAdminProfileSource")
-  expect(homePageSource).toContain('initialAdminProfileSource === "static-fallback"')
+  expect(homePageSource).toContain('initialAdminProfileSource === "unavailable"')
   expect(aboutPageSource).toContain("initialAdminProfileSource")
   expect(aboutPageSource).toContain("resolvePublicAdminProfileCacheControl")
   expect(postDetailPageSource).toContain("queryKey.adminProfile()")
@@ -244,7 +244,7 @@ test.describe("core smoke public shell", () => {
   expect(useAdminProfileSource).toContain("staleTimeMs?: number")
 })
 
-  test("post detail adminProfile seed는 published와 fallback source를 구분한다", async () => {
+  test("post detail adminProfile seed는 published와 unavailable source를 구분한다", async () => {
   const publishedProfile = {
     username: "aquila",
     name: "aquila",
@@ -254,21 +254,14 @@ test.describe("core smoke public shell", () => {
     legacyBlogScheme: "light" as const,
   }
 
-  await expect(resolveStaticAdminProfileSeed(async () => publishedProfile)).resolves.toMatchObject({
-    profile: { blogDesign: "legacy", legacyBlogScheme: "light" },
-    source: "published",
-  })
-  await expect(
-    resolveStaticAdminProfileSeed(async () => {
-      throw new Error("admin profile unavailable")
-    })
-  ).resolves.toMatchObject({
-    profile: { blogDesign: "legacy", legacyBlogScheme: "dark" },
-    source: "static-fallback",
-  })
+  const publishedSeed = await resolveStaticAdminProfileSeed(async () => publishedProfile)
+  expect(publishedSeed).toEqual({ profile: publishedProfile, source: "published" })
+  await expect(resolveStaticAdminProfileSeed(async () => {
+    throw new Error("admin profile unavailable")
+  })).resolves.toEqual({ profile: null, source: "unavailable" })
 })
 
-  test("about fallback profile 응답은 public cache로 저장하지 않는다", async ({ page }) => {
+  test("about unavailable profile 응답은 public cache로 저장하지 않는다", async ({ page }) => {
   await page.route("**/member/api/v1/auth/me", async (route) => {
     await route.fulfill({
       status: 401,
@@ -284,14 +277,9 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  const staticFallbackResponse = await page.goto("/about")
-  expect(staticFallbackResponse?.headers()["cache-control"]).toBe("private, no-store")
-  expect(staticFallbackResponse?.headers()["server-timing"]).toContain('desc="static-fallback"')
-
-  await addPublicAboutSnapshotCookie(page)
-  const cookieSnapshotResponse = await page.goto("/about")
-  expect(cookieSnapshotResponse?.headers()["cache-control"]).toBe("private, no-store")
-  expect(cookieSnapshotResponse?.headers()["server-timing"]).toContain('desc="cookie-snapshot"')
+  const unavailableResponse = await page.goto("/about")
+  expect(unavailableResponse?.headers()["cache-control"]).toBe("private, no-store")
+  expect(unavailableResponse?.headers()["server-timing"]).toContain('desc="unavailable"')
 })
 
   test("about 자기소개 문구는 작성 개행을 유지하는 white-space 계약을 가진다", async ({ page }) => {

@@ -56,15 +56,6 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "administrator session identifier",
   }),
   {
-    area: "cookie",
-    key: "admin_profile_snapshot_v1",
-    purpose: "admin-profile-snapshot",
-    required: false,
-    retention: "short-lived SSR snapshot cache",
-    deletion: "snapshot refresh or browser cookie deletion",
-    stores: "public admin profile display snapshot",
-  },
-  {
     area: "localStorage",
     key: "auth.admin.savedEmail.v1",
     purpose: "admin-login-saved-email",

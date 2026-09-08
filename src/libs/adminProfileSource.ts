@@ -1,7 +1,5 @@
-export type StaticAdminProfileSeedSource = "published" | "static-fallback"
-export type PublicAdminProfileSource =
-  | StaticAdminProfileSeedSource
-  | "cookie-snapshot"
+export type PublicAdminProfileSource = "published" | "unavailable"
+export type StaticAdminProfileSeedSource = PublicAdminProfileSource
 
 export const shouldRefetchAdminProfileSource = (
   source?: PublicAdminProfileSource | null
