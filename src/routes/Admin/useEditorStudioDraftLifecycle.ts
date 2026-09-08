@@ -73,10 +73,6 @@ type RsData<T> = {
   msg: string
 }
 
-type LoadPostForEditorOptions = {
-  initialPost?: PostForEditor | null
-}
-
 type EditorFingerprintPayload = {
   title: string
   content: string
@@ -441,29 +437,13 @@ export const useEditorStudioDraftLifecycle = ({
 
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
-    options: LoadPostForEditorOptions = {}
   ) => {
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postOne")
       const normalizedTargetPostId = targetPostId.trim()
-      const initialPost =
-        String(options.initialPost?.id ?? "") === normalizedTargetPostId
-          ? options.initialPost
-          : null
-      let post =
-        initialPost ??
-        (await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`))
-      if (initialPost) {
-        try {
-          const freshPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
-          if ((freshPost.content ?? "").trim().length > 0 || freshPost.contentHtml) {
-            post = freshPost
-          }
-        } catch {
-          // SSR initialPost is still a valid fallback when the client-side refresh fails.
-        }
-      }
+      // 빈 본문도 현재 원문이다. 조회 실패를 과거 SSR 본문으로 대체하지 않는다.
+      const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       let resolvedPost = post
 
       const adminContent = resolvedPost.content ?? ""

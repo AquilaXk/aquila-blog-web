@@ -17,7 +17,6 @@ import {
   clearScheduledForcedEditorExitUrl,
   scheduleForcedEditorExitUrl,
 } from "./editorStudioUnsavedExitGuard"
-import type { PostForEditor } from "./EditorStudioWorkspaceControllerRootModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 
@@ -29,7 +28,6 @@ type UseEditorStudioRoutingParams = {
   router: NextRouter
   authStatus: string
   sessionMember: SessionMember | null
-  initialEditorPost?: PostForEditor | null
   postId: string
   isDedicatedEditorRoute: boolean
   isDedicatedNewEditorRoute: boolean
@@ -47,7 +45,6 @@ type UseEditorStudioRoutingParams = {
   restoreLocalDraft: () => void
   loadPostForEditor: (
     targetPostId?: string,
-    options?: { initialPost?: PostForEditor | null }
   ) => Promise<void>
   handleLoadOrCreateTempPost: (options?: {
     redirectToEditor?: boolean
@@ -63,7 +60,6 @@ export const useEditorStudioRouting = ({
   autoLoadedPostIdRef,
   editorNewRoutePath,
   handleLoadOrCreateTempPost,
-  initialEditorPost,
   isDedicatedEditorRoute,
   isDedicatedNewEditorRoute,
   loadPostForEditor,
@@ -144,11 +140,9 @@ export const useEditorStudioRouting = ({
 
     autoLoadedPostIdRef.current = queryPostId
     setPostId(queryPostId)
-    const initialPost = String(initialEditorPost?.id ?? "") === queryPostId ? initialEditorPost : null
-    void loadPostForEditor(queryPostId, { initialPost })
+    void loadPostForEditor(queryPostId)
   }, [
     autoLoadedPostIdRef,
-    initialEditorPost,
     loadPostForEditor,
     router.isReady,
     router.query.id,

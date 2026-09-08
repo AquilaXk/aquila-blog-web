@@ -769,6 +769,21 @@ test.describe("live Markdown writing surface", () => {
     await expect(page.getByLabel("Summary")).toHaveValue("")
   })
 
+  test("loads the current empty manuscript without restoring public content", async ({ page }) => {
+    const postId = 774
+    await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
+    await routeEditorPost(page, postId, "")
+    let publicReads = 0
+    await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+      publicReads += 1
+      await fulfillJson(route, { content: liveMarkdown, contentHtml: "<p>Old body</p>" })
+    })
+    await page.goto(`/admin/editor/${postId}`)
+    await expect(page.getByPlaceholder("제목을 입력하세요", { exact: true })).toHaveValue("Existing post")
+    await expect.poll(() => readMarkdown(page)).toBe("")
+    expect(publicReads).toBe(0)
+  })
+
   for (const nextSummary of ["Newer manual summary", ""]) {
     test(`preserves newer summary intent after a delayed save: ${nextSummary ? "manual" : "auto"}`, async ({ page }) => {
       const postId = 771

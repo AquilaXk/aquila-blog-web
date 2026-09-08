@@ -105,12 +105,9 @@ type MarkdownEditorChangeMeta = {
   editorFocused: boolean
 }
 
-type EditorStudioWorkspaceControllerProps = AdminPageProps & {
-  initialEditorPost?: PostForEditor | null
-}
+type EditorStudioWorkspaceControllerProps = AdminPageProps
 
 export const EditorStudioWorkspaceController = ({
-  initialEditorPost = null,
   initialMember,
 }: EditorStudioWorkspaceControllerProps) => {
   const router = useRouter()
@@ -733,7 +730,6 @@ export const EditorStudioWorkspaceController = ({
     router,
     authStatus,
     sessionMember,
-    initialEditorPost,
     postId,
     isDedicatedEditorRoute,
     isDedicatedNewEditorRoute,

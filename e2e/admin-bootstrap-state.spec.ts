@@ -123,6 +123,17 @@ test.describe("admin bootstrap state contract", () => {
       "utf8"
     )
 
+    const lifecycleSource = readFileSync(
+      path.resolve(__dirname, "../src/routes/Admin/useEditorStudioDraftLifecycle.ts"), "utf8"
+    )
+    const routingSource = readFileSync(
+      path.resolve(__dirname, "../src/routes/Admin/useEditorStudioRouting.ts"), "utf8"
+    )
+    expect(editorSource).not.toContain("initialEditorPost")
+    expect(editorSource).not.toContain("serverApiFetchJson")
+    expect(routingSource).not.toContain("initialEditorPost")
+    expect(lifecycleSource).not.toContain("initialPost")
+    expect(lifecycleSource).toContain('await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)')
     expect(editorSource).toContain('import { hasServerAuthCookie } from "src/libs/server/authSession"')
     expect(editorSource).toContain('"/member/api/v1/adm/members/bootstrap"')
     expect(editorSource).toContain("if (hasServerAuthCookie(req))")
