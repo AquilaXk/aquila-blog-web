@@ -855,6 +855,7 @@ test.describe("live Markdown writing surface", () => {
 
   test("a delayed temporary-post publish preserves a newer visibility selection", async ({ page }) => {
     const postId = 771
+    const title = "Publish visibility concurrency"
     await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
     await routeEditorPost(page, postId, liveMarkdown, true)
     await page.route("**/api/revalidate", (route) => fulfillJson(route, { revalidated: true }))
@@ -867,11 +868,14 @@ test.describe("live Markdown writing surface", () => {
       pendingWrite = route
     })
     await page.goto(`/admin/editor/${postId}`)
+    // 임시글은 제목을 빈 입력으로 시작하므로 실제 작성처럼 필수 제목을 입력한다.
+    await page.getByPlaceholder("제목을 입력하세요", { exact: true }).fill(title)
     await page.getByRole("button", { name: "발행 설정", exact: true }).click()
     const dialog = page.getByRole("dialog", { name: "새 글 작성", exact: true })
     await dialog.getByRole("button", { name: /전체 공개/ }).click()
     await dialog.getByRole("button", { name: "새 글 작성", exact: true }).click()
     await expect.poll(() => pendingWrite?.request().postDataJSON().published).toBe(true)
+    expect(pendingWrite?.request().postDataJSON().title).toBe(title)
     await dialog.getByRole("button", { name: /비공개/ }).click()
     await fulfillJson(pendingWrite!, {
       resultCode: "200-1", msg: "saved",
