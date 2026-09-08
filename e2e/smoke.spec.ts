@@ -2,10 +2,7 @@ import { expect, test } from "@playwright/test"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import path from "path"
 import { resolveStaticAdminProfileSeed } from "../src/libs/server/postDetailPage"
-import {
-  createPublicAdminProfileSnapshotFixture,
-  mockPublicAdminProfile,
-} from "./helpers/smokeFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 test.describe("core smoke source boundaries", () => {
   test("Markdown renderer pipeline은 facade/component/parser/style module로 분리된다", () => {
@@ -452,16 +449,6 @@ const mockAvatarAsset = async (page: Page) => {
       body: AVATAR_PNG,
     })
   })
-}
-
-const addPublicAboutSnapshotCookie = async (page: Page) => {
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(createPublicAdminProfileSnapshotFixture())),
-      url: "http://127.0.0.1:3000",
-    },
-  ])
 }
 
 const createExplorePost = (overrides: Partial<Record<string, unknown>> & { title: string }) => ({

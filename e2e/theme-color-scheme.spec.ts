@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { readFileSync } from "fs"
 import path from "path"
-import { addPublicAboutSnapshotCookie, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
+import { mockPublicAdminProfile, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
 
 type SchemeCookie = "dark" | "light" | null
 
 const prepareHomeThemePage = async (page: Page, schemeCookie: SchemeCookie = "dark") => {
   await mockAvatarAsset(page)
   await mockFeedEndpoints(page)
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   if (!schemeCookie) return
   await page.context().addCookies([
     {

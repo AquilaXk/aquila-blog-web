@@ -12,8 +12,8 @@ test("admin profile readers share the fail-closed request contract", () => {
     expect(source).toContain("throwOnError: true")
   }
   expect(requestSource).toContain('await import("src/apis/backend/client")')
-  expect(requestSource).toContain("const profile = await apiFetch<AdminProfile>(PUBLIC_ADMIN_PROFILE_PATH)")
-  expect(requestSource).toContain("await persistAdminProfileSnapshotCookie(profile)")
+  expect(requestSource).toContain("return await apiFetch<AdminProfile>(PUBLIC_ADMIN_PROFILE_PATH)")
+  expect(requestSource).not.toContain("persistAdminProfileSnapshotCookie")
   expect(hookSource).not.toContain("return initialProfile ?? null")
   expect(rootLayoutSource).not.toContain("if (!response.ok) return null")
 })

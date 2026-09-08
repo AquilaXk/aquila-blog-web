@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
-import {
-  createPublicAdminProfileSnapshotFixture,
-  mockPublicAdminProfile,
-} from "./helpers/smokeFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 const readSourceFile = (sourcePath: string) => readFileSync(path.resolve(__dirname, "..", sourcePath), "utf8")
 
@@ -126,16 +123,6 @@ const mockAnonymousSession = async (page: Page) => {
       body: JSON.stringify({ resultCode: "401-1", msg: "로그인 후 이용해주세요.", data: null }),
     })
   })
-}
-
-const addPublicAboutSnapshotCookie = async (page: Page) => {
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(createPublicAdminProfileSnapshotFixture())),
-      url: "http://127.0.0.1:3000",
-    },
-  ])
 }
 
 const createExplorePage = (title: string, tag = "모바일테스트") => ({

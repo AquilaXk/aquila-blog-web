@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "fs"
 import path from "path"
 import { resolveStaticAdminProfileSeed } from "../src/libs/server/postDetailPage"
 import {
-  addPublicAboutSnapshotCookie,
   mockAvatarAsset,
   mockFeedEndpoints,
   mockPublicAdminProfile,
@@ -291,7 +290,7 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
   await expect(page.locator('[data-ui="about-hero"] h1')).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
 
@@ -318,7 +317,7 @@ test.describe("core smoke public shell", () => {
     })
   })
 
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
   await page.goto("/about")
 
   await expect(page.getByRole("heading", { level: 1, name: "About Me" })).toHaveCount(0)

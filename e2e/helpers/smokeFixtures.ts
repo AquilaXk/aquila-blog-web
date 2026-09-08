@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test"
 import {
-  createPublicAdminProfileSnapshotFixture,
   PUBLIC_ADMIN_PROFILE_FIXTURE,
   PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "../../tests/fixtures/publicAdminProfileFixture"
@@ -33,17 +32,6 @@ export const mockAvatarAsset = async (page: Page) => {
       body: AVATAR_PNG,
     })
   })
-}
-
-export const addPublicAboutSnapshotCookie = async (page: Page) => {
-  await mockPublicAdminProfile(page)
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(createPublicAdminProfileSnapshotFixture())),
-      url: "http://127.0.0.1:3100",
-    },
-  ])
 }
 
 export const createExplorePost = (overrides: Partial<Record<string, unknown>> & { title: string }) => ({

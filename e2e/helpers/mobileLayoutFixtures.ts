@@ -1,8 +1,5 @@
 import type { Page } from "@playwright/test"
-import {
-  createPublicAdminProfileSnapshotFixture,
-  mockPublicAdminProfile,
-} from "./smokeFixtures"
+import { mockPublicAdminProfile } from "./smokeFixtures"
 
 export const MOBILE_VIEWPORT = { width: 393, height: 852 }
 export const AVATAR_PNG_BASE64 =
@@ -27,17 +24,6 @@ export const mockAnonymousSession = async (page: Page) => {
       body: JSON.stringify({ resultCode: "401-1", msg: "로그인 후 이용해주세요.", data: null }),
     })
   })
-}
-
-export const addPublicAboutSnapshotCookie = async (page: Page) => {
-  await mockPublicAdminProfile(page)
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(createPublicAdminProfileSnapshotFixture())),
-      url: "http://127.0.0.1:3100",
-    },
-  ])
 }
 
 export const createExplorePage = (title: string, tag = "모바일테스트") => ({

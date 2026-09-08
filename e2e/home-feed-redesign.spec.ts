@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 import { readFileSync } from "fs"
 import path from "path"
 import {
-  addPublicAboutSnapshotCookie,
+  mockPublicAdminProfile,
   createPublicAdminProfileSnapshotFixture,
   createExplorePost,
   mockAvatarAsset,
@@ -50,7 +50,7 @@ const createPageResponse = (posts = POSTS) => ({
 
 const mockHomeFeedRedesignEndpoints = async (page: Page, posts = POSTS) => {
   await mockAvatarAsset(page)
-  await addPublicAboutSnapshotCookie(page)
+  await mockPublicAdminProfile(page)
 
   await page.route("**/mock-cover-*.png", async (route) => {
     await route.fulfill({
@@ -96,7 +96,7 @@ const mockHomeFeedRedesignEndpoints = async (page: Page, posts = POSTS) => {
   })
 }
 
-const addEmptyProfileLinksCookie = async (page: Page) => {
+const mockEmptyProfileLinks = async (page: Page) => {
   const profile = {
     ...createPublicAdminProfileSnapshotFixture(),
     contactLinks: [],
@@ -111,13 +111,6 @@ const addEmptyProfileLinksCookie = async (page: Page) => {
     })
   })
 
-  await page.context().addCookies([
-    {
-      name: "admin_profile_snapshot_v1",
-      value: encodeURIComponent(JSON.stringify(profile)),
-      url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000",
-    },
-  ])
 }
 
 test.describe("home feed product redesign", () => {
@@ -243,7 +236,7 @@ test.describe("home feed product redesign", () => {
   test("명시적으로 비운 profile 링크는 홈 intro에 기본 링크로 되살리지 않는다", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await mockHomeFeedRedesignEndpoints(page)
-    await addEmptyProfileLinksCookie(page)
+    await mockEmptyProfileLinks(page)
 
     await page.goto("/")
 

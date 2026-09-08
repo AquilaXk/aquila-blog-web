@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { addPublicAboutSnapshotCookie, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
+import { mockPublicAdminProfile, mockAvatarAsset, mockFeedEndpoints } from "./helpers/smokeFixtures"
 
 const retiredLegalPaths = [
   "/privacy",
@@ -23,7 +23,7 @@ test.describe("retired public legal surface", () => {
 
   test("footer omits legal-policy links", async ({ page }) => {
     await mockAvatarAsset(page)
-    await addPublicAboutSnapshotCookie(page)
+    await mockPublicAdminProfile(page)
     await mockFeedEndpoints(page)
     await page.goto("/", { waitUntil: "domcontentloaded" })
 
