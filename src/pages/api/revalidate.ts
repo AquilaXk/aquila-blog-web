@@ -1,11 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next"
-import { getPosts } from "../../apis"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 
-// Revalidate endpoint (POST only)
-// - token: x-revalidate-token header only, or authenticated admin session
-// - path: JSON body { path: "/target" } (or ?path=... fallback)
+// 정적 페이지 재생성은 토큰 또는 관리자 세션으로 인증한 POST만 허용한다.
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -39,33 +36,20 @@ export default async function handler(
   try {
     await invalidatePublicPostReadCaches()
 
-    let paths: string[] = []
-
-    if (targetPaths.length > 0) {
-      const normalizedPaths = Array.from(
-        new Set(
-          targetPaths.map((path) => (path.startsWith("/") ? path : `/${path}`))
-        )
-      )
-      await Promise.all(normalizedPaths.map((path) => res.revalidate(path)))
-      paths = normalizedPaths
-    } else {
-      const posts = await getPosts()
-      const pathsToRevalidate = new Set<string>(["/"])
-      posts.forEach((row) => {
-        if (row?.id) {
-          pathsToRevalidate.add(`/posts/${row.id}`)
-        }
-      })
-      paths = [...pathsToRevalidate]
-      const revalidateRequests = paths.map((pathName) => res.revalidate(pathName))
-      await Promise.all(revalidateRequests)
-    }
+    const normalizedPaths = Array.from(new Set(
+      (targetPaths.length > 0 ? targetPaths : ["/"])
+        .map((path) => path.startsWith("/") ? path : `/${path}`)
+    ))
+    // 상세는 요청별 SSR이므로 재생성할 정적 산출물이 없다. 피드 무효화는 위에서 유지한다.
+    const dynamicPaths = normalizedPaths.filter((path) => /^\/posts\/[1-9]\d*\/?$/.test(path))
+    const paths = normalizedPaths.filter((path) => !dynamicPaths.includes(path))
+    await Promise.all(paths.map((path) => res.revalidate(path)))
 
     res.json({
-      revalidated: true,
+      revalidated: paths.length > 0,
       count: paths.length,
       paths,
+      dynamicPaths,
     })
   } catch (error) {
     // 실패를 로그로 남기지 않으면 재생성 실패가 stale 응답으로만 나타나 조용히 묻힌다.

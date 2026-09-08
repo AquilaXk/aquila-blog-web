@@ -99,7 +99,7 @@ test("bootstrap reset isolates old and new in-flight cache generations", async (
   expect(fetchCount).toBe(3)
 })
 
-test("detail reset isolates old and new in-flight cache generations", async () => {
+test("detail requests independently check the origin without a reset", async () => {
   const oldResponse = createDeferredResponse()
   const newResponse = createDeferredResponse()
   const finalResponse = createDeferredResponse()
@@ -113,8 +113,8 @@ test("detail reset isolates old and new in-flight cache generations", async () =
   }) as typeof fetch
 
   const oldRequest = getPostDetailById("101")
-  resetPostsRequestCaches()
   const newRequest = getPostDetailById("101")
+  expect(fetchCount).toBe(2)
 
   oldResponse.resolve(jsonResponse(200, createDetail("before reset")))
   await expect(oldRequest).resolves.toMatchObject({ title: "before reset" })
@@ -133,3 +133,19 @@ test("detail 404 remains semantic not-found after reset", async () => {
 
   await expect(getPostDetailById("101")).resolves.toBeNull()
 })
+
+for (const status of [404, 503]) {
+  test(`a subsequent detail read does not reuse a body after origin ${status}`, async () => {
+    let fetchCount = 0
+    globalThis.fetch = (async () => {
+      fetchCount += 1
+      return fetchCount === 1
+        ? jsonResponse(200, createDetail("Formerly public"))
+        : jsonResponse(status, { msg: "unavailable" })
+    }) as typeof fetch
+    await expect(getPostDetailById("101")).resolves.toMatchObject({ title: "Formerly public" })
+    if (status === 404) await expect(getPostDetailById("101")).resolves.toBeNull()
+    else await expect(getPostDetailById("101")).rejects.toBeInstanceOf(ApiError)
+    expect(fetchCount).toBe(2)
+  })
+}

@@ -1,5 +1,6 @@
 import { dehydrate } from "@tanstack/react-query"
-import { GetStaticPathsResult, GetStaticPropsResult } from "next"
+import type { GetServerSidePropsResult } from "next"
+import type { ServerResponse } from "node:http"
 import { getPostDetailById } from "src/apis"
 import { apiFetch } from "src/apis/backend/client"
 import { queryKey } from "src/constants/queryKey"
@@ -21,9 +22,7 @@ type DetailPageProps = {
 
 type FetchStaticAdminProfile = () => Promise<AdminProfile>
 
-const DETAIL_ISR_REVALIDATE_SECONDS = 60 * 60
-const DETAIL_RECOVERY_REVALIDATE_SECONDS = 30
-const IS_QA_STATIC_RECOVERY_MODE = process.env.ENABLE_QA_ROUTES === "true"
+const IS_QA_CLIENT_FETCH_MODE = process.env.ENABLE_QA_ROUTES === "true"
 
 const toSerializableState = (value: unknown): unknown =>
   JSON.parse(
@@ -34,37 +33,21 @@ const fetchPublicAdminProfile: FetchStaticAdminProfile = async () => {
   return await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
 }
 
-export const buildCanonicalPostDetailStaticProps = async (
-  postId: string
-): Promise<GetStaticPropsResult<DetailPageProps>> => {
+export const buildCanonicalPostDetailServerProps = async (
+  postId: string,
+  res: Pick<ServerResponse, "setHeader">,
+): Promise<GetServerSidePropsResult<DetailPageProps>> => {
+  // 상세 본문의 공개 권한은 요청마다 확인하며 HTML/data 응답도 공유 캐시에 남기지 않는다.
+  res.setHeader("Cache-Control", "private, no-store")
   registerServerApiFetchMetrics()
   const queryClient = createQueryClient()
+  // QA에서는 브라우저가 API 응답을 주입한다. 실제 서버 장애를 성공으로 바꾸는 경로가 아니다.
+  const postDetail = IS_QA_CLIENT_FETCH_MODE ? null : await getPostDetailById(postId)
+  if (!IS_QA_CLIENT_FETCH_MODE && !postDetail) return { notFound: true }
   const adminProfileSeed = await resolveStaticAdminProfileSeed(fetchPublicAdminProfile)
   const initialAdminProfile = adminProfileSeed.profile
   const initialAdminProfileSource = adminProfileSeed.source
   queryClient.setQueryData(queryKey.adminProfile(), initialAdminProfile)
-
-  if (IS_QA_STATIC_RECOVERY_MODE) {
-    return {
-      props: {
-        dehydratedState: toSerializableState(dehydrate(queryClient)),
-        initialAdminProfile,
-        initialAdminProfileSource,
-      },
-      revalidate: DETAIL_RECOVERY_REVALIDATE_SECONDS,
-    }
-  }
-
-  let postDetail = null as Awaited<ReturnType<typeof getPostDetailById>>
-  let shouldClientRecover = false
-  try {
-    postDetail = await getPostDetailById(postId)
-  } catch {
-    // ISR 생성 시점의 일시 장애는 기존 정적 결과를 유지하고, 첫 생성에서는 클라이언트 1회 복구 fetch를 허용한다.
-    shouldClientRecover = true
-  }
-  const shouldServeClientRecoveryShell = shouldClientRecover || (IS_QA_STATIC_RECOVERY_MODE && !postDetail)
-  if (!postDetail && !shouldServeClientRecoveryShell) return { notFound: true }
 
   if (postDetail) {
     queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
@@ -75,24 +58,5 @@ export const buildCanonicalPostDetailStaticProps = async (
       initialAdminProfile,
       initialAdminProfileSource,
     },
-    revalidate:
-      shouldServeClientRecoveryShell || initialAdminProfileSource === "static-fallback"
-        ? DETAIL_RECOVERY_REVALIDATE_SECONDS
-        : DETAIL_ISR_REVALIDATE_SECONDS,
-  }
-}
-
-export const buildCanonicalPostDetailStaticPaths = async (): Promise<GetStaticPathsResult> => {
-  registerServerApiFetchMetrics()
-  if (IS_QA_STATIC_RECOVERY_MODE) {
-    return {
-      paths: [],
-      fallback: "blocking",
-    }
-  }
-
-  return {
-    paths: [],
-    fallback: "blocking",
   }
 }
