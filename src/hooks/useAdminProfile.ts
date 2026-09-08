@@ -1,38 +1,9 @@
 import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { ProfileCardLinkItem } from "src/constants/profileCardLinks"
 import { queryKey } from "src/constants/queryKey"
-import { normalizeBlogDesign, normalizeLegacyBlogScheme } from "src/libs/profileWorkspace"
-import type { AboutProjectBlock, AboutSectionBlock } from "src/libs/profileWorkspace"
 import { fetchPublicAdminProfile } from "src/libs/publicAdminProfileClient"
-import type { BlogDesignType, LegacyBlogScheme } from "src/types"
 import type { AdminProfile } from "src/types/adminProfile"
 
 export type { AdminProfile } from "src/types/adminProfile"
-
-type AdminProfileLike = {
-  username: string
-  name?: string
-  nickname?: string
-  modifiedAt?: string
-  profileImageUrl?: string
-  profileImageDirectUrl?: string
-  profileRole?: string
-  profileBio?: string
-  aboutHeadline?: string
-  aboutRole?: string
-  aboutBio?: string
-  aboutDetails?: string
-  aboutSections?: AboutSectionBlock[]
-  aboutProjectSectionTitle?: string
-  aboutProjects?: AboutProjectBlock[]
-  blogTitle?: string
-  homeIntroTitle?: string
-  homeIntroDescription?: string
-  blogDesign?: BlogDesignType
-  legacyBlogScheme?: LegacyBlogScheme
-  serviceLinks?: ProfileCardLinkItem[]
-  contactLinks?: ProfileCardLinkItem[]
-}
 
 type UseAdminProfileOptions = {
   enabled?: boolean
@@ -40,33 +11,19 @@ type UseAdminProfileOptions = {
   staleTimeMs?: number
 }
 
-export const toAdminProfile = (value: AdminProfileLike): AdminProfile => ({
-  username: value.username,
-  name: value.name || value.nickname || value.username,
-  nickname: value.nickname || value.name || value.username,
-  modifiedAt: value.modifiedAt,
-  profileImageUrl: value.profileImageUrl || "",
-  profileImageDirectUrl: value.profileImageDirectUrl,
-  profileRole: value.profileRole,
-  profileBio: value.profileBio,
-  aboutHeadline: value.aboutHeadline,
-  aboutRole: value.aboutRole,
-  aboutBio: value.aboutBio,
-  aboutDetails: value.aboutDetails,
-  aboutSections: value.aboutSections || [],
-  aboutProjectSectionTitle: value.aboutProjectSectionTitle,
-  aboutProjects: value.aboutProjects || [],
-  blogTitle: value.blogTitle,
-  homeIntroTitle: value.homeIntroTitle,
-  homeIntroDescription: value.homeIntroDescription,
-  blogDesign: normalizeBlogDesign(value.blogDesign),
-  legacyBlogScheme: normalizeLegacyBlogScheme(value.legacyBlogScheme),
-  serviceLinks: value.serviceLinks || [],
-  contactLinks: value.contactLinks || [],
-})
-
 export const setAdminProfileCache = (queryClient: QueryClient, profile: AdminProfile | null) => {
   queryClient.setQueryData(queryKey.adminProfile(), profile)
+}
+
+export const refreshAdminProfileCache = async (queryClient: QueryClient): Promise<boolean> => {
+  setAdminProfileCache(queryClient, null)
+  try {
+    setAdminProfileCache(queryClient, await fetchPublicAdminProfile())
+    return true
+  } catch {
+    // 갱신 실패 시 이전 프로필이나 세션 데이터로 공개본을 복원하지 않는다.
+    return false
+  }
 }
 
 export const useAdminProfile = (initialProfile: AdminProfile | null = null, options: UseAdminProfileOptions = {}) => {
@@ -75,7 +32,7 @@ export const useAdminProfile = (initialProfile: AdminProfile | null = null, opti
   const queryClient = useQueryClient()
   const cacheKey = queryKey.adminProfile()
   const cachedProfile = queryClient.getQueryData<AdminProfile | null>(cacheKey)
-  const seededProfile = cachedProfile ?? initialProfile
+  const seededProfile = cachedProfile === undefined ? initialProfile : cachedProfile
   const hasSeedProfile = seededProfile != null
 
   const query = useQuery<AdminProfile | null>({
@@ -90,5 +47,5 @@ export const useAdminProfile = (initialProfile: AdminProfile | null = null, opti
     refetchOnMount: canFetch && (options.refetchOnMount ?? !hasSeedProfile),
   })
 
-  return query.data ?? initialProfile
+  return query.data === undefined ? initialProfile : query.data
 }

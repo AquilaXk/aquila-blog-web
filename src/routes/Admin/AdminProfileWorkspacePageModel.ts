@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import useAuthSession from "src/hooks/useAuthSession"
-import { setAdminProfileCache, toAdminProfile } from "src/hooks/useAdminProfile"
+import { setAdminProfileCache, refreshAdminProfileCache, type AdminProfile } from "src/hooks/useAdminProfile"
 import { setProfileWorkspaceCache, useProfileWorkspace } from "src/hooks/useProfileWorkspace"
 import {
-  buildProfileWorkspaceAdminProfileCacheFields,
   normalizeProfileWorkspaceContent,
   ProfileWorkspaceContent,
   ProfileWorkspaceResponse,
@@ -104,21 +103,6 @@ export const useAdminProfileWorkspacePageModel = ({
   })
 
 
-  const syncPublishedAdminProfileCache = useCallback(
-    (content: ProfileWorkspaceContent) => {
-      const owner = sessionMember || initialMember
-      setAdminProfileCache(
-        queryClient,
-        toAdminProfile({
-          username: owner.username,
-          name: owner.nickname || owner.username,
-          nickname: owner.nickname || owner.username,
-          ...buildProfileWorkspaceAdminProfileCacheFields(content),
-        })
-      )
-    },
-    [initialMember, queryClient, sessionMember]
-  )
 
   const applyWorkspaceState = useCallback(
     (workspace: ProfileWorkspaceResponse) => {
@@ -310,13 +294,13 @@ export const useAdminProfileWorkspacePageModel = ({
   const persistDisplayName = useCallback(
     async (memberId: number, nickname: string) => {
       const updatedMember = await saveProfileCardWithConflictRetry(() =>
-        apiFetch<AuthMember>(`/member/api/v1/adm/members/${memberId}/nickname`, {
+        apiFetch<AuthMember & AdminProfile>(`/member/api/v1/adm/members/${memberId}/nickname`, {
           method: "PATCH",
           body: JSON.stringify({ nickname }),
         })
       )
       setMe(updatedMember)
-      setAdminProfileCache(queryClient, toAdminProfile(updatedMember))
+      setAdminProfileCache(queryClient, updatedMember)
       return updatedMember
     },
     [queryClient, setMe]
@@ -492,8 +476,9 @@ export const useAdminProfileWorkspacePageModel = ({
           }
         )
         applyWorkspaceState(nextWorkspace)
-        syncPublishedAdminProfileCache(normalizeProfileWorkspaceContent(nextWorkspace.published))
-        const publicCacheRevalidated = await revalidatePublicBlogAppearance()
+        const profileRefreshed = await refreshAdminProfileCache(queryClient)
+        const appearanceRevalidated = await revalidatePublicBlogAppearance()
+        const publicCacheRevalidated = profileRefreshed && appearanceRevalidated
         setPreviewMode("published")
         setWorkspaceNotice({
           tone: publicCacheRevalidated ? "success" : "error",
@@ -523,7 +508,7 @@ export const useAdminProfileWorkspacePageModel = ({
     persistDisplayName,
     saveWorkspaceDraft,
     sessionMember?.id,
-    syncPublishedAdminProfileCache,
+    queryClient,
     validateDraftBeforePersistence,
   ])
 
@@ -533,6 +518,6 @@ export const useAdminProfileWorkspacePageModel = ({
   }, [linkTab])
 
   if (!sessionMember) return null
-  const profileWorkspaceSectionProps = { initialMember, router, queryClient, sessionMember, workspaceQuery, activeSection, setActiveSection, linkTab, setLinkTab, previewMode, setPreviewMode, isPreviewExpanded, setIsPreviewExpanded, draggingLinkIndex, setDraggingLinkIndex, dragOverLinkIndex, setDragOverLinkIndex, dragOverLinkPosition, setDragOverLinkPosition, openIconPicker, setOpenIconPicker, loadingKey, setLoadingKey, workspaceNotice, setWorkspaceNotice, imageNotice, setImageNotice, displayNameInput, setDisplayNameInput, remoteDraft, setRemoteDraft, publishedSnapshot, setPublishedSnapshot, draft, setDraft, profileImageFileName, setProfileImageFileName, isProfileImageEditorOpen, setIsProfileImageEditorOpen, profileImageDraftFile, setProfileImageDraftFile, profileImageDraftPreviewUrl, setProfileImageDraftPreviewUrl, profileImageDraftFocusX, setProfileImageDraftFocusX, profileImageDraftFocusY, setProfileImageDraftFocusY, profileImageDraftZoom, setProfileImageDraftZoom, profileImageDraftSourceSize, setProfileImageDraftSourceSize, profileImageDraftNotice, setProfileImageDraftNotice, profileImageDraftFrameRef, profileImageFileInputRef, profileImageDraftFileSeqRef, previousProfileImages, syncPublishedAdminProfileCache, applyWorkspaceState, hasWorkspaceUnsavedChanges, hasDisplayNameDirty, hasUnsavedChanges, hasPublishedDiff, sectionStateMap, refreshWorkspace, persistDisplayName, validateDraftBeforePersistence, buildDraftPayload, saveWorkspaceDraft, updateDraft, updateLinkItem, appendLinkItem, removeLinkItem, moveLinkItem, reorderLinkItems, updateAboutSection, addAboutSection, removeAboutSection, moveAboutSection, addAboutItem, removeAboutItem, moveAboutItem, updateAboutProject, addAboutProject, removeAboutProject, moveAboutProject, applyProfileImageDraftPreviewStyle, normalizeProfileImageDraftTransform, computeAnchoredZoomTransform, computeDraggedProfileImageTransform, commitProfileImageDraftTransform, finalizeProfileImageDraftPointer, handleProfileImageDraftPointerDown, handleProfileImageDraftPointerMove, handleDeletePreviousProfileImage, handleSelectPreviousProfileImage, isProfileImageDraftDragging, resetProfileImageDraftInteractions, scheduleProfileImageDraftTransform, profileImageDraftTransformRef, clearProfileImageDraft, handleDraftFileChange, handleUploadMemberProfileImage, handleApplyProfileImageDraft, handleSaveDraft, handlePublish }
+  const profileWorkspaceSectionProps = { initialMember, router, queryClient, sessionMember, workspaceQuery, activeSection, setActiveSection, linkTab, setLinkTab, previewMode, setPreviewMode, isPreviewExpanded, setIsPreviewExpanded, draggingLinkIndex, setDraggingLinkIndex, dragOverLinkIndex, setDragOverLinkIndex, dragOverLinkPosition, setDragOverLinkPosition, openIconPicker, setOpenIconPicker, loadingKey, setLoadingKey, workspaceNotice, setWorkspaceNotice, imageNotice, setImageNotice, displayNameInput, setDisplayNameInput, remoteDraft, setRemoteDraft, publishedSnapshot, setPublishedSnapshot, draft, setDraft, profileImageFileName, setProfileImageFileName, isProfileImageEditorOpen, setIsProfileImageEditorOpen, profileImageDraftFile, setProfileImageDraftFile, profileImageDraftPreviewUrl, setProfileImageDraftPreviewUrl, profileImageDraftFocusX, setProfileImageDraftFocusX, profileImageDraftFocusY, setProfileImageDraftFocusY, profileImageDraftZoom, setProfileImageDraftZoom, profileImageDraftSourceSize, setProfileImageDraftSourceSize, profileImageDraftNotice, setProfileImageDraftNotice, profileImageDraftFrameRef, profileImageFileInputRef, profileImageDraftFileSeqRef, previousProfileImages, applyWorkspaceState, hasWorkspaceUnsavedChanges, hasDisplayNameDirty, hasUnsavedChanges, hasPublishedDiff, sectionStateMap, refreshWorkspace, persistDisplayName, validateDraftBeforePersistence, buildDraftPayload, saveWorkspaceDraft, updateDraft, updateLinkItem, appendLinkItem, removeLinkItem, moveLinkItem, reorderLinkItems, updateAboutSection, addAboutSection, removeAboutSection, moveAboutSection, addAboutItem, removeAboutItem, moveAboutItem, updateAboutProject, addAboutProject, removeAboutProject, moveAboutProject, applyProfileImageDraftPreviewStyle, normalizeProfileImageDraftTransform, computeAnchoredZoomTransform, computeDraggedProfileImageTransform, commitProfileImageDraftTransform, finalizeProfileImageDraftPointer, handleProfileImageDraftPointerDown, handleProfileImageDraftPointerMove, handleDeletePreviousProfileImage, handleSelectPreviousProfileImage, isProfileImageDraftDragging, resetProfileImageDraftInteractions, scheduleProfileImageDraftTransform, profileImageDraftTransformRef, clearProfileImageDraft, handleDraftFileChange, handleUploadMemberProfileImage, handleApplyProfileImageDraft, handleSaveDraft, handlePublish }
   return profileWorkspaceSectionProps
 }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
-import { buildProfileWorkspaceAdminProfileCacheFields, normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
+import { normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
 
 test.describe("admin profile state contract", () => {
   test("프로필 이미지는 hydration 시점에 이미 완료된 실패도 기본 이미지로 전환한다", async ({
@@ -337,66 +337,19 @@ test.describe("admin profile state contract", () => {
     )
     const aboutSource = readFileSync(path.resolve(__dirname, "../src/pages/about.tsx"), "utf8")
 
-    expect(profileSource).toContain("syncPublishedAdminProfileCache(normalizeProfileWorkspaceContent(nextWorkspace.published))")
-    expect(profileSource).toContain("...buildProfileWorkspaceAdminProfileCacheFields(content)")
+    expect(profileSource).toContain("await refreshAdminProfileCache(queryClient)")
+    expect(profileSource).not.toContain("buildProfileWorkspaceAdminProfileCacheFields")
     expect(profileSource).not.toContain("buildLegacyAboutDetails")
     expect(profileSource).not.toContain("aboutDetails:")
-    expect(aboutSource).toContain("const displayHeadline = adminProfile?.aboutHeadline || DEFAULT_ABOUT_HEADLINE")
-    expect(aboutSource).toContain("const displayRole = adminProfile?.aboutRole || CONFIG.profile.role")
-    expect(aboutSource).toContain("const displayBio = adminProfile?.aboutBio || CONFIG.profile.bio")
-    expect(aboutSource).toContain("adminProfile?.aboutSections && adminProfile.aboutSections.length > 0")
-    expect(aboutSource).toContain("adminProfile?.aboutProjects && adminProfile.aboutProjects.length > 0")
+    expect(aboutSource).toContain("const displayHeadline = adminProfile.aboutHeadline || \"\"")
+    expect(aboutSource).toContain("const displayRole = adminProfile.aboutRole || \"\"")
+    expect(aboutSource).toContain("const displayBio = adminProfile.aboutBio || \"\"")
+    expect(aboutSource).toContain("(adminProfile.aboutSections || [])")
+    expect(aboutSource).toContain("(adminProfile.aboutProjects || [])")
     expect(aboutSource).not.toContain("PROJECT_PRESETS")
     expect(aboutSource).not.toContain("대표 글 보기")
   })
 
-  test("profile workspace legacy cache bridge는 structured about 필드와 aboutDetails를 함께 만든다", () => {
-    const bridge = buildProfileWorkspaceAdminProfileCacheFields({
-      profileImageUrl: "/profile.png",
-      profileRole: "Backend",
-      profileBio: "운영 가능한 시스템을 설계합니다.",
-      aboutHeadline: "이유를 먼저 따집니다.",
-      aboutRole: "Full-stack",
-      aboutBio: "문제와 운영을 같이 봅니다.",
-      aboutSections: [
-        {
-          id: "career",
-          title: "경력",
-          items: ["2026.03 Aquila Blog 운영"],
-          dividerBefore: false,
-        },
-      ],
-      aboutProjectSectionTitle: "프로젝트",
-      aboutProjects: [
-        {
-          id: "blog",
-          name: "aquila-blog",
-          summary: "관리자에서 직접 수정하는 프로젝트",
-          role: "Full-stack",
-          href: "https://github.com/AquilaXk/aquila-blog",
-          linkLabel: "GitHub",
-        },
-      ],
-      blogTitle: "AquilaLog",
-      homeIntroTitle: "비밀스러운 IT 공작소",
-      homeIntroDescription: "비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다",
-      blogDesign: "grid" as never,
-      legacyBlogScheme: "light",
-      serviceLinks: [],
-      contactLinks: [],
-    })
-
-    expect(bridge.profileImageUrl).toBe("/profile.png")
-    expect(bridge.profileImageDirectUrl).toBe("/profile.png")
-    expect(bridge.aboutHeadline).toBe("이유를 먼저 따집니다.")
-    expect(bridge.aboutSections.map((section) => section.title)).toEqual(["경력"])
-    expect(bridge.aboutProjectSectionTitle).toBe("프로젝트")
-    expect(bridge.aboutProjects.map((project) => project.name)).toEqual(["aquila-blog"])
-    expect(bridge.blogDesign).toBe("legacy")
-    expect(bridge.legacyBlogScheme).toBe("light")
-    expect(bridge.aboutDetails).toContain("## 경력")
-    expect(bridge.aboutDetails).toContain("- 2026.03 Aquila Blog 운영")
-  })
 
   test("profile workspace 정규화는 전역 블로그 디자인 fallback을 고정한다", () => {
     const normalized = normalizeProfileWorkspaceContent({

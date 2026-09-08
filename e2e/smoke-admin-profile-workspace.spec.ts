@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 for (const status of [200, 503]) {
   test(`missing canonical workspace is not editable (HTTP ${status})`, async ({ page }) => {
+    await mockPublicAdminProfile(page)
     await page.route("**/member/api/v1/auth/me", (route) => route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ id: 1, username: "owner", nickname: "Owner", isAdmin: true }),
