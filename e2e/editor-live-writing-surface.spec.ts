@@ -830,6 +830,38 @@ test.describe("live Markdown writing surface", () => {
     await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
   })
 
+  test("a failed public refresh does not report a committed update as a failed save", async ({ page }) => {
+    const postId = 771
+    let writes = 0
+    await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)
+    await routeEditorPost(page, postId, liveMarkdown)
+    await page.route("**/api/revalidate", (route) =>
+      route.fulfill({ status: 500, body: "refresh unavailable" }))
+    await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback()
+        return
+      }
+      writes += 1
+      await fulfillJson(route, {
+        resultCode: "200-1", msg: "saved",
+        data: { id: postId, version: 2, summary: "Saved summary", summarySource: "MANUAL" },
+      })
+    })
+    await page.goto(`/admin/editor/${postId}`)
+    await page.getByLabel(/^Summary/).fill("Saved summary")
+    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
+    await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText(
+      "저장은 완료됐지만 공개 화면 갱신에 실패했습니다. 다시 저장할 필요는 없습니다.",
+      { exact: true }
+    )).toBeVisible()
+    await expect(page.getByLabel(/^Summary/)).toHaveValue("Saved summary")
+    expect(writes).toBe(1)
+  })
+
   test("an unchanged canonical post exits without an unsaved-changes dialog", async ({ page }) => {
     const postId = 771
     await routeAuthenticatedEditor(page)

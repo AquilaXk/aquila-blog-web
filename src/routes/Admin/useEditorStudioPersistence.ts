@@ -23,6 +23,7 @@ import {
   type SummaryIntent,
 } from "./EditorStudioWorkspaceControllerRootModel"
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
+import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
@@ -417,7 +418,6 @@ export const useEditorStudioPersistence = ({
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       lastWriteFingerprintRef.current = ""
       lastWriteIdempotencyKeyRef.current = ""
-      await refreshPublicPostReadViews(createWritePostId.postId)
 
       const visibilityText =
         postVisibility === "PUBLIC_LISTED"
@@ -438,10 +438,10 @@ export const useEditorStudioPersistence = ({
       setLocalDraftSlotLabel("")
 
       setPublishStatus(
-        {
-          tone: "success",
-          text: `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`,
-        },
+        await resolvePostSaveRefresh(
+          () => refreshPublicPostReadViews(createWritePostId.postId),
+          `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`
+        ),
         "page"
       )
       setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
@@ -549,7 +549,6 @@ export const useEditorStudioPersistence = ({
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      await refreshPublicPostReadViews(postId)
       removeLocalDraft({ kind: "post", postId: postId.trim() })
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
@@ -560,7 +559,10 @@ export const useEditorStudioPersistence = ({
       })
       setLocalDraftSavedAt("")
       setLocalDraftSlotLabel("")
-      setPublishStatus({ tone: "success", text: `수정 완료: ${response.msg}` }, "page")
+      setPublishStatus(await resolvePostSaveRefresh(
+        () => refreshPublicPostReadViews(postId),
+        `수정 완료: ${response.msg}`
+      ), "page")
       setResult(pretty(response))
       return true
     } catch (error) {
@@ -661,8 +663,7 @@ export const useEditorStudioPersistence = ({
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      await refreshPublicPostReadViews(postId)
-      // Temp posts autosave into the post slot; do not wipe an unrelated create-slot draft.
+      // 임시글은 post 슬롯에 저장되므로 관계없는 create 초안은 지우지 않는다.
       removeLocalDraft({ kind: "post", postId: postId.trim() })
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
@@ -673,7 +674,10 @@ export const useEditorStudioPersistence = ({
       })
       setLocalDraftSavedAt("")
       setLocalDraftSlotLabel("")
-      setPublishStatus({ tone: "success", text: "새 글 작성이 완료되었습니다." }, "page")
+      setPublishStatus(await resolvePostSaveRefresh(
+        () => refreshPublicPostReadViews(postId),
+        "새 글 작성이 완료되었습니다."
+      ), "page")
       setResult(pretty(response))
       return true
     } catch (error) {
