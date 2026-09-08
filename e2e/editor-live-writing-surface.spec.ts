@@ -830,6 +830,29 @@ test.describe("live Markdown writing surface", () => {
     await expect(page.getByTestId("markdown-editor-live-surface")).toBeVisible()
   })
 
+  test("blocked browser draft storage leaves the manuscript editable and reports failure", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "", "Storage failure", false)
+    await page.addInitScript(() => {
+      const setItem = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key, value) {
+        if (key.startsWith("admin.editor.localDraft.")) {
+          throw new DOMException("Storage unavailable", "QuotaExceededError")
+        }
+        return setItem.call(this, key, value)
+      }
+    })
+    await page.goto("/admin/editor/new?source=local-draft")
+    const manuscript = "원고는 저장소 오류가 나도 편집기에 남아 있어야 합니다."
+    await page.locator("#post-title").fill("Storage failure")
+    await fillMarkdown(page, manuscript)
+    await expect(page.getByText(
+      "브라우저 임시저장에 실패했습니다. 현재 원고를 복사하거나 서버에 저장한 뒤 페이지를 닫아주세요.",
+      { exact: true }
+    )).toBeVisible()
+    await expect.poll(() => readMarkdown(page)).toBe(manuscript)
+    await expect(editorContent(page)).toBeEditable()
+  })
+
   test("a delayed temporary-post publish preserves a newer visibility selection", async ({ page }) => {
     const postId = 771
     await routeAuthenticatedEditor(page, liveMarkdown, "Existing post", false)

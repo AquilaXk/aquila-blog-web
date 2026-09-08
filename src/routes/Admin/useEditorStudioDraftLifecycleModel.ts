@@ -524,7 +524,18 @@ export const useEditorStudioLocalDraftLifecycle = ({
       postVersion: resolvedPostVersion,
     }
 
-    persistLocalDraft(payload)
+    try {
+      persistLocalDraft(payload)
+    } catch {
+      // 실패한 원고를 저장 완료로 표시하거나 fingerprint를 갱신하지 않는다.
+      setLocalDraftSavedAt("")
+      setLocalDraftSlotLabel("")
+      setPublishStatus({
+        tone: "error",
+        text: "브라우저 임시저장에 실패했습니다. 현재 원고를 복사하거나 서버에 저장한 뒤 페이지를 닫아주세요.",
+      }, "page")
+      return
+    }
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
     setLocalDraftCandidate({ source, fingerprint: currentLocalDraftFingerprint })
     setLocalDraftSavedAt(payload.savedAt)
