@@ -40,7 +40,6 @@ import { useEditorStudioThumbnailControls } from "./useEditorStudioThumbnailCont
 import { useEditorStudioThumbnailPreview } from "./useEditorStudioThumbnailPreview"
 import { useEditorStudioMetaCatalog } from "./useEditorStudioMetaCatalog"
 import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFlow"
-import { useEditorStudioProfileCommands } from "./useEditorStudioProfileCommands"
 import { useEditorStudioUtilityCommands } from "./useEditorStudioUtilityCommands"
 import { useEditorStudioWorkspaceControllerRuntime } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioWorkspaceControllerRootView } from "./EditorStudioWorkspaceControllerRootView"
@@ -315,34 +314,6 @@ export const EditorStudioWorkspaceController = ({
     setPublishModalNotice,
     setPublishNotice,
     setResult,
-  })
-
-  const {
-    applyProfileState,
-    handleProfileImageSelected,
-    handleRefreshAdminProfile,
-    handleUpdateMemberProfileCard,
-    member,
-    profileBioInput,
-    profileImageFileInputRef,
-    profileImageFileName,
-    profileImageNotice,
-    profileImgInputUrl,
-    profileNotice,
-    profileRoleInput,
-    setProfileBioInput,
-    setProfileNotice,
-    setProfileRoleInput,
-  } = useEditorStudioProfileCommands({
-    initialMember,
-    pretty,
-    queryClient,
-    run,
-    sessionMember,
-    setLoadingKey,
-    setMe,
-    setResult,
-    uploadWithConflictRetry,
   })
 
   const {
@@ -797,15 +768,8 @@ export const EditorStudioWorkspaceController = ({
     if (hydratedAdminIdRef.current === sessionMember.id) return
 
     hydratedAdminIdRef.current = sessionMember.id
-    // auth/me 응답에는 관리자 프로필 카드 필드가 포함되어 있으므로,
-    // 관리자 상세 재조회가 끝날 때까지 패널을 비워두지 않고 즉시 화면을 채운다.
-    applyProfileState(sessionMember)
-    setProfileNotice({
-      tone: "idle",
-      text: "현재 로그인 세션의 관리자 프로필 값을 불러왔습니다. 필요하면 아래 버튼으로 저장값을 다시 조회할 수 있습니다.",
-    })
     void refreshEditorMetaCatalog()
-  }, [applyProfileState, refreshEditorMetaCatalog, sessionMember, setProfileNotice])
+  }, [refreshEditorMetaCatalog, sessionMember])
 
   const {
     closePublishModal,
@@ -861,23 +825,21 @@ export const EditorStudioWorkspaceController = ({
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePostSummaryChange,
         handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
         handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
-        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove, handleProfileImageSelected,
-        handleReadPostCount, handleReadSystemHealth, handleRefreshAdminProfile,
+        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove,
+        handleReadPostCount, handleReadSystemHealth,
         handleSelectedPostIdChange, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange, handleTitleChange,
-        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete, handleUpdateMemberProfileCard,
+        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete,
         hardDeleteDeletedPostFromList, isAllVisiblePostsSelected, isCompactMobileLayout, isComposeAssistOpen, isComposeUtilityOpen,
         isDedicatedEditorRoute, isDedicatedNewEditorRoute, isDirectLoadOpen, isListAdvancedOpen, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen,
         isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
+        loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, metaNotice,
         mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
-        postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,
-        profileImageFileInputRef, profileImageFileName, profileImageNotice, profileImgInputUrl, profileNotice,
-        profileRoleInput, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
+        postThumbnailZoom, postTitle, postVersion, postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
         previewThumbTransformRef, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
         removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, result, safePreviewThumbnail,
         saveLocalDraft,
@@ -887,7 +849,7 @@ export const EditorStudioWorkspaceController = ({
         setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
         setMobileComposeStep,
         setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
-        setProfileBioInput, setProfileRoleInput, setSelectedPostIds, setTagDraft,
+        setSelectedPostIds, setTagDraft,
         softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
         thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
         commitPostCategory, handlePostCategoryChange,

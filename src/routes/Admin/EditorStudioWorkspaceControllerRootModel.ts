@@ -218,7 +218,6 @@ export const PUBLISH_VISIBILITY_OPTIONS: Array<{
   },
 ]
 
-export const SHOW_LEGACY_PROFILE_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_PROFILE_STUDIO === "true"
 export const SHOW_LEGACY_UTILITY_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_UTILITY_STUDIO === "true"
 
 export const pretty = (value: unknown) => JSON.stringify(value, null, 2)

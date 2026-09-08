@@ -91,25 +91,24 @@ test.describe("관리자 런타임 회귀 계약", () => {
 
   test("프로필 이미지 업로드는 CSRF preflight 헤더를 포함한다", () => {
     const profilePersistenceSource = readFrontSource("routes/Admin/AdminProfilePersistenceModel.ts")
-    const legacyProfileSource = readFrontSource("routes/Admin/useEditorStudioProfileCommands.ts")
 
-    expect(profilePersistenceSource).toContain('"X-Aquila-CSRF": "1"')
-    expect(legacyProfileSource).toContain("PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS")
+    expect(profilePersistenceSource).toContain(
+      'export const PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS = { "X-Aquila-CSRF": "1" } as const'
+    )
+    expect(profilePersistenceSource).toContain("headers: PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS")
   })
 
-  test("관리자 프로필 새로고침은 현재 세션을 다시 읽고 실패를 캐시 성공으로 바꾸지 않는다", () => {
-    const profileCommandsSource = readFrontSource("routes/Admin/useEditorStudioProfileCommands.ts")
+  test("레거시 편집기 프로필 스튜디오는 런타임 경계에서 제거된다", () => {
+    const editorRootSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRoot.tsx")
+    const editorViewSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootView.tsx")
+    const editorModelSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts")
 
-    expect(profileCommandsSource).toContain('"/member/api/v1/auth/me"')
-    expect(profileCommandsSource).toContain("const refreshAdminProfile = useCallback(async () =>")
-    expect(profileCommandsSource).toContain("await refreshAdminProfile()")
-    expect(profileCommandsSource).not.toContain("/member/api/v1/adm/members/${memberId}")
-    expect(profileCommandsSource).not.toContain("fallback?: MemberMe")
-    expect(profileCommandsSource).not.toContain("syncProfileState(fallback)")
-    expect(profileCommandsSource).not.toContain("return fallback")
-    expect(profileCommandsSource).not.toContain("refreshAdminProfile(member.id, member)")
-    expect(profileCommandsSource).toContain("현재 저장값을 불러오지 못했습니다: ${message}")
-    expect(profileCommandsSource).toMatch(/setProfileNotice\(\{ tone: "error"[\s\S]*throw error/)
+    expect(existsSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioLegacyProfileSection.tsx"))).toBe(false)
+    expect(existsSync(path.resolve(__dirname, "../src/routes/Admin/useEditorStudioProfileCommands.ts"))).toBe(false)
+    expect(editorRootSource).not.toContain("useEditorStudioProfileCommands")
+    expect(editorViewSource).not.toContain("EditorStudioLegacyProfileSection")
+    expect(editorViewSource).not.toContain("SHOW_LEGACY_PROFILE_STUDIO")
+    expect(editorModelSource).not.toContain("SHOW_LEGACY_PROFILE_STUDIO")
   })
 
   test("프로필 이미지 편집 모달은 과거 이미지 선택과 삭제 동선을 제공한다", () => {

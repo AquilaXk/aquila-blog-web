@@ -5,7 +5,7 @@ import {
   DEFAULT_THUMBNAIL_FOCUS_Y,
   DEFAULT_THUMBNAIL_ZOOM,
 } from "src/libs/thumbnailFocus"
-import { POST_IMAGE_UPLOAD_RULE_LABEL, PROFILE_IMAGE_UPLOAD_RULE_LABEL } from "src/libs/profileImageUpload"
+import { POST_IMAGE_UPLOAD_RULE_LABEL } from "src/libs/profileImageUpload"
 import { WriterEditorHost } from "./WriterEditorHost"
 import {
   handleMarkdownEditorFocusRequestReady,
@@ -13,7 +13,6 @@ import {
 } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
-import { EditorStudioLegacyProfileSection } from "./EditorStudioLegacyProfileSection"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDeleteConfirmDialog } from "./EditorStudioDeleteConfirmDialog"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
@@ -23,7 +22,7 @@ import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGua
 import { buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
 import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
-import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, SHOW_LEGACY_PROFILE_STUDIO, recordEditorCommitDurationForRuntimeGuard } from "./EditorStudioWorkspaceControllerRootModel"
+import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard } from "./EditorStudioWorkspaceControllerRootModel"
 
 type EditorStudioWorkspaceControllerRootViewProps = {
   props: Record<string, any>
@@ -59,15 +58,12 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handlePostSummaryChange,
     handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove,
-    handleProfileImageSelected,
-    handleRefreshAdminProfile,
     handleThumbnailImageFileChange,
     handleThumbnailPaste,
     handleThumbnailUrlModalChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    handleUpdateMemberProfileCard,
     isCompactMobileLayout,
     isDedicatedEditorRoute,
     isDedicatedNewEditorRoute,
@@ -84,7 +80,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     localDraftCandidate,
     localDraftSavedAt,
     localDraftSource,
-    member,
     openPublishModal,
     openThumbnailFileInput,
     postCategory,
@@ -100,13 +95,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     postThumbnailZoom,
     postTitle,
     postVisibility,
-    profileBioInput,
-    profileImageFileInputRef,
-    profileImageFileName,
-    profileImageNotice,
-    profileImgInputUrl,
-    profileNotice,
-    profileRoleInput,
     publishActionType,
     publishModalNotice,
     publishNotice,
@@ -124,8 +112,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     setIsMobileThumbnailEditorOpen,
     setIsPreviewThumbnailError,
     setPostVisibility,
-    setProfileBioInput,
-    setProfileRoleInput,
     setTagDraft,
     studioSurface,
     tagDraft,
@@ -302,16 +288,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       handleExitDedicatedEditor()
     })
   }, [handleExitDedicatedEditor, requestGuardedAction])
-  const profilePreviewSrc = profileImgInputUrl.trim()
-  const profileImageStatus = profilePreviewSrc ? "설정됨" : "기본 이미지 사용 중"
-  const profileRoleStatus = profileRoleInput.trim() || "미설정"
-  const profileBioStatus = profileBioInput.trim() || "미설정"
-  const profileUpdatedText = sessionMember?.modifiedAt
-    ? sessionMember.modifiedAt.slice(0, 16).replace("T", " ")
-    : "확인 전"
-  const profileImageHint = profileImageFileName
-    ? `선택 파일: ${profileImageFileName}`
-    : `${PROFILE_IMAGE_UPLOAD_RULE_LABEL} (선택 즉시 업로드)`
   const publishActionViewModel = derivePublishActionViewModel({
     publishActionType,
     editorMode,
@@ -328,8 +304,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishActionTriggerDisabled,
   } = publishActionViewModel
   const isCompactManageSurface = isCompactMobileLayout && studioSurface === "manage"
-  const displayName = member.nickname || member.username || "관리자"
-  const displayNameInitial = displayName.slice(0, 2).toUpperCase()
   const shouldShowPublishModalNotice = publishModalNotice.tone !== "idle"
   const isCompactSplitPreview = false
   const shouldShowPublishNotice = publishNotice.tone !== "idle"
@@ -561,33 +535,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
 
       <WorkspaceGrid>
         <WorkspaceMain>
-          {SHOW_LEGACY_PROFILE_STUDIO && (
-            <EditorStudioLegacyProfileSection
-              displayName={displayName}
-              displayNameInitial={displayNameInitial}
-              isProfileCardUpdateDisabled={disabled("admMemberProfileCardUpdate")}
-              isProfileImageUploadDisabled={disabled("admMemberProfileImgUpdate")}
-              isProfileImageUploading={loadingKey === "admMemberProfileImgUpdate"}
-              isProfileRefreshDisabled={disabled("admMemberProfileRefresh")}
-              profileBioInput={profileBioInput}
-              profileBioStatus={profileBioStatus}
-              profileImageFileInputRef={profileImageFileInputRef}
-              profileImageHint={profileImageHint}
-              profileImageNotice={profileImageNotice}
-              profileImageStatus={profileImageStatus}
-              profileNotice={profileNotice}
-              profilePreviewSrc={profilePreviewSrc}
-              profileRoleInput={profileRoleInput}
-              profileRoleStatus={profileRoleStatus}
-              profileUpdatedText={profileUpdatedText}
-              onProfileBioChange={setProfileBioInput}
-              onProfileImageSelected={handleProfileImageSelected}
-              onProfileRoleChange={setProfileRoleInput}
-              onRefreshAdminProfile={handleRefreshAdminProfile}
-              onUpdateMemberProfileCard={() => void handleUpdateMemberProfileCard()}
-            />
-          )}
-
         <EditorStudioDeleteConfirmDialog
           state={deleteConfirmState}
           noticeTone={deleteConfirmNotice.tone}
