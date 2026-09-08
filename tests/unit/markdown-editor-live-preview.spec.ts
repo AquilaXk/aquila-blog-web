@@ -8,6 +8,33 @@ import {
 const markdownParser = parser.configure(GFM)
 
 test.describe("markdown editor live preview model", () => {
+  test("renders inactive rules and validated color tokens without rewriting source", () => {
+    const markdown = "Active\n\n---\n\n{{color:#34d399|**green**}}"
+    const tree = markdownParser.parse(markdown)
+    const plan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+    expect(plan).toContainEqual({ kind: "horizontal-rule", from: 8, to: 11 })
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "inline-color", color: "#34d399" }))
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "strong" }))
+    const tokenStart = markdown.indexOf("{{")
+    expect(buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: tokenStart, to: tokenStart }]))
+      .not.toContainEqual(expect.objectContaining({ kind: "inline-color" }))
+    expect(tree.toString()).toContain("HorizontalRule")
+  })
+
+  test("leaves code literals and invalid color tokens intact", () => {
+    const markdown = "Active\n\n`{{color:#34d399|literal}}`\n\n```\n{{color:#34d399|literal}}\n---\n```\n\n{{color:url(evil)|invalid}}"
+    const plan = buildMarkdownLivePreviewPlan(markdown, markdownParser.parse(markdown).topNode, [{ from: 0, to: 0 }])
+    expect(plan).not.toContainEqual(expect.objectContaining({ kind: "inline-color" }))
+    expect(plan).not.toContainEqual(expect.objectContaining({ kind: "horizontal-rule" }))
+  })
+
+  test("renders color wrappers around supported links and inline code", () => {
+    const markdown = "Active\n\n{{color:green|[label](https://example.com)}}\n\n{{color:green|`code`}}"
+    const plan = buildMarkdownLivePreviewPlan(markdown, markdownParser.parse(markdown).topNode, [{ from: 0, to: 0 }])
+    expect(plan.filter(({ kind }) => kind === "inline-color")).toHaveLength(2)
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "link" }))
+    expect(plan).toContainEqual(expect.objectContaining({ kind: "inline-code" }))
+  })
   test("reveals the complete active block while keeping other blocks formatted", () => {
     const markdown = ["# Heading", "", "Paragraph with **bold** text."].join("\n")
     const tree = markdownParser.parse(markdown)

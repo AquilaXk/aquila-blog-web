@@ -329,16 +329,16 @@ test.describe("live Markdown writing surface", () => {
 
     const inspector = page.getByLabel("발행 설정")
     await expect(inspector.getByText("Live writing test", { exact: true })).toHaveCount(0)
-    await expect(inspector.getByText("Visibility", { exact: true })).toBeVisible()
-    await expect(inspector.getByText("Summary", { exact: true })).toBeVisible()
-    await expect(inspector.getByText("Tags", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("공개 범위", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("요약", { exact: true })).toBeVisible()
+    await expect(inspector.getByText("태그", { exact: true })).toBeVisible()
     const summary = inspector.locator("textarea")
-    const summaryCounter = inspector.locator("small")
+    const summaryCounter = inspector.locator("label").filter({ has: page.locator("textarea") }).locator("small")
     const categoryInput = inspector.locator('input[list="editor-category-suggestions"]')
     await categoryInput.fill("backend")
     const categoryClear = inspector.getByRole("button", { name: "카테고리 지우기" })
     const tagSection = inspector.locator("section").filter({
-      has: page.getByText("Tags", { exact: true }),
+      has: page.getByText("태그", { exact: true }),
     })
     const tagChip = tagSection.getByText("markdown", { exact: true })
     const tagInput = tagSection.getByPlaceholder("태그 추가")
@@ -386,6 +386,8 @@ test.describe("live Markdown writing surface", () => {
     const toolbar = page.getByRole("toolbar", { name: "Markdown 작성 도구" })
     await expect(toolbar).toBeVisible()
     await expect(page.getByRole("combobox", { name: "명령 메뉴" })).toHaveCount(0)
+    await expect(page.getByRole("combobox", { name: "표 행" })).toHaveCount(0)
+    await expect(page.getByRole("combobox", { name: "표 열" })).toHaveCount(0)
 
     const headingMenu = page.getByRole("button", { name: "제목 메뉴" })
     await headingMenu.focus()
@@ -413,9 +415,14 @@ test.describe("live Markdown writing surface", () => {
     await page.getByRole("menuitem", { name: "제목 2" }).click()
     await expect.poll(() => readMarkdown(page)).toBe("## Hello")
 
-    await page.getByRole("button", { name: "표 메뉴" }).click()
-    await expect(page.getByRole("menuitem", { name: "표 행 추가" })).toBeDisabled()
+    const tableTrigger = page.getByRole("button", { name: "표" })
+    await tableTrigger.click()
+    const tableDialog = page.getByRole("dialog", { name: "표" })
+    await expect(tableDialog).toBeVisible()
+    await expect(tableDialog.getByRole("combobox", { name: "표 행" })).toBeFocused()
+    await expect(tableDialog.getByRole("button", { name: "표 행 추가" })).toBeDisabled()
     await page.keyboard.press("Escape")
+    await expect(tableTrigger).toBeFocused()
 
     const layout = await toolbar.evaluate((element) => ({
       clientWidth: element.clientWidth,
@@ -452,7 +459,7 @@ test.describe("live Markdown writing surface", () => {
         }))
         .filter((control) => control.height < 36 || control.fontSize < 13)
     )).toEqual([])
-    for (const label of ["제목", "목록", "삽입", "표", "더보기"]) {
+    for (const label of ["제목", "목록", "삽입", "더보기"]) {
       await page.getByRole("button", { name: `${label} 메뉴` }).click()
       const menu = page.getByRole("menu", { name: label })
       const menuBounds = await menu.boundingBox()
@@ -463,6 +470,14 @@ test.describe("live Markdown writing surface", () => {
       )
       await menu.getByRole("menuitem").first().press("Escape")
     }
+    await page.getByRole("button", { name: "표" }).click()
+    const tableDialogBounds = await tableDialog.boundingBox()
+    expect(tableDialogBounds).not.toBeNull()
+    expect(tableDialogBounds!.x).toBeGreaterThanOrEqual(editorBounds!.x)
+    expect(tableDialogBounds!.x + tableDialogBounds!.width).toBeLessThanOrEqual(
+      editorBounds!.x + editorBounds!.width
+    )
+    await page.keyboard.press("Escape")
   })
 
   test("selection reveals source for the active block and formats inactive blocks in place", async ({ page }) => {
@@ -487,6 +502,22 @@ test.describe("live Markdown writing surface", () => {
       "Paragraph with **bold** text.",
     ])
     await expect(page.locator(".cm-live-heading")).toHaveCount(1)
+  })
+
+  test("inactive rules and inline colors render while the selected color token shows its source", async ({ page }) => {
+    const markdown = ["Active", "", "---", "", "{{color:#34d399|**green**}}"].join("\n")
+    await routeAuthenticatedEditor(page, markdown)
+    await openEditorDraft(page)
+
+    await expect(page.locator(".cm-live-horizontal-rule[role=separator]")).toHaveCount(1)
+    const greenText = editorContent(page).getByText("green", { exact: true })
+    await expect(greenText).toBeVisible()
+    await expect(greenText).toHaveCSS("color", "rgb(52, 211, 153)")
+
+    const greenOffset = markdown.indexOf("green")
+    await selectMarkdownRange(page, greenOffset + 1, greenOffset + 1)
+    await expect.poll(() => visibleEditorLines(page)).toContain("{{color:#34d399|**green**}}")
+    await expect.poll(() => readMarkdown(page)).toBe(markdown)
   })
 
   test("outline navigation targets the single surface and preserves heading labels", async ({ page }) => {
@@ -585,9 +616,10 @@ test.describe("live Markdown writing surface", () => {
 
     const oneOffset = table.indexOf("one")
     await selectMarkdownRange(page, oneOffset, oneOffset)
-    await page.getByRole("button", { name: "표 메뉴" }).click()
-    await expect(page.getByRole("menuitem", { name: "표 행 추가", exact: true })).toBeEnabled()
-    await page.getByRole("menuitem", { name: "표 행 추가", exact: true }).click()
+    await page.getByRole("button", { name: "표" }).click()
+    const tableDialog = page.getByRole("dialog", { name: "표" })
+    await expect(tableDialog.getByRole("button", { name: "표 행 추가", exact: true })).toBeEnabled()
+    await tableDialog.getByRole("button", { name: "표 행 추가", exact: true }).click()
     expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
 
     const lines = ["first", "second", "third"].join("\n")
@@ -604,12 +636,22 @@ test.describe("live Markdown writing surface", () => {
     await routeAuthenticatedEditor(page, "")
     await openEditorDraft(page)
 
-    await page.getByRole("button", { name: "표 메뉴" }).click()
-    await page.getByRole("menuitem", { name: /^표 삽입/ }).click()
-    await page.getByRole("button", { name: "표 메뉴" }).click()
-    await expect(page.getByRole("menuitem", { name: "표 행 추가", exact: true })).toBeEnabled()
-    await page.getByRole("menuitem", { name: "표 행 추가", exact: true }).click()
-    expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
+    const tableTrigger = page.getByRole("button", { name: "표" })
+    await tableTrigger.click()
+    const tableDialog = page.getByRole("dialog", { name: "표" })
+    await tableDialog.getByRole("combobox", { name: "표 행" }).selectOption("3")
+    await tableDialog.getByRole("combobox", { name: "표 열" }).selectOption("4")
+    await tableDialog.getByRole("button", { name: "표 삽입 (3×4)" }).click()
+    // 전체 선택을 사용하는 원문 읽기로 삽입 직후의 셀 커서를 바꾸지 않는다.
+    expect((await visibleEditorLines(page)).filter((line) => line.startsWith("|")).length).toBe(4)
+
+    await tableTrigger.click()
+    const reopenedTableDialog = page.getByRole("dialog", { name: "표" })
+    await expect(reopenedTableDialog.getByRole("combobox", { name: "표 행" })).toHaveValue("3")
+    await expect(reopenedTableDialog.getByRole("combobox", { name: "표 열" })).toHaveValue("4")
+    await expect(reopenedTableDialog.getByRole("button", { name: "표 행 추가", exact: true })).toBeEnabled()
+    await reopenedTableDialog.getByRole("button", { name: "표 행 추가", exact: true }).click()
+    expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(5)
   })
 
   test("paired input preserves a selected range and remains undoable", async ({ page }) => {
@@ -878,7 +920,7 @@ test.describe("live Markdown writing surface", () => {
     await openEditorDraft(page)
     await page.locator("#post-title").fill(title)
     await fillMarkdown(page, content)
-    await page.getByLabel("Summary").fill("수동 요약")
+    await page.getByLabel("요약").fill("수동 요약")
     await expect.poll(() => page.evaluate((expectedContent) => {
       const key = Object.keys(localStorage).find((entry) => entry.startsWith("admin.editor.localDraft.create.") && JSON.parse(localStorage.getItem(entry) || "{}").content === expectedContent)
       const raw = key ? window.localStorage.getItem(key) : null
@@ -887,7 +929,7 @@ test.describe("live Markdown writing surface", () => {
       return { summary: draft.summary, summarySource: draft.summarySource }
     }, content)).toEqual({ summary: "수동 요약", summarySource: "MANUAL" })
 
-    await page.getByLabel("Summary").fill("   ")
+    await page.getByLabel("요약").fill("   ")
     await expect.poll(() => page.evaluate((expectedContent) => {
       const key = Object.keys(localStorage).find((entry) => entry.startsWith("admin.editor.localDraft.create.") && JSON.parse(localStorage.getItem(entry) || "{}").content === expectedContent)
       const raw = key ? window.localStorage.getItem(key) : null
@@ -914,7 +956,7 @@ test.describe("live Markdown writing surface", () => {
     await openEditorDraft(page)
     await restoreSelectedLocalDraft(page, content)
     await expect.poll(() => readMarkdown(page)).toBe(content)
-    await expect(page.getByLabel("Summary")).toHaveValue("")
+    await expect(page.getByLabel("요약")).toHaveValue("")
   })
 
   for (const manuscript of ["", "Intro\n\n```ts\n\n```", "Intro\n\n~~~ts title=example.ts\n\n~~~"]) {
@@ -949,7 +991,7 @@ test.describe("live Markdown writing surface", () => {
         pendingWrite = route
       })
       await page.goto(`/admin/editor/${postId}`)
-      const summary = page.getByLabel(/^Summary/)
+      const summary = page.getByLabel(/^요약/)
       await summary.fill("Saved summary")
       await page.getByRole("button", { name: "발행 설정", exact: true }).click()
       const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
@@ -1174,7 +1216,7 @@ test.describe("live Markdown writing surface", () => {
       })
     })
     await page.goto(`/admin/editor/${postId}`)
-    await page.getByLabel(/^Summary/).fill("Saved summary")
+    await page.getByLabel(/^요약/).fill("Saved summary")
     await page.getByRole("button", { name: "발행 설정", exact: true }).click()
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
     await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
@@ -1183,7 +1225,7 @@ test.describe("live Markdown writing surface", () => {
       "저장은 완료됐지만 공개 화면 갱신에 실패했습니다. 다시 저장할 필요는 없습니다.",
       { exact: true }
     )).toBeVisible()
-    await expect(page.getByLabel(/^Summary/)).toHaveValue("Saved summary")
+    await expect(page.getByLabel(/^요약/)).toHaveValue("Saved summary")
     expect(writes).toBe(1)
   })
 

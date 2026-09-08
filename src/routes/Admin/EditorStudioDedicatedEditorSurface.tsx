@@ -226,8 +226,6 @@ export const EditorStudioDedicatedEditorSurface = ({
     ]
   }, [outlineInsights.headings, postTitle])
   const projectRepository = CONFIG.projects?.[0]
-  const hasTitleAndBody = Boolean(postTitle.trim() && postContent.trim())
-  const hasMarkdownBody = Boolean(postContent.trim())
   const linkWarningCount = countMarkdownLinkWarnings(postContent)
   const handleTagDraftChange = (nextValue: string) => {
     const commaSeparated = /[,，]/
@@ -346,9 +344,9 @@ export const EditorStudioDedicatedEditorSurface = ({
         </EditorStudioWritingColumn>
 
         <EditorInspector aria-label="발행 설정">
-          <h3>Publish inspector</h3>
+          <h3>발행 설정</h3>
           <label>
-            <span>Visibility</span>
+            <span>공개 범위</span>
             <select value={postVisibility} onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}>
               {PUBLISH_VISIBILITY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -358,7 +356,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             </select>
           </label>
           <label>
-            <span>Summary</span>
+            <span>요약</span>
             <textarea
               value={postSummary}
               maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
@@ -369,7 +367,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             </small>
           </label>
           <label>
-            <span>Category</span>
+            <span>분류 (선택)</span>
             <EditorInspectorTagInputRow>
               <input
                 list="editor-category-suggestions"
@@ -391,6 +389,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                 <option key={category} value={category} />
               ))}
             </datalist>
+            <small>하나의 글에는 넓은 분류를 하나만 선택하세요. 세부 키워드는 태그로 추가할 수 있습니다.</small>
           </label>
           <LocalDraftRestoreSuggestion
             visible={isLocalDraftRestoreSuggestionVisible}
@@ -404,7 +403,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             onDismiss={onDismissLocalDraftRestoreSuggestion}
           />
           <section>
-            <span>Tags</span>
+            <span>태그</span>
             <EditorTagRow aria-label="발행 태그" $compact>
               {postTags.map((tag) => (
                 <SelectedTagChip key={`inspector-${tag}`}>
@@ -427,23 +426,9 @@ export const EditorStudioDedicatedEditorSurface = ({
               </button>
             </EditorInspectorTagInputRow>
           </section>
-          <section>
-            <span>Quality checks</span>
-            <p>
-              <strong>제목과 본문</strong>
-              <b data-tone={hasTitleAndBody ? "pass" : "warn"}>{hasTitleAndBody ? "PASS" : "WARN"}</b>
-            </p>
-            <p>
-              <strong>Markdown 렌더링</strong>
-              <b data-tone={hasMarkdownBody ? "pass" : "warn"}>{hasMarkdownBody ? "PASS" : "WARN"}</b>
-            </p>
-            <p>
-              <strong>링크 검사</strong>
-              <b data-tone={linkWarningCount === 0 ? "pass" : "warn"}>
-                {linkWarningCount === 0 ? "PASS" : `${linkWarningCount} WARN`}
-              </b>
-            </p>
-          </section>
+          {linkWarningCount > 0 ? (
+            <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
+          ) : null}
         </EditorInspector>
       </EditorStudioFrame>
 

@@ -9,7 +9,6 @@ import {
   EditorToolbar,
   ToolbarGroup,
   ToolbarButton,
-  ToolbarSelect,
   ToolbarHiddenInput,
   ToolbarError,
   LiveEditorBody,
@@ -50,6 +49,7 @@ import {
   type MarkdownEditorLiveSurfaceHandle,
 } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
+import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -484,12 +484,12 @@ export const MarkdownEditor = ({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => applyFormatShortcutOrAppend("link")}
           >
-            Link
+            링크
           </ToolbarButton>
 
           <MarkdownEditorToolbarMenu
             label="제목"
-            triggerLabel="H"
+            triggerLabel="제목"
             disabled={disabled}
             onBeforeOpen={rememberTextareaSelection}
             actions={toolbarMarkdownSnippets
@@ -502,7 +502,7 @@ export const MarkdownEditor = ({
           />
           <MarkdownEditorToolbarMenu
             label="목록"
-            triggerLabel="List"
+            triggerLabel="목록"
             disabled={disabled}
             onBeforeOpen={rememberTextareaSelection}
             actions={toolbarListCommands.map((command) => ({
@@ -513,7 +513,7 @@ export const MarkdownEditor = ({
           />
           <MarkdownEditorToolbarMenu
             label="삽입"
-            triggerLabel="+"
+            triggerLabel="삽입"
             disabled={disabled}
             onBeforeOpen={rememberTextareaSelection}
             actions={[
@@ -543,30 +543,12 @@ export const MarkdownEditor = ({
             ]}
           />
 
-          <ToolbarSelect
-            aria-label="표 행"
-            value={tableRows}
+          <MarkdownEditorTablePopover
+            rows={tableRows}
+            columns={tableColumns}
             disabled={disabled}
-            onChange={(event) => setTableRows(Number(event.currentTarget.value))}
-          >
-            {[2, 3, 4, 5, 6].map((rows) => (
-              <option key={rows} value={rows}>{`${rows}행`}</option>
-            ))}
-          </ToolbarSelect>
-          <ToolbarSelect
-            aria-label="표 열"
-            value={tableColumns}
-            disabled={disabled}
-            onChange={(event) => setTableColumns(Number(event.currentTarget.value))}
-          >
-            {[2, 3, 4, 5, 6].map((columns) => (
-              <option key={columns} value={columns}>{`${columns}열`}</option>
-            ))}
-          </ToolbarSelect>
-          <MarkdownEditorToolbarMenu
-            label="표"
-            triggerLabel="Table"
-            disabled={disabled}
+            onRowsChange={setTableRows}
+            onColumnsChange={setTableColumns}
             onBeforeOpen={rememberTextareaSelection}
             actions={[
               {
