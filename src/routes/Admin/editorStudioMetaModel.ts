@@ -3,7 +3,6 @@ import {
   hasNonCanonicalPostImageSource,
   isCanonicalPostImageUploadUrl,
 } from "src/libs/markdown/postImageUrlPolicy"
-import { convertHtmlToMarkdown as convertHtmlClipboardToMarkdown } from "src/libs/markdown/htmlToMarkdown"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
@@ -16,10 +15,8 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import type { PostVisibility } from "./editorStudioState"
-import { restoreEmptyFencedCodeBlocks } from "./editorCodeFenceRecovery"
 import { dedupeStrings } from "./editorStudioMetaModelHelpers"
 
-export { restoreEmptyFencedCodeBlocks } from "./editorCodeFenceRecovery"
 export { dedupeStrings } from "./editorStudioMetaModelHelpers"
 
 export type ParsedEditorMeta = {
@@ -82,9 +79,6 @@ const LEADING_EDITOR_METADATA_LINE_REGEX =
   /^\s*(tags?|categories?|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*(.+)\s*$/i
 const EDITOR_BODY_PLACEHOLDER = "내용을 입력하세요."
 const EDITOR_TOGGLE_TITLE_PLACEHOLDER = "토글 제목"
-const HTML_TAG_REGEX = /<\/?([a-z][a-z0-9:-]*)\b([^>]*)>/gi
-const HTML_ATTRIBUTE_REGEX = /\s([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>`]+)))?/g
-const HTML_VOID_TAG_NAMES = new Set("area base br col embed hr img input link meta param source track wbr".split(" "))
 export const PREVIEW_SUMMARY_MAX_LENGTH = 150
 export const PREVIEW_SUMMARY_MAX_CONTENT_LENGTH = 50_000
 
@@ -250,118 +244,9 @@ const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
   return inlineMetadataSplit.body.trim().length > 0 ? inlineMetadataSplit.body : parsedBody
 }
 
-const decodeHtmlAttributeValue = (value: string) =>
-  value
-    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(Number.parseInt(code, 16)))
-    .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number.parseInt(code, 10)))
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/\r\n?/g, "\n")
-
-const readHtmlAttributes = (rawAttributes: string) => {
-  const attributes = new Map<string, string>()
-  rawAttributes.replace(HTML_ATTRIBUTE_REGEX, (_match, name, doubleQuoted, singleQuoted, unquoted) => {
-    const key = String(name).toLowerCase()
-    const value = doubleQuoted ?? singleQuoted ?? unquoted ?? ""
-    attributes.set(key, decodeHtmlAttributeValue(String(value)))
-    return _match
-  })
-  return attributes
-}
-
-const resolveCodeLanguageFromHtmlAttributes = (attributes: Map<string, string>) => {
-  const explicitLanguage = (
-    attributes.get("data-language") ||
-    attributes.get("data-prism-language") ||
-    ""
-  ).trim()
-  if (explicitLanguage) return explicitLanguage
-
-  const className = attributes.get("class") || ""
-  return (className.match(/(?:^|\s)language-([a-zA-Z0-9_-]+)/)?.[1] || "").trim()
-}
-
-const backfillLatestRawCodeBlockLanguage = (
-  blocks: Array<{ codeSource: string; language: string }>,
-  codeSource: string,
-  language: string
-) => {
-  if (!language) return
-
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const previousBlock = blocks[index]
-    if (previousBlock.codeSource !== codeSource) continue
-    if (!previousBlock.language) previousBlock.language = language
-    break
-  }
-}
-
-const extractRawCodeFencedBlocksFromHtml = (contentHtml?: string | null) => {
-  if (!contentHtml?.trim()) return ""
-
-  const blocks: Array<{ codeSource: string; language: string }> = []
-  const elementStack: Array<{ rawCodeSource?: string; tagName: string }> = []
-  contentHtml.replace(HTML_TAG_REGEX, (_match, rawTagName, rawAttributes) => {
-    const tagName = String(rawTagName).toLowerCase()
-    if (String(_match).startsWith("</")) {
-      for (let index = elementStack.length - 1; index >= 0; index -= 1) {
-        const current = elementStack.pop()
-        if (current?.tagName === tagName) break
-      }
-      return _match
-    }
-
-    const attributes = readHtmlAttributes(String(rawAttributes))
-    const language = resolveCodeLanguageFromHtmlAttributes(attributes)
-    const codeSource = (
-      attributes.get("data-raw-code") ||
-      attributes.get("data-prism-source") ||
-      ""
-    ).trimEnd()
-    const isSelfClosing = /\/\s*>$/.test(String(_match)) || HTML_VOID_TAG_NAMES.has(tagName)
-    const stackEntry: { rawCodeSource?: string; tagName: string } = { tagName }
-    if (codeSource.trim()) {
-      const hasSameRawCodeAncestor = elementStack.some((entry) => entry.rawCodeSource === codeSource)
-      if (hasSameRawCodeAncestor) {
-        backfillLatestRawCodeBlockLanguage(blocks, codeSource, language)
-      } else {
-        blocks.push({ codeSource, language })
-      }
-      stackEntry.rawCodeSource = codeSource
-    } else if (language) {
-      for (let index = elementStack.length - 1; index >= 0; index -= 1) {
-        const ancestorSource = elementStack[index]?.rawCodeSource
-        if (!ancestorSource) continue
-        backfillLatestRawCodeBlockLanguage(blocks, ancestorSource, language)
-        break
-      }
-    }
-    if (!isSelfClosing) elementStack.push(stackEntry)
-    return _match
-  })
-
-  return blocks
-    .map(({ codeSource, language }) => `\`\`\`${language}\n${codeSource}\n\`\`\``)
-    .join("\n\n")
-}
-
-export const resolveEditorMetaSnapshot = (content: string, contentHtml?: string | null): ResolvedEditorMetaSnapshot => {
+export const resolveEditorMetaSnapshot = (content: string): ResolvedEditorMetaSnapshot => {
   const parsed = parseEditorMeta(content)
-  const normalizedRawContent = content.replace(/\r\n?/g, "\n").trim()
-  const markdownFromHtml = contentHtml?.trim() ? convertHtmlClipboardToMarkdown(contentHtml).trim() : ""
-  const rawCodeMarkdownFromHtml = extractRawCodeFencedBlocksFromHtml(contentHtml)
-  const recoveredCodeMarkdown = [rawCodeMarkdownFromHtml, markdownFromHtml].filter(Boolean).join("\n\n")
-  const htmlFallbackBody = rawCodeMarkdownFromHtml
-    ? restoreEmptyFencedCodeBlocks(markdownFromHtml || rawCodeMarkdownFromHtml, rawCodeMarkdownFromHtml)
-    : markdownFromHtml
-  const restoredParsedBody = parsed.body.trim() && recoveredCodeMarkdown
-    ? restoreEmptyFencedCodeBlocks(parsed.body, recoveredCodeMarkdown)
-    : parsed.body
-  const resolvedBody = restoredParsedBody.trim() || htmlFallbackBody || rawCodeMarkdownFromHtml || normalizedRawContent
+  const resolvedBody = parsed.body
   const parsedThumbnail = normalizeSafeImageUrl(parsed.thumbnail)
   const fallbackThumbnail = normalizeSafeImageUrl(extractFirstMarkdownImage(resolvedBody))
   const syncedThumbnail = stripThumbnailFocusFromUrl(parsedThumbnail || fallbackThumbnail)

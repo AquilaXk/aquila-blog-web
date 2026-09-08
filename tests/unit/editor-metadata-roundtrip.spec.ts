@@ -1,7 +1,16 @@
 import { expect, test } from "@playwright/test"
-import { composeEditorContent, parseEditorMeta } from "../../src/routes/Admin/editorStudioMetaModel"
+import { composeEditorContent, parseEditorMeta, resolveEditorMetaSnapshot } from "../../src/routes/Admin/editorStudioMetaModel"
 
 test.describe("editor metadata body preservation", () => {
+  for (const body of ["", "Intro\n\n```ts\n\n```", "~~~ts title=example.ts\n\n~~~"]) {
+    test(`snapshot preserves canonical body with metadata: ${body || "empty"}`, () => {
+      const saved = composeEditorContent(body, ["typescript"])
+      const snapshot = resolveEditorMetaSnapshot(saved)
+      expect(snapshot.body).toBe(body)
+      expect(snapshot.tags).toEqual(["typescript"])
+      expect(parseEditorMeta(composeEditorContent(snapshot.body, snapshot.tags)).body).toBe(body)
+    })
+  }
   for (const [name, content] of [
     ["ordinary prose between thematic breaks", "---\nThis paragraph is the manuscript.\n---\n\nLast paragraph"],
     ["unknown metadata-like text", "---\nauthor: A writer\n---\n\nLast paragraph"],

@@ -165,8 +165,8 @@ const createHarness = (useRealMetaParser = false) => {
   let lifecycle!: ReturnType<typeof useEditorStudioDraftLifecycle>
   if (useRealMetaParser) {
     params.resolveEditorMetaSnapshot = resolveEditorMetaSnapshot
-    params.syncEditorMeta = (content, _summary, html) => {
-      const snapshot = resolveEditorMetaSnapshot(content, html)
+    params.syncEditorMeta = (content) => {
+      const snapshot = resolveEditorMetaSnapshot(content)
       setPostContent(snapshot.body)
       return snapshot
     }

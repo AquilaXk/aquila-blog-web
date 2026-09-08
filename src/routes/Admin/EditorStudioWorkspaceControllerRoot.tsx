@@ -318,8 +318,8 @@ export const EditorStudioWorkspaceController = ({
     void replaceShallowRoutePreservingScroll(router, { query: nextQuery })
   }, [router])
 
-  const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState, contentHtml?: string | null) => {
-    const snapshot = resolveEditorMetaSnapshot(content, contentHtml)
+  const syncEditorMeta = useCallback((content: string, canonicalSummary: CanonicalSummaryState) => {
+    const snapshot = resolveEditorMetaSnapshot(content)
     postContentLiveRef.current = snapshot.body
     setPostContent(snapshot.body)
     setPostSummary(canonicalSummary.summary)

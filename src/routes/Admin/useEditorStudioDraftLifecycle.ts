@@ -139,8 +139,8 @@ type UseEditorStudioDraftLifecycleParams = {
   removeLocalDraft: (source: LocalDraftSource) => void
   buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
   pretty: (value: unknown) => string
-  resolveEditorMetaSnapshot: (content: string, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
-  syncEditorMeta: (content: string, summary: CanonicalSummaryState, contentHtml?: string | null) => ResolvedEditorMetaSnapshot
+  resolveEditorMetaSnapshot: (content: string) => ResolvedEditorMetaSnapshot
+  syncEditorMeta: (content: string, summary: CanonicalSummaryState) => ResolvedEditorMetaSnapshot
   buildEmptyEditorMetaSnapshot: () => ResolvedEditorMetaSnapshot
   isBlankServerTempDraft: (
     post: Pick<PostForEditor, "title" | "published" | "listed" | "tempDraft">,
@@ -399,7 +399,7 @@ export const useEditorStudioDraftLifecycle = ({
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
       // 저장된 HTML은 파생 데이터이므로 현재 Markdown을 복구·대체하지 않는다.
-      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "", null)
+      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
       const shouldMaskTempTitle = isServerTempDraftPost(post)
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
       const title = shouldMaskTempTitle ? "" : post.title ?? ""
@@ -416,7 +416,7 @@ export const useEditorStudioDraftLifecycle = ({
       const snapshot = shouldMaskTempPlaceholder
         ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
           buildEmptyEditorMetaSnapshot())
-        : syncEditorMeta(post.content ?? "", canonicalSummary, null)
+        : syncEditorMeta(post.content ?? "", canonicalSummary)
       return {
         shouldMaskTempPlaceholder,
         title,
