@@ -22,7 +22,7 @@ test.describe("markdown editor live preview model", () => {
   })
 
   test("leaves code literals and invalid color tokens intact", () => {
-    const markdown = "Active\n\n`{{color:red|literal}}`\n\n```\n{{color:#34d399|literal}}\n---\n```\n\n{{color:url(evil)|invalid}}"
+    const markdown = "Active\n\n`{{color:#34d399|literal}}`\n\n```\n{{color:#34d399|literal}}\n---\n```\n\n{{color:url(evil)|invalid}}"
     const plan = buildMarkdownLivePreviewPlan(markdown, markdownParser.parse(markdown).topNode, [{ from: 0, to: 0 }])
     expect(plan).not.toContainEqual(expect.objectContaining({ kind: "inline-color" }))
     expect(plan).not.toContainEqual(expect.objectContaining({ kind: "horizontal-rule" }))

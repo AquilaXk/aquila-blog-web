@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import {
   ToolbarMenuItem,
   ToolbarMenuPanel,
@@ -7,6 +7,7 @@ import {
   ToolbarSelect,
 } from "./MarkdownEditor.styles"
 import type { MarkdownEditorToolbarMenuAction } from "./MarkdownEditorToolbarMenu"
+import { useMarkdownEditorPanelPosition } from "./useMarkdownEditorPanelPosition"
 
 type MarkdownEditorTablePopoverProps = {
   rows: number
@@ -28,13 +29,16 @@ export const MarkdownEditorTablePopover = ({
   actions,
 }: MarkdownEditorTablePopoverProps) => {
   const [open, setOpen] = useState(false)
-  const [horizontalOffset, setHorizontalOffset] = useState(0)
-  const horizontalOffsetRef = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const rowsSelectRef = useRef<HTMLSelectElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const dialogId = useId()
+  const { horizontalOffset, resetHorizontalOffset } = useMarkdownEditorPanelPosition({
+    open,
+    rootRef,
+    panelRef,
+  })
 
   const closePopover = useCallback((restoreTriggerFocus: boolean) => {
     setOpen(false)
@@ -46,10 +50,9 @@ export const MarkdownEditorTablePopover = ({
   const openPopover = useCallback(() => {
     if (disabled) return
     onBeforeOpen?.()
-    horizontalOffsetRef.current = 0
-    setHorizontalOffset(0)
+    resetHorizontalOffset()
     setOpen(true)
-  }, [disabled, onBeforeOpen])
+  }, [disabled, onBeforeOpen, resetHorizontalOffset])
 
   useEffect(() => {
     if (!open) return
@@ -68,33 +71,6 @@ export const MarkdownEditorTablePopover = ({
   useEffect(() => {
     if (disabled && open) closePopover(false)
   }, [closePopover, disabled, open])
-
-  const keepPanelInsideEditor = useCallback(() => {
-    const editor = rootRef.current?.closest<HTMLElement>("[data-testid='markdown-editor']")
-    const panel = panelRef.current
-    if (!editor || !panel) return
-
-    const editorBounds = editor.getBoundingClientRect()
-    const panelBounds = panel.getBoundingClientRect()
-    const baseLeft = panelBounds.left - horizontalOffsetRef.current
-    const baseRight = panelBounds.right - horizontalOffsetRef.current
-    let nextOffset = 0
-
-    if (baseLeft < editorBounds.left) nextOffset = editorBounds.left - baseLeft
-    if (baseRight + nextOffset > editorBounds.right) {
-      nextOffset += editorBounds.right - (baseRight + nextOffset)
-    }
-
-    horizontalOffsetRef.current = nextOffset
-    setHorizontalOffset(nextOffset)
-  }, [])
-
-  useLayoutEffect(() => {
-    if (!open) return
-    keepPanelInsideEditor()
-    window.addEventListener("resize", keepPanelInsideEditor)
-    return () => window.removeEventListener("resize", keepPanelInsideEditor)
-  }, [keepPanelInsideEditor, open])
 
   return (
     <ToolbarMenuRoot ref={rootRef}>
