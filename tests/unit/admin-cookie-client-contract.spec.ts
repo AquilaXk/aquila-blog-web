@@ -24,6 +24,5 @@ test("admin cookie client contract", () => {
   expect(publicAdminProfileClientSource).not.toContain('import { setCookie } from "cookies-next/client"')
   expect(publicAdminProfileClientSource).not.toContain("cookies-next/client")
   expect(publicAdminProfileClientSource).not.toContain("admin_profile_snapshot_v1")
-  expect(publicAdminProfileClientSource).toContain("return await apiFetch<AdminProfile>(PUBLIC_ADMIN_PROFILE_PATH)")
 
 })

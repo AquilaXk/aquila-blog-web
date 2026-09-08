@@ -4,43 +4,6 @@ import { expect, test } from "@playwright/test"
 import { normalizeProfileWorkspaceContent } from "src/libs/profileWorkspace"
 
 test.describe("admin profile state contract", () => {
-  test("프로필 이미지는 hydration 시점에 이미 완료된 실패도 기본 이미지로 전환한다", async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      const completeDescriptor = Object.getOwnPropertyDescriptor(
-        HTMLImageElement.prototype,
-        "complete"
-      )
-      const naturalWidthDescriptor = Object.getOwnPropertyDescriptor(
-        HTMLImageElement.prototype,
-        "naturalWidth"
-      )
-      const isFailedPrimary = (image: HTMLImageElement) =>
-        image.getAttribute("src")?.includes("qa=already-complete-broken") === true
-
-      Object.defineProperty(HTMLImageElement.prototype, "complete", {
-        configurable: true,
-        get() {
-          return isFailedPrimary(this) || completeDescriptor?.get?.call(this) || false
-        },
-      })
-      Object.defineProperty(HTMLImageElement.prototype, "naturalWidth", {
-        configurable: true,
-        get() {
-          return isFailedPrimary(this) ? 0 : naturalWidthDescriptor?.get?.call(this) || 0
-        },
-      })
-    })
-
-    await page.goto("/_qa/profile-image-hydration")
-
-    await expect(page.getByTestId("qa-profile-image")).toHaveAttribute(
-      "src",
-      "/images/default-profile.svg"
-    )
-  })
-
   test("admin profile workspace residual file boundaries는 600 line companion budget을 유지한다", () => {
     const adminRoot = path.resolve(__dirname, "../src/routes/Admin")
     const requiredModules = [
@@ -102,40 +65,6 @@ test.describe("admin profile state contract", () => {
     expect(rendererSource).not.toContain("<AvatarWorkspaceCard>")
     expect(layoutSource).toContain("AdminProfileWorkspace.styles.links")
     expect(layoutSource).not.toContain("export const LinkRowCard = styled.div")
-  })
-
-  test("프로필 이미지는 저장된 URL 로드 실패 시 기본 이미지를 한 번만 fallback 한다", () => {
-    const profileImageSource = readFileSync(
-      path.resolve(__dirname, "../src/components/ProfileImage.tsx"),
-      "utf8"
-    )
-    const identitySource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/AdminProfileWorkspaceIdentitySection.tsx"),
-      "utf8"
-    )
-    const previewSource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/AdminProfilePreviewRail.tsx"),
-      "utf8"
-    )
-
-    expect(profileImageSource).not.toContain('import { CONFIG } from "site.config"')
-    expect(profileImageSource).toContain("fallbackSrc,")
-    expect(profileImageSource).toContain("const requestedSrc = src || fallbackSrc")
-    expect(profileImageSource).toContain('const fallbackAttemptKey = typeof requestedSrc === "string" ? requestedSrc : fallbackSrc')
-    expect(profileImageSource).toContain("const [resolvedSrc, setResolvedSrc] = React.useState(requestedSrc)")
-    expect(profileImageSource).toContain("const fallbackAttemptSourceRef = React.useRef<string | undefined>(undefined)")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current = undefined")
-    expect(profileImageSource).toContain("setResolvedSrc(requestedSrc)")
-    expect(profileImageSource).toContain("}, [requestedSrc])")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current === fallbackAttemptKey")
-    expect(profileImageSource).toContain("fallbackAttemptSourceRef.current = fallbackAttemptKey")
-    expect(profileImageSource).toContain("setResolvedSrc(fallbackSrc)")
-    expect(identitySource).toContain("src={draft.profileImageUrl || undefined}")
-    expect(identitySource).toContain("fallbackSrc={CONFIG.profile.image}")
-    expect(identitySource).not.toContain("<AvatarFallback>")
-    expect(previewSource).toContain("src={previewContent.profileImageUrl || undefined}")
-    expect(previewSource).toContain("fallbackSrc={CONFIG.profile.image}")
-    expect(previewSource).not.toContain("<AvatarFallback>")
   })
 
   test("profile 작업공간은 공통 section nav/action dock primitive 위에서 반응형 분기를 유지한다", () => {

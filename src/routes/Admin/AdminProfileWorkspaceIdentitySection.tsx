@@ -1,5 +1,4 @@
 import ProfileImage from "src/components/ProfileImage"
-import { CONFIG } from "site.config"
 import type { ProfileWorkspaceContent } from "src/libs/profileWorkspace"
 import {
   AvatarWorkspaceCard,
@@ -32,7 +31,6 @@ export const renderAdminProfileIdentitySection = (props: Record<string, any>) =>
         <div className="avatarPreview">
           <ProfileImage
             src={draft.profileImageUrl || undefined}
-            fallbackSrc={CONFIG.profile.image}
             alt={displayName}
             width={88}
             height={88}

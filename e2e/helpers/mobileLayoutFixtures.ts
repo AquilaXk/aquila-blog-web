@@ -71,6 +71,7 @@ export const ADMIN_MEMBER_FIXTURE = {
 const ADMIN_PROFILE_FIXTURE = {
   id: 1,
   username: "aquila",
+  name: "aquila",
   nickname: "aquila",
   profileImageUrl: "/avatar.png",
   blogTitle: "Aquila",
