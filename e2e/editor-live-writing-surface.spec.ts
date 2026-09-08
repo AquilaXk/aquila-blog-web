@@ -868,9 +868,9 @@ test.describe("live Markdown writing surface", () => {
     })
     await page.goto(`/admin/editor/${postId}`)
     await page.getByRole("button", { name: "발행 설정", exact: true }).click()
-    const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
+    const dialog = page.getByRole("dialog", { name: "새 글 작성", exact: true })
     await dialog.getByRole("button", { name: /전체 공개/ }).click()
-    await dialog.getByRole("button", { name: /^(발행하기|새 글 작성)$/ }).click()
+    await dialog.getByRole("button", { name: "새 글 작성", exact: true }).click()
     await expect.poll(() => pendingWrite?.request().postDataJSON().published).toBe(true)
     await dialog.getByRole("button", { name: /비공개/ }).click()
     await fulfillJson(pendingWrite!, {
@@ -879,7 +879,8 @@ test.describe("live Markdown writing surface", () => {
     })
     await expect(dialog).toHaveCount(0)
     await page.getByRole("button", { name: "발행 설정", exact: true }).click()
-    await expect(dialog.getByRole("button", { name: /비공개/ })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByRole("dialog", { name: "수정 설정", exact: true })
+      .getByRole("button", { name: /비공개/ })).toHaveAttribute("aria-pressed", "true")
   })
 
   test("a failed public refresh does not report a committed update as a failed save", async ({ page }) => {
@@ -944,7 +945,8 @@ test.describe("live Markdown writing surface", () => {
   })
 
   test("constrained editor height can scroll the final line into view", async ({ page }) => {
-    const markdown = Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join("\n")
+    const lines = Array.from({ length: 80 }, (_, index) => `line ${index + 1}`)
+    const markdown = lines.join("\n")
     await routeAuthenticatedEditor(page, markdown)
     await page.goto("/admin/editor/new?source=local-draft")
     await page.getByTestId("markdown-editor").evaluate((element) => {
@@ -955,16 +957,14 @@ test.describe("live Markdown writing surface", () => {
     await scroller.evaluate((element) => {
       element.scrollTop = element.scrollHeight
     })
-    const finalLine = editorContent(page).locator(".cm-line").last()
+    // 가상화된 DOM의 마지막 항목이 아니라 원문의 마지막 줄을 확인한다.
+    const finalLine = editorContent(page).getByText(lines[lines.length - 1], { exact: true })
     await expect(finalLine).toBeVisible()
-    const [bodyBox, lineBox] = await Promise.all([
-      page.getByTestId("markdown-editor-live-surface").boundingBox(),
-      finalLine.boundingBox(),
-    ])
-    expect(bodyBox).not.toBeNull()
-    expect(lineBox).not.toBeNull()
-    expect((lineBox?.y ?? Number.POSITIVE_INFINITY) + (lineBox?.height ?? 0)).toBeLessThanOrEqual(
-      (bodyBox?.y ?? 0) + (bodyBox?.height ?? 0) + 1
-    )
+    await expect.poll(async () => {
+      const bodyBox = await page.getByTestId("markdown-editor-live-surface").boundingBox()
+      const lineBox = await finalLine.boundingBox()
+      if (!bodyBox || !lineBox) return false
+      return lineBox.y >= bodyBox.y && lineBox.y + lineBox.height <= bodyBox.y + bodyBox.height + 1
+    }).toBe(true)
   })
 })
