@@ -642,7 +642,8 @@ test.describe("live Markdown writing surface", () => {
     await tableDialog.getByRole("combobox", { name: "표 행" }).selectOption("3")
     await tableDialog.getByRole("combobox", { name: "표 열" }).selectOption("4")
     await tableDialog.getByRole("button", { name: "표 삽입 (3×4)" }).click()
-    expect((await readMarkdown(page)).split("\n").filter((line) => line.startsWith("|")).length).toBe(4)
+    // 전체 선택을 사용하는 원문 읽기로 삽입 직후의 셀 커서를 바꾸지 않는다.
+    expect((await visibleEditorLines(page)).filter((line) => line.startsWith("|")).length).toBe(4)
 
     await tableTrigger.click()
     const reopenedTableDialog = page.getByRole("dialog", { name: "표" })

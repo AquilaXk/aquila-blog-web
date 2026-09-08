@@ -175,7 +175,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
       return [Decoration.replace({ widget: new MarkdownRuleWidget() }).range(spec.from, spec.to)]
     }
     if (spec.kind === "inline-color") {
-      return [Decoration.mark({ attributes: { style: `color: ${spec.color}` } }).range(spec.from, spec.to)]
+      return [Decoration.mark({ class: "cm-live-color", attributes: { style: `color: ${spec.color}` } }).range(spec.from, spec.to)]
     }
     if (spec.kind === "task") {
       const checked = /\[[xX]\]/.test(markdownValue.slice(spec.from, spec.to))

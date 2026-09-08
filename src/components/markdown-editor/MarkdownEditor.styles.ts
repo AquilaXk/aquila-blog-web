@@ -388,6 +388,10 @@ export const LiveEditorBody = styled.div`
     text-underline-offset: 0.18em;
   }
 
+  .cm-live-color :is(.cm-live-strong, .cm-live-inline-code, .cm-live-link) {
+    color: inherit;
+  }
+
   .cm-live-horizontal-rule {
     display: inline-block;
     width: 100%;
