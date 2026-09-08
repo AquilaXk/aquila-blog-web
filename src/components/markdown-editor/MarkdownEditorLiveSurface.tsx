@@ -115,6 +115,15 @@ class MarkdownMarkerWidget extends WidgetType {
   }
 }
 
+class MarkdownRuleWidget extends WidgetType {
+  toDOM() {
+    const rule = document.createElement("span")
+    rule.setAttribute("role", "separator")
+    rule.className = "cm-live-horizontal-rule"
+    return rule
+  }
+}
+
 class MarkdownTaskWidget extends WidgetType {
   constructor(private readonly checked: boolean) {
     super()
@@ -161,6 +170,12 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     }
     if (spec.kind === "hide-mark") {
       return [Decoration.replace({}).range(spec.from, spec.to)]
+    }
+    if (spec.kind === "horizontal-rule") {
+      return [Decoration.replace({ widget: new MarkdownRuleWidget() }).range(spec.from, spec.to)]
+    }
+    if (spec.kind === "inline-color") {
+      return [Decoration.mark({ attributes: { style: `color: ${spec.color}` } }).range(spec.from, spec.to)]
     }
     if (spec.kind === "task") {
       const checked = /\[[xX]\]/.test(markdownValue.slice(spec.from, spec.to))

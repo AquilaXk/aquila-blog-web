@@ -662,18 +662,6 @@ export const EditorInspector = styled.aside`
     font-size: 0.84rem;
   }
 
-  b {
-    border: 1px solid ${({ theme }) => theme.colors.green7};
-    padding: 0.12rem 0.34rem;
-    color: ${({ theme }) => theme.colors.green11};
-    font: 750 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-
-  b[data-tone="warn"] {
-    border-color: ${({ theme }) => theme.colors.orange7};
-    color: ${({ theme }) => theme.colors.orange10};
-  }
-
   @media (max-width: 1100px) {
     grid-column: 1 / -1;
     max-height: min(38vh, 360px);

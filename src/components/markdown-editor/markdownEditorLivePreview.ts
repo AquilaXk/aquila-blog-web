@@ -1,3 +1,5 @@
+import { INLINE_COLOR_TOKEN_REGEX, resolveInlineColorValue } from "../../libs/markdown/inlineColor"
+
 export type MarkdownLiveSelection = {
   from: number
   to: number
@@ -30,7 +32,10 @@ export type MarkdownLivePreviewDecoration = {
     | "list"
     | "list-marker"
     | "fenced-code"
+    | "horizontal-rule"
+    | "inline-color"
   level?: number
+  color?: string
 }
 
 const HIDDEN_MARK_NODES = new Set([
@@ -147,6 +152,7 @@ const decorationForNode = (
     BulletList: "list",
     OrderedList: "list",
     FencedCode: "fenced-code",
+    HorizontalRule: "horizontal-rule",
   }
   const kind = kindByNode[node.name]
   return kind ? { from: node.from, to: node.to, kind } : null
@@ -162,6 +168,32 @@ export const buildMarkdownLivePreviewPlan = (
 
   const sourceRanges = resolveMarkdownLiveSourceRanges(markdown, documentNode, selections)
   const decorations: MarkdownLivePreviewDecoration[] = []
+  const literalRanges: MarkdownLiveSourceRange[] = []
+
+  const collectLiterals = (node: MarkdownSyntaxNode) => {
+    if (["InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag", "URL"].includes(node.name)) {
+      literalRanges.push({ from: node.from, to: node.to })
+      return
+    }
+    for (const child of listChildren(node)) collectLiterals(child)
+  }
+  collectLiterals(documentNode)
+
+  // 원문을 치환하지 않고 검증된 색상 토큰의 표시만 바꾼다. 코드와 편집 중인 범위는 그대로 둔다.
+  for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
+    const from = match.index
+    const to = from + match[0].length
+    if ([...sourceRanges, ...literalRanges].some((range) => from < range.to && to > range.from)) continue
+    const color = resolveInlineColorValue(match[1])
+    if (!color) continue
+    const bodyFrom = from + match[0].indexOf("|") + 1
+    const bodyTo = to - 2
+    decorations.push(
+      { from, to: bodyFrom, kind: "hide-mark" },
+      { from: bodyFrom, to: bodyTo, kind: "inline-color", color },
+      { from: bodyTo, to, kind: "hide-mark" }
+    )
+  }
 
   const visit = (node: MarkdownSyntaxNode, parent: MarkdownSyntaxNode | null) => {
     if (node !== documentNode && isInsideSourceRange(node, sourceRanges)) return

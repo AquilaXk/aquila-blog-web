@@ -388,6 +388,13 @@ export const LiveEditorBody = styled.div`
     text-underline-offset: 0.18em;
   }
 
+  .cm-live-horizontal-rule {
+    display: inline-block;
+    width: 100%;
+    vertical-align: middle;
+    border-top: 1px solid ${({ theme }) => theme.colors.gray7};
+  }
+
   .cm-live-quote {
     color: ${({ theme }) => theme.colors.gray10};
   }
