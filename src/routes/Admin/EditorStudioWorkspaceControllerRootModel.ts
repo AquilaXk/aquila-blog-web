@@ -1,7 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
-import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import {
   applyThumbnailTransformToUrl,
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -29,12 +28,6 @@ export const ADMIN_POSTS_WORKSPACE_ROUTE = "/admin/posts"
 export const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
 
 export const toEditorPostRoute = (id: string | number) => `/admin/editor/${encodeURIComponent(String(id))}`
-
-export const buildCanonicalPostUrl = (postId: string | number) => {
-  const path = toCanonicalPostPath(postId)
-  if (typeof window === "undefined") return path
-  return new URL(path, window.location.origin).toString()
-}
 
 export { extractImageFileFromClipboard } from "src/components/markdown-editor/markdownEditorPasteDropModel"
 

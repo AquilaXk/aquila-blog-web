@@ -1,5 +1,4 @@
 import type { QueryClient } from "@tanstack/react-query"
-import type { NextRouter } from "next/router"
 import {
   type ChangeEvent,
   type Dispatch,
@@ -10,10 +9,8 @@ import {
   useRef,
 } from "react"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
-import { pushRoute } from "src/libs/router"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import {
-  buildCanonicalPostUrl,
   isComposingKeyboardEvent,
   pretty,
   syncTitleTextareaHeight,
@@ -42,7 +39,6 @@ type UseEditorStudioWorkspaceControllerRuntimeArgs = {
   postId: string
   postTitle: string
   queryClient: QueryClient
-  router: NextRouter
   setEditorMode: Dispatch<SetStateAction<EditorMode>>
   setGlobalNotice: Dispatch<SetStateAction<NoticeState>>
   setIsTempDraftMode: Dispatch<SetStateAction<boolean>>
@@ -61,7 +57,6 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
   postId,
   postTitle,
   queryClient,
-  router,
   setEditorMode,
   setGlobalNotice,
   setIsTempDraftMode,
@@ -185,71 +180,12 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     [isPublishModalOpen, setGlobalNotice, setPublishModalNotice, setPublishNotice]
   )
 
-  const openPostDetailRoute = useCallback(
-    async (targetPostId: string | number) => {
-      const resolvedPostId = String(targetPostId).trim()
-      if (!resolvedPostId) {
-        setPublishStatus({ tone: "error", text: "상세 링크를 열 글 ID가 없습니다." }, "page")
-        return
-      }
-
-      const path = toCanonicalPostPath(resolvedPostId)
-      if (typeof window !== "undefined") {
-        const opened = window.open(path, "_blank", "noopener,noreferrer")
-        if (opened) return
-      }
-
-      try {
-        await pushRoute(router, path)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        setPublishStatus({ tone: "error", text: `상세 열기 실패: ${message}` }, "page")
-      }
-    },
-    [router, setPublishStatus]
-  )
-
-  const copyPostDetailLink = useCallback(
-    async (targetPostId: string | number, title?: string) => {
-      const resolvedPostId = String(targetPostId).trim()
-      if (!resolvedPostId) {
-        setPublishStatus({ tone: "error", text: "복사할 상세 링크가 없습니다." }, "page")
-        return
-      }
-
-      const rowLabel = `#${resolvedPostId} ${title?.trim() || "제목 없는 글"}`
-      const url = buildCanonicalPostUrl(resolvedPostId)
-
-      try {
-        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(url)
-          setPublishStatus({ tone: "success", text: `${rowLabel} 링크를 복사했습니다.` }, "page")
-          return
-        }
-
-        if (typeof window !== "undefined") {
-          window.prompt("링크를 복사하세요.", url)
-          setPublishStatus({ tone: "success", text: `${rowLabel} 링크를 표시했습니다.` }, "page")
-          return
-        }
-
-        throw new Error("링크를 복사할 수 없는 환경입니다.")
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        setPublishStatus({ tone: "error", text: `링크 복사 실패: ${message}` }, "page")
-      }
-    },
-    [setPublishStatus]
-  )
-
   return {
-    copyPostDetailLink,
     disabled,
     handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    openPostDetailRoute,
     publishModalHintByAction,
     refreshPublicPostReadViews,
     run,

@@ -10,6 +10,13 @@ test.describe("editor authoring structure", () => {
       sourcePath("components", "editor"),
       sourcePath("pages", "_qa", "block-editor-slash.tsx"),
       sourcePath("routes", "Admin", "QaEditorHarness.tsx"),
+      ...[
+        "EditorStudioContentWorkspace", "EditorStudioPostListPanel",
+        "EditorStudioPostListPanelParts", "EditorStudioPostListPanelStyles", "EditorStudioPostListActionStyles",
+        "EditorStudioPostQueryPanel", "EditorStudioSelectedPostPanel",
+        "EditorStudioSelectedPostToolsPanel", "EditorStudioMobileStepNavigator",
+        "EditorStudioUndoToast",
+      ].map((name) => sourcePath("routes", "Admin", `${name}.tsx`)),
     ]
 
     expect(forbiddenPaths.filter((path) => existsSync(path))).toEqual([])

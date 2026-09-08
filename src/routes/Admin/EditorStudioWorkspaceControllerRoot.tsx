@@ -293,13 +293,11 @@ export const EditorStudioWorkspaceController = ({
   const lastLocalDraftFingerprintRef = useRef("")
   const serverBaselineEditorFingerprintRef = useRef("")
   const {
-    copyPostDetailLink,
     disabled,
     handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    openPostDetailRoute,
     publishModalHintByAction,
     refreshPublicPostReadViews,
     run,
@@ -310,7 +308,6 @@ export const EditorStudioWorkspaceController = ({
     postId,
     postTitle,
     queryClient,
-    router,
     setEditorMode,
     setGlobalNotice,
     setIsTempDraftMode,
@@ -861,7 +858,7 @@ export const EditorStudioWorkspaceController = ({
       props={{
         activeMetaPanel, addTagsToPost, addTagToPost, adminPostRows, adminPostTotal,
         adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
-        closePublishModal, commitPreviewThumbTransform, copyPostDetailLink,
+        closePublishModal, commitPreviewThumbTransform,
         deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
@@ -879,7 +876,7 @@ export const EditorStudioWorkspaceController = ({
         listPage,
         listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
         loadPostForEditor, loadingKey, localDraftCandidate, localDraftSavedAt, localDraftSlotLabel, localDraftSource, member, metaNotice,
-        mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm, openPostDetailRoute,
+        mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm,
         openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
         postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
         postThumbnailZoom, postTitle, postVersion, postVisibility, profileBioInput,

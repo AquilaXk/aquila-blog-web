@@ -83,8 +83,8 @@ test.describe("admin posts workspace link contract", () => {
       "utf8"
     )
 
-    expect(source).toContain("onOpenPostDetail={(id) => void openPostDetailRoute(id)}")
-    expect(source).toContain("onCopyPostDetailLink={(id, title) => void copyPostDetailLink(id, title)}")
+    expect(source).not.toContain("onOpenPostDetail")
+    expect(source).not.toContain("onCopyPostDetailLink")
     expect(editorSurfaceSource).toContain("본문 형식 · Markdown")
     expect(editorSurfaceSource).not.toContain("onOpenPostDetail")
     expect(editorSurfaceSource).not.toContain("onCopyPostDetailLink")
