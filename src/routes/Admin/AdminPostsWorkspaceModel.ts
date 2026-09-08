@@ -1,8 +1,4 @@
 import { isServerTempDraftPost } from "./editorTempDraft"
-import {
-  describeLocalDraftSlot,
-  readLocalDraft as readLocalDraftPayload,
-} from "./editorStudioStorageModel"
 
 export type PostListScope = "active" | "deleted"
 export type PostStatusFilter = "all" | "draft" | "published" | "private" | "deleted"
@@ -46,14 +42,6 @@ export type LocalDraftPayload = {
   category: string
   visibility: "PRIVATE" | "PUBLIC_UNLISTED" | "PUBLIC_LISTED"
   savedAt: string
-}
-
-export type LocalDraftSummary = {
-  title: string
-  savedAt: string
-  tagCount: number
-  visibility: LocalDraftPayload["visibility"]
-  slotLabel: string
 }
 
 export type ListSort = "MODIFIED_AT" | "CREATED_AT" | "CREATED_AT_ASC"
@@ -198,28 +186,4 @@ export const buildListEndpoint = (
   }
 
   return `${endpoint}?${query.toString()}`
-}
-
-export const readLocalDraft = (): LocalDraftSummary | null => {
-  if (typeof window === "undefined") return null
-
-  try {
-    const parsed = readLocalDraftPayload({ kind: "create" })
-    if (!parsed) return null
-
-    const title = parsed.title.trim()
-    const content = parsed.content.trim()
-    const summary = parsed.summary.trim()
-    if (!title && !summary && !content) return null
-
-    return {
-      title: title || "제목 없는 임시저장",
-      savedAt: parsed.savedAt,
-      tagCount: parsed.tags.length,
-      visibility: parsed.visibility,
-      slotLabel: describeLocalDraftSlot(parsed),
-    }
-  } catch {
-    return null
-  }
 }

@@ -17,10 +17,8 @@ import {
   POSTS_WORKSPACE_DEFERRED_PANEL_TIMEOUT_MS,
   POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS,
   POSTS_WORKSPACE_MOBILE_LIST_QUERY,
-  readLocalDraft,
   sanitizeNumberInput,
   type AdminPostListItem,
-  type LocalDraftSummary,
   type ListSort,
   type ListState,
   type PageDto,
@@ -56,7 +54,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   const hasInitialRecentPosts = initialSnapshot.recentFetchedAt !== null
   const hasInitialListState = initialSnapshot.listState !== null
 
-  const [localDraft, setLocalDraft] = useState<LocalDraftSummary | null>(null)
   const [recentPosts, setRecentPosts] = useState<AdminPostListItem[]>(() => initialSnapshot.recentPosts)
   const [isRecentLoading, setIsRecentLoading] = useState(!hasInitialRecentPosts)
   const [recentError, setRecentError] = useState("")
@@ -152,7 +149,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   }, [listKw, listPage, listPageSize, listScope, listSort, listStatus])
 
   useEffect(() => {
-    setLocalDraft(readLocalDraft())
     if (skipInitialRecentFetchRef.current) {
       skipInitialRecentFetchRef.current = false
       return
@@ -513,7 +509,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       listState={listState}
       loadList={loadList}
       loadRecentPosts={loadRecentPosts}
-      localDraft={localDraft}
       mutationPending={mutationPending}
       openCanonicalPost={openCanonicalPost}
       openWriteRoute={openWriteRoute}
