@@ -7,6 +7,7 @@ import {
   type AdminPageProps,
 } from "src/libs/server/adminPage"
 import { hasServerAuthCookie } from "src/libs/server/authSession"
+import type { AdminProfile } from "src/types/adminProfile"
 import { EditorStudioWorkspaceController } from "./EditorStudioWorkspaceController"
 
 const EDITOR_NEW_ROUTE_PATH = "/admin/editor/new"
@@ -20,42 +21,13 @@ export const getEditorStudioPageProps: GetServerSideProps<EditorStudioPageProps>
   if (hasServerAuthCookie(req)) {
     const bootstrapResult = await readAdminProtectedBootstrap<{
       member: AuthMember
-      profile: Partial<AuthMember>
+      profile: AdminProfile
     }>(req, "/member/api/v1/adm/members/bootstrap", EDITOR_NEW_ROUTE_PATH)
 
     if (bootstrapResult.ok) {
       const { member, profile } = bootstrapResult.value
-      const mergedMember: AuthMember = {
-        ...member,
-        profileImageDirectUrl:
-          profile.profileImageDirectUrl ||
-          profile.profileImageUrl ||
-          member.profileImageDirectUrl ||
-          member.profileImageUrl ||
-          "",
-        profileImageUrl:
-          profile.profileImageUrl ||
-          profile.profileImageDirectUrl ||
-          member.profileImageUrl ||
-          member.profileImageDirectUrl ||
-          "",
-        profileRole: profile.profileRole || member.profileRole || "",
-        profileBio: profile.profileBio || member.profileBio || "",
-        aboutRole: profile.aboutRole || member.aboutRole || "",
-        aboutBio: profile.aboutBio || member.aboutBio || "",
-        aboutDetails: profile.aboutDetails || member.aboutDetails || "",
-        blogTitle: profile.blogTitle || member.blogTitle || "",
-        homeIntroTitle: profile.homeIntroTitle || member.homeIntroTitle || "",
-        homeIntroDescription:
-          profile.homeIntroDescription || member.homeIntroDescription || "",
-      }
-
-      const baseProps = buildAdminPagePropsFromMember(mergedMember)
-
       return {
-        props: {
-          ...baseProps,
-        },
+        props: buildAdminPagePropsFromMember(member, profile),
       }
     }
 

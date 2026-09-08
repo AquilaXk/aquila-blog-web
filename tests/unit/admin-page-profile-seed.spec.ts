@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test"
 import type { IncomingMessage } from "node:http"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { buildAdminPagePropsFromMember, getAdminPageProps } from "../../src/libs/server/adminPage"
 import { registerServerApiFetchMetrics } from "../../src/libs/server/apiFetchMetrics"
 import { queryKey } from "../../src/constants/queryKey"
@@ -17,7 +19,17 @@ test("member bootstrap keeps authentication without synthesizing a profile", () 
 
 test("member bootstrap forwards an explicitly supplied canonical profile unchanged", () => {
   const profile = { username: "owner", name: "Published", nickname: "Published", profileImageUrl: "/published.svg", profileBio: "" }
-  expect(buildAdminPagePropsFromMember(member, profile).initialProfileSnapshot).toBe(profile)
+  const props = buildAdminPagePropsFromMember(member, profile)
+  expect(props.initialProfileSnapshot).toBe(profile)
+  expect(props.initialMember).toBe(member)
+  expect(props.dehydratedState.queries.find((query) => JSON.stringify(query.queryKey) === JSON.stringify(queryKey.authMe()))?.state.data).toEqual(member)
+})
+
+test("editor bootstrap keeps profile data separate from authentication hydration", () => {
+  const source = readFileSync(path.resolve(__dirname, "../../src/routes/Admin/EditorStudioPage.tsx"), "utf8")
+  expect(source).toContain("buildAdminPagePropsFromMember(member, profile)")
+  expect(source).not.toContain("mergedMember")
+  expect(source).not.toContain("profileImageDirectUrl")
 })
 
 test("guarded admin props do not fetch a public profile or consume a snapshot cookie", async () => {
