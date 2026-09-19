@@ -36,8 +36,8 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   z-index: ${zIndexes.dropdownMenu + 10};
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
-  width: 260px;
-  max-height: 320px;
+  width: 280px;
+  max-height: 360px;
   overflow-y: auto;
   padding: 6px;
   border-radius: 8px;
@@ -63,12 +63,19 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
 
 const SlashMenuHeading = styled.div`
   padding: 4px 8px 6px;
-  font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: ${({ theme }) => theme.colors.gray9};
   border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   margin-bottom: 4px;
+`
+
+const SlashMenuEmpty = styled.div`
+  padding: 14px 10px;
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.gray10};
+  text-align: center;
 `
 
 const SlashMenuItemButton = styled.button<{ $active: boolean }>`
@@ -95,14 +102,22 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.publicDesign.readableSurface};
-    font: 700 12px/1 ui-monospace, SFMono-Regular, monospace;
     color: ${({ theme }) => theme.publicDesign.accent};
     flex-shrink: 0;
+  }
+
+  .icon.icon-emoji {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .icon.icon-text {
+    font: 700 13px/1 ui-monospace, SFMono-Regular, monospace;
   }
 
   .text-group {
@@ -111,20 +126,22 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     min-width: 0;
 
     .label {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 650;
       line-height: 1.25;
       color: ${({ theme }) => theme.colors.gray12};
     }
 
     .description {
-      font-size: 11px;
-      color: ${({ theme }) => theme.colors.gray9};
-      line-height: 1.3;
-      margin-top: 1px;
+      font-size: 12px;
+      color: ${({ theme }) => theme.colors.gray10};
+      line-height: 1.35;
+      margin-top: 2px;
     }
   }
 `
+
+const isEmojiIcon = (icon: string) => /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
 
 export const MarkdownEditorSlashMenu = ({
   isOpen,
@@ -137,7 +154,7 @@ export const MarkdownEditorSlashMenu = ({
 
   useEffect(() => {
     setSelectedIndex(0)
-  }, [isOpen])
+  }, [isOpen, items])
 
   useEffect(() => {
     if (!isOpen) return
@@ -151,13 +168,13 @@ export const MarkdownEditorSlashMenu = ({
 
       if (event.key === "ArrowDown") {
         event.preventDefault()
-        setSelectedIndex((prev) => (prev + 1) % items.length)
+        setSelectedIndex((prev) => (items.length > 0 ? (prev + 1) % items.length : 0))
         return
       }
 
       if (event.key === "ArrowUp") {
         event.preventDefault()
-        setSelectedIndex((prev) => (prev - 1 + items.length) % items.length)
+        setSelectedIndex((prev) => (items.length > 0 ? (prev - 1 + items.length) % items.length : 0))
         return
       }
 
@@ -187,7 +204,7 @@ export const MarkdownEditorSlashMenu = ({
     return () => window.removeEventListener("pointerdown", handlePointerDownOutside)
   }, [isOpen, onClose])
 
-  if (!isOpen || !position || items.length === 0) return null
+  if (!isOpen || !position) return null
 
   return (
     <SlashMenuContainer
@@ -198,24 +215,31 @@ export const MarkdownEditorSlashMenu = ({
       aria-label="빠른 서식 삽입 메뉴"
     >
       <SlashMenuHeading>블록 빠른 삽입</SlashMenuHeading>
-      {items.map((item, index) => (
-        <SlashMenuItemButton
-          key={item.id}
-          type="button"
-          role="menuitem"
-          $active={index === selectedIndex}
-          onClick={() => item.action()}
-          onMouseEnter={() => setSelectedIndex(index)}
-        >
-          <span className="icon" aria-hidden="true">
-            {item.icon}
-          </span>
-          <div className="text-group">
-            <span className="label">{item.label}</span>
-            <span className="description">{item.description}</span>
-          </div>
-        </SlashMenuItemButton>
-      ))}
+      {items.length === 0 ? (
+        <SlashMenuEmpty>일치하는 명령어가 없습니다</SlashMenuEmpty>
+      ) : (
+        items.map((item, index) => (
+          <SlashMenuItemButton
+            key={item.id}
+            type="button"
+            role="menuitem"
+            $active={index === selectedIndex}
+            onClick={() => item.action()}
+            onMouseEnter={() => setSelectedIndex(index)}
+          >
+            <span
+              className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
+              aria-hidden="true"
+            >
+              {item.icon}
+            </span>
+            <div className="text-group">
+              <span className="label">{item.label}</span>
+              <span className="description">{item.description}</span>
+            </div>
+          </SlashMenuItemButton>
+        ))
+      )}
     </SlashMenuContainer>
   )
 }

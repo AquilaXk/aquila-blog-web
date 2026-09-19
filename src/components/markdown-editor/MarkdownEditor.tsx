@@ -422,66 +422,96 @@ export const MarkdownEditor = ({
   const [slashMenuState, setSlashMenuState] = useState<{
     isOpen: boolean
     position: { top: number; left: number } | null
+    query: string
+    slashFrom: number
   }>({
     isOpen: false,
     position: null,
+    query: "",
+    slashFrom: 0,
   })
 
   const handleSelectSlashItem = useCallback(
     (snippet: string) => {
-      const markdown = valueRef.current
       const selection = selectionRef.current
-      let start = selection.from
+      const start = slashMenuState.slashFrom
       const end = selection.to
-      if (start > 0 && markdown[start - 1] === "/") {
-        start -= 1
-      }
       applyMutationPlan(planReplaceSelection(start, end, snippet))
-      setSlashMenuState({ isOpen: false, position: null })
+      setSlashMenuState({ isOpen: false, position: null, query: "", slashFrom: 0 })
     },
-    [applyMutationPlan]
+    [applyMutationPlan, slashMenuState.slashFrom]
   )
 
-  const slashMenuItems: SlashMenuItem[] = useMemo(
-    () =>
-      SLASH_COMMAND_SPECS.map((spec) => ({
-        id: spec.id,
-        label: spec.label,
-        description: spec.description,
-        icon: spec.icon,
-        action: () =>
-          handleSelectSlashItem(
-            spec.snippet === "__TABLE__" ? createMarkdownEditorTable(2, 2) + "\n" : spec.snippet
-          ),
-      })),
-    [handleSelectSlashItem]
-  )
+  const slashMenuItems: SlashMenuItem[] = useMemo(() => {
+    const q = slashMenuState.query.trim().toLowerCase()
+    const specs = !q
+      ? SLASH_COMMAND_SPECS
+      : SLASH_COMMAND_SPECS.filter(
+          (spec) =>
+            spec.label.toLowerCase().includes(q) ||
+            spec.description.toLowerCase().includes(q) ||
+            spec.id.toLowerCase().includes(q)
+        )
+
+    return specs.map((spec) => ({
+      id: spec.id,
+      label: spec.label,
+      description: spec.description,
+      icon: spec.icon,
+      action: () =>
+        handleSelectSlashItem(
+          spec.snippet === "__TABLE__" ? createMarkdownEditorTable(2, 2) + "\n" : spec.snippet
+        ),
+    }))
+  }, [handleSelectSlashItem, slashMenuState.query])
 
   const checkSlashCommand = useCallback((markdown: string, selection: TextareaSelection) => {
     const pos = selection.from
-    if (pos === 0) {
-      setSlashMenuState({ isOpen: false, position: null })
+    if (pos === 0 || selection.from !== selection.to) {
+      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
       return
     }
     const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
     const lineText = markdown.slice(lineStart, pos)
-    if (lineText.trim() === "/") {
-      const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
-      let coords = { top: 240, left: 340 }
-      if (selectionObj && selectionObj.rangeCount > 0) {
-        const range = selectionObj.getRangeAt(0)
-        const rect = range.getBoundingClientRect()
-        if (rect.bottom > 0) {
-          coords = {
-            top: Math.min(rect.bottom + 8, window.innerHeight - 340),
-            left: Math.min(rect.left, window.innerWidth - 280),
-          }
+    const lastSlashIndex = lineText.lastIndexOf("/")
+
+    if (lastSlashIndex === -1) {
+      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
+      return
+    }
+
+    const beforeSlash = lineText.slice(0, lastSlashIndex)
+    if (beforeSlash.length > 0 && !/\s$/.test(beforeSlash)) {
+      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
+      return
+    }
+
+    const query = lineText.slice(lastSlashIndex + 1)
+    if (/\s/.test(query)) {
+      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
+      return
+    }
+
+    const slashAbsolutePos = lineStart + lastSlashIndex
+    const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
+    let coords = { top: 240, left: 340 }
+    if (selectionObj && selectionObj.rangeCount > 0) {
+      const range = selectionObj.getRangeAt(0)
+      const rect = range.getBoundingClientRect()
+      if (rect.bottom > 0) {
+        coords = {
+          top: Math.min(rect.bottom + 8, window.innerHeight - 380),
+          left: Math.min(rect.left, window.innerWidth - 300),
         }
       }
-      setSlashMenuState({ isOpen: true, position: coords })
-    } else {
-      setSlashMenuState((prev) => (prev.isOpen ? { isOpen: false, position: null } : prev))
     }
+
+    setSlashMenuState((prev) => ({
+      isOpen: true,
+      position: prev.isOpen && prev.position ? prev.position : coords,
+      query,
+      slashFrom: slashAbsolutePos,
+    }))
   }, [])
 
   const handleLiveSelectionChange = useCallback(
@@ -571,7 +601,7 @@ export const MarkdownEditor = ({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => applySnippet(before, after)}
             >
-              {label}
+              {label === "”" ? <span style={{ fontSize: "15px", lineHeight: 1 }}>”</span> : label}
             </ToolbarButton>
           ))}
 
@@ -750,7 +780,7 @@ export const MarkdownEditor = ({
           query={findReplace.query}
         />
       ) : null}
-      <LiveEditorBody aria-disabled={disabled}>
+      <LiveEditorBody aria-disabled={disabled} $isEmpty={!draftValue}>
         <MarkdownEditorLiveSurface
           ref={liveSurfaceRef}
           value={draftValue}
@@ -768,7 +798,7 @@ export const MarkdownEditor = ({
         isOpen={slashMenuState.isOpen}
         position={slashMenuState.position}
         items={slashMenuItems}
-        onClose={() => setSlashMenuState({ isOpen: false, position: null })}
+        onClose={() => setSlashMenuState({ isOpen: false, position: null, query: "", slashFrom: 0 })}
       />
     </EditorRoot>
   )

@@ -136,7 +136,7 @@ export const ToolbarMenuTrigger = styled(ToolbarButton)`
 `
 
 export const ToolbarMenuChevron = styled.span`
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
 `
 
@@ -169,7 +169,7 @@ export const ToolbarMenuItem = styled.button`
   padding: 0 10px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.3;
   text-align: left;
@@ -288,7 +288,7 @@ export const FindReplaceActions = styled.div`
   }
 `
 
-export const LiveEditorBody = styled.div`
+export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
@@ -302,6 +302,18 @@ export const LiveEditorBody = styled.div`
   line-height: 1.75;
   letter-spacing: -0.012em;
   tab-size: 2;
+
+  ${({ $isEmpty, theme }) =>
+    $isEmpty &&
+    `
+    .cm-content .cm-line:first-of-type::before {
+      content: "글 내용을 입력하거나 '/'를 눌러 서식을 빠르게 추가하세요...";
+      color: ${theme.colors.gray9};
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+    }
+  `}
 
   @media (max-width: 820px) {
     font-size: 15px;
@@ -327,6 +339,12 @@ export const LiveEditorBody = styled.div`
 
   .cm-content {
     caret-color: ${({ theme }) => theme.colors.gray12};
+  }
+
+  .cm-placeholder {
+    color: ${({ theme }) => theme.colors.gray9};
+    font-style: normal;
+    user-select: none;
   }
 
   .cm-content ::selection,

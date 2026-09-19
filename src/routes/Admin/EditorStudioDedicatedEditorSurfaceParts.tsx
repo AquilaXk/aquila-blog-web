@@ -311,7 +311,7 @@ export const EditorStudioDedicatedMetaSection = styled.section<{
   border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   border-radius: 0;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  padding: 22px 28px 17px;
+  padding: 22px 32px 17px;
 
   @media (max-width: 820px) {
     width: 100vw;
@@ -452,13 +452,13 @@ export const TitleInput = styled.textarea<{
   border: 0;
   border-radius: 0;
   padding: 0;
-  min-height: 44px;
+  min-height: 48px;
   background: transparent;
   box-shadow: none;
   font-family: inherit;
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 850;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.045em;
   resize: none;
   overflow: hidden;
@@ -475,7 +475,7 @@ export const TitleInput = styled.textarea<{
   }
 
   @media (max-width: 820px) {
-    font-size: 25px;
+    font-size: 28px;
   }
 `;
 export const EditorHeaderMetaRow = styled.div `
@@ -523,8 +523,8 @@ export const EditorStudioDedicatedCanvasSection = styled.section `
 `;
 export const PublishNotice = styled.div `
   position: absolute;
-  left: 28px;
-  right: 28px;
+  left: 32px;
+  right: 32px;
   bottom: 18px;
   z-index: 10;
   margin: 0;
