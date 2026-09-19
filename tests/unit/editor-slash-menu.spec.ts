@@ -77,7 +77,10 @@ test.describe("editor slash menu and toolbar usability", () => {
     const liveSurfaceContent = readFileSync(liveSurfacePath, "utf8")
 
     expect(liveSurfaceContent).toContain("40px")
-    expect(liveSurfaceContent).toContain("placeholder(")
-    expect(liveSurfaceContent).toContain("글 내용을 입력하거나 '/'를 눌러 서식을 빠르게 추가하세요...")
+
+    const stylesFilePath = resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts")
+    const stylesContent = readFileSync(stylesFilePath, "utf8")
+    expect(stylesContent).toContain("$isEmpty")
+    expect(stylesContent).toContain("글 내용을 입력하거나 '/'를 눌러 서식을 빠르게 추가하세요...")
   })
 })

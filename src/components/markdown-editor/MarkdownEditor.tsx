@@ -780,7 +780,7 @@ export const MarkdownEditor = ({
           query={findReplace.query}
         />
       ) : null}
-      <LiveEditorBody aria-disabled={disabled}>
+      <LiveEditorBody aria-disabled={disabled} $isEmpty={!draftValue}>
         <MarkdownEditorLiveSurface
           ref={liveSurfaceRef}
           value={draftValue}

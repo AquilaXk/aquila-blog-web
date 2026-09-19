@@ -24,7 +24,6 @@ import {
   EditorView,
   WidgetType,
   keymap,
-  placeholder,
   type DecorationSet,
 } from "@codemirror/view"
 import { GFM } from "@lezer/markdown"
@@ -236,11 +235,6 @@ const liveSurfaceTheme = EditorView.theme({
   ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
   ".cm-content": { minHeight: "640px", padding: "24px 32px 40px 32px" },
   ".cm-line": { padding: "0" },
-  ".cm-placeholder": {
-    color: "#8c8c8c",
-    fontStyle: "normal",
-    userSelect: "none",
-  },
   "@media (max-width: 820px)": {
     ".cm-content": { padding: "18px 16px 32px 16px" },
   },
@@ -287,7 +281,6 @@ export const MarkdownEditorLiveSurface = forwardRef<
         historyCompartment.of(history()),
         keymap.of([...historyKeymap, ...defaultKeymap]),
         EditorView.lineWrapping,
-        placeholder("글 내용을 입력하거나 '/'를 눌러 서식을 빠르게 추가하세요..."),
         compositionField,
         pointerSelectingField,
         decorationField,
