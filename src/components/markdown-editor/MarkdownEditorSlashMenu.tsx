@@ -11,6 +11,19 @@ export type SlashMenuItem = {
   action: () => void
 }
 
+export const SLASH_COMMAND_SPECS = [
+  { id: "heading-1", label: "제목 1 (H1)", description: "가장 큰 섹션 제목", icon: "H1", snippet: "# " },
+  { id: "heading-2", label: "제목 2 (H2)", description: "중간 섹션 제목", icon: "H2", snippet: "## " },
+  { id: "heading-3", label: "제목 3 (H3)", description: "작은 소제목", icon: "H3", snippet: "### " },
+  { id: "quote", label: "인용구 (Quote)", description: "참고 문헌이나 인용문", icon: "”", snippet: "> " },
+  { id: "code-block", label: "코드 블록 (Code)", description: "언어 구문 강조 코드 블록", icon: "</>", snippet: "```ts\n\n```" },
+  { id: "callout-tip", label: "콜아웃 팁 (Tip)", description: "유용한 팁 및 힌트 블록", icon: "💡", snippet: "> [!TIP]\n> " },
+  { id: "callout-warning", label: "콜아웃 주의 (Warning)", description: "주의사항 및 경고 블록", icon: "⚠️", snippet: "> [!WARNING]\n> " },
+  { id: "task-list", label: "할 일 목록 (Todo)", description: "체크박스 목록", icon: "☑", snippet: "- [ ] " },
+  { id: "table", label: "표 (Table)", description: "기본 표 삽입", icon: "▦", snippet: "__TABLE__" },
+  { id: "divider", label: "구분선 (Divider)", description: "가로 구분선", icon: "—", snippet: "\n---\n\n" },
+] as const
+
 type MarkdownEditorSlashMenuProps = {
   isOpen: boolean
   position: { top: number; left: number } | null

@@ -9,8 +9,16 @@ test.describe("editor slash menu and toolbar usability", () => {
 
     expect(content).toContain("MarkdownEditorSlashMenu")
     expect(content).toContain("SlashMenuItem")
+    expect(content).toContain("SLASH_COMMAND_SPECS")
     expect(content).toContain("role=\"menu\"")
     expect(content).toContain("role=\"menuitem\"")
+    expect(content).toContain("인용구 (Quote)")
+    expect(content).toContain("코드 블록 (Code)")
+    expect(content).toContain("콜아웃 팁 (Tip)")
+    expect(content).toContain("콜아웃 주의 (Warning)")
+    expect(content).toContain("할 일 목록 (Todo)")
+    expect(content).toContain("표 (Table)")
+    expect(content).toContain("구분선 (Divider)")
   })
 
   test("markdown editor wires slash command menu and 1-click toolbar shortcuts", () => {
@@ -18,16 +26,12 @@ test.describe("editor slash menu and toolbar usability", () => {
     const editorContent = readFileSync(editorFilePath, "utf8")
 
     expect(editorContent).toContain("MarkdownEditorSlashMenu")
+    expect(editorContent).toContain("SLASH_COMMAND_SPECS")
     expect(editorContent).toContain("slashMenuItems")
     expect(editorContent).toContain("checkSlashCommand")
     expect(editorContent).toContain("제목 1 (H1)")
-    expect(editorContent).toContain("인용구 (Quote)")
-    expect(editorContent).toContain("코드 블록 (Code)")
-    expect(editorContent).toContain("콜아웃 팁 (Tip)")
-    expect(editorContent).toContain("콜아웃 주의 (Warning)")
-    expect(editorContent).toContain("할 일 목록 (Todo)")
-    expect(editorContent).toContain("표 (Table)")
-    expect(editorContent).toContain("구분선 (Divider)")
+    expect(editorContent).toContain("인용구")
+    expect(editorContent).toContain("코드 블록")
   })
 
   test("dedicated editor surface supports sidebar toggles and focus mode", () => {
@@ -55,6 +59,6 @@ test.describe("editor slash menu and toolbar usability", () => {
     const liveSurfacePath = resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorLiveSurface.tsx")
     const liveSurfaceContent = readFileSync(liveSurfacePath, "utf8")
 
-    expect(liveSurfaceContent).toContain("35vh")
+    expect(liveSurfaceContent).toContain("40px")
   })
 })

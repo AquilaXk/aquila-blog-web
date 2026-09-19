@@ -51,7 +51,7 @@ import {
 } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
 import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
-import { MarkdownEditorSlashMenu, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
+import { MarkdownEditorSlashMenu, SLASH_COMMAND_SPECS, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -443,78 +443,17 @@ export const MarkdownEditor = ({
   )
 
   const slashMenuItems: SlashMenuItem[] = useMemo(
-    () => [
-      {
-        id: "heading-1",
-        label: "제목 1 (H1)",
-        description: "가장 큰 섹션 제목",
-        icon: "H1",
-        action: () => handleSelectSlashItem("# "),
-      },
-      {
-        id: "heading-2",
-        label: "제목 2 (H2)",
-        description: "중간 섹션 제목",
-        icon: "H2",
-        action: () => handleSelectSlashItem("## "),
-      },
-      {
-        id: "heading-3",
-        label: "제목 3 (H3)",
-        description: "작은 소제목",
-        icon: "H3",
-        action: () => handleSelectSlashItem("### "),
-      },
-      {
-        id: "quote",
-        label: "인용구 (Quote)",
-        description: "참고 문헌이나 인용문",
-        icon: "”",
-        action: () => handleSelectSlashItem("> "),
-      },
-      {
-        id: "code-block",
-        label: "코드 블록 (Code)",
-        description: "언어 구문 강조 코드 블록",
-        icon: "</>",
-        action: () => handleSelectSlashItem("```ts\n\n```"),
-      },
-      {
-        id: "callout-tip",
-        label: "콜아웃 팁 (Tip)",
-        description: "유용한 팁 및 힌트 블록",
-        icon: "💡",
-        action: () => handleSelectSlashItem("> [!TIP]\n> "),
-      },
-      {
-        id: "callout-warning",
-        label: "콜아웃 주의 (Warning)",
-        description: "주의사항 및 경고 블록",
-        icon: "⚠️",
-        action: () => handleSelectSlashItem("> [!WARNING]\n> "),
-      },
-      {
-        id: "task-list",
-        label: "할 일 목록 (Todo)",
-        description: "체크박스 목록",
-        icon: "☑",
-        action: () => handleSelectSlashItem("- [ ] "),
-      },
-      {
-        id: "table",
-        label: "표 (Table)",
-        description: "기본 표 삽입",
-        icon: "▦",
-        action: () => handleSelectSlashItem(createMarkdownEditorTable(2, 2) + "\n"),
-      },
-      {
-        id: "divider",
-        label: "구분선 (Divider)",
-        description: "가로 구분선",
-        icon: "—",
-        action: () => handleSelectSlashItem("\n---\n\n"),
-      },
-    ],
+    () =>
+      SLASH_COMMAND_SPECS.map((spec) => ({
+        id: spec.id,
+        label: spec.label,
+        description: spec.description,
+        icon: spec.icon,
+        action: () =>
+          handleSelectSlashItem(
+            spec.snippet === "__TABLE__" ? createMarkdownEditorTable(2, 2) + "\n" : spec.snippet
+          ),
+      })),
     [handleSelectSlashItem]
   )
 
@@ -617,46 +556,24 @@ export const MarkdownEditor = ({
             링크
           </ToolbarButton>
 
-          <ToolbarButton
-            type="button"
-            title="제목 1 (H1)"
-            aria-label="제목 1"
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applySnippet("# ", "")}
-          >
-            H1
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            title="제목 2 (H2)"
-            aria-label="제목 2"
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applySnippet("## ", "")}
-          >
-            H2
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            title="인용구"
-            aria-label="인용구"
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applySnippet("> ", "")}
-          >
-            ”
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            title="코드 블록"
-            aria-label="코드 블록"
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applySnippet("```ts\n", "\n```")}
-          >
-            {"</>"}
-          </ToolbarButton>
+          {([
+            ["제목 1 (H1)", "H1", "# "],
+            ["제목 2 (H2)", "H2", "## "],
+            ["인용구", "”", "> "],
+            ["코드 블록", "</>", "```ts\n", "\n```"],
+          ] as const).map(([title, label, before, after = ""]) => (
+            <ToolbarButton
+              key={title}
+              type="button"
+              title={title}
+              aria-label={title}
+              disabled={disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applySnippet(before, after)}
+            >
+              {label}
+            </ToolbarButton>
+          ))}
 
           <MarkdownEditorToolbarMenu
             label="제목"
