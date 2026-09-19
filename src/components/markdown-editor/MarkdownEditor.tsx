@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
   planToggleListCommand,
@@ -15,6 +15,7 @@ import {
 } from "./MarkdownEditor.styles"
 import {
   applyPlannedTextMutationToValue,
+  planReplaceSelection,
   planToggleWrapSelection,
   planWrapSelection,
   type PlannedTextMutation,
@@ -50,6 +51,7 @@ import {
 } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
 import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
+import { MarkdownEditorSlashMenu, SLASH_COMMAND_SPECS, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -417,13 +419,79 @@ export const MarkdownEditor = ({
     onRequestSave,
   })
 
+  const [slashMenuState, setSlashMenuState] = useState<{
+    isOpen: boolean
+    position: { top: number; left: number } | null
+  }>({
+    isOpen: false,
+    position: null,
+  })
+
+  const handleSelectSlashItem = useCallback(
+    (snippet: string) => {
+      const markdown = valueRef.current
+      const selection = selectionRef.current
+      let start = selection.from
+      const end = selection.to
+      if (start > 0 && markdown[start - 1] === "/") {
+        start -= 1
+      }
+      applyMutationPlan(planReplaceSelection(start, end, snippet))
+      setSlashMenuState({ isOpen: false, position: null })
+    },
+    [applyMutationPlan]
+  )
+
+  const slashMenuItems: SlashMenuItem[] = useMemo(
+    () =>
+      SLASH_COMMAND_SPECS.map((spec) => ({
+        id: spec.id,
+        label: spec.label,
+        description: spec.description,
+        icon: spec.icon,
+        action: () =>
+          handleSelectSlashItem(
+            spec.snippet === "__TABLE__" ? createMarkdownEditorTable(2, 2) + "\n" : spec.snippet
+          ),
+      })),
+    [handleSelectSlashItem]
+  )
+
+  const checkSlashCommand = useCallback((markdown: string, selection: TextareaSelection) => {
+    const pos = selection.from
+    if (pos === 0) {
+      setSlashMenuState({ isOpen: false, position: null })
+      return
+    }
+    const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
+    const lineText = markdown.slice(lineStart, pos)
+    if (lineText.trim() === "/") {
+      const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
+      let coords = { top: 240, left: 340 }
+      if (selectionObj && selectionObj.rangeCount > 0) {
+        const range = selectionObj.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+        if (rect.bottom > 0) {
+          coords = {
+            top: Math.min(rect.bottom + 8, window.innerHeight - 340),
+            left: Math.min(rect.left, window.innerWidth - 280),
+          }
+        }
+      }
+      setSlashMenuState({ isOpen: true, position: coords })
+    } else {
+      setSlashMenuState((prev) => (prev.isOpen ? { isOpen: false, position: null } : prev))
+    }
+  }, [])
+
   const handleLiveSelectionChange = useCallback(
     (selection: TextareaSelection) => {
       selectionRef.current = selection
       handleFindReplaceSelectionChange(selection)
       updateActiveTableSelection(valueRef.current, selection)
+      checkSlashCommand(valueRef.current, selection)
     },
-    [handleFindReplaceSelectionChange, updateActiveTableSelection]
+    [checkSlashCommand, handleFindReplaceSelectionChange, updateActiveTableSelection]
   )
 
   const handleLiveChange = useCallback(
@@ -434,8 +502,9 @@ export const MarkdownEditor = ({
     ) => {
       invalidateFindReplace()
       commitMarkdown(nextMarkdown, editorFocused, options)
+      checkSlashCommand(nextMarkdown, selectionRef.current)
     },
-    [commitMarkdown, invalidateFindReplace]
+    [checkSlashCommand, commitMarkdown, invalidateFindReplace]
   )
 
   return (
@@ -486,6 +555,25 @@ export const MarkdownEditor = ({
           >
             링크
           </ToolbarButton>
+
+          {([
+            ["제목 1 (H1)", "H1", "# "],
+            ["제목 2 (H2)", "H2", "## "],
+            ["인용구", "”", "> "],
+            ["코드 블록", "</>", "```ts\n", "\n```"],
+          ] as const).map(([title, label, before, after = ""]) => (
+            <ToolbarButton
+              key={title}
+              type="button"
+              title={title}
+              aria-label={title}
+              disabled={disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applySnippet(before, after)}
+            >
+              {label}
+            </ToolbarButton>
+          ))}
 
           <MarkdownEditorToolbarMenu
             label="제목"
@@ -676,6 +764,12 @@ export const MarkdownEditor = ({
           onDropCapture={handleDrop}
         />
       </LiveEditorBody>
+      <MarkdownEditorSlashMenu
+        isOpen={slashMenuState.isOpen}
+        position={slashMenuState.position}
+        items={slashMenuItems}
+        onClose={() => setSlashMenuState({ isOpen: false, position: null })}
+      />
     </EditorRoot>
   )
 }

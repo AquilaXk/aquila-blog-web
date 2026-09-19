@@ -156,7 +156,7 @@ export const EditorStudioSaveState = styled.span `
   }
 
   @media (max-width: 820px) {
-    display: none;
+    font-size: 10px;
   }
 `;
 const Button = styled.button `
@@ -218,18 +218,60 @@ export const SecondaryButton = styled(Button) `
     background: ${({ theme }) => theme.colors.gray2};
   }
 `;
-export const EditorStudioFrame = styled.div `
+export const EditorSidebarToggleButton = styled.button<{ $active?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.gray8 : theme.publicDesign.border)};
+  border-radius: 5px;
+  background: ${({ theme, $active }) => ($active ? theme.colors.gray4 : theme.publicDesign.readableSurface)};
+  color: ${({ theme, $active }) => ($active ? theme.colors.gray12 : theme.colors.gray10)};
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.gray8};
+    color: ${({ theme }) => theme.colors.gray12};
+    background: ${({ theme }) => theme.colors.gray3};
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4};
+  }
+`;
+
+export const EditorStudioFrame = styled.div<{
+  $showOutline?: boolean;
+  $showInspector?: boolean;
+}>`
   width: 100%;
   min-height: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 300px;
+  grid-template-columns: ${({ $showOutline = true, $showInspector = true }) => {
+    if ($showOutline && $showInspector) return "240px minmax(0, 1fr) 300px"
+    if ($showOutline && !$showInspector) return "240px minmax(0, 1fr)"
+    if (!$showOutline && $showInspector) return "minmax(0, 1fr) 300px"
+    return "minmax(0, 1fr)"
+  }};
   gap: 0;
   align-items: stretch;
   overflow-x: clip;
 
   @media (max-width: 1100px) {
-    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-columns: ${({ $showOutline = true, $showInspector = false }) => {
+      if ($showOutline && $showInspector) return "200px minmax(0, 1fr)"
+      if ($showOutline) return "200px minmax(0, 1fr)"
+      if ($showInspector) return "minmax(0, 1fr)"
+      return "minmax(0, 1fr)"
+    }};
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
@@ -241,15 +283,20 @@ export const EditorStudioFrame = styled.div `
     overflow-y: auto;
   }
 `;
+
 export const EditorStudioWritingColumn = styled.section<{
-    $compact?: boolean;
-}> `
+  $compact?: boolean;
+  $zenMode?: boolean;
+}>`
   position: relative;
   display: grid;
   min-width: 0;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
+  max-width: ${({ $zenMode }) => ($zenMode ? "880px" : "100%")};
+  margin: ${({ $zenMode }) => ($zenMode ? "0 auto" : "0")};
+  width: 100%;
 `;
 export const EditorStudioDedicatedMetaSection = styled.section<{
     $compact?: boolean;
@@ -516,6 +563,38 @@ export const PublishNotice = styled.div `
     left: 16px;
     right: 16px;
     bottom: 16px;
+  }
+`;
+
+export const EditorPanelHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 16px;
+
+  h3 {
+    margin: 0;
+    color: ${({ theme }) => theme.colors.gray10};
+    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  button {
+    border: 0;
+    background: transparent;
+    color: ${({ theme }) => theme.colors.gray9};
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+
+    &:hover {
+      color: ${({ theme }) => theme.colors.gray12};
+      background: ${({ theme }) => theme.colors.gray3};
+    }
   }
 `;
 
