@@ -136,7 +136,7 @@ export const ToolbarMenuTrigger = styled(ToolbarButton)`
 `
 
 export const ToolbarMenuChevron = styled.span`
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
 `
 
@@ -169,7 +169,7 @@ export const ToolbarMenuItem = styled.button`
   padding: 0 10px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.3;
   text-align: left;
@@ -327,6 +327,12 @@ export const LiveEditorBody = styled.div`
 
   .cm-content {
     caret-color: ${({ theme }) => theme.colors.gray12};
+  }
+
+  .cm-placeholder {
+    color: ${({ theme }) => theme.colors.gray9};
+    font-style: normal;
+    user-select: none;
   }
 
   .cm-content ::selection,
