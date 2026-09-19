@@ -11,7 +11,7 @@ export const EditorRoot = styled.section`
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  border: 0;
   border-radius: 0;
   overflow: hidden;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
@@ -296,11 +296,16 @@ export const LiveEditorBody = styled.div`
   overflow: hidden;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   color: ${({ theme }) => theme.colors.gray12};
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.78;
+  font-family: var(--aq-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
+  font-size: 16px;
+  font-weight: 450;
+  line-height: 1.75;
+  letter-spacing: -0.012em;
   tab-size: 2;
+
+  @media (max-width: 820px) {
+    font-size: 15px;
+  }
 
   [data-testid="markdown-editor-live-surface"] {
     height: 100%;
@@ -313,8 +318,7 @@ export const LiveEditorBody = styled.div`
   }
 
   .cm-editor.cm-focused {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: -2px;
+    outline: none;
   }
 
   .cm-scroller {
@@ -338,31 +342,37 @@ export const LiveEditorBody = styled.div`
   .cm-live-heading {
     color: ${({ theme }) => theme.colors.gray12};
     font-family: var(--aq-font-sans);
-    font-weight: 600;
-    letter-spacing: -0.035em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
   }
 
   .cm-live-heading-1 {
-    font-size: 1.9em;
+    font-size: 2em;
     line-height: 1.28;
+    margin-top: 1.1em;
+    margin-bottom: 0.4em;
   }
 
   .cm-live-heading-2 {
-    font-size: 1.55em;
+    font-size: 1.6em;
     line-height: 1.34;
+    margin-top: 1em;
+    margin-bottom: 0.35em;
   }
 
   .cm-live-heading-3,
   .cm-live-heading-4,
   .cm-live-heading-5,
   .cm-live-heading-6 {
-    font-size: 1.24em;
-    line-height: 1.42;
+    font-size: 1.3em;
+    line-height: 1.4;
+    margin-top: 0.9em;
+    margin-bottom: 0.3em;
   }
 
   .cm-live-strong {
     color: ${({ theme }) => theme.colors.gray12};
-    font-weight: 800;
+    font-weight: 750;
   }
 
   .cm-live-emphasis {
@@ -377,9 +387,11 @@ export const LiveEditorBody = styled.div`
   .cm-live-inline-code {
     border: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-radius: 4px;
-    padding: 0.08em 0.3em;
+    padding: 0.12em 0.38em;
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray11};
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.88em;
   }
 
   .cm-live-link {
@@ -435,6 +447,9 @@ export const LiveEditorBody = styled.div`
 
   .cm-live-fenced-code {
     color: ${({ theme }) => theme.colors.gray11};
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.9em;
+    line-height: 1.65;
   }
 
   &[aria-disabled="true"] .cm-editor {

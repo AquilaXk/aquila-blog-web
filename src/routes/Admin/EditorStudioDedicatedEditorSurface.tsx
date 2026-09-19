@@ -22,6 +22,8 @@ import {
   EditorInspectorTagInputRow,
   EditorOutline,
   EditorOutlineItem,
+  EditorPanelHeader,
+  EditorSidebarToggleButton,
   EditorStudioDedicatedCanvasSection,
   EditorStudioDedicatedMetaSection,
   EditorStudioDedicatedTopBar,
@@ -211,7 +213,21 @@ export const EditorStudioDedicatedEditorSurface = ({
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false)
+  const [isOutlineOpen, setIsOutlineOpen] = useState(true)
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
+  const isZenMode = !isOutlineOpen && !isInspectorOpen
+
+  const handleToggleZenMode = () => {
+    if (isZenMode) {
+      setIsOutlineOpen(true)
+      setIsInspectorOpen(true)
+    } else {
+      setIsOutlineOpen(false)
+      setIsInspectorOpen(false)
+    }
+  }
+
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(postContent), [postContent])
   const outlineItems = useMemo(() => {
     const title = postTitle.trim()
@@ -264,11 +280,42 @@ export const EditorStudioDedicatedEditorSurface = ({
       />
 
       <EditorStudioDedicatedTopBar>
-        <EditorExitAction type="button" onClick={onExit}>
-          ← 글 관리
-        </EditorExitAction>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <EditorExitAction type="button" onClick={onExit}>
+            ← 글 관리
+          </EditorExitAction>
+          <EditorSidebarToggleButton
+            type="button"
+            $active={isOutlineOpen}
+            onClick={() => setIsOutlineOpen((prev) => !prev)}
+            aria-label="문서 목차 토글"
+            title="문서 목차 토글"
+          >
+            목차
+          </EditorSidebarToggleButton>
+        </div>
+
         {saveStateText ? <EditorStudioSaveState data-tone={saveStateTone}>{saveStateText}</EditorStudioSaveState> : <span />}
+
         <EditorStudioTopBarActions>
+          <EditorSidebarToggleButton
+            type="button"
+            $active={isZenMode}
+            onClick={handleToggleZenMode}
+            aria-label="집중 모드 토글"
+            title="집중 모드 (사이드바 숨김)"
+          >
+            {isZenMode ? "집중 모드 켜짐" : "집중 모드"}
+          </EditorSidebarToggleButton>
+          <EditorSidebarToggleButton
+            type="button"
+            $active={isInspectorOpen}
+            onClick={() => setIsInspectorOpen((prev) => !prev)}
+            aria-label="발행 설정 토글"
+            title="발행 설정 패널 토글"
+          >
+            발행 설정
+          </EditorSidebarToggleButton>
           <SecondaryButton type="button" onClick={() => setIsGuideOpen(true)}>
             Markdown 가이드
           </SecondaryButton>
@@ -278,34 +325,49 @@ export const EditorStudioDedicatedEditorSurface = ({
         </EditorStudioTopBarActions>
       </EditorStudioDedicatedTopBar>
 
-      <EditorStudioFrame data-testid="editor-studio-frame">
-        <EditorOutline aria-label="문서 목차">
-          <h3>Document outline</h3>
-          {outlineItems.length > 0 ? (
-            outlineItems.map((item, index) => (
-              <EditorOutlineItem
-                key={item.id}
-                type="button"
-                data-level={item.level}
-                data-active={index === 0 ? "true" : "false"}
-                onClick={() => {
-                  if (item.range) {
-                    onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
-                    return
-                  }
-                  titleNodeRef.current?.focus()
-                }}
-              >
-                <span>H{item.level}</span>
-                <strong>{item.label}</strong>
-              </EditorOutlineItem>
-            ))
-          ) : (
-            <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
-          )}
-        </EditorOutline>
+      <EditorStudioFrame
+        data-testid="editor-studio-frame"
+        $showOutline={isOutlineOpen}
+        $showInspector={isInspectorOpen}
+      >
+        {isOutlineOpen ? (
+          <EditorOutline aria-label="문서 목차">
+            <EditorPanelHeader>
+              <h3>Document outline</h3>
+              <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>
+                ×
+              </button>
+            </EditorPanelHeader>
+            {outlineItems.length > 0 ? (
+              outlineItems.map((item, index) => (
+                <EditorOutlineItem
+                  key={item.id}
+                  type="button"
+                  data-level={item.level}
+                  data-active={index === 0 ? "true" : "false"}
+                  onClick={() => {
+                    if (item.range) {
+                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
+                      return
+                    }
+                    titleNodeRef.current?.focus()
+                  }}
+                >
+                  <span>H{item.level}</span>
+                  <strong>{item.label}</strong>
+                </EditorOutlineItem>
+              ))
+            ) : (
+              <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
+            )}
+          </EditorOutline>
+        ) : null}
 
-        <EditorStudioWritingColumn data-testid="editor-writing-column" $compact={isCompactSplitPreview}>
+        <EditorStudioWritingColumn
+          data-testid="editor-writing-column"
+          $compact={isCompactSplitPreview}
+          $zenMode={isZenMode}
+        >
           <EditorStudioDedicatedMetaSection $compact={isCompactSplitPreview}>
             <TitleInput
               $compact={isCompactSplitPreview}
@@ -343,8 +405,14 @@ export const EditorStudioDedicatedEditorSurface = ({
           {showPublishNotice ? <PublishNotice data-tone={publishNoticeTone}>{publishNoticeText}</PublishNotice> : null}
         </EditorStudioWritingColumn>
 
-        <EditorInspector aria-label="발행 설정">
-          <h3>발행 설정</h3>
+        {isInspectorOpen ? (
+          <EditorInspector aria-label="발행 설정">
+            <EditorPanelHeader>
+              <h3>발행 설정</h3>
+              <button type="button" aria-label="발행 설정 닫기" onClick={() => setIsInspectorOpen(false)}>
+                ×
+              </button>
+            </EditorPanelHeader>
           <label>
             <span>공개 범위</span>
             <select value={postVisibility} onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}>
@@ -430,6 +498,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
           ) : null}
         </EditorInspector>
+        ) : null}
       </EditorStudioFrame>
 
       {isGuideOpen ? (

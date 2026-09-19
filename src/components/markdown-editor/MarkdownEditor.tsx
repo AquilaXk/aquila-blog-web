@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
   planToggleListCommand,
@@ -15,6 +15,7 @@ import {
 } from "./MarkdownEditor.styles"
 import {
   applyPlannedTextMutationToValue,
+  planReplaceSelection,
   planToggleWrapSelection,
   planWrapSelection,
   type PlannedTextMutation,
@@ -50,6 +51,7 @@ import {
 } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
 import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
+import { MarkdownEditorSlashMenu, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -417,13 +419,140 @@ export const MarkdownEditor = ({
     onRequestSave,
   })
 
+  const [slashMenuState, setSlashMenuState] = useState<{
+    isOpen: boolean
+    position: { top: number; left: number } | null
+  }>({
+    isOpen: false,
+    position: null,
+  })
+
+  const handleSelectSlashItem = useCallback(
+    (snippet: string) => {
+      const markdown = valueRef.current
+      const selection = selectionRef.current
+      let start = selection.from
+      const end = selection.to
+      if (start > 0 && markdown[start - 1] === "/") {
+        start -= 1
+      }
+      applyMutationPlan(planReplaceSelection(start, end, snippet))
+      setSlashMenuState({ isOpen: false, position: null })
+    },
+    [applyMutationPlan]
+  )
+
+  const slashMenuItems: SlashMenuItem[] = useMemo(
+    () => [
+      {
+        id: "heading-1",
+        label: "제목 1 (H1)",
+        description: "가장 큰 섹션 제목",
+        icon: "H1",
+        action: () => handleSelectSlashItem("# "),
+      },
+      {
+        id: "heading-2",
+        label: "제목 2 (H2)",
+        description: "중간 섹션 제목",
+        icon: "H2",
+        action: () => handleSelectSlashItem("## "),
+      },
+      {
+        id: "heading-3",
+        label: "제목 3 (H3)",
+        description: "작은 소제목",
+        icon: "H3",
+        action: () => handleSelectSlashItem("### "),
+      },
+      {
+        id: "quote",
+        label: "인용구 (Quote)",
+        description: "참고 문헌이나 인용문",
+        icon: "”",
+        action: () => handleSelectSlashItem("> "),
+      },
+      {
+        id: "code-block",
+        label: "코드 블록 (Code)",
+        description: "언어 구문 강조 코드 블록",
+        icon: "</>",
+        action: () => handleSelectSlashItem("```ts\n\n```"),
+      },
+      {
+        id: "callout-tip",
+        label: "콜아웃 팁 (Tip)",
+        description: "유용한 팁 및 힌트 블록",
+        icon: "💡",
+        action: () => handleSelectSlashItem("> [!TIP]\n> "),
+      },
+      {
+        id: "callout-warning",
+        label: "콜아웃 주의 (Warning)",
+        description: "주의사항 및 경고 블록",
+        icon: "⚠️",
+        action: () => handleSelectSlashItem("> [!WARNING]\n> "),
+      },
+      {
+        id: "task-list",
+        label: "할 일 목록 (Todo)",
+        description: "체크박스 목록",
+        icon: "☑",
+        action: () => handleSelectSlashItem("- [ ] "),
+      },
+      {
+        id: "table",
+        label: "표 (Table)",
+        description: "기본 표 삽입",
+        icon: "▦",
+        action: () => handleSelectSlashItem(createMarkdownEditorTable(2, 2) + "\n"),
+      },
+      {
+        id: "divider",
+        label: "구분선 (Divider)",
+        description: "가로 구분선",
+        icon: "—",
+        action: () => handleSelectSlashItem("\n---\n\n"),
+      },
+    ],
+    [handleSelectSlashItem]
+  )
+
+  const checkSlashCommand = useCallback((markdown: string, selection: TextareaSelection) => {
+    const pos = selection.from
+    if (pos === 0) {
+      setSlashMenuState({ isOpen: false, position: null })
+      return
+    }
+    const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
+    const lineText = markdown.slice(lineStart, pos)
+    if (lineText.trim() === "/") {
+      const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
+      let coords = { top: 240, left: 340 }
+      if (selectionObj && selectionObj.rangeCount > 0) {
+        const range = selectionObj.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+        if (rect.bottom > 0) {
+          coords = {
+            top: Math.min(rect.bottom + 8, window.innerHeight - 340),
+            left: Math.min(rect.left, window.innerWidth - 280),
+          }
+        }
+      }
+      setSlashMenuState({ isOpen: true, position: coords })
+    } else {
+      setSlashMenuState((prev) => (prev.isOpen ? { isOpen: false, position: null } : prev))
+    }
+  }, [])
+
   const handleLiveSelectionChange = useCallback(
     (selection: TextareaSelection) => {
       selectionRef.current = selection
       handleFindReplaceSelectionChange(selection)
       updateActiveTableSelection(valueRef.current, selection)
+      checkSlashCommand(valueRef.current, selection)
     },
-    [handleFindReplaceSelectionChange, updateActiveTableSelection]
+    [checkSlashCommand, handleFindReplaceSelectionChange, updateActiveTableSelection]
   )
 
   const handleLiveChange = useCallback(
@@ -434,8 +563,9 @@ export const MarkdownEditor = ({
     ) => {
       invalidateFindReplace()
       commitMarkdown(nextMarkdown, editorFocused, options)
+      checkSlashCommand(nextMarkdown, selectionRef.current)
     },
-    [commitMarkdown, invalidateFindReplace]
+    [checkSlashCommand, commitMarkdown, invalidateFindReplace]
   )
 
   return (
@@ -485,6 +615,47 @@ export const MarkdownEditor = ({
             onClick={() => applyFormatShortcutOrAppend("link")}
           >
             링크
+          </ToolbarButton>
+
+          <ToolbarButton
+            type="button"
+            title="제목 1 (H1)"
+            aria-label="제목 1"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applySnippet("# ", "")}
+          >
+            H1
+          </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            title="제목 2 (H2)"
+            aria-label="제목 2"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applySnippet("## ", "")}
+          >
+            H2
+          </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            title="인용구"
+            aria-label="인용구"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applySnippet("> ", "")}
+          >
+            ”
+          </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            title="코드 블록"
+            aria-label="코드 블록"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applySnippet("```ts\n", "\n```")}
+          >
+            {"</>"}
           </ToolbarButton>
 
           <MarkdownEditorToolbarMenu
@@ -676,6 +847,12 @@ export const MarkdownEditor = ({
           onDropCapture={handleDrop}
         />
       </LiveEditorBody>
+      <MarkdownEditorSlashMenu
+        isOpen={slashMenuState.isOpen}
+        position={slashMenuState.position}
+        items={slashMenuItems}
+        onClose={() => setSlashMenuState({ isOpen: false, position: null })}
+      />
     </EditorRoot>
   )
 }

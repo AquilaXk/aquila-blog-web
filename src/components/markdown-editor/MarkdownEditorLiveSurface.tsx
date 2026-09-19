@@ -233,10 +233,10 @@ const decorationField = StateField.define<DecorationSet>({
 const liveSurfaceTheme = EditorView.theme({
   "&": { height: "100%" },
   ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
-  ".cm-content": { minHeight: "640px", padding: "30px 32px" },
+  ".cm-content": { minHeight: "640px", padding: "24px 32px 35vh 32px" },
   ".cm-line": { padding: "0" },
   "@media (max-width: 820px)": {
-    ".cm-content": { padding: "22px 18px" },
+    ".cm-content": { padding: "18px 16px 25vh 16px" },
   },
 })
 
