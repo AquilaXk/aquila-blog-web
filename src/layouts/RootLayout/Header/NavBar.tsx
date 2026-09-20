@@ -220,7 +220,7 @@ const NavBar = () => {
                   </Link>
                 )
               })}
-              <div className="mobileLangSwitchRow" role="group" aria-label={t("langSwitchAria")}>
+              <div className="mobileLangSwitchRow">
                 <button
                   type="button"
                   className="mobileLangBtn"
@@ -274,7 +274,7 @@ const NavBar = () => {
       </ul>
 
       <div className="authArea">
-        <div className="langSwitchGroup" role="group" aria-label={t("langSwitchAria")}>
+        <div className="langSwitchGroup">
           <GlobeIcon />
           <button
             type="button"
