@@ -33,14 +33,6 @@ export const ExplorerCard = styled.section`
     font-weight: 750;
   }
 
-  .feedDescription {
-    margin: 2px 0 0;
-    color: var(--aq-muted);
-    max-width: 560px;
-    font-size: 0.875rem;
-    line-height: 1.5;
-  }
-
   .searchSlot {
     min-width: 0;
     display: flex;

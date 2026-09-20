@@ -552,7 +552,6 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
           <ExplorerCard>
             <div className="feedTitle">
               <h1 className="feedHeading">{t("recentPosts")}</h1>
-              <p className="feedDescription">{t("recentPostsSubtitle")}</p>
             </div>
             <div className="searchSlot">
               <SearchInput

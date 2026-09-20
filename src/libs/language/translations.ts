@@ -7,10 +7,6 @@ const translationTable = {
   navSearch: ["검색", "Search"],
   navSearchShortcut: ["글과 태그 검색", "Search posts & tags"],
   recentPosts: ["최근 글", "Recent Posts"],
-  recentPostsSubtitle: [
-    "소프트웨어 아키텍처와 엔지니어링 탐구 기록",
-    "Writing on software architecture and systems engineering",
-  ],
   tagTitle: ["태그", "Tags"],
   tagAll: ["전체", "All"],
   tagListAria: ["태그 목록", "Tag list"],
