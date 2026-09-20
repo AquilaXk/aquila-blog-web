@@ -40,4 +40,10 @@ test.describe("language system and translations", () => {
     expect(translations.ko.navTopics).toBe("태그")
     expect(translations.en.navTopics).toBe("Tags")
   })
+
+  test("recentPosts translation key has no companion subtitle key", () => {
+    const keys = Object.keys(translations.ko)
+    const subtitleKeys = keys.filter((key) => key.toLowerCase().includes("subtitle"))
+    expect(subtitleKeys).toEqual([])
+  })
 })

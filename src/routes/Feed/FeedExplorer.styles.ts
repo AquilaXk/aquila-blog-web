@@ -6,7 +6,7 @@ const FEED_POST_COLUMN_MAX_WIDTH_REM = 100
 export const ExplorerCard = styled.section`
   --feed-post-column-max-width: ${FEED_POST_COLUMN_MAX_WIDTH_REM}rem;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 0;
@@ -20,10 +20,9 @@ export const ExplorerCard = styled.section`
 
   .feedTitle {
     min-width: 0;
-    display: grid;
-    gap: 4px;
   }
 
+  .feedHeading,
   .feedTitle h1 {
     margin: 0;
     color: var(--aq-text);
