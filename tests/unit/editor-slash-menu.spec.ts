@@ -60,7 +60,7 @@ test.describe("editor slash menu and toolbar usability", () => {
     expect(partsContent).toContain("right: 32px")
   })
 
-  test("editor body typography is upgraded to 16px sans-serif and toolbar chevron is 11px", () => {
+  test("editor body typography is upgraded to 16px sans-serif and toolbar chevron is 12px svg", () => {
     const stylesFilePath = resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts")
     const stylesContent = readFileSync(stylesFilePath, "utf8")
 
@@ -68,7 +68,8 @@ test.describe("editor slash menu and toolbar usability", () => {
     expect(stylesContent).toContain("font-size: 16px")
     expect(stylesContent).toContain("line-height: 1.75")
     expect(stylesContent).toContain(".cm-live-fenced-code")
-    expect(stylesContent).toContain("font-size: 11px")
+    expect(stylesContent).toContain("width: 12px")
+    expect(stylesContent).toContain("height: 12px")
     expect(stylesContent).toContain(".cm-placeholder")
   })
 

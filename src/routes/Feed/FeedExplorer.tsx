@@ -1,11 +1,5 @@
 import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
+  startTransition, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent,
 } from "react"
 import { InfiniteData, useQueryClient } from "@tanstack/react-query"
 import SearchInput from "./SearchInput"
@@ -19,37 +13,19 @@ import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import { FEED_EXPLORE_PAGE_SIZE } from "src/constants/feed"
 import { type ExplorePostsPage } from "src/apis/backend/posts"
 import { normalizeKeywordQuery, normalizeOptionalTagQuery, normalizeTagQuery } from "src/libs/query/normalize"
+import { useLanguage } from "src/libs/language"
 import { ExplorerCard, FeedBody, FilterContextBar } from "./FeedExplorer.styles"
 import {
-  FEED_EXPLORER_ORDER,
-  FEED_EXPLORER_SNAPSHOT_MAX_BYTES,
-  getFeedExplorerRestoreKey,
-  getFeedExplorerSnapshotKey,
-  isCursorOnlyPublicFeedRestoreSnapshot,
-  parseFeedExplorerRestoreSnapshot,
-  parseFeedExplorerRestoreState,
-  pruneFeedExplorerStateStorage,
-  resolveRestorePageCap,
-  resolveSnapshotPageCap,
-  scheduleIdleRevalidate,
-  shouldRestoreFeedExplorerSession,
-  toFeedExplorerInfiniteQueryKey,
-  toPersistFingerprint,
-  toRestoredPageParams,
-  toRestoredPage,
-  toSnapshotPageParam,
-  toSnapshotPage,
-  type FeedExplorerRestoreSnapshot,
-  type FeedExplorerRestoreState,
-  type FeedExplorerSnapshotPage,
-  type FeedExplorerSnapshotPageParam,
+  FEED_EXPLORER_ORDER, FEED_EXPLORER_SNAPSHOT_MAX_BYTES, getFeedExplorerRestoreKey, getFeedExplorerSnapshotKey,
+  isCursorOnlyPublicFeedRestoreSnapshot, parseFeedExplorerRestoreSnapshot, parseFeedExplorerRestoreState,
+  pruneFeedExplorerStateStorage, resolveRestorePageCap, resolveSnapshotPageCap, scheduleIdleRevalidate,
+  shouldRestoreFeedExplorerSession, toFeedExplorerInfiniteQueryKey, toPersistFingerprint, toRestoredPageParams,
+  toRestoredPage, toSnapshotPageParam, toSnapshotPage, type FeedExplorerRestoreSnapshot, type FeedExplorerRestoreState,
+  type FeedExplorerSnapshotPage, type FeedExplorerSnapshotPageParam,
 } from "./FeedExplorerRestoreModel"
 import {
-  FEED_SORT_OPTIONS,
-  feedSortOptionId,
-  resolveFeedSortListboxKeyDown,
-  resolveFeedSortTriggerKeyDown,
-  type FeedSortMode,
+  FEED_SORT_OPTIONS, feedSortOptionId, resolveFeedSortListboxKeyDown,
+  resolveFeedSortTriggerKeyDown, type FeedSortMode,
 } from "./FeedSortMenuModel"
 
 const LOAD_MORE_THROTTLE_MS = 800
@@ -60,6 +36,7 @@ type FeedExplorerProps = {
 }
 
 const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
+  const { t } = useLanguage()
   const queryClient = useQueryClient()
   const [q, setQ] = useState("")
   const [sortMode, setSortMode] = useState<FeedSortMode>("latest")
@@ -501,7 +478,11 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     })
   }, [currentTag, router])
   const currentSortLabel =
-    FEED_SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "최신순"
+    sortMode === "latest"
+      ? t("sortLatest")
+      : sortMode === "views"
+      ? t("sortViews")
+      : t("sortLikes")
 
   const handleSortSelect = useCallback(
     (value: FeedSortMode) => {
@@ -570,9 +551,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
         <section className="postColumn">
           <ExplorerCard>
             <div className="feedTitle">
-              <span>Latest Notes</span>
-              <h1>최근 글</h1>
-              <p className="feedDescription">실제 운영에서 마주친 문제와 선택, 검증 결과를 긴 글로 정리합니다.</p>
+              <h1 className="feedHeading">{t("recentPosts")}</h1>
+              <p className="feedDescription">{t("recentPostsSubtitle")}</p>
             </div>
             <div className="searchSlot">
               <SearchInput
@@ -590,6 +570,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
                   aria-haspopup="listbox"
                   aria-expanded={sortOpen}
                   aria-controls="feed-sort-listbox"
+                  aria-label={t("sortTriggerLabel")}
                   onClick={() => {
                     if (sortOpen) {
                       closeSortMenu(false)
@@ -613,26 +594,34 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
                     className="sortMenu"
                     role="listbox"
                     tabIndex={0}
-                    aria-label="피드 정렬"
+                    aria-label={t("sortTriggerLabel")}
                     aria-activedescendant={activeSortOptionId}
                     onKeyDown={handleSortListboxKeyDown}
                   >
-                    {FEED_SORT_OPTIONS.map((option, index) => (
-                      <button
-                        type="button"
-                        key={option.value}
-                        id={feedSortOptionId(option.value)}
-                        className="sortOption"
-                        role="option"
-                        tabIndex={-1}
-                        aria-selected={sortMode === option.value}
-                        data-active={sortActiveIndex === index || sortMode === option.value}
-                        onClick={() => handleSortSelect(option.value)}
-                        onMouseEnter={() => setSortActiveIndex(index)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                    {FEED_SORT_OPTIONS.map((option, index) => {
+                      const optionLabel =
+                        option.value === "latest"
+                          ? t("sortLatest")
+                          : option.value === "views"
+                          ? t("sortViews")
+                          : t("sortLikes")
+                      return (
+                        <button
+                          type="button"
+                          key={option.value}
+                          id={feedSortOptionId(option.value)}
+                          className="sortOption"
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={sortMode === option.value}
+                          data-active={sortActiveIndex === index || sortMode === option.value}
+                          onClick={() => handleSortSelect(option.value)}
+                          onMouseEnter={() => setSortActiveIndex(index)}
+                        >
+                          {optionLabel}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -641,14 +630,18 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
           {(hasFilter || contextStatusLabel) && (
             <FilterContextBar>
               <div className="contextMain">
-                <strong className="contextCount">{hasFilter ? `${resultCount}개` : `피드 ${resultCount}개`}</strong>
+                <strong className="contextCount">
+                  {hasFilter
+                    ? `${resultCount}${t("filterResultUnit")}`
+                    : `${t("filterFeedPrefix")}${resultCount}${t("filterResultUnit")}`}
+                </strong>
                 {hasFilter && <span className="filterSummary">{filterSummary}</span>}
                 {contextStatusLabel ? <span className="statusBadge">{contextStatusLabel}</span> : null}
               </div>
               <div className="contextActions">
                 {hasFilter && (
                   <button type="button" className="resetButton" onClick={handleClearFilters}>
-                    초기화
+                    {t("filterReset")}
                   </button>
                 )}
               </div>

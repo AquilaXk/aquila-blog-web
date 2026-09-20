@@ -1,24 +1,28 @@
 import React, { memo } from "react"
 import styled from "@emotion/styled"
 import AppIcon from "src/components/icons/AppIcon"
+import { useLanguage } from "src/libs/language"
 
 type Props = {
   hasFilter: boolean
   onRetryInitialLoad?: () => void
 }
 
-const InitialLoadErrorState: React.FC<Props> = ({ hasFilter, onRetryInitialLoad }) => (
-  <StyledWrapper role="alert" aria-live="assertive">
-    <div className="initialLoadErrorIcon" aria-hidden="true">
-      <AppIcon name="question" />
-    </div>
-    <h3>{hasFilter ? "검색 결과를 불러오지 못했습니다." : "게시글을 불러오지 못했습니다."}</h3>
-    <p>일시적인 연결 문제일 수 있습니다. 기존 빈 목록으로 처리하지 않고 다시 시도할 수 있습니다.</p>
-    <button type="button" onClick={onRetryInitialLoad}>
-      다시 시도
-    </button>
-  </StyledWrapper>
-)
+const InitialLoadErrorState: React.FC<Props> = ({ hasFilter, onRetryInitialLoad }) => {
+  const { t } = useLanguage()
+  return (
+    <StyledWrapper role="alert" aria-live="assertive">
+      <div className="initialLoadErrorIcon" aria-hidden="true">
+        <AppIcon name="question" />
+      </div>
+      <h3>{hasFilter ? t("initialErrorFilterTitle") : t("initialErrorTitle")}</h3>
+      <p>{t("initialErrorDesc")}</p>
+      <button type="button" onClick={onRetryInitialLoad}>
+        {t("initialErrorRetry")}
+      </button>
+    </StyledWrapper>
+  )
+}
 
 export default memo(InitialLoadErrorState)
 

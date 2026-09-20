@@ -9,6 +9,7 @@ import { useAdminProfile, type AdminProfile } from "src/hooks/useAdminProfile"
 import { isNavigationCancelledError, isRequestCancelledError } from "src/libs/router"
 import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import { FLUID_LAYOUT_MAX_PX } from "./layoutTiers"
+import { LanguageProvider } from "src/libs/language"
 
 const INITIAL_PROPS_CANCELLED_MESSAGE = "loading initial props cancelled"
 const RootAdminProfileContext = React.createContext<AdminProfile | null>(null)
@@ -130,14 +131,16 @@ const RootLayout = ({
   }, [])
 
   return (
-    <ThemeProvider scheme={effectiveScheme} blogDesign={effectiveBlogDesign}>
-      <RootAdminProfileContext.Provider value={adminProfile}>
-        {isAdminRoute || isDedicatedEditorRoute || isStandaloneSurfaceRoute ? null : (
-          <Header fullWidth={false} blogTitle={headerBlogTitle} />
-        )}
-        <LayoutShell $fullBleed={isFullBleedRoute}>{children}</LayoutShell>
-      </RootAdminProfileContext.Provider>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider scheme={effectiveScheme} blogDesign={effectiveBlogDesign}>
+        <RootAdminProfileContext.Provider value={adminProfile}>
+          {isAdminRoute || isDedicatedEditorRoute || isStandaloneSurfaceRoute ? null : (
+            <Header fullWidth={false} blogTitle={headerBlogTitle} />
+          )}
+          <LayoutShell $fullBleed={isFullBleedRoute}>{children}</LayoutShell>
+        </RootAdminProfileContext.Provider>
+      </ThemeProvider>
+    </LanguageProvider>
   )
 }
 

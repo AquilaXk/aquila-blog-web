@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { waitForFeedSearchInputFocus } from "src/routes/Feed/feedSearchFocus"
 import { zIndexes } from "src/styles/zIndexes"
+import { useLanguage } from "src/libs/language"
 
 const primaryLinks = [
   ["notes", "Notes", "/"],
@@ -51,6 +52,7 @@ const waitForFocusTrapRestore = () =>
 
 const NavBar = () => {
   const router = useRouter()
+  const { language, setLanguage, t } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null)
@@ -199,14 +201,37 @@ const NavBar = () => {
                 aria-keyshortcuts="Meta+K Control+K"
                 onClick={requestFocusFeedSearch}
               >
-                <span>검색</span>
+                <span>{t("navSearch")}</span>
                 <kbd>{SEARCH_SHORTCUT_HINT}</kbd>
               </button>
-              {primaryLinks.map(([, name, to]) => (
-                <Link key={to} href={to} onClick={closeMobileMenu}>
-                  {name}
-                </Link>
-              ))}
+              {primaryLinks.map(([id, , to]) => {
+                const label = id === "notes" ? t("navNotes") : id === "topics" ? t("navTopics") : t("navAbout")
+                return (
+                  <Link key={to} href={to} data-nav-id={id} aria-label={label} onClick={closeMobileMenu}>
+                    {label}
+                  </Link>
+                )
+              })}
+              <div className="mobileLangSwitchRow" role="group" aria-label={t("langSwitchAria")}>
+                <button
+                  type="button"
+                  className="mobileLangBtn"
+                  data-active={language === "ko"}
+                  aria-pressed={language === "ko"}
+                  onClick={() => setLanguage("ko")}
+                >
+                  한국어 (KO)
+                </button>
+                <button
+                  type="button"
+                  className="mobileLangBtn"
+                  data-active={language === "en"}
+                  aria-pressed={language === "en"}
+                  onClick={() => setLanguage("en")}
+                >
+                  English (EN)
+                </button>
+              </div>
             </MobileMenuPanel>
           </MobileMenuLayer>,
           document.body
@@ -216,26 +241,53 @@ const NavBar = () => {
   return (
     <StyledWrapper>
       <ul className="primaryLinks">
-        {primaryLinks.map(([id, name, to]) => (
-          <li key={id}>
-            <Link
-              href={to}
-              data-ui="nav-control"
-              data-active={
-                (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
-                (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
-                (id === "about" && router.pathname === "/about")
-                  ? "true"
-                  : "false"
-              }
-            >
-              {name}
-            </Link>
-          </li>
-        ))}
+        {primaryLinks.map(([id, , to]) => {
+          const label = id === "notes" ? t("navNotes") : id === "topics" ? t("navTopics") : t("navAbout")
+          return (
+            <li key={id}>
+              <Link
+                href={to}
+                data-nav-id={id}
+                aria-label={label}
+                data-ui="nav-control"
+                data-active={
+                  (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
+                  (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
+                  (id === "about" && router.pathname === "/about")
+                    ? "true"
+                    : "false"
+                }
+              >
+                {label}
+              </Link>
+            </li>
+          )
+        })}
       </ul>
 
       <div className="authArea">
+        <div className="langSwitchGroup" role="group" aria-label={t("langSwitchAria")}>
+          <button
+            type="button"
+            className="langSwitchBtn"
+            data-active={language === "ko"}
+            aria-pressed={language === "ko"}
+            onClick={() => setLanguage("ko")}
+          >
+            KO
+          </button>
+          <span className="langSwitchDivider" aria-hidden="true">/</span>
+          <button
+            type="button"
+            className="langSwitchBtn"
+            data-active={language === "en"}
+            aria-pressed={language === "en"}
+            onClick={() => setLanguage("en")}
+          >
+            EN
+          </button>
+        </div>
+
         {router.pathname !== "/" && (
           <button
             type="button"
@@ -245,7 +297,7 @@ const NavBar = () => {
             onClick={requestFocusFeedSearch}
           >
             <SearchIcon />
-            <span>글과 태그 검색</span>
+            <span>{t("navSearchShortcut")}</span>
             <kbd>⌘ K</kbd>
           </button>
         )}
@@ -314,6 +366,35 @@ const MobileMenuPanel = styled.div`
     font-size: 13px;
     font-weight: 650;
     cursor: pointer;
+  }
+
+  .mobileLangSwitchRow {
+    display: flex;
+    gap: 4px;
+    padding: 2px 2px 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--aq-border);
+
+    button {
+      flex: 1;
+      min-height: 28px;
+      border: 1px solid var(--aq-border);
+      background: var(--aq-surface);
+      color: var(--aq-muted);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 4px;
+      justify-content: center;
+      padding: 0 4px;
+
+      &[data-active="true"] {
+        border-color: var(--aq-border-strong);
+        color: var(--aq-text);
+        background: var(--aq-surface-elevated);
+        font-weight: 750;
+      }
+    }
   }
 
   kbd {
@@ -387,6 +468,54 @@ const StyledWrapper = styled.div`
     > * {
       flex-shrink: 0;
     }
+  }
+
+  .langSwitchGroup {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 30px;
+    padding: 0 4px;
+    border-radius: 4px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface);
+  }
+
+  .langSwitchBtn {
+    border: none;
+    background: transparent;
+    color: var(--aq-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    letter-spacing: 0.04em;
+    padding: 2px 4px;
+    border-radius: 2px;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.12s ease, background-color 0.12s ease;
+
+    &[data-active="true"] {
+      color: var(--aq-text);
+      font-weight: 800;
+      background: var(--aq-surface-elevated);
+    }
+
+    &:hover:not([data-active="true"]) {
+      color: var(--aq-text);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: 1px;
+    }
+  }
+
+  .langSwitchDivider {
+    color: var(--aq-border-strong);
+    font-size: 0.6875rem;
+    line-height: 1;
+    user-select: none;
   }
 
   .searchTrigger {

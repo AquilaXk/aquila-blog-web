@@ -4,6 +4,7 @@ import React, { memo, startTransition, useCallback, useMemo, useState } from "re
 import { usePostsTotalCountQuery } from "src/hooks/usePostsTotalCountQuery"
 import { useTagsQuery } from "src/hooks/useTagsQuery"
 import { replaceShallowRoutePreservingScroll } from "src/libs/router"
+import { useLanguage } from "src/libs/language"
 import {
   FEED_TAG_RAIL_CHIP_MAX_PX,
   FEED_TAG_RAIL_DESKTOP_MIN_PX,
@@ -36,6 +37,7 @@ const toRepresentativeTagEntries = (
 
 const TagList: React.FC = () => {
   const router = useRouter()
+  const { t } = useLanguage()
   const currentTag =
     typeof router.query.tag === "string" ? router.query.tag : undefined
   const [desktopExpanded, setDesktopExpanded] = useState(false)
@@ -106,10 +108,10 @@ const TagList: React.FC = () => {
     <StyledWrapper id="topics">
       <section
         className="desktopPanel"
-        aria-label="태그 목록"
+        aria-label={t("tagListAria")}
       >
         <h2 className="panelTitle">
-          <span>Topics</span>
+          <span>{t("tagTitle")}</span>
         </h2>
         <ul className="desktopList">
           <li>
@@ -117,10 +119,10 @@ const TagList: React.FC = () => {
               type="button"
               data-active={!currentTag}
               aria-pressed={!currentTag}
-              aria-label="전체보기"
+              aria-label={t("tagViewAllAria")}
               onClick={handleClickAll}
             >
-              <span className="name">전체</span>
+              <span className="name">{t("tagAll")}</span>
               {typeof allCount === "number" && <span className="count">{allCount}</span>}
             </button>
           </li>
@@ -146,7 +148,7 @@ const TagList: React.FC = () => {
             aria-expanded={desktopExpanded}
             onClick={() => setDesktopExpanded((prev) => !prev)}
           >
-            {desktopExpanded ? "접기" : `더보기 (+${hiddenDesktopTagCount})`}
+            {desktopExpanded ? t("foldTags") : `${t("moreTags")} (+${hiddenDesktopTagCount})`}
           </button>
         )}
       </section>
@@ -155,16 +157,16 @@ const TagList: React.FC = () => {
         className="chipRail"
         data-ui="feed-tag-chip-rail"
         role="group"
-        aria-label="태그 선택"
+        aria-label={t("tagSelectAria")}
       >
         <button
           type="button"
           data-active={!currentTag}
           aria-pressed={!currentTag}
-          aria-label="전체보기"
+          aria-label={t("tagViewAllAria")}
           onClick={handleClickAll}
         >
-          <span className="name">전체</span>
+          <span className="name">{t("tagAll")}</span>
           {typeof allCount === "number" && <span className="count">({allCount})</span>}
         </button>
         {chipTagEntries.map(([key, count]) => (
@@ -187,7 +189,7 @@ const TagList: React.FC = () => {
             aria-expanded={chipExpanded}
             onClick={() => setChipExpanded((prev) => !prev)}
           >
-            <span className="name">{chipExpanded ? "접기" : "더보기"}</span>
+            <span className="name">{chipExpanded ? t("foldTags") : t("moreTags")}</span>
             {!chipExpanded && <span className="count">(+{hiddenChipTagCount})</span>}
           </button>
         )}

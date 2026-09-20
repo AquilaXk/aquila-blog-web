@@ -122,6 +122,7 @@ export const TitleInput = styled.textarea `
   font-weight: 700;
   line-height: ${articleTypographyScale.postTitleLineHeight};
   letter-spacing: 0;
+  outline: none;
   resize: none;
   overflow: hidden;
   white-space: pre-wrap;
@@ -131,7 +132,9 @@ export const TitleInput = styled.textarea `
     color: ${({ theme }) => theme.colors.gray9};
   }
 
-  &:focus {
+  &:focus,
+  &:focus-visible {
+    outline: none;
     box-shadow: none;
     border-color: transparent;
   }

@@ -2,18 +2,20 @@ import PostCard from "src/routes/Feed/PostList/PostCard"
 import React, { memo } from "react"
 import styled from "@emotion/styled"
 import { TPost } from "src/types"
+import { useLanguage } from "src/libs/language"
 
 type Props = {
   posts: TPost[]
 }
 
 const PinnedPosts: React.FC<Props> = ({ posts }) => {
+  const { t } = useLanguage()
   if (posts.length === 0) return null
 
   return (
     <StyledWrapper>
       <div className="wrapper">
-        <div className="header">📌 Pinned Posts</div>
+        <div className="header">📌 {t("pinnedPostsHeader")}</div>
       </div>
       <div className="my-2">
         {posts.map((post) => (

@@ -15,40 +15,30 @@ export const ExplorerCard = styled.section`
   height: auto;
   overflow: visible;
   margin: 0;
-  border-bottom: 2px solid var(--aq-text);
-  padding-bottom: 18px;
+  border-bottom: 1px solid var(--aq-border-strong);
+  padding-bottom: 16px;
 
   .feedTitle {
     min-width: 0;
     display: grid;
-    gap: 0;
-  }
-
-  .feedTitle span {
-    color: var(--aq-accent);
-    font-size: 0.6875rem;
-    line-height: 1.2;
-    font-weight: 820;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    gap: 4px;
   }
 
   .feedTitle h1 {
     margin: 0;
     color: var(--aq-text);
-    margin: 4px 0 0;
-    font-size: 28px;
-    line-height: 1.2;
-    letter-spacing: -0.04em;
-    font-weight: 820;
+    font-size: 1.75rem;
+    line-height: 1.25;
+    letter-spacing: -0.03em;
+    font-weight: 750;
   }
 
   .feedDescription {
-    margin: 8px 0 0;
+    margin: 2px 0 0;
     color: var(--aq-muted);
     max-width: 560px;
     font-size: 0.875rem;
-    line-height: 1.55;
+    line-height: 1.5;
   }
 
   .searchSlot {

@@ -309,4 +309,65 @@ test.describe("home feed product redesign", () => {
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1)
     expect(new Set(layout.rects.map((rect) => rect.left)).size).toBe(1)
   })
+
+  test("데스크톱 언어 전환기는 한국어와 영어를 전환하고 새로고침 후에도 유지된다", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockHomeFeedRedesignEndpoints(page)
+
+    await page.goto("/")
+
+    // 1. Initial default state: Korean
+    await expect(page.getByRole("heading", { level: 1, name: "최근 글" })).toBeVisible()
+    await expect(page.getByRole("region", { name: "태그 목록" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "글" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "태그" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "소개" })).toBeVisible()
+    await expect(page.getByPlaceholder("제목, 요약, 태그로 검색")).toBeVisible()
+    const koBtn = page.getByRole("button", { name: "KO", exact: true })
+    const enBtn = page.getByRole("button", { name: "EN", exact: true })
+    await expect(koBtn).toHaveAttribute("aria-pressed", "true")
+    await expect(enBtn).toHaveAttribute("aria-pressed", "false")
+
+    // 2. Switch to English
+    await enBtn.click()
+    await expect(page.getByRole("heading", { level: 1, name: "Recent Posts" })).toBeVisible()
+    await expect(page.getByRole("region", { name: "Tag list" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Posts" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Tags" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "About" })).toBeVisible()
+    await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
+    await expect(enBtn).toHaveAttribute("aria-pressed", "true")
+    await expect(koBtn).toHaveAttribute("aria-pressed", "false")
+
+    // 3. Verify persistence across page reload
+    await page.reload()
+    await expect(page.getByRole("heading", { level: 1, name: "Recent Posts" })).toBeVisible()
+    await expect(page.getByRole("region", { name: "Tag list" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Posts" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Tags" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "About" })).toBeVisible()
+
+    // 4. Switch back to Korean
+    await page.getByRole("button", { name: "KO", exact: true }).click()
+    await expect(page.getByRole("heading", { level: 1, name: "최근 글" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "글" })).toBeVisible()
+  })
+
+  test("모바일 메뉴 언어 전환기는 한국어와 영어를 전환한다", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 })
+    await mockHomeFeedRedesignEndpoints(page)
+
+    await page.goto("/")
+    await page.getByRole("button", { name: "메뉴" }).click()
+    const menu = page.getByRole("dialog", { name: "메뉴" })
+    await expect(menu).toBeVisible()
+
+    const mobileEnBtn = menu.getByRole("button", { name: "English (EN)" })
+    await mobileEnBtn.click()
+
+    await expect(page.getByRole("heading", { level: 1, name: "Recent Posts" })).toBeVisible()
+    await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
+    await expect(page.locator("html")).toHaveAttribute("lang", "en-US")
+  })
 })
+

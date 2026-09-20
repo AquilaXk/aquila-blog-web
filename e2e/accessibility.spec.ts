@@ -410,8 +410,8 @@ test("모바일 header와 관리자 로그인은 keyboard-only 진입에서 심�
   await expect(menuButton).toHaveAttribute("aria-expanded", "false")
   await menuButton.click()
   await expect(menuButton).toHaveAttribute("aria-expanded", "true")
-  await expect(page.getByRole("link", { name: "Notes" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "About" })).toBeVisible()
+  await expect(page.getByRole("link", { name: /(?:글|Notes|Posts)/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /(?:소개|About)/ })).toBeVisible()
   await expect(page.getByRole("button", { name: "테마 전환" })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await expectLaunchGateAccessibility(page, testInfo, "mobile-header")
@@ -461,6 +461,7 @@ test("모바일 header와 관리자 로그인은 keyboard-only 진입에서 심�
   await expect(loginButton).toBeFocused()
   await expectPrimaryLandmarks(page)
   await expectNoHorizontalOverflow(page)
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)))
   await expectLaunchGateAccessibility(page, testInfo, "admin-login")
 })
 
