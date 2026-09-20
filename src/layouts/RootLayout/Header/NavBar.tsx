@@ -60,7 +60,7 @@ const waitForFocusTrapRestore = () =>
 
 const NavBar = () => {
   const router = useRouter()
-  const { language, setLanguage, t } = useLanguage()
+  const { language, toggleLanguage, t } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null)
@@ -223,21 +223,16 @@ const NavBar = () => {
               <div className="mobileLangSwitchRow">
                 <button
                   type="button"
-                  className="mobileLangBtn"
-                  data-active={language === "ko"}
-                  aria-pressed={language === "ko"}
-                  onClick={() => setLanguage("ko")}
+                  className="mobileLangToggleBtn"
+                  aria-label={language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}
+                  title={language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}
+                  onClick={() => {
+                    toggleLanguage()
+                  }}
+                  data-language={language}
                 >
-                  한국어 (KO)
-                </button>
-                <button
-                  type="button"
-                  className="mobileLangBtn"
-                  data-active={language === "en"}
-                  aria-pressed={language === "en"}
-                  onClick={() => setLanguage("en")}
-                >
-                  English (EN)
+                  <GlobeIcon />
+                  <span>{language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}</span>
                 </button>
               </div>
             </MobileMenuPanel>
@@ -274,28 +269,17 @@ const NavBar = () => {
       </ul>
 
       <div className="authArea">
-        <div className="langSwitchGroup">
+        <button
+          type="button"
+          className="langToggleBtn"
+          aria-label={language === "ko" ? "Switch to English" : "한국어로 전환"}
+          title={language === "ko" ? "Switch to English" : "한국어로 전환"}
+          onClick={toggleLanguage}
+          data-language={language}
+        >
           <GlobeIcon />
-          <button
-            type="button"
-            className="langSwitchBtn"
-            data-active={language === "ko"}
-            aria-pressed={language === "ko"}
-            onClick={() => setLanguage("ko")}
-          >
-            KO
-          </button>
-          <span className="langSwitchDivider" aria-hidden="true">/</span>
-          <button
-            type="button"
-            className="langSwitchBtn"
-            data-active={language === "en"}
-            aria-pressed={language === "en"}
-            onClick={() => setLanguage("en")}
-          >
-            EN
-          </button>
-        </div>
+          <span>{language === "ko" ? "EN" : "KO"}</span>
+        </button>
 
         {router.pathname !== "/" && (
           <button
@@ -379,36 +363,36 @@ const MobileMenuPanel = styled.div`
 
   .mobileLangSwitchRow {
     display: flex;
-    gap: 6px;
     padding: 2px 2px 8px;
     margin-bottom: 6px;
     border-bottom: 1px solid var(--aq-border);
 
-    .mobileLangBtn {
-      flex: 1;
+    .mobileLangToggleBtn {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      min-height: 34px;
-      padding: 0 8px;
-      border: 1px solid var(--aq-border);
+      gap: 8px;
+      width: 100%;
+      min-height: 36px;
+      padding: 0 10px;
+      border: none;
       border-radius: 6px;
-      background: var(--aq-surface);
+      background: transparent;
       color: var(--aq-muted);
       font-size: 0.8125rem;
       font-weight: 600;
       cursor: pointer;
-      transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+      text-align: left;
+      transition: color 0.15s ease, background-color 0.15s ease;
 
-      &[data-active="true"] {
-        border-color: var(--aq-border-strong);
-        color: var(--aq-text);
-        background: var(--aq-surface-elevated);
-        font-weight: 750;
+      svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
       }
 
-      &:hover:not([data-active="true"]) {
+      &:hover {
         color: var(--aq-text);
+        background: var(--aq-surface-elevated);
       }
 
       &:focus-visible {
@@ -491,60 +475,44 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .langSwitchGroup {
+  .langToggleBtn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     height: 32px;
-    padding: 0 6px;
-    border-radius: 6px;
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface);
-
-    svg {
-      width: 14px;
-      height: 14px;
-      color: var(--aq-muted);
-      flex-shrink: 0;
-      margin-right: 2px;
-    }
-  }
-
-  .langSwitchBtn {
+    padding: 0 8px;
     border: none;
+    border-radius: 6px;
     background: transparent;
     color: var(--aq-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-family: inherit;
-    letter-spacing: 0.03em;
-    padding: 2px 5px;
-    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
     cursor: pointer;
     line-height: 1;
     transition: color 0.15s ease, background-color 0.15s ease;
 
-    &[data-active="true"] {
-      color: var(--aq-text);
-      font-weight: 750;
-      background: var(--aq-surface-elevated);
+    svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
     }
 
-    &:hover:not([data-active="true"]) {
+    span {
+      font-size: 0.8125rem;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+    }
+
+    &:hover {
       color: var(--aq-text);
+      background: var(--aq-surface-elevated);
     }
 
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 1px;
     }
-  }
-
-  .langSwitchDivider {
-    color: var(--aq-border-strong);
-    font-size: 0.6875rem;
-    line-height: 1;
-    user-select: none;
   }
 
   .searchTrigger {

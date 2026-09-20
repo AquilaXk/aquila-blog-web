@@ -324,21 +324,18 @@ test.describe("home feed product redesign", () => {
     await expect(page.getByRole("link", { name: "태그" })).toBeVisible()
     await expect(page.getByRole("link", { name: "소개" })).toBeVisible()
     await expect(page.getByPlaceholder("제목, 요약, 태그로 검색")).toBeVisible()
-    const koBtn = page.getByRole("button", { name: "KO", exact: true })
-    const enBtn = page.getByRole("button", { name: "EN", exact: true })
-    await expect(koBtn).toHaveAttribute("aria-pressed", "true")
-    await expect(enBtn).toHaveAttribute("aria-pressed", "false")
+    const langBtn = page.getByRole("button", { name: "Switch to English" })
+    await expect(langBtn).toBeVisible()
 
     // 2. Switch to English
-    await enBtn.click()
+    await langBtn.click()
     await expect(page.getByRole("heading", { level: 1, name: "Recent Posts" })).toBeVisible()
     await expect(page.getByRole("region", { name: "Tag list" })).toBeVisible()
     await expect(page.getByRole("link", { name: "Posts" })).toBeVisible()
     await expect(page.getByRole("link", { name: "Tags" })).toBeVisible()
     await expect(page.getByRole("link", { name: "About" })).toBeVisible()
     await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
-    await expect(enBtn).toHaveAttribute("aria-pressed", "true")
-    await expect(koBtn).toHaveAttribute("aria-pressed", "false")
+    await expect(page.getByRole("button", { name: "한국어로 전환" })).toBeVisible()
 
     // 3. Verify persistence across page reload
     await page.reload()
@@ -347,13 +344,13 @@ test.describe("home feed product redesign", () => {
     await expect(page.getByRole("link", { name: "Posts" })).toBeVisible()
     await expect(page.getByRole("link", { name: "Tags" })).toBeVisible()
     await expect(page.getByRole("link", { name: "About" })).toBeVisible()
-    await expect(page.getByRole("button", { name: "EN", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByRole("button", { name: "한국어로 전환" })).toBeVisible()
 
     // 4. Switch back to Korean
-    await page.getByRole("button", { name: "KO", exact: true }).click()
+    await page.getByRole("button", { name: "한국어로 전환" }).click()
     await expect(page.getByRole("heading", { level: 1, name: "최근 글" })).toBeVisible()
     await expect(page.getByRole("link", { name: "글" })).toBeVisible()
-    await expect(page.getByRole("button", { name: "KO", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByRole("button", { name: "Switch to English" })).toBeVisible()
   })
 
   test("모바일 메뉴 언어 전환기는 한국어와 영어를 전환한다", async ({ page }) => {
@@ -365,14 +362,10 @@ test.describe("home feed product redesign", () => {
     const menu = page.getByRole("dialog", { name: "메뉴" })
     await expect(menu).toBeVisible()
 
-    const mobileKoBtn = menu.getByRole("button", { name: "한국어 (KO)" })
-    const mobileEnBtn = menu.getByRole("button", { name: "English (EN)" })
-    await expect(mobileKoBtn).toBeVisible()
-    await expect(mobileEnBtn).toBeVisible()
-    await expect(mobileKoBtn).toHaveAttribute("aria-pressed", "true")
-    await expect(mobileEnBtn).toHaveAttribute("aria-pressed", "false")
+    const mobileLangBtn = menu.getByRole("button", { name: "Switch to English (EN)" })
+    await expect(mobileLangBtn).toBeVisible()
 
-    await mobileEnBtn.click()
+    await mobileLangBtn.click()
 
     await expect(page.getByRole("heading", { level: 1, name: "Recent Posts" })).toBeVisible()
     await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
