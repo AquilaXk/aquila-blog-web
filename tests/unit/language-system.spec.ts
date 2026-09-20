@@ -9,11 +9,11 @@ test.describe("language system and translations", () => {
   })
 
   test("all translation values are non-empty strings", () => {
-    for (const [key, value] of Object.entries(translations.ko)) {
+    for (const value of Object.values(translations.ko)) {
       expect(typeof value).toBe("string")
       expect(value.trim().length).toBeGreaterThan(0)
     }
-    for (const [key, value] of Object.entries(translations.en)) {
+    for (const value of Object.values(translations.en)) {
       expect(typeof value).toBe("string")
       expect(value.trim().length).toBeGreaterThan(0)
     }

@@ -36,7 +36,7 @@ type FeedExplorerProps = {
 }
 
 const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
-  const { language, t } = useLanguage()
+  const { t } = useLanguage()
   const queryClient = useQueryClient()
   const [q, setQ] = useState("")
   const [sortMode, setSortMode] = useState<FeedSortMode>("latest")

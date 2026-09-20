@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test"
-import { Buffer } from "node:buffer"
 import { mkdirSync } from "node:fs"
 import { resolve } from "node:path"
 import {
