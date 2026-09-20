@@ -6,6 +6,7 @@ import { uiTokens } from "@shared/ui-tokens"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import { memo, useCallback, type MouseEvent } from "react"
 import Router from "next/router"
+import { useLanguage } from "src/libs/language"
 
 type Props = {
   data: TPost
@@ -13,8 +14,10 @@ type Props = {
 }
 
 const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
+  const { language } = useLanguage()
   const postPath = toCanonicalPostPath(data.id)
-  const createdAtText = formatDate(data.date?.start_date || data.createdTime, CONFIG.lang)
+  const currentLang = language === "en" ? "en-US" : (CONFIG.lang || "ko-KR")
+  const createdAtText = formatDate(data.date?.start_date || data.createdTime, currentLang)
   const author = data.author?.map((entry) => entry.name).filter(Boolean).join(", ")
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||

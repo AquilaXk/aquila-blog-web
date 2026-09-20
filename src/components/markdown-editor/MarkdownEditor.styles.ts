@@ -136,8 +136,20 @@ export const ToolbarMenuTrigger = styled(ToolbarButton)`
 `
 
 export const ToolbarMenuChevron = styled.span`
-  font-size: 11px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: currentColor;
+  opacity: 0.75;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+  }
 `
 
 export const ToolbarMenuPanel = styled.div<{

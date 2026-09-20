@@ -36,6 +36,7 @@ import {
   EditorStudioWritingColumn,
   EditorTagRow,
   InlineMetaInput,
+  LocalDraftRestoreCard,
   PrimaryButton,
   PublishNotice,
   SelectedTagChip,
@@ -138,22 +139,26 @@ const LocalDraftRestoreSuggestion = ({
   if (!visible) return null
 
   return (
-    <PublishNotice role="status" aria-live="polite" data-tone="idle">
-      브라우저 임시글이 있습니다.
+    <LocalDraftRestoreCard role="status" aria-live="polite">
+      <div className="card-header">
+        <span>브라우저 임시글이 있습니다.</span>
+      </div>
       <select aria-label="복구할 브라우저 초안" disabled={disabled} value={selectedKey} onChange={(event) => onSelect(event.target.value)}>
         <option value="">초안을 선택하세요</option>
         {candidates.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
       </select>
-      <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
-        복구
-      </SecondaryButton>
-      <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onDiscard}>
-        삭제
-      </SecondaryButton>
-      <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
-        이번 세션에 표시 안 함
-      </SecondaryButton>
-    </PublishNotice>
+      <div className="card-actions">
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
+          복구
+        </SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onDiscard}>
+          삭제
+        </SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
+          이번 세션에 표시 안 함
+        </SecondaryButton>
+      </div>
+    </LocalDraftRestoreCard>
   )
 }
 
@@ -333,7 +338,7 @@ export const EditorStudioDedicatedEditorSurface = ({
         {isOutlineOpen ? (
           <EditorOutline aria-label="문서 목차">
             <EditorPanelHeader>
-              <h3>Document outline</h3>
+              <h3>문서 목차</h3>
               <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>
                 ×
               </button>

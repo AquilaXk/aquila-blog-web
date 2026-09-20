@@ -9,6 +9,8 @@ import {
 } from "./feedUiTokens"
 import { FEED_SEARCH_INPUT_ID } from "./feedSearchFocus"
 
+import { useLanguage } from "src/libs/language"
+
 export { FEED_SEARCH_INPUT_ID } from "./feedSearchFocus"
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
@@ -16,6 +18,7 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
+  const { t } = useLanguage()
   const inputId = props.id || FEED_SEARCH_INPUT_ID
 
   const focusInput = () => {
@@ -40,12 +43,12 @@ const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
           ref={inputRef}
           className="mid"
           type="search"
-          placeholder="제목, 요약, 태그로 검색"
+          placeholder={t("searchPlaceholder")}
           aria-label="Search posts by keyword"
           {...props}
         />
-        <button type="button" className="shortcut" onClick={focusInput} aria-label="검색창으로 이동">
-          검색
+        <button type="button" className="shortcut" onClick={focusInput} aria-label={t("searchButton")}>
+          {t("searchButton")}
         </button>
       </div>
     </StyledWrapper>

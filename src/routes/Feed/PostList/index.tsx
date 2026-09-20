@@ -5,6 +5,7 @@ import PostCard from "src/routes/Feed/PostList/PostCard"
 import InitialLoadErrorState from "src/routes/Feed/PostList/InitialLoadErrorState"
 import AppIcon from "src/components/icons/AppIcon"
 import { TPost } from "src/types"
+import { useLanguage } from "src/libs/language"
 
 type Props = {
   posts: TPost[]
@@ -35,23 +36,24 @@ const DEFERRED_MOUNT_BATCH_COUNT = 8
 const DEFERRED_MOUNT_ROOT_MARGIN = "680px 0px"
 
 const EmptyPostStateInner: React.FC<EmptyPostStateProps> = ({ hasFilter, onClearFilters }) => {
+  const { t } = useLanguage()
   return (
     <section className="emptyState" aria-live="polite">
       <div className="emptyIcon" aria-hidden="true">
         <AppIcon name={hasFilter ? "search" : "edit"} />
       </div>
-      <h3>{hasFilter ? "검색 결과가 없습니다." : "아직 게시글이 없습니다."}</h3>
-      <p>{hasFilter ? "다른 검색어를 입력해보세요." : "곧 새로운 글을 준비하겠습니다."}</p>
+      <h3>{hasFilter ? t("emptyFilterTitle") : t("emptyNoPostsTitle")}</h3>
+      <p>{hasFilter ? t("emptyFilterDesc") : t("emptyNoPostsDesc")}</p>
       <div className="emptyActions">
         {hasFilter ? (
           <button type="button" onClick={onClearFilters} className="actionBtn actionBtn--primary">
             <AppIcon name="search" />
-            초기화
+            {t("filterReset")}
           </button>
         ) : (
           <Link href="/about" className="actionBtn actionBtn--primary">
             <AppIcon name="service" />
-            블로그 소개
+            {t("emptyAboutButton")}
           </Link>
         )}
       </div>
@@ -62,24 +64,27 @@ const EmptyPostStateInner: React.FC<EmptyPostStateProps> = ({ hasFilter, onClear
 const EmptyPostState = memo(EmptyPostStateInner)
 EmptyPostState.displayName = "EmptyPostState"
 
-const FilterLoadingStateInner: React.FC = () => (
-  <section className="searchLoadingState" aria-live="polite">
-    <div className="searchLoadingHeading">
-      <div className="searchLoadingIcon" aria-hidden="true">
-        <AppIcon name="search" />
+const FilterLoadingStateInner: React.FC = () => {
+  const { t } = useLanguage()
+  return (
+    <section className="searchLoadingState" aria-live="polite">
+      <div className="searchLoadingHeading">
+        <div className="searchLoadingIcon" aria-hidden="true">
+          <AppIcon name="search" />
+        </div>
+        <div className="searchLoadingCopy">
+          <h3>{t("loadingTitle")}</h3>
+          <p>{t("loadingDesc")}</p>
+        </div>
       </div>
-      <div className="searchLoadingCopy">
-        <h3>검색 결과를 불러오는 중...</h3>
-        <p>입력한 조건에 맞는 글을 불러오고 있습니다.</p>
+      <div className="searchLoadingGrid skeletonGrid" aria-hidden="true">
+        {FILTER_SKELETON_KEYS.map((key) => (
+          <article key={key} className="skeletonCard" />
+        ))}
       </div>
-    </div>
-    <div className="searchLoadingGrid skeletonGrid" aria-hidden="true">
-      {FILTER_SKELETON_KEYS.map((key) => (
-        <article key={key} className="skeletonCard" />
-      ))}
-    </div>
-  </section>
-)
+    </section>
+  )
+}
 
 const FilterLoadingState = memo(FilterLoadingStateInner)
 FilterLoadingState.displayName = "FilterLoadingState"
@@ -99,6 +104,7 @@ const PostList: React.FC<Props> = ({
   onRetryLoadMore,
   loadMoreTriggerRef,
 }) => {
+  const { t } = useLanguage()
   const deferredMountTriggerRef = useRef<HTMLDivElement | null>(null)
   const previousFirstPostIdRef = useRef<string | null>(null)
   const [mountedCardCount, setMountedCardCount] = useState(() =>
@@ -197,10 +203,10 @@ const PostList: React.FC<Props> = ({
           <div ref={loadMoreTriggerRef} className="loadMoreTrigger" aria-hidden="true" />
           {isFetchNextPageError && !isFetchingNextPage && (
             <div className="loadMoreError" role="alert" aria-live="assertive">
-              <strong>다음 글을 불러오지 못했습니다.</strong>
-              <span>기존 목록은 유지했습니다. 잠시 후 다시 시도해주세요.</span>
+              <strong>{t("loadMoreErrorTitle")}</strong>
+              <span>{t("loadMoreErrorDesc")}</span>
               <button type="button" className="loadMoreButton" onClick={onRetryLoadMore ?? onLoadMore}>
-                다시 시도
+                {t("loadMoreRetry")}
               </button>
             </div>
           )}
@@ -211,14 +217,14 @@ const PostList: React.FC<Props> = ({
               onClick={onLoadMore}
               disabled={isFetchingNextPage}
             >
-              {isFetchingNextPage ? "불러오는 중..." : "더보기"}
+              {isFetchingNextPage ? t("loadingMore") : t("loadMore")}
             </button>
           )}
           {isFetchingNextPage && (
             <div className="loadMoreSkeletonShell" aria-hidden="true">
               <div className="loadMoreSkeletonCopy">
-                <strong>다음 글을 정리하는 중...</strong>
-                <span>현재 카드 레이아웃을 유지한 채 다음 페이지를 이어 붙입니다.</span>
+                <strong>{t("loadMorePreparingTitle")}</strong>
+                <span>{t("loadMorePreparingDesc")}</span>
               </div>
               <div className="skeletonGrid">
                 {NEXT_SKELETON_KEYS.map((key) => (

@@ -453,6 +453,7 @@ export const TitleInput = styled.textarea<{
   border-radius: 0;
   padding: 0;
   min-height: 48px;
+  outline: none;
   background: transparent;
   box-shadow: none;
   font-family: inherit;
@@ -469,7 +470,9 @@ export const TitleInput = styled.textarea<{
     color: ${({ theme }) => theme.colors.gray9};
   }
 
-  &:focus {
+  &:focus,
+  &:focus-visible {
+    outline: none;
     box-shadow: none;
     border-color: transparent;
   }
@@ -574,10 +577,10 @@ export const EditorPanelHeader = styled.div`
 
   h3 {
     margin: 0;
-    color: ${({ theme }) => theme.colors.gray10};
-    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.gray12};
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   button {
@@ -607,10 +610,10 @@ export const EditorOutline = styled.aside`
 
   h3 {
     margin: 0 0 16px;
-    color: ${({ theme }) => theme.colors.gray10};
-    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.gray12};
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   p {
@@ -632,22 +635,30 @@ export const EditorOutlineItem = styled.button`
   text-align: left;
   cursor: pointer;
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 6px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   color: ${({ theme }) => theme.colors.gray10};
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
 
   &[data-level="2"] {
-    padding-left: 20px;
+    padding-left: 18px;
   }
 
   &[data-level="3"] {
-    padding-left: 34px;
+    padding-left: 28px;
   }
 
   &[data-level="4"] {
-    padding-left: 48px;
+    padding-left: 38px;
   }
 
   &:focus-visible {
@@ -656,19 +667,64 @@ export const EditorOutlineItem = styled.button`
   }
 
   &[data-active="true"] {
-    color: ${({ theme }) => theme.publicDesign.accent};
-    font-weight: 750;
+    color: ${({ theme }) => theme.colors.gray12};
+    font-weight: 600;
   }
 
   span {
-    font: 700 12px/1.3 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: ${({ theme }) => theme.colors.gray11};
+    flex-shrink: 0;
   }
 
   strong {
     min-width: 0;
-    font-weight: 650;
+    font-weight: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+export const LocalDraftRestoreCard = styled.div`
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid ${({ theme }) => theme.colors.blue7};
+  background: ${({ theme }) => theme.colors.blue3};
+  box-sizing: border-box;
+
+  .card-header {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: ${({ theme }) => theme.colors.blue11};
     line-height: 1.4;
-    overflow-wrap: anywhere;
+  }
+
+  select {
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 0.84rem;
+    border-radius: 6px;
+    border: 1px solid ${({ theme }) => theme.colors.blue7};
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
+    color: ${({ theme }) => theme.colors.gray12};
+    box-sizing: border-box;
+  }
+
+  .card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    button {
+      font-size: 0.78rem;
+      padding: 5px 9px;
+    }
   }
 `;
 
@@ -683,33 +739,35 @@ export const EditorInspector = styled.aside`
 
   h3 {
     margin: 0 0 16px;
-    color: ${({ theme }) => theme.colors.gray10};
-    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.gray12};
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   label > span,
   section > span {
     margin: 0;
-    color: ${({ theme }) => theme.colors.gray10};
-    font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.gray11};
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   label,
   section {
     display: grid;
     gap: 8px;
-    padding: 0 0 22px;
-    margin-bottom: 22px;
+    padding: 0 0 20px;
+    margin-bottom: 20px;
     border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   }
 
   small {
     justify-self: end;
     color: ${({ theme }) => theme.colors.gray10};
-    font: 700 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    line-height: 1.4;
   }
 
   select,
@@ -721,16 +779,17 @@ export const EditorInspector = styled.aside`
     color: ${({ theme }) => theme.colors.gray12};
     font-size: 0.88rem;
     padding: 10px;
+    box-sizing: border-box;
   }
 
   select {
-    min-height: 42px;
+    min-height: 40px;
   }
 
   textarea {
-    min-height: 90px;
+    min-height: 84px;
     resize: vertical;
-    line-height: 1.65;
+    line-height: 1.6;
   }
 
   p {
