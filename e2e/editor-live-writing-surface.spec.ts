@@ -165,6 +165,13 @@ const restoreSelectedLocalDraft = async (page: Page, content: string) => {
   }, content)
   await candidates.selectOption(matchingKey)
   await page.getByRole("button", { name: "복구" }).click()
+  await expect(candidates).toHaveCount(0)
+  if (content.length > 0) {
+    const firstLine = content.split("\n")[0].trim()
+    if (firstLine.length > 0) {
+      await expect.poll(() => editorContent(page).locator(".cm-line").first().textContent()).toContain(firstLine)
+    }
+  }
 }
 
 const openEditorDraft = async (page: Page) => {

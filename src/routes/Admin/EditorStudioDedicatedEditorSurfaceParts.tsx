@@ -20,6 +20,10 @@ export const EditorStudioRoot = styled.main `
   @media (max-width: 1024px) {
     padding: 0;
   }
+
+  @media (max-width: 820px) {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
 `;
 export const EditorStudioPageHeading = styled.h1 `
   position: absolute;
@@ -62,9 +66,12 @@ export const EditorStudioDedicatedTopBar = styled.div `
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
   @media (max-width: 820px) {
-    grid-template-columns: auto minmax(0, 1fr);
+    height: auto;
+    min-height: 52px;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
     gap: 8px;
-    padding: 0 10px;
+    padding: 8px 12px;
   }
 `;
 export const EditorExitAction = styled.button `
@@ -124,16 +131,23 @@ export const EditorStudioTopBarActions = styled.div `
   }
 
   @media (max-width: 820px) {
-    width: auto;
-    justify-self: end;
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-self: stretch;
     margin-left: 0;
     justify-content: flex-end;
-    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-top: 2px;
 
     button {
-      height: 34px;
-      min-height: 34px;
-      padding: 0 10px;
+      height: 32px;
+      min-height: 32px;
+      padding: 0 9px;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
   }
 `;
