@@ -218,5 +218,13 @@ test.describe("Visual verification of Home Feed and Editor", () => {
     await page.screenshot({
       path: resolve(SCREENSHOT_DIR, "06-editor-inspector-inline-draft-card.png"),
     })
+
+    // 5. Mobile Editor Layout
+    await page.setViewportSize({ width: 393, height: 852 })
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, "07-editor-mobile.png"),
+      fullPage: true,
+    })
   })
 })

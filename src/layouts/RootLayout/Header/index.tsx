@@ -147,6 +147,10 @@ const StyledWrapper = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+
+        em {
+          display: none;
+        }
       }
 
       .nav {
