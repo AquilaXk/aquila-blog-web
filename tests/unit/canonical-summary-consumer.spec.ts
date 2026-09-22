@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test"
 import summaryFixtures from "../../contracts/platform/summary-fixtures.json"
 import { mapPostDetail, mapPostDto } from "../../src/apis/backend/posts/PostApiMappers"
-import { toCompanyNewsSummary } from "../../src/routes/Company/CompanyPageModel"
+import {
+  BLOG_URL,
+  toCompanyNewsSummary,
+  toCompanyNewsThumbnail,
+} from "../../src/routes/Company/CompanyPageModel"
 import {
   resolvePersistedSummaryResult,
   resolveSummaryWriteCompletion,
@@ -115,6 +119,35 @@ test("Company news도 canonical summary를 공백 정규화나 JS 절단 없이 
   const canonicalSummary = `${expectedSummary(fixture).summary}\n${"추가 문장 ".repeat(20)}`
 
   expect(toCompanyNewsSummary(canonicalSummary)).toBe(canonicalSummary)
+})
+
+test("Company news 썸네일 URL에 상대 경로가 오면 블로그 절대 도메인을 붙이고 절대 URL은 보존한다", () => {
+  expect(toCompanyNewsThumbnail("/api/v1/posts/1/thumbnail")).toBe(
+    `${BLOG_URL}/api/v1/posts/1/thumbnail`,
+  )
+  expect(toCompanyNewsThumbnail("api/v1/posts/1/thumbnail")).toBe(
+    `${BLOG_URL}/api/v1/posts/1/thumbnail`,
+  )
+  expect(toCompanyNewsThumbnail("https://cdn.example.com/image.png")).toBe(
+    "https://cdn.example.com/image.png",
+  )
+  expect(toCompanyNewsThumbnail("http://cdn.example.com/image.png")).toBe(
+    "http://cdn.example.com/image.png",
+  )
+  expect(toCompanyNewsThumbnail("//cdn.example.com/image.png")).toBe(
+    "https://cdn.example.com/image.png",
+  )
+  expect(toCompanyNewsThumbnail("data:image/webp;base64,AAAA")).toBe(
+    "data:image/webp;base64,AAAA",
+  )
+  expect(toCompanyNewsThumbnail("blob:https://example.com/uuid")).toBe(
+    "blob:https://example.com/uuid",
+  )
+  expect(toCompanyNewsThumbnail("javascript:alert(1)")).toBe("")
+  expect(toCompanyNewsThumbnail("ftp://cdn.example.com/image.png")).toBe("")
+  expect(toCompanyNewsThumbnail("")).toBe("")
+  expect(toCompanyNewsThumbnail("   ")).toBe("")
+  expect(toCompanyNewsThumbnail(undefined)).toBe("")
 })
 
 test("imported manual intent와 unchanged intent를 write fields로 그대로 전달한다", () => {

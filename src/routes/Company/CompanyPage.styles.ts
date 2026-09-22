@@ -12,9 +12,8 @@ import { variables } from "src/styles"
  * 정체성이지 사용자 설정이 아니다. 그래서 Emotion 테마가 아니라 마케팅 팔레트를 직접 참조한다.
  * 색·대비 근거는 `src/design-system/marketingPalette.ts` 주석에 있다.
  *
- * 배경 장식(세로 그리드 라인 + 양측 소프트 일립스)은 오너가 마케팅 표면 한정으로 승인한
- * gradient 예외다(2026-08-02). 블로그·관리자 표면에는 적용하지 않는다.
- * 그림자는 히어로 플로팅 카드와 그 위 폰 목업 두 곳뿐이다.
+ * 미니멀한 라이트 테마를 유지하며 불필요한 배경 장식(그리드 라인, 글로우 타원 등)을 배제한다.
+ * 그림자는 히어로 폰 목업과 프로덕트 쇼케이스 미디어 카드에 한해 적용한다.
  *
  * 타이포 하한(상용 마케팅 기준, 2026-08-03): 본문·설명·내비·CTA는 1rem 이상, 히어로 서브와 섹션
  * 리드는 1.0625~1.125rem, 저작권·캡션 같은 보조 텍스트는 0.875rem 이상, 한국어 본문 line-height는
@@ -187,46 +186,6 @@ export const Hero = styled.section`
   text-align: center;
 `
 
-/**
- * 히어로 배경. 옅은 세로 그리드는 실제 1px 보더를 가진 열로 그리고, 양측 소프트 일립스는 승인된
- * gradient 예외다. 일립스가 섹션 밖으로 새지 않도록 clip은 이 래퍼가 담당한다 - 히어로 자신에
- * `overflow: hidden`을 걸면 다음 섹션에 걸치는 플로팅 카드가 잘린다.
- */
-export const HeroBackdrop = styled.div`
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-`
-
-export const HeroGrid = styled.div`
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-
-  span {
-    border-left: 1px solid ${light.border};
-  }
-
-  span:first-of-type {
-    border-left: 0;
-  }
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-`
-
-export const HeroEllipse = styled.span<{ $side: "left" | "right" }>`
-  position: absolute;
-  top: ${({ $side }) => ($side === "left" ? "2%" : "16%")};
-  ${({ $side }) => ($side === "left" ? "left: -14%;" : "right: -12%;")}
-  width: ${({ $side }) => ($side === "left" ? "42%" : "48%")};
-  height: ${({ $side }) => ($side === "left" ? "58%" : "66%")};
-  background: radial-gradient(closest-side, ${light.surfaceBrandStrong}, transparent);
-`
-
 export const HeroCopy = styled.div`
   position: relative;
   display: flex;
@@ -260,62 +219,24 @@ export const HeroLead = styled.p`
 `
 
 /**
- * 와이드 플로팅 제품 카드. 뷰포트 62% 폭(1440에서 896px)이고 하단이 다음 섹션에 걸친다.
- * 카드 안의 컷은 라이브 블로그 홈 캡처이며 폰 목업이 우하단에 겹친다.
+ * 히어로 EasySubway 핵심 앱 인터페이스 쇼케이스.
+ * 무의미한 그리드 선, 보라색 글로우, 맥 창틀 점 3개를 제거하고 앱 인터페이스를 무대 중심에 배치한다.
  */
 export const HeroShowcase = styled.figure`
   position: relative;
   z-index: 1;
-  margin: clamp(3rem, 5.5vw, 4.5rem) auto calc(-1 * clamp(3rem, 6vw, 5.5rem));
-  width: min(100%, 56rem);
-  padding: 0.75rem;
-  border: 1px solid ${light.border};
-  border-radius: 1rem;
-  background: ${light.surface};
-  box-shadow: ${variables.ui.card.shadowFloating};
-`
-
-/** 브라우저 프레임 상단 바. 단색 원 세 개만 두고 텍스처를 만들지 않는다. */
-export const ShowcaseChrome = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.1rem 0.35rem 0.6rem;
-
-  span {
-    display: block;
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: ${radius.pill}px;
-    background: ${light.border};
-  }
+  justify-content: center;
+  margin: clamp(2.5rem, 5vw, 4rem) auto 0;
+  padding: 0;
 `
 
-export const ShowcaseCapture = styled.div`
-  overflow: hidden;
-  border-radius: 0.5rem;
-  background: ${light.surfaceSubtle};
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-`
-
-/**
- * 카드 위에 겹치는 소형 폰. 스크린샷은 1080x2340 원본 비율 그대로다.
- * 가로 오프셋은 카드 안에 두고 아래로만 걸치게 한다 - 좁은 폭에서 가로 넘침을 만들지 않기 위한
- * 제약이다.
- */
-export const ShowcasePhone = styled.div`
-  position: absolute;
-  right: clamp(0.75rem, 3vw, 2rem);
-  bottom: calc(-1 * clamp(1rem, 3vw, 2.5rem));
-  width: clamp(4.5rem, 11vw, 9rem);
-  padding: 0.3rem;
+export const HeroPhoneFrame = styled.div`
+  position: relative;
+  width: min(100%, clamp(16rem, 28vw, 21rem));
+  padding: 0.5rem;
   border: 1px solid ${dark.hairline};
-  border-radius: 1.15rem;
+  border-radius: 2rem;
   background: ${dark.field};
   box-shadow: ${variables.ui.card.shadowFloating};
 
@@ -323,7 +244,7 @@ export const ShowcasePhone = styled.div`
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 0.9rem;
+    border-radius: 1.6rem;
   }
 `
 
