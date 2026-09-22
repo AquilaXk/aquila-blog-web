@@ -140,7 +140,13 @@ test("Company news 썸네일 URL에 상대 경로가 오면 블로그 절대 도
   expect(toCompanyNewsThumbnail("data:image/webp;base64,AAAA")).toBe(
     "data:image/webp;base64,AAAA",
   )
+  expect(toCompanyNewsThumbnail("blob:https://example.com/uuid")).toBe(
+    "blob:https://example.com/uuid",
+  )
+  expect(toCompanyNewsThumbnail("javascript:alert(1)")).toBe("")
+  expect(toCompanyNewsThumbnail("ftp://cdn.example.com/image.png")).toBe("")
   expect(toCompanyNewsThumbnail("")).toBe("")
+  expect(toCompanyNewsThumbnail("   ")).toBe("")
   expect(toCompanyNewsThumbnail(undefined)).toBe("")
 })
 

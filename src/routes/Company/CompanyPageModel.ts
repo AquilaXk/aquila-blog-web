@@ -317,10 +317,19 @@ export const toCompanyNewsThumbnail = (thumbnail: string | undefined): string =>
   if (!thumbnail) return ""
   const trimmed = thumbnail.trim()
   if (!trimmed) return ""
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
   if (trimmed.startsWith("//")) return `https:${trimmed}`
-  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed
-  const baseUrl = BLOG_URL.replace(/\/+$/, "")
+  const colonIndex = trimmed.indexOf(":")
+  if (colonIndex > 0) {
+    const scheme = trimmed.slice(0, colonIndex).toLowerCase()
+    if (scheme === "http" || scheme === "https" || scheme === "data" || scheme === "blob") {
+      return trimmed
+    }
+    return ""
+  }
+  let baseUrl = BLOG_URL
+  while (baseUrl.endsWith("/")) {
+    baseUrl = baseUrl.slice(0, -1)
+  }
   const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`
   return `${baseUrl}${cleanPath}`
 }
