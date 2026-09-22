@@ -192,12 +192,34 @@ export const buildMarkdownLivePreviewPlan = (
   }
   collectLiterals(documentNode)
 
+  // Wikilink tokens ([[target]] or [[target|alias]])
+  const wikilinkRanges: MarkdownLiveSourceRange[] = []
+  for (const match of markdown.matchAll(/\[\[([^\]\r\n]+)\]\]/g)) {
+    const from = match.index
+    const to = from + match[0].length
+    if (literalRanges.some((range) => from < range.to && to > range.from)) continue
+
+    const raw = match[1]
+    const pipeIndex = raw.indexOf("|")
+    const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).trim()
+    const rawAlias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
+    const alias = rawAlias ? rawAlias : undefined
+    if (!target) continue
+
+    wikilinkRanges.push({ from, to })
+
+    if (!isTokenActive(from, to, selections)) {
+      decorations.push({ from, to, kind: "wikilink", target, alias })
+    }
+  }
+
   // Inactive validated color tokens
   for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
     const from = match.index
     const to = from + match[0].length
     if (isTokenActive(from, to, selections)) continue
     if (literalRanges.some((range) => from >= range.from && to <= range.to)) continue
+    if (wikilinkRanges.some((range) => from >= range.from && to <= range.to)) continue
     const color = resolveInlineColorValue(match[1])
     if (!color) continue
     const bodyFrom = from + match[0].indexOf("|") + 1
@@ -209,28 +231,8 @@ export const buildMarkdownLivePreviewPlan = (
     )
   }
 
-  // Wikilink tokens ([[target]] or [[target|alias]])
-  const wikilinkRanges: MarkdownLiveSourceRange[] = []
-  for (const match of markdown.matchAll(/\[\[([^\]\r\n]+)\]\]/g)) {
-    const from = match.index
-    const to = from + match[0].length
-    if (literalRanges.some((range) => from < range.to && to > range.from)) continue
-
-    const raw = match[1]
-    const pipeIndex = raw.indexOf("|")
-    const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).trim()
-    const alias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
-    if (!target) continue
-
-    wikilinkRanges.push({ from, to })
-
-    if (!isTokenActive(from, to, selections)) {
-      decorations.push({ from, to, kind: "wikilink", target, alias })
-    }
-  }
-
   // Highlight tokens (==text==)
-  for (const match of markdown.matchAll(/(?<!=)==([^=\r\n]+)==(?!=)/g)) {
+  for (const match of markdown.matchAll(/(?<!=)==((?:[^\r\n=]|=(?!=))+?)==(?!=)/g)) {
     const from = match.index
     const to = from + match[0].length
     if (literalRanges.some((range) => from < range.to && to > range.from)) continue
@@ -262,10 +264,7 @@ export const buildMarkdownLivePreviewPlan = (
       return
     }
 
-    if (
-      (node.name === "Link" || node.name === "LinkMark") &&
-      wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)
-    ) {
+    if (wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)) {
       return
     }
 

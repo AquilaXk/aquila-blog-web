@@ -338,11 +338,7 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.appendChild(icon)
     root.appendChild(text)
 
-    const handleClick = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      e.preventDefault()
-      e.stopPropagation()
-
+    const handleActivate = () => {
       if (this.from !== undefined) {
         view.focus()
         view.dispatch({
@@ -352,7 +348,24 @@ export class MarkdownWikilinkWidget extends WidgetType {
       }
     }
 
+    const handleClick = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      e.stopPropagation()
+      handleActivate()
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault()
+        e.stopPropagation()
+        handleActivate()
+      }
+    }
+
     root.addEventListener("mousedown", handleClick)
+    root.addEventListener("click", handleClick)
+    root.addEventListener("keydown", handleKeyDown)
 
     return root
   }
