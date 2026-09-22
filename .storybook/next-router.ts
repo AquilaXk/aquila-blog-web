@@ -20,4 +20,33 @@ const push = async (href: unknown) => {
   return true
 }
 
-export default { push }
+const events = {
+  on: () => {},
+  off: () => {},
+  emit: () => {},
+}
+
+export const useRouter = () => {
+  const currentPath = getStorybookRouterPath() ?? "/"
+  return {
+    pathname: currentPath,
+    asPath: currentPath,
+    route: currentPath,
+    query: {},
+    basePath: "",
+    push,
+    replace: push,
+    reload: () => {},
+    back: () => {},
+    prefetch: async () => {},
+    beforePopState: () => {},
+    events,
+    isFallback: false,
+    isReady: true,
+    isPreview: false,
+    isLocaleDomain: false,
+  }
+}
+
+export default { push, useRouter, events }
+
