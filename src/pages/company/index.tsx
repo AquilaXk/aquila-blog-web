@@ -67,7 +67,7 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
       summary: toCompanyNewsSummary(post.summary),
       date: toCompanyNewsDate(post.modifiedTime || post.createdTime),
       href: `${BLOG_URL}/posts/${post.id}`,
-      // 썸네일이 없는 글도 있다. 그 경우 카드 미디어 슬롯은 자리를 채우는 이미지 대신 글 번호를 쓴다.
+      // 썸네일이 없는 글도 있다. 없는 자산을 지어내지 않고 에디토리얼 텍스트 카드로 렌더한다.
       thumbnail: toCompanyNewsThumbnail(post.thumbnail),
     }))
   } catch {

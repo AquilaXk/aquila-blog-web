@@ -473,11 +473,47 @@ export const PrincipleList = styled.ul`
   }
 `
 
+export const NewsHead = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem 2.5rem;
+`
+
+export const NewsHeaderAction = styled.a`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.4rem 0.25rem;
+  font-size: 1rem;
+  font-weight: ${fontWeight.semibold};
+  color: ${light.accentText};
+  text-decoration: none;
+  transition: color ${TRANSITION}, gap ${TRANSITION};
+
+  svg {
+    flex: 0 0 auto;
+    transition: transform ${TRANSITION};
+  }
+
+  &:hover {
+    color: ${light.accentPressed};
+    gap: 0.6rem;
+
+    svg {
+      transform: translateX(2px);
+    }
+  }
+`
+
 export const NewsGrid = styled.ul`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
-  margin: clamp(2.25rem, 5vw, 3.5rem) 0 0;
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
   padding: 0;
   list-style: none;
 
@@ -492,7 +528,7 @@ export const NewsCard = styled.a`
   flex-direction: column;
   gap: 0.85rem;
   height: 100%;
-  padding: clamp(1rem, 2vw, 1.25rem);
+  padding: clamp(1.25rem, 2.2vw, 1.65rem);
   border: 1px solid ${light.border};
   border-radius: ${radius.lg}px;
   background: ${light.surface};
@@ -503,17 +539,38 @@ export const NewsCard = styled.a`
     border-color: ${light.borderStrong};
   }
 
+  &:hover h3,
   &:hover strong {
     color: ${light.accentText};
   }
 
+  &:hover [data-ui="company-news-media"] img {
+    transform: scale(1.025);
+  }
+
+  &:hover [data-ui="company-news-action"] {
+    color: ${light.accentPressed};
+    gap: 0.55rem;
+
+    svg {
+      transform: translateX(2px);
+    }
+  }
+
+  h3,
   strong {
-    font-size: 1.1rem;
+    margin: 0;
+    font-size: clamp(1.125rem, 1.8vw, 1.25rem);
     line-height: 1.45;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
     font-weight: ${fontWeight.bold};
     color: ${light.inkPrimary};
     transition: color ${TRANSITION};
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   p {
@@ -521,42 +578,72 @@ export const NewsCard = styled.a`
     font-size: 1rem;
     line-height: 1.65;
     color: ${light.inkSecondary};
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   time {
     font-family: ${editorialLabel.fontFamily};
     font-size: 0.875rem;
     color: ${light.inkMuted};
+    letter-spacing: 0.02em;
   }
 `
 
-/**
- * 카드 상단 미디어 슬롯. 글에 실제 썸네일이 있으면 그 이미지를, 없으면 자리를 채우는 이미지를
- * 만들지 않고 같은 크기의 단색 면에 글 번호만 올린다 - 카드 실루엣은 유지되고 없는 자산을
- * 지어내지도 않는다.
- */
-export const NewsMedia = styled.div`
+export const NewsMeta = styled.div`
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+`
+
+export const NewsIndex = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: ${variables.ui.button.radiusPill}px;
+  background: ${light.surfaceBrand};
+  color: ${light.accentText};
+  font-family: ${editorialLabel.fontFamily};
+  font-size: ${editorialLabel.fontSize};
+  font-weight: ${editorialLabel.fontWeight};
+  letter-spacing: ${editorialLabel.letterSpacing};
+`
+
+/** 실제 썸네일 이미지가 존재할 때만 렌더되는 미디어 슬롯 */
+export const NewsMedia = styled.div`
   overflow: hidden;
   aspect-ratio: 16 / 9;
   border-radius: ${radius.md}px;
-  background: ${light.surfaceBrand};
+  background: ${light.surfaceBrandChrome};
 
   img {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform ${TRANSITION};
   }
+`
 
-  span {
-    padding: 0 0 0.6rem 0.75rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
-    font-weight: ${fontWeight.extraBold};
-    letter-spacing: -0.02em;
-    color: ${light.onSignature};
+export const NewsAction = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  font-size: 1rem;
+  font-weight: ${fontWeight.semibold};
+  color: ${light.accentText};
+  transition: gap ${TRANSITION}, color ${TRANSITION};
+
+  svg {
+    flex: 0 0 auto;
+    transition: transform ${TRANSITION};
   }
 `
 
