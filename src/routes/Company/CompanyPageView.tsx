@@ -239,24 +239,59 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
       {news.length > 0 ? (
         <S.Section id={NEWS_SECTION_ID}>
           <S.SectionInner>
-            <S.SectionLabel>소식</S.SectionLabel>
-            <S.SectionHeading>만들면서 남긴 기록</S.SectionHeading>
+            <Sec.NewsHead>
+              <div>
+                <S.SectionLabel>소식</S.SectionLabel>
+                <S.SectionHeading>만들면서 남긴 기록</S.SectionHeading>
+              </div>
+              <Sec.NewsHeaderAction href={BLOG_URL}>
+                <span>기술 블로그 전체 보기</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Sec.NewsHeaderAction>
+            </Sec.NewsHead>
             <Sec.NewsGrid>
               {news.map((item) => (
                 <li key={item.id}>
                   <Sec.NewsCard href={item.href}>
-                    <Sec.NewsMedia>
-                      {item.thumbnail ? (
+                    {item.thumbnail?.trim() ? (
+                      <Sec.NewsMedia data-ui="company-news-media">
                         <img src={item.thumbnail} alt="" loading="lazy" decoding="async" />
-                      ) : (
-                        <span aria-hidden="true">{item.index}</span>
-                      )}
-                    </Sec.NewsMedia>
-                    {item.date ? (
-                      <time dateTime={item.date.replace(/\./g, "-")}>{item.date}</time>
+                      </Sec.NewsMedia>
                     ) : null}
-                    <strong>{item.title}</strong>
+                    <Sec.NewsMeta>
+                      <Sec.NewsIndex aria-hidden="true">{item.index}</Sec.NewsIndex>
+                      {item.date ? (
+                        <time dateTime={item.date.replace(/\./g, "-")}>{item.date}</time>
+                      ) : null}
+                    </Sec.NewsMeta>
+                    <h3>{item.title}</h3>
                     {item.summary ? <p>{item.summary}</p> : null}
+                    <Sec.NewsAction aria-hidden="true" data-ui="company-news-action">
+                      <span>글 읽기</span>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </Sec.NewsAction>
                   </Sec.NewsCard>
                 </li>
               ))}
