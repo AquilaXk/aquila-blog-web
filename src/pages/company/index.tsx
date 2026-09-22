@@ -10,6 +10,7 @@ import {
   toCompanyNewsDate,
   toCompanyNewsIndex,
   toCompanyNewsSummary,
+  toCompanyNewsThumbnail,
   type CompanyNewsItem,
 } from "src/routes/Company/CompanyPageModel"
 import type { NextPageWithLayout } from "../../types"
@@ -67,7 +68,7 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
       date: toCompanyNewsDate(post.modifiedTime || post.createdTime),
       href: `${BLOG_URL}/posts/${post.id}`,
       // 썸네일이 없는 글도 있다. 그 경우 카드 미디어 슬롯은 자리를 채우는 이미지 대신 글 번호를 쓴다.
-      thumbnail: post.thumbnail || "",
+      thumbnail: toCompanyNewsThumbnail(post.thumbnail),
     }))
   } catch {
     return []

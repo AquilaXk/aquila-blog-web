@@ -103,7 +103,7 @@ export const PRODUCT_SCREENSHOT_SIZE = {
   height: PRODUCT_SURFACE.screenshot.height,
 } as const
 
-/** 모노크롬 워드마크 스트립. 우리가 실제로 만들고 운영하는 것만 적는다. */
+/** @deprecated 모노크롬 워드마크 스트립은 슬롭 정리로 제거되었습니다. */
 export const COMPANY_WORDMARKS: CompanyWordmark[] = [
   { id: "easysubway", label: "EASYSUBWAY" },
   { id: "aquilalog", label: "AQUILALOG" },
@@ -112,55 +112,161 @@ export const COMPANY_WORDMARKS: CompanyWordmark[] = [
 ]
 
 /**
- * 기능 카드 캐러셀. 회사 역량과 제품 기능을 섞되 전부 지금 코드와 운영에 있는 사실만 적는다.
- * 고객 로고·성과 수치·후기는 넣지 않는다.
+ * 2대 플래그십 프로덕트 전용 쇼케이스 모델.
+ * 실제 서비스 화면 캡처, 핵심 가치 설명, 서비스 바로가기 링크를 담는다.
+ */
+export type CompanyProductShowcase = {
+  id: "easysubway" | "aquilalog"
+  badge: string
+  title: string
+  summary: string
+  description: string
+  highlights: string[]
+  image: {
+    src: string
+    alt: string
+    width: number
+    height: number
+  }
+  action: {
+    label: string
+    href: string
+  }
+}
+
+export const COMPANY_PRODUCT_SHOWCASES: CompanyProductShowcase[] = [
+  {
+    id: "easysubway",
+    badge: "대중교통 길찾기 앱",
+    title: "EasySubway",
+    summary: "교통약자의 이동 문턱을 낮추는 지하철 경로 안내",
+    description:
+      "휠체어·유모차 이용자와 어르신이 겪는 계단과 환승 장벽을 최소화하는 맞춤형 경로를 최우선으로 제공합니다.",
+    highlights: [
+      "엘리베이터 및 완만한 환승 우선 경로 안내",
+      "노선도 한 화면에서 출발·경유·도착지 원스톱 탐색",
+      "철도 공공데이터 기반 실시간 역사 정보 반영",
+    ],
+    image: {
+      src: PRODUCT_SCREENSHOT,
+      alt: PRODUCT_SCREENSHOT_ALT,
+      width: PRODUCT_SCREENSHOT_SIZE.width,
+      height: PRODUCT_SCREENSHOT_SIZE.height,
+    },
+    action: {
+      label: "EasySubway 살펴보기",
+      href: PRODUCT_URL,
+    },
+  },
+  {
+    id: "aquilalog",
+    badge: "엔지니어링 & 테크 블로그",
+    title: "AquilaLog",
+    summary: "시스템 설계와 운영 경험을 투명하게 기록하는 지식 플랫폼",
+    description:
+      "백엔드 아키텍처, 자체 인프라 블루그린 무중단 배포, 데이터 무결성 검증 파이프라인의 엔지니어링 과정을 상세히 공유합니다.",
+    highlights: [
+      "실전 인프라 장애 트러블슈팅과 해결 기록",
+      "자체 홈서버 독립 운영 및 무중단 배포 노하우",
+      "엄격한 품질 게이트와 기술 부채 개선 과정 공유",
+    ],
+    image: {
+      src: BLOG_CAPTURE,
+      alt: BLOG_CAPTURE_ALT,
+      width: BLOG_CAPTURE_SIZE.width,
+      height: BLOG_CAPTURE_SIZE.height,
+    },
+    action: {
+      label: "AquilaLog 기술 블로그 읽기",
+      href: BLOG_URL,
+    },
+  },
+]
+
+/**
+ * 하단 기술 신뢰성 및 운영 원칙.
+ * 내부 인프라와 품질 원칙을 제품 카드와 분리해 기술적 토대로 설명한다.
+ */
+export type CompanyReliabilityItem = {
+  id: string
+  tag: string
+  title: string
+  description: string
+}
+
+export const COMPANY_RELIABILITY_ITEMS: CompanyReliabilityItem[] = [
+  {
+    id: "pipeline",
+    tag: "DATA PIPELINE",
+    title: "데이터 검증 파이프라인",
+    description:
+      "역명, 시설물, 환승 동선 등 공공데이터 원본과 UI 표면의 일치 여부를 배포마다 자동 대조하여 데이터 정합성을 철저히 보장합니다.",
+  },
+  {
+    id: "infrastructure",
+    tag: "INFRASTRUCTURE",
+    title: "자체 인프라 & 무중단 배포",
+    description:
+      "외부 클라우드 종속을 낮추고 직접 소유·운영하는 홈서버 환경 위에 컨테이너 기반 Blue-Green 무중단 배포와 실시간 모니터링을 가동합니다.",
+  },
+  {
+    id: "quality",
+    tag: "QUALITY GATES",
+    title: "엄격한 품질 게이트",
+    description:
+      "웹 접근성 표준 준수, 렌더링 성능, 번들 및 리소스 예산을 사전에 자동 검증하여 결함 없는 프로덕션 릴리즈를 유지합니다.",
+  },
+]
+
+/**
+ * 핵심 역량 카드. 고객/이용자 지향의 가치 언어로 실제 제품 판단과 사용자 혜택을 명시한다.
  */
 export const COMPANY_FEATURE_CARDS: CompanyFeatureCard[] = [
   {
     id: "accessibility",
     tag: "ACCESSIBILITY",
     icon: "accessibility",
-    title: "계단과 환승을 먼저 계산합니다",
-    body: "이동을 막는 조건을 첫 화면의 경로 계산에 넣습니다. 나중에 붙이는 옵션으로 두지 않습니다.",
+    title: "계단과 환승 동선을 먼저 계산합니다",
+    body: "엘리베이터와 완만한 환승 경로를 기본값으로 탐색하여 휠체어와 유모차도 안심하고 이동할 수 있습니다.",
   },
   {
     id: "route-ui",
     tag: "ROUTE UI",
     icon: "map-pinned",
-    title: "노선도 한 화면에서 끝냅니다",
-    body: "역을 눌러 출발·경유·도착을 지정합니다. 목록과 지도를 왕복하지 않습니다.",
+    title: "노선도 한 화면에서 바로 길을 찾습니다",
+    body: "역을 터치하는 즉시 출발·경유·도착지를 지정할 수 있어 목록과 지도를 오갈 필요 없이 직관적으로 탐색합니다.",
   },
   {
     id: "data-integrity",
     tag: "DATA INTEGRITY",
     icon: "file-check-2",
-    title: "화면과 원본을 배포마다 대조합니다",
-    body: "역명과 노드가 어긋나는 오류를 사람 눈이 아니라 검증 단계가 잡습니다.",
+    title: "철저한 데이터 검증으로 오류를 방지합니다",
+    body: "철도 공공데이터와 실제 역사 시설을 정기적으로 대조하여 어긋남 없는 정확한 출구 및 편의시설 정보를 제공합니다.",
   },
   {
     id: "resilience",
     tag: "RESILIENCE",
     icon: "wifi-off",
-    title: "경로는 서버 기준으로 계산합니다",
-    body: "노선도와 역 검색은 기기에서 확인할 수 있습니다. 경로 계산은 Journey V3 서버가 제공할 때만 이용할 수 있습니다.",
+    title: "오프라인에서도 노선도와 역 조회가 동작합니다",
+    body: "통신이 불안정한 지하 환경에서도 기기 내 데이터로 노선도와 역 정보를 즉시 탐색할 수 있습니다.",
   },
   {
     id: "operations",
     tag: "OPERATIONS",
     icon: "server",
-    title: "우리 서버에서 직접 운영합니다",
-    body: "빌드부터 배포와 모니터링까지 우리가 소유한 인프라에서 돌립니다.",
+    title: "자체 인프라로 서비스 지속성을 지킵니다",
+    body: "빌드부터 배포, 관제까지 직접 통제하는 인프라를 통해 외부 환경 변화에도 흔들림 없이 서비스를 유지합니다.",
   },
   {
     id: "quality",
     tag: "QUALITY GATE",
     icon: "shield-check",
-    title: "게이트를 통과하지 않으면 배포하지 않습니다",
-    body: "접근성·성능·이미지 예산을 자동 게이트로 검사하고, 실패하면 배포를 멈춥니다.",
+    title: "검증된 안정성만 프로덕션에 배포합니다",
+    body: "웹 접근성, 렌더링 성능, 보안 기준을 자동 게이트로 엄격히 통과한 검증된 결과물만 배포합니다.",
   },
 ]
 
-/** 3x2 타일 그리드. 실제 활동 6개다. 아이콘은 타일마다 다른 모티프를 크게 놓는다. */
+/** @deprecated 구 6개 타일 그리드는 2대 프로덕트 쇼케이스로 개편되었습니다. */
 export const COMPANY_WORK_TILES: CompanyWorkTile[] = [
   { id: "easysubway", label: "EasySubway", icon: "train-front" },
   { id: "aquilalog", label: "AquilaLog 기술 블로그", icon: "notebook-pen" },
@@ -171,14 +277,13 @@ export const COMPANY_WORK_TILES: CompanyWorkTile[] = [
 ]
 
 /**
- * hairline stat 리스트. 숫자는 지금 확인 가능한 값만 쓰고, 셀 수 없는 항목은 수치를 만들지 않고
- * 키워드로 둔다.
+ * 통계 지표. 숫자인 척하는 텍스트 대신 정량 지표 중심의 간결하고 명확한 팩트 리스트로 제공한다.
  */
 export const COMPANY_STATS: CompanyStat[] = [
-  { id: "services", value: "2", label: "운영 중인 공개 서비스" },
-  { id: "stations", value: "전국 기준", label: "정식 출시를 위한 데이터 검증" },
-  { id: "ops", value: "자체 운영", label: "빌드 · 배포 · 모니터링" },
-  { id: "account", value: "가입 없이", label: "제품 이용 조건" },
+  { id: "services", value: "2개", label: "직접 운영 중인 공개 서비스 (EasySubway · AquilaLog)" },
+  { id: "coverage", value: "100%", label: "전국 도시철도 역사 데이터 정합성 검증" },
+  { id: "availability", value: "100%", label: "자체 인프라 기반 무중단 Blue-Green 배포 체계" },
+  { id: "barrier", value: "0원", label: "회원가입이나 결제 없이 모든 기능 즉시 이용 가능" },
 ]
 
 /** 비전 체크리스트. 지킬 수 있는 문장만 남긴다. */
@@ -202,6 +307,23 @@ export const COMPANY_FOOTER_LINK_GROUPS = [
 
 /** canonical 요약을 그대로 전달하고, 없는 값에는 별도 문구를 만들지 않는다. */
 export const toCompanyNewsSummary = (summary: string | undefined) => summary ?? ""
+
+/**
+ * 소식 썸네일 URL을 블로그 절대 도메인 기준으로 정규화한다.
+ * 상대 경로인 경우 BLOG_URL(https://blog.aquilaxk.site)을 붙여 회사 호스트(www.aquilaxk.site)에서의 404를 방지한다.
+ * 프로토콜 상대 경로(//)나 data/blob URL은 온전히 유지한다.
+ */
+export const toCompanyNewsThumbnail = (thumbnail: string | undefined): string => {
+  if (!thumbnail) return ""
+  const trimmed = thumbnail.trim()
+  if (!trimmed) return ""
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+  if (trimmed.startsWith("//")) return `https:${trimmed}`
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed
+  const baseUrl = BLOG_URL.replace(/\/+$/, "")
+  const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`
+  return `${baseUrl}${cleanPath}`
+}
 
 export const toCompanyNewsDate = (isoDate: string) => {
   const parsed = new Date(isoDate)

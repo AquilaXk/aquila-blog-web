@@ -4,17 +4,14 @@ import BrandMark from "src/components/branding/BrandMark"
 import CompanyFeatureCarousel from "src/routes/Company/CompanyFeatureCarousel"
 import CompanyIcon from "src/routes/Company/CompanyIcon"
 import {
-  BLOG_CAPTURE,
-  BLOG_CAPTURE_ALT,
-  BLOG_CAPTURE_SIZE,
   BLOG_URL,
   COMPANY_FOOTER_LINK_GROUPS,
   COMPANY_NOTICE,
   COMPANY_PRINCIPLES,
+  COMPANY_PRODUCT_SHOWCASES,
+  COMPANY_RELIABILITY_ITEMS,
   COMPANY_STATS,
   COMPANY_SURFACE,
-  COMPANY_WORDMARKS,
-  COMPANY_WORK_TILES,
   CONTACT_MAILTO,
   PRODUCT_SCREENSHOT,
   PRODUCT_SCREENSHOT_ALT,
@@ -84,15 +81,6 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
 
     <main>
       <S.Hero>
-        <S.HeroBackdrop aria-hidden="true">
-          <S.HeroGrid>
-            {Array.from({ length: 8 }, (_, column) => (
-              <span key={`hero-rule-${column}`} />
-            ))}
-          </S.HeroGrid>
-          <S.HeroEllipse $side="left" />
-          <S.HeroEllipse $side="right" />
-        </S.HeroBackdrop>
         <S.HeroCopy>
           <S.HeroTitle>
             이동의 <S.HeroAccent>문턱</S.HeroAccent>을 낮추는
@@ -106,45 +94,20 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
           <S.PillAction href={PRODUCT_URL}>EasySubway 살펴보기</S.PillAction>
         </S.HeroCopy>
         <S.HeroShowcase>
-          <S.ShowcaseChrome aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </S.ShowcaseChrome>
-          <S.ShowcaseCapture>
-            <img
-              src={BLOG_CAPTURE}
-              alt={BLOG_CAPTURE_ALT}
-              width={BLOG_CAPTURE_SIZE.width}
-              height={BLOG_CAPTURE_SIZE.height}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              data-ui="company-hero-capture"
-            />
-          </S.ShowcaseCapture>
-          <S.ShowcasePhone>
+          <S.HeroPhoneFrame>
             <img
               src={PRODUCT_SCREENSHOT}
               alt={PRODUCT_SCREENSHOT_ALT}
               width={PRODUCT_SCREENSHOT_SIZE.width}
               height={PRODUCT_SCREENSHOT_SIZE.height}
-              loading="lazy"
+              loading="eager"
+              fetchPriority="high"
               decoding="async"
               data-ui="company-hero-phone"
             />
-          </S.ShowcasePhone>
+          </S.HeroPhoneFrame>
         </S.HeroShowcase>
       </S.Hero>
-
-      <Sec.WordmarkStrip>
-        <Sec.WordmarkLabel>우리가 만들고 운영하는 것들</Sec.WordmarkLabel>
-        <Sec.WordmarkRow>
-          {COMPANY_WORDMARKS.map((wordmark) => (
-            <li key={wordmark.id}>{wordmark.label}</li>
-          ))}
-        </Sec.WordmarkRow>
-      </Sec.WordmarkStrip>
 
       <S.Section id="capabilities">
         <S.SectionInner>
@@ -154,7 +117,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
               <S.SectionHeading>제품에 실제로 들어간 판단</S.SectionHeading>
             </div>
             <S.SectionAside>
-              카드마다 지금 코드와 운영에 있는 것만 적었습니다. 좌우로 넘겨 볼 수 있습니다.
+              사용자의 실제 이용 경험과 이동 안전에 초점을 맞춰 구현했습니다.
             </S.SectionAside>
           </Sec.CarouselHead>
           <CompanyFeatureCarousel />
@@ -164,16 +127,69 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
       <S.Section id="work" $tone="scaffold">
         <S.SectionInner>
           <Sec.WorkHeading>회사가 지금 만들고 운영하는 것</Sec.WorkHeading>
-          <Sec.WorkGrid>
-            {COMPANY_WORK_TILES.map((tile, position) => (
-              <Sec.WorkTile key={tile.id} $alternate={position % 2 === 1}>
-                <span>
-                  <CompanyIcon name={tile.icon} />
-                </span>
-                <span>{tile.label}</span>
-              </Sec.WorkTile>
+          <Sec.ProductShowcaseGrid>
+            {COMPANY_PRODUCT_SHOWCASES.map((product) => (
+              <Sec.ProductShowcaseCard key={product.id}>
+                <Sec.ProductShowcaseMedia $layout={product.id === "easysubway" ? "phone" : "desktop"}>
+                  <img
+                    src={product.image.src}
+                    alt={product.image.alt}
+                    width={product.image.width}
+                    height={product.image.height}
+                    loading="lazy"
+                    decoding="async"
+                    data-ui={`company-showcase-${product.id}`}
+                  />
+                </Sec.ProductShowcaseMedia>
+                <Sec.ProductShowcaseContent>
+                  <Sec.ProductBadge>{product.badge}</Sec.ProductBadge>
+                  <h3>{product.title}</h3>
+                  <p className="summary">{product.summary}</p>
+                  <p className="description">{product.description}</p>
+                  <Sec.ProductHighlightList>
+                    {product.highlights.map((item) => (
+                      <li key={item}>
+                        <CompanyIcon name="check" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </Sec.ProductHighlightList>
+                  <Sec.ProductAction href={product.action.href}>
+                    {product.action.label}
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </Sec.ProductAction>
+                </Sec.ProductShowcaseContent>
+              </Sec.ProductShowcaseCard>
             ))}
-          </Sec.WorkGrid>
+          </Sec.ProductShowcaseGrid>
+
+          <Sec.ReliabilityBlock>
+            <Sec.ReliabilityHeader>
+              <S.SectionLabel>기술 신뢰성 & 운영 원칙</S.SectionLabel>
+              <h3>제품의 안정성을 뒷받침하는 기술적 토대</h3>
+              <p>화려한 설명 대신 실제 시스템과 검증 파이프라인으로 약속을 지킵니다.</p>
+            </Sec.ReliabilityHeader>
+            <Sec.ReliabilityList role="list" data-ui="company-reliability-list">
+              {COMPANY_RELIABILITY_ITEMS.map((item) => (
+                <Sec.ReliabilityItem key={item.id}>
+                  <span className="tag">{item.tag}</span>
+                  <h4>{item.title}</h4>
+                  <p>{item.description}</p>
+                </Sec.ReliabilityItem>
+              ))}
+            </Sec.ReliabilityList>
+          </Sec.ReliabilityBlock>
         </S.SectionInner>
       </S.Section>
 
@@ -188,8 +204,8 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
               </Sec.StoryHeadline>
             </div>
             <S.SectionAside>
-              설계부터 배포와 운영까지 같은 사람이 봅니다. 넘기는 단계가 없으니 틀린 것을 늦게 알지
-              않습니다.
+              기획부터 개발, 인프라 운영까지 유기적으로 연결하여 사용자의 목소리를 빠르게 제품에
+              반영합니다.
             </S.SectionAside>
           </Sec.StoryLayout>
           <Sec.StatList>
@@ -253,9 +269,9 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
         <Sec.ContactBand>
           <div>
             <h2>함께 만들 이야기가 있다면</h2>
-            <p>제품 협업, 데이터 검증, 기술 문의를 이 주소로 받습니다.</p>
+            <p>제품 협업, 데이터 검증, 기술 문의를 이메일로 받습니다.</p>
           </div>
-          <S.PillAction href={CONTACT_MAILTO}>{COMPANY_SURFACE.contactEmail}</S.PillAction>
+          <S.PillAction href={CONTACT_MAILTO}>이메일로 문의하기</S.PillAction>
         </Sec.ContactBand>
       </S.Section>
     </main>

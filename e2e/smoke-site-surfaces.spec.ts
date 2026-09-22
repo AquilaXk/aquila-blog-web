@@ -77,7 +77,7 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(page.locator("#approach")).toBeVisible()
     await expect(page.getByRole("heading", { name: "함께 만들 이야기가 있다면" })).toBeVisible()
     await expect(page.getByText("EasySubway 전국 정식 출시 준비 중")).toBeVisible()
-    await expect(page.getByRole("link", { name: "aquila@aquilaxk.site" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "이메일로 문의하기" })).toHaveAttribute(
       "href",
       "mailto:aquila@aquilaxk.site"
     )
@@ -122,13 +122,9 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expectTouchTargets(page, "header a")
   })
 
-  test("hero 카드의 블로그 캡처와 겹친 폰이 각자 원본 비율을 유지한다", async ({ page }) => {
+  test("hero 폰 목업이 1080x2340 원본 비율을 유지한다", async ({ page }) => {
     await page.goto("/company")
-    // 와이드 카드 안의 컷은 라이브 블로그 홈 캡처다. 자리를 채우는 껍데기 자산이 아니어야 한다.
-    const capture = page.locator("[data-ui='company-hero-capture']")
-    await expect(capture).toBeVisible()
-    expect(await measureRenderedAspectRatio(capture)).toBeCloseTo(BLOG_CAPTURE_ASPECT_RATIO, 2)
-    // 겹친 폰은 제품 검수본이므로 1080x2340이 잘리지 않아야 한다.
+    // hero 폰은 제품 검수본이므로 1080x2340이 잘리지 않아야 한다.
     const phone = page.locator("[data-ui='company-hero-phone']")
     await expect(phone).toBeVisible()
     expect(await measureRenderedAspectRatio(phone)).toBeCloseTo(SCREENSHOT_ASPECT_RATIO, 2)
@@ -154,22 +150,36 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(page.locator("link[rel='alternate'][type='application/rss+xml']")).toHaveCount(1)
   })
 
-  test("역량 캐러셀은 키보드로 접근 가능하고 화살표로 카드를 넘긴다", async ({ page }) => {
+  test("핵심 역량은 6개 카드가 한눈에 보이는 정적 그리드로 렌더된다", async ({ page }) => {
     await page.goto("/company")
-    // 스크롤 영역이 포커스를 못 받으면 키보드만 쓰는 방문자는 세 번째 카드 뒤를 볼 수 없다.
-    const viewport = page.getByRole("group", { name: "핵심 역량 카드" })
-    await expect(viewport).toHaveAttribute("tabindex", "0")
+    const grid = page.getByRole("region", { name: "핵심 역량 카드" })
+    await expect(grid).toBeVisible()
+    await expect(grid.locator("article")).toHaveCount(6)
+  })
 
-    const before = await viewport.evaluate((element) => element.scrollLeft)
-    await page.getByRole("button", { name: "다음 카드 보기" }).click()
-    await expect
-      .poll(async () => await viewport.evaluate((element) => element.scrollLeft))
-      .toBeGreaterThan(before)
-    // 처음 위치에서는 이전 버튼이 눌리지 않아야 한다.
-    await page.getByRole("button", { name: "이전 카드 보기" }).click()
-    await expect
-      .poll(async () => await viewport.evaluate((element) => element.scrollLeft))
-      .toBeLessThanOrEqual(before + 2)
+  test("2대 프로덕트 쇼케이스 카드와 하단 기술 신뢰성 텍스트 리스트를 렌더한다", async ({ page }) => {
+    await page.goto("/company")
+    const workSection = page.locator("#work")
+    await expect(workSection.locator("[data-ui='company-showcase-easysubway']")).toBeVisible()
+    await expect(workSection.locator("[data-ui='company-showcase-aquilalog']")).toBeVisible()
+    await expect(workSection.getByRole("link", { name: "EasySubway 살펴보기" })).toBeVisible()
+    await expect(workSection.getByRole("link", { name: "AquilaLog 기술 블로그 읽기" })).toBeVisible()
+
+    const reliabilityList = workSection.locator("[data-ui='company-reliability-list']")
+    await expect(reliabilityList).toBeVisible()
+    await expect(reliabilityList.locator("li")).toHaveCount(3)
+    await expect(workSection.getByText("DATA PIPELINE")).toBeVisible()
+    await expect(workSection.getByText("INFRASTRUCTURE")).toBeVisible()
+    await expect(workSection.getByText("QUALITY GATES")).toBeVisible()
+  })
+
+  test("통계 위젯은 정량 지표 중심의 값을 렌더한다", async ({ page }) => {
+    await page.goto("/company")
+    const statList = page.locator("#approach dl")
+    await expect(statList).toBeVisible()
+    await expect(statList.getByText("2개")).toBeVisible()
+    await expect(statList.getByText("100%").first()).toBeVisible()
+    await expect(statList.getByText("0원")).toBeVisible()
   })
 })
 
