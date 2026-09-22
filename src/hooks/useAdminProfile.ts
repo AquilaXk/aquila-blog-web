@@ -39,13 +39,17 @@ export const useAdminProfile = (initialProfile: AdminProfile | null = null, opti
     queryKey: cacheKey,
     queryFn: fetchPublicAdminProfile,
     enabled: isBrowser && canFetch,
-    throwOnError: true,
+    throwOnError: false,
     initialData: seededProfile ?? undefined,
     staleTime: options.staleTimeMs ?? (hasSeedProfile ? 5 * 60 * 1000 : 0),
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnMount: canFetch && (options.refetchOnMount ?? !hasSeedProfile),
   })
+
+  if (query.isError) {
+    return seededProfile ?? initialProfile
+  }
 
   return query.data === undefined ? initialProfile : query.data
 }
