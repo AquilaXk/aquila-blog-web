@@ -9,10 +9,10 @@ import { useAdminProfile, type AdminProfile } from "src/hooks/useAdminProfile"
 import { isNavigationCancelledError, isRequestCancelledError } from "src/libs/router"
 import { isStandaloneSurfacePathname } from "src/libs/publicSurfaceUrl"
 import { FLUID_LAYOUT_MAX_PX } from "./layoutTiers"
-import { LanguageProvider } from "src/libs/language"
+import { LanguageProvider, type SiteLanguage } from "src/libs/language"
 
 const INITIAL_PROPS_CANCELLED_MESSAGE = "loading initial props cancelled"
-const RootAdminProfileContext = React.createContext<AdminProfile | null>(null)
+export const RootAdminProfileContext = React.createContext<AdminProfile | null>(null)
 
 export const useRootAdminProfile = () => React.useContext(RootAdminProfileContext)
 
@@ -20,12 +20,14 @@ type Props = {
   children: ReactNode
   initialAdminProfile?: AdminProfile | null
   initialAdminProfileShouldRefetch?: boolean
+  initialLanguage?: SiteLanguage
 }
 
 const RootLayout = ({
   children,
   initialAdminProfile = null,
   initialAdminProfileShouldRefetch = false,
+  initialLanguage,
 }: Props) => {
   // Enforce intentional light-only DOM/query scheme (PR 1275 / HIG P5-5).
   useScheme()
@@ -131,7 +133,7 @@ const RootLayout = ({
   }, [])
 
   return (
-    <LanguageProvider>
+    <LanguageProvider initialLanguage={initialLanguage}>
       <ThemeProvider scheme={effectiveScheme} blogDesign={effectiveBlogDesign}>
         <RootAdminProfileContext.Provider value={adminProfile}>
           {isAdminRoute || isDedicatedEditorRoute || isStandaloneSurfaceRoute ? null : (

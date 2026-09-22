@@ -19,6 +19,7 @@ import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { appendSsrDebugTiming, isSsrDebugEnabled, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { resolveRenderableProfileLinkHref } from "src/libs/utils/profileCardLinks"
+import { parseLanguagePreference, type SiteLanguage } from "src/libs/language"
 
 export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
@@ -59,10 +60,13 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
     },
   ])
 
+  const initialLanguage = parseLanguagePreference(req.headers.cookie) ?? undefined
+
   return {
     props: {
       initialAdminProfile,
       initialAdminProfileSource,
+      ...(initialLanguage ? { initialLanguage } : {}),
     },
   }
 })
@@ -70,6 +74,7 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
 type AboutPageProps = {
   initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: PublicAdminProfileSource
+  initialLanguage?: SiteLanguage
 }
 
 const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, initialAdminProfileSource }) => {

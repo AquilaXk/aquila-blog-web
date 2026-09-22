@@ -39,6 +39,10 @@ test.describe("language system and translations", () => {
     expect(translations.en.navNotes).toBe("Posts")
     expect(translations.ko.navTopics).toBe("태그")
     expect(translations.en.navTopics).toBe("Tags")
+    expect(translations.ko.metaDate).toBe("작성일:")
+    expect(translations.en.metaDate).toBe("Date:")
+    expect(translations.ko.metaAuthor).toBe("글쓴이:")
+    expect(translations.en.metaAuthor).toBe("Author:")
   })
 
   test("recentPosts translation key has no companion subtitle key", () => {
@@ -46,4 +50,42 @@ test.describe("language system and translations", () => {
     const subtitleKeys = keys.filter((key) => key.toLowerCase().includes("subtitle"))
     expect(subtitleKeys).toEqual([])
   })
+
+  test("parseLanguagePreference extracts valid language from cookie strings", async () => {
+    const { parseLanguagePreference, LANGUAGE_STORAGE_KEY, LANGUAGE_COOKIE_KEY } = await import(
+      "../../src/libs/language"
+    )
+
+    expect(LANGUAGE_STORAGE_KEY).toBe("aquila_blog_lang")
+    expect(LANGUAGE_COOKIE_KEY).toBe("aquila_blog_lang")
+
+    // Direct values
+    expect(parseLanguagePreference("aquila_blog_lang=en")).toBe("en")
+    expect(parseLanguagePreference("aquila_blog_lang=ko")).toBe("ko")
+    expect(parseLanguagePreference("aquila_blog_lang=EN")).toBe("en")
+    expect(parseLanguagePreference("aquila_blog_lang=en-US")).toBe("en")
+    expect(parseLanguagePreference("aquila_blog_lang=ko-KR")).toBe("ko")
+
+    // Multiple cookies
+    expect(
+      parseLanguagePreference("sessionId=abc123; aquila_blog_lang=en; theme=light")
+    ).toBe("en")
+    expect(
+      parseLanguagePreference("theme=dark; aquila_blog_lang=ko")
+    ).toBe("ko")
+
+    // Quoted cookies
+    expect(parseLanguagePreference('aquila_blog_lang="en"')).toBe("en")
+    expect(parseLanguagePreference('aquila_blog_lang="ko"')).toBe("ko")
+    expect(parseLanguagePreference('sessionId=abc123; aquila_blog_lang="en"; theme=light')).toBe("en")
+
+    // Edge cases and fallbacks
+    expect(parseLanguagePreference(null)).toBeNull()
+    expect(parseLanguagePreference(undefined)).toBeNull()
+    expect(parseLanguagePreference("")).toBeNull()
+    expect(parseLanguagePreference("other_cookie=value")).toBeNull()
+    expect(parseLanguagePreference("aquila_blog_lang=fr")).toBeNull()
+    expect(parseLanguagePreference("aquila_blog_lang=")).toBeNull()
+  })
 })
+

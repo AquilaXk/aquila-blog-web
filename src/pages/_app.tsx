@@ -10,6 +10,7 @@ import createEmotionCache from "src/libs/emotion/createEmotionCache"
 import { createQueryClient } from "src/libs/react-query"
 import type { PublicAdminProfileSource } from "src/libs/adminProfileSource"
 import { shouldRefetchAdminProfileSource } from "src/libs/adminProfileSource"
+import type { SiteLanguage } from "src/libs/language"
 import { useState } from "react"
 import "katex/dist/katex.min.css"
 
@@ -18,6 +19,7 @@ type AppPageProps = AppPropsWithLayout["pageProps"] & {
   initialAdminProfile?: AdminProfile | null
   initialProfileSnapshot?: AdminProfile | null
   initialAdminProfileSource?: PublicAdminProfileSource
+  initialLanguage?: SiteLanguage
 }
 
 function App({ Component, pageProps, emotionCache = clientSideEmotionCache }: AppPropsWithLayout) {
@@ -40,6 +42,7 @@ function App({ Component, pageProps, emotionCache = clientSideEmotionCache }: Ap
             <RootLayout
               initialAdminProfile={initialAdminProfile}
               initialAdminProfileShouldRefetch={initialAdminProfileShouldRefetch}
+              initialLanguage={appPageProps.initialLanguage}
             >
               {getLayout(<Component {...pageProps} />)}
             </RootLayout>
