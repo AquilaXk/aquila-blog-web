@@ -30,6 +30,20 @@ const adminAuthCookieEntry = (
   ...entry,
 })
 
+const siteLanguageStorageEntry = (
+  area: "cookie" | "localStorage",
+  retention: string,
+  deletion: string,
+): BrowserStorageRegistryEntry => ({
+  area,
+  key: "aquila_blog_lang",
+  purpose: "site-language-preference",
+  required: false,
+  retention,
+  deletion,
+  stores: "site language preference ('ko' or 'en')",
+})
+
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   adminAuthCookieEntry({
     key: "apiKey",
@@ -55,24 +69,16 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     deletion: "logout, session revocation, or browser cookie deletion",
     stores: "administrator session identifier",
   }),
-  {
-    area: "cookie",
-    key: "aquila_blog_lang",
-    purpose: "site-language-preference",
-    required: false,
-    retention: "1 year or until browser storage is cleared",
-    deletion: "manual toggle, browser cookie deletion",
-    stores: "site language preference ('ko' or 'en')",
-  },
-  {
-    area: "localStorage",
-    key: "aquila_blog_lang",
-    purpose: "site-language-preference",
-    required: false,
-    retention: "until language preference changes or browser storage is cleared",
-    deletion: "browser storage deletion",
-    stores: "site language preference ('ko' or 'en')",
-  },
+  siteLanguageStorageEntry(
+    "cookie",
+    "1 year or until browser storage is cleared",
+    "manual toggle, browser cookie deletion",
+  ),
+  siteLanguageStorageEntry(
+    "localStorage",
+    "until language preference changes or browser storage is cleared",
+    "browser storage deletion",
+  ),
   {
     area: "localStorage",
     key: "auth.admin.savedEmail.v1",
@@ -96,9 +102,9 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     key: "admin.editor.localDraft.create.v3",
     purpose: "editor-local-draft-create",
     required: false,
-    retention: "7 days from savedAt or until manually cleared",
-    deletion: "manual clear, successful create publish, TTL expiry, or browser storage deletion",
-    stores: "create-context draft title, markdown, canonical summary source and intent, thumbnail, tags, category, visibility, source, savedAt",
+    retention: "7 days TTL per active authoring session",
+    deletion: "explicit clear or successful publication",
+    stores: "persisted uncommitted post drafts",
   },
   {
     area: "localStorage",
