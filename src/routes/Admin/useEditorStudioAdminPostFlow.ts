@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { apiFetch } from "src/apis/backend/client"
 import { isServerTempDraftPost } from "./editorTempDraft"
 import { LIST_SORT_OPTIONS, type ListQuickPreset, type PostListScope } from "./useEditorStudioListConditions"
+import type { RsData } from "src/types"
 
 type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null
 
@@ -43,10 +44,6 @@ type PageDto<T> = {
   }
 }
 
-type RsData<T> = {
-  data: T
-  msg: string
-}
 
 type PostWriteResult = {
   id: number

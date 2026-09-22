@@ -4,7 +4,6 @@ import Link from "next/link"
 import { CONFIG } from "site.config"
 import AppIcon from "src/components/icons/AppIcon"
 import ProfileImage from "src/components/ProfileImage"
-import { useRootAdminProfile } from "src/layouts/RootLayout"
 import { formatDateTime } from "src/libs/utils"
 import {
   parseThumbnailFocusXFromUrl,
@@ -43,14 +42,9 @@ const PostHeader: React.FC<Props> = ({
   showEngagement = true,
   showThumbnail = true,
 }) => {
-  const adminProfile = useRootAdminProfile()
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
-  const usingAdminFallback = !postAuthor
-  const authorName =
-    postAuthor?.name?.trim() || adminProfile?.nickname?.trim() || adminProfile?.name?.trim() || "익명"
-  const authorImageSrc = usingAdminFallback
-    ? adminProfile?.profileImageUrl || ""
-    : postAuthor?.profile_photo || ""
+  const authorName = postAuthor?.name?.trim() || "익명"
+  const authorImageSrc = postAuthor?.profile_photo || ""
   const tags = (data.tags || []).map((tag) => tag.trim()).filter(Boolean)
   const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()
   const rawTypeLabel = data.type?.[0]?.trim() || "Post"
@@ -74,7 +68,7 @@ const PostHeader: React.FC<Props> = ({
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const viewCount = hitCount ?? data.hitCount ?? 0
   const viewText = `${Intl.NumberFormat(CONFIG.lang).format(viewCount)} VIEWS`
-  const authorRole = usingAdminFallback ? adminProfile?.profileRole?.trim() || "" : ""
+  const authorRole = ""
 
   return (
     <StyledWrapper>

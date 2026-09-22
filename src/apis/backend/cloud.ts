@@ -1,4 +1,5 @@
 import type { components } from "@shared/contracts"
+import type { RsData } from "src/types"
 import { ApiError, apiFetch, getApiRequestUrl } from "./client"
 
 export type CloudFileDto = components["schemas"]["CloudFileDto"]
@@ -42,11 +43,7 @@ type CloudExternalPlaybackTokenDto = {
   contentPath?: string
 }
 
-type RsDataCloudExternalPlaybackTokenDto = {
-  resultCode?: string
-  msg?: string
-  data?: CloudExternalPlaybackTokenDto
-}
+type RsDataCloudExternalPlaybackTokenDto = RsData<CloudExternalPlaybackTokenDto | undefined>
 
 type CloudVideoUploadSession = {
   id: number
@@ -71,11 +68,7 @@ type CloudVideoUploadPartResult = {
   }
 }
 
-type RsDataCloudVideoUploadSession = {
-  resultCode?: string
-  msg?: string
-  data?: CloudVideoUploadSession
-}
+type RsDataCloudVideoUploadSession = RsData<CloudVideoUploadSession | undefined>
 
 type CloudUploadProgress = {
   progress: number

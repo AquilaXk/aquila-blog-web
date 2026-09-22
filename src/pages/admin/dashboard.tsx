@@ -23,12 +23,8 @@ type AdminDashboardBootstrapPayload = {
 }
 
 async function readJsonIfOk<T>(req: IncomingMessage, path: string): Promise<T | null> {
-  try {
-    const value = await serverApiFetchJson<T>(req, path)
-    return value ?? null
-  } catch {
-    return null
-  }
+  const value = await serverApiFetchJson<T>(req, path)
+  return value ?? null
 }
 
 export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = withSsrMetrics<AdminDashboardPageProps>("admin", async ({ req, res }) => {

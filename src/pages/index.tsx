@@ -34,7 +34,7 @@ export const getStaticProps: GetStaticProps = async () => {
   const initialAdminProfile = adminProfileSeed.profile
   const initialAdminProfileSource = adminProfileSeed.source
   const bootstrapSnapshot = await (async () => {
-    if (IS_QA_STATIC_SHELL_MODE) {
+    if (IS_QA_STATIC_SHELL_MODE || (!process.env.BACKEND_INTERNAL_URL && process.env.NODE_ENV === "production")) {
       return {
         posts: [] as TPost[],
         tagCounts: {} as Record<string, number>,
@@ -48,37 +48,23 @@ export const getStaticProps: GetStaticProps = async () => {
       }
     }
 
-    try {
-      const bootstrapResult = await getPostsBootstrap({
-        tag: currentTag,
-        pageSize: FEED_EXPLORE_PAGE_SIZE,
-      })
-      const hasNext = bootstrapResult.hasNext
-      const resolvedTotalCount = hasNext ? null : bootstrapResult.posts.length
+    const bootstrapResult = await getPostsBootstrap({
+      tag: currentTag,
+      pageSize: FEED_EXPLORE_PAGE_SIZE,
+    })
+    const hasNext = bootstrapResult.hasNext
+    const resolvedTotalCount = hasNext ? null : bootstrapResult.posts.length
 
-      return {
-        posts: bootstrapResult.posts,
-        tagCounts: bootstrapResult.tagCounts,
-        totalCount: resolvedTotalCount,
-        initialPageTotalCount: resolvedTotalCount ?? bootstrapResult.posts.length,
-        hasNext,
-        nextCursor: bootstrapResult.nextCursor ?? null,
-        postsLoaded: true,
-        tagsLoaded: true,
-        status: "ready" as HomeBootstrapStatus,
-      }
-    } catch {
-      return {
-        posts: [] as TPost[],
-        tagCounts: {} as Record<string, number>,
-        totalCount: null as number | null,
-        initialPageTotalCount: 0,
-        hasNext: false,
-        nextCursor: null as string | null,
-        postsLoaded: false,
-        tagsLoaded: false,
-        status: "degraded" as HomeBootstrapStatus,
-      }
+    return {
+      posts: bootstrapResult.posts,
+      tagCounts: bootstrapResult.tagCounts,
+      totalCount: resolvedTotalCount,
+      initialPageTotalCount: resolvedTotalCount ?? bootstrapResult.posts.length,
+      hasNext,
+      nextCursor: bootstrapResult.nextCursor ?? null,
+      postsLoaded: true,
+      tagsLoaded: true,
+      status: "ready" as HomeBootstrapStatus,
     }
   })()
   const { posts, tagCounts, totalCount, initialPageTotalCount, hasNext, nextCursor, postsLoaded, tagsLoaded, status } =

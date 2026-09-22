@@ -87,3 +87,8 @@ export const formatShortDateTime = (
   if (!parts) return ""
   return `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`
 }
+
+export const formatIsoDateTime = (value?: string, fallback: string = "-"): string => {
+  if (!value) return fallback
+  return value.slice(0, 16).replace("T", " ")
+}

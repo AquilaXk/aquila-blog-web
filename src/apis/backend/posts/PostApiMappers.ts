@@ -117,7 +117,7 @@ const normalizeStringArray = (value?: string[]) => {
 const normalizeCategoryArray = (value?: string[]) =>
   normalizeStringArray(value).map(normalizeCategoryValue)
 
-const pickPreferredImageUrl = (...candidates: Array<string | undefined>) => {
+const pickPreferredImageUrl = (...candidates: Array<string | null | undefined>) => {
   for (const candidate of candidates) {
     if (typeof candidate !== "string") continue
     const normalized = candidate.trim()
@@ -164,26 +164,29 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     post.authorProfileImgUrl,
     post.authorProfileImageUrl
   )
+  const postId = post.id ?? 0
+  const postTitle = post.title ?? ""
+  const postCreatedAt = post.createdAt ?? ""
   return {
-    id: String(post.id),
-    date: { start_date: post.createdAt.slice(0, 10) },
+    id: String(postId),
+    date: { start_date: postCreatedAt.slice(0, 10) },
     type: ["Post"],
-    slug: toSlug(post.id, post.title),
+    slug: toSlug(postId, postTitle),
     summary: canonicalSummary.summary,
     summarySource: canonicalSummary.summarySource,
     author: [
       {
-        id: String(post.authorId),
+        id: String(post.authorId ?? ""),
         name: post.authorName || post.authorUsername || "익명",
         profile_photo: authorProfileImage,
       },
     ],
-    title: post.title,
+    title: postTitle,
     ...(hasThumbnail ? { thumbnail: normalizedThumbnail } : {}),
     ...(normalizedTags.length > 0 ? { tags: normalizedTags } : {}),
     ...(normalizedCategories.length > 0 ? { category: normalizedCategories } : {}),
-    status: toStatus(post.published, post.listed),
-    createdTime: post.createdAt,
+    status: toStatus(post.published ?? false, post.listed ?? false),
+    createdTime: postCreatedAt,
     modifiedTime: post.modifiedAt,
     fullWidth: false,
     likesCount: post.likesCount ?? 0,
@@ -195,7 +198,8 @@ export const mapPostDetail = async (
   post: ApiPostWithContentDto,
   { allowTrustedContentHtml }: { allowTrustedContentHtml: boolean },
 ): Promise<PostDetail> => {
-  const parsed = parsePostMeta(post.content)
+  const postContent = post.content ?? ""
+  const parsed = parsePostMeta(postContent)
   const dtoTags = normalizeStringArray(post.tags)
   const dtoCategories = normalizeCategoryArray(post.category)
   const tags = dtoTags.length > 0 ? dtoTags : parsed.tags
@@ -204,7 +208,7 @@ export const mapPostDetail = async (
 
   const hasActorCanModify = typeof post.actorCanModify === "boolean"
   const hasActorCanDelete = typeof post.actorCanDelete === "boolean"
-  const trustedContentHtml = !allowTrustedContentHtml || post.content.trim()
+  const trustedContentHtml = !allowTrustedContentHtml || postContent.trim()
     ? undefined
     : await resolveTrustedContentHtml(post)
 
@@ -231,8 +235,8 @@ export const mapPostDetail = async (
     content: normalizedContent,
     ...(trustedContentHtml ? { trustedContentHtml } : {}),
     modifiedTime: post.modifiedAt,
-    likesCount: post.likesCount,
-    hitCount: post.hitCount,
+    likesCount: post.likesCount ?? 0,
+    hitCount: post.hitCount ?? 0,
     ...(hasActorCanModify ? { actorCanModify: post.actorCanModify } : {}),
     ...(hasActorCanDelete ? { actorCanDelete: post.actorCanDelete } : {}),
   }

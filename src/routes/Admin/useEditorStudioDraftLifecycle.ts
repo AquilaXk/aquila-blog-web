@@ -19,11 +19,12 @@ import {
   type SummaryIntent,
 } from "./EditorStudioWorkspaceControllerRootModel"
 
+import type { PostVisibility, RsData } from "src/types"
+
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
 type PublishNotice = { tone: NoticeTone; text: string }
 type PublishTarget = "page" | "modal"
-type PostVisibility = "PRIVATE" | "PUBLIC_UNLISTED" | "PUBLIC_LISTED"
 type EditorMode = "create" | "edit"
 type ComposeMobileStudioStep = "edit" | "publish"
 
@@ -62,10 +63,6 @@ type PageDto<T> = {
   content?: T[]
 }
 
-type RsData<T> = {
-  data: T
-  msg: string
-}
 
 type EditorFingerprintPayload = {
   title: string
@@ -501,7 +498,7 @@ export const useEditorStudioDraftLifecycle = ({
   const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
     try {
       const data = await apiFetch<PageDto<AdminPostListItem>>(
-        "/post/api/v1/adm/posts?page=1&pageSize=30&kw=&sort=MODIFIED_AT"
+        "/post/api/v1/adm/posts?page=1&pageSize=20&kw=&sort=MODIFIED_AT"
       )
       const tempRow = (data.content || []).find((row) => isServerTempDraftPost(row) && !row.deletedAt)
       if (!tempRow?.id) return null

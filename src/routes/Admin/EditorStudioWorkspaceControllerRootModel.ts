@@ -129,11 +129,8 @@ export const resolveSummaryWriteCompletion = (
   return { ...resolved, editorState: unchanged ? resolved.state : current }
 }
 
-export type RsData<T> = {
-  resultCode: string
-  msg: string
-  data: T
-}
+import type { RsData } from "src/types"
+export type { RsData }
 
 export type NoticeTone = "idle" | "loading" | "success" | "error"
 export type NoticeState = {

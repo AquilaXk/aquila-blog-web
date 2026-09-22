@@ -21,12 +21,10 @@ import {
   buildRelatedByAuthorPath,
   buildSearchPath,
   getFreshServerSnapshot,
-  isAbortError,
   isServerRuntime,
   PAGE_SIZE,
   POSTS_BOOTSTRAP_SSR_CACHE_MAX_ENTRIES,
   POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS,
-  POSTS_CACHE_TTL_MS,
   POSTS_TAGS_API_PATH,
   recordRuntimeEndpoint,
   setServerSnapshot,
@@ -36,15 +34,8 @@ import {
 
 export { getPostDetailById, getPostDetailBySlug } from "./PostApiDetailRequests"
 
-let postsCache: TPost[] | null = null
-let postsCacheAt = 0
-let pendingPostsPromise: Promise<TPost[]> | null = null
 let postsBootstrapSsrCache = new Map<string, { value: PostsBootstrapResult; cachedAt: number }>()
 let pendingPostsBootstrapPromises = new Map<string, Promise<PostsBootstrapResult>>()
-
-type GetPostsOptions = {
-  throwOnError?: boolean
-}
 
 const toPostsPageResult = (
   response: PageDto<ApiPostDto>,
@@ -85,9 +76,6 @@ const toPostsCursorPageResult = (
 }
 
 export const resetPostsRequestCaches = () => {
-  postsCache = null
-  postsCacheAt = 0
-  pendingPostsPromise = null
   postsBootstrapSsrCache = new Map()
   pendingPostsBootstrapPromises = new Map()
 }
@@ -400,53 +388,4 @@ export const getRelatedPostsByAuthor = async ({
     .map(mapPostDto)
     .filter((post) => (safeExcludePostId ? Number(post.id) !== safeExcludePostId : true))
     .slice(0, safeLimit)
-}
-
-export const getPosts = async (
-  { throwOnError = false }: GetPostsOptions = {}
-): Promise<TPost[]> => {
-  const now = Date.now()
-  if (isServerRuntime && postsCache && now - postsCacheAt < POSTS_CACHE_TTL_MS) {
-    return postsCache
-  }
-
-  if (pendingPostsPromise) {
-    return pendingPostsPromise
-  }
-
-  try {
-    pendingPostsPromise = (async () => {
-      const feedItems = await getFeedPosts({ page: 1, pageSize: PAGE_SIZE })
-
-      if (isServerRuntime) {
-        postsCache = feedItems
-        postsCacheAt = Date.now()
-      }
-
-      return feedItems
-    })()
-
-    return await pendingPostsPromise
-  } catch (error) {
-    if (!throwOnError && isServerRuntime && postsCache) {
-      return postsCache
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      // 로그 위변조(CWE-117) 방지를 위해 사용자/원격 입력(error.message/url/body)은 로그에 포함하지 않는다.
-      if (error instanceof ApiError) {
-        console.error("[getPosts] backend request failed: api-status")
-      } else if (isAbortError(error)) {
-        console.error("[getPosts] backend request failed: abort")
-      } else if (error instanceof Error) {
-        console.error("[getPosts] backend request failed: runtime")
-      } else {
-        console.error("[getPosts] backend request failed: unknown")
-      }
-    }
-    if (throwOnError) throw error
-    return []
-  } finally {
-    pendingPostsPromise = null
-  }
 }

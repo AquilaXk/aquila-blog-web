@@ -45,46 +45,14 @@ export type PostsBootstrapDto = {
   tags: ApiTagCountDto[]
 }
 
-export type ApiPostDto = PostSummaryFields & {
-  id: number
-  createdAt: string
-  modifiedAt: string
-  authorId: number
-  authorName: string
-  authorUsername?: string
-  authorProfileImgUrl: string
+export type ApiPostDto = GeneratedPostDto & {
   authorProfileImageUrl?: string
   authorProfileImageDirectUrl?: string
-  title: string
-  thumbnail?: string
-  tags?: string[]
-  category?: string[]
-  published: boolean
-  listed: boolean
-  likesCount?: number
-  hitCount?: number
 }
-
-export type ApiPostWithContentDto = ContentHtmlTrustFields & PostWithContentSummaryFields & {
-  id: number
-  createdAt: string
-  modifiedAt: string
-  authorId: number
-  authorName: string
-  authorUsername?: string
-  authorProfileImageUrl?: string
-  authorProfileImageDirectUrl?: string
+export type ApiPostWithContentDto = GeneratedPostWithContentDto & {
   authorProfileImgUrl?: string
-  title: string
-  content: string
   tags?: string[]
   category?: string[]
-  published: boolean
-  listed: boolean
-  likesCount: number
-  hitCount: number
-  actorCanModify?: boolean
-  actorCanDelete?: boolean
 }
 
 export type ApiTagCountDto = {

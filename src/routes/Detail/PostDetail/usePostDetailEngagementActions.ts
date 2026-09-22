@@ -3,13 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "src/apis/backend/client"
 import { queryKey } from "src/constants/queryKey"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import type { PostDetail as PostDetailType } from "src/types"
-
-type RsData<T> = {
-  resultCode: string
-  msg: string
-  data: T
-}
+import type { PostDetail as PostDetailType, RsData } from "src/types"
 
 type ShareFeedback = "copied" | "shared" | "failed"
 

@@ -85,10 +85,6 @@ const CONFIG = {
   link: SITE_URL,
   since: 2026, // If leave this empty, current year will be used.
   lang: "ko-KR", // ['en-US', 'zh-CN', 'zh-HK', 'zh-TW', 'ja-JP', 'es-ES', 'ko-KR']
-  // notion configuration (required)
-  notionConfig: {
-    pageId: process.env.NOTION_PAGE_ID || "2ffdedd9d0ff81eaac21d05d868b6e2b",
-  },
 
   googleSearchConsole: {
     enable: false,
@@ -100,31 +96,6 @@ const CONFIG = {
     enable: false,
     config: {
       siteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || "",
-    },
-  },
-  utterances: {
-    enable: false,
-    config: {
-      repo: process.env.NEXT_PUBLIC_UTTERANCES_REPO || "aquilaXk/aquila-log",
-      "issue-term": "og:title",
-      label: "💬 Utterances",
-    },
-  },
-  giscus: {
-    enable: false,
-    config: {
-      repo: "aquilaXk/aquila-log",
-      repositoryId: "R_kgDORJ7GcA",
-      category: "Announcements",
-      categoryId: "DIC_kwDORJ7GcM4C2ML9",
-      lang: "ko",
-    },
-  },
-  cusdis: {
-    enable: false,
-    config: {
-      host: "https://cusdis.com",
-      appid: "", // Embed Code -> data-app-id value
     },
   },
   // 운영 사이트 URL이 빌드에 명시적으로 주입된 경우에만 production으로 본다. 홈서버 이미지가

@@ -26,17 +26,13 @@ import {
 import { useEditorStudioPersistenceUploads } from "./useEditorStudioPersistenceModel"
 import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 
+import type { PostVisibility, RsData } from "src/types"
+
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
 type PublishNotice = { tone: NoticeTone; text: string }
 type PublishTarget = "page" | "modal"
 type EditorMode = "create" | "edit"
-type PostVisibility = "PRIVATE" | "PUBLIC_UNLISTED" | "PUBLIC_LISTED"
-
-type RsData<T> = {
-  data?: T
-  msg: string
-}
 
 type PostWriteResult = ApiPostWriteResult
 
