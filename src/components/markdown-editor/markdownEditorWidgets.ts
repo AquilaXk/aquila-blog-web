@@ -1,4 +1,5 @@
 import { WidgetType, type EditorView } from "@codemirror/view"
+import { Transaction } from "@codemirror/state"
 
 let cachedKatex: any = null
 let katexLoadPromise: Promise<any> | null = null
@@ -78,13 +79,27 @@ export class MarkdownTaskWidget extends WidgetType {
     checkbox.addEventListener("mousedown", (e) => {
       e.preventDefault()
       e.stopPropagation()
-      const doc = view.state.doc.toString()
-      const current = doc.slice(this.from, this.to)
+      let targetFrom = this.from
+      let targetTo = this.to
+      try {
+        const pos = view.posAtDOM(checkbox)
+        if (typeof pos === "number") {
+          const line = view.state.doc.lineAt(pos)
+          const match = /^(\s*[-*+]\s+)(\[[ xX]\])/.exec(line.text)
+          if (match) {
+            targetFrom = line.from + match[1].length
+            targetTo = targetFrom + match[2].length
+          }
+        }
+      } catch {
+        // Fall back to stored coordinates
+      }
+      const current = view.state.doc.sliceString(targetFrom, targetTo)
       const next = this.checked ? "[ ]" : "[x]"
       if (/\[[ xX]\]/.test(current)) {
         view.dispatch({
-          changes: { from: this.from, to: this.to, insert: next },
-          userEvent: "input",
+          changes: { from: targetFrom, to: targetTo, insert: next },
+          annotations: [Transaction.userEvent.of("input")],
         })
       }
     })
@@ -241,7 +256,9 @@ export class MarkdownTableWidget extends WidgetType {
 
     const parseCells = (line: string): string[] => {
       const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "")
-      return trimmed.split("|").map((cell) => cell.trim())
+      return trimmed
+        .split(/(?<!\\)\|/)
+        .map((cell) => cell.replace(/\\\|/g, "|").trim())
     }
 
     // Header row

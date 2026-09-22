@@ -40,6 +40,24 @@ export const codeLanguageCompletionSource = (
   }
 }
 
+export type InternalPostSuggestion = {
+  title: string
+  slug?: string
+  id?: number | string
+}
+
+let registeredPostSuggestions: InternalPostSuggestion[] = []
+
+export const registerInternalPostSuggestions = (posts: InternalPostSuggestion[]) => {
+  registeredPostSuggestions = posts
+}
+
+export const getRegisteredPostSuggestions = () => registeredPostSuggestions
+
+export const clearRegisteredPostSuggestions = () => {
+  registeredPostSuggestions = []
+}
+
 export const wikilinkCompletionSource = (
   context: CompletionContext
 ): CompletionResult | null => {
@@ -64,14 +82,25 @@ export const wikilinkCompletionSource = (
     }
   })
 
-  const defaultNoteOptions = [
-    { label: "Overview", type: "text", detail: "Note link", apply: "Overview]]" },
-    { label: "Architecture", type: "text", detail: "Note link", apply: "Architecture]]" },
-    { label: "Guide", type: "text", detail: "Note link", apply: "Guide]]" },
-    { label: "Development", type: "text", detail: "Note link", apply: "Development]]" },
-  ]
+  // Include registered internal blog posts
+  const postOptions = registeredPostSuggestions.map((post) => ({
+    label: post.title,
+    type: "text",
+    detail: post.slug ? `Blog post (/posts/${post.slug})` : "Blog post",
+    apply: `${post.title}]]`,
+  }))
 
-  const allOptions = [...headingOptions, ...defaultNoteOptions]
+  const defaultNoteOptions =
+    registeredPostSuggestions.length > 0
+      ? []
+      : [
+          { label: "Overview", type: "text", detail: "Note link", apply: "Overview]]" },
+          { label: "Architecture", type: "text", detail: "Note link", apply: "Architecture]]" },
+          { label: "Guide", type: "text", detail: "Note link", apply: "Guide]]" },
+          { label: "Development", type: "text", detail: "Note link", apply: "Development]]" },
+        ]
+
+  const allOptions = [...headingOptions, ...postOptions, ...defaultNoteOptions]
 
   return {
     from: startPos,

@@ -31,6 +31,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   applyRecordedMutation: (plan: PlannedTextMutation) => boolean
   setTextareaSelection: (from: number, to?: number) => void
   onRequestSave?: () => void
+  onToggleViewMode?: () => void
 }
 
 export const useMarkdownEditorTextareaKeyboard = ({
@@ -42,6 +43,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   applyRecordedMutation,
   setTextareaSelection,
   onRequestSave,
+  onToggleViewMode,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
   const handleTabKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -118,6 +120,17 @@ export const useMarkdownEditorTextareaKeyboard = ({
         }
         return true
       }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        (event.key === "e" || event.key === "E") &&
+        !event.shiftKey &&
+        !event.altKey &&
+        onToggleViewMode
+      ) {
+        event.preventDefault()
+        onToggleViewMode()
+        return true
+      }
       const formatShortcut = resolveFormatShortcut(event)
       if (!formatShortcut) return false
       event.preventDefault()
@@ -125,7 +138,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, formatShortcut))
       return true
     },
-    [applyMutationPlan, disabled, rememberTextareaSelection, valueRef]
+    [applyMutationPlan, disabled, onToggleViewMode, rememberTextareaSelection, valueRef]
   )
 
   const handleLineCommandKeyDown = useCallback(

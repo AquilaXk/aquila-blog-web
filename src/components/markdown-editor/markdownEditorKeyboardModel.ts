@@ -145,7 +145,8 @@ export const planListEnterContinuation = (
     }
 
     if (renumbered.length > 0) {
-      const replacement = `\n${nextMarker}\n${renumbered.join("\n")}`
+      const remainderOfLine = value.slice(selectionEnd, lineEnd)
+      const replacement = `\n${nextMarker}${remainderOfLine.trimStart()}\n${renumbered.join("\n")}`
       return {
         rangeStart: selectionStart,
         rangeEnd: spanEnd,
@@ -158,12 +159,45 @@ export const planListEnterContinuation = (
     return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
   }
 
-  const nextMarker =
-    matched.kind === "ordered"
-      ? `${matched.indent}${matched.number + 1}. `
-      : `${matched.indent}${matched.marker}`
+  const nextMarker = `${matched.indent}${matched.marker}`
 
   return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
+}
+
+export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
+  const uncheckedMatch = /^(?<indent>\s*[-*+]\s+\[) (?<rest>\]\s*.*)$/.exec(lineText)
+  if (uncheckedMatch?.groups) {
+    const boxPos = uncheckedMatch.groups.indent.length
+    return {
+      replaced: true,
+      lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
+    }
+  }
+
+  const checkedMatch = /^(?<indent>\s*[-*+]\s+\[)[xX](?<rest>\]\s*.*)$/.exec(lineText)
+  if (checkedMatch?.groups) {
+    const boxPos = checkedMatch.groups.indent.length
+    return {
+      replaced: true,
+      lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
+    }
+  }
+
+  const bulletMatch = /^(?<indent>\s*)(?:[-*+]|\d+\.)\s+(?<content>.*)$/.exec(lineText)
+  if (bulletMatch?.groups) {
+    return {
+      replaced: true,
+      lineText: `${bulletMatch.groups.indent}- [ ] ${bulletMatch.groups.content}`,
+    }
+  }
+
+  const plainMatch = /^(?<indent>\s*)(?<content>.*)$/.exec(lineText)
+  const indent = plainMatch?.groups?.indent ?? ""
+  const content = plainMatch?.groups?.content ?? ""
+  return {
+    replaced: true,
+    lineText: `${indent}- [ ] ${content}`,
+  }
 }
 
 export const planFormatShortcutMutation = (

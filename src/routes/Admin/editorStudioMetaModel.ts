@@ -24,6 +24,7 @@ export type ParsedEditorMeta = {
   tags: string[]
   category: string
   thumbnail: string
+  customFrontmatterLines?: string[]
 }
 
 export type ResolvedEditorMetaSnapshot = {
@@ -34,6 +35,7 @@ export type ResolvedEditorMetaSnapshot = {
   thumbnailFocusX: number
   thumbnailFocusY: number
   thumbnailZoom: number
+  customFrontmatterLines?: string[]
 }
 
 export type MetaUsageMap = Record<string, number>
@@ -182,7 +184,17 @@ export const normalizeSafePreviewThumbnailUrl = (raw: string): string => {
   }
 }
 
-const splitFrontmatterBlock = (content: string) => {
+const isYamlLine = (line: string): boolean => {
+  const trimmed = line.trim()
+  if (!trimmed) return true
+  if (trimmed.startsWith("#")) return true
+  if (/^[A-Za-z0-9_.-]+\s*:/i.test(trimmed)) return true
+  if (/^-\s+/.test(trimmed)) return true
+  if (/^\s{2,}/.test(line)) return true
+  return false
+}
+
+const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = false) => {
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
   const lines = normalized.split("\n")
   if (!FRONTMATTER_DELIMITER_REGEX.test(lines[0] || "")) {
@@ -196,9 +208,13 @@ const splitFrontmatterBlock = (content: string) => {
     if (!FRONTMATTER_DELIMITER_REGEX.test(lines[index] || "")) continue
     const metadataLines = lines.slice(1, index)
     const meaningfulLines = metadataLines.filter((line) => line.trim().length > 0)
-    const isSupportedMetadata = meaningfulLines.length > 0 && meaningfulLines.every((line) =>
-      /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
-    )
+    const isSupportedMetadata =
+      meaningfulLines.length > 0 &&
+      meaningfulLines.every((line) =>
+        allowArbitraryFrontmatter
+          ? isYamlLine(line)
+          : /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
+      )
     if (!isSupportedMetadata) return { metadataLines: [] as string[], body: normalized }
     return {
       metadataLines,
@@ -244,8 +260,11 @@ const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
   return inlineMetadataSplit.body.trim().length > 0 ? inlineMetadataSplit.body : parsedBody
 }
 
-export const resolveEditorMetaSnapshot = (content: string): ResolvedEditorMetaSnapshot => {
-  const parsed = parseEditorMeta(content)
+export const resolveEditorMetaSnapshot = (
+  content: string,
+  options?: { allowArbitraryFrontmatter?: boolean }
+): ResolvedEditorMetaSnapshot => {
+  const parsed = parseEditorMeta(content, options)
   const resolvedBody = parsed.body
   const parsedThumbnail = normalizeSafeImageUrl(parsed.thumbnail)
   const fallbackThumbnail = normalizeSafeImageUrl(extractFirstMarkdownImage(resolvedBody))
@@ -268,6 +287,7 @@ export const resolveEditorMetaSnapshot = (content: string): ResolvedEditorMetaSn
     thumbnailFocusX: syncedThumbnailFocusX,
     thumbnailFocusY: syncedThumbnailFocusY,
     thumbnailZoom: syncedThumbnailZoom,
+    customFrontmatterLines: parsed.customFrontmatterLines,
   }
 }
 
@@ -313,11 +333,15 @@ export const buildEditorStateFingerprint = ({
     visibility,
   })
 
-export const parseEditorMeta = (content: string): ParsedEditorMeta => {
+export const parseEditorMeta = (
+  content: string,
+  options?: { allowArbitraryFrontmatter?: boolean }
+): ParsedEditorMeta => {
   let trimmed = content.replace(/\r\n?/g, "\n").trimStart()
   const tags: string[] = []
   let category = ""
   let thumbnail = ""
+  const customFrontmatterLines: string[] = []
 
   const pushTags = (items: string[]) => {
     dedupeStrings(items).forEach((item) => {
@@ -330,19 +354,24 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
     if (nextCategory) category = nextCategory
   }
 
-  const frontmatterSplit = splitFrontmatterBlock(trimmed)
+  const frontmatterSplit = splitFrontmatterBlock(trimmed, options?.allowArbitraryFrontmatter)
   if (frontmatterSplit.metadataLines.length > 0) {
     frontmatterSplit.metadataLines.forEach((line) => {
       const [rawKey, ...rest] = line.split(":")
-      if (!rawKey || rest.length === 0) return
+      if (!rawKey || rest.length === 0) {
+        if (options?.allowArbitraryFrontmatter) customFrontmatterLines.push(line)
+        return
+      }
       const key = rawKey.trim().toLowerCase()
       const value = rest.join(":").trim()
-      if (!value) return
+      if (!value && !options?.allowArbitraryFrontmatter) return
 
       if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))
-      if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
-      if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
+      else if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
+      else if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
         thumbnail = normalizeMetaScalar(value)
+      } else if (options?.allowArbitraryFrontmatter) {
+        customFrontmatterLines.push(line)
       }
     })
     trimmed = frontmatterSplit.body.trimStart()
@@ -373,6 +402,7 @@ export const parseEditorMeta = (content: string): ParsedEditorMeta => {
     tags,
     category,
     thumbnail,
+    customFrontmatterLines: customFrontmatterLines.length > 0 ? customFrontmatterLines : undefined,
   }
 }
 
@@ -381,13 +411,19 @@ const serializeMetaItems = (items: string[]) => items.map((item) => JSON.stringi
 export const composeEditorContent = (
   body: string,
   tags: string[],
-  options?: { category?: string; thumbnail?: string }
+  options?: { category?: string; thumbnail?: string; customFrontmatterLines?: string[] }
 ) => {
   const normalizedBody = body.trim()
   const normalizedTags = dedupeStrings(tags)
   const normalizedCategory = options?.category ? normalizeCategoryValue(options.category) : ""
   const normalizedThumbnail = options?.thumbnail?.trim() || ""
   const metadataLines: string[] = []
+
+  if (options?.customFrontmatterLines?.length) {
+    for (const line of options.customFrontmatterLines) {
+      metadataLines.push(line)
+    }
+  }
 
   if (normalizedTags.length > 0) metadataLines.push(`tags: [${serializeMetaItems(normalizedTags)}]`)
   if (normalizedCategory) metadataLines.push(`category: [${serializeMetaItems([normalizedCategory])}]`)

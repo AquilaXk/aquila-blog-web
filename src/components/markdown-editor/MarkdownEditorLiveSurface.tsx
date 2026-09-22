@@ -73,6 +73,7 @@ import {
   codeLanguageCompletionSource,
   wikilinkCompletionSource,
 } from "./markdownEditorCompletions"
+import { cycleTaskCheckboxInLine } from "./markdownEditorKeyboardModel"
 
 type MarkdownEditorSnapshot = {
   documentValue: string
@@ -82,8 +83,9 @@ type MarkdownEditorSnapshot = {
 type MarkdownEditorLiveSurfaceProps = {
   value: string
   disabled: boolean
-  mode?: "live" | "source"
+  mode?: "live" | "source" | "reading"
   ariaDescription: string
+  onToggleViewMode?: () => void
   onChange: (
     value: string,
     editorFocused: boolean,
@@ -120,7 +122,7 @@ const externalDocumentChange = Annotation.define<boolean>()
 const preserveUploadError = Annotation.define<boolean>()
 const setComposition = StateEffect.define<boolean>()
 const setPointerSelecting = StateEffect.define<boolean>()
-const setEditorMode = StateEffect.define<"live" | "source">()
+const setEditorMode = StateEffect.define<"live" | "source" | "reading">()
 
 const compositionField = StateField.define<boolean>({
   create: () => false,
@@ -142,7 +144,7 @@ const pointerSelectingField = StateField.define<boolean>({
   },
 })
 
-const editorModeField = StateField.define<"live" | "source">({
+const editorModeField = StateField.define<"live" | "source" | "reading">({
   create: () => "live",
   update: (mode, transaction) => {
     for (const effect of transaction.effects) {
@@ -164,7 +166,8 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
 }
 
 const buildDecorations = (state: EditorState): DecorationSet => {
-  if (state.field(editorModeField) === "source") {
+  const currentMode = state.field(editorModeField)
+  if (currentMode === "source") {
     return Decoration.none
   }
 
@@ -435,21 +438,38 @@ const selectNextOccurrenceCommand = (view: EditorView): boolean => {
   if (!selectedText) return false
 
   const docText = doc.toString()
-  let nextIndex = docText.indexOf(selectedText, main.to)
+  const selectedRanges = selection.ranges
+  const maxTo = Math.max(...selectedRanges.map((r) => r.to))
+
+  let nextIndex = docText.indexOf(selectedText, maxTo)
   if (nextIndex === -1) {
     nextIndex = docText.indexOf(selectedText, 0)
   }
-  if (nextIndex === -1 || (nextIndex === main.from && selection.ranges.length === 1)) {
+
+  const isAlreadySelected = (idx: number) =>
+    selectedRanges.some((r) => r.from === idx && r.to === idx + selectedText.length)
+
+  while (nextIndex !== -1 && isAlreadySelected(nextIndex)) {
+    nextIndex = docText.indexOf(selectedText, nextIndex + 1)
+    if (nextIndex === -1 && maxTo > 0) {
+      nextIndex = docText.indexOf(selectedText, 0)
+    }
+    if (nextIndex >= maxTo) {
+      nextIndex = -1
+      break
+    }
+  }
+
+  if (nextIndex === -1) {
     return false
   }
 
   const nextRange = EditorSelection.range(nextIndex, nextIndex + selectedText.length)
-  if (selection.ranges.some((r) => r.from === nextRange.from && r.to === nextRange.to)) {
-    return false
-  }
+  const newRanges = [...selectedRanges, nextRange].sort((a, b) => a.from - b.from)
+  const newMainIndex = newRanges.findIndex((r) => r.from === nextRange.from)
 
   view.dispatch({
-    selection: EditorSelection.create([...selection.ranges, nextRange]),
+    selection: EditorSelection.create(newRanges, newMainIndex >= 0 ? newMainIndex : undefined),
     scrollIntoView: true,
   })
   return true
@@ -462,45 +482,15 @@ const cycleTaskCommand = (view: EditorView): boolean => {
   const line = doc.lineAt(main.head)
   const lineText = line.text
 
-  const uncheckedMatch = /^(?<indent>\s*[-*+]\s+\[) (?<rest>\]\s*.*)$/.exec(lineText)
-  if (uncheckedMatch?.groups) {
-    const boxPos = line.from + uncheckedMatch.groups.indent.length - 1
+  const res = cycleTaskCheckboxInLine(lineText)
+  if (res.replaced) {
     view.dispatch({
-      changes: { from: boxPos, to: boxPos + 1, insert: "x" },
-      userEvent: "input",
+      changes: { from: line.from, to: line.to, insert: res.lineText },
+      annotations: [Transaction.userEvent.of("input")],
     })
     return true
   }
-
-  const checkedMatch = /^(?<indent>\s*[-*+]\s+\[)[xX](?<rest>\]\s*.*)$/.exec(lineText)
-  if (checkedMatch?.groups) {
-    const boxPos = line.from + checkedMatch.groups.indent.length - 1
-    view.dispatch({
-      changes: { from: boxPos, to: boxPos + 1, insert: " " },
-      userEvent: "input",
-    })
-    return true
-  }
-
-  const bulletMatch = /^(?<indent>\s*)(?:[-*+]|\d+\.)\s+(?<content>.*)$/.exec(lineText)
-  if (bulletMatch?.groups) {
-    const replacement = `${bulletMatch.groups.indent}- [ ] ${bulletMatch.groups.content}`
-    view.dispatch({
-      changes: { from: line.from, to: line.to, insert: replacement },
-      userEvent: "input",
-    })
-    return true
-  }
-
-  const plainMatch = /^(?<indent>\s*)(?<content>.*)$/.exec(lineText)
-  const indent = plainMatch?.groups?.indent ?? ""
-  const content = plainMatch?.groups?.content ?? ""
-  const replacement = `${indent}- [ ] ${content}`
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert: replacement },
-    userEvent: "input",
-  })
-  return true
+  return false
 }
 
 const handleFenceEnter: KeyBinding = {
@@ -516,9 +506,15 @@ const handleFenceEnter: KeyBinding = {
     if (!match) return false
     if (from < line.from + match[0].length) return false
 
+    // Check if the current fence is already closed.
+    // Count fence lines in the remainder of the document.
+    // If the count is odd, there is an unmatched closing fence directly closing this block.
+    // If the count is even (0, 2, 4...), all subsequent fences are paired, so this fence needs auto-closing.
     const restOfDoc = doc.sliceString(line.to)
-    const closingPattern = new RegExp(`\n\\s*${match[2]}\\s*(\n|$)`)
-    if (closingPattern.test(restOfDoc)) {
+    const fenceCount = restOfDoc
+      .split("\n")
+      .filter((l) => /^\s*(`{3,}|~{3,})/.test(l.trim())).length
+    if (fenceCount % 2 === 1) {
       return false
     }
 
@@ -529,7 +525,7 @@ const handleFenceEnter: KeyBinding = {
       changes: { from, to: from, insert: insertion },
       selection: EditorSelection.cursor(from + 1 + indent.length),
       scrollIntoView: true,
-      userEvent: "input",
+      annotations: [Transaction.userEvent.of("input")],
     })
     return true
   },
@@ -670,6 +666,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
     disabled,
     mode = "live",
     ariaDescription,
+    onToggleViewMode,
     onChange,
     onSelectionChange,
     onRequestFocusTitle,
@@ -685,12 +682,14 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
   const onRequestFocusTitleRef = useRef(onRequestFocusTitle)
+  const onToggleViewModeRef = useRef(onToggleViewMode)
   const editableCompartmentRef = useRef(new Compartment())
   const historyCompartmentRef = useRef(new Compartment())
   const initialStateRef = useRef({ value, disabled, ariaDescription })
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
   onRequestFocusTitleRef.current = onRequestFocusTitle
+  onToggleViewModeRef.current = onToggleViewMode
 
   useEffect(() => {
     const host = hostRef.current
@@ -702,6 +701,16 @@ export const MarkdownEditorLiveSurface = forwardRef<
 
     const customKeymaps: KeyBinding[] = [
       handleFenceEnter,
+      {
+        key: "Mod-e",
+        run: () => {
+          if (onToggleViewModeRef.current) {
+            onToggleViewModeRef.current()
+            return true
+          }
+          return false
+        },
+      },
       { key: "Mod-Enter", run: cycleTaskCommand },
       { key: "Mod-d", run: selectNextOccurrenceCommand },
       { key: "Alt-ArrowUp", run: moveLineUp },
@@ -834,12 +843,13 @@ export const MarkdownEditorLiveSurface = forwardRef<
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
+    const isReadOnly = disabled || mode === "reading"
     const next = [
-      EditorState.readOnly.of(disabled),
-      EditorView.editable.of(!disabled),
+      EditorState.readOnly.of(isReadOnly),
+      EditorView.editable.of(!isReadOnly),
     ]
     view.dispatch({ effects: editableCompartmentRef.current.reconfigure(next) })
-  }, [disabled])
+  }, [disabled, mode])
 
   useEffect(() => {
     const view = viewRef.current

@@ -393,7 +393,15 @@ export const MarkdownEditor = ({
     [commitMarkdown, insertMarkdownAtEditorSelection]
   )
 
-  const [viewMode, setViewMode] = useState<"live" | "source">("live")
+  const [viewMode, setViewMode] = useState<"live" | "source" | "reading">("live")
+
+  const cycleViewMode = useCallback(() => {
+    setViewMode((prev) => {
+      if (prev === "live") return "source"
+      if (prev === "source") return "reading"
+      return "live"
+    })
+  }, [])
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
@@ -422,7 +430,7 @@ export const MarkdownEditor = ({
     applyRecordedMutation: applyMutationPlan,
     setTextareaSelection: setEditorSelection,
     onRequestSave,
-    onToggleViewMode: () => setViewMode((prev) => (prev === "source" ? "live" : "source")),
+    onToggleViewMode: cycleViewMode,
   })
 
   const [slashMenuState, setSlashMenuState] = useState<{
@@ -783,6 +791,15 @@ export const MarkdownEditor = ({
           >
             소스
           </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            title={`읽기 뷰 (${modShortcutLabel}E)`}
+            aria-label="읽기 뷰"
+            $active={viewMode === "reading"}
+            onClick={() => setViewMode("reading")}
+          >
+            읽기
+          </ToolbarButton>
         </ToolbarGroup>
       </EditorToolbar>
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
@@ -812,6 +829,7 @@ export const MarkdownEditor = ({
           value={draftValue}
           disabled={disabled}
           mode={viewMode}
+          onToggleViewMode={cycleViewMode}
           ariaDescription={TEXTAREA_KEYBOARD_HELP}
           onChange={handleLiveChange}
           onSelectionChange={handleLiveSelectionChange}

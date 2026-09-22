@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import {
   isOffsetInsideFencedCodeBlock,
   matchListMarkerLine,
+  cycleTaskCheckboxInLine,
   planFormatShortcutMutation,
   planHardBreak,
   planListEnterContinuation,
@@ -168,6 +169,34 @@ test.describe("markdown editor keyboard model", () => {
     const plan = planListEnterContinuation(doc, 8, 8)
     expect(plan).not.toBeNull()
     expect(plan?.replacement).toBe("\n2. \n3. second\n4. third")
+
+    // Press enter in middle of line: "1. first item\n2. second" -> "item" must NOT be lost!
+    const midDoc = "1. first item\n2. second"
+    const midPlan = planListEnterContinuation(midDoc, 8, 8)
+    expect(midPlan).not.toBeNull()
+    expect(midPlan?.replacement).toBe("\n2. item\n3. second")
+  })
+
+  test("cycles task checkbox between unchecked and checked without bracket corruption", () => {
+    // Unchecked -> Checked
+    const res1 = cycleTaskCheckboxInLine("- [ ] Write docs")
+    expect(res1.replaced).toBe(true)
+    expect(res1.lineText).toBe("- [x] Write docs")
+
+    // Checked -> Unchecked
+    const res2 = cycleTaskCheckboxInLine("- [x] Write docs")
+    expect(res2.replaced).toBe(true)
+    expect(res2.lineText).toBe("- [ ] Write docs")
+
+    // Plain bullet -> Task
+    const res3 = cycleTaskCheckboxInLine("- Normal item")
+    expect(res3.replaced).toBe(true)
+    expect(res3.lineText).toBe("- [ ] Normal item")
+
+    // Plain text -> Task
+    const res4 = cycleTaskCheckboxInLine("Plain text")
+    expect(res4.replaced).toBe(true)
+    expect(res4.lineText).toBe("- [ ] Plain text")
   })
 
   test("does not continue list markers inside fenced code blocks", () => {
