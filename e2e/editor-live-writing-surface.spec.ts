@@ -551,6 +551,67 @@ test.describe("live Markdown writing surface", () => {
     await expect.poll(() => readMarkdown(page)).toBe(markdown)
   })
 
+  test("inactive highlights render with background and disclose delimiters when caret enters", async ({ page }) => {
+    const markdown = ["Active", "", "Some ==highlighted phrase== text."].join("\n")
+    await routeAuthenticatedEditor(page, markdown)
+    await openEditorDraft(page)
+
+    const highlightEl = page.locator(".cm-live-highlight")
+    await expect(highlightEl).toHaveCount(1)
+    await expect(highlightEl).toHaveText("highlighted phrase")
+    await expect(highlightEl).toHaveCSS("background-color", "rgba(255, 208, 0, 0.35)")
+
+    // Inactive: visible text has delimiters hidden
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Active",
+      "",
+      "Some highlighted phrase text.",
+    ])
+
+    // Selecting inside the highlight discloses raw == delimiters
+    const phraseOffset = markdown.indexOf("highlighted")
+    await selectMarkdownRange(page, phraseOffset + 2, phraseOffset + 2)
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Active",
+      "",
+      "Some ==highlighted phrase== text.",
+    ])
+    await expect(page.locator(".cm-live-highlight")).toHaveCount(1)
+  })
+
+  test("inactive wikilinks render as pill badges and disclose raw brackets on click", async ({ page }) => {
+    const markdown = ["Start", "", "Read [[Architecture]] or [[Guide|User Guide]]."].join("\n")
+    await routeAuthenticatedEditor(page, markdown)
+    await openEditorDraft(page)
+
+    const wikilinks = page.locator(".cm-live-wikilink")
+    await expect(wikilinks).toHaveCount(2)
+    await expect(wikilinks.first()).toHaveAttribute("aria-label", "Wikilink: Architecture")
+    await expect(wikilinks.first().locator(".cm-live-wikilink-text")).toHaveText("Architecture")
+    await expect(wikilinks.first().locator(".cm-live-wikilink-icon svg")).toBeVisible()
+
+    await expect(wikilinks.nth(1)).toHaveAttribute("aria-label", "Wikilink: User Guide")
+    await expect(wikilinks.nth(1).locator(".cm-live-wikilink-text")).toHaveText("User Guide")
+
+    // Inactive: visible text shows rendered pill labels, not raw brackets
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Start",
+      "",
+      "Read Architecture or User Guide.",
+    ])
+
+    // Clicking the first wikilink pill moves cursor inside and discloses raw [[Architecture]]
+    await wikilinks.first().click()
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Start",
+      "",
+      "Read [[Architecture]] or User Guide.",
+    ])
+    // The second wikilink remains a pill widget
+    await expect(page.locator(".cm-live-wikilink")).toHaveCount(1)
+    await expect(page.locator(".cm-live-wikilink").first().locator(".cm-live-wikilink-text")).toHaveText("User Guide")
+  })
+
   test("outline navigation targets the single surface and preserves heading labels", async ({ page }) => {
     const title = "목차 이동"
     const markdown = ["## **시작하며**", "", "본문", "", "#### `핵심` 포인트"].join("\n")

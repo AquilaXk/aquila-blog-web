@@ -68,6 +68,7 @@ import {
   MarkdownRuleWidget,
   MarkdownTableWidget,
   MarkdownTaskWidget,
+  MarkdownWikilinkWidget,
 } from "./markdownEditorWidgets"
 import {
   codeLanguageCompletionSource,
@@ -163,6 +164,7 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
   quote: "cm-live-quote",
   list: "cm-live-list",
   "fenced-code": "cm-live-fenced-code",
+  highlight: "cm-live-highlight",
 }
 
 const buildDecorations = (state: EditorState): DecorationSet => {
@@ -309,6 +311,17 @@ const buildDecorations = (state: EditorState): DecorationSet => {
         decorations.push(
           Decoration.replace({
             widget: new MarkdownTaskWidget(checked, spec.from, spec.to),
+          }).range(spec.from, spec.to)
+        )
+      }
+      continue
+    }
+
+    if (spec.kind === "wikilink") {
+      if (!isUnderComposition && !isTokenActive(spec.from, spec.to, selections)) {
+        decorations.push(
+          Decoration.replace({
+            widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
           }).range(spec.from, spec.to)
         )
       }

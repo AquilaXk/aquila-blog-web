@@ -34,8 +34,12 @@ export type MarkdownLivePreviewDecoration = {
     | "fenced-code"
     | "horizontal-rule"
     | "inline-color"
+    | "highlight"
+    | "wikilink"
   level?: number
   color?: string
+  target?: string
+  alias?: string
 }
 
 const HIDDEN_MARK_NODES = new Set([
@@ -205,6 +209,46 @@ export const buildMarkdownLivePreviewPlan = (
     )
   }
 
+  // Wikilink tokens ([[target]] or [[target|alias]])
+  const wikilinkRanges: MarkdownLiveSourceRange[] = []
+  for (const match of markdown.matchAll(/\[\[([^\]\r\n]+)\]\]/g)) {
+    const from = match.index
+    const to = from + match[0].length
+    if (literalRanges.some((range) => from < range.to && to > range.from)) continue
+
+    const raw = match[1]
+    const pipeIndex = raw.indexOf("|")
+    const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).trim()
+    const alias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
+    if (!target) continue
+
+    wikilinkRanges.push({ from, to })
+
+    if (!isTokenActive(from, to, selections)) {
+      decorations.push({ from, to, kind: "wikilink", target, alias })
+    }
+  }
+
+  // Highlight tokens (==text==)
+  for (const match of markdown.matchAll(/(?<!=)==([^=\r\n]+)==(?!=)/g)) {
+    const from = match.index
+    const to = from + match[0].length
+    if (literalRanges.some((range) => from < range.to && to > range.from)) continue
+    if (wikilinkRanges.some((range) => from < range.to && to > range.from)) continue
+    if (!match[1] || match[1].trim().length === 0) continue
+
+    const bodyFrom = from + 2
+    const bodyTo = to - 2
+    decorations.push({ from: bodyFrom, to: bodyTo, kind: "highlight" })
+
+    if (!isTokenActive(from, to, selections)) {
+      decorations.push(
+        { from, to: bodyFrom, kind: "hide-mark" },
+        { from: bodyTo, to, kind: "hide-mark" }
+      )
+    }
+  }
+
   const visit = (
     node: MarkdownSyntaxNode,
     parent: MarkdownSyntaxNode | null,
@@ -215,6 +259,13 @@ export const buildMarkdownLivePreviewPlan = (
 
     if (node === documentNode) {
       for (const child of listChildren(node)) visit(child, node, null)
+      return
+    }
+
+    if (
+      (node.name === "Link" || node.name === "LinkMark") &&
+      wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)
+    ) {
       return
     }
 
