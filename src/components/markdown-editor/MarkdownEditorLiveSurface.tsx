@@ -167,7 +167,7 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
 
 const buildDecorations = (state: EditorState): DecorationSet => {
   const currentMode = state.field(editorModeField)
-  if (currentMode === "source") {
+  if (currentMode === "source" || state.field(compositionField)) {
     return Decoration.none
   }
 
@@ -304,7 +304,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     }
 
     if (spec.kind === "task") {
-      if (!isUnderComposition) {
+      if (!isUnderComposition && !isTokenActive(spec.from, spec.to, selections)) {
         const checked = /\[[xX]\]/.test(markdownValue.slice(spec.from, spec.to))
         decorations.push(
           Decoration.replace({
@@ -316,7 +316,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     }
 
     if (spec.kind === "list-marker") {
-      if (!isUnderComposition) {
+      if (!isUnderComposition && !isTokenActive(spec.from, spec.to, selections)) {
         const source = markdownValue.slice(spec.from, spec.to)
         const label = /^\d/.test(source) ? source : "•"
         decorations.push(
@@ -329,7 +329,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     }
 
     if (spec.kind === "quote-mark") {
-      if (!isUnderComposition) {
+      if (!isUnderComposition && !isTokenActive(spec.from, spec.to, selections)) {
         decorations.push(
           Decoration.replace({
             widget: new MarkdownMarkerWidget("", "cm-live-quote-marker"),
@@ -569,18 +569,9 @@ const liveSurfaceTheme = EditorView.theme({
   ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
   ".cm-content": {
     minHeight: "640px",
-    maxWidth: "720px",
-    margin: "0 auto",
     padding: "24px 32px 40px 32px",
   },
   ".cm-line": { padding: "0" },
-  ".cm-live-heading-line-1": { marginTop: "1.5rem", marginBottom: "0.5rem" },
-  ".cm-live-heading-line-2": { marginTop: "1.25rem", marginBottom: "0.4rem" },
-  ".cm-live-heading-line-3": { marginTop: "1rem", marginBottom: "0.3rem" },
-  ".cm-live-heading-line-4, .cm-live-heading-line-5, .cm-live-heading-line-6": {
-    marginTop: "0.75rem",
-    marginBottom: "0.25rem",
-  },
   ".cm-live-task-checkbox": {
     display: "inline-flex",
     alignItems: "center",

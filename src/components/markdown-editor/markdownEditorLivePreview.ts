@@ -205,9 +205,16 @@ export const buildMarkdownLivePreviewPlan = (
     )
   }
 
-  const visit = (node: MarkdownSyntaxNode, parent: MarkdownSyntaxNode | null) => {
+  const visit = (
+    node: MarkdownSyntaxNode,
+    parent: MarkdownSyntaxNode | null,
+    currentHeading: MarkdownSyntaxNode | null = null
+  ) => {
+    const isHeading = /^ATXHeading[1-6]$/.test(node.name)
+    const activeHeading = isHeading ? node : currentHeading
+
     if (node === documentNode) {
-      for (const child of listChildren(node)) visit(child, node)
+      for (const child of listChildren(node)) visit(child, node, null)
       return
     }
 
@@ -232,6 +239,9 @@ export const buildMarkdownLivePreviewPlan = (
     ) {
       if (parent && isTokenActive(parent.from, parent.to, selections)) {
         // Active token: disclose raw delimiter marks
+        return
+      }
+      if (activeHeading && isTokenActive(activeHeading.from, activeHeading.to, selections)) {
         return
       }
       decorations.push({ from: node.from, to: node.to, kind: "hide-mark" })
@@ -264,9 +274,9 @@ export const buildMarkdownLivePreviewPlan = (
       decorations.push(decoration)
     }
 
-    for (const child of listChildren(node)) visit(child, node)
+    for (const child of listChildren(node)) visit(child, node, activeHeading)
   }
 
-  visit(documentNode, null)
+  visit(documentNode, null, null)
   return decorations
 }
