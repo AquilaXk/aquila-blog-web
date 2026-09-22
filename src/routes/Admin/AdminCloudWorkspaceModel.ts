@@ -1,4 +1,5 @@
 import type { CloudFile, CloudMediaKind } from "src/apis/backend/cloud"
+import { formatFileSize } from "src/libs/utils"
 
 export type CloudMediaFilter = "ALL" | CloudMediaKind
 export type UploadQueueStatus = "queued" | "uploading" | "done" | "failed" | "cancelled"
@@ -65,17 +66,8 @@ export const getCloudFilenameParts = (filename: string) => {
   }
 }
 
-export const formatCloudFileSize = (bytes: number) => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
-  const units = ["B", "KB", "MB", "GB"] as const
-  let value = bytes
-  let unitIndex = 0
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex += 1
-  }
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
-}
+export const formatCloudFileSize = (bytes: number) =>
+  formatFileSize(bytes, { fallback: "0 B" })
 
 export const formatCloudDate = (value?: string) => {
   if (!value) return "날짜 없음"

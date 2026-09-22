@@ -2,7 +2,8 @@ export type EditorMode = "create" | "edit"
 
 export type PublishActionType = "create" | "modify" | "temp"
 
-export type PostVisibility = "PRIVATE" | "PUBLIC_UNLISTED" | "PUBLIC_LISTED"
+import type { PostVisibility } from "src/types"
+export type { PostVisibility }
 
 type LoadingKey = "" | "writePost" | "modifyPost" | "publishTempPost" | string
 

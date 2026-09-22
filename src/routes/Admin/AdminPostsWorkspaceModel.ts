@@ -1,4 +1,5 @@
 import { isServerTempDraftPost } from "./editorTempDraft"
+import { formatIsoDateTime } from "src/libs/utils"
 
 export type PostListScope = "active" | "deleted"
 export type PostStatusFilter = "all" | "draft" | "published" | "private" | "deleted"
@@ -95,10 +96,7 @@ export const POSTS_WORKSPACE_DEFERRED_PANEL_TIMEOUT_MS = 720
 export const POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS = 180
 export const POSTS_WORKSPACE_MOBILE_LIST_QUERY = "(max-width: 900px)"
 
-export const formatDateTime = (value?: string) => {
-  if (!value) return "-"
-  return value.slice(0, 16).replace("T", " ")
-}
+export const formatDateTime = (value?: string) => formatIsoDateTime(value)
 
 export const toVisibility = (published: boolean, listed: boolean) => {
   if (!published) return "PRIVATE" as const

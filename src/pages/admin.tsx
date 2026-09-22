@@ -13,6 +13,7 @@ import {
   ADMIN_HUB_GREETING_VARIANT_COUNT,
   resolveAdminHubGreeting,
 } from "src/routes/Admin/AdminHubSurfaceModel"
+import { formatIsoDateTime } from "src/libs/utils"
 import AdminShell from "src/routes/Admin/AdminShell"
 
 const AdminHubSurface = dynamic(() => import("src/routes/Admin/AdminHubSurface"), {
@@ -109,10 +110,7 @@ const readAdminHubOperationalSnapshot = async (req: IncomingMessage): Promise<Ad
 
 const DASHBOARD_DATA_MISSING_LABEL = "데이터 미수집"
 
-const formatAdminHubDateTime = (value?: string) => {
-  if (!value) return "-"
-  return value.slice(0, 16).replace("T", " ")
-}
+const formatAdminHubDateTime = (value?: string) => formatIsoDateTime(value)
 
 const getSystemHealthStatusLabel = (value: string | null | undefined) => {
   const normalized = value?.trim()
@@ -246,9 +244,7 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
   const displayName = sessionMember?.nickname || sessionMember?.username || "관리자"
   const profileSrc = adminProfile?.profileImageUrl || ""
 
-  const profileUpdatedText = adminProfile?.modifiedAt
-    ? adminProfile.modifiedAt.slice(0, 16).replace("T", " ")
-    : "미확인"
+  const profileUpdatedText = formatIsoDateTime(adminProfile?.modifiedAt, "미확인")
   const profileChecklist = [
     Boolean(profileSrc),
     Boolean(adminProfile?.profileRole?.trim()),

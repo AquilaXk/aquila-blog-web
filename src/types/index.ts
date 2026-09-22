@@ -68,3 +68,5 @@ export type TCategories = {
 export type SchemeType = "light" | "dark"
 export type BlogDesignType = "legacy"
 export type LegacyBlogScheme = "light" | "dark"
+export type { RsData, PostVisibility } from "./api"
+
