@@ -372,7 +372,7 @@ const MobileMenuPanel = styled.div`
       align-items: center;
       gap: 8px;
       width: 100%;
-      min-height: 36px;
+      min-height: ${control.lg}px;
       padding: 0 10px;
       border: none;
       border-radius: 6px;
@@ -627,6 +627,12 @@ const StyledWrapper = styled.div`
     .authArea {
       gap: 7px;
       min-height: ${control.lg}px;
+    }
+
+    .langToggleBtn {
+      min-height: ${control.lg}px;
+      height: ${control.lg}px;
+      padding: 0 10px;
     }
 
     .searchTrigger {
