@@ -469,6 +469,13 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
         theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9"};
       text-decoration: none;
     }
+
+    &:focus-visible {
+      outline: 2px solid
+        ${({ theme }) =>
+          theme.scheme === "dark" ? "rgba(168, 85, 247, 0.7)" : "rgba(124, 58, 237, 0.6)"};
+      outline-offset: 1px;
+    }
   }
 
   .cm-live-wikilink-icon {

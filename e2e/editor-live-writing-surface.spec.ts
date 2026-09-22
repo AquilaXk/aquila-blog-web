@@ -610,6 +610,16 @@ test.describe("live Markdown writing surface", () => {
     // The second wikilink remains a pill widget
     await expect(page.locator(".cm-live-wikilink")).toHaveCount(1)
     await expect(page.locator(".cm-live-wikilink").first().locator(".cm-live-wikilink-text")).toHaveText("User Guide")
+
+    // Pressing Enter on the focused wikilink pill discloses it for keyboard users
+    const remainingPill = page.locator(".cm-live-wikilink").first()
+    await remainingPill.focus()
+    await page.keyboard.press("Enter")
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Start",
+      "",
+      "Read Architecture or [[Guide|User Guide]].",
+    ])
   })
 
   test("outline navigation targets the single surface and preserves heading labels", async ({ page }) => {

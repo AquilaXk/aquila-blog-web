@@ -269,4 +269,75 @@ test.describe("markdown editor live preview model", () => {
       alias: "System Architecture",
     }))
   })
+
+  test("formats highlight containing equal signs and math expressions", () => {
+    const markdown = "Evaluate ==1 + 1 = 2== and ==status = active== or ==x >= 10==."
+    const tree = markdownParser.parse(markdown)
+
+    const plan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+    const mathHighlightStart = markdown.indexOf("==1 + 1 = 2==")
+    const mathHighlightEnd = mathHighlightStart + "==1 + 1 = 2==".length
+
+    expect(plan).toContainEqual({
+      from: mathHighlightStart + 2,
+      to: mathHighlightEnd - 2,
+      kind: "highlight",
+    })
+    expect(plan).toContainEqual({
+      from: mathHighlightStart,
+      to: mathHighlightStart + 2,
+      kind: "hide-mark",
+    })
+
+    const statusStart = markdown.indexOf("==status = active==")
+    const statusEnd = statusStart + "==status = active==".length
+    expect(plan).toContainEqual({
+      from: statusStart + 2,
+      to: statusEnd - 2,
+      kind: "highlight",
+    })
+
+    // Discloses when caret enters the highlight with equal sign
+    const caretInside = mathHighlightStart + 4
+    const activePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: caretInside, to: caretInside }])
+    expect(activePlan).not.toContainEqual({
+      from: mathHighlightStart,
+      to: mathHighlightStart + 2,
+      kind: "hide-mark",
+    })
+  })
+
+  test("suppresses conflicting lezer markdown formatting inside wikilinks and normalizes empty alias", () => {
+    const markdown = "Check [[My *Important* Note]] and [[report_v1_draft]] and [[EmptyAlias|]] here."
+    const tree = markdownParser.parse(markdown)
+
+    const inactivePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+
+    const starredStart = markdown.indexOf("[[My *Important* Note]]")
+    const starredEnd = starredStart + "[[My *Important* Note]]".length
+
+    // The wikilink widget replaces the whole token
+    expect(inactivePlan).toContainEqual({
+      from: starredStart,
+      to: starredEnd,
+      kind: "wikilink",
+      target: "My *Important* Note",
+      alias: undefined,
+    })
+
+    // No conflicting emphasis or hide-mark decorations are emitted inside the wikilink range
+    const innerDecos = inactivePlan.filter(
+      (d) => d.from >= starredStart && d.to <= starredEnd && d.kind !== "wikilink"
+    )
+    expect(innerDecos).toHaveLength(0)
+
+    // Empty alias is normalized to undefined
+    const emptyAliasStart = markdown.indexOf("[[EmptyAlias|]]")
+    expect(inactivePlan).toContainEqual(expect.objectContaining({
+      from: emptyAliasStart,
+      kind: "wikilink",
+      target: "EmptyAlias",
+      alias: undefined,
+    }))
+  })
 })
