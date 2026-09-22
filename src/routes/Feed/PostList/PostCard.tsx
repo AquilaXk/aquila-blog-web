@@ -7,7 +7,6 @@ import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import { memo, useCallback, type MouseEvent } from "react"
 import Router from "next/router"
 import { useLanguage } from "src/libs/language"
-import { useRootAdminProfile } from "src/layouts/RootLayout"
 import ProfileImage from "src/components/ProfileImage"
 
 type Props = {
@@ -17,22 +16,14 @@ type Props = {
 
 const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   const { language, t } = useLanguage()
-  const adminProfile = useRootAdminProfile()
   const postPath = toCanonicalPostPath(data.id)
   const isEn = language === "en"
   const currentLang = isEn ? "en-US" : (CONFIG.lang || "ko-KR")
   const createdAtText = formatDate(data.date?.start_date || data.createdTime, currentLang)
 
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
-  const usingAdminFallback = !postAuthor
-  const authorName =
-    postAuthor?.name?.trim() ||
-    adminProfile?.nickname?.trim() ||
-    adminProfile?.name?.trim() ||
-    (isEn ? "Anonymous" : "익명")
-  const authorImageSrc = usingAdminFallback
-    ? adminProfile?.profileImageUrl || ""
-    : postAuthor?.profile_photo || ""
+  const authorName = postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")
+  const authorImageSrc = postAuthor?.profile_photo || ""
 
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||
