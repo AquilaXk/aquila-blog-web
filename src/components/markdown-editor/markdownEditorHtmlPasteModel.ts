@@ -54,7 +54,7 @@ const BLOCK_TAGS = new Set([
 
 const TABLE_CELL_TAGS = new Set(["td", "th"])
 
-const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}\[\]()#+!|><~.=-]/g, "\\$&")
+const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}\[\]|<>~]/g, "\\$&")
 
 /** Canonical whitespace used for untrusted HTML text nodes and alt text. */
 export const normalizeHtmlPasteText = (value: string): string => {
@@ -165,7 +165,14 @@ const serializeInline = (node: Node): string => {
     const href = resolveSafeHtmlPasteHref(element.getAttribute("href") || "")
     return href && inner ? `[${inner}](${href.replace(/[\\()]/g, "\\$&")})` : inner
   }
-  if (tag === "img") return inlineText(element.getAttribute("alt") || "")
+  if (tag === "img") {
+    const src = resolveSafeHtmlPasteHref(element.getAttribute("src") || "")
+    const alt = inlineText(element.getAttribute("alt") || "")
+    if (src) {
+      return `![${alt}](${src.replace(/[\\()]/g, "\\$&")})`
+    }
+    return alt
+  }
   return inner
 }
 
@@ -236,6 +243,41 @@ const serializeBlock = (node: Node): string => {
   if (/^h[1-6]$/.test(tag)) {
     const content = serializeInline(element).trim()
     return content ? `${"#".repeat(Number(tag[1]))} ${content}` : ""
+  }
+  if (tag === "pre") {
+    const codeChild = Array.from(element.children).find((child) => child.tagName.toLowerCase() === "code")
+    if (codeChild) {
+      const langMatch = /(?:language-|lang-)([a-zA-Z0-9_-]+)/.exec(codeChild.className)
+      const lang = langMatch ? langMatch[1] : ""
+      const text = (codeChild.textContent || "").replace(/\r\n?/g, "\n").trimEnd()
+      return `\`\`\`${lang}\n${text}\n\`\`\``
+    }
+    const text = (element.textContent || "").replace(/\r\n?/g, "\n").trimEnd()
+    return `\`\`\`\n${text}\n\`\`\``
+  }
+  if (tag === "table") {
+    const rows = Array.from(element.querySelectorAll("tr"))
+    if (rows.length === 0) return ""
+    const parsedRows = rows.map((tr) => {
+      const cells = Array.from(tr.children).filter((c) => TABLE_CELL_TAGS.has(c.tagName.toLowerCase()))
+      return cells.map((cell) => serializeInline(cell).trim().replaceAll("|", "\\|"))
+    }).filter((r) => r.length > 0)
+
+    if (parsedRows.length === 0) return ""
+    const maxCols = Math.max(...parsedRows.map((r) => r.length))
+    if (maxCols === 0) return ""
+
+    const normalizedRows = parsedRows.map((r) => {
+      const copy = [...r]
+      while (copy.length < maxCols) copy.push("")
+      return copy
+    })
+
+    const header = normalizedRows[0]!
+    const headerLine = `| ${header.join(" | ")} |`
+    const delimiterLine = `| ${header.map(() => "---").join(" | ")} |`
+    const bodyLines = normalizedRows.slice(1).map((r) => `| ${r.join(" | ")} |`)
+    return [headerLine, delimiterLine, ...bodyLines].join("\n")
   }
   if (tag === "p") return serializeInline(element).trim()
   if (tag === "ul" || tag === "ol") return serializeList(element, tag === "ol")

@@ -54,6 +54,7 @@ type UseMarkdownEditorMediaTransfersArgs = {
   /** Placeholder replace/remove after async upload — must not steal focus from other controls. */
   applyBackgroundMarkdownMutation: (plan: PlannedTextMutation) => boolean
   resolveActiveSelection: () => TextareaSelection
+  resolveDropTargetPosition?: (coords: { x: number; y: number }) => number | null
   setUploadInFlight: (delta: number) => void
   setEditorError: (message: string) => void
   insertUploadedMarkdown: (markdown: string) => void
@@ -70,6 +71,7 @@ export const useMarkdownEditorMediaTransfers = ({
   applyRecordedMarkdownMutation,
   applyBackgroundMarkdownMutation,
   resolveActiveSelection,
+  resolveDropTargetPosition,
   setUploadInFlight,
   setEditorError,
   insertUploadedMarkdown,
@@ -389,6 +391,19 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
+      // Prioritize URL linkify when text is selected and valid URL is pasted
+      const { from, to } = resolveActiveSelection()
+      if (from < to) {
+        const plainText = readClipboardPlainText(event.clipboardData)
+        const url = parseSingleHttpUrl(plainText)
+        if (url) {
+          event.preventDefault()
+          const selectedText = valueRef.current.slice(from, to)
+          applyPlannedMarkdownMutation(planLinkifySelectionWithUrl(from, to, selectedText, url))
+          return
+        }
+      }
+
       const html = readClipboardHtml(event.clipboardData)
       if (html !== null) {
         const imported = convertSafeHtmlPasteToMarkdown(html)
@@ -398,13 +413,11 @@ export const useMarkdownEditorMediaTransfers = ({
           return
         }
         if (imported.kind === "markdown") {
-          const { from, to } = resolveActiveSelection()
           applyRecordedMarkdownMutation(planReplaceSelection(from, to, imported.markdown))
         }
         return
       }
 
-      const { from, to } = resolveActiveSelection()
       if (from === to) return
 
       const url = parseSingleHttpUrl(readClipboardPlainText(event.clipboardData))
@@ -444,9 +457,13 @@ export const useMarkdownEditorMediaTransfers = ({
       const files = listFilesFromDataTransfer(event.dataTransfer)
       if (files.length === 0) return
       event.preventDefault()
+      const dropPos = resolveDropTargetPosition?.({ x: event.clientX, y: event.clientY })
+      if (typeof dropPos === "number") {
+        selectionRef.current = { from: dropPos, to: dropPos }
+      }
       void processTransferFiles(files)
     },
-    [disabled, onUploadFile, onUploadImage, processTransferFiles]
+    [disabled, onUploadFile, onUploadImage, processTransferFiles, resolveDropTargetPosition, selectionRef]
   )
 
   return {

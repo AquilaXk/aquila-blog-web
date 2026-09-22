@@ -170,6 +170,15 @@ test.describe("markdown editor paste/drop model", () => {
     expect(applyPlannedTextMutationToValue(value, plan).value).toBe("see [docs](https://example.com) here")
   })
 
+  test("trims leading and trailing whitespace around selected text to keep clean markdown link", () => {
+    const value = "see   docs   here"
+    const plan = planLinkifySelectionWithUrl(4, 12, "  docs  ", "https://example.com")
+    expect(plan.replacement).toBe("  [docs](https://example.com)  ")
+    expect(plan.selectionStart).toBe(4 + "  [docs](https://example.com)".length)
+    expect(plan.selectionEnd).toBe(4 + "  [docs](https://example.com)".length)
+    expect(applyPlannedTextMutationToValue(value, plan).value).toBe("see   [docs](https://example.com)   here")
+  })
+
   test("escapes markdown label metacharacters when linkifying a selection", () => {
     const value = "see foo]bar here"
     const plan = planLinkifySelectionWithUrl(4, 11, "foo]bar", "https://example.com")

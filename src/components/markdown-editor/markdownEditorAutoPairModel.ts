@@ -12,6 +12,23 @@ const OPEN_TO_CLOSE: Readonly<Record<string, string>> = {
   "\"": "\"",
   "'": "'",
   "`": "`",
+  "$": "$",
+}
+
+const SELECTION_WRAP_MAP: Readonly<Record<string, { opener: string; closer: string }>> = {
+  "*": { opener: "*", closer: "*" },
+  "_": { opener: "_", closer: "_" },
+  "~": { opener: "~", closer: "~" },
+  "~~": { opener: "~~", closer: "~~" },
+  "==": { opener: "==", closer: "==" },
+  "=": { opener: "==", closer: "==" },
+  "$": { opener: "$", closer: "$" },
+  "[": { opener: "[", closer: "]" },
+  "\"": { opener: "\"", closer: "\"" },
+  "'": { opener: "'", closer: "'" },
+  "`": { opener: "`", closer: "`" },
+  "(": { opener: "(", closer: ")" },
+  "{": { opener: "{", closer: "}" },
 }
 
 const CLOSE_TO_OPEN: Readonly<Record<string, string>> = {
@@ -72,6 +89,23 @@ export const planMarkdownEditorAutoPairInsert = (
   key: string
 ): MarkdownEditorAutoPairAction | null => {
   if (!canAutoPair(value, selectionStart, selectionEnd, key)) return null
+
+  // If text is selected, check selection wrap map
+  if (selectionStart < selectionEnd) {
+    const wrap = SELECTION_WRAP_MAP[key]
+    if (!wrap) return null
+    const selected = value.slice(selectionStart, selectionEnd)
+    return {
+      kind: "mutation",
+      mutation: {
+        rangeStart: selectionStart,
+        rangeEnd: selectionEnd,
+        replacement: `${wrap.opener}${selected}${wrap.closer}`,
+        selectionStart: selectionStart + wrap.opener.length,
+        selectionEnd: selectionStart + wrap.opener.length + selected.length,
+      },
+    }
+  }
 
   if (selectionStart === selectionEnd && CLOSE_TO_OPEN[key] && value[selectionStart] === key) {
     return { kind: "select", selectionStart: selectionStart + 1, selectionEnd: selectionStart + 1 }

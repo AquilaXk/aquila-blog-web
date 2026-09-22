@@ -145,4 +145,25 @@ test.describe("markdown editor live preview model", () => {
       to: markdown.indexOf(imageUrl) + imageUrl.length,
     })
   })
+
+  test("provides fine-grained token disclosure without unrendering entire paragraph", () => {
+    const markdown = "Hello plain text with **bold** and *italic* here."
+    const tree = markdownParser.parse(markdown)
+
+    // Caret at plain text "Hello"
+    const plainCaretPlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 2, to: 2 }])
+    expect(plainCaretPlan).toContainEqual(expect.objectContaining({ kind: "strong" }))
+    expect(plainCaretPlan).toContainEqual(expect.objectContaining({ kind: "emphasis" }))
+    expect(plainCaretPlan).toContainEqual(expect.objectContaining({ kind: "hide-mark", from: markdown.indexOf("**bold**") }))
+    expect(plainCaretPlan).toContainEqual(expect.objectContaining({ kind: "hide-mark", from: markdown.indexOf("*italic*") }))
+
+    // Caret moved inside **bold**
+    const boldOffset = markdown.indexOf("bold") + 1
+    const boldCaretPlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: boldOffset, to: boldOffset }])
+    // bold mark is disclosed (not hidden)
+    expect(boldCaretPlan).not.toContainEqual(expect.objectContaining({ kind: "hide-mark", from: markdown.indexOf("**bold**") }))
+    // italic mark remains hidden and formatted
+    expect(boldCaretPlan).toContainEqual(expect.objectContaining({ kind: "emphasis" }))
+    expect(boldCaretPlan).toContainEqual(expect.objectContaining({ kind: "hide-mark", from: markdown.indexOf("*italic*") }))
+  })
 })

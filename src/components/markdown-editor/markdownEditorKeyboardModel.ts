@@ -101,6 +101,20 @@ export const planListEnterContinuation = (
   if (!matched) return null
 
   if (matched.content === "") {
+    if (matched.indent.length > 0) {
+      const outdentLen = matched.indent.startsWith("\t") ? 1 : Math.min(2, matched.indent.length)
+      const nextIndent = matched.indent.slice(outdentLen)
+      const nextMarker = matched.kind === "ordered" ? "1. " : matched.marker
+      const replacement = `${nextIndent}${nextMarker}`
+      return {
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
+        replacement,
+        selectionStart: lineStart + replacement.length,
+        selectionEnd: lineStart + replacement.length,
+      }
+    }
+
     return {
       rangeStart: lineStart,
       rangeEnd: lineEnd,
@@ -110,12 +124,80 @@ export const planListEnterContinuation = (
     }
   }
 
-  const nextMarker =
-    matched.kind === "ordered"
-      ? `${matched.indent}${matched.number + 1}. `
-      : `${matched.indent}${matched.marker}`
+  if (matched.kind === "ordered") {
+    const nextNumber = matched.number + 1
+    const nextMarker = `${matched.indent}${nextNumber}. `
+    const rest = value.slice(lineEnd + 1)
+    const restLines = rest.split("\n")
+    let currentNum = nextNumber
+    const renumbered: string[] = []
+    let spanEnd = lineEnd
+
+    for (const rLine of restLines) {
+      const rMatch = matchListMarkerLine(rLine)
+      if (rMatch && rMatch.kind === "ordered" && rMatch.indent === matched.indent) {
+        currentNum += 1
+        renumbered.push(`${rMatch.indent}${currentNum}. ${rMatch.content}`)
+        spanEnd += 1 + rLine.length
+      } else {
+        break
+      }
+    }
+
+    if (renumbered.length > 0) {
+      const remainderOfLine = value.slice(selectionEnd, lineEnd)
+      const replacement = `\n${nextMarker}${remainderOfLine.trimStart()}\n${renumbered.join("\n")}`
+      return {
+        rangeStart: selectionStart,
+        rangeEnd: spanEnd,
+        replacement,
+        selectionStart: selectionStart + 1 + nextMarker.length,
+        selectionEnd: selectionStart + 1 + nextMarker.length,
+      }
+    }
+
+    return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
+  }
+
+  const nextMarker = `${matched.indent}${matched.marker}`
 
   return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
+}
+
+export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
+  const uncheckedMatch = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/.exec(lineText)
+  if (uncheckedMatch) {
+    const boxPos = uncheckedMatch[1].length
+    return {
+      replaced: true,
+      lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
+    }
+  }
+
+  const checkedMatch = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/.exec(lineText)
+  if (checkedMatch) {
+    const boxPos = checkedMatch[1].length
+    return {
+      replaced: true,
+      lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
+    }
+  }
+
+  const bulletMatch = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/.exec(lineText)
+  if (bulletMatch) {
+    return {
+      replaced: true,
+      lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
+    }
+  }
+
+  const plainMatch = /^([ \t]*)(.*)$/.exec(lineText)
+  const indent = plainMatch?.[1] ?? ""
+  const content = plainMatch?.[2] ?? ""
+  return {
+    replaced: true,
+    lineText: `${indent}- [ ] ${content}`,
+  }
 }
 
 export const planFormatShortcutMutation = (

@@ -245,6 +245,7 @@ export const EditorStudioWorkspaceController = ({
   const serverBaselineEditorFingerprintRef = useRef("")
   const {
     disabled,
+    handleFocusTitle,
     handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,
@@ -774,7 +775,7 @@ export const EditorStudioWorkspaceController = ({
         customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
         deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
         handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePostSummaryChange,
-        handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleHitPost,
+        handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleFocusTitle, handleHitPost,
         handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
         handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove,
         handleReadPostCount, handleReadSystemHealth,

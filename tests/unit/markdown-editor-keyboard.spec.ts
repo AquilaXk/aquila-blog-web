@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import {
   isOffsetInsideFencedCodeBlock,
   matchListMarkerLine,
+  cycleTaskCheckboxInLine,
   planFormatShortcutMutation,
   planHardBreak,
   planListEnterContinuation,
@@ -143,6 +144,59 @@ test.describe("markdown editor keyboard model", () => {
     expect(orderedMarker).not.toBeNull()
     if (!orderedMarker) throw new Error("expected an ordered list marker")
     expect(orderedMarker.kind).toBe("ordered")
+  })
+
+  test("outdents an indented empty list item by one level on Enter", () => {
+    expect(planListEnterContinuation("  - ", 4, 4)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 4,
+      replacement: "- ",
+      selectionStart: 2,
+      selectionEnd: 2,
+    })
+    expect(planListEnterContinuation("    - ", 6, 6)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 6,
+      replacement: "  - ",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+  })
+
+  test("auto-renumbers following ordered list items on Enter", () => {
+    const doc = "1. first\n2. second\n3. third"
+    // Press enter at end of "1. first" (offset 8)
+    const plan = planListEnterContinuation(doc, 8, 8)
+    expect(plan).not.toBeNull()
+    expect(plan?.replacement).toBe("\n2. \n3. second\n4. third")
+
+    // Press enter in middle of line: "1. first item\n2. second" -> "item" must NOT be lost!
+    const midDoc = "1. first item\n2. second"
+    const midPlan = planListEnterContinuation(midDoc, 8, 8)
+    expect(midPlan).not.toBeNull()
+    expect(midPlan?.replacement).toBe("\n2. item\n3. second")
+  })
+
+  test("cycles task checkbox between unchecked and checked without bracket corruption", () => {
+    // Unchecked -> Checked
+    const res1 = cycleTaskCheckboxInLine("- [ ] Write docs")
+    expect(res1.replaced).toBe(true)
+    expect(res1.lineText).toBe("- [x] Write docs")
+
+    // Checked -> Unchecked
+    const res2 = cycleTaskCheckboxInLine("- [x] Write docs")
+    expect(res2.replaced).toBe(true)
+    expect(res2.lineText).toBe("- [ ] Write docs")
+
+    // Plain bullet -> Task
+    const res3 = cycleTaskCheckboxInLine("- Normal item")
+    expect(res3.replaced).toBe(true)
+    expect(res3.lineText).toBe("- [ ] Normal item")
+
+    // Plain text -> Task
+    const res4 = cycleTaskCheckboxInLine("Plain text")
+    expect(res4.replaced).toBe(true)
+    expect(res4.lineText).toBe("- [ ] Plain text")
   })
 
   test("does not continue list markers inside fenced code blocks", () => {

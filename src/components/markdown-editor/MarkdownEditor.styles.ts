@@ -49,16 +49,16 @@ export const ToolbarGroup = styled.div`
   overflow: visible;
 `
 
-export const ToolbarButton = styled.button`
-  border: 1px solid transparent;
+export const ToolbarButton = styled.button<{ $active?: boolean }>`
+  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.gray8 : "transparent")};
   border-radius: 4px;
   height: 36px;
   min-height: 36px;
   min-width: 36px;
   flex: 0 0 auto;
   padding: 0 9px;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray10};
+  background: ${({ theme, $active }) => ($active ? theme.colors.gray4 : "transparent")};
+  color: ${({ theme, $active }) => ($active ? theme.colors.gray12 : theme.colors.gray10)};
   font-family: var(--aq-font-sans);
   font-size: 13px;
   font-weight: 600;

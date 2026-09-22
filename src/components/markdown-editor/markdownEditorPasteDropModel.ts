@@ -176,8 +176,25 @@ export const planLinkifySelectionWithUrl = (
   selectedText: string,
   url: string
 ): PlannedTextMutation => {
-  const replacement = `[${escapeMarkdownLinkLabel(selectedText)}](${escapeMarkdownLinkDestination(url)})`
-  const cursor = selectionStart + replacement.length
+  const leading = selectedText.match(/^\s*/)?.[0] ?? ""
+  const trailing = selectedText.match(/\s*$/)?.[0] ?? ""
+  const core = selectedText.trim()
+
+  if (!core) {
+    const replacement = `[${escapeMarkdownLinkLabel(selectedText)}](${escapeMarkdownLinkDestination(url)})`
+    const cursor = selectionStart + replacement.length
+    return {
+      rangeStart: selectionStart,
+      rangeEnd: selectionEnd,
+      replacement,
+      selectionStart: cursor,
+      selectionEnd: cursor,
+    }
+  }
+
+  const innerLink = `[${escapeMarkdownLinkLabel(core)}](${escapeMarkdownLinkDestination(url)})`
+  const replacement = `${leading}${innerLink}${trailing}`
+  const cursor = selectionStart + leading.length + innerLink.length
   return {
     rangeStart: selectionStart,
     rangeEnd: selectionEnd,

@@ -43,4 +43,22 @@ test.describe("editor metadata body preservation", () => {
     expect(parsed.thumbnail).toBe(thumbnail)
     expect(composeEditorContent(parsed.body, parsed.tags, parsed)).toBe(saved)
   })
+
+  test("preserves arbitrary Obsidian YAML frontmatter when whitelist is lifted", () => {
+    const body = "This is the body content."
+    const customLines = ["author: Aquila", "date: 2026-09-22", "draft: false"]
+    const frontmatter = `---\n${customLines.join("\n")}\ntags: ["test"]\n---\n\n${body}`
+    const parsed = parseEditorMeta(frontmatter, { allowArbitraryFrontmatter: true })
+    expect(parsed.body).toBe(body)
+    expect(parsed.tags).toEqual(["test"])
+    expect(parsed.customFrontmatterLines).toEqual(customLines)
+
+    const saved = composeEditorContent(parsed.body, parsed.tags, parsed)
+    expect(saved).toBe(frontmatter)
+
+    const snapshot = resolveEditorMetaSnapshot(frontmatter, { allowArbitraryFrontmatter: true })
+    expect(snapshot.body).toBe(body)
+    expect(snapshot.tags).toEqual(["test"])
+    expect(snapshot.customFrontmatterLines).toEqual(customLines)
+  })
 })

@@ -18,6 +18,7 @@ import {
   EditorExitAction,
   EditorHeaderMetaPill,
   EditorHeaderMetaRow,
+  MobilePropertiesToggle,
   EditorInspector,
   EditorInspectorTagInputRow,
   EditorOutline,
@@ -220,6 +221,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const [isGuideOpen, setIsGuideOpen] = useState(false)
   const [isOutlineOpen, setIsOutlineOpen] = useState(true)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
+  const [isMobilePropertiesOpen, setIsMobilePropertiesOpen] = useState(false)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
@@ -384,7 +386,14 @@ export const EditorStudioDedicatedEditorSurface = ({
               onChange={onPostTitleChange}
               onKeyDown={onPostTitleKeyDown}
             />
-            <EditorHeaderMetaRow>
+            <MobilePropertiesToggle
+              type="button"
+              onClick={() => setIsMobilePropertiesOpen((prev) => !prev)}
+              aria-label="속성 정보 토글"
+            >
+              속성 {isMobilePropertiesOpen ? "접기 ▲" : `펼치기 (${postTags.length}개 태그) ▼`}
+            </MobilePropertiesToggle>
+            <EditorHeaderMetaRow $collapsedOnMobile={!isMobilePropertiesOpen}>
               <EditorTagRow aria-label="태그 입력" $compact={isCompactSplitPreview}>
                 {postTags.map((tag) => (
                   <SelectedTagChip key={tag}>
