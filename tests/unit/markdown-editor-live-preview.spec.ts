@@ -166,4 +166,107 @@ test.describe("markdown editor live preview model", () => {
     expect(boldCaretPlan).toContainEqual(expect.objectContaining({ kind: "emphasis" }))
     expect(boldCaretPlan).toContainEqual(expect.objectContaining({ kind: "hide-mark", from: markdown.indexOf("*italic*") }))
   })
+
+  test("formats highlight tokens with delimiter hiding and discloses them when active", () => {
+    const markdown = "Hello ==highlighted text== here with `==code==` untouched."
+    const tree = markdownParser.parse(markdown)
+
+    // Caret outside highlight token
+    const inactivePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+    const highlightStart = markdown.indexOf("==highlighted text==")
+    const highlightEnd = highlightStart + "==highlighted text==".length
+    expect(inactivePlan).toContainEqual({
+      from: highlightStart + 2,
+      to: highlightEnd - 2,
+      kind: "highlight",
+    })
+    expect(inactivePlan).toContainEqual({
+      from: highlightStart,
+      to: highlightStart + 2,
+      kind: "hide-mark",
+    })
+    expect(inactivePlan).toContainEqual({
+      from: highlightEnd - 2,
+      to: highlightEnd,
+      kind: "hide-mark",
+    })
+
+    // Code literal is NOT highlighted or hidden
+    const codeStart = markdown.indexOf("`==code==`")
+    expect(inactivePlan).not.toContainEqual(expect.objectContaining({
+      from: codeStart + 1,
+      kind: "highlight",
+    }))
+
+    // Caret inside highlight token discloses delimiters for live editing
+    const caretInside = highlightStart + 5
+    const activePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: caretInside, to: caretInside }])
+    expect(activePlan).toContainEqual({
+      from: highlightStart + 2,
+      to: highlightEnd - 2,
+      kind: "highlight",
+    })
+    expect(activePlan).not.toContainEqual({
+      from: highlightStart,
+      to: highlightStart + 2,
+      kind: "hide-mark",
+    })
+    expect(activePlan).not.toContainEqual({
+      from: highlightEnd - 2,
+      to: highlightEnd,
+      kind: "hide-mark",
+    })
+  })
+
+  test("formats wikilink pills with target and alias and discloses raw brackets when active", () => {
+    const markdown = "See [[Overview]] and [[Architecture#Design|System Architecture]] or `[[Code]]`."
+    const tree = markdownParser.parse(markdown)
+
+    // Caret outside
+    const inactivePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: 0, to: 0 }])
+    const overviewStart = markdown.indexOf("[[Overview]]")
+    const archStart = markdown.indexOf("[[Architecture#Design|System Architecture]]")
+
+    expect(inactivePlan).toContainEqual({
+      from: overviewStart,
+      to: overviewStart + "[[Overview]]".length,
+      kind: "wikilink",
+      target: "Overview",
+      alias: undefined,
+    })
+    expect(inactivePlan).toContainEqual({
+      from: archStart,
+      to: archStart + "[[Architecture#Design|System Architecture]]".length,
+      kind: "wikilink",
+      target: "Architecture#Design",
+      alias: "System Architecture",
+    })
+
+    // Code literal is NOT treated as a wikilink
+    const codeStart = markdown.indexOf("`[[Code]]`")
+    expect(inactivePlan).not.toContainEqual(expect.objectContaining({
+      from: codeStart + 1,
+      kind: "wikilink",
+    }))
+
+    // Lezer Link/LinkMark inside wikilinks are suppressed
+    expect(inactivePlan).not.toContainEqual(expect.objectContaining({
+      kind: "link",
+      from: overviewStart + 1,
+    }))
+
+    // Caret inside first wikilink discloses raw [[Overview]] for editing
+    const caretInside = overviewStart + 3
+    const activePlan = buildMarkdownLivePreviewPlan(markdown, tree.topNode, [{ from: caretInside, to: caretInside }])
+    expect(activePlan).not.toContainEqual(expect.objectContaining({
+      kind: "wikilink",
+      target: "Overview",
+    }))
+    // Second wikilink remains a pill widget
+    expect(activePlan).toContainEqual(expect.objectContaining({
+      kind: "wikilink",
+      target: "Architecture#Design",
+      alias: "System Architecture",
+    }))
+  })
 })

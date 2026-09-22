@@ -295,3 +295,66 @@ export class MarkdownTableWidget extends WidgetType {
     return wrap
   }
 }
+
+export class MarkdownWikilinkWidget extends WidgetType {
+  constructor(
+    private readonly target: string,
+    private readonly alias?: string,
+    private readonly from?: number,
+    private readonly to?: number
+  ) {
+    super()
+  }
+
+  eq(other: MarkdownWikilinkWidget) {
+    return (
+      other.target === this.target &&
+      other.alias === this.alias &&
+      other.from === this.from &&
+      other.to === this.to
+    )
+  }
+
+  toDOM(view: EditorView) {
+    const root = document.createElement("span")
+    root.className = "cm-live-wikilink"
+    root.setAttribute("role", "link")
+    root.setAttribute("tabindex", "0")
+    root.setAttribute("aria-label", `Wikilink: ${this.alias || this.target}`)
+    root.dataset.target = this.target
+    if (this.alias) {
+      root.dataset.alias = this.alias
+    }
+
+    const icon = document.createElement("span")
+    icon.className = "cm-live-wikilink-icon"
+    icon.setAttribute("aria-hidden", "true")
+    icon.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`
+
+    const text = document.createElement("span")
+    text.className = "cm-live-wikilink-text"
+    text.textContent = this.alias || this.target
+
+    root.appendChild(icon)
+    root.appendChild(text)
+
+    const handleClick = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (this.from !== undefined) {
+        view.focus()
+        view.dispatch({
+          selection: { anchor: this.from + 2 },
+          scrollIntoView: true,
+        })
+      }
+    }
+
+    root.addEventListener("mousedown", handleClick)
+
+    return root
+  }
+}
+

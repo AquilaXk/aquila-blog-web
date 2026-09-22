@@ -430,6 +430,64 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     text-underline-offset: 0.18em;
   }
 
+  .cm-live-highlight {
+    background-color: rgba(255, 208, 0, 0.35);
+    border-radius: 2px;
+    padding: 0 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .cm-live-wikilink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px 1px 5px;
+    margin: 0 2px;
+    border-radius: 9999px;
+    background: ${({ theme }) =>
+      theme.scheme === "dark" ? "rgba(168, 85, 247, 0.18)" : "rgba(124, 58, 237, 0.1)"};
+    border: 1px solid
+      ${({ theme }) =>
+        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.35)" : "rgba(124, 58, 237, 0.22)"};
+    color: ${({ theme }) =>
+      theme.scheme === "dark" ? "#c084fc" : "#7c3aed"};
+    font-size: 0.9em;
+    font-weight: 500;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+    vertical-align: baseline;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: ${({ theme }) =>
+        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(124, 58, 237, 0.18)"};
+      border-color: ${({ theme }) =>
+        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.5)" : "rgba(124, 58, 237, 0.35)"};
+      color: ${({ theme }) =>
+        theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9"};
+      text-decoration: none;
+    }
+  }
+
+  .cm-live-wikilink-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+
+    svg {
+      display: block;
+      width: 11px;
+      height: 11px;
+    }
+  }
+
+  .cm-live-wikilink-text {
+    display: inline-block;
+  }
+
   .cm-live-color :is(.cm-live-strong, .cm-live-inline-code, .cm-live-link) {
     color: inherit;
   }
