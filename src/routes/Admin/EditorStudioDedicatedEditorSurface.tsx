@@ -316,10 +316,10 @@ export const EditorStudioDedicatedEditorSurface = ({
             type="button"
             $active={isInspectorOpen}
             onClick={() => setIsInspectorOpen((prev) => !prev)}
-            aria-label="발행 설정 토글"
-            title="발행 설정 패널 토글"
+            aria-label="메타 패널 토글"
+            title="메타 패널 토글"
           >
-            발행 설정
+            메타 패널
           </EditorSidebarToggleButton>
           <SecondaryButton type="button" onClick={() => setIsGuideOpen(true)}>
             Markdown 가이드

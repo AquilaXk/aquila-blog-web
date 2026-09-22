@@ -75,14 +75,14 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
     initialMember: AuthMember
     publishedSnapshot: ProfileWorkspaceContent
   }
-  const displayName = displayNameInput.trim() || sessionMember.nickname || sessionMember.username || "관리자"
+  const displayName = (displayNameInput ?? "").trim() || sessionMember.nickname || sessionMember.username || "관리자"
   const previewContent = previewMode === "published" ? publishedSnapshot : draft
   const missingExposureItems: string[] = []
-  if (!displayNameInput.trim()) missingExposureItems.push("계정 이름")
-  if (!draft.profileBio.trim()) missingExposureItems.push("짧은 소개")
-  if (!draft.aboutHeadline.trim() || !draft.aboutRole.trim() || !draft.aboutBio.trim()) missingExposureItems.push("About 소개")
-  if (!draft.aboutProjectSectionTitle.trim() || draft.aboutProjects.length === 0) missingExposureItems.push("About 프로젝트")
-  if (!draft.homeIntroTitle.trim() || !draft.homeIntroDescription.trim()) missingExposureItems.push("메인 헤더 카피")
+  if (!(displayNameInput ?? "").trim()) missingExposureItems.push("계정 이름")
+  if (!(draft.profileBio ?? "").trim()) missingExposureItems.push("짧은 소개")
+  if (!(draft.aboutHeadline ?? "").trim() || !(draft.aboutRole ?? "").trim() || !(draft.aboutBio ?? "").trim()) missingExposureItems.push("About 소개")
+  if (!(draft.aboutProjectSectionTitle ?? "").trim() || (draft.aboutProjects?.length ?? 0) === 0) missingExposureItems.push("About 프로젝트")
+  if (!(draft.homeIntroTitle ?? "").trim() || !(draft.homeIntroDescription ?? "").trim()) missingExposureItems.push("메인 헤더 카피")
   const hasMissingExposureItems = missingExposureItems.length > 0
   const activeSectionMeta = WORKSPACE_SECTIONS.find((section) => section.id === activeSection) || WORKSPACE_SECTIONS[0]
   const pageToasts = [workspaceNotice, imageNotice].filter(

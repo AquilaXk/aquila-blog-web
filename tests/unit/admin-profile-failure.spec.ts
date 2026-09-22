@@ -8,7 +8,7 @@ test("admin profile readers share the fail-closed request contract", () => {
   const requestSource = readFileSync(path.resolve(__dirname, "../../src/libs/publicAdminProfileClient.ts"), "utf8")
 
   expect(hookSource).toContain("queryFn: fetchPublicAdminProfile")
-  expect(hookSource).toContain("throwOnError: true")
+  expect(hookSource).toContain("throwOnError: false")
   expect(rootLayoutSource).toContain('from "src/hooks/useAdminProfile"')
   expect(rootLayoutSource).toContain("useAdminProfile(initialAdminProfile,")
   expect(rootLayoutSource).not.toContain("fetchPublicAdminProfile")

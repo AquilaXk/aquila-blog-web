@@ -1024,7 +1024,7 @@ test.describe("live Markdown writing surface", () => {
       await page.goto(`/admin/editor/${postId}`)
       const summary = page.getByLabel(/^요약/)
       await summary.fill("Saved summary")
-      await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+      await page.getByRole("button", { name: /^(발행하기|발행 설정)$/, exact: true }).click()
       const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
       await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
       await expect.poll(() => pendingWrite?.request().postDataJSON().summary).toBe("Saved summary")
@@ -1098,7 +1098,7 @@ test.describe("live Markdown writing surface", () => {
         } })
       })
       await page.route("**/api/revalidate", (route) => fulfillJson(route, { revalidated: true }))
-      await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+      await page.getByRole("button", { name: /^(발행하기|발행 설정)$/, exact: true }).click()
       const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
       await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
       await expect(dialog).toHaveCount(0)
@@ -1117,7 +1117,7 @@ test.describe("live Markdown writing surface", () => {
   test("publish workflow remains available from the unified editor", async ({ page }) => {
     await routeAuthenticatedEditor(page)
     await openEditorDraft(page)
-    await page.getByRole("button", { name: /^(발행 설정|발행|새 글 작성|수정 반영)$/ }).first().click()
+    await page.getByRole("button", { name: /^(발행 설정|발행하기|발행|새 글 작성|수정 반영)$/ }).first().click()
 
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|새 글 작성|수정 설정)$/ })
     await expect(dialog).toBeVisible()
@@ -1211,7 +1211,7 @@ test.describe("live Markdown writing surface", () => {
     await page.goto(`/admin/editor/${postId}`)
     // 임시글은 제목을 빈 입력으로 시작하므로 실제 작성처럼 필수 제목을 입력한다.
     await page.getByPlaceholder("제목을 입력하세요", { exact: true }).fill(title)
-    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    await page.getByRole("button", { name: /^(발행하기|발행 설정)$/, exact: true }).click()
     const dialog = page.getByRole("dialog", { name: "새 글 작성", exact: true })
     await dialog.getByRole("button", { name: /전체 공개/ }).click()
     await dialog.getByRole("button", { name: "새 글 작성", exact: true }).click()
@@ -1223,7 +1223,7 @@ test.describe("live Markdown writing surface", () => {
       data: { id: postId, version: 2, summary: "Existing summary", summarySource: "MANUAL" },
     })
     await expect(dialog).toHaveCount(0)
-    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    await page.getByRole("button", { name: /^(발행하기|발행 설정)$/, exact: true }).click()
     await expect(page.getByRole("dialog", { name: "수정 설정", exact: true })
       .getByRole("button", { name: /비공개/ })).toHaveAttribute("aria-pressed", "true")
   })
@@ -1248,7 +1248,7 @@ test.describe("live Markdown writing surface", () => {
     })
     await page.goto(`/admin/editor/${postId}`)
     await page.getByLabel(/^요약/).fill("Saved summary")
-    await page.getByRole("button", { name: "발행 설정", exact: true }).click()
+    await page.getByRole("button", { name: /^(발행하기|발행 설정)$/, exact: true }).click()
     const dialog = page.getByRole("dialog", { name: /^(발행 설정|수정 설정)$/ })
     await dialog.getByRole("button", { name: "변경 반영", exact: true }).click()
     await expect(dialog).toHaveCount(0)

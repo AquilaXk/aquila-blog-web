@@ -30,7 +30,8 @@ test.describe("admin posts workspace link contract", () => {
     expect(listSource).toContain('<th className="topicCell">Topic</th>')
     expect(listSource).toContain('<th className="statusCell">Status</th>')
     expect(listSource).toContain('<th className="dateCell">Updated</th>')
-    expect(listSource).toContain('<th className="viewsCell">{isDeletedScope ? "Actions" : "Views"}</th>')
+    expect(listSource).toContain('<th className="viewsCell">Views</th>')
+    expect(listSource).toContain('<th className="actionsCell">Actions</th>')
     expect(listSource).toContain("const openEditorForRow = (row: AdminPostListItem) => onOpenWriteRoute({ postId: String(row.id) })")
     const titleButtonSource = listSource.match(/<TitleButton[\s\S]*?<\/TitleButton>/)?.[0] ?? ""
     expect(titleButtonSource).toContain("{...primaryProps}")
@@ -138,7 +139,8 @@ test.describe("admin posts workspace link contract", () => {
     const markdownEditorRootStyle = styleSource.match(/export const EditorRoot = styled\.section`[\s\S]*?\n`/)?.[0] ?? ""
     const markdownEditorToolbarStyle = styleSource.match(/export const EditorToolbar = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
     const markdownToolbarGroupStyle = styleSource.match(/export const ToolbarGroup = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
-    const liveEditorBodyStyle = styleSource.match(/export const LiveEditorBody = styled\.div`[\s\S]*?\n`/)?.[0] ?? ""
+    const liveEditorBodyStyle =
+      styleSource.match(/export const LiveEditorBody = styled\.div(?:<[^>]*>)?`[\s\S]*?\n`/)?.[0] ?? ""
 
     expect(editorNewPageSource).toContain("getEditorStudioPageProps")
     expect(editorPostPageSource).toContain("getEditorStudioPageProps")
@@ -253,14 +255,13 @@ test.describe("admin posts workspace link contract", () => {
     expect(editorFrameStyle).toContain("overflow-x: hidden;")
     expect(editorFrameStyle).toContain("overflow-y: auto;")
     expect(editorPartsSource).toContain("padding: 20px 14px;")
-    expect(editorPartsSource).toContain("font: 750 11px/1 ui-monospace")
-    expect(editorPartsSource).toContain("letter-spacing: 0.08em;")
+    expect(editorPartsSource).toContain("letter-spacing: -0.01em;")
     expect(editorPartsSource).toContain("display: flex;")
-    expect(editorPartsSource).toContain("gap: 9px;")
-    expect(editorPartsSource).toContain("padding: 8px 6px;")
-    expect(editorPartsSource).toContain("padding-left: 20px;")
-    expect(editorPartsSource).toContain("padding-left: 34px;")
-    expect(editorPartsSource).toContain("grid-template-columns: 220px minmax(0, 1fr) 300px;")
+    expect(editorPartsSource).toContain("gap: 8px;")
+    expect(editorPartsSource).toContain("padding: 6px 8px;")
+    expect(editorPartsSource).toContain("padding-left: 18px;")
+    expect(editorPartsSource).toContain("padding-left: 28px;")
+    expect(editorPartsSource).toContain('"240px minmax(0, 1fr) 300px"')
     expect(editorMetaSectionStyle).toContain("gap: 0;")
     expect(editorMetaSectionStyle).toContain("border-bottom: 1px solid")
     expect(editorMetaSectionStyle).toContain("theme.publicDesign.readableSurface")
@@ -291,17 +292,17 @@ test.describe("admin posts workspace link contract", () => {
     expect(publishNoticeStyle).toContain("bottom: 18px;")
     expect(publishNoticeStyle).toContain("border-radius: 6px;")
     expect(publishNoticeStyle).not.toContain("border-radius: 10px;")
-    expect(editorPartsSource).toContain("padding: 22px 28px 17px;")
+    expect(editorPartsSource).toContain("padding: 22px 32px 17px;")
     expect(editorPartsSource).not.toContain("export const EditorInspectorPreview")
     expect(editorPartsSource).toContain("@media (max-width: 1100px)")
-    expect(editorPartsSource).toContain("grid-template-columns: 190px minmax(0, 1fr);")
+    expect(editorPartsSource).toContain('"200px minmax(0, 1fr)"')
     expect(editorPartsSource).toContain("grid-template-rows: minmax(0, 1fr) auto;")
     expect(editorPartsSource).toContain("@media (max-width: 820px)")
     expect(editorPartsSource).toContain("z-index: 200;")
     expect(editorPartsSource).toContain("background: rgba(10, 12, 16, 0.42);")
     expect(editorPartsSource).toContain("width: min(100%, 590px);")
     expect(editorPartsSource).toContain("height: 64px;")
-    expect(editorInspectorStyle).toContain("font: 750 11px/1 ui-monospace")
+    expect(editorInspectorStyle).toContain("letter-spacing: -0.01em;")
     expect(editorInspectorStyle).toContain("grid-column: 1 / -1;")
     expect(editorInspectorStyle).toContain("max-height: min(38vh, 360px);")
     expect(editorInspectorStyle).not.toContain("display: none;")

@@ -139,8 +139,14 @@ export const ExplorerCard = styled.section`
     }
 
     .sortTrigger {
-      height: 36px;
+      height: 44px;
+      min-height: 44px;
       min-width: 86px;
+    }
+
+    .sortOption {
+      height: 44px;
+      min-height: 44px;
     }
 
     .sortMenu {
@@ -273,6 +279,11 @@ export const FilterContextBar = styled.div`
       max-width: 100%;
       white-space: normal;
       line-height: 1.35;
+    }
+
+    .resetButton {
+      min-height: 44px;
+      padding: 0 0.8rem;
     }
   }
 `

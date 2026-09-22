@@ -112,7 +112,7 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
   const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()
   const sidebarIdentityInitial = sidebarIdentityName.slice(0, 2).toUpperCase()
   const { profile, isLoading: isProfileLoading, isError: isProfileError } = useAdminShellProfile(member.id, profileSnapshot)
-  const sidebarProfileImageSrc = profile?.profileImageUrl.trim() || ""
+  const sidebarProfileImageSrc = (profile?.profileImageUrl ?? "").trim()
   const [isProfileImageFailed, setIsProfileImageFailed] = useState(false)
   useEffect(() => {
     setIsProfileImageFailed(false)

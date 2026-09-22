@@ -444,7 +444,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         saveStateText={composeStatusText}
         saveStateTone={composeStatusTone}
         primaryActionDisabled={publishActionTriggerDisabled}
-        primaryActionLabel="발행 설정"
+        primaryActionLabel="발행하기"
         onPrimaryAction={() => openPublishModal(editorPrimaryActionType)}
         isCompactSplitPreview={isCompactSplitPreview}
         postTags={postTags}

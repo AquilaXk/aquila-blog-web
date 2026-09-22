@@ -45,8 +45,12 @@ const ResultLogPanel = styled.section`
     max-width: var(--article-readable-width, 48rem);
     min-width: 0;
     margin-inline: auto;
-    border-top: 1px solid ${({ theme }) => theme.colors.gray5};
-    padding-top: 0.9rem;
+    border: 1px solid ${({ theme }) => theme.colors.gray6};
+    border-radius: 8px;
+    background: ${({ theme }) => theme.colors.gray2};
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1.5rem;
   }
 
   &[data-variant="standard"] {

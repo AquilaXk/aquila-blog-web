@@ -308,6 +308,7 @@ export const DiagnosticsTabs = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+  align-self: flex-start;
 `
 
 export const DiagnosticsTabButton = styled.button`

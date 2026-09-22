@@ -71,7 +71,7 @@ export const ListSkeleton = styled.div`
   .headerRow,
   .row {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) 120px 96px 132px 72px;
+    grid-template-columns: 42px minmax(0, 1fr) 120px 96px 132px 72px 108px;
   }
 
   .headerRow {
@@ -247,6 +247,12 @@ export const PostsDesktopTable = styled.table`
 
   .viewsCell {
     width: 72px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .actionsCell {
+    width: 108px;
     white-space: nowrap;
     vertical-align: middle;
   }
