@@ -58,21 +58,17 @@ type CompanyPageProps = {
  * 실패를 그대로 빈 목록으로 되돌린다.
  */
 const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
-  try {
-    const bootstrap = await getPostsBootstrap({ pageSize: NEWS_ITEM_COUNT })
-    return bootstrap.posts.slice(0, NEWS_ITEM_COUNT).map((post, position) => ({
-      id: post.id,
-      index: toCompanyNewsIndex(position),
-      title: post.title,
-      summary: toCompanyNewsSummary(post.summary),
-      date: toCompanyNewsDate(post.modifiedTime || post.createdTime),
-      href: `${BLOG_URL}/posts/${post.id}`,
-      // 썸네일이 없는 글도 있다. 없는 자산을 지어내지 않고 에디토리얼 텍스트 카드로 렌더한다.
-      thumbnail: toCompanyNewsThumbnail(post.thumbnail),
-    }))
-  } catch {
-    return []
-  }
+  const bootstrap = await getPostsBootstrap({ pageSize: NEWS_ITEM_COUNT })
+  return bootstrap.posts.slice(0, NEWS_ITEM_COUNT).map((post, position) => ({
+    id: post.id,
+    index: toCompanyNewsIndex(position),
+    title: post.title,
+    summary: toCompanyNewsSummary(post.summary),
+    date: toCompanyNewsDate(post.modifiedTime || post.createdTime),
+    href: `${BLOG_URL}/posts/${post.id}`,
+    // 썸네일이 없는 글도 있다. 없는 자산을 지어내지 않고 에디토리얼 텍스트 카드로 렌더한다.
+    thumbnail: toCompanyNewsThumbnail(post.thumbnail),
+  }))
 }
 
 export const getServerSideProps: GetServerSideProps<CompanyPageProps> = withSsrMetrics<CompanyPageProps>("public", async ({ req, res }) => {

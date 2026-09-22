@@ -87,12 +87,8 @@ const EMPTY_OPERATIONAL_SNAPSHOT: AdminHubOperationalSnapshot = {
 }
 
 async function readJsonIfOk<T>(req: IncomingMessage, path: string): Promise<T | null> {
-  try {
-    const value = await serverApiFetchJson<T>(req, path)
-    return value ?? null
-  } catch {
-    return null
-  }
+  const value = await serverApiFetchJson<T>(req, path)
+  return value ?? null
 }
 
 const buildAdminHubPostListEndpoint = () => "/post/api/v1/adm/posts?page=1&pageSize=20&kw=&sort=MODIFIED_AT"
@@ -200,14 +196,10 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
 
   if (hasAuthCookie) {
     const operationalResult = await timed(() => readAdminHubOperationalSnapshot(req))
-    if (operationalResult.ok) {
-      operationalSnapshot = operationalResult.value
-      operationalDurationMs = operationalResult.durationMs
-      operationalDescription = operationalSnapshot.fetchedAt ? "ok" : "empty"
-    } else {
-      operationalDurationMs = operationalResult.durationMs
-      operationalDescription = "error"
-    }
+    if (!operationalResult.ok) throw operationalResult.error
+    operationalSnapshot = operationalResult.value
+    operationalDurationMs = operationalResult.durationMs
+    operationalDescription = operationalSnapshot.fetchedAt ? "ok" : "empty"
   }
 
   appendSsrDebugTiming(req, res, [
