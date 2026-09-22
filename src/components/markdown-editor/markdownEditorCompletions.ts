@@ -63,15 +63,14 @@ export const wikilinkCompletionSource = (
 ): CompletionResult | null => {
   const line = context.state.doc.lineAt(context.pos)
   const textBefore = line.text.slice(0, context.pos - line.from)
-  const match = /\[\[([^\]\n]*)$/.exec(textBefore)
+  const match = /\[\[([^\]\r\n]*)$/.exec(textBefore)
   if (!match) return null
 
-  const query = match[1]?.toLowerCase() ?? ""
   const startPos = line.from + textBefore.length - (match[1]?.length ?? 0)
 
   // Collect headings from the current document as wikilink targets
   const docText = context.state.doc.toString()
-  const headingMatches = Array.from(docText.matchAll(/^#{1,6}\s+(.+)$/gm))
+  const headingMatches = Array.from(docText.matchAll(/^#{1,6}[ \t]+([^\r\n]+)$/gm))
   const headingOptions = headingMatches.map((m) => {
     const title = m[1]?.trim() ?? ""
     return {

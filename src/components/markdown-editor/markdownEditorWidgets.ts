@@ -258,7 +258,7 @@ export class MarkdownTableWidget extends WidgetType {
       const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "")
       return trimmed
         .split(/(?<!\\)\|/)
-        .map((cell) => cell.replace(/\\\|/g, "|").trim())
+        .map((cell) => cell.replaceAll("\\|", "|").trim())
     }
 
     // Header row

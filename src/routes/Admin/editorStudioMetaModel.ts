@@ -188,7 +188,7 @@ const isYamlLine = (line: string): boolean => {
   const trimmed = line.trim()
   if (!trimmed) return true
   if (trimmed.startsWith("#")) return true
-  if (/^[A-Za-z0-9_.-]+\s*:/i.test(trimmed)) return true
+  if (/^[a-z0-9_.-]+\s*:/i.test(trimmed)) return true
   if (/^-\s+/.test(trimmed)) return true
   if (/^\s{2,}/.test(line)) return true
   return false

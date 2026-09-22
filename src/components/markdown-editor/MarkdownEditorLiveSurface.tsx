@@ -198,7 +198,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
         }
       } else if (node.name === "Blockquote") {
         const raw = markdownValue.slice(node.from, node.to)
-        const calloutMatch = /^>\s*\[!([a-zA-Z0-9_-]+)\](?:\s*(.*))?(?:\n([\s\S]*))?$/.exec(
+        const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\](?:[ \t]+([^\r\n]*))?(?:\r?\n([\s\S]*))?$/.exec(
           raw.trim()
         )
         if (calloutMatch && !isTokenActive(node.from, node.to, selections)) {

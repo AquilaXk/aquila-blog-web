@@ -260,7 +260,7 @@ const serializeBlock = (node: Node): string => {
     if (rows.length === 0) return ""
     const parsedRows = rows.map((tr) => {
       const cells = Array.from(tr.children).filter((c) => TABLE_CELL_TAGS.has(c.tagName.toLowerCase()))
-      return cells.map((cell) => serializeInline(cell).trim().replace(/\|/g, "\\|"))
+      return cells.map((cell) => serializeInline(cell).trim().replaceAll("|", "\\|"))
     }).filter((r) => r.length > 0)
 
     if (parsedRows.length === 0) return ""

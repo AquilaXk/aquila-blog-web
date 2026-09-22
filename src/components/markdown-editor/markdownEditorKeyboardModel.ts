@@ -165,35 +165,35 @@ export const planListEnterContinuation = (
 }
 
 export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
-  const uncheckedMatch = /^(?<indent>\s*[-*+]\s+\[) (?<rest>\]\s*.*)$/.exec(lineText)
-  if (uncheckedMatch?.groups) {
-    const boxPos = uncheckedMatch.groups.indent.length
+  const uncheckedMatch = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/.exec(lineText)
+  if (uncheckedMatch) {
+    const boxPos = uncheckedMatch[1].length
     return {
       replaced: true,
       lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
     }
   }
 
-  const checkedMatch = /^(?<indent>\s*[-*+]\s+\[)[xX](?<rest>\]\s*.*)$/.exec(lineText)
-  if (checkedMatch?.groups) {
-    const boxPos = checkedMatch.groups.indent.length
+  const checkedMatch = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/.exec(lineText)
+  if (checkedMatch) {
+    const boxPos = checkedMatch[1].length
     return {
       replaced: true,
       lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
     }
   }
 
-  const bulletMatch = /^(?<indent>\s*)(?:[-*+]|\d+\.)\s+(?<content>.*)$/.exec(lineText)
-  if (bulletMatch?.groups) {
+  const bulletMatch = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/.exec(lineText)
+  if (bulletMatch) {
     return {
       replaced: true,
-      lineText: `${bulletMatch.groups.indent}- [ ] ${bulletMatch.groups.content}`,
+      lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
     }
   }
 
-  const plainMatch = /^(?<indent>\s*)(?<content>.*)$/.exec(lineText)
-  const indent = plainMatch?.groups?.indent ?? ""
-  const content = plainMatch?.groups?.content ?? ""
+  const plainMatch = /^([ \t]*)(.*)$/.exec(lineText)
+  const indent = plainMatch?.[1] ?? ""
+  const content = plainMatch?.[2] ?? ""
   return {
     replaced: true,
     lineText: `${indent}- [ ] ${content}`,
