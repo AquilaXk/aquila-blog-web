@@ -13,7 +13,6 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
-import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { PostDetail } from "src/types"
 import { StyledWrapper } from "./PostHeader.styles"
 
@@ -42,7 +41,6 @@ const PostHeader: React.FC<Props> = ({
   onSharePost,
   deckSummary,
   showEngagement = true,
-  showReadingTime = showEngagement,
   showThumbnail = true,
 }) => {
   const adminProfile = useRootAdminProfile()
@@ -74,8 +72,6 @@ const PostHeader: React.FC<Props> = ({
         ? "복사 완료"
         : "복사 완료"
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
-  const readingMinutes = createMarkdownDocumentInsights(data.content).readingMinutes
-  const readTimeText = readingMinutes ? `${readingMinutes}분 READ` : ""
   const viewCount = hitCount ?? data.hitCount ?? 0
   const viewText = `${Intl.NumberFormat(CONFIG.lang).format(viewCount)} VIEWS`
   const authorRole = usingAdminFallback ? adminProfile?.profileRole?.trim() || "" : ""
@@ -123,26 +119,24 @@ const PostHeader: React.FC<Props> = ({
           </div>
         )}
 
-        {showEngagement || showReadingTime ? (
+        {showEngagement ? (
           <div className="metaUtilities">
-            {showEngagement || showReadingTime ? (
-              <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
-                <div className="engagementRow" aria-label="post engagement">
-                  <div className="stats" aria-label="post stats">
-                    {showEngagement ? <span className="statChip">{publishedAt}</span> : null}
-                    {showReadingTime && readTimeText ? <span className="statChip">{readTimeText}</span> : null}
-                    {showEngagement ? <span className="statChip">{viewText}</span> : null}
-                    {showEngagement && modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
-                  </div>
-                  {showEngagement ? <span
-                    className="likeButton"
-                    data-hide-mobile={hideActionButtonsOnMobile}
-                  >
-                    <AppIcon name="heart" />
-                    <span>좋아요 {likesCount ?? data.likesCount ?? 0}</span>
-                  </span> : null}
+            <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
+              <div className="engagementRow" aria-label="post engagement">
+                <div className="stats" aria-label="post stats">
+                  <span className="statChip">{publishedAt}</span>
+                  <span className="statChip">{viewText}</span>
+                  {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
+                </div>
+                <span
+                  className="likeButton"
+                  data-hide-mobile={hideActionButtonsOnMobile}
+                >
+                  <AppIcon name="heart" />
+                  <span>좋아요 {likesCount ?? data.likesCount ?? 0}</span>
+                </span>
 
-                  {showEngagement && onSharePost && (
+                {onSharePost && (
                     <button
                       type="button"
                       className="shareButton"
@@ -168,7 +162,6 @@ const PostHeader: React.FC<Props> = ({
                   </span>
                 )}
               </div>
-            ) : null}
           </div>
         ) : null}
       </div>
