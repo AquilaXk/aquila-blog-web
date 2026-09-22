@@ -495,13 +495,36 @@ export const TitleInput = styled.textarea<{
     font-size: 28px;
   }
 `;
-export const EditorHeaderMetaRow = styled.div `
+export const EditorHeaderMetaRow = styled.div<{ $collapsedOnMobile?: boolean }>`
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
   min-width: 0;
   margin-top: 10px;
+
+  @media (max-width: 820px) {
+    ${({ $collapsedOnMobile }) => ($collapsedOnMobile ? "display: none;" : "display: flex;")}
+  }
+`;
+
+export const MobilePropertiesToggle = styled.button`
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  border-radius: 4px;
+  padding: 4px 10px;
+  margin-top: 8px;
+  color: ${({ theme }) => theme.colors.gray10};
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  @media (max-width: 820px) {
+    display: inline-flex;
+  }
 `;
 export const EditorHeaderMetaPill = styled.span<{
     $compact?: boolean;

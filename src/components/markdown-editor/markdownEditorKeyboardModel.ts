@@ -101,6 +101,20 @@ export const planListEnterContinuation = (
   if (!matched) return null
 
   if (matched.content === "") {
+    if (matched.indent.length > 0) {
+      const outdentLen = matched.indent.startsWith("\t") ? 1 : Math.min(2, matched.indent.length)
+      const nextIndent = matched.indent.slice(outdentLen)
+      const nextMarker = matched.kind === "ordered" ? "1. " : matched.marker
+      const replacement = `${nextIndent}${nextMarker}`
+      return {
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
+        replacement,
+        selectionStart: lineStart + replacement.length,
+        selectionEnd: lineStart + replacement.length,
+      }
+    }
+
     return {
       rangeStart: lineStart,
       rangeEnd: lineEnd,
@@ -108,6 +122,40 @@ export const planListEnterContinuation = (
       selectionStart: lineStart,
       selectionEnd: lineStart,
     }
+  }
+
+  if (matched.kind === "ordered") {
+    const nextNumber = matched.number + 1
+    const nextMarker = `${matched.indent}${nextNumber}. `
+    const rest = value.slice(lineEnd + 1)
+    const restLines = rest.split("\n")
+    let currentNum = nextNumber
+    const renumbered: string[] = []
+    let spanEnd = lineEnd
+
+    for (const rLine of restLines) {
+      const rMatch = matchListMarkerLine(rLine)
+      if (rMatch && rMatch.kind === "ordered" && rMatch.indent === matched.indent) {
+        currentNum += 1
+        renumbered.push(`${rMatch.indent}${currentNum}. ${rMatch.content}`)
+        spanEnd += 1 + rLine.length
+      } else {
+        break
+      }
+    }
+
+    if (renumbered.length > 0) {
+      const replacement = `\n${nextMarker}\n${renumbered.join("\n")}`
+      return {
+        rangeStart: selectionStart,
+        rangeEnd: spanEnd,
+        replacement,
+        selectionStart: selectionStart + 1 + nextMarker.length,
+        selectionEnd: selectionStart + 1 + nextMarker.length,
+      }
+    }
+
+    return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
   }
 
   const nextMarker =

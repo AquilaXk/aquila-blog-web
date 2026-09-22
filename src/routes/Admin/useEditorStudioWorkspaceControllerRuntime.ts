@@ -116,8 +116,25 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     if (isComposingKeyboardEvent(event)) return
     if (event.key === "Enter") {
       event.preventDefault()
-      markdownEditorFocusRequestRef.current?.()
+      markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+    } else if (event.key === "ArrowDown") {
+      const target = event.currentTarget
+      if (
+        target.selectionStart === target.value.length &&
+        target.selectionEnd === target.value.length
+      ) {
+        event.preventDefault()
+        markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+      }
     }
+  }, [])
+
+  const handleFocusTitle = useCallback(() => {
+    const node = titleFieldRef.current
+    if (!node) return
+    node.focus()
+    const len = node.value.length
+    node.setSelectionRange(len, len)
   }, [])
 
   useEffect(() => {
@@ -168,6 +185,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
   return {
     disabled,
+    handleFocusTitle,
     handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,

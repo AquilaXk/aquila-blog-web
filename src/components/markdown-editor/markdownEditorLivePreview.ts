@@ -112,8 +112,18 @@ export const resolveMarkdownLiveSourceRanges = (
   return mergeRanges(sourceRanges)
 }
 
-const isInsideSourceRange = (node: MarkdownSyntaxNode, sourceRanges: readonly MarkdownLiveSourceRange[]) =>
-  sourceRanges.some((range) => node.from >= range.from && node.to <= range.to)
+export const isTokenActive = (
+  from: number,
+  to: number,
+  selections: readonly MarkdownLiveSelection[]
+): boolean => {
+  return selections.some((sel) => {
+    if (sel.from === sel.to) {
+      return sel.from >= from && sel.from <= to
+    }
+    return sel.from < to && sel.to > from
+  })
+}
 
 const decorationForNode = (
   markdown: string,
@@ -166,7 +176,6 @@ export const buildMarkdownLivePreviewPlan = (
 ): MarkdownLivePreviewDecoration[] => {
   if (composing) return []
 
-  const sourceRanges = resolveMarkdownLiveSourceRanges(markdown, documentNode, selections)
   const decorations: MarkdownLivePreviewDecoration[] = []
   const literalRanges: MarkdownLiveSourceRange[] = []
 
@@ -179,11 +188,11 @@ export const buildMarkdownLivePreviewPlan = (
   }
   collectLiterals(documentNode)
 
-  // 원문을 치환하지 않고 검증된 색상 토큰의 표시만 바꾼다. 코드와 편집 중인 범위는 그대로 둔다.
+  // Inactive validated color tokens
   for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
     const from = match.index
     const to = from + match[0].length
-    if (sourceRanges.some((range) => from < range.to && to > range.from)) continue
+    if (isTokenActive(from, to, selections)) continue
     if (literalRanges.some((range) => from >= range.from && to <= range.to)) continue
     const color = resolveInlineColorValue(match[1])
     if (!color) continue
@@ -197,11 +206,67 @@ export const buildMarkdownLivePreviewPlan = (
   }
 
   const visit = (node: MarkdownSyntaxNode, parent: MarkdownSyntaxNode | null) => {
-    if (node !== documentNode && isInsideSourceRange(node, sourceRanges)) return
+    if (node === documentNode) {
+      for (const child of listChildren(node)) visit(child, node)
+      return
+    }
+
+    // Fine-grained token disclosure
+    if (node.name === "HeaderMark") {
+      const headingNode = parent
+      if (headingNode && isTokenActive(headingNode.from, headingNode.to, selections)) {
+        // Cursor is on this heading line, header mark is revealed
+        return
+      }
+      let to = node.to
+      while (to < markdown.length && (markdown[to] === " " || markdown[to] === "\t")) to += 1
+      decorations.push({ from: node.from, to, kind: "hide-mark" })
+      return
+    }
+
+    if (
+      node.name === "EmphasisMark" ||
+      node.name === "StrikethroughMark" ||
+      node.name === "CodeMark" ||
+      node.name === "LinkMark"
+    ) {
+      if (parent && isTokenActive(parent.from, parent.to, selections)) {
+        // Active token: disclose raw delimiter marks
+        return
+      }
+      decorations.push({ from: node.from, to: node.to, kind: "hide-mark" })
+      return
+    }
+
+    if (node.name === "URL" && (parent?.name === "Link" || parent?.name === "Image")) {
+      if (parent && isTokenActive(parent.from, parent.to, selections)) {
+        // Active link/image: disclose URL
+        return
+      }
+      decorations.push({ from: node.from, to: node.to, kind: "hide-mark" })
+      return
+    }
+
+    if (node.name === "HorizontalRule") {
+      if (!isTokenActive(node.from, node.to, selections)) {
+        decorations.push({ from: node.from, to: node.to, kind: "horizontal-rule" })
+      }
+      return
+    }
+
+    if (node.name === "FencedCode") {
+      decorations.push({ from: node.from, to: node.to, kind: "fenced-code" })
+      return
+    }
+
     const decoration = decorationForNode(markdown, node, parent)
-    if (decoration) decorations.push(decoration)
+    if (decoration && decoration.kind !== "hide-mark" && decoration.kind !== "horizontal-rule") {
+      decorations.push(decoration)
+    }
+
     for (const child of listChildren(node)) visit(child, node)
   }
+
   visit(documentNode, null)
   return decorations
 }

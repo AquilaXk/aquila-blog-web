@@ -65,6 +65,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
+    handleFocusTitle,
     isCompactMobileLayout,
     isDedicatedEditorRoute,
     isDedicatedNewEditorRoute,
@@ -379,6 +380,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onMarkdownChange={handleMarkdownEditorChange}
         onFlushMarkdownReady={handleFlushMarkdownReady}
         onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
+        onRequestFocusTitle={handleFocusTitle}
         onRequestSave={handleDedicatedEditorRequestSave}
         onUploadingChange={handleMarkdownUploadingChange}
         onImageUpload={handleMarkdownEditorImageUpload}

@@ -46,6 +46,37 @@ test.describe("markdown editor auto pair model", () => {
     })
   })
 
+  test("wraps selection with *, _, ~, ==, $, [, \", ` without deleting selected text", () => {
+    const text = "before target after"
+    const start = 7
+    const end = 13 // "target"
+    const expectations: Array<[string, string]> = [
+      ["*", "*target*"],
+      ["_", "_target_"],
+      ["~", "~target~"],
+      ["==", "==target=="],
+      ["=", "==target=="],
+      ["$", "$target$"],
+      ["[", "[target]"],
+      ["\"", "\"target\""],
+      ["`", "`target`"],
+    ]
+
+    for (const [key, replacement] of expectations) {
+      const openerLen = replacement.indexOf("target")
+      expect(planMarkdownEditorAutoPairInsert(text, start, end, key)).toEqual({
+        kind: "mutation",
+        mutation: {
+          rangeStart: start,
+          rangeEnd: end,
+          replacement,
+          selectionStart: start + openerLen,
+          selectionEnd: start + openerLen + 6,
+        },
+      })
+    }
+  })
+
   test("inserts supported quote and bracket pairs", () => {
     for (const [key, replacement] of [["\"", "\"\""], ["'", "''"], ["{", "{}"]] as const) {
       expect(planMarkdownEditorAutoPairInsert("", 0, 0, key)).toEqual({

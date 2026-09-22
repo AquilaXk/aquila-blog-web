@@ -68,6 +68,7 @@ type MarkdownEditorProps = {
   value: string
   disabled?: boolean
   disableMermaid?: boolean
+  onRequestFocusTitle?: () => void
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
@@ -93,6 +94,7 @@ export const MarkdownEditor = ({
   value,
   disabled = false,
   disableMermaid = false,
+  onRequestFocusTitle,
   onChange,
   onFlushMarkdownReady,
   onFocusRequestReady,
@@ -391,6 +393,8 @@ export const MarkdownEditor = ({
     [commitMarkdown, insertMarkdownAtEditorSelection]
   )
 
+  const [viewMode, setViewMode] = useState<"live" | "source">("live")
+
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
       disabled,
@@ -403,6 +407,7 @@ export const MarkdownEditor = ({
       applyRecordedMarkdownMutation: applyMutationPlan,
       applyBackgroundMarkdownMutation,
       resolveActiveSelection,
+      resolveDropTargetPosition: (coords) => liveSurfaceRef.current?.posAtCoords(coords) ?? null,
       setUploadInFlight,
       setEditorError: setUploadError,
       insertUploadedMarkdown,
@@ -417,6 +422,7 @@ export const MarkdownEditor = ({
     applyRecordedMutation: applyMutationPlan,
     setTextareaSelection: setEditorSelection,
     onRequestSave,
+    onToggleViewMode: () => setViewMode((prev) => (prev === "source" ? "live" : "source")),
   })
 
   const [slashMenuState, setSlashMenuState] = useState<{
@@ -758,6 +764,26 @@ export const MarkdownEditor = ({
             }}
           />
         </ToolbarGroup>
+        <ToolbarGroup style={{ marginLeft: "auto" }}>
+          <ToolbarButton
+            type="button"
+            title={`라이브 프리뷰 (${modShortcutLabel}E)`}
+            aria-label="라이브 프리뷰"
+            $active={viewMode === "live"}
+            onClick={() => setViewMode("live")}
+          >
+            라이브
+          </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            title={`소스 모드 (${modShortcutLabel}E)`}
+            aria-label="소스 모드"
+            $active={viewMode === "source"}
+            onClick={() => setViewMode("source")}
+          >
+            소스
+          </ToolbarButton>
+        </ToolbarGroup>
       </EditorToolbar>
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
       {findReplace.panel ? (
@@ -785,9 +811,11 @@ export const MarkdownEditor = ({
           ref={liveSurfaceRef}
           value={draftValue}
           disabled={disabled}
+          mode={viewMode}
           ariaDescription={TEXTAREA_KEYBOARD_HELP}
           onChange={handleLiveChange}
           onSelectionChange={handleLiveSelectionChange}
+          onRequestFocusTitle={onRequestFocusTitle}
           onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste}
           onDragOver={handleDragOver}

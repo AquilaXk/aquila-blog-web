@@ -145,6 +145,31 @@ test.describe("markdown editor keyboard model", () => {
     expect(orderedMarker.kind).toBe("ordered")
   })
 
+  test("outdents an indented empty list item by one level on Enter", () => {
+    expect(planListEnterContinuation("  - ", 4, 4)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 4,
+      replacement: "- ",
+      selectionStart: 2,
+      selectionEnd: 2,
+    })
+    expect(planListEnterContinuation("    - ", 6, 6)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 6,
+      replacement: "  - ",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+  })
+
+  test("auto-renumbers following ordered list items on Enter", () => {
+    const doc = "1. first\n2. second\n3. third"
+    // Press enter at end of "1. first" (offset 8)
+    const plan = planListEnterContinuation(doc, 8, 8)
+    expect(plan).not.toBeNull()
+    expect(plan?.replacement).toBe("\n2. \n3. second\n4. third")
+  })
+
   test("does not continue list markers inside fenced code blocks", () => {
     const fenced = ["```ts", "- item", "```"].join("\n")
     const caretInCode = fenced.indexOf("- item") + "- item".length
