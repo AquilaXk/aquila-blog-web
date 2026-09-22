@@ -72,7 +72,8 @@ test.describe("core smoke feed and search", () => {
   await expect(page.locator('[data-ui="feed-profile-summary"]')).toHaveCount(0)
   await expect(page.locator('section[aria-label="태그 목록"]')).toBeVisible()
   await expect(page.locator('[data-ui="feed-tag-chip-rail"]')).toBeHidden()
-  await expect(page.locator('[data-ui="feed-post-card"] img')).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-post-card"] .thumbnail, [data-ui="feed-post-card"] .cover')).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-post-card"] .avatar img').first()).toBeVisible()
   await expect(page.locator(".rt")).toBeHidden()
 
   const homeStyles = await page.evaluate(() => {
@@ -117,7 +118,8 @@ test.describe("core smoke feed and search", () => {
 
   const firstCard = page.locator('[data-ui="feed-post-card"]').first()
   await expect(firstCard.getByRole("heading")).toContainText("깨진 썸네일 fallback")
-  await expect(firstCard.locator("img, .imageFallback")).toHaveCount(0)
+  await expect(firstCard.locator(".cover, .coverImage, .imageFallback")).toHaveCount(0)
+  await expect(firstCard.locator(".meta .avatar img")).toBeVisible()
   expect(externalImageRequests).toBe(0)
 })
 
@@ -145,7 +147,8 @@ test.describe("core smoke feed and search", () => {
   const firstCard = page.locator('[data-ui="feed-post-card"]').first()
   await expect(firstCard.locator(".tagRow")).toHaveCount(0)
   await expect(firstCard.locator(".summary")).toHaveCount(0)
-  await expect(firstCard.locator("img, .imageFallback")).toHaveCount(0)
+  await expect(firstCard.locator(".cover, .coverImage, .imageFallback")).toHaveCount(0)
+  await expect(firstCard.locator(".meta .avatar img")).toBeVisible()
   await expect(firstCard.getByRole("heading")).toContainText("빈 표시값 카드")
   await expect(firstCard).not.toContainText("핵심 내용을 정리 중입니다.")
 })
