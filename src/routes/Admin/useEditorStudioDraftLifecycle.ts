@@ -501,7 +501,7 @@ export const useEditorStudioDraftLifecycle = ({
   const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
     try {
       const data = await apiFetch<PageDto<AdminPostListItem>>(
-        "/post/api/v1/adm/posts?page=1&pageSize=30&kw=&sort=MODIFIED_AT"
+        "/post/api/v1/adm/posts?page=1&pageSize=20&kw=&sort=MODIFIED_AT"
       )
       const tempRow = (data.content || []).find((row) => isServerTempDraftPost(row) && !row.deletedAt)
       if (!tempRow?.id) return null

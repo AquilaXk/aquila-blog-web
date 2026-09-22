@@ -16,7 +16,7 @@ const renderNewsCard = (item: CompanyNewsItem) =>
       item.thumbnail?.trim()
         ? createElement(
             Sec.NewsMedia,
-            { "data-ui": "company-news-media" },
+            { "data-ui": "company-news-media" } as Record<string, unknown>,
             createElement("img", {
               src: item.thumbnail,
               alt: "",
@@ -35,7 +35,7 @@ const renderNewsCard = (item: CompanyNewsItem) =>
       item.summary ? createElement("p", null, item.summary) : null,
       createElement(
         Sec.NewsAction,
-        { "aria-hidden": "true", "data-ui": "company-news-action" },
+        { "aria-hidden": "true", "data-ui": "company-news-action" } as Record<string, unknown>,
         createElement("span", null, "글 읽기"),
         createElement(
           "svg",

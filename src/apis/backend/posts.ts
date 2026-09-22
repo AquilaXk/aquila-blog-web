@@ -10,7 +10,6 @@ export {
   getFeedPostsPage,
   getPostDetailById,
   getPostDetailBySlug,
-  getPosts,
   getPostsBootstrap,
   getRelatedPostsByAuthor,
   getSearchPostsPage,

@@ -41,6 +41,7 @@
     "check:runtime-metrics-standalone": "node scripts/verify-runtime-metrics-standalone.mjs",
     "inventory:public-images": "node scripts/security/public-content-image-inventory.mjs",
     "postbuild": "echo \"skip next-sitemap (handled by pages/sitemap.xml.tsx)\"",
+    "type-check": "tsc --noEmit",
     "lint": "next lint"
   },
   "dependencies": {
