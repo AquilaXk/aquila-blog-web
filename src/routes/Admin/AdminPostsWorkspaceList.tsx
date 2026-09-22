@@ -89,6 +89,7 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
               <span className="statusCell">Status</span>
               <span className="dateCell">Updated</span>
               <span className="viewsCell">Views</span>
+              <span className="actionsCell">Actions</span>
             </div>
             {Array.from({ length: LIST_SKELETON_ROW_COUNT }, (_, index) => (
               <div className="row" key={`desktop-skeleton-${index}`}>
@@ -109,6 +110,9 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
                   <span className="line medium" />
                 </div>
                 <div className="cell viewsCell">
+                  <span className="line short" />
+                </div>
+                <div className="cell actionsCell">
                   <span className="line short" />
                 </div>
               </div>
@@ -186,7 +190,8 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
               <th className="topicCell">Topic</th>
               <th className="statusCell">Status</th>
               <th className="dateCell">Updated</th>
-              <th className="viewsCell">{isDeletedScope ? "Actions" : "Views"}</th>
+              <th className="viewsCell">Views</th>
+              <th className="actionsCell">Actions</th>
             </tr>
           </thead>
           <tbody onKeyDown={onListKeyDown}>
@@ -219,6 +224,9 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
                 </td>
                 <td className="dateCell">{formatDateTime(listScope === "active" ? row.modifiedAt : row.deletedAt)}</td>
                 <td className="viewsCell">
+                  <span>{formatWorkspaceViews(row)}</span>
+                </td>
+                <td className="actionsCell">
                   {isDeletedScope ? (
                     <RowActions>
                       <GhostButton
@@ -239,7 +247,6 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
                     </RowActions>
                   ) : (
                     <RowActions>
-                      <span>{formatWorkspaceViews(row)}</span>
                       <GhostButton type="button" disabled={isActiveActionPending} onClick={() => onDeletePost(row)}>
                         삭제
                       </GhostButton>

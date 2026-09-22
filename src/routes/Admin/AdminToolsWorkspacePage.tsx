@@ -62,7 +62,7 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
   const [systemHealthCheckedAt, setSystemHealthCheckedAt] = useState<string | null>(initialSnapshot.systemHealthFetchedAt)
   const [activeSection, setActiveSection] = useState<SectionKey>("diagnostics")
   const [sectionJumpTarget, setSectionJumpTarget] = useState<SectionKey | null>(null)
-  const [activeDiagnosticTab, setActiveDiagnosticTab] = useState<DiagnosticTab | null>(null)
+  const [activeDiagnosticTab, setActiveDiagnosticTab] = useState<DiagnosticTab | null>("queue")
   const [freshnessClock, setFreshnessClock] = useState<number | null>(null)
   const systemHealthQuery = useQuery({
     queryKey: SYSTEM_HEALTH_QUERY_KEY,

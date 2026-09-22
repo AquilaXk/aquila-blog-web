@@ -8,6 +8,7 @@ import { AboutPageView } from "src/routes/About/AboutPageView"
 import {
   isExternalHref,
   isTimelineSection,
+  normalizeSectionTitle,
   parseTimelineItem,
   type AboutProjectItem,
 } from "src/routes/About/AboutPageModel"
@@ -98,11 +99,19 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
   const displayRole = adminProfile.aboutRole || ""
   const displayBio = adminProfile.aboutBio || ""
   const profileImageSrc = adminProfile.profileImageUrl
-  const aboutDetailSections = (adminProfile.aboutSections || []).map((section) => ({
-    title: section.title,
-    items: section.items,
-    hasDivider: section.dividerBefore,
-  }))
+  const seenSectionTitles = new Set<string>()
+  const aboutDetailSections = (adminProfile.aboutSections || [])
+    .filter((section) => {
+      const normalized = normalizeSectionTitle(section?.title ?? "")
+      if (!normalized || seenSectionTitles.has(normalized)) return false
+      seenSectionTitles.add(normalized)
+      return true
+    })
+    .map((section) => ({
+      title: section.title,
+      items: section.items || [],
+      hasDivider: section.dividerBefore,
+    }))
   const blogTitle = adminProfile.blogTitle || CONFIG.blog.title
   const contactLinks = (adminProfile.contactLinks || [])
     .map((item) => {
@@ -248,9 +257,9 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
               <section key={`${section.title}-${index}`} data-has-divider={section.hasDivider ? "true" : "false"}>
                 <h2>{section.title}</h2>
                 <div className="stack-list">
-                  {section.items.map((item) => (
-                    <div className="stack-row" key={`${section.title}-${item}`}>
-                      <strong>{String(index + 1).padStart(2, "0")}</strong>
+                  {(section.items || []).map((item, itemIndex) => (
+                    <div className="stack-row" key={`${section.title}-${item}-${itemIndex}`}>
+                      <strong>{String(itemIndex + 1).padStart(2, "0")}</strong>
                       <span>{item}</span>
                     </div>
                   ))}
