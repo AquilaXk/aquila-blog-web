@@ -376,7 +376,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerSource).toContain("const viewText =")
     expect(headerSource).toContain("Intl.NumberFormat(CONFIG.lang).format(viewCount)")
     expect(headerSource).toContain("<span className=\"statChip\">{publishedAt}</span>")
-    expect(headerSource).toContain("<span className=\"statChip\">{readTimeText}</span>")
+    expect(headerSource).not.toContain("{readTimeText}")
     expect(headerSource).toContain("<span className=\"statChip\">{viewText}</span>")
     expect(headerSource).toContain("UPDATED {modifiedAt}")
     expect(headerSource).not.toContain("댓글 {data.commentsCount ?? 0}")

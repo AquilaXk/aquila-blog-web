@@ -15,9 +15,9 @@ import { buildPostDetailMetadata } from "src/routes/Detail/PostDetail/postDetail
 import { ErrorState } from "src/design-system/StatePresenters"
 import { resolvePostDetailRenderState } from "src/routes/Detail/postDetailRenderState"
 
-export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ params, res }) => {
+export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ params, res, req }) => {
   const postId = params?.id as string
-  return await buildCanonicalPostDetailServerProps(postId, res)
+  return await buildCanonicalPostDetailServerProps(postId, res, req)
 })
 
 type DetailPageProps = {

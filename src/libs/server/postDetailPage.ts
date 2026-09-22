@@ -11,6 +11,7 @@ import {
   resolveStaticAdminProfileSeed,
 } from "src/libs/server/adminProfile"
 import type { StaticAdminProfileSeedSource } from "src/libs/adminProfileSource"
+import { parseLanguagePreference, type SiteLanguage } from "src/libs/language"
 
 export { resolveStaticAdminProfileSeed } from "src/libs/server/adminProfile"
 
@@ -18,6 +19,7 @@ type DetailPageProps = {
   dehydratedState: unknown
   initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: StaticAdminProfileSeedSource
+  initialLanguage?: SiteLanguage
 }
 
 type FetchStaticAdminProfile = () => Promise<AdminProfile>
@@ -36,6 +38,7 @@ const fetchPublicAdminProfile: FetchStaticAdminProfile = async () => {
 export const buildCanonicalPostDetailServerProps = async (
   postId: string,
   res: Pick<ServerResponse, "setHeader">,
+  req?: { headers?: { cookie?: string } },
 ): Promise<GetServerSidePropsResult<DetailPageProps>> => {
   // 상세 본문의 공개 권한은 요청마다 확인하며 HTML/data 응답도 공유 캐시에 남기지 않는다.
   res.setHeader("Cache-Control", "private, no-store")
@@ -52,11 +55,13 @@ export const buildCanonicalPostDetailServerProps = async (
   if (postDetail) {
     queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
   }
+  const initialLanguage = parseLanguagePreference(req?.headers?.cookie) ?? undefined
   return {
     props: {
       dehydratedState: toSerializableState(dehydrate(queryClient)),
       initialAdminProfile,
       initialAdminProfileSource,
+      ...(initialLanguage ? { initialLanguage } : {}),
     },
   }
 }

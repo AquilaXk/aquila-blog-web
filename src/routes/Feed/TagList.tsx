@@ -101,8 +101,10 @@ const TagList: React.FC = () => {
       ),
     [chipExpanded, currentTag, tagEntries]
   )
-  const hiddenDesktopTagCount = Math.max(tagEntries.length - desktopTagEntries.length, 0)
-  const hiddenChipTagCount = Math.max(tagEntries.length - chipTagEntries.length, 0)
+  const hasExcessDesktopTags = tagEntries.length > FEED_TAG_REPRESENTATIVE_DESKTOP_LIMIT
+  const hasExcessChipTags = tagEntries.length > FEED_TAG_REPRESENTATIVE_CHIP_LIMIT
+  const hiddenDesktopTagCount = Math.max(tagEntries.length - FEED_TAG_REPRESENTATIVE_DESKTOP_LIMIT, 0)
+  const hiddenChipTagCount = Math.max(tagEntries.length - FEED_TAG_REPRESENTATIVE_CHIP_LIMIT, 0)
 
   return (
     <StyledWrapper id="topics">
@@ -141,7 +143,7 @@ const TagList: React.FC = () => {
             </li>
           ))}
         </ul>
-        {hiddenDesktopTagCount > 0 && (
+        {hasExcessDesktopTags && (
           <button
             type="button"
             className="toggleButton"
@@ -182,7 +184,7 @@ const TagList: React.FC = () => {
             <span className="count">({count})</span>
           </button>
         ))}
-        {hiddenChipTagCount > 0 && (
+        {hasExcessChipTags && (
           <button
             type="button"
             className="chipToggle"
@@ -232,6 +234,7 @@ const StyledWrapper = styled.div`
     display: inline-flex;
     align-items: center;
     gap: 0.44rem;
+    flex-shrink: 0;
   }
 
   .panelEmoji {
@@ -245,8 +248,8 @@ const StyledWrapper = styled.div`
     display: grid;
     gap: 0;
     border-top: 1px solid var(--aq-text);
-    max-height: calc(100vh - var(--app-header-height, 56px) - 6.35rem);
-    max-height: calc(100dvh - var(--app-header-height, 56px) - 6.35rem);
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -305,6 +308,13 @@ const StyledWrapper = styled.div`
     font-weight: 700;
     letter-spacing: -0.01em;
     transition: color 0.125s ease-in;
+    flex-shrink: 0;
+    width: 100%;
+    text-align: left;
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 0;
+    cursor: pointer;
 
     &:hover {
       color: var(--aq-text);
@@ -370,6 +380,7 @@ const StyledWrapper = styled.div`
     min-width: 0;
 
     padding-bottom: 0.28rem;
+    padding-right: 0.5rem;
 
     &::-webkit-scrollbar {
       display: none;
@@ -381,7 +392,8 @@ const StyledWrapper = styled.div`
 
   @media (min-width: ${FEED_TAG_RAIL_DESKTOP_MIN_PX}px) {
     .desktopPanel {
-      display: block;
+      display: flex;
+      flex-direction: column;
     }
 
     .chipRail {
@@ -465,6 +477,8 @@ const StyledWrapper = styled.div`
 
   .chipRail .chipToggle {
     flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: max-content;
   }
 
   @media (max-width: 768px) {

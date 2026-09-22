@@ -7,6 +7,8 @@ import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import { memo, useCallback, type MouseEvent } from "react"
 import Router from "next/router"
 import { useLanguage } from "src/libs/language"
+import { useRootAdminProfile } from "src/layouts/RootLayout"
+import ProfileImage from "src/components/ProfileImage"
 
 type Props = {
   data: TPost
@@ -14,11 +16,24 @@ type Props = {
 }
 
 const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
-  const { language } = useLanguage()
+  const { language, t } = useLanguage()
+  const adminProfile = useRootAdminProfile()
   const postPath = toCanonicalPostPath(data.id)
-  const currentLang = language === "en" ? "en-US" : (CONFIG.lang || "ko-KR")
+  const isEn = language === "en"
+  const currentLang = isEn ? "en-US" : (CONFIG.lang || "ko-KR")
   const createdAtText = formatDate(data.date?.start_date || data.createdTime, currentLang)
-  const author = data.author?.map((entry) => entry.name).filter(Boolean).join(", ")
+
+  const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
+  const usingAdminFallback = !postAuthor
+  const authorName =
+    postAuthor?.name?.trim() ||
+    adminProfile?.nickname?.trim() ||
+    adminProfile?.name?.trim() ||
+    (isEn ? "Anonymous" : "익명")
+  const authorImageSrc = usingAdminFallback
+    ? adminProfile?.profileImageUrl || ""
+    : postAuthor?.profile_photo || ""
+
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||
       event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -32,8 +47,27 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
         <header><h2>{data.title}</h2></header>
         {data.summary && <p className="summary">{data.summary}</p>}
         <div className="meta">
-          <span>Date: {createdAtText}</span>
-          {author && <><span aria-hidden="true">|</span><span>Author: {author}</span></>}
+          {createdAtText && <span>{t("metaDate")} {createdAtText}</span>}
+          {createdAtText && authorName && <span aria-hidden="true">|</span>}
+          {authorName && (
+            <span className="author">
+              <span>{t("metaAuthor")}</span>
+              <span className="avatar">
+                {authorImageSrc ? (
+                  <ProfileImage
+                    src={authorImageSrc}
+                    alt={`${authorName} profile image`}
+                    fillContainer
+                    width={20}
+                    height={20}
+                  />
+                ) : (
+                  <span className="avatarFallback" aria-hidden="true" />
+                )}
+              </span>
+              <strong className="authorName">{authorName}</strong>
+            </span>
+          )}
         </div>
       </article>
     </StyledWrapper>
@@ -85,11 +119,75 @@ const StyledWrapper = styled.a`
   .meta {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.35rem;
     margin-top: 10px;
     color: var(--aq-muted);
     font-size: ${uiTokens.feed.card.metaFontSizeRem}rem;
     line-height: 1.5;
+  }
+
+  .author {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .avatar {
+    position: relative;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--aq-surface-elevated);
+    box-shadow: inset 0 0 0 1px var(--aq-border);
+    flex-shrink: 0;
+    vertical-align: middle;
+
+    img {
+      object-fit: cover;
+      object-position: center 38%;
+    }
+  }
+
+  .avatarFallback {
+    position: absolute;
+    inset: 2.5px;
+    display: block;
+    color: var(--aq-muted);
+  }
+
+  .avatarFallback::before,
+  .avatarFallback::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    background: currentColor;
+    transform: translateX(-50%);
+  }
+
+  .avatarFallback::before {
+    top: 0;
+    width: 42%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+  }
+
+  .avatarFallback::after {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 45%;
+    border-radius: 999px 999px 2px 2px;
+    transform: none;
+  }
+
+  .authorName {
+    color: var(--aq-text);
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   @media (hover: hover) and (pointer: fine) {

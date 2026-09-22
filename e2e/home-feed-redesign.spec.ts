@@ -169,10 +169,10 @@ test.describe("home feed product redesign", () => {
     })
     await expect(entry).toBeVisible()
     await expect(entry.getByRole("heading", { name: "JWT VS Session" })).toBeVisible()
-    await expect(entry.locator(".summary")).toBeVisible()
-    await expect(entry.locator(".meta")).toContainText("Date:")
-    await expect(entry.locator(".meta")).toContainText("Author:")
-    await expect(entry.locator("img, .rowIndex, .tagRow, .side, .arrowBtn, .like")).toHaveCount(0)
+    await expect(entry.locator(".meta")).toContainText("작성일:")
+    await expect(entry.locator(".meta")).toContainText("글쓴이:")
+    await expect(entry.locator(".meta .avatar img")).toBeVisible()
+    await expect(entry.locator(".cover, .coverImage, .rowIndex, .tagRow, .side, .arrowBtn, .like")).toHaveCount(0)
     await expect(entry).not.toContainText("views")
     await expect(entry).not.toContainText("Reading Time")
     await expect(entry.getByRole("heading")).toHaveCSS("font-size", "24px")
@@ -230,7 +230,8 @@ test.describe("home feed product redesign", () => {
       hasText: "Pinned SSE 운영 노트",
     })
     await expect(pinnedCover).toBeVisible()
-    await expect(pinnedCover.locator("img, .tagRow")).toHaveCount(0)
+    await expect(pinnedCover.locator(".tagRow")).toHaveCount(0)
+    await expect(pinnedCover.locator(".meta .avatar img")).toBeVisible()
     await expect(pinnedCover.getByText("Pinned", { exact: true })).toHaveCount(0)
   })
 
@@ -336,6 +337,10 @@ test.describe("home feed product redesign", () => {
     await expect(page.getByRole("link", { name: "About" })).toBeVisible()
     await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
     await expect(page.getByRole("button", { name: "한국어로 전환" })).toBeVisible()
+    const firstEnCard = page.locator('[data-ui="feed-post-card"]').first()
+    await expect(firstEnCard.locator(".meta")).toContainText("Date:")
+    await expect(firstEnCard.locator(".meta")).toContainText("Author:")
+    await expect(firstEnCard.locator(".meta .avatar img")).toBeVisible()
 
     // 3. Verify persistence across page reload
     await page.reload()
@@ -351,6 +356,10 @@ test.describe("home feed product redesign", () => {
     await expect(page.getByRole("heading", { level: 1, name: "최근 글" })).toBeVisible()
     await expect(page.getByRole("link", { name: "글" })).toBeVisible()
     await expect(page.getByRole("button", { name: "Switch to English" })).toBeVisible()
+    const firstKoCard = page.locator('[data-ui="feed-post-card"]').first()
+    await expect(firstKoCard.locator(".meta")).toContainText("작성일:")
+    await expect(firstKoCard.locator(".meta")).toContainText("글쓴이:")
+    await expect(firstKoCard.locator(".meta .avatar img")).toBeVisible()
   })
 
   test("모바일 메뉴 언어 전환기는 한국어와 영어를 전환한다", async ({ page }) => {
@@ -371,5 +380,127 @@ test.describe("home feed product redesign", () => {
     await expect(page.getByPlaceholder("Search by title, summary, or tag...")).toBeVisible()
     await expect(page.locator("html")).toHaveAttribute("lang", "en-US")
   })
+
+  test("날짜 없는 글은 선행 파이프 구분자를 노출하지 않고, 사진 없는 작성자는 fallback 실루엣을 렌더링한다", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const edgeCasePosts = [
+      createExplorePost({
+        id: 8901,
+        title: "사진 없는 외부 기여자 글",
+        summary: "작성자는 있으나 프로필 사진이 비어 있는 경우입니다.",
+        authorName: "GuestContributor",
+        authorUsername: "guest",
+        authorProfileImgUrl: "",
+        createdAt: "2026-04-08T00:00:00Z",
+      }),
+      createExplorePost({
+        id: 8902,
+        title: "작성일이 없는 글",
+        summary: "날짜 정보가 비어 있는 경우 선행 파이프가 없어야 합니다.",
+        authorName: "Aquila",
+        authorUsername: "aquila",
+        authorProfileImgUrl: "/avatar.png",
+        createdAt: "",
+        modifiedAt: "",
+      }),
+    ]
+    await mockHomeFeedRedesignEndpoints(page, edgeCasePosts)
+
+    await page.goto("/")
+
+    // 1. Post with author but no photo: shows avatar fallback silhouette, no img inside avatar
+    const fallbackCard = page.locator('[data-ui="feed-post-card"]').filter({
+      hasText: "사진 없는 외부 기여자 글",
+    })
+    await expect(fallbackCard).toBeVisible()
+    await expect(fallbackCard.locator(".meta")).toContainText("작성일: 2026년 4월 8일")
+    await expect(fallbackCard.locator(".meta")).toContainText("글쓴이:")
+    await expect(fallbackCard.locator(".meta")).toContainText("GuestContributor")
+    await expect(fallbackCard.locator(".meta .avatar .avatarFallback")).toBeVisible()
+    await expect(fallbackCard.locator(".meta .avatar img")).toHaveCount(0)
+
+    // 2. Post without date: does not contain pipe divider or 작성일:
+    const noDateCard = page.locator('[data-ui="feed-post-card"]').filter({
+      hasText: "작성일이 없는 글",
+    })
+    await expect(noDateCard).toBeVisible()
+    await expect(noDateCard.locator(".meta")).not.toContainText("작성일:")
+    await expect(noDateCard.locator(".meta")).not.toContainText("|")
+    await expect(noDateCard.locator(".meta")).toContainText("글쓴이:")
+    await expect(noDateCard.locator(".meta")).toContainText("Aquila")
+    await expect(noDateCard.locator(".meta .avatar img")).toBeVisible()
+  })
+
+  test("데스크톱과 모바일 태그 더보기 (+숫자) 버튼은 잘리지 않고 접기 전환이 동작한다", async ({ page }) => {
+    const manyTags = Array.from({ length: 25 }, (_, i) => ({
+      tag: `Tag${String(i + 1).padStart(2, "0")}`,
+      count: 30 - i,
+    }))
+
+    // 1. Desktop test
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await mockHomeFeedRedesignEndpoints(page)
+    await page.route("**/post/api/v1/posts/tags", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(manyTags),
+      })
+    })
+
+    await page.goto("/")
+
+    const desktopPanel = page.locator(".desktopPanel")
+    await expect(desktopPanel).toBeVisible()
+
+    const desktopToggle = desktopPanel.locator(".toggleButton")
+    await expect(desktopToggle).toBeVisible()
+    await expect(desktopToggle).toHaveText("더보기 (+5)")
+
+    // Verify toggle button is within panel bounding box and not clipped
+    const panelBox = await desktopPanel.boundingBox()
+    const toggleBox = await desktopToggle.boundingBox()
+    expect(panelBox).not.toBeNull()
+    expect(toggleBox).not.toBeNull()
+    if (panelBox && toggleBox) {
+      expect(toggleBox.y + toggleBox.height).toBeLessThanOrEqual(panelBox.y + panelBox.height + 1)
+      expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1)
+    }
+
+    // Switch to English and verify text updates
+    await page.getByRole("button", { name: "Switch to English" }).click()
+    await expect(desktopToggle).toHaveText("More (+5)")
+
+    // Click to expand: button should change to Collapse (접기) and not disappear
+    await desktopToggle.click()
+    await expect(desktopToggle).toHaveText("Collapse")
+    await expect(desktopPanel.locator(".desktopList li")).toHaveCount(26) // 1 "All" + 25 tags
+
+    // Click to collapse back: button should change back to More (+5)
+    await desktopToggle.click()
+    await expect(desktopToggle).toHaveText("More (+5)")
+    await expect(desktopPanel.locator(".desktopList li")).toHaveCount(21) // 1 "All" + 20 tags
+
+    // 2. Mobile / Chip rail test
+    await page.setViewportSize({ width: 393, height: 852 })
+    const chipRail = page.locator('[data-ui="feed-tag-chip-rail"]')
+    await expect(chipRail).toBeVisible()
+
+    const chipToggle = chipRail.locator(".chipToggle")
+    await expect(chipToggle).toBeVisible()
+    await expect(chipToggle.locator(".name")).toHaveText("More")
+    await expect(chipToggle.locator(".count")).toHaveText("(+19)") // 25 - 6 = 19
+
+    // Click to expand
+    await chipToggle.click()
+    await expect(chipToggle.locator(".name")).toHaveText("Collapse")
+    await expect(chipToggle.locator(".count")).toHaveCount(0)
+
+    // Click to collapse
+    await chipToggle.click()
+    await expect(chipToggle.locator(".name")).toHaveText("More")
+    await expect(chipToggle.locator(".count")).toHaveText("(+19)")
+  })
 })
+
 

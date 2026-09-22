@@ -30,6 +30,20 @@ const adminAuthCookieEntry = (
   ...entry,
 })
 
+const siteLanguageStorageEntry = (
+  area: "cookie" | "localStorage",
+  retention: string,
+  deletion: string,
+): BrowserStorageRegistryEntry => ({
+  area,
+  key: "aquila_blog_lang",
+  purpose: "site-language-preference",
+  required: false,
+  retention,
+  deletion,
+  stores: "site language preference ('ko' or 'en')",
+})
+
 export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   adminAuthCookieEntry({
     key: "apiKey",
@@ -55,6 +69,16 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     deletion: "logout, session revocation, or browser cookie deletion",
     stores: "administrator session identifier",
   }),
+  siteLanguageStorageEntry(
+    "cookie",
+    "1 year or until browser storage is cleared",
+    "manual toggle, browser cookie deletion",
+  ),
+  siteLanguageStorageEntry(
+    "localStorage",
+    "until language preference changes or browser storage is cleared",
+    "browser storage deletion",
+  ),
   {
     area: "localStorage",
     key: "auth.admin.savedEmail.v1",
@@ -72,6 +96,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     retention: "7 days from savedAt or until the owning browser document clears its slot",
     deletion: "owning-slot clear, successful create publish, TTL expiry, or browser storage deletion",
     stores: "document-owned create-context draft title, markdown, canonical summary source and intent, thumbnail, tags, category, visibility, source, savedAt",
+  },
+  {
+    area: "localStorage",
+    key: "admin.editor.localDraft.create.v3",
+    purpose: "editor-local-draft-create",
+    required: false,
+    retention: "7 days TTL per active authoring session",
+    deletion: "explicit clear or successful publication",
+    stores: "persisted uncommitted post drafts",
   },
   {
     area: "localStorage",
