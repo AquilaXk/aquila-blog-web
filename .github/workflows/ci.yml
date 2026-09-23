@@ -64,7 +64,7 @@ jobs:
       - run: yarn build
       - run: yarn check:bundle-size
       - name: Cache Playwright browsers
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -92,7 +92,7 @@ jobs:
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
       - name: Cache Playwright browsers
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -120,7 +120,7 @@ jobs:
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
       - name: Cache Playwright browsers
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
