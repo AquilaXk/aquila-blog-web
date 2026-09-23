@@ -6,20 +6,16 @@ const readFrontSource = (relativePath: string) =>
   readFileSync(path.resolve(__dirname, "../src", relativePath), "utf8")
 
 test.describe("관리자 런타임 회귀 계약", () => {
-  test("운영 브라우저 API는 로그인과 관리자 요청, 작성 temp draft를 same-origin 백엔드 프록시로 보낸다", () => {
+  test("운영 브라우저 API는 클라이언트 IP 보존과 계정 잠금 DoS 방지를 위해 백엔드로 직접 요청한다", () => {
     const clientSource = readFrontSource("apis/backend/client.ts")
     const editorRootModelSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts")
     const proxySourcePath = path.resolve(__dirname, "../src/pages/api/backend/[...path].ts")
     const notificationsSourcePath = path.resolve(__dirname, "../src/apis/backend/notifications.ts")
 
-    expect(clientSource).toContain('const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"')
-    expect(clientSource).toContain("const shouldUseBrowserBackendProxy = (safePath: string) =>")
-    expect(clientSource).toContain('process.env.NODE_ENV === "production"')
-    expect(clientSource).toContain("safePath.startsWith(\"/member/api/v1/auth/\")")
-    expect(clientSource).not.toContain("safePath.startsWith(\"/member/api/v1/notifications/snapshot\")")
-    expect(clientSource).toContain("safePath.startsWith(\"/post/api/v1/posts/temp\")")
-    expect(clientSource).toContain("safePath.startsWith(\"/system/api/v1/adm/\")")
-    expect(clientSource).toContain("return `${BROWSER_BACKEND_PROXY_PREFIX}${safePath}`")
+    expect(clientSource).not.toContain('const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"')
+    expect(clientSource).not.toContain("const shouldUseBrowserBackendProxy =")
+    expect(clientSource).not.toContain("return `${BROWSER_BACKEND_PROXY_PREFIX}${safePath}`")
+    expect(clientSource).toContain("return `${getApiBaseUrl()}${safePath}`")
     expect(existsSync(notificationsSourcePath)).toBe(false)
     expect(editorRootModelSource).toContain('import { ApiError, apiFetch } from "src/apis/backend/client"')
     expect(editorRootModelSource).toContain('apiFetch<RsData<PostForEditor>>("/post/api/v1/posts/temp", {')

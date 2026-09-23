@@ -17,7 +17,6 @@ export { resolveStaticAdminProfileSeed } from "src/libs/server/adminProfile"
 
 type DetailPageProps = {
   dehydratedState: unknown
-  initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: StaticAdminProfileSeedSource
   initialLanguage?: SiteLanguage
 }
@@ -59,7 +58,6 @@ export const buildCanonicalPostDetailServerProps = async (
   return {
     props: {
       dehydratedState: toSerializableState(dehydrate(queryClient)),
-      initialAdminProfile,
       initialAdminProfileSource,
       ...(initialLanguage ? { initialLanguage } : {}),
     },

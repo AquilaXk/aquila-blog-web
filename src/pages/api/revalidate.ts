@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
+import { safeTokenCompare } from "src/libs/server/safeTokenCompare"
 
 // 정적 페이지 재생성은 토큰 또는 관리자 세션으로 인증한 POST만 허용한다.
 export default async function handler(
@@ -17,7 +18,7 @@ export default async function handler(
     typeof req.headers["x-revalidate-token"] === "string"
       ? req.headers["x-revalidate-token"]
       : ""
-  const hasValidSecret = Boolean(expectedSecret) && headerSecret === expectedSecret
+  const hasValidSecret = Boolean(expectedSecret) && safeTokenCompare(headerSecret, expectedSecret)
   const adminSession = hasValidSecret ? null : await fetchServerAdminSession(req)
   const isAdminRequest = adminSession?.isAdmin === true
 

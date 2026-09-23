@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
+import { safeTokenCompare } from "src/libs/server/safeTokenCompare"
 
 type MetricsRegistry = {
   contentType: string
@@ -20,7 +21,8 @@ export const createMetricsHandler = ({ token, registry }: MetricsHandlerDependen
 
     const configuredToken = token?.trim()
     if (!configuredToken || configuredToken.length < 32) return res.status(503).send("Service Unavailable")
-    if (req.headers.authorization !== `Bearer ${configuredToken}`) return res.status(401).send("Unauthorized")
+    const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : ""
+    if (!safeTokenCompare(authHeader, `Bearer ${configuredToken}`)) return res.status(401).send("Unauthorized")
 
     try {
       const exposition = await registry.metrics()
