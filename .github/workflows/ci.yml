@@ -63,7 +63,18 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn build
       - run: yarn check:bundle-size
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - run: yarn test:storybook:smoke
         env:
           STORYBOOK_STATIC_PORT: "6106"
@@ -80,7 +91,18 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - run: yarn test:e2e:smoke
       - run: yarn playwright test e2e/home-feed-redesign.spec.ts e2e/theme-color-scheme.spec.ts --workers=2
       - run: yarn test:e2e:authoring
@@ -97,5 +119,16 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772115f6ec1 # v4.2.2
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - run: yarn test:e2e:a11y
