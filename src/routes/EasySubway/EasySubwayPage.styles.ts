@@ -24,6 +24,10 @@ export const ProductSurface = styled.div`
   word-break: keep-all;
   overflow-wrap: break-word;
 
+  & [id] {
+    scroll-margin-top: clamp(4.5rem, 8vw, 6rem);
+  }
+
   /* [Scroll Reveal] https://kimhss.github.io/portfolio/ 패리티:
      뷰포트 진입 전 24px 아래에서 대기하다가 진입 시 부드러운 cubic-bezier 곡선으로 순차 페이드인 */
   & [data-reveal] {
@@ -301,7 +305,7 @@ export const PhoneFrame = styled.figure<{ $width?: string }>`
   border: 1px solid ${dark.borderStrong};
   border-radius: 1.75rem;
   background: ${dark.fieldDeep};
-  box-shadow: none;
+  box-shadow: ${dark.phoneShadow};
   transform: none;
 
   img {
@@ -327,6 +331,7 @@ export const HeroPhoneWrap = styled.div`
 export const Section = styled.section<{ $tone?: "base" | "raised" }>`
   position: relative;
   overflow: hidden;
+  scroll-margin-top: clamp(4.5rem, 8vw, 6rem);
   padding: ${SECTION_PADDING_Y} ${SECTION_PADDING_X};
   background: ${({ $tone }) => ($tone === "raised" ? dark.fieldRaised : dark.field)};
   border-top: 1px solid ${dark.hairline};
@@ -819,3 +824,413 @@ export const FooterLinks = styled.nav`
     }
   }
 `
+
+/**
+ * [Feature 02] 실제 무장애 타임라인 경로 결과 목업 및 콜아웃
+ */
+export const TimelineShowcase = styled.div`
+  display: flex;
+  align-items: center;
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+  width: 100%;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`
+
+export const TimelinePhoneFrame = styled.figure`
+  position: relative;
+  flex: 0 0 clamp(11rem, 24vw, 14.5rem);
+  margin: 0;
+  padding: 0.4rem;
+  border: 1px solid ${dark.borderStrong};
+  border-radius: 1.5rem;
+  background: ${dark.fieldDeep};
+  box-shadow: ${dark.phoneShadow};
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 1.15rem;
+  }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    flex: none;
+    width: min(100%, 14rem);
+    margin: 0 auto;
+  }
+`
+
+export const TimelineCalloutCluster = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+`
+
+export const TimelineCalloutCard = styled.div`
+  padding: 1rem 1.15rem;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.fieldRaised};
+
+  strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.9375rem;
+    font-weight: ${fontWeight.bold};
+    color: ${dark.textPrimary};
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: ${dark.textSecondary};
+  }
+`
+
+export const CalloutHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+
+  img {
+    display: block;
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+  }
+`
+
+export const CalloutTag = styled.span`
+  font-family: ${editorialLabel.fontFamily};
+  font-size: ${editorialLabel.fontSize};
+  font-weight: ${editorialLabel.fontWeight};
+  letter-spacing: ${editorialLabel.letterSpacing};
+  text-transform: ${editorialLabel.textTransform};
+  color: ${dark.signature};
+`
+
+export const CalloutIconSvg = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: ${dark.signature};
+
+  svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+  }
+`
+
+/**
+ * [P2] 1:1 비교 섹션: 일반 지도앱 vs EasySubway
+ */
+export const ComparisonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.25rem, 3vw, 2rem);
+  margin-top: clamp(2rem, 4vw, 3rem);
+
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`
+
+export const ComparisonCard = styled.div<{ $variant?: "standard" | "highlighted" }>`
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid
+    ${({ $variant }) => ($variant === "highlighted" ? dark.accent : dark.hairline)};
+  border-radius: ${radius.lg}px;
+  background: ${({ $variant }) => ($variant === "highlighted" ? dark.fieldRaised : dark.fieldDeep)};
+  box-shadow: ${({ $variant }) => ($variant === "highlighted" ? dark.phoneShadow : "none")};
+`
+
+export const ComparisonCardHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid ${dark.hairline};
+`
+
+export const ComparisonBadge = styled.span<{ $variant?: "standard" | "highlighted" }>`
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 0 0.75rem;
+  border: 1px solid
+    ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.hairline)};
+  border-radius: ${radius.sm}px;
+  background: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.fieldDeep)};
+  color: ${({ $variant }) => ($variant === "highlighted" ? dark.onSignature : dark.textMuted)};
+  font-size: 0.8125rem;
+  font-weight: ${fontWeight.semibold};
+`
+
+export const ComparisonTitle = styled.h3`
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  font-weight: ${fontWeight.bold};
+  color: ${dark.textPrimary};
+  letter-spacing: -0.01em;
+`
+
+export const ComparisonList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+
+    strong {
+      display: block;
+      font-size: 0.9375rem;
+      font-weight: ${fontWeight.bold};
+      color: ${dark.textPrimary};
+      margin-bottom: 0.25rem;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.875rem;
+      line-height: 1.55;
+      color: ${dark.textSecondary};
+    }
+  }
+`
+
+export const ComparisonCheckIcon = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: ${radius.sm}px;
+  background: ${dark.signature};
+  color: ${dark.onSignature};
+  font-size: 0.875rem;
+  font-weight: ${fontWeight.bold};
+`
+
+export const ComparisonCrossIcon = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.sm}px;
+  background: ${dark.fieldDeep};
+  color: ${dark.textMuted};
+  font-size: 0.8125rem;
+  font-weight: ${fontWeight.medium};
+`
+
+/**
+ * [P1/Scope] 공식 20개 노선 뱃지 그리드
+ */
+export const MetroBadgeGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: 0.65rem;
+  margin-top: 1.75rem;
+`
+
+export const MetroSectionTitle = styled.h3`
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: ${fontWeight.bold};
+  color: ${dark.textPrimary};
+  letter-spacing: -0.01em;
+`
+
+export const MetroSectionLead = styled.p`
+  margin: 0;
+  max-width: 32rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: ${dark.textSecondary};
+`
+
+export const MetroBadgeCard = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.4rem;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.sm}px;
+  background: ${dark.fieldDeep};
+  text-align: center;
+  transition: border-color ${TRANSITION}, background-color ${TRANSITION};
+
+  &:hover {
+    border-color: ${dark.signature};
+    background: ${dark.fieldRaised};
+  }
+
+  img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+  }
+
+  span {
+    font-size: 0.75rem;
+    font-weight: ${fontWeight.medium};
+    color: ${dark.textSecondary};
+  }
+`
+
+/**
+ * [P2] FAQ 섹션
+ */
+export const FaqSection = styled.div`
+  width: 100%;
+`
+
+export const FaqList = styled.ul`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  list-style: none;
+
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`
+
+export const FaqCard = styled.li`
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.fieldDeep};
+`
+
+export const FaqQuestionHeader = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin: 0 0 0.75rem;
+`
+
+export const FaqQuestionNumber = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ${editorialLabel.fontFamily};
+  font-size: 0.875rem;
+  font-weight: ${fontWeight.bold};
+  color: ${dark.signature};
+  flex-shrink: 0;
+`
+
+export const FaqQuestionText = styled.h3`
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: ${fontWeight.bold};
+  color: ${dark.textPrimary};
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+`
+
+export const FaqAnswerText = styled.p`
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: ${dark.textSecondary};
+`
+
+/**
+ * [P2] 문의 CTA 액션 그룹 및 이메일 복사 버튼
+ */
+export const ContactActionGroup = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+`
+
+export const CopyEmailButton = styled.button`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.25rem;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.fieldDeep};
+  color: ${dark.textPrimary};
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: ${fontWeight.medium};
+  letter-spacing: -0.01em;
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, color ${TRANSITION};
+
+  &:hover {
+    border-color: ${dark.signature};
+    background: ${dark.fieldRaised};
+    color: ${dark.textPrimary};
+  }
+
+  &:active {
+    background: ${dark.fieldDeep};
+  }
+
+  @media (forced-colors: active) {
+    border: 1px solid ButtonText;
+  }
+`
+
+export const CopyIconWrapper = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: ${dark.signature};
+
+  svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+  }
+`
+
+export const CopyEmailAddress = styled.span`
+  font-size: 0.875rem;
+  color: ${dark.textMuted};
+  border-left: 1px solid ${dark.hairline};
+  padding-left: 0.5rem;
+  margin-left: 0.25rem;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    display: none;
+  }
+`
+

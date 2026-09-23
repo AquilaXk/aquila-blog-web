@@ -201,6 +201,13 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     const canonical = page.locator("link[rel='canonical']")
     await expect(canonical).toHaveAttribute("href", `${baseURL}/easysubway`)
     await expect(page.locator("meta[property='og:site_name']")).toHaveAttribute("content", "EasySubway")
+    await expect(page.locator("meta[property='og:image']")).toHaveAttribute("content", "/easysubway/og-image.png")
+    await expect(page).toHaveTitle("교통약자를 먼저 생각한 지하철 길찾기 | EasySubway")
+    await expect(page).not.toHaveTitle(/EasySubway.*EasySubway/)
+
+    await expect(page.locator("#compare")).toBeVisible()
+    await expect(page.locator("#faq")).toBeVisible()
+
     const description = page.locator("meta[name='description']")
     await expect(description).toHaveAttribute("content", /Android\/iOS/)
     await expect(description).toHaveAttribute("content", /무장애/)
@@ -248,12 +255,24 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expect(scope).not.toContainText(staleScopeCopy)
     }
 
-    // [Phase 1 P0] 무장애 이동 경로 에디토리얼 명세표 4대 규격 렌더 검증
-    const routeSpec = page.getByRole("region", { name: "무장애 이동 경로 에디토리얼 명세표" })
+    // [Phase 1 P0] 교통약자를 위한 무장애 경로 기준 4대 규격 렌더 검증
+    const routeSpec = page.getByRole("region", { name: "교통약자를 위한 무장애 경로 기준" })
     await expect(routeSpec).toBeVisible()
+    await expect(routeSpec).toContainText("검증 완료")
     for (const specCategory of ["수직 이동", "환승 연계", "시설 데이터", "운행 안전"]) {
       await expect(routeSpec).toContainText(specCategory)
     }
+
+    // [P1/P2] 실기기 타임라인 목업, 1:1 비교, FAQ, 공식 20개 노선 렌더 검증
+    await expect(page.locator("main")).toContainText("빠른 환승·하차")
+    await expect(page.locator("main")).toContainText("9-2 승차 위치 안내")
+    await expect(page.locator("main")).toContainText("단차 0cm 이동")
+    await expect(page.getByRole("region", { name: "자주 묻는 질문" })).toBeVisible()
+    await expect(page.locator("#scope")).toContainText("공식 20개 노선 무장애 데이터 연동")
+    await expect(page.locator("#compare")).toContainText("계단 80개 구간 통과 강요")
+    await expect(page.locator("#compare")).toContainText("단차 0cm 엘리베이터 직결 동선")
+    await expect(page.getByRole("link", { name: "서비스 문의하기" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "이메일 주소 복사" })).toBeVisible()
 
     // 시스템 에러 및 내부 엔지니어링 방어 카피 영구 제거 단언
     await expect(page.locator("main")).not.toContainText("현재 경로를 계산할 수 없어요")

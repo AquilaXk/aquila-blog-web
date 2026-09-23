@@ -25,12 +25,13 @@ export const getServerSideProps: GetServerSideProps<EasySubwayPageProps> = withS
 const EasySubwayPage: NextPageWithLayout<EasySubwayPageProps> = ({ canonicalUrl }) => (
   <>
     <MetaConfig
-      title={`${PRODUCT_SURFACE.name} — 교통약자를 먼저 생각한 지하철 길찾기`}
+      title="교통약자를 먼저 생각한 지하철 길찾기"
       description="전국 정식 출시를 준비하는 Android/iOS 도시철도 이동 지원 서비스입니다. 노선도와 역 검색, 계단과 환승 동선을 고려한 무장애 경로를 제공합니다."
       type="website"
       url={canonicalUrl}
       canonicalUrl={canonicalUrl}
       siteName={PRODUCT_SURFACE.name}
+      image="/easysubway/og-image.png"
     />
     <EasySubwayPageView surfaceUrl={canonicalUrl} />
   </>
