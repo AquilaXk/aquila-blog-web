@@ -1,6 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import { CONFIG } from "site.config"
 import EasySubwayLineArt from "src/routes/EasySubway/EasySubwayLineArt"
+import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
+import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
+import useScrollReveal from "src/routes/EasySubway/useScrollReveal"
 import {
   COMPANY_SURFACE,
   COMPANY_URL,
@@ -17,12 +20,6 @@ import {
 } from "src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
 
-/**
- * 공개 가능한 실기기 검수본이 한 장이라, 그 한 장을 hero에서 원본 비율 무잘림으로 한 번, 기능
- * 블록에서 확대 컷으로 한 번만 쓴다. 확대 컷은 캡션으로 잘린 컷임을 밝히고, 나머지 섹션은 단색
- * 패널과 타이포로 구성한다 - 같은 이미지를 세 번째로 반복하거나 자리를 채우는 이미지를 만드는
- * 것보다 정직하고 덜 지루하다.
- */
 const [PICK_FEATURE, ROUTE_FEATURE] = PRODUCT_FEATURES
 
 /**
@@ -36,78 +33,75 @@ type Props = {
   surfaceUrl: string
 }
 
-const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
-  <S.ProductSurface>
-    <S.SurfaceHeader>
-      <S.BrandLink href={surfaceUrl} aria-current="page">
-        {PRODUCT_SURFACE.name}
-        <small>by {COMPANY_SURFACE.name}</small>
-      </S.BrandLink>
-      <S.HeaderLinks aria-label="제품 소개 둘러보기">
-        <S.NavLink href="#features">기능</S.NavLink>
-        <S.NavLink href="#scope">제공 범위</S.NavLink>
-        <S.NavLink href={COMPANY_URL}>회사 소개</S.NavLink>
-        <S.HeaderAction href={CONTACT_MAILTO}>문의</S.HeaderAction>
-      </S.HeaderLinks>
-    </S.SurfaceHeader>
+const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
+  const surfaceRef = useScrollReveal<HTMLDivElement>()
 
-    <main>
-      <S.Hero>
-        <S.HeroStage aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </S.HeroStage>
-        <S.LineArtLayer $align="bottom">
-          <EasySubwayLineArt />
-        </S.LineArtLayer>
-        <S.HeroCopy>
-          <S.StatusPill>{PRODUCT_RELEASE_STATUS}</S.StatusPill>
-          <S.HeroTitle>
-            갈 수 있는 길을
-            <strong>먼저 보여주는 지하철</strong>
-          </S.HeroTitle>
-          <S.HeroLead>
-            계단과 환승 동선을 함께 계산해 <S.InlineHighlight>끝까지 이동할 수 있는 경로</S.InlineHighlight>
-            를 먼저 내놓습니다.
-          </S.HeroLead>
-        </S.HeroCopy>
-        <S.HeroPhoneWrap>
-          {/* 히어로 폰은 무대의 주인공이라 다른 폰 컷보다 한 단계 크게 둔다(D6: 기존 20rem → +12.5%). */}
-          <S.PhoneFrame $tilt={-4} $width="22.5rem">
-            <img
-              src={PRODUCT_SCREENSHOT}
-              alt={PRODUCT_SCREENSHOT_ALT}
-              width={PRODUCT_SCREENSHOT_SIZE.width}
-              height={PRODUCT_SCREENSHOT_SIZE.height}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-            />
-          </S.PhoneFrame>
-        </S.HeroPhoneWrap>
-      </S.Hero>
+  return (
+    <S.ProductSurface ref={surfaceRef}>
+      <S.SurfaceHeader>
+        <S.BrandLink href={surfaceUrl} aria-current="page">
+          {PRODUCT_SURFACE.name}
+          <small>by {COMPANY_SURFACE.name}</small>
+        </S.BrandLink>
+        <S.HeaderLinks aria-label="제품 소개 둘러보기">
+          <S.NavLink href="#features">기능</S.NavLink>
+          <S.NavLink href="#scope">제공 범위</S.NavLink>
+          <S.NavLink href={COMPANY_URL}>회사 소개</S.NavLink>
+          <S.HeaderAction href={CONTACT_MAILTO}>문의</S.HeaderAction>
+        </S.HeaderLinks>
+      </S.SurfaceHeader>
+
+      <main>
+        <S.Hero>
+          <S.LineArtLayer $align="bottom">
+            <EasySubwayLineArt />
+          </S.LineArtLayer>
+          <S.HeroCopy>
+            <S.StatusBadge>{PRODUCT_RELEASE_STATUS}</S.StatusBadge>
+            <S.HeroTitle>
+              갈 수 있는 길을
+              <strong>먼저 보여주는 지하철</strong>
+            </S.HeroTitle>
+            <S.HeroLead>
+              계단과 환승 동선을 함께 계산해 <S.InlineHighlight>끝까지 이동할 수 있는 경로</S.InlineHighlight>
+              를 먼저 내놓습니다.
+            </S.HeroLead>
+          </S.HeroCopy>
+          <S.HeroPhoneWrap data-reveal data-reveal-delay="120">
+            <S.PhoneFrame $width="21.5rem">
+              <img
+                src={PRODUCT_SCREENSHOT}
+                alt={PRODUCT_SCREENSHOT_ALT}
+                width={PRODUCT_SCREENSHOT_SIZE.width}
+                height={PRODUCT_SCREENSHOT_SIZE.height}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </S.PhoneFrame>
+          </S.HeroPhoneWrap>
+        </S.Hero>
 
       <S.Section $tone="raised" id="overview">
         <S.SectionInner>
-          <S.IntroLayout>
+          <S.IntroLayout data-reveal>
             <div>
               <S.Eyebrow>제품 개요</S.Eyebrow>
               <S.DisplayHeading>
-                시간보다 먼저
-                <strong>갈 수 있는지 봅니다</strong>
+                교통약자의 이동 경로를
+                <strong>직접 검증합니다</strong>
               </S.DisplayHeading>
             </div>
             <S.IntroAside>
-              전국 정식 출시를 준비하며 <strong>확인한 데이터와 접근성 근거</strong>만 제품에 반영합니다.
+              전국 정식 출시를 목표로 <strong>현장 데이터와 이동편의시설 근거</strong>를 꼼꼼히 검증해 반영합니다.
             </S.IntroAside>
           </S.IntroLayout>
           <S.MetaFactRow>
             {PRODUCT_META_FACTS.map((fact) => (
-              <div key={fact.id}>
+              <div key={fact.id} data-reveal data-reveal-group="overview-facts">
                 <dt>{fact.label}</dt>
                 <dd>
-                  <S.MetaPill $accent={fact.accent}>{fact.value}</S.MetaPill>
+                  <S.MetaBadge $accent={fact.accent}>{fact.value}</S.MetaBadge>
                 </dd>
               </div>
             ))}
@@ -117,23 +111,23 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
       <S.Section id="features">
         <S.SectionInner>
-          <S.IntroLayout>
+          <S.IntroLayout data-reveal>
             <div>
               <S.Eyebrow>핵심 기능</S.Eyebrow>
               <S.DisplayHeading>
-                화면을 늘리는 대신
-                <strong>한 화면을 정확하게</strong>
+                노선도 한 화면에서
+                <strong>역 선택과 이동 경로를 확인합니다</strong>
               </S.DisplayHeading>
             </div>
             <S.IntroAside>
-              노선도 한 화면에서 <strong>역 선택</strong>과 <strong>경로 지정</strong>이 끝나야 지하에서
-              쓸 수 있습니다.
+              노선도 화면에서 <strong>출발·경유·도착역 선택</strong>과 <strong>환승 경로 확인</strong>을 한 번에
+              진행할 수 있습니다.
             </S.IntroAside>
           </S.IntroLayout>
 
           <S.FeatureBlock>
-            <div>
-              <S.GhostIndex aria-hidden="true">{PICK_FEATURE.index}</S.GhostIndex>
+            <div data-reveal>
+              <S.FeatureIndex>{PICK_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{PICK_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {PICK_FEATURE.lead} <S.InlineHighlight>{PICK_FEATURE.keyword}</S.InlineHighlight>
@@ -141,7 +135,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.FeatureBody>
             </div>
             <div>
-              <S.FeatureStage>
+              <S.FeatureStage data-reveal data-reveal-delay="100">
                 <S.DetailCrop>
                   <div>
                     <img
@@ -160,8 +154,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           </S.FeatureBlock>
 
           <S.FeatureBlock $reverse>
-            <div>
-              <S.GhostIndex aria-hidden="true">{ROUTE_FEATURE.index}</S.GhostIndex>
+            <div data-reveal>
+              <S.FeatureIndex>{ROUTE_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {ROUTE_FEATURE.lead} <S.InlineHighlight>{ROUTE_FEATURE.keyword}</S.InlineHighlight>
@@ -169,55 +163,45 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.FeatureBody>
             </div>
             <div>
-              <S.StatementPanel>
-                <span>화면에 적히는 문장</span>
-                <p>현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요.</p>
-              </S.StatementPanel>
+              {/* [Phase 1 P0] 무장애 이동 경로 에디토리얼 명세표 컴포넌트 */}
+              <EasySubwayRouteSpecTable />
             </div>
           </S.FeatureBlock>
         </S.SectionInner>
       </S.Section>
 
-      <S.BreakCut>
-        <S.LineArtLayer>
-          <EasySubwayLineArt />
-        </S.LineArtLayer>
-        <p>
-          경로가 필요할 때는, <strong>현재 서버 기준의 결과만 안내합니다.</strong>
-        </p>
-      </S.BreakCut>
-
       <S.Section $tone="raised" id="scope">
         <S.SectionInner>
-          <S.Eyebrow>정식 출시 기준</S.Eyebrow>
-          <S.DisplayHeading>
-            넓히기 전에
-            <strong>확인부터 합니다</strong>
-          </S.DisplayHeading>
+          <S.IntroLayout data-reveal>
+            <div>
+              <S.Eyebrow>정식 출시 기준</S.Eyebrow>
+              <S.DisplayHeading>
+                전국 정식 출시를 위한
+                <strong>데이터 검증 기준</strong>
+              </S.DisplayHeading>
+            </div>
+          </S.IntroLayout>
           <S.ScopeLayout>
             <div>
-              <S.IntroAside>
-                전국 출시 기준을 통과한 데이터만 제품에 반영합니다. 범위를 넓히는 일보다{" "}
-                <strong>틀린 정보를 내보내지 않는 일</strong>이 먼저입니다.
+              <S.IntroAside data-reveal>
+                전국 출시 기준에 맞춰 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
               </S.IntroAside>
               <S.ChipCluster>
                 {PRODUCT_SCOPE_CHIPS.map((chip) => (
-                  <li key={chip.id}>
-                    <S.MetaPill $accent={chip.accent}>{chip.label}</S.MetaPill>
+                  <li key={chip.id} data-reveal data-reveal-group="scope-chips">
+                    <S.ScopeChip $accent={chip.accent}>{chip.label}</S.ScopeChip>
                   </li>
                 ))}
               </S.ChipCluster>
             </div>
-            <S.StatCard>
-              <strong>전국 기준</strong>
-              <span>정식 출시를 위한 데이터와 접근성 근거 검증</span>
-            </S.StatCard>
+            {/* [Phase 3 P2] 2x2 에디토리얼 기술 명세표 */}
+            <EasySubwayTechSpecGrid />
           </S.ScopeLayout>
         </S.SectionInner>
       </S.Section>
 
       <S.Section>
-        <S.ContactBand>
+        <S.ContactBand data-reveal>
           <div>
             <h2>출시 소식과 협업 문의</h2>
             <p>
@@ -225,7 +209,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               검증과 기술 협업 문의도 같은 주소로 받습니다.
             </p>
           </div>
-          <S.PillAction href={CONTACT_MAILTO}>{PRODUCT_SURFACE.contactEmail}</S.PillAction>
+          <S.ButtonAction href={CONTACT_MAILTO}>{PRODUCT_SURFACE.contactEmail}</S.ButtonAction>
         </S.ContactBand>
       </S.Section>
     </main>
@@ -249,6 +233,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
       </S.FooterInner>
     </S.SurfaceFooter>
   </S.ProductSurface>
-)
+  )
+}
 
 export default EasySubwayPageView
