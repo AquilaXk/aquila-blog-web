@@ -78,8 +78,6 @@ const buildContentSecurityPolicy = (options = {}) => {
     "'self'",
     "data:",
     "blob:",
-    "https:",
-    "http:",
     ...aquilaDomains,
     "https://www.notion.so",
     "https://lh5.googleusercontent.com",

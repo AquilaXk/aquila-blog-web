@@ -45,19 +45,18 @@ const getSecurityHeaders = async () => {
   return globalRule?.headers ?? []
 }
 
-const getHeaderValue = async (headerName: string) => {
+const findHeaderValue = async (headerName: string) => {
   const headers = await getSecurityHeaders()
-  const value = headers.find((header) => header.key.toLowerCase() === headerName.toLowerCase())
-    ?.value
+  return headers.find((header) => header.key.toLowerCase() === headerName.toLowerCase())?.value
+}
 
+const getHeaderValue = async (headerName: string) => {
+  const value = await findHeaderValue(headerName)
   expect(value).toBeTruthy()
   return value ?? ""
 }
 
 const getCspHeader = async () => getHeaderValue("content-security-policy")
-
-const getCspReportOnlyHeader = async () =>
-  getHeaderValue("content-security-policy-report-only")
 
 const hasScriptHashOrNonce = (scriptSrc: string[] | undefined) =>
   (scriptSrc ?? []).some(
@@ -80,10 +79,10 @@ const parseCspDirectives = (csp: string) => {
 test.describe("frontend security headers", () => {
   test("CSP declares script style image connect and font boundaries", async () => {
     const enforceCsp = await getCspHeader()
-    const reportOnlyCsp = await getCspReportOnlyHeader()
+    const reportOnlyCsp = await findHeaderValue("content-security-policy-report-only")
     const directives = parseCspDirectives(enforceCsp)
 
-    expect(reportOnlyCsp).toBe(enforceCsp)
+    expect(reportOnlyCsp).toBeUndefined()
     expect(directives.get("default-src")).toEqual(["'self'"])
     expect(directives.get("script-src")).toEqual(expect.arrayContaining(["'self'"]))
     expect(directives.get("script-src")?.join(" ")).not.toMatch(/vercel|googletagmanager|google-analytics/i)
@@ -96,13 +95,13 @@ test.describe("frontend security headers", () => {
         "'self'",
         "data:",
         "blob:",
-        "https:",
-        "http:",
         "https://*.aquilaxk.site",
         "https://www.notion.so",
         "https://avatars.githubusercontent.com",
       ]),
     )
+    expect(directives.get("img-src")).not.toContain("https:")
+    expect(directives.get("img-src")).not.toContain("http:")
     expect(directives.get("connect-src")).toEqual(
       expect.arrayContaining([
         "'self'",

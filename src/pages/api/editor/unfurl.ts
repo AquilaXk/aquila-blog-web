@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import { extractUnfurlMetadata } from "src/libs/unfurl/extractMeta"
 import { fetchSafeUnfurlResponse, normalizeSafeUnfurlUrl } from "src/libs/unfurl/requestSafety"
+import { fetchServerAdminSession } from "src/libs/server/authSession"
+import { shouldBypassAdminGuardForQa } from "src/libs/server/adminGuard"
 
 const QA_UNFURL_FIXTURES: Record<
   string,
@@ -42,6 +44,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET")
     return res.status(405).json({ ok: false, message: "허용되지 않은 메서드입니다." })
+  }
+
+  if (!shouldBypassAdminGuardForQa()) {
+    const adminSession = await fetchServerAdminSession(req)
+    if (adminSession?.isAdmin !== true) {
+      return res.status(401).json({ ok: false, message: "관리자 세션이 필요합니다." })
+    }
   }
 
   const rawUrl = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url

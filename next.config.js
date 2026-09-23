@@ -47,10 +47,6 @@ const buildSecurityHeaders = () => {
       key: "Content-Security-Policy",
       value: csp,
     },
-    {
-      key: "Content-Security-Policy-Report-Only",
-      value: csp,
-    },
   ]
 }
 
@@ -68,7 +64,7 @@ module.exports = {
    * `next-server` 키는 next-server 기본 트레이스에만 매칭된다 — Next는 이 키를
    * `picomatch(glob)("next-server")` 로 판정한다 (next/dist/build/collect-build-traces.js).
    * 페이지 트레이스는 라우트 경로로 매칭되므로 여기 항목은 SSR 페이지 의존성을 건드리지 않는다.
-   * (mermaid·katex·prismjs·shiki는 실제 페이지 트레이스에 들어 있어 대상이 아니다.)
+   * (mermaid·katex·prismjs는 실제 페이지 트레이스에 들어 있어 대상이 아니다.)
    *
    * 제외 근거 (모두 next-server 트레이스 경유로만 유입된다):
    * - typescript: `next/dist/server/config.js` 는 `transpileConfig()` 를
