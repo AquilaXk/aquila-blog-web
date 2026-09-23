@@ -145,4 +145,6 @@ export const marketingDark = {
   /** 라인아트에서 단 하나만 올리는 인디고 포인트 선. */
   lineArtAccent: brand[600],
   graphic: brand[500],
+  /** 폰 프레임 목업을 위한 정갈한 다크 입체 섀도우 토큰. */
+  phoneShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 12px 24px -8px rgba(0, 0, 0, 0.45)",
 } as const

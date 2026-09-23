@@ -17,10 +17,10 @@ type Props = {
 export const EasySubwayRouteSpecTable: React.FC<Props> = ({
   specs = BARRIER_FREE_ROUTE_SPECS,
 }) => (
-  <S.RouteSpecPanel role="region" aria-label="무장애 이동 경로 에디토리얼 명세표">
+  <S.RouteSpecPanel role="region" aria-label="교통약자를 위한 무장애 경로 기준">
     <S.RouteSpecHeader>
-      <S.RouteSpecTitle>무장애 이동 경로 에디토리얼 명세표</S.RouteSpecTitle>
-      <S.RouteSpecTag>VERIFIED SPEC</S.RouteSpecTag>
+      <S.RouteSpecTitle>교통약자를 위한 무장애 경로 기준</S.RouteSpecTitle>
+      <S.RouteSpecTag>검증 완료</S.RouteSpecTag>
     </S.RouteSpecHeader>
     <S.RouteSpecList>
       {specs.map((spec) => (

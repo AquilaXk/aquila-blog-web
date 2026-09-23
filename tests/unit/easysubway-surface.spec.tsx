@@ -3,6 +3,9 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import {
   BARRIER_FREE_ROUTE_SPECS,
+  COMPARISON_TRACKS,
+  FAQ_ITEMS,
+  OFFICIAL_METRO_BADGES,
   PRODUCT_FEATURES,
   PRODUCT_META_FACTS,
   PRODUCT_SCOPE_CHIPS,
@@ -40,11 +43,11 @@ const renderTechSpecGrid = (items = TECH_SPEC_ITEMS) =>
 
 
 test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
-  test("무장애 이동 경로 에디토리얼 명세표는 4대 기준을 완전하게 렌더하고 시스템 에러 문구가 없다", () => {
+  test("교통약자를 위한 무장애 경로 기준은 4대 기준을 완전하게 렌더하고 시스템 에러 문구가 없다", () => {
     const markup = renderRouteSpecTable()
 
-    expect(markup).toContain("무장애 이동 경로 에디토리얼 명세표")
-    expect(markup).toContain("VERIFIED SPEC")
+    expect(markup).toContain("교통약자를 위한 무장애 경로 기준")
+    expect(markup).toContain("검증 완료")
 
     for (const spec of BARRIER_FREE_ROUTE_SPECS) {
       expect(markup).toContain(spec.category)
@@ -117,7 +120,7 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
   test("명세표 컴포넌트는 role='region'과 접근성 라벨을 온전히 포함한다", () => {
     const routeMarkup = renderRouteSpecTable()
     expect(routeMarkup).toContain('role="region"')
-    expect(routeMarkup).toContain('aria-label="무장애 이동 경로 에디토리얼 명세표"')
+    expect(routeMarkup).toContain('aria-label="교통약자를 위한 무장애 경로 기준"')
 
     const techMarkup = renderTechSpecGrid()
     expect(techMarkup).toContain('role="region"')
@@ -126,7 +129,7 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
 
   test("빈 명세 배열이나 커스텀 명세가 주어져도 오류 없이 방어적으로 렌더한다", () => {
     const emptyRouteMarkup = renderRouteSpecTable([])
-    expect(emptyRouteMarkup).toContain("무장애 이동 경로 에디토리얼 명세표")
+    expect(emptyRouteMarkup).toContain("교통약자를 위한 무장애 경로 기준")
 
     const customRouteMarkup = renderRouteSpecTable([
       {
@@ -179,4 +182,44 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
     expect(calculateRevealDelay(2, 150)).toBe(150)
     expect(calculateRevealDelay(3, "200")).toBe(200)
   })
+
+  test("자주 묻는 질문(FAQ) 모델은 4종 필수 질문(무료 이용, 지원 노선, 차별점, 무추적 원칙)을 온전히 포함한다", () => {
+    expect(FAQ_ITEMS).toHaveLength(4)
+
+    const ids = FAQ_ITEMS.map((item) => item.id)
+    expect(ids).toContain("free-service")
+    expect(ids).toContain("supported-lines")
+    expect(ids).toContain("difference")
+    expect(ids).toContain("privacy-policy")
+
+    for (const item of FAQ_ITEMS) {
+      expect(item.question.length).toBeGreaterThan(0)
+      expect(item.answer.length).toBeGreaterThan(0)
+    }
+  })
+
+  test("일반 지도앱 vs EasySubway 1:1 비교 모델은 2개 트랙과 계단 80개 vs 단차 0cm 기준을 포함한다", () => {
+    expect(COMPARISON_TRACKS).toHaveLength(2)
+
+    const [standard, easysubway] = COMPARISON_TRACKS
+    expect(standard.label).toBe("일반 지도앱")
+    expect(easysubway.label).toBe("EasySubway")
+
+    const standardPoints = standard.points.map((p) => p.title).join(" ")
+    expect(standardPoints).toContain("계단 80개")
+
+    const easysubwayPoints = easysubway.points.map((p) => p.title).join(" ")
+    expect(easysubwayPoints).toContain("단차 0cm 엘리베이터 직결 동선")
+    expect(easysubwayPoints).toContain("9-2칸")
+  })
+
+  test("공식 20개 노선 뱃지 모델은 4호선을 포함한 20개 노선 심볼을 온전히 정의한다", () => {
+    expect(OFFICIAL_METRO_BADGES).toHaveLength(20)
+
+    const line4 = OFFICIAL_METRO_BADGES.find((b) => b.id === "line-4")
+    expect(line4).toBeDefined()
+    expect(line4?.name).toBe("4호선")
+    expect(line4?.fileName).toBe("seoul_4_compact_256.png")
+  })
 })
+

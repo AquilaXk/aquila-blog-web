@@ -168,3 +168,134 @@ export const PRODUCT_FOOTER_LINKS = [
   { label: "회사 소개", href: COMPANY_URL },
   { label: "기술 블로그", href: BLOG_URL },
 ] as const
+
+export const TIMELINE_SCREENSHOT = "/easysubway/timeline-detail.png"
+export const TIMELINE_SCREENSHOT_ALT =
+  "EasySubway 실제 무장애 타임라인 경로 결과 화면. 4호선 빠른 하차 9-2칸 및 엘리베이터 동선 안내."
+
+export type ComparisonPoint = {
+  title: string
+  description: string
+}
+
+export type ComparisonTrack = {
+  id: "standard" | "easysubway"
+  label: string
+  title: string
+  badgeVariant: "standard" | "highlighted"
+  points: ComparisonPoint[]
+}
+
+export const COMPARISON_TRACKS: ComparisonTrack[] = [
+  {
+    id: "standard",
+    label: "일반 지도앱",
+    title: "소요 시간 중심 경로",
+    badgeVariant: "standard",
+    points: [
+      {
+        title: "계단 80개 구간 통과 강요",
+        description: "최단 시간 단축만을 위해 휠체어나 유모차가 갈 수 없는 가파른 계단 구간 안내",
+      },
+      {
+        title: "단차 정보 없는 출구 안내",
+        description: "도착 후 출구에 턱이나 계단이 있어 지상으로 나가지 못하고 되돌아오는 위험",
+      },
+      {
+        title: "복잡한 환승 동선 방치",
+        description: "승강기 위치와 무관한 일반 계단 환승 통로를 안내해 이동 거리와 피로도 가중",
+      },
+      {
+        title: "승강기 고장 사전 인지 불가",
+        description: "현장에 도착해서야 엘리베이터 점검이나 리프트 고장을 발견해 이동이 중단되는 문제",
+      },
+    ],
+  },
+  {
+    id: "easysubway",
+    label: "EasySubway",
+    title: "단차 0cm 무장애 이동 경로",
+    badgeVariant: "highlighted",
+    points: [
+      {
+        title: "단차 0cm 엘리베이터 직결 동선",
+        description: "계단을 전면 배제하고 지상 출구부터 승강장까지 100% 승강기로만 이어지는 안전 동선",
+      },
+      {
+        title: "교통약자 전용 출구 및 경사로 우선",
+        description: "휠체어 경사로와 교통약자 전용 개찰구 위치를 사전에 확인하여 목적지로 직결",
+      },
+      {
+        title: "빠른 환승 9-2칸 맞춤 승하차",
+        description: "환승 시 엘리베이터 바로 앞으로 내리는 최적 승차 위치(칸·문)를 안내해 환승 단축",
+      },
+      {
+        title: "실시간 승강기 운행·점검 상태 연동",
+        description: "점검 중인 승강기를 실시간으로 감지하여 대체 엘리베이터 우회 경로를 즉시 재계산",
+      },
+    ],
+  },
+]
+
+export type FaqItem = {
+  id: string
+  question: string
+  answer: string
+}
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    id: "free-service",
+    question: "EasySubway는 무료로 이용할 수 있나요?",
+    answer:
+      "네, 모든 무장애 경로 탐색, 실시간 편의시설 정보, 노선도 기능은 100% 무료입니다. 유료 결제나 광고 유도 없이 누구나 편안하게 이용할 수 있습니다.",
+  },
+  {
+    id: "supported-lines",
+    question: "현재 어떤 지하철 노선과 지역을 지원하나요?",
+    answer:
+      "수도권 1~9호선, 수인분당선, 신분당선, 공항철도, 경의중앙선, GTX-A 등 20여 개 핵심 노선을 포함하여 부산, 대구, 대전, 광주 등 전국 주요 도시철도 전 노선으로 데이터를 지속 검증 및 확장하고 있습니다.",
+  },
+  {
+    id: "difference",
+    question: "일반 지도앱과 가장 큰 차이점은 무엇인가요?",
+    answer:
+      "일반 지도앱의 최단 시간 위주 검색과 달리, EasySubway는 계단 80개를 배제한 '단차 0cm 엘리베이터 직결 동선'과 '빠른 환승 9-2칸 안내'를 결합하여 휠체어와 유모차가 실제로 끝까지 완주할 수 있는 경로를 계산합니다.",
+  },
+  {
+    id: "privacy-policy",
+    question: "회원가입이 필요하거나 위치 추적이 발생하나요?",
+    answer:
+      "아닙니다. EasySubway는 별도의 회원가입이나 로그인 없이 바로 이용할 수 있으며, 사용자의 위치나 이동 검색 기록을 서버에 수집하거나 추적하지 않는 무추적(Zero-tracking) 원칙을 철저히 지킵니다.",
+  },
+]
+
+export type MetroBadgeItem = {
+  id: string
+  name: string
+  fileName: string
+}
+
+export const OFFICIAL_METRO_BADGES: MetroBadgeItem[] = [
+  { id: "line-1", name: "1호선", fileName: "seoul_1_compact_256.png" },
+  { id: "line-2", name: "2호선", fileName: "seoul_2_compact_256.png" },
+  { id: "line-3", name: "3호선", fileName: "seoul_3_compact_256.png" },
+  { id: "line-4", name: "4호선", fileName: "seoul_4_compact_256.png" },
+  { id: "line-5", name: "5호선", fileName: "seoul_5_compact_256.png" },
+  { id: "line-6", name: "6호선", fileName: "seoul_6_compact_256.png" },
+  { id: "line-7", name: "7호선", fileName: "seoul_7_compact_256.png" },
+  { id: "line-8", name: "8호선", fileName: "seoul_8_compact_256.png" },
+  { id: "line-9", name: "9호선", fileName: "seoul_9_compact_256.png" },
+  { id: "suin-bundang", name: "수인분당", fileName: "suin_bundang_compact_256.png" },
+  { id: "shinbundang", name: "신분당", fileName: "shinbundang_compact_256.png" },
+  { id: "airport", name: "공항철도", fileName: "airport_railroad_compact_256.png" },
+  { id: "gyeongui", name: "경의중앙", fileName: "gyeongui_jungang_compact_256.png" },
+  { id: "gtx-a", name: "GTX-A", fileName: "gtx_a_compact_256.png" },
+  { id: "incheon-1", name: "인천1호선", fileName: "incheon_1_compact_256.png" },
+  { id: "incheon-2", name: "인천2호선", fileName: "incheon_2_compact_256.png" },
+  { id: "gyeongchun", name: "경춘선", fileName: "gyeongchun_compact_256.png" },
+  { id: "gyeonggang", name: "경강선", fileName: "gyeonggang_compact_256.png" },
+  { id: "seohae", name: "서해선", fileName: "seohae_compact_256.png" },
+  { id: "sillim", name: "신림선", fileName: "sillim_compact_256.png" },
+]
+
