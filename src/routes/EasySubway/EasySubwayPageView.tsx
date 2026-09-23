@@ -41,24 +41,38 @@ type Props = {
 
 const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
   const surfaceRef = useScrollReveal<HTMLDivElement>()
-  const [copied, setCopied] = useState(false)
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle")
 
-  const handleCopyEmail = useCallback(() => {
+  const handleCopyEmail = useCallback(async () => {
     const email = PRODUCT_SURFACE.contactEmail
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(email)
-        .then(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        })
-        .catch(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        })
-    } else {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(email)
+        setCopyStatus("copied")
+        setTimeout(() => setCopyStatus("idle"), 2000)
+        return
+      }
+      if (typeof document !== "undefined" && document.execCommand) {
+        const textarea = document.createElement("textarea")
+        textarea.value = email
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        textarea.style.pointerEvents = "none"
+        document.body.appendChild(textarea)
+        textarea.select()
+        const successful = document.execCommand("copy")
+        document.body.removeChild(textarea)
+        if (successful) {
+          setCopyStatus("copied")
+          setTimeout(() => setCopyStatus("idle"), 2000)
+          return
+        }
+      }
+      setCopyStatus("failed")
+      setTimeout(() => setCopyStatus("idle"), 2000)
+    } catch {
+      setCopyStatus("failed")
+      setTimeout(() => setCopyStatus("idle"), 2000)
     }
   }, [])
 
@@ -227,6 +241,18 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                         <strong>엘리베이터 직결 동선</strong>
                         <p>계단과 턱을 배제하고 지상 출구부터 승강장까지 100% 수직 이동 경로를 시각화합니다.</p>
                       </S.TimelineCalloutCard>
+                      <S.TimelineCalloutCard>
+                        <S.CalloutHeader>
+                          <S.CalloutIconSvg aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                              <path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 11v-2c-1.54.02-3.09-.75-4.07-1.83l-1.29-1.43c-.17-.19-.38-.34-.61-.45-.01 0-.01-.01-.02-.01H13c-.35-.2-.75-.31-1.18-.31C10.26 6.97 9 8.24 9 9.8v4.44c0 .43.18.84.49 1.14l2.84 2.76c.49.48 1.13.73 1.78.73.55 0 1.09-.18 1.54-.53l2.86-2.22c.65-.5.99-1.3.89-2.12zm-8.5 7c-2.48 0-4.5-2.02-4.5-4.5 0-1.82 1.09-3.39 2.66-4.09l.4 1.95c-.86.47-1.46 1.37-1.46 2.41 0 1.52 1.23 2.75 2.75 2.75 1.18 0 2.18-.74 2.57-1.78l1.96.42C14.3 19.33 12.57 20 10.5 20z" />
+                            </svg>
+                          </S.CalloutIconSvg>
+                          <S.CalloutTag>교통약자 특화</S.CalloutTag>
+                        </S.CalloutHeader>
+                        <strong>휠체어·유모차 맞춤 동선</strong>
+                        <p>단차 없는 지상 출구와 경사로를 우선 연계해 휠체어와 유모차 이동을 보장합니다.</p>
+                      </S.TimelineCalloutCard>
                     </S.TimelineCalloutCluster>
                   </S.TimelineShowcase>
                 </S.FeatureStage>
@@ -274,9 +300,17 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                     {track.points.map((pt, i) => (
                       <li key={i}>
                         {track.id === "easysubway" ? (
-                          <S.ComparisonCheckIcon aria-hidden="true">✓</S.ComparisonCheckIcon>
+                          <S.ComparisonCheckIcon aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                            </svg>
+                          </S.ComparisonCheckIcon>
                         ) : (
-                          <S.ComparisonCrossIcon aria-hidden="true">✕</S.ComparisonCrossIcon>
+                          <S.ComparisonCrossIcon aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
+                            </svg>
+                          </S.ComparisonCrossIcon>
                         )}
                         <div>
                           <strong>{pt.title}</strong>
@@ -394,12 +428,22 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
               <S.CopyEmailButton
                 type="button"
                 onClick={handleCopyEmail}
-                aria-label="이메일 주소 복사"
+                aria-label={
+                  copyStatus === "copied"
+                    ? "이메일 주소가 복사되었습니다"
+                    : copyStatus === "failed"
+                      ? "이메일 주소 복사에 실패했습니다"
+                      : "이메일 주소 복사"
+                }
               >
                 <S.CopyIconWrapper aria-hidden="true">
-                  {copied ? (
+                  {copyStatus === "copied" ? (
                     <svg viewBox="0 0 24 24">
                       <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                  ) : copyStatus === "failed" ? (
+                    <svg viewBox="0 0 24 24">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
                     </svg>
                   ) : (
                     <svg viewBox="0 0 24 24">
@@ -407,7 +451,13 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                     </svg>
                   )}
                 </S.CopyIconWrapper>
-                <span>{copied ? "복사 완료!" : "이메일 복사"}</span>
+                <span>
+                  {copyStatus === "copied"
+                    ? "복사 완료!"
+                    : copyStatus === "failed"
+                      ? "복사 실패"
+                      : "이메일 복사"}
+                </span>
                 <S.CopyEmailAddress>{PRODUCT_SURFACE.contactEmail}</S.CopyEmailAddress>
               </S.CopyEmailButton>
             </S.ContactActionGroup>

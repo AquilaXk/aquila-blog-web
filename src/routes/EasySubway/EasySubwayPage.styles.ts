@@ -26,6 +26,10 @@ export const ProductSurface = styled.div`
 
   & [id] {
     scroll-margin-top: clamp(4.5rem, 8vw, 6rem);
+
+    @media (max-width: ${layoutBreakpoint.navCompact}px) {
+      scroll-margin-top: 7.75rem;
+    }
   }
 
   /* [Scroll Reveal] https://kimhss.github.io/portfolio/ 패리티:
@@ -335,6 +339,10 @@ export const Section = styled.section<{ $tone?: "base" | "raised" }>`
   padding: ${SECTION_PADDING_Y} ${SECTION_PADDING_X};
   background: ${({ $tone }) => ($tone === "raised" ? dark.fieldRaised : dark.field)};
   border-top: 1px solid ${dark.hairline};
+
+  @media (max-width: ${layoutBreakpoint.navCompact}px) {
+    scroll-margin-top: 7.75rem;
+  }
 `
 
 export const SectionInner = styled.div`
@@ -1029,6 +1037,12 @@ export const ComparisonCheckIcon = styled.span`
   color: ${dark.onSignature};
   font-size: 0.875rem;
   font-weight: ${fontWeight.bold};
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
 `
 
 export const ComparisonCrossIcon = styled.span`
@@ -1044,6 +1058,12 @@ export const ComparisonCrossIcon = styled.span`
   color: ${dark.textMuted};
   font-size: 0.8125rem;
   font-weight: ${fontWeight.medium};
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
 `
 
 /**
