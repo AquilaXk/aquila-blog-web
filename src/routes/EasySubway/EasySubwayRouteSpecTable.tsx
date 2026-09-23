@@ -24,7 +24,11 @@ export const EasySubwayRouteSpecTable: React.FC<Props> = ({
     </S.RouteSpecHeader>
     <S.RouteSpecList>
       {specs.map((spec) => (
-        <S.RouteSpecCard key={spec.id}>
+        <S.RouteSpecCard
+          key={spec.id}
+          data-reveal
+          data-reveal-group="route-specs"
+        >
           <dt>{spec.category}</dt>
           <dd>
             <strong>{spec.title}</strong>

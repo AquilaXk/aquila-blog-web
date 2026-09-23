@@ -3,6 +3,7 @@ import { CONFIG } from "site.config"
 import EasySubwayLineArt from "src/routes/EasySubway/EasySubwayLineArt"
 import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
 import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
+import useScrollReveal from "src/routes/EasySubway/useScrollReveal"
 import {
   COMPANY_SURFACE,
   COMPANY_URL,
@@ -32,55 +33,58 @@ type Props = {
   surfaceUrl: string
 }
 
-const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
-  <S.ProductSurface>
-    <S.SurfaceHeader>
-      <S.BrandLink href={surfaceUrl} aria-current="page">
-        {PRODUCT_SURFACE.name}
-        <small>by {COMPANY_SURFACE.name}</small>
-      </S.BrandLink>
-      <S.HeaderLinks aria-label="제품 소개 둘러보기">
-        <S.NavLink href="#features">기능</S.NavLink>
-        <S.NavLink href="#scope">제공 범위</S.NavLink>
-        <S.NavLink href={COMPANY_URL}>회사 소개</S.NavLink>
-        <S.HeaderAction href={CONTACT_MAILTO}>문의</S.HeaderAction>
-      </S.HeaderLinks>
-    </S.SurfaceHeader>
+const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
+  const surfaceRef = useScrollReveal<HTMLDivElement>()
 
-    <main>
-      <S.Hero>
-        <S.LineArtLayer $align="bottom">
-          <EasySubwayLineArt />
-        </S.LineArtLayer>
-        <S.HeroCopy>
-          <S.StatusBadge>{PRODUCT_RELEASE_STATUS}</S.StatusBadge>
-          <S.HeroTitle>
-            갈 수 있는 길을
-            <strong>먼저 보여주는 지하철</strong>
-          </S.HeroTitle>
-          <S.HeroLead>
-            계단과 환승 동선을 함께 계산해 <S.InlineHighlight>끝까지 이동할 수 있는 경로</S.InlineHighlight>
-            를 먼저 내놓습니다.
-          </S.HeroLead>
-        </S.HeroCopy>
-        <S.HeroPhoneWrap>
-          <S.PhoneFrame $width="21.5rem">
-            <img
-              src={PRODUCT_SCREENSHOT}
-              alt={PRODUCT_SCREENSHOT_ALT}
-              width={PRODUCT_SCREENSHOT_SIZE.width}
-              height={PRODUCT_SCREENSHOT_SIZE.height}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-            />
-          </S.PhoneFrame>
-        </S.HeroPhoneWrap>
-      </S.Hero>
+  return (
+    <S.ProductSurface ref={surfaceRef}>
+      <S.SurfaceHeader>
+        <S.BrandLink href={surfaceUrl} aria-current="page">
+          {PRODUCT_SURFACE.name}
+          <small>by {COMPANY_SURFACE.name}</small>
+        </S.BrandLink>
+        <S.HeaderLinks aria-label="제품 소개 둘러보기">
+          <S.NavLink href="#features">기능</S.NavLink>
+          <S.NavLink href="#scope">제공 범위</S.NavLink>
+          <S.NavLink href={COMPANY_URL}>회사 소개</S.NavLink>
+          <S.HeaderAction href={CONTACT_MAILTO}>문의</S.HeaderAction>
+        </S.HeaderLinks>
+      </S.SurfaceHeader>
+
+      <main>
+        <S.Hero>
+          <S.LineArtLayer $align="bottom">
+            <EasySubwayLineArt />
+          </S.LineArtLayer>
+          <S.HeroCopy>
+            <S.StatusBadge>{PRODUCT_RELEASE_STATUS}</S.StatusBadge>
+            <S.HeroTitle>
+              갈 수 있는 길을
+              <strong>먼저 보여주는 지하철</strong>
+            </S.HeroTitle>
+            <S.HeroLead>
+              계단과 환승 동선을 함께 계산해 <S.InlineHighlight>끝까지 이동할 수 있는 경로</S.InlineHighlight>
+              를 먼저 내놓습니다.
+            </S.HeroLead>
+          </S.HeroCopy>
+          <S.HeroPhoneWrap data-reveal data-reveal-delay="120">
+            <S.PhoneFrame $width="21.5rem">
+              <img
+                src={PRODUCT_SCREENSHOT}
+                alt={PRODUCT_SCREENSHOT_ALT}
+                width={PRODUCT_SCREENSHOT_SIZE.width}
+                height={PRODUCT_SCREENSHOT_SIZE.height}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </S.PhoneFrame>
+          </S.HeroPhoneWrap>
+        </S.Hero>
 
       <S.Section $tone="raised" id="overview">
         <S.SectionInner>
-          <S.IntroLayout>
+          <S.IntroLayout data-reveal>
             <div>
               <S.Eyebrow>제품 개요</S.Eyebrow>
               <S.DisplayHeading>
@@ -94,7 +98,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           </S.IntroLayout>
           <S.MetaFactRow>
             {PRODUCT_META_FACTS.map((fact) => (
-              <div key={fact.id}>
+              <div key={fact.id} data-reveal data-reveal-group="overview-facts">
                 <dt>{fact.label}</dt>
                 <dd>
                   <S.MetaBadge $accent={fact.accent}>{fact.value}</S.MetaBadge>
@@ -107,7 +111,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
       <S.Section id="features">
         <S.SectionInner>
-          <S.IntroLayout>
+          <S.IntroLayout data-reveal>
             <div>
               <S.Eyebrow>핵심 기능</S.Eyebrow>
               <S.DisplayHeading>
@@ -122,7 +126,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           </S.IntroLayout>
 
           <S.FeatureBlock>
-            <div>
+            <div data-reveal>
               <S.FeatureIndex>{PICK_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{PICK_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
@@ -131,7 +135,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.FeatureBody>
             </div>
             <div>
-              <S.FeatureStage>
+              <S.FeatureStage data-reveal data-reveal-delay="100">
                 <S.DetailCrop>
                   <div>
                     <img
@@ -150,7 +154,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           </S.FeatureBlock>
 
           <S.FeatureBlock $reverse>
-            <div>
+            <div data-reveal>
               <S.FeatureIndex>{ROUTE_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
@@ -168,19 +172,23 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
       <S.Section $tone="raised" id="scope">
         <S.SectionInner>
-          <S.Eyebrow>정식 출시 기준</S.Eyebrow>
-          <S.DisplayHeading>
-            전국 정식 출시를 위한
-            <strong>데이터 검증 기준</strong>
-          </S.DisplayHeading>
+          <S.IntroLayout data-reveal>
+            <div>
+              <S.Eyebrow>정식 출시 기준</S.Eyebrow>
+              <S.DisplayHeading>
+                전국 정식 출시를 위한
+                <strong>데이터 검증 기준</strong>
+              </S.DisplayHeading>
+            </div>
+          </S.IntroLayout>
           <S.ScopeLayout>
             <div>
-              <S.IntroAside>
+              <S.IntroAside data-reveal>
                 전국 출시 기준에 맞춰 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
               </S.IntroAside>
               <S.ChipCluster>
                 {PRODUCT_SCOPE_CHIPS.map((chip) => (
-                  <li key={chip.id}>
+                  <li key={chip.id} data-reveal data-reveal-group="scope-chips">
                     <S.ScopeChip $accent={chip.accent}>{chip.label}</S.ScopeChip>
                   </li>
                 ))}
@@ -193,7 +201,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
       </S.Section>
 
       <S.Section>
-        <S.ContactBand>
+        <S.ContactBand data-reveal>
           <div>
             <h2>출시 소식과 협업 문의</h2>
             <p>
@@ -225,6 +233,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
       </S.FooterInner>
     </S.SurfaceFooter>
   </S.ProductSurface>
-)
+  )
+}
 
 export default EasySubwayPageView

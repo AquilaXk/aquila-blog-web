@@ -276,6 +276,24 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     }
   })
 
+  test("스크롤 리빌 요소는 뷰포트 진입 시 is-visible 클래스를 부여받고 순차 노출된다", async ({
+    page,
+  }) => {
+    await page.goto("/easysubway")
+
+    const overviewIntro = page.locator("#overview [data-reveal]").first()
+    await expect(overviewIntro).toHaveAttribute("data-reveal", "true")
+
+    // 요소로 스크롤하여 진입 트리거
+    await overviewIntro.scrollIntoViewIfNeeded()
+    await expect(overviewIntro).toHaveClass(/is-visible/)
+
+    // 기술 명세 셀 스태거 검증
+    const techSpecCell = page.locator("[data-reveal-group='tech-specs']").first()
+    await techSpecCell.scrollIntoViewIfNeeded()
+    await expect(techSpecCell).toHaveClass(/is-visible/)
+  })
+
   for (const viewport of VIEWPORTS) {
     test(`${viewport.name} ${viewport.width}x${viewport.height}에서 가로 넘침이 없다`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })

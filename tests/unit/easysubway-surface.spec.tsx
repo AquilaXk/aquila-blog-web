@@ -31,7 +31,11 @@ const renderRouteSpecTable = (specs = BARRIER_FREE_ROUTE_SPECS) =>
         specs.map((spec) =>
           createElement(
             S.RouteSpecCard,
-            { key: spec.id },
+            {
+              key: spec.id,
+              "data-reveal": "true",
+              "data-reveal-group": "route-specs",
+            } as any,
             createElement("dt", null, spec.category),
             createElement(
               "dd",
@@ -48,18 +52,26 @@ const renderRouteSpecTable = (specs = BARRIER_FREE_ROUTE_SPECS) =>
 const renderTechSpecGrid = (items = TECH_SPEC_ITEMS) =>
   renderToStaticMarkup(
     createElement(
-      S.TechSpecGrid,
+      "section",
       { role: "region", "aria-label": "정식 출시 기술 명세" },
-      items.map((item) =>
-        createElement(
-          S.TechSpecCell,
-          { key: item.id },
-          createElement("dt", null, item.label),
+      createElement(
+        S.TechSpecGrid,
+        null,
+        items.map((item) =>
           createElement(
-            "dd",
-            null,
-            createElement("strong", null, item.value),
-            createElement("p", null, item.detail)
+            S.TechSpecCell,
+            {
+              key: item.id,
+              "data-reveal": "true",
+              "data-reveal-group": "tech-specs",
+            } as any,
+            createElement("dt", null, item.label),
+            createElement(
+              "dd",
+              null,
+              createElement("strong", null, item.value),
+              createElement("p", null, item.detail)
+            )
           )
         )
       )
@@ -181,5 +193,36 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
     expect(customTechMarkup).toContain("커스텀 항목")
     expect(customTechMarkup).toContain("99.9%")
     expect(customTechMarkup).toContain("커스텀 세부 안내")
+  })
+
+  test("스크롤 리빌 data-reveal 속성과 스태거 그룹이 에디토리얼 명세표 및 기술 그리드에 정의된다", () => {
+    const routeMarkup = renderRouteSpecTable()
+    expect(routeMarkup).toContain("data-reveal")
+    expect(routeMarkup).toContain('data-reveal-group="route-specs"')
+
+    const techMarkup = renderTechSpecGrid()
+    expect(techMarkup).toContain("data-reveal")
+    expect(techMarkup).toContain('data-reveal-group="tech-specs"')
+  })
+
+  test("스크롤 리빌 스태거 알고리즘은 4단계 한도와 지정 딜레이 우선권을 보장한다", () => {
+    const maxSteps = 4
+    const stepMs = 60
+    const calculateDelay = (groupIndex: number, explicitDelay?: number) => {
+      if (explicitDelay !== undefined) return explicitDelay
+      const step = Math.min(groupIndex >= 0 ? groupIndex % maxSteps : 0, maxSteps - 1)
+      return step * stepMs
+    }
+
+    // 그룹 내 인덱스 순서대로 0ms, 60ms, 120ms, 180ms 부여
+    expect(calculateDelay(0)).toBe(0)
+    expect(calculateDelay(1)).toBe(60)
+    expect(calculateDelay(2)).toBe(120)
+    expect(calculateDelay(3)).toBe(180)
+    // 4번째 요소는 0ms로 순환
+    expect(calculateDelay(4)).toBe(0)
+
+    // 명시적 딜레이가 있는 경우 그룹 순환을 덮어씀
+    expect(calculateDelay(2, 150)).toBe(150)
   })
 })

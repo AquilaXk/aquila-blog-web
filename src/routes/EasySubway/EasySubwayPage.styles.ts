@@ -23,6 +23,36 @@ export const ProductSurface = styled.div`
   color: ${dark.textPrimary};
   word-break: keep-all;
   overflow-wrap: break-word;
+
+  /* [Scroll Reveal] https://kimhss.github.io/portfolio/ 패리티:
+     뷰포트 진입 전 24px 아래에서 대기하다가 진입 시 부드러운 cubic-bezier 곡선으로 순차 페이드인 */
+  & [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.75s ease, transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1);
+    will-change: opacity, transform;
+  }
+
+  & [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+  }
+
+  @media print {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+  }
 `
 
 export const SurfaceHeader = styled.header`
