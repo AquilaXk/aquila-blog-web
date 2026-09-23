@@ -39,7 +39,8 @@ export type ProductMetaFact = {
 
 export type ProductFeature = {
   id: string
-  index: string
+  index?: string
+  tag: string
   name: string
   lead: string
   keyword: string
@@ -81,6 +82,7 @@ export const PRODUCT_FEATURES: ProductFeature[] = [
   {
     id: "station-pick",
     index: "01",
+    tag: "01 / STATION SELECTION",
     name: "노선도에서 역을 바로 선택합니다",
     lead: "노선도 화면에서 원하는 역을 터치해 출발·경유·도착을 바로 지정합니다. 인접 역 탐색과 경로 지정을",
     keyword: "단일 화면",
@@ -89,6 +91,7 @@ export const PRODUCT_FEATURES: ProductFeature[] = [
   {
     id: "barrier-free-route",
     index: "02",
+    tag: "02 / ROUTE SPECIFICATION",
     name: "엘리베이터와 환승 동선을 고려한 경로를 계산합니다",
     lead: "역사 내 엘리베이터, 단차 없는 수직 이동 동선, 최단 환승 칸 정보를 바탕으로",
     keyword: "무장애 이동 경로",

@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import { CONFIG } from "site.config"
 import EasySubwayLineArt from "src/routes/EasySubway/EasySubwayLineArt"
+import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
+import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
 import {
-  BARRIER_FREE_ROUTE_SPECS,
   COMPANY_SURFACE,
   COMPANY_URL,
   CONTACT_MAILTO,
@@ -15,7 +16,6 @@ import {
   PRODUCT_SCREENSHOT_ALT,
   PRODUCT_SCREENSHOT_SIZE,
   PRODUCT_SURFACE,
-  TECH_SPEC_ITEMS,
 } from "src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
 
@@ -53,7 +53,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           <EasySubwayLineArt />
         </S.LineArtLayer>
         <S.HeroCopy>
-          <S.StatusPill>{PRODUCT_RELEASE_STATUS}</S.StatusPill>
+          <S.StatusBadge>{PRODUCT_RELEASE_STATUS}</S.StatusBadge>
           <S.HeroTitle>
             갈 수 있는 길을
             <strong>먼저 보여주는 지하철</strong>
@@ -97,7 +97,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               <div key={fact.id}>
                 <dt>{fact.label}</dt>
                 <dd>
-                  <S.MetaPill $accent={fact.accent}>{fact.value}</S.MetaPill>
+                  <S.MetaBadge $accent={fact.accent}>{fact.value}</S.MetaBadge>
                 </dd>
               </div>
             ))}
@@ -123,7 +123,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
           <S.FeatureBlock>
             <div>
-              <S.FeatureIndex>01 / STATION SELECTION</S.FeatureIndex>
+              <S.FeatureIndex>{PICK_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{PICK_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {PICK_FEATURE.lead} <S.InlineHighlight>{PICK_FEATURE.keyword}</S.InlineHighlight>
@@ -151,7 +151,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
           <S.FeatureBlock $reverse>
             <div>
-              <S.FeatureIndex>02 / ROUTE SPECIFICATION</S.FeatureIndex>
+              <S.FeatureIndex>{ROUTE_FEATURE.tag}</S.FeatureIndex>
               <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {ROUTE_FEATURE.lead} <S.InlineHighlight>{ROUTE_FEATURE.keyword}</S.InlineHighlight>
@@ -159,24 +159,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.FeatureBody>
             </div>
             <div>
-              {/* [Phase 1] 무장애 이동 경로 에디토리얼 명세표 컴포넌트 */}
-              <S.RouteSpecPanel>
-                <S.RouteSpecHeader>
-                  <S.RouteSpecTitle>무장애 이동 경로 에디토리얼 명세표</S.RouteSpecTitle>
-                  <S.RouteSpecTag>VERIFIED SPEC</S.RouteSpecTag>
-                </S.RouteSpecHeader>
-                <S.RouteSpecList>
-                  {BARRIER_FREE_ROUTE_SPECS.map((spec) => (
-                    <S.RouteSpecCard key={spec.id}>
-                      <dt>{spec.category}</dt>
-                      <dd>
-                        <strong>{spec.title}</strong>
-                        <p>{spec.description}</p>
-                      </dd>
-                    </S.RouteSpecCard>
-                  ))}
-                </S.RouteSpecList>
-              </S.RouteSpecPanel>
+              {/* [Phase 1 P0] 무장애 이동 경로 에디토리얼 명세표 컴포넌트 */}
+              <EasySubwayRouteSpecTable />
             </div>
           </S.FeatureBlock>
         </S.SectionInner>
@@ -202,18 +186,8 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
                 ))}
               </S.ChipCluster>
             </div>
-            {/* [Phase 3] 2x2 에디토리얼 기술 명세표 */}
-            <S.TechSpecGrid>
-              {TECH_SPEC_ITEMS.map((item) => (
-                <S.TechSpecCell key={item.id}>
-                  <dt>{item.label}</dt>
-                  <dd>
-                    <strong>{item.value}</strong>
-                    <p>{item.detail}</p>
-                  </dd>
-                </S.TechSpecCell>
-              ))}
-            </S.TechSpecGrid>
+            {/* [Phase 3 P2] 2x2 에디토리얼 기술 명세표 */}
+            <EasySubwayTechSpecGrid />
           </S.ScopeLayout>
         </S.SectionInner>
       </S.Section>
@@ -227,7 +201,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               검증과 기술 협업 문의도 같은 주소로 받습니다.
             </p>
           </div>
-          <S.PillAction href={CONTACT_MAILTO}>{PRODUCT_SURFACE.contactEmail}</S.PillAction>
+          <S.ButtonAction href={CONTACT_MAILTO}>{PRODUCT_SURFACE.contactEmail}</S.ButtonAction>
         </S.ContactBand>
       </S.Section>
     </main>

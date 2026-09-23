@@ -105,8 +105,8 @@ export const NavLink = styled.a`
   }
 `
 
-/** 패밀리룩 전환: 999px Pill ➔ 사각 버튼(radius: 10px) */
-export const PillAction = styled.a`
+/** 패밀리룩 전환: 999px Pill ➔ 사각 제어 버튼(radius: 10px) */
+export const ButtonAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
   align-items: center;
@@ -125,16 +125,22 @@ export const PillAction = styled.a`
   &:hover {
     background: ${dark.accentPressed};
   }
+
+  @media (forced-colors: active) {
+    border: 1px solid ButtonText;
+  }
 `
 
-export const HeaderAction = styled(PillAction)`
+export const PillAction = ButtonAction
+
+export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
   padding: 0 1.15rem;
   border-radius: ${radius.md}px;
 `
 
-/** 상태 뱃지: 999px Pill ➔ 사각 배지(radius: 6px) */
-export const StatusPill = styled.span`
+/** 상태 뱃지: 999px Pill ➔ 사각 배지(radius: 6px) 및 원형 상태 점(50%) */
+export const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -150,10 +156,20 @@ export const StatusPill = styled.span`
     content: "";
     width: 0.45rem;
     height: 0.45rem;
-    border-radius: ${radius.sm}px;
+    border-radius: 50%;
     background: ${dark.signature};
   }
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+
+    &::before {
+      background: CanvasText;
+    }
+  }
 `
+
+export const StatusPill = StatusBadge
 
 /**
  * 에디토리얼 다크 히어로.
@@ -224,7 +240,7 @@ export const InlineHighlight = styled.strong`
  * 회전(-4deg) ➔ 0deg 평면 정렬, 56px 플로팅 그림자 및 가짜 CSS 노치 제거.
  * 스크린샷 1080x2340 원본 비율을 깨끗한 에디토리얼 테두리로 감싼다.
  */
-export const PhoneFrame = styled.figure<{ $tilt?: number; $width?: string }>`
+export const PhoneFrame = styled.figure<{ $width?: string }>`
   position: relative;
   margin: 0;
   width: min(94%, ${({ $width }) => $width || "21rem"});
@@ -240,6 +256,10 @@ export const PhoneFrame = styled.figure<{ $tilt?: number; $width?: string }>`
     width: 100%;
     height: auto;
     border-radius: 1.35rem;
+  }
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
   }
 `
 
@@ -343,7 +363,7 @@ export const MetaFactRow = styled.dl`
 `
 
 /** 메타 라벨 뱃지: 사각 컨트롤(radius: 6px) */
-export const MetaPill = styled.span<{ $accent?: boolean }>`
+export const MetaBadge = styled.span<{ $accent?: boolean }>`
   display: inline-flex;
   align-items: center;
   min-height: 32px;
@@ -354,7 +374,13 @@ export const MetaPill = styled.span<{ $accent?: boolean }>`
   color: ${({ $accent }) => ($accent ? dark.onSignature : dark.textSecondary)};
   font-size: 0.9375rem;
   font-weight: ${fontWeight.medium};
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
 `
+
+export const MetaPill = MetaBadge
 
 export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
   display: grid;
@@ -461,6 +487,10 @@ export const RouteSpecPanel = styled.div`
   border: 1px solid ${dark.hairline};
   border-radius: ${radius.md}px;
   background: ${dark.fieldDeep};
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
 `
 
 export const RouteSpecHeader = styled.div`
@@ -506,6 +536,10 @@ export const RouteSpecCard = styled.div`
   border: 1px solid ${dark.hairline};
   border-radius: ${radius.sm}px;
   background: ${dark.fieldRaised};
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
 
   dt {
     margin: 0 0 0.35rem;
@@ -570,6 +604,10 @@ export const ScopeChip = styled.span<{ $accent?: boolean }>`
   color: ${({ $accent }) => ($accent ? dark.textPrimary : dark.textSecondary)};
   font-size: 0.9375rem;
   font-weight: ${fontWeight.medium};
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
 `
 
 /**
@@ -586,6 +624,10 @@ export const TechSpecGrid = styled.dl`
   border-radius: ${radius.md}px;
   background: ${dark.fieldDeep};
 
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
+
   @media (max-width: ${breakpoint.sm}px) {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -596,6 +638,10 @@ export const TechSpecCell = styled.div`
   border: 1px solid ${dark.hairline};
   border-radius: ${radius.sm}px;
   background: ${dark.fieldRaised};
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+  }
 
   dt {
     margin: 0 0 0.5rem;

@@ -248,10 +248,32 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expect(scope).not.toContainText(staleScopeCopy)
     }
 
-    await expect(page.getByText("무장애 이동 경로 에디토리얼 명세표")).toBeVisible()
+    // [Phase 1 P0] 무장애 이동 경로 에디토리얼 명세표 4대 규격 렌더 검증
+    const routeSpec = page.getByRole("region", { name: "무장애 이동 경로 에디토리얼 명세표" })
+    await expect(routeSpec).toBeVisible()
+    for (const specCategory of ["수직 이동", "환승 연계", "시설 데이터", "운행 안전"]) {
+      await expect(routeSpec).toContainText(specCategory)
+    }
+
+    // 시스템 에러 및 내부 엔지니어링 방어 카피 영구 제거 단언
     await expect(page.locator("main")).not.toContainText("현재 경로를 계산할 수 없어요")
     await expect(page.locator("main")).not.toContainText("Journey V3")
     await expect(page.locator("main")).not.toContainText("경로 검색은 계속")
+
+    // [Phase 2 P1] 탈-슬롭: 9rem 고스트 넘버 및 BreakCut 띠 섹션 제거 단언
+    await expect(page.locator("main")).not.toContainText("현재 서버 기준의 결과만 안내합니다")
+
+    // [Phase 3 P2] 2x2 에디토리얼 기술 명세표 4대 팩트 렌더 검증
+    const techSpec = page.getByRole("region", { name: "정식 출시 기술 명세" })
+    await expect(techSpec).toBeVisible()
+    for (const specLabel of ["적용 범위", "접근성 데이터", "서비스 형태", "제공 플랫폼"]) {
+      await expect(techSpec).toContainText(specLabel)
+    }
+
+    // [Phase 3 P2] Not X but Y 대구법 카피라이팅 제거 단언
+    for (const notXbutY of ["시간보다 먼저", "화면을 늘리는 대신", "넓히기 전에"]) {
+      await expect(page.locator("main")).not.toContainText(notXbutY)
+    }
   })
 
   for (const viewport of VIEWPORTS) {
