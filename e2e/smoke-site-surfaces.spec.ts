@@ -225,6 +225,21 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expectWithinViewport(page, nav.getByRole("link", { name: label }), label)
     }
     await expectTouchTargets(page, "header a")
+
+    // 모바일 앵커 내비게이션 시 헤더에 가려지지 않음을 검증 (scroll-margin-top 버그 방지)
+    const header = page.locator("header")
+    const headerBox = await header.boundingBox()
+    expect(headerBox).not.toBeNull()
+
+    await nav.getByRole("link", { name: "기능" }).click()
+    await page.waitForTimeout(300)
+
+    const featuresSection = page.locator("#features")
+    const featuresBox = await featuresSection.boundingBox()
+    expect(featuresBox).not.toBeNull()
+    if (headerBox && featuresBox) {
+      expect(featuresBox.y).toBeGreaterThanOrEqual(Math.floor(headerBox.y + headerBox.height) - 1)
+    }
   })
 
   test("셀프 링크는 공개 URL이고 회사 표면 교차 링크는 절대 URL이다", async ({ page, baseURL }) => {
@@ -267,6 +282,8 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("main")).toContainText("빠른 환승·하차")
     await expect(page.locator("main")).toContainText("9-2 승차 위치 안내")
     await expect(page.locator("main")).toContainText("단차 0cm 이동")
+    await expect(page.locator("main")).toContainText("교통약자 특화")
+    await expect(page.locator("main")).toContainText("휠체어·유모차 맞춤 동선")
     await expect(page.getByRole("region", { name: "자주 묻는 질문" })).toBeVisible()
     await expect(page.locator("#scope")).toContainText("공식 20개 노선 무장애 데이터 연동")
     await expect(page.locator("#compare")).toContainText("계단 80개 구간 통과 강요")
