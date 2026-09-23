@@ -203,7 +203,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("meta[property='og:site_name']")).toHaveAttribute("content", "EasySubway")
     const description = page.locator("meta[name='description']")
     await expect(description).toHaveAttribute("content", /Android\/iOS/)
-    await expect(description).toHaveAttribute("content", /Journey V3/)
+    await expect(description).toHaveAttribute("content", /무장애/)
     await expect(description).toHaveAttribute("content", /전국 정식 출시를 준비/)
   })
 
@@ -240,7 +240,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("link[rel='alternate'][type='application/rss+xml']")).toHaveCount(0)
   })
 
-  test("전국 정식 출시 범위와 fail-closed 경로 안내를 노출한다", async ({ page }) => {
+  test("전국 정식 출시 범위와 무장애 이동 경로 명세를 노출한다", async ({ page }) => {
     await page.goto("/easysubway")
     const scope = page.locator("#scope")
     await expect(scope).toContainText("전국 기준")
@@ -248,9 +248,58 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expect(scope).not.toContainText(staleScopeCopy)
     }
 
-    const routeFailureCopy = "현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요."
-    await expect(page.getByText(routeFailureCopy, { exact: true })).toBeVisible()
+    // [Phase 1 P0] 무장애 이동 경로 에디토리얼 명세표 4대 규격 렌더 검증
+    const routeSpec = page.getByRole("region", { name: "무장애 이동 경로 에디토리얼 명세표" })
+    await expect(routeSpec).toBeVisible()
+    for (const specCategory of ["수직 이동", "환승 연계", "시설 데이터", "운행 안전"]) {
+      await expect(routeSpec).toContainText(specCategory)
+    }
+
+    // 시스템 에러 및 내부 엔지니어링 방어 카피 영구 제거 단언
+    await expect(page.locator("main")).not.toContainText("현재 경로를 계산할 수 없어요")
+    await expect(page.locator("main")).not.toContainText("Journey V3")
     await expect(page.locator("main")).not.toContainText("경로 검색은 계속")
+
+    // [Phase 2 P1] 탈-슬롭: 9rem 고스트 넘버 및 BreakCut 띠 섹션 제거 단언
+    await expect(page.locator("main")).not.toContainText("현재 서버 기준의 결과만 안내합니다")
+
+    // [Phase 3 P2] 2x2 에디토리얼 기술 명세표 4대 팩트 렌더 검증
+    const techSpec = page.getByRole("region", { name: "정식 출시 기술 명세" })
+    await expect(techSpec).toBeVisible()
+    for (const specLabel of ["적용 범위", "접근성 데이터", "서비스 형태", "제공 플랫폼"]) {
+      await expect(techSpec).toContainText(specLabel)
+    }
+
+    // [Phase 3 P2] Not X but Y 대구법 카피라이팅 제거 단언
+    for (const notXbutY of ["시간보다 먼저", "화면을 늘리는 대신", "넓히기 전에"]) {
+      await expect(page.locator("main")).not.toContainText(notXbutY)
+    }
+  })
+
+  test("스크롤 리빌 요소는 뷰포트 진입 시 is-visible 클래스를 부여받고 순차 노출된다", async ({
+    page,
+  }) => {
+    await page.goto("/easysubway")
+
+    const overviewIntro = page.locator("#overview [data-reveal]").first()
+    await expect(overviewIntro).toHaveAttribute("data-reveal", "true")
+
+    // 요소로 스크롤하여 진입 트리거
+    await overviewIntro.scrollIntoViewIfNeeded()
+    await expect(overviewIntro).toHaveClass(/is-visible/)
+    await expect(overviewIntro).toHaveAttribute("data-visible", "true")
+
+    // 기술 명세 셀 스태거 검증
+    const techSpecCell = page.locator("[data-reveal-group='tech-specs']").first()
+    await techSpecCell.scrollIntoViewIfNeeded()
+    await expect(techSpecCell).toHaveClass(/is-visible/)
+    await expect(techSpecCell).toHaveAttribute("data-visible", "true")
+
+    // 키보드 탭 이동 시 focus-within으로 즉시 시각적 노출 보장 (A11y)
+    const contactCta = page.locator("a[href^='mailto:']").last()
+    await contactCta.focus()
+    const contactBand = page.locator("[data-reveal]").filter({ has: contactCta })
+    await expect(contactBand).toBeVisible()
   })
 
   for (const viewport of VIEWPORTS) {

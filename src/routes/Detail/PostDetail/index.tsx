@@ -12,7 +12,7 @@ import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions
 import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
-const MarkdownRenderer = dynamic(() => import("../components/MarkdownRenderer"))
+const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"))
 
 const PostDetail: React.FC = () => {
   const { post: data } = usePostQuery()

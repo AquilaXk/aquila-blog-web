@@ -53,3 +53,15 @@ for (const status of [404, 503]) {
     expect(next.headers.get("Cache-Control")).toBe("private, no-store")
   })
 }
+
+test("does not duplicate initialAdminProfile in props", async () => {
+  globalThis.fetch = (async (input) => {
+    if (String(input).includes("/posts/101")) return json(200, post)
+    return json(200, { username: "Aquila", nickname: "Aquila" })
+  }) as typeof fetch
+  const res = response()
+  const result = await buildCanonicalPostDetailServerProps("101", res.res)
+  if ("props" in result) {
+    expect((result.props as Record<string, unknown>).initialAdminProfile).toBeUndefined()
+  }
+})

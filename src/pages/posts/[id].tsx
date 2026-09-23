@@ -5,7 +5,6 @@ import CustomError from "src/routes/Error"
 import MetaConfig from "src/components/MetaConfig"
 import PostDetail from "src/routes/Detail/PostDetail"
 import usePostQuery from "src/hooks/usePostQuery"
-import type { AdminProfile } from "src/hooks/useAdminProfile"
 import {
   buildCanonicalPostDetailServerProps,
 } from "src/libs/server/postDetailPage"
@@ -21,7 +20,6 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
 })
 
 type DetailPageProps = {
-  initialAdminProfile: AdminProfile | null
   initialAdminProfileSource: PublicAdminProfileSource
 }
 
