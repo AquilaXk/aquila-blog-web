@@ -22,28 +22,38 @@ export type PostSummarySource = NonNullable<
 
 export type TPost = {
   id: string
-  date: { start_date: string }
-  type: TPostType[]
+  title: string
   slug: string
-  tags?: string[]
-  category?: string[]
+  createdAt?: string
+  modifiedAt?: string
+  published?: boolean
+  listed?: boolean
+  authorId?: number
+  authorName?: string
+  authorUsername?: string
+  authorProfileImgUrl?: string
+  thumbnail?: string
   summary?: string
   summarySource?: PostSummarySource
+  tags?: string[]
+  category?: string[]
+  likesCount?: number
+  hitCount?: number
+  actorCanModify?: boolean
+  actorCanDelete?: boolean
+
+  // Legacy Notion schema compatibility fields
+  date?: { start_date: string }
+  type?: TPostType[]
+  status?: TPostStatus[]
   author?: {
     id: string
     name: string
     profile_photo?: string
   }[]
-  title: string
-  status: TPostStatus[]
-  createdTime: string
+  createdTime?: string
   modifiedTime?: string
-  fullWidth: boolean
-  thumbnail?: string
-  likesCount?: number
-  hitCount?: number
-  actorCanModify?: boolean
-  actorCanDelete?: boolean
+  fullWidth?: boolean
 }
 
 export type TrustedContentHtml = {

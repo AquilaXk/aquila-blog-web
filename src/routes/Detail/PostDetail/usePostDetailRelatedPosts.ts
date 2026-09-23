@@ -15,7 +15,7 @@ type UsePostDetailRelatedPostsArgs = {
 
 export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostDetailRelatedPostsArgs) => {
   const [shouldFetchRelated, setShouldFetchRelated] = useState(false)
-  const detailType = data?.type[0]
+  const detailType = data?.type?.[0] ?? "Post"
   const relatedTag = useMemo(
     () =>
       data?.tags
@@ -23,7 +23,10 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
         .find((tag) => tag && tag.toLowerCase() !== "pinned") || "",
     [data?.tags]
   )
-  const authorId = useMemo(() => data?.author?.[0]?.id || "", [data?.author])
+  const authorId = useMemo(
+    () => (typeof data?.authorId === "number" ? String(data.authorId) : data?.author?.[0]?.id || ""),
+    [data?.authorId, data?.author]
+  )
 
   const relatedByTagQuery = useQuery({
     queryKey: queryKey.postsExplore({

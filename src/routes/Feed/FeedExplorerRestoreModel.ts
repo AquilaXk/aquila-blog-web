@@ -34,9 +34,17 @@ export type FeedExplorerSnapshotPageParam = number | string | null
 export type FeedExplorerSnapshotPost = {
   id: string
   title: string
-  createdTime: string
+  createdAt?: string
+  createdTime?: string
   date?: { start_date: string }
+  modifiedAt?: string
   modifiedTime?: string
+  published?: boolean
+  listed?: boolean
+  authorId?: number
+  authorName?: string
+  authorUsername?: string
+  authorProfileImgUrl?: string
   summary: string
   summarySource: PostSummarySource
   thumbnail?: string
@@ -111,9 +119,17 @@ export const toSnapshotPost = (post: TPost): FeedExplorerSnapshotPost => {
   return {
     id: post.id,
     title: post.title,
-    createdTime: post.createdTime,
+    ...(post.createdAt ? { createdAt: post.createdAt } : {}),
+    ...(post.createdTime ? { createdTime: post.createdTime } : {}),
     ...(post.date?.start_date ? { date: { start_date: post.date.start_date } } : {}),
+    ...(post.modifiedAt ? { modifiedAt: post.modifiedAt } : {}),
     ...(post.modifiedTime ? { modifiedTime: post.modifiedTime } : {}),
+    ...(typeof post.published === "boolean" ? { published: post.published } : {}),
+    ...(typeof post.listed === "boolean" ? { listed: post.listed } : {}),
+    ...(typeof post.authorId === "number" ? { authorId: post.authorId } : {}),
+    ...(post.authorName ? { authorName: post.authorName } : {}),
+    ...(post.authorUsername ? { authorUsername: post.authorUsername } : {}),
+    ...(post.authorProfileImgUrl ? { authorProfileImgUrl: post.authorProfileImgUrl } : {}),
     summary: post.summary ?? "",
     summarySource: post.summarySource ?? "NONE",
     ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
@@ -146,30 +162,48 @@ export const toSnapshotPage = (page: ExplorePostsPage): FeedExplorerSnapshotPage
 })
 
 export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
+  const created = post.createdAt || post.createdTime || ""
   const dateStart =
     post.date?.start_date ||
-    (typeof post.createdTime === "string" && post.createdTime.length >= 10
-      ? post.createdTime.slice(0, 10)
-      : "1970-01-01")
+    (created.length >= 10 ? created.slice(0, 10) : "1970-01-01")
+  const authorName = post.authorName || post.author?.[0]?.name || "익명"
 
   return {
     id: post.id,
-    date: { start_date: dateStart },
-    type: ["Post"],
-    slug: post.id,
     title: post.title,
-    status: ["Public"],
-    createdTime: post.createdTime,
-    fullWidth: false,
-    ...(post.modifiedTime ? { modifiedTime: post.modifiedTime } : {}),
+    slug: post.id,
+    createdAt: created || undefined,
+    modifiedAt: post.modifiedAt || post.modifiedTime,
+    published: post.published ?? true,
+    listed: post.listed ?? true,
+    authorId: post.authorId,
+    authorName,
+    authorUsername: post.authorUsername,
+    authorProfileImgUrl: post.authorProfileImgUrl || post.author?.[0]?.profile_photo,
     summary: post.summary,
     summarySource: post.summarySource,
     ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
     ...(post.tags?.length ? { tags: post.tags } : {}),
     ...(post.category?.length ? { category: post.category } : {}),
-    ...(post.author?.length ? { author: post.author } : {}),
-    ...(typeof post.likesCount === "number" ? { likesCount: post.likesCount } : {}),
-    ...(typeof post.hitCount === "number" ? { hitCount: post.hitCount } : {}),
+    likesCount: typeof post.likesCount === "number" ? post.likesCount : 0,
+    hitCount: typeof post.hitCount === "number" ? post.hitCount : 0,
+
+    // Legacy compatibility fields
+    date: { start_date: dateStart },
+    type: ["Post"],
+    status: ["Public"],
+    author: post.author?.length
+      ? post.author
+      : [
+          {
+            id: String(post.authorId ?? ""),
+            name: authorName,
+            profile_photo: post.authorProfileImgUrl,
+          },
+        ],
+    createdTime: created,
+    modifiedTime: post.modifiedAt || post.modifiedTime,
+    fullWidth: false,
   }
 }
 

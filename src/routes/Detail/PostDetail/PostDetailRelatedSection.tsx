@@ -24,7 +24,7 @@ const renderSkeletonItems = (prefix: string) =>
 
 const getRelatedPostMeta = (post: TPost) => {
   const taxonomy = post.tags?.[0] || post.category?.[0] || post.type?.[0] || "Post"
-  return `${taxonomy} · ${formatDate(post.date?.start_date || post.createdTime)}`
+  return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "")}`
 }
 
 export const RelatedPostsSection = ({
