@@ -9,74 +9,35 @@ import {
   TECH_SPEC_ITEMS,
 } from "../../src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "../../src/routes/EasySubway/EasySubwayPage.styles"
+import EasySubwayRouteSpecTable from "../../src/routes/EasySubway/EasySubwayRouteSpecTable"
+import EasySubwayTechSpecGrid from "../../src/routes/EasySubway/EasySubwayTechSpecGrid"
+import { calculateRevealDelay } from "../../src/routes/EasySubway/useScrollReveal"
 
 /**
- * EasySubway RouteSpec 및 TechSpec 렌더 로직과 1:1로 대응하는 렌더러.
- * Playwright 단위 테스트 러너의 JSX __pw_type 래핑을 피해 React.createElement로 결정론적 마크업을 검증한다.
+ * Playwright 단위 테스트 러너가 JSX를 { __pw_type: "jsx" }로 래핑하므로,
+ * 실제 프로덕션 컴포넌트를 renderToStaticMarkup으로 검증할 수 있도록 React Element로 변환한다.
  */
+function unwrapPw(node: any, index?: number): any {
+  if (!node || typeof node !== "object") return node
+  if (Array.isArray(node)) return node.map((child, i) => unwrapPw(child, i))
+  if (node.__pw_type === "jsx") {
+    const { type, props, key } = node
+    const newProps: any = {}
+    for (const k in props) {
+      newProps[k] = unwrapPw(props[k])
+    }
+    const resolvedKey = key !== undefined && key !== null ? key : (index !== undefined ? `child-${index}` : undefined)
+    return createElement(type, { ...newProps, key: resolvedKey })
+  }
+  return node
+}
+
 const renderRouteSpecTable = (specs = BARRIER_FREE_ROUTE_SPECS) =>
-  renderToStaticMarkup(
-    createElement(
-      S.RouteSpecPanel,
-      { role: "region", "aria-label": "무장애 이동 경로 에디토리얼 명세표" },
-      createElement(
-        S.RouteSpecHeader,
-        null,
-        createElement(S.RouteSpecTitle, null, "무장애 이동 경로 에디토리얼 명세표"),
-        createElement(S.RouteSpecTag, null, "VERIFIED SPEC")
-      ),
-      createElement(
-        S.RouteSpecList,
-        null,
-        specs.map((spec) =>
-          createElement(
-            S.RouteSpecCard,
-            {
-              key: spec.id,
-              "data-reveal": "true",
-              "data-reveal-group": "route-specs",
-            } as any,
-            createElement("dt", null, spec.category),
-            createElement(
-              "dd",
-              null,
-              createElement("strong", null, spec.title),
-              createElement("p", null, spec.description)
-            )
-          )
-        )
-      )
-    )
-  )
+  renderToStaticMarkup(unwrapPw((EasySubwayRouteSpecTable as any)({ specs })))
 
 const renderTechSpecGrid = (items = TECH_SPEC_ITEMS) =>
-  renderToStaticMarkup(
-    createElement(
-      "section",
-      { role: "region", "aria-label": "정식 출시 기술 명세" },
-      createElement(
-        S.TechSpecGrid,
-        null,
-        items.map((item) =>
-          createElement(
-            S.TechSpecCell,
-            {
-              key: item.id,
-              "data-reveal": "true",
-              "data-reveal-group": "tech-specs",
-            } as any,
-            createElement("dt", null, item.label),
-            createElement(
-              "dd",
-              null,
-              createElement("strong", null, item.value),
-              createElement("p", null, item.detail)
-            )
-          )
-        )
-      )
-    )
-  )
+  renderToStaticMarkup(unwrapPw((EasySubwayTechSpecGrid as any)({ items })))
+
 
 test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
   test("무장애 이동 경로 에디토리얼 명세표는 4대 기준을 완전하게 렌더하고 시스템 에러 문구가 없다", () => {
@@ -206,23 +167,16 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
   })
 
   test("스크롤 리빌 스태거 알고리즘은 4단계 한도와 지정 딜레이 우선권을 보장한다", () => {
-    const maxSteps = 4
-    const stepMs = 60
-    const calculateDelay = (groupIndex: number, explicitDelay?: number) => {
-      if (explicitDelay !== undefined) return explicitDelay
-      const step = Math.min(groupIndex >= 0 ? groupIndex % maxSteps : 0, maxSteps - 1)
-      return step * stepMs
-    }
-
     // 그룹 내 인덱스 순서대로 0ms, 60ms, 120ms, 180ms 부여
-    expect(calculateDelay(0)).toBe(0)
-    expect(calculateDelay(1)).toBe(60)
-    expect(calculateDelay(2)).toBe(120)
-    expect(calculateDelay(3)).toBe(180)
-    // 4번째 요소는 0ms로 순환
-    expect(calculateDelay(4)).toBe(0)
+    expect(calculateRevealDelay(0)).toBe(0)
+    expect(calculateRevealDelay(1)).toBe(60)
+    expect(calculateRevealDelay(2)).toBe(120)
+    expect(calculateRevealDelay(3)).toBe(180)
+    // 4번째 요소는 0ms로 순환 (maxStaggerSteps = 4)
+    expect(calculateRevealDelay(4)).toBe(0)
 
-    // 명시적 딜레이가 있는 경우 그룹 순환을 덮어씀
-    expect(calculateDelay(2, 150)).toBe(150)
+    // 명시적 딜레이가 있는 경우 그룹 순환을 덮어씀 (숫자 및 문자열 지원)
+    expect(calculateRevealDelay(2, 150)).toBe(150)
+    expect(calculateRevealDelay(3, "200")).toBe(200)
   })
 })

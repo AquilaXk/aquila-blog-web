@@ -27,15 +27,26 @@ export const ProductSurface = styled.div`
   /* [Scroll Reveal] https://kimhss.github.io/portfolio/ 패리티:
      뷰포트 진입 전 24px 아래에서 대기하다가 진입 시 부드러운 cubic-bezier 곡선으로 순차 페이드인 */
   & [data-reveal] {
+    --reveal-delay: 0ms;
     opacity: 0;
     transform: translateY(24px);
-    transition: opacity 0.75s ease, transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition: opacity 0.75s ease var(--reveal-delay, 0ms),
+      transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms);
     will-change: opacity, transform;
   }
 
   & [data-reveal].is-visible {
     opacity: 1;
     transform: none;
+    will-change: auto;
+  }
+
+  /* 키보드 내비게이션(A11y): 포커스 진입 시 뷰포트 스크롤 전이라도 즉시 노출하여 초점 링 유실 방지 */
+  & [data-reveal]:focus-within {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -43,6 +54,17 @@ export const ProductSurface = styled.div`
       opacity: 1 !important;
       transform: none !important;
       transition: none !important;
+      will-change: auto !important;
+    }
+  }
+
+  /* No-JS / 크롤러 회복 탄력성: 자바스크립트 비활성화 환경에서 콘텐츠 블랭크 방지 */
+  @media (scripting: none) {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
     }
   }
 
@@ -51,6 +73,7 @@ export const ProductSurface = styled.div`
       opacity: 1 !important;
       transform: none !important;
       transition: none !important;
+      will-change: auto !important;
     }
   }
 `

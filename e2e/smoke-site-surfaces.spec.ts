@@ -287,11 +287,19 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     // 요소로 스크롤하여 진입 트리거
     await overviewIntro.scrollIntoViewIfNeeded()
     await expect(overviewIntro).toHaveClass(/is-visible/)
+    await expect(overviewIntro).toHaveAttribute("data-visible", "true")
 
     // 기술 명세 셀 스태거 검증
     const techSpecCell = page.locator("[data-reveal-group='tech-specs']").first()
     await techSpecCell.scrollIntoViewIfNeeded()
     await expect(techSpecCell).toHaveClass(/is-visible/)
+    await expect(techSpecCell).toHaveAttribute("data-visible", "true")
+
+    // 키보드 탭 이동 시 focus-within으로 즉시 시각적 노출 보장 (A11y)
+    const contactCta = page.locator("a[href^='mailto:']").last()
+    await contactCta.focus()
+    const contactBand = page.locator("[data-reveal]").filter({ has: contactCta })
+    await expect(contactBand).toBeVisible()
   })
 
   for (const viewport of VIEWPORTS) {

@@ -9,6 +9,29 @@ export type ScrollRevealOptions = {
 }
 
 /**
+ * 스크롤 리빌 스태거 트랜지션 딜레이 계산 함수.
+ * data-reveal-delay가 명시된 경우 우선 적용하고,
+ * 그 외의 경우 그룹 내 순서에 따라 0..3단계(0ms, 60ms, 120ms, 180ms)로 순환 딜레이를 부여한다.
+ */
+export const calculateRevealDelay = (
+  groupIndex: number,
+  explicitDelay?: number | string,
+  staggerMs = 60,
+  maxStaggerSteps = 4
+): number => {
+  if (explicitDelay !== undefined) {
+    const parsed =
+      typeof explicitDelay === "string" ? parseInt(explicitDelay, 10) : explicitDelay
+    if (!Number.isNaN(parsed)) return parsed
+  }
+  const step = Math.min(
+    groupIndex >= 0 ? groupIndex % maxStaggerSteps : 0,
+    maxStaggerSteps - 1
+  )
+  return step * staggerMs
+}
+
+/**
  * EasySubway 에디토리얼 스크롤 리빌(Scroll Reveal) 훅.
  * https://kimhss.github.io/portfolio/ 의 인터랙션 설계와 패리티를 맞추어
  * 뷰포트 진입 시 요소별 순차 페이드인 및 y축 슬라이드업(0.75s cubic-bezier)을 트리거한다.
@@ -44,33 +67,35 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
 
     // 2. IntersectionObserver 미지원 또는 모션 감소 시 즉시 노출
     if (isReducedMotion || typeof IntersectionObserver === "undefined") {
-      elements.forEach((el) => el.classList.add("is-visible"))
+      elements.forEach((el) => {
+        el.classList.add("is-visible")
+        el.setAttribute("data-visible", "true")
+      })
       return
     }
 
-    // 3. 그룹별 또는 순차 인덱스 기반 스태거 트랜지션 딜레이 설정
-    elements.forEach((element, index) => {
+    // 3. 그룹별 단일 패스(O(N)) 스태거 트랜지션 딜레이 설정
+    const groupIndices = new Map<string, number>()
+
+    elements.forEach((element, globalIndex) => {
       const explicitDelay = element.dataset.revealDelay
-      if (explicitDelay) {
-        element.style.transitionDelay = `${explicitDelay}ms`
-        return
+      const groupName = element.dataset.revealGroup
+
+      let indexInGroup = globalIndex
+      if (groupName) {
+        const currentIndex = groupIndices.get(groupName) ?? 0
+        groupIndices.set(groupName, currentIndex + 1)
+        indexInGroup = currentIndex
       }
 
-      const groupName = element.dataset.revealGroup
-      if (groupName) {
-        const groupElements = container.querySelectorAll<HTMLElement>(
-          `[data-reveal-group='${groupName}']`
-        )
-        const groupIndex = Array.prototype.indexOf.call(groupElements, element)
-        const step = Math.min(
-          groupIndex >= 0 ? groupIndex % maxStaggerSteps : 0,
-          maxStaggerSteps - 1
-        )
-        element.style.transitionDelay = `${step * staggerMs}ms`
-      } else {
-        const step = Math.min(index % maxStaggerSteps, maxStaggerSteps - 1)
-        element.style.transitionDelay = `${step * staggerMs}ms`
-      }
+      const delayMs = calculateRevealDelay(
+        indexInGroup,
+        explicitDelay,
+        staggerMs,
+        maxStaggerSteps
+      )
+      element.style.setProperty("--reveal-delay", `${delayMs}ms`)
+      element.style.transitionDelay = `${delayMs}ms`
     })
 
     // 4. 교차 관찰자 등록 (단방향 1회 노출)
@@ -78,8 +103,10 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
       (entries, obs) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return
-          entry.target.classList.add("is-visible")
-          obs.unobserve(entry.target)
+          const target = entry.target as HTMLElement
+          target.classList.add("is-visible")
+          target.setAttribute("data-visible", "true")
+          obs.unobserve(target)
         })
       },
       { threshold, rootMargin }
