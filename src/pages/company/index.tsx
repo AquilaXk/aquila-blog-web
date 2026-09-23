@@ -65,7 +65,7 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
       index: toCompanyNewsIndex(position),
       title: post.title,
       summary: toCompanyNewsSummary(post.summary),
-      date: toCompanyNewsDate(post.modifiedTime || post.createdTime),
+      date: toCompanyNewsDate(post.modifiedAt || post.modifiedTime || post.createdAt || post.createdTime || ""),
       href: `${BLOG_URL}/posts/${post.id}`,
       // 썸네일이 없는 글도 있다. 없는 자산을 지어내지 않고 에디토리얼 텍스트 카드로 렌더한다.
       thumbnail: toCompanyNewsThumbnail(post.thumbnail),

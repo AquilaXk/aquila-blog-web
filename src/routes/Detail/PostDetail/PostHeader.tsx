@@ -43,17 +43,19 @@ const PostHeader: React.FC<Props> = ({
   showThumbnail = true,
 }) => {
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
-  const authorName = postAuthor?.name?.trim() || "익명"
-  const authorImageSrc = postAuthor?.profile_photo || ""
+  const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || "익명"
+  const authorImageSrc = data.authorProfileImgUrl || postAuthor?.profile_photo || ""
   const tags = (data.tags || []).map((tag) => tag.trim()).filter(Boolean)
   const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()
   const rawTypeLabel = data.type?.[0]?.trim() || "Post"
   const typeLabel = rawTypeLabel === "Post" ? "Production note" : rawTypeLabel
   const heroLabels = primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]
-  const publishedAt = formatDateTime(data.createdTime, CONFIG.lang)
+  const publishedAt = formatDateTime(data.createdAt || data.createdTime || "", CONFIG.lang)
+  const effectiveModified = data.modifiedAt || data.modifiedTime
+  const effectiveCreated = data.createdAt || data.createdTime
   const modifiedAt =
-    data.modifiedTime && data.modifiedTime !== data.createdTime
-      ? formatDateTime(data.modifiedTime, CONFIG.lang)
+    effectiveModified && effectiveModified !== effectiveCreated
+      ? formatDateTime(effectiveModified, CONFIG.lang)
       : ""
   const thumbnailSrc = data.thumbnail ? normalizePublicPostImageUrl(stripThumbnailFocusFromUrl(data.thumbnail)) : ""
   const thumbnailFocusX = parseThumbnailFocusXFromUrl(data.thumbnail || "")
