@@ -11,7 +11,6 @@ import {
 } from "./serverMetricsBridge"
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080"
-const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"
 const DEFAULT_API_FETCH_TIMEOUT_MS = 12_000
 const DEFAULT_GET_TRANSIENT_RETRY_COUNT = 1
 const DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS = 120
@@ -332,27 +331,10 @@ export const getApiBaseUrl = () => {
   return DEFAULT_API_BASE_URL
 }
 
-const shouldUseBrowserBackendProxy = (safePath: string) => {
-  if (isServer) return false
-  if (process.env.NODE_ENV !== "production") return false
-
-  return (
-    safePath.startsWith("/member/api/v1/auth/") ||
-    safePath.startsWith("/member/api/v1/adm/") ||
-    safePath.startsWith("/post/api/v1/posts/temp") ||
-    safePath.startsWith("/post/api/v1/adm/") ||
-    safePath.startsWith("/system/api/v1/adm/")
-  )
-}
-
 export const getApiRequestUrl = (path: string, options: ApiRequestUrlOptions = {}) => {
   const safePath = normalizeApiRequestPath(path)
   if (options.backendProxy === "bypass") {
     return `${getApiBaseUrl()}${safePath}`
-  }
-
-  if (shouldUseBrowserBackendProxy(safePath)) {
-    return `${BROWSER_BACKEND_PROXY_PREFIX}${safePath}`
   }
 
   return `${getApiBaseUrl()}${safePath}`
