@@ -26,7 +26,7 @@ const EasySubwayPage: NextPageWithLayout<EasySubwayPageProps> = ({ canonicalUrl 
   <>
     <MetaConfig
       title={`${PRODUCT_SURFACE.name} — 교통약자를 먼저 생각한 지하철 길찾기`}
-      description="전국 정식 출시를 준비하는 Android/iOS 도시철도 이동 지원 서비스입니다. 노선도와 역 검색은 기기에서 제공하며, 경로 계산은 Journey V3 서버가 제공할 때만 이용할 수 있습니다."
+      description="전국 정식 출시를 준비하는 Android/iOS 도시철도 이동 지원 서비스입니다. 노선도와 역 검색, 계단과 환승 동선을 고려한 무장애 경로를 제공합니다."
       type="website"
       url={canonicalUrl}
       canonicalUrl={canonicalUrl}

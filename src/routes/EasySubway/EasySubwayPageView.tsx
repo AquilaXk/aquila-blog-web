@@ -2,6 +2,7 @@
 import { CONFIG } from "site.config"
 import EasySubwayLineArt from "src/routes/EasySubway/EasySubwayLineArt"
 import {
+  BARRIER_FREE_ROUTE_SPECS,
   COMPANY_SURFACE,
   COMPANY_URL,
   CONTACT_MAILTO,
@@ -14,15 +15,10 @@ import {
   PRODUCT_SCREENSHOT_ALT,
   PRODUCT_SCREENSHOT_SIZE,
   PRODUCT_SURFACE,
+  TECH_SPEC_ITEMS,
 } from "src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
 
-/**
- * 공개 가능한 실기기 검수본이 한 장이라, 그 한 장을 hero에서 원본 비율 무잘림으로 한 번, 기능
- * 블록에서 확대 컷으로 한 번만 쓴다. 확대 컷은 캡션으로 잘린 컷임을 밝히고, 나머지 섹션은 단색
- * 패널과 타이포로 구성한다 - 같은 이미지를 세 번째로 반복하거나 자리를 채우는 이미지를 만드는
- * 것보다 정직하고 덜 지루하다.
- */
 const [PICK_FEATURE, ROUTE_FEATURE] = PRODUCT_FEATURES
 
 /**
@@ -53,11 +49,6 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
     <main>
       <S.Hero>
-        <S.HeroStage aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </S.HeroStage>
         <S.LineArtLayer $align="bottom">
           <EasySubwayLineArt />
         </S.LineArtLayer>
@@ -73,8 +64,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
           </S.HeroLead>
         </S.HeroCopy>
         <S.HeroPhoneWrap>
-          {/* 히어로 폰은 무대의 주인공이라 다른 폰 컷보다 한 단계 크게 둔다(D6: 기존 20rem → +12.5%). */}
-          <S.PhoneFrame $tilt={-4} $width="22.5rem">
+          <S.PhoneFrame $width="21.5rem">
             <img
               src={PRODUCT_SCREENSHOT}
               alt={PRODUCT_SCREENSHOT_ALT}
@@ -94,12 +84,12 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
             <div>
               <S.Eyebrow>제품 개요</S.Eyebrow>
               <S.DisplayHeading>
-                시간보다 먼저
-                <strong>갈 수 있는지 봅니다</strong>
+                교통약자의 이동 경로를
+                <strong>직접 검증합니다</strong>
               </S.DisplayHeading>
             </div>
             <S.IntroAside>
-              전국 정식 출시를 준비하며 <strong>확인한 데이터와 접근성 근거</strong>만 제품에 반영합니다.
+              전국 정식 출시를 목표로 <strong>현장 데이터와 이동편의시설 근거</strong>를 꼼꼼히 검증해 반영합니다.
             </S.IntroAside>
           </S.IntroLayout>
           <S.MetaFactRow>
@@ -121,19 +111,19 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
             <div>
               <S.Eyebrow>핵심 기능</S.Eyebrow>
               <S.DisplayHeading>
-                화면을 늘리는 대신
-                <strong>한 화면을 정확하게</strong>
+                노선도 한 화면에서
+                <strong>역 선택과 이동 경로를 확인합니다</strong>
               </S.DisplayHeading>
             </div>
             <S.IntroAside>
-              노선도 한 화면에서 <strong>역 선택</strong>과 <strong>경로 지정</strong>이 끝나야 지하에서
-              쓸 수 있습니다.
+              노선도 화면에서 <strong>출발·경유·도착역 선택</strong>과 <strong>환승 경로 확인</strong>을 한 번에
+              진행할 수 있습니다.
             </S.IntroAside>
           </S.IntroLayout>
 
           <S.FeatureBlock>
             <div>
-              <S.GhostIndex aria-hidden="true">{PICK_FEATURE.index}</S.GhostIndex>
+              <S.FeatureIndex>01 / STATION SELECTION</S.FeatureIndex>
               <S.FeatureName>{PICK_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {PICK_FEATURE.lead} <S.InlineHighlight>{PICK_FEATURE.keyword}</S.InlineHighlight>
@@ -161,7 +151,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
 
           <S.FeatureBlock $reverse>
             <div>
-              <S.GhostIndex aria-hidden="true">{ROUTE_FEATURE.index}</S.GhostIndex>
+              <S.FeatureIndex>02 / ROUTE SPECIFICATION</S.FeatureIndex>
               <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
               <S.FeatureBody>
                 {ROUTE_FEATURE.lead} <S.InlineHighlight>{ROUTE_FEATURE.keyword}</S.InlineHighlight>
@@ -169,49 +159,61 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => (
               </S.FeatureBody>
             </div>
             <div>
-              <S.StatementPanel>
-                <span>화면에 적히는 문장</span>
-                <p>현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요.</p>
-              </S.StatementPanel>
+              {/* [Phase 1] 무장애 이동 경로 에디토리얼 명세표 컴포넌트 */}
+              <S.RouteSpecPanel>
+                <S.RouteSpecHeader>
+                  <S.RouteSpecTitle>무장애 이동 경로 에디토리얼 명세표</S.RouteSpecTitle>
+                  <S.RouteSpecTag>VERIFIED SPEC</S.RouteSpecTag>
+                </S.RouteSpecHeader>
+                <S.RouteSpecList>
+                  {BARRIER_FREE_ROUTE_SPECS.map((spec) => (
+                    <S.RouteSpecCard key={spec.id}>
+                      <dt>{spec.category}</dt>
+                      <dd>
+                        <strong>{spec.title}</strong>
+                        <p>{spec.description}</p>
+                      </dd>
+                    </S.RouteSpecCard>
+                  ))}
+                </S.RouteSpecList>
+              </S.RouteSpecPanel>
             </div>
           </S.FeatureBlock>
         </S.SectionInner>
       </S.Section>
 
-      <S.BreakCut>
-        <S.LineArtLayer>
-          <EasySubwayLineArt />
-        </S.LineArtLayer>
-        <p>
-          경로가 필요할 때는, <strong>현재 서버 기준의 결과만 안내합니다.</strong>
-        </p>
-      </S.BreakCut>
-
       <S.Section $tone="raised" id="scope">
         <S.SectionInner>
           <S.Eyebrow>정식 출시 기준</S.Eyebrow>
           <S.DisplayHeading>
-            넓히기 전에
-            <strong>확인부터 합니다</strong>
+            전국 정식 출시를 위한
+            <strong>데이터 검증 기준</strong>
           </S.DisplayHeading>
           <S.ScopeLayout>
             <div>
               <S.IntroAside>
-                전국 출시 기준을 통과한 데이터만 제품에 반영합니다. 범위를 넓히는 일보다{" "}
-                <strong>틀린 정보를 내보내지 않는 일</strong>이 먼저입니다.
+                전국 출시 기준에 맞춰 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
               </S.IntroAside>
               <S.ChipCluster>
                 {PRODUCT_SCOPE_CHIPS.map((chip) => (
                   <li key={chip.id}>
-                    <S.MetaPill $accent={chip.accent}>{chip.label}</S.MetaPill>
+                    <S.ScopeChip $accent={chip.accent}>{chip.label}</S.ScopeChip>
                   </li>
                 ))}
               </S.ChipCluster>
             </div>
-            <S.StatCard>
-              <strong>전국 기준</strong>
-              <span>정식 출시를 위한 데이터와 접근성 근거 검증</span>
-            </S.StatCard>
+            {/* [Phase 3] 2x2 에디토리얼 기술 명세표 */}
+            <S.TechSpecGrid>
+              {TECH_SPEC_ITEMS.map((item) => (
+                <S.TechSpecCell key={item.id}>
+                  <dt>{item.label}</dt>
+                  <dd>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </dd>
+                </S.TechSpecCell>
+              ))}
+            </S.TechSpecGrid>
           </S.ScopeLayout>
         </S.SectionInner>
       </S.Section>

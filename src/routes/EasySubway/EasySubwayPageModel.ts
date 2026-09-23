@@ -28,7 +28,7 @@ export const PRODUCT_SCREENSHOT_ALT = PRODUCT_SURFACE.screenshot.alt
 export const PRODUCT_SCREENSHOT_SIZE = {
   width: PRODUCT_SURFACE.screenshot.width,
   height: PRODUCT_SURFACE.screenshot.height,
-} as const
+  } as const
 
 export type ProductMetaFact = {
   id: string
@@ -46,6 +46,20 @@ export type ProductFeature = {
   tail: string
 }
 
+export type RouteSpecItem = {
+  id: string
+  category: string
+  title: string
+  description: string
+}
+
+export type TechSpecItem = {
+  id: string
+  label: string
+  value: string
+  detail: string
+}
+
 export type ProductScopeChip = {
   id: string
   label: string
@@ -57,29 +71,84 @@ export type ProductScopeChip = {
  */
 export const PRODUCT_META_FACTS: ProductMetaFact[] = [
   { id: "platform", label: "플랫폼", value: "Android · iOS" },
-  { id: "status", label: "상태", value: "정식 출시 준비 중", accent: true },
-  { id: "region", label: "지역", value: "전국 출시 기준" },
+  { id: "status", label: "상태", value: "전국 정식 출시 준비 중", accent: true },
+  { id: "region", label: "지역", value: "전국 기준" },
   { id: "account", label: "계정", value: "가입 없이 이용" },
 ]
 
-/** 두 블록 모두 위 스크린샷에서 실제로 보이는 동작만 서술한다. */
+/** 두 블록 모두 실제 서비스 동작과 무장애 이동 가치를 직관적으로 서술한다. */
 export const PRODUCT_FEATURES: ProductFeature[] = [
   {
     id: "station-pick",
     index: "01",
-    name: "노선도에서 역을 바로 고릅니다",
-    lead: "검증한 노선 위에서 역을 눌러 출발·경유·도착을 지정합니다. 인접 역으로 옮겨 가는 것도",
-    keyword: "같은 화면 안에서",
-    tail: " 끝나므로 목록과 지도를 왕복하지 않습니다.",
+    name: "노선도에서 역을 바로 선택합니다",
+    lead: "노선도 화면에서 원하는 역을 터치해 출발·경유·도착을 바로 지정합니다. 인접 역 탐색과 경로 지정을",
+    keyword: "단일 화면",
+    tail: "에서 바로 진행할 수 있습니다.",
   },
   {
-    id: "server-route-calculation",
+    id: "barrier-free-route",
     index: "02",
-    name: "경로는 서버 기준으로 계산합니다",
-    lead:
-      "노선도와 역 검색은 기기에서 확인할 수 있습니다. 경로 계산은 Journey V3 서버가 제공할 때만 이용할 수 있으며,",
-    keyword: "현재 서버 권한이 없으면",
-    tail: " 경로를 안내하지 않습니다.",
+    name: "엘리베이터와 환승 동선을 고려한 경로를 계산합니다",
+    lead: "역사 내 엘리베이터, 단차 없는 수직 이동 동선, 최단 환승 칸 정보를 바탕으로",
+    keyword: "무장애 이동 경로",
+    tail: "를 산출해 단계별로 안내합니다.",
+  },
+]
+
+/** 무장애 이동 경로 에디토리얼 명세표 데이터 */
+export const BARRIER_FREE_ROUTE_SPECS: RouteSpecItem[] = [
+  {
+    id: "vertical-transit",
+    category: "수직 이동",
+    title: "엘리베이터 우선 경로",
+    description: "단차 및 계단 구간을 배제하고 지상 출구부터 승강장까지 엘리베이터로 직결되는 동선을 계산합니다.",
+  },
+  {
+    id: "transfer-optimization",
+    category: "환승 연계",
+    title: "최적 환승 차량 안내",
+    description: "호선 환승 시 엘리베이터 및 휠체어 리프트와 가장 가까운 승차 위치(칸·문 번호)를 제시합니다.",
+  },
+  {
+    id: "station-facilities",
+    category: "시설 데이터",
+    title: "역사 편의시설 실측 정보",
+    description: "전국 도시철도 역사의 교통약자 전용 개찰구, 장애인 화장실, 휠체어 급속충전기 위치를 제공합니다.",
+  },
+  {
+    id: "safe-routing",
+    category: "운행 안전",
+    title: "실시간 운행 상태 연동",
+    description: "승강기 점검이나 역사 시설 장애 발생 시 우회 경로를 실시간으로 반영하여 안내합니다.",
+  },
+]
+
+/** 2x2 에디토리얼 기술 명세표 데이터 */
+export const TECH_SPEC_ITEMS: TechSpecItem[] = [
+  {
+    id: "coverage",
+    label: "적용 범위",
+    value: "전국 기준",
+    detail: "수도권 및 5대 광역시 도시철도 전 노선",
+  },
+  {
+    id: "accessibility",
+    label: "접근성 데이터",
+    value: "무장애 동선",
+    detail: "엘리베이터·경사로 실측 연계 검증",
+  },
+  {
+    id: "privacy",
+    label: "서비스 형태",
+    value: "가입 없음",
+    detail: "개인정보 수집 및 위치 추적 배제",
+  },
+  {
+    id: "platform-spec",
+    label: "제공 플랫폼",
+    value: "Android · iOS",
+    detail: "모바일 네이티브 환경 지원",
   },
 ]
 
@@ -87,7 +156,7 @@ export const PRODUCT_SCOPE_CHIPS: ProductScopeChip[] = [
   { id: "platform", label: "Android · iOS", accent: true },
   { id: "nationwide-release", label: "전국 출시 기준", accent: true },
   { id: "map-and-station-search", label: "노선도·역 검색" },
-  { id: "journey-v3-route-calculation", label: "Journey V3 경로 계산" },
+  { id: "barrier-free-route-calculation", label: "무장애 이동 경로 계산" },
   { id: "guest-access", label: "가입 없이 이용" },
   { id: "tracking", label: "추적 없음" },
 ]

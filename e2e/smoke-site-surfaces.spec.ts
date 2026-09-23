@@ -203,7 +203,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("meta[property='og:site_name']")).toHaveAttribute("content", "EasySubway")
     const description = page.locator("meta[name='description']")
     await expect(description).toHaveAttribute("content", /Android\/iOS/)
-    await expect(description).toHaveAttribute("content", /Journey V3/)
+    await expect(description).toHaveAttribute("content", /무장애/)
     await expect(description).toHaveAttribute("content", /전국 정식 출시를 준비/)
   })
 
@@ -240,7 +240,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page.locator("link[rel='alternate'][type='application/rss+xml']")).toHaveCount(0)
   })
 
-  test("전국 정식 출시 범위와 fail-closed 경로 안내를 노출한다", async ({ page }) => {
+  test("전국 정식 출시 범위와 무장애 이동 경로 명세를 노출한다", async ({ page }) => {
     await page.goto("/easysubway")
     const scope = page.locator("#scope")
     await expect(scope).toContainText("전국 기준")
@@ -248,8 +248,9 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expect(scope).not.toContainText(staleScopeCopy)
     }
 
-    const routeFailureCopy = "현재 경로를 계산할 수 없어요. Journey V3 서버가 제공될 때 다시 시도해 주세요."
-    await expect(page.getByText(routeFailureCopy, { exact: true })).toBeVisible()
+    await expect(page.getByText("무장애 이동 경로 에디토리얼 명세표")).toBeVisible()
+    await expect(page.locator("main")).not.toContainText("현재 경로를 계산할 수 없어요")
+    await expect(page.locator("main")).not.toContainText("Journey V3")
     await expect(page.locator("main")).not.toContainText("경로 검색은 계속")
   })
 
