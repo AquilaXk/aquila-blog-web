@@ -325,19 +325,21 @@ export interface paths {
         patch: operations["updateProfileIdentity"];
         trace?: never;
     };
-    "/system/api/v1/adm/cloud/files/{id}/external-content": {
+    "/system/api/v1/public/cloud/files/{id}/playback": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["externalContent"];
+        /** 외부 비디오 파일 재생 */
+        get: operations["playback"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        head: operations["externalContentHead"];
+        /** 외부 비디오 파일 메타데이터 조회 */
+        head: operations["playbackHead"];
         patch?: never;
         trace?: never;
     };
@@ -2360,7 +2362,7 @@ export interface operations {
             };
         };
     };
-    externalContent: {
+    playback: {
         parameters: {
             query: {
                 token: string;
@@ -2384,7 +2386,7 @@ export interface operations {
             };
         };
     };
-    externalContentHead: {
+    playbackHead: {
         parameters: {
             query: {
                 token: string;

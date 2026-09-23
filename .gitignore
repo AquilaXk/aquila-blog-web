@@ -40,3 +40,7 @@ yarn-error.log*
 # public/sitemap.xml
 
 /.firebase
+
+# local agent docs
+AGENTS.md
+GEMINI.md
