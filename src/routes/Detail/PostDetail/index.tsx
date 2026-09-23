@@ -56,7 +56,7 @@ const PostDetail: React.FC = () => {
     },
   })
 
-  const showFloatingLike = data?.type[0] === "Post"
+  const showFloatingLike = (data?.type?.[0] ?? "Post") === "Post"
   const {
     hitCount,
     handleSharePost,
@@ -361,12 +361,14 @@ const PostDetail: React.FC = () => {
     window.scrollTo({ top: targetTop, behavior: "smooth" })
   }
 
+  const isPostType = (data.type?.[0] ?? "Post") === "Post"
+
   return (
     <StyledWrapper data-sticky-rail-safe="true">
       <div className="detailReadProgress" aria-hidden="true">
         <span ref={readProgressRef} />
       </div>
-      {data.type[0] === "Post" && (
+      {isPostType && (
         <section className="detailHero">
           <PostHeader
             data={data}
@@ -398,7 +400,7 @@ const PostDetail: React.FC = () => {
         />
 
         <article ref={articleRef}>
-          {data.type[0] === "Post" ? (
+          {isPostType ? (
             <MobileSummaryActions
               likesCount={data.likesCount ?? 0}
               shareFeedback={shareFeedback}
@@ -422,8 +424,8 @@ const PostDetail: React.FC = () => {
               />
             </RecoverableSurfaceBoundary>
           </BodySection>
-          {data.type[0] === "Post" && <div ref={relatedPrefetchTriggerRef} className="relatedPrefetchTrigger" aria-hidden="true" />}
-          {data.type[0] === "Post" && shouldFetchRelated ? (
+          {isPostType && <div ref={relatedPrefetchTriggerRef} className="relatedPrefetchTrigger" aria-hidden="true" />}
+          {isPostType && shouldFetchRelated ? (
             <RelatedPostsSection
               relatedTag={relatedTag}
               showRelatedTagSkeleton={showRelatedTagSkeleton}

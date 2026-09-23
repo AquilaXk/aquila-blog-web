@@ -167,30 +167,41 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
   const postId = post.id ?? 0
   const postTitle = post.title ?? ""
   const postCreatedAt = post.createdAt ?? ""
+  const authorName = post.authorName || post.authorUsername || "익명"
   return {
     id: String(postId),
-    date: { start_date: postCreatedAt.slice(0, 10) },
-    type: ["Post"],
+    title: postTitle,
     slug: toSlug(postId, postTitle),
+    createdAt: postCreatedAt,
+    modifiedAt: post.modifiedAt,
+    published: post.published ?? false,
+    listed: post.listed ?? false,
+    authorId: post.authorId,
+    authorName,
+    authorUsername: post.authorUsername,
+    authorProfileImgUrl: authorProfileImage || undefined,
     summary: canonicalSummary.summary,
     summarySource: canonicalSummary.summarySource,
-    author: [
-      {
-        id: String(post.authorId ?? ""),
-        name: post.authorName || post.authorUsername || "익명",
-        profile_photo: authorProfileImage,
-      },
-    ],
-    title: postTitle,
     ...(hasThumbnail ? { thumbnail: normalizedThumbnail } : {}),
     ...(normalizedTags.length > 0 ? { tags: normalizedTags } : {}),
     ...(normalizedCategories.length > 0 ? { category: normalizedCategories } : {}),
+    likesCount: post.likesCount ?? 0,
+    hitCount: post.hitCount ?? 0,
+
+    // Legacy compatibility fields
+    date: { start_date: postCreatedAt.slice(0, 10) },
+    type: ["Post"],
     status: toStatus(post.published ?? false, post.listed ?? false),
+    author: [
+      {
+        id: String(post.authorId ?? ""),
+        name: authorName,
+        profile_photo: authorProfileImage,
+      },
+    ],
     createdTime: postCreatedAt,
     modifiedTime: post.modifiedAt,
     fullWidth: false,
-    likesCount: post.likesCount ?? 0,
-    hitCount: post.hitCount ?? 0,
   }
 }
 

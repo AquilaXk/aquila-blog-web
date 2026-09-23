@@ -35,15 +35,23 @@ const toStableIsoTimestamp = (value: string | undefined) => {
   return new Date(timestamp).toISOString()
 }
 
-const isSitemapVisiblePost = (post: TPost) =>
-  post.status.includes("Public") &&
-  !post.status.includes("Private") &&
-  !post.status.includes("PublicOnDetail")
+const isSitemapVisiblePost = (post: TPost) => {
+  if (typeof post.published === "boolean" && typeof post.listed === "boolean") {
+    return post.published && post.listed
+  }
+  return (
+    post.status?.includes("Public") === true &&
+    !post.status?.includes("Private") &&
+    !post.status?.includes("PublicOnDetail")
+  )
+}
 
 export const getSitemapPostLastmod = (post: TPost) =>
+  toStableIsoTimestamp(post.modifiedAt) ??
   toStableIsoTimestamp(post.modifiedTime) ??
+  toStableIsoTimestamp(post.createdAt) ??
   toStableIsoTimestamp(post.createdTime) ??
-  toStableIsoTimestamp(post.date.start_date) ??
+  (post.date ? toStableIsoTimestamp(post.date.start_date) : null) ??
   "1970-01-01T00:00:00.000Z"
 
 const getLatestLastmod = (lastmods: string[], fallback: string) =>

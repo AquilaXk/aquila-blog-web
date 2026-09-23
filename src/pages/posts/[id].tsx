@@ -89,7 +89,7 @@ const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = () => {
   return (
     <>
       <MetaConfig {...meta} />
-      <DetailShell data-type={post.type}>
+      <DetailShell data-type={post.type?.[0] ?? "Post"}>
         <PostDetail />
       </DetailShell>
     </>

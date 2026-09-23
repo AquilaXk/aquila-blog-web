@@ -38,16 +38,24 @@ const toStableDate = (value: string | undefined) => {
   return new Date(timestamp)
 }
 
-const getRssPostDate = (post: TPost) =>
+export const getRssPostDate = (post: TPost) =>
+  toStableDate(post.modifiedAt) ??
   toStableDate(post.modifiedTime) ??
+  toStableDate(post.createdAt) ??
   toStableDate(post.createdTime) ??
-  toStableDate(post.date.start_date) ??
+  (post.date ? toStableDate(post.date.start_date) : null) ??
   new Date(0)
 
-const isRssVisiblePost = (post: TPost) =>
-  post.status.includes("Public") &&
-  !post.status.includes("Private") &&
-  !post.status.includes("PublicOnDetail")
+const isRssVisiblePost = (post: TPost) => {
+  if (typeof post.published === "boolean" && typeof post.listed === "boolean") {
+    return post.published && post.listed
+  }
+  return (
+    post.status?.includes("Public") === true &&
+    !post.status?.includes("Private") &&
+    !post.status?.includes("PublicOnDetail")
+  )
+}
 
 const hasMoreRssPages = (page: ExplorePostsPage, requestedPage: number, requestedPageSize: number) => {
   if (page.hasNext === true) return true

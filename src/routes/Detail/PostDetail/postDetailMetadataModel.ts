@@ -17,6 +17,7 @@ const toIsoDate = (value: string | undefined) => {
 const normalizePostImage = (post: TPost) => post.thumbnail?.trim() || ""
 
 const normalizeAuthorName = (post: TPost) =>
+  post.authorName?.trim() ||
   post.author?.find((author) => author.name.trim().length > 0)?.name.trim() ||
   "익명"
 
@@ -77,9 +78,9 @@ const buildBreadcrumbJsonLd = (
 export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
   const canonicalPath = toCanonicalPostPath(post.id)
   const canonicalUrl = `${SITE_URL}${canonicalPath}`
-  const publishedDate = toIsoDate(post.createdTime || post.date?.start_date)
+  const publishedDate = toIsoDate(post.createdAt || post.createdTime || post.date?.start_date)
   const modifiedDate = toIsoDate(
-    post.modifiedTime || post.createdTime || post.date?.start_date
+    post.modifiedAt || post.modifiedTime || post.createdAt || post.createdTime || post.date?.start_date
   )
   const image = normalizePostImage(post)
 
@@ -89,7 +90,7 @@ export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
     modifiedDate,
     image,
     description: post.summary || "",
-    type: Array.isArray(post.type) ? post.type[0] : post.type,
+    type: Array.isArray(post.type) ? post.type[0] || "Post" : post.type || "Post",
     url: canonicalUrl,
     jsonLd: [
       buildBlogPostingJsonLd({

@@ -19,11 +19,11 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   const postPath = toCanonicalPostPath(data.id)
   const isEn = language === "en"
   const currentLang = isEn ? "en-US" : (CONFIG.lang || "ko-KR")
-  const createdAtText = formatDate(data.date?.start_date || data.createdTime, currentLang)
+  const createdAtText = formatDate(data.createdAt || data.date?.start_date || data.createdTime || "", currentLang)
 
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
-  const authorName = postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")
-  const authorImageSrc = postAuthor?.profile_photo || ""
+  const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")
+  const authorImageSrc = data.authorProfileImgUrl || postAuthor?.profile_photo || ""
 
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||
