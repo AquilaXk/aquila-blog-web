@@ -221,8 +221,7 @@ export const StyledWrapper = styled.header `
     transition:
       border-color 0.18s ease,
       background-color 0.18s ease,
-      color 0.18s ease,
-      transform 0.12s ease;
+      color 0.18s ease;
 
     svg {
       font-size: 1.05rem;
@@ -231,10 +230,6 @@ export const StyledWrapper = styled.header `
     &:hover:not(:disabled) {
       border-color: var(--aq-border-strong, var(--aq-text));
       background: var(--aq-surface-elevated, transparent);
-    }
-
-    &:active:not(:disabled) {
-      transform: scale(0.97);
     }
 
     &[data-active="true"] {
@@ -269,8 +264,7 @@ export const StyledWrapper = styled.header `
     transition:
       border-color 0.18s ease,
       background-color 0.18s ease,
-      color 0.18s ease,
-      transform 0.12s ease;
+      color 0.18s ease;
 
     svg {
       font-size: 1rem;
@@ -279,10 +273,6 @@ export const StyledWrapper = styled.header `
     &:hover:not(:disabled) {
       border-color: var(--aq-border-strong, var(--aq-text));
       background: var(--aq-surface-elevated, transparent);
-    }
-
-    &:active:not(:disabled) {
-      transform: scale(0.97);
     }
   }
 
@@ -312,7 +302,7 @@ export const StyledWrapper = styled.header `
     overflow: hidden;
     position: relative;
     margin-top: 2rem;
-    border-radius: 6px;
+    border-radius: 0;
     width: 100%;
     border: 1px solid var(--aq-border);
     background-color: var(--aq-surface);
