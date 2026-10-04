@@ -307,7 +307,7 @@ const StyledWrapper = styled.div`
       gap: 0.35rem;
       min-height: 36px;
       padding: 0 0.82rem;
-      border-radius: 8px;
+      border-radius: 6px;
       border: 1px solid ${({ theme }) => theme.colors.gray6};
       background: transparent;
       color: ${({ theme }) => theme.colors.gray11};
@@ -315,11 +315,28 @@ const StyledWrapper = styled.div`
       font-weight: 700;
       cursor: pointer;
       text-decoration: none;
+      transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+
+      &:hover {
+        border-color: ${({ theme }) => theme.colors.gray8};
+        background: ${({ theme }) => theme.colors.gray3};
+        color: ${({ theme }) => theme.colors.gray12};
+      }
+
+      &:active {
+        transform: scale(0.97);
+      }
     }
 
     .actionBtn--primary {
       border-color: ${({ theme }) => theme.colors.blue7};
       color: ${({ theme }) => theme.colors.blue11};
+
+      &:hover {
+        border-color: ${({ theme }) => theme.colors.blue8};
+        background: ${({ theme }) => theme.colors.blue3};
+        color: ${({ theme }) => theme.colors.blue11};
+      }
     }
   }
 
@@ -341,7 +358,7 @@ const StyledWrapper = styled.div`
     .searchLoadingIcon {
       width: 2.1rem;
       height: 2.1rem;
-      border-radius: 8px;
+      border-radius: 6px;
       border: 1px solid ${({ theme }) => theme.colors.gray6};
       color: ${({ theme }) => theme.colors.blue10};
       display: inline-flex;
@@ -440,14 +457,19 @@ const StyledWrapper = styled.div`
   .loadMoreButton {
     min-height: 36px;
     padding: 0 0.9rem;
-    border-radius: 999px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.colors.gray2};
     color: ${({ theme }) => theme.colors.gray12};
     font-size: 0.86rem;
     font-weight: 700;
     cursor: pointer;
-    transition: opacity 0.16s ease;
+    transition: opacity 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+
+    &:hover:not(:disabled) {
+      border-color: ${({ theme }) => theme.colors.gray8};
+      background: ${({ theme }) => theme.colors.gray3};
+    }
 
     &:disabled {
       cursor: wait;

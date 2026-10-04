@@ -25,7 +25,7 @@ export const PrioritySection = styled(AdminPlainCard)`
   display: grid;
   gap: 0;
   padding: 0;
-  border-radius: 2px;
+  border-radius: 8px;
   overflow: hidden;
 
   @media (max-width: 1120px) {
@@ -47,7 +47,7 @@ export const ContextSection = styled(AdminPlainCard)`
   display: grid;
   gap: 12px;
   padding: 16px 18px;
-  border-radius: 2px;
+  border-radius: 8px;
 `
 
 export const ContextLinkGrid = styled(AdminInfoList)`
@@ -80,7 +80,7 @@ export const ContextMonitoringLinkCard = styled(AdminInfoLinkCard)`
 
 export const AdditionalPanelsSection = styled(AdminPlainCard)`
   padding: 14px 16px;
-  border-radius: 2px;
+  border-radius: 8px;
 `
 
 export const AdditionalPanelsDisclosure = styled.details`
@@ -201,7 +201,7 @@ export const PrioritySummary = styled.div`
   min-width: 4.4rem;
   min-height: 1.8rem;
   padding: 0.2rem 0.5rem;
-  border-radius: 2px;
+  border-radius: 4px;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};
   color: ${adminTextSecondary};

@@ -1,1 +1,9 @@
-vulnerabilities: []
+vulnerabilities:
+  - id: CVE-2026-93687
+    paths:
+      - yarn.lock
+    statement: "No patched braces 3.x release available; stack exhaustion on deeply nested patterns"
+  - id: GHSA-vfj7-8cjw-p6xm
+    paths:
+      - yarn.lock
+    statement: "No patched braces 3.x release available; stack exhaustion on deeply nested patterns"

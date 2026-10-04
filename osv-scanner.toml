@@ -1,0 +1,7 @@
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+reason = "no patched braces 3.x release available; stack exhaustion on deeply nested patterns"
+
+[[IgnoredVulns]]
+id = "CVE-2026-93687"
+reason = "no patched braces 3.x release available; stack exhaustion on deeply nested patterns"

@@ -161,7 +161,7 @@ export const StyledWrapper = styled.div `
       transform: translateY(-50%);
       white-space: nowrap;
       padding: 0.3rem 0.48rem;
-      border-radius: 6px;
+      border-radius: 4px;
       border: 1px solid var(--aq-border);
       background: var(--aq-surface);
       color: var(--aq-text-secondary);

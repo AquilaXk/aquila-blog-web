@@ -66,7 +66,7 @@ export const WorkspaceMain = styled.div`
 
 export const PrimaryCta = styled.button`
   border: 0;
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${({ theme }) => theme.colors.blue11};
   color: ${({ theme }) => theme.colors.gray1};
   min-height: 38px;
@@ -91,7 +91,7 @@ export const DeferredPanelPlaceholder = styled(AdminRailCard)<{ "data-size": "ac
   display: grid;
   gap: 0.3rem;
   padding: 0.92rem 1rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray5};
   background: ${({ theme }) => theme.colors.gray2};
   min-height: 92px;
@@ -111,7 +111,7 @@ export const DeferredPanelPlaceholder = styled(AdminRailCard)<{ "data-size": "ac
 export const RecentActionPanel = styled(AdminRailCard)`
   gap: 0.72rem;
   padding: 0.92rem 1rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray5};
 
   .panelHead {
@@ -138,7 +138,7 @@ export const RecentActionList = styled.ul`
     justify-content: space-between;
     gap: 0.72rem;
     padding: 0.8rem 0.88rem;
-    border-radius: 2px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
     background: ${({ theme }) => theme.colors.gray1};
   }
@@ -171,7 +171,7 @@ export const RecentActionList = styled.ul`
     align-items: center;
     min-height: 24px;
     padding: 0 0.56rem;
-    border-radius: 2px;
+    border-radius: 4px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.colors.gray2};
     color: ${({ theme }) => theme.colors.gray11};
