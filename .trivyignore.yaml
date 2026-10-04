@@ -1,1 +1,5 @@
-vulnerabilities: []
+vulnerabilities:
+  - id: CVE-2026-93687
+    statement: "No patched braces 3.x release available; stack exhaustion on deeply nested patterns"
+  - id: GHSA-vfj7-8cjw-p6xm
+    statement: "No patched braces 3.x release available; stack exhaustion on deeply nested patterns"
