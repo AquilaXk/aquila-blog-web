@@ -90,7 +90,7 @@ export const FeaturedStatusCard = styled.button`
   text-align: left;
   display: grid;
   gap: 0.55rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   padding: 1rem;
@@ -136,7 +136,7 @@ export const StatusCardButton = styled.button`
   text-align: left;
   display: grid;
   gap: 0.22rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};
   padding: 0.82rem 0.9rem;
@@ -188,7 +188,7 @@ export const WorkspaceSection = styled.section`
   display: grid;
   gap: 0.82rem;
   padding: 0.92rem;
-  border-radius: 2px;
+  border-radius: 8px;
   background: ${adminSurfaceRaised};
   border: 1px solid ${adminBorder};
   content-visibility: auto;
@@ -268,7 +268,7 @@ export const SubSectionHeading = styled.div`
 `
 
 export const DetailsPanel = styled.details`
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
 
@@ -314,7 +314,7 @@ export const DiagnosticsTabs = styled.div`
 export const DiagnosticsTabButton = styled.button`
   min-height: 38px;
   padding: 0 0.82rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray10};
@@ -394,7 +394,7 @@ export const MetricCard = styled.div`
   display: grid;
   gap: 0.22rem;
   padding: 0.82rem 0.88rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
 

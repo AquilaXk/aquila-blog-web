@@ -91,6 +91,8 @@ const StyledWrapper = styled.a`
     font-weight: 600;
     letter-spacing: -0.02em;
     overflow-wrap: anywhere;
+    word-break: keep-all;
+    text-wrap: balance;
     transition: color 120ms ease;
   }
 

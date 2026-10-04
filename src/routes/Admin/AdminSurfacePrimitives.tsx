@@ -298,7 +298,7 @@ export const AdminWorkspaceSectionNavButton = styled.button`
     top: 7px;
     bottom: 7px;
     width: 3px;
-    border-radius: 2px;
+    border-radius: 4px;
     background: ${({ theme }) => theme.colors.gray7};
   }
 

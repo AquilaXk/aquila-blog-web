@@ -315,11 +315,28 @@ const StyledWrapper = styled.div`
       font-weight: 700;
       cursor: pointer;
       text-decoration: none;
+      transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+
+      &:hover {
+        border-color: ${({ theme }) => theme.colors.gray8};
+        background: ${({ theme }) => theme.colors.gray3};
+        color: ${({ theme }) => theme.colors.gray12};
+      }
+
+      &:active {
+        transform: scale(0.97);
+      }
     }
 
     .actionBtn--primary {
       border-color: ${({ theme }) => theme.colors.blue7};
       color: ${({ theme }) => theme.colors.blue11};
+
+      &:hover {
+        border-color: ${({ theme }) => theme.colors.blue8};
+        background: ${({ theme }) => theme.colors.blue3};
+        color: ${({ theme }) => theme.colors.blue11};
+      }
     }
   }
 

@@ -124,7 +124,7 @@ export const DragHandleButton = styled.span`
   gap: 0.34rem;
   min-height: 32px;
   padding: 0 0.72rem;
-  border-radius: 2px;
+  border-radius: 4px;
   border: 1px dashed ${({ theme }) => theme.colors.gray6};
   color: ${({ theme }) => theme.colors.gray10};
   font-size: 0.78rem;

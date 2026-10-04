@@ -292,7 +292,7 @@ export const ChartBars = styled.div`
 export const ChartBar = styled.i`
   display: block;
   min-height: 8%;
-  border-radius: 2px 2px 0 0;
+  border-radius: 4px 4px 0 0;
   background: ${adminTeal};
 
   &[data-tone="warn"] {

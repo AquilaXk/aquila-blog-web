@@ -257,7 +257,7 @@ export const PostsDesktopTable = styled.table`
     width: 16px;
     height: 16px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-radius: 2px;
+    border-radius: 4px;
   }
 
   tbody tr:last-of-type td {
@@ -354,7 +354,7 @@ export const TitleButton = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.gray8};
     outline-offset: 3px;
-    border-radius: 2px;
+    border-radius: 4px;
   }
 `
 
@@ -371,7 +371,7 @@ export const MobileCardList = styled.div`
     display: grid;
     gap: 0.55rem;
     padding: 0.95rem;
-    border-radius: 2px;
+    border-radius: 8px;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
     background: ${({ theme }) => theme.colors.gray1};
   }
