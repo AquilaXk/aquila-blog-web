@@ -114,7 +114,7 @@ export const StatusChip = styled.span`
   justify-content: center;
   min-height: 38px;
   padding: 0 0.78rem;
-  border-radius: 2px;
+  border-radius: 4px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};
@@ -144,7 +144,7 @@ export const HeaderLink = styled.a`
   justify-content: center;
   min-height: 38px;
   padding: 0 0.9rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};
@@ -370,7 +370,7 @@ export const StatusDot = styled.i`
 `
 
 export const PanelCard = styled(AdminPlainCard)`
-  border-radius: 2px;
+  border-radius: 8px;
   overflow: hidden;
   box-shadow: none;
 `
@@ -498,7 +498,7 @@ export const SnapshotLeadBody = styled(PanelBody)`
 export const LeadMetaCard = styled(AdminInfoPanelCard)`
   gap: 0.38rem;
   padding: 0.72rem;
-  border-radius: 2px;
+  border-radius: 8px;
 `
 
 export const PanelFrame = styled.iframe`
@@ -592,5 +592,5 @@ export const ActionList = styled(AdminInfoList)`
 
 export const ActionListLinkCard = styled(AdminInfoLinkCard)`
   padding: 0.64rem 0.72rem;
-  border-radius: 2px;
+  border-radius: 6px;
 `
