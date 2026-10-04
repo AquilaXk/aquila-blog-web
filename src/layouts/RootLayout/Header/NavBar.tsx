@@ -404,13 +404,15 @@ const MobileMenuPanel = styled.div`
 
   kbd {
     border: 1px solid var(--aq-border);
+    border-radius: 4px;
     background: var(--aq-surface-elevated);
-    padding: 0.2rem 0.3rem;
+    padding: 0.15rem 0.35rem;
     color: var(--aq-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.625rem;
     line-height: 1;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 1px 0 1px var(--aq-border);
   }
 `
 
@@ -528,6 +530,13 @@ const StyledWrapper = styled.div`
     border-radius: 6px;
     cursor: pointer;
     text-decoration: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      border-color: var(--aq-border-strong);
+      background: var(--aq-surface-elevated);
+      color: var(--aq-text);
+    }
 
     svg {
       width: 0.9375rem;
@@ -547,13 +556,15 @@ const StyledWrapper = styled.div`
 
     kbd {
       border: 1px solid var(--aq-border);
+      border-radius: 4px;
       background: var(--aq-surface-elevated);
-      padding: 0.25rem 0.3rem;
+      padding: 0.15rem 0.35rem;
       color: var(--aq-muted);
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
       font-size: 0.625rem;
       line-height: 1;
-      font-weight: 600;
+      font-weight: 700;
+      box-shadow: 0 1px 0 1px var(--aq-border);
     }
   }
 

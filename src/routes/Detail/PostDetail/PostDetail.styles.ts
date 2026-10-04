@@ -123,12 +123,13 @@ export const StyledWrapper = styled.div `
     align-items: center;
     justify-content: center;
     padding: 0;
-    border-radius: 6px;
+    border-radius: 50%;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text-secondary);
     cursor: pointer;
-    transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+    box-shadow: 0 1px 3px var(--aq-border);
+    transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 
     svg {
       width: 1em;
@@ -140,6 +141,8 @@ export const StyledWrapper = styled.div `
       border-color: var(--aq-accent-link);
       background: var(--aq-surface);
       color: var(--aq-accent-link);
+      box-shadow: 0 2px 6px var(--aq-border);
+      transform: translateY(-1px);
     }
 
     &:disabled {
@@ -161,7 +164,7 @@ export const StyledWrapper = styled.div `
       transform: translateY(-50%);
       white-space: nowrap;
       padding: 0.3rem 0.48rem;
-      border-radius: 6px;
+      border-radius: 4px;
       border: 1px solid var(--aq-border);
       background: var(--aq-surface);
       color: var(--aq-text-secondary);

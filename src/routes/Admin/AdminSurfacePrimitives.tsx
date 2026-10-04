@@ -382,7 +382,7 @@ export const AdminInfoLinkCard = styled.a<{ $withIcon?: boolean }>`
     display: ${({ $withIcon = true }) => ($withIcon ? "grid" : "none")};
     width: 2.35rem;
     height: 2.35rem;
-    border-radius: 2px;
+    border-radius: 6px;
     place-items: center;
     background: transparent;
     color: ${({ theme }) => adminSecondaryText(theme)};
@@ -529,7 +529,7 @@ export const AdminTextActionButton = styled.button`
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: 4px;
   background: transparent;
   color: ${({ theme }) => adminSecondaryText(theme)};
   font-size: 0.84rem;
@@ -563,7 +563,7 @@ export const AdminTextActionLink = styled.a`
   display: inline-flex;
   align-items: center;
   min-height: 0;
-  border-radius: 2px;
+  border-radius: 4px;
   color: ${({ theme }) => adminSecondaryText(theme)};
   font-size: 0.84rem;
   font-weight: 700;
@@ -592,7 +592,7 @@ export const AdminActionCardButton = styled.button`
   display: grid;
   gap: 0.16rem;
   padding: 0.82rem 0.88rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => adminCardBorder(theme)};
   background: ${({ theme }) => adminRaisedSurface(theme)};
   color: ${({ theme }) => adminPrimaryText(theme)};
