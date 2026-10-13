@@ -20,6 +20,7 @@ export const Global = () => {
           text-size-adjust: 100%;
           overflow-x: visible;
           --article-readable-width: 47.5rem;
+          --app-header-height: 65px;
           --aq-font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
           --editor-split-readable-width: 42rem;
           --aq-page-bg: ${lightDesign.pageBackgroundColor};
@@ -86,6 +87,12 @@ export const Global = () => {
 
         code, pre, kbd, samp {
           font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        @media (max-width: 820px) {
+          html {
+            --app-header-height: 59px;
+          }
         }
 
         @media (max-width: 1199px) {

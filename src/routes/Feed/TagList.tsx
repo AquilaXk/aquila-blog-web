@@ -217,9 +217,9 @@ const StyledWrapper = styled.div`
     display: none;
     min-width: 0;
     position: sticky;
-    top: calc(var(--app-header-height, 56px) + 1.2rem);
-    max-height: calc(100vh - var(--app-header-height, 56px) - 1.8rem);
-    max-height: calc(100dvh - var(--app-header-height, 56px) - 1.8rem);
+    top: calc(var(--app-header-height, 65px) + 1.2rem);
+    max-height: calc(100vh - var(--app-header-height, 65px) - 1.8rem);
+    max-height: calc(100dvh - var(--app-header-height, 65px) - 1.8rem);
     overflow: hidden;
   }
 
