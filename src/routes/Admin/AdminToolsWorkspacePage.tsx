@@ -38,7 +38,11 @@ import {
 } from "src/routes/Admin/AdminToolsWorkspacePageState"
 import { AdminToolsWorkspaceSections } from "src/routes/Admin/AdminToolsWorkspaceSections"
 
-const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialSnapshot = EMPTY_INITIAL_SNAPSHOT }) => {
+const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
+  initialMember,
+  initialProfileSnapshot = null,
+  initialSnapshot = EMPTY_INITIAL_SNAPSHOT,
+}) => {
   const queryClient = useQueryClient()
   const { me, authStatus } = useAuthSession()
   const sessionMember = authStatus === "loading" || authStatus === "unavailable" ? initialMember : me || initialMember
@@ -78,10 +82,18 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
     refetchOnMount: false,
     refetchOnWindowFocus: false,
   })
+  const initialDashboardSnapshot = initialSnapshot.dashboardSnapshot ?? undefined
+  const initialDashboardSnapshotFetchedAt =
+    initialSnapshot.dashboardSnapshotFetchedAt ?? initialSnapshot.systemHealthFetchedAt
   const dashboardSnapshotQuery = useQuery({
     queryKey: ["admin", "tools", "dashboard-snapshot"],
     queryFn: (): Promise<DashboardSnapshotPayload> => apiFetch<DashboardSnapshotPayload>("/system/api/v1/adm/dashboard-snapshot"),
     enabled: Boolean(sessionMember?.isAdmin),
+    initialData: initialDashboardSnapshot,
+    initialDataUpdatedAt:
+      initialDashboardSnapshot && initialDashboardSnapshotFetchedAt
+        ? new Date(initialDashboardSnapshotFetchedAt).getTime()
+        : undefined,
     staleTime: 30_000,
     gcTime: 120_000,
     retry: 1,
@@ -406,7 +418,7 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({ initialMember, initialS
     setSectionJumpTarget(section)
   }
   if (!sessionMember) return null
-  const toolsWorkspaceSectionProps = { queryClient, sessionMember, loadingKey, setLoadingKey, executions, setExecutions, selectedExecutionId, setSelectedExecutionId, resultsFilter, setResultsFilter, taskQueueDiagnostics, setTaskQueueDiagnostics, taskQueueDiagnosticsError, setTaskQueueDiagnosticsError, taskQueueCheckedAt, setTaskQueueCheckedAt, cleanupDiagnostics, setCleanupDiagnostics, cleanupDiagnosticsError, setCleanupDiagnosticsError, cleanupCheckedAt, setCleanupCheckedAt, authSecurityEvents, setAuthSecurityEvents, authSecurityEventsError, setAuthSecurityEventsError, authSecurityCheckedAt, setAuthSecurityCheckedAt, systemHealthCheckedAt, setSystemHealthCheckedAt, activeSection, setActiveSection, sectionJumpTarget, setSectionJumpTarget, activeDiagnosticTab, setActiveDiagnosticTab, freshnessClock, setFreshnessClock, systemHealthQuery, dashboardSnapshot: dashboardSnapshotQuery.data ?? null, fetchSystemHealthCached, pushExecution, executeAction, fetchTaskQueueDiagnostics, fetchCleanupDiagnostics, fetchAuthSecurityEvents, filteredExecutions, resultFilterCounts, selectedExecution, rawSystemHealthStatus, hasSystemHealthStatus, isSystemHealthConnectionUnavailable, systemHealthStatus, taskQueueFreshness, cleanupFreshness, authFreshness, systemHealthFreshness, systemHealthSummary, systemHealthFetchedAt, isQueueLoading, isCleanupLoading, isAuthLoading, hasTaskQueueDiagnostics, hasAuthDiagnostics, hasCleanupDiagnostics, queueStatusLabel, cleanupStatusLabel, authSecurityStatusLabel, recentCheckedLabel, overviewStatusLabel, attentionItems, quickLinks, focusSection }
+  const toolsWorkspaceSectionProps = { queryClient, sessionMember, initialProfileSnapshot, loadingKey, setLoadingKey, executions, setExecutions, selectedExecutionId, setSelectedExecutionId, resultsFilter, setResultsFilter, taskQueueDiagnostics, setTaskQueueDiagnostics, taskQueueDiagnosticsError, setTaskQueueDiagnosticsError, taskQueueCheckedAt, setTaskQueueCheckedAt, cleanupDiagnostics, setCleanupDiagnostics, cleanupDiagnosticsError, setCleanupDiagnosticsError, cleanupCheckedAt, setCleanupCheckedAt, authSecurityEvents, setAuthSecurityEvents, authSecurityEventsError, setAuthSecurityEventsError, authSecurityCheckedAt, setAuthSecurityCheckedAt, systemHealthCheckedAt, setSystemHealthCheckedAt, activeSection, setActiveSection, sectionJumpTarget, setSectionJumpTarget, activeDiagnosticTab, setActiveDiagnosticTab, freshnessClock, setFreshnessClock, systemHealthQuery, dashboardSnapshot: dashboardSnapshotQuery.data ?? initialDashboardSnapshot ?? null, fetchSystemHealthCached, pushExecution, executeAction, fetchTaskQueueDiagnostics, fetchCleanupDiagnostics, fetchAuthSecurityEvents, filteredExecutions, resultFilterCounts, selectedExecution, rawSystemHealthStatus, hasSystemHealthStatus, isSystemHealthConnectionUnavailable, systemHealthStatus, taskQueueFreshness, cleanupFreshness, authFreshness, systemHealthFreshness, systemHealthSummary, systemHealthFetchedAt, isQueueLoading, isCleanupLoading, isAuthLoading, hasTaskQueueDiagnostics, hasAuthDiagnostics, hasCleanupDiagnostics, queueStatusLabel, cleanupStatusLabel, authSecurityStatusLabel, recentCheckedLabel, overviewStatusLabel, attentionItems, quickLinks, focusSection }
   return <AdminToolsWorkspaceSections {...toolsWorkspaceSectionProps} />
 }
 

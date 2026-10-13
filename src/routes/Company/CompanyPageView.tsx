@@ -95,16 +95,19 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
         </S.HeroCopy>
         <S.HeroShowcase>
           <S.HeroPhoneFrame>
-            <img
-              src={PRODUCT_SCREENSHOT}
-              alt={PRODUCT_SCREENSHOT_ALT}
-              width={PRODUCT_SCREENSHOT_SIZE.width}
-              height={PRODUCT_SCREENSHOT_SIZE.height}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              data-ui="company-hero-phone"
-            />
+            <picture>
+              <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
+              <img
+                src={PRODUCT_SCREENSHOT}
+                alt={PRODUCT_SCREENSHOT_ALT}
+                width={PRODUCT_SCREENSHOT_SIZE.width}
+                height={PRODUCT_SCREENSHOT_SIZE.height}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                data-ui="company-hero-phone"
+              />
+            </picture>
           </S.HeroPhoneFrame>
         </S.HeroShowcase>
       </S.Hero>

@@ -7,6 +7,7 @@ import { serverApiFetchJson } from "src/libs/server/backend"
 import { readServerSnapshot } from "src/libs/server/serverSnapshotCache"
 import { appendSsrDebugTiming, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
+import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import {
   type SystemHealthPayload,
   type TaskRetryPolicy,
@@ -90,6 +91,8 @@ type AuthSecurityEvent = {
 type AdminToolsInitialSnapshot = {
   systemHealth: SystemHealthPayload | null
   systemHealthFetchedAt: string | null
+  dashboardSnapshot?: DashboardSnapshotPayload | null
+  dashboardSnapshotFetchedAt?: string | null
   taskQueueDiagnostics: TaskQueueDiagnostics | null
   taskQueueCheckedAt: string | null
   cleanupDiagnostics: UploadedFileCleanupDiagnostics | null
@@ -107,6 +110,8 @@ type AdminToolsHealthSsrSnapshot = {
 type AdminToolsBootstrapPayload = {
   member: AuthMember
   health: SystemHealthPayload
+  dashboard?: DashboardSnapshotPayload | null
+  dashboardSnapshot?: DashboardSnapshotPayload | null
 }
 
 type AdminToolsPageProps = AdminPageProps & {
@@ -150,6 +155,7 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
   let baseProps: AdminPageProps
   let authDurationMs = 0
   let authDescription = "bootstrap"
+  let dashboardSnapshot: DashboardSnapshotPayload | null = null
   let systemHealthResult: {
     durationMs: number
     ok: true
@@ -158,6 +164,8 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
 
   if (bootstrapResult?.ok && bootstrapResult.value.ok) {
     baseProps = buildAdminPagePropsFromMember(bootstrapResult.value.value.member)
+    dashboardSnapshot =
+      bootstrapResult.value.value.dashboard ?? bootstrapResult.value.value.dashboardSnapshot ?? null
     systemHealthResult = {
       durationMs: bootstrapResult.durationMs,
       ok: true,
@@ -170,8 +178,9 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
       },
     }
   } else {
+    const hasCookie = hasServerAuthCookie(req)
     const systemHealthResultPromise =
-      hasServerAuthCookie(req)
+      hasCookie
         ? timed(() =>
             readServerSnapshot<AdminToolsHealthSsrSnapshot>(
               ADMIN_TOOLS_HEALTH_SSR_CACHE_KEY,
@@ -187,6 +196,9 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
             )
           )
         : null
+    const dashboardSnapshotPromise = hasCookie
+      ? readJsonIfOk<DashboardSnapshotPayload>(req, "/system/api/v1/adm/dashboard-snapshot")
+      : null
     const baseResult = await timed(() => getAdminPageProps(req))
     if (!baseResult.ok) throw baseResult.error
     if ("redirect" in baseResult.value) return baseResult.value
@@ -195,10 +207,10 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
     authDurationMs = baseResult.durationMs
     authDescription = "fallback"
 
-    const fallbackSystemHealthResult =
+    const [fallbackSystemHealthResult, fallbackDashboardSnapshot] = await Promise.all([
       systemHealthResultPromise
-        ? await systemHealthResultPromise
-        : await timed(() =>
+        ? systemHealthResultPromise
+        : timed(() =>
             readServerSnapshot<AdminToolsHealthSsrSnapshot>(
               ADMIN_TOOLS_HEALTH_SSR_CACHE_KEY,
               ADMIN_TOOLS_HEALTH_SSR_CACHE_TTL_MS,
@@ -211,14 +223,19 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
                 }
               }
             )
-          )
+          ),
+      dashboardSnapshotPromise ?? readJsonIfOk<DashboardSnapshotPayload>(req, "/system/api/v1/adm/dashboard-snapshot"),
+    ])
     if (!fallbackSystemHealthResult.ok) throw fallbackSystemHealthResult.error
     systemHealthResult = fallbackSystemHealthResult
+    dashboardSnapshot = fallbackDashboardSnapshot
   }
 
   const healthSnapshot = systemHealthResult.ok ? systemHealthResult.value.value : null
   const systemHealth = healthSnapshot?.systemHealth ?? null
   const fetchedAt = healthSnapshot?.fetchedAt ?? null
+  const dashboardSnapshotFetchedAt =
+    dashboardSnapshot?.generatedAt ?? (dashboardSnapshot ? fetchedAt ?? new Date().toISOString() : null)
 
   appendSsrDebugTiming(req, res, [
     {
@@ -244,6 +261,8 @@ export const getServerSideProps: GetServerSideProps<AdminToolsPageProps> = withS
       initialSnapshot: {
         systemHealth,
         systemHealthFetchedAt: fetchedAt,
+        dashboardSnapshot,
+        dashboardSnapshotFetchedAt,
         taskQueueDiagnostics: null,
         taskQueueCheckedAt: null,
         cleanupDiagnostics: null,

@@ -175,6 +175,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
                     width={132}
                     height={132}
                     alt={`${displayName} profile`}
+                    priority
                     fillContainer
                   />
                 </div>

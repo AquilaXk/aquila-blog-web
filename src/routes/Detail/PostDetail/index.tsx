@@ -5,6 +5,7 @@ import usePostQuery from "src/hooks/usePostQuery"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
 import { RelatedPostsSection } from "./PostDetailRelatedSection"
 import {
+  buildInitialTocFromMarkdown,
   collectTocFromArticle,
   createObserverRegistry,
   createRafScheduler,
@@ -34,8 +35,9 @@ const PostDetail: React.FC = () => {
   const rightRailInnerRef = useRef<HTMLElement | null>(null)
   const rightTocListRef = useRef<HTMLOListElement | null>(null)
   const readProgressRef = useRef<HTMLSpanElement | null>(null)
-  const [tocItems, setTocItems] = useState<TocItem[]>([])
-  const [activeTocId, setActiveTocId] = useState<string>("")
+  const initialToc = useMemo(() => buildInitialTocFromMarkdown(data?.content ?? ""), [data?.content])
+  const [tocItems, setTocItems] = useState<TocItem[]>(initialToc)
+  const [activeTocId, setActiveTocId] = useState<string>(() => initialToc[0]?.id ?? "")
   const [showDetailedToc, setShowDetailedToc] = useState(false)
   const [leftHybridRailActive, setLeftHybridRailActive] = useState(false)
   const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
@@ -184,15 +186,16 @@ const PostDetail: React.FC = () => {
   useEffect(() => {
     const article = articleRef.current
     if (!article) {
-      setTocItems([])
-      setActiveTocId("")
+      setTocItems(initialToc)
+      setActiveTocId(initialToc[0]?.id ?? "")
       return
     }
 
     let rafId: number | null = null
 
     const syncToc = () => {
-      const collected = collectTocFromArticle(article)
+      const domCollected = collectTocFromArticle(article)
+      const collected = domCollected.length > 0 ? domCollected : initialToc
       setTocItems((prev) => (isSameToc(prev, collected) ? prev : collected))
       setActiveTocId((prev) => (collected.some((item) => item.id === prev) ? prev : collected[0]?.id ?? ""))
     }
@@ -222,7 +225,7 @@ const PostDetail: React.FC = () => {
         window.cancelAnimationFrame(rafId)
       }
     }
-  }, [data?.id, renderedContent])
+  }, [data?.id, initialToc, renderedContent])
 
   useEffect(() => {
     if (typeof window === "undefined") return

@@ -112,6 +112,12 @@ module.exports = {
         value: "public, max-age=86400, stale-while-revalidate=604800",
       },
     ]
+    const immutableAssetCacheHeaders = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=31536000, immutable",
+      },
+    ]
 
     return [
       {
@@ -128,6 +134,30 @@ module.exports = {
       },
       {
         source: "/brand-mascot.:slug*.png",
+        headers: immutableAssetCacheHeaders,
+      },
+      {
+        source: "/pdf.worker.min.mjs",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/pdfjs/:path*",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/images/:path*",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/favicon.ico",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/apple-touch-icon.png",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/avatar.png",
         headers: staticAssetCacheHeaders,
       },
     ]

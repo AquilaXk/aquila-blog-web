@@ -86,94 +86,96 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
 
   let tableRenderIndex = 0
 
-  const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => (
-    <ReactMarkdown
-      key={key}
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeKatex]}
-      components={{
-        p({ children }) {
-          if (inlineOnly) return <>{children}</>
-          return <MarkdownParagraph inCallout={inCallout}>{children}</MarkdownParagraph>
-        },
-        blockquote({ children }) {
-          return <MarkdownBlockquote>{children}</MarkdownBlockquote>
-        },
-        table({ children, ...props }) {
-          const layout = tableLayouts[tableRenderIndex] || null
-          tableRenderIndex += 1
-          return (
-            <MarkdownTableRenderer layout={layout} {...props}>
-              {children}
-            </MarkdownTableRenderer>
-          )
-        },
-        tr({ children, ...props }) {
-          return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
-        },
-        th({ children, node, ...props }) {
-          return (
-            <MarkdownTableCellRenderer
-              as="th"
-              alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-              className={props.className}
-            >
-              {children}
-            </MarkdownTableCellRenderer>
-          )
-        },
-        td({ children, node, ...props }) {
-          return (
-            <MarkdownTableCellRenderer
-              as="td"
-              alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-              className={props.className}
-            >
-              {children}
-            </MarkdownTableCellRenderer>
-          )
-        },
-        img({ src, alt }) {
-          const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
-          if (!imageSrc) {
-            const blockedLabel = alt || "차단된 이미지"
-            return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
-          }
-          const isFirstImage = imageRenderOrderRef.current === 0
-          imageRenderOrderRef.current += 1
+  const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
+    const hasMath = markdown.includes("$")
+    return (
+      <ReactMarkdown
+        key={key}
+        remarkPlugins={hasMath ? [remarkGfm, remarkMath] : [remarkGfm]}
+        rehypePlugins={hasMath ? [rehypeKatex] : []}
+        components={{
+          p({ children }) {
+            if (inlineOnly) return <>{children}</>
+            return <MarkdownParagraph inCallout={inCallout}>{children}</MarkdownParagraph>
+          },
+          blockquote({ children }) {
+            return <MarkdownBlockquote>{children}</MarkdownBlockquote>
+          },
+          table({ children, ...props }) {
+            const layout = tableLayouts[tableRenderIndex] || null
+            tableRenderIndex += 1
+            return (
+              <MarkdownTableRenderer layout={layout} {...props}>
+                {children}
+              </MarkdownTableRenderer>
+            )
+          },
+          tr({ children, ...props }) {
+            return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
+          },
+          th({ children, node, ...props }) {
+            return (
+              <MarkdownTableCellRenderer
+                as="th"
+                alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
+                className={props.className}
+              >
+                {children}
+              </MarkdownTableCellRenderer>
+            )
+          },
+          td({ children, node, ...props }) {
+            return (
+              <MarkdownTableCellRenderer
+                as="td"
+                alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
+                className={props.className}
+              >
+                {children}
+              </MarkdownTableCellRenderer>
+            )
+          },
+          img({ src, alt }) {
+            const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
+            if (!imageSrc) {
+              const blockedLabel = alt || "차단된 이미지"
+              return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
+            }
+            const isFirstImage = imageRenderOrderRef.current === 0
+            imageRenderOrderRef.current += 1
 
-          let imgWidth: number | undefined
-          let imgHeight: number | undefined
-          try {
-            const parsed = new URL(imageSrc, "https://dummy.local")
-            const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
-            const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
-            if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
-            if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
-          } catch {}
+            let imgWidth: number | undefined
+            let imgHeight: number | undefined
+            try {
+              const parsed = new URL(imageSrc, "https://dummy.local")
+              const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
+              const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
+              if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
+              if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
+            } catch {}
 
-          const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
+            const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
 
-          return (
-            <figure
-              className="aq-image-frame"
-              style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageSrc}
-                alt={alt || ""}
-                width={imgWidth}
-                height={imgHeight}
-                style={aspectRatio ? { aspectRatio } : undefined}
-                loading={isFirstImage ? "eager" : "lazy"}
-                fetchPriority={isFirstImage ? "high" : "auto"}
-                decoding="async"
-              />
-              {alt ? <figcaption>{alt}</figcaption> : null}
-            </figure>
-          )
-        },
+            return (
+              <figure
+                className="aq-image-frame"
+                style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt={alt || ""}
+                  width={imgWidth}
+                  height={imgHeight}
+                  style={aspectRatio ? { aspectRatio } : undefined}
+                  loading={isFirstImage ? "eager" : "lazy"}
+                  fetchPriority={isFirstImage ? "high" : undefined}
+                  decoding="async"
+                />
+                {alt ? <figcaption>{alt}</figcaption> : null}
+              </figure>
+            )
+          },
         a({ children, href, title, node: _node, ...props }) {
           return (
             <MarkdownFootnoteReferenceLink footnotes={footnotes} marker={footnoteMarker} href={href} title={title} {...props}>
@@ -253,7 +255,8 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     >
       {markdown}
     </ReactMarkdown>
-  )
+    )
+  }
 
   if (resolvedContentHtml) {
     return (

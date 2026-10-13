@@ -152,6 +152,7 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
           readAdminProtectedBootstrap<AdminHubBootstrapPayload>(req, "/member/api/v1/adm/members/bootstrap", "/admin")
         )
       : null
+  const operationalResultPromise = hasAuthCookie ? timed(() => readAdminHubOperationalSnapshot(req)) : null
 
   const bootstrapResult = bootstrapResultPromise ? await bootstrapResultPromise : null
   if (bootstrapResult && !bootstrapResult.ok) {
@@ -192,8 +193,8 @@ export const getServerSideProps: GetServerSideProps<AdminHubPageProps> = withSsr
     profileDescription = "unavailable"
   }
 
-  if (hasAuthCookie) {
-    const operationalResult = await timed(() => readAdminHubOperationalSnapshot(req))
+  if (operationalResultPromise) {
+    const operationalResult = await operationalResultPromise
     if (!operationalResult.ok) throw operationalResult.error
     operationalSnapshot = operationalResult.value
     operationalDurationMs = operationalResult.durationMs

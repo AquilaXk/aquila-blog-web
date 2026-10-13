@@ -14,6 +14,7 @@ export const AdminToolsWorkspaceSections = (props: Record<string, any>) => {
     executions,
     filteredExecutions,
     freshnessClock,
+    initialProfileSnapshot,
     loadingKey,
     resultFilterCounts,
     resultsFilter,
@@ -24,7 +25,7 @@ export const AdminToolsWorkspaceSections = (props: Record<string, any>) => {
   } = props
 
   return (
-    <AdminShell currentSection="tools" member={sessionMember}>
+    <AdminShell currentSection="tools" member={sessionMember} profileSnapshot={initialProfileSnapshot}>
       <Main>
         <AdminToolsOpsOverview {...props} loadingKey={loadingKey} />
 

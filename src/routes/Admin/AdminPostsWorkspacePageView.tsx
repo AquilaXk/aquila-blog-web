@@ -19,6 +19,7 @@ export const AdminPostsWorkspacePageView = (props: Record<string, any>) => {
     confirmState,
     handleConfirmAction,
     handleToastAction,
+    initialProfileSnapshot,
     isListLoading,
     listError,
     listKw,
@@ -47,7 +48,7 @@ export const AdminPostsWorkspacePageView = (props: Record<string, any>) => {
   } = props
 
   return (
-    <AdminShell currentSection="posts" member={sessionMember}>
+    <AdminShell currentSection="posts" member={sessionMember} profileSnapshot={initialProfileSnapshot}>
       <Main>
         <HeroSection>
           <AdminWorkspaceHeroLayout>

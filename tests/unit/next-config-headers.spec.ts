@@ -39,9 +39,29 @@ test.describe("next.config.js static asset cache headers", () => {
       expect.arrayContaining([
         {
           key: "Cache-Control",
-          value: "public, max-age=86400, stale-while-revalidate=604800",
+          value: "public, max-age=31536000, immutable",
         },
       ])
     )
+
+    for (const source of [
+      "/pdf.worker.min.mjs",
+      "/pdfjs/:path*",
+      "/images/:path*",
+      "/favicon.ico",
+      "/apple-touch-icon.png",
+      "/avatar.png",
+    ]) {
+      const headers = bySource.get(source)
+      expect(headers, `expected Cache-Control headers for ${source}`).toBeDefined()
+      expect(headers).toEqual(
+        expect.arrayContaining([
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ])
+      )
+    }
   })
 })

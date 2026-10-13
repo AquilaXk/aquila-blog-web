@@ -107,7 +107,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
               를 먼저 내놓습니다.
             </S.HeroLead>
           </S.HeroCopy>
-          <S.HeroPhoneWrap data-reveal data-reveal-delay="120">
+          <S.HeroPhoneWrap>
             <S.PhoneFrame $width="21.5rem">
               <picture>
                 <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
@@ -181,14 +181,17 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                 <S.FeatureStage data-reveal data-reveal-delay="100">
                   <S.DetailCrop>
                     <div>
-                      <img
-                        src={PRODUCT_SCREENSHOT}
-                        alt="노선도에서 역을 선택하면 출발·경유·도착 버튼이 함께 열린 모습."
-                        width={PRODUCT_SCREENSHOT_SIZE.width}
-                        height={PRODUCT_SCREENSHOT_SIZE.height}
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <picture>
+                        <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
+                        <img
+                          src={PRODUCT_SCREENSHOT}
+                          alt="노선도에서 역을 선택하면 출발·경유·도착 버튼이 함께 열린 모습."
+                          width={PRODUCT_SCREENSHOT_SIZE.width}
+                          height={PRODUCT_SCREENSHOT_SIZE.height}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </picture>
                     </div>
                     <figcaption>노선도 화면 일부 — 역 선택 시 출발·경유·도착 지정</figcaption>
                   </S.DetailCrop>

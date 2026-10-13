@@ -314,15 +314,45 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
-  const isTableEditDisabled = (edit: MarkdownEditorTableEdit) =>
-    disabled ||
-    !activeTableSelection ||
-    !planMarkdownEditorTableEdit(
-      draftValue,
-      activeTableSelection.from,
-      activeTableSelection.to,
-      edit
-    )
+  const tableEditAvailability = useMemo(() => {
+    if (disabled || !activeTableSelection) {
+      return null
+    }
+    const { from, to } = activeTableSelection
+    return {
+      addRow: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, TABLE_ADD_ROW_EDIT)),
+      deleteRow: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "delete-row" })),
+      addColumn: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "add-column" })),
+      deleteColumn: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "delete-column" })),
+      alignLeft: Boolean(
+        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "left" })
+      ),
+      alignCenter: Boolean(
+        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "center" })
+      ),
+      alignRight: Boolean(
+        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "right" })
+      ),
+    }
+  }, [activeTableSelection, disabled, draftValue])
+
+  const isTableEditDisabled = (edit: MarkdownEditorTableEdit) => {
+    if (!tableEditAvailability) return true
+    switch (edit.kind) {
+      case "add-row":
+        return !tableEditAvailability.addRow
+      case "delete-row":
+        return !tableEditAvailability.deleteRow
+      case "add-column":
+        return !tableEditAvailability.addColumn
+      case "delete-column":
+        return !tableEditAvailability.deleteColumn
+      case "set-alignment":
+        if (edit.alignment === "left") return !tableEditAvailability.alignLeft
+        if (edit.alignment === "center") return !tableEditAvailability.alignCenter
+        return !tableEditAvailability.alignRight
+    }
+  }
 
   const commandContext = {
     disabled,

@@ -4,7 +4,7 @@ import type { TPost } from "src/types"
 import styled from "@emotion/styled"
 import { uiTokens } from "@shared/ui-tokens"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import { memo, useCallback, useEffect, useRef, type MouseEvent } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, type MouseEvent } from "react"
 import Router from "next/router"
 import { useLanguage } from "src/libs/language"
 import ProfileImage from "src/components/ProfileImage"
@@ -33,7 +33,8 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   const postPath = toCanonicalPostPath(data.id)
   const isEn = language === "en"
   const currentLang = isEn ? "en-US" : (CONFIG.lang || "ko-KR")
-  const createdAtText = formatDate(data.createdAt || data.date?.start_date || data.createdTime || "", currentLang)
+  const rawDate = data.createdAt || data.date?.start_date || data.createdTime || ""
+  const createdAtText = useMemo(() => formatDate(rawDate, currentLang), [rawDate, currentLang])
 
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
   const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")

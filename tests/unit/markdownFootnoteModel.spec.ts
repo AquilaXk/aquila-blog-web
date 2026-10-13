@@ -109,3 +109,16 @@ test("preserves an ordinary definition required by a footnote reference-style li
   expect(model.footnotes[0]?.content).toContain("[문서][guide]")
   expect(model.footnotes[0]?.content).toContain("[guide]: /guide")
 })
+
+test("short-circuits without modifying segments when source contains no footnote markers or no definitions", () => {
+  const plainSource = ["# 제목", "", "일반 본문과 [링크](/archive) 문단입니다."].join("\n")
+  const plainModel = createModel(plainSource)
+  expect(plainModel.footnotes).toEqual([])
+  expect(getTransformedMarkdown(plainModel)).toBe(plainSource)
+
+  const undefinedRefSource = ["정의 없는 참조[^missing]만 있는 문서입니다."].join("\n")
+  const undefinedRefModel = createModel(undefinedRefSource)
+  expect(undefinedRefModel.footnotes).toEqual([])
+  expect(getTransformedMarkdown(undefinedRefModel)).toBe(undefinedRefSource)
+})
+

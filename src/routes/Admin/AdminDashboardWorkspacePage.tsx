@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { NextPage } from "next"
 import { useCallback, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import type { AdminProfile } from "src/hooks/useAdminProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import useAuthSession from "src/hooks/useAuthSession"
 import {
@@ -31,11 +32,13 @@ import { AdminDashboardWorkspaceView } from "src/routes/Admin/AdminDashboardWork
 
 type AdminDashboardPageProps = {
   initialMember: AuthMember
+  initialProfileSnapshot?: AdminProfile | null
   initialSnapshot: AdminDashboardInitialSnapshot
 }
 
 const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
   initialMember,
+  initialProfileSnapshot = null,
   initialSnapshot = EMPTY_INITIAL_SNAPSHOT,
 }) => {
   const { me, authStatus } = useAuthSession()
@@ -318,6 +321,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       dashboardStatusLabel={dashboardStatusLabel}
       dashboardStatusTone={dashboardStatusTone}
       freshnessLabel={freshnessLabel}
+      initialProfileSnapshot={initialProfileSnapshot}
       isRefreshing={isRefreshing}
       kpiCards={kpiCards}
       logRows={logRows}
