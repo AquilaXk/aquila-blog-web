@@ -151,6 +151,7 @@ export const renderMarkdownSegment = ({
         alt={segment.alt}
         src={segment.src}
         widthPx={segment.widthPx}
+        heightPx={segment.heightPx}
         eager={imageIndex === 0}
         editable={editableImages}
         imageIndex={imageIndex}

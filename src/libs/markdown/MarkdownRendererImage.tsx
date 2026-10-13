@@ -3,7 +3,17 @@ import type { MarkdownImageFigureProps } from "src/libs/markdown/MarkdownRendere
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 
 export const MarkdownImageFigure = memo(
-  ({ alt, src, widthPx, eager = false, editable = false, imageIndex, onWidthCommit }: MarkdownImageFigureProps) => {
+  ({
+    alt,
+    src,
+    widthPx,
+    heightPx,
+    aspectRatio,
+    eager = false,
+    editable = false,
+    imageIndex,
+    onWidthCommit,
+  }: MarkdownImageFigureProps) => {
     const frameRef = useRef<HTMLElement>(null)
     const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(null)
     const liveWidthRef = useRef<number | null>(null)
@@ -15,10 +25,17 @@ export const MarkdownImageFigure = memo(
     }, [src, widthPx])
 
     const effectiveWidthPx = draftWidthPx ?? widthPx
+    const effectiveHeightPx = heightPx
+    const effectiveAspectRatio =
+      aspectRatio || (effectiveWidthPx && effectiveHeightPx ? `${effectiveWidthPx} / ${effectiveHeightPx}` : undefined)
     const safeSrc = normalizeSafeMarkdownImageSrc(src)
-    const frameStyle = effectiveWidthPx
-      ? ({ "--aq-image-width": `${effectiveWidthPx}px` } as CSSProperties)
-      : undefined
+    const frameStyle: CSSProperties | undefined =
+      effectiveWidthPx || effectiveAspectRatio
+        ? ({
+            ...(effectiveWidthPx ? { "--aq-image-width": `${effectiveWidthPx}px` } : {}),
+            ...(effectiveAspectRatio ? { aspectRatio: effectiveAspectRatio } : {}),
+          } as CSSProperties)
+        : undefined
 
     if (!safeSrc) {
       const blockedLabel = alt || "차단된 이미지"
@@ -37,6 +54,9 @@ export const MarkdownImageFigure = memo(
         <img
           src={safeSrc}
           alt={alt || ""}
+          width={effectiveWidthPx || undefined}
+          height={effectiveHeightPx || undefined}
+          style={effectiveAspectRatio ? { aspectRatio: effectiveAspectRatio } : undefined}
           loading={eager ? "eager" : "lazy"}
           fetchPriority={eager ? "high" : "auto"}
           decoding="async"

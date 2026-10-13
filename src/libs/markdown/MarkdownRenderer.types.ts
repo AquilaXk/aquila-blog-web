@@ -20,6 +20,8 @@ export type MarkdownImageFigureProps = {
   alt: string
   src: string
   widthPx?: number
+  heightPx?: number
+  aspectRatio?: string
   eager?: boolean
   editable?: boolean
   imageIndex: number

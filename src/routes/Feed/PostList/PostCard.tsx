@@ -4,7 +4,7 @@ import type { TPost } from "src/types"
 import styled from "@emotion/styled"
 import { uiTokens } from "@shared/ui-tokens"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import { memo, useCallback, type MouseEvent } from "react"
+import { memo, useCallback, useRef, type MouseEvent } from "react"
 import Router from "next/router"
 import { useLanguage } from "src/libs/language"
 import ProfileImage from "src/components/ProfileImage"
@@ -25,6 +25,15 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")
   const authorImageSrc = data.authorProfileImgUrl || postAuthor?.profile_photo || ""
 
+  const lastPrefetchedPathRef = useRef<string | null>(null)
+  const handlePrefetch = useCallback(() => {
+    if (lastPrefetchedPathRef.current === postPath) return
+    lastPrefetchedPathRef.current = postPath
+    if (typeof Router.prefetch === "function") {
+      void Router.prefetch(postPath)
+    }
+  }, [postPath])
+
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||
       event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -33,7 +42,15 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   }, [postPath])
 
   return (
-    <StyledWrapper href={postPath} data-layout={layout} data-ui="feed-post-card" onClick={handleNavigate}>
+    <StyledWrapper
+      href={postPath}
+      data-layout={layout}
+      data-ui="feed-post-card"
+      onClick={handleNavigate}
+      onMouseEnter={handlePrefetch}
+      onTouchStart={handlePrefetch}
+      onFocus={handlePrefetch}
+    >
       <article>
         <header><h2>{data.title}</h2></header>
         {data.summary && <p className="summary">{data.summary}</p>}
