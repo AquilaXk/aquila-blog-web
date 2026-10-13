@@ -844,7 +844,7 @@ test.describe("live Markdown writing surface", () => {
       buffer: onePixelPng,
     })
     await expect.poll(() => readMarkdown(page)).toContain(
-      "![body.png](http://127.0.0.1:3000/post/api/v1/images/posts/body-image.png)"
+      "![body.png](http://127.0.0.1:3000/post/api/v1/images/posts/body-image.png?w=1&h=1)"
     )
 
     await selectMarkdownRangeWithoutAssertion(page, source.indexOf("omega"), source.indexOf("omega"))
