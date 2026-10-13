@@ -59,6 +59,16 @@ test.describe("markdown image CLS dimension model", () => {
     expect(parsed?.aspectRatio).toBe("1920 / 1080")
   })
 
+  test("ignores non-numeric query parameters and falls back gracefully", () => {
+    const parsed = parseStandaloneMarkdownImageLine(
+      '![Diagram](https://blog.aquilaxk.site/post/api/v1/images/posts/diag.png?w=invalid&h=bad)'
+    )
+    expect(parsed).not.toBeNull()
+    expect(parsed?.widthPx).toBeUndefined()
+    expect(parsed?.heightPx).toBeUndefined()
+    expect(parsed?.aspectRatio).toBeUndefined()
+  })
+
   test("serializes standalone image line preserving width and height metadata", () => {
     const serialized = serializeStandaloneMarkdownImageLine({
       alt: "System Architecture",
