@@ -43,6 +43,7 @@ export type MarkdownSegment =
       title: string
       widthPx?: number
       heightPx?: number
+      aspectRatio?: string
       align?: "left" | "center" | "wide" | "full"
     }
 

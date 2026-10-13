@@ -24,6 +24,7 @@ export type ParsedStandaloneMarkdownImage = {
   title: string
   widthPx?: number
   heightPx?: number
+  aspectRatio?: string
   align?: "left" | "center" | "wide" | "full"
 }
 
@@ -46,16 +47,16 @@ export const parseStandaloneMarkdownImageLine = (
   const heightFromTitleMatch = title.match(/(?:^|\s)height=(\d{2,4})(?:$|\s)/i)
   const widthFromTitle = Number.parseInt(widthFromTitleMatch?.[1] || "", 10)
   const heightFromTitle = Number.parseInt(heightFromTitleMatch?.[1] || "", 10)
-  const resolvedWidth = Number.isFinite(widthFromSuffix)
+  const explicitWidth = Number.isFinite(widthFromSuffix)
     ? widthFromSuffix
     : Number.isFinite(widthFromTitle)
       ? widthFromTitle
-      : NaN
-  const resolvedHeight = Number.isFinite(heightFromSuffix)
+      : undefined
+  const explicitHeight = Number.isFinite(heightFromSuffix)
     ? heightFromSuffix
     : Number.isFinite(heightFromTitle)
       ? heightFromTitle
-      : NaN
+      : undefined
 
   if (!src) return null
 
@@ -69,16 +70,49 @@ export const parseStandaloneMarkdownImageLine = (
     if (h && /^\d+$/.test(h)) urlHeight = Number.parseInt(h, 10)
   } catch {}
 
-  const finalWidth = Number.isFinite(resolvedWidth)
-    ? clampImageWidthPx(resolvedWidth)
-    : urlWidth
-      ? clampImageWidthPx(urlWidth)
-      : undefined
-  const finalHeight = Number.isFinite(resolvedHeight)
-    ? clampImageDimensionPx(resolvedHeight)
-    : urlHeight
-      ? clampImageDimensionPx(urlHeight)
-      : undefined
+  const hasExplicitRatio = explicitWidth != null && explicitHeight != null && explicitWidth > 0 && explicitHeight > 0
+  const hasUrlRatio = urlWidth != null && urlHeight != null && urlWidth > 0 && urlHeight > 0
+
+  let finalWidth: number | undefined
+  let finalHeight: number | undefined
+  let aspectRatio: string | undefined
+
+  if (hasExplicitRatio) {
+    aspectRatio = `${explicitWidth} / ${explicitHeight}`
+    finalWidth = clampImageWidthPx(explicitWidth!)
+    finalHeight = clampImageDimensionPx(Math.round(finalWidth * (explicitHeight! / explicitWidth!)))
+  } else if (hasUrlRatio) {
+    aspectRatio = `${urlWidth} / ${urlHeight}`
+    if (explicitWidth != null) {
+      finalWidth = clampImageWidthPx(explicitWidth)
+      finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
+    } else if (explicitHeight != null) {
+      finalHeight = clampImageDimensionPx(explicitHeight)
+      finalWidth = clampImageWidthPx(Math.round(finalHeight * (urlWidth! / urlHeight!)))
+    } else {
+      if (urlWidth! > 960) {
+        finalWidth = clampImageWidthPx(urlWidth!)
+        finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
+      } else if (urlWidth! < 180) {
+        finalWidth = clampImageWidthPx(urlWidth!)
+        finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
+      } else {
+        finalWidth = urlWidth
+        finalHeight = urlHeight
+      }
+    }
+  } else {
+    finalWidth = explicitWidth != null
+      ? clampImageWidthPx(explicitWidth)
+      : urlWidth
+        ? clampImageWidthPx(urlWidth)
+        : undefined
+    finalHeight = explicitHeight != null
+      ? clampImageDimensionPx(explicitHeight)
+      : urlHeight
+        ? clampImageDimensionPx(urlHeight)
+        : undefined
+  }
 
   return {
     alt,
@@ -86,6 +120,7 @@ export const parseStandaloneMarkdownImageLine = (
     title,
     widthPx: finalWidth,
     heightPx: finalHeight,
+    aspectRatio,
     align: normalizeImageAlign(alignFromSuffixMatch?.[1]),
   }
 }

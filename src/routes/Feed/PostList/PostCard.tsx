@@ -4,10 +4,24 @@ import type { TPost } from "src/types"
 import styled from "@emotion/styled"
 import { uiTokens } from "@shared/ui-tokens"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import { memo, useCallback, useRef, type MouseEvent } from "react"
+import { memo, useCallback, useEffect, useRef, type MouseEvent } from "react"
 import Router from "next/router"
 import { useLanguage } from "src/libs/language"
 import ProfileImage from "src/components/ProfileImage"
+import { getNavigatorConnection } from "src/routes/Feed/FeedExplorerRestoreModel"
+
+const prefetchedPaths = new Set<string>()
+
+export const canPrefetchOnCurrentNetwork = () => {
+  if (typeof navigator === "undefined") return true
+  if (navigator.onLine === false) return false
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return false
+  const connection = getNavigatorConnection()
+  if (!connection) return true
+  if (connection.saveData) return false
+  if (connection.effectiveType === "slow-2g" || connection.effectiveType === "2g") return false
+  return true
+}
 
 type Props = {
   data: TPost
@@ -25,21 +39,40 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
   const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || (isEn ? "Anonymous" : "익명")
   const authorImageSrc = data.authorProfileImgUrl || postAuthor?.profile_photo || ""
 
-  const lastPrefetchedPathRef = useRef<string | null>(null)
-  const handlePrefetch = useCallback(() => {
-    if (lastPrefetchedPathRef.current === postPath) return
-    lastPrefetchedPathRef.current = postPath
-    if (typeof Router.prefetch === "function") {
-      void Router.prefetch(postPath)
+  const prefetchTimerRef = useRef<number | null>(null)
+
+  const clearPrefetchTimer = useCallback(() => {
+    if (prefetchTimerRef.current !== null) {
+      window.clearTimeout(prefetchTimerRef.current)
+      prefetchTimerRef.current = null
     }
-  }, [postPath])
+  }, [])
+
+  useEffect(() => {
+    return () => clearPrefetchTimer()
+  }, [clearPrefetchTimer])
+
+  const schedulePrefetch = useCallback(() => {
+    if (prefetchedPaths.has(postPath)) return
+    if (!canPrefetchOnCurrentNetwork()) return
+    clearPrefetchTimer()
+    prefetchTimerRef.current = window.setTimeout(() => {
+      prefetchTimerRef.current = null
+      if (prefetchedPaths.has(postPath)) return
+      prefetchedPaths.add(postPath)
+      if (typeof Router.prefetch === "function") {
+        void Router.prefetch(postPath)
+      }
+    }, 65)
+  }, [clearPrefetchTimer, postPath])
 
   const handleNavigate = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (event.defaultPrevented || event.button !== 0 ||
       event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
+    clearPrefetchTimer()
     void Router.push(postPath)
-  }, [postPath])
+  }, [clearPrefetchTimer, postPath])
 
   return (
     <StyledWrapper
@@ -47,9 +80,13 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
       data-layout={layout}
       data-ui="feed-post-card"
       onClick={handleNavigate}
-      onMouseEnter={handlePrefetch}
-      onTouchStart={handlePrefetch}
-      onFocus={handlePrefetch}
+      onMouseEnter={schedulePrefetch}
+      onMouseLeave={clearPrefetchTimer}
+      onTouchStart={schedulePrefetch}
+      onTouchEnd={clearPrefetchTimer}
+      onTouchCancel={clearPrefetchTimer}
+      onFocus={schedulePrefetch}
+      onBlur={clearPrefetchTimer}
     >
       <article>
         <header><h2>{data.title}</h2></header>
