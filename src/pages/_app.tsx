@@ -12,7 +12,6 @@ import type { PublicAdminProfileSource } from "src/libs/adminProfileSource"
 import { shouldRefetchAdminProfileSource } from "src/libs/adminProfileSource"
 import type { SiteLanguage } from "src/libs/language"
 import { useState } from "react"
-import "katex/dist/katex.min.css"
 
 const clientSideEmotionCache = createEmotionCache()
 type AppPageProps = AppPropsWithLayout["pageProps"] & {

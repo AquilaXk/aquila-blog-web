@@ -131,15 +131,23 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => (
             {COMPANY_PRODUCT_SHOWCASES.map((product) => (
               <Sec.ProductShowcaseCard key={product.id}>
                 <Sec.ProductShowcaseMedia $layout={product.id === "easysubway" ? "phone" : "desktop"}>
-                  <img
-                    src={product.image.src}
-                    alt={product.image.alt}
-                    width={product.image.width}
-                    height={product.image.height}
-                    loading="lazy"
-                    decoding="async"
-                    data-ui={`company-showcase-${product.id}`}
-                  />
+                  <picture>
+                    {product.image.src.endsWith(".png") ? (
+                      <source
+                        srcSet={product.image.src.replace(/\.png$/, ".webp")}
+                        type="image/webp"
+                      />
+                    ) : null}
+                    <img
+                      src={product.image.src}
+                      alt={product.image.alt}
+                      width={product.image.width}
+                      height={product.image.height}
+                      loading="lazy"
+                      decoding="async"
+                      data-ui={`company-showcase-${product.id}`}
+                    />
+                  </picture>
                 </Sec.ProductShowcaseMedia>
                 <Sec.ProductShowcaseContent>
                   <Sec.ProductBadge>{product.badge}</Sec.ProductBadge>

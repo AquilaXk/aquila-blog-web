@@ -1,6 +1,7 @@
 import { type FC, memo, useEffect, useMemo, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import {

@@ -1,5 +1,6 @@
 import { WidgetType, type EditorView } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
+import "katex/dist/katex.min.css"
 
 let cachedKatex: any = null
 let katexLoadPromise: Promise<any> | null = null
