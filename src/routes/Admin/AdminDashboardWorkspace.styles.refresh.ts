@@ -25,7 +25,7 @@ export const RefreshButton = styled.button`
   justify-content: center;
   min-height: 38px;
   padding: 0 0.9rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};

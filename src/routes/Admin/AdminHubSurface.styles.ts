@@ -94,7 +94,7 @@ export const PrimaryActionLink = styled.a`
   min-height: 2.5rem;
   padding: 0 0.95rem;
   border: 1px solid ${adminTealBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminTeal};
   color: ${adminControlText};
   text-decoration: none;
@@ -113,7 +113,7 @@ export const SecondaryActionLink = styled.a`
   min-height: 2.5rem;
   padding: 0 1rem;
   border: 1px solid ${adminBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};
   text-decoration: none;
@@ -221,7 +221,7 @@ export const Panel = styled.section`
   gap: 0;
   min-width: 0;
   border: 1px solid ${adminBorder};
-  border-radius: 2px;
+  border-radius: 8px;
   background: ${adminSurface};
 `
 
@@ -315,7 +315,7 @@ export const ContentRow = styled.a`
     min-width: 5.6rem;
     padding: 0.28rem 0.45rem;
     border: 1px solid ${adminBorder};
-    border-radius: 2px;
+    border-radius: 4px;
     color: ${adminTextSecondary};
     font-size: 0.67rem;
     font-weight: 820;

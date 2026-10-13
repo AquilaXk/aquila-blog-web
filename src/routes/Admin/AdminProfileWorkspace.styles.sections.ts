@@ -67,7 +67,7 @@ export const PreviewToggleButton = styled.button`
     justify-content: center;
     min-height: ${control.lg}px;
     padding: 0 0.82rem;
-    border-radius: 2px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.colors.gray1};
     color: ${({ theme }) => theme.colors.gray11};
@@ -89,7 +89,7 @@ export const EditorActionDock = styled(AdminWorkspaceActionDock)``
 export const DockSecondaryButton = styled(BaseButton)`
   min-height: 40px;
   padding: 0 1rem;
-  border-radius: 2px;
+  border-radius: 6px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
 
@@ -101,7 +101,7 @@ export const DockSecondaryButton = styled(BaseButton)`
 export const DockPrimaryButton = styled(PublishButton)`
   min-height: 40px;
   padding: 0 1rem;
-  border-radius: 2px;
+  border-radius: 6px;
 
   @media (max-width: 1100px) {
     min-height: ${control.lg}px;
@@ -275,7 +275,7 @@ export const ToastStack = styled.div`
 `
 
 export const ToastCard = styled.div`
-  border-radius: 2px;
+  border-radius: 8px;
   padding: 0.78rem 0.9rem;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
@@ -330,7 +330,7 @@ export const ModalCard = styled.section`
   width: min(640px, 100%);
   max-height: min(92vh, 860px);
   overflow: auto;
-  border-radius: 2px;
+  border-radius: 12px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
@@ -360,7 +360,7 @@ export const ModalHeader = styled.div`
 export const ModalCloseButton = styled.button`
   width: 40px;
   height: 40px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
@@ -446,7 +446,7 @@ export const ModalHistoryAction = styled.button`
   width: 36px;
   height: 36px;
   justify-self: center;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
   color: ${({ theme }) => theme.colors.gray11};
@@ -528,7 +528,7 @@ export const ModalSliderWrap = styled.div`
 
 export const ModalEmptyState = styled.div`
   padding: 1rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px dashed ${({ theme }) => theme.colors.gray6};
   color: ${({ theme }) => theme.colors.gray11};
   text-align: center;

@@ -495,13 +495,13 @@ const LoginInput = styled.input`
   box-sizing: border-box;
   padding: 0.65rem 0.75rem;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
-  border-radius: 8px;
+  border-radius: 6px;
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
 
   &:focus-visible {
-    outline: 3px solid ${({ theme }) => theme.colors.blue5};
-    outline-offset: 2px;
+    outline: 2px solid ${({ theme }) => theme.colors.blue7};
+    outline-offset: 1px;
   }
 
   &:disabled {
@@ -534,14 +534,14 @@ const LoginSecondaryButton = styled.button`
   min-height: 2.5rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
-  border-radius: 8px;
+  border-radius: 6px;
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray11};
   font: inherit;
 
   &:focus-visible {
-    outline: 3px solid ${({ theme }) => theme.colors.blue5};
-    outline-offset: 2px;
+    outline: 2px solid ${({ theme }) => theme.colors.blue7};
+    outline-offset: 1px;
   }
 
   &:disabled {
@@ -553,15 +553,15 @@ const LoginSecondaryButton = styled.button`
 const LoginSubmit = styled.button`
   min-height: 2.75rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: ${({ theme }) => theme.publicDesign.accent};
   color: ${({ theme }) => theme.colors.gray1};
   font: inherit;
   font-weight: 700;
 
   &:focus-visible {
-    outline: 3px solid ${({ theme }) => theme.colors.blue5};
-    outline-offset: 2px;
+    outline: 2px solid ${({ theme }) => theme.colors.blue7};
+    outline-offset: 1px;
   }
 
   &:disabled {

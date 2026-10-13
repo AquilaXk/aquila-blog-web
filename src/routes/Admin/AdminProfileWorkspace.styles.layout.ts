@@ -176,7 +176,7 @@ export const SectionStateBadge = styled.span`
   justify-content: center;
   min-height: 1.8rem;
   padding: 0 0.62rem;
-  border-radius: 2px;
+  border-radius: 4px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   color: ${({ theme }) => theme.colors.gray10};
   background: ${({ theme }) => theme.colors.gray2};
@@ -328,7 +328,7 @@ export const FieldLabel = styled.label`
 export const Input = styled.input`
   width: 100%;
   min-height: 42px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray3};
   color: ${({ theme }) => theme.colors.gray12};
@@ -353,7 +353,7 @@ export const Input = styled.input`
 export const TextArea = styled.textarea`
   width: 100%;
   min-height: 132px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray3};
   color: ${({ theme }) => theme.colors.gray12};
@@ -382,7 +382,7 @@ export const AboutSectionCard = styled.div`
   display: grid;
   gap: 0.72rem;
   padding: 0.9rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
 `
@@ -461,7 +461,7 @@ export const InlineActionRow = styled.div`
 
 export const EmptyStateCard = styled.div`
   padding: 1rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px dashed ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
   display: grid;
@@ -482,7 +482,7 @@ export const SegmentedControl = styled.div`
   display: inline-flex;
   gap: 0.36rem;
   padding: 0.25rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
 `
@@ -490,7 +490,7 @@ export const SegmentedControl = styled.div`
 export const SegmentButton = styled.button`
   min-height: 34px;
   padding: 0 0.82rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};

@@ -94,7 +94,7 @@ export const FeatureIconPanel = styled.div`
 export const FeatureTag = styled.span`
   align-self: flex-start;
   padding: 0.25rem 0.6rem;
-  border-radius: ${variables.ui.button.radiusPill}px;
+  border-radius: ${radius.xs}px;
   background: ${light.surfaceBrandStrong};
   color: ${light.onSignature};
   font-family: ${editorialLabel.fontFamily};
@@ -198,7 +198,7 @@ export const ProductShowcaseContent = styled.div`
 export const ProductBadge = styled.span`
   align-self: flex-start;
   padding: 0.25rem 0.6rem;
-  border-radius: ${variables.ui.button.radiusPill}px;
+  border-radius: ${radius.xs}px;
   background: ${light.surfaceBrandStrong};
   color: ${light.onSignature};
   font-family: ${editorialLabel.fontFamily};
@@ -605,7 +605,7 @@ export const NewsIndex = styled.span`
   align-items: center;
   justify-content: center;
   padding: 0.2rem 0.55rem;
-  border-radius: ${variables.ui.button.radiusPill}px;
+  border-radius: ${radius.xs}px;
   background: ${light.surfaceBrand};
   color: ${light.accentText};
   font-family: ${editorialLabel.fontFamily};

@@ -16,7 +16,7 @@ import {
 export const InlineNotice = styled.p`
   margin: 0;
   padding: 0.8rem 0.88rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray3};
   color: ${({ theme }) => theme.colors.gray12};
@@ -52,7 +52,7 @@ export const SubtleMetaItem = styled.div`
   display: grid;
   gap: 0.18rem;
   padding: 0.72rem 0.8rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: transparent;
 
@@ -112,7 +112,7 @@ export const CompactCodeList = styled.div`
 
   code {
     display: block;
-    border-radius: 2px;
+    border-radius: 4px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.colors.gray2};
     padding: 0.62rem 0.72rem;
@@ -142,7 +142,7 @@ export const ExecutionRail = styled(AdminStickyRail)`
 
 export const ActionGroupCard = styled(AdminRailCard)`
   gap: 0.8rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => adminActionGroupSurface(theme)};
 `
@@ -194,7 +194,7 @@ export const ActionRowLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0.78rem 0.9rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
   color: ${({ theme }) => theme.colors.gray12};
@@ -246,7 +246,7 @@ export const FieldLabel = styled.label`
 export const Input = styled.input`
   width: 100%;
   min-height: 44px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
@@ -257,7 +257,7 @@ export const Input = styled.input`
 export const TextArea = styled.textarea`
   width: 100%;
   min-height: 110px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
@@ -270,7 +270,7 @@ export const TextArea = styled.textarea`
 export const PrimaryButton = styled.button`
   min-height: 42px;
   padding: 0 0.95rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.accentControl};
   background: ${({ theme }) => theme.colors.accentControl};
   color: ${({ theme }) => theme.colors.accentControlText};
@@ -292,7 +292,7 @@ export const DangerPanel = styled.div`
   display: grid;
   gap: 0.9rem;
   padding: 0.96rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.statusDangerBorder};
   background: rgba(239, 68, 68, 0.06);
 `
@@ -339,7 +339,7 @@ export const DangerButton = styled.button`
   width: fit-content;
   min-height: 42px;
   padding: 0 0.95rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.statusDangerBorder};
   background: transparent;
   color: ${({ theme }) => theme.colors.statusDangerText};
@@ -369,7 +369,7 @@ export const ResultFilterButton = styled.button`
   gap: 0.45rem;
   min-height: 36px;
   padding: 0 0.8rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray11};
@@ -407,7 +407,7 @@ export const ResultPrimaryCard = styled.div`
   display: grid;
   gap: 0.8rem;
   padding: 0.96rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
 `
@@ -461,7 +461,7 @@ export const ResultHistoryCard = styled.div`
   display: grid;
   gap: 0.7rem;
   padding: 0.96rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
 `
@@ -476,7 +476,7 @@ export const HistoryButton = styled.button`
   display: grid;
   gap: 0.14rem;
   padding: 0.72rem 0.8rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: transparent;
   color: ${({ theme }) => theme.colors.gray12};
@@ -501,7 +501,7 @@ export const ResultPanel = styled.pre`
   margin: 0 0.95rem 0.95rem;
   min-height: 180px;
   padding: 0.95rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
   color: ${({ theme }) => theme.colors.gray12};
@@ -513,7 +513,7 @@ export const ResultPanel = styled.pre`
 export const EmptyResultState = styled.p`
   margin: 0;
   padding: 1rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px dashed ${({ theme }) => theme.colors.gray6};
   color: ${({ theme }) => theme.colors.gray10};
   line-height: 1.6;

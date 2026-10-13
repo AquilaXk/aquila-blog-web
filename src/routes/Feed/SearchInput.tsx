@@ -59,11 +59,6 @@ export default SearchInput
 
 const StyledWrapper = styled.div`
   min-width: 0;
-  --feed-search-border: #30363d;
-  --feed-search-border-strong: #58a6ff;
-  --feed-search-surface: #161b22;
-  --feed-search-surface-elevated: #21262d;
-  --feed-search-accent-muted: rgba(88, 166, 255, 0.16);
 
   > .field {
     display: flex;
@@ -72,11 +67,10 @@ const StyledWrapper = styled.div`
     min-width: 0;
     min-height: ${FEED_SEARCH_FIELD_MIN_HEIGHT_PX}px;
     padding: 0 10px;
-    border-radius: 0;
+    border-radius: 6px;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
-    box-shadow: none;
-    transition: border-color 0.125s ease-in, background-color 0.125s ease-in, box-shadow 0.125s ease-in;
+    transition: border-color 0.125s ease-in, background-color 0.125s ease-in;
 
     .searchIcon {
       display: inline-flex;
@@ -102,9 +96,10 @@ const StyledWrapper = styled.div`
       min-width: 56px;
       height: 24px;
       padding: 0 0.5rem;
-      border-radius: 0;
+      border-radius: 4px;
       border: 1px solid var(--aq-border);
-      background: transparent;
+      background: var(--aq-surface-elevated, transparent);
+      box-shadow: 0 1px 0 1px var(--aq-border);
       color: var(--aq-muted);
       font-size: 0.74rem;
       font-weight: 700;
@@ -116,7 +111,6 @@ const StyledWrapper = styled.div`
       &:hover {
         color: var(--aq-text);
         border-color: var(--aq-accent);
-        background: var(--aq-accent-muted);
       }
 
       @media (max-width: ${FEED_TAG_RAIL_CHIP_MAX_PX}px) {
@@ -176,7 +170,7 @@ const StyledWrapper = styled.div`
       height: auto;
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
       padding: 0 0.5rem;
-      border-radius: 0;
+      border-radius: 6px;
     }
 
     > .field > .mid {

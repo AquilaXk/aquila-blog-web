@@ -72,7 +72,7 @@ export const AdminPostsWorkspaceFilterToolbar: React.FC<AdminPostsWorkspaceFilte
 
 const baseButton = ({ theme }: { theme: any }) => `
   min-height: 48px;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${theme.colors.gray5};
   font-size: 0.95rem;
   font-weight: 800;
@@ -95,7 +95,6 @@ const StickyFilterToolbar = styled.div`
     padding: 0.58rem 0.62rem;
     border-radius: 12px;
   }
-
 `
 
 const FilterRail = styled.div`
@@ -144,7 +143,7 @@ const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`
   @media (max-width: 767px) {
     min-height: 38px;
     padding: 0 0.46rem;
-    border-radius: 2px;
+    border-radius: 6px;
     font-size: 0.78rem;
   }
 `
@@ -158,7 +157,7 @@ const SearchField = styled.div`
     width: 100%;
     min-width: 0;
     min-height: 46px;
-    border-radius: 2px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
     background: ${({ theme }) => theme.colors.gray1};
     color: ${({ theme }) => theme.colors.gray12};
@@ -169,7 +168,7 @@ const SearchField = styled.div`
   @media (max-width: 767px) {
     input {
       min-height: 38px;
-      border-radius: 2px;
+      border-radius: 6px;
       padding: 0 0.7rem;
       font-size: 0.86rem;
     }
@@ -184,7 +183,7 @@ const SortField = styled.div`
     box-sizing: border-box;
     width: 100%;
     min-height: 46px;
-    border-radius: 2px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
     background: ${({ theme }) => theme.colors.gray1};
     color: ${({ theme }) => theme.colors.gray12};

@@ -49,12 +49,7 @@ export const VisibilityBadge = styled(AdminStatusPill)<{ "data-tone": string }>`
       : tone === "PUBLIC_UNLISTED"
         ? theme.colors.orange9
         : theme.colors.green9};
-  background: ${({ theme, "data-tone": tone }) =>
-    tone === "PRIVATE"
-      ? theme.colors.gray2
-      : tone === "PUBLIC_UNLISTED"
-        ? "rgba(249, 115, 22, 0.12)"
-        : "rgba(34, 197, 94, 0.12)"};
+  background: transparent;
   border-color: ${({ theme, "data-tone": tone }) =>
     tone === "PRIVATE"
       ? theme.colors.gray7
@@ -107,7 +102,7 @@ export const ListSkeleton = styled.div`
   .line {
     display: block;
     height: 12px;
-    border-radius: 999px;
+    border-radius: 4px;
     background: ${({ theme }) =>
       theme.scheme === "light"
         ? "linear-gradient(90deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.16))"
@@ -153,7 +148,7 @@ export const ListSkeleton = styled.div`
       display: grid;
       gap: 0.55rem;
       padding: 0.95rem;
-      border-radius: 2px;
+      border-radius: 6px;
       border: 1px solid ${({ theme }) => theme.colors.gray5};
       background: ${({ theme }) => theme.colors.gray1};
     }
@@ -171,7 +166,7 @@ export const ListEmptyState = styled.div`
   display: grid;
   gap: 0.45rem;
   padding: 1rem;
-  border-radius: 2px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray5};
   background: ${({ theme }) => theme.colors.gray2};
 
@@ -187,7 +182,7 @@ export const ListEmptyState = styled.div`
 `
 
 export const ListCard = styled(AdminSubtleCard)`
-  border-radius: 2px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid ${({ theme }) => theme.colors.gray5};
 `
@@ -262,7 +257,7 @@ export const PostsDesktopTable = styled.table`
     width: 16px;
     height: 16px;
     border: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-radius: 2px;
+    border-radius: 4px;
   }
 
   tbody tr:last-of-type td {
@@ -359,7 +354,7 @@ export const TitleButton = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.gray8};
     outline-offset: 3px;
-    border-radius: 2px;
+    border-radius: 4px;
   }
 `
 
@@ -376,7 +371,7 @@ export const MobileCardList = styled.div`
     display: grid;
     gap: 0.55rem;
     padding: 0.95rem;
-    border-radius: 2px;
+    border-radius: 8px;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
     background: ${({ theme }) => theme.colors.gray1};
   }

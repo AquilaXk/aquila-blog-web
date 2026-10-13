@@ -7,13 +7,13 @@ export const variables = {
   widthMd: 1280,
   navControl: {
     height: 40,
-    radius: 10,
+    radius: 6,
     fontSize: 0.96,
   },
   ui: {
     card: {
       radius: 8,
-      radiusLg: 16,
+      radiusLg: 12,
       borderWidth: 1,
       padding: 16,
       paddingLg: 20,
@@ -28,14 +28,14 @@ export const variables = {
       shadowFloatingDark: "0 28px 56px rgba(0, 0, 0, 0.45)",
     },
     button: {
-      radius: 10,
+      radius: 6,
       radiusPill: 999,
       minHeight: 44,
       minHeightSm: 36,
       fontSize: 0.93,
     },
     field: {
-      radius: 12,
+      radius: 6,
       minHeight: 44,
       fontSize: 0.95,
     },

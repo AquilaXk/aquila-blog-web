@@ -323,7 +323,7 @@ const StyledWrapper = styled.div`
     &:focus-visible {
       outline: 2px solid var(--feed-tag-border-strong);
       outline-offset: 2px;
-      border-radius: 999px;
+      border-radius: 6px;
     }
   }
 
@@ -409,7 +409,7 @@ const StyledWrapper = styled.div`
     text-align: left;
     white-space: nowrap;
     min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
-    border-radius: 999px;
+    border-radius: 6px;
     border: 0;
     background: transparent;
     padding: 0.34rem 0.82rem;
@@ -423,7 +423,7 @@ const StyledWrapper = styled.div`
       content: "";
       position: absolute;
       inset: 5px 0;
-      border-radius: 999px;
+      border-radius: 6px;
       border: 1px solid var(--feed-tag-border);
       background: var(--feed-tag-surface);
       transition: all 0.125s ease-in;
@@ -500,7 +500,7 @@ const StyledWrapper = styled.div`
     .chipRail button {
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
       padding: 0.28rem 0.82rem;
-      border-radius: 999px;
+      border-radius: 6px;
 
       &::after {
         inset: 6px 0;

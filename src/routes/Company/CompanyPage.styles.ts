@@ -151,7 +151,7 @@ export const PillAction = styled.a`
   justify-content: center;
   min-height: 48px;
   padding: 0 1.5rem;
-  border-radius: ${variables.ui.button.radiusPill}px;
+  border-radius: ${variables.ui.button.radius}px;
   background: ${light.accent};
   color: ${light.onAccent};
   text-decoration: none;

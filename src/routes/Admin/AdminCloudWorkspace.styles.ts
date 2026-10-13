@@ -140,7 +140,7 @@ export const StorageMeter = styled.div`
   span {
     display: block;
     height: 0.28rem;
-    border-radius: 2px;
+    border-radius: 4px;
     background: linear-gradient(90deg, ${accentGold} 0 22%, ${surfaceMuted} 22% 100%);
   }
 `
@@ -214,7 +214,7 @@ export const SearchInput = styled.input`
   width: 100%;
   min-height: 2.42rem;
   border: 0;
-  border-radius: 2px;
+  border-radius: 6px;
   padding: 0 3.25rem 0 2.45rem;
   background: ${surfaceRaised};
   color: ${textPrimary};
@@ -817,7 +817,7 @@ export const SkeletonRows = styled.div`
 export const SkeletonRow = styled.span`
   display: block;
   height: 0.78rem;
-  border-radius: 2px;
+  border-radius: 4px;
   background: linear-gradient(90deg, ${surfaceRaised}, ${surfaceMuted}, ${surfaceRaised});
   background-size: 220% 100%;
   animation: admin-cloud-skeleton 1.2s ease-in-out infinite;
@@ -1072,7 +1072,7 @@ export const DocumentFallbackBox = styled.div`
 
   a {
     border: 1px solid ${borderStrong};
-    border-radius: 2px;
+    border-radius: 6px;
     padding: 0.45rem 0.7rem;
     background: ${surfaceMuted};
     color: ${textPrimary};
@@ -1227,7 +1227,7 @@ export const PlayerBar = styled.div`
 
 export const Timeline = styled.div`
   height: 0.45rem;
-  border-radius: 2px;
+  border-radius: 4px;
   background: linear-gradient(90deg, ${accentGold} 0 34%, ${accentTeal} 34% 36%, ${surfaceMuted} 36% 100%);
 `
 
@@ -1238,7 +1238,7 @@ export const InlineList = styled.div`
 
   span {
     border: 1px solid ${border};
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 0.25rem 0.48rem;
     color: ${textSecondary};
     font-size: 0.72rem;
@@ -1343,7 +1343,7 @@ export const StatusPill = styled.span`
   justify-self: end;
   min-width: 3.55rem;
   max-width: 5.6rem;
-  border-radius: 2px;
+  border-radius: 4px;
   padding: 0.22rem 0.45rem;
   background: ${surfaceRaised};
   color: ${accentGold};
@@ -1370,7 +1370,7 @@ export const ProgressTrack = styled.div`
   grid-column: 1 / -1;
   height: 0.28rem;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 4px;
   background: ${surfaceMuted};
 
   span {

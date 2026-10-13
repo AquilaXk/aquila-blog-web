@@ -432,7 +432,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
 
   .cm-live-highlight {
     background-color: rgba(255, 208, 0, 0.35);
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 0 2px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;

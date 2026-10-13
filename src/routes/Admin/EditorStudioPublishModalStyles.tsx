@@ -53,7 +53,7 @@ export const VisibilityOptionButton = styled.button`
   width: 100%;
   min-height: 48px;
   padding: 0.5rem 0.58rem;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
@@ -152,7 +152,7 @@ export const CompactPublishEditorCard = styled.div`
   display: grid;
   gap: 0.62rem;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
-  border-radius: 12px;
+  border-radius: 8px;
   background: ${({ theme }) => theme.colors.gray2};
   padding: 0.72rem;
 `
@@ -199,7 +199,7 @@ export const CompactPublishEditorToggle = styled.button`
 export const PublishModalNotice = styled.div`
   margin: 0;
   padding: 0.55rem 0.7rem;
-  border-radius: 10px;
+  border-radius: 6px;
   font-size: 0.83rem;
   line-height: 1.4;
   width: 100%;
@@ -234,7 +234,7 @@ export const PublishModalNotice = styled.div`
 
 export const PublishButton = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.gray6};
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 0.62rem 0.92rem;
   min-height: 44px;
   background: transparent;

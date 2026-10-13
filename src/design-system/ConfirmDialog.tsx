@@ -87,7 +87,7 @@ const ConfirmPanel = styled.div`
   display: grid;
   gap: 0.95rem;
   padding: 1.1rem;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   box-shadow: none;
@@ -119,7 +119,7 @@ const ActionRow = styled.div<{ $actionRowBackground?: (theme: Theme) => string }
   width: fit-content;
   max-width: 100%;
   padding: 0.42rem 0.48rem;
-  border-radius: 6px;
+  border-radius: 8px;
   background: ${({ theme, $actionRowBackground }) =>
     $actionRowBackground ? $actionRowBackground(theme) : theme.colors.gray2};
 `
@@ -128,11 +128,19 @@ const GhostButton = styled.button`
   border: 0;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
-  padding: 0;
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: 6px;
   font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
   ${focusVisibleRing}
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
 `
 
 const ConfirmButton = styled.button`
@@ -141,14 +149,23 @@ const ConfirmButton = styled.button`
   color: ${({ theme }) => theme.colors.gray12};
   min-height: 40px;
   padding: 0 0.85rem;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 0.92rem;
   font-weight: 800;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   ${focusVisibleRing}
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+  }
 
   &[data-tone="danger"] {
     border-color: ${({ theme }) => theme.colors.statusDangerBorder};
     color: ${({ theme }) => theme.colors.statusDangerText};
+
+    &:hover {
+      background: color-mix(in srgb, ${({ theme }) => theme.colors.statusDangerBorder} 12%, transparent);
+    }
   }
 `

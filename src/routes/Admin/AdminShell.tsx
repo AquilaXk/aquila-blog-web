@@ -313,7 +313,7 @@ const NavLink = styled.a`
   min-width: 0;
   min-height: 2.5rem;
   padding: 0 0.72rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 0;
   color: inherit;
   text-decoration: none;
@@ -383,7 +383,7 @@ const SidebarLogoutAction = styled.button`
   width: 36px;
   height: 36px;
   border: 1px solid ${adminBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   cursor: pointer;
@@ -392,7 +392,7 @@ const SidebarLogoutAction = styled.button`
 const SidebarAvatar = styled.div`
   width: 2.28rem;
   height: 2.28rem;
-  border-radius: 2px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   position: relative;
@@ -490,7 +490,7 @@ const CompactNavLink = styled.a`
   min-height: ${control.lg}px;
   min-width: ${control.lg}px;
   padding: 0.35rem 0.55rem;
-  border-radius: 2px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -542,7 +542,7 @@ const SecondaryTopAction = styled.a`
   min-height: 36px;
   padding: 0 0.9rem;
   border: 1px solid ${adminBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};
   text-decoration: none;
@@ -561,7 +561,7 @@ const PrimaryTopAction = styled.a`
   min-height: 36px;
   padding: 0 0.95rem;
   border: 1px solid ${adminTealBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminTeal};
   color: ${adminControlText};
   text-decoration: none;
@@ -584,7 +584,7 @@ const ResponsiveLogoutAction = styled.button`
   width: 36px;
   height: 36px;
   border: 1px solid ${adminBorder};
-  border-radius: 2px;
+  border-radius: 6px;
   background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   cursor: pointer;
