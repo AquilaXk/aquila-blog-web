@@ -332,7 +332,7 @@ const MobileMenuBackdrop = styled.div`
 
 const MobileMenuPanel = styled.div`
   position: fixed;
-  top: calc(var(--app-header-height, 58px) + 8px);
+  top: calc(var(--app-header-height, 59px) + 8px);
   right: max(0.75rem, env(safe-area-inset-right, 0px));
   z-index: ${zIndexes.mobileNavOverlay};
   display: grid;

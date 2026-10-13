@@ -15,10 +15,10 @@ export type HybridRailMetrics = {
 }
 
 const getHeaderHeightFromCssVar = () => {
-  if (typeof window === "undefined" || typeof document === "undefined") return 56
+  if (typeof window === "undefined" || typeof document === "undefined") return 65
   const raw = getComputedStyle(document.documentElement).getPropertyValue("--app-header-height")
   const parsed = Number.parseFloat(raw)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 56
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 65
 }
 
 export const resolveRailTopOffset = () => getHeaderHeightFromCssVar() + DETAIL_RAIL_GAP_FROM_HEADER_PX

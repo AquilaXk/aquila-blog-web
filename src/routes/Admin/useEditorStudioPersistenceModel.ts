@@ -24,6 +24,8 @@ type UploadPostImageResult = {
   uploaded: UploadPostImageResponse
   prepared: {
     summary: string
+    width: number
+    height: number
   }
 }
 
@@ -41,6 +43,9 @@ export type MarkdownImageUploadAttrs = {
   alt: string
   title?: string
   widthPx?: number
+  heightPx?: number
+  width?: number
+  height?: number
   align: "left" | "center" | "right" | "wide" | "full"
 }
 
@@ -107,6 +112,8 @@ export const useEditorStudioPersistenceUploads = ({
       uploaded: (await response.json()) as UploadPostImageResponse,
       prepared: {
         summary: buildImageOptimizationSummary(prepared),
+        width: prepared.width,
+        height: prepared.height,
       },
     }
   }, [uploadWithConflictRetry])
@@ -137,7 +144,10 @@ export const useEditorStudioPersistenceUploads = ({
         src: safeUploadedUrl,
         alt: parsed?.alt || file.name,
         title: parsed?.title,
-        widthPx: parsed?.widthPx,
+        widthPx: parsed?.widthPx ?? uploaded.prepared.width,
+        heightPx: parsed?.heightPx ?? uploaded.prepared.height,
+        width: uploaded.prepared.width,
+        height: uploaded.prepared.height,
         align: parsed?.align || "center",
       }
     } catch (error) {

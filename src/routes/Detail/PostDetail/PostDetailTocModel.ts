@@ -112,3 +112,41 @@ export const createObserverRegistry = () => {
     cleanup,
   }
 }
+
+export type HeadingOffset = {
+  id: string
+  topDoc: number
+}
+
+export const measureHeadingOffsets = (
+  items: readonly TocItem[],
+  scrollY: number = typeof window !== "undefined" ? window.scrollY : 0
+): HeadingOffset[] => {
+  if (typeof document === "undefined" || !items.length) return []
+  const result: HeadingOffset[] = []
+  for (const item of items) {
+    const el = document.getElementById(item.id)
+    if (el) {
+      result.push({
+        id: item.id,
+        topDoc: scrollY + el.getBoundingClientRect().top,
+      })
+    }
+  }
+  return result
+}
+
+export const resolveActiveTocIdFromOffsets = (
+  offsets: readonly HeadingOffset[],
+  scrollY: number,
+  boundaryOffset: number
+): string => {
+  if (!offsets.length) return ""
+  const threshold = scrollY + boundaryOffset
+  let activeId = offsets[0].id
+  for (const offset of offsets) {
+    if (offset.topDoc > threshold) break
+    activeId = offset.id
+  }
+  return activeId
+}

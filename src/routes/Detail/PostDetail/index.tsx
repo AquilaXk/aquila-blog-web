@@ -4,7 +4,16 @@ import PostHeader from "./PostHeader"
 import usePostQuery from "src/hooks/usePostQuery"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
 import { RelatedPostsSection } from "./PostDetailRelatedSection"
-import { collectTocFromArticle, createObserverRegistry, createRafScheduler, isSameToc, type TocItem } from "./PostDetailTocModel"
+import {
+  collectTocFromArticle,
+  createObserverRegistry,
+  createRafScheduler,
+  isSameToc,
+  measureHeadingOffsets,
+  resolveActiveTocIdFromOffsets,
+  type HeadingOffset,
+  type TocItem,
+} from "./PostDetailTocModel"
 import { LEFT_RAIL_HYBRID_MIN_VIEWPORT_PX, RIGHT_RAIL_HYBRID_MIN_VIEWPORT_PX, applyHybridRail, clearInlineRailStyle, measureHybridRail, resolveRailTopOffset } from "./PostDetailRailModel"
 import { FloatingActionRail, MobileSummaryActions, RightTocRail } from "./PostDetailActionSections"
 import PostDetailMobileToc from "./PostDetailMobileToc"
@@ -31,6 +40,7 @@ const PostDetail: React.FC = () => {
   const [leftHybridRailActive, setLeftHybridRailActive] = useState(false)
   const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
   const visibleTocItemsRef = useRef<TocItem[]>([])
+  const headingOffsetsRef = useRef<HeadingOffset[]>([])
   const showFloatingLikeRef = useRef(false)
   const showStickyTocRef = useRef(false)
   const leftHybridRailActiveRef = useRef(false)
@@ -91,6 +101,10 @@ const PostDetail: React.FC = () => {
 
   useEffect(() => {
     visibleTocItemsRef.current = visibleTocItems
+    headingOffsetsRef.current = measureHeadingOffsets(
+      visibleTocItems,
+      typeof window !== "undefined" ? window.scrollY : 0
+    )
   }, [visibleTocItems])
 
   useEffect(() => {
@@ -235,6 +249,10 @@ const PostDetail: React.FC = () => {
           rightEnabled,
           articleBottomDoc
         )
+        headingOffsetsRef.current = measureHeadingOffsets(
+          visibleTocItemsRef.current,
+          window.scrollY
+        )
       }
 
       const leftNeedsHybridFallback = leftEnabled && hybridRailMetricsRef.current.left.stickyBlocked
@@ -259,28 +277,13 @@ const PostDetail: React.FC = () => {
       const items = visibleTocItemsRef.current
       if (!items.length) return ""
 
-      const anchorTop = resolveRailTopOffset() + 12
-      const activeBoundary = anchorTop + 4
-      const candidates = items
-        .map((item) => {
-          const heading = document.getElementById(item.id)
-          if (!heading) return null
-          return {
-            id: item.id,
-            top: heading.getBoundingClientRect().top,
-          }
-        })
-        .filter((candidate): candidate is { id: string; top: number } => Boolean(candidate))
-
-      if (!candidates.length) return items[0]?.id || ""
-
-      let activeId = candidates[0].id
-      for (const candidate of candidates) {
-        if (candidate.top > activeBoundary) break
-        activeId = candidate.id
+      if (!headingOffsetsRef.current.length) {
+        headingOffsetsRef.current = measureHeadingOffsets(items, window.scrollY)
       }
 
-      return activeId
+      const anchorTop = resolveRailTopOffset() + 12
+      const activeBoundary = anchorTop + 4
+      return resolveActiveTocIdFromOffsets(headingOffsetsRef.current, window.scrollY, activeBoundary)
     }
 
     const scheduler = createRafScheduler(() => {

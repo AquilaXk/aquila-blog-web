@@ -21,6 +21,10 @@ export type MarkdownImageUploadResult = {
   title?: string
   url?: string
   src?: string
+  width?: number
+  height?: number
+  widthPx?: number
+  heightPx?: number
 }
 
 export const validateMarkdownAttachmentSize = (file: File): string | null => {
@@ -52,12 +56,25 @@ export const resolveMarkdownImageEmbed = (
   fallbackName: string,
   options?: { publicApiOrigin?: string },
 ): { markdown: string } | { error: string } => {
-  const src = String(uploaded.url || uploaded.src || "").trim()
-  if (!src || !isCanonicalPostImageUploadUrl(src, options)) {
+  const rawSrc = String(uploaded.url || uploaded.src || "").trim()
+  if (!rawSrc || !isCanonicalPostImageUploadUrl(rawSrc, options)) {
     return { error: MARKDOWN_IMAGE_URL_MISSING_MESSAGE }
   }
 
   const alt = String(uploaded.alt || uploaded.title || fallbackName).trim() || fallbackName
+  const width = uploaded.width ?? uploaded.widthPx
+  const height = uploaded.height ?? uploaded.heightPx
+
+  let src = rawSrc
+  if (width != null && height != null && width > 0 && height > 0) {
+    const roundedWidth = Math.round(width)
+    const roundedHeight = Math.round(height)
+    if (!/[?&](?:w|width)=/i.test(src)) {
+      const separator = src.includes("?") ? "&" : "?"
+      src = `${src}${separator}w=${roundedWidth}&h=${roundedHeight}`
+    }
+  }
+
   return {
     markdown: `\n\n![${alt}](${src})\n`,
   }

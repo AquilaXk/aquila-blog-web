@@ -125,4 +125,20 @@ test.describe("markdown editor attachment upload model", () => {
     expect(publishActionViewModel.publishActionButtonDisabled).toBe(true)
     expect(publishActionViewModel.mobilePrimaryActionDisabled).toBe(true)
   })
+
+  test("embeds image width and height query parameters into markdown image src", () => {
+    expect(
+      resolveMarkdownImageEmbed(
+        {
+          url: "https://blog.aquilaxk.site/post/api/v1/images/posts/body.png",
+          width: 1200,
+          height: 800,
+        },
+        "body.png",
+        { publicApiOrigin: "https://blog.aquilaxk.site" },
+      )
+    ).toEqual({
+      markdown: "\n\n![body.png](https://blog.aquilaxk.site/post/api/v1/images/posts/body.png?w=1200&h=800)\n",
+    })
+  })
 })

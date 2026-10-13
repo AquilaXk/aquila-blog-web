@@ -106,10 +106,29 @@ module.exports = {
     ],
   },
   async headers() {
+    const staticAssetCacheHeaders = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=86400, stale-while-revalidate=604800",
+      },
+    ]
+
     return [
       {
         source: "/:path*",
         headers: buildSecurityHeaders(),
+      },
+      {
+        source: "/easysubway/:path*",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/company/:path*",
+        headers: staticAssetCacheHeaders,
+      },
+      {
+        source: "/brand-mascot.:slug*.png",
+        headers: staticAssetCacheHeaders,
       },
     ]
   },
