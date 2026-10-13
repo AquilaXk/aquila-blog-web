@@ -1,7 +1,7 @@
 import type { ChangeEvent, ClipboardEvent as ReactClipboardEvent, Dispatch, SetStateAction } from "react"
 import { useCallback } from "react"
 import { getApiBaseUrl } from "src/apis/backend/client"
-import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/rendering"
+import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
 import {
   buildImageOptimizationSummary,
   preparePostImageForUpload,

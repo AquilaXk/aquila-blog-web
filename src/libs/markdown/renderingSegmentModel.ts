@@ -233,6 +233,8 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
         src: standaloneImage.src,
         title: standaloneImage.title,
         widthPx: standaloneImage.widthPx,
+        heightPx: standaloneImage.heightPx,
+        align: standaloneImage.align,
       })
       i += 1
       continue

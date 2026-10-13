@@ -38,7 +38,7 @@ export const useRouter = () => {
     replace: push,
     reload: () => {},
     back: () => {},
-    prefetch: async () => {},
+    prefetch: async (_href?: unknown, _asPath?: unknown, _options?: unknown) => {},
     beforePopState: () => {},
     events,
     isFallback: false,
@@ -48,5 +48,7 @@ export const useRouter = () => {
   }
 }
 
-export default { push, useRouter, events }
+const prefetch = async (_href?: unknown, _asPath?: unknown, _options?: unknown) => true
+
+export default { push, useRouter, events, prefetch }
 

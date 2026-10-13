@@ -57,6 +57,10 @@ const buildSecurityHeaders = () => {
 module.exports = {
   /** Homeserver container runs `.next/standalone/server.js`; traced deps only, no source tree. */
   output: "standalone",
+  /** Enable Next.js SWC compiler Emotion transform for optimized styles and bundle reduction. */
+  compiler: {
+    emotion: true,
+  },
   /** Keep standalone output rooted in this application for linked worktrees. */
   outputFileTracingRoot: __dirname,
   /**

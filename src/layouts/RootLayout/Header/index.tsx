@@ -39,7 +39,6 @@ const Header: React.FC<Props> = ({ fullWidth, blogTitle }) => {
       })
     }
 
-    syncHeaderHeight()
     scheduleSync()
 
     const handleResize = () => scheduleSync()
@@ -49,7 +48,18 @@ const Header: React.FC<Props> = ({ fullWidth, blogTitle }) => {
 
     let observer: ResizeObserver | null = null
     if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(() => {
+      observer = new ResizeObserver((entries) => {
+        const entry = entries[0]
+        if (entry) {
+          const measured = Math.round(
+            entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height
+          )
+          if (measured > 0 && measured !== lastHeight) {
+            lastHeight = measured
+            root.style.setProperty("--app-header-height", `${measured}px`)
+            return
+          }
+        }
         scheduleSync()
       })
       observer.observe(wrapper)

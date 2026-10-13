@@ -11,4 +11,8 @@ test.describe("storybook router adapter", () => {
     await expect(router.push("/posts/503")).resolves.toBe(true)
     expect(getStorybookRouterPath()).toBe("/posts/503")
   })
+
+  test("supports router.prefetch for feed card prefetch handlers", async () => {
+    await expect(router.prefetch("/posts/503")).resolves.toBe(true)
+  })
 })

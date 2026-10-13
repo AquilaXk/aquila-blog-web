@@ -43,10 +43,16 @@ export const buildCanonicalPostDetailServerProps = async (
   res.setHeader("Cache-Control", "private, no-store")
   registerServerApiFetchMetrics()
   const queryClient = createQueryClient()
+  const numericPostId = Number(postId)
+  if (!IS_QA_CLIENT_FETCH_MODE && (!Number.isInteger(numericPostId) || numericPostId <= 0)) {
+    return { notFound: true }
+  }
   // QA에서는 브라우저가 API 응답을 주입한다. 실제 서버 장애를 성공으로 바꾸는 경로가 아니다.
-  const postDetail = IS_QA_CLIENT_FETCH_MODE ? null : await getPostDetailById(postId)
+  const [postDetail, adminProfileSeed] = await Promise.all([
+    IS_QA_CLIENT_FETCH_MODE ? Promise.resolve(null) : getPostDetailById(postId),
+    resolveStaticAdminProfileSeed(fetchPublicAdminProfile),
+  ])
   if (!IS_QA_CLIENT_FETCH_MODE && !postDetail) return { notFound: true }
-  const adminProfileSeed = await resolveStaticAdminProfileSeed(fetchPublicAdminProfile)
   const initialAdminProfile = adminProfileSeed.profile
   const initialAdminProfileSource = adminProfileSeed.source
   queryClient.setQueryData(queryKey.adminProfile(), initialAdminProfile)

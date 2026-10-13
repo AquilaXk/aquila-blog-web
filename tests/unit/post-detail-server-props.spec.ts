@@ -65,3 +65,16 @@ test("does not duplicate initialAdminProfile in props", async () => {
     expect((result.props as Record<string, unknown>).initialAdminProfile).toBeUndefined()
   }
 })
+
+test("invalid post ID returns notFound without making network requests", async () => {
+  let fetchCount = 0
+  globalThis.fetch = (async () => {
+    fetchCount += 1
+    return json(200, { username: "Aquila", nickname: "Aquila" })
+  }) as typeof fetch
+  const res = response()
+  const result = await buildCanonicalPostDetailServerProps("invalid-id", res.res)
+  expect(result).toEqual({ notFound: true })
+  expect(fetchCount).toBe(0)
+})
+

@@ -1,6 +1,7 @@
-import { type FC, memo, useEffect, useMemo, useRef } from "react"
+import { type CSSProperties, type FC, memo, useEffect, useMemo, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import {
@@ -141,12 +142,30 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
           const isFirstImage = imageRenderOrderRef.current === 0
           imageRenderOrderRef.current += 1
 
+          let imgWidth: number | undefined
+          let imgHeight: number | undefined
+          try {
+            const parsed = new URL(imageSrc, "https://dummy.local")
+            const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
+            const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
+            if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
+            if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
+          } catch {}
+
+          const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
+
           return (
-            <figure className="aq-image-frame">
+            <figure
+              className="aq-image-frame"
+              style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageSrc}
                 alt={alt || ""}
+                width={imgWidth}
+                height={imgHeight}
+                style={aspectRatio ? { aspectRatio } : undefined}
                 loading={isFirstImage ? "eager" : "lazy"}
                 fetchPriority={isFirstImage ? "high" : "auto"}
                 decoding="async"

@@ -109,15 +109,18 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
           </S.HeroCopy>
           <S.HeroPhoneWrap data-reveal data-reveal-delay="120">
             <S.PhoneFrame $width="21.5rem">
-              <img
-                src={PRODUCT_SCREENSHOT}
-                alt={PRODUCT_SCREENSHOT_ALT}
-                width={PRODUCT_SCREENSHOT_SIZE.width}
-                height={PRODUCT_SCREENSHOT_SIZE.height}
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-              />
+              <picture>
+                <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
+                <img
+                  src={PRODUCT_SCREENSHOT}
+                  alt={PRODUCT_SCREENSHOT_ALT}
+                  width={PRODUCT_SCREENSHOT_SIZE.width}
+                  height={PRODUCT_SCREENSHOT_SIZE.height}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+              </picture>
             </S.PhoneFrame>
           </S.HeroPhoneWrap>
         </S.Hero>
@@ -206,24 +209,30 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                 <S.FeatureStage data-reveal data-reveal-delay="100">
                   <S.TimelineShowcase>
                     <S.TimelinePhoneFrame>
-                      <img
-                        src={TIMELINE_SCREENSHOT}
-                        alt={TIMELINE_SCREENSHOT_ALT}
-                        width={1080}
-                        height={2340}
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <picture>
+                        <source srcSet="/easysubway/timeline-detail.webp" type="image/webp" />
+                        <img
+                          src={TIMELINE_SCREENSHOT}
+                          alt={TIMELINE_SCREENSHOT_ALT}
+                          width={1080}
+                          height={2340}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </picture>
                     </S.TimelinePhoneFrame>
                     <S.TimelineCalloutCluster>
                       <S.TimelineCalloutCard>
                         <S.CalloutHeader>
-                          <img
-                            src="/easysubway/badges/seoul_4_compact_256.png"
-                            alt="4호선"
-                            width={22}
-                            height={22}
-                          />
+                          <picture>
+                            <source srcSet="/easysubway/badges/seoul_4_compact_256.webp" type="image/webp" />
+                            <img
+                              src="/easysubway/badges/seoul_4_compact_256.png"
+                              alt="4호선"
+                              width={22}
+                              height={22}
+                            />
+                          </picture>
                           <S.CalloutTag>빠른 환승·하차</S.CalloutTag>
                         </S.CalloutHeader>
                         <strong>9-2 승차 위치 안내</strong>
@@ -365,14 +374,20 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
               <S.MetroBadgeGrid>
                 {OFFICIAL_METRO_BADGES.map((badge) => (
                   <S.MetroBadgeCard key={badge.id} data-reveal data-reveal-group="metro-badges">
-                    <img
-                      src={`/easysubway/badges/${badge.fileName}`}
-                      alt={badge.name}
-                      width={26}
-                      height={26}
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    <picture>
+                      <source
+                        srcSet={`/easysubway/badges/${badge.fileName.replace(/\.png$/, ".webp")}`}
+                        type="image/webp"
+                      />
+                      <img
+                        src={`/easysubway/badges/${badge.fileName}`}
+                        alt={badge.name}
+                        width={26}
+                        height={26}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </picture>
                     <span>{badge.name}</span>
                   </S.MetroBadgeCard>
                 ))}
