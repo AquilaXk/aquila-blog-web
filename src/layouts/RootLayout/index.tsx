@@ -23,6 +23,22 @@ type Props = {
   initialLanguage?: SiteLanguage
 }
 
+export const resolveShouldRefetchAdminProfile = ({
+  shouldLoadAdminProfile,
+  isAdminRoute,
+  initialAdminProfile,
+  initialAdminProfileShouldRefetch,
+}: {
+  shouldLoadAdminProfile: boolean
+  isAdminRoute: boolean
+  initialAdminProfile: AdminProfile | null
+  initialAdminProfileShouldRefetch: boolean
+}): boolean =>
+  shouldLoadAdminProfile &&
+  (isAdminRoute ||
+    initialAdminProfile == null ||
+    initialAdminProfileShouldRefetch)
+
 const RootLayout = ({
   children,
   initialAdminProfile = null,
@@ -55,13 +71,19 @@ const RootLayout = ({
     (isPublicBlogRoute ||
       isAdminRoute ||
       (initialAdminProfile != null && initialAdminProfileShouldRefetch))
+  const shouldRefetchAdminProfile = resolveShouldRefetchAdminProfile({
+    shouldLoadAdminProfile,
+    isAdminRoute,
+    initialAdminProfile,
+    initialAdminProfileShouldRefetch,
+  })
   const adminProfile = useAdminProfile(initialAdminProfile, {
     // 독립 표면은 관리자 프로필을 전혀 읽지 않는다. 여기서 켜 두면 blog 호스트 백엔드로 credentialed
     // XHR이 나가는데, 회사·제품 호스트에서는 그것이 cross-origin이고 edge에 그 origin을 허용하는
     // CORS가 없다 - 아무 화면 효과 없이 실패하는 요청만 남는다.
     enabled: shouldLoadAdminProfile,
-    refetchOnMount: shouldLoadAdminProfile,
-    staleTimeMs: shouldLoadAdminProfile ? 0 : undefined,
+    refetchOnMount: shouldRefetchAdminProfile,
+    staleTimeMs: shouldRefetchAdminProfile ? 0 : undefined,
   })
   const effectiveScheme = "light" // intentional light-only; do not wire dark/toggle
   const effectiveBlogDesign = isAdminRoute ? adminProfile?.blogDesign || "legacy" : "legacy"
