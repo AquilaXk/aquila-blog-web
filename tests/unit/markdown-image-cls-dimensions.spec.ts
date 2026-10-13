@@ -14,6 +14,7 @@ test.describe("markdown image CLS dimension model", () => {
     expect(parsed).not.toBeNull()
     expect(parsed?.widthPx).toBe(800)
     expect(parsed?.heightPx).toBe(450)
+    expect(parsed?.aspectRatio).toBe("800 / 450")
     expect(parsed?.align).toBe("center")
     expect(parsed?.alt).toBe("System Architecture")
   })
@@ -25,6 +26,7 @@ test.describe("markdown image CLS dimension model", () => {
     expect(parsed).not.toBeNull()
     expect(parsed?.widthPx).toBe(640)
     expect(parsed?.heightPx).toBe(360)
+    expect(parsed?.aspectRatio).toBe("640 / 360")
   })
 
   test("parses dimensions from image URL shorthand w and h query parameters", () => {
@@ -34,6 +36,27 @@ test.describe("markdown image CLS dimension model", () => {
     expect(parsed).not.toBeNull()
     expect(parsed?.widthPx).toBe(720)
     expect(parsed?.heightPx).toBe(480)
+    expect(parsed?.aspectRatio).toBe("720 / 480")
+  })
+
+  test("proportionally scales large landscape images (1920x1080) to max width without aspect ratio distortion", () => {
+    const parsed = parseStandaloneMarkdownImageLine(
+      '![Landscape](https://blog.aquilaxk.site/post/api/v1/images/posts/hero.png?w=1920&h=1080)'
+    )
+    expect(parsed).not.toBeNull()
+    expect(parsed?.widthPx).toBe(960)
+    expect(parsed?.heightPx).toBe(540)
+    expect(parsed?.aspectRatio).toBe("1920 / 1080")
+  })
+
+  test("preserves intrinsic aspect ratio when custom width is specified on image with URL dimensions", () => {
+    const parsed = parseStandaloneMarkdownImageLine(
+      '![Custom](https://blog.aquilaxk.site/post/api/v1/images/posts/hero.png?w=1920&h=1080) {width=600}'
+    )
+    expect(parsed).not.toBeNull()
+    expect(parsed?.widthPx).toBe(600)
+    expect(parsed?.heightPx).toBe(338)
+    expect(parsed?.aspectRatio).toBe("1920 / 1080")
   })
 
   test("serializes standalone image line preserving width and height metadata", () => {

@@ -17,9 +17,6 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     margin: 30px 0;
     position: relative;
     min-width: 0;
-    min-height: 120px;
-    content-visibility: auto;
-    contain-intrinsic-size: 1px 300px;
     border: 1px solid ${ theme.colors.gray6};
     background: ${ theme.publicDesign.readableSurface};
   }
