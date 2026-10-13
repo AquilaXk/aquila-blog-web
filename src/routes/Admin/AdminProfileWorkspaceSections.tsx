@@ -46,6 +46,7 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
     hasUnsavedChanges,
     imageNotice,
     initialMember,
+    initialProfileSnapshot,
     isPreviewExpanded,
     isProfileImageDraftDragging,
     isProfileImageEditorOpen,
@@ -96,7 +97,7 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
 
 
   return (
-    <AdminShell currentSection="profile" member={sessionMember || initialMember}>
+    <AdminShell currentSection="profile" member={sessionMember || initialMember} profileSnapshot={initialProfileSnapshot}>
       <Main>
       <input
         ref={profileImageFileInputRef}

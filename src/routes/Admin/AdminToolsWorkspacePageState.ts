@@ -1,4 +1,6 @@
+import type { AdminProfile } from "src/hooks/useAdminProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
+import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import type { SystemHealthPayload, TaskRetryPolicy } from "src/routes/Admin/AdminToolsWorkspaceModel"
 
 export type TaskTypeDiagnostics = {
@@ -85,6 +87,8 @@ export type ApiRsData<T> = {
 export type AdminToolsInitialSnapshot = {
   systemHealth: SystemHealthPayload | null
   systemHealthFetchedAt: string | null
+  dashboardSnapshot?: DashboardSnapshotPayload | null
+  dashboardSnapshotFetchedAt?: string | null
   taskQueueDiagnostics: TaskQueueDiagnostics | null
   taskQueueCheckedAt: string | null
   cleanupDiagnostics: UploadedFileCleanupDiagnostics | null
@@ -102,10 +106,13 @@ export type AdminToolsHealthSsrSnapshot = {
 export type AdminToolsBootstrapPayload = {
   member: AuthMember
   health: SystemHealthPayload
+  dashboard?: DashboardSnapshotPayload | null
+  dashboardSnapshot?: DashboardSnapshotPayload | null
 }
 
 export type AdminToolsPageProps = {
   initialMember: AuthMember
+  initialProfileSnapshot?: AdminProfile | null
   initialSnapshot: AdminToolsInitialSnapshot
 }
 
@@ -116,6 +123,8 @@ export type PageDto<T> = {
 export const EMPTY_INITIAL_SNAPSHOT: AdminToolsInitialSnapshot = {
   systemHealth: null,
   systemHealthFetchedAt: null,
+  dashboardSnapshot: null,
+  dashboardSnapshotFetchedAt: null,
   taskQueueDiagnostics: null,
   taskQueueCheckedAt: null,
   cleanupDiagnostics: null,

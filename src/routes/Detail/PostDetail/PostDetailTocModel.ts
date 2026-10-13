@@ -1,9 +1,21 @@
-import { createMarkdownHeadingSlugAllocator } from "../../../libs/markdown/markdownDocumentInsights"
+import {
+  createMarkdownDocumentInsights,
+  createMarkdownHeadingSlugAllocator,
+} from "../../../libs/markdown/markdownDocumentInsights"
 
 export type TocItem = {
   id: string
   text: string
   level: 2 | 3 | 4
+}
+
+export const buildInitialTocFromMarkdown = (markdown: string): TocItem[] => {
+  if (!markdown.trim()) return []
+  return createMarkdownDocumentInsights(markdown).headings.map(({ slug, label, level }) => ({
+    id: slug,
+    text: label,
+    level,
+  }))
 }
 
 const TOC_SELECTOR = ".aq-markdown h2, .aq-markdown h3, .aq-markdown h4"

@@ -99,7 +99,6 @@ const PostHeader: React.FC<Props> = ({
                 <ProfileImage
                   src={authorImageSrc}
                   alt={`${authorName} profile image`}
-                  priority
                   fillContainer
                   width={38}
                   height={38}

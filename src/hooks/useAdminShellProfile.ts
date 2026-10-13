@@ -28,11 +28,14 @@ export const readAdminShellProfile = async (memberId: number): Promise<AdminProf
 
 export const useAdminShellProfile = (memberId: number, initialProfile: AdminProfile | null = null) => {
   const isBrowser = typeof window !== "undefined"
+  const hasSeedProfile = initialProfile != null
   const query = useQuery<AdminProfile>({
     queryKey: adminShellProfileQueryKey(memberId),
     queryFn: () => readAdminShellProfile(memberId),
     enabled: isBrowser,
     initialData: initialProfile ?? undefined,
+    staleTime: 60_000,
+    refetchOnMount: !hasSeedProfile,
     retry: false,
     refetchOnWindowFocus: false,
   })

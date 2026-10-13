@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import {
+  buildInitialTocFromMarkdown,
   measureHeadingOffsets,
   resolveActiveTocIdFromOffsets,
   type HeadingOffset,
@@ -12,6 +13,24 @@ test.describe("PostDetailTocModel decoupled layout reading", () => {
     { id: "details", text: "Details", level: 3 },
     { id: "summary", text: "Summary", level: 2 },
   ]
+
+  test("buildInitialTocFromMarkdown extracts h2-h4 headings with deterministic slugs for SSR TOC", () => {
+    const markdown = [
+      "# Ignored H1",
+      "## Overview",
+      "### Deep Dive",
+      "#### Implementation",
+      "### Deep Dive",
+    ].join("\n\n")
+
+    expect(buildInitialTocFromMarkdown(markdown)).toEqual([
+      { id: "overview", text: "Overview", level: 2 },
+      { id: "deep-dive", text: "Deep Dive", level: 3 },
+      { id: "implementation", text: "Implementation", level: 4 },
+      { id: "deep-dive-2", text: "Deep Dive", level: 3 },
+    ])
+    expect(buildInitialTocFromMarkdown("   ")).toEqual([])
+  })
 
   test("resolveActiveTocIdFromOffsets returns empty string for empty offsets", () => {
     expect(resolveActiveTocIdFromOffsets([], 100, 80)).toBe("")
@@ -43,3 +62,4 @@ test.describe("PostDetailTocModel decoupled layout reading", () => {
     expect(offsets).toEqual([])
   })
 })
+

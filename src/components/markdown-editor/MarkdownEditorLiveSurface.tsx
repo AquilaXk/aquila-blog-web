@@ -167,85 +167,129 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
   highlight: "cm-live-highlight",
 }
 
+type RangeSpec = { from: number; to: number }
+type TableReplacementSpec = RangeSpec & { markdown: string }
+type CalloutReplacementSpec = RangeSpec & { type: string; title: string; content: string }
+type ImageReplacementSpec = RangeSpec & { alt: string; src: string }
+type MathReplacementSpec = RangeSpec & { math: string; displayMode: boolean }
+
+let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
+const getDocString = (doc: EditorState["doc"]): string => {
+  if (cachedDocStringEntry && cachedDocStringEntry.doc === doc) {
+    return cachedDocStringEntry.text
+  }
+  const text = doc.toString()
+  cachedDocStringEntry = { doc, text }
+  return text
+}
+
+let cachedDocBlocksEntry: {
+  doc: EditorState["doc"]
+  tree: ReturnType<typeof syntaxTree>
+  markdownValue: string
+  tables: TableReplacementSpec[]
+  callouts: CalloutReplacementSpec[]
+  images: ImageReplacementSpec[]
+  maths: MathReplacementSpec[]
+} | null = null
+
+const getCachedDocBlocks = (state: EditorState) => {
+  const tree = syntaxTree(state)
+  if (
+    cachedDocBlocksEntry &&
+    cachedDocBlocksEntry.doc === state.doc &&
+    cachedDocBlocksEntry.tree === tree
+  ) {
+    return cachedDocBlocksEntry
+  }
+
+  const markdownValue = getDocString(state.doc)
+  const tables: TableReplacementSpec[] = []
+  const callouts: CalloutReplacementSpec[] = []
+  const images: ImageReplacementSpec[] = []
+
+  tree.iterate({
+    enter(node) {
+      if (node.name === "Table") {
+        tables.push({
+          from: node.from,
+          to: node.to,
+          markdown: markdownValue.slice(node.from, node.to),
+        })
+      } else if (node.name === "Blockquote") {
+        const raw = markdownValue.slice(node.from, node.to)
+        const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\](?:[ \t]+([^\r\n]*))?(?:\r?\n([\s\S]*))?$/.exec(
+          raw.trim()
+        )
+        if (calloutMatch) {
+          callouts.push({
+            from: node.from,
+            to: node.to,
+            type: calloutMatch[1] ?? "note",
+            title: calloutMatch[2] ?? "",
+            content: calloutMatch[3] ?? "",
+          })
+        }
+      } else if (node.name === "Image") {
+        const raw = markdownValue.slice(node.from, node.to)
+        const match = /^!\[(.*?)\]\((.*?)\)$/.exec(raw)
+        if (match) {
+          images.push({
+            from: node.from,
+            to: node.to,
+            alt: match[1] ?? "",
+            src: match[2] ?? "",
+          })
+        }
+      }
+    },
+  })
+
+  const maths: MathReplacementSpec[] = []
+  if (markdownValue.includes("$")) {
+    const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
+    let mathMatch: RegExpExecArray | null
+    while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
+      const from = mathMatch.index
+      const to = from + mathMatch[0].length
+      const isDisplay = Boolean(mathMatch[1])
+      const formula = mathMatch[1] ?? mathMatch[2] ?? ""
+      maths.push({ from, to, math: formula, displayMode: isDisplay })
+    }
+  }
+
+  cachedDocBlocksEntry = {
+    doc: state.doc,
+    tree,
+    markdownValue,
+    tables,
+    callouts,
+    images,
+    maths,
+  }
+  return cachedDocBlocksEntry
+}
+
 const buildDecorations = (state: EditorState): DecorationSet => {
   const currentMode = state.field(editorModeField)
   if (currentMode === "source" || state.field(compositionField)) {
     return Decoration.none
   }
 
-  const markdownValue = state.doc.toString()
+  const { markdownValue, tree, tables, callouts, images, maths } = getCachedDocBlocks(state)
   const selections = state.selection.ranges.map(({ from, to }) => ({ from, to }))
   const isComposing = state.field(compositionField)
   const compSel = state.selection.main
   const compFrom = compSel.from
   const compTo = compSel.to
 
-  // 1. Identify complex blocks (tables, callouts, images)
-  type RangeSpec = { from: number; to: number }
-  const tableReplacements: (RangeSpec & { markdown: string })[] = []
-  const calloutReplacements: (RangeSpec & { type: string; title: string; content: string })[] = []
-  const imageReplacements: (RangeSpec & { alt: string; src: string })[] = []
+  const isEligibleReplacement = (from: number, to: number) =>
+    !isTokenActive(from, to, selections) && !(isComposing && compFrom <= to && compTo >= from)
 
-  syntaxTree(state).iterate({
-    enter(node) {
-      if (node.name === "Table") {
-        if (!isTokenActive(node.from, node.to, selections)) {
-          if (!(isComposing && compFrom <= node.to && compTo >= node.from)) {
-            tableReplacements.push({
-              from: node.from,
-              to: node.to,
-              markdown: markdownValue.slice(node.from, node.to),
-            })
-          }
-        }
-      } else if (node.name === "Blockquote") {
-        const raw = markdownValue.slice(node.from, node.to)
-        const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\](?:[ \t]+([^\r\n]*))?(?:\r?\n([\s\S]*))?$/.exec(
-          raw.trim()
-        )
-        if (calloutMatch && !isTokenActive(node.from, node.to, selections)) {
-          if (!(isComposing && compFrom <= node.to && compTo >= node.from)) {
-            calloutReplacements.push({
-              from: node.from,
-              to: node.to,
-              type: calloutMatch[1] ?? "note",
-              title: calloutMatch[2] ?? "",
-              content: calloutMatch[3] ?? "",
-            })
-          }
-        }
-      } else if (node.name === "Image") {
-        if (!isTokenActive(node.from, node.to, selections)) {
-          if (!(isComposing && compFrom <= node.to && compTo >= node.from)) {
-            const raw = markdownValue.slice(node.from, node.to)
-            const match = /^!\[(.*?)\]\((.*?)\)$/.exec(raw)
-            if (match) {
-              imageReplacements.push({
-                from: node.from,
-                to: node.to,
-                alt: match[1] ?? "",
-                src: match[2] ?? "",
-              })
-            }
-          }
-        }
-      }
-    },
-  })
-
-  // 2. Scan math formulas ($...$ and $$...$$) outside code blocks
-  const mathReplacements: (RangeSpec & { math: string; displayMode: boolean })[] = []
-  const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
-  let mathMatch: RegExpExecArray | null
-  while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
-    const from = mathMatch.index
-    const to = from + mathMatch[0].length
-    if (isTokenActive(from, to, selections)) continue
-    if (isComposing && compFrom <= to && compTo >= from) continue
-    const isDisplay = Boolean(mathMatch[1])
-    const formula = mathMatch[1] ?? mathMatch[2] ?? ""
-    mathReplacements.push({ from, to, math: formula, displayMode: isDisplay })
-  }
+  const tableReplacements = tables.filter((item) => isEligibleReplacement(item.from, item.to))
+  const calloutReplacements = callouts.filter((item) => isEligibleReplacement(item.from, item.to))
+  const imageReplacements = images.filter((item) => isEligibleReplacement(item.from, item.to))
+  const mathReplacements = maths.filter((item) => isEligibleReplacement(item.from, item.to))
 
   const replacedRanges = [
     ...tableReplacements,
@@ -259,7 +303,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
 
   const plan = buildMarkdownLivePreviewPlan(
     markdownValue,
-    syntaxTree(state).topNode,
+    tree.topNode,
     selections
   )
   const taskRanges = plan.filter(({ kind }) => kind === "task")
@@ -450,7 +494,7 @@ const selectNextOccurrenceCommand = (view: EditorView): boolean => {
   const selectedText = doc.sliceString(main.from, main.to)
   if (!selectedText) return false
 
-  const docText = doc.toString()
+  const docText = getDocString(doc)
   const selectedRanges = selection.ranges
   const maxTo = Math.max(...selectedRanges.map((r) => r.to))
 
@@ -519,14 +563,12 @@ const handleFenceEnter: KeyBinding = {
     if (!match) return false
     if (from < line.from + match[0].length) return false
 
-    // Check if the current fence is already closed.
-    // Count fence lines in the remainder of the document.
-    // If the count is odd, there is an unmatched closing fence directly closing this block.
-    // If the count is even (0, 2, 4...), all subsequent fences are paired, so this fence needs auto-closing.
-    const restOfDoc = doc.sliceString(line.to)
-    const fenceCount = restOfDoc
-      .split("\n")
-      .filter((l) => /^\s*(`{3,}|~{3,})/.test(l.trim())).length
+    let fenceCount = 0
+    for (let lineNo = line.number + 1; lineNo <= doc.lines; lineNo += 1) {
+      if (/^\s*(`{3,}|~{3,})/.test(doc.line(lineNo).text.trim())) {
+        fenceCount += 1
+      }
+    }
     if (fenceCount % 2 === 1) {
       return false
     }
@@ -819,7 +861,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
               transaction.annotation(preserveUploadError)
             )
             onChangeRef.current(
-              update.state.doc.toString(),
+              getDocString(update.state.doc),
               update.view.hasFocus,
               shouldPreserveUploadError ? { clearUploadError: false } : undefined
             )
@@ -864,7 +906,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
   // CM6 Undo/Redo preservation: external doc sync without clearing history
   useEffect(() => {
     const view = viewRef.current
-    if (!view || view.state.doc.toString() === value) return
+    if (!view || getDocString(view.state.doc) === value) return
     const selection = view.state.selection.main
     const nextAnchor = Math.min(selection.anchor, value.length)
     const nextHead = Math.min(selection.head, value.length)
@@ -935,7 +977,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const view = viewRef.current
         const selection = view?.state.selection.main
         return {
-          documentValue: view?.state.doc.toString() ?? value,
+          documentValue: view ? getDocString(view.state.doc) : value,
           selection: selection ? { from: selection.from, to: selection.to } : { from: 0, to: 0 },
         }
       },

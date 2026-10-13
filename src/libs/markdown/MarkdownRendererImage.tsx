@@ -58,7 +58,7 @@ export const MarkdownImageFigure = memo(
           height={effectiveHeightPx || undefined}
           style={effectiveAspectRatio ? { aspectRatio: effectiveAspectRatio } : undefined}
           loading={eager ? "eager" : "lazy"}
-          fetchPriority={eager ? "high" : "auto"}
+          fetchPriority={eager ? "high" : undefined}
           decoding="async"
           draggable={false}
         />

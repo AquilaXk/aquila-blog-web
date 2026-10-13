@@ -39,6 +39,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
     dashboardStatusLabel,
     dashboardStatusTone,
     freshnessLabel,
+    initialProfileSnapshot,
     isRefreshing,
     kpiCards,
     logRows,
@@ -48,7 +49,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
   } = props
 
   return (
-    <AdminShell currentSection="dashboard" member={sessionMember}>
+    <AdminShell currentSection="dashboard" member={sessionMember} profileSnapshot={initialProfileSnapshot}>
       <Main>
         <Shell>
           <HeroPanel>

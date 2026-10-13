@@ -90,11 +90,11 @@ export const getServerSideProps: GetServerSideProps<AdminDashboardPageProps> = w
     authDurationMs = baseResult.durationMs
     authDescription = "fallback"
 
-    const fallbackSystemHealthResult = await timed(() => readJsonIfOk<SystemHealthPayload>(req, "/system/api/v1/adm/health"))
+    const [fallbackSystemHealthResult, fallbackDashboardSnapshotResult] = await Promise.all([
+      timed(() => readJsonIfOk<SystemHealthPayload>(req, "/system/api/v1/adm/health")),
+      timed(() => readJsonIfOk<DashboardSnapshotPayload>(req, "/system/api/v1/adm/dashboard-snapshot")),
+    ])
     if (!fallbackSystemHealthResult.ok) throw fallbackSystemHealthResult.error
-    const fallbackDashboardSnapshotResult = await timed(() =>
-      readJsonIfOk<DashboardSnapshotPayload>(req, "/system/api/v1/adm/dashboard-snapshot")
-    )
     if (!fallbackDashboardSnapshotResult.ok) throw fallbackDashboardSnapshotResult.error
     systemHealthResult = {
       durationMs: fallbackSystemHealthResult.durationMs,

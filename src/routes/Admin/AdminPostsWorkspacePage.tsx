@@ -45,6 +45,7 @@ const postsWorkspaceCommands = buildPostsWorkspacePageCommands()
 
 export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   initialMember,
+  initialProfileSnapshot = null,
   initialSnapshot = EMPTY_INITIAL_SNAPSHOT,
 }) => {
   const router = useRouter()
@@ -78,8 +79,14 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   const listSectionRef = useRef<HTMLElement | null>(null)
   const listRequestIdRef = useRef(0)
   const recentRequestIdRef = useRef(0)
-  const skipInitialRecentFetchRef = useRef(hasInitialRecentPosts)
   const skipInitialListFetchRef = useRef(hasInitialListState)
+  const isInitialListMountRef = useRef(true)
+  const isDefaultRecentSource =
+    listScope === "active" &&
+    listStatus === "all" &&
+    !listKw.trim() &&
+    sanitizeNumberInput(listPage, DEFAULT_PAGE) === DEFAULT_PAGE &&
+    listSort === DEFAULT_SORT
 
   const loadRecentPosts = useCallback(async () => {
     const requestId = recentRequestIdRef.current + 1
@@ -137,24 +144,44 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         total: data.pageable?.totalElements ?? data.content?.length ?? 0,
         loadedAt: new Date().toISOString(),
       })
+
+      if (isDefaultRecentSource) {
+        recentRequestIdRef.current += 1
+        const rows = [...(data.content || [])]
+          .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
+          .slice(0, 5)
+        setRecentPosts(rows)
+        setRecentError("")
+        setIsRecentLoading(false)
+      }
     } catch {
       if (listRequestIdRef.current !== requestId) return
       setListError(POSTS_LIST_LOAD_ERROR_MESSAGE)
       setListState({ rows: [], total: 0, loadedAt: "" })
+      if (isDefaultRecentSource) {
+        setRecentError(RECENT_POSTS_UNAVAILABLE_MESSAGE)
+        setRecentPosts([])
+        setIsRecentLoading(false)
+      }
     } finally {
       if (listRequestIdRef.current === requestId) {
         setIsListLoading(false)
       }
     }
-  }, [listKw, listPage, listPageSize, listScope, listSort, listStatus])
+  }, [isDefaultRecentSource, listKw, listPage, listPageSize, listScope, listSort, listStatus])
 
-  useEffect(() => {
-    if (skipInitialRecentFetchRef.current) {
-      skipInitialRecentFetchRef.current = false
+  const refreshWorkspaceLists = useCallback(async () => {
+    if (isDefaultRecentSource) {
+      await loadList()
       return
     }
+    await Promise.all([loadList(), loadRecentPosts()])
+  }, [isDefaultRecentSource, loadList, loadRecentPosts])
+
+  useEffect(() => {
+    if (!hasInitialListState || hasInitialRecentPosts) return
     void loadRecentPosts()
-  }, [loadRecentPosts])
+  }, [hasInitialListState, hasInitialRecentPosts, loadRecentPosts])
 
   useEffect(() => {
     if (showDeferredSupportPanels || typeof window === "undefined") return
@@ -221,8 +248,14 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   }, [])
 
   useEffect(() => {
+    const isInitialMount = isInitialListMountRef.current
+    isInitialListMountRef.current = false
     if (skipInitialListFetchRef.current) {
       skipInitialListFetchRef.current = false
+      return
+    }
+    if (isInitialMount) {
+      void loadList()
       return
     }
     const timer = window.setTimeout(() => {
@@ -332,7 +365,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch(`/post/api/v1/posts/${row.id}`, { method: "DELETE" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
-        await Promise.all([loadList(), loadRecentPosts()])
+        await refreshWorkspaceLists()
         showToast({
           tone: "success",
           text: `#${row.id} ${buildRowTitle(row)} 글을 삭제했습니다.`,
@@ -352,7 +385,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setMutationPending(null)
       }
     },
-    [loadList, loadRecentPosts, pushRecentAction, queryClient, showToast]
+    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
   )
 
   const performRestorePost = useCallback(
@@ -362,7 +395,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch<PostWriteResult>(`/post/api/v1/adm/posts/${row.id}/restore`, { method: "POST" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
-        await Promise.all([loadList(), loadRecentPosts()])
+        await refreshWorkspaceLists()
         showToast({
           tone: "success",
           text: `#${row.id} ${buildRowTitle(row)} 글을 복구했습니다.`,
@@ -376,7 +409,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setMutationPending(null)
       }
     },
-    [loadList, loadRecentPosts, pushRecentAction, queryClient, showToast]
+    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
   )
 
   const performHardDeletePost = useCallback(
@@ -386,7 +419,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch(`/post/api/v1/adm/posts/${row.id}/hard`, { method: "DELETE" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
-        await Promise.all([loadList(), loadRecentPosts()])
+        await refreshWorkspaceLists()
         showToast({
           tone: "success",
           text: `#${row.id} ${buildRowTitle(row)} 글을 영구삭제했습니다.`,
@@ -400,7 +433,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setMutationPending(null)
       }
     },
-    [loadList, loadRecentPosts, pushRecentAction, queryClient, showToast]
+    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
   )
 
   const handleDeletePost = useCallback(
@@ -496,6 +529,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       handleHardDeletePost={handleHardDeletePost}
       handleRestorePost={handleRestorePost}
       handleToastAction={handleToastAction}
+      initialProfileSnapshot={initialProfileSnapshot}
       isListLoading={isListLoading}
       isRecentLoading={isRecentLoading}
       listError={listError}

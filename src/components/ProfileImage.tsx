@@ -89,8 +89,8 @@ const ProfileImage: React.FC<Props> = ({
       width={width}
       height={height}
       loading={loading || (priority ? "eager" : "lazy")}
-      {...({ fetchpriority: priority ? "high" : "auto" } as Record<string, string>)}
-      decoding={priority ? "sync" : "async"}
+      {...(priority ? ({ fetchpriority: "high" } as Record<string, string>) : {})}
+      decoding="async"
       draggable={false}
       onError={handleImageError}
       ref={imageRef}
