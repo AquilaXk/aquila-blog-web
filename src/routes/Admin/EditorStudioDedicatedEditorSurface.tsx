@@ -384,7 +384,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   onClick={() => {
                     if (item.range) {
                       setLastActivatedOutlineOffset(item.range.start)
-                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.start })
+                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
                       return
                     }
                     setLastActivatedOutlineOffset(null)
