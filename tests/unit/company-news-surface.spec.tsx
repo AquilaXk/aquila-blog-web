@@ -273,6 +273,7 @@ test("formatCapabilityStepLabel과 stepCapabilityIndex는 순환 인덱스 및 �
 test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 보간과 정규화된 입자 시드를 생성한다", () => {
   expect(smoothstep(0, 1, -0.5)).toBe(0)
   expect(smoothstep(0, 1, 0.5)).toBe(0.5)
+  expect(smoothstep(2, 6, 4)).toBe(0.5)
   expect(smoothstep(0, 1, 1.5)).toBe(1)
   expect(smoothstep(2, 2, 2)).toBe(0)
 
