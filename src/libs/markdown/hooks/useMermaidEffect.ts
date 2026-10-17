@@ -25,7 +25,7 @@ const useMermaidEffect = (
   const shouldLogMermaidWarnings = process.env.NODE_ENV !== "production"
   const observeMutations = options?.observeMutations ?? true
   const allowDesktopWideLane = options?.allowDesktopWideLane ?? true
-  const lazyViewport = options?.lazyViewport ?? true
+  const lazyViewport = options?.lazyViewport ?? false
   const effectiveScheme = options?.forceScheme ?? (scheme === "dark" ? "dark" : "light")
 
   useEffect(() => {

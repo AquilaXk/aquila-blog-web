@@ -281,9 +281,9 @@ export const COMPANY_WORK_TILES: CompanyWorkTile[] = [
  */
 export const COMPANY_STATS: CompanyStat[] = [
   { id: "services", value: "2개", label: "직접 운영 중인 공개 서비스 (EasySubway · AquilaLog)" },
-  { id: "coverage", value: "100%", label: "전국 도시철도 역사 데이터 정합성 검증" },
-  { id: "availability", value: "100%", label: "자체 인프라 기반 무중단 Blue-Green 배포 체계" },
-  { id: "barrier", value: "0원", label: "회원가입이나 결제 없이 모든 기능 즉시 이용 가능" },
+  { id: "coverage", value: "20개 노선", label: "수도권 및 광역시 도시철도 무장애 실측 데이터 연동" },
+  { id: "availability", value: "Blue-Green", label: "자체 홈서버 기반 무중단 컨테이너 배포 및 실시간 관제" },
+  { id: "barrier", value: "0원", label: "회원가입·결제·위치 추적 없이 모든 기능 즉시 이용" },
 ]
 
 /** 비전 체크리스트. 지킬 수 있는 문장만 남긴다. */
@@ -301,6 +301,15 @@ export const COMPANY_FOOTER_LINK_GROUPS = [
     links: [
       { label: "EasySubway", href: PRODUCT_URL },
       { label: "기술 블로그", href: BLOG_URL },
+    ],
+  },
+  {
+    id: "company",
+    title: "탐색 & 문의",
+    links: [
+      { label: "핵심 역량", href: "#capabilities" },
+      { label: "회사 소개", href: "#approach" },
+      { label: "이메일 문의", href: CONTACT_MAILTO },
     ],
   },
 ] as const

@@ -205,14 +205,20 @@ const CompanyHeroParticles: React.FC = () => {
         const finalX = p.refX + dispX + p.posX * 0.28
         const finalY = p.refY + dispY + p.posY * 0.28
 
-        const centerClearance = smoothstep(0.14, 0.46, Math.hypot(finalX * 0.9, finalY + 0.16))
+        const screenX = (finalX * 0.5 + 0.5) * width
+        const screenY = (finalY * 0.5 + 0.5) * height
+        const clearRx = Math.min(width * 0.48, 420)
+        const clearRy = Math.min(height * 0.36, 230)
+        const centerClearance = smoothstep(
+          0.76,
+          1.16,
+          Math.hypot((screenX - width * 0.5) / clearRx, (screenY - height * 0.5) / clearRy)
+        )
         const alpha =
-          Math.min(0.76, Math.max(0.08, p.scale * 0.34)) * (0.32 + centerClearance * 0.68)
+          Math.min(0.76, Math.max(0.08, p.scale * 0.34)) * centerClearance
 
         if (alpha < 0.05) continue
 
-        const screenX = (finalX * 0.5 + 0.5) * width
-        const screenY = (finalY * 0.5 + 0.5) * height
         const angle =
           Math.atan2(finalY - ringY, finalX - ringX) +
           Math.sin(p.seedA * 6.28 + time * 0.9) * 0.35

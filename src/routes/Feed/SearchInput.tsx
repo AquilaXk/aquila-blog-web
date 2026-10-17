@@ -3,7 +3,6 @@ import React, { InputHTMLAttributes, Ref } from "react"
 import AppIcon from "src/components/icons/AppIcon"
 import {
   FEED_SEARCH_FIELD_MIN_HEIGHT_PX,
-  FEED_TAG_RAIL_CHIP_MAX_PX,
   MOBILE_TOUCH_TARGET_MIN_PX,
   TOUCH_TOKEN_BUNDLE_REVISION,
 } from "./feedUiTokens"
@@ -21,17 +20,6 @@ const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
   const { t } = useLanguage()
   const inputId = props.id || FEED_SEARCH_INPUT_ID
 
-  const focusInput = () => {
-    if (typeof inputRef !== "function" && inputRef?.current) {
-      inputRef.current.focus()
-      return
-    }
-
-    if (typeof document === "undefined") return
-    const input = document.getElementById(inputId)
-    if (input instanceof HTMLInputElement) input.focus()
-  }
-
   return (
     <StyledWrapper data-touch-token-revision={TOUCH_TOKEN_BUNDLE_REVISION}>
       <div className="field">
@@ -47,9 +35,6 @@ const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
           aria-label="Search posts by keyword"
           {...props}
         />
-        <button type="button" className="shortcut" onClick={focusInput} aria-label={t("searchButton")}>
-          {t("searchButton")}
-        </button>
       </div>
     </StyledWrapper>
   )
@@ -85,36 +70,6 @@ const StyledWrapper = styled.div`
       svg {
         width: 15px;
         height: 15px;
-      }
-    }
-
-    .shortcut {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      min-width: 56px;
-      height: 24px;
-      padding: 0 0.5rem;
-      border-radius: 4px;
-      border: 1px solid var(--aq-border);
-      background: var(--aq-surface-elevated, transparent);
-      box-shadow: 0 1px 0 1px var(--aq-border);
-      color: var(--aq-muted);
-      font-size: 0.74rem;
-      font-weight: 700;
-      letter-spacing: 0;
-      line-height: 1;
-      cursor: pointer;
-      transition: all 0.125s ease-in;
-
-      &:hover {
-        color: var(--aq-text);
-        border-color: var(--aq-accent);
-      }
-
-      @media (max-width: ${FEED_TAG_RAIL_CHIP_MAX_PX}px) {
-        display: none;
       }
     }
   }

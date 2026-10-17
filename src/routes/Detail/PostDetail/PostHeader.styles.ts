@@ -229,23 +229,23 @@ export const StyledWrapper = styled.header `
   .likeButton {
     display: inline-flex;
     align-items: center;
-    gap: 0.42rem;
-    min-height: 40px;
-    padding: 0 0.9rem;
-    border-radius: 6px;
-    border: 1px solid var(--aq-border);
+    gap: 0.35rem;
+    min-height: auto;
+    padding: 0 0.25rem;
+    border-radius: 0;
+    border: 0;
     background: transparent;
     color: var(--aq-muted);
-    font-size: 0.9rem;
-    font-weight: 650;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
     cursor: default;
 
     svg {
-      font-size: 1.05rem;
+      font-size: 0.95rem;
     }
 
     &[data-active="true"] {
-      border-color: var(--aq-accent-link, var(--aq-accent));
       background: transparent;
       color: var(--aq-text);
 

@@ -56,27 +56,26 @@ export const CompanySurface = styled.div`
 `
 
 export const NoticeBanner = styled.div`
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 ${SECTION_PADDING_X};
-  background: ${light.surfaceScaffold};
-  border-bottom: 1px solid ${light.border};
-  text-align: center;
+  margin-bottom: 0.25rem;
 
   a {
     ${focusVisibleRing};
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    min-height: 44px;
-    padding: 0.2rem 0.5rem;
-    border-radius: ${radius.sm}px;
+    gap: 0.45rem;
+    min-height: 36px;
+    padding: 0.25rem 0.95rem;
+    border-radius: ${radius.pill}px;
+    border: 1px solid ${light.border};
+    background: ${light.surfaceScaffold};
     color: ${light.inkSecondary};
-    font-size: 0.875rem;
+    font-size: 0.84375rem;
     font-weight: ${fontWeight.medium};
     text-decoration: none;
-    transition: color ${TRANSITION};
+    transition: color ${TRANSITION}, border-color ${TRANSITION}, background-color ${TRANSITION};
 
     svg {
       flex: 0 0 auto;
@@ -86,6 +85,7 @@ export const NoticeBanner = styled.div`
 
     &:hover {
       color: ${light.inkPrimary};
+      border-color: ${light.borderStrong};
 
       svg {
         transform: translateX(3px);
@@ -181,7 +181,7 @@ export const NavLink = styled.a`
   flex: 0 0 auto;
   min-height: 44px;
   padding: 0 0.85rem;
-  border-radius: ${radius.sm}px;
+  border-radius: ${radius.pill}px;
   color: ${light.inkSecondary};
   text-decoration: none;
   font-size: 0.96875rem;
@@ -201,13 +201,13 @@ export const PillAction = styled.a`
   justify-content: center;
   gap: 0.45rem;
   min-height: 46px;
-  padding: 0 1.35rem;
-  border-radius: ${radius.md}px;
+  padding: 0 1.4rem;
+  border-radius: ${radius.pill}px;
   background: ${light.inkPrimary};
   color: ${light.onAccent};
   text-decoration: none;
   font-size: 0.96875rem;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   letter-spacing: -0.01em;
   transition: background-color ${TRANSITION};
 
@@ -240,8 +240,8 @@ export const SecondaryPillAction = styled.a`
   justify-content: center;
   gap: 0.45rem;
   min-height: 46px;
-  padding: 0 1.25rem;
-  border-radius: ${radius.md}px;
+  padding: 0 1.35rem;
+  border-radius: ${radius.pill}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   color: ${light.inkPrimary};
@@ -264,7 +264,7 @@ export const SecondaryPillAction = styled.a`
 export const HeaderAction = styled(PillAction)`
   justify-self: end;
   min-height: 44px;
-  padding: 0 1.1rem;
+  padding: 0 1.15rem;
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     grid-row: 1;
@@ -275,7 +275,7 @@ export const HeaderAction = styled(PillAction)`
 export const Hero = styled.section`
   position: relative;
   overflow: hidden;
-  padding: clamp(4.5rem, 9vw, 8.5rem) ${SECTION_PADDING_X} clamp(2.5rem, 5vw, 4rem);
+  padding: clamp(5.5rem, 11vw, 9.5rem) ${SECTION_PADDING_X} clamp(5.5rem, 11vw, 9.5rem);
   text-align: center;
 `
 
@@ -296,7 +296,7 @@ export const HeroCopy = styled.div`
 
 export const HeroTitle = styled.h1`
   margin: 0;
-  font-size: clamp(2.35rem, 6vw, 4.4rem);
+  font-size: clamp(2.45rem, 6.2vw, 4.5rem);
   line-height: 1.08;
   letter-spacing: -0.03em;
   font-weight: ${fontWeight.medium};
@@ -327,10 +327,6 @@ export const HeroActions = styled.div`
   margin-top: 0.25rem;
 `
 
-/**
- * 히어로 EasySubway 핵심 앱 인터페이스 쇼케이스.
- * 무의미한 그리드 선, 보라색 글로우, 부유 알약 배지를 제거하고 앱 인터페이스를 무대 중심에 담백하게 배치한다.
- */
 export const HeroShowcase = styled.figure`
   position: relative;
   z-index: 1;
@@ -389,7 +385,7 @@ export const SectionHeading = styled.h2`
   font-size: clamp(1.75rem, 3.4vw, 2.65rem);
   line-height: 1.18;
   letter-spacing: -0.025em;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
 `
 
@@ -402,9 +398,10 @@ export const SectionAside = styled.p`
 `
 
 export const SurfaceFooter = styled.footer`
-  padding: clamp(2.75rem, 6vw, 4.5rem) ${SECTION_PADDING_X};
-  background: ${dark.field};
-  color: ${dark.textPrimary};
+  padding: clamp(3rem, 6vw, 4.5rem) ${SECTION_PADDING_X};
+  border-top: 1px solid ${light.border};
+  background: ${light.surfaceScaffold};
+  color: ${light.inkPrimary};
 `
 
 export const FooterInner = styled.div`
@@ -433,8 +430,9 @@ export const FooterBrand = styled.div`
     align-items: center;
     gap: 0.6rem;
     font-size: 1.02rem;
-    font-weight: ${fontWeight.extraBold};
+    font-weight: ${fontWeight.bold};
     letter-spacing: -0.02em;
+    color: ${light.inkPrimary};
   }
 
   > div > span:first-of-type {
@@ -447,14 +445,14 @@ export const FooterBrand = styled.div`
   p {
     margin: 0;
     max-width: 22rem;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: ${dark.textSecondary};
+    font-size: 0.96875rem;
+    line-height: 1.65;
+    color: ${light.inkSecondary};
   }
 
   small {
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
+    font-size: 0.84375rem;
+    color: ${light.inkMuted};
   }
 `
 
@@ -470,7 +468,7 @@ export const FooterGroup = styled.nav`
     font-weight: ${editorialLabel.fontWeight};
     letter-spacing: ${editorialLabel.letterSpacing};
     text-transform: ${editorialLabel.textTransform};
-    color: ${dark.textMuted};
+    color: ${light.inkMuted};
   }
 
   a {
@@ -479,14 +477,14 @@ export const FooterGroup = styled.nav`
     align-items: center;
     min-height: 44px;
     border-radius: ${radius.sm}px;
-    color: ${dark.textPrimary};
+    color: ${light.inkSecondary};
     text-decoration: none;
-    font-size: 1rem;
+    font-size: 0.96875rem;
     font-weight: ${fontWeight.medium};
     transition: color ${TRANSITION};
 
     &:hover {
-      color: ${dark.signature};
+      color: ${light.inkPrimary};
     }
   }
 `

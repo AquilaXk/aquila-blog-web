@@ -177,11 +177,11 @@ export const NavLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0 0.75rem;
-  border-radius: ${radius.sm}px;
+  border-radius: ${radius.pill}px;
   color: ${dark.textSecondary};
   text-decoration: none;
-  font-size: 1rem;
-  font-weight: ${fontWeight.regular};
+  font-size: 0.96875rem;
+  font-weight: ${fontWeight.medium};
   transition: color ${TRANSITION}, background-color ${TRANSITION};
 
   &:hover {
@@ -199,14 +199,14 @@ export const ButtonAction = styled.a`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 46px;
   padding: 0 1.45rem;
-  border-radius: ${radius.md}px;
+  border-radius: ${radius.pill}px;
   background: ${dark.accent};
   color: ${dark.onAccent};
   text-decoration: none;
-  font-size: 1rem;
-  font-weight: ${fontWeight.semibold};
+  font-size: 0.96875rem;
+  font-weight: ${fontWeight.medium};
   letter-spacing: -0.01em;
   transition: background-color ${TRANSITION};
 
@@ -227,20 +227,20 @@ export const PillAction = ButtonAction
 
 export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
-  padding: 0 1.1rem;
-  border-radius: ${radius.sm}px;
+  padding: 0 1.15rem;
+  border-radius: ${radius.pill}px;
 `
 
 export const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.9rem;
   border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
+  border-radius: ${radius.pill}px;
   background: ${dark.fieldRaised};
   color: ${dark.textPrimary};
-  font-size: 0.875rem;
+  font-size: 0.84375rem;
   font-weight: ${fontWeight.medium};
 
   &::before {
@@ -291,7 +291,7 @@ export const HeroCopy = styled.div`
 
 export const HeroTitle = styled.h1`
   margin: 0;
-  font-size: clamp(2.2rem, 5.4vw, 4rem);
+  font-size: clamp(2.25rem, 5.6vw, 4.1rem);
   line-height: 1.1;
   letter-spacing: -0.025em;
   font-weight: ${fontWeight.medium};
@@ -299,7 +299,7 @@ export const HeroTitle = styled.h1`
 
   strong {
     display: block;
-    font-weight: ${fontWeight.semibold};
+    font-weight: ${fontWeight.medium};
     color: ${dark.textPrimary};
   }
 `
@@ -383,12 +383,12 @@ export const DisplayHeading = styled.h2`
   font-size: clamp(1.75rem, 3.6vw, 2.65rem);
   line-height: 1.2;
   letter-spacing: -0.025em;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${dark.textPrimary};
 
   strong {
     display: block;
-    font-weight: ${fontWeight.semibold};
+    font-weight: ${fontWeight.medium};
     color: ${dark.textPrimary};
   }
 `
@@ -420,13 +420,16 @@ export const IntroAside = styled.p`
 export const MetaFactRow = styled.dl`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1.25rem 1.5rem;
-  margin: clamp(2rem, 4vw, 3rem) 0 0;
-  padding-top: clamp(1.5rem, 3vw, 2.25rem);
-  border-top: 1px solid ${dark.hairline};
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  margin: clamp(2.25rem, 4.5vw, 3.25rem) 0 0;
+
+  > div {
+    padding-top: 1.15rem;
+    border-top: 1px solid ${dark.hairline};
+  }
 
   dt {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.45rem;
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
@@ -445,20 +448,12 @@ export const MetaFactRow = styled.dl`
 `
 
 export const MetaBadge = styled.span<{ $accent?: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 0.75rem;
-  border: 1px solid ${({ $accent }) => ($accent ? dark.signature : dark.hairline)};
-  border-radius: ${radius.sm}px;
-  background: ${({ $accent }) => ($accent ? dark.signature : dark.fieldDeep)};
-  color: ${({ $accent }) => ($accent ? dark.onSignature : dark.textSecondary)};
-  font-size: 0.9375rem;
-  font-weight: ${fontWeight.medium};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
+  display: inline-block;
+  color: ${({ $accent }) => ($accent ? dark.signature : dark.textPrimary)};
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  font-weight: ${fontWeight.semibold};
+  letter-spacing: -0.015em;
+  line-height: 1.35;
 `
 
 export const MetaPill = MetaBadge

@@ -328,6 +328,7 @@ test.describe("core smoke detail layout", () => {
   await expect(page.getByRole("heading", { name: "상세 목차 active 안정성 테스트" })).toBeVisible()
   const rightToc = page.locator('aside.rightRail nav[aria-label="목차"]')
   await expect(rightToc.getByRole("button", { name: "계측 섹션 02" })).toBeVisible()
+  await expect(page.locator("article").getByRole("heading", { name: "계측 섹션 02" })).toBeVisible()
 
   await page.evaluate(() => {
     const target = Array.from(document.querySelectorAll<HTMLElement>("article h2, article h3"))

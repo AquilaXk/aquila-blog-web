@@ -33,10 +33,8 @@ export const CarouselHead = styled.div`
 export const FeatureGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  margin-top: clamp(2rem, 4vw, 3rem);
-  border: 1px solid ${light.border};
-  background: ${light.border};
+  gap: clamp(2.25rem, 3.5vw, 3rem) clamp(1.75rem, 3vw, 2.75rem);
+  margin-top: clamp(2.5rem, 4.5vw, 3.5rem);
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -51,21 +49,22 @@ export const FeatureCard = styled.article`
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: clamp(1.5rem, 2.5vw, 2.25rem);
-  background: ${light.surface};
+  padding: 1.35rem 0 0;
+  border-top: 1px solid ${light.border};
+  background: transparent;
 
   h3 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: 1.15rem;
     line-height: 1.4;
     letter-spacing: -0.015em;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${light.inkPrimary};
   }
 
   p {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 0.96875rem;
     line-height: 1.68;
     color: ${light.inkSecondary};
   }
@@ -109,56 +108,54 @@ export const WorkHeading = styled.h2`
   font-size: clamp(1.75rem, 3.4vw, 2.65rem);
   line-height: 1.18;
   letter-spacing: -0.025em;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
 `
 
 export const ProductShowcaseGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.5rem, 3vw, 2.25rem);
+  display: flex;
+  flex-direction: column;
   margin: 0;
+`
+
+export const ProductShowcaseCard = styled.article`
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: clamp(2rem, 4.5vw, 4rem);
+  align-items: center;
+  padding: clamp(2.25rem, 4.5vw, 3.5rem) 0;
+  border-top: 1px solid ${light.border};
+  background: transparent;
+
+  &:last-of-type {
+    border-bottom: 1px solid ${light.border};
+  }
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
   }
 `
 
-export const ProductShowcaseCard = styled.article`
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
-  background: ${light.surface};
-`
-
 export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: clamp(220px, 24vw, 280px);
-  padding: 1.25rem;
-  border-bottom: 1px solid ${light.border};
-  background: ${light.surfaceBrandChrome};
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border: 1px solid ${light.border};
+  border-radius: ${radius.lg}px;
+  background: ${light.surface};
   overflow: hidden;
 
   picture {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    display: block;
+    width: ${({ $layout }) => ($layout === "phone" ? "min(100%, 14.5rem)" : "100%")};
   }
 
   img {
     display: block;
-    max-height: 100%;
-    max-width: 100%;
-    width: ${({ $layout }) => ($layout === "phone" ? "auto" : "100%")};
-    height: ${({ $layout }) => ($layout === "phone" ? "100%" : "auto")};
-    object-fit: contain;
-    border-radius: ${({ $layout }) => ($layout === "phone" ? `${radius.md}px` : `${radius.sm}px`)};
+    width: 100%;
+    height: auto;
+    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.35rem" : `${radius.md}px`)};
     box-shadow: ${variables.ui.card.shadowFloating};
   }
 `
@@ -166,30 +163,30 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
 export const ProductShowcaseContent = styled.div`
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  padding: clamp(1.5rem, 2.5vw, 2rem);
-  gap: 0.75rem;
+  gap: 0.9rem;
 
   h3 {
     margin: 0;
-    font-size: clamp(1.35rem, 2.2vw, 1.6rem);
-    font-weight: ${fontWeight.bold};
-    letter-spacing: -0.02em;
+    font-size: clamp(1.65rem, 2.8vw, 2.2rem);
+    font-weight: ${fontWeight.medium};
+    letter-spacing: -0.025em;
+    line-height: 1.18;
     color: ${light.inkPrimary};
   }
 
   .summary {
     margin: 0;
-    font-size: 1.02rem;
-    font-weight: ${fontWeight.semibold};
-    line-height: 1.55;
+    font-size: 1.0625rem;
+    font-weight: ${fontWeight.medium};
+    line-height: 1.6;
     color: ${light.inkPrimary};
   }
 
   .description {
     margin: 0;
-    font-size: 0.95rem;
-    line-height: 1.65;
+    max-width: 32rem;
+    font-size: 0.96875rem;
+    line-height: 1.68;
     color: ${light.inkSecondary};
   }
 `
@@ -204,46 +201,20 @@ export const ProductBadge = styled.span`
   color: ${light.accentText};
 `
 
-export const ProductHighlightList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  margin: 0.35rem 0 0.75rem;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    font-size: 0.925rem;
-    line-height: 1.5;
-    color: ${light.inkPrimary};
-
-    svg {
-      flex: 0 0 auto;
-      width: 1rem;
-      height: 1rem;
-      color: ${light.accentText};
-      stroke-width: 2.1;
-    }
-  }
-`
-
 export const ProductAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 0.4rem;
+  gap: 0.45rem;
   min-height: 44px;
-  margin-top: auto;
-  padding: 0 1rem;
-  border-radius: ${radius.sm}px;
+  margin-top: 0.4rem;
+  padding: 0 1.25rem;
+  border-radius: ${radius.pill}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   font-size: 0.9375rem;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
   text-decoration: none;
   transition: color ${TRANSITION}, background-color ${TRANSITION}, border-color ${TRANSITION};
@@ -253,7 +224,7 @@ export const ProductAction = styled.a`
   }
 
   &:hover {
-    background: ${light.surfaceScaffold};
+    background: ${light.surfaceBrandChrome};
     border-color: ${light.borderStrong};
 
     svg {
@@ -267,80 +238,6 @@ export const ProductAction = styled.a`
     svg {
       transition: none;
     }
-  }
-`
-
-export const ReliabilityBlock = styled.div`
-  margin-top: clamp(3rem, 6vw, 4.5rem);
-  padding-top: clamp(2.5rem, 5vw, 3.5rem);
-  border-top: 1px solid ${light.border};
-`
-
-export const ReliabilityHeader = styled.div`
-  max-width: 38rem;
-  margin-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
-
-  h3 {
-    margin: 0.35rem 0 0.5rem;
-    font-size: clamp(1.35rem, 2.4vw, 1.7rem);
-    font-weight: ${fontWeight.semibold};
-    letter-spacing: -0.02em;
-    color: ${light.inkPrimary};
-  }
-
-  p {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.65;
-    color: ${light.inkSecondary};
-  }
-`
-
-export const ReliabilityList = styled.ul`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid ${light.border};
-  background: ${light.border};
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const ReliabilityItem = styled.li`
-  display: flex;
-  flex-direction: column;
-  padding: clamp(1.35rem, 2.2vw, 1.85rem);
-  background: ${light.surface};
-
-  .tag {
-    align-self: flex-start;
-    margin-bottom: 0.65rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${light.accentText};
-  }
-
-  h4 {
-    margin: 0 0 0.45rem;
-    font-size: 1.0625rem;
-    font-weight: ${fontWeight.bold};
-    color: ${light.inkPrimary};
-    letter-spacing: -0.01em;
-  }
-
-  p {
-    margin: 0;
-    font-size: 0.925rem;
-    line-height: 1.65;
-    color: ${light.inkSecondary};
   }
 `
 
@@ -360,57 +257,52 @@ export const StoryHeadline = styled.h2`
   font-size: clamp(1.9rem, 4vw, 2.9rem);
   line-height: 1.16;
   letter-spacing: -0.025em;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
 
   strong {
     display: block;
-    font-weight: ${fontWeight.semibold};
+    font-weight: ${fontWeight.medium};
     color: ${light.inkSecondary};
   }
 `
 
 export const StatList = styled.dl`
-  margin: clamp(2.25rem, 5vw, 3.5rem) 0 0;
-  max-width: 34rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
 
   > div {
-    display: grid;
-    grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
-    align-items: baseline;
-    gap: 0.35rem 1.5rem;
-    padding: 1.15rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding-top: 1.25rem;
     border-top: 1px solid ${light.border};
-  }
-
-  > div:first-of-type {
-    border-top: none;
-  }
-
-  > div:last-of-type {
-    border-bottom: 1px solid ${light.border};
   }
 
   dt {
     margin: 0;
-    font-size: clamp(1.3rem, 2.4vw, 1.7rem);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-    font-weight: ${fontWeight.bold};
+    font-size: clamp(1.55rem, 2.6vw, 2.05rem);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    font-weight: ${fontWeight.semibold};
     color: ${light.inkPrimary};
   }
 
   dd {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.96875rem;
     line-height: 1.6;
     color: ${light.inkSecondary};
   }
 
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   @media (max-width: ${breakpoint.sm}px) {
-    > div {
-      grid-template-columns: minmax(0, 1fr);
-    }
+    grid-template-columns: minmax(0, 1fr);
   }
 `
 

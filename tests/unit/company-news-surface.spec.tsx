@@ -10,6 +10,8 @@ import * as Sec from "../../src/routes/Company/CompanySection.styles"
 import {
   BLOG_URL,
   COMPANY_FEATURE_CARDS,
+  COMPANY_FOOTER_LINK_GROUPS,
+  COMPANY_STATS,
   type CompanyNewsItem,
 } from "../../src/routes/Company/CompanyPageModel"
 
@@ -265,5 +267,17 @@ test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 �
     expect(seed.colorIndex).toBeLessThan(5)
   }
 })
+
+test("COMPANY_STATS는 중복 100% 수치 없이 4개 고유 운영 지표를 정의하고 푸터는 2개 내비 그룹을 채운다", () => {
+  expect(COMPANY_STATS).toHaveLength(4)
+  const statValues = COMPANY_STATS.map((stat) => stat.value)
+  expect(new Set(statValues).size).toBe(4)
+  expect(statValues).toEqual(["2개", "20개 노선", "Blue-Green", "0원"])
+  expect(statValues).not.toContain("100%")
+
+  expect(COMPANY_FOOTER_LINK_GROUPS).toHaveLength(2)
+  expect(COMPANY_FOOTER_LINK_GROUPS.map((group) => group.title)).toEqual(["제품", "탐색 & 문의"])
+})
+
 
 

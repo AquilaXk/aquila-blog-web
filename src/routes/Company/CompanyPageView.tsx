@@ -3,20 +3,15 @@ import { CONFIG } from "site.config"
 import BrandMark from "src/components/branding/BrandMark"
 import CompanyFeatureCarousel from "src/routes/Company/CompanyFeatureCarousel"
 import CompanyHeroParticles from "src/routes/Company/CompanyHeroParticles"
-import CompanyIcon from "src/routes/Company/CompanyIcon"
 import {
   BLOG_URL,
   COMPANY_FOOTER_LINK_GROUPS,
   COMPANY_NOTICE,
   COMPANY_PRINCIPLES,
   COMPANY_PRODUCT_SHOWCASES,
-  COMPANY_RELIABILITY_ITEMS,
   COMPANY_STATS,
   COMPANY_SURFACE,
   CONTACT_MAILTO,
-  PRODUCT_SCREENSHOT,
-  PRODUCT_SCREENSHOT_ALT,
-  PRODUCT_SCREENSHOT_SIZE,
   PRODUCT_URL,
   type CompanyNewsItem,
 } from "src/routes/Company/CompanyPageModel"
@@ -61,13 +56,6 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
 
   return (
     <S.CompanySurface ref={surfaceRef}>
-      <S.NoticeBanner>
-        <a href={COMPANY_NOTICE.href}>
-          <span>{COMPANY_NOTICE.label}</span>
-          <ArrowRightGlyph size={13} />
-        </a>
-      </S.NoticeBanner>
-
       <S.SurfaceHeader data-header data-scroll-reactive="true">
         <S.BrandLink href={surfaceUrl} aria-current="page">
           <BrandMark priority />
@@ -90,6 +78,12 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
         <S.Hero>
           <CompanyHeroParticles />
           <S.HeroCopy data-reveal data-reveal-group="hero">
+            <S.NoticeBanner>
+              <a href={COMPANY_NOTICE.href}>
+                <span>{COMPANY_NOTICE.label}</span>
+                <ArrowRightGlyph size={13} />
+              </a>
+            </S.NoticeBanner>
             <S.HeroTitle>
               이동의 문턱을 낮추는
               <span>소프트웨어를 만듭니다</span>
@@ -108,23 +102,6 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
               </S.SecondaryPillAction>
             </S.HeroActions>
           </S.HeroCopy>
-          <S.HeroShowcase data-reveal data-reveal-group="hero">
-            <S.HeroPhoneFrame>
-              <picture>
-                <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
-                <img
-                  src={PRODUCT_SCREENSHOT}
-                  alt={PRODUCT_SCREENSHOT_ALT}
-                  width={PRODUCT_SCREENSHOT_SIZE.width}
-                  height={PRODUCT_SCREENSHOT_SIZE.height}
-                  loading="eager"
-                  fetchPriority="high"
-                  decoding="async"
-                  data-ui="company-hero-phone"
-                />
-              </picture>
-            </S.HeroPhoneFrame>
-          </S.HeroShowcase>
         </S.Hero>
 
         <S.Section id="capabilities">
@@ -154,6 +131,16 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                   data-reveal
                   data-reveal-group="work-cards"
                 >
+                  <Sec.ProductShowcaseContent>
+                    <Sec.ProductBadge>{product.badge}</Sec.ProductBadge>
+                    <h3>{product.title}</h3>
+                    <p className="summary">{product.summary}</p>
+                    <p className="description">{product.description}</p>
+                    <Sec.ProductAction href={product.action.href}>
+                      <span>{product.action.label}</span>
+                      <ArrowRightGlyph size={16} />
+                    </Sec.ProductAction>
+                  </Sec.ProductShowcaseContent>
                   <Sec.ProductShowcaseMedia $layout={product.id === "easysubway" ? "phone" : "desktop"}>
                     <picture>
                       {product.image.src.endsWith(".png") ? (
@@ -173,44 +160,9 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                       />
                     </picture>
                   </Sec.ProductShowcaseMedia>
-                  <Sec.ProductShowcaseContent>
-                    <Sec.ProductBadge>{product.badge}</Sec.ProductBadge>
-                    <h3>{product.title}</h3>
-                    <p className="summary">{product.summary}</p>
-                    <p className="description">{product.description}</p>
-                    <Sec.ProductHighlightList>
-                      {product.highlights.map((item) => (
-                        <li key={item}>
-                          <CompanyIcon name="check" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </Sec.ProductHighlightList>
-                    <Sec.ProductAction href={product.action.href}>
-                      <span>{product.action.label}</span>
-                      <ArrowRightGlyph size={16} />
-                    </Sec.ProductAction>
-                  </Sec.ProductShowcaseContent>
                 </Sec.ProductShowcaseCard>
               ))}
             </Sec.ProductShowcaseGrid>
-
-            <Sec.ReliabilityBlock data-reveal data-reveal-group="work-reliability">
-              <Sec.ReliabilityHeader>
-                <S.SectionLabel>기술 신뢰성 &amp; 운영 원칙</S.SectionLabel>
-                <h3>제품의 안정성을 뒷받침하는 기술적 토대</h3>
-                <p>화려한 설명 대신 실제 시스템과 검증 파이프라인으로 약속을 지킵니다.</p>
-              </Sec.ReliabilityHeader>
-              <Sec.ReliabilityList role="list" data-ui="company-reliability-list">
-                {COMPANY_RELIABILITY_ITEMS.map((item) => (
-                  <Sec.ReliabilityItem key={item.id}>
-                    <span className="tag">{item.tag}</span>
-                    <h4>{item.title}</h4>
-                    <p>{item.description}</p>
-                  </Sec.ReliabilityItem>
-                ))}
-              </Sec.ReliabilityList>
-            </Sec.ReliabilityBlock>
           </S.SectionInner>
         </S.Section>
 
@@ -245,11 +197,9 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
             <S.SectionLabel>일하는 방식</S.SectionLabel>
             <S.SectionHeading>먼저 확인하고, 그다음 공개합니다</S.SectionHeading>
             <Sec.PrincipleList>
-              {COMPANY_PRINCIPLES.map((principle) => (
+              {COMPANY_PRINCIPLES.map((principle, index) => (
                 <li key={principle}>
-                  <span>
-                    <CompanyIcon name="check" />
-                  </span>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                   {principle}
                 </li>
               ))}

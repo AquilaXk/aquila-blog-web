@@ -18,23 +18,6 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     scrollbar-width: thin;
   }
 
-  .aq-mermaid::before {
-    content: "Mermaid · diagram";
-    height: 42px;
-    padding: 0 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid ${theme.colors.gray6};
-    color: ${theme.colors.gray9};
-    background: ${theme.publicDesign.readableSurface};
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-
   .aq-mermaid[data-mermaid-wide="true"] {
     width: var(--aq-mermaid-wide-width, 100%);
     max-width: none;
@@ -44,7 +27,7 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid[data-mermaid-rendered="pending"] {
-    min-height: 12rem;
+    min-height: 8rem;
   }
 
   .aq-mermaid[data-mermaid-rendered="pending"] > code {
@@ -62,9 +45,6 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     padding: 28px;
-    background-image: linear-gradient(${theme.publicDesign.surfaceElevated} 1px, transparent 1px),
-      linear-gradient(90deg, ${theme.publicDesign.surfaceElevated} 1px, transparent 1px);
-    background-size: 28px 28px;
   }
 
   .aq-mermaid[data-mermaid-wide="true"] .aq-mermaid-stage {
