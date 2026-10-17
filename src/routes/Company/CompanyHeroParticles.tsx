@@ -13,13 +13,13 @@ type ParticleSeed = {
   colorIndex: number
 }
 
-const smoothstep = (edge0: number, edge1: number, value: number) => {
+export const smoothstep = (edge0: number, edge1: number, value: number) => {
   if (edge0 === edge1) return 0
   const clamped = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
   return clamped * clamped * (3 - 2 * clamped)
 }
 
-const createParticleSeeds = (cols: number, rows: number, paletteLength: number): ParticleSeed[] => {
+export const createParticleSeeds = (cols: number, rows: number, paletteLength: number): ParticleSeed[] => {
   const seeds: ParticleSeed[] = []
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -293,6 +293,7 @@ const CompanyHeroParticles: React.FC = () => {
 
     const onResize = () => {
       syncSize()
+      renderFrame(performance.now())
     }
 
     const onVisibilityChange = () => {

@@ -328,7 +328,7 @@ export const ContactBand = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem 2.5rem;
-  width: min(100%, 82rem);
+  width: min(100%, 75rem);
   margin: 0 auto;
   padding: clamp(2rem, 4.5vw, 3.25rem);
   border: 1px solid ${dark.borderStrong};

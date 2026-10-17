@@ -3,8 +3,8 @@ import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 
-const CONTENT_MAX_WIDTH = "82rem"
-const SECTION_PADDING_X = "clamp(1.25rem, 4vw, 3rem)"
+const CONTENT_MAX_WIDTH = "75rem"
+const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
 const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
 const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
 

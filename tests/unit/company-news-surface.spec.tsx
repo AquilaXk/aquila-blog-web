@@ -1,8 +1,42 @@
 import { expect, test } from "@playwright/test"
-import { createElement } from "react"
+import { createElement, Fragment } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
+import {
+  CompanyFeatureExplorerView,
+  formatCapabilityStepLabel,
+  stepCapabilityIndex,
+} from "../../src/routes/Company/CompanyFeatureCarousel"
+import { createParticleSeeds, smoothstep } from "../../src/routes/Company/CompanyHeroParticles"
 import * as Sec from "../../src/routes/Company/CompanySection.styles"
-import { BLOG_URL, type CompanyNewsItem } from "../../src/routes/Company/CompanyPageModel"
+import {
+  BLOG_URL,
+  COMPANY_FEATURE_CARDS,
+  type CompanyNewsItem,
+} from "../../src/routes/Company/CompanyPageModel"
+
+function unwrapPw(node: any, index?: number): any {
+  if (!node || typeof node !== "object") return node
+  if (Array.isArray(node)) return node.map((child, i) => unwrapPw(child, i))
+  if (node.__pw_type === "jsx") {
+    const { type, props, key } = node
+    const newProps: any = {}
+    for (const k in props) {
+      newProps[k] = unwrapPw(props[k])
+    }
+    const resolvedKey = key !== undefined && key !== null ? key : index !== undefined ? `child-${index}` : undefined
+    if (typeof type === "function" && !(type as any).__emotion_real) {
+      return unwrapPw(type(newProps), index)
+    }
+    const elementType =
+      typeof type === "string" ||
+      typeof type === "function" ||
+      (type && typeof type === "object" && "$$typeof" in type)
+        ? type
+        : Fragment
+    return createElement(elementType, { ...newProps, key: resolvedKey })
+  }
+  return node
+}
 
 /**
  * CompanyPageView 내 소식 카드 렌더 로직과 1:1로 대응하는 렌더러.
@@ -188,58 +222,17 @@ test("NewsHead와 NewsHeaderAction은 기술 블로그 링크와 44px 터치 타
   expect(headMarkup).not.toContain(".undefined")
 })
 
-test("ExplorerToolbar, BouncerOrb, ExplorerNavPill, FeatureGrid는 핵심 역량 카드 리전, 플로팅 바운서 궤도, 이전/다음 컨트롤, 활성 역량 아티클을 렌더한다", () => {
+test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드, 첫 번째 활성 바운서 궤도, 이전/다음 컨트롤, 스텝 카운터를 렌더한다", () => {
   const markup = renderToStaticMarkup(
-    createElement(
-      "div",
-      null,
-      createElement(
-        Sec.ExplorerToolbar,
-        { "data-reveal": true } as Record<string, unknown>,
-        createElement(
-          Sec.BouncerRail,
-          { "data-bouncer-list": "true" } as Record<string, unknown>,
-          createElement(
-            Sec.BouncerOrb,
-            {
-              type: "button",
-              $active: true,
-              $index: 0,
-              "data-bouncer": "true",
-              "aria-label": "실시간 처리: 실시간 데이터 처리",
-              "aria-pressed": true,
-            } as Record<string, unknown>,
-            "1",
-          ),
-        ),
-        createElement(
-          Sec.ExplorerControls,
-          null,
-          createElement("span", { className: "stepCounter", "aria-live": "polite" }, "01 / 06"),
-          createElement(
-            Sec.ExplorerNavPill,
-            { type: "button", "aria-label": "이전 역량 카드" },
-            "←",
-          ),
-          createElement(
-            Sec.ExplorerNavPill,
-            { type: "button", "aria-label": "다음 역량 카드" },
-            "→",
-          ),
-        ),
-      ),
-      createElement(
-        Sec.FeatureGrid,
-        { role: "region", "aria-label": "핵심 역량 카드" },
-        createElement(
-          Sec.FeatureCard,
-          { $active: true, "data-active": "true" } as Record<string, unknown>,
-          createElement(Sec.FeatureIconPanel, { $active: true }, "icon"),
-          createElement(Sec.FeatureTag, null, "실시간 처리"),
-          createElement("h3", null, "실시간 데이터 처리"),
-          createElement("p", null, "이벤트 스트림과 웹소켓 연결을 안정적으로 처리합니다."),
-        ),
-      ),
+    unwrapPw(
+      (CompanyFeatureExplorerView as any)({
+        activeIndex: 0,
+        isPaused: false,
+        onSelect: () => {},
+        onStep: () => {},
+        onHoverChange: () => {},
+        onFocusChange: () => {},
+      }),
     ),
   )
 
@@ -248,9 +241,51 @@ test("ExplorerToolbar, BouncerOrb, ExplorerNavPill, FeatureGrid는 핵심 역량
   expect(markup).toContain('data-bouncer-list="true"')
   expect(markup).toContain('aria-label="이전 역량 카드"')
   expect(markup).toContain('aria-label="다음 역량 카드"')
-  expect(markup).toContain('data-active="true"')
+  expect(markup).toContain('aria-live="off"')
   expect(markup).toContain("01 / 06")
-  expect(markup).toContain("실시간 데이터 처리")
   expect(markup).not.toContain(".undefined")
+
+  // 초기 activeIndex=0 상태에서 정확히 1개의 바운서 오브와 1개의 카드만 활성 상태여야 한다
+  const activeOrbs = markup.match(/aria-pressed="true"/g) ?? []
+  const inactiveOrbs = markup.match(/aria-pressed="false"/g) ?? []
+  const activeCards = markup.match(/data-active="true"/g) ?? []
+  const inactiveCards = markup.match(/data-active="false"/g) ?? []
+  expect(activeOrbs).toHaveLength(1)
+  expect(inactiveOrbs).toHaveLength(COMPANY_FEATURE_CARDS.length - 1)
+  expect(activeCards).toHaveLength(1)
+  expect(inactiveCards).toHaveLength(COMPANY_FEATURE_CARDS.length - 1)
+
+  for (const card of COMPANY_FEATURE_CARDS) {
+    expect(markup).toContain(card.title)
+    expect(markup).toContain(card.tag)
+    expect(markup).toContain(card.body)
+  }
 })
+
+test("formatCapabilityStepLabel과 stepCapabilityIndex는 순환 인덱스 및 스텝 라벨을 정확히 계산한다", () => {
+  expect(formatCapabilityStepLabel(0, 6)).toBe("01 / 06")
+  expect(formatCapabilityStepLabel(5, 6)).toBe("06 / 06")
+  expect(stepCapabilityIndex(0, 1, 6)).toBe(1)
+  expect(stepCapabilityIndex(5, 1, 6)).toBe(0)
+  expect(stepCapabilityIndex(0, -1, 6)).toBe(5)
+})
+
+test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 보간과 정규화된 입자 시드를 생성한다", () => {
+  expect(smoothstep(0, 1, -0.5)).toBe(0)
+  expect(smoothstep(0, 1, 0.5)).toBe(0.5)
+  expect(smoothstep(0, 1, 1.5)).toBe(1)
+  expect(smoothstep(2, 2, 2)).toBe(0)
+
+  const seeds = createParticleSeeds(15, 9, 5)
+  expect(seeds).toHaveLength(135)
+  for (const seed of seeds) {
+    expect(seed.refX).toBeGreaterThanOrEqual(-1.1)
+    expect(seed.refX).toBeLessThanOrEqual(1.1)
+    expect(seed.refY).toBeGreaterThanOrEqual(-1.1)
+    expect(seed.refY).toBeLessThanOrEqual(1.1)
+    expect(seed.colorIndex).toBeGreaterThanOrEqual(0)
+    expect(seed.colorIndex).toBeLessThan(5)
+  }
+})
+
 

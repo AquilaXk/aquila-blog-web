@@ -5,34 +5,41 @@ import * as S from "src/routes/Company/CompanySection.styles"
 
 const totalCards = COMPANY_FEATURE_CARDS.length
 
-const CompanyFeatureCarousel: React.FC = () => {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
+export const formatCapabilityStepLabel = (activeIndex: number, count = totalCards) =>
+  `${String(activeIndex + 1).padStart(2, "0")} / ${String(count).padStart(2, "0")}`
 
-  useEffect(() => {
-    if (isPaused || typeof window === "undefined") return
-    const isReducedMotion =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    if (isReducedMotion) return
+export const stepCapabilityIndex = (current: number, delta: number, count = totalCards) =>
+  ((current + delta) % count + count) % count
 
-    const timer = window.setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % totalCards)
-    }, 4200)
+type CompanyFeatureExplorerViewProps = {
+  activeIndex: number
+  isPaused: boolean
+  onSelect: (index: number) => void
+  onStep: (delta: number) => void
+  onHoverChange: (hovered: boolean) => void
+  onFocusChange: (focused: boolean) => void
+}
 
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [isPaused])
-
-  const stepLabel = `${String(activeIndex + 1).padStart(2, "0")} / ${String(totalCards).padStart(2, "0")}`
+export const CompanyFeatureExplorerView: React.FC<CompanyFeatureExplorerViewProps> = ({
+  activeIndex,
+  isPaused,
+  onSelect,
+  onStep,
+  onHoverChange,
+  onFocusChange,
+}) => {
+  const stepLabel = formatCapabilityStepLabel(activeIndex)
 
   return (
     <div
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onFocusCapture={() => setIsPaused(true)}
-      onBlurCapture={() => setIsPaused(false)}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
+      onFocusCapture={() => onFocusChange(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          onFocusChange(false)
+        }
+      }}
     >
       <S.ExplorerToolbar data-reveal data-reveal-group="capabilities-toolbar">
         <S.BouncerRail data-bouncer-list>
@@ -45,20 +52,20 @@ const CompanyFeatureCarousel: React.FC = () => {
               data-bouncer
               aria-label={`${card.tag}: ${card.title}`}
               aria-pressed={activeIndex === index}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => onSelect(index)}
             >
               <CompanyIcon name={card.icon} />
             </S.BouncerOrb>
           ))}
         </S.BouncerRail>
         <S.ExplorerControls>
-          <span className="stepCounter" aria-live="polite">
+          <span className="stepCounter" aria-live={isPaused ? "polite" : "off"}>
             {stepLabel}
           </span>
           <S.ExplorerNavPill
             type="button"
             aria-label="이전 역량 카드"
-            onClick={() => setActiveIndex((prev) => (prev - 1 + totalCards) % totalCards)}
+            onClick={() => onStep(-1)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -76,7 +83,7 @@ const CompanyFeatureCarousel: React.FC = () => {
           <S.ExplorerNavPill
             type="button"
             aria-label="다음 역량 카드"
-            onClick={() => setActiveIndex((prev) => (prev + 1) % totalCards)}
+            onClick={() => onStep(1)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -104,8 +111,8 @@ const CompanyFeatureCarousel: React.FC = () => {
               data-active={isActive ? "true" : "false"}
               data-reveal
               data-reveal-group="capabilities-cards"
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => setActiveIndex(index)}
+              onMouseEnter={() => onSelect(index)}
+              onClick={() => onSelect(index)}
             >
               <S.FeatureIconPanel $active={isActive}>
                 <CompanyIcon name={card.icon} />
@@ -121,4 +128,39 @@ const CompanyFeatureCarousel: React.FC = () => {
   )
 }
 
+const CompanyFeatureCarousel: React.FC = () => {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const isPaused = isHovered || isFocused
+
+  useEffect(() => {
+    if (isPaused || typeof window === "undefined") return
+    const isReducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (isReducedMotion) return
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((prev) => stepCapabilityIndex(prev, 1))
+    }, 4200)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isPaused])
+
+  return (
+    <CompanyFeatureExplorerView
+      activeIndex={activeIndex}
+      isPaused={isPaused}
+      onSelect={setActiveIndex}
+      onStep={(delta) => setActiveIndex((prev) => stepCapabilityIndex(prev, delta))}
+      onHoverChange={setIsHovered}
+      onFocusChange={setIsFocused}
+    />
+  )
+}
+
 export default CompanyFeatureCarousel
+
