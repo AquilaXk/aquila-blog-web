@@ -16,10 +16,31 @@ export const StyledWrapper = styled.header `
     font-weight: 650;
     line-height: 1.2;
     text-decoration: none;
-    transition: color 120ms ease;
+    transition: color 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
+
+    span:first-of-type {
+      display: inline-block;
+      transition: transform 220ms cubic-bezier(0.215, 0.61, 0.355, 1);
+    }
 
     &:hover {
       color: var(--aq-text);
+
+      span:first-of-type {
+        transform: translateX(-3px);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+
+      span:first-of-type {
+        transition: none;
+      }
+
+      &:hover span:first-of-type {
+        transform: none;
+      }
     }
   }
 

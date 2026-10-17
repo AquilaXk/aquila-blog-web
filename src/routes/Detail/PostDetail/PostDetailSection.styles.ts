@@ -105,10 +105,14 @@ export const RelatedSection = styled.section `
     border-top: 1px solid #dfe1e5;
     color: #111216;
     text-decoration: none;
-    transition: color 0.14s ease-in;
+    transition: color 0.18s cubic-bezier(0.215, 0.61, 0.355, 1);
 
     &:hover {
       color: #155eef;
+
+      .relatedArrow {
+        transform: translateX(4px);
+      }
     }
   }
 
@@ -137,9 +141,22 @@ export const RelatedSection = styled.section `
   }
 
   .relatedArrow {
+    display: inline-block;
     color: currentColor;
     font-size: 18px;
     line-height: 1;
+    transition: transform 0.22s cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    li a,
+    .relatedArrow {
+      transition: none;
+    }
+
+    li a:hover .relatedArrow {
+      transform: none;
+    }
   }
 `;
 export const RelatedSkeletonItem = styled.li `

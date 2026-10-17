@@ -1,14 +1,29 @@
+import { keyframes } from "@emotion/react"
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { variables } from "src/styles"
-import { CONTENT_MAX_WIDTH, TRANSITION } from "src/routes/Company/CompanyPage.styles"
+import { MOTION_EASE_OUT, TRANSITION } from "src/routes/Company/CompanyPage.styles"
 
-/**
- * 회사 표면 섹션 레이아웃: 핵심 역량 그리드 · 프로덕트 쇼케이스 & 기술 신뢰성 ·
- * 비대칭 스토리 · 비전 체크리스트 · 소식 카드 · 문의 밴드.
- */
+export {
+  ContactBand,
+  NewsAction,
+  NewsCard,
+  NewsGrid,
+  NewsHead,
+  NewsHeaderAction,
+  NewsIndex,
+  NewsMedia,
+  NewsMeta,
+  PrincipleList,
+} from "src/routes/Company/CompanyNews.styles"
+
+const bouncerWave = keyframes`
+  0%, 100% { transform: translate3d(0, 2px, 0); }
+  50% { transform: translate3d(0, -3px, 0); }
+`
+
 export const CarouselHead = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -17,15 +32,125 @@ export const CarouselHead = styled.div`
   gap: 1.5rem 2.5rem;
 `
 
-/**
- * 3x2 핵심 역량 정적 그리드.
- * 한눈에 보이는 6개 카드로 구성되며 좁은 뷰포트에서는 반응형으로 2열, 1열로 축소된다.
- */
+export const ExplorerToolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  margin-top: clamp(1.75rem, 3.5vw, 2.5rem);
+  padding: 0.85rem 1.15rem;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderHairline};
+  background: ${light.surfaceScaffold};
+
+  @media (max-width: ${breakpoint.sm}px) {
+    border-radius: 1.25rem;
+  }
+`
+
+export const BouncerRail = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+`
+
+export const BouncerOrb = styled.button<{ $active?: boolean; $index?: number }>`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid ${({ $active }) => ($active ? light.accent : light.border)};
+  background: ${({ $active }) => ($active ? light.accent : light.surface)};
+  color: ${({ $active }) => ($active ? light.onAccent : light.accentText)};
+  box-shadow: ${({ $active }) => ($active ? light.cardShadowActive : light.cardShadowRest)};
+  cursor: pointer;
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, color ${TRANSITION},
+    transform 240ms ${MOTION_EASE_OUT};
+
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    stroke-width: 1.85;
+    animation: ${bouncerWave} 3.6s ease-in-out infinite;
+    animation-delay: ${({ $index = 0 }) => `${$index * 0.26}s`};
+  }
+
+  &:hover {
+    border-color: ${light.borderStrong};
+    background: ${({ $active }) => ($active ? light.accentPressed : light.surfaceBrand)};
+    transform: translateY(-2px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    svg {
+      animation: none;
+    }
+
+    &:hover {
+      transform: none;
+    }
+  }
+`
+
+export const ExplorerControls = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+
+  .stepCounter {
+    padding: 0 0.5rem;
+    color: ${light.accentText};
+    font-family: ${editorialLabel.fontFamily};
+    font-size: ${editorialLabel.fontSize};
+    font-weight: ${editorialLabel.fontWeight};
+    letter-spacing: 0.06em;
+  }
+`
+
+export const ExplorerNavPill = styled.button`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderGlass};
+  background: ${light.surface};
+  color: ${light.inkPrimary};
+  cursor: pointer;
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, transform ${TRANSITION};
+
+  &:hover {
+    background: ${light.surfaceBrand};
+    border-color: ${light.borderStrong};
+    transform: scale(1.04);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+`
+
 export const FeatureGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
-  margin-top: clamp(2rem, 4vw, 3rem);
+  margin-top: clamp(1.25rem, 2.5vw, 1.75rem);
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -36,18 +161,24 @@ export const FeatureGrid = styled.div`
   }
 `
 
-export const FeatureCard = styled.article`
+export const FeatureCard = styled.article<{ $active?: boolean }>`
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding: clamp(1.25rem, 2.2vw, 1.65rem);
-  border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
-  background: ${light.surface};
-  transition: border-color ${TRANSITION};
+  padding: clamp(1.35rem, 2.2vw, 1.75rem);
+  border: 1px solid ${({ $active }) => ($active ? light.borderStrong : light.border)};
+  border-radius: 1.5rem;
+  background: ${({ $active }) => ($active ? light.surfaceBrandChrome : light.surface)};
+  box-shadow: ${({ $active }) => ($active ? light.cardShadowActive : light.cardShadowRest)};
+  cursor: pointer;
+  transition: border-color ${TRANSITION}, background-color ${TRANSITION},
+    transform 320ms ${MOTION_EASE_OUT}, box-shadow 320ms ${MOTION_EASE_OUT};
 
   &:hover {
     border-color: ${light.borderStrong};
+    transform: translateY(-3px);
+    box-shadow: ${light.cardShadowHover};
   }
 
   h3 {
@@ -65,36 +196,38 @@ export const FeatureCard = styled.article`
     line-height: 1.65;
     color: ${light.inkSecondary};
   }
-`
 
-/**
- * 카드 상단 컴팩트 아이콘 뱃지.
- * 거대 아이콘을 축소하고 정돈된 2.75rem(44px) 뱃지로 제공한다.
- */
-export const FeatureIconPanel = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: ${radius.md}px;
-  background: ${light.surfaceBrand};
-  color: ${light.accentText};
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
 
-  svg {
-    width: 1.5rem;
-    height: 1.5rem;
-    stroke-width: 1.75;
+    &:hover {
+      transform: none;
+    }
   }
 `
 
-/**
- * 카드 분류 pill.
- */
+export const FeatureIconPanel = styled.div<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 50%;
+  background: ${({ $active }) => ($active ? light.accent : light.surfaceBrand)};
+  color: ${({ $active }) => ($active ? light.onAccent : light.accentText)};
+  transition: background-color ${TRANSITION}, color ${TRANSITION}, transform 260ms ${MOTION_EASE_OUT};
+
+  svg {
+    width: 1.4rem;
+    height: 1.4rem;
+    stroke-width: 1.8;
+  }
+`
+
 export const FeatureTag = styled.span`
   align-self: flex-start;
-  padding: 0.25rem 0.6rem;
-  border-radius: ${radius.xs}px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
   background: ${light.surfaceBrandStrong};
   color: ${light.onSignature};
   font-family: ${editorialLabel.fontFamily};
@@ -115,9 +248,6 @@ export const WorkHeading = styled.h2`
   text-align: center;
 `
 
-/**
- * 2대 프로덕트(EasySubway · AquilaLog) 전용 쇼케이스 그리드.
- */
 export const ProductShowcaseGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -134,12 +264,32 @@ export const ProductShowcaseCard = styled.article`
   flex-direction: column;
   overflow: hidden;
   border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
+  border-radius: 1.75rem;
   background: ${light.surface};
-  transition: border-color ${TRANSITION};
+  box-shadow: ${light.cardShadowRest};
+  transition: border-color ${TRANSITION}, transform 340ms ${MOTION_EASE_OUT},
+    box-shadow 340ms ${MOTION_EASE_OUT};
 
   &:hover {
     border-color: ${light.borderStrong};
+    transform: translateY(-4px);
+    box-shadow: ${light.cardShadowHover};
+  }
+
+  &:hover img {
+    transform: scale(1.035);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+
+    &:hover img {
+      transform: none;
+    }
   }
 `
 
@@ -161,6 +311,7 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
     object-fit: contain;
     border-radius: ${({ $layout }) => ($layout === "phone" ? `${radius.md}px` : `${radius.sm}px`)};
     box-shadow: ${variables.ui.card.shadowFloating};
+    transition: transform 420ms ${MOTION_EASE_OUT};
   }
 `
 
@@ -168,12 +319,12 @@ export const ProductShowcaseContent = styled.div`
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  padding: clamp(1.35rem, 2.5vw, 1.85rem);
+  padding: clamp(1.45rem, 2.5vw, 2rem);
   gap: 0.75rem;
 
   h3 {
     margin: 0;
-    font-size: clamp(1.35rem, 2.2vw, 1.6rem);
+    font-size: clamp(1.35rem, 2.2vw, 1.65rem);
     font-weight: ${fontWeight.extraBold};
     letter-spacing: -0.02em;
     color: ${light.inkPrimary};
@@ -197,8 +348,8 @@ export const ProductShowcaseContent = styled.div`
 
 export const ProductBadge = styled.span`
   align-self: flex-start;
-  padding: 0.25rem 0.6rem;
-  border-radius: ${radius.xs}px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
   background: ${light.surfaceBrandStrong};
   color: ${light.onSignature};
   font-family: ${editorialLabel.fontFamily};
@@ -238,33 +389,43 @@ export const ProductAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  align-self: flex-start;
+  gap: 0.45rem;
+  min-height: 44px;
   margin-top: auto;
-  padding-top: 0.75rem;
-  font-size: 1rem;
+  padding: 0 1.15rem;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderGlass};
+  background: ${light.surfacePillGlass};
+  font-size: 0.96875rem;
   font-weight: ${fontWeight.bold};
   color: ${light.accentText};
   text-decoration: none;
-  transition: color ${TRANSITION}, gap ${TRANSITION};
+  transition: color ${TRANSITION}, background-color ${TRANSITION}, border-color ${TRANSITION};
 
   svg {
-    transition: transform ${TRANSITION};
+    transition: transform 240ms ${MOTION_EASE_OUT};
   }
 
   &:hover {
-    color: ${light.accentPressed};
-    gap: 0.65rem;
+    color: ${light.onAccent};
+    background: ${light.inkPrimary};
+    border-color: ${light.inkPrimary};
 
     svg {
-      transform: translateX(2px);
+      transform: translateX(3.5px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    svg {
+      transition: none;
     }
   }
 `
 
-/**
- * 하단 기술 신뢰성 섹션.
- * 내부 인프라, 데이터 검증 파이프라인, 품질 게이트를 제품 카드가 아닌 텍스트 리스트로 분리해 기술적 토대로 설명한다.
- */
 export const ReliabilityBlock = styled.div`
   margin-top: clamp(3rem, 6vw, 4.5rem);
   padding-top: clamp(2.5rem, 5vw, 3.5rem);
@@ -294,25 +455,38 @@ export const ReliabilityHeader = styled.div`
 export const ReliabilityList = styled.ul`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(1.5rem, 3vw, 2.5rem);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
   margin: 0;
   padding: 0;
   list-style: none;
 
   @media (max-width: ${breakpoint.md}px) {
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.5rem;
+    gap: 1.25rem;
   }
 `
 
 export const ReliabilityItem = styled.li`
   display: flex;
   flex-direction: column;
-  padding-top: 1.25rem;
-  border-top: 1px solid ${light.border};
+  padding: 1.35rem 1.5rem;
+  border: 1px solid ${light.border};
+  border-radius: 1.35rem;
+  background: ${light.surface};
+  box-shadow: ${light.cardShadowRest};
+  transition: border-color ${TRANSITION}, transform 280ms ${MOTION_EASE_OUT};
+
+  &:hover {
+    border-color: ${light.borderStrong};
+    transform: translateY(-2px);
+  }
 
   .tag {
-    margin-bottom: 0.5rem;
+    align-self: flex-start;
+    margin-bottom: 0.65rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    background: ${light.surfaceBrand};
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
@@ -333,6 +507,14 @@ export const ReliabilityItem = styled.li`
     font-size: 0.925rem;
     line-height: 1.65;
     color: ${light.inkSecondary};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 `
 
@@ -362,13 +544,6 @@ export const StoryHeadline = styled.h2`
   }
 `
 
-/**
- * hairline divider stat 리스트. 확인 가능한 값만 올린다.
- *
- * 구분선은 **항목 사이와 마지막 항목 아래**에만 둔다 - 첫 항목 위 여는 선은 섹션 리드와 리스트를
- * 한 번 더 끊어 리스트가 별개의 표처럼 떠 보인다(오너 지시 2026-08-03). 1열로 스택되는 좁은 폭에서도
- * 같은 규칙이 유지된다: 선 규칙이 열 수가 아니라 항목 순서에 걸려 있다.
- */
 export const StatList = styled.dl`
   margin: clamp(2.25rem, 5vw, 3.5rem) 0 0;
   max-width: 34rem;
@@ -410,272 +585,5 @@ export const StatList = styled.dl`
     > div {
       grid-template-columns: minmax(0, 1fr);
     }
-  }
-`
-
-/**
- * 2x2 비전 체크리스트.
- * 구분선 규칙은 StatList와 같다: 여는 선 없음 · 줄 사이 · 닫는 선.
- */
-const PRINCIPLE_RULE = `1px solid ${light.borderBrand}`
-
-export const PrincipleList = styled.ul`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 clamp(1.5rem, 4vw, 3.5rem);
-  margin: clamp(2.25rem, 5vw, 3.5rem) 0 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 1.1rem 0;
-    border-top: ${PRINCIPLE_RULE};
-    font-size: clamp(1.0625rem, 1.8vw, 1.15rem);
-    line-height: 1.6;
-    font-weight: ${fontWeight.semibold};
-    color: ${light.inkPrimary};
-  }
-
-  li:nth-child(-n + 2) {
-    border-top: none;
-  }
-
-  li:nth-last-child(-n + 2) {
-    border-bottom: ${PRINCIPLE_RULE};
-  }
-
-  li > span:first-of-type {
-    display: flex;
-    flex: 0 0 auto;
-    color: ${light.accentText};
-  }
-
-  /** 22px에 24 viewBox 기준 2.1 → 렌더 2.1px 획. 본문 옆에서 확인 표시가 또렷하게 읽히는 두께다. */
-  li > span:first-of-type svg {
-    width: 1.375rem;
-    height: 1.375rem;
-    stroke-width: 2.1;
-  }
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: minmax(0, 1fr);
-
-    li:nth-child(2) {
-      border-top: ${PRINCIPLE_RULE};
-    }
-
-    li:nth-last-child(2) {
-      border-bottom: none;
-    }
-  }
-`
-
-export const NewsHead = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.25rem 2.5rem;
-`
-
-export const NewsHeaderAction = styled.a`
-  ${focusVisibleRing};
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 44px;
-  padding: 0.4rem 0.25rem;
-  font-size: 1rem;
-  font-weight: ${fontWeight.semibold};
-  color: ${light.accentText};
-  text-decoration: none;
-  transition: color ${TRANSITION}, gap ${TRANSITION};
-
-  svg {
-    flex: 0 0 auto;
-    transition: transform ${TRANSITION};
-  }
-
-  &:hover {
-    color: ${light.accentPressed};
-    gap: 0.6rem;
-
-    svg {
-      transform: translateX(2px);
-    }
-  }
-`
-
-export const NewsGrid = styled.ul`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(1rem, 2vw, 1.5rem);
-  margin: clamp(2rem, 4vw, 3rem) 0 0;
-  padding: 0;
-  list-style: none;
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const NewsCard = styled.a`
-  ${focusVisibleRing};
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  height: 100%;
-  padding: clamp(1.25rem, 2.2vw, 1.65rem);
-  border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
-  background: ${light.surface};
-  text-decoration: none;
-  transition: border-color ${TRANSITION};
-
-  &:hover {
-    border-color: ${light.borderStrong};
-  }
-
-  &:hover h3,
-  &:hover strong {
-    color: ${light.accentText};
-  }
-
-  &:hover [data-ui="company-news-media"] img {
-    transform: scale(1.025);
-  }
-
-  &:hover [data-ui="company-news-action"] {
-    color: ${light.accentPressed};
-    gap: 0.55rem;
-
-    svg {
-      transform: translateX(2px);
-    }
-  }
-
-  h3,
-  strong {
-    margin: 0;
-    font-size: clamp(1.125rem, 1.8vw, 1.25rem);
-    line-height: 1.45;
-    letter-spacing: -0.015em;
-    font-weight: ${fontWeight.bold};
-    color: ${light.inkPrimary};
-    transition: color ${TRANSITION};
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  p {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.65;
-    color: ${light.inkSecondary};
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  time {
-    font-family: ${editorialLabel.fontFamily};
-    font-size: 0.875rem;
-    color: ${light.inkMuted};
-    letter-spacing: 0.02em;
-  }
-`
-
-export const NewsMeta = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-`
-
-export const NewsIndex = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: ${radius.xs}px;
-  background: ${light.surfaceBrand};
-  color: ${light.accentText};
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-`
-
-/** 실제 썸네일 이미지가 존재할 때만 렌더되는 미디어 슬롯 */
-export const NewsMedia = styled.div`
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-  border-radius: ${radius.md}px;
-  background: ${light.surfaceBrandChrome};
-
-  img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform ${TRANSITION};
-  }
-`
-
-export const NewsAction = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: auto;
-  padding-top: 0.75rem;
-  font-size: 1rem;
-  font-weight: ${fontWeight.semibold};
-  color: ${light.accentText};
-  transition: gap ${TRANSITION}, color ${TRANSITION};
-
-  svg {
-    flex: 0 0 auto;
-    transition: transform ${TRANSITION};
-  }
-`
-
-/**
- * 문의 밴드. 오너 페어링의 시그니처 면이고 그 위 텍스트·focus는 전부 onSignature다
- * (기본 focus 색은 이 면에서 3:1을 못 넘긴다).
- */
-export const ContactBand = styled.div`
-  --aq-focus-ring: ${light.onSignature};
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem 2.5rem;
-  width: min(100%, ${CONTENT_MAX_WIDTH});
-  margin: 0 auto;
-  padding: clamp(1.75rem, 4vw, 3rem);
-  border-radius: 1.75rem;
-  background: ${light.signature};
-  color: ${light.onSignature};
-
-  h2 {
-    margin: 0 0 0.5rem;
-    font-size: clamp(1.4rem, 2.8vw, 2rem);
-    line-height: 1.25;
-    letter-spacing: -0.02em;
-    font-weight: ${fontWeight.extraBold};
-  }
-
-  p {
-    margin: 0;
-    font-size: 1.0625rem;
-    line-height: 1.65;
   }
 `

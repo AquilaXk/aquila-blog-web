@@ -56,8 +56,26 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
     const container = containerRef.current
     if (!container) return
 
+    const headerEl = container.querySelector<HTMLElement>("[data-header]")
+    const syncHeaderScroll = () => {
+      if (!headerEl) return
+      const scrolled = window.scrollY > 12
+      headerEl.classList.toggle("scrolled", scrolled)
+      if (scrolled) {
+        headerEl.setAttribute("data-scrolled", "true")
+      } else {
+        headerEl.removeAttribute("data-scrolled")
+      }
+    }
+    syncHeaderScroll()
+    window.addEventListener("scroll", syncHeaderScroll, { passive: true })
+
     const elements = container.querySelectorAll<HTMLElement>(selector)
-    if (!elements.length) return
+    if (!elements.length) {
+      return () => {
+        window.removeEventListener("scroll", syncHeaderScroll)
+      }
+    }
 
     // 1. 사용자 모션 감소 설정(A11y) 확인
     const isReducedMotion =
@@ -71,7 +89,9 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
         el.classList.add("is-visible")
         el.setAttribute("data-visible", "true")
       })
-      return
+      return () => {
+        window.removeEventListener("scroll", syncHeaderScroll)
+      }
     }
 
     // 3. 그룹별 단일 패스(O(N)) 스태거 트랜지션 딜레이 설정
@@ -116,6 +136,7 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
 
     return () => {
       observer.disconnect()
+      window.removeEventListener("scroll", syncHeaderScroll)
     }
   }, [selector, threshold, rootMargin, staggerMs, maxStaggerSteps])
 

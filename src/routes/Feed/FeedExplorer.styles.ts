@@ -60,6 +60,10 @@ export const ExplorerCard = styled.section`
     font-weight: 740;
     letter-spacing: 0;
     cursor: pointer;
+    transition:
+      border-color 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      color 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      background-color 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
   }
 
   .sortTrigger:hover,
@@ -76,6 +80,18 @@ export const ExplorerCard = styled.section`
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     transform: translateY(-2px) rotate(45deg);
+    transition: transform 200ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  .sortTrigger[aria-expanded="true"] .sortChevron {
+    transform: translateY(1px) rotate(225deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sortTrigger,
+    .sortChevron {
+      transition: none;
+    }
   }
 
   .sortMenu {

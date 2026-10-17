@@ -2,21 +2,66 @@ import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { marketingDark as dark } from "src/design-system/marketingPalette"
-import { variables } from "src/styles"
 
-/**
- * 제품 표면은 방문자 테마와 무관하게 인디고-블랙 다크로 고정한다 - 이 페이지의 색은 사용자 설정이
- * 아니라 제품 정체성이다. 색·대비 근거는 `src/design-system/marketingPalette.ts` 주석에 있다.
- *
- * 패밀리룩 원칙:
- * 1) 과도한 3D 틸트, 마이너스 마진 폰 클리핑, 다각형 클립패스 및 인위적 radial 광원(AI 슬롭)을 배제한다.
- * 2) 999px pill 컨트롤 대신 플랫폼 공통의 사각 제어 버튼(radius: 8px/10px) 및 사각 보더 칩(radius: 6px)을 사용한다.
- * 3) 9rem 고스트 숫자와 거대 StatCard 대신 정제된 2x2 에디토리얼 기술 명세표 및 무장애 경로 명세표를 배치한다.
- */
+export {
+  CalloutHeader,
+  CalloutIconSvg,
+  CalloutTag,
+  ComparisonBadge,
+  ComparisonCard,
+  ComparisonCardHeader,
+  ComparisonCheckIcon,
+  ComparisonCrossIcon,
+  ComparisonGrid,
+  ComparisonList,
+  ComparisonTitle,
+  DetailCrop,
+  FeatureBlock,
+  FeatureBody,
+  FeatureIndex,
+  FeatureName,
+  FeatureStage,
+  RouteSpecCard,
+  RouteSpecHeader,
+  RouteSpecList,
+  RouteSpecPanel,
+  RouteSpecTag,
+  RouteSpecTitle,
+  TimelineCalloutCard,
+  TimelineCalloutCluster,
+  TimelinePhoneFrame,
+  TimelineShowcase,
+} from "src/routes/EasySubway/EasySubwayFeatures.styles"
+
+export {
+  ChipCluster,
+  ContactActionGroup,
+  ContactBand,
+  CopyEmailAddress,
+  CopyEmailButton,
+  CopyIconWrapper,
+  FaqAnswerText,
+  FaqCard,
+  FaqList,
+  FaqQuestionHeader,
+  FaqQuestionNumber,
+  FaqQuestionText,
+  FaqSection,
+  MetroBadgeCard,
+  MetroBadgeGrid,
+  MetroSectionLead,
+  MetroSectionTitle,
+  ScopeChip,
+  ScopeLayout,
+  TechSpecCell,
+  TechSpecGrid,
+} from "src/routes/EasySubway/EasySubwayScope.styles"
+
 const CONTENT_MAX_WIDTH = "75rem"
 const SECTION_PADDING_Y = "clamp(3.5rem, 8vw, 7rem)"
 const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
-const TRANSITION = "160ms ease-out"
+const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
+const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
 
 export const ProductSurface = styled.div`
   background: ${dark.field};
@@ -32,14 +77,12 @@ export const ProductSurface = styled.div`
     }
   }
 
-  /* [Scroll Reveal] https://kimhss.github.io/portfolio/ 패리티:
-     뷰포트 진입 전 24px 아래에서 대기하다가 진입 시 부드러운 cubic-bezier 곡선으로 순차 페이드인 */
   & [data-reveal] {
     --reveal-delay: 0ms;
     opacity: 0;
     transform: translateY(24px);
-    transition: opacity 0.75s ease var(--reveal-delay, 0ms),
-      transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms);
+    transition: opacity 0.72s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms),
+      transform 0.72s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
     will-change: opacity, transform;
   }
 
@@ -49,7 +92,6 @@ export const ProductSurface = styled.div`
     will-change: auto;
   }
 
-  /* 키보드 내비게이션(A11y): 포커스 진입 시 뷰포트 스크롤 전이라도 즉시 노출하여 초점 링 유실 방지 */
   & [data-reveal]:focus-within {
     opacity: 1 !important;
     transform: none !important;
@@ -66,7 +108,6 @@ export const ProductSurface = styled.div`
     }
   }
 
-  /* No-JS / 크롤러 회복 탄력성: 자바스크립트 비활성화 환경에서 콘텐츠 블랭크 방지 */
   @media (scripting: none) {
     & [data-reveal] {
       opacity: 1 !important;
@@ -96,8 +137,17 @@ export const SurfaceHeader = styled.header`
   gap: 1rem;
   min-height: 72px;
   padding: 0.75rem ${SECTION_PADDING_X};
-  background: ${dark.fieldDeep};
+  background: ${dark.surfaceGlass};
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid ${dark.hairline};
+  transition: background-color ${TRANSITION}, box-shadow ${TRANSITION};
+
+  &.scrolled,
+  &[data-scrolled="true"] {
+    background: ${dark.surfaceGlassScrolled};
+    box-shadow: ${dark.headerShadowScrolled};
+  }
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     flex-wrap: wrap;
@@ -111,7 +161,7 @@ export const BrandLink = styled.a`
   align-items: baseline;
   gap: 0.5rem;
   min-height: 44px;
-  border-radius: ${radius.md}px;
+  border-radius: 9999px;
   color: ${dark.textPrimary};
   text-decoration: none;
   font-size: 1.06rem;
@@ -149,7 +199,7 @@ export const NavLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0 0.75rem;
-  border-radius: ${radius.md}px;
+  border-radius: 9999px;
   color: ${dark.textSecondary};
   text-decoration: none;
   font-size: 1rem;
@@ -158,7 +208,7 @@ export const NavLink = styled.a`
 
   &:hover {
     color: ${dark.textPrimary};
-    background: ${dark.fieldRaised};
+    background: ${dark.surfacePillHover};
   }
 
   @media (max-width: ${breakpoint.sm}px) {
@@ -166,7 +216,6 @@ export const NavLink = styled.a`
   }
 `
 
-/** 패밀리룩 전환: 999px Pill ➔ 사각 제어 버튼(radius: 10px) */
 export const ButtonAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
@@ -174,17 +223,26 @@ export const ButtonAction = styled.a`
   justify-content: center;
   min-height: 48px;
   padding: 0 1.5rem;
-  border-radius: ${radius.md}px;
+  border-radius: 9999px;
   background: ${dark.accent};
   color: ${dark.onAccent};
   text-decoration: none;
   font-size: 1rem;
   font-weight: ${fontWeight.semibold};
   letter-spacing: -0.01em;
-  transition: background-color ${TRANSITION};
+  transition: background-color ${TRANSITION}, transform 240ms ${MOTION_EASE_OUT};
 
   &:hover {
     background: ${dark.accentPressed};
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 
   @media (forced-colors: active) {
@@ -197,17 +255,16 @@ export const PillAction = ButtonAction
 export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
   padding: 0 1.15rem;
-  border-radius: ${radius.md}px;
+  border-radius: 9999px;
 `
 
-/** 상태 뱃지: 999px Pill ➔ 사각 배지(radius: 6px) 및 원형 상태 점(50%) */
 export const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.4rem 0.85rem;
+  padding: 0.4rem 0.9rem;
   border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
+  border-radius: 9999px;
   background: ${dark.fieldRaised};
   color: ${dark.textPrimary};
   font-size: 0.9375rem;
@@ -232,10 +289,6 @@ export const StatusBadge = styled.span`
 
 export const StatusPill = StatusBadge
 
-/**
- * 에디토리얼 다크 히어로.
- * 과도한 3D 회전과 마이너스 마진을 제거하고, 목업과 카피가 균형 있게 정돈된 레이아웃을 제공한다.
- */
 export const Hero = styled.section`
   position: relative;
   overflow: hidden;
@@ -243,7 +296,6 @@ export const Hero = styled.section`
   background: ${dark.fieldDeep};
 `
 
-/** 배경 추상 노선도 라인 아트 레이어 */
 export const LineArtLayer = styled.div<{ $align?: "top" | "bottom" }>`
   position: absolute;
   right: 0;
@@ -289,34 +341,42 @@ export const HeroLead = styled.p`
 `
 
 export const InlineHighlight = styled.strong`
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.4rem;
   border-radius: ${radius.sm}px;
   background: ${dark.hairline};
   color: ${dark.textPrimary};
   font-weight: ${fontWeight.semibold};
 `
 
-/**
- * 폰 프레임 목업:
- * 회전(-4deg) ➔ 0deg 평면 정렬, 56px 플로팅 그림자 및 가짜 CSS 노치 제거.
- * 스크린샷 1080x2340 원본 비율을 깨끗한 에디토리얼 테두리로 감싼다.
- */
 export const PhoneFrame = styled.figure<{ $width?: string }>`
   position: relative;
   margin: 0;
   width: min(94%, ${({ $width }) => $width || "21rem"});
   padding: 0.5rem;
   border: 1px solid ${dark.borderStrong};
-  border-radius: 1.75rem;
+  border-radius: 1.85rem;
   background: ${dark.fieldDeep};
   box-shadow: ${dark.phoneShadow};
   transform: none;
+  transition: transform 340ms ${MOTION_EASE_OUT};
+
+  &:hover {
+    transform: translateY(-4px);
+  }
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 1.35rem;
+    border-radius: 1.45rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 
   @media (forced-colors: active) {
@@ -428,14 +488,13 @@ export const MetaFactRow = styled.dl`
   }
 `
 
-/** 메타 라벨 뱃지: 사각 컨트롤(radius: 6px) */
 export const MetaBadge = styled.span<{ $accent?: boolean }>`
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  padding: 0 0.85rem;
+  padding: 0 0.9rem;
   border: 1px solid ${({ $accent }) => ($accent ? dark.signature : dark.hairline)};
-  border-radius: ${radius.sm}px;
+  border-radius: 9999px;
   background: ${({ $accent }) => ($accent ? dark.signature : dark.fieldDeep)};
   color: ${({ $accent }) => ($accent ? dark.onSignature : dark.textSecondary)};
   font-size: 0.9375rem;
@@ -447,329 +506,6 @@ export const MetaBadge = styled.span<{ $accent?: boolean }>`
 `
 
 export const MetaPill = MetaBadge
-
-export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(2rem, 5vw, 5rem);
-  padding: clamp(2.5rem, 6vw, 4.5rem) 0;
-
-  > div:last-of-type {
-    order: ${({ $reverse }) => ($reverse ? -1 : 0)};
-  }
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-
-    > div:last-of-type {
-      order: 0;
-    }
-  }
-`
-
-/** 9rem 고스트 숫자 대신 단정한 에디토리얼 인덱스 라벨 */
-export const FeatureIndex = styled.span`
-  display: inline-block;
-  margin-bottom: 0.75rem;
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-  text-transform: ${editorialLabel.textTransform};
-  color: ${dark.textMuted};
-`
-
-export const FeatureName = styled.h3`
-  margin: 0 0 1rem;
-  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-  font-weight: ${fontWeight.bold};
-  color: ${dark.textPrimary};
-`
-
-export const FeatureBody = styled.p`
-  margin: 0;
-  max-width: 30rem;
-  font-size: 1.0625rem;
-  line-height: 1.7;
-  color: ${dark.textSecondary};
-`
-
-export const FeatureStage = styled.div`
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: clamp(1rem, 2vw, 1.75rem);
-  padding: clamp(1.25rem, 2.4vw, 1.85rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldDeep};
-
-  @media (max-width: ${breakpoint.sm}px) {
-    flex-direction: column;
-    align-items: center;
-  }
-`
-
-export const DetailCrop = styled.figure`
-  margin: 0;
-  width: min(100%, 26rem);
-
-  > div {
-    overflow: hidden;
-    aspect-ratio: 4 / 3;
-    border: 1px solid ${dark.borderStrong};
-    border-radius: ${radius.md}px;
-    background: ${dark.fieldRaised};
-  }
-
-  img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 50% 51%;
-  }
-
-  figcaption {
-    margin-top: 0.6rem;
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
-  }
-`
-
-/**
- * [Phase 1] 무장애 이동 경로 에디토리얼 명세표 컴포넌트
- * 기존의 가짜 시스템 에러 문구 패널(StatementPanel)을 완전히 대체하여
- * 제품의 안전성과 경로 계산 알고리즘 기준을 명확하게 전달한다.
- */
-export const RouteSpecPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  padding: clamp(1.5rem, 3.5vw, 2.25rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldDeep};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-`
-
-export const RouteSpecHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.85rem;
-  border-bottom: 1px solid ${dark.hairline};
-`
-
-export const RouteSpecTitle = styled.h4`
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: ${fontWeight.bold};
-  color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
-`
-
-export const RouteSpecTag = styled.span`
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-  text-transform: ${editorialLabel.textTransform};
-  color: ${dark.signature};
-`
-
-export const RouteSpecList = styled.dl`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 0;
-  padding: 0;
-
-  @media (max-width: ${breakpoint.sm}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const RouteSpecCard = styled.div`
-  padding: 1rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
-  background: ${dark.fieldRaised};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-
-  dt {
-    margin: 0 0 0.35rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${dark.signature};
-  }
-
-  dd {
-    margin: 0;
-
-    strong {
-      display: block;
-      margin-bottom: 0.35rem;
-      font-size: 0.9375rem;
-      font-weight: ${fontWeight.bold};
-      color: ${dark.textPrimary};
-    }
-
-    p {
-      margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
-      color: ${dark.textSecondary};
-    }
-  }
-`
-
-export const ScopeLayout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  align-items: start;
-  gap: clamp(2rem, 5vw, 4rem);
-  margin-top: clamp(2rem, 4vw, 3rem);
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const ChipCluster = styled.ul`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-`
-
-/** [Phase 3] radius: 6px 사각 보더 칩 */
-export const ScopeChip = styled.span<{ $accent?: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 0.85rem;
-  border: 1px solid ${({ $accent }) => ($accent ? dark.signature : dark.hairline)};
-  border-radius: ${radius.sm}px;
-  background: ${({ $accent }) => ($accent ? dark.fieldRaised : dark.fieldDeep)};
-  color: ${({ $accent }) => ($accent ? dark.textPrimary : dark.textSecondary)};
-  font-size: 0.9375rem;
-  font-weight: ${fontWeight.medium};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-`
-
-/**
- * [Phase 3] 2x2 에디토리얼 기술 명세표
- * 기존의 과장된 StatCard를 대체하여 신뢰할 수 있는 4개 기술 팩트를 정갈한 2x2 그리드로 제시한다.
- */
-export const TechSpecGrid = styled.dl`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 0;
-  padding: clamp(1.25rem, 3vw, 1.75rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldDeep};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-
-  @media (max-width: ${breakpoint.sm}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const TechSpecCell = styled.div`
-  padding: 1.15rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
-  background: ${dark.fieldRaised};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-
-  dt {
-    margin: 0 0 0.5rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${dark.textMuted};
-  }
-
-  dd {
-    margin: 0;
-
-    strong {
-      display: block;
-      font-size: 1.25rem;
-      line-height: 1.3;
-      font-weight: ${fontWeight.bold};
-      color: ${dark.textPrimary};
-      letter-spacing: -0.01em;
-    }
-
-    p {
-      margin: 0.35rem 0 0;
-      font-size: 0.875rem;
-      line-height: 1.5;
-      color: ${dark.textSecondary};
-    }
-  }
-`
-
-export const ContactBand = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem 2.5rem;
-  width: min(100%, ${CONTENT_MAX_WIDTH});
-  margin: 0 auto;
-  padding: clamp(1.75rem, 4vw, 3rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.fieldRaised};
-
-  h2 {
-    margin: 0 0 0.6rem;
-    font-size: clamp(1.4rem, 2.8vw, 2rem);
-    line-height: 1.25;
-    letter-spacing: -0.02em;
-    font-weight: ${fontWeight.bold};
-    color: ${dark.textPrimary};
-  }
-
-  p {
-    margin: 0;
-    max-width: 30rem;
-    font-size: 1.0625rem;
-    line-height: 1.7;
-    color: ${dark.textSecondary};
-  }
-`
 
 export const SurfaceFooter = styled.footer`
   padding: clamp(2.5rem, 5vw, 4rem) ${SECTION_PADDING_X};
@@ -832,425 +568,3 @@ export const FooterLinks = styled.nav`
     }
   }
 `
-
-/**
- * [Feature 02] 실제 무장애 타임라인 경로 결과 목업 및 콜아웃
- */
-export const TimelineShowcase = styled.div`
-  display: flex;
-  align-items: center;
-  gap: clamp(1.25rem, 2.5vw, 2rem);
-  width: 100%;
-
-  @media (max-width: ${breakpoint.sm}px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
-`
-
-export const TimelinePhoneFrame = styled.figure`
-  position: relative;
-  flex: 0 0 clamp(11rem, 24vw, 14.5rem);
-  margin: 0;
-  padding: 0.4rem;
-  border: 1px solid ${dark.borderStrong};
-  border-radius: 1.5rem;
-  background: ${dark.fieldDeep};
-  box-shadow: ${dark.phoneShadow};
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 1.15rem;
-  }
-
-  @media (max-width: ${breakpoint.sm}px) {
-    flex: none;
-    width: min(100%, 14rem);
-    margin: 0 auto;
-  }
-`
-
-export const TimelineCalloutCluster = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  flex: 1;
-`
-
-export const TimelineCalloutCard = styled.div`
-  padding: 1rem 1.15rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldRaised};
-
-  strong {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.9375rem;
-    font-weight: ${fontWeight.bold};
-    color: ${dark.textPrimary};
-  }
-
-  p {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.55;
-    color: ${dark.textSecondary};
-  }
-`
-
-export const CalloutHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.45rem;
-
-  img {
-    display: block;
-    width: 22px;
-    height: 22px;
-    object-fit: contain;
-  }
-`
-
-export const CalloutTag = styled.span`
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-  text-transform: ${editorialLabel.textTransform};
-  color: ${dark.signature};
-`
-
-export const CalloutIconSvg = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  color: ${dark.signature};
-
-  svg {
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-  }
-`
-
-/**
- * [P2] 1:1 비교 섹션: 일반 지도앱 vs EasySubway
- */
-export const ComparisonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.25rem, 3vw, 2rem);
-  margin-top: clamp(2rem, 4vw, 3rem);
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const ComparisonCard = styled.div<{ $variant?: "standard" | "highlighted" }>`
-  display: flex;
-  flex-direction: column;
-  padding: clamp(1.5rem, 3vw, 2.25rem);
-  border: 1px solid
-    ${({ $variant }) => ($variant === "highlighted" ? dark.accent : dark.hairline)};
-  border-radius: ${radius.lg}px;
-  background: ${({ $variant }) => ($variant === "highlighted" ? dark.fieldRaised : dark.fieldDeep)};
-  box-shadow: ${({ $variant }) => ($variant === "highlighted" ? dark.phoneShadow : "none")};
-`
-
-export const ComparisonCardHeader = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid ${dark.hairline};
-`
-
-export const ComparisonBadge = styled.span<{ $variant?: "standard" | "highlighted" }>`
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  min-height: 28px;
-  padding: 0 0.75rem;
-  border: 1px solid
-    ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.hairline)};
-  border-radius: ${radius.sm}px;
-  background: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.fieldDeep)};
-  color: ${({ $variant }) => ($variant === "highlighted" ? dark.onSignature : dark.textMuted)};
-  font-size: 0.8125rem;
-  font-weight: ${fontWeight.semibold};
-`
-
-export const ComparisonTitle = styled.h3`
-  margin: 0;
-  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
-  font-weight: ${fontWeight.bold};
-  color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
-`
-
-export const ComparisonList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: 1.15rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-
-    strong {
-      display: block;
-      font-size: 0.9375rem;
-      font-weight: ${fontWeight.bold};
-      color: ${dark.textPrimary};
-      margin-bottom: 0.25rem;
-    }
-
-    p {
-      margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
-      color: ${dark.textSecondary};
-    }
-  }
-`
-
-export const ComparisonCheckIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  flex-shrink: 0;
-  border-radius: ${radius.sm}px;
-  background: ${dark.signature};
-  color: ${dark.onSignature};
-  font-size: 0.875rem;
-  font-weight: ${fontWeight.bold};
-
-  svg {
-    width: 14px;
-    height: 14px;
-    fill: currentColor;
-  }
-`
-
-export const ComparisonCrossIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  flex-shrink: 0;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
-  background: ${dark.fieldDeep};
-  color: ${dark.textMuted};
-  font-size: 0.8125rem;
-  font-weight: ${fontWeight.medium};
-
-  svg {
-    width: 14px;
-    height: 14px;
-    fill: currentColor;
-  }
-`
-
-/**
- * [P1/Scope] 공식 20개 노선 뱃지 그리드
- */
-export const MetroBadgeGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
-  gap: 0.65rem;
-  margin-top: 1.75rem;
-`
-
-export const MetroSectionTitle = styled.h3`
-  margin: 0 0 0.5rem;
-  font-size: 1.25rem;
-  font-weight: ${fontWeight.bold};
-  color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
-`
-
-export const MetroSectionLead = styled.p`
-  margin: 0;
-  max-width: 32rem;
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: ${dark.textSecondary};
-`
-
-export const MetroBadgeCard = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.65rem 0.4rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.sm}px;
-  background: ${dark.fieldDeep};
-  text-align: center;
-  transition: border-color ${TRANSITION}, background-color ${TRANSITION};
-
-  &:hover {
-    border-color: ${dark.signature};
-    background: ${dark.fieldRaised};
-  }
-
-  img {
-    width: 26px;
-    height: 26px;
-    object-fit: contain;
-  }
-
-  span {
-    font-size: 0.75rem;
-    font-weight: ${fontWeight.medium};
-    color: ${dark.textSecondary};
-  }
-`
-
-/**
- * [P2] FAQ 섹션
- */
-export const FaqSection = styled.div`
-  width: 100%;
-`
-
-export const FaqList = styled.ul`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
-  margin: clamp(2rem, 4vw, 3rem) 0 0;
-  padding: 0;
-  list-style: none;
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const FaqCard = styled.li`
-  padding: clamp(1.25rem, 2.5vw, 1.75rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldDeep};
-`
-
-export const FaqQuestionHeader = styled.div`
-  display: flex;
-  align-items: baseline;
-  gap: 0.65rem;
-  margin: 0 0 0.75rem;
-`
-
-export const FaqQuestionNumber = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: ${editorialLabel.fontFamily};
-  font-size: 0.875rem;
-  font-weight: ${fontWeight.bold};
-  color: ${dark.signature};
-  flex-shrink: 0;
-`
-
-export const FaqQuestionText = styled.h3`
-  margin: 0;
-  font-size: 1.0625rem;
-  font-weight: ${fontWeight.bold};
-  color: ${dark.textPrimary};
-  line-height: 1.4;
-  letter-spacing: -0.01em;
-`
-
-export const FaqAnswerText = styled.p`
-  margin: 0;
-  font-size: 0.9375rem;
-  line-height: 1.65;
-  color: ${dark.textSecondary};
-`
-
-/**
- * [P2] 문의 CTA 액션 그룹 및 이메일 복사 버튼
- */
-export const ContactActionGroup = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-`
-
-export const CopyEmailButton = styled.button`
-  ${focusVisibleRing};
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 48px;
-  padding: 0 1.25rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldDeep};
-  color: ${dark.textPrimary};
-  cursor: pointer;
-  font-size: 0.9375rem;
-  font-weight: ${fontWeight.medium};
-  letter-spacing: -0.01em;
-  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, color ${TRANSITION};
-
-  &:hover {
-    border-color: ${dark.signature};
-    background: ${dark.fieldRaised};
-    color: ${dark.textPrimary};
-  }
-
-  &:active {
-    background: ${dark.fieldDeep};
-  }
-
-  @media (forced-colors: active) {
-    border: 1px solid ButtonText;
-  }
-`
-
-export const CopyIconWrapper = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.125rem;
-  height: 1.125rem;
-  color: ${dark.signature};
-
-  svg {
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-  }
-`
-
-export const CopyEmailAddress = styled.span`
-  font-size: 0.875rem;
-  color: ${dark.textMuted};
-  border-left: 1px solid ${dark.hairline};
-  padding-left: 0.5rem;
-  margin-left: 0.25rem;
-
-  @media (max-width: ${breakpoint.sm}px) {
-    display: none;
-  }
-`
-

@@ -1,24 +1,124 @@
+import { useEffect, useState } from "react"
 import CompanyIcon from "src/routes/Company/CompanyIcon"
 import { COMPANY_FEATURE_CARDS } from "src/routes/Company/CompanyPageModel"
 import * as S from "src/routes/Company/CompanySection.styles"
 
-/**
- * 핵심 역량 3x2 정적 그리드.
- * 복잡한 캐러셀 스크롤 없이 6대 핵심 역량을 한눈에 조망할 수 있는 정적 그리드로 배치한다.
- */
-const CompanyFeatureCarousel: React.FC = () => (
-  <S.FeatureGrid role="region" aria-label="핵심 역량 카드">
-    {COMPANY_FEATURE_CARDS.map((card) => (
-      <S.FeatureCard key={card.id}>
-        <S.FeatureIconPanel>
-          <CompanyIcon name={card.icon} />
-        </S.FeatureIconPanel>
-        <S.FeatureTag>{card.tag}</S.FeatureTag>
-        <h3>{card.title}</h3>
-        <p>{card.body}</p>
-      </S.FeatureCard>
-    ))}
-  </S.FeatureGrid>
-)
+const totalCards = COMPANY_FEATURE_CARDS.length
+
+const CompanyFeatureCarousel: React.FC = () => {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+
+  useEffect(() => {
+    if (isPaused || typeof window === "undefined") return
+    const isReducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (isReducedMotion) return
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % totalCards)
+    }, 4200)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isPaused])
+
+  const stepLabel = `${String(activeIndex + 1).padStart(2, "0")} / ${String(totalCards).padStart(2, "0")}`
+
+  return (
+    <div
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
+    >
+      <S.ExplorerToolbar data-reveal data-reveal-group="capabilities-toolbar">
+        <S.BouncerRail data-bouncer-list>
+          {COMPANY_FEATURE_CARDS.map((card, index) => (
+            <S.BouncerOrb
+              key={card.id}
+              type="button"
+              $active={activeIndex === index}
+              $index={index}
+              data-bouncer
+              aria-label={`${card.tag}: ${card.title}`}
+              aria-pressed={activeIndex === index}
+              onClick={() => setActiveIndex(index)}
+            >
+              <CompanyIcon name={card.icon} />
+            </S.BouncerOrb>
+          ))}
+        </S.BouncerRail>
+        <S.ExplorerControls>
+          <span className="stepCounter" aria-live="polite">
+            {stepLabel}
+          </span>
+          <S.ExplorerNavPill
+            type="button"
+            aria-label="이전 역량 카드"
+            onClick={() => setActiveIndex((prev) => (prev - 1 + totalCards) % totalCards)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </S.ExplorerNavPill>
+          <S.ExplorerNavPill
+            type="button"
+            aria-label="다음 역량 카드"
+            onClick={() => setActiveIndex((prev) => (prev + 1) % totalCards)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </S.ExplorerNavPill>
+        </S.ExplorerControls>
+      </S.ExplorerToolbar>
+
+      <S.FeatureGrid role="region" aria-label="핵심 역량 카드">
+        {COMPANY_FEATURE_CARDS.map((card, index) => {
+          const isActive = activeIndex === index
+          return (
+            <S.FeatureCard
+              key={card.id}
+              $active={isActive}
+              data-active={isActive ? "true" : "false"}
+              data-reveal
+              data-reveal-group="capabilities-cards"
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => setActiveIndex(index)}
+            >
+              <S.FeatureIconPanel $active={isActive}>
+                <CompanyIcon name={card.icon} />
+              </S.FeatureIconPanel>
+              <S.FeatureTag>{card.tag}</S.FeatureTag>
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </S.FeatureCard>
+          )
+        })}
+      </S.FeatureGrid>
+    </div>
+  )
+}
 
 export default CompanyFeatureCarousel

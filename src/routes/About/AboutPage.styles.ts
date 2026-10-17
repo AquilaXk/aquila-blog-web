@@ -122,6 +122,11 @@ export const StyledWrapper = styled.div`
     gap: 20px;
     padding: 14px 0;
     border-bottom: 1px solid var(--aq-border);
+    transition: border-color 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
+
+    &:hover {
+      border-bottom-color: var(--aq-border-strong, var(--aq-text));
+    }
   }
 
   .stack-row strong {
@@ -147,12 +152,20 @@ export const StyledWrapper = styled.div`
 
   .stack-row a {
     text-decoration: none;
+    transition: color 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
   }
 
   .stack-row a:hover {
     color: var(--aq-text);
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stack-row,
+    .stack-row a {
+      transition: none;
+    }
   }
 
   @media (max-width: 820px) {

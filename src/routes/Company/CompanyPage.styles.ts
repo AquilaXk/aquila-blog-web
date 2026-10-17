@@ -1,65 +1,151 @@
+import { keyframes } from "@emotion/react"
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 import { variables } from "src/styles"
 
-/**
- * 회사 표면의 chrome(공지 스트립 · 헤더 · 히어로 · footer)과 섹션 공통 프리미티브.
- * 섹션별 레이아웃은 `CompanySection.styles.ts`에 있다.
- *
- * 이 표면은 방문자 테마와 무관하게 라이트로 고정한다 - 회사 사이트의 화이트 헤더는 브랜드
- * 정체성이지 사용자 설정이 아니다. 그래서 Emotion 테마가 아니라 마케팅 팔레트를 직접 참조한다.
- * 색·대비 근거는 `src/design-system/marketingPalette.ts` 주석에 있다.
- *
- * 미니멀한 라이트 테마를 유지하며 불필요한 배경 장식(그리드 라인, 글로우 타원 등)을 배제한다.
- * 그림자는 히어로 폰 목업과 프로덕트 쇼케이스 미디어 카드에 한해 적용한다.
- *
- * 타이포 하한(상용 마케팅 기준, 2026-08-03): 본문·설명·내비·CTA는 1rem 이상, 히어로 서브와 섹션
- * 리드는 1.0625~1.125rem, 저작권·캡션 같은 보조 텍스트는 0.875rem 이상, 한국어 본문 line-height는
- * 1.6~1.7이다. 예외는 대문자 + letter-spacing으로 읽는 editorial 라벨(eyebrow·pill)뿐이며 그 값은
- * `editorialLabel` 토큰이 소유한다 - 본문 하한을 그 라벨에 적용하면 라벨이 소제목처럼 읽힌다.
- */
 export const CONTENT_MAX_WIDTH = "75rem"
 export const SECTION_PADDING_Y = "clamp(4.5rem, 10vw, 10rem)"
 export const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
-export const TRANSITION = "160ms ease-out"
+export const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
+export const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
+
+const cursorBlink = keyframes`
+  0%, 42% { opacity: 1; transform: scaleY(1); }
+  50%, 92% { opacity: 0.18; transform: scaleY(0.92); }
+  100% { opacity: 1; transform: scaleY(1); }
+`
+
+const gentleFloat = keyframes`
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
+`
 
 export const CompanySurface = styled.div`
-  /* 이 표면 안의 focus ring은 브랜드 focus 색을 쓴다(정본 semantic focus.default). */
   --aq-focus-ring: ${light.focus};
   background: ${light.surface};
   color: ${light.inkPrimary};
-  /* 한국어 본문이 단어 중간에서 끊기지 않게 한다. 블로그 타이포에 영향을 주지 않도록 이 표면에만 둔다. */
   word-break: keep-all;
   overflow-wrap: break-word;
+
+  & [id] {
+    scroll-margin-top: clamp(4.75rem, 8vw, 6.25rem);
+
+    @media (max-width: ${layoutBreakpoint.navCompact}px) {
+      scroll-margin-top: 7.5rem;
+    }
+  }
+
+  & [data-reveal] {
+    --reveal-delay: 0ms;
+    opacity: 1;
+    transform: translateY(20px);
+    transition: transform 0.68s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
+    will-change: transform;
+  }
+
+  & [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+
+  & [data-reveal]:focus-within {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
+    }
+  }
+
+  @media (scripting: none) {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
+    }
+  }
+
+  @media print {
+    & [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
+    }
+  }
 `
 
-/**
- * 헤더 위 공지 스트립. 채운 accent 면이라 focus ring을 그 위에서 보이는 색으로 바꾼다 -
- * 기본 ring 색이 배경과 같은 값이면 키보드 위치가 사라진다.
- */
 export const NoticeBanner = styled.div`
   --aq-focus-ring: ${light.onAccent};
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 ${SECTION_PADDING_X};
-  background: ${light.accent};
+  background: ${dark.fieldDeep};
+  border-bottom: 1px solid ${dark.hairline};
   text-align: center;
 
   a {
     ${focusVisibleRing};
     display: inline-flex;
     align-items: center;
+    gap: 0.6rem;
     min-height: 44px;
-    padding: 0 0.35rem;
-    border-radius: ${radius.sm}px;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
     color: ${light.onAccent};
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: ${fontWeight.medium};
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    text-decoration: none;
+    transition: background-color ${TRANSITION};
+
+    .noticeBadge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.14rem 0.55rem;
+      border-radius: 9999px;
+      background: ${dark.signature};
+      color: ${dark.onSignature};
+      font-family: ${editorialLabel.fontFamily};
+      font-size: 0.72rem;
+      font-weight: ${fontWeight.extraBold};
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .noticeArrow {
+      display: inline-flex;
+      align-items: center;
+      color: ${dark.signature};
+      transition: transform 250ms ${MOTION_EASE_OUT};
+    }
+
+    &:hover {
+      background: ${dark.surfacePillHover};
+
+      .noticeArrow {
+        transform: translateX(3.5px);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+
+      .noticeArrow {
+        transition: none;
+      }
+    }
   }
 `
 
@@ -73,11 +159,19 @@ export const SurfaceHeader = styled.header`
   gap: 1rem;
   min-height: 72px;
   padding: 0.75rem ${SECTION_PADDING_X};
-  background: ${light.surface};
-  border-bottom: 1px solid ${light.border};
+  background: ${light.surfaceGlass};
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid ${light.borderHairline};
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, box-shadow ${TRANSITION};
 
-  /* 좁은 폭에서는 내비가 통째로 둘째 줄로 내려가 남은 폭 안에서 랩한다. 가로 스크롤 컨테이너로
-     만들면 항목이 화면 밖에 주차된 채로도 "보인다"고 측정된다. */
+  &.scrolled,
+  &[data-scrolled="true"] {
+    background: ${light.surfaceGlassElevated};
+    border-bottom-color: ${light.border};
+    box-shadow: ${light.headerShadowScrolled};
+  }
+
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.35rem;
@@ -91,13 +185,18 @@ export const BrandLink = styled.a`
   gap: 0.6rem;
   justify-self: start;
   min-height: 44px;
-  padding-right: 0.35rem;
-  border-radius: ${radius.md}px;
+  padding-right: 0.5rem;
+  border-radius: 9999px;
   color: ${light.inkPrimary};
   text-decoration: none;
   font-size: 1.06rem;
   font-weight: ${fontWeight.extraBold};
   letter-spacing: -0.02em;
+  transition: opacity ${TRANSITION};
+
+  &:hover {
+    opacity: 0.86;
+  }
 
   > span:first-of-type {
     display: block;
@@ -111,7 +210,7 @@ export const SurfaceNav = styled.nav`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     grid-row: 2;
@@ -129,46 +228,100 @@ export const NavLink = styled.a`
   align-items: center;
   flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 0.75rem;
-  border-radius: ${radius.md}px;
+  padding: 0 0.95rem;
+  border-radius: 9999px;
   color: ${light.inkSecondary};
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 0.96875rem;
   font-weight: ${fontWeight.medium};
   transition: color ${TRANSITION}, background-color ${TRANSITION};
 
   &:hover {
-    color: ${light.onSignature};
-    background: ${light.surfaceBrand};
+    color: ${light.inkPrimary};
+    background: ${light.surfaceHoverTint};
   }
 `
 
-/** pill CTA. accent 면 + 흰 글자가 정본 contrastPairs의 primary-action 조합이다. */
 export const PillAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   min-height: 48px;
-  padding: 0 1.5rem;
-  border-radius: ${variables.ui.button.radius}px;
-  background: ${light.accent};
+  padding: 0 1.55rem;
+  border-radius: 9999px;
+  background: ${light.inkPrimary};
   color: ${light.onAccent};
   text-decoration: none;
   font-size: 1rem;
   font-weight: ${fontWeight.bold};
   letter-spacing: -0.01em;
-  transition: background-color ${TRANSITION};
+  transition: background-color ${TRANSITION}, transform ${TRANSITION}, box-shadow ${TRANSITION};
+
+  svg {
+    flex: 0 0 auto;
+    transition: transform 240ms ${MOTION_EASE_OUT};
+  }
 
   &:hover {
     background: ${light.accentPressed};
+    transform: translateY(-1px);
+    box-shadow: ${light.cardShadowRest};
+
+    svg {
+      transform: translateX(3px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    svg {
+      transition: none;
+    }
+
+    &:hover {
+      transform: none;
+    }
   }
 `
 
-/**
- * 좁은 폭에서도 브랜드와 같은 줄에 남는다 - 내비만 둘째 줄로 내려간다.
- * 글자 크기는 줄이지 않고 `PillAction`의 1rem을 그대로 쓴다. 높이·패딩만 좁힌다.
- */
+export const SecondaryPillAction = styled.a`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0 1.45rem;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderGlass};
+  background: ${light.surfacePillGlass};
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: ${light.inkPrimary};
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: ${fontWeight.semibold};
+  letter-spacing: -0.01em;
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION}, transform ${TRANSITION};
+
+  &:hover {
+    background: ${light.surfaceBrand};
+    border-color: ${light.borderStrong};
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+`
+
 export const HeaderAction = styled(PillAction)`
   justify-self: end;
   min-height: 44px;
@@ -182,27 +335,55 @@ export const HeaderAction = styled(PillAction)`
 
 export const Hero = styled.section`
   position: relative;
-  padding: clamp(4rem, 9.5vw, 9.5rem) ${SECTION_PADDING_X} 0;
+  overflow: hidden;
+  padding: clamp(4.25rem, 9vw, 8.75rem) ${SECTION_PADDING_X} clamp(2rem, 4vw, 3.5rem);
   text-align: center;
 `
 
 export const HeroCopy = styled.div`
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  width: min(100%, 52rem);
+  gap: 1.4rem;
+  width: min(100%, 54rem);
   margin: 0 auto;
+`
+
+export const HeroEyebrowPill = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderGlass};
+  background: ${light.surfacePillGlass};
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: ${light.accentText};
+  font-family: ${editorialLabel.fontFamily};
+  font-size: ${editorialLabel.fontSize};
+  font-weight: ${editorialLabel.fontWeight};
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  .pulseDot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: ${light.accent};
+  }
 `
 
 export const HeroTitle = styled.h1`
   margin: 0;
-  font-size: clamp(2.1rem, 6vw, 4.25rem);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-size: clamp(2.25rem, 6.2vw, 4.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
   font-weight: ${fontWeight.extraBold};
   color: ${light.inkPrimary};
+  text-wrap: balance;
 `
 
 export const HeroAccent = styled.em`
@@ -210,25 +391,93 @@ export const HeroAccent = styled.em`
   color: ${light.accentText};
 `
 
+export const HeroCursorBlock = styled.span`
+  display: inline-block;
+  width: clamp(0.32rem, 0.7vw, 0.52rem);
+  height: 0.84em;
+  margin-left: 0.16em;
+  vertical-align: -0.08em;
+  border-radius: 2px;
+  background: ${light.cursorGradient};
+  animation: ${cursorBlink} 1.25s steps(1, end) infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
 export const HeroLead = styled.p`
   margin: 0;
-  max-width: 34rem;
-  font-size: clamp(1.0625rem, 1.5vw, 1.125rem);
+  max-width: 35rem;
+  font-size: clamp(1.0625rem, 1.5vw, 1.1875rem);
   line-height: 1.65;
   color: ${light.inkSecondary};
 `
 
-/**
- * 히어로 EasySubway 핵심 앱 인터페이스 쇼케이스.
- * 무의미한 그리드 선, 보라색 글로우, 맥 창틀 점 3개를 제거하고 앱 인터페이스를 무대 중심에 배치한다.
- */
+export const HeroActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+`
+
 export const HeroShowcase = styled.figure`
   position: relative;
   z-index: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
+  width: min(100%, ${CONTENT_MAX_WIDTH});
   margin: clamp(2.5rem, 5vw, 4rem) auto 0;
-  padding: 0;
+  padding: clamp(1.5rem, 3.5vw, 2.75rem) clamp(1rem, 3vw, 2.5rem);
+  border-radius: 2.25rem;
+  border: 1px solid ${light.borderHairline};
+  background: ${light.surfaceGlass};
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: ${light.cardShadowRest};
+`
+
+export const HeroFloatingPill = styled.div<{ $position: "left" | "right" }>`
+  position: absolute;
+  ${({ $position }) =>
+    $position === "left"
+      ? "left: clamp(1.5rem, 6vw, 5.5rem); top: 24%;"
+      : "right: clamp(1.5rem, 6vw, 5.5rem); bottom: 24%;"}
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid ${light.borderGlass};
+  background: ${light.surfaceGlassElevated};
+  box-shadow: ${light.cardShadowRest};
+  color: ${light.inkPrimary};
+  font-size: 0.875rem;
+  font-weight: ${fontWeight.semibold};
+  animation: ${gentleFloat} 5.2s ease-in-out infinite;
+  animation-delay: ${({ $position }) => ($position === "left" ? "0s" : "1.8s")};
+
+  .pillTag {
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: ${light.surfaceBrandStrong};
+    color: ${light.onSignature};
+    font-family: ${editorialLabel.fontFamily};
+    font-size: 0.7rem;
+    font-weight: ${fontWeight.extraBold};
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `
 
 export const HeroPhoneFrame = styled.div`
@@ -239,12 +488,25 @@ export const HeroPhoneFrame = styled.div`
   border-radius: 2rem;
   background: ${dark.field};
   box-shadow: ${variables.ui.card.shadowFloating};
+  transition: transform 360ms ${MOTION_EASE_OUT};
+
+  &:hover {
+    transform: translateY(-4px);
+  }
 
   img {
     display: block;
     width: 100%;
     height: auto;
     border-radius: 1.6rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 `
 
@@ -291,98 +553,9 @@ export const SectionAside = styled.p`
   color: ${light.inkSecondary};
 `
 
-/** 다크 풀블리드 footer. 라이트 페이지의 마지막 면을 제품 표면과 같은 인디고-블랙으로 닫는다. */
-export const SurfaceFooter = styled.footer`
-  padding: clamp(2.75rem, 6vw, 4.5rem) ${SECTION_PADDING_X};
-  background: ${dark.field};
-  color: ${dark.textPrimary};
-`
-
-export const FooterInner = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 0.6fr));
-  gap: clamp(1.75rem, 4vw, 3.5rem);
-  width: min(100%, ${CONTENT_MAX_WIDTH});
-  margin: 0 auto;
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-`
-
-export const FooterBrand = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-column: 1 / -1;
-  }
-
-  > div {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 1.02rem;
-    font-weight: ${fontWeight.extraBold};
-    letter-spacing: -0.02em;
-  }
-
-  /*
-   * 마크 내부가 페리윙클·화이트라 인디고-블랙 면 위에서 그대로 읽힌다. 밝은 원판을 두지 않는
-   * 이유는 실측 결과다: 원판은 밝은 마크를 흰 바탕에 얹어 대비를 오히려 죽이고, 34px 안에서
-   * 마크를 한 단계 더 줄인다.
-   */
-  > div > span:first-of-type {
-    display: block;
-    flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-  }
-
-  p {
-    margin: 0;
-    max-width: 22rem;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: ${dark.textSecondary};
-  }
-
-  small {
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
-  }
-`
-
-export const FooterGroup = styled.nav`
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-
-  h2 {
-    margin: 0 0 0.35rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${dark.textMuted};
-  }
-
-  a {
-    ${focusVisibleRing};
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    border-radius: ${radius.sm}px;
-    color: ${dark.textPrimary};
-    text-decoration: none;
-    font-size: 1rem;
-    font-weight: ${fontWeight.medium};
-    transition: color ${TRANSITION};
-
-    &:hover {
-      color: ${dark.signature};
-    }
-  }
-`
+export {
+  FooterBrand,
+  FooterGroup,
+  FooterInner,
+  SurfaceFooter,
+} from "src/routes/Company/CompanyNews.styles"

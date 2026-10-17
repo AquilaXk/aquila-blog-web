@@ -78,7 +78,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
 
   return (
     <S.ProductSurface ref={surfaceRef}>
-      <S.SurfaceHeader>
+      <S.SurfaceHeader data-header data-scroll-reactive="true">
         <S.BrandLink href={surfaceUrl} aria-current="page">
           {PRODUCT_SURFACE.name}
           <small>by {COMPANY_SURFACE.name}</small>

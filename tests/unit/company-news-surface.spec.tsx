@@ -187,3 +187,70 @@ test("NewsHead와 NewsHeaderAction은 기술 블로그 링크와 44px 터치 타
   expect(headMarkup).toContain('aria-hidden="true"')
   expect(headMarkup).not.toContain(".undefined")
 })
+
+test("ExplorerToolbar, BouncerOrb, ExplorerNavPill, FeatureGrid는 핵심 역량 카드 리전, 플로팅 바운서 궤도, 이전/다음 컨트롤, 활성 역량 아티클을 렌더한다", () => {
+  const markup = renderToStaticMarkup(
+    createElement(
+      "div",
+      null,
+      createElement(
+        Sec.ExplorerToolbar,
+        { "data-reveal": true } as Record<string, unknown>,
+        createElement(
+          Sec.BouncerRail,
+          { "data-bouncer-list": "true" } as Record<string, unknown>,
+          createElement(
+            Sec.BouncerOrb,
+            {
+              type: "button",
+              $active: true,
+              $index: 0,
+              "data-bouncer": "true",
+              "aria-label": "실시간 처리: 실시간 데이터 처리",
+              "aria-pressed": true,
+            } as Record<string, unknown>,
+            "1",
+          ),
+        ),
+        createElement(
+          Sec.ExplorerControls,
+          null,
+          createElement("span", { className: "stepCounter", "aria-live": "polite" }, "01 / 06"),
+          createElement(
+            Sec.ExplorerNavPill,
+            { type: "button", "aria-label": "이전 역량 카드" },
+            "←",
+          ),
+          createElement(
+            Sec.ExplorerNavPill,
+            { type: "button", "aria-label": "다음 역량 카드" },
+            "→",
+          ),
+        ),
+      ),
+      createElement(
+        Sec.FeatureGrid,
+        { role: "region", "aria-label": "핵심 역량 카드" },
+        createElement(
+          Sec.FeatureCard,
+          { $active: true, "data-active": "true" } as Record<string, unknown>,
+          createElement(Sec.FeatureIconPanel, { $active: true }, "icon"),
+          createElement(Sec.FeatureTag, null, "실시간 처리"),
+          createElement("h3", null, "실시간 데이터 처리"),
+          createElement("p", null, "이벤트 스트림과 웹소켓 연결을 안정적으로 처리합니다."),
+        ),
+      ),
+    ),
+  )
+
+  expect(markup).toContain('role="region"')
+  expect(markup).toContain('aria-label="핵심 역량 카드"')
+  expect(markup).toContain('data-bouncer-list="true"')
+  expect(markup).toContain('aria-label="이전 역량 카드"')
+  expect(markup).toContain('aria-label="다음 역량 카드"')
+  expect(markup).toContain('data-active="true"')
+  expect(markup).toContain("01 / 06")
+  expect(markup).toContain("실시간 데이터 처리")
+  expect(markup).not.toContain(".undefined")
+})
+
