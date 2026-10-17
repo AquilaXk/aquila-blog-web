@@ -60,7 +60,7 @@ export {
 const CONTENT_MAX_WIDTH = "75rem"
 const SECTION_PADDING_Y = "clamp(3.5rem, 8vw, 7rem)"
 const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
-const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
+const TRANSITION = "200ms cubic-bezier(0.165, 0.84, 0.44, 1)"
 const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
 
 export const ProductSurface = styled.div`
@@ -80,49 +80,27 @@ export const ProductSurface = styled.div`
   & [data-reveal] {
     --reveal-delay: 0ms;
     opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.72s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms),
-      transform 0.72s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
-    will-change: opacity, transform;
+    transform: translateY(16px);
+    transition: opacity 0.6s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms),
+      transform 0.6s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
   }
 
   & [data-reveal].is-visible {
     opacity: 1;
     transform: none;
-    will-change: auto;
   }
 
   & [data-reveal]:focus-within {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
-    will-change: auto !important;
   }
 
-  @media (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: reduce), (scripting: none), print {
     & [data-reveal] {
       opacity: 1 !important;
       transform: none !important;
       transition: none !important;
-      will-change: auto !important;
-    }
-  }
-
-  @media (scripting: none) {
-    & [data-reveal] {
-      opacity: 1 !important;
-      transform: none !important;
-      transition: none !important;
-      will-change: auto !important;
-    }
-  }
-
-  @media print {
-    & [data-reveal] {
-      opacity: 1 !important;
-      transform: none !important;
-      transition: none !important;
-      will-change: auto !important;
     }
   }
 `
@@ -141,12 +119,12 @@ export const SurfaceHeader = styled.header`
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid ${dark.hairline};
-  transition: background-color ${TRANSITION}, box-shadow ${TRANSITION};
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION};
 
   &.scrolled,
   &[data-scrolled="true"] {
     background: ${dark.surfaceGlassScrolled};
-    box-shadow: ${dark.headerShadowScrolled};
+    border-bottom-color: ${dark.borderStrong};
   }
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
@@ -161,7 +139,7 @@ export const BrandLink = styled.a`
   align-items: baseline;
   gap: 0.5rem;
   min-height: 44px;
-  border-radius: 9999px;
+  border-radius: ${radius.sm}px;
   color: ${dark.textPrimary};
   text-decoration: none;
   font-size: 1.06rem;
@@ -199,7 +177,7 @@ export const NavLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0 0.75rem;
-  border-radius: 9999px;
+  border-radius: ${radius.sm}px;
   color: ${dark.textSecondary};
   text-decoration: none;
   font-size: 1rem;
@@ -208,7 +186,7 @@ export const NavLink = styled.a`
 
   &:hover {
     color: ${dark.textPrimary};
-    background: ${dark.surfacePillHover};
+    background: ${dark.fieldRaised};
   }
 
   @media (max-width: ${breakpoint.sm}px) {
@@ -222,27 +200,22 @@ export const ButtonAction = styled.a`
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  padding: 0 1.5rem;
-  border-radius: 9999px;
+  padding: 0 1.45rem;
+  border-radius: ${radius.md}px;
   background: ${dark.accent};
   color: ${dark.onAccent};
   text-decoration: none;
   font-size: 1rem;
   font-weight: ${fontWeight.semibold};
   letter-spacing: -0.01em;
-  transition: background-color ${TRANSITION}, transform 240ms ${MOTION_EASE_OUT};
+  transition: background-color ${TRANSITION};
 
   &:hover {
     background: ${dark.accentPressed};
-    transform: translateY(-1px);
   }
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
-
-    &:hover {
-      transform: none;
-    }
   }
 
   @media (forced-colors: active) {
@@ -254,26 +227,26 @@ export const PillAction = ButtonAction
 
 export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
-  padding: 0 1.15rem;
-  border-radius: 9999px;
+  padding: 0 1.1rem;
+  border-radius: ${radius.sm}px;
 `
 
 export const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.4rem 0.9rem;
+  padding: 0.35rem 0.75rem;
   border: 1px solid ${dark.hairline};
-  border-radius: 9999px;
+  border-radius: ${radius.sm}px;
   background: ${dark.fieldRaised};
   color: ${dark.textPrimary};
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: ${fontWeight.medium};
 
   &::before {
     content: "";
-    width: 0.45rem;
-    height: 0.45rem;
+    width: 0.4rem;
+    height: 0.4rem;
     border-radius: 50%;
     background: ${dark.signature};
   }
@@ -292,7 +265,7 @@ export const StatusPill = StatusBadge
 export const Hero = styled.section`
   position: relative;
   overflow: hidden;
-  padding: clamp(3rem, 7vw, 5.5rem) ${SECTION_PADDING_X} clamp(3rem, 7vw, 5rem);
+  padding: clamp(3.5rem, 7vw, 5.5rem) ${SECTION_PADDING_X} clamp(3rem, 7vw, 5rem);
   background: ${dark.fieldDeep};
 `
 
@@ -318,15 +291,15 @@ export const HeroCopy = styled.div`
 
 export const HeroTitle = styled.h1`
   margin: 0;
-  font-size: clamp(2.1rem, 5.4vw, 3.9rem);
-  line-height: 1.12;
-  letter-spacing: -0.02em;
-  font-weight: ${fontWeight.regular};
-  color: ${dark.textMuted};
+  font-size: clamp(2.2rem, 5.4vw, 4rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: ${fontWeight.medium};
+  color: ${dark.textSecondary};
 
   strong {
     display: block;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${dark.textPrimary};
   }
 `
@@ -341,9 +314,6 @@ export const HeroLead = styled.p`
 `
 
 export const InlineHighlight = styled.strong`
-  padding: 0.1rem 0.4rem;
-  border-radius: ${radius.sm}px;
-  background: ${dark.hairline};
   color: ${dark.textPrimary};
   font-weight: ${fontWeight.semibold};
 `
@@ -357,26 +327,12 @@ export const PhoneFrame = styled.figure<{ $width?: string }>`
   border-radius: 1.85rem;
   background: ${dark.fieldDeep};
   box-shadow: ${dark.phoneShadow};
-  transform: none;
-  transition: transform 340ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    transform: translateY(-4px);
-  }
 
   img {
     display: block;
     width: 100%;
     height: auto;
     border-radius: 1.45rem;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
   }
 
   @media (forced-colors: active) {
@@ -412,7 +368,7 @@ export const SectionInner = styled.div`
 `
 
 export const Eyebrow = styled.p`
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
   font-family: ${editorialLabel.fontFamily};
   font-size: ${editorialLabel.fontSize};
   font-weight: ${editorialLabel.fontWeight};
@@ -424,15 +380,15 @@ export const Eyebrow = styled.p`
 export const DisplayHeading = styled.h2`
   margin: 0;
   max-width: 34rem;
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-size: clamp(1.75rem, 3.6vw, 2.65rem);
   line-height: 1.2;
-  letter-spacing: -0.02em;
-  font-weight: ${fontWeight.regular};
-  color: ${dark.textMuted};
+  letter-spacing: -0.025em;
+  font-weight: ${fontWeight.semibold};
+  color: ${dark.textPrimary};
 
   strong {
     display: block;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${dark.textPrimary};
   }
 `
@@ -492,9 +448,9 @@ export const MetaBadge = styled.span<{ $accent?: boolean }>`
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  padding: 0 0.9rem;
+  padding: 0 0.75rem;
   border: 1px solid ${({ $accent }) => ($accent ? dark.signature : dark.hairline)};
-  border-radius: 9999px;
+  border-radius: ${radius.sm}px;
   background: ${({ $accent }) => ($accent ? dark.signature : dark.fieldDeep)};
   color: ${({ $accent }) => ($accent ? dark.onSignature : dark.textSecondary)};
   font-size: 0.9375rem;
@@ -568,3 +524,4 @@ export const FooterLinks = styled.nav`
     }
   }
 `
+

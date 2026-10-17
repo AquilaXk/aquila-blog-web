@@ -20,26 +20,25 @@ export const NewsHeaderAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   min-height: 44px;
-  padding: 0 1.1rem;
-  border-radius: 9999px;
-  border: 1px solid ${light.borderGlass};
-  background: ${light.surfacePillGlass};
-  font-size: 0.96875rem;
+  padding: 0 1rem;
+  border-radius: ${radius.sm}px;
+  border: 1px solid ${light.border};
+  background: ${light.surface};
+  font-size: 0.9375rem;
   font-weight: ${fontWeight.semibold};
-  color: ${light.accentText};
+  color: ${light.inkPrimary};
   text-decoration: none;
   transition: color ${TRANSITION}, background-color ${TRANSITION}, border-color ${TRANSITION};
 
   svg {
     flex: 0 0 auto;
-    transition: transform 240ms ${MOTION_EASE_OUT};
+    transition: transform 220ms ${MOTION_EASE_OUT};
   }
 
   &:hover {
-    color: ${light.accentPressed};
-    background: ${light.surfaceBrand};
+    background: ${light.surfaceScaffold};
     border-color: ${light.borderStrong};
 
     svg {
@@ -77,17 +76,13 @@ export const NewsCard = styled.a`
   height: 100%;
   padding: clamp(1.35rem, 2.2vw, 1.75rem);
   border: 1px solid ${light.border};
-  border-radius: 1.5rem;
+  border-radius: ${radius.lg}px;
   background: ${light.surface};
-  box-shadow: ${light.cardShadowRest};
   text-decoration: none;
-  transition: border-color ${TRANSITION}, transform 320ms ${MOTION_EASE_OUT},
-    box-shadow 320ms ${MOTION_EASE_OUT};
+  transition: border-color ${TRANSITION};
 
   &:hover {
     border-color: ${light.borderStrong};
-    transform: translateY(-3px);
-    box-shadow: ${light.cardShadowHover};
   }
 
   &:hover h3,
@@ -96,12 +91,12 @@ export const NewsCard = styled.a`
   }
 
   &:hover [data-ui="company-news-media"] img {
-    transform: scale(1.04);
+    transform: scale(1.025);
   }
 
   &:hover [data-ui="company-news-action"] {
     color: ${light.accentPressed};
-    gap: 0.55rem;
+    gap: 0.5rem;
 
     svg {
       transform: translateX(3px);
@@ -146,10 +141,6 @@ export const NewsCard = styled.a`
   @media (prefers-reduced-motion: reduce) {
     transition: none;
 
-    &:hover {
-      transform: none;
-    }
-
     &:hover [data-ui="company-news-media"] img {
       transform: none;
     }
@@ -164,23 +155,18 @@ export const NewsMeta = styled.div`
 `
 
 export const NewsIndex = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.22rem 0.6rem;
-  border-radius: 9999px;
-  background: ${light.surfaceBrand};
-  color: ${light.accentText};
   font-family: ${editorialLabel.fontFamily};
   font-size: ${editorialLabel.fontSize};
   font-weight: ${editorialLabel.fontWeight};
   letter-spacing: ${editorialLabel.letterSpacing};
+  color: ${light.accentText};
 `
 
 export const NewsMedia = styled.div`
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  border-radius: ${radius.lg}px;
+  border-radius: ${radius.md}px;
+  border: 1px solid ${light.border};
   background: ${light.surfaceBrandChrome};
 
   img {
@@ -188,7 +174,7 @@ export const NewsMedia = styled.div`
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 420ms ${MOTION_EASE_OUT};
+    transition: transform 360ms ${MOTION_EASE_OUT};
   }
 `
 
@@ -198,14 +184,14 @@ export const NewsAction = styled.div`
   gap: 0.35rem;
   margin-top: auto;
   padding-top: 0.75rem;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: ${fontWeight.semibold};
   color: ${light.accentText};
   transition: gap ${TRANSITION}, color ${TRANSITION};
 
   svg {
     flex: 0 0 auto;
-    transition: transform 240ms ${MOTION_EASE_OUT};
+    transition: transform 220ms ${MOTION_EASE_OUT};
   }
 `
 
@@ -218,19 +204,18 @@ export const ContactBand = styled.div`
   gap: 1.5rem 2.5rem;
   width: min(100%, ${CONTENT_MAX_WIDTH});
   margin: 0 auto;
-  padding: clamp(2.25rem, 4.5vw, 3.5rem);
-  border-radius: 2.25rem;
+  padding: clamp(2.25rem, 4.5vw, 3.25rem);
+  border-radius: ${radius.lg}px;
   border: 1px solid ${light.borderStrong};
   background: ${light.signature};
   color: ${light.onSignature};
-  box-shadow: ${light.cardShadowHover};
 
   h2 {
     margin: 0 0 0.5rem;
-    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-size: clamp(1.5rem, 3vw, 2.15rem);
     line-height: 1.22;
     letter-spacing: -0.02em;
-    font-weight: ${fontWeight.extraBold};
+    font-weight: ${fontWeight.bold};
   }
 
   p {

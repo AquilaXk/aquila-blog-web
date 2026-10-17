@@ -3,8 +3,7 @@ import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { marketingDark as dark } from "src/design-system/marketingPalette"
 
-const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
-const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
+const TRANSITION = "200ms cubic-bezier(0.165, 0.84, 0.44, 1)"
 
 export const ScopeLayout = styled.div`
   display: grid;
@@ -21,7 +20,7 @@ export const ScopeLayout = styled.div`
 export const ChipCluster = styled.ul`
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.5rem;
   margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
@@ -30,15 +29,14 @@ export const ChipCluster = styled.ul`
 export const ScopeChip = styled.span<{ $accent?: boolean }>`
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
-  padding: 0 0.9rem;
+  min-height: 32px;
+  padding: 0 0.75rem;
   border: 1px solid ${({ $accent }) => ($accent ? dark.signature : dark.hairline)};
-  border-radius: 9999px;
+  border-radius: ${radius.xs}px;
   background: ${({ $accent }) => ($accent ? dark.fieldRaised : dark.fieldDeep)};
   color: ${({ $accent }) => ($accent ? dark.textPrimary : dark.textSecondary)};
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: ${fontWeight.medium};
-  transition: border-color ${TRANSITION}, background-color ${TRANSITION};
 
   @media (forced-colors: active) {
     border-color: CanvasText;
@@ -48,12 +46,13 @@ export const ScopeChip = styled.span<{ $accent?: boolean }>`
 export const TechSpecGrid = styled.dl`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1px;
   margin: 0;
-  padding: clamp(1.25rem, 3vw, 1.75rem);
+  padding: 0;
   border: 1px solid ${dark.hairline};
-  border-radius: 1.5rem;
-  background: ${dark.fieldDeep};
+  border-radius: ${radius.lg}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 
   @media (forced-colors: active) {
     border-color: CanvasText;
@@ -65,27 +64,11 @@ export const TechSpecGrid = styled.dl`
 `
 
 export const TechSpecCell = styled.div`
-  padding: 1.15rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.fieldRaised};
-  transition: border-color ${TRANSITION}, transform 260ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.borderStrong};
-    transform: translateY(-2px);
-  }
+  padding: 1.5rem;
+  background: ${dark.fieldDeep};
 
   @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
+    border: 1px solid CanvasText;
   }
 
   dt {
@@ -105,7 +88,7 @@ export const TechSpecCell = styled.div`
       display: block;
       font-size: 1.25rem;
       line-height: 1.3;
-      font-weight: ${fontWeight.bold};
+      font-weight: ${fontWeight.semibold};
       color: ${dark.textPrimary};
       letter-spacing: -0.01em;
     }
@@ -122,14 +105,18 @@ export const TechSpecCell = styled.div`
 export const MetroBadgeGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
-  gap: 0.65rem;
+  gap: 1px;
   margin-top: 1.75rem;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 `
 
 export const MetroSectionTitle = styled.h3`
   margin: 0 0 0.5rem;
   font-size: 1.25rem;
-  font-weight: ${fontWeight.bold};
+  font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
   letter-spacing: -0.01em;
 `
@@ -148,19 +135,9 @@ export const MetroBadgeCard = styled.div`
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding: 0.65rem 0.4rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
+  padding: 0.75rem 0.5rem;
   background: ${dark.fieldDeep};
   text-align: center;
-  transition: border-color ${TRANSITION}, background-color ${TRANSITION},
-    transform 240ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.signature};
-    background: ${dark.fieldRaised};
-    transform: translateY(-2px);
-  }
 
   img {
     width: 26px;
@@ -173,14 +150,6 @@ export const MetroBadgeCard = styled.div`
     font-weight: ${fontWeight.medium};
     color: ${dark.textSecondary};
   }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
-  }
 `
 
 export const FaqSection = styled.div`
@@ -190,10 +159,14 @@ export const FaqSection = styled.div`
 export const FaqList = styled.ul`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: 1px;
   margin: clamp(2rem, 4vw, 3rem) 0 0;
   padding: 0;
   list-style: none;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.lg}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -201,24 +174,8 @@ export const FaqList = styled.ul`
 `
 
 export const FaqCard = styled.li`
-  padding: clamp(1.25rem, 2.5vw, 1.75rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: 1.25rem;
+  padding: clamp(1.5rem, 2.8vw, 2rem);
   background: ${dark.fieldDeep};
-  transition: border-color ${TRANSITION}, transform 260ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.borderStrong};
-    transform: translateY(-2px);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
-  }
 `
 
 export const FaqQuestionHeader = styled.div`
@@ -242,7 +199,7 @@ export const FaqQuestionNumber = styled.span`
 export const FaqQuestionText = styled.h3`
   margin: 0;
   font-size: 1.0625rem;
-  font-weight: ${fontWeight.bold};
+  font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
   line-height: 1.4;
   letter-spacing: -0.01em;
@@ -268,10 +225,10 @@ export const CopyEmailButton = styled.button`
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 48px;
+  min-height: 44px;
   padding: 0 1.25rem;
   border: 1px solid ${dark.hairline};
-  border-radius: 9999px;
+  border-radius: ${radius.md}px;
   background: ${dark.fieldDeep};
   color: ${dark.textPrimary};
   cursor: pointer;
@@ -332,17 +289,15 @@ export const ContactBand = styled.div`
   margin: 0 auto;
   padding: clamp(2rem, 4.5vw, 3.25rem);
   border: 1px solid ${dark.borderStrong};
-  border-radius: 2.25rem;
+  border-radius: ${radius.lg}px;
   background-color: ${dark.fieldRaised};
-  background-image: ${dark.ctaStageBackdrop};
-  box-shadow: ${dark.cardShadowHover};
 
   h2 {
     margin: 0 0 0.6rem;
     font-size: clamp(1.4rem, 2.8vw, 2rem);
     line-height: 1.25;
     letter-spacing: -0.02em;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${dark.textPrimary};
   }
 

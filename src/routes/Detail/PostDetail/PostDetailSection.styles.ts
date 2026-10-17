@@ -60,14 +60,14 @@ export const MobileSummaryBar = styled.div `
 export const RelatedSection = styled.section `
   margin-top: 64px;
   padding-top: 40px;
-  border-top: 1px solid #dfe1e5;
+  border-top: 1px solid var(--aq-border);
   content-visibility: auto;
   contain-intrinsic-size: 1px 420px;
 
   .monoLabel {
     display: inline-flex;
     margin-bottom: 12px;
-    color: #155eef;
+    color: var(--aq-accent-link, var(--aq-accent));
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 11px;
     font-weight: 700;
@@ -78,7 +78,7 @@ export const RelatedSection = styled.section `
 
   h3 {
     margin: 0 0 22px;
-    color: #111216;
+    color: var(--aq-text);
     font-size: 22px;
     line-height: 1.25;
     font-weight: 800;
@@ -102,13 +102,13 @@ export const RelatedSection = styled.section `
     gap: 20px;
     min-width: 0;
     padding: 18px 0;
-    border-top: 1px solid #dfe1e5;
-    color: #111216;
+    border-top: 1px solid var(--aq-border);
+    color: var(--aq-text);
     text-decoration: none;
     transition: color 0.18s cubic-bezier(0.215, 0.61, 0.355, 1);
 
     &:hover {
-      color: #155eef;
+      color: var(--aq-accent-link, var(--aq-accent));
 
       .relatedArrow {
         transform: translateX(4px);
@@ -133,7 +133,7 @@ export const RelatedSection = styled.section `
   }
 
   .relatedMeta {
-    color: #646a73;
+    color: var(--aq-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 12px;
     line-height: 1.4;
@@ -165,13 +165,13 @@ export const RelatedSkeletonItem = styled.li `
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 20px;
   padding: 18px 0;
-  border-top: 1px solid #dfe1e5;
+  border-top: 1px solid var(--aq-border);
 
   .titleLine,
   .metaLine {
     display: block;
-    border-radius: 999px;
-    background: #dfe1e5;
+    border-radius: 4px;
+    background: var(--aq-border);
     animation: related-skeleton-pulse 1.18s ease-in-out infinite;
   }
 

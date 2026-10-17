@@ -74,9 +74,15 @@ const ProfileImage: React.FC<Props> = ({
           height="24"
           style={{ width: "min(24px, 60%)", height: "min(24px, 60%)" }}
         >
-          <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.75" />
-          <path d="m7 16 3-3 2.5 2.5 2-2 2.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
-          <circle cx="9" cy="9" r="1.25" fill="currentColor" />
+          <circle cx="12" cy="8.5" r="4" fill="currentColor" opacity="0.72" />
+          <path
+            d="M4.5 19.5c1.8-3.4 4.4-5 7.5-5s5.7 1.6 7.5 5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            opacity="0.72"
+          />
         </svg>
       </span>
     )

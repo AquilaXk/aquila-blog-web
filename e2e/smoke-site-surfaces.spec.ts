@@ -157,7 +157,7 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(grid.locator("article")).toHaveCount(6)
   })
 
-  test("히어로 파티클 캔버스, 스크롤 반응형 헤더, 역량 스포트라이트 바운서 상호작용이 동작한다", async ({
+  test("히어로 파티클 캔버스, 스크롤 반응형 헤더, 1px 헤어라인 역량 그리드가 동작한다", async ({
     page,
   }) => {
     await page.goto("/company")
@@ -180,15 +180,10 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(header).not.toHaveClass(/scrolled/)
 
     const grid = page.getByRole("region", { name: "핵심 역량 카드" })
-    const bouncers = page.locator("[data-bouncer]")
-    await expect(bouncers).toHaveCount(6)
-    await expect(bouncers.nth(0)).toHaveAttribute("aria-pressed", "true")
-    await expect(grid.locator("article").nth(0)).toHaveAttribute("data-active", "true")
-
-    await page.getByRole("button", { name: "다음 역량 카드" }).click()
-    await expect(bouncers.nth(1)).toHaveAttribute("aria-pressed", "true")
-    await expect(grid.locator("article").nth(1)).toHaveAttribute("data-active", "true")
-    await expect(page.locator("#capabilities .stepCounter")).toHaveText("02 / 06")
+    await expect(grid.locator("article")).toHaveCount(6)
+    await expect(grid.getByText("01")).toBeVisible()
+    await expect(grid.getByText("06")).toBeVisible()
+    await expect(page.locator("[data-bouncer]")).toHaveCount(0)
   })
 
   test("2대 프로덕트 쇼케이스 카드와 하단 기술 신뢰성 텍스트 리스트를 렌더한다", async ({ page }) => {

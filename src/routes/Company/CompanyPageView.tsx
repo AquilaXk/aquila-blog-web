@@ -63,13 +63,8 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
     <S.CompanySurface ref={surfaceRef}>
       <S.NoticeBanner>
         <a href={COMPANY_NOTICE.href}>
-          <span className="noticeBadge" aria-hidden="true">
-            NEW
-          </span>
           <span>{COMPANY_NOTICE.label}</span>
-          <span className="noticeArrow" aria-hidden="true">
-            <ArrowRightGlyph size={14} />
-          </span>
+          <ArrowRightGlyph size={13} />
         </a>
       </S.NoticeBanner>
 
@@ -87,7 +82,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
         </S.SurfaceNav>
         <S.HeaderAction href={CONTACT_MAILTO}>
           <span>문의하기</span>
-          <ArrowRightGlyph size={15} />
+          <ArrowRightGlyph size={14} />
         </S.HeaderAction>
       </S.SurfaceHeader>
 
@@ -95,15 +90,9 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
         <S.Hero>
           <CompanyHeroParticles />
           <S.HeroCopy data-reveal data-reveal-group="hero">
-            <S.HeroEyebrowPill aria-hidden="true">
-              <span className="pulseDot" />
-              <span>AQUILA SOFTWARE · PLATFORM &amp; MOBILITY</span>
-            </S.HeroEyebrowPill>
             <S.HeroTitle>
-              이동의 <S.HeroAccent>문턱</S.HeroAccent>을 낮추는
-              <br />
-              소프트웨어를 만듭니다
-              <S.HeroCursorBlock data-cursor-container aria-hidden="true" />
+              이동의 문턱을 낮추는
+              <span>소프트웨어를 만듭니다</span>
             </S.HeroTitle>
             <S.HeroLead>
               교통약자가 먼저 쓸 수 있는 길찾기부터 만듭니다. 검증한 데이터와 직접 운영하는 인프라 위에
@@ -112,7 +101,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
             <S.HeroActions>
               <S.PillAction href={PRODUCT_URL}>
                 <span>EasySubway 살펴보기</span>
-                <ArrowRightGlyph size={16} />
+                <ArrowRightGlyph size={15} />
               </S.PillAction>
               <S.SecondaryPillAction href="#capabilities">
                 핵심 역량 둘러보기
@@ -120,10 +109,6 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
             </S.HeroActions>
           </S.HeroCopy>
           <S.HeroShowcase data-reveal data-reveal-group="hero">
-            <S.HeroFloatingPill $position="left" aria-hidden="true">
-              <span className="pillTag">ROUTE</span>
-              <span>단차 0cm 무장애 동선</span>
-            </S.HeroFloatingPill>
             <S.HeroPhoneFrame>
               <picture>
                 <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
@@ -139,10 +124,6 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                 />
               </picture>
             </S.HeroPhoneFrame>
-            <S.HeroFloatingPill $position="right" aria-hidden="true">
-              <span className="pillTag">INFRA</span>
-              <span>Blue-Green 무중단 운영</span>
-            </S.HeroFloatingPill>
           </S.HeroShowcase>
         </S.Hero>
 

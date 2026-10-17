@@ -3,6 +3,7 @@ import { createElement, Fragment } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import {
   CompanyFeatureExplorerView,
+  formatCapabilityIndex,
   formatCapabilityStepLabel,
   stepCapabilityIndex,
 } from "../../src/routes/Company/CompanyFeatureCarousel"
@@ -222,47 +223,30 @@ test("NewsHead와 NewsHeaderAction은 기술 블로그 링크와 44px 터치 타
   expect(headMarkup).not.toContain(".undefined")
 })
 
-test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드, 첫 번째 활성 바운서 궤도, 이전/다음 컨트롤, 스텝 카운터를 렌더한다", () => {
+test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드와 01~06 모노스페이스 인덱스를 정적 헤어라인 그리드로 렌더한다", () => {
   const markup = renderToStaticMarkup(
-    unwrapPw(
-      (CompanyFeatureExplorerView as any)({
-        activeIndex: 0,
-        isPaused: false,
-        onSelect: () => {},
-        onStep: () => {},
-        onHoverChange: () => {},
-        onFocusChange: () => {},
-      }),
-    ),
+    unwrapPw((CompanyFeatureExplorerView as any)({})),
   )
 
   expect(markup).toContain('role="region"')
   expect(markup).toContain('aria-label="핵심 역량 카드"')
-  expect(markup).toContain('data-bouncer-list="true"')
-  expect(markup).toContain('aria-label="이전 역량 카드"')
-  expect(markup).toContain('aria-label="다음 역량 카드"')
-  expect(markup).toContain('aria-live="off"')
-  expect(markup).toContain("01 / 06")
+  expect(markup).not.toContain('data-bouncer')
   expect(markup).not.toContain(".undefined")
 
-  // 초기 activeIndex=0 상태에서 정확히 1개의 바운서 오브와 1개의 카드만 활성 상태여야 한다
-  const activeOrbs = markup.match(/aria-pressed="true"/g) ?? []
-  const inactiveOrbs = markup.match(/aria-pressed="false"/g) ?? []
-  const activeCards = markup.match(/data-active="true"/g) ?? []
-  const inactiveCards = markup.match(/data-active="false"/g) ?? []
-  expect(activeOrbs).toHaveLength(1)
-  expect(inactiveOrbs).toHaveLength(COMPANY_FEATURE_CARDS.length - 1)
-  expect(activeCards).toHaveLength(1)
-  expect(inactiveCards).toHaveLength(COMPANY_FEATURE_CARDS.length - 1)
+  const articles = markup.match(/<article\b/g) ?? []
+  expect(articles).toHaveLength(COMPANY_FEATURE_CARDS.length)
 
-  for (const card of COMPANY_FEATURE_CARDS) {
+  COMPANY_FEATURE_CARDS.forEach((card, index) => {
+    expect(markup).toContain(formatCapabilityIndex(index))
     expect(markup).toContain(card.title)
     expect(markup).toContain(card.tag)
     expect(markup).toContain(card.body)
-  }
+  })
 })
 
-test("formatCapabilityStepLabel과 stepCapabilityIndex는 순환 인덱스 및 스텝 라벨을 정확히 계산한다", () => {
+test("formatCapabilityIndex, formatCapabilityStepLabel, stepCapabilityIndex는 인덱스 및 스텝 라벨을 정확히 계산한다", () => {
+  expect(formatCapabilityIndex(0)).toBe("01")
+  expect(formatCapabilityIndex(5)).toBe("06")
   expect(formatCapabilityStepLabel(0, 6)).toBe("01 / 06")
   expect(formatCapabilityStepLabel(5, 6)).toBe("06 / 06")
   expect(stepCapabilityIndex(0, 1, 6)).toBe(1)

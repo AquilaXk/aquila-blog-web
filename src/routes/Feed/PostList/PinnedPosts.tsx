@@ -15,9 +15,9 @@ const PinnedPosts: React.FC<Props> = ({ posts }) => {
   return (
     <StyledWrapper>
       <div className="wrapper">
-        <div className="header">📌 {t("pinnedPostsHeader")}</div>
+        <div className="header">{t("pinnedPostsHeader")}</div>
       </div>
-      <div className="my-2">
+      <div className="list">
         {posts.map((post) => (
           <PostCard key={post.id} data={post} layout="pinned" />
         ))}
@@ -46,6 +46,8 @@ const StyledWrapper = styled.div`
     font-size: 1.25rem;
     line-height: 1.75rem;
     font-weight: 700;
-    cursor: pointer;
+  }
+  .list {
+    margin: 0.5rem 0;
   }
 `

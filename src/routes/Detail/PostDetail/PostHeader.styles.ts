@@ -235,22 +235,13 @@ export const StyledWrapper = styled.header `
     border-radius: 6px;
     border: 1px solid var(--aq-border);
     background: transparent;
-    color: var(--aq-text);
+    color: var(--aq-muted);
     font-size: 0.9rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition:
-      border-color 0.18s ease,
-      background-color 0.18s ease,
-      color 0.18s ease;
+    font-weight: 650;
+    cursor: default;
 
     svg {
       font-size: 1.05rem;
-    }
-
-    &:hover:not(:disabled) {
-      border-color: var(--aq-border-strong, var(--aq-text));
-      background: var(--aq-surface-elevated, transparent);
     }
 
     &[data-active="true"] {
@@ -261,11 +252,6 @@ export const StyledWrapper = styled.header `
       svg {
         color: var(--aq-accent-link, var(--aq-accent));
       }
-    }
-
-    :disabled {
-      opacity: 0.72;
-      cursor: not-allowed;
     }
   }
 

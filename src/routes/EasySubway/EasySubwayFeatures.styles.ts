@@ -2,9 +2,6 @@ import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { marketingDark as dark } from "src/design-system/marketingPalette"
 
-const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
-const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
-
 export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -41,7 +38,7 @@ export const FeatureName = styled.h3`
   font-size: clamp(1.4rem, 2.5vw, 1.85rem);
   line-height: 1.3;
   letter-spacing: -0.02em;
-  font-weight: ${fontWeight.bold};
+  font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
 `
 
@@ -60,22 +57,12 @@ export const FeatureStage = styled.div`
   gap: clamp(1rem, 2vw, 1.75rem);
   padding: clamp(1.25rem, 2.4vw, 1.85rem);
   border: 1px solid ${dark.hairline};
-  border-radius: 1.5rem;
+  border-radius: ${radius.lg}px;
   background: ${dark.fieldDeep};
-  transition: border-color ${TRANSITION}, box-shadow 320ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.borderStrong};
-    box-shadow: ${dark.cardShadowHover};
-  }
 
   @media (max-width: ${breakpoint.sm}px) {
     flex-direction: column;
     align-items: center;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
   }
 `
 
@@ -97,27 +84,12 @@ export const DetailCrop = styled.figure`
     height: 100%;
     object-fit: cover;
     object-position: 50% 51%;
-    transition: transform 420ms ${MOTION_EASE_OUT};
-  }
-
-  &:hover img {
-    transform: scale(1.035);
   }
 
   figcaption {
     margin-top: 0.6rem;
     font-size: 0.875rem;
     color: ${dark.textMuted};
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    img {
-      transition: none;
-    }
-
-    &:hover img {
-      transform: none;
-    }
   }
 `
 
@@ -127,7 +99,7 @@ export const RouteSpecPanel = styled.div`
   gap: 1.25rem;
   padding: clamp(1.5rem, 3.5vw, 2.25rem);
   border: 1px solid ${dark.hairline};
-  border-radius: 1.5rem;
+  border-radius: ${radius.lg}px;
   background: ${dark.fieldDeep};
 
   @media (forced-colors: active) {
@@ -147,7 +119,7 @@ export const RouteSpecHeader = styled.div`
 export const RouteSpecTitle = styled.h4`
   margin: 0;
   font-size: 1.1rem;
-  font-weight: ${fontWeight.bold};
+  font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
   letter-spacing: -0.01em;
 `
@@ -164,9 +136,13 @@ export const RouteSpecTag = styled.span`
 export const RouteSpecList = styled.dl`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1px;
   margin: 0;
   padding: 0;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 
   @media (max-width: ${breakpoint.sm}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -174,27 +150,11 @@ export const RouteSpecList = styled.dl`
 `
 
 export const RouteSpecCard = styled.div`
-  padding: 1.1rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
+  padding: 1.25rem;
   background: ${dark.fieldRaised};
-  transition: border-color ${TRANSITION}, transform 260ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.borderStrong};
-    transform: translateY(-2px);
-  }
 
   @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
+    border: 1px solid CanvasText;
   }
 
   dt {
@@ -214,7 +174,7 @@ export const RouteSpecCard = styled.div`
       display: block;
       margin-bottom: 0.35rem;
       font-size: 0.9375rem;
-      font-weight: ${fontWeight.bold};
+      font-weight: ${fontWeight.semibold};
       color: ${dark.textPrimary};
     }
 
@@ -266,27 +226,23 @@ export const TimelinePhoneFrame = styled.figure`
 export const TimelineCalloutCluster = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1px;
   flex: 1;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.md}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 `
 
 export const TimelineCalloutCard = styled.div`
-  padding: 1rem 1.15rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
+  padding: 1.15rem 1.25rem;
   background: ${dark.fieldRaised};
-  transition: border-color ${TRANSITION}, transform 260ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${dark.borderStrong};
-    transform: translateY(-2px);
-  }
 
   strong {
     display: block;
     margin-bottom: 0.35rem;
     font-size: 0.9375rem;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${dark.textPrimary};
   }
 
@@ -295,14 +251,6 @@ export const TimelineCalloutCard = styled.div`
     font-size: 0.875rem;
     line-height: 1.55;
     color: ${dark.textSecondary};
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
   }
 `
 
@@ -347,8 +295,12 @@ export const CalloutIconSvg = styled.span`
 export const ComparisonGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.25rem, 3vw, 2rem);
+  gap: 1px;
   margin-top: clamp(2rem, 4vw, 3rem);
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.lg}px;
+  background: ${dark.hairline};
+  overflow: hidden;
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -359,25 +311,7 @@ export const ComparisonCard = styled.div<{ $variant?: "standard" | "highlighted"
   display: flex;
   flex-direction: column;
   padding: clamp(1.5rem, 3vw, 2.25rem);
-  border: 1px solid
-    ${({ $variant }) => ($variant === "highlighted" ? dark.accent : dark.hairline)};
-  border-radius: 1.5rem;
   background: ${({ $variant }) => ($variant === "highlighted" ? dark.fieldRaised : dark.fieldDeep)};
-  box-shadow: ${({ $variant }) => ($variant === "highlighted" ? dark.phoneShadow : "none")};
-  transition: border-color ${TRANSITION}, transform 280ms ${MOTION_EASE_OUT};
-
-  &:hover {
-    border-color: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.borderStrong)};
-    transform: translateY(-2px);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
-  }
 `
 
 export const ComparisonCardHeader = styled.div`
@@ -392,21 +326,21 @@ export const ComparisonBadge = styled.span<{ $variant?: "standard" | "highlighte
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  min-height: 28px;
-  padding: 0 0.75rem;
+  min-height: 26px;
+  padding: 0 0.65rem;
   border: 1px solid
     ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.hairline)};
-  border-radius: 9999px;
+  border-radius: ${radius.xs}px;
   background: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.fieldDeep)};
   color: ${({ $variant }) => ($variant === "highlighted" ? dark.onSignature : dark.textMuted)};
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: ${fontWeight.semibold};
 `
 
 export const ComparisonTitle = styled.h3`
   margin: 0;
   font-size: clamp(1.25rem, 2.2vw, 1.5rem);
-  font-weight: ${fontWeight.bold};
+  font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
   letter-spacing: -0.01em;
 `
@@ -427,7 +361,7 @@ export const ComparisonList = styled.ul`
     strong {
       display: block;
       font-size: 0.9375rem;
-      font-weight: ${fontWeight.bold};
+      font-weight: ${fontWeight.semibold};
       color: ${dark.textPrimary};
       margin-bottom: 0.25rem;
     }
@@ -448,7 +382,7 @@ export const ComparisonCheckIcon = styled.span`
   width: 1.5rem;
   height: 1.5rem;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: ${radius.xs}px;
   background: ${dark.signature};
   color: ${dark.onSignature};
   font-size: 0.875rem;
@@ -469,7 +403,7 @@ export const ComparisonCrossIcon = styled.span`
   height: 1.5rem;
   flex-shrink: 0;
   border: 1px solid ${dark.hairline};
-  border-radius: 50%;
+  border-radius: ${radius.xs}px;
   background: ${dark.fieldDeep};
   color: ${dark.textMuted};
   font-size: 0.8125rem;

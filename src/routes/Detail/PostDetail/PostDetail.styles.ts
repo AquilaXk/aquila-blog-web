@@ -127,7 +127,7 @@ export const StyledWrapper = styled.div `
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text-secondary);
-    cursor: pointer;
+    cursor: default;
     transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 
     svg {
@@ -135,6 +135,10 @@ export const StyledWrapper = styled.div `
       height: 1em;
       font-size: 1.125rem;
     }
+  }
+
+  button.floatingActionButton {
+    cursor: pointer;
 
     &:hover {
       border-color: var(--aq-accent-link);

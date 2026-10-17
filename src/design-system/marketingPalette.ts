@@ -106,23 +106,11 @@ export const marketingLight = {
   focus: brand[700],
   /** 1px stroke 라인아트·장식 그래픽 전용(정본 roleRestrictions `brand.500` = brand.graphic). */
   graphic: brand[500],
-  /** Antigravity 스타일 프로스티드 글래스 헤더 및 반투명 알약 컨트롤 면 */
-  surfaceGlass: "rgba(255, 255, 255, 0.86)",
-  surfaceGlassElevated: "rgba(248, 249, 255, 0.94)",
-  surfacePillGlass: "rgba(240, 242, 254, 0.78)",
-  surfaceHoverTint: "rgba(180, 188, 251, 0.24)",
+  /** 프로스티드 글래스 헤더 및 1px 헤어라인 토큰 */
+  surfaceGlass: "rgba(255, 255, 255, 0.88)",
+  surfaceGlassElevated: "rgba(255, 255, 255, 0.96)",
+  surfaceHoverTint: "rgba(31, 35, 64, 0.04)",
   borderHairline: "rgba(31, 35, 64, 0.08)",
-  borderGlass: "rgba(31, 35, 64, 0.14)",
-  headerShadowScrolled:
-    "0 10px 30px -12px rgba(31, 35, 64, 0.08), 0 2px 8px -2px rgba(31, 35, 64, 0.04)",
-  cardShadowRest: "0 4px 16px -6px rgba(31, 35, 64, 0.05)",
-  cardShadowHover:
-    "0 20px 44px -16px rgba(31, 35, 64, 0.13), 0 8px 20px -8px rgba(31, 35, 64, 0.07)",
-  cardShadowActive:
-    "0 22px 48px -14px rgba(92, 107, 192, 0.22), 0 8px 20px -8px rgba(31, 35, 64, 0.09)",
-  heroStageGlow:
-    "radial-gradient(65% 55% at 50% 42%, rgba(92, 107, 192, 0.15) 0%, rgba(180, 188, 251, 0.08) 48%, rgba(255, 255, 255, 0) 76%)",
-  cursorGradient: "linear-gradient(180deg, #3279F9 0%, #5C6BC0 52%, #F84242 100%)",
   particleColors: ["#2C64ED", "#5C6BC0", "#7480D2", "#F84242", "#FFCF03"] as const,
 } as const
 
@@ -165,14 +153,7 @@ export const marketingDark = {
   graphic: brand[500],
   /** 폰 프레임 목업을 위한 정갈한 다크 입체 섀도우 토큰. */
   phoneShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 12px 24px -8px rgba(0, 0, 0, 0.45)",
-  surfaceGlass: "rgba(22, 25, 45, 0.84)",
-  surfaceGlassScrolled: "rgba(22, 25, 45, 0.94)",
-  surfaceCardHover: "rgba(48, 56, 106, 0.85)",
-  surfacePillHover: "rgba(92, 107, 192, 0.22)",
-  headerShadowScrolled: "0 14px 34px -12px rgba(0, 0, 0, 0.52)",
-  cardShadowHover:
-    "0 22px 48px -14px rgba(0, 0, 0, 0.56), 0 8px 22px -8px rgba(92, 107, 192, 0.22)",
-  ctaStageBackdrop:
-    "radial-gradient(110% 120% at 88% 12%, rgba(92, 107, 192, 0.34) 0%, rgba(38, 44, 84, 0.45) 48%, rgba(22, 25, 45, 0.98) 100%)",
+  surfaceGlass: "rgba(22, 25, 45, 0.86)",
+  surfaceGlassScrolled: "rgba(22, 25, 45, 0.95)",
   particleColors: ["#7189FF", "#3074F9", "#949FE8", "#B4BCFB"] as const,
 } as const

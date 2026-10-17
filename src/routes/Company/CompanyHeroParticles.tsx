@@ -53,7 +53,6 @@ const ParticlesStage = styled.div`
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background: ${light.heroStageGlow};
 
   canvas {
     display: block;
