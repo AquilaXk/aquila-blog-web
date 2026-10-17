@@ -42,7 +42,7 @@ const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 15 }) => (
 export const EasySubwayMetroDirectory: React.FC<{ badges?: MetroBadgeItem[] }> = ({
   badges = OFFICIAL_METRO_BADGES,
 }) => (
-  <div style={{ marginTop: "clamp(3rem, 6vw, 4.5rem)" }} data-reveal>
+  <S.MetroDirectoryBlock data-reveal>
     <S.Eyebrow>지원 노선 데이터</S.Eyebrow>
     <S.MetroSectionTitle>공식 20개 노선 무장애 데이터 연동</S.MetroSectionTitle>
     <S.MetroSectionLead>
@@ -71,7 +71,7 @@ export const EasySubwayMetroDirectory: React.FC<{ badges?: MetroBadgeItem[] }> =
         </S.MetroBadgeCard>
       ))}
     </S.MetroBadgeGrid>
-  </div>
+  </S.MetroDirectoryBlock>
 )
 
 export const EasySubwayCopyEmailButton: React.FC<{
@@ -326,9 +326,9 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                 </S.IntroAside>
               </S.IntroLayout>
 
-              <div style={{ marginTop: "clamp(2rem, 4vw, 3rem)" }}>
+              <S.TechSpecBlock>
                 <EasySubwayTechSpecGrid />
-              </div>
+              </S.TechSpecBlock>
             </div>
 
             <EasySubwayMetroDirectory />

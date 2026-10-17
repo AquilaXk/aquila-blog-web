@@ -57,6 +57,14 @@ export const TechSpecCell = styled.div`
   }
 `
 
+export const TechSpecBlock = styled.div`
+  margin-top: clamp(2rem, 4vw, 3rem);
+`
+
+export const MetroDirectoryBlock = styled.div`
+  margin-top: clamp(3rem, 6vw, 4.5rem);
+`
+
 export const MetroBadgeGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -150,6 +158,10 @@ export const CopyEmailButton = styled.button`
 
   &:active {
     background: ${light.surfaceScaffold};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 
   @media (forced-colors: active) {

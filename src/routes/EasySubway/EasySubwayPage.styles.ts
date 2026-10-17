@@ -27,8 +27,10 @@ export {
   CopyIconWrapper,
   MetroBadgeCard,
   MetroBadgeGrid,
+  MetroDirectoryBlock,
   MetroSectionLead,
   MetroSectionTitle,
+  TechSpecBlock,
   TechSpecCell,
   TechSpecGrid,
 } from "src/routes/EasySubway/EasySubwayScope.styles"
@@ -362,14 +364,9 @@ export const HeroPhoneWrap = styled.div`
 export const Section = styled.section<{ $tone?: "base" | "raised" }>`
   position: relative;
   overflow: hidden;
-  scroll-margin-top: clamp(4.5rem, 8vw, 6rem);
   padding: ${SECTION_PADDING_Y} ${SECTION_PADDING_X};
   background: ${({ $tone }) => ($tone === "raised" ? light.surfaceScaffold : light.surface)};
   border-top: 1px solid ${light.borderHairline};
-
-  @media (max-width: ${layoutBreakpoint.navCompact}px) {
-    scroll-margin-top: 7.75rem;
-  }
 `
 
 export const SectionInner = styled.div`
