@@ -223,7 +223,7 @@ test("NewsHead와 NewsHeaderAction은 기술 블로그 링크와 44px 터치 타
 
 test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드와 01~06 모노스페이스 인덱스를 정적 헤어라인 그리드로 렌더한다", () => {
   const markup = renderToStaticMarkup(
-    unwrapPw((CompanyFeatureExplorerView as any)({})),
+    unwrapPw((CompanyFeatureExplorerView as () => unknown)()),
   )
 
   expect(markup).toContain('role="region"')
