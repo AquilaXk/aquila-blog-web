@@ -27,6 +27,7 @@ type Props = {
   interactiveTags?: boolean
   showEngagement?: boolean
   showReadingTime?: boolean
+  readingMinutes?: number
   showThumbnail?: boolean
 }
 
@@ -40,6 +41,8 @@ const PostHeader: React.FC<Props> = ({
   onSharePost,
   deckSummary,
   showEngagement = true,
+  showReadingTime = false,
+  readingMinutes,
   showThumbnail = true,
 }) => {
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
@@ -121,6 +124,11 @@ const PostHeader: React.FC<Props> = ({
                 <div className="stats" aria-label="post stats">
                   <span className="statChip">{publishedAt}</span>
                   <span className="statChip">{viewText}</span>
+                  {showReadingTime && readingMinutes && readingMinutes > 0 ? (
+                    <span className="statChip metaReadingTime">
+                      {`약 ${Math.max(1, readingMinutes)}분 읽기`}
+                    </span>
+                  ) : null}
                   {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
                 </div>
                 <span

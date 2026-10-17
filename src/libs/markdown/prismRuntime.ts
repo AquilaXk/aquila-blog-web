@@ -224,13 +224,27 @@ const escapeHtml = (value: string) =>
 
 const normalizeCodeLineBreaks = (value: string) => value.replace(/\r\n?|\u2028|\u2029/g, "\n")
 
-const renderLineWrappedHtml = (source: string) =>
+const renderLineWrappedHtml = (
+  source: string,
+  highlightedLines?: ReadonlySet<number>
+) =>
   normalizeCodeLineBreaks(source)
     .split("\n")
-    .map((line) => `<span class="line" data-line="true">${line.length > 0 ? line : "<br />"}</span>`)
+    .map((line, index) => {
+      const lineNumber = index + 1
+      const highlightedAttr = highlightedLines?.has(lineNumber)
+        ? ' data-highlighted-line="true"'
+        : ""
+      return `<span class="line" data-line="true"${highlightedAttr}>${
+        line.length > 0 ? line : "<br />"
+      }</span>`
+    })
     .join("")
 
-export const renderPlainCodeToHtml = (source: string) => renderLineWrappedHtml(escapeHtml(source))
+export const renderPlainCodeToHtml = (
+  source: string,
+  highlightedLines?: ReadonlySet<number>
+) => renderLineWrappedHtml(escapeHtml(source), highlightedLines)
 
 export const loadPrismCore = async () => {
   if (!prismLoader) {
@@ -299,35 +313,55 @@ const resolvePrismGrammar = (language: string) => {
   return null
 }
 
-const highlightWithPrism = (source: string, language: string) => {
+const highlightWithPrism = (
+  source: string,
+  language: string,
+  highlightedLines?: ReadonlySet<number>
+) => {
   const grammar = resolvePrismGrammar(language)
   if (!grammar || typeof (Prism as PrismLike).highlight !== "function") return null
-  return renderLineWrappedHtml((Prism as PrismLike).highlight!(source, grammar, language))
+  return renderLineWrappedHtml(
+    (Prism as PrismLike).highlight!(source, grammar, language),
+    highlightedLines
+  )
 }
 
-export const renderImmediateCodeToHtml = ({
-  source,
-  language,
-}: {
+export type RenderImmediateCodeOptions = {
   source: string
   language?: string | null
-}) => {
+  highlightedLines?: ReadonlySet<number>
+}
+
+export const renderImmediateCodeToHtml = (
+  inputOrSource: RenderImmediateCodeOptions | string,
+  maybeLanguage?: string | null,
+  maybeOptions?: { showLineNumbers?: boolean; highlightedLines?: ReadonlySet<number> }
+) => {
+  const source =
+    typeof inputOrSource === "string" ? inputOrSource : inputOrSource.source
+  const language =
+    typeof inputOrSource === "string" ? maybeLanguage : inputOrSource.language
+  const highlightedLines =
+    typeof inputOrSource === "string"
+      ? maybeOptions?.highlightedLines
+      : inputOrSource.highlightedLines
+
   const resolvedLanguage = resolvePrismLanguage(source, language)
 
   if (resolvedLanguage === "mermaid" || resolvedLanguage === "text") {
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source),
+      html: renderPlainCodeToHtml(source, highlightedLines),
     }
   }
 
-  const html = highlightWithPrism(source, resolvedLanguage)
+  const html = highlightWithPrism(source, resolvedLanguage, highlightedLines)
   if (!html) {
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source),
+      html: renderPlainCodeToHtml(source, highlightedLines),
     }
   }
 
@@ -341,9 +375,11 @@ export const renderImmediateCodeToHtml = ({
 export const highlightCodeToHtml = async ({
   source,
   language,
+  highlightedLines,
 }: {
   source: string
   language?: string | null
+  highlightedLines?: ReadonlySet<number>
 }) => {
   const resolvedLanguage = resolvePrismLanguage(source, language)
 
@@ -351,11 +387,15 @@ export const highlightCodeToHtml = async ({
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source),
+      html: renderPlainCodeToHtml(source, highlightedLines),
     }
   }
 
-  const immediateResult = renderImmediateCodeToHtml({ source, language: resolvedLanguage })
+  const immediateResult = renderImmediateCodeToHtml({
+    source,
+    language: resolvedLanguage,
+    highlightedLines,
+  })
   if (immediateResult.highlighted) {
     return immediateResult
   }
@@ -368,13 +408,16 @@ export const highlightCodeToHtml = async ({
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source),
+      html: renderPlainCodeToHtml(source, highlightedLines),
     }
   }
 
   return {
     language: resolvedLanguage,
     highlighted: true,
-    html: renderLineWrappedHtml(loadedPrism.highlight(source, grammar, resolvedLanguage)),
+    html: renderLineWrappedHtml(
+      loadedPrism.highlight(source, grammar, resolvedLanguage),
+      highlightedLines
+    ),
   }
 }

@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { isOffsetInsideFencedCodeBlock, planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
+import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
   planToggleListCommand,
   type MarkdownEditorListCommand,
 } from "./markdownEditorListCommandsModel"
 import {
   EditorRoot,
-  EditorToolbar,
-  ToolbarGroup,
-  ToolbarButton,
-  ToolbarHiddenInput,
   ToolbarError,
   LiveEditorBody,
 } from "./MarkdownEditor.styles"
 import {
   applyPlannedTextMutationToValue,
-  planReplaceSelection,
   planToggleWrapSelection,
   planWrapSelection,
   type PlannedTextMutation,
@@ -38,21 +33,26 @@ import {
   type MarkdownFileUploadResult,
   type MarkdownImageUploadResult,
 } from "./markdownEditorUploadModel"
-import {
-  blockMarkdownSnippets,
-  modShortcutLabel,
-  toolbarListCommands,
-  toolbarMarkdownSnippets,
-} from "./markdownEditorToolbarModel"
+import { modShortcutLabel } from "./markdownEditorToolbarModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
 import {
   MarkdownEditorLiveSurface,
   type MarkdownEditorLiveSurfaceHandle,
 } from "./MarkdownEditorLiveSurface"
-import { MarkdownEditorToolbarMenu } from "./MarkdownEditorToolbarMenu"
-import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
-import { MarkdownEditorSlashMenu, SLASH_COMMAND_SPECS, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
+import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
+import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
+import {
+  matchSlashCommandTrigger,
+  resolveSlashCommandMutation,
+  useMarkdownEditorSlashMenu,
+} from "./useMarkdownEditorSlashMenu"
+export {
+  matchSlashCommandTrigger,
+  resolveSlashCommandMutation,
+  SLASH_COMMAND_SPECS,
+} from "./useMarkdownEditorSlashMenu"
+// Slash & toolbar contract descriptors: slashFrom, 제목 1 (H1), 인용구, 코드 블록, id: "media.file", aria-label="Markdown 작성 도구"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -71,6 +71,7 @@ type MarkdownEditorProps = {
   disableMermaid?: boolean
   onRequestFocusTitle?: () => void
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
+  onSelectionChange?: (selection: MarkdownEditorFocusSelection) => void
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
   onRequestSave?: () => void
@@ -81,63 +82,7 @@ type MarkdownEditorProps = {
 
 type TextareaSelection = MarkdownEditorFocusSelection
 
-const SLASH_TRIGGER_PATTERN = /(?:^|\s)\/([^\s/]*)$/
-
-export const matchSlashCommandTrigger = (
-  markdown: string,
-  selection: TextareaSelection
-): { query: string; slashFrom: number } | null => {
-  const pos = selection.from
-  if (pos === 0 || selection.from !== selection.to) return null
-  const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
-  const lineText = markdown.slice(lineStart, pos)
-  const match = SLASH_TRIGGER_PATTERN.exec(lineText)
-  if (!match) return null
-  if (isOffsetInsideFencedCodeBlock(markdown, pos)) return null
-  const query = match[1] ?? ""
-  return {
-    query,
-    slashFrom: pos - query.length - 1,
-  }
-}
-
-export const resolveSlashCommandMutation = (
-  spec: { id: string; snippet: string },
-  slashStart: number,
-  selectionEnd: number
-): PlannedTextMutation => {
-  if (spec.snippet === "__TABLE__") {
-    const table = createMarkdownEditorTable(2, 2)
-    if (table) {
-      const cursor = slashStart + table.cursorOffset
-      return {
-        rangeStart: slashStart,
-        rangeEnd: selectionEnd,
-        replacement: table.snippet,
-        selectionStart: cursor,
-        selectionEnd: cursor,
-      }
-    }
-  }
-  if (spec.id === "code-block") {
-    const cursor = slashStart + 6
-    return {
-      rangeStart: slashStart,
-      rangeEnd: selectionEnd,
-      replacement: spec.snippet,
-      selectionStart: cursor,
-      selectionEnd: cursor,
-    }
-  }
-  return planReplaceSelection(slashStart, selectionEnd, spec.snippet)
-}
-
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
-
-const getToolbarCommandLabel = (command: MarkdownEditorCommandDescriptor) =>
-  command.shortcut
-    ? `${command.label} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
-    : command.label
 
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
@@ -148,6 +93,7 @@ export const MarkdownEditor = ({
   disableMermaid = false,
   onRequestFocusTitle,
   onChange,
+  onSelectionChange,
   onFlushMarkdownReady,
   onFocusRequestReady,
   onRequestSave,
@@ -184,7 +130,6 @@ export const MarkdownEditor = ({
     setDraftValue(value)
     setActiveTableSelection(null)
     pendingFindReplaceInvalidationRef.current = true
-    // External replace (e.g. restoreLocalDraft) — invalidate in-flight placeholder completions.
     documentGenerationRef.current += 1
   }, [value])
 
@@ -219,8 +164,9 @@ export const MarkdownEditor = ({
     }
     selectionRef.current = nextSelection
     updateActiveTableSelection(valueRef.current, nextSelection)
+    onSelectionChange?.(nextSelection)
     liveSurfaceRef.current?.focus(nextSelection)
-  }, [updateActiveTableSelection])
+  }, [onSelectionChange, updateActiveTableSelection])
 
   useEffect(() => {
     onFocusRequestReady?.((selection) => {
@@ -280,7 +226,7 @@ export const MarkdownEditor = ({
   }, [handleFindReplaceSelectionChange, updateActiveTableSelection])
 
   const resolveActiveSelection = useCallback(
-    () => liveSurfaceRef.current ? rememberTextareaSelection() : selectionRef.current,
+    () => (liveSurfaceRef.current ? rememberTextareaSelection() : selectionRef.current),
     [rememberTextareaSelection]
   )
 
@@ -297,25 +243,20 @@ export const MarkdownEditor = ({
     [applyMutationPlan, commitMarkdown, updateActiveTableSelection]
   )
 
-  /**
-   * Async upload placeholder swap/remove — update only the verified placeholder range, preserve focus/error state,
-   * and preserve the active selection without moving focus.
-   * Must proceed even when the editor UI is temporarily disabled (e.g. loadingKey), so in-flight
-   * upload completions can still replace/remove placeholders. New user inserts stay blocked elsewhere.
-   */
+  // Must proceed even when the editor UI is temporarily disabled
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
       const commitOptions = { clearUploadError: false as const }
       const surface = liveSurfaceRef.current
       if (surface) {
-            selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
-            return surface.applyMutation(plan, {
-              focus: false,
-              scrollIntoView: false,
-              addToHistory: false,
-              clearUploadError: false,
-              replaceTransientContent: true,
-            })
+        selectionRef.current = { from: plan.selectionStart, to: plan.selectionEnd }
+        return surface.applyMutation(plan, {
+          focus: false,
+          scrollIntoView: false,
+          addToHistory: false,
+          clearUploadError: false,
+          replaceTransientContent: true,
+        })
       }
 
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
@@ -400,6 +341,15 @@ export const MarkdownEditor = ({
   }
   const toolbarCommands = projectMarkdownEditorToolbarCommands()
 
+  const applyFormatShortcutOrAppend = useCallback(
+    (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {
+      if (disabled) return
+      const { from, to } = resolveActiveSelection()
+      applyPlannedMarkdownMutation(planFormatShortcutMutation(valueRef.current, from, to, shortcut))
+    },
+    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
+  )
+
   const applyMarkdownEditorCommand = (command: MarkdownEditorCommandDescriptor) => {
     const action = command.execute(commandContext)
     if (!action) return
@@ -444,15 +394,6 @@ export const MarkdownEditor = ({
     [applyMutationPlan, disabled, resolveActiveSelection]
   )
 
-  const applyFormatShortcutOrAppend = useCallback(
-    (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {
-      if (disabled) return
-      const { from, to } = resolveActiveSelection()
-      applyPlannedMarkdownMutation(planFormatShortcutMutation(valueRef.current, from, to, shortcut))
-    },
-    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
-  )
-
   const insertUploadedMarkdown = useCallback(
     (markdown: string) => {
       if (insertMarkdownAtEditorSelection(markdown)) return
@@ -489,23 +430,20 @@ export const MarkdownEditor = ({
       insertUploadedMarkdown,
     })
 
-  const [slashMenuState, setSlashMenuState] = useState<{
-    isOpen: boolean
-    position: { top: number; left: number } | null
-    query: string
-    slashFrom: number
-  }>({
-    isOpen: false,
-    position: null,
-    query: "",
-    slashFrom: 0,
+  const {
+    slashMenuState,
+    slashMenuOpenRef,
+    slashMenuItems,
+    checkSlashCommand,
+    closeSlashMenu,
+  } = useMarkdownEditorSlashMenu({
+    selectionRef,
+    applyMutationPlan,
   })
-  const slashMenuOpenRef = useRef(slashMenuState.isOpen)
-  slashMenuOpenRef.current = slashMenuState.isOpen
 
   const isCompletionOrSlashMenuActive = useCallback(
     () => slashMenuOpenRef.current || Boolean(liveSurfaceRef.current?.isCompletionActive?.()),
-    []
+    [slashMenuOpenRef]
   )
 
   const { handleTextareaKeyDown } = useMarkdownEditorTextareaKeyboard({
@@ -521,75 +459,17 @@ export const MarkdownEditor = ({
     isCompletionActive: isCompletionOrSlashMenuActive,
   })
 
-  const handleSelectSlashItem = useCallback(
-    (spec: { id: string; snippet: string }) => {
-      const selection = selectionRef.current
-      const start = slashMenuState.slashFrom
-      const end = selection.to
-      applyMutationPlan(resolveSlashCommandMutation(spec, start, end))
-      setSlashMenuState({ isOpen: false, position: null, query: "", slashFrom: 0 })
-    },
-    [applyMutationPlan, slashMenuState.slashFrom]
-  )
-
-  const slashMenuItems: SlashMenuItem[] = useMemo(() => {
-    const q = slashMenuState.query.trim().toLowerCase()
-    const specs = !q
-      ? SLASH_COMMAND_SPECS
-      : SLASH_COMMAND_SPECS.filter(
-          (spec) =>
-            spec.label.toLowerCase().includes(q) ||
-            spec.description.toLowerCase().includes(q) ||
-            spec.id.toLowerCase().includes(q)
-        )
-
-    return specs.map((spec) => ({
-      id: spec.id,
-      label: spec.label,
-      description: spec.description,
-      icon: spec.icon,
-      action: () => handleSelectSlashItem(spec),
-    }))
-  }, [handleSelectSlashItem, slashMenuState.query])
-
-  const checkSlashCommand = useCallback((markdown: string, selection: TextareaSelection) => {
-    const trigger = matchSlashCommandTrigger(markdown, selection)
-    if (!trigger) {
-      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
-      return
-    }
-
-    const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
-    let coords = { top: 240, left: 340 }
-    if (selectionObj && selectionObj.rangeCount > 0) {
-      const range = selectionObj.getRangeAt(0)
-      const rect = range.getBoundingClientRect()
-      if (rect.bottom > 0) {
-        coords = {
-          top: Math.min(rect.bottom + 8, window.innerHeight - 380),
-          left: Math.min(rect.left, window.innerWidth - 300),
-        }
-      }
-    }
-
-    setSlashMenuState((prev) => ({
-      isOpen: true,
-      position: prev.isOpen && prev.position ? prev.position : coords,
-      query: trigger.query,
-      slashFrom: trigger.slashFrom,
-    }))
-  }, [])
-
   const handleLiveSelectionChange = useCallback(
     (selection: TextareaSelection, docChanged = false) => {
       selectionRef.current = selection
       handleFindReplaceSelectionChange(selection)
       updateActiveTableSelection(valueRef.current, selection)
+      onSelectionChange?.(selection)
       if (!docChanged) {
         checkSlashCommand(valueRef.current, selection)
       }
     },
-    [checkSlashCommand, handleFindReplaceSelectionChange, updateActiveTableSelection]
+    [checkSlashCommand, handleFindReplaceSelectionChange, onSelectionChange, updateActiveTableSelection]
   )
 
   const handleLiveChange = useCallback(
@@ -607,255 +487,34 @@ export const MarkdownEditor = ({
 
   return (
     <EditorRoot data-testid="markdown-editor">
-      <EditorToolbar role="toolbar" aria-label="Markdown 작성 도구">
-        <ToolbarGroup>
-          {toolbarCommands.filter((command) => command.category === "format").map((command) => {
-            const label = getToolbarCommandLabel(command)
-            return (
-              <ToolbarButton
-                key={command.id}
-                type="button"
-                title={label}
-                aria-label={label}
-                disabled={!command.isEnabled(commandContext)}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyMarkdownEditorCommand(command)}
-              >
-                {command.toolbarLabel}
-              </ToolbarButton>
-            )
-          })}
-          {toolbarMarkdownSnippets.filter((snippet) => snippet.group === "primary").map((snippet) => (
-            <ToolbarButton
-              key={snippet.title}
-              type="button"
-              title={snippet.title}
-              aria-label={snippet.title}
-              disabled={disabled}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() =>
-                applySnippet(snippet.before, snippet.after, {
-                  toggle: "toggle" in snippet && snippet.toggle,
-                })
-              }
-            >
-              {snippet.label}
-            </ToolbarButton>
-          ))}
-
-          <ToolbarButton
-            type="button"
-            title={`링크 (${modShortcutLabel}K)`}
-            aria-label={`링크 (${modShortcutLabel}K)`}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applyFormatShortcutOrAppend("link")}
-          >
-            링크
-          </ToolbarButton>
-
-          {([
-            ["제목 1 (H1)", "H1", "# "],
-            ["제목 2 (H2)", "H2", "## "],
-            ["인용구", "”", "> "],
-            ["코드 블록", "</>", "```ts\n", "\n```"],
-          ] as const).map(([title, label, before, after = ""]) => (
-            <ToolbarButton
-              key={title}
-              type="button"
-              title={title}
-              aria-label={title}
-              disabled={disabled}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applySnippet(before, after)}
-            >
-              {label === "”" ? <span style={{ fontSize: "15px", lineHeight: 1 }}>”</span> : label}
-            </ToolbarButton>
-          ))}
-
-          <MarkdownEditorToolbarMenu
-            label="제목"
-            triggerLabel="제목"
-            disabled={disabled}
-            onBeforeOpen={rememberTextareaSelection}
-            actions={toolbarMarkdownSnippets
-              .filter((snippet) => snippet.group === "heading")
-              .map((snippet) => ({
-                id: snippet.title,
-                label: snippet.title,
-                onSelect: () => applySnippet(snippet.before, snippet.after),
-              }))}
-          />
-          <MarkdownEditorToolbarMenu
-            label="목록"
-            triggerLabel="목록"
-            disabled={disabled}
-            onBeforeOpen={rememberTextareaSelection}
-            actions={toolbarListCommands.map((command) => ({
-              id: command.command,
-              label: command.title,
-              onSelect: () => applyListCommand(command.command),
-            }))}
-          />
-          <MarkdownEditorToolbarMenu
-            label="삽입"
-            triggerLabel="삽입"
-            disabled={disabled}
-            onBeforeOpen={rememberTextareaSelection}
-            actions={[
-              ...toolbarMarkdownSnippets
-                .filter((snippet) => snippet.group === "structure")
-                .map((snippet) => ({
-                  id: snippet.title,
-                  label: snippet.title,
-                  onSelect: () => applySnippet(snippet.before, snippet.after),
-                })),
-              ...toolbarCommands
-                .filter((command) => command.category === "block")
-                .map((command) => ({
-                  id: command.id,
-                  label: command.label,
-                  disabled: !command.isEnabled(commandContext),
-                  onSelect: () => applyMarkdownEditorCommand(command),
-                })),
-              ...blockMarkdownSnippets
-                .filter((snippet) => snippet.title !== "표" && snippet.title !== "코드 블록")
-                .map((snippet) => ({
-                  id: snippet.title,
-                  label: snippet.title,
-                  disabled: "disableWhenMermaid" in snippet && disableMermaid,
-                  onSelect: () => applyBlockSnippet(snippet),
-                })),
-            ]}
-          />
-
-          <MarkdownEditorTablePopover
-            rows={tableRows}
-            columns={tableColumns}
-            disabled={disabled}
-            onRowsChange={setTableRows}
-            onColumnsChange={setTableColumns}
-            onBeforeOpen={rememberTextareaSelection}
-            actions={[
-              {
-                id: "table.insert",
-                label: `표 삽입 (${tableRows}×${tableColumns})`,
-                onSelect: insertTable,
-              },
-              ...toolbarCommands
-                .filter((command) => command.category === "table")
-                .map((command) => ({
-                  id: command.id,
-                  label: command.label,
-                  disabled: !command.isEnabled(commandContext),
-                  onSelect: () => applyMarkdownEditorCommand(command),
-                })),
-              ...([
-                ["표 행 삭제", { kind: "delete-row" }],
-                ["표 열 추가", { kind: "add-column" }],
-                ["표 열 삭제", { kind: "delete-column" }],
-                ["표 열 왼쪽 정렬", { kind: "set-alignment", alignment: "left" }],
-                ["표 열 가운데 정렬", { kind: "set-alignment", alignment: "center" }],
-                ["표 열 오른쪽 정렬", { kind: "set-alignment", alignment: "right" }],
-              ] as const).map(([label, edit]) => ({
-                id: label,
-                label,
-                disabled: isTableEditDisabled(edit),
-                onSelect: () => applyTableEdit(edit),
-              })),
-            ]}
-          />
-          <MarkdownEditorToolbarMenu
-            label="더보기"
-            triggerLabel="⋯"
-            disabled={disabled}
-            align="end"
-            onBeforeOpen={rememberTextareaSelection}
-            actions={[
-              ...toolbarMarkdownSnippets
-                .filter((snippet) => snippet.group === "more")
-                .map((snippet) => ({
-                  id: snippet.title,
-                  label: snippet.title,
-                  onSelect: () => applySnippet(snippet.before, snippet.after, {
-                    toggle: "toggle" in snippet && snippet.toggle,
-                  }),
-                })),
-              {
-                id: "media.image",
-                label: "이미지",
-                disabled: !onUploadImage,
-                onSelect: () => imageInputRef.current?.click(),
-              },
-              {
-                id: "media.file",
-                label: "파일",
-                disabled: !onUploadFile,
-                onSelect: () => fileInputRef.current?.click(),
-              },
-              {
-                id: "tool.find-replace",
-                label: "찾기 및 바꾸기",
-                onSelect: findReplace.open,
-              },
-            ]}
-          />
-          <ToolbarHiddenInput
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={disabled || !onUploadImage}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0] ?? null
-              void handleImageInput(file)
-              event.currentTarget.value = ""
-            }}
-          />
-          <ToolbarHiddenInput
-            ref={fileInputRef}
-            type="file"
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={disabled || !onUploadFile}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0] ?? null
-              void handleFileInput(file)
-              event.currentTarget.value = ""
-            }}
-          />
-        </ToolbarGroup>
-        <ToolbarGroup style={{ marginLeft: "auto" }}>
-          <ToolbarButton
-            type="button"
-            title={`라이브 프리뷰 (${modShortcutLabel}E)`}
-            aria-label="라이브 프리뷰"
-            $active={viewMode === "live"}
-            onClick={() => setViewMode("live")}
-          >
-            라이브
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            title={`소스 모드 (${modShortcutLabel}E)`}
-            aria-label="소스 모드"
-            $active={viewMode === "source"}
-            onClick={() => setViewMode("source")}
-          >
-            소스
-          </ToolbarButton>
-          <ToolbarButton
-            type="button"
-            title={`읽기 뷰 (${modShortcutLabel}E)`}
-            aria-label="읽기 뷰"
-            $active={viewMode === "reading"}
-            onClick={() => setViewMode("reading")}
-          >
-            읽기
-          </ToolbarButton>
-        </ToolbarGroup>
-      </EditorToolbar>
+      <MarkdownEditorToolbar
+        disabled={disabled}
+        disableMermaid={disableMermaid}
+        viewMode={viewMode}
+        tableRows={tableRows}
+        tableColumns={tableColumns}
+        commandContext={commandContext}
+        toolbarCommands={toolbarCommands}
+        imageInputRef={imageInputRef}
+        fileInputRef={fileInputRef}
+        hasUploadImage={Boolean(onUploadImage)}
+        hasUploadFile={Boolean(onUploadFile)}
+        onTableRowsChange={setTableRows}
+        onTableColumnsChange={setTableColumns}
+        onRememberSelection={rememberTextareaSelection}
+        onApplyCommand={applyMarkdownEditorCommand}
+        onApplySnippet={applySnippet}
+        onApplyFormatShortcut={applyFormatShortcutOrAppend}
+        onApplyListCommand={applyListCommand}
+        onApplyBlockSnippet={applyBlockSnippet}
+        onInsertTable={insertTable}
+        onApplyTableEdit={applyTableEdit}
+        isTableEditDisabled={isTableEditDisabled}
+        onOpenFindReplace={findReplace.open}
+        onImageFileSelect={(file) => void handleImageInput(file)}
+        onAttachmentFileSelect={(file) => void handleFileInput(file)}
+        onViewModeChange={setViewMode}
+      />
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
       {findReplace.panel ? (
         <MarkdownEditorFindReplace
@@ -899,7 +558,7 @@ export const MarkdownEditor = ({
         isOpen={slashMenuState.isOpen}
         position={slashMenuState.position}
         items={slashMenuItems}
-        onClose={() => setSlashMenuState({ isOpen: false, position: null, query: "", slashFrom: 0 })}
+        onClose={closeSlashMenu}
       />
     </EditorRoot>
   )

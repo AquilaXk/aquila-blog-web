@@ -100,4 +100,87 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     accent-color: ${theme.publicDesign.accent};
   }
 
+  .aq-footnote-reference {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    font-size: 0.78em;
+    line-height: 1;
+    margin: 0 0.1em;
+  }
+
+  .aq-footnote-reference > a[data-footnote-ref] {
+    color: ${theme.publicDesign.accent};
+    text-decoration: none;
+    font-weight: 650;
+    padding: 0.08rem 0.24rem;
+    border-radius: 3px;
+    transition: background-color 0.15s ease;
+  }
+
+  .aq-footnote-reference > a[data-footnote-ref]:hover,
+  .aq-footnote-reference > a[data-footnote-ref]:focus-visible {
+    background: color-mix(in srgb, ${theme.publicDesign.accent} 12%, transparent);
+  }
+
+  .aq-footnote-popover {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%) translateY(4px);
+    min-width: 180px;
+    max-width: min(320px, 80vw);
+    padding: 8px 11px;
+    border: 1px solid ${theme.colors.gray6};
+    background: ${theme.publicDesign.surfaceElevated};
+    color: ${theme.colors.gray12};
+    font-size: 12.5px;
+    font-weight: 450;
+    line-height: 1.5;
+    white-space: normal;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+    z-index: 25;
+  }
+
+  .aq-footnote-reference:hover .aq-footnote-popover,
+  .aq-footnote-reference:focus-within .aq-footnote-popover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .aq-footnotes {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid ${theme.colors.gray5};
+    color: ${theme.colors.gray11};
+    font-size: 0.92rem;
+    line-height: 1.65;
+  }
+
+  .aq-footnotes > h2 {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: ${theme.colors.gray12};
+  }
+
+  .aq-footnotes > ol {
+    margin: 0;
+    padding-left: 1.35rem;
+  }
+
+  .aq-footnotes > ol > li {
+    margin-bottom: 0.5rem;
+  }
+
+  .aq-footnotes a[data-footnote-backref] {
+    margin-left: 0.35rem;
+    color: ${theme.publicDesign.accent};
+    text-decoration: none;
+  }
 `

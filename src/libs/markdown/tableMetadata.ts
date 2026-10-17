@@ -309,6 +309,13 @@ const isLikelyGfmTable = (headerLine: string, separatorLine: string) => {
 export const extractMarkdownTableLayouts = (
   markdown: string
 ): ExtractedTableLayouts => {
+  if (!markdown.includes("|") && !markdown.includes("aq-table")) {
+    return {
+      cleanedMarkdown: markdown.includes("\r") ? markdown.replace(/\r\n?/g, "\n") : markdown,
+      layouts: [],
+    }
+  }
+
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
   const cleanedLines: string[] = []
   const layouts: Array<MarkdownTableLayout | null> = []

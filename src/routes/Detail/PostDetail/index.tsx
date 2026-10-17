@@ -29,6 +29,7 @@ import { FloatingActionRail, MobileSummaryActions, RightTocRail } from "./PostDe
 import PostDetailMobileToc from "./PostDetailMobileToc"
 import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions"
 import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
+import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
 const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"))
@@ -44,6 +45,10 @@ const PostDetail: React.FC = () => {
   const rightRailInnerRef = useRef<HTMLElement | null>(null)
   const rightTocListRef = useRef<HTMLOListElement | null>(null)
   const readProgressRef = useRef<HTMLSpanElement | null>(null)
+  const documentInsights = useMemo(
+    () => createMarkdownDocumentInsights(data?.content ?? ""),
+    [data?.content]
+  )
   const initialToc = useMemo(() => buildInitialTocFromMarkdown(data?.content ?? ""), [data?.content])
   const [tocItems, setTocItems] = useState<TocItem[]>(initialToc)
   const [activeTocId, setActiveTocId] = useState<string>(() => initialToc[0]?.id ?? "")
@@ -397,6 +402,8 @@ const PostDetail: React.FC = () => {
             shareFeedback={shareFeedback}
             onSharePost={handleSharePost}
             deckSummary={headerDeckSummaryText}
+            showReadingTime
+            readingMinutes={documentInsights.readingMinutes}
           />
         </section>
       )}

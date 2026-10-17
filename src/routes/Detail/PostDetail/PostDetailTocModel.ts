@@ -11,11 +11,10 @@ export type TocItem = {
 
 export const buildInitialTocFromMarkdown = (markdown: string): TocItem[] => {
   if (!markdown.trim()) return []
-  const slugAllocator = createMarkdownHeadingSlugAllocator()
   return createMarkdownDocumentInsights(markdown)
     .headings.filter((heading): heading is typeof heading & { level: 2 | 3 | 4 } => heading.level >= 2)
-    .map(({ label, level }) => ({
-      id: slugAllocator.allocate(label),
+    .map(({ id, slug, label, level }) => ({
+      id: id || slug,
       text: label,
       level,
     }))

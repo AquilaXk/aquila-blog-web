@@ -78,6 +78,43 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     position: relative;
   }
 
+  .aq-code-block[data-collapsed="true"] .aq-code-body {
+    max-height: 460px;
+    overflow: hidden;
+  }
+
+  .aq-code-block[data-collapsed="true"] .aq-code-body::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 76px;
+    background: linear-gradient(180deg, rgba(15, 23, 40, 0) 0%, #0f1728 92%);
+    pointer-events: none;
+  }
+
+  .aq-code-collapse-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 9px 14px;
+    border: 0;
+    border-top: 1px solid #27334a;
+    background: #131d32;
+    color: #93b4eb;
+    font: 600 12px / 1.3 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Courier New", monospace;
+    cursor: pointer;
+    transition: background-color 0.16s ease, color 0.16s ease;
+  }
+
+  .aq-code-collapse-toggle:hover {
+    background: #192642;
+    color: #c3daff;
+  }
+
   .aq-code-shell {
     width: 100%;
     max-width: 100%;

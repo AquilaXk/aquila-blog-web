@@ -540,6 +540,40 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     vertical-align: -0.08em;
   }
 
+  .cm-live-heading-line { position: relative; padding-top: 0.35em; padding-bottom: 0.15em; }
+  .cm-live-heading-line-1 { padding-top: 0.65em; padding-bottom: 0.22em; }
+  .cm-live-heading-line-2 { padding-top: 0.5em; padding-bottom: 0.18em; }
+  .cm-live-list { border-left: 1px solid ${({ theme }) => theme.colors.gray5}; padding-left: 2px; }
+
+  .cm-live-code-fence-open[data-code-lang] {
+    position: relative;
+    &::after {
+      content: attr(data-code-lang);
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px solid ${({ theme }) => theme.publicDesign.border};
+      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+      color: ${({ theme }) => theme.colors.gray10};
+      font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-transform: lowercase;
+      pointer-events: none;
+      user-select: none;
+    }
+  }
+
+  .cm-foldGutter .cm-gutterElement {
+    padding: 0 4px;
+    color: ${({ theme }) => theme.colors.gray9};
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.15s ease;
+    &:hover { opacity: 1; color: ${({ theme }) => theme.colors.gray12}; }
+  }
+
   .cm-live-fenced-code {
     color: ${({ theme }) => theme.colors.gray11};
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;

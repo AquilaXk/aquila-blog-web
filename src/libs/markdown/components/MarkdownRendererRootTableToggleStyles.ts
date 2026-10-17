@@ -75,12 +75,45 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
   }
 
   .aq-table-shell {
+    position: relative;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     margin: 30px 0;
     overflow-x: hidden;
     contain: layout style;
+  }
+
+  .aq-table-shell[data-scroll-left="true"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 1.5rem;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(
+      to left,
+      transparent,
+      ${getTableChromePalette(theme).background}
+    );
+  }
+
+  .aq-table-shell[data-scroll-hint="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1.5rem;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(
+      to right,
+      transparent,
+      ${getTableChromePalette(theme).background}
+    );
   }
 
   .aq-table-scroll {
@@ -137,6 +170,9 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     ${(() => {
       const tableChrome = getTableChromePalette(theme)
       return `
+    position: sticky;
+    top: 0;
+    z-index: 1;
     text-align: left;
     background: ${tableChrome.headerBackground};
     color: ${theme.colors.gray10};
@@ -174,6 +210,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     white-space: normal;
     overflow-wrap: break-word;
     word-break: normal;
+    font-variant-numeric: tabular-nums;
   }
 
   th > *,
@@ -214,25 +251,6 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
       width: max-content;
       min-width: 100%;
       max-width: none;
-    }
-
-    .aq-table-shell {
-      position: relative;
-    }
-
-    .aq-table-shell[data-scroll-hint="true"]::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 1.5rem;
-      pointer-events: none;
-      background: linear-gradient(
-        to right,
-        transparent,
-        ${getTableChromePalette(theme).background}
-      );
     }
   }
 

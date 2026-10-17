@@ -334,7 +334,7 @@ export const createMermaidRuntimeController = ({
       expandButton.className = "aq-mermaid-expand-btn"
       expandButton.textContent = "확대 보기"
       expandButton.addEventListener("click", () => {
-        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup)
+        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
       })
       block.appendChild(expandButton)
     }

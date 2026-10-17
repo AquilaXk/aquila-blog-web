@@ -51,28 +51,13 @@ type EditorFingerprintPayload = {
   visibility: PostVisibility
 }
 
-const isBrowserOnline = () => typeof navigator === "undefined" ? undefined : navigator.onLine
+const isBrowserOnline = () => (typeof navigator === "undefined" ? undefined : navigator.onLine)
 
 const armLocalDraftFingerprintBaseline = (
   lastLocalDraftFingerprintRef: MutableRefObject<string>,
-  payload: {
-    title: string
-    content: string
-    summary: string
-    summarySource: CanonicalSummaryState["summarySource"]
-    summaryIntent: SummaryIntent
-    thumbnailUrl: string
-    thumbnailFocusX: number
-    thumbnailFocusY: number
-    thumbnailZoom: number
-    tags: string[]
-    category: string
-    visibility: PostVisibility
-  },
+  payload: EditorFingerprintPayload,
   dedupeStrings: (items: string[]) => string[]
 ): string => {
-  // Arm the *request* snapshot as baseline. In-flight title/summary/tags edits must
-  // stay dirty so autosave can recreate the cleared slot after write settle.
   const fingerprint = buildLocalDraftFingerprint({
     title: payload.title,
     content: payload.content,
@@ -155,62 +140,20 @@ type UseEditorStudioPersistenceParams = {
 }
 
 export const useEditorStudioPersistence = ({
-  buildEditorStateFingerprint,
-  composeEditorContent,
-  dedupeStrings,
-  defaultThumbnailFocusX,
-  defaultThumbnailFocusY,
-  defaultThumbnailZoom,
-  detectPublishPlaceholderIssue,
-  editorMode,
-  effectiveThumbnailUrl,
-  extractImageFileFromClipboard,
-  generateIdempotencyKey,
-  lastLocalDraftFingerprintRef,
-  lastWriteFingerprintRef,
-  lastWriteIdempotencyKeyRef,
-  loadingKey,
-  normalizeSafeImageUrl,
-  postCategory,
-  getCurrentPostContent,
-  postId,
-  postSummary,
-  postSummarySource,
-  summaryIntent,
-  postTags,
-  postThumbnailFocusX,
-  postThumbnailFocusY,
-  postThumbnailUrl,
-  postThumbnailZoom,
-  postTitle,
-  postVersion,
-  postVisibility,
-  pretty,
-  refreshPublicPostReadViews,
-  serverBaselineEditorFingerprintRef,
-  signalLocalDraftBaselineReady,
-  setEditorMode,
-  setIsPreviewThumbnailError,
-  setIsTempDraftMode,
-  setKnownTags,
-  setLoadingKey,
-  setLocalDraftSavedAt,
-  setLocalDraftSlotLabel,
-  setPostId,
-  setPostThumbnailFocusX,
-  setPostThumbnailFocusY,
-  setPostThumbnailUrl,
-  setPostThumbnailZoom,
-  setPostVersion,
-  setPostSummary,
-  setPostSummarySource,
-  setSummaryIntent,
-  setPreviewThumbnailSourceUrl,
-  setPublishStatus,
-  setResult,
-  setThumbnailImageFileName,
-  toFlags,
-  uploadWithConflictRetry,
+  buildEditorStateFingerprint, composeEditorContent, dedupeStrings, defaultThumbnailFocusX,
+  defaultThumbnailFocusY, defaultThumbnailZoom, detectPublishPlaceholderIssue, editorMode,
+  effectiveThumbnailUrl, extractImageFileFromClipboard, generateIdempotencyKey,
+  lastLocalDraftFingerprintRef, lastWriteFingerprintRef, lastWriteIdempotencyKeyRef,
+  loadingKey, normalizeSafeImageUrl, postCategory, getCurrentPostContent, postId,
+  postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX,
+  postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion,
+  postVisibility, pretty, refreshPublicPostReadViews, serverBaselineEditorFingerprintRef,
+  signalLocalDraftBaselineReady, setEditorMode, setIsPreviewThumbnailError,
+  setIsTempDraftMode, setKnownTags, setLoadingKey, setLocalDraftSavedAt,
+  setLocalDraftSlotLabel, setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
+  setPostThumbnailUrl, setPostThumbnailZoom, setPostVersion, setPostSummary,
+  setPostSummarySource, setSummaryIntent, setPreviewThumbnailSourceUrl, setPublishStatus,
+  setResult, setThumbnailImageFileName, toFlags, uploadWithConflictRetry,
 }: UseEditorStudioPersistenceParams) => {
   const {
     handleMarkdownEditorImageUpload,
@@ -238,18 +181,42 @@ export const useEditorStudioPersistence = ({
   })
 
   const currentSummaryRef = useRef<CanonicalSummaryState>({
-    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+    summary: postSummary,
+    summarySource: postSummarySource,
+    intent: summaryIntent,
   })
   currentSummaryRef.current = {
-    summary: postSummary, summarySource: postSummarySource, intent: summaryIntent,
+    summary: postSummary,
+    summarySource: postSummarySource,
+    intent: summaryIntent,
   }
+
+  const reportValidationError = useCallback(
+    (message: string): false => {
+      setPublishStatus({ tone: "error", text: message })
+      setResult(pretty({ error: message }))
+      return false
+    },
+    [pretty, setPublishStatus, setResult]
+  )
+
+  const validateContentPreflight = useCallback(
+    (currentPostContent: string): boolean => {
+      if (!postTitle.trim()) return reportValidationError("제목을 입력해주세요.")
+      if (!currentPostContent.trim()) return reportValidationError("본문을 입력해주세요.")
+      const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
+      if (placeholderIssue) return reportValidationError(placeholderIssue)
+      return true
+    },
+    [detectPublishPlaceholderIssue, postTitle, reportValidationError]
+  )
 
   const applyCanonicalWriteResponse = useCallback(
     (response: RsData<PostWriteResult>) => {
       const resolvedSummary = resolveSummaryWriteCompletion(
         { summary: postSummary, summarySource: postSummarySource, intent: summaryIntent },
         { summary: response.data?.summary, source: response.data?.summarySource },
-        currentSummaryRef.current,
+        currentSummaryRef.current
       )
       if (!resolvedSummary.ok) {
         const message = "저장된 canonical summary 응답이 올바르지 않습니다."
@@ -265,16 +232,9 @@ export const useEditorStudioPersistence = ({
       return canonicalSummary
     },
     [
-      postSummary,
-      postSummarySource,
-      pretty,
-      setPostSummary,
-      setPostSummarySource,
-      setPublishStatus,
-      setResult,
-      setSummaryIntent,
-      summaryIntent,
-    ],
+      postSummary, postSummarySource, pretty, setPostSummary, setPostSummarySource,
+      setPublishStatus, setResult, setSummaryIntent, summaryIntent,
+    ]
   )
 
   const buildSuccessfulWriteFingerprintPayload = useCallback(
@@ -293,15 +253,9 @@ export const useEditorStudioPersistence = ({
       visibility: postVisibility,
     }),
     [
-      postCategory,
-      postTags,
-      postThumbnailFocusX,
-      postThumbnailFocusY,
-      postThumbnailUrl,
-      postThumbnailZoom,
-      postTitle,
-      postVisibility,
-    ],
+      postCategory, postTags, postThumbnailFocusX, postThumbnailFocusY,
+      postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
+    ]
   )
 
   const buildModifyPostRequestBody = useCallback(
@@ -316,47 +270,19 @@ export const useEditorStudioPersistence = ({
       version: postVersion,
     }),
     [
-      composeEditorContent,
-      effectiveThumbnailUrl,
-      postCategory,
-      postTags,
-      postTitle,
-      postVersion,
-      postVisibility,
-      summaryIntent,
-      toFlags,
-    ],
+      composeEditorContent, effectiveThumbnailUrl, postCategory, postTags,
+      postTitle, postVersion, postVisibility, summaryIntent, toFlags,
+    ]
   )
 
   const handleWritePost = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode === "edit" || postId.trim()) {
-      const message = "현재는 수정 모드입니다. 새 글을 만들려면 먼저 '새 글 모드 전환'을 눌러주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
+      return reportValidationError(
+        "현재는 수정 모드입니다. 새 글을 만들려면 먼저 '새 글 모드 전환'을 눌러주세요."
+      )
     }
-
-    if (!postTitle.trim()) {
-      const message = "제목을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    if (!currentPostContent.trim()) {
-      const message = "본문을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
-    if (placeholderIssue) {
-      setPublishStatus({ tone: "error", text: placeholderIssue })
-      setResult(pretty({ error: placeholderIssue }))
-      return false
-    }
+    if (!validateContentPreflight(currentPostContent)) return false
 
     try {
       const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "create" })
@@ -454,77 +380,24 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
-    applyCanonicalWriteResponse,
-    buildEditorStateFingerprint,
-    buildSuccessfulWriteFingerprintPayload,
-    composeEditorContent,
-    dedupeStrings,
-    detectPublishPlaceholderIssue,
-    editorMode,
-    effectiveThumbnailUrl,
-    generateIdempotencyKey,
-    getCurrentPostContent,
-    lastLocalDraftFingerprintRef,
-    lastWriteFingerprintRef,
-    lastWriteIdempotencyKeyRef,
-    postCategory,
-    postId,
-    summaryIntent,
-    postTags,
-    postTitle,
-    postVisibility,
-    pretty,
-    refreshPublicPostReadViews,
-    serverBaselineEditorFingerprintRef,
-    signalLocalDraftBaselineReady,
-    setEditorMode,
-    setIsTempDraftMode,
-    setKnownTags,
-    setLoadingKey,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-    setPostId,
-    setPostVersion,
-    setPublishStatus,
-    setResult,
-    toFlags,
+    applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
+    composeEditorContent, dedupeStrings, editorMode, effectiveThumbnailUrl, generateIdempotencyKey,
+    getCurrentPostContent, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
+    lastWriteIdempotencyKeyRef, postCategory, postId, summaryIntent, postTags, postTitle,
+    postVisibility, pretty, refreshPublicPostReadViews, reportValidationError,
+    serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, setEditorMode,
+    setIsTempDraftMode, setKnownTags, setLoadingKey, setLocalDraftSavedAt, setLocalDraftSlotLabel,
+    setPostId, setPostVersion, setPublishStatus, setResult, toFlags, validateContentPreflight,
   ])
 
   const handleModifyPost = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode !== "edit" || !postId.trim()) {
-      const message = "수정할 글 ID를 먼저 선택해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
+      return reportValidationError("수정할 글 ID를 먼저 선택해주세요.")
     }
-
-    if (!postTitle.trim()) {
-      const message = "제목을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    if (!currentPostContent.trim()) {
-      const message = "본문을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
-    if (placeholderIssue) {
-      setPublishStatus({ tone: "error", text: placeholderIssue })
-      setResult(pretty({ error: placeholderIssue }))
-      return false
-    }
-
+    if (!validateContentPreflight(currentPostContent)) return false
     if (postVersion == null) {
-      const message = "최신 글 버전을 불러오지 못했습니다. 글을 다시 열어주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
+      return reportValidationError("최신 글 버전을 불러오지 못했습니다. 글을 다시 열어주세요.")
     }
 
     try {
@@ -557,10 +430,13 @@ export const useEditorStudioPersistence = ({
         setLocalDraftSavedAt("")
         setLocalDraftSlotLabel("")
       }
-      setPublishStatus(await resolvePostSaveRefresh(
-        () => refreshPublicPostReadViews(postId),
-        `수정 완료: ${response.msg}`
-      ), "page")
+      setPublishStatus(
+        await resolvePostSaveRefresh(
+          () => refreshPublicPostReadViews(postId),
+          `수정 완료: ${response.msg}`
+        ),
+        "page"
+      )
       setResult(pretty(response))
       return true
     } catch (error) {
@@ -575,74 +451,23 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
-    applyCanonicalWriteResponse,
-    buildEditorStateFingerprint,
-    buildModifyPostRequestBody,
-    buildSuccessfulWriteFingerprintPayload,
-    composeEditorContent,
-    dedupeStrings,
-    detectPublishPlaceholderIssue,
-    editorMode,
-    effectiveThumbnailUrl,
-    getCurrentPostContent,
-    lastLocalDraftFingerprintRef,
-    postCategory,
-    postId,
-    summaryIntent,
-    postTags,
-    postTitle,
-    postVersion,
-    postVisibility,
-    pretty,
-    refreshPublicPostReadViews,
-    serverBaselineEditorFingerprintRef,
-    signalLocalDraftBaselineReady,
-    setIsTempDraftMode,
-    setKnownTags,
-    setLoadingKey,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-    setPostVersion,
-    setPublishStatus,
-    setResult,
-    toFlags,
+    applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
+    buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
+    lastLocalDraftFingerprintRef, postId, postTags, postTitle, postVersion, postVisibility,
+    pretty, refreshPublicPostReadViews, reportValidationError, serverBaselineEditorFingerprintRef,
+    signalLocalDraftBaselineReady, setIsTempDraftMode, setKnownTags, setLoadingKey,
+    setLocalDraftSavedAt, setLocalDraftSlotLabel, setPostVersion, setPublishStatus, setResult,
+    validateContentPreflight,
   ])
 
   const handlePublishTempDraft = useCallback(async (): Promise<boolean> => {
     const currentPostContent = getCurrentPostContent()
     if (editorMode !== "edit" || !postId.trim()) {
-      const message = "작성할 새 글을 먼저 불러와주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
+      return reportValidationError("작성할 새 글을 먼저 불러와주세요.")
     }
-
-    if (!postTitle.trim()) {
-      const message = "제목을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    if (!currentPostContent.trim()) {
-      const message = "본문을 입력해주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
-    }
-
-    const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
-    if (placeholderIssue) {
-      setPublishStatus({ tone: "error", text: placeholderIssue })
-      setResult(pretty({ error: placeholderIssue }))
-      return false
-    }
-
+    if (!validateContentPreflight(currentPostContent)) return false
     if (postVersion == null) {
-      const message = "새 글 버전을 불러오지 못했습니다. 글을 다시 열어주세요."
-      setPublishStatus({ tone: "error", text: message })
-      setResult(pretty({ error: message }))
-      return false
+      return reportValidationError("새 글 버전을 불러오지 못했습니다. 글을 다시 열어주세요.")
     }
 
     try {
@@ -660,7 +485,6 @@ export const useEditorStudioPersistence = ({
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
-      // 임시글은 post 슬롯에 저장되므로 관계없는 create 초안은 지우지 않는다.
       const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
         baselineFingerprint: armLocalDraftFingerprintBaseline(
@@ -673,10 +497,13 @@ export const useEditorStudioPersistence = ({
         setLocalDraftSavedAt("")
         setLocalDraftSlotLabel("")
       }
-      setPublishStatus(await resolvePostSaveRefresh(
-        () => refreshPublicPostReadViews(postId),
-        "새 글 작성이 완료되었습니다."
-      ), "page")
+      setPublishStatus(
+        await resolvePostSaveRefresh(
+          () => refreshPublicPostReadViews(postId),
+          "새 글 작성이 완료되었습니다."
+        ),
+        "page"
+      )
       setResult(pretty(response))
       return true
     } catch (error) {
@@ -691,36 +518,12 @@ export const useEditorStudioPersistence = ({
       setLoadingKey("")
     }
   }, [
-    applyCanonicalWriteResponse,
-    buildEditorStateFingerprint,
-    buildModifyPostRequestBody,
-    buildSuccessfulWriteFingerprintPayload,
-    composeEditorContent,
-    dedupeStrings,
-    detectPublishPlaceholderIssue,
-    editorMode,
-    effectiveThumbnailUrl,
-    getCurrentPostContent,
-    postCategory,
-    postId,
-    summaryIntent,
-    postTags,
-    postTitle,
-    postVersion,
-    postVisibility,
-    pretty,
-    refreshPublicPostReadViews,
-    lastLocalDraftFingerprintRef,
-    serverBaselineEditorFingerprintRef,
-    signalLocalDraftBaselineReady,
-    setIsTempDraftMode,
-    setLoadingKey,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-    setPostVersion,
-    setPublishStatus,
-    setResult,
-    toFlags,
+    applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
+    buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
+    lastLocalDraftFingerprintRef, postId, postVersion, pretty, refreshPublicPostReadViews,
+    reportValidationError, serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady,
+    setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt, setLocalDraftSlotLabel,
+    setPostVersion, setPublishStatus, setResult, validateContentPreflight,
   ])
 
   return {

@@ -36,6 +36,29 @@ const escapeFormulaHtml = (value: string) =>
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;")
 
+const MAX_FORMULA_CACHE_ENTRIES = 256
+const formulaHtmlCache = new Map<string, string>()
+
+const getCachedFormulaHtml = (key: string): string | undefined => {
+  const cached = formulaHtmlCache.get(key)
+  if (cached === undefined) return undefined
+  formulaHtmlCache.delete(key)
+  formulaHtmlCache.set(key, cached)
+  return cached
+}
+
+const setCachedFormulaHtml = (key: string, html: string) => {
+  if (formulaHtmlCache.has(key)) {
+    formulaHtmlCache.delete(key)
+  } else if (formulaHtmlCache.size >= MAX_FORMULA_CACHE_ENTRIES) {
+    const oldestKey = formulaHtmlCache.keys().next().value
+    if (oldestKey !== undefined) {
+      formulaHtmlCache.delete(oldestKey)
+    }
+  }
+  formulaHtmlCache.set(key, html)
+}
+
 export const renderFormulaToHtml = async (
   formula: string,
   { displayMode = true }: RenderFormulaOptions = {}
@@ -43,15 +66,21 @@ export const renderFormulaToHtml = async (
   const normalized = String(formula || "").trim()
   if (!normalized) return ""
 
+  const cacheKey = `${displayMode ? "1" : "0"}:${normalized}`
+  const cached = getCachedFormulaHtml(cacheKey)
+  if (cached !== undefined) return cached
+
   try {
     const katex = await loadKatex()
-    return katex.renderToString(normalized, {
+    const rendered = katex.renderToString(normalized, {
       displayMode,
       throwOnError: false,
       strict: "ignore",
       output: "html",
       trust: false,
     })
+    setCachedFormulaHtml(cacheKey, rendered)
+    return rendered
   } catch {
     return renderFormulaFallbackHtml(normalized, { displayMode })
   }

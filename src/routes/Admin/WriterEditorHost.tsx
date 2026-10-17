@@ -9,6 +9,7 @@ type WriterEditorHostProps = {
   canvasId: string
   markdown: string
   onMarkdownChange: (markdown: string, meta?: { editorFocused: boolean }) => void
+  onSelectionChange?: (selection: { from: number; to: number }) => void
   onFlushMarkdownReady: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
   onRequestFocusTitle?: () => void
@@ -31,6 +32,7 @@ export const WriterEditorHost = ({
   canvasId,
   markdown,
   onMarkdownChange,
+  onSelectionChange,
   onFlushMarkdownReady,
   onFocusRequestReady,
   onRequestFocusTitle,
@@ -52,6 +54,7 @@ export const WriterEditorHost = ({
       <MarkdownEditor
         value={markdown}
         onChange={onMarkdownChange}
+        onSelectionChange={onSelectionChange}
         onFlushMarkdownReady={onFlushMarkdownReady}
         onFocusRequestReady={onFocusRequestReady}
         onRequestFocusTitle={onRequestFocusTitle}

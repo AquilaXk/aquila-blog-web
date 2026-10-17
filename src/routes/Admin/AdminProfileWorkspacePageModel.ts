@@ -125,7 +125,7 @@ export const useAdminProfileWorkspacePageModel = ({
         setProfileWorkspaceCache(queryClient, sessionMember.id, workspace)
       }
     },
-    [queryClient, sessionMember]
+    [queryClient, sessionMember, setDraft]
   )
 
   useEffect(() => {

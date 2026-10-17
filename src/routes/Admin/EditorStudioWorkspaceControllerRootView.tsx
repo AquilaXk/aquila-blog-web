@@ -30,99 +30,28 @@ type EditorStudioWorkspaceControllerRootViewProps = {
 
 export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioWorkspaceControllerRootViewProps) => {
   const {
-    addTagsToPost,
-    addTagToPost,
-    applyFirstBodyImageToThumbnail,
-    clearLocalDraft,
-    discardLocalDraftCandidate,
-    closeDeleteConfirm,
-    closePublishModal,
-    commitPreviewThumbTransform,
-    customCategoryCatalog,
-    deferredContentDerived,
-    deleteConfirmNotice,
-    deleteConfirmState,
-    deletePostsFromList,
-    dismissedLocalDraft,
-    dismissLocalDraftRestoreSuggestion,
-    disabled,
-    editorMode,
-    finalizePreviewThumbPointer,
-    handleMarkdownEditorChange,
-    handleMarkdownEditorFileUpload,
-    handleMarkdownEditorImageUpload,
-    handleConfirmPublish,
-    handleExitDedicatedEditor,
-    handleFlushMarkdownReady,
-    commitPostCategory,
-    handlePostCategoryChange,
-    handlePostSummaryChange,
-    handlePreviewThumbPointerDown,
-    handlePreviewThumbPointerMove,
-    handleThumbnailImageFileChange,
-    handleThumbnailPaste,
-    handleThumbnailUrlModalChange,
-    handleTitleChange,
-    handleTitleFieldRef,
-    handleTitleKeyDown,
-    handleFocusTitle,
-    isCompactMobileLayout,
-    isDedicatedEditorRoute,
-    isDedicatedNewEditorRoute,
-    isMobileMetaEditorOpen,
-    isMobileThumbnailEditorOpen,
-    isNewEditorBootstrapPending,
-    isPreviewThumbDragging,
-    isPreviewThumbnailError,
-    isPublishModalOpen,
-    isTempDraftMode,
-    getCurrentPostContent,
-    lastLocalDraftFingerprintRef,
-    loadingKey,
-    localDraftCandidate,
-    localDraftCandidates,
-    localDraftSavedAt,
-    localDraftSource,
-    openPublishModal,
-    openThumbnailFileInput,
-    postCategory,
-    postContent,
-    postId,
-    postSummary,
-    postSummarySource,
-    summaryIntent,
-    postTags,
-    postThumbnailFocusX,
-    postThumbnailFocusY,
-    postThumbnailUrl,
-    postThumbnailZoom,
-    postTitle,
-    postVisibility,
-    publishActionType,
-    publishModalNotice,
-    publishNotice,
-    previewThumbFrameRef,
-    previewThumbTransformRef,
-    resetThumbnailToAutoMode,
-    removeTagFromPost,
-    restoreLocalDraft,
-    selectLocalDraftCandidate,
-    restoredLocalDraft,
-    result,
-    safePreviewThumbnail,
-    serverBaselineEditorFingerprintRef,
-    sessionMember,
-    setIsMobileMetaEditorOpen,
-    setIsMobileThumbnailEditorOpen,
-    setIsPreviewThumbnailError,
-    setPostVisibility,
-    setTagDraft,
-    studioSurface,
-    tagDraft,
-    thumbnailImageFileInputRef,
+    addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
+    closeDeleteConfirm, closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
+    deleteConfirmNotice, deleteConfirmState, deletePostsFromList, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
+    disabled, editorMode, finalizePreviewThumbPointer, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
+    handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
+    commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
+    handlePreviewThumbPointerMove, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange,
+    handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle, isCompactMobileLayout,
+    isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen, isMobileThumbnailEditorOpen,
+    isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen, isTempDraftMode,
+    getCurrentPostContent, lastLocalDraftFingerprintRef, loadingKey, localDraftCandidate, localDraftCandidates,
+    localDraftSavedAt, localDraftSource, openPublishModal, openThumbnailFileInput, postCategory, postContent,
+    postId, postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
+    postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility, publishActionType, publishModalNotice,
+    publishNotice, previewThumbFrameRef, previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost,
+    restoreLocalDraft, selectLocalDraftCandidate, restoredLocalDraft, result, safePreviewThumbnail,
+    serverBaselineEditorFingerprintRef, sessionMember, setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen,
+    setIsPreviewThumbnailError, setPostVisibility, setTagDraft, studioSurface, tagDraft, thumbnailImageFileInputRef,
     thumbnailImageFileName,
   } = props
   const [isMarkdownUploading, setIsMarkdownUploading] = useState(false)
+  const [editorSelection, setEditorSelection] = useState<{ from: number; to: number }>({ from: 0, to: 0 })
   const handleMarkdownUploadingChange = useCallback((nextIsUploading: boolean) => {
     setIsMarkdownUploading(nextIsUploading)
   }, [])
@@ -378,6 +307,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         canvasId="editor-dedicated-canvas"
         markdown={postContent}
         onMarkdownChange={handleMarkdownEditorChange}
+        onSelectionChange={setEditorSelection}
         onFlushMarkdownReady={handleFlushMarkdownReady}
         onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
         onRequestFocusTitle={handleFocusTitle}
@@ -392,6 +322,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     ),
     [
       handleDedicatedEditorRequestSave,
+      handleFocusTitle,
       handleMarkdownEditorChange,
       handleMarkdownEditorFileUpload,
       handleMarkdownEditorImageUpload,
@@ -457,6 +388,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onRemoveTag={removeTagFromPost}
         titleInputRef={handleTitleFieldRef}
         onOutlineBodyHeadingActivate={requestMarkdownEditorFocus}
+        activeCursorOffset={editorSelection.to}
+        activeSelectionRange={editorSelection}
         postTitle={postTitle}
         onPostTitleChange={handleTitleChange}
         onPostTitleKeyDown={handleTitleKeyDown}

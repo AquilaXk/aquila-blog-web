@@ -89,6 +89,51 @@ const extractCodeTitle = (meta: string) => {
   return ""
 }
 
+export const extractCodeHighlightSpec = (meta: string): string => {
+  if (!meta?.includes("{")) return ""
+  const match = /\{([\d,\s-]+)\}/.exec(meta)
+  return match?.[1]?.replace(/\s+/g, "") || ""
+}
+
+const MAX_HIGHLIGHT_LINE_NUMBER = 100_000
+const MAX_HIGHLIGHT_TOTAL_LINES = 2_000
+
+const isValidHighlightLineBound = (value: number): boolean =>
+  Number.isSafeInteger(value) && value > 0 && value <= MAX_HIGHLIGHT_LINE_NUMBER
+
+const addHighlightedLineToken = (rawToken: string, result: Set<number>): void => {
+  const token = rawToken.trim()
+  if (!token) return
+  const dashIndex = token.indexOf("-")
+  if (dashIndex <= 0) {
+    const single = Number.parseInt(token, 10)
+    if (isValidHighlightLineBound(single) && result.size < MAX_HIGHLIGHT_TOTAL_LINES) {
+      result.add(single)
+    }
+    return
+  }
+
+  const start = Number.parseInt(token.slice(0, dashIndex), 10)
+  const end = Number.parseInt(token.slice(dashIndex + 1), 10)
+  if (!isValidHighlightLineBound(start) || !Number.isSafeInteger(end) || end < start) return
+
+  const cappedEnd = Math.min(end, start + MAX_HIGHLIGHT_TOTAL_LINES, MAX_HIGHLIGHT_LINE_NUMBER)
+  for (let line = start; line <= cappedEnd && result.size < MAX_HIGHLIGHT_TOTAL_LINES; line += 1) {
+    result.add(line)
+  }
+}
+
+export const parseHighlightedLineNumbers = (meta: string): Set<number> => {
+  const result = new Set<number>()
+  if (!meta) return result
+  const rawSpec = meta.includes("{") ? extractCodeHighlightSpec(meta) : meta
+  for (const token of rawSpec.split(",")) {
+    if (result.size >= MAX_HIGHLIGHT_TOTAL_LINES) break
+    addHighlightedLineToken(token, result)
+  }
+  return result
+}
+
 export const extractTextFromCodeAst = (node: unknown): string => {
   if (!node || typeof node !== "object") return ""
 
@@ -102,7 +147,17 @@ export const extractTextFromCodeAst = (node: unknown): string => {
   return children.map(extractTextFromCodeAst).join("")
 }
 
-export const extractCodeMetaFromPreChildren = (children: ReactNode, preNode?: unknown) => {
+export type ExtractedCodeMeta = {
+  language: string
+  title: string
+  rawCode: string
+  highlightLines?: string
+}
+
+export const extractCodeMetaFromPreChildren = (
+  children: ReactNode,
+  preNode?: unknown
+): ExtractedCodeMeta => {
   const list = Array.isArray(children) ? children : [children]
   const codeElement = list.find(
     (child): child is ReactElement<Record<string, unknown>> =>
@@ -135,11 +190,13 @@ export const extractCodeMetaFromPreChildren = (children: ReactNode, preNode?: un
   const rawCodeFromAst = extractTextFromCodeAst(codeAstNode)
   const rawCode = (dataRawCode || rawCodeFromChildren || rawCodeFromAst).replace(/\n$/, "")
   const meta = readCodeMeta(codeAstNode)
+  const highlightLines = extractCodeHighlightSpec(meta)
 
   return {
     language: dataLanguage || classLanguage || "text",
     title: extractCodeTitle(meta),
     rawCode,
+    ...(highlightLines ? { highlightLines } : {}),
   }
 }
 
