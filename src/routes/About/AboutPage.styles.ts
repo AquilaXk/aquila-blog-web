@@ -27,17 +27,17 @@ export const StyledWrapper = styled.div`
     margin: 13px 0 0;
     max-width: 920px;
     color: var(--aq-text);
-    font-size: 54px;
-    line-height: 1.05;
-    letter-spacing: -0.06em;
-    font-weight: 850;
+    font-size: clamp(2.15rem, 4.2vw, 3.1rem);
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    font-weight: 600;
     word-break: keep-all;
     overflow-wrap: anywhere;
   }
 
   .profile-image {
     position: relative;
-    width: 132px;
+    width: 72px;
     aspect-ratio: 1;
     border-radius: 50%;
     border: 1px solid var(--aq-border);
@@ -51,10 +51,10 @@ export const StyledWrapper = styled.div`
 
   .profile-inline {
     display: grid;
-    grid-template-columns: 132px minmax(0, 1fr);
+    grid-template-columns: 72px minmax(0, 1fr);
     gap: 18px;
     align-items: start;
-    margin-bottom: 18px;
+    margin-bottom: 0;
   }
 
   .profile-copy {
@@ -67,7 +67,7 @@ export const StyledWrapper = styled.div`
     color: var(--aq-text);
     font-size: 1.125rem;
     line-height: 1.35;
-    font-weight: 820;
+    font-weight: 700;
     word-break: keep-all;
     overflow-wrap: anywhere;
   }
@@ -77,7 +77,7 @@ export const StyledWrapper = styled.div`
     color: var(--aq-muted);
     font-size: 0.875rem;
     line-height: 1.5;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     overflow-wrap: anywhere;
   }
@@ -106,10 +106,10 @@ export const StyledWrapper = styled.div`
   .about-grid h2 {
     margin: 0 0 16px;
     color: var(--aq-text);
-    font-size: 30px;
+    font-size: 1.65rem;
     line-height: 1.25;
-    letter-spacing: -0.04em;
-    font-weight: 820;
+    letter-spacing: -0.025em;
+    font-weight: 650;
   }
 
   .stack-list {
@@ -172,7 +172,7 @@ export const StyledWrapper = styled.div`
     padding: 44px 0 70px;
 
     .page-head h1 {
-      font-size: 42px;
+      font-size: clamp(1.85rem, 6vw, 2.35rem);
     }
 
     .about-grid {
@@ -181,11 +181,11 @@ export const StyledWrapper = styled.div`
     }
 
     .profile-inline {
-      grid-template-columns: 96px minmax(0, 1fr);
+      grid-template-columns: 64px minmax(0, 1fr);
     }
 
     .profile-image {
-      width: 96px;
+      width: 64px;
     }
   }
 `

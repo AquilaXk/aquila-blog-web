@@ -122,12 +122,20 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expectTouchTargets(page, "header a")
   })
 
-  test("hero 폰 목업이 1080x2340 원본 비율을 유지한다", async ({ page }) => {
+  test("프로덕트 쇼케이스 목업이 원본 비율(1080x2340 · 1920x733)을 유지하고 중복 노출되지 않는다", async ({
+    page,
+  }) => {
     await page.goto("/company")
-    // hero 폰은 제품 검수본이므로 1080x2340이 잘리지 않아야 한다.
-    const phone = page.locator("[data-ui='company-hero-phone']")
+    const phone = page.locator("[data-ui='company-showcase-easysubway']")
     await expect(phone).toBeVisible()
     expect(await measureRenderedAspectRatio(phone)).toBeCloseTo(SCREENSHOT_ASPECT_RATIO, 2)
+
+    const blogCapture = page.locator("[data-ui='company-showcase-aquilalog']")
+    await expect(blogCapture).toBeVisible()
+    expect(await measureRenderedAspectRatio(blogCapture)).toBeCloseTo(BLOG_CAPTURE_ASPECT_RATIO, 2)
+
+    // 동일한 앱 스크린샷을 히어로와 쇼케이스에 중복 노출하지 않는다.
+    await expect(page.locator("img[src='/easysubway/station-detail.png']")).toHaveCount(1)
   })
 
   test("브랜드 셀프 링크는 canonical과 같은 공개 URL이고 블로그 RSS alternate를 상속하지 않는다", async ({
@@ -186,29 +194,30 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(page.locator("[data-bouncer]")).toHaveCount(0)
   })
 
-  test("2대 프로덕트 쇼케이스 카드와 하단 기술 신뢰성 텍스트 리스트를 렌더한다", async ({ page }) => {
+  test("2대 프로덕트 쇼케이스 카드를 중복 신뢰성 블록 없이 렌더한다", async ({ page }) => {
     await page.goto("/company")
     const workSection = page.locator("#work")
     await expect(workSection.locator("[data-ui='company-showcase-easysubway']")).toBeVisible()
     await expect(workSection.locator("[data-ui='company-showcase-aquilalog']")).toBeVisible()
     await expect(workSection.getByRole("link", { name: "EasySubway 살펴보기" })).toBeVisible()
     await expect(workSection.getByRole("link", { name: "AquilaLog 기술 블로그 읽기" })).toBeVisible()
-
-    const reliabilityList = workSection.locator("[data-ui='company-reliability-list']")
-    await expect(reliabilityList).toBeVisible()
-    await expect(reliabilityList.locator("li")).toHaveCount(3)
-    await expect(workSection.getByText("DATA PIPELINE")).toBeVisible()
-    await expect(workSection.getByText("INFRASTRUCTURE")).toBeVisible()
-    await expect(workSection.getByText("QUALITY GATES")).toBeVisible()
+    await expect(workSection.locator("[data-ui='company-reliability-list']")).toHaveCount(0)
   })
 
-  test("통계 위젯은 정량 지표 중심의 값을 렌더한다", async ({ page }) => {
+  test("통계 위젯은 중복 100% 없이 구체적 운영 지표를 렌더하고 푸터 2개 내비 그룹을 노출한다", async ({
+    page,
+  }) => {
     await page.goto("/company")
     const statList = page.locator("#approach dl")
     await expect(statList).toBeVisible()
     await expect(statList.getByText("2개")).toBeVisible()
-    await expect(statList.getByText("100%").first()).toBeVisible()
+    await expect(statList.getByText("20개 노선")).toBeVisible()
+    await expect(statList.getByText("Blue-Green")).toBeVisible()
     await expect(statList.getByText("0원")).toBeVisible()
+    await expect(statList.getByText("100%")).toHaveCount(0)
+
+    await expect(page.getByRole("navigation", { name: "제품" })).toBeVisible()
+    await expect(page.getByRole("navigation", { name: "탐색 & 문의" })).toBeVisible()
   })
 })
 

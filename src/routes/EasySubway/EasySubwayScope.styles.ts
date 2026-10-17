@@ -45,17 +45,13 @@ export const ScopeChip = styled.span<{ $accent?: boolean }>`
 
 export const TechSpecGrid = styled.dl`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.25rem);
   margin: 0;
   padding: 0;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.hairline};
-  overflow: hidden;
 
-  @media (forced-colors: active) {
-    border-color: CanvasText;
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   @media (max-width: ${breakpoint.sm}px) {
@@ -64,15 +60,12 @@ export const TechSpecGrid = styled.dl`
 `
 
 export const TechSpecCell = styled.div`
-  padding: 1.5rem;
-  background: ${dark.fieldDeep};
-
-  @media (forced-colors: active) {
-    border: 1px solid CanvasText;
-  }
+  padding: 1.15rem 0 0;
+  border-top: 1px solid ${dark.hairline};
+  background: transparent;
 
   dt {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.45rem;
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
@@ -90,65 +83,62 @@ export const TechSpecCell = styled.div`
       line-height: 1.3;
       font-weight: ${fontWeight.semibold};
       color: ${dark.textPrimary};
-      letter-spacing: -0.01em;
+      letter-spacing: -0.015em;
     }
 
     p {
       margin: 0.35rem 0 0;
       font-size: 0.875rem;
-      line-height: 1.5;
+      line-height: 1.55;
       color: ${dark.textSecondary};
     }
   }
 `
 
 export const MetroBadgeGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
-  gap: 1px;
-  margin-top: 1.75rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.hairline};
-  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
 `
 
 export const MetroSectionTitle = styled.h3`
   margin: 0 0 0.5rem;
   font-size: 1.25rem;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 `
 
 export const MetroSectionLead = styled.p`
   margin: 0;
-  max-width: 32rem;
+  max-width: 34rem;
   font-size: 0.9375rem;
-  line-height: 1.6;
+  line-height: 1.65;
   color: ${dark.textSecondary};
 `
 
 export const MetroBadgeCard = styled.div`
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.75rem 0.5rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem 0.4rem 0.55rem;
+  border: 1px solid ${dark.hairline};
+  border-radius: ${radius.pill}px;
   background: ${dark.fieldDeep};
-  text-align: center;
 
   img {
-    width: 26px;
-    height: 26px;
+    display: block;
+    width: 22px;
+    height: 22px;
     object-fit: contain;
   }
 
   span {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: ${fontWeight.medium};
-    color: ${dark.textSecondary};
+    color: ${dark.textPrimary};
+    line-height: 1;
   }
 `
 
@@ -159,14 +149,10 @@ export const FaqSection = styled.div`
 export const FaqList = styled.ul`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  gap: clamp(1.75rem, 3.5vw, 2.5rem);
   margin: clamp(2rem, 4vw, 3rem) 0 0;
   padding: 0;
   list-style: none;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.hairline};
-  overflow: hidden;
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -174,15 +160,16 @@ export const FaqList = styled.ul`
 `
 
 export const FaqCard = styled.li`
-  padding: clamp(1.5rem, 2.8vw, 2rem);
-  background: ${dark.fieldDeep};
+  padding: 1.35rem 0 0;
+  border-top: 1px solid ${dark.hairline};
+  background: transparent;
 `
 
 export const FaqQuestionHeader = styled.div`
   display: flex;
   align-items: baseline;
   gap: 0.65rem;
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.65rem;
 `
 
 export const FaqQuestionNumber = styled.span`
@@ -190,8 +177,9 @@ export const FaqQuestionNumber = styled.span`
   align-items: center;
   justify-content: center;
   font-family: ${editorialLabel.fontFamily};
-  font-size: 0.875rem;
-  font-weight: ${fontWeight.bold};
+  font-size: ${editorialLabel.fontSize};
+  font-weight: ${editorialLabel.fontWeight};
+  letter-spacing: ${editorialLabel.letterSpacing};
   color: ${dark.signature};
   flex-shrink: 0;
 `
@@ -201,14 +189,14 @@ export const FaqQuestionText = styled.h3`
   font-size: 1.0625rem;
   font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
 `
 
 export const FaqAnswerText = styled.p`
   margin: 0;
   font-size: 0.9375rem;
-  line-height: 1.65;
+  line-height: 1.68;
   color: ${dark.textSecondary};
 `
 
@@ -225,10 +213,10 @@ export const CopyEmailButton = styled.button`
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 1.25rem;
   border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
+  border-radius: ${radius.pill}px;
   background: ${dark.fieldDeep};
   color: ${dark.textPrimary};
   cursor: pointer;
@@ -296,15 +284,15 @@ export const ContactBand = styled.div`
     margin: 0 0 0.6rem;
     font-size: clamp(1.4rem, 2.8vw, 2rem);
     line-height: 1.25;
-    letter-spacing: -0.02em;
-    font-weight: ${fontWeight.semibold};
+    letter-spacing: -0.025em;
+    font-weight: ${fontWeight.medium};
     color: ${dark.textPrimary};
   }
 
   p {
     margin: 0;
     max-width: 30rem;
-    font-size: 1.0625rem;
+    font-size: 1.03125rem;
     line-height: 1.7;
     color: ${dark.textSecondary};
   }

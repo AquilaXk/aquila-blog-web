@@ -18,12 +18,12 @@ export const NewsHeaderAction = styled.a`
   align-items: center;
   gap: 0.4rem;
   min-height: 44px;
-  padding: 0 1rem;
-  border-radius: ${radius.sm}px;
+  padding: 0 1.2rem;
+  border-radius: ${radius.pill}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   font-size: 0.9375rem;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
   text-decoration: none;
   transition: color ${TRANSITION}, background-color ${TRANSITION}, border-color ${TRANSITION};
@@ -105,7 +105,7 @@ export const NewsCard = styled.a`
     font-size: clamp(1.125rem, 1.8vw, 1.25rem);
     line-height: 1.45;
     letter-spacing: -0.015em;
-    font-weight: ${fontWeight.bold};
+    font-weight: ${fontWeight.semibold};
     color: ${light.inkPrimary};
     transition: color ${TRANSITION};
     display: -webkit-box;
@@ -117,7 +117,7 @@ export const NewsCard = styled.a`
 
   p {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.96875rem;
     line-height: 1.65;
     color: ${light.inkSecondary};
     display: -webkit-box;
@@ -181,7 +181,7 @@ export const NewsAction = styled.div`
   margin-top: auto;
   padding-top: 0.75rem;
   font-size: 0.9375rem;
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${light.accentText};
   transition: gap ${TRANSITION}, color ${TRANSITION};
 
@@ -192,7 +192,6 @@ export const NewsAction = styled.div`
 `
 
 export const ContactBand = styled.div`
-  --aq-focus-ring: ${light.onSignature};
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -202,22 +201,24 @@ export const ContactBand = styled.div`
   margin: 0 auto;
   padding: clamp(2.25rem, 4.5vw, 3.25rem);
   border-radius: ${radius.lg}px;
-  border: 1px solid ${light.borderStrong};
-  background: ${light.signature};
-  color: ${light.onSignature};
+  border: 1px solid ${light.border};
+  background: ${light.surfaceScaffold};
+  color: ${light.inkPrimary};
 
   h2 {
     margin: 0 0 0.5rem;
     font-size: clamp(1.5rem, 3vw, 2.15rem);
     line-height: 1.22;
-    letter-spacing: -0.02em;
-    font-weight: ${fontWeight.bold};
+    letter-spacing: -0.025em;
+    font-weight: ${fontWeight.medium};
+    color: ${light.inkPrimary};
   }
 
   p {
     margin: 0;
-    font-size: 1.0625rem;
+    font-size: 1.03125rem;
     line-height: 1.65;
+    color: ${light.inkSecondary};
   }
 `
 
@@ -233,13 +234,13 @@ export const PrincipleList = styled.ul`
 
   li {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.85rem;
-    padding: 1.1rem 0;
+    padding: 1.15rem 0;
     border-top: ${PRINCIPLE_RULE};
-    font-size: clamp(1.0625rem, 1.8vw, 1.15rem);
+    font-size: clamp(1.03125rem, 1.6vw, 1.125rem);
     line-height: 1.6;
-    font-weight: ${fontWeight.semibold};
+    font-weight: ${fontWeight.medium};
     color: ${light.inkPrimary};
   }
 
@@ -252,15 +253,13 @@ export const PrincipleList = styled.ul`
   }
 
   li > span:first-of-type {
-    display: flex;
+    display: inline-flex;
     flex: 0 0 auto;
+    font-family: ${editorialLabel.fontFamily};
+    font-size: ${editorialLabel.fontSize};
+    font-weight: ${editorialLabel.fontWeight};
+    letter-spacing: ${editorialLabel.letterSpacing};
     color: ${light.accentText};
-  }
-
-  li > span:first-of-type svg {
-    width: 1.375rem;
-    height: 1.375rem;
-    stroke-width: 2.1;
   }
 
   @media (max-width: ${breakpoint.md}px) {

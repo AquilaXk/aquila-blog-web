@@ -100,7 +100,9 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
   }
 
   const displayName = adminProfile.nickname || adminProfile.name
-  const displayHeadline = adminProfile.aboutHeadline || ""
+  const displayHeadline =
+    adminProfile.aboutHeadline?.trim() ||
+    "이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다."
   const displayRole = adminProfile.aboutRole || ""
   const displayBio = adminProfile.aboutBio || ""
   const profileImageSrc = adminProfile.profileImageUrl
@@ -172,8 +174,8 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
                 <div className="profile-image" data-ui="about-avatar">
                   <ProfileImage
                     src={profileImageSrc}
-                    width={132}
-                    height={132}
+                    width={72}
+                    height={72}
                     alt={`${displayName} profile`}
                     priority
                     fillContainer
@@ -183,16 +185,6 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
                   <strong>{displayName}</strong>
                   <span>{displayRole}</span>
                   <p>{displayBio}</p>
-                </div>
-              </div>
-              <div className="stack-list">
-                <div className="stack-row">
-                  <strong>NAME</strong>
-                  <span>{displayName}</span>
-                </div>
-                <div className="stack-row">
-                  <strong>ROLE</strong>
-                  <span>{displayRole}</span>
                 </div>
               </div>
             </section>

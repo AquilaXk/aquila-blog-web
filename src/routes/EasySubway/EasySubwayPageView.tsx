@@ -16,7 +16,6 @@ import {
   PRODUCT_FOOTER_LINKS,
   PRODUCT_META_FACTS,
   PRODUCT_RELEASE_STATUS,
-  PRODUCT_SCOPE_CHIPS,
   PRODUCT_SCREENSHOT,
   PRODUCT_SCREENSHOT_ALT,
   PRODUCT_SCREENSHOT_SIZE,
@@ -347,23 +346,13 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                   <strong>데이터 검증 기준</strong>
                 </S.DisplayHeading>
               </div>
+              <S.IntroAside>
+                수도권과 광역시 주요 노선에서 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
+              </S.IntroAside>
             </S.IntroLayout>
-            <S.ScopeLayout>
-              <div>
-                <S.IntroAside data-reveal>
-                  수도권과 광역시 주요 노선에서 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
-                </S.IntroAside>
-                <S.ChipCluster>
-                  {PRODUCT_SCOPE_CHIPS.map((chip) => (
-                    <li key={chip.id} data-reveal data-reveal-group="scope-chips">
-                      <S.ScopeChip $accent={chip.accent}>{chip.label}</S.ScopeChip>
-                    </li>
-                  ))}
-                </S.ChipCluster>
-              </div>
-              {/* [Phase 3 P2] 2x2 에디토리얼 기술 명세표 */}
+            <div style={{ marginTop: "clamp(2rem, 4vw, 3rem)" }}>
               <EasySubwayTechSpecGrid />
-            </S.ScopeLayout>
+            </div>
 
             {/* [P1] 공식 20개 노선 뱃지 그리드 */}
             <div style={{ marginTop: "clamp(2.5rem, 5vw, 3.5rem)" }} data-reveal>

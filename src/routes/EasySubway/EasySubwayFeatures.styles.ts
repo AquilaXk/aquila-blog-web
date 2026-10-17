@@ -55,10 +55,9 @@ export const FeatureStage = styled.div`
   align-items: flex-end;
   justify-content: center;
   gap: clamp(1rem, 2vw, 1.75rem);
-  padding: clamp(1.25rem, 2.4vw, 1.85rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.fieldDeep};
+  padding: 0;
+  border: none;
+  background: transparent;
 
   @media (max-width: ${breakpoint.sm}px) {
     flex-direction: column;
@@ -96,15 +95,10 @@ export const DetailCrop = styled.figure`
 export const RouteSpecPanel = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: clamp(1.5rem, 3.5vw, 2.25rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.fieldDeep};
-
-  @media (forced-colors: active) {
-    border-color: CanvasText;
-  }
+  gap: 1.5rem;
+  padding: clamp(1.75rem, 3.5vw, 2.5rem) 0 0;
+  border-top: 1px solid ${dark.hairline};
+  background: transparent;
 `
 
 export const RouteSpecHeader = styled.div`
@@ -112,16 +106,14 @@ export const RouteSpecHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding-bottom: 0.85rem;
-  border-bottom: 1px solid ${dark.hairline};
 `
 
 export const RouteSpecTitle = styled.h4`
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: ${fontWeight.semibold};
   color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 `
 
 export const RouteSpecTag = styled.span`
@@ -136,13 +128,9 @@ export const RouteSpecTag = styled.span`
 export const RouteSpecList = styled.dl`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
   margin: 0;
   padding: 0;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.hairline};
-  overflow: hidden;
 
   @media (max-width: ${breakpoint.sm}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -150,15 +138,12 @@ export const RouteSpecList = styled.dl`
 `
 
 export const RouteSpecCard = styled.div`
-  padding: 1.25rem;
-  background: ${dark.fieldRaised};
-
-  @media (forced-colors: active) {
-    border: 1px solid CanvasText;
-  }
+  padding: 1.15rem 0 0;
+  border-top: 1px solid ${dark.hairline};
+  background: transparent;
 
   dt {
-    margin: 0 0 0.35rem;
+    margin: 0 0 0.4rem;
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
@@ -173,15 +158,15 @@ export const RouteSpecCard = styled.div`
     strong {
       display: block;
       margin-bottom: 0.35rem;
-      font-size: 0.9375rem;
+      font-size: 0.96875rem;
       font-weight: ${fontWeight.semibold};
       color: ${dark.textPrimary};
     }
 
     p {
       margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
+      font-size: 0.90625rem;
+      line-height: 1.6;
       color: ${dark.textSecondary};
     }
   }
@@ -190,7 +175,7 @@ export const RouteSpecCard = styled.div`
 export const TimelineShowcase = styled.div`
   display: flex;
   align-items: center;
-  gap: clamp(1.25rem, 2.5vw, 2rem);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
   width: 100%;
 
   @media (max-width: ${breakpoint.sm}px) {
@@ -226,30 +211,30 @@ export const TimelinePhoneFrame = styled.figure`
 export const TimelineCalloutCluster = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1px;
   flex: 1;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.md}px;
-  background: ${dark.hairline};
-  overflow: hidden;
 `
 
 export const TimelineCalloutCard = styled.div`
-  padding: 1.15rem 1.25rem;
-  background: ${dark.fieldRaised};
+  padding: 1.1rem 0;
+  border-top: 1px solid ${dark.hairline};
+  background: transparent;
+
+  &:last-of-type {
+    border-bottom: 1px solid ${dark.hairline};
+  }
 
   strong {
     display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.9375rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.96875rem;
     font-weight: ${fontWeight.semibold};
     color: ${dark.textPrimary};
   }
 
   p {
     margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.55;
+    font-size: 0.90625rem;
+    line-height: 1.6;
     color: ${dark.textSecondary};
   }
 `
@@ -281,8 +266,8 @@ export const CalloutIconSvg = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   color: ${dark.signature};
 
   svg {
@@ -295,12 +280,8 @@ export const CalloutIconSvg = styled.span`
 export const ComparisonGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
   margin-top: clamp(2rem, 4vw, 3rem);
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.lg}px;
-  background: ${dark.hairline};
-  overflow: hidden;
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -311,6 +292,8 @@ export const ComparisonCard = styled.div<{ $variant?: "standard" | "highlighted"
   display: flex;
   flex-direction: column;
   padding: clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid ${({ $variant }) => ($variant === "highlighted" ? dark.borderStrong : dark.hairline)};
+  border-radius: ${radius.lg}px;
   background: ${({ $variant }) => ($variant === "highlighted" ? dark.fieldRaised : dark.fieldDeep)};
 `
 
@@ -326,23 +309,20 @@ export const ComparisonBadge = styled.span<{ $variant?: "standard" | "highlighte
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  min-height: 26px;
-  padding: 0 0.65rem;
-  border: 1px solid
-    ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.hairline)};
-  border-radius: ${radius.xs}px;
-  background: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.fieldDeep)};
-  color: ${({ $variant }) => ($variant === "highlighted" ? dark.onSignature : dark.textMuted)};
-  font-size: 0.75rem;
-  font-weight: ${fontWeight.semibold};
+  font-family: ${editorialLabel.fontFamily};
+  font-size: ${editorialLabel.fontSize};
+  font-weight: ${editorialLabel.fontWeight};
+  letter-spacing: ${editorialLabel.letterSpacing};
+  text-transform: ${editorialLabel.textTransform};
+  color: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.textMuted)};
 `
 
 export const ComparisonTitle = styled.h3`
   margin: 0;
   font-size: clamp(1.25rem, 2.2vw, 1.5rem);
-  font-weight: ${fontWeight.semibold};
+  font-weight: ${fontWeight.medium};
   color: ${dark.textPrimary};
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 `
 
 export const ComparisonList = styled.ul`
@@ -356,7 +336,7 @@ export const ComparisonList = styled.ul`
   li {
     display: flex;
     align-items: flex-start;
-    gap: 0.85rem;
+    gap: 0.75rem;
 
     strong {
       display: block;
@@ -379,18 +359,15 @@ export const ComparisonCheckIcon = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
   flex-shrink: 0;
-  border-radius: ${radius.xs}px;
-  background: ${dark.signature};
-  color: ${dark.onSignature};
-  font-size: 0.875rem;
-  font-weight: ${fontWeight.bold};
+  color: ${dark.signature};
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     fill: currentColor;
   }
 `
@@ -399,19 +376,15 @@ export const ComparisonCrossIcon = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
   flex-shrink: 0;
-  border: 1px solid ${dark.hairline};
-  border-radius: ${radius.xs}px;
-  background: ${dark.fieldDeep};
   color: ${dark.textMuted};
-  font-size: 0.8125rem;
-  font-weight: ${fontWeight.medium};
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     fill: currentColor;
   }
 `

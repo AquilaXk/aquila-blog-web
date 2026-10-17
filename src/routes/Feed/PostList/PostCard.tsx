@@ -93,19 +93,24 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
         <header><h2>{data.title}</h2></header>
         {data.summary && <p className="summary">{data.summary}</p>}
         <div className="meta">
-          {createdAtText && <span>{t("metaDate")} {createdAtText}</span>}
-          {createdAtText && authorName && <span aria-hidden="true">|</span>}
+          {createdAtText && (
+            <span>
+              <span className="srOnly">{t("metaDate")} </span>
+              {createdAtText}
+            </span>
+          )}
+          {createdAtText && authorName && <span aria-hidden="true">·</span>}
           {authorName && (
             <span className="author">
-              <span>{t("metaAuthor")}</span>
+              <span className="srOnly">{t("metaAuthor")} </span>
               <span className="avatar">
                 {authorImageSrc ? (
                   <ProfileImage
                     src={authorImageSrc}
                     alt={`${authorName} profile image`}
                     fillContainer
-                    width={20}
-                    height={20}
+                    width={16}
+                    height={16}
                   />
                 ) : (
                   <span className="avatarFallback" aria-hidden="true" />
@@ -138,6 +143,18 @@ const StyledWrapper = styled.a`
 
   article { min-width: 0; }
 
+  .srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   h2 {
     margin: 0;
     color: var(--aq-text);
@@ -168,7 +185,7 @@ const StyledWrapper = styled.a`
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
     margin-top: 10px;
     color: var(--aq-muted);
     font-size: ${uiTokens.feed.card.metaFontSizeRem}rem;
@@ -185,8 +202,8 @@ const StyledWrapper = styled.a`
   .avatar {
     position: relative;
     display: inline-block;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     overflow: hidden;
     background: var(--aq-surface-elevated);
