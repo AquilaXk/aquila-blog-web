@@ -243,8 +243,16 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     await expect(page).toHaveTitle("교통약자를 먼저 생각한 지하철 길찾기 | EasySubway")
     await expect(page).not.toHaveTitle(/EasySubway.*EasySubway/)
 
-    await expect(page.locator("#compare")).toBeVisible()
-    await expect(page.locator("#faq")).toBeVisible()
+    await expect(page.getByRole("link", { name: "핵심 기능 살펴보기" })).toHaveAttribute(
+      "href",
+      "#features"
+    )
+    await expect(page.getByRole("link", { name: "제공 범위 확인하기" })).toHaveAttribute(
+      "href",
+      "#scope"
+    )
+    await expect(page.locator("#compare")).toHaveCount(0)
+    await expect(page.locator("#faq")).toHaveCount(0)
 
     const description = page.locator("meta[name='description']")
     await expect(description).toHaveAttribute("content", /Android\/iOS/)
@@ -315,17 +323,13 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     for (const specCategory of ["수직 이동", "환승 연계", "시설 데이터", "운행 안전"]) {
       await expect(routeSpec).toContainText(specCategory)
     }
+    await expect(routeSpec).toContainText("엘리베이터 직결 동선")
+    await expect(routeSpec).toContainText("9-2 승차 위치 안내")
+    await expect(routeSpec).toContainText("역사 편의시설 실측 정보")
+    await expect(routeSpec).toContainText("실시간 운행 상태 연동")
 
-    // [P1/P2] 실기기 타임라인 목업, 1:1 비교, FAQ, 공식 20개 노선 렌더 검증
-    await expect(page.locator("main")).toContainText("빠른 환승·하차")
-    await expect(page.locator("main")).toContainText("9-2 승차 위치 안내")
-    await expect(page.locator("main")).toContainText("단차 0cm 이동")
-    await expect(page.locator("main")).toContainText("교통약자 특화")
-    await expect(page.locator("main")).toContainText("휠체어·유모차 맞춤 동선")
-    await expect(page.getByRole("region", { name: "자주 묻는 질문" })).toBeVisible()
+    // 실기기 타임라인 목업, 공식 20개 노선, 문의 및 복사 CTA 렌더 검증
     await expect(page.locator("#scope")).toContainText("공식 20개 노선 무장애 데이터 연동")
-    await expect(page.locator("#compare")).toContainText("계단 80개 구간 통과 강요")
-    await expect(page.locator("#compare")).toContainText("단차 0cm 엘리베이터 직결 동선")
     await expect(page.getByRole("link", { name: "서비스 문의하기" })).toBeVisible()
     await expect(page.getByRole("button", { name: "이메일 주소 복사" })).toBeVisible()
 
@@ -337,7 +341,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     // [Phase 2 P1] 탈-슬롭: 9rem 고스트 넘버 및 BreakCut 띠 섹션 제거 단언
     await expect(page.locator("main")).not.toContainText("현재 서버 기준의 결과만 안내합니다")
 
-    // [Phase 3 P2] 2x2 에디토리얼 기술 명세표 4대 팩트 렌더 검증
+    // [Phase 3 P2] 4열 에디토리얼 기술 명세표 4대 팩트 렌더 검증
     const techSpec = page.getByRole("region", { name: "정식 출시 기술 명세" })
     await expect(techSpec).toBeVisible()
     for (const specLabel of ["적용 범위", "접근성 데이터", "서비스 형태", "제공 플랫폼"]) {

@@ -1,6 +1,6 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
-import { marketingDark as dark } from "src/design-system/marketingPalette"
+import { marketingLight as light } from "src/design-system/marketingPalette"
 
 export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
   display: grid;
@@ -8,6 +8,11 @@ export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
   align-items: center;
   gap: clamp(2rem, 5vw, 5rem);
   padding: clamp(2.5rem, 6vw, 4.5rem) 0;
+  border-top: 1px solid ${light.border};
+
+  &:first-of-type {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
 
   > div:last-of-type {
     order: ${({ $reverse }) => ($reverse ? -1 : 0)};
@@ -30,16 +35,17 @@ export const FeatureIndex = styled.span`
   font-weight: ${editorialLabel.fontWeight};
   letter-spacing: ${editorialLabel.letterSpacing};
   text-transform: ${editorialLabel.textTransform};
-  color: ${dark.textMuted};
+  color: ${light.accentText};
 `
 
 export const FeatureName = styled.h3`
   margin: 0 0 1rem;
-  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
-  line-height: 1.3;
+  font-size: clamp(1.45rem, 2.5vw, 1.9rem);
+  line-height: 1.25;
   letter-spacing: -0.02em;
-  font-weight: ${fontWeight.semibold};
-  color: ${dark.textPrimary};
+  font-weight: ${fontWeight.medium};
+  color: ${light.inkPrimary};
+  text-wrap: balance;
 `
 
 export const FeatureBody = styled.p`
@@ -47,17 +53,15 @@ export const FeatureBody = styled.p`
   max-width: 30rem;
   font-size: 1.0625rem;
   line-height: 1.7;
-  color: ${dark.textSecondary};
+  color: ${light.inkSecondary};
 `
 
 export const FeatureStage = styled.div`
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   gap: clamp(1rem, 2vw, 1.75rem);
   padding: 0;
-  border: none;
-  background: transparent;
 
   @media (max-width: ${breakpoint.sm}px) {
     flex-direction: column;
@@ -67,14 +71,15 @@ export const FeatureStage = styled.div`
 
 export const DetailCrop = styled.figure`
   margin: 0;
-  width: min(100%, 26rem);
+  width: min(100%, 24rem);
 
   > div {
     overflow: hidden;
     aspect-ratio: 4 / 3;
-    border: 1px solid ${dark.borderStrong};
-    border-radius: ${radius.lg}px;
-    background: ${dark.fieldRaised};
+    border: 1px solid ${light.border};
+    border-radius: ${radius.md}px;
+    background: ${light.surface};
+    box-shadow: ${light.phoneShadow};
   }
 
   img {
@@ -86,18 +91,19 @@ export const DetailCrop = styled.figure`
   }
 
   figcaption {
-    margin-top: 0.6rem;
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
+    margin-top: 0.75rem;
+    font-size: 0.84375rem;
+    color: ${light.inkSecondary};
+    text-align: center;
   }
 `
 
 export const RouteSpecPanel = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: clamp(1.75rem, 3.5vw, 2.5rem) 0 0;
-  border-top: 1px solid ${dark.hairline};
+  gap: 1.75rem;
+  padding: clamp(2rem, 4vw, 3rem) 0 0;
+  border-top: 1px solid ${light.border};
   background: transparent;
 `
 
@@ -110,9 +116,9 @@ export const RouteSpecHeader = styled.div`
 
 export const RouteSpecTitle = styled.h4`
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: ${fontWeight.semibold};
-  color: ${dark.textPrimary};
+  color: ${light.inkPrimary};
   letter-spacing: -0.015em;
 `
 
@@ -122,15 +128,19 @@ export const RouteSpecTag = styled.span`
   font-weight: ${editorialLabel.fontWeight};
   letter-spacing: ${editorialLabel.letterSpacing};
   text-transform: ${editorialLabel.textTransform};
-  color: ${dark.signature};
+  color: ${light.accentText};
 `
 
 export const RouteSpecList = styled.dl`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.5rem, 3vw, 2.5rem);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.25rem);
   margin: 0;
   padding: 0;
+
+  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   @media (max-width: ${breakpoint.sm}px) {
     grid-template-columns: minmax(0, 1fr);
@@ -139,17 +149,17 @@ export const RouteSpecList = styled.dl`
 
 export const RouteSpecCard = styled.div`
   padding: 1.15rem 0 0;
-  border-top: 1px solid ${dark.hairline};
+  border-top: 1px solid ${light.border};
   background: transparent;
 
   dt {
-    margin: 0 0 0.4rem;
+    margin: 0 0 0.45rem;
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
     letter-spacing: ${editorialLabel.letterSpacing};
     text-transform: ${editorialLabel.textTransform};
-    color: ${dark.signature};
+    color: ${light.accentText};
   }
 
   dd {
@@ -157,17 +167,18 @@ export const RouteSpecCard = styled.div`
 
     strong {
       display: block;
-      margin-bottom: 0.35rem;
-      font-size: 0.96875rem;
+      margin-bottom: 0.4rem;
+      font-size: 1.0625rem;
       font-weight: ${fontWeight.semibold};
-      color: ${dark.textPrimary};
+      color: ${light.inkPrimary};
+      letter-spacing: -0.015em;
     }
 
     p {
       margin: 0;
-      font-size: 0.90625rem;
-      line-height: 1.6;
-      color: ${dark.textSecondary};
+      font-size: 0.9375rem;
+      line-height: 1.65;
+      color: ${light.inkSecondary};
     }
   }
 `
@@ -175,216 +186,31 @@ export const RouteSpecCard = styled.div`
 export const TimelineShowcase = styled.div`
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: clamp(1.5rem, 3vw, 2.5rem);
   width: 100%;
 
   @media (max-width: ${breakpoint.sm}px) {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
   }
 `
 
 export const TimelinePhoneFrame = styled.figure`
   position: relative;
-  flex: 0 0 clamp(11rem, 24vw, 14.5rem);
-  margin: 0;
-  padding: 0.4rem;
-  border: 1px solid ${dark.borderStrong};
-  border-radius: 1.5rem;
-  background: ${dark.fieldDeep};
-  box-shadow: ${dark.phoneShadow};
+  flex: 0 0 auto;
+  width: min(100%, 17.5rem);
+  margin: 0 auto;
+  padding: 0.45rem;
+  border: 1px solid ${light.border};
+  border-radius: 1.75rem;
+  background: ${light.surface};
+  box-shadow: ${light.phoneShadow};
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 1.15rem;
-  }
-
-  @media (max-width: ${breakpoint.sm}px) {
-    flex: none;
-    width: min(100%, 14rem);
-    margin: 0 auto;
-  }
-`
-
-export const TimelineCalloutCluster = styled.div`
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-`
-
-export const TimelineCalloutCard = styled.div`
-  padding: 1.1rem 0;
-  border-top: 1px solid ${dark.hairline};
-  background: transparent;
-
-  &:last-of-type {
-    border-bottom: 1px solid ${dark.hairline};
-  }
-
-  strong {
-    display: block;
-    margin-bottom: 0.3rem;
-    font-size: 0.96875rem;
-    font-weight: ${fontWeight.semibold};
-    color: ${dark.textPrimary};
-  }
-
-  p {
-    margin: 0;
-    font-size: 0.90625rem;
-    line-height: 1.6;
-    color: ${dark.textSecondary};
-  }
-`
-
-export const CalloutHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.45rem;
-
-  img {
-    display: block;
-    width: 22px;
-    height: 22px;
-    object-fit: contain;
-  }
-`
-
-export const CalloutTag = styled.span`
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-  text-transform: ${editorialLabel.textTransform};
-  color: ${dark.signature};
-`
-
-export const CalloutIconSvg = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: ${dark.signature};
-
-  svg {
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-  }
-`
-
-export const ComparisonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.5rem, 3vw, 2.5rem);
-  margin-top: clamp(2rem, 4vw, 3rem);
-
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-export const ComparisonCard = styled.div<{ $variant?: "standard" | "highlighted" }>`
-  display: flex;
-  flex-direction: column;
-  padding: clamp(1.5rem, 3vw, 2.25rem);
-  border: 1px solid ${({ $variant }) => ($variant === "highlighted" ? dark.borderStrong : dark.hairline)};
-  border-radius: ${radius.lg}px;
-  background: ${({ $variant }) => ($variant === "highlighted" ? dark.fieldRaised : dark.fieldDeep)};
-`
-
-export const ComparisonCardHeader = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid ${dark.hairline};
-`
-
-export const ComparisonBadge = styled.span<{ $variant?: "standard" | "highlighted" }>`
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  font-family: ${editorialLabel.fontFamily};
-  font-size: ${editorialLabel.fontSize};
-  font-weight: ${editorialLabel.fontWeight};
-  letter-spacing: ${editorialLabel.letterSpacing};
-  text-transform: ${editorialLabel.textTransform};
-  color: ${({ $variant }) => ($variant === "highlighted" ? dark.signature : dark.textMuted)};
-`
-
-export const ComparisonTitle = styled.h3`
-  margin: 0;
-  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
-  font-weight: ${fontWeight.medium};
-  color: ${dark.textPrimary};
-  letter-spacing: -0.015em;
-`
-
-export const ComparisonList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: 1.15rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-
-    strong {
-      display: block;
-      font-size: 0.9375rem;
-      font-weight: ${fontWeight.semibold};
-      color: ${dark.textPrimary};
-      margin-bottom: 0.25rem;
-    }
-
-    p {
-      margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
-      color: ${dark.textSecondary};
-    }
-  }
-`
-
-export const ComparisonCheckIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: 0.1rem;
-  flex-shrink: 0;
-  color: ${dark.signature};
-
-  svg {
-    width: 16px;
-    height: 16px;
-    fill: currentColor;
-  }
-`
-
-export const ComparisonCrossIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: 0.1rem;
-  flex-shrink: 0;
-  color: ${dark.textMuted};
-
-  svg {
-    width: 15px;
-    height: 15px;
-    fill: currentColor;
+    border-radius: 1.35rem;
   }
 `

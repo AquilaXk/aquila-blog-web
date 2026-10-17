@@ -171,10 +171,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
             <Sec.StoryLayout data-reveal data-reveal-group="approach-story">
               <div>
                 <S.SectionLabel>회사 소개</S.SectionLabel>
-                <Sec.StoryHeadline>
-                  작은 팀이
-                  <strong>끝까지 봅니다</strong>
-                </Sec.StoryHeadline>
+                <Sec.StoryHeadline>작은 팀이 끝까지 봅니다</Sec.StoryHeadline>
               </div>
               <S.SectionAside>
                 기획부터 개발, 인프라 운영까지 유기적으로 연결하여 사용자의 목소리를 빠르게 제품에
