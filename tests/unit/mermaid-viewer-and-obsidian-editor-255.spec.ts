@@ -49,13 +49,16 @@ import {
 test.describe("Issue #255 Track 1 + Track 2 verification", () => {
   test("AC1: Mermaid controller reuses queue/observer across runs, prevents duplicate in-flight renders, and batches layout reads before writes", async () => {
     const events: string[] = []
-    const makeBlock = (id: string, source: string) => {
+    const makeBlock = (id: string, initialSource: string) => {
+      let currentSource = initialSource
       const code = {
         className: "language-mermaid",
-        textContent: source,
+        get textContent() {
+          return currentSource
+        },
         getAttribute: (name: string) => (name === "data-language" ? "mermaid" : null),
       } as unknown as HTMLElement
-      let innerHTMLValue = `<code class="language-mermaid">${source}</code>`
+      let innerHTMLValue = `<code class="language-mermaid">${initialSource}</code>`
       const block = {
         isConnected: true,
         className: "aq-mermaid",
@@ -65,8 +68,13 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
           overflowX: "",
           setProperty: () => {},
         },
-        textContent: source,
-        getAttribute: (name: string) => (name === "data-mermaid-source" ? source : null),
+        get textContent() {
+          return currentSource
+        },
+        getAttribute: (name: string) => (name === "data-mermaid-source" ? currentSource : null),
+        setSource: (next: string) => {
+          currentSource = next
+        },
         closest: () => null,
         querySelector: () => code,
         querySelectorAll: () => [],
@@ -77,7 +85,7 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
           events.push(`read:${id}`)
           return { width: 640, height: 180, left: 40, right: 680, top: 0, bottom: 180 } as DOMRect
         },
-      } as unknown as HTMLElement
+      } as unknown as HTMLElement & { setSource: (next: string) => void }
       Object.defineProperty(block, "innerHTML", {
         get: () => innerHTMLValue,
         set: (next: string) => {
@@ -156,6 +164,12 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
       for (const readIdx of readIndices) {
         expect(readIdx).toBeLessThan(firstWriteIndex)
       }
+
+      // In-place data-mermaid-source update on an already-rendered block triggers re-render
+      block1.setSource("flowchart TD\nA1-->C1")
+      await controller.renderMermaidBlocks()
+      expect(renderCalls).toBe(3)
+      expect(block1.dataset.mermaidRenderedSource).toBe("flowchart TD\nA1-->C1")
     } finally {
       ;(globalThis as Record<string, unknown>).window = origWin
       ;(globalThis as Record<string, unknown>).document = origDoc
@@ -292,14 +306,17 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
       },
     }
     const fnModel = createDocumentFootnoteModel({
-      source: "일반 문단입니다.\n\n각주 참조[^1]\n\n[^1]: 각주 설명",
+      source:
+        "일반 문단입니다.\n\n[ext]: https://example.com/doc\n\n각주 참조[^1]\n\n[^1]: 각주 [설명][ext]",
       segments: [
         plainSegment,
-        { type: "markdown", content: "각주 참조[^1]\n\n[^1]: 각주 설명" },
+        { type: "markdown", content: "[ext]: https://example.com/doc" },
+        { type: "markdown", content: "각주 참조[^1]\n\n[^1]: 각주 [설명][ext]" },
       ],
     })
     expect(fnModel.footnotes).toHaveLength(1)
-    expect(nonFootnoteContentReads).toBeLessThanOrEqual(2)
+    expect(fnModel.footnotes[0]?.content).toContain("https://example.com/doc")
+    expect(nonFootnoteContentReads).toBeLessThanOrEqual(3)
 
     const variants = createMarkdownComponentVariants({
       footnotes: [],
@@ -367,7 +384,7 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
       "  A --> B",
       "```",
       "",
-      "한글 입력 중인 **강조** 문단입니다.",
+      "한글 입력 중인 **강조** $x+1$ 문단입니다.",
     ].join("\n")
 
     const activeLinePos = doc.indexOf("한글 입력 중인") + 2

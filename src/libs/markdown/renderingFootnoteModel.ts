@@ -17,7 +17,7 @@ type MarkdownAstNode = {
 
 type MarkdownCapableSegment = Extract<MarkdownSegment, { content: string }>
 type ParsedSegment = { index: number; segment: MarkdownCapableSegment; tree: MarkdownAstNode }
-type DefinitionRecord = { node: MarkdownAstNode }
+type DefinitionRecord = { node: MarkdownAstNode; raw?: string }
 type ReferenceRecord = { segmentIndex: number; node: MarkdownAstNode }
 type CombinedSegmentRange = { segmentIndex: number; start: number; end: number }
 type SourcePatch = { start: number; end: number; replacement: string }
@@ -154,7 +154,9 @@ export const createDocumentFootnoteModel = ({
   for (const parsed of parsedSegments) {
     visitNodes(parsed.tree, (node) => {
       if (node.type === "footnoteDefinition" && node.identifier && !footnoteDefinitions.has(node.identifier)) {
-        footnoteDefinitions.set(node.identifier, { node })
+        const offsets = getOffsets(node)
+        const raw = offsets ? parsed.segment.content.slice(offsets.start, offsets.end) : undefined
+        footnoteDefinitions.set(node.identifier, { node, raw })
       }
       if (node.type === "definition" && node.identifier && !ordinaryDefinitions.has(node.identifier)) {
         ordinaryDefinitions.set(node.identifier, { node })
@@ -164,6 +166,32 @@ export const createDocumentFootnoteModel = ({
 
   if (footnoteDefinitions.size === 0) {
     return buildUnchangedResult()
+  }
+
+  const parsedIndices = new Set(parsedSegments.map((item) => item.index))
+  const externalOrdinaryDefTexts: string[] = []
+  segments.forEach((segment, index) => {
+    if (parsedIndices.has(index) || !isMarkdownCapableSegment(segment)) return
+    const { content } = segment
+    if (!content.includes("]:")) return
+    visitNodes(parseMarkdownAst(content), (node) => {
+      if (node.type === "definition" && node.identifier && !ordinaryDefinitions.has(node.identifier)) {
+        ordinaryDefinitions.set(node.identifier, { node })
+        externalOrdinaryDefTexts.push(serializeDefinition(node))
+      }
+    })
+  })
+  if (externalOrdinaryDefTexts.length > 0) {
+    const suffix = externalOrdinaryDefTexts.join("\n\n")
+    for (const [identifier, record] of footnoteDefinitions.entries()) {
+      const sourceText = record.raw ?? serializeDefinition(record.node)
+      const reparsed = parseMarkdownAst(`${sourceText}\n\n${suffix}`)
+      visitNodes(reparsed, (node) => {
+        if (node.type === "footnoteDefinition" && node.identifier === identifier) {
+          footnoteDefinitions.set(identifier, { node, raw: record.raw })
+        }
+      })
+    }
   }
 
   const { combinedSource, ranges } = buildCombinedSource(parsedSegments)

@@ -68,10 +68,34 @@ export const createMermaidRuntimeController = ({
   const maxRetryCount = 6
   const retryBaseDelayMs = 150
 
-  const isBlockAlreadyRendered = (block: HTMLElement, desiredSource?: string) =>
-    (block.dataset.mermaidRendered === "true" || block.dataset.mermaidRendered === "error") &&
-    block.dataset.mermaidTheme === preset.themeKey &&
-    (desiredSource === undefined || block.dataset.mermaidRenderedSource === desiredSource)
+  const resolveBlockDesiredSource = (block: HTMLElement) => {
+    const codeBlock =
+      block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
+    return applyMermaidSoftWrapHints(
+      extractNormalizedMermaidSource(
+        block.getAttribute("data-mermaid-source") ||
+          codeBlock?.textContent ||
+          block.textContent ||
+          ""
+      )
+    )
+  }
+
+  const isBlockAlreadyRendered = (block: HTMLElement, desiredSource?: string) => {
+    if (
+      (block.dataset.mermaidRendered !== "true" && block.dataset.mermaidRendered !== "error") ||
+      block.dataset.mermaidTheme !== preset.themeKey
+    ) {
+      return false
+    }
+    const targetSource = desiredSource ?? resolveBlockDesiredSource(block)
+    if (!targetSource) return true
+    const renderedSource = block.dataset.mermaidRenderedSource
+    return (
+      renderedSource === targetSource ||
+      renderedSource === stripRiskyFlowchartDirectives(targetSource).trim()
+    )
+  }
 
   const resolveDesktopWideLaneBounds = (block: HTMLElement) => {
     if (!allowDesktopWideLane) return null
