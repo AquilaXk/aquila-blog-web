@@ -47,6 +47,7 @@ export const ExplorerCard = styled.section`
   .sortTrigger {
     height: 36px;
     border: 1px solid var(--aq-border);
+    border-radius: 6px;
     background: var(--aq-surface);
     display: inline-flex;
     color: var(--aq-muted);
@@ -60,6 +61,10 @@ export const ExplorerCard = styled.section`
     font-weight: 740;
     letter-spacing: 0;
     cursor: pointer;
+    transition:
+      border-color 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      color 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      background-color 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
   }
 
   .sortTrigger:hover,
@@ -76,6 +81,18 @@ export const ExplorerCard = styled.section`
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     transform: translateY(-2px) rotate(45deg);
+    transition: transform 200ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  .sortTrigger[aria-expanded="true"] .sortChevron {
+    transform: translateY(1px) rotate(225deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sortTrigger,
+    .sortChevron {
+      transition: none;
+    }
   }
 
   .sortMenu {
@@ -85,6 +102,7 @@ export const ExplorerCard = styled.section`
     z-index: 20;
     min-width: 100%;
     border: 1px solid var(--aq-border-strong);
+    border-radius: 6px;
     background: var(--aq-surface);
     box-shadow: none;
     padding: 3px;
@@ -94,6 +112,7 @@ export const ExplorerCard = styled.section`
     width: 100%;
     height: 30px;
     border: 0;
+    border-radius: 4px;
     background: transparent;
     color: var(--aq-muted);
     display: grid;
@@ -233,7 +252,7 @@ export const FilterContextBar = styled.div`
     gap: 0.28rem;
     min-height: 1.7rem;
     padding: 0 0.58rem;
-    border-radius: 999px;
+    border-radius: 4px;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface-elevated);
     color: var(--aq-muted);

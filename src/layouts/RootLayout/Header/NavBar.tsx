@@ -338,6 +338,7 @@ const MobileMenuPanel = styled.div`
   display: grid;
   width: min(220px, calc(100vw - 1.5rem));
   border: 1px solid var(--aq-border-strong);
+  border-radius: 6px;
   background: var(--aq-surface);
   padding: 6px;
   pointer-events: auto;

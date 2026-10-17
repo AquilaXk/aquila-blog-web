@@ -1,8 +1,41 @@
 import { expect, test } from "@playwright/test"
-import { createElement } from "react"
+import { createElement, Fragment } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
+import {
+  CompanyFeatureExplorerView,
+  formatCapabilityIndex,
+} from "../../src/routes/Company/CompanyFeatureCarousel"
+import { createParticleSeeds, smoothstep } from "../../src/routes/Company/CompanyHeroParticles"
 import * as Sec from "../../src/routes/Company/CompanySection.styles"
-import { BLOG_URL, type CompanyNewsItem } from "../../src/routes/Company/CompanyPageModel"
+import {
+  BLOG_URL,
+  COMPANY_FEATURE_CARDS,
+  type CompanyNewsItem,
+} from "../../src/routes/Company/CompanyPageModel"
+
+function unwrapPw(node: any, index?: number): any {
+  if (!node || typeof node !== "object") return node
+  if (Array.isArray(node)) return node.map((child, i) => unwrapPw(child, i))
+  if (node.__pw_type === "jsx") {
+    const { type, props, key } = node
+    const newProps: any = {}
+    for (const k in props) {
+      newProps[k] = unwrapPw(props[k])
+    }
+    const resolvedKey = key !== undefined && key !== null ? key : index !== undefined ? `child-${index}` : undefined
+    if (typeof type === "function" && !(type as any).__emotion_real) {
+      return unwrapPw(type(newProps), index)
+    }
+    const elementType =
+      typeof type === "string" ||
+      typeof type === "function" ||
+      (type && typeof type === "object" && "$$typeof" in type)
+        ? type
+        : Fragment
+    return createElement(elementType, { ...newProps, key: resolvedKey })
+  }
+  return node
+}
 
 /**
  * CompanyPageView 내 소식 카드 렌더 로직과 1:1로 대응하는 렌더러.
@@ -187,3 +220,50 @@ test("NewsHead와 NewsHeaderAction은 기술 블로그 링크와 44px 터치 타
   expect(headMarkup).toContain('aria-hidden="true"')
   expect(headMarkup).not.toContain(".undefined")
 })
+
+test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드와 01~06 모노스페이스 인덱스를 정적 헤어라인 그리드로 렌더한다", () => {
+  const markup = renderToStaticMarkup(
+    unwrapPw((CompanyFeatureExplorerView as () => unknown)()),
+  )
+
+  expect(markup).toContain('role="region"')
+  expect(markup).toContain('aria-label="핵심 역량 카드"')
+  expect(markup).not.toContain('data-bouncer')
+  expect(markup).not.toContain(".undefined")
+
+  const articles = markup.match(/<article\b/g) ?? []
+  expect(articles).toHaveLength(COMPANY_FEATURE_CARDS.length)
+
+  COMPANY_FEATURE_CARDS.forEach((card, index) => {
+    expect(markup).toContain(formatCapabilityIndex(index))
+    expect(markup).toContain(card.title)
+    expect(markup).toContain(card.tag)
+    expect(markup).toContain(card.body)
+  })
+})
+
+test("formatCapabilityIndex는 1-based 두 자리 모노스페이스 인덱스를 정확히 계산한다", () => {
+  expect(formatCapabilityIndex(0)).toBe("01")
+  expect(formatCapabilityIndex(5)).toBe("06")
+})
+
+test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 보간과 정규화된 입자 시드를 생성한다", () => {
+  expect(smoothstep(0, 1, -0.5)).toBe(0)
+  expect(smoothstep(0, 1, 0.5)).toBe(0.5)
+  expect(smoothstep(2, 6, 4)).toBe(0.5)
+  expect(smoothstep(0, 1, 1.5)).toBe(1)
+  expect(smoothstep(2, 2, 2)).toBe(0)
+
+  const seeds = createParticleSeeds(15, 9, 5)
+  expect(seeds).toHaveLength(135)
+  for (const seed of seeds) {
+    expect(seed.refX).toBeGreaterThanOrEqual(-1.1)
+    expect(seed.refX).toBeLessThanOrEqual(1.1)
+    expect(seed.refY).toBeGreaterThanOrEqual(-1.1)
+    expect(seed.refY).toBeLessThanOrEqual(1.1)
+    expect(seed.colorIndex).toBeGreaterThanOrEqual(0)
+    expect(seed.colorIndex).toBeLessThan(5)
+  }
+})
+
+

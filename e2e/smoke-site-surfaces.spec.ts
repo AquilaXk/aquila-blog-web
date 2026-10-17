@@ -157,6 +157,35 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(grid.locator("article")).toHaveCount(6)
   })
 
+  test("히어로 파티클 캔버스, 스크롤 반응형 헤더, 1px 헤어라인 역량 그리드가 동작한다", async ({
+    page,
+  }) => {
+    await page.goto("/company")
+
+    const canvas = page.locator("[data-ui='company-hero-particles'] canvas")
+    await expect(canvas).toBeAttached()
+    const canvasDimensions = await canvas.evaluate((el: HTMLCanvasElement) => ({
+      width: el.width,
+      height: el.height,
+    }))
+    expect(canvasDimensions.width).toBeGreaterThan(0)
+    expect(canvasDimensions.height).toBeGreaterThan(0)
+
+    const header = page.locator("header[data-header]")
+    await expect(header).not.toHaveClass(/scrolled/)
+    await page.evaluate(() => window.scrollTo(0, 120))
+    await expect(header).toHaveAttribute("data-scrolled", "true")
+    await expect(header).toHaveClass(/scrolled/)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await expect(header).not.toHaveClass(/scrolled/)
+
+    const grid = page.getByRole("region", { name: "핵심 역량 카드" })
+    await expect(grid.locator("article")).toHaveCount(6)
+    await expect(grid.getByText("01")).toBeVisible()
+    await expect(grid.getByText("06")).toBeVisible()
+    await expect(page.locator("[data-bouncer]")).toHaveCount(0)
+  })
+
   test("2대 프로덕트 쇼케이스 카드와 하단 기술 신뢰성 텍스트 리스트를 렌더한다", async ({ page }) => {
     await page.goto("/company")
     const workSection = page.locator("#work")

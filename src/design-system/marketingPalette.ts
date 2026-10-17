@@ -106,6 +106,12 @@ export const marketingLight = {
   focus: brand[700],
   /** 1px stroke 라인아트·장식 그래픽 전용(정본 roleRestrictions `brand.500` = brand.graphic). */
   graphic: brand[500],
+  /** 프로스티드 글래스 헤더 및 1px 헤어라인 토큰 */
+  surfaceGlass: "rgba(255, 255, 255, 0.88)",
+  surfaceGlassElevated: "rgba(255, 255, 255, 0.96)",
+  surfaceHoverTint: "rgba(31, 35, 64, 0.04)",
+  borderHairline: "rgba(31, 35, 64, 0.08)",
+  particleColors: ["#2C64ED", "#5C6BC0", "#7480D2", "#F84242", "#FFCF03"] as const,
 } as const
 
 /**
@@ -147,4 +153,7 @@ export const marketingDark = {
   graphic: brand[500],
   /** 폰 프레임 목업을 위한 정갈한 다크 입체 섀도우 토큰. */
   phoneShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 12px 24px -8px rgba(0, 0, 0, 0.45)",
+  surfaceGlass: "rgba(22, 25, 45, 0.86)",
+  surfaceGlassScrolled: "rgba(22, 25, 45, 0.95)",
+  particleColors: ["#7189FF", "#3074F9", "#949FE8", "#B4BCFB"] as const,
 } as const
