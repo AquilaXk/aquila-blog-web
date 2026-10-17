@@ -158,10 +158,6 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     font-size: 14px;
   }
 
-  .aq-table[data-narrow-table="true"] {
-    min-width: 100%;
-  }
-
   table[data-overflow-mode="wide"],
   .aq-table.aq-table-wide {
     width: max-content;
