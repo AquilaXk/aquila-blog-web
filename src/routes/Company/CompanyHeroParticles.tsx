@@ -161,6 +161,10 @@ const CompanyHeroParticles: React.FC = () => {
       ctx.clearRect(0, 0, width, height)
 
       const baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
+      const halfWidth = width * 0.5
+      const halfHeight = height * 0.5
+      const clearRx = Math.min(width * 0.48, 420)
+      const clearRy = Math.min(height * 0.36, 230)
 
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i]
@@ -205,14 +209,12 @@ const CompanyHeroParticles: React.FC = () => {
         const finalX = p.refX + dispX + p.posX * 0.28
         const finalY = p.refY + dispY + p.posY * 0.28
 
-        const screenX = (finalX * 0.5 + 0.5) * width
-        const screenY = (finalY * 0.5 + 0.5) * height
-        const clearRx = Math.min(width * 0.48, 420)
-        const clearRy = Math.min(height * 0.36, 230)
+        const screenX = (finalX + 1) * halfWidth
+        const screenY = (finalY + 1) * halfHeight
         const centerClearance = smoothstep(
           0.76,
           1.16,
-          Math.hypot((screenX - width * 0.5) / clearRx, (screenY - height * 0.5) / clearRy)
+          Math.hypot((screenX - halfWidth) / clearRx, (screenY - halfHeight) / clearRy)
         )
         const alpha =
           Math.min(0.76, Math.max(0.08, p.scale * 0.34)) * centerClearance

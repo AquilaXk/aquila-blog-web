@@ -201,6 +201,26 @@ export const ProductBadge = styled.span`
   color: ${light.accentText};
 `
 
+export const ProductHighlightList = styled.ul`
+  display: none;
+`
+
+export const ReliabilityBlock = styled.div`
+  display: none;
+`
+
+export const ReliabilityHeader = styled.div`
+  display: none;
+`
+
+export const ReliabilityList = styled.ul`
+  display: none;
+`
+
+export const ReliabilityItem = styled.li`
+  display: none;
+`
+
 export const ProductAction = styled.a`
   ${focusVisibleRing};
   display: inline-flex;

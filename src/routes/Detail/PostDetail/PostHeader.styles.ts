@@ -338,7 +338,6 @@ export const StyledWrapper = styled.header `
     }
 
     .shareFeedbackPill,
-    .likeButton,
     .shareButton {
       min-height: ${control.lg}px;
     }
