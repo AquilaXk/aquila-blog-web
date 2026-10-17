@@ -681,7 +681,20 @@ test.describe("live Markdown writing surface", () => {
     await editorContent(page).evaluate((element) => {
       element.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "ㅎ" }))
     })
-    await expect.poll(() => visibleEditorLines(page)).toEqual(liveMarkdown.split("\n"))
+    await expect.poll(() => visibleEditorLines(page)).toEqual([
+      "Live writing",
+      "",
+      "Paragraph with **bold** and [link](https://example.test).",
+      "",
+      "• ",
+      "• ✓",
+      "",
+      " quoted note",
+      "",
+      "```ts",
+      "const value = 1",
+      "```",
+    ])
     await editorContent(page).evaluate((element) => {
       element.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "한" }))
     })
