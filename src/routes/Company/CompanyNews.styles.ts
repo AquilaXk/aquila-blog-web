@@ -1,12 +1,8 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
-
-const CONTENT_MAX_WIDTH = "75rem"
-const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
-const TRANSITION = "220ms cubic-bezier(0.165, 0.84, 0.44, 1)"
-const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
+import { marketingLight as light } from "src/design-system/marketingPalette"
+import { CONTENT_MAX_WIDTH, MOTION_EASE_OUT, TRANSITION } from "src/routes/Company/CompanyPage.styles"
 
 export const NewsHead = styled.div`
   display: flex;
@@ -276,96 +272,6 @@ export const PrincipleList = styled.ul`
 
     li:nth-last-child(2) {
       border-bottom: none;
-    }
-  }
-`
-
-export const SurfaceFooter = styled.footer`
-  padding: clamp(2.75rem, 6vw, 4.5rem) ${SECTION_PADDING_X};
-  background: ${dark.field};
-  color: ${dark.textPrimary};
-`
-
-export const FooterInner = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 0.6fr));
-  gap: clamp(1.75rem, 4vw, 3.5rem);
-  width: min(100%, ${CONTENT_MAX_WIDTH});
-  margin: 0 auto;
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-`
-
-export const FooterBrand = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-column: 1 / -1;
-  }
-
-  > div {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 1.02rem;
-    font-weight: ${fontWeight.extraBold};
-    letter-spacing: -0.02em;
-  }
-
-  > div > span:first-of-type {
-    display: block;
-    flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-  }
-
-  p {
-    margin: 0;
-    max-width: 22rem;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: ${dark.textSecondary};
-  }
-
-  small {
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
-  }
-`
-
-export const FooterGroup = styled.nav`
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-
-  h2 {
-    margin: 0 0 0.35rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${dark.textMuted};
-  }
-
-  a {
-    ${focusVisibleRing};
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    border-radius: ${radius.sm}px;
-    color: ${dark.textPrimary};
-    text-decoration: none;
-    font-size: 1rem;
-    font-weight: ${fontWeight.medium};
-    transition: color ${TRANSITION};
-
-    &:hover {
-      color: ${dark.signature};
     }
   }
 `

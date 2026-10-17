@@ -78,6 +78,8 @@ export const FeatureMeta = styled.div`
   margin-bottom: 0.15rem;
 `
 
+export const FeatureIconPanel = FeatureMeta
+
 export const FeatureIndex = styled.span`
   font-family: ${editorialLabel.fontFamily};
   font-size: ${editorialLabel.fontSize};

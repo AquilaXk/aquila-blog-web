@@ -4,8 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server"
 import {
   CompanyFeatureExplorerView,
   formatCapabilityIndex,
-  formatCapabilityStepLabel,
-  stepCapabilityIndex,
 } from "../../src/routes/Company/CompanyFeatureCarousel"
 import { createParticleSeeds, smoothstep } from "../../src/routes/Company/CompanyHeroParticles"
 import * as Sec from "../../src/routes/Company/CompanySection.styles"
@@ -244,14 +242,9 @@ test("CompanyFeatureExplorerView는 실제 COMPANY_FEATURE_CARDS 6개 카드와 
   })
 })
 
-test("formatCapabilityIndex, formatCapabilityStepLabel, stepCapabilityIndex는 인덱스 및 스텝 라벨을 정확히 계산한다", () => {
+test("formatCapabilityIndex는 1-based 두 자리 모노스페이스 인덱스를 정확히 계산한다", () => {
   expect(formatCapabilityIndex(0)).toBe("01")
   expect(formatCapabilityIndex(5)).toBe("06")
-  expect(formatCapabilityStepLabel(0, 6)).toBe("01 / 06")
-  expect(formatCapabilityStepLabel(5, 6)).toBe("06 / 06")
-  expect(stepCapabilityIndex(0, 1, 6)).toBe(1)
-  expect(stepCapabilityIndex(5, 1, 6)).toBe(0)
-  expect(stepCapabilityIndex(0, -1, 6)).toBe(5)
 })
 
 test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 보간과 정규화된 입자 시드를 생성한다", () => {
