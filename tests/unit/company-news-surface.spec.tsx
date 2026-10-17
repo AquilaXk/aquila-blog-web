@@ -286,6 +286,11 @@ test("CompanyHeroParticles의 smoothstep, createParticleSeeds, resolveParticleCl
   expect(desktopSpec.maxAlpha).toBeCloseTo(0.76, 2)
   expect(computeCenterClearance(720, 320, 1440, 640)).toBe(0)
   expect(computeCenterClearance(180, 140, 1440, 640)).toBe(1)
+
+  const zeroHeightSpec = resolveParticleClearance(800, 0)
+  expect(zeroHeightSpec.clearRx).toBeGreaterThanOrEqual(1)
+  expect(zeroHeightSpec.clearRy).toBeGreaterThanOrEqual(1)
+  expect(computeCenterClearance(400, 0, 800, 0)).toBe(0)
 })
 
 test("COMPANY_STATS는 중복 100% 수치 없이 4개 고유 운영 지표를 정의하고 푸터는 2개 내비 그룹을 채운다", () => {

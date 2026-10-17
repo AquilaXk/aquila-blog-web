@@ -41,8 +41,8 @@ export const resolveParticleClearance = (
     }
   }
   return {
-    clearRx: Math.min(width * 0.48, 420),
-    clearRy: Math.min(height * 0.36, 230),
+    clearRx: Math.max(1, Math.min(width * 0.48, 420)),
+    clearRy: Math.max(1, Math.min(height * 0.36, 230)),
     innerStop: 0.76,
     outerStop: 1.16,
     maxAlpha: 0.76,
@@ -140,6 +140,7 @@ const CompanyHeroParticles: React.FC = () => {
     let width = 0
     let height = 0
     let dpr = 1
+    let clearanceSpec = resolveParticleClearance(1, 1)
     let ringX = 0.18
     let ringY = -0.12
     let targetX = 0.18
@@ -154,6 +155,7 @@ const CompanyHeroParticles: React.FC = () => {
       width = Math.max(1, Math.floor(rect.width))
       height = Math.max(1, Math.floor(rect.height))
       dpr = Math.min(window.devicePixelRatio || 1, finePointer ? 2 : 1.5)
+      clearanceSpec = resolveParticleClearance(width, height)
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
     }
@@ -209,7 +211,6 @@ const CompanyHeroParticles: React.FC = () => {
       const baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
       const halfWidth = width * 0.5
       const halfHeight = height * 0.5
-      const clearanceSpec = resolveParticleClearance(width, height)
 
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i]

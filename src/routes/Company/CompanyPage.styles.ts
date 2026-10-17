@@ -98,6 +98,12 @@ export const NoticeBanner = styled.div`
       font-size: 0.75rem;
       white-space: nowrap;
       max-width: 100%;
+      overflow: hidden;
+
+      span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
