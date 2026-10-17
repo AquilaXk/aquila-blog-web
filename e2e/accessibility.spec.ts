@@ -531,11 +531,11 @@ test("회사 소개 표면은 데스크톱·모바일 폭에서 심각도 높은
   await expectLaunchGateAccessibility(page, testInfo, "company-surface-phone")
 })
 
-test("EasySubway 제품 표면은 고정 다크 톤에서 심각도 높은 접근성 위반이 없다", async ({
+test("EasySubway 제품 표면은 데스크톱·모바일 폭에서 심각도 높은 접근성 위반이 없다", async ({
   page,
 }, testInfo) => {
-  // 이 표면은 방문자 설정과 무관하게 near-black으로 고정된다. 라이트 쿠키에서도 대비를 확인한다.
-  await setSchemeCookie(page, "light")
+  // 이 표면은 방문자 테마 쿠키와 무관하게 에디토리얼 라이트 톤으로 고정된다. 다크 쿠키에서도 대비를 확인한다.
+  await setSchemeCookie(page, "dark")
   await page.goto("/easysubway")
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
   await expect(page.getByRole("navigation", { name: "제품 소개 둘러보기" })).toBeVisible()

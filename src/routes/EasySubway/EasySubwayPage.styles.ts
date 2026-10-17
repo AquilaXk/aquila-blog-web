@@ -1,20 +1,9 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { marketingDark as dark } from "src/design-system/marketingPalette"
+import { marketingLight as light } from "src/design-system/marketingPalette"
 
 export {
-  CalloutHeader,
-  CalloutIconSvg,
-  CalloutTag,
-  ComparisonBadge,
-  ComparisonCard,
-  ComparisonCardHeader,
-  ComparisonCheckIcon,
-  ComparisonCrossIcon,
-  ComparisonGrid,
-  ComparisonList,
-  ComparisonTitle,
   DetailCrop,
   FeatureBlock,
   FeatureBody,
@@ -27,45 +16,35 @@ export {
   RouteSpecPanel,
   RouteSpecTag,
   RouteSpecTitle,
-  TimelineCalloutCard,
-  TimelineCalloutCluster,
   TimelinePhoneFrame,
   TimelineShowcase,
 } from "src/routes/EasySubway/EasySubwayFeatures.styles"
 
 export {
-  ChipCluster,
   ContactActionGroup,
   ContactBand,
-  CopyEmailAddress,
   CopyEmailButton,
   CopyIconWrapper,
-  FaqAnswerText,
-  FaqCard,
-  FaqList,
-  FaqQuestionHeader,
-  FaqQuestionNumber,
-  FaqQuestionText,
-  FaqSection,
   MetroBadgeCard,
   MetroBadgeGrid,
+  MetroDirectoryBlock,
   MetroSectionLead,
   MetroSectionTitle,
-  ScopeChip,
-  ScopeLayout,
+  TechSpecBlock,
   TechSpecCell,
   TechSpecGrid,
 } from "src/routes/EasySubway/EasySubwayScope.styles"
 
 const CONTENT_MAX_WIDTH = "75rem"
-const SECTION_PADDING_Y = "clamp(3.5rem, 8vw, 7rem)"
+const SECTION_PADDING_Y = "clamp(4rem, 8.5vw, 7.5rem)"
 const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
 const TRANSITION = "200ms cubic-bezier(0.165, 0.84, 0.44, 1)"
 const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
 
 export const ProductSurface = styled.div`
-  background: ${dark.field};
-  color: ${dark.textPrimary};
+  --aq-focus-ring: ${light.focus};
+  background: ${light.surface};
+  color: ${light.inkPrimary};
   word-break: keep-all;
   overflow-wrap: break-word;
 
@@ -79,26 +58,21 @@ export const ProductSurface = styled.div`
 
   & [data-reveal] {
     --reveal-delay: 0ms;
-    opacity: 0;
-    transform: translateY(16px);
-    transition: opacity 0.6s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms),
-      transform 0.6s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
+    transform: translateY(12px);
+    transition: transform 0.56s ${MOTION_EASE_OUT} var(--reveal-delay, 0ms);
   }
 
   & [data-reveal].is-visible {
-    opacity: 1;
     transform: none;
   }
 
   & [data-reveal]:focus-within {
-    opacity: 1 !important;
     transform: none !important;
     transition: none !important;
   }
 
   @media (prefers-reduced-motion: reduce), (scripting: none), print {
     & [data-reveal] {
-      opacity: 1 !important;
       transform: none !important;
       transition: none !important;
     }
@@ -115,16 +89,16 @@ export const SurfaceHeader = styled.header`
   gap: 1rem;
   min-height: 72px;
   padding: 0.75rem ${SECTION_PADDING_X};
-  background: ${dark.surfaceGlass};
+  background: ${light.surfaceGlass};
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid ${dark.hairline};
+  border-bottom: 1px solid ${light.borderHairline};
   transition: background-color ${TRANSITION}, border-color ${TRANSITION};
 
   &.scrolled,
   &[data-scrolled="true"] {
-    background: ${dark.surfaceGlassScrolled};
-    border-bottom-color: ${dark.borderStrong};
+    background: ${light.surfaceGlassElevated};
+    border-bottom-color: ${light.border};
   }
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
@@ -140,7 +114,7 @@ export const BrandLink = styled.a`
   gap: 0.5rem;
   min-height: 44px;
   border-radius: ${radius.sm}px;
-  color: ${dark.textPrimary};
+  color: ${light.inkPrimary};
   text-decoration: none;
   font-size: 1.06rem;
   font-weight: ${fontWeight.bold};
@@ -149,7 +123,7 @@ export const BrandLink = styled.a`
   small {
     font-size: 0.875rem;
     font-weight: ${fontWeight.regular};
-    color: ${dark.textMuted};
+    color: ${light.inkSecondary};
 
     @media (max-width: ${breakpoint.sm}px) {
       display: none;
@@ -176,17 +150,17 @@ export const NavLink = styled.a`
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 0.75rem;
+  padding: 0 0.8rem;
   border-radius: ${radius.pill}px;
-  color: ${dark.textSecondary};
+  color: ${light.inkSecondary};
   text-decoration: none;
   font-size: 0.96875rem;
   font-weight: ${fontWeight.medium};
   transition: color ${TRANSITION}, background-color ${TRANSITION};
 
   &:hover {
-    color: ${dark.textPrimary};
-    background: ${dark.fieldRaised};
+    color: ${light.inkPrimary};
+    background: ${light.surfaceHoverTint};
   }
 
   @media (max-width: ${breakpoint.sm}px) {
@@ -199,27 +173,69 @@ export const ButtonAction = styled.a`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   min-height: 46px;
   padding: 0 1.45rem;
   border-radius: ${radius.pill}px;
-  background: ${dark.accent};
-  color: ${dark.onAccent};
+  background: ${light.inkPrimary};
+  color: ${light.onAccent};
   text-decoration: none;
   font-size: 0.96875rem;
   font-weight: ${fontWeight.medium};
   letter-spacing: -0.01em;
   transition: background-color ${TRANSITION};
 
+  svg {
+    flex: 0 0 auto;
+    transition: transform 220ms ${MOTION_EASE_OUT};
+  }
+
   &:hover {
-    background: ${dark.accentPressed};
+    background: ${light.accentPressed};
+
+    svg {
+      transform: translateX(3px);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
+
+    svg {
+      transition: none;
+    }
   }
 
   @media (forced-colors: active) {
     border: 1px solid ButtonText;
+  }
+`
+
+export const SecondaryPillAction = styled.a`
+  ${focusVisibleRing};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 46px;
+  padding: 0 1.35rem;
+  border-radius: ${radius.pill}px;
+  border: 1px solid ${light.border};
+  background: ${light.surface};
+  color: ${light.inkPrimary};
+  text-decoration: none;
+  font-size: 0.96875rem;
+  font-weight: ${fontWeight.medium};
+  letter-spacing: -0.01em;
+  transition: background-color ${TRANSITION}, border-color ${TRANSITION};
+
+  &:hover {
+    background: ${light.surfaceScaffold};
+    border-color: ${light.borderStrong};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 `
 
@@ -235,11 +251,11 @@ export const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.3rem 0.9rem;
-  border: 1px solid ${dark.hairline};
+  padding: 0.3rem 0.95rem;
+  border: 1px solid ${light.border};
   border-radius: ${radius.pill}px;
-  background: ${dark.fieldRaised};
-  color: ${dark.textPrimary};
+  background: ${light.surfaceScaffold};
+  color: ${light.inkSecondary};
   font-size: 0.84375rem;
   font-weight: ${fontWeight.medium};
 
@@ -248,7 +264,7 @@ export const StatusBadge = styled.span`
     width: 0.4rem;
     height: 0.4rem;
     border-radius: 50%;
-    background: ${dark.signature};
+    background: ${light.accent};
   }
 
   @media (forced-colors: active) {
@@ -265,17 +281,8 @@ export const StatusPill = StatusBadge
 export const Hero = styled.section`
   position: relative;
   overflow: hidden;
-  padding: clamp(3.5rem, 7vw, 5.5rem) ${SECTION_PADDING_X} clamp(3rem, 7vw, 5rem);
-  background: ${dark.fieldDeep};
-`
-
-export const LineArtLayer = styled.div<{ $align?: "top" | "bottom" }>`
-  position: absolute;
-  right: 0;
-  left: 0;
-  ${({ $align }) => ($align === "bottom" ? "bottom: 0;" : "top: 0;")}
-  height: clamp(14rem, 34vw, 26rem);
-  pointer-events: none;
+  padding: clamp(4.5rem, 9vw, 7rem) ${SECTION_PADDING_X} clamp(3.5rem, 7vw, 5.5rem);
+  background: ${light.surface};
 `
 
 export const HeroCopy = styled.div`
@@ -283,56 +290,62 @@ export const HeroCopy = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
-  width: min(100%, 46rem);
+  gap: 1.35rem;
+  width: min(100%, 48rem);
   margin: 0 auto;
   text-align: center;
 `
 
 export const HeroTitle = styled.h1`
   margin: 0;
-  font-size: clamp(2.25rem, 5.6vw, 4.1rem);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  font-size: clamp(2.35rem, 5.8vw, 4.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   font-weight: ${fontWeight.medium};
-  color: ${dark.textSecondary};
+  color: ${light.inkPrimary};
+  text-wrap: balance;
 
-  strong {
+  strong,
+  span {
     display: block;
     font-weight: ${fontWeight.medium};
-    color: ${dark.textPrimary};
+    color: ${light.inkSecondary};
   }
 `
 
 export const HeroLead = styled.p`
   position: relative;
   margin: 0;
-  max-width: 32rem;
-  font-size: clamp(1.0625rem, 1.5vw, 1.125rem);
-  line-height: 1.7;
-  color: ${dark.textSecondary};
+  max-width: 34rem;
+  font-size: clamp(1.0625rem, 1.45vw, 1.15rem);
+  line-height: 1.68;
+  color: ${light.inkSecondary};
 `
 
-export const InlineHighlight = styled.strong`
-  color: ${dark.textPrimary};
-  font-weight: ${fontWeight.semibold};
+export const HeroActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
 `
 
 export const PhoneFrame = styled.figure<{ $width?: string }>`
   position: relative;
   margin: 0;
-  width: min(94%, ${({ $width }) => $width || "21rem"});
+  width: min(94%, ${({ $width }) => $width || "20.5rem"});
   padding: 0.5rem;
-  border: 1px solid ${dark.borderStrong};
-  border-radius: 1.85rem;
-  background: ${dark.fieldDeep};
-  box-shadow: ${dark.phoneShadow};
+  border: 1px solid ${light.border};
+  border-radius: 2rem;
+  background: ${light.surface};
+  box-shadow: ${light.phoneShadow};
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 1.45rem;
+    border-radius: 1.55rem;
   }
 
   @media (forced-colors: active) {
@@ -344,21 +357,16 @@ export const HeroPhoneWrap = styled.div`
   position: relative;
   display: flex;
   justify-content: center;
-  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  margin-top: clamp(2.5rem, 5vw, 3.75rem);
   margin-bottom: 0;
 `
 
 export const Section = styled.section<{ $tone?: "base" | "raised" }>`
   position: relative;
   overflow: hidden;
-  scroll-margin-top: clamp(4.5rem, 8vw, 6rem);
   padding: ${SECTION_PADDING_Y} ${SECTION_PADDING_X};
-  background: ${({ $tone }) => ($tone === "raised" ? dark.fieldRaised : dark.field)};
-  border-top: 1px solid ${dark.hairline};
-
-  @media (max-width: ${layoutBreakpoint.navCompact}px) {
-    scroll-margin-top: 7.75rem;
-  }
+  background: ${({ $tone }) => ($tone === "raised" ? light.surfaceScaffold : light.surface)};
+  border-top: 1px solid ${light.borderHairline};
 `
 
 export const SectionInner = styled.div`
@@ -374,33 +382,29 @@ export const Eyebrow = styled.p`
   font-weight: ${editorialLabel.fontWeight};
   letter-spacing: ${editorialLabel.letterSpacing};
   text-transform: ${editorialLabel.textTransform};
-  color: ${dark.textMuted};
+  color: ${light.inkSecondary};
 `
 
 export const DisplayHeading = styled.h2`
   margin: 0;
-  max-width: 34rem;
-  font-size: clamp(1.75rem, 3.6vw, 2.65rem);
-  line-height: 1.2;
+  max-width: 36rem;
+  font-size: clamp(1.75rem, 3.4vw, 2.65rem);
+  line-height: 1.18;
   letter-spacing: -0.025em;
   font-weight: ${fontWeight.medium};
-  color: ${dark.textPrimary};
-
-  strong {
-    display: block;
-    font-weight: ${fontWeight.medium};
-    color: ${dark.textPrimary};
-  }
+  color: ${light.inkPrimary};
+  text-wrap: balance;
 `
 
 export const IntroLayout = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
-  align-items: start;
+  align-items: end;
   gap: clamp(1.5rem, 4vw, 4rem);
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
   }
 `
 
@@ -409,59 +413,13 @@ export const IntroAside = styled.p`
   max-width: 24rem;
   font-size: 1.0625rem;
   line-height: 1.7;
-  color: ${dark.textSecondary};
-
-  strong {
-    font-weight: ${fontWeight.semibold};
-    color: ${dark.textPrimary};
-  }
+  color: ${light.inkSecondary};
 `
-
-export const MetaFactRow = styled.dl`
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(1.5rem, 3vw, 2.5rem);
-  margin: clamp(2.25rem, 4.5vw, 3.25rem) 0 0;
-
-  > div {
-    padding-top: 1.15rem;
-    border-top: 1px solid ${dark.hairline};
-  }
-
-  dt {
-    margin: 0 0 0.45rem;
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${dark.textMuted};
-  }
-
-  dd {
-    margin: 0;
-  }
-
-  @media (max-width: ${breakpoint.md}px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-`
-
-export const MetaBadge = styled.span<{ $accent?: boolean }>`
-  display: inline-block;
-  color: ${({ $accent }) => ($accent ? dark.signature : dark.textPrimary)};
-  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
-  font-weight: ${fontWeight.semibold};
-  letter-spacing: -0.015em;
-  line-height: 1.35;
-`
-
-export const MetaPill = MetaBadge
 
 export const SurfaceFooter = styled.footer`
-  padding: clamp(2.5rem, 5vw, 4rem) ${SECTION_PADDING_X};
-  border-top: 1px solid ${dark.hairline};
-  background: ${dark.fieldDeep};
+  padding: clamp(2.75rem, 5vw, 4rem) ${SECTION_PADDING_X};
+  border-top: 1px solid ${light.border};
+  background: ${light.surfaceScaffold};
 `
 
 export const FooterInner = styled.div`
@@ -483,17 +441,17 @@ export const FooterBrand = styled.div`
     font-size: 1rem;
     font-weight: ${fontWeight.bold};
     letter-spacing: -0.02em;
-    color: ${dark.textPrimary};
+    color: ${light.inkPrimary};
   }
 
   span {
-    font-size: 1rem;
-    color: ${dark.textSecondary};
+    font-size: 0.96875rem;
+    color: ${light.inkSecondary};
   }
 
   small {
-    font-size: 0.875rem;
-    color: ${dark.textMuted};
+    font-size: 0.84375rem;
+    color: ${light.inkMuted};
   }
 `
 
@@ -508,15 +466,14 @@ export const FooterLinks = styled.nav`
     align-items: center;
     min-height: 44px;
     border-radius: ${radius.sm}px;
-    color: ${dark.textSecondary};
+    color: ${light.inkSecondary};
     text-decoration: none;
-    font-size: 1rem;
-    font-weight: ${fontWeight.regular};
+    font-size: 0.96875rem;
+    font-weight: ${fontWeight.medium};
     transition: color ${TRANSITION};
 
     &:hover {
-      color: ${dark.signature};
+      color: ${light.inkPrimary};
     }
   }
 `
-
