@@ -83,13 +83,13 @@ export const MarkdownTableRenderer = ({
     if (!isWideOverflowTable) {
       return {
         width: "100%",
-        minWidth: isNarrowTable ? "100%" : "680px",
+        minWidth: "680px",
         maxWidth: "none",
       }
     }
 
     return undefined
-  }, [explicitTableWidth, isNarrowTable, isWideOverflowTable, usesExplicitNormalWidth])
+  }, [explicitTableWidth, isWideOverflowTable, usesExplicitNormalWidth])
   rowCursorRef.current = 0
   const contextValue = useMemo<MarkdownTableRenderContextValue>(
     () => ({
