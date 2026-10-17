@@ -12,19 +12,6 @@ export const StyledWrapper = styled.div `
   z-index: 0;
   isolation: isolate;
 
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    z-index: -1;
-    width: 100vw;
-    transform: translateX(-50%);
-    background: var(--aq-page-bg);
-    pointer-events: none;
-  }
-
   .detailReadProgress {
     position: fixed;
     top: 0;
@@ -40,6 +27,7 @@ export const StyledWrapper = styled.div `
       height: 100%;
       transform: scaleX(0);
       transform-origin: left center;
+      will-change: transform;
       background: var(--aq-accent-link);
     }
   }

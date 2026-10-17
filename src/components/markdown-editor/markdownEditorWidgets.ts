@@ -52,6 +52,55 @@ export class MarkdownRuleWidget extends WidgetType {
   }
 }
 
+const INLINE_MARKDOWN_TOKEN_REGEX =
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
+
+const isSafeInlineHref = (href: string): boolean => {
+  const trimmed = href.trim()
+  return /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(trimmed)
+}
+
+export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
+  let lastIndex = 0
+  INLINE_MARKDOWN_TOKEN_REGEX.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = INLINE_MARKDOWN_TOKEN_REGEX.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
+    }
+    if (match[1] !== undefined) {
+      const code = document.createElement("code")
+      code.textContent = match[1]
+      container.appendChild(code)
+    } else if (match[2] !== undefined) {
+      const strong = document.createElement("strong")
+      strong.textContent = match[2]
+      container.appendChild(strong)
+    } else if (match[3] !== undefined) {
+      const em = document.createElement("em")
+      em.textContent = match[3]
+      container.appendChild(em)
+    } else if (match[4] !== undefined && match[5] !== undefined) {
+      const label = match[4]
+      const href = match[5]
+      if (isSafeInlineHref(href)) {
+        const link = document.createElement("a")
+        link.href = href.trim()
+        link.textContent = label
+        link.target = "_blank"
+        link.rel = "noopener noreferrer"
+        container.appendChild(link)
+      } else {
+        container.appendChild(document.createTextNode(match[0]))
+      }
+    }
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex)))
+  }
+}
+
 export class MarkdownTaskWidget extends WidgetType {
   constructor(
     private readonly checked: boolean,
@@ -62,11 +111,7 @@ export class MarkdownTaskWidget extends WidgetType {
   }
 
   eq(other: MarkdownTaskWidget) {
-    return (
-      other.checked === this.checked &&
-      other.from === this.from &&
-      other.to === this.to
-    )
+    return other instanceof MarkdownTaskWidget && other.checked === this.checked
   }
 
   toDOM(view: EditorView) {
@@ -75,6 +120,8 @@ export class MarkdownTaskWidget extends WidgetType {
     checkbox.setAttribute("role", "checkbox")
     checkbox.setAttribute("aria-checked", this.checked ? "true" : "false")
     checkbox.setAttribute("aria-label", "Toggle task item")
+    checkbox.dataset.from = String(this.from)
+    checkbox.dataset.to = String(this.to)
     checkbox.textContent = this.checked ? "✓" : ""
 
     checkbox.addEventListener("mousedown", (e) => {
@@ -121,7 +168,7 @@ export class MarkdownMathWidget extends WidgetType {
     return other.math === this.math && other.displayMode === this.displayMode
   }
 
-  toDOM(view: EditorView) {
+  toDOM(_view: EditorView) {
     const span = document.createElement("span")
     span.className = `cm-live-math ${
       this.displayMode ? "cm-live-math-display" : "cm-live-math-inline"
@@ -139,7 +186,6 @@ export class MarkdownMathWidget extends WidgetType {
       }
     } else if (katexLoadPromise) {
       void katexLoadPromise.then(() => {
-        // Trigger a lightweight re-render or update
         try {
           if (cachedKatex) {
             span.innerHTML = cachedKatex.renderToString(this.math, {
@@ -212,16 +258,22 @@ export class MarkdownCalloutWidget extends WidgetType {
 
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-callout-title"
-    titleSpan.textContent = this.title || this.calloutType.toUpperCase()
+    appendInlineMarkdownNodes(titleSpan, this.title || this.calloutType.toUpperCase())
 
     header.appendChild(foldIcon)
     header.appendChild(titleSpan)
     root.appendChild(header)
 
-    if (this.content.trim()) {
+    const strippedContent = this.content
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\s*>\s?/, ""))
+      .join("\n")
+      .trim()
+
+    if (strippedContent) {
       const body = document.createElement("div")
       body.className = "cm-live-callout-body"
-      body.textContent = this.content
+      appendInlineMarkdownNodes(body, strippedContent)
       root.appendChild(body)
 
       header.addEventListener("mousedown", (e) => {
@@ -262,21 +314,19 @@ export class MarkdownTableWidget extends WidgetType {
         .map((cell) => cell.replaceAll("\\|", "|").trim())
     }
 
-    // Header row
     const headerRow = lines[0]
     if (headerRow) {
       const thead = document.createElement("thead")
       const tr = document.createElement("tr")
       for (const cell of parseCells(headerRow)) {
         const th = document.createElement("th")
-        th.textContent = cell
+        appendInlineMarkdownNodes(th, cell)
         tr.appendChild(th)
       }
       thead.appendChild(tr)
       table.appendChild(thead)
     }
 
-    // Body rows (skip delimiter line if lines[1] contains ---)
     const bodyStartIndex = lines[1] && /^[\s|:-]+$/.test(lines[1]) ? 2 : 1
     if (lines.length > bodyStartIndex) {
       const tbody = document.createElement("tbody")
@@ -284,7 +334,7 @@ export class MarkdownTableWidget extends WidgetType {
         const tr = document.createElement("tr")
         for (const cell of parseCells(lines[i]!)) {
           const td = document.createElement("td")
-          td.textContent = cell
+          appendInlineMarkdownNodes(td, cell)
           tr.appendChild(td)
         }
         tbody.appendChild(tr)
@@ -309,10 +359,9 @@ export class MarkdownWikilinkWidget extends WidgetType {
 
   eq(other: MarkdownWikilinkWidget) {
     return (
+      other instanceof MarkdownWikilinkWidget &&
       other.target === this.target &&
-      other.alias === this.alias &&
-      other.from === this.from &&
-      other.to === this.to
+      other.alias === this.alias
     )
   }
 
@@ -325,6 +374,9 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.dataset.target = this.target
     if (this.alias) {
       root.dataset.alias = this.alias
+    }
+    if (this.from !== undefined) {
+      root.dataset.from = String(this.from)
     }
 
     const icon = document.createElement("span")
@@ -340,10 +392,19 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.appendChild(text)
 
     const handleActivate = () => {
-      if (this.from !== undefined) {
+      let resolvedFrom = this.from
+      try {
+        const domPos = view.posAtDOM(root)
+        if (typeof domPos === "number") {
+          resolvedFrom = domPos
+        }
+      } catch {
+        // Fall back to stored coordinate
+      }
+      if (resolvedFrom !== undefined) {
         view.focus()
         view.dispatch({
-          selection: { anchor: this.from + 2 },
+          selection: { anchor: Math.min(view.state.doc.length, resolvedFrom + 2) },
           scrollIntoView: true,
         })
       }
@@ -430,8 +491,8 @@ export class MarkdownMermaidWidget extends WidgetType {
 
   eq(other: MarkdownMermaidWidget) {
     return (
+      other instanceof MarkdownMermaidWidget &&
       other.source === this.source &&
-      other.from === this.from &&
       other.customRenderer === this.customRenderer
     )
   }
@@ -439,6 +500,9 @@ export class MarkdownMermaidWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = "cm-live-mermaid"
+    if (this.from !== undefined) {
+      root.dataset.from = String(this.from)
+    }
 
     const renderFallbackCode = (container: HTMLElement, text: string) => {
       const pre = document.createElement("pre")
@@ -459,16 +523,27 @@ export class MarkdownMermaidWidget extends WidgetType {
       renderFallbackCode(container, text)
     }
 
-    if (view && this.from !== undefined) {
+    if (view) {
       root.addEventListener("mousedown", (e) => {
         if (e.button !== 0) return
         e.preventDefault()
         e.stopPropagation()
-        view.focus()
-        view.dispatch({
-          selection: { anchor: this.from! },
-          scrollIntoView: true,
-        })
+        let resolvedFrom = this.from
+        try {
+          const domPos = view.posAtDOM(root)
+          if (typeof domPos === "number") {
+            resolvedFrom = domPos
+          }
+        } catch {
+          // Fall back to stored coordinate
+        }
+        if (resolvedFrom !== undefined) {
+          view.focus()
+          view.dispatch({
+            selection: { anchor: Math.min(view.state.doc.length, resolvedFrom) },
+            scrollIntoView: true,
+          })
+        }
       })
     }
 

@@ -21,7 +21,6 @@ import {
   isNegativeRectWidthError,
   renderMermaidErrorState,
   sanitizeRenderableMermaidSource,
-  stabilizeMermaidSvgLabels,
   stripRiskyFlowchartDirectives,
 } from "src/libs/markdown/mermaidRuntimeSanitize"
 import type {
@@ -60,6 +59,7 @@ export const createMermaidRuntimeController = ({
   let cachedDesktopWideLaneBounds: DesktopWideLaneBounds | null | undefined
   let mermaidOverlayCleanup: (() => void) | null = null
   let renderQueue: Promise<void> = Promise.resolve()
+  let activeQueueCount = 0
   const renderingBlocks = new Set<HTMLElement>()
   const observedBlocks = new WeakSet<HTMLElement>()
   let premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
@@ -211,7 +211,6 @@ export const createMermaidRuntimeController = ({
 
     const svgElement = stage.querySelector("svg")
     if (!svgElement) throw new Error("Mermaid SVG 생성 실패")
-    stabilizeMermaidSvgLabels(svgElement)
 
     const viewBox = svgElement.getAttribute("viewBox") || ""
     const viewBoxValues = viewBox
@@ -324,7 +323,6 @@ export const createMermaidRuntimeController = ({
     svgElement.style.minHeight = "0"
     svgElement.style.objectFit = "contain"
     svgElement.style.margin = "0 auto"
-    svgElement.style.textRendering = "geometricPrecision"
     svgElement.removeAttribute("width")
     svgElement.removeAttribute("height")
 
@@ -495,6 +493,7 @@ export const createMermaidRuntimeController = ({
   enqueueRender = (block: HTMLElement) => {
     if (!block || renderingBlocks.has(block)) return
     renderingBlocks.add(block)
+    activeQueueCount += 1
     renderQueue = renderQueue
       .then(async () => {
         await renderSingleBlock(block)
@@ -506,23 +505,19 @@ export const createMermaidRuntimeController = ({
       })
       .finally(() => {
         renderingBlocks.delete(block)
+        activeQueueCount = Math.max(0, activeQueueCount - 1)
       })
   }
 
   const renderMermaidBlocks = async () => {
     const codeBlocks = Array.from(
       root.querySelectorAll<HTMLElement>(
-        [
-          "pre > code.language-mermaid",
-          "pre.aq-mermaid > code.language-mermaid",
-          "pre > code[data-language='mermaid']",
-          "pre[data-language='mermaid'] > code",
-        ].join(", ")
+        "pre > code.language-mermaid, pre.aq-mermaid > code.language-mermaid, pre > code[data-language='mermaid'], pre[data-language='mermaid'] > code"
       )
     )
     const preBlocks = Array.from(
       root.querySelectorAll<HTMLElement>(
-        ["pre.aq-mermaid", "pre[data-aq-mermaid='true']", "pre[data-language='mermaid']"].join(", ")
+        "pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']"
       )
     )
     const mergedBlocks = new Map<HTMLElement, HTMLElement>()
@@ -581,8 +576,12 @@ export const createMermaidRuntimeController = ({
     })
   }
 
+  const isRendering = () => activeQueueCount > 0 || renderingBlocks.size > 0
+
   return {
-    resetLayoutCache: () => {
+    isRendering,
+    resetLayoutCache: (force = false) => {
+      if (!force && isRendering()) return
       cachedDesktopWideLaneBounds = undefined
       premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
     },
@@ -593,6 +592,7 @@ export const createMermaidRuntimeController = ({
       intersectionObserver?.disconnect()
       intersectionObserver = null
       renderingBlocks.clear()
+      activeQueueCount = 0
     },
   }
 }

@@ -58,6 +58,46 @@ const REMARK_PLUGINS_MATH = [remarkGfm, remarkMath]
 const REHYPE_PLUGINS_DEFAULT: never[] = []
 const REHYPE_PLUGINS_MATH = [rehypeKatex]
 
+export const resolvePreBlockMermaidSource = (language: string, rawCode: string): string => {
+  const normalizedLanguage = (language || "").trim().toLowerCase()
+  if (normalizedLanguage && normalizedLanguage !== "mermaid") {
+    return ""
+  }
+  if (normalizedLanguage === "mermaid") {
+    return extractNormalizedMermaidSource(rawCode) || rawCode
+  }
+  if (!isMermaidSource(rawCode)) {
+    return ""
+  }
+  return extractNormalizedMermaidSource(rawCode) || rawCode
+}
+
+export const hasLikelyMarkdownMath = (markdown: string): boolean => {
+  const firstDollar = markdown.indexOf("$")
+  if (firstDollar === -1) return false
+  if (markdown.includes("$$")) return true
+  let index = firstDollar
+  const length = markdown.length
+  while (index < length) {
+    const lineEnd = markdown.indexOf("\n", index)
+    const currentLineEnd = lineEnd === -1 ? length : lineEnd
+    let dollarCountOnLine = 0
+    let cursor = index
+    while (cursor < currentLineEnd) {
+      const nextDollar = markdown.indexOf("$", cursor)
+      if (nextDollar === -1 || nextDollar >= currentLineEnd) break
+      if (nextDollar === 0 || markdown.charCodeAt(nextDollar - 1) !== 92) {
+        dollarCountOnLine += 1
+        if (dollarCountOnLine >= 2) return true
+      }
+      cursor = nextDollar + 1
+    }
+    if (lineEnd === -1) break
+    index = lineEnd + 1
+  }
+  return false
+}
+
 export const createMarkdownComponentVariants = ({
   footnotes,
   footnoteMarker,
@@ -244,18 +284,17 @@ export const createMarkdownComponentVariants = ({
       className?: string
     } & Record<string, unknown>) {
       const { language, title, rawCode } = extractCodeMetaFromPreChildren(children, node)
-      const mermaidSource = extractNormalizedMermaidSource(rawCode)
-      const shouldRenderMermaid = language === "mermaid" || isMermaidSource(rawCode)
+      const mermaidSource = resolvePreBlockMermaidSource(language, rawCode)
 
-      if (shouldRenderMermaid) {
+      if (mermaidSource) {
         return (
           <pre
             className="aq-mermaid"
             data-aq-mermaid="true"
             data-mermaid-rendered="pending"
-            data-mermaid-source={mermaidSource || rawCode}
+            data-mermaid-source={mermaidSource}
           >
-            <code className="language-mermaid">{mermaidSource || rawCode}</code>
+            <code className="language-mermaid">{mermaidSource}</code>
           </pre>
         )
       }
@@ -363,7 +402,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   imageRenderOrderRef.current = 0
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
-    const hasMath = markdown.includes("$")
+    const hasMath = hasLikelyMarkdownMath(markdown)
     return (
       <ReactMarkdown
         key={key}

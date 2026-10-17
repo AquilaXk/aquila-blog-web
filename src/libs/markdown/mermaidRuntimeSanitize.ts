@@ -129,26 +129,7 @@ export const sanitizeRenderableMermaidSource = (source: string) => {
   return sanitized || withoutRiskyInitDirective || trimmed
 }
 
-export const stabilizeMermaidSvgLabels = (svgElement: SVGSVGElement) => {
-  svgElement
-    .querySelectorAll<HTMLElement>(
-      ".nodeLabel p, .edgeLabel p, .nodeLabel div, .edgeLabel div, .nodeLabel span, .edgeLabel span"
-    )
-    .forEach((labelElement) => {
-      labelElement.style.margin = "0"
-      labelElement.style.lineHeight = "1.18"
-      labelElement.style.display = "inline-block"
-      labelElement.style.boxSizing = "border-box"
-      labelElement.style.paddingTop = "0.08em"
-      labelElement.style.paddingBottom = "0.18em"
-    })
-
-  svgElement
-    .querySelectorAll<SVGElement>("foreignObject, .nodeLabel, .edgeLabel")
-    .forEach((labelContainer) => {
-      labelContainer.style.overflow = "visible"
-    })
-}
+export const stabilizeMermaidSvgLabels = (_svgElement: SVGSVGElement) => {}
 
 const escapeMermaidHtml = (value: string) =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")

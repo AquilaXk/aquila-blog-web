@@ -4,7 +4,7 @@ export type MarkdownSourceRange = {
 }
 
 export type MarkdownDocumentHeading = {
-  level: 2 | 3 | 4
+  level: 1 | 2 | 3 | 4
   label: string
   offset: number
   range: MarkdownSourceRange
@@ -19,7 +19,49 @@ export type MarkdownDocumentInsights = {
 }
 
 const FENCE_OPEN_PATTERN = /^\s{0,3}(`{3,}|~{3,})/
-const ATX_HEADING_PATTERN = /^\s{0,3}(#{2,4})\s+(.+?)(?:\s+#+)?\s*$/
+const ATX_HEADING_PATTERN = /^\s{0,3}(#{1,4})\s+(.+?)(?:\s+#+)?\s*$/
+
+const isUnicodeWhitespace = (code: number): boolean =>
+  code === 0x20 ||
+  (code >= 0x09 && code <= 0x0d) ||
+  code === 0xa0 ||
+  code === 0x1680 ||
+  (code >= 0x2000 && code <= 0x200a) ||
+  code === 0x2028 ||
+  code === 0x2029 ||
+  code === 0x202f ||
+  code === 0x205f ||
+  code === 0x3000 ||
+  code === 0xfeff
+
+export const countCodePoints = (text: string): number => {
+  let count = 0
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index)
+    if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length) {
+      const next = text.charCodeAt(index + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        index += 1
+      }
+    }
+    count += 1
+  }
+  return count
+}
+
+export const countWords = (text: string): number => {
+  let words = 0
+  let inWord = false
+  for (let index = 0; index < text.length; index += 1) {
+    if (isUnicodeWhitespace(text.charCodeAt(index))) {
+      inWord = false
+    } else if (!inWord) {
+      inWord = true
+      words += 1
+    }
+  }
+  return words
+}
 
 const formatMarkdownHeadingLabel = (text: string) => {
   const codeSpans: string[] = []
@@ -72,8 +114,8 @@ export const createMarkdownHeadingSlugAllocator = () => {
 
 export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocumentInsights => {
   const body = markdown.trim()
-  const characterCount = Array.from(body).length
-  const wordCount = body ? body.split(/\s+/u).length : 0
+  const characterCount = countCodePoints(body)
+  const wordCount = countWords(body)
   const headings: MarkdownDocumentHeading[] = []
   const slugAllocator = createMarkdownHeadingSlugAllocator()
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n")

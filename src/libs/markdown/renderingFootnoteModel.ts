@@ -120,6 +120,8 @@ const buildCombinedSource = (parsedSegments: ParsedSegment[]) => {
   return { combinedSource, ranges }
 }
 
+const FOOTNOTE_DEFINITION_PATTERN = /\[\^[^\]\r\n]+\]:/
+
 export const createDocumentFootnoteModel = ({
   source,
   segments,
@@ -137,7 +139,7 @@ export const createDocumentFootnoteModel = ({
       ),
     })
 
-  if (!source.includes("[^")) {
+  if (!source.includes("[^") || !FOOTNOTE_DEFINITION_PATTERN.test(source)) {
     return buildUnchangedResult()
   }
 

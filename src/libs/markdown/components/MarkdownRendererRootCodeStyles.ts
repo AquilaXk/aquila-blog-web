@@ -22,6 +22,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     overflow: hidden;
     border: 1px solid #27334a;
     box-shadow: none;
+    contain: layout style;
   }
 
   .aq-code-toolbar {

@@ -227,6 +227,7 @@ const listDraftEntries = (source: LocalDraftSource): Array<{ key: string; savedA
 
 const admitLocalDraftSlot = (source: LocalDraftSource, storageKey: string) => {
   if (typeof window === "undefined") return
+  if (window.localStorage.getItem(storageKey) !== null) return
   const entries = listDraftEntries(source)
   // 만료된 슬롯만 정리하고, 아직 유효한 다른 원고를 지워 공간을 확보하지 않는다.
   if (!entries.some((entry) => entry.key === storageKey) && entries.length >= LOCAL_DRAFT_POST_SLOT_LIMIT) {

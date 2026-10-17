@@ -77,6 +77,38 @@ const isPrismTokenNode = (node: Node | null) => {
   return Boolean(element.matches("span.token") || element.closest("span.token"))
 }
 
+export const isMermaidCodeBlock = (block: Element): boolean =>
+  block.classList?.contains("language-mermaid") ||
+  block.classList?.contains("aq-mermaid") ||
+  block.getAttribute?.("data-language") === "mermaid" ||
+  block.getAttribute?.("data-aq-mermaid") === "true" ||
+  Boolean(
+    block.closest?.("pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']")
+  )
+
+export const shouldRescanPrismOnRemovedNodes = (removedNodes: Iterable<Node>): boolean => {
+  for (const node of Array.from(removedNodes)) {
+    if (!node || typeof (node as Element).matches !== "function") continue
+    const element = node as Element
+    if (isMermaidCodeBlock(element)) continue
+    if (element.matches("code")) {
+      return true
+    }
+    if (element.matches("pre")) {
+      const codeChildren = Array.from(element.querySelectorAll("code"))
+      if (codeChildren.length > 0 && codeChildren.every((code) => isMermaidCodeBlock(code))) {
+        continue
+      }
+      return true
+    }
+    const nestedCodeBlocks = Array.from(element.querySelectorAll("pre > code"))
+    if (nestedCodeBlocks.some((block) => !isMermaidCodeBlock(block))) {
+      return true
+    }
+  }
+  return false
+}
+
 export const createPrismEffectRuntime = ({
   root,
   isDisposed,
@@ -106,13 +138,6 @@ export const createPrismEffectRuntime = ({
     pendingBlocks.clear()
     return targets
   }
-
-  const isMermaidCodeBlock = (block: HTMLElement) =>
-    block.classList.contains("language-mermaid") ||
-    block.getAttribute("data-language") === "mermaid" ||
-    Boolean(
-      block.closest("pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']")
-    )
 
   const hasCodeBlockMissingLineWrappers = () =>
     Array.from(root.querySelectorAll<HTMLElement>("pre > code")).some(
@@ -237,12 +262,9 @@ export const createPrismEffectRuntime = ({
         scheduleRun({ block: addedBlock })
       }
 
-      for (const node of Array.from(mutation.removedNodes)) {
-        if (!(node instanceof Element)) continue
-        if (!node.matches("pre,code") && !node.querySelector("pre > code")) continue
+      if (shouldRescanPrismOnRemovedNodes(mutation.removedNodes)) {
         hasRelevantMutation = true
         scheduleRun({ fullRescan: true })
-        break
       }
     }
 

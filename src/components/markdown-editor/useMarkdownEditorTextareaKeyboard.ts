@@ -32,6 +32,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   setTextareaSelection: (from: number, to?: number) => void
   onRequestSave?: () => void
   onToggleViewMode?: () => void
+  isCompletionActive?: () => boolean
 }
 
 export const useMarkdownEditorTextareaKeyboard = ({
@@ -44,6 +45,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   setTextareaSelection,
   onRequestSave,
   onToggleViewMode,
+  isCompletionActive,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
   const handleTabKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -195,6 +197,17 @@ export const useMarkdownEditorTextareaKeyboard = ({
     (event: ReactKeyboardEvent<HTMLElement>) => {
       if (disabled || isComposingEditorKeyboardEvent(event)) return
 
+      if (
+        isCompletionActive?.() &&
+        (event.key === "Enter" ||
+          event.key === "ArrowUp" ||
+          event.key === "ArrowDown" ||
+          event.key === "Tab" ||
+          event.key === "Escape")
+      ) {
+        return
+      }
+
       if (event.key === "Escape") {
         allowNativeTabAfterEscapeRef.current = true
         return
@@ -224,6 +237,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       handleAutoPairKeyDown,
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
+      isCompletionActive,
     ]
   )
 

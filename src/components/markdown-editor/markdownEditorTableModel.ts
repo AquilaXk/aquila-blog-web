@@ -6,7 +6,7 @@ export type MarkdownEditorTableEdit =
   | { kind: "add-row" | "delete-row" | "add-column" | "delete-column" }
   | { kind: "set-alignment"; alignment: MarkdownEditorTableAlignment }
 
-export type MarkdownEditorTableTabDirection = "next" | "previous"
+export type MarkdownEditorTableTabDirection = "next" | "previous" | "prev"
 
 export type MarkdownEditorTableSnippet = {
   snippet: string
@@ -378,7 +378,7 @@ export const planMarkdownEditorTableTab = (
   if (target >= 0 && target < totalRows * table.header.cells.length) {
     return planForTable(table, Math.floor(target / table.header.cells.length), target % table.header.cells.length)
   }
-  if (direction === "previous" || totalRows >= MAX_EDIT_ROWS) return null
+  if (direction === "previous" || direction === "prev" || totalRows >= MAX_EDIT_ROWS) return null
   table.body.push({
     cells: table.header.cells.map(() => ({
       value: "",
@@ -392,3 +392,5 @@ export const planMarkdownEditorTableTab = (
   })
   return planForTable(table, table.body.length, 0)
 }
+
+export const planMarkdownEditorTableCellNavigation = planMarkdownEditorTableTab

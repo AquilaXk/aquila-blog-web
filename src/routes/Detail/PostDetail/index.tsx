@@ -12,10 +12,19 @@ import {
   isSameToc,
   measureHeadingOffsets,
   resolveActiveTocIdFromOffsets,
+  shouldSyncTocFromMutations,
   type HeadingOffset,
   type TocItem,
 } from "./PostDetailTocModel"
-import { LEFT_RAIL_HYBRID_MIN_VIEWPORT_PX, RIGHT_RAIL_HYBRID_MIN_VIEWPORT_PX, applyHybridRail, clearInlineRailStyle, measureHybridRail, resolveRailTopOffset } from "./PostDetailRailModel"
+import {
+  LEFT_RAIL_HYBRID_MIN_VIEWPORT_PX,
+  RIGHT_RAIL_HYBRID_MIN_VIEWPORT_PX,
+  applyHybridRail,
+  clearInlineRailStyle,
+  invalidateStickyBlockingAncestorCache,
+  measureHybridRail,
+  resolveRailTopOffset,
+} from "./PostDetailRailModel"
 import { FloatingActionRail, MobileSummaryActions, RightTocRail } from "./PostDetailActionSections"
 import PostDetailMobileToc from "./PostDetailMobileToc"
 import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions"
@@ -149,43 +158,6 @@ const PostDetail: React.FC = () => {
   }, [activeTocId, showDetailedToc, showStickyToc, visibleTocItems.length])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const progressNode = readProgressRef.current
-    if (!progressNode) return
-
-    let rafId: number | null = null
-    const measureScrollableHeight = () => {
-      const documentElement = document.documentElement
-      scrollableHeightRef.current = Math.max(1, documentElement.scrollHeight - window.innerHeight)
-    }
-    const syncReadProgress = () => {
-      rafId = null
-      const scrollableHeight = Math.max(1, scrollableHeightRef.current)
-      const progress = Math.max(0, Math.min(1, window.scrollY / scrollableHeight))
-      progressNode.style.transform = `scaleX(${progress})`
-    }
-    const scheduleSync = () => {
-      if (rafId !== null) return
-      rafId = window.requestAnimationFrame(syncReadProgress)
-    }
-    const handleResize = () => {
-      measureScrollableHeight()
-      scheduleSync()
-    }
-
-    measureScrollableHeight()
-    syncReadProgress()
-    window.addEventListener("scroll", scheduleSync, { passive: true })
-    window.addEventListener("resize", handleResize, { passive: true })
-
-    return () => {
-      window.removeEventListener("scroll", scheduleSync)
-      window.removeEventListener("resize", handleResize)
-      if (rafId !== null) window.cancelAnimationFrame(rafId)
-    }
-  }, [data?.id])
-
-  useEffect(() => {
     leftHybridRailActiveRef.current = leftHybridRailActive
   }, [leftHybridRailActive])
 
@@ -223,7 +195,8 @@ const PostDetail: React.FC = () => {
 
     let observer: MutationObserver | null = null
     if (typeof MutationObserver !== "undefined") {
-      observer = new MutationObserver(() => {
+      observer = new MutationObserver((mutations) => {
+        if (!shouldSyncTocFromMutations(mutations)) return
         scheduleSync()
       })
       observer.observe(article, { childList: true, subtree: true, characterData: true })
@@ -243,6 +216,14 @@ const PostDetail: React.FC = () => {
     if (!article) return
     const leftRailInnerNode = leftRailInnerRef.current
     const rightRailInnerNode = rightRailInnerRef.current
+
+    const syncReadProgress = () => {
+      const progressNode = readProgressRef.current
+      if (!progressNode) return
+      const scrollableHeight = Math.max(1, scrollableHeightRef.current)
+      const progress = Math.max(0, Math.min(1, window.scrollY / scrollableHeight))
+      progressNode.style.transform = `scaleX(${progress})`
+    }
 
     const syncHybridRails = ({ remeasure = false }: { remeasure?: boolean } = {}) => {
       const viewportWidth = window.innerWidth
@@ -312,33 +293,37 @@ const PostDetail: React.FC = () => {
       return resolveActiveTocIdFromOffsets(headingOffsetsRef.current, window.scrollY, activeBoundary)
     }
 
-    const scheduler = createRafScheduler(() => {
+    const scrollScheduler = createRafScheduler(() => {
+      syncReadProgress()
       const nextActiveId = resolveActiveByScrollPosition()
       setActiveTocId((prev) => (prev === nextActiveId ? prev : nextActiveId))
-    })
-    const railScheduler = createRafScheduler(() => {
-      if (!leftHybridRailActiveRef.current && !rightHybridRailActiveRef.current) return
-      syncHybridRails()
+      if (leftHybridRailActiveRef.current || rightHybridRailActiveRef.current) {
+        syncHybridRails()
+      }
     })
     const remeasureScheduler = createRafScheduler(() => {
       syncHybridRails({ remeasure: true })
-      scheduler.schedule()
+      scrollScheduler.schedule()
     })
     const registry = createObserverRegistry()
 
     registry.addWindowEvent(
       "scroll",
       () => {
-        scheduler.schedule()
-        if (!leftHybridRailActiveRef.current && !rightHybridRailActiveRef.current) return
-        railScheduler.schedule()
+        scrollScheduler.schedule()
       },
       { passive: true }
     )
-    registry.addWindowEvent("resize", () => {
-      remeasureScheduler.schedule()
-    }, { passive: true })
+    registry.addWindowEvent(
+      "resize",
+      () => {
+        invalidateStickyBlockingAncestorCache()
+        remeasureScheduler.schedule()
+      },
+      { passive: true }
+    )
     registry.addWindowEvent("orientationchange", () => {
+      invalidateStickyBlockingAncestorCache()
       remeasureScheduler.schedule()
     })
 
@@ -357,13 +342,12 @@ const PostDetail: React.FC = () => {
     }
 
     syncHybridRails({ remeasure: true })
-    scheduler.schedule()
-    railScheduler.schedule()
+    syncReadProgress()
+    scrollScheduler.schedule()
 
     return () => {
       registry.cleanup()
-      scheduler.cancel()
-      railScheduler.cancel()
+      scrollScheduler.cancel()
       remeasureScheduler.cancel()
       clearInlineRailStyle(leftRailInnerNode)
       clearInlineRailStyle(rightRailInnerNode)

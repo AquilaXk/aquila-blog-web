@@ -170,6 +170,8 @@ export const parseSingleHttpUrl = (text: string): string | null => {
 export const escapeMarkdownLinkDestination = (url: string): string =>
   url.replace(/[\\()]/g, "\\$&")
 
+const EXISTING_MARKDOWN_LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/
+
 export const planLinkifySelectionWithUrl = (
   selectionStart: number,
   selectionEnd: number,
@@ -192,7 +194,9 @@ export const planLinkifySelectionWithUrl = (
     }
   }
 
-  const innerLink = `[${escapeMarkdownLinkLabel(core)}](${escapeMarkdownLinkDestination(url)})`
+  const existingLinkMatch = EXISTING_MARKDOWN_LINK_PATTERN.exec(core)
+  const label = existingLinkMatch ? existingLinkMatch[1]! : escapeMarkdownLinkLabel(core)
+  const innerLink = `[${label}](${escapeMarkdownLinkDestination(url)})`
   const replacement = `${leading}${innerLink}${trailing}`
   const cursor = selectionStart + leading.length + innerLink.length
   return {

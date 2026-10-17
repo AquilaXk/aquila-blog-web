@@ -5,7 +5,7 @@ import type {
   ReactNode,
   Ref,
 } from "react"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
 import { CONFIG } from "site.config"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
@@ -48,6 +48,21 @@ import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
 
+export const resolveActiveOutlineItemIndex = (
+  items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
+  cursorOffset?: number | null
+): number => {
+  if (items.length === 0) return -1
+  if (cursorOffset == null || cursorOffset < 0) return 0
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const range = items[index]?.range
+    if (range && cursorOffset >= range.start) {
+      return index
+    }
+  }
+  return 0
+}
+
 type NoticeTone = "idle" | "loading" | "success" | "error"
 
 type EditorStudioDedicatedEditorSurfaceProps = {
@@ -68,6 +83,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onRemoveTag: (value: string) => void
   titleInputRef: (node: HTMLTextAreaElement | null) => void
   onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
+  activeCursorOffset?: number | null
   postTitle: string
   onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
   onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
@@ -105,7 +121,7 @@ const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
   return nativeEvent.isComposing === true || nativeEvent.keyCode === 229
 }
 
-const countMarkdownLinkWarnings = (markdown: string) =>
+export const countMarkdownLinkWarnings = (markdown: string) =>
   [...markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]*)/g)].filter((match) => {
     const href = match[1]?.trim() ?? ""
     return !href || /^https?:\/\/$/.test(href)
@@ -190,6 +206,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   onRemoveTag,
   titleInputRef,
   onOutlineBodyHeadingActivate,
+  activeCursorOffset,
   postTitle,
   onPostTitleChange,
   onPostTitleKeyDown,
@@ -222,6 +239,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const [isOutlineOpen, setIsOutlineOpen] = useState(true)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [isMobilePropertiesOpen, setIsMobilePropertiesOpen] = useState(false)
+  const [lastActivatedOutlineOffset, setLastActivatedOutlineOffset] = useState<number | null>(null)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
@@ -235,7 +253,11 @@ export const EditorStudioDedicatedEditorSurface = ({
     }
   }
 
-  const outlineInsights = useMemo(() => createMarkdownDocumentInsights(postContent), [postContent])
+  const deferredPostContent = useDeferredValue(postContent)
+  const outlineInsights = useMemo(
+    () => createMarkdownDocumentInsights(deferredPostContent),
+    [deferredPostContent]
+  )
   const outlineItems = useMemo(() => {
     const title = postTitle.trim()
     return [
@@ -248,8 +270,15 @@ export const EditorStudioDedicatedEditorSurface = ({
       })),
     ]
   }, [outlineInsights.headings, postTitle])
+  const activeOutlineIndex = useMemo(
+    () => resolveActiveOutlineItemIndex(outlineItems, activeCursorOffset ?? lastActivatedOutlineOffset),
+    [activeCursorOffset, lastActivatedOutlineOffset, outlineItems]
+  )
   const projectRepository = CONFIG.projects?.[0]
-  const linkWarningCount = countMarkdownLinkWarnings(postContent)
+  const linkWarningCount = useMemo(
+    () => countMarkdownLinkWarnings(deferredPostContent),
+    [deferredPostContent]
+  )
   const handleTagDraftChange = (nextValue: string) => {
     const commaSeparated = /[,，]/
     if (!commaSeparated.test(nextValue)) {
@@ -351,12 +380,14 @@ export const EditorStudioDedicatedEditorSurface = ({
                   key={item.id}
                   type="button"
                   data-level={item.level}
-                  data-active={index === 0 ? "true" : "false"}
+                  data-active={index === activeOutlineIndex ? "true" : "false"}
                   onClick={() => {
                     if (item.range) {
-                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
+                      setLastActivatedOutlineOffset(item.range.start)
+                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.start })
                       return
                     }
+                    setLastActivatedOutlineOffset(null)
                     titleNodeRef.current?.focus()
                   }}
                 >

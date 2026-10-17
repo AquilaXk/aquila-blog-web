@@ -9,8 +9,11 @@ import {
 } from "./markdownEditorTextMutation"
 import {
   isMarkdownEditorTableSelection,
+  planMarkdownEditorTableCellNavigation,
   planMarkdownEditorTableTab,
 } from "./markdownEditorTableModel"
+
+export { planMarkdownEditorTableCellNavigation }
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import { matchListMarkerLine } from "./markdownEditorListCommandsModel"
 import { resolveMarkdownEditorCommandShortcut } from "./markdownEditorCommandRegistryModel"
