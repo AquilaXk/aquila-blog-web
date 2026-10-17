@@ -372,3 +372,149 @@ export class MarkdownWikilinkWidget extends WidgetType {
   }
 }
 
+type LiveMermaidRenderer = {
+  initialize?: (config: Record<string, unknown>) => void
+  render: (id: string, text: string) => Promise<{ svg: string }>
+}
+
+let cachedMermaid: LiveMermaidRenderer | null = null
+let mermaidLoadPromise: Promise<LiveMermaidRenderer | null> | null = null
+let mermaidInitialized = false
+let mermaidRenderCounter = 0
+const LIVE_MERMAID_SVG_CACHE_LIMIT = 64
+const liveMermaidSvgCache = new Map<string, string>()
+
+const loadLiveMermaid = (): Promise<LiveMermaidRenderer | null> => {
+  if (cachedMermaid) return Promise.resolve(cachedMermaid)
+  if (!mermaidLoadPromise && typeof window !== "undefined") {
+    mermaidLoadPromise = import("mermaid")
+      .then((mod) => {
+        const api = (mod.default || mod) as LiveMermaidRenderer
+        if (!mermaidInitialized && typeof api.initialize === "function") {
+          api.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            suppressErrorRendering: true,
+          })
+          mermaidInitialized = true
+        }
+        cachedMermaid = api
+        return cachedMermaid
+      })
+      .catch(() => null)
+  }
+  return mermaidLoadPromise ?? Promise.resolve(null)
+}
+
+const cacheLiveMermaidSvg = (source: string, svg: string) => {
+  if (liveMermaidSvgCache.has(source)) {
+    liveMermaidSvgCache.delete(source)
+  }
+  liveMermaidSvgCache.set(source, svg)
+  if (liveMermaidSvgCache.size > LIVE_MERMAID_SVG_CACHE_LIMIT) {
+    const oldest = liveMermaidSvgCache.keys().next().value
+    if (oldest !== undefined) {
+      liveMermaidSvgCache.delete(oldest)
+    }
+  }
+}
+
+export class MarkdownMermaidWidget extends WidgetType {
+  constructor(
+    private readonly source: string,
+    private readonly from?: number,
+    private readonly customRenderer?: (id: string, text: string) => Promise<{ svg: string }>
+  ) {
+    super()
+  }
+
+  eq(other: MarkdownMermaidWidget) {
+    return (
+      other.source === this.source &&
+      other.from === this.from &&
+      other.customRenderer === this.customRenderer
+    )
+  }
+
+  toDOM(view?: EditorView) {
+    const root = document.createElement("div")
+    root.className = "cm-live-mermaid"
+
+    const renderFallbackCode = (container: HTMLElement, text: string) => {
+      const pre = document.createElement("pre")
+      pre.className = "cm-live-mermaid-fallback"
+      const code = document.createElement("code")
+      code.textContent = text
+      pre.appendChild(code)
+      container.appendChild(pre)
+    }
+
+    const renderErrorFallback = (container: HTMLElement, text: string) => {
+      container.innerHTML = ""
+      container.dataset.mermaidState = "error"
+      const banner = document.createElement("div")
+      banner.className = "cm-live-mermaid-error"
+      banner.textContent = "Mermaid 다이어그램 문법 오류"
+      container.appendChild(banner)
+      renderFallbackCode(container, text)
+    }
+
+    if (view && this.from !== undefined) {
+      root.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        view.focus()
+        view.dispatch({
+          selection: { anchor: this.from! },
+          scrollIntoView: true,
+        })
+      })
+    }
+
+    const normalized = this.source.trim()
+    if (!normalized) {
+      root.dataset.mermaidState = "empty"
+      renderFallbackCode(root, this.source)
+      return root
+    }
+
+    if (!this.customRenderer) {
+      const cachedSvg = liveMermaidSvgCache.get(normalized)
+      if (cachedSvg) {
+        root.dataset.mermaidState = "rendered"
+        root.innerHTML = cachedSvg
+        return root
+      }
+    }
+
+    root.dataset.mermaidState = "loading"
+    renderFallbackCode(root, normalized)
+
+    const renderId = `cm-live-mermaid-${(mermaidRenderCounter += 1)}`
+    const executeRender = this.customRenderer
+      ? this.customRenderer(renderId, normalized)
+      : loadLiveMermaid().then((mermaid) => {
+          if (!mermaid) throw new Error("Mermaid unavailable")
+          return mermaid.render(renderId, normalized)
+        })
+
+    void executeRender
+      .then((res) => {
+        if (!res?.svg) {
+          renderErrorFallback(root, normalized)
+          return
+        }
+        if (!this.customRenderer) {
+          cacheLiveMermaidSvg(normalized, res.svg)
+        }
+        root.dataset.mermaidState = "rendered"
+        root.innerHTML = res.svg
+      })
+      .catch(() => {
+        renderErrorFallback(root, normalized)
+      })
+
+    return root
+  }
+}

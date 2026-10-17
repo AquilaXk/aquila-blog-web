@@ -88,24 +88,65 @@ const applyResponsiveTableLabels = (root: HTMLElement) => {
   })
 }
 
+const TABLE_NODE_SELECTOR = "table, thead, tbody, tr, th, td"
+
+const resolveElementFromMutationNode = (node: Node | null): Element | null => {
+  if (!node) return null
+  if (typeof (node as Element).matches === "function") return node as Element
+  if (node.nodeType === 3) return (node as Text).parentElement
+  return null
+}
+
+const isTableTargetNode = (node: Node | null): boolean => {
+  const element = resolveElementFromMutationNode(node)
+  if (!element) return false
+  return Boolean(element.matches(TABLE_NODE_SELECTOR) || element.closest?.(TABLE_NODE_SELECTOR))
+}
+
+const isTableSubtreeNode = (node: Node | null): boolean => {
+  if (isTableTargetNode(node)) return true
+  const element = resolveElementFromMutationNode(node)
+  if (!element || typeof element.querySelector !== "function") return false
+  return Boolean(element.querySelector(TABLE_NODE_SELECTOR))
+}
+
+export const shouldScheduleFromTableMutations = (
+  mutations: readonly MutationRecord[]
+): boolean => {
+  for (const mutation of mutations) {
+    if (isTableTargetNode(mutation.target)) return true
+    for (const added of Array.from(mutation.addedNodes || [])) {
+      if (isTableSubtreeNode(added)) return true
+    }
+    for (const removed of Array.from(mutation.removedNodes || [])) {
+      if (isTableSubtreeNode(removed)) return true
+    }
+  }
+  return false
+}
+
+export const syncResponsiveTables = (root: HTMLElement) => {
+  applyResponsiveTableLabels(root)
+}
+
 const useResponsiveTableEffect = (rootRef?: RefObject<HTMLElement | null>, contentKey?: string) => {
   useEffect(() => {
     const root = rootRef?.current
     if (!root) return
 
-    applyResponsiveTableLabels(root)
+    syncResponsiveTables(root)
 
     // ReactMarkdown can replace table nodes on parent re-render without changing contentKey.
     // Re-apply labels when the markdown subtree mutates so data-label survives remounts.
     if (typeof MutationObserver === "undefined") return
 
     let scheduled = false
-    const observer = new MutationObserver(() => {
-      if (scheduled) return
+    const observer = new MutationObserver((mutations) => {
+      if (scheduled || !shouldScheduleFromTableMutations(mutations)) return
       scheduled = true
       queueMicrotask(() => {
         scheduled = false
-        applyResponsiveTableLabels(root)
+        syncResponsiveTables(root)
       })
     })
     observer.observe(root, { childList: true, subtree: true })

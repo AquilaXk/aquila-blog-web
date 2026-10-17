@@ -17,7 +17,7 @@ type MarkdownAstNode = {
 
 type MarkdownCapableSegment = Extract<MarkdownSegment, { content: string }>
 type ParsedSegment = { index: number; segment: MarkdownCapableSegment; tree: MarkdownAstNode }
-type DefinitionRecord = { node: MarkdownAstNode }
+type DefinitionRecord = { node: MarkdownAstNode; raw?: string }
 type ReferenceRecord = { segmentIndex: number; node: MarkdownAstNode }
 type CombinedSegmentRange = { segmentIndex: number; start: number; end: number }
 type SourcePatch = { start: number; end: number; replacement: string }
@@ -143,7 +143,9 @@ export const createDocumentFootnoteModel = ({
 
   const parsedSegments: ParsedSegment[] = segments.flatMap((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return []
-    return [{ index, segment, tree: parseMarkdownAst(segment.content) }]
+    const { content } = segment
+    if (!content.includes("[^")) return []
+    return [{ index, segment, tree: parseMarkdownAst(content) }]
   })
   const footnoteDefinitions = new Map<string, DefinitionRecord>()
   const ordinaryDefinitions = new Map<string, DefinitionRecord>()
@@ -152,7 +154,9 @@ export const createDocumentFootnoteModel = ({
   for (const parsed of parsedSegments) {
     visitNodes(parsed.tree, (node) => {
       if (node.type === "footnoteDefinition" && node.identifier && !footnoteDefinitions.has(node.identifier)) {
-        footnoteDefinitions.set(node.identifier, { node })
+        const offsets = getOffsets(node)
+        const raw = offsets ? parsed.segment.content.slice(offsets.start, offsets.end) : undefined
+        footnoteDefinitions.set(node.identifier, { node, raw })
       }
       if (node.type === "definition" && node.identifier && !ordinaryDefinitions.has(node.identifier)) {
         ordinaryDefinitions.set(node.identifier, { node })
@@ -164,8 +168,35 @@ export const createDocumentFootnoteModel = ({
     return buildUnchangedResult()
   }
 
+  const parsedIndices = new Set(parsedSegments.map((item) => item.index))
+  const externalOrdinaryDefTexts: string[] = []
+  segments.forEach((segment, index) => {
+    if (parsedIndices.has(index) || !isMarkdownCapableSegment(segment)) return
+    const { content } = segment
+    if (!content.includes("]:")) return
+    visitNodes(parseMarkdownAst(content), (node) => {
+      if (node.type === "definition" && node.identifier && !ordinaryDefinitions.has(node.identifier)) {
+        ordinaryDefinitions.set(node.identifier, { node })
+        externalOrdinaryDefTexts.push(serializeDefinition(node))
+      }
+    })
+  })
+  if (externalOrdinaryDefTexts.length > 0) {
+    const suffix = externalOrdinaryDefTexts.join("\n\n")
+    for (const [identifier, record] of footnoteDefinitions.entries()) {
+      const sourceText = record.raw ?? serializeDefinition(record.node)
+      const reparsed = parseMarkdownAst(`${sourceText}\n\n${suffix}`)
+      visitNodes(reparsed, (node) => {
+        if (node.type === "footnoteDefinition" && node.identifier === identifier) {
+          footnoteDefinitions.set(identifier, { node, raw: record.raw })
+        }
+      })
+    }
+  }
+
   const { combinedSource, ranges } = buildCombinedSource(parsedSegments)
-  const combinedTree = parseMarkdownAst(combinedSource)
+  const combinedTree =
+    parsedSegments.length === 1 ? parsedSegments[0].tree : parseMarkdownAst(combinedSource)
   let rangeCursor = 0
   visitRootVisibleNodes(combinedTree, (node) => {
     if (node.type !== "footnoteReference" || !node.identifier) return
@@ -245,7 +276,9 @@ export const createDocumentFootnoteModel = ({
 
   const transformedSegments = segments.map((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return segment
-    return { ...segment, content: applySourcePatches(segment.content, patchesBySegment.get(index) || []) }
+    const patches = patchesBySegment.get(index)
+    if (!patches || patches.length === 0) return { ...segment }
+    return { ...segment, content: applySourcePatches(segment.content, patches) }
   })
   const immutableFootnotes = Object.freeze(
     footnotes.map((footnote) => Object.freeze({ ...footnote, referenceIds: Object.freeze([...footnote.referenceIds]) }))

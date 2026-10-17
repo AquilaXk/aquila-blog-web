@@ -90,7 +90,23 @@ test.describe("markdown editor table model", () => {
     expect(planMarkdownEditorTableEdit(empty, empty.indexOf("second"), empty.indexOf("second"), { kind: "delete-row" })).toBeNull()
   })
 
-  test("fails closed for non-basic or unsafe table contexts", () => {
+  test("fails closed for non-basic or unsafe table contexts while allowing >6 row tables up to MAX_EDIT_ROWS", () => {
+    const sevenRowTable = "| one |\n| --- |\n| a |\n| b |\n| c |\n| d |\n| e |\n| f |"
+    expect(
+      planMarkdownEditorTableEdit(
+        sevenRowTable,
+        sevenRowTable.indexOf("one") + 1,
+        sevenRowTable.indexOf("one") + 1,
+        { kind: "add-column" }
+      )
+    ).not.toBeNull()
+
+    const overMaxRowsTable = [
+      "| one |",
+      "| --- |",
+      ...Array.from({ length: 200 }, (_, i) => `| r${i} |`),
+    ].join("\n")
+
     const invalids = [
       "| one |\n| --- |\n| two | three |",
       "    | one |\n    | --- |\n    | two |",
@@ -98,7 +114,7 @@ test.describe("markdown editor table model", () => {
       "> | one |\n> | --- |\n> | two |",
       "```\n| one |\n| --- |\n| two |\n```",
       "<!-- aq-table malformed\n| one |\n| --- |\n| two |",
-      "| one |\n| --- |\n| a |\n| b |\n| c |\n| d |\n| e |\n| f |",
+      overMaxRowsTable,
     ]
 
     for (const value of invalids) {

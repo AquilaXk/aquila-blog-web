@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import PostHeader from "./PostHeader"
 import usePostQuery from "src/hooks/usePostQuery"
@@ -43,6 +43,8 @@ const PostDetail: React.FC = () => {
   const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
   const visibleTocItemsRef = useRef<TocItem[]>([])
   const headingOffsetsRef = useRef<HeadingOffset[]>([])
+  const railTopOffsetRef = useRef(85)
+  const scrollableHeightRef = useRef(1)
   const showFloatingLikeRef = useRef(false)
   const showStickyTocRef = useRef(false)
   const leftHybridRailActiveRef = useRef(false)
@@ -152,10 +154,13 @@ const PostDetail: React.FC = () => {
     if (!progressNode) return
 
     let rafId: number | null = null
+    const measureScrollableHeight = () => {
+      const documentElement = document.documentElement
+      scrollableHeightRef.current = Math.max(1, documentElement.scrollHeight - window.innerHeight)
+    }
     const syncReadProgress = () => {
       rafId = null
-      const documentElement = document.documentElement
-      const scrollableHeight = Math.max(1, documentElement.scrollHeight - window.innerHeight)
+      const scrollableHeight = Math.max(1, scrollableHeightRef.current)
       const progress = Math.max(0, Math.min(1, window.scrollY / scrollableHeight))
       progressNode.style.transform = `scaleX(${progress})`
     }
@@ -163,14 +168,19 @@ const PostDetail: React.FC = () => {
       if (rafId !== null) return
       rafId = window.requestAnimationFrame(syncReadProgress)
     }
+    const handleResize = () => {
+      measureScrollableHeight()
+      scheduleSync()
+    }
 
+    measureScrollableHeight()
     syncReadProgress()
     window.addEventListener("scroll", scheduleSync, { passive: true })
-    window.addEventListener("resize", scheduleSync, { passive: true })
+    window.addEventListener("resize", handleResize, { passive: true })
 
     return () => {
       window.removeEventListener("scroll", scheduleSync)
-      window.removeEventListener("resize", scheduleSync)
+      window.removeEventListener("resize", handleResize)
       if (rafId !== null) window.cancelAnimationFrame(rafId)
     }
   }, [data?.id])
@@ -239,6 +249,11 @@ const PostDetail: React.FC = () => {
       const leftEnabled = showFloatingLikeRef.current && viewportWidth >= LEFT_RAIL_HYBRID_MIN_VIEWPORT_PX
       const rightEnabled = showStickyTocRef.current && viewportWidth >= RIGHT_RAIL_HYBRID_MIN_VIEWPORT_PX
       if (remeasure) {
+        railTopOffsetRef.current = resolveRailTopOffset()
+        scrollableHeightRef.current = Math.max(
+          1,
+          document.documentElement.scrollHeight - window.innerHeight
+        )
         const articleBottomDoc = window.scrollY + article.getBoundingClientRect().bottom
         hybridRailMetricsRef.current.left = measureHybridRail(
           leftRailRef.current,
@@ -272,8 +287,16 @@ const PostDetail: React.FC = () => {
 
       hybridRailMetricsRef.current.left.enabled = leftEnabled
       hybridRailMetricsRef.current.right.enabled = rightEnabled
-      applyHybridRail(leftRailInnerRef.current, hybridRailMetricsRef.current.left)
-      applyHybridRail(rightRailInnerRef.current, hybridRailMetricsRef.current.right)
+      applyHybridRail(
+        leftRailInnerRef.current,
+        hybridRailMetricsRef.current.left,
+        railTopOffsetRef.current
+      )
+      applyHybridRail(
+        rightRailInnerRef.current,
+        hybridRailMetricsRef.current.right,
+        railTopOffsetRef.current
+      )
     }
 
     const resolveActiveByScrollPosition = () => {
@@ -284,7 +307,7 @@ const PostDetail: React.FC = () => {
         headingOffsetsRef.current = measureHeadingOffsets(items, window.scrollY)
       }
 
-      const anchorTop = resolveRailTopOffset() + 12
+      const anchorTop = railTopOffsetRef.current + 12
       const activeBoundary = anchorTop + 4
       return resolveActiveTocIdFromOffsets(headingOffsetsRef.current, window.scrollY, activeBoundary)
     }
@@ -296,6 +319,10 @@ const PostDetail: React.FC = () => {
     const railScheduler = createRafScheduler(() => {
       if (!leftHybridRailActiveRef.current && !rightHybridRailActiveRef.current) return
       syncHybridRails()
+    })
+    const remeasureScheduler = createRafScheduler(() => {
+      syncHybridRails({ remeasure: true })
+      scheduler.schedule()
     })
     const registry = createObserverRegistry()
 
@@ -309,27 +336,23 @@ const PostDetail: React.FC = () => {
       { passive: true }
     )
     registry.addWindowEvent("resize", () => {
-      syncHybridRails({ remeasure: true })
-      scheduler.schedule()
+      remeasureScheduler.schedule()
     }, { passive: true })
     registry.addWindowEvent("orientationchange", () => {
-      syncHybridRails({ remeasure: true })
-      scheduler.schedule()
+      remeasureScheduler.schedule()
     })
 
     const resizeTargets = [article].filter(
       (target): target is HTMLElement => Boolean(target)
     )
     registry.addResizeObserver(resizeTargets, () => {
-      syncHybridRails({ remeasure: true })
-      scheduler.schedule()
+      remeasureScheduler.schedule()
     })
 
     const fontSet = document.fonts
     if (fontSet) {
       void fontSet.ready.then(() => {
-        syncHybridRails({ remeasure: true })
-        scheduler.schedule()
+        remeasureScheduler.schedule()
       }).catch(() => {})
     }
 
@@ -341,6 +364,7 @@ const PostDetail: React.FC = () => {
       registry.cleanup()
       scheduler.cancel()
       railScheduler.cancel()
+      remeasureScheduler.cancel()
       clearInlineRailStyle(leftRailInnerNode)
       clearInlineRailStyle(rightRailInnerNode)
       if (leftHybridRailActiveRef.current) {
@@ -354,18 +378,22 @@ const PostDetail: React.FC = () => {
     }
   }, [data?.id, visibleTocItems])
 
-  if (!data) return null
-
-  const handleTocNavigate = (id: string) => {
+  const handleTocNavigate = useCallback((id: string) => {
     const heading = document.getElementById(id)
     if (!heading) return
-    const targetTop = heading.getBoundingClientRect().top + window.scrollY - (resolveRailTopOffset() + 24)
+    const targetTop = heading.getBoundingClientRect().top + window.scrollY - (railTopOffsetRef.current + 24)
     setActiveTocId(id)
     const hash = `#${encodeURIComponent(id)}`
     const nextUrl = `${window.location.pathname}${window.location.search}${hash}`
     window.history.replaceState(window.history.state, "", nextUrl)
     window.scrollTo({ top: targetTop, behavior: "smooth" })
-  }
+  }, [])
+
+  const handleToggleDetailedToc = useCallback(() => {
+    setShowDetailedToc((value) => !value)
+  }, [])
+
+  if (!data) return null
 
   const isPostType = (data.type?.[0] ?? "Post") === "Post"
 
@@ -452,7 +480,7 @@ const PostDetail: React.FC = () => {
           activeTocId={activeTocId}
           hasDepth4Toc={hasDepth4Toc}
           showDetailedToc={showDetailedToc}
-          onToggleDetailed={() => setShowDetailedToc((value) => !value)}
+          onToggleDetailed={handleToggleDetailedToc}
           onNavigate={handleTocNavigate}
         />
       </div>

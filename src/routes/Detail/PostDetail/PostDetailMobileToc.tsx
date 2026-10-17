@@ -1,3 +1,4 @@
+import { memo } from "react"
 import type { TocItem } from "./PostDetailTocModel"
 
 type PostDetailMobileTocProps = {
@@ -33,4 +34,4 @@ const PostDetailMobileToc = ({ items, activeTocId, onNavigate }: PostDetailMobil
   )
 }
 
-export default PostDetailMobileToc
+export default memo(PostDetailMobileToc)
