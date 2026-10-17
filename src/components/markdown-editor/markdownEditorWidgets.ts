@@ -281,11 +281,9 @@ export class MarkdownCalloutWidget extends WidgetType {
     root.className = `cm-live-callout cm-live-callout-${rawKind} cm-live-callout-tone-${tone.kind}${
       isCollapsed ? " is-collapsed" : ""
     }`
-    root.setAttribute("data-callout", tone.kind)
-    if (root.dataset) root.dataset.callout = tone.kind
-    if (this.foldState) {
-      root.setAttribute("data-fold-state", this.foldState)
-      if (root.dataset) root.dataset.foldState = this.foldState
+    if (root.dataset) {
+      root.dataset.callout = tone.kind
+      if (this.foldState) root.dataset.foldState = this.foldState
     }
 
     const header = document.createElement("div")

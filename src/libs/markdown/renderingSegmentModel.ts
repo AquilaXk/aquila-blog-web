@@ -14,7 +14,7 @@ type ParsedCalloutHeader = {
 const isAsciiCalloutToken = (token: string): boolean => {
   if (token.length === 0) return false
   for (let index = 0; index < token.length; index += 1) {
-    const code = token.charCodeAt(index)
+    const code = token.codePointAt(index) ?? -1
     const isUpper = code >= 65 && code <= 90
     const isLower = code >= 97 && code <= 122
     const isDigit = code >= 48 && code <= 57
@@ -31,9 +31,9 @@ export const hasUniformFenceMarker = (
   markerChar: string
 ): boolean => {
   if (text.length < 3 || markerChar.length === 0) return false
-  const expectedCode = markerChar.charCodeAt(0)
+  const expectedCode = markerChar.codePointAt(0) ?? -1
   for (let index = 0; index < text.length; index += 1) {
-    if (text.charCodeAt(index) !== expectedCode) {
+    if ((text.codePointAt(index) ?? -2) !== expectedCode) {
       return false
     }
   }
@@ -44,7 +44,7 @@ const parseBlockquoteCalloutToken = (raw: string) => {
   const line = raw.trim()
   if (!line.startsWith("[!")) return null
 
-  const match = line.match(/^\[!([^\]]+)\]([+-])?(?:\s*(.*))?$/)
+  const match = /^\[!([^\]]+)\]([+-])?/.exec(line)
   if (!match) return null
 
   const token = match[1] || ""
@@ -56,7 +56,7 @@ const parseBlockquoteCalloutToken = (raw: string) => {
 
   return {
     token,
-    title: (match[3] || "").trim(),
+    title: line.slice(match[0].length).trim(),
     foldable,
     defaultCollapsed,
   }

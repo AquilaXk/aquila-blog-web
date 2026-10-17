@@ -39,7 +39,7 @@ export const applyInlineColors = (root: HTMLElement) => {
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
     const value = node.nodeValue ?? node.textContent
-    if (!value || !value.includes("{{color:")) continue
+    if (!value?.includes("{{color:")) continue
     const parent = node.parentElement
     if (!parent) continue
     if (parent.closest("pre, code, textarea, script, style, .aq-inline-color")) continue

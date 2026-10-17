@@ -3,7 +3,7 @@ import { INLINE_COLOR_TOKEN_REGEX, resolveInlineColorValue } from "../../libs/ma
 
 const fallbackMarkdownParser = parser.configure(GFM)
 
-export const ENTRY_FLAG_IN_TASK = 1 << 0
+export const ENTRY_FLAG_IN_TASK = 1
 
 export type MarkdownLiveSelection = {
   from: number
@@ -135,8 +135,8 @@ export const resolveMarkdownLiveSourceRanges = (
 ): MarkdownLiveSourceRange[] => {
   const sourceRanges: MarkdownLiveSourceRange[] = []
 
-  for (let i = 0; i < selections.length; i += 1) {
-    const selection = normalizeSelection(selections[i], markdown.length)
+  for (const rawSelection of selections) {
+    const selection = normalizeSelection(rawSelection, markdown.length)
     let matchedTopLevel = false
     for (let child = documentNode.firstChild; child; child = child.nextSibling) {
       if (selectionIntersectsNode(selection, child)) {
@@ -157,8 +157,7 @@ export const isTokenActive = (
   to: number,
   selections: readonly MarkdownLiveSelection[]
 ): boolean => {
-  for (let i = 0; i < selections.length; i += 1) {
-    const sel = selections[i]
+  for (const sel of selections) {
     if (sel.from === sel.to) {
       if (sel.from >= from && sel.from <= to) return true
     } else if (sel.from < to && sel.to > from) {
@@ -250,29 +249,26 @@ const LITERAL_NODE_NAMES = new Set([
   "URL",
 ])
 
-export const buildMarkdownLivePreviewEntries = (
-  markdown: string,
-  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode as unknown as MarkdownSyntaxNode
-): readonly MarkdownLivePreviewPlanEntry[] => {
-  const cached = cachedPreviewEntriesByNode.get(documentNode)
-  if (cached && cached.markdown === markdown) {
-    return cached.entries
-  }
-
-  const entries: MarkdownLivePreviewPlanEntry[] = []
+const collectLiteralRanges = (rootNode: MarkdownSyntaxNode): MarkdownLiveSourceRange[] => {
   const literalRanges: MarkdownLiveSourceRange[] = []
-
-  const collectLiterals = (node: MarkdownSyntaxNode) => {
+  const walk = (node: MarkdownSyntaxNode) => {
     if (LITERAL_NODE_NAMES.has(node.name)) {
       literalRanges.push({ from: node.from, to: node.to })
       return
     }
     for (let child = node.firstChild; child; child = child.nextSibling) {
-      collectLiterals(child)
+      walk(child)
     }
   }
-  collectLiterals(documentNode)
+  walk(rootNode)
+  return literalRanges
+}
 
+const collectRegexPlanEntries = (
+  markdown: string,
+  literalRanges: readonly MarkdownLiveSourceRange[],
+  entries: MarkdownLivePreviewPlanEntry[]
+): MarkdownLiveSourceRange[] => {
   const wikilinkRanges: MarkdownLiveSourceRange[] = []
   if (markdown.includes("[[")) {
     for (const match of markdown.matchAll(WIKILINK_TOKEN_REGEX)) {
@@ -284,14 +280,12 @@ export const buildMarkdownLivePreviewEntries = (
       const pipeIndex = raw.indexOf("|")
       const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).trim()
       const rawAlias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
-      const alias = rawAlias ? rawAlias : undefined
+      const alias = rawAlias || undefined
       if (!target) continue
 
       const activeRange = { from, to }
       wikilinkRanges.push(activeRange)
-      entries.push(
-        createPlanEntry({ from, to, kind: "wikilink", target, alias }, activeRange)
-      )
+      entries.push(createPlanEntry({ from, to, kind: "wikilink", target, alias }, activeRange))
     }
   }
 
@@ -320,7 +314,7 @@ export const buildMarkdownLivePreviewEntries = (
       const to = from + match[0].length
       if (hasIntervalOverlap(literalRanges, from, to)) continue
       if (hasIntervalOverlap(wikilinkRanges, from, to)) continue
-      if (!match[1] || match[1].trim().length === 0) continue
+      if (!match[1]?.trim()) continue
 
       const bodyFrom = from + 2
       const bodyTo = to - 2
@@ -333,6 +327,56 @@ export const buildMarkdownLivePreviewEntries = (
     }
   }
 
+  return wikilinkRanges
+}
+
+const extractFencedCodeLanguage = (markdown: string, node: MarkdownSyntaxNode): string | undefined => {
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.name === "CodeInfo") {
+      const rawInfo = markdown.slice(child.from, child.to).trim()
+      const langToken = rawInfo.split(/\s+/)[0]?.trim()
+      return langToken || undefined
+    }
+  }
+  return undefined
+}
+
+const tagEntriesInsideTasks = (
+  entries: MarkdownLivePreviewPlanEntry[],
+  taskRanges: readonly MarkdownLiveSourceRange[]
+): void => {
+  if (taskRanges.length === 0) return
+  let taskIdx = 0
+  for (const entry of entries) {
+    if (entry.kind !== "hide-mark") continue
+    while (taskIdx < taskRanges.length && taskRanges[taskIdx].to < entry.from) {
+      taskIdx += 1
+    }
+    for (let j = taskIdx; j < taskRanges.length; j += 1) {
+      const task = taskRanges[j]
+      if (task.from > entry.from) break
+      if (entry.from >= task.from && entry.to <= task.to) {
+        const nextFlags = (entry.flags ?? 0) | ENTRY_FLAG_IN_TASK
+        entry.flags = nextFlags
+        entry.decoration.flags = nextFlags
+        break
+      }
+    }
+  }
+}
+
+export const buildMarkdownLivePreviewEntries = (
+  markdown: string,
+  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode as unknown as MarkdownSyntaxNode
+): readonly MarkdownLivePreviewPlanEntry[] => {
+  const cached = cachedPreviewEntriesByNode.get(documentNode)
+  if (cached && cached.markdown === markdown) {
+    return cached.entries
+  }
+
+  const entries: MarkdownLivePreviewPlanEntry[] = []
+  const literalRanges = collectLiteralRanges(documentNode)
+  const wikilinkRanges = collectRegexPlanEntries(markdown, literalRanges, entries)
   const taskRanges: MarkdownLiveSourceRange[] = []
 
   const visit = (
@@ -350,18 +394,17 @@ export const buildMarkdownLivePreviewEntries = (
       return
     }
 
-    if (wikilinkRanges.length > 0 && wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)) {
+    if (wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)) {
       return
     }
 
     if (node.name === "HeaderMark") {
-      const headingNode = parent
       let to = node.to
       while (to < markdown.length && (markdown[to] === " " || markdown[to] === "\t")) to += 1
       entries.push(
         createPlanEntry(
           { from: node.from, to, kind: "hide-mark" },
-          headingNode ? { from: headingNode.from, to: headingNode.to } : undefined
+          parent ? { from: parent.from, to: parent.to } : undefined
         )
       )
       return
@@ -404,17 +447,7 @@ export const buildMarkdownLivePreviewEntries = (
     }
 
     if (node.name === "FencedCode") {
-      let codeLanguage: string | undefined
-      for (let child = node.firstChild; child; child = child.nextSibling) {
-        if (child.name === "CodeInfo") {
-          const rawInfo = markdown.slice(child.from, child.to).trim()
-          const langToken = rawInfo.split(/\s+/)[0]?.trim()
-          if (langToken) {
-            codeLanguage = langToken
-          }
-          break
-        }
-      }
+      const codeLanguage = extractFencedCodeLanguage(markdown, node)
       entries.push(
         createPlanEntry({
           from: node.from,
@@ -443,27 +476,7 @@ export const buildMarkdownLivePreviewEntries = (
   visit(documentNode, null, null)
 
   entries.sort((a, b) => a.from - b.from || a.to - b.to)
-
-  if (taskRanges.length > 0) {
-    let taskIdx = 0
-    for (let i = 0; i < entries.length; i += 1) {
-      const entry = entries[i]
-      if (entry.kind !== "hide-mark") continue
-      while (taskIdx < taskRanges.length && taskRanges[taskIdx].to < entry.from) {
-        taskIdx += 1
-      }
-      for (let j = taskIdx; j < taskRanges.length; j += 1) {
-        const task = taskRanges[j]
-        if (task.from > entry.from) break
-        if (entry.from >= task.from && entry.to <= task.to) {
-          const nextFlags = (entry.flags ?? 0) | ENTRY_FLAG_IN_TASK
-          entry.flags = nextFlags
-          entry.decoration.flags = nextFlags
-          break
-        }
-      }
-    }
-  }
+  tagEntriesInsideTasks(entries, taskRanges)
 
   cachedPreviewEntriesByNode.set(documentNode, { markdown, entries })
   return entries
@@ -476,8 +489,7 @@ export const resolveMarkdownLivePreviewPlanFromEntries = (
 ): MarkdownLivePreviewDecoration[] => {
   if (composing) return []
   const decorations: MarkdownLivePreviewDecoration[] = []
-  for (let i = 0; i < entries.length; i += 1) {
-    const entry = entries[i]
+  for (const entry of entries) {
     if (
       entry.hideWhenActiveRange &&
       isTokenActive(entry.hideWhenActiveRange.from, entry.hideWhenActiveRange.to, selections)

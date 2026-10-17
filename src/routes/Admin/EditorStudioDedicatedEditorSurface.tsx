@@ -41,7 +41,7 @@ const computeCursorLineAndColumn = (
   let line = 1
   let lastNewlineIndex = -1
   for (let index = 0; index < clamped; index += 1) {
-    if (markdown.charCodeAt(index) === 10) {
+    if (markdown.codePointAt(index) === 10) {
       line += 1
       lastNewlineIndex = index
     }
@@ -56,12 +56,12 @@ export const countMarkdownTotalLinks = (markdown: string): number => {
   if (!markdown.includes("](") && !markdown.includes("[[")) return 0
   let count = 0
   if (markdown.includes("](")) {
-    for (const _match of markdown.matchAll(/!?\[[^\]]*\]\([^)\s]*\)/g)) {
+    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s\r\n]*\)/g)) {
       count += 1
     }
   }
   if (markdown.includes("[[")) {
-    for (const _match of markdown.matchAll(/\[\[[^\]]+\]\]/g)) {
+    for (const _match of markdown.matchAll(/\[\[[^\][\r\n]+\]\]/g)) {
       count += 1
     }
   }
@@ -130,7 +130,7 @@ const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
 export const countMarkdownLinkWarnings = (markdown: string) => {
   if (!markdown.includes("](")) return 0
   let count = 0
-  for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]*)/g)) {
+  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s\r\n]*)/g)) {
     const href = match[1]?.trim() ?? ""
     if (!href || /^https?:\/\/$/.test(href)) {
       count += 1
@@ -162,6 +162,7 @@ const LocalDraftRestoreSuggestion = ({
   selectedKey,
   onSelect,
   onDiscard,
+  onClear,
   onDismiss,
 }: LocalDraftRestoreSuggestionProps) => {
   if (!visible) return null
@@ -179,7 +180,7 @@ const LocalDraftRestoreSuggestion = ({
         <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
           복구
         </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onDiscard}>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={selectedKey ? onDiscard : onClear}>
           삭제
         </SecondaryButton>
         <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>

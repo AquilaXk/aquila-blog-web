@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type MutableRefObject } from "react"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import { SLASH_COMMAND_SPECS, type SlashMenuItem } from "./MarkdownEditorSlashMenu"
+export { SLASH_COMMAND_SPECS } from "./MarkdownEditorSlashMenu"
 import { createMarkdownEditorTable } from "./markdownEditorTableModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 

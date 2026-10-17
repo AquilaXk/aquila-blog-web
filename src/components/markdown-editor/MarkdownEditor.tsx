@@ -40,7 +40,7 @@ import {
   MarkdownEditorLiveSurface,
   type MarkdownEditorLiveSurfaceHandle,
 } from "./MarkdownEditorLiveSurface"
-import { MarkdownEditorSlashMenu, SLASH_COMMAND_SPECS } from "./MarkdownEditorSlashMenu"
+import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
 import {
   matchSlashCommandTrigger,
@@ -51,7 +51,7 @@ export {
   matchSlashCommandTrigger,
   resolveSlashCommandMutation,
   SLASH_COMMAND_SPECS,
-}
+} from "./useMarkdownEditorSlashMenu"
 // Slash & toolbar contract descriptors: slashFrom, 제목 1 (H1), 인용구, 코드 블록, id: "media.file", aria-label="Markdown 작성 도구"
 
 type MarkdownChangeMeta = {

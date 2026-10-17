@@ -10,9 +10,8 @@ type MarkdownFootnoteReferenceLinkProps = ComponentPropsWithoutRef<"a"> & {
 
 const extractFootnotePlainTextPreview = (content: string): string => {
   const cleaned = content
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!?\[([^\][\r\n]*)\]\([^()\r\n]*\)/g, "$1")
+    .replace(/`([^`\r\n]+)`/g, "$1")
     .replace(/(\*\*|__|~~|\*|_)/g, "")
     .replace(/\s+/g, " ")
     .trim()

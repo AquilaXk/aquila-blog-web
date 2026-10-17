@@ -15,11 +15,16 @@ const countRawCodeLines = (rawCode: string): number => {
   if (!rawCode) return 0
   let count = 1
   for (let i = 0; i < rawCode.length; i += 1) {
-    if (rawCode.charCodeAt(i) === 10) {
+    if (rawCode.codePointAt(i) === 10) {
       count += 1
     }
   }
   return count
+}
+
+const resolveCollapsedAttr = (isCollapsible: boolean, isCollapsed: boolean): "true" | "false" | undefined => {
+  if (!isCollapsible) return undefined
+  return isCollapsed ? "true" : "false"
 }
 
 const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
@@ -57,7 +62,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   return (
     <div
       className="aq-code-block"
-      data-collapsed={isCollapsible ? (isCollapsed ? "true" : "false") : undefined}
+      data-collapsed={resolveCollapsedAttr(isCollapsible, isCollapsed)}
       data-highlight-lines={highlightLines || undefined}
     >
       <div className="aq-code-toolbar">

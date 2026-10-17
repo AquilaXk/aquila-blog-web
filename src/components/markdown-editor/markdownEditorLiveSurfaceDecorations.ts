@@ -113,7 +113,7 @@ export const getDocString = (doc: EditorState["doc"]): string => {
 export const computeMinimalDocChange = (current: string, next: string) => {
   let from = 0
   const minLen = Math.min(current.length, next.length)
-  while (from < minLen && current.charCodeAt(from) === next.charCodeAt(from)) {
+  while (from < minLen && current.codePointAt(from) === next.codePointAt(from)) {
     from += 1
   }
   let currentEnd = current.length
@@ -121,7 +121,7 @@ export const computeMinimalDocChange = (current: string, next: string) => {
   while (
     currentEnd > from &&
     nextEnd > from &&
-    current.charCodeAt(currentEnd - 1) === next.charCodeAt(nextEnd - 1)
+    current.codePointAt(currentEnd - 1) === next.codePointAt(nextEnd - 1)
   ) {
     currentEnd -= 1
     nextEnd -= 1
@@ -144,6 +144,74 @@ let cachedDocBlocksEntry: {
   maths: MathReplacementSpec[]
   mermaids: MermaidReplacementSpec[]
 } | null = null
+
+const parseCalloutBlockquoteSpec = (
+  raw: string,
+  from: number,
+  to: number
+): CalloutReplacementSpec | null => {
+  const trimmed = raw.trim()
+  const newlineIndex = trimmed.indexOf("\n")
+  const firstLine = (newlineIndex >= 0 ? trimmed.slice(0, newlineIndex) : trimmed).replace(/\r$/, "")
+  const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\]([+-])?/.exec(firstLine)
+  if (!calloutMatch) return null
+  const modifier = calloutMatch[2]
+  return {
+    from,
+    to,
+    type: calloutMatch[1] ?? "note",
+    foldState: modifier === "+" || modifier === "-" ? modifier : null,
+    title: firstLine.slice(calloutMatch[0].length).trim(),
+    content: newlineIndex >= 0 ? trimmed.slice(newlineIndex + 1) : "",
+  }
+}
+
+const parseImageReplacementSpec = (
+  raw: string,
+  from: number,
+  to: number
+): ImageReplacementSpec | null => {
+  const match = /^!\[([^\][\r\n]*)\]\(([^()\r\n]*)\)$/.exec(raw)
+  if (!match) return null
+  return {
+    from,
+    to,
+    alt: match[1] ?? "",
+    src: match[2] ?? "",
+  }
+}
+
+const parseMermaidReplacementSpec = (
+  raw: string,
+  from: number,
+  to: number
+): MermaidReplacementSpec | null => {
+  const lines = raw.split(/\r?\n/)
+  if (lines.length < 2) return null
+  const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(lines[0] ?? "")
+  const closeLine = lines.at(-1) ?? ""
+  if (!openMatch || !/^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)) return null
+  return {
+    from,
+    to,
+    source: lines.slice(1, -1).join("\n"),
+  }
+}
+
+const collectMathReplacementSpecs = (markdownValue: string): MathReplacementSpec[] => {
+  const maths: MathReplacementSpec[] = []
+  if (!markdownValue.includes("$")) return maths
+  const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
+  let mathMatch: RegExpExecArray | null
+  while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
+    const from = mathMatch.index
+    const to = from + mathMatch[0].length
+    const isDisplay = Boolean(mathMatch[1])
+    const formula = mathMatch[1] ?? mathMatch[2] ?? ""
+    maths.push({ from, to, math: formula, displayMode: isDisplay })
+  }
+  return maths
+}
 
 const getCachedDocBlocks = (state: EditorState) => {
   const tree = syntaxTree(state)
@@ -171,65 +239,31 @@ const getCachedDocBlocks = (state: EditorState) => {
           markdown: markdownValue.slice(node.from, node.to),
         })
       } else if (node.name === "Blockquote") {
-        const raw = markdownValue.slice(node.from, node.to)
-        const calloutMatch =
-          /^>[ \t]*\[!([a-zA-Z0-9_-]+)\]([+-])?(?:[ \t]*([^\r\n]*))?(?:\r?\n([\s\S]*))?$/.exec(
-            raw.trim()
-          )
-        if (calloutMatch) {
-          const modifier = calloutMatch[2]
-          callouts.push({
-            from: node.from,
-            to: node.to,
-            type: calloutMatch[1] ?? "note",
-            foldState: modifier === "+" || modifier === "-" ? modifier : null,
-            title: (calloutMatch[3] ?? "").trim(),
-            content: calloutMatch[4] ?? "",
-          })
-        }
+        const callout = parseCalloutBlockquoteSpec(
+          markdownValue.slice(node.from, node.to),
+          node.from,
+          node.to
+        )
+        if (callout) callouts.push(callout)
       } else if (node.name === "Image") {
-        const raw = markdownValue.slice(node.from, node.to)
-        const match = /^!\[(.*?)\]\((.*?)\)$/.exec(raw)
-        if (match) {
-          images.push({
-            from: node.from,
-            to: node.to,
-            alt: match[1] ?? "",
-            src: match[2] ?? "",
-          })
-        }
+        const img = parseImageReplacementSpec(
+          markdownValue.slice(node.from, node.to),
+          node.from,
+          node.to
+        )
+        if (img) images.push(img)
       } else if (node.name === "FencedCode") {
-        const raw = markdownValue.slice(node.from, node.to)
-        const lines = raw.split(/\r?\n/)
-        const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(lines[0] ?? "")
-        const closeLine = lines[lines.length - 1] ?? ""
-        if (
-          openMatch &&
-          lines.length >= 2 &&
-          /^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)
-        ) {
-          mermaids.push({
-            from: node.from,
-            to: node.to,
-            source: lines.slice(1, -1).join("\n"),
-          })
-        }
+        const mermaid = parseMermaidReplacementSpec(
+          markdownValue.slice(node.from, node.to),
+          node.from,
+          node.to
+        )
+        if (mermaid) mermaids.push(mermaid)
       }
     },
   })
 
-  const maths: MathReplacementSpec[] = []
-  if (markdownValue.includes("$")) {
-    const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
-    let mathMatch: RegExpExecArray | null
-    while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
-      const from = mathMatch.index
-      const to = from + mathMatch[0].length
-      const isDisplay = Boolean(mathMatch[1])
-      const formula = mathMatch[1] ?? mathMatch[2] ?? ""
-      maths.push({ from, to, math: formula, displayMode: isDisplay })
-    }
-  }
+  const maths = collectMathReplacementSpecs(markdownValue)
 
   cachedDocBlocksEntry = {
     doc: state.doc,
@@ -243,6 +277,150 @@ const getCachedDocBlocks = (state: EditorState) => {
     mermaids,
   }
   return cachedDocBlocksEntry
+}
+
+type PlanSpecDecorationContext = {
+  state: EditorState
+  markdownValue: string
+  selections: { from: number; to: number }[]
+  styledHeadingLineStarts: Set<number>
+  styledCodeFenceLineStarts: Set<number>
+  decorations: Range<Decoration>[]
+}
+
+const appendActiveAwareWidgetSpec = (
+  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
+  ctx: PlanSpecDecorationContext
+): boolean => {
+  if (spec.kind === "task") {
+    if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
+      const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, spec.to))
+      ctx.decorations.push(
+        Decoration.replace({
+          widget: new MarkdownTaskWidget(checked, spec.from, spec.to),
+        }).range(spec.from, spec.to)
+      )
+    }
+    return true
+  }
+
+  if (spec.kind === "wikilink") {
+    if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
+      ctx.decorations.push(
+        Decoration.replace({
+          widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
+        }).range(spec.from, spec.to)
+      )
+    }
+    return true
+  }
+
+  if (spec.kind === "list-marker") {
+    if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
+      const source = ctx.markdownValue.slice(spec.from, spec.to)
+      const label = /^\d/.test(source) ? source : "•"
+      ctx.decorations.push(
+        Decoration.replace({
+          widget: new MarkdownMarkerWidget(label, "cm-live-list-marker"),
+        }).range(spec.from, spec.to)
+      )
+    }
+    return true
+  }
+
+  if (spec.kind === "quote-mark") {
+    if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
+      ctx.decorations.push(
+        Decoration.replace({
+          widget: new MarkdownMarkerWidget("", "cm-live-quote-marker"),
+        }).range(spec.from, spec.to)
+      )
+    }
+    return true
+  }
+
+  return false
+}
+
+const appendStructuralBlockSpec = (
+  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
+  ctx: PlanSpecDecorationContext
+): boolean => {
+  if (spec.kind === "heading") {
+    const line = ctx.state.doc.lineAt(spec.from)
+    if (!ctx.styledHeadingLineStarts.has(line.from)) {
+      ctx.styledHeadingLineStarts.add(line.from)
+      ctx.decorations.push(
+        Decoration.line({
+          class: `cm-live-heading-line cm-live-heading-line-${spec.level ?? 1}`,
+        }).range(line.from)
+      )
+    }
+    ctx.decorations.push(
+      Decoration.mark({
+        class: `cm-live-heading cm-live-heading-${spec.level ?? 1}`,
+      }).range(spec.from, spec.to)
+    )
+    return true
+  }
+
+  if (spec.kind === "fenced-code") {
+    if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
+      const fenceLine = ctx.state.doc.lineAt(spec.from)
+      if (!ctx.styledCodeFenceLineStarts.has(fenceLine.from)) {
+        ctx.styledCodeFenceLineStarts.add(fenceLine.from)
+        ctx.decorations.push(
+          Decoration.line({
+            class: "cm-live-code-fence-open",
+            attributes: spec.codeLanguage ? { "data-code-lang": spec.codeLanguage } : undefined,
+          }).range(fenceLine.from)
+        )
+      }
+    }
+    ctx.decorations.push(
+      Decoration.mark({ class: "cm-live-fenced-code" }).range(spec.from, spec.to)
+    )
+    return true
+  }
+
+  return false
+}
+
+const appendSinglePlanSpecDecoration = (
+  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
+  ctx: PlanSpecDecorationContext
+): void => {
+  if (spec.kind === "hide-mark") {
+    if (spec.flags === undefined || (spec.flags & ENTRY_FLAG_IN_TASK) === 0) {
+      ctx.decorations.push(Decoration.replace({}).range(spec.from, spec.to))
+    }
+    return
+  }
+
+  if (spec.kind === "horizontal-rule") {
+    ctx.decorations.push(
+      Decoration.replace({ widget: new MarkdownRuleWidget() }).range(spec.from, spec.to)
+    )
+    return
+  }
+
+  if (spec.kind === "inline-color") {
+    ctx.decorations.push(
+      Decoration.mark({
+        class: "cm-live-color",
+        attributes: { style: `color: ${spec.color}` },
+      }).range(spec.from, spec.to)
+    )
+    return
+  }
+
+  if (appendActiveAwareWidgetSpec(spec, ctx)) return
+  if (appendStructuralBlockSpec(spec, ctx)) return
+
+  const className = markClassByKind[spec.kind]
+  if (className) {
+    ctx.decorations.push(Decoration.mark({ class: className }).range(spec.from, spec.to))
+  }
 }
 
 export const buildDecorations = (state: EditorState): DecorationSet => {
@@ -282,143 +460,28 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
 
   const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections)
   const decorations: Range<Decoration>[] = []
-  const styledHeadingLineStarts = new Set<number>()
-  const styledCodeFenceLineStarts = new Set<number>()
+  const ctx: PlanSpecDecorationContext = {
+    state,
+    markdownValue,
+    selections,
+    styledHeadingLineStarts: new Set<number>(),
+    styledCodeFenceLineStarts: new Set<number>(),
+    decorations,
+  }
 
   for (const spec of plan) {
     if (spec.from === spec.to) continue
     if (hasIntervalOverlap(replacedRanges, spec.from, spec.to)) continue
-
-    const isUnderComposition = isComposing && compFrom <= spec.to && compTo >= spec.from
-    if (isUnderComposition) continue
-
-    if (
-      spec.kind === "hide-mark" &&
-      spec.flags !== undefined &&
-      (spec.flags & ENTRY_FLAG_IN_TASK) !== 0
-    ) {
-      continue
-    }
-
-    if (spec.kind === "hide-mark") {
-      decorations.push(Decoration.replace({}).range(spec.from, spec.to))
-      continue
-    }
-
-    if (spec.kind === "horizontal-rule") {
-      decorations.push(
-        Decoration.replace({ widget: new MarkdownRuleWidget() }).range(spec.from, spec.to)
-      )
-      continue
-    }
-
-    if (spec.kind === "inline-color") {
-      decorations.push(
-        Decoration.mark({
-          class: "cm-live-color",
-          attributes: { style: `color: ${spec.color}` },
-        }).range(spec.from, spec.to)
-      )
-      continue
-    }
-
-    if (spec.kind === "task") {
-      if (!isTokenActive(spec.from, spec.to, selections)) {
-        const checked = /\[[xX]\]/.test(markdownValue.slice(spec.from, spec.to))
-        decorations.push(
-          Decoration.replace({
-            widget: new MarkdownTaskWidget(checked, spec.from, spec.to),
-          }).range(spec.from, spec.to)
-        )
-      }
-      continue
-    }
-
-    if (spec.kind === "wikilink") {
-      if (!isTokenActive(spec.from, spec.to, selections)) {
-        decorations.push(
-          Decoration.replace({
-            widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
-          }).range(spec.from, spec.to)
-        )
-      }
-      continue
-    }
-
-    if (spec.kind === "list-marker") {
-      if (!isTokenActive(spec.from, spec.to, selections)) {
-        const source = markdownValue.slice(spec.from, spec.to)
-        const label = /^\d/.test(source) ? source : "•"
-        decorations.push(
-          Decoration.replace({
-            widget: new MarkdownMarkerWidget(label, "cm-live-list-marker"),
-          }).range(spec.from, spec.to)
-        )
-      }
-      continue
-    }
-
-    if (spec.kind === "quote-mark") {
-      if (!isTokenActive(spec.from, spec.to, selections)) {
-        decorations.push(
-          Decoration.replace({
-            widget: new MarkdownMarkerWidget("", "cm-live-quote-marker"),
-          }).range(spec.from, spec.to)
-        )
-      }
-      continue
-    }
-
-    if (spec.kind === "heading") {
-      const line = state.doc.lineAt(spec.from)
-      if (!styledHeadingLineStarts.has(line.from)) {
-        styledHeadingLineStarts.add(line.from)
-        decorations.push(
-          Decoration.line({
-            class: `cm-live-heading-line cm-live-heading-line-${spec.level ?? 1}`,
-          }).range(line.from)
-        )
-      }
-      decorations.push(
-        Decoration.mark({
-          class: `cm-live-heading cm-live-heading-${spec.level ?? 1}`,
-        }).range(spec.from, spec.to)
-      )
-      continue
-    }
-
-    if (spec.kind === "fenced-code") {
-      if (!isTokenActive(spec.from, spec.to, selections)) {
-        const fenceLine = state.doc.lineAt(spec.from)
-        if (!styledCodeFenceLineStarts.has(fenceLine.from)) {
-          styledCodeFenceLineStarts.add(fenceLine.from)
-          decorations.push(
-            Decoration.line({
-              class: "cm-live-code-fence-open",
-              attributes: spec.codeLanguage
-                ? { "data-code-lang": spec.codeLanguage }
-                : undefined,
-            }).range(fenceLine.from)
-          )
-        }
-      }
-      decorations.push(
-        Decoration.mark({ class: "cm-live-fenced-code" }).range(spec.from, spec.to)
-      )
-      continue
-    }
-
-    const className = markClassByKind[spec.kind]
-    if (className) {
-      decorations.push(Decoration.mark({ class: className }).range(spec.from, spec.to))
-    }
+    if (isComposing && compFrom <= spec.to && compTo >= spec.from) continue
+    appendSinglePlanSpecDecoration(spec, ctx)
   }
 
   for (const table of tableReplacements) {
     decorations.push(
-      Decoration.replace({
-        widget: new MarkdownTableWidget(table.markdown),
-      }).range(table.from, table.to)
+      Decoration.replace({ widget: new MarkdownTableWidget(table.markdown) }).range(
+        table.from,
+        table.to
+      )
     )
   }
 
@@ -439,25 +502,28 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
 
   for (const img of imageReplacements) {
     decorations.push(
-      Decoration.replace({
-        widget: new MarkdownImageWidget(img.src, img.alt),
-      }).range(img.from, img.to)
+      Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt) }).range(
+        img.from,
+        img.to
+      )
     )
   }
 
   for (const math of mathReplacements) {
     decorations.push(
-      Decoration.replace({
-        widget: new MarkdownMathWidget(math.math, math.displayMode),
-      }).range(math.from, math.to)
+      Decoration.replace({ widget: new MarkdownMathWidget(math.math, math.displayMode) }).range(
+        math.from,
+        math.to
+      )
     )
   }
 
   for (const mermaid of mermaidReplacements) {
     decorations.push(
-      Decoration.replace({
-        widget: new MarkdownMermaidWidget(mermaid.source, mermaid.from),
-      }).range(mermaid.from, mermaid.to)
+      Decoration.replace({ widget: new MarkdownMermaidWidget(mermaid.source, mermaid.from) }).range(
+        mermaid.from,
+        mermaid.to
+      )
     )
   }
 

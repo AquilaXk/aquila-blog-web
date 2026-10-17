@@ -38,12 +38,8 @@ const isUnicodeWhitespace = (code: number): boolean =>
 export const countCodePoints = (text: string): number => {
   let count = 0
   for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index)
-    if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length) {
-      const next = text.charCodeAt(index + 1)
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        index += 1
-      }
+    if ((text.codePointAt(index) ?? 0) > 0xffff) {
+      index += 1
     }
     count += 1
   }
@@ -54,7 +50,7 @@ export const countWords = (text: string): number => {
   let words = 0
   let inWord = false
   for (let index = 0; index < text.length; index += 1) {
-    if (isUnicodeWhitespace(text.charCodeAt(index))) {
+    if (isUnicodeWhitespace(text.codePointAt(index) ?? 0)) {
       inWord = false
     } else if (!inWord) {
       inWord = true
@@ -64,18 +60,23 @@ export const countWords = (text: string): number => {
   return words
 }
 
-const countTrimmedCodePointsAndWords = (
-  text: string
-): { characterCount: number; wordCount: number } => {
+const findTrimmedBounds = (text: string): { start: number; end: number } => {
   let start = 0
   const len = text.length
-  while (start < len && isUnicodeWhitespace(text.charCodeAt(start))) {
+  while (start < len && isUnicodeWhitespace(text.codePointAt(start) ?? 0)) {
     start += 1
   }
   let end = len
-  while (end > start && isUnicodeWhitespace(text.charCodeAt(end - 1))) {
+  while (end > start && isUnicodeWhitespace(text.codePointAt(end - 1) ?? 0)) {
     end -= 1
   }
+  return { start, end }
+}
+
+const countTrimmedCodePointsAndWords = (
+  text: string
+): { characterCount: number; wordCount: number } => {
+  const { start, end } = findTrimmedBounds(text)
   if (start >= end) {
     return { characterCount: 0, wordCount: 0 }
   }
@@ -85,18 +86,15 @@ const countTrimmedCodePointsAndWords = (
   let inWord = false
 
   for (let index = start; index < end; index += 1) {
-    const code = text.charCodeAt(index)
+    const code = text.codePointAt(index) ?? 0
     if (isUnicodeWhitespace(code)) {
       inWord = false
     } else if (!inWord) {
       inWord = true
       wordCount += 1
     }
-    if (code >= 0xd800 && code <= 0xdbff && index + 1 < end) {
-      const next = text.charCodeAt(index + 1)
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        index += 1
-      }
+    if (code > 0xffff) {
+      index += 1
     }
     characterCount += 1
   }
@@ -153,6 +151,65 @@ export const createMarkdownHeadingSlugAllocator = () => {
   return { allocate }
 }
 
+type ActiveFenceState = { marker: "`" | "~"; length: number } | null
+
+const updateActiveFenceState = (line: string, activeFence: ActiveFenceState): ActiveFenceState => {
+  const fenceMatch = FENCE_OPEN_PATTERN.exec(line)
+  if (!fenceMatch) return activeFence
+  const fence = fenceMatch[1]
+  const marker = fence[0] as "`" | "~"
+  if (!activeFence) {
+    return { marker, length: fence.length }
+  }
+  if (
+    activeFence.marker === marker &&
+    fence.length >= activeFence.length &&
+    line.slice(fenceMatch[0].length).trim() === ""
+  ) {
+    return null
+  }
+  return activeFence
+}
+
+const appendMarkdownHeadingInsight = (
+  line: string,
+  offset: number,
+  lineLength: number,
+  slugAllocator: ReturnType<typeof createMarkdownHeadingSlugAllocator>,
+  headings: MarkdownDocumentHeading[]
+): void => {
+  const headingMatch = ATX_HEADING_PATTERN.exec(line)
+  if (!headingMatch) return
+  const label = formatMarkdownHeadingLabel(headingMatch[2])
+  if (!label) return
+  const level = headingMatch[1].length as MarkdownDocumentHeading["level"]
+  const slug = slugAllocator.allocate(label)
+  const headingItem = {
+    level,
+    label,
+    offset,
+    range: { start: offset, end: offset + lineLength },
+    slug,
+  } as MarkdownDocumentHeading
+  Object.defineProperty(headingItem, "id", {
+    value: slug,
+    enumerable: false,
+  })
+  headings.push(headingItem)
+}
+
+const findFirstNonSpaceWithinIndent = (markdown: string, lineStart: number, lineEnd: number): number => {
+  let firstNonSpace = lineStart
+  while (
+    firstNonSpace < lineEnd &&
+    firstNonSpace - lineStart < 3 &&
+    (markdown.codePointAt(firstNonSpace) === 32 || markdown.codePointAt(firstNonSpace) === 9)
+  ) {
+    firstNonSpace += 1
+  }
+  return firstNonSpace
+}
+
 export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocumentInsights => {
   const { characterCount, wordCount } = countTrimmedCodePointsAndWords(markdown)
   const headings: MarkdownDocumentHeading[] = []
@@ -160,65 +217,29 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
   const len = markdown.length
   let lineStart = 0
   let offset = 0
-  let activeFence: { marker: "`" | "~"; length: number } | null = null
+  let activeFence: ActiveFenceState = null
 
   while (lineStart <= len) {
     const nextBreak = markdown.indexOf("\n", lineStart)
     const rawLineEnd = nextBreak === -1 ? len : nextBreak
     const lineEnd =
-      rawLineEnd > lineStart && markdown.charCodeAt(rawLineEnd - 1) === 13
+      rawLineEnd > lineStart && markdown.codePointAt(rawLineEnd - 1) === 13
         ? rawLineEnd - 1
         : rawLineEnd
     const lineLength = lineEnd - lineStart
+    const firstNonSpace = findFirstNonSpaceWithinIndent(markdown, lineStart, lineEnd)
+    const firstChar = firstNonSpace < lineEnd ? (markdown.codePointAt(firstNonSpace) ?? 0) : 0
 
-    let firstNonSpace = lineStart
-    while (
-      firstNonSpace < lineEnd &&
-      firstNonSpace - lineStart < 3 &&
-      (markdown.charCodeAt(firstNonSpace) === 32 || markdown.charCodeAt(firstNonSpace) === 9)
-    ) {
-      firstNonSpace += 1
-    }
-
-    const firstChar = firstNonSpace < lineEnd ? markdown.charCodeAt(firstNonSpace) : 0
     if (firstChar === 96 || firstChar === 126) {
-      const line = markdown.slice(lineStart, lineEnd)
-      const fenceMatch = FENCE_OPEN_PATTERN.exec(line)
-      if (fenceMatch) {
-        const fence = fenceMatch[1]
-        const marker = fence[0] as "`" | "~"
-        if (!activeFence) {
-          activeFence = { marker, length: fence.length }
-        } else if (
-          activeFence.marker === marker &&
-          fence.length >= activeFence.length &&
-          line.slice(fenceMatch[0].length).trim() === ""
-        ) {
-          activeFence = null
-        }
-      }
+      activeFence = updateActiveFenceState(markdown.slice(lineStart, lineEnd), activeFence)
     } else if (!activeFence && firstChar === 35) {
-      const line = markdown.slice(lineStart, lineEnd)
-      const headingMatch = ATX_HEADING_PATTERN.exec(line)
-      if (headingMatch) {
-        const label = formatMarkdownHeadingLabel(headingMatch[2])
-        if (label) {
-          const level = headingMatch[1].length as MarkdownDocumentHeading["level"]
-          const slug = slugAllocator.allocate(label)
-          const headingItem = {
-            level,
-            label,
-            offset,
-            range: { start: offset, end: offset + lineLength },
-            slug,
-          } as MarkdownDocumentHeading
-          Object.defineProperty(headingItem, "id", {
-            value: slug,
-            enumerable: false,
-          })
-          headings.push(headingItem)
-        }
-      }
+      appendMarkdownHeadingInsight(
+        markdown.slice(lineStart, lineEnd),
+        offset,
+        lineLength,
+        slugAllocator,
+        headings
+      )
     }
 
     offset += lineLength + 1

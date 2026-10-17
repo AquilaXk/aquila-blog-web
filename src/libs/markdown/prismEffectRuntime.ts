@@ -188,7 +188,7 @@ export const createPrismEffectRuntime = ({
     }> = []
 
     for (const { block, language, source } of languageByBlock) {
-      const highlightSpec = block.getAttribute("data-highlight-lines") || ""
+      const highlightSpec = block.dataset.highlightLines || ""
       const highlightedLines = parseHighlightedLineNumbers(highlightSpec)
       const immediate = renderImmediateCodeToHtml({
         source,
@@ -207,10 +207,10 @@ export const createPrismEffectRuntime = ({
       })
       block.dataset.prismLanguage = immediate.language
       block.dataset.prismSource = source
-      block.setAttribute("data-language", immediate.language)
-      block.setAttribute("data-raw-code", source)
+      block.dataset.language = immediate.language
+      block.dataset.rawCode = source
       if (immediate.highlighted) {
-        block.setAttribute("data-prism-highlighted", "true")
+        block.dataset.prismHighlighted = "true"
         continue
       }
       asyncCandidates.push({
@@ -252,10 +252,10 @@ export const createPrismEffectRuntime = ({
       })
       block.dataset.prismLanguage = language
       block.dataset.prismSource = source
-      block.setAttribute("data-language", language)
-      block.setAttribute("data-raw-code", source)
+      block.dataset.language = language
+      block.dataset.rawCode = source
       if (result.highlighted) {
-        block.setAttribute("data-prism-highlighted", "true")
+        block.dataset.prismHighlighted = "true"
       }
     })
   }
