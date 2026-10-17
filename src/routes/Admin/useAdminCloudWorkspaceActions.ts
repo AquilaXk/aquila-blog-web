@@ -42,15 +42,79 @@ const getCachedCloudQueryFilters = (queryKey: readonly unknown[]) => ({
   keyword: typeof queryKey[2] === "string" ? queryKey[2] : "",
 })
 
-const createUploadQueueItem = (file: File): UploadQueueItem => ({
-  id: `${Date.now()}-${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
-  file,
-  name: file.name,
-  byteSize: file.size,
-  status: "queued",
-  progress: 0,
-  message: "업로드 대기 중",
-})
+let nextUploadQueueItemSequence = 1
+
+const createUploadQueueItem = (file: File): UploadQueueItem => {
+  const sequence = nextUploadQueueItemSequence
+  nextUploadQueueItemSequence += 1
+  return {
+    id: `${Date.now()}-${file.name}-${file.size}-${sequence}`,
+    file,
+    name: file.name,
+    byteSize: file.size,
+    status: "queued",
+    progress: 0,
+    message: "업로드 대기 중",
+  }
+}
+
+const applyUploadQueueProgress = (
+  current: UploadQueueItem[],
+  targetId: string,
+  progress: number,
+  message: string
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId && item.status !== "cancelled" ? { ...item, progress, message } : item
+  )
+
+const applyUploadQueueSuccess = (
+  current: UploadQueueItem[],
+  targetId: string,
+  uploadedFileId: number
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId && item.status !== "cancelled"
+      ? {
+          ...item,
+          status: "done",
+          progress: 100,
+          message: "업로드 완료",
+          uploadedFileId,
+        }
+      : item
+  )
+
+const applyUploadQueueFailure = (
+  current: UploadQueueItem[],
+  targetId: string,
+  aborted: boolean,
+  failureMessage: string
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId
+      ? {
+          ...item,
+          status: aborted ? "cancelled" : "failed",
+          progress: aborted ? 0 : 100,
+          message: failureMessage,
+        }
+      : item
+  )
+
+const resolveBulkDeleteFailureMessage = (
+  deletedCount: number,
+  failedCount: number,
+  firstFailure: PromiseRejectedResult | undefined
+): string => {
+  if (deletedCount > 0) {
+    return `${deletedCount}개 삭제 완료, ${failedCount}개 실패`
+  }
+  if (firstFailure) {
+    return toUserFacingMessage(firstFailure.reason)
+  }
+  return `${failedCount}개 파일 삭제 실패`
+}
 
 const sanitizeClientFilenameForDisplayFallback = (filename: string) => {
   const normalized = filename
@@ -212,13 +276,7 @@ export const useAdminCloudWorkspaceActions = () => {
       try {
         const uploaded = await uploadCloudFile(nextUpload.file, "", controller.signal, {
           onProgress: ({ progress, message }) => {
-            setUploadQueue((current) =>
-              current.map((item) =>
-                item.id === nextUpload.id && item.status !== "cancelled"
-                  ? { ...item, progress, message }
-                  : item
-              )
-            )
+            setUploadQueue((current) => applyUploadQueueProgress(current, nextUpload.id, progress, message))
           },
         })
         if (controller.signal.aborted) throw new DOMException("Upload aborted", "AbortError")
@@ -231,36 +289,13 @@ export const useAdminCloudWorkspaceActions = () => {
         setNotice((current) =>
           current.includes(nextUpload.name) && /업로드 (실패|취소)/.test(current) ? "" : current
         )
-        setUploadQueue((current) =>
-          current.map((item) =>
-            item.id === nextUpload.id && item.status !== "cancelled"
-              ? {
-                  ...item,
-                  status: "done",
-                  progress: 100,
-                  message: "업로드 완료",
-                  uploadedFileId: displayUploaded.id,
-                }
-              : item
-          )
-        )
+        setUploadQueue((current) => applyUploadQueueSuccess(current, nextUpload.id, displayUploaded.id))
         void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
       } catch (error) {
         const aborted = controller.signal.aborted || isAbortLikeError(error)
         const failureMessage = aborted ? "사용자가 취소함" : resolveCloudErrorMessage(error)
         setNotice(aborted ? `${nextUpload.name} 업로드 취소` : `${nextUpload.name} 업로드 실패: ${failureMessage}`)
-        setUploadQueue((current) =>
-          current.map((item) =>
-            item.id === nextUpload.id
-              ? {
-                  ...item,
-                  status: aborted ? "cancelled" : "failed",
-                  progress: aborted ? 0 : 100,
-                  message: failureMessage,
-                }
-              : item
-          )
-        )
+        setUploadQueue((current) => applyUploadQueueFailure(current, nextUpload.id, aborted, failureMessage))
       } finally {
         uploadControllersRef.current.delete(nextUpload.id)
       }
@@ -369,7 +404,8 @@ export const useAdminCloudWorkspaceActions = () => {
     }
 
     const firstElement = focusableElements[0]
-    const lastElement = focusableElements[focusableElements.length - 1]
+    const lastElement = focusableElements.at(-1)
+    if (!lastElement) return
     if (event.shiftKey && document.activeElement === firstElement) {
       event.preventDefault()
       lastElement.focus()
@@ -417,12 +453,7 @@ export const useAdminCloudWorkspaceActions = () => {
     }
 
     if (failedCount > 0) {
-      const failureText =
-        deletedIds.size > 0
-          ? `${deletedIds.size}개 삭제 완료, ${failedCount}개 실패`
-          : firstFailure
-            ? toUserFacingMessage(firstFailure.reason)
-            : `${failedCount}개 파일 삭제 실패`
+      const failureText = resolveBulkDeleteFailureMessage(deletedIds.size, failedCount, firstFailure)
       setToast({ tone: "error", text: failureText })
     } else {
       setToast({ tone: "success", text: `${deletedIds.size}개 파일 삭제 완료` })

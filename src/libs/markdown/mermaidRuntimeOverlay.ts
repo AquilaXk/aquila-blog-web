@@ -81,7 +81,7 @@ export const attachStageDragPan = (
     stage.scrollTop = startScrollTop - (event.clientY - startY)
   }
 
-  const stopDragging = (event: PointerEvent) => {
+  const stopDragging = () => {
     if (!dragging) return
     dragging = false
     if (activePointerId !== null) {
@@ -89,7 +89,6 @@ export const attachStageDragPan = (
       activePointerId = null
     }
     stage.style.cursor = getZoomLevel() > 1 ? "grab" : ""
-    void event
   }
 
   stage.addEventListener("pointerdown", handlePointerDown)

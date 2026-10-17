@@ -50,7 +50,7 @@ const EXTERNAL_PLAYBACK_PLAYER_LABELS: Record<ExternalPlaybackPlayer, string> = 
   mpv: "mpv",
 }
 
-const quoteShellArg = (value: string) => `"${value.replace(/(["\\$`])/g, "\\$1")}"`
+const quoteShellArg = (value: string) => `"${value.replace(/(["\\$`])/g, String.raw`\$1`)}"`
 
 const buildExternalPlaybackCommand = (player: ExternalPlaybackPlayer, contentUrl: string) =>
   `${player} ${quoteShellArg(contentUrl)}`
@@ -85,38 +85,45 @@ const installPdfWorkerTerminationRejectionHandler = () => {
   }
 }
 
+const swallowPromiseRejection = (promise: Promise<unknown> | undefined) => {
+  void promise?.catch(() => undefined)
+}
+
+const scheduleLoadedPdfTaskDestroy = (loadingTask: PDFDocumentLoadingTask | null) => {
+  window.setTimeout(() => {
+    swallowPromiseRejection(loadingTask?.destroy())
+  }, PDF_LOADED_TASK_DESTROY_DELAY_MS)
+}
+
+const cleanupPdfDocumentAfterRender = async (
+  pdfDocument: PDFDocumentProxy,
+  loadingTask: PDFDocumentLoadingTask | null
+) => {
+  try {
+    await pdfDocument.cleanup()
+  } catch {
+    // 이미 해제된 문서 리소스 정리는 사용자에게 노출하지 않는다.
+  }
+  scheduleLoadedPdfTaskDestroy(loadingTask)
+}
+
 const ignorePdfPreviewTeardownRejection = (
   loadingTask: PDFDocumentLoadingTask | null,
   pdfDocument: PDFDocumentProxy | null,
   renderTask: RenderTask | null
 ) => {
   const renderSettled = renderTask?.promise.catch(() => undefined) ?? Promise.resolve()
-
-  void loadingTask?.promise.catch(() => {
-    // teardown 중 늦게 도착한 loading reject도 pageerror로 노출하지 않는다.
-  })
+  swallowPromiseRejection(loadingTask?.promise)
 
   if (pdfDocument) {
-    void renderSettled.then(async () => {
-      await pdfDocument.cleanup().catch(() => {
-        // 이미 해제된 문서 리소스 정리는 사용자에게 노출하지 않는다.
-      })
-
-      window.setTimeout(() => {
-        void loadingTask?.destroy().catch(() => {
-          // 로드 완료 후 worker 종료 reject도 미리보기 teardown 결과로 흡수한다.
-        })
-      }, PDF_LOADED_TASK_DESTROY_DELAY_MS)
-    })
+    void renderSettled.then(() => cleanupPdfDocumentAfterRender(pdfDocument, loadingTask))
     return
   }
 
   if (!loadingTask) return
 
   void renderSettled.finally(() => {
-    void loadingTask.destroy().catch(() => {
-      // cleanup에서 PDF.js worker/download를 종료할 때 발생하는 reject도 사용자에게 노출하지 않는다.
-    })
+    swallowPromiseRejection(loadingTask.destroy())
   })
 }
 
@@ -355,7 +362,9 @@ const VideoPreview = ({ file, contentUrl }: VideoPreviewProps) => {
         <h3>클라우드 동영상</h3>
       </PreviewHeader>
       <VideoFrame>
-        <video ref={videoRef} src={contentUrl} controls preload="metadata" playsInline />
+        <video ref={videoRef} src={contentUrl} controls preload="metadata" playsInline>
+          <track kind="captions" />
+        </video>
         <PlayerBar aria-label="클라우드 동영상 재생 제어">
           <InlineList>
             <span>브라우저 기본 재생</span>
@@ -482,7 +491,7 @@ export const CloudDeleteConfirmDialog = ({
     >
       <strong id="cloud-delete-confirm-title">파일 삭제</strong>
       <p id="cloud-delete-confirm-description">
-        <span>{files.length === 1 ? files[0].originalFilename : `${files.length}개 파일`}</span>
+        <span>{files.length === 1 ? files[0].originalFilename : `${files.length}개 파일`}</span>{" "}
         삭제한 파일은 관리자 클라우드 목록에서 제거됩니다.
       </p>
       <div>

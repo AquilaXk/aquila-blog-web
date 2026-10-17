@@ -162,6 +162,7 @@ test.describe("Issue #263 Wave 4 UX & Zero Boundary Warnings", () => {
           tagName: tag.toUpperCase(),
           className: "",
           textContent: "",
+          dataset: {},
           style: {
             setProperty: () => {},
           },
@@ -237,9 +238,11 @@ test.describe("Issue #263 Wave 4 UX & Zero Boundary Warnings", () => {
       expect(appended).toHaveLength(1)
       const backdrop = appended[0] as {
         className: string
+        dataset: Record<string, string>
         getAttribute: (k: string) => string | null
       }
       expect(backdrop.className).toContain("aq-image-lightbox-backdrop")
+      expect(backdrop.dataset.aqImageLightbox).toBe("true")
       expect(backdrop.getAttribute("role")).toBe("dialog")
       expect(backdrop.getAttribute("aria-modal")).toBe("true")
 

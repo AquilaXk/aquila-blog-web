@@ -68,9 +68,9 @@ const handleHeadingAnchorClick = (target: Element): boolean => {
   window.history.replaceState(null, "", `#${heading.id}`)
   const fullUrl = buildHeadingAnchorUrl(window.location.href, heading.id)
   void navigator.clipboard?.writeText(fullUrl)?.catch(() => undefined)
-  heading.setAttribute("data-anchor-copied", "true")
+  heading.dataset.anchorCopied = "true"
   window.setTimeout(() => {
-    heading.removeAttribute("data-anchor-copied")
+    delete heading.dataset.anchorCopied
   }, 1500)
   return true
 }
@@ -80,7 +80,7 @@ const handleImageLightboxClick = (target: Element): boolean => {
   const image = target.closest<HTMLImageElement>(".aq-image-frame img")
   if (!image) return false
   const frame = image.closest<HTMLElement>(".aq-image-frame")
-  if (frame?.getAttribute("data-editable") === "true") return false
+  if (frame?.dataset.editable === "true") return false
   const src = image.getAttribute("src") || image.src
   if (!src) return false
   const caption = frame?.querySelector("figcaption")?.textContent || undefined

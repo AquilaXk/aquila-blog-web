@@ -116,18 +116,21 @@ const CloudFileTableSection = ({
   }
 
   if (files.length === 0) {
+    const retryOrUploadButton = isFileListError ? (
+      <PrimaryButton type="button" aria-label="파일 목록 다시 시도" onClick={onRetryList}>
+        다시 시도
+      </PrimaryButton>
+    ) : (
+      <PrimaryButton type="button" aria-label="파일 업로드" onClick={onOpenUploadPicker}>
+        ⤴ 올리기
+      </PrimaryButton>
+    )
+    const emptyAction = activeUploadCount > 0 ? null : retryOrUploadButton
+
     return (
       <EmptyTableState>
         <strong>{emptyTitle}</strong>
-        {activeUploadCount > 0 ? null : isFileListError ? (
-          <PrimaryButton type="button" aria-label="파일 목록 다시 시도" onClick={onRetryList}>
-            다시 시도
-          </PrimaryButton>
-        ) : (
-          <PrimaryButton type="button" aria-label="파일 업로드" onClick={onOpenUploadPicker}>
-            ⤴ 올리기
-          </PrimaryButton>
-        )}
+        {emptyAction}
       </EmptyTableState>
     )
   }

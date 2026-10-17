@@ -133,7 +133,7 @@ export const useFeedExplorerSessionRestore = ({
     pruneFeedExplorerStateStorage(window.sessionStorage)
 
     const restored = parseFeedExplorerRestoreState(window.sessionStorage.getItem(restoreStorageKey))
-    if (!restored || restored.tag !== (currentTag || "")) return
+    if (restored?.tag !== (currentTag || "")) return
 
     restoreStateRef.current = restored
     restoreTargetPagesRef.current = Math.min(resolveRestorePageCap(), Math.max(1, restored.loadedPages))
@@ -207,7 +207,7 @@ export const useFeedExplorerSessionRestore = ({
 
     const restored = restoreStateRef.current
     const activeTag = currentTag || ""
-    if (!restored || restored.tag !== activeTag || restored.q !== normalizedQuery) return
+    if (restored?.tag !== activeTag || restored.q !== normalizedQuery) return
 
     const restoreQueryKey = toFeedExplorerInfiniteQueryKey({
       kw: normalizedQuery,

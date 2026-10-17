@@ -65,7 +65,7 @@ export const openImageLightboxOverlay = (
 
   const overlay = document.createElement("div")
   overlay.className = "aq-image-lightbox-backdrop"
-  overlay.setAttribute("data-aq-image-lightbox", "true")
+  overlay.dataset.aqImageLightbox = "true"
   overlay.setAttribute("role", "dialog")
   overlay.setAttribute("aria-modal", "true")
   overlay.setAttribute("aria-label", altText)
