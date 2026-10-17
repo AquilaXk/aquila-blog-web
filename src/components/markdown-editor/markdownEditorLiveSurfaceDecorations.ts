@@ -342,6 +342,43 @@ const appendActiveAwareWidgetSpec = (
   return false
 }
 
+const addLineDecorationOnce = (
+  ctx: PlanSpecDecorationContext,
+  lineFrom: number,
+  className: string,
+  attributes?: Record<string, string>
+) => {
+  if (ctx.styledCodeFenceLineStarts.has(lineFrom)) return
+  ctx.styledCodeFenceLineStarts.add(lineFrom)
+  ctx.decorations.push(
+    Decoration.line({
+      class: className,
+      attributes,
+    }).range(lineFrom)
+  )
+}
+
+const appendFencedCodeLineDecorations = (
+  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
+  ctx: PlanSpecDecorationContext
+) => {
+  const startLine = ctx.state.doc.lineAt(spec.from)
+  const endLine = ctx.state.doc.lineAt(spec.to)
+  addLineDecorationOnce(
+    ctx,
+    startLine.from,
+    "cm-live-code-line cm-live-code-fence-open",
+    spec.codeLanguage ? { "data-code-lang": spec.codeLanguage } : undefined
+  )
+  for (let lineNo = startLine.number + 1; lineNo < endLine.number; lineNo += 1) {
+    const bodyLine = ctx.state.doc.line(lineNo)
+    addLineDecorationOnce(ctx, bodyLine.from, "cm-live-code-line cm-live-code-body-line")
+  }
+  if (endLine.number > startLine.number) {
+    addLineDecorationOnce(ctx, endLine.from, "cm-live-code-line cm-live-code-fence-close")
+  }
+}
+
 const appendStructuralBlockSpec = (
   spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
   ctx: PlanSpecDecorationContext
@@ -366,16 +403,7 @@ const appendStructuralBlockSpec = (
 
   if (spec.kind === "fenced-code") {
     if (!isTokenActive(spec.from, spec.to, ctx.selections)) {
-      const fenceLine = ctx.state.doc.lineAt(spec.from)
-      if (!ctx.styledCodeFenceLineStarts.has(fenceLine.from)) {
-        ctx.styledCodeFenceLineStarts.add(fenceLine.from)
-        ctx.decorations.push(
-          Decoration.line({
-            class: "cm-live-code-fence-open",
-            attributes: spec.codeLanguage ? { "data-code-lang": spec.codeLanguage } : undefined,
-          }).range(fenceLine.from)
-        )
-      }
+      appendFencedCodeLineDecorations(spec, ctx)
     }
     ctx.decorations.push(
       Decoration.mark({ class: "cm-live-fenced-code" }).range(spec.from, spec.to)

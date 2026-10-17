@@ -135,22 +135,6 @@ const useResponsiveTableEffect = (rootRef?: RefObject<HTMLElement | null>, conte
     if (!root) return
 
     syncResponsiveTables(root)
-
-    // ReactMarkdown can replace table nodes on parent re-render without changing contentKey.
-    // Re-apply labels when the markdown subtree mutates so data-label survives remounts.
-    if (typeof MutationObserver === "undefined") return
-
-    let scheduled = false
-    const observer = new MutationObserver((mutations) => {
-      if (scheduled || !shouldScheduleFromTableMutations(mutations)) return
-      scheduled = true
-      queueMicrotask(() => {
-        scheduled = false
-        syncResponsiveTables(root)
-      })
-    })
-    observer.observe(root, { childList: true, subtree: true })
-    return () => observer.disconnect()
   }, [contentKey, rootRef])
 }
 

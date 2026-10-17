@@ -306,55 +306,56 @@ const isLikelyGfmTable = (headerLine: string, separatorLine: string) => {
   return countGfmTableCells(headerLine) === countGfmTableCells(separatorLine)
 }
 
+export const stepFencedCodeState = (
+  line: string,
+  currentMarker: FencedCodeBlockMarker | null
+): FencedCodeBlockMarker | null => {
+  if (currentMarker) {
+    return isFencedCodeBlockClosingLine(line, currentMarker) ? null : currentMarker
+  }
+  return parseFencedCodeBlockMarker(line)
+}
+
+export const isGfmTableAt = (lines: readonly string[], headerIndex: number): boolean =>
+  isLikelyGfmTable(lines[headerIndex] || "", lines[headerIndex + 1] || "")
+
+const normalizeTableSourceLineEndings = (markdown: string): string =>
+  markdown.includes("\r") ? markdown.replace(/\r\n?/g, "\n") : markdown
+
 export const extractMarkdownTableLayouts = (
   markdown: string
 ): ExtractedTableLayouts => {
-  if (!markdown.includes("|") && !markdown.includes("aq-table")) {
+  const normalizedMarkdown = normalizeTableSourceLineEndings(markdown)
+  if (!normalizedMarkdown.includes("|") && !normalizedMarkdown.includes("aq-table")) {
     return {
-      cleanedMarkdown: markdown.includes("\r") ? markdown.replace(/\r\n?/g, "\n") : markdown,
+      cleanedMarkdown: normalizedMarkdown,
       layouts: [],
     }
   }
 
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
+  const lines = normalizedMarkdown.split("\n")
   const cleanedLines: string[] = []
   const layouts: Array<MarkdownTableLayout | null> = []
   const tableHeaderLinesWithExplicitLayout = new Set<number>()
   let fencedCodeBlockMarker: FencedCodeBlockMarker | null = null
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] || ""
-
-    if (fencedCodeBlockMarker) {
+    const line = lines[index] ?? ""
+    const wasInFencedCode = fencedCodeBlockMarker !== null
+    fencedCodeBlockMarker = stepFencedCodeState(line, fencedCodeBlockMarker)
+    if (wasInFencedCode || fencedCodeBlockMarker !== null) {
       cleanedLines.push(line)
-      if (isFencedCodeBlockClosingLine(line, fencedCodeBlockMarker)) {
-        fencedCodeBlockMarker = null
-      }
-      continue
-    }
-
-    const openingMarker = parseFencedCodeBlockMarker(line)
-    if (openingMarker) {
-      cleanedLines.push(line)
-      fencedCodeBlockMarker = openingMarker
       continue
     }
 
     const layout = parseMarkdownTableLayoutComment(line)
-
-    if (
-      layout &&
-      isLikelyGfmTable(lines[index + 1] || "", lines[index + 2] || "")
-    ) {
+    if (layout && isGfmTableAt(lines, index + 1)) {
       layouts.push(layout)
       tableHeaderLinesWithExplicitLayout.add(index + 1)
       continue
     }
 
-    if (
-      !tableHeaderLinesWithExplicitLayout.has(index) &&
-      isLikelyGfmTable(line, lines[index + 1] || "")
-    ) {
+    if (!tableHeaderLinesWithExplicitLayout.has(index) && isGfmTableAt(lines, index)) {
       layouts.push(null)
     }
 

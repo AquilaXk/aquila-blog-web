@@ -8,6 +8,31 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     scroll-margin-top: 6.8rem;
   }
 
+  h2[id],
+  h3[id],
+  h4[id] {
+    position: relative;
+  }
+
+  h2[id]:hover::after,
+  h3[id]:hover::after,
+  h4[id]:hover::after {
+    content: " #";
+    color: var(--aq-AccentPrimary);
+    opacity: 0.65;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  h2[id][data-anchor-copied="true"]::after,
+  h3[id][data-anchor-copied="true"]::after,
+  h4[id][data-anchor-copied="true"]::after {
+    content: " ✓";
+    color: var(--aq-AccentPrimary);
+    opacity: 1;
+    font-size: 0.8em;
+  }
+
   figure {
     margin: 1.25rem 0;
   }
@@ -36,6 +61,11 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     border: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  &:not([data-editable="true"]) .aq-image-frame:not([data-editable="true"]) img,
+  .aq-markdown:not([data-editable="true"]) .aq-image-frame img {
+    cursor: zoom-in;
   }
 
   .aq-image-frame[data-editable="true"] .aq-image-resize-handle {

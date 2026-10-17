@@ -8,55 +8,17 @@ import { createPortal } from "react-dom"
 import { waitForFeedSearchInputFocus } from "src/routes/Feed/feedSearchFocus"
 import { zIndexes } from "src/styles/zIndexes"
 import { useLanguage } from "src/libs/language"
-
-const primaryLinks = [
-  ["notes", "Notes", "/"],
-  ["topics", "Topics", "/#topics"],
-  ["about", "About", "/about"],
-] as const
-
-const SearchIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-    <circle cx="11" cy="11" r="6.5" />
-    <path d="m16 16 4.5 4.5" strokeLinecap="round" />
-  </svg>
-)
-
-const MenuIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-    <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-  </svg>
-)
-
-const GlobeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-)
-
-const isTypingTarget = (target: EventTarget | null) => {
-  if (!(target instanceof HTMLElement)) return false
-  if (target.isContentEditable) return true
-
-  const tagName = target.tagName
-  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT"
-}
-
-const FEED_SEARCH_ROUTE_TIMEOUT_MS = 8_000
-const SEARCH_SHORTCUT_HINT = "⌘K"
-
-const reportFocusFeedSearchFailure = (error: unknown) => {
-  console.error("[NavBar] failed to focus feed search input", error)
-}
-
-const waitForFocusTrapRestore = () =>
-  new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve())
-    })
-  })
+import {
+  GlobeIcon,
+  isTypingTarget,
+  MenuIcon,
+  primaryLinks,
+  reportFocusFeedSearchFailure,
+  SEARCH_SHORTCUT_HINT,
+  SearchIcon,
+  waitForFeedSearchRoute,
+  waitForFocusTrapRestore,
+} from "./NavBarSearchModel"
 
 const NavBar = () => {
   const router = useRouter()
@@ -104,41 +66,7 @@ const NavBar = () => {
 
     const run = (async () => {
       if (router.pathname !== "/") {
-        await new Promise<void>((resolve, reject) => {
-          let settled = false
-          let timeoutId: ReturnType<typeof setTimeout> | undefined
-          const cleanup = () => {
-            if (timeoutId !== undefined) clearTimeout(timeoutId)
-            router.events.off("routeChangeComplete", handleComplete)
-            router.events.off("routeChangeError", handleError)
-          }
-          const settle = (action: () => void) => {
-            if (settled) return
-            settled = true
-            cleanup()
-            action()
-          }
-          const handleComplete = (url: string) => {
-            const pathname = new URL(url, window.location.origin).pathname
-            if (pathname === "/") {
-              settle(() => resolve())
-              return
-            }
-            settle(() => reject(new Error(`unexpected route after search navigation: ${url}`)))
-          }
-          const handleError = (error: Error) => {
-            settle(() => reject(error))
-          }
-
-          router.events.on("routeChangeComplete", handleComplete)
-          router.events.on("routeChangeError", handleError)
-          timeoutId = setTimeout(() => {
-            settle(() => reject(new Error("timed out waiting for feed search route")))
-          }, FEED_SEARCH_ROUTE_TIMEOUT_MS)
-          void router.push("/").catch((error: unknown) => {
-            settle(() => reject(error instanceof Error ? error : new Error(String(error))))
-          })
-        })
+        await waitForFeedSearchRoute(router)
       }
 
       const focused = await waitForFeedSearchInputFocus()
@@ -583,7 +511,8 @@ const StyledWrapper = styled.div`
     text-decoration: none;
   }
 
-  .loginLink {
+  .loginLink,
+  .logoutBtn {
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text);
@@ -594,13 +523,6 @@ const StyledWrapper = styled.div`
     border: 1px solid var(--aq-text);
     background: var(--aq-text);
     color: var(--aq-page-bg);
-  }
-
-  .logoutBtn {
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface);
-    color: var(--aq-text);
-    cursor: pointer;
   }
 
   .mobileMenuButton {

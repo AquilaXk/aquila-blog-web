@@ -1,7 +1,12 @@
 import {
-  startTransition, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent,
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
 } from "react"
-import { InfiniteData, useQueryClient } from "@tanstack/react-query"
 import SearchInput from "./SearchInput"
 import PinnedPosts from "./PostList/PinnedPosts"
 import PostList from "./PostList"
@@ -11,22 +16,18 @@ import { useDebouncedValue } from "src/hooks/useDebouncedValue"
 import { useRouter } from "next/router"
 import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import { FEED_EXPLORE_PAGE_SIZE } from "src/constants/feed"
-import { type ExplorePostsPage } from "src/apis/backend/posts"
-import { normalizeKeywordQuery, normalizeOptionalTagQuery, normalizeTagQuery } from "src/libs/query/normalize"
+import { normalizeKeywordQuery, normalizeOptionalTagQuery } from "src/libs/query/normalize"
 import { useLanguage } from "src/libs/language"
 import { ExplorerCard, FeedBody, FilterContextBar } from "./FeedExplorer.styles"
+import { FEED_EXPLORER_ORDER, shouldRestoreFeedExplorerSession } from "./FeedExplorerRestoreModel"
 import {
-  FEED_EXPLORER_ORDER, FEED_EXPLORER_SNAPSHOT_MAX_BYTES, getFeedExplorerRestoreKey, getFeedExplorerSnapshotKey,
-  isCursorOnlyPublicFeedRestoreSnapshot, parseFeedExplorerRestoreSnapshot, parseFeedExplorerRestoreState,
-  pruneFeedExplorerStateStorage, resolveRestorePageCap, resolveSnapshotPageCap, scheduleIdleRevalidate,
-  shouldRestoreFeedExplorerSession, toFeedExplorerInfiniteQueryKey, toPersistFingerprint, toRestoredPageParams,
-  toRestoredPage, toSnapshotPageParam, toSnapshotPage, type FeedExplorerRestoreSnapshot, type FeedExplorerRestoreState,
-  type FeedExplorerSnapshotPage, type FeedExplorerSnapshotPageParam,
-} from "./FeedExplorerRestoreModel"
-import {
-  FEED_SORT_OPTIONS, feedSortOptionId, resolveFeedSortListboxKeyDown,
-  resolveFeedSortTriggerKeyDown, type FeedSortMode,
+  FEED_SORT_OPTIONS,
+  feedSortOptionId,
+  resolveFeedSortListboxKeyDown,
+  resolveFeedSortTriggerKeyDown,
+  type FeedSortMode,
 } from "./FeedSortMenuModel"
+import { useFeedExplorerSessionRestore } from "./useFeedExplorerSessionRestore"
 
 const LOAD_MORE_THROTTLE_MS = 800
 const LOAD_MORE_OBSERVER_THROTTLE_MS = 180
@@ -35,9 +36,36 @@ type FeedExplorerProps = {
   initialBootstrapDegraded?: boolean
 }
 
+const resolveSortOptionLabel = (
+  value: FeedSortMode,
+  t: (key: "sortLatest" | "sortViews" | "sortLikes") => string
+) => {
+  if (value === "latest") return t("sortLatest")
+  if (value === "views") return t("sortViews")
+  return t("sortLikes")
+}
+
+const resolveFilterSummary = (normalizedQuery: string, currentTag: string | undefined) => {
+  if (!normalizedQuery && !currentTag) return ""
+  const parts: string[] = []
+  if (normalizedQuery.length > 0) parts.push(`검색 "${normalizedQuery}"`)
+  if (currentTag) parts.push(`태그 "${currentTag}"`)
+  return parts.join(" · ")
+}
+
+const resolveContextStatusLabel = (
+  isInitialLoading: boolean,
+  hasFilter: boolean,
+  showBootstrapDegraded: boolean,
+  resultCount: number
+) => {
+  if (isInitialLoading) return hasFilter ? "검색 결과를 불러오는 중..." : "피드를 불러오는 중..."
+  if (showBootstrapDegraded && resultCount > 0) return "최근 저장된 글을 먼저 표시 중"
+  return ""
+}
+
 const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
   const { t } = useLanguage()
-  const queryClient = useQueryClient()
   const [q, setQ] = useState("")
   const [sortMode, setSortMode] = useState<FeedSortMode>("latest")
   const [sortOpen, setSortOpen] = useState(false)
@@ -48,33 +76,9 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const sortMenuRef = useRef<HTMLDivElement | null>(null)
   const sortTriggerRef = useRef<HTMLButtonElement | null>(null)
   const sortListboxRef = useRef<HTMLDivElement | null>(null)
-  const restoreStateRef = useRef<FeedExplorerRestoreState | null>(null)
-  const restoreQueryPagesRef = useRef<FeedExplorerSnapshotPage[] | null>(null)
-  const restoreQueryPageParamsRef = useRef<FeedExplorerSnapshotPageParam[] | null>(null)
-  const hasHydratedQuerySnapshotRef = useRef(false)
-  const hasAppliedRestoreSnapshotRef = useRef(false)
-  const hasScheduledIdleRevalidateRef = useRef(false)
-  const restoreTargetPagesRef = useRef(1)
-  const hasInitializedRestoreRef = useRef(false)
-  const hasRestoredScrollRef = useRef(false)
-  const lastPersistFingerprintRef = useRef("")
-  const cancelIdlePersistRef = useRef<(() => void) | null>(null)
-  const restoreSnapshotRef = useRef({
-    q: "",
-    tag: "",
-    loadedPagesCount: 1,
-  })
 
   const currentTag = normalizeOptionalTagQuery(
     typeof router.query.tag === "string" ? router.query.tag : undefined
-  )
-  const restoreStorageKey = useMemo(
-    () => getFeedExplorerRestoreKey(currentTag || "", FEED_EXPLORE_PAGE_SIZE, FEED_EXPLORER_ORDER),
-    [currentTag]
-  )
-  const restoreSnapshotStorageKey = useMemo(
-    () => getFeedExplorerSnapshotKey(restoreStorageKey),
-    [restoreStorageKey]
   )
   const debouncedQ = useDebouncedValue(q, isComposing)
   const normalizedQuery = normalizeKeywordQuery(debouncedQ)
@@ -98,6 +102,19 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     order: FEED_EXPLORER_ORDER,
     sortMode,
     enabled: router.isReady,
+  })
+  const { hasRestoredScrollRef, restoreStateRef } = useFeedExplorerSessionRestore({
+    currentTag,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isInitialLoading,
+    loadedPagesCount,
+    normalizedQuery,
+    q,
+    router,
+    setQ,
+    sortMode,
   })
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const lastLoadMoreAtRef = useRef(0)
@@ -144,267 +161,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     }
   }, [closeSortMenu, sortOpen])
 
-  useEffect(() => {
-    restoreSnapshotRef.current = {
-      q,
-      tag: currentTag || "",
-      loadedPagesCount: Math.max(1, loadedPagesCount),
-    }
-  }, [currentTag, loadedPagesCount, q])
-
-  useEffect(() => {
-    if (!router.isReady || hasInitializedRestoreRef.current) return
-    if (typeof window === "undefined") return
-
-    hasInitializedRestoreRef.current = true
-    pruneFeedExplorerStateStorage(window.sessionStorage)
-
-    const restored = parseFeedExplorerRestoreState(
-      window.sessionStorage.getItem(restoreStorageKey)
-    )
-    if (!restored) return
-
-    const activeTag = currentTag || ""
-    if (restored.tag !== activeTag) return
-
-    restoreStateRef.current = restored
-    restoreTargetPagesRef.current = Math.min(
-      resolveRestorePageCap(),
-      Math.max(1, restored.loadedPages)
-    )
-    if (restored.q.length > 0) {
-      setQ(restored.q)
-    }
-
-    const restoredSnapshot = parseFeedExplorerRestoreSnapshot(
-      window.sessionStorage.getItem(restoreSnapshotStorageKey)
-    )
-    if (
-      restoredSnapshot?.pages?.length &&
-      (restored.q.length > 0 || isCursorOnlyPublicFeedRestoreSnapshot(restoredSnapshot))
-    ) {
-      const restoredPages = restoredSnapshot.pages.slice(0, resolveSnapshotPageCap())
-      const restoredPageParams = toRestoredPageParams({
-        ...restoredSnapshot,
-        pages: restoredPages,
-        pageParams: restoredSnapshot.pageParams?.slice(0, restoredPages.length),
-      })
-      restoreQueryPagesRef.current = restoredPages
-      restoreQueryPageParamsRef.current = restoredPageParams
-    }
-
-  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady])
-
-  useEffect(() => {
-    if (hasHydratedQuerySnapshotRef.current) return
-
-    const restored = restoreStateRef.current
-    const restoredPages = restoreQueryPagesRef.current
-    if (!restored || !restoredPages || restoredPages.length === 0) return
-
-    const activeTag = currentTag || ""
-    if (restored.tag !== activeTag) return
-    if (restored.q !== normalizedQuery) return
-
-    // Restore snapshots are latest-only (CREATED_AT); never hydrate into views/likes keys.
-    if (!shouldRestoreFeedExplorerSession(sortMode)) return
-
-    const restoreQueryKey = toFeedExplorerInfiniteQueryKey({
-      kw: normalizedQuery,
-      tag: activeTag,
-      pageSize: FEED_EXPLORE_PAGE_SIZE,
-      order: FEED_EXPLORER_ORDER,
-      sortMode: "latest",
-    })
-
-    const existingPages = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(restoreQueryKey)?.pages
-    if (existingPages && existingPages.length > 0) {
-      hasHydratedQuerySnapshotRef.current = true
-      return
-    }
-
-    queryClient.setQueryData<InfiniteData<ExplorePostsPage>>(restoreQueryKey, {
-      pages: restoredPages.map(toRestoredPage),
-      pageParams:
-        restoreQueryPageParamsRef.current?.length === restoredPages.length
-          ? restoreQueryPageParamsRef.current
-          : toRestoredPageParams({ savedAt: restored.savedAt, pages: restoredPages }),
-    })
-    hasHydratedQuerySnapshotRef.current = true
-    hasAppliedRestoreSnapshotRef.current = true
-  }, [currentTag, normalizedQuery, queryClient, sortMode])
-
-  useEffect(() => {
-    if (hasScheduledIdleRevalidateRef.current) return
-    if (!hasAppliedRestoreSnapshotRef.current) return
-    if (!restoreQueryPagesRef.current?.length) return
-    if (!shouldRestoreFeedExplorerSession(sortMode)) return
-
-    const restored = restoreStateRef.current
-    if (!restored) return
-
-    const activeTag = currentTag || ""
-    if (restored.tag !== activeTag) return
-    if (restored.q !== normalizedQuery) return
-
-    const restoreQueryKey = toFeedExplorerInfiniteQueryKey({
-      kw: normalizedQuery,
-      tag: activeTag,
-      pageSize: FEED_EXPLORE_PAGE_SIZE,
-      order: FEED_EXPLORER_ORDER,
-      sortMode: "latest",
-    })
-
-    hasScheduledIdleRevalidateRef.current = true
-    return scheduleIdleRevalidate(() => {
-      void queryClient.invalidateQueries({
-        queryKey: restoreQueryKey,
-        exact: true,
-        refetchType: "active",
-      })
-    })
-  }, [currentTag, normalizedQuery, queryClient, sortMode])
-
-  const persistFeedExplorerState = useCallback(() => {
-    if (typeof window === "undefined") return
-    // sessionStorage restore is latest-only; do not snapshot views/likes ordered pages.
-    if (!shouldRestoreFeedExplorerSession(sortMode)) return
-
-    const snapshot = restoreSnapshotRef.current
-    const normalizedSnapshotTag = normalizeTagQuery(snapshot.tag)
-    const normalizedSnapshotQuery = normalizeKeywordQuery(snapshot.q)
-    const restoreKey = getFeedExplorerRestoreKey(
-      normalizedSnapshotTag,
-      FEED_EXPLORE_PAGE_SIZE,
-      FEED_EXPLORER_ORDER
-    )
-    const snapshotKey = getFeedExplorerSnapshotKey(restoreKey)
-    const state: FeedExplorerRestoreState = {
-      q: normalizedSnapshotQuery,
-      tag: normalizedSnapshotTag,
-      scrollY: Math.max(0, Math.trunc(window.scrollY || 0)),
-      loadedPages: Math.max(1, snapshot.loadedPagesCount),
-      savedAt: Date.now(),
-    }
-    const persistFingerprint = toPersistFingerprint(state)
-    if (lastPersistFingerprintRef.current === persistFingerprint) {
-      return
-    }
-
-    try {
-      window.sessionStorage.setItem(restoreKey, JSON.stringify(state))
-      lastPersistFingerprintRef.current = persistFingerprint
-
-      const feedQueryKey = toFeedExplorerInfiniteQueryKey({
-        kw: normalizedSnapshotQuery,
-        tag: normalizedSnapshotTag,
-        pageSize: FEED_EXPLORE_PAGE_SIZE,
-        order: FEED_EXPLORER_ORDER,
-        sortMode: "latest",
-      })
-      const queryData = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(feedQueryKey)
-      const pages = queryData?.pages ?? []
-
-      if (pages.length > 0) {
-        const snapshotPages = pages.slice(0, resolveSnapshotPageCap()).map(toSnapshotPage)
-        const snapshotPageParams = (queryData?.pageParams ?? [])
-          .slice(0, snapshotPages.length)
-          .map(toSnapshotPageParam)
-        const snapshotPayload: FeedExplorerRestoreSnapshot = {
-          savedAt: state.savedAt,
-          pages: snapshotPages,
-          ...(snapshotPageParams.length === snapshotPages.length ? { pageParams: snapshotPageParams } : {}),
-        }
-        const snapshotJson = JSON.stringify(snapshotPayload)
-        if (snapshotJson.length <= FEED_EXPLORER_SNAPSHOT_MAX_BYTES) {
-          window.sessionStorage.setItem(snapshotKey, snapshotJson)
-        } else {
-          window.sessionStorage.removeItem(snapshotKey)
-        }
-      } else {
-        window.sessionStorage.removeItem(snapshotKey)
-      }
-      pruneFeedExplorerStateStorage(window.sessionStorage)
-    } catch {
-      // ignore sessionStorage quota/permission errors
-    }
-  }, [queryClient, sortMode])
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof document === "undefined") return
-
-    const flushPersist = () => {
-      if (cancelIdlePersistRef.current) {
-        cancelIdlePersistRef.current()
-        cancelIdlePersistRef.current = null
-      }
-      persistFeedExplorerState()
-    }
-    const scheduleIdlePersist = () => {
-      if (cancelIdlePersistRef.current) return
-      cancelIdlePersistRef.current = scheduleIdleRevalidate(() => {
-        cancelIdlePersistRef.current = null
-        persistFeedExplorerState()
-      })
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        flushPersist()
-      }
-    }
-
-    window.addEventListener("pagehide", flushPersist)
-    window.addEventListener("beforeunload", flushPersist)
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    router.events.on("routeChangeStart", scheduleIdlePersist)
-
-    return () => {
-      if (cancelIdlePersistRef.current) {
-        cancelIdlePersistRef.current()
-        cancelIdlePersistRef.current = null
-      }
-      window.removeEventListener("pagehide", flushPersist)
-      window.removeEventListener("beforeunload", flushPersist)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-      router.events.off("routeChangeStart", scheduleIdlePersist)
-    }
-  }, [persistFeedExplorerState, router.events])
-
-  useEffect(() => {
-    // Snapshot hydrate/persist are latest-only; do not prefetch or scroll using that state on views/likes.
-    if (!shouldRestoreFeedExplorerSession(sortMode)) return
-
-    const restoreState = restoreStateRef.current
-    if (!restoreState || hasRestoredScrollRef.current) return
-
-    const targetPages = restoreTargetPagesRef.current
-    if (loadedPagesCount < targetPages && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage()
-      return
-    }
-
-    if (isInitialLoading) return
-
-    hasRestoredScrollRef.current = true
-    window.requestAnimationFrame(() => {
-      window.scrollTo({
-        top: restoreState.scrollY,
-        behavior: "auto",
-      })
-    })
-  }, [
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isInitialLoading,
-    loadedPagesCount,
-    sortMode,
-  ])
-
   const handleLoadMore = useCallback(() => {
-    if (isFetchNextPageErrorRef.current) return
-    if (!hasNextPageRef.current || isFetchingNextPageRef.current) return
+    if (isFetchNextPageErrorRef.current || !hasNextPageRef.current || isFetchingNextPageRef.current) return
     const now = Date.now()
     if (now - lastLoadMoreAtRef.current < LOAD_MORE_THROTTLE_MS) return
     lastLoadMoreAtRef.current = now
@@ -448,20 +206,14 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const visiblePosts = resolveFeedVisiblePosts(pinnedPosts, regularPosts, isRetainedDataError)
   const resultCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
   const showBootstrapDegraded = initialBootstrapDegraded && !hasInitialLoadSucceeded
-  const hasQueryFilter = normalizedQuery.length > 0
-  const hasTagFilter = Boolean(currentTag)
-  const filterSummary = useMemo(() => {
-    if (!hasFilter) return ""
-    const parts: string[] = []
-    if (hasQueryFilter) parts.push(`검색 "${normalizedQuery}"`)
-    if (hasTagFilter && currentTag) parts.push(`태그 "${currentTag}"`)
-    return parts.join(" · ")
-  }, [currentTag, hasFilter, hasQueryFilter, hasTagFilter, normalizedQuery])
-  const contextStatusLabel = useMemo(() => {
-    if (isInitialLoading) return hasFilter ? "검색 결과를 불러오는 중..." : "피드를 불러오는 중..."
-    if (showBootstrapDegraded && resultCount > 0) return "최근 저장된 글을 먼저 표시 중"
-    return ""
-  }, [hasFilter, isInitialLoading, resultCount, showBootstrapDegraded])
+  const filterSummary = useMemo(
+    () => resolveFilterSummary(normalizedQuery, currentTag),
+    [currentTag, normalizedQuery]
+  )
+  const contextStatusLabel = useMemo(
+    () => resolveContextStatusLabel(isInitialLoading, hasFilter, showBootstrapDegraded, resultCount),
+    [hasFilter, isInitialLoading, resultCount, showBootstrapDegraded]
+  )
 
   const handleClearFilters = useCallback(() => {
     setQ("")
@@ -477,26 +229,23 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
       })
     })
   }, [currentTag, router])
-  const currentSortLabel =
-    sortMode === "latest"
-      ? t("sortLatest")
-      : sortMode === "views"
-      ? t("sortViews")
-      : t("sortLikes")
+  const currentSortLabel = resolveSortOptionLabel(sortMode, t)
 
   const handleSortSelect = useCallback(
     (value: FeedSortMode) => {
       if (value !== sortMode) {
         // Drop restore intent so a deep latest scrollY is not reapplied after sort change,
         // and reset viewport so ranked/latest list swaps do not land on an empty region.
-        restoreStateRef.current = null
-        hasRestoredScrollRef.current = true
+        if (!shouldRestoreFeedExplorerSession(value) || shouldRestoreFeedExplorerSession(sortMode)) {
+          restoreStateRef.current = null
+          hasRestoredScrollRef.current = true
+        }
         window.scrollTo({ top: 0, behavior: "auto" })
       }
       setSortMode(value)
       closeSortMenu(true)
     },
-    [closeSortMenu, sortMode]
+    [closeSortMenu, hasRestoredScrollRef, restoreStateRef, sortMode]
   )
 
   const openSortMenu = useCallback((activeIndex: number) => {
@@ -597,30 +346,22 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
                     aria-activedescendant={activeSortOptionId}
                     onKeyDown={handleSortListboxKeyDown}
                   >
-                    {FEED_SORT_OPTIONS.map((option, index) => {
-                      const optionLabel =
-                        option.value === "latest"
-                          ? t("sortLatest")
-                          : option.value === "views"
-                          ? t("sortViews")
-                          : t("sortLikes")
-                      return (
-                        <button
-                          type="button"
-                          key={option.value}
-                          id={feedSortOptionId(option.value)}
-                          className="sortOption"
-                          role="option"
-                          tabIndex={-1}
-                          aria-selected={sortMode === option.value}
-                          data-active={sortActiveIndex === index || sortMode === option.value}
-                          onClick={() => handleSortSelect(option.value)}
-                          onMouseEnter={() => setSortActiveIndex(index)}
-                        >
-                          {optionLabel}
-                        </button>
-                      )
-                    })}
+                    {FEED_SORT_OPTIONS.map((option, index) => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        id={feedSortOptionId(option.value)}
+                        className="sortOption"
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={sortMode === option.value}
+                        data-active={sortActiveIndex === index || sortMode === option.value}
+                        onClick={() => handleSortSelect(option.value)}
+                        onMouseEnter={() => setSortActiveIndex(index)}
+                      >
+                        {resolveSortOptionLabel(option.value, t)}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
