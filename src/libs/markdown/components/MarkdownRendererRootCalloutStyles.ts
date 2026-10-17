@@ -115,6 +115,38 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     --ad-border: ${theme.colors.gray7};
   }
 
+  .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head {
+    grid-column: 2;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    margin-bottom: 0;
+  }
+
+  .aq-callout.aq-admonition[data-callout-foldable="true"][open] > summary.aq-callout-head {
+    margin-bottom: 5px;
+  }
+
+  .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head::-webkit-details-marker {
+    display: none;
+  }
+
+  .aq-callout.aq-admonition .aq-callout-fold-chevron {
+    margin-left: auto;
+    width: 7px;
+    height: 7px;
+    border-right: 1.75px solid var(--ad-accent);
+    border-bottom: 1.75px solid var(--ad-accent);
+    transform: rotate(-45deg);
+    transition: transform 0.16s ease;
+    opacity: 0.78;
+    flex-shrink: 0;
+  }
+
+  .aq-callout.aq-admonition[data-callout-foldable="true"][open] .aq-callout-fold-chevron {
+    transform: rotate(45deg);
+  }
+
   @media (max-width: 820px) {
     .aq-callout.aq-admonition {
       grid-template-columns: 28px minmax(0, 1fr);

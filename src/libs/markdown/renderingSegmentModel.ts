@@ -7,23 +7,59 @@ type ParsedCalloutHeader = {
   kind: CalloutKind
   title: string
   emoji: string
+  foldable?: boolean
+  defaultCollapsed?: boolean
 }
 
-const isAsciiLetter = (character: string) => {
-  const code = character.charCodeAt(0)
-  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+const isAsciiCalloutToken = (token: string): boolean => {
+  if (token.length === 0) return false
+  for (let index = 0; index < token.length; index += 1) {
+    const code = token.charCodeAt(index)
+    const isUpper = code >= 65 && code <= 90
+    const isLower = code >= 97 && code <= 122
+    const isDigit = code >= 48 && code <= 57
+    const isDashOrUnderscore = code === 45 || code === 95
+    if (!isUpper && !isLower && !isDigit && !isDashOrUnderscore) {
+      return false
+    }
+  }
+  return true
+}
+
+export const hasUniformFenceMarker = (
+  text: string,
+  markerChar: string
+): boolean => {
+  if (text.length < 3 || markerChar.length === 0) return false
+  const expectedCode = markerChar.charCodeAt(0)
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) !== expectedCode) {
+      return false
+    }
+  }
+  return true
 }
 
 const parseBlockquoteCalloutToken = (raw: string) => {
   const line = raw.trim()
   if (!line.startsWith("[!")) return null
 
-  const closingBracketIndex = line.indexOf("]", 2)
-  if (closingBracketIndex < 0) return null
+  const match = line.match(/^\[!([^\]]+)\]([+-])?(?:\s*(.*))?$/)
+  if (!match) return null
 
-  const token = line.slice(2, closingBracketIndex)
-  if (!token || !token.split("").every(isAsciiLetter)) return null
-  return { token, title: line.slice(closingBracketIndex + 1).trim() }
+  const token = match[1] || ""
+  if (!isAsciiCalloutToken(token)) return null
+
+  const foldModifier = match[2]
+  const foldable = foldModifier === "+" || foldModifier === "-"
+  const defaultCollapsed = foldModifier === "-"
+
+  return {
+    token,
+    title: (match[3] || "").trim(),
+    foldable,
+    defaultCollapsed,
+  }
 }
 
 const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
@@ -38,6 +74,12 @@ const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
       kind: blockquoteCallout.kind,
       title: blockquoteToken.title,
       emoji: blockquoteCallout.callout.marker,
+      ...(blockquoteToken.foldable
+        ? {
+            foldable: true,
+            defaultCollapsed: blockquoteToken.defaultCollapsed,
+          }
+        : {}),
     }
   }
 
@@ -61,6 +103,12 @@ const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
     kind: "info",
     title: blockquoteToken.title,
     emoji: infoCalloutMarker,
+    ...(blockquoteToken.foldable
+      ? {
+          foldable: true,
+          defaultCollapsed: blockquoteToken.defaultCollapsed,
+        }
+      : {}),
   }
 }
 
@@ -114,6 +162,12 @@ const buildCalloutSegment = (
     title: resolvedTitle,
     emoji: header.emoji,
     content: promoted.bodyLines.join("\n").trim() || "내용을 입력하세요.",
+    ...(header.foldable
+      ? {
+          foldable: true,
+          defaultCollapsed: Boolean(header.defaultCollapsed),
+        }
+      : {}),
   }
 }
 
@@ -123,7 +177,7 @@ const parseFenceMarker = (line: string): "`" | "~" | null => {
 
   const fence = match[1]
   const marker = fence[0] as "`" | "~"
-  if (!fence.split("").every((char) => char === marker)) return null
+  if (!hasUniformFenceMarker(fence, marker)) return null
   return marker
 }
 

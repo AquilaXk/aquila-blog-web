@@ -1,267 +1,35 @@
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
+  useCallback, useEffect, useMemo, useRef, useState,
+  type Dispatch, type MutableRefObject, type SetStateAction,
 } from "react"
-import {
-  localDraftSourcesEqual,
-  type LocalDraftPayload,
-  type LocalDraftSource,
-} from "./editorStudioMetaModel"
+import { localDraftSourcesEqual, type LocalDraftPayload, type LocalDraftSource } from "./editorStudioMetaModel"
 import type { PostVisibility } from "./editorStudioState"
 import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
-  describeLocalDraftSlot,
-  listLocalDraftCandidates,
-  readLocalDraftCandidate,
-  removeLocalDraftCandidate,
-  resolveLocalDraftSource,
+  describeLocalDraftSlot, listLocalDraftCandidates, readLocalDraftCandidate,
+  removeLocalDraftCandidate, resolveLocalDraftSource,
 } from "./editorStudioStorageModel"
+import {
+  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition,
+  removeLocalDraftCandidateForSource, resolveLocalDraftShouldAdoptBaseline,
+  shouldReleasePostIdTransitionGate,
+  type LocalDraftBaselineReadySignal, type LocalDraftFingerprintSnapshot,
+} from "./editorStudioDraftAutosaveDecisionModel"
+export {
+  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition,
+  isLocalDraftBaselineSettleLoadingKey, isLocalDraftRestoreSuggestionEligible,
+  LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS, removeLocalDraftCandidateForSource,
+  resolveCreateWritePostId, resolveLocalDraftShouldAdoptBaseline, shouldReleasePostIdTransitionGate,
+  type CreateWritePostIdResolution, type LocalDraftAutosaveDecision,
+  type LocalDraftAutosaveDecisionInput, type LocalDraftBaselineReadySignal,
+  type LocalDraftFingerprintSnapshot,
+} from "./editorStudioDraftAutosaveDecisionModel"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 type NoticeTone = "idle" | "loading" | "success" | "error"
 type PublishNotice = { tone: NoticeTone; text: string }
 type PublishTarget = "page" | "modal"
 type EditorMode = "create" | "edit"
-
-/** loadingKey values whose settle should adopt editor fingerprint as autosave baseline. */
-export const LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS = new Set([
-  "postOne",
-  "postTemp",
-  "writePost",
-  "modifyPost",
-  "publishTempPost",
-])
-
-export const isLocalDraftBaselineSettleLoadingKey = (loadingKey: string): boolean =>
-  LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS.has(loadingKey)
-
-/**
- * Adopt baseline when a success signal is pending and loading is idle.
- * Do not require a wasLoading→idle transition from a baseline loadingKey —
- * a non-baseline key (e.g. uploadThumbnail) can clear loading first while
- * postOne is still in flight, leaving no transition when the load finishes.
- */
-export const resolveLocalDraftShouldAdoptBaseline = (input: {
-  loadingKey: string
-  pendingSuccessfulBaseline: boolean
-}): boolean => input.loadingKey.length === 0 && input.pendingSuccessfulBaseline
-
-type LocalDraftFingerprintSnapshot = {
-  label?: string
-  key: string
-  source: LocalDraftSource
-  fingerprint: string
-}
-
-export const isLocalDraftRestoreSuggestionEligible = (input: {
-  candidate: LocalDraftFingerprintSnapshot | null
-  currentSource: LocalDraftSource
-  editorFingerprint: string
-  serverBaselineFingerprint: string
-  restored: LocalDraftFingerprintSnapshot[]
-  dismissed: LocalDraftFingerprintSnapshot[]
-}): boolean => {
-  const candidate = input.candidate
-  if (candidate == null) return false
-
-  return (
-    localDraftSourcesEqual(candidate.source, input.currentSource) &&
-    candidate.fingerprint !== input.editorFingerprint &&
-    candidate.fingerprint !== input.serverBaselineFingerprint &&
-    !input.restored.some(
-      (snapshot) =>
-        snapshot.key === candidate.key &&
-        localDraftSourcesEqual(snapshot.source, candidate.source) &&
-        snapshot.fingerprint === candidate.fingerprint
-    ) &&
-    !input.dismissed.some(
-      (snapshot) =>
-        snapshot.key === candidate.key &&
-        localDraftSourcesEqual(snapshot.source, candidate.source) &&
-        snapshot.fingerprint === candidate.fingerprint
-    )
-  )
-}
-
-export const removeLocalDraftCandidateForSource = (
-  candidate: LocalDraftFingerprintSnapshot | null,
-  source: LocalDraftSource
-): LocalDraftFingerprintSnapshot | null =>
-  candidate != null && localDraftSourcesEqual(candidate.source, source) ? null : candidate
-
-export type LocalDraftBaselineReadySignal = {
-  /**
-   * Write/publish request snapshot to arm as baseline. Omit on post-load settle so
-   * the latest editor (server content) becomes the baseline.
-   */
-  baselineFingerprint?: string
-}
-
-/**
- * ID field edits switch editorMode to create while keeping the previous body and a
- * non-empty postId. Autosave stays gated only while awaiting the first load settle.
- * After a failed load settles, awaitingPostLoad is cleared so user edits autosave again.
- */
-export const isLocalDraftAutosaveGatedForPostIdTransition = (
-  editorMode: "create" | "edit",
-  postId: string,
-  awaitingPostLoad = true
-): boolean =>
-  awaitingPostLoad && editorMode === "create" && postId.trim().length > 0
-
-/**
- * Failed post load must not release the create-slot gate immediately — stale edit body
- * would autosave into the create slot. Release only when edit context restores or the user edits.
- */
-export const shouldReleasePostIdTransitionGate = (input: {
-  editorMode: EditorMode
-  postId: string
-  editorFingerprint: string
-  transitionBaselineFingerprint: string | null
-  awaitingLoad: boolean
-}): boolean => {
-  if (!input.awaitingLoad) {
-    return false
-  }
-  if (input.editorMode === "edit") {
-    return true
-  }
-  if (input.postId.trim().length === 0) {
-    return true
-  }
-  if (
-    input.transitionBaselineFingerprint != null &&
-    input.editorFingerprint !== input.transitionBaselineFingerprint
-  ) {
-    return true
-  }
-  return false
-}
-
-const CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT =
-  "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요."
-
-export type CreateWritePostIdResolution =
-  | { ok: true; postId: string }
-  | { ok: false; statusText: string }
-
-/** Create-mode write success must include a non-empty post id before draft cleanup. */
-export const resolveCreateWritePostId = (
-  writeResult: { id?: number | string } | null | undefined
-): CreateWritePostIdResolution => {
-  const rawId = writeResult?.id
-  if (rawId == null || rawId === "") {
-    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT }
-  }
-
-  const postId = String(rawId).trim()
-  if (!postId) {
-    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT }
-  }
-
-  return { ok: true, postId }
-}
-
-export type LocalDraftAutosaveDecisionInput = {
-  loadingKey: string
-  /**
-   * True only when a successful post-load / publish signal just settled.
-   * Failed settles and unrelated settles (list refresh, upload, profile, …) must stay
-   * false so pending edits are rescheduled instead of being adopted as a saved baseline.
-   */
-  shouldAdoptBaseline: boolean
-  /**
-   * Write/publish request snapshot. When set on baseline adopt, arm this fingerprint
-   * instead of the latest editor so in-flight title/summary/tags edits stay dirty.
-   * Null/undefined means adopt `editorFingerprint` (post-load settle).
-   */
-  baselineFingerprint?: string | null
-  /**
-   * True while a postOne/postTemp request is still in flight.
-   * Shared loadingKey can be cleared by uploadThumbnail (etc.) before the load settles;
-   * block schedule until the actual post-load counter reaches zero.
-   */
-  isPostLoadInFlight?: boolean
-  /**
-   * True while post-id field transition keeps create mode with a pending postId.
-   * Blocks create-slot autosave of foreign edit body until load settles.
-   */
-  isPostIdTransitionGated: boolean
-  hasDraftContent: boolean
-  editorFingerprint: string
-  lastArmedFingerprint: string
-  /**
-   * Fingerprint of a restorable slot draft, if any.
-   * Used to block server-baseline overwrite before the post-load baseline is adopted.
-   */
-  pendingRestorableDraftFingerprint: string | null
-}
-
-export type LocalDraftAutosaveDecision =
-  | { action: "skip" }
-  | { action: "adopt-baseline"; fingerprint: string }
-  | { action: "adopt-baseline-and-schedule"; fingerprint: string }
-  | { action: "schedule" }
-
-/**
- * Decide whether autosave should write, adopt a non-persist baseline, or stay idle.
- * Callers must apply `adopt-baseline` / `adopt-baseline-and-schedule` to
- * lastArmedFingerprint without treating the adopt itself as a storage write.
- */
-export const decideLocalDraftAutosave = (
-  input: LocalDraftAutosaveDecisionInput
-): LocalDraftAutosaveDecision => {
-  if (input.loadingKey.length > 0) {
-    return { action: "skip" }
-  }
-
-  // After successful post load / write settles: arm baseline so we neither overwrite a
-  // restorable draft with server content nor recreate a cleared slot. Prefer the request
-  // snapshot when provided — in-flight editor edits must stay dirty and reschedule.
-  if (input.shouldAdoptBaseline) {
-    const baseline = input.baselineFingerprint ?? input.editorFingerprint
-    if (baseline !== input.editorFingerprint) {
-      return { action: "adopt-baseline-and-schedule", fingerprint: baseline }
-    }
-    return { action: "adopt-baseline", fingerprint: baseline }
-  }
-
-  // Post load still running even if a non-baseline key cleared shared loadingKey first.
-  if (input.isPostLoadInFlight) {
-    return { action: "skip" }
-  }
-
-  // ID-change create transition: do not autosave previous edit body into the create slot.
-  if (input.isPostIdTransitionGated) {
-    return { action: "skip" }
-  }
-
-  if (!input.hasDraftContent) {
-    return { action: "skip" }
-  }
-
-  if (input.lastArmedFingerprint === input.editorFingerprint) {
-    return { action: "skip" }
-  }
-
-  // Pending restoreable draft still pointed at by lastArmed means load UI hydrated the
-  // stored draft fingerprint before server content arrived — do not overwrite the slot.
-  if (
-    input.pendingRestorableDraftFingerprint != null &&
-    input.pendingRestorableDraftFingerprint !== input.editorFingerprint &&
-    input.lastArmedFingerprint === input.pendingRestorableDraftFingerprint
-  ) {
-    return { action: "skip" }
-  }
-
-  return { action: "schedule" }
-}
 
 type UseEditorStudioLocalDraftLifecycleParams = {
   editorMode: EditorMode
@@ -314,53 +82,16 @@ type UseEditorStudioLocalDraftLifecycleParams = {
 }
 
 export const useEditorStudioLocalDraftLifecycle = ({
-  buildLocalDraftFingerprint,
-  dedupeStrings,
-  editorMode,
-  lastLocalDraftFingerprintRef,
-  lastWriteFingerprintRef,
-  lastWriteIdempotencyKeyRef,
-  loadingKey,
-  normalizeCategoryValue,
-  persistLocalDraft,
-  postCategory,
-  postContent,
-  getCurrentPostContent,
-  postId,
-  postSummary,
-  postSummarySource,
-  summaryIntent,
-  postTags,
-  postThumbnailFocusX,
-  postThumbnailFocusY,
-  postThumbnailUrl,
-  postThumbnailZoom,
-  postTitle,
-  postVersion,
-  postVisibility,
-  readLocalDraft,
-  removeLocalDraft,
-  setEditorMode,
-  setIsTempDraftMode,
-  setKnownTags,
-  setLocalDraftSavedAt,
-  setLocalDraftSlotLabel,
-  setPostCategory,
-  setPostContent,
-  setPostId,
-  setPostSummary,
-  setPostSummarySource,
-  setSummaryIntent,
-  setPostTags,
-  setPostThumbnailFocusX,
-  setPostThumbnailFocusY,
-  setPostThumbnailUrl,
-  setPostThumbnailZoom,
-  setPostTitle,
-  setPostVersion,
-  setPostVisibility,
-  setPreviewThumbnailSourceUrl,
-  setPublishStatus,
+  buildLocalDraftFingerprint, dedupeStrings, editorMode, lastLocalDraftFingerprintRef,
+  lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, loadingKey, normalizeCategoryValue,
+  persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
+  postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
+  postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
+  removeLocalDraft, setEditorMode, setIsTempDraftMode, setKnownTags, setLocalDraftSavedAt,
+  setLocalDraftSlotLabel, setPostCategory, setPostContent, setPostId, setPostSummary,
+  setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
+  setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
+  setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
 }: UseEditorStudioLocalDraftLifecycleParams) => {
   const draftSource = useMemo(
     () => resolveLocalDraftSource(editorMode, postId),
@@ -405,8 +136,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
     pendingSuccessfulBaselineSettleRef.current = true
     pendingBaselineFingerprintRef.current =
       typeof signal?.baselineFingerprint === "string" ? signal.baselineFingerprint : null
-    // Force the autosave effect to re-run even when loadingKey is already idle
-    // (non-baseline keys may have cleared it before this success signal).
     setBaselineReadyEpoch((value) => value + 1)
   }, [])
 
@@ -440,20 +169,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
       visibility: postVisibility,
     }),
     [
-      dedupeStrings,
-      normalizeCategoryValue,
-      postCategory,
-      postContent,
-      postSummary,
-      postSummarySource,
-      summaryIntent,
-      postTags,
-      postThumbnailFocusX,
-      postThumbnailFocusY,
-      postThumbnailUrl,
-      postThumbnailZoom,
-      postTitle,
-      postVisibility,
+      dedupeStrings, normalizeCategoryValue, postCategory, postContent, postSummary,
+      postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
+      postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
     ]
   )
 
@@ -497,18 +215,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
     silent?: boolean
     expectedSource?: LocalDraftSource
   }) => {
-    // Skip while load/switch transitions: postId/editorMode can settle before content does.
-    if (loadingKeyRef.current.length > 0) {
-      return
-    }
-    // Shared loadingKey may already be idle while postOne/postTemp is still fetching.
-    if (isPostLoadInFlightRef.current) {
-      return
-    }
-    // ID field changed to create+pending postId: do not write previous body into the create slot.
-    if (isPostIdTransitionGatedRef.current) {
-      return
-    }
+    if (loadingKeyRef.current.length > 0) return
+    if (isPostLoadInFlightRef.current) return
+    if (isPostIdTransitionGatedRef.current) return
 
     const source = draftSourceRef.current
     if (options?.expectedSource && !localDraftSourcesEqual(options.expectedSource, source)) {
@@ -540,7 +249,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
     try {
       persistLocalDraft(payload)
     } catch {
-      // 실패한 원고를 저장 완료로 표시하거나 fingerprint를 갱신하지 않는다.
       setLocalDraftSavedAt("")
       setLocalDraftSlotLabel("")
       setPublishStatus({
@@ -568,15 +276,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
       )
     }
   }, [
-    buildLocalDraftFingerprint,
-    getCurrentPostContent,
-    lastLocalDraftFingerprintRef,
-    localDraftCandidates,
-    localDraftCore,
-    persistLocalDraft,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-    setPublishStatus,
+    buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
+    localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt,
+    setLocalDraftSlotLabel, setPublishStatus,
   ])
 
   const restoreLocalDraft = useCallback((candidateKey?: string) => {
@@ -608,8 +310,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
       } else if (postId !== draft.source.postId) {
         setPostVersion(null)
       }
-      // Same post without stored version: keep current postVersion for modify/temp-publish.
-      // Same open temp post: keep isTempDraftMode so restore stays on publish-temp path.
       if (draft.source.postId !== postId) {
         setIsTempDraftMode(false)
       }
@@ -673,37 +373,13 @@ export const useEditorStudioLocalDraftLifecycle = ({
       "page"
     )
   }, [
-    buildLocalDraftFingerprint,
-    dedupeStrings,
-    draftSource,
-    lastLocalDraftFingerprintRef,
-    lastWriteFingerprintRef,
-    lastWriteIdempotencyKeyRef,
-    normalizeCategoryValue,
-    postId,
-    localDraftCandidate,
-    readLocalDraftCandidate,
-    setEditorMode,
-    setIsTempDraftMode,
-    setKnownTags,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
-    setPostCategory,
-    setPostContent,
-    setPostId,
-    setPostSummary,
-    setPostSummarySource,
-    setSummaryIntent,
-    setPostTags,
-    setPostThumbnailFocusX,
-    setPostThumbnailFocusY,
-    setPostThumbnailUrl,
-    setPostThumbnailZoom,
-    setPostTitle,
-    setPostVersion,
-    setPostVisibility,
-    setPreviewThumbnailSourceUrl,
-    setPublishStatus,
+    buildLocalDraftFingerprint, dedupeStrings, draftSource, lastLocalDraftFingerprintRef,
+    lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, normalizeCategoryValue, postId,
+    localDraftCandidate, setEditorMode, setIsTempDraftMode, setKnownTags, setLocalDraftSavedAt,
+    setLocalDraftSlotLabel, setPostCategory, setPostContent, setPostId, setPostSummary,
+    setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
+    setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
+    setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
   ])
 
   const clearLocalDraft = useCallback(() => {
@@ -713,7 +389,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
       setPublishStatus({ tone: "error", text: "브라우저 임시저장을 삭제하지 못했습니다. 현재 원고는 유지됩니다." }, "page")
       return
     }
-    // Keep editor fingerprint as baseline so autosave does not recreate the cleared slot.
     lastLocalDraftFingerprintRef.current = localDraftFingerprint
     cachedRestorableDraftRef.current = {
       source: draftSource,
@@ -731,14 +406,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
       "page"
     )
   }, [
-    draftSource,
-    lastLocalDraftFingerprintRef,
-    localDraftCandidates,
-    localDraftFingerprint,
-    removeLocalDraft,
-    signalLocalDraftRemoved,
-    setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
+    draftSource, lastLocalDraftFingerprintRef, localDraftCandidates, localDraftFingerprint,
+    removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt, setLocalDraftSlotLabel,
     setPublishStatus,
   ])
 
@@ -865,28 +534,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
       window.clearTimeout(timerId)
     }
   }, [
-    baselineReadyEpoch,
-    buildLocalDraftFingerprint,
-    dedupeStrings,
-    draftSource,
-    isPostIdTransitionGated,
-    isPostLoadInFlight,
-    lastLocalDraftFingerprintRef,
-    loadingKey,
-    localDraftCandidates,
-    localDraftFingerprint,
-    normalizeCategoryValue,
-    postCategory,
-    postContent,
-    postLoadInFlightEpoch,
-    postSummary,
-    postSummarySource,
-    summaryIntent,
-    postTags,
-    postThumbnailUrl,
-    postTitle,
-    readLocalDraft,
-    saveLocalDraft,
+    baselineReadyEpoch, buildLocalDraftFingerprint, dedupeStrings, draftSource,
+    isPostIdTransitionGated, isPostLoadInFlight, lastLocalDraftFingerprintRef, loadingKey,
+    localDraftCandidates, localDraftFingerprint, normalizeCategoryValue, postCategory,
+    postContent, postLoadInFlightEpoch, postSummary, postSummarySource, summaryIntent,
+    postTags, postThumbnailUrl, postTitle, readLocalDraft, saveLocalDraft,
   ])
 
   const selectLocalDraftCandidate = useCallback((key: string) => {

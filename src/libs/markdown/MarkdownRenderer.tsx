@@ -8,6 +8,7 @@ import {
   extractCodeMetaFromPreChildren,
   extractTextFromCodeAst,
   isMermaidSource,
+  parseHighlightedLineNumbers,
   resolveMarkdownRenderModel,
 } from "src/libs/markdown/rendering"
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
@@ -283,7 +284,7 @@ export const createMarkdownComponentVariants = ({
       children?: ReactNode
       className?: string
     } & Record<string, unknown>) {
-      const { language, title, rawCode } = extractCodeMetaFromPreChildren(children, node)
+      const { language, title, rawCode, highlightLines } = extractCodeMetaFromPreChildren(children, node)
       const mermaidSource = resolvePreBlockMermaidSource(language, rawCode)
 
       if (mermaidSource) {
@@ -300,9 +301,13 @@ export const createMarkdownComponentVariants = ({
       }
 
       const mergedClassName = "aq-code aq-pretty-pre"
+      const highlightedLines = highlightLines
+        ? parseHighlightedLineNumbers(highlightLines)
+        : undefined
       const initialCodePresentation = renderImmediateCodeToHtml({
         source: rawCode,
         language,
+        highlightedLines,
       })
 
       return (
@@ -310,6 +315,7 @@ export const createMarkdownComponentVariants = ({
           language={initialCodePresentation.language}
           title={title}
           rawCode={rawCode}
+          highlightLines={highlightLines}
           preElement={
             <pre {...props} className={mergedClassName}>
               <code
@@ -318,6 +324,7 @@ export const createMarkdownComponentVariants = ({
                 data-prism-language={initialCodePresentation.language}
                 data-prism-source={rawCode}
                 data-raw-code={rawCode}
+                data-highlight-lines={highlightLines || undefined}
                 dangerouslySetInnerHTML={{ __html: initialCodePresentation.html }}
               />
             </pre>

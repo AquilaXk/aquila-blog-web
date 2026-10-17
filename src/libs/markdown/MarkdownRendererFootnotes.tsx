@@ -8,6 +8,18 @@ type MarkdownFootnoteReferenceLinkProps = ComponentPropsWithoutRef<"a"> & {
   marker: string
 }
 
+const extractFootnotePlainTextPreview = (content: string): string => {
+  const cleaned = content
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/(\*\*|__|~~|\*|_)/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (cleaned.length <= 220) return cleaned
+  return `${cleaned.slice(0, 217).trimEnd()}...`
+}
+
 export const MarkdownFootnoteReferenceLink = ({
   children,
   href,
@@ -24,6 +36,7 @@ export const MarkdownFootnoteReferenceLink = ({
     return <a href={href} title={title} {...props}>{children}</a>
   }
   const occurrence = footnote.referenceIds.indexOf(referenceId) + 1
+  const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
 
   return (
     <sup className="aq-footnote-reference">
@@ -37,6 +50,11 @@ export const MarkdownFootnoteReferenceLink = ({
       >
         {children}
       </a>
+      {plainTextPreview ? (
+        <span className="aq-footnote-popover" role="tooltip">
+          {plainTextPreview}
+        </span>
+      ) : null}
     </sup>
   )
 }

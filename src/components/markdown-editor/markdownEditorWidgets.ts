@@ -61,6 +61,10 @@ const isSafeInlineHref = (href: string): boolean => {
 }
 
 export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
+  if (!text.includes("`") && !text.includes("*") && !text.includes("[")) {
+    container.textContent = text
+    return
+  }
   let lastIndex = 0
   INLINE_MARKDOWN_TOKEN_REGEX.lastIndex = 0
   let match: RegExpExecArray | null
@@ -157,10 +161,7 @@ export class MarkdownTaskWidget extends WidgetType {
 }
 
 export class MarkdownMathWidget extends WidgetType {
-  constructor(
-    private readonly math: string,
-    private readonly displayMode: boolean
-  ) {
+  constructor(private readonly math: string, private readonly displayMode: boolean) {
     super()
   }
 
@@ -170,16 +171,11 @@ export class MarkdownMathWidget extends WidgetType {
 
   toDOM(_view: EditorView) {
     const span = document.createElement("span")
-    span.className = `cm-live-math ${
-      this.displayMode ? "cm-live-math-display" : "cm-live-math-inline"
-    }`
+    span.className = `cm-live-math ${this.displayMode ? "cm-live-math-display" : "cm-live-math-inline"}`
     const katex = getKatex()
     if (katex) {
       try {
-        span.innerHTML = katex.renderToString(this.math, {
-          displayMode: this.displayMode,
-          throwOnError: false,
-        })
+        span.innerHTML = katex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
         return span
       } catch {
         // Fallback to text
@@ -188,10 +184,7 @@ export class MarkdownMathWidget extends WidgetType {
       void katexLoadPromise.then(() => {
         try {
           if (cachedKatex) {
-            span.innerHTML = cachedKatex.renderToString(this.math, {
-              displayMode: this.displayMode,
-              throwOnError: false,
-            })
+            span.innerHTML = cachedKatex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
           }
         } catch {
           // Keep text
@@ -204,10 +197,7 @@ export class MarkdownMathWidget extends WidgetType {
 }
 
 export class MarkdownImageWidget extends WidgetType {
-  constructor(
-    private readonly src: string,
-    private readonly alt: string
-  ) {
+  constructor(private readonly src: string, private readonly alt: string) {
     super()
   }
 
@@ -228,11 +218,48 @@ export class MarkdownImageWidget extends WidgetType {
   }
 }
 
+const moveCursorToWidgetOrigin = (
+  view: EditorView,
+  el: HTMLElement,
+  fallbackFrom: number | undefined,
+  offset = 0
+) => {
+  let resolvedFrom = fallbackFrom
+  try {
+    const domPos = view.posAtDOM(el)
+    if (typeof domPos === "number") resolvedFrom = domPos
+  } catch {
+    // Fall back to stored coordinate
+  }
+  if (resolvedFrom !== undefined) {
+    view.focus()
+    view.dispatch({
+      selection: { anchor: Math.min(view.state.doc.length, resolvedFrom + offset) },
+      scrollIntoView: true,
+    })
+  }
+}
+
+const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: string } => {
+  const token = rawType.toLowerCase()
+  if (["tip", "hint", "success", "check", "done"].includes(token)) return { kind: "tip", icon: "T" }
+  if (["warning", "caution", "attention", "failure", "fail", "missing", "danger", "error", "bug"].includes(token)) {
+    return { kind: "warning", icon: "!" }
+  }
+  if (["summary", "abstract", "tldr", "important"].includes(token)) return { kind: "summary", icon: "§" }
+  if (token === "example") return { kind: "example", icon: "✓" }
+  if (["outline", "quote", "cite"].includes(token)) return { kind: "outline", icon: "≡" }
+  return { kind: "info", icon: "i" }
+}
+
 export class MarkdownCalloutWidget extends WidgetType {
   constructor(
-    private readonly calloutType: string,
-    private readonly title: string,
-    private readonly content: string
+    readonly calloutType: string,
+    readonly title: string,
+    readonly content: string,
+    readonly from: number = 0,
+    readonly to: number = 0,
+    readonly foldState: "+" | "-" | null = null
   ) {
     super()
   }
@@ -241,34 +268,48 @@ export class MarkdownCalloutWidget extends WidgetType {
     return (
       other.calloutType === this.calloutType &&
       other.title === this.title &&
-      other.content === this.content
+      other.content === this.content &&
+      other.foldState === this.foldState
     )
   }
 
-  toDOM() {
+  toDOM(view?: EditorView) {
+    const rawKind = this.calloutType.toLowerCase()
+    const tone = resolveLiveCalloutTone(rawKind)
+    let isCollapsed = this.foldState === "-"
     const root = document.createElement("div")
-    root.className = `cm-live-callout cm-live-callout-${this.calloutType.toLowerCase()}`
+    root.className = `cm-live-callout cm-live-callout-${rawKind} cm-live-callout-tone-${tone.kind}${
+      isCollapsed ? " is-collapsed" : ""
+    }`
+    root.setAttribute("data-callout", tone.kind)
+    if (root.dataset) root.dataset.callout = tone.kind
+    if (this.foldState) {
+      root.setAttribute("data-fold-state", this.foldState)
+      if (root.dataset) root.dataset.foldState = this.foldState
+    }
 
     const header = document.createElement("div")
     header.className = "cm-live-callout-header"
 
+    const badge = document.createElement("span")
+    badge.className = "cm-live-callout-icon"
+    badge.setAttribute("aria-hidden", "true")
+    badge.textContent = tone.icon
+
     const foldIcon = document.createElement("span")
     foldIcon.className = "cm-live-callout-fold"
-    foldIcon.textContent = "▼"
+    foldIcon.textContent = isCollapsed ? "▶" : "▼"
 
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-callout-title"
     appendInlineMarkdownNodes(titleSpan, this.title || this.calloutType.toUpperCase())
 
-    header.appendChild(foldIcon)
+    header.appendChild(badge)
     header.appendChild(titleSpan)
+    header.appendChild(foldIcon)
     root.appendChild(header)
 
-    const strippedContent = this.content
-      .split(/\r?\n/)
-      .map((line) => line.replace(/^\s*>\s?/, ""))
-      .join("\n")
-      .trim()
+    const strippedContent = this.content.replace(/^[ \t]*>[ \t]?/gm, "").trim()
 
     if (strippedContent) {
       const body = document.createElement("div")
@@ -279,9 +320,19 @@ export class MarkdownCalloutWidget extends WidgetType {
       header.addEventListener("mousedown", (e) => {
         e.preventDefault()
         e.stopPropagation()
-        const isCollapsed = root.classList.toggle("is-collapsed")
+        isCollapsed = root.classList.toggle("is-collapsed")
         foldIcon.textContent = isCollapsed ? "▶" : "▼"
       })
+
+      if (view) {
+        body.addEventListener("mousedown", (e) => {
+          const target = e.target as HTMLElement | null
+          if (target?.closest("a")) return
+          e.preventDefault()
+          e.stopPropagation()
+          moveCursorToWidgetOrigin(view, root, this.from)
+        })
+      }
     }
 
     return root
@@ -300,19 +351,19 @@ export class MarkdownTableWidget extends WidgetType {
   toDOM() {
     const wrap = document.createElement("div")
     wrap.className = "cm-live-table-wrap"
-
     const table = document.createElement("table")
     table.className = "cm-live-table"
 
     const lines = this.markdown.trim().split("\n").filter((l) => l.trim().length > 0)
     if (lines.length === 0) return wrap
 
-    const parseCells = (line: string): string[] => {
-      const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "")
-      return trimmed
+    const parseCells = (line: string): string[] =>
+      line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
         .split(/(?<!\\)\|/)
         .map((cell) => cell.replaceAll("\\|", "|").trim())
-    }
 
     const headerRow = lines[0]
     if (headerRow) {
@@ -372,12 +423,8 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.setAttribute("tabindex", "0")
     root.setAttribute("aria-label", `Wikilink: ${this.alias || this.target}`)
     root.dataset.target = this.target
-    if (this.alias) {
-      root.dataset.alias = this.alias
-    }
-    if (this.from !== undefined) {
-      root.dataset.from = String(this.from)
-    }
+    if (this.alias) root.dataset.alias = this.alias
+    if (this.from !== undefined) root.dataset.from = String(this.from)
 
     const icon = document.createElement("span")
     icon.className = "cm-live-wikilink-icon"
@@ -391,37 +438,18 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.appendChild(icon)
     root.appendChild(text)
 
-    const handleActivate = () => {
-      let resolvedFrom = this.from
-      try {
-        const domPos = view.posAtDOM(root)
-        if (typeof domPos === "number") {
-          resolvedFrom = domPos
-        }
-      } catch {
-        // Fall back to stored coordinate
-      }
-      if (resolvedFrom !== undefined) {
-        view.focus()
-        view.dispatch({
-          selection: { anchor: Math.min(view.state.doc.length, resolvedFrom + 2) },
-          scrollIntoView: true,
-        })
-      }
-    }
-
     const handleClick = (e: MouseEvent) => {
       if (e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
-      handleActivate()
+      moveCursorToWidgetOrigin(view, root, this.from, 2)
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault()
         e.stopPropagation()
-        handleActivate()
+        moveCursorToWidgetOrigin(view, root, this.from, 2)
       }
     }
 
@@ -468,15 +496,11 @@ const loadLiveMermaid = (): Promise<LiveMermaidRenderer | null> => {
 }
 
 const cacheLiveMermaidSvg = (source: string, svg: string) => {
-  if (liveMermaidSvgCache.has(source)) {
-    liveMermaidSvgCache.delete(source)
-  }
+  if (liveMermaidSvgCache.has(source)) liveMermaidSvgCache.delete(source)
   liveMermaidSvgCache.set(source, svg)
   if (liveMermaidSvgCache.size > LIVE_MERMAID_SVG_CACHE_LIMIT) {
     const oldest = liveMermaidSvgCache.keys().next().value
-    if (oldest !== undefined) {
-      liveMermaidSvgCache.delete(oldest)
-    }
+    if (oldest !== undefined) liveMermaidSvgCache.delete(oldest)
   }
 }
 
@@ -500,9 +524,7 @@ export class MarkdownMermaidWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = "cm-live-mermaid"
-    if (this.from !== undefined) {
-      root.dataset.from = String(this.from)
-    }
+    if (this.from !== undefined) root.dataset.from = String(this.from)
 
     const renderFallbackCode = (container: HTMLElement, text: string) => {
       const pre = document.createElement("pre")
@@ -528,22 +550,7 @@ export class MarkdownMermaidWidget extends WidgetType {
         if (e.button !== 0) return
         e.preventDefault()
         e.stopPropagation()
-        let resolvedFrom = this.from
-        try {
-          const domPos = view.posAtDOM(root)
-          if (typeof domPos === "number") {
-            resolvedFrom = domPos
-          }
-        } catch {
-          // Fall back to stored coordinate
-        }
-        if (resolvedFrom !== undefined) {
-          view.focus()
-          view.dispatch({
-            selection: { anchor: Math.min(view.state.doc.length, resolvedFrom) },
-            scrollIntoView: true,
-          })
-        }
+        moveCursorToWidgetOrigin(view, root, this.from)
       })
     }
 
@@ -580,15 +587,11 @@ export class MarkdownMermaidWidget extends WidgetType {
           renderErrorFallback(root, normalized)
           return
         }
-        if (!this.customRenderer) {
-          cacheLiveMermaidSvg(normalized, res.svg)
-        }
+        if (!this.customRenderer) cacheLiveMermaidSvg(normalized, res.svg)
         root.dataset.mermaidState = "rendered"
         root.innerHTML = res.svg
       })
-      .catch(() => {
-        renderErrorFallback(root, normalized)
-      })
+      .catch(() => renderErrorFallback(root, normalized))
 
     return root
   }

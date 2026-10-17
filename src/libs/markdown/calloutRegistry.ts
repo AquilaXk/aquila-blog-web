@@ -1,10 +1,49 @@
 export const calloutRegistry = {
-  tip: { blockquoteToken: "TIP", aliases: [], marker: "T", legacyEmoji: ["💡", "✨"] },
-  info: { blockquoteToken: "INFO", aliases: ["NOTE"], marker: "i", legacyEmoji: ["ℹ️", "ℹ"] },
-  warning: { blockquoteToken: "WARNING", aliases: ["CAUTION"], marker: "!", legacyEmoji: ["⚠️", "⚠", "🚨", "❗", "⛔"] },
-  outline: { blockquoteToken: "OUTLINE", aliases: [], marker: "≡", legacyEmoji: ["📋", "📝", "📌", "🗒️"] },
-  example: { blockquoteToken: "EXAMPLE", aliases: [], marker: "✓", legacyEmoji: ["✅", "✔️", "☑️"] },
-  summary: { blockquoteToken: "SUMMARY", aliases: ["IMPORTANT"], marker: "§", legacyEmoji: ["📚", "🧾"] },
+  tip: {
+    blockquoteToken: "TIP",
+    aliases: ["HINT", "SUCCESS", "CHECK", "DONE"],
+    marker: "T",
+    legacyEmoji: ["💡", "✨"],
+  },
+  info: {
+    blockquoteToken: "INFO",
+    aliases: ["NOTE", "QUESTION", "HELP", "FAQ", "TODO"],
+    marker: "i",
+    legacyEmoji: ["ℹ️", "ℹ"],
+  },
+  warning: {
+    blockquoteToken: "WARNING",
+    aliases: [
+      "CAUTION",
+      "ATTENTION",
+      "FAILURE",
+      "FAIL",
+      "MISSING",
+      "DANGER",
+      "ERROR",
+      "BUG",
+    ],
+    marker: "!",
+    legacyEmoji: ["⚠️", "⚠", "🚨", "❗", "⛔"],
+  },
+  outline: {
+    blockquoteToken: "OUTLINE",
+    aliases: ["QUOTE", "CITE"],
+    marker: "≡",
+    legacyEmoji: ["📋", "📝", "📌", "🗒️"],
+  },
+  example: {
+    blockquoteToken: "EXAMPLE",
+    aliases: [],
+    marker: "✓",
+    legacyEmoji: ["✅", "✔️", "☑️"],
+  },
+  summary: {
+    blockquoteToken: "SUMMARY",
+    aliases: ["IMPORTANT", "ABSTRACT", "TLDR"],
+    marker: "§",
+    legacyEmoji: ["📚", "🧾"],
+  },
 } as const
 
 export type CalloutKind = keyof typeof calloutRegistry

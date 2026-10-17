@@ -9,6 +9,7 @@ export type MarkdownDocumentHeading = {
   offset: number
   range: MarkdownSourceRange
   slug: string
+  id: string
 }
 
 export type MarkdownDocumentInsights = {
@@ -63,6 +64,46 @@ export const countWords = (text: string): number => {
   return words
 }
 
+const countTrimmedCodePointsAndWords = (
+  text: string
+): { characterCount: number; wordCount: number } => {
+  let start = 0
+  const len = text.length
+  while (start < len && isUnicodeWhitespace(text.charCodeAt(start))) {
+    start += 1
+  }
+  let end = len
+  while (end > start && isUnicodeWhitespace(text.charCodeAt(end - 1))) {
+    end -= 1
+  }
+  if (start >= end) {
+    return { characterCount: 0, wordCount: 0 }
+  }
+
+  let characterCount = 0
+  let wordCount = 0
+  let inWord = false
+
+  for (let index = start; index < end; index += 1) {
+    const code = text.charCodeAt(index)
+    if (isUnicodeWhitespace(code)) {
+      inWord = false
+    } else if (!inWord) {
+      inWord = true
+      wordCount += 1
+    }
+    if (code >= 0xd800 && code <= 0xdbff && index + 1 < end) {
+      const next = text.charCodeAt(index + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        index += 1
+      }
+    }
+    characterCount += 1
+  }
+
+  return { characterCount, wordCount }
+}
+
 const formatMarkdownHeadingLabel = (text: string) => {
   const codeSpans: string[] = []
   return text
@@ -113,46 +154,76 @@ export const createMarkdownHeadingSlugAllocator = () => {
 }
 
 export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocumentInsights => {
-  const body = markdown.trim()
-  const characterCount = countCodePoints(body)
-  const wordCount = countWords(body)
+  const { characterCount, wordCount } = countTrimmedCodePointsAndWords(markdown)
   const headings: MarkdownDocumentHeading[] = []
   const slugAllocator = createMarkdownHeadingSlugAllocator()
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
+  const len = markdown.length
+  let lineStart = 0
   let offset = 0
   let activeFence: { marker: "`" | "~"; length: number } | null = null
 
-  for (const line of lines) {
-    const fenceMatch = FENCE_OPEN_PATTERN.exec(line)
-    if (fenceMatch) {
-      const fence = fenceMatch[1]
-      const marker = fence[0] as "`" | "~"
-      if (!activeFence) {
-        activeFence = { marker, length: fence.length }
-      } else if (
-        activeFence.marker === marker &&
-        fence.length >= activeFence.length &&
-        line.slice(fenceMatch[0].length).trim() === ""
-      ) {
-        activeFence = null
+  while (lineStart <= len) {
+    const nextBreak = markdown.indexOf("\n", lineStart)
+    const rawLineEnd = nextBreak === -1 ? len : nextBreak
+    const lineEnd =
+      rawLineEnd > lineStart && markdown.charCodeAt(rawLineEnd - 1) === 13
+        ? rawLineEnd - 1
+        : rawLineEnd
+    const lineLength = lineEnd - lineStart
+
+    let firstNonSpace = lineStart
+    while (
+      firstNonSpace < lineEnd &&
+      firstNonSpace - lineStart < 3 &&
+      (markdown.charCodeAt(firstNonSpace) === 32 || markdown.charCodeAt(firstNonSpace) === 9)
+    ) {
+      firstNonSpace += 1
+    }
+
+    const firstChar = firstNonSpace < lineEnd ? markdown.charCodeAt(firstNonSpace) : 0
+    if (firstChar === 96 || firstChar === 126) {
+      const line = markdown.slice(lineStart, lineEnd)
+      const fenceMatch = FENCE_OPEN_PATTERN.exec(line)
+      if (fenceMatch) {
+        const fence = fenceMatch[1]
+        const marker = fence[0] as "`" | "~"
+        if (!activeFence) {
+          activeFence = { marker, length: fence.length }
+        } else if (
+          activeFence.marker === marker &&
+          fence.length >= activeFence.length &&
+          line.slice(fenceMatch[0].length).trim() === ""
+        ) {
+          activeFence = null
+        }
       }
-    } else if (!activeFence) {
+    } else if (!activeFence && firstChar === 35) {
+      const line = markdown.slice(lineStart, lineEnd)
       const headingMatch = ATX_HEADING_PATTERN.exec(line)
       if (headingMatch) {
         const label = formatMarkdownHeadingLabel(headingMatch[2])
         if (label) {
           const level = headingMatch[1].length as MarkdownDocumentHeading["level"]
-          headings.push({
+          const slug = slugAllocator.allocate(label)
+          const headingItem = {
             level,
             label,
             offset,
-            range: { start: offset, end: offset + line.length },
-            slug: slugAllocator.allocate(label),
+            range: { start: offset, end: offset + lineLength },
+            slug,
+          } as MarkdownDocumentHeading
+          Object.defineProperty(headingItem, "id", {
+            value: slug,
+            enumerable: false,
           })
+          headings.push(headingItem)
         }
       }
     }
-    offset += line.length + 1
+
+    offset += lineLength + 1
+    if (nextBreak === -1) break
+    lineStart = nextBreak + 1
   }
 
   return {

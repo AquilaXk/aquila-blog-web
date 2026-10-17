@@ -75,12 +75,27 @@ const isBacktickFenceContext = (value: string, selectionStart: number, key: stri
   return /^[ \t]*`/.test(value.slice(lineStart, selectionStart))
 }
 
-const canAutoPair = (value: string, selectionStart: number, selectionEnd: number, key: string): boolean =>
-  hasValidSelection(value, selectionStart, selectionEnd) &&
-  isSingleLineSelection(value, selectionStart, selectionEnd) &&
-  !isInFencedCode(value, selectionStart, selectionEnd) &&
-  !isEscapedAt(value, selectionStart) &&
-  !isBacktickFenceContext(value, selectionStart, key)
+const MULTILINE_WRAP_KEYS = new Set(["*", "_", "~", "$", "`"])
+
+const canAutoPair = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  key: string
+): boolean => {
+  if (!hasValidSelection(value, selectionStart, selectionEnd)) return false
+  const hasSelection = selectionStart < selectionEnd
+  const lineAllowed =
+    isSingleLineSelection(value, selectionStart, selectionEnd) ||
+    (hasSelection && MULTILINE_WRAP_KEYS.has(key))
+  if (!lineAllowed) return false
+  if (isInFencedCode(value, selectionStart, selectionEnd)) return false
+  if (isEscapedAt(value, selectionStart)) return false
+  if (!hasSelection && isBacktickFenceContext(value, selectionStart, key)) {
+    return false
+  }
+  return true
+}
 
 export const planMarkdownEditorAutoPairInsert = (
   value: string,
@@ -92,6 +107,24 @@ export const planMarkdownEditorAutoPairInsert = (
 
   // If text is selected, check selection wrap map
   if (selectionStart < selectionEnd) {
+    if (
+      key === "(" &&
+      selectionStart > 0 &&
+      value[selectionStart - 1] === "[" &&
+      value[selectionEnd] === "]"
+    ) {
+      return {
+        kind: "mutation",
+        mutation: {
+          rangeStart: selectionEnd,
+          rangeEnd: selectionEnd + 1,
+          replacement: "]()",
+          selectionStart: selectionEnd + 2,
+          selectionEnd: selectionEnd + 2,
+        },
+      }
+    }
+
     const wrap = SELECTION_WRAP_MAP[key]
     if (!wrap) return null
     const selected = value.slice(selectionStart, selectionEnd)

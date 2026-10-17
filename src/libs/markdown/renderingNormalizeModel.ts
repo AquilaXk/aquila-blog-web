@@ -3,8 +3,10 @@ import { normalizeEscapedMarkdownFences } from "src/libs/markdown/mermaid"
 
 const FENCE_MARKER_PATTERN = /^(`{3,}|~{3,})/
 
-const normalizeLegacyCollapsedBlockquoteStrongLines = (markdown: string) =>
-  markdown
+const normalizeLegacyCollapsedBlockquoteStrongLines = (markdown: string) => {
+  if (!markdown.includes("****")) return markdown
+
+  return markdown
     .split("\n")
     .flatMap((line) => {
       const match = line.match(/^(\s*>\s?)(.+)$/)
@@ -25,6 +27,7 @@ const normalizeLegacyCollapsedBlockquoteStrongLines = (markdown: string) =>
       return segments.map((segment) => `${prefix}**${segment}**`)
     })
     .join("\n")
+}
 
 const SPLIT_INLINE_COLOR_MARKERS = ["**", "__", "*", "_"] as const
 const SPLIT_INLINE_COLOR_QUOTE_PAIRS = [

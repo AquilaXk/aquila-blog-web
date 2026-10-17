@@ -89,6 +89,45 @@ const extractCodeTitle = (meta: string) => {
   return ""
 }
 
+export const extractCodeHighlightSpec = (meta: string): string => {
+  if (!meta || !meta.includes("{")) return ""
+  const match = meta.match(/\{([\d,\s-]+)\}/)
+  return match?.[1]?.replace(/\s+/g, "") || ""
+}
+
+export const parseHighlightedLineNumbers = (meta: string): Set<number> => {
+  const result = new Set<number>()
+  if (!meta) return result
+  const rawSpec = meta.includes("{") ? extractCodeHighlightSpec(meta) : meta
+  const tokens = rawSpec.split(",")
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i].trim()
+    if (!token) continue
+    const dashIndex = token.indexOf("-")
+    if (dashIndex > 0) {
+      const start = Number.parseInt(token.slice(0, dashIndex), 10)
+      const end = Number.parseInt(token.slice(dashIndex + 1), 10)
+      if (
+        Number.isFinite(start) &&
+        Number.isFinite(end) &&
+        start > 0 &&
+        end >= start
+      ) {
+        const cappedEnd = Math.min(end, start + 2000)
+        for (let line = start; line <= cappedEnd; line += 1) {
+          result.add(line)
+        }
+      }
+    } else {
+      const single = Number.parseInt(token, 10)
+      if (Number.isFinite(single) && single > 0) {
+        result.add(single)
+      }
+    }
+  }
+  return result
+}
+
 export const extractTextFromCodeAst = (node: unknown): string => {
   if (!node || typeof node !== "object") return ""
 
@@ -102,7 +141,17 @@ export const extractTextFromCodeAst = (node: unknown): string => {
   return children.map(extractTextFromCodeAst).join("")
 }
 
-export const extractCodeMetaFromPreChildren = (children: ReactNode, preNode?: unknown) => {
+export type ExtractedCodeMeta = {
+  language: string
+  title: string
+  rawCode: string
+  highlightLines?: string
+}
+
+export const extractCodeMetaFromPreChildren = (
+  children: ReactNode,
+  preNode?: unknown
+): ExtractedCodeMeta => {
   const list = Array.isArray(children) ? children : [children]
   const codeElement = list.find(
     (child): child is ReactElement<Record<string, unknown>> =>
@@ -135,11 +184,13 @@ export const extractCodeMetaFromPreChildren = (children: ReactNode, preNode?: un
   const rawCodeFromAst = extractTextFromCodeAst(codeAstNode)
   const rawCode = (dataRawCode || rawCodeFromChildren || rawCodeFromAst).replace(/\n$/, "")
   const meta = readCodeMeta(codeAstNode)
+  const highlightLines = extractCodeHighlightSpec(meta)
 
   return {
     language: dataLanguage || classLanguage || "text",
     title: extractCodeTitle(meta),
     rawCode,
+    ...(highlightLines ? { highlightLines } : {}),
   }
 }
 

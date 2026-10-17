@@ -13,9 +13,11 @@ export type {
 } from "src/libs/markdown/renderingTypes"
 export { markdownGuide } from "src/libs/markdown/renderingTypes"
 export {
+  extractCodeHighlightSpec,
   extractCodeMetaFromPreChildren,
   extractTextFromCodeAst,
   hashString,
+  parseHighlightedLineNumbers,
   toLanguageLabel,
 } from "src/libs/markdown/renderingCodeModel"
 export {

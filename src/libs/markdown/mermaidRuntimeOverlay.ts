@@ -36,29 +36,55 @@ export const openMermaidOverlay = (
   panel.style.background = "rgba(11, 16, 23, 0.98)"
   panel.style.padding = "0.75rem"
 
-  const closeButton = document.createElement("button")
-  closeButton.type = "button"
-  closeButton.textContent = "닫기"
-  closeButton.style.display = "inline-flex"
-  closeButton.style.alignItems = "center"
-  closeButton.style.justifyContent = "center"
-  closeButton.style.minHeight = "44px"
-  closeButton.style.padding = "0 0.8rem"
-  closeButton.style.borderRadius = "999px"
-  closeButton.style.border = "1px solid rgba(255, 255, 255, 0.2)"
-  closeButton.style.background = "rgba(15, 23, 42, 0.7)"
-  closeButton.style.color = "#f3f4f6"
-  closeButton.style.fontSize = "0.82rem"
-  closeButton.style.fontWeight = "700"
-  closeButton.style.marginLeft = "auto"
-  closeButton.style.marginBottom = "0.56rem"
-  closeButton.style.cursor = "pointer"
+  const createActionBtn = (label: string, ariaLabel: string) => {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = label
+    button.setAttribute("aria-label", ariaLabel)
+    button.style.display = "inline-flex"
+    button.style.alignItems = "center"
+    button.style.justifyContent = "center"
+    button.style.minHeight = "44px"
+    button.style.padding = "0 0.8rem"
+    button.style.borderRadius = "999px"
+    button.style.border = "1px solid rgba(255, 255, 255, 0.2)"
+    button.style.background = "rgba(15, 23, 42, 0.7)"
+    button.style.color = "#f3f4f6"
+    button.style.fontSize = "0.82rem"
+    button.style.fontWeight = "700"
+    button.style.cursor = "pointer"
+    return button
+  }
+
+  const actionsBar = document.createElement("div")
+  actionsBar.className = "aq-mermaid-modal-actions"
+  actionsBar.style.display = "flex"
+  actionsBar.style.alignItems = "center"
+  actionsBar.style.justifyContent = "flex-end"
+  actionsBar.style.gap = "0.45rem"
+  actionsBar.style.marginBottom = "0.56rem"
+
+  const zoomOutButton = createActionBtn("-", "축소")
+  const zoomResetButton = createActionBtn("100%", "배율 초기화")
+  const zoomInButton = createActionBtn("+", "확대")
+  const closeButton = createActionBtn("닫기", "닫기")
 
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup
   const stageSvg = stage.querySelector("svg")
+  let zoomLevel = 1
+
+  const applyZoom = (nextZoom: number) => {
+    zoomLevel = Math.max(0.5, Math.min(2.5, Math.round(nextZoom * 100) / 100))
+    zoomResetButton.textContent = `${Math.round(zoomLevel * 100)}%`
+    if (stageSvg) {
+      stageSvg.style.transform = `scale(${zoomLevel})`
+      stageSvg.style.transformOrigin = "top left"
+    }
+  }
+
   if (stageSvg) {
     stageSvg.removeAttribute("width")
     stageSvg.removeAttribute("height")
@@ -66,9 +92,23 @@ export const openMermaidOverlay = (
     stageSvg.style.width = "max-content"
     stageSvg.style.height = "auto"
     stageSvg.style.display = "block"
+    stageSvg.style.transition = "transform 0.14s ease"
   }
 
-  panel.appendChild(closeButton)
+  const handleZoomOut = () => applyZoom(zoomLevel - 0.25)
+  const handleZoomReset = () => applyZoom(1)
+  const handleZoomIn = () => applyZoom(zoomLevel + 0.25)
+
+  zoomOutButton.addEventListener("click", handleZoomOut)
+  zoomResetButton.addEventListener("click", handleZoomReset)
+  zoomInButton.addEventListener("click", handleZoomIn)
+
+  actionsBar.appendChild(zoomOutButton)
+  actionsBar.appendChild(zoomResetButton)
+  actionsBar.appendChild(zoomInButton)
+  actionsBar.appendChild(closeButton)
+
+  panel.appendChild(actionsBar)
   panel.appendChild(stage)
   overlay.appendChild(panel)
   document.body.appendChild(overlay)

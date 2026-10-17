@@ -23,17 +23,26 @@ export const shouldScheduleFromInlineColorMutations = (
 }
 
 export const applyInlineColors = (root: HTMLElement) => {
-  if (!root.textContent?.includes("{{color:")) return
-
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const ownTextDesc = Object.getOwnPropertyDescriptor(root, "textContent")
+  if (
+    ownTextDesc &&
+    "value" in ownTextDesc &&
+    typeof ownTextDesc.value === "string" &&
+    !ownTextDesc.value.includes("{{color:")
+  ) {
+    return
+  }
+  const showTextFilter = typeof NodeFilter !== "undefined" ? NodeFilter.SHOW_TEXT : 4
+  const walker = document.createTreeWalker(root, showTextFilter)
   const textNodes: Text[] = []
 
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
+    const value = node.nodeValue ?? node.textContent
+    if (!value || !value.includes("{{color:")) continue
     const parent = node.parentElement
     if (!parent) continue
     if (parent.closest("pre, code, textarea, script, style, .aq-inline-color")) continue
-    if (!node.nodeValue || !node.nodeValue.includes("{{color:")) continue
     textNodes.push(node)
   }
 

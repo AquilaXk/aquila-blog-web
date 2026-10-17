@@ -7,7 +7,15 @@ export type { CalloutKind } from "src/libs/markdown/calloutRegistry"
 export type MarkdownSegment =
   | { type: "markdown"; content: string }
   | { type: "toggle"; title: string; content: string }
-  | { type: "callout"; kind: CalloutKind; title: string; emoji: string; content: string }
+  | {
+      type: "callout"
+      kind: CalloutKind
+      title: string
+      emoji: string
+      content: string
+      foldable?: boolean
+      defaultCollapsed?: boolean
+    }
   | {
       type: "bookmark"
       url: string

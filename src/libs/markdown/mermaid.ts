@@ -183,7 +183,7 @@ const extractFirstFencedMermaidSource = (normalized: string) => {
 }
 
 export const normalizeEscapedMermaidFences = (raw: string): string => {
-  if (!raw) return raw
+  if (!raw || !/mermaid/i.test(raw)) return raw
 
   const lines = normalizeLineEndings(raw).split("\n")
   const normalized: string[] = []
@@ -225,7 +225,15 @@ export const normalizeEscapedMermaidFences = (raw: string): string => {
 // IME/키보드 오타로 깨진 일반 fenced code block까지 렌더 단계에서 복구한다.
 // 예: "```4" -> "```" + "4"
 export const normalizeEscapedMarkdownFences = (raw: string): string => {
-  if (!raw) return raw
+  if (
+    !raw ||
+    (!raw.includes("```") &&
+      !raw.includes("~~~") &&
+      !/mermaid/i.test(raw) &&
+      !/[｀´ˋ'‘’]{3}/.test(raw))
+  ) {
+    return raw
+  }
 
   const lines = normalizeLineEndings(raw).split("\n")
   const normalized: string[] = []

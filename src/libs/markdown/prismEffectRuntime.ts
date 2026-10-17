@@ -3,6 +3,7 @@ import {
   highlightCodeToHtml,
   renderImmediateCodeToHtml,
 } from "src/libs/markdown/prismRuntime"
+import { parseHighlightedLineNumbers } from "src/libs/markdown/renderingCodeModel"
 
 export const PRISM_DEFAULT_MUTATION_DEBOUNCE_MS = 72
 export const PRISM_INITIAL_HYDRATION_TIMEOUT_MS = 1200
@@ -46,13 +47,15 @@ const ensureLineWrappedHtml = ({
   html,
   language,
   source,
+  highlightedLines,
 }: {
   html: string
   language: string
   source: string
+  highlightedLines?: ReadonlySet<number>
 }) => {
   if (html.includes("data-line=")) return html
-  return renderImmediateCodeToHtml({ source, language }).html
+  return renderImmediateCodeToHtml({ source, language, highlightedLines }).html
 }
 
 const resolveElementFromNode = (node: Node | null): Element | null => {
@@ -177,10 +180,20 @@ export const createPrismEffectRuntime = ({
 
     if (!languageByBlock.length) return
 
-    languageByBlock.forEach(({ block, language, source }) => {
+    const asyncCandidates: Array<{
+      block: HTMLElement
+      language: string
+      source: string
+      highlightedLines: Set<number>
+    }> = []
+
+    for (const { block, language, source } of languageByBlock) {
+      const highlightSpec = block.getAttribute("data-highlight-lines") || ""
+      const highlightedLines = parseHighlightedLineNumbers(highlightSpec)
       const immediate = renderImmediateCodeToHtml({
         source,
         language,
+        highlightedLines,
       })
       Array.from(block.classList)
         .filter((className) => className.startsWith("language-"))
@@ -190,26 +203,41 @@ export const createPrismEffectRuntime = ({
         html: immediate.html,
         language: immediate.language,
         source,
+        highlightedLines,
       })
       block.dataset.prismLanguage = immediate.language
       block.dataset.prismSource = source
       block.setAttribute("data-language", immediate.language)
       block.setAttribute("data-raw-code", source)
-    })
+      if (immediate.highlighted) {
+        block.setAttribute("data-prism-highlighted", "true")
+        continue
+      }
+      asyncCandidates.push({
+        block,
+        language,
+        source,
+        highlightedLines,
+      })
+    }
+
+    if (!asyncCandidates.length) return
 
     const highlightedBlocks = await Promise.all(
-      languageByBlock.map(async ({ block, language, source }) => ({
+      asyncCandidates.map(async ({ block, language, source, highlightedLines }) => ({
         block,
         source,
+        highlightedLines,
         result: await highlightCodeToHtml({
           source,
           language,
+          highlightedLines,
         }),
       }))
     )
     if (isDisposed()) return
 
-    highlightedBlocks.forEach(({ block, source, result }) => {
+    highlightedBlocks.forEach(({ block, source, highlightedLines, result }) => {
       if (!block.isConnected || !root.contains(block)) return
       const language = result.language
       Array.from(block.classList)
@@ -220,11 +248,15 @@ export const createPrismEffectRuntime = ({
         html: result.html,
         language,
         source,
+        highlightedLines,
       })
       block.dataset.prismLanguage = language
       block.dataset.prismSource = source
       block.setAttribute("data-language", language)
       block.setAttribute("data-raw-code", source)
+      if (result.highlighted) {
+        block.setAttribute("data-prism-highlighted", "true")
+      }
     })
   }
 

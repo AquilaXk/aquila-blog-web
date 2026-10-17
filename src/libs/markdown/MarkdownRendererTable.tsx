@@ -42,9 +42,18 @@ export const MarkdownTableRenderer = ({
 }) => {
   const rowCursorRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [hasScrollLeft, setHasScrollLeft] = useState(false)
   const [showScrollHint, setShowScrollHint] = useState(false)
+  const [detectedColumnCount, setDetectedColumnCount] = useState(0)
   const isWideOverflowTable = layout?.overflowMode === "wide"
   const columnWidths = layout?.columnWidths
+  const layoutColumnCount = Math.max(
+    layout?.columnWidths?.length ?? 0,
+    layout?.columnAlignments?.length ?? 0,
+    layout?.cells?.[0]?.length ?? 0
+  )
+  const columnCount = layoutColumnCount > 0 ? layoutColumnCount : detectedColumnCount
+  const isNarrowTable = columnCount > 0 && columnCount <= 3
   const normalizedColumnWidths = useMemo(
     () =>
       (columnWidths ?? []).map((width) =>
@@ -74,13 +83,13 @@ export const MarkdownTableRenderer = ({
     if (!isWideOverflowTable) {
       return {
         width: "100%",
-        minWidth: "680px",
+        minWidth: isNarrowTable ? "100%" : "680px",
         maxWidth: "none",
       }
     }
 
     return undefined
-  }, [explicitTableWidth, isWideOverflowTable, usesExplicitNormalWidth])
+  }, [explicitTableWidth, isNarrowTable, isWideOverflowTable, usesExplicitNormalWidth])
   rowCursorRef.current = 0
   const contextValue = useMemo<MarkdownTableRenderContextValue>(
     () => ({
@@ -102,8 +111,13 @@ export const MarkdownTableRenderer = ({
     const tableElement = scrollElement.querySelector("table")
 
     const syncScrollHint = () => {
+      const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
+      if (domCols > 0) {
+        setDetectedColumnCount(domCols)
+      }
       const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
       const remaining = overflowAmount - scrollElement.scrollLeft
+      setHasScrollLeft(scrollElement.scrollLeft > 2)
       setShowScrollHint(overflowAmount > 1 && remaining > 1)
     }
 
@@ -130,7 +144,8 @@ export const MarkdownTableRenderer = ({
       <div
         className="aq-table-shell"
         data-table-width-mode={usesExplicitNormalWidth ? "explicit-normal" : undefined}
-        data-scroll-hint={showScrollHint ? "true" : undefined}
+        data-scroll-left={hasScrollLeft ? "true" : "false"}
+        data-scroll-hint={showScrollHint ? "true" : "false"}
       >
         <div
           ref={scrollRef}
@@ -146,6 +161,7 @@ export const MarkdownTableRenderer = ({
               .filter(Boolean)
               .join(" ")}
             data-overflow-mode={isWideOverflowTable ? "wide" : undefined}
+            data-narrow-table={isNarrowTable ? "true" : undefined}
             style={tableStyle}
           >
             {hasExplicitColumnWidths ? (

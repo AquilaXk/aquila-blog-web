@@ -1,48 +1,18 @@
 import type {
-  ChangeEventHandler,
-  KeyboardEvent as ReactKeyboardEvent,
-  KeyboardEventHandler,
-  ReactNode,
-  Ref,
+  ChangeEventHandler, KeyboardEvent as ReactKeyboardEvent, KeyboardEventHandler, ReactNode, Ref,
 } from "react"
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
-import { CONFIG } from "site.config"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
 import {
-  EditorGuideBackdrop,
-  EditorGuideBody,
-  EditorGuideGrid,
-  EditorGuidePanel,
-  EditorGuideRepo,
-  EditorExitAction,
-  EditorHeaderMetaPill,
-  EditorHeaderMetaRow,
-  MobilePropertiesToggle,
-  EditorInspector,
-  EditorInspectorTagInputRow,
-  EditorOutline,
-  EditorOutlineItem,
-  EditorPanelHeader,
-  EditorSidebarToggleButton,
-  EditorStudioDedicatedCanvasSection,
-  EditorStudioDedicatedMetaSection,
-  EditorStudioDedicatedTopBar,
-  EditorStudioFrame,
-  EditorStudioLoadingState,
-  EditorStudioPageHeading,
-  EditorStudioRoot,
-  EditorStudioSaveState,
-  EditorStudioTopBarActions,
-  EditorStudioWritingColumn,
-  EditorTagRow,
-  InlineMetaInput,
-  LocalDraftRestoreCard,
-  PrimaryButton,
-  PublishNotice,
-  SelectedTagChip,
-  SecondaryButton,
-  TitleInput,
+  EditorExitAction, EditorHeaderMetaPill, EditorHeaderMetaRow, MobilePropertiesToggle,
+  EditorInspector, EditorInspectorTagInputRow, EditorOutline, EditorOutlineItem,
+  EditorPanelHeader, EditorSidebarToggleButton, EditorStudioDedicatedCanvasSection,
+  EditorStudioDedicatedMetaSection, EditorStudioDedicatedTopBar, EditorStudioFrame,
+  EditorStudioGuideModal, EditorStudioLoadingState, EditorStudioPageHeading, EditorStudioRoot,
+  EditorStudioSaveState, EditorStudioStatusBar, EditorStudioTopBarActions,
+  EditorStudioWritingColumn, EditorTagRow, InlineMetaInput, LocalDraftRestoreCard,
+  PrimaryButton, PublishNotice, SelectedTagChip, SecondaryButton, TitleInput,
 } from "./EditorStudioDedicatedEditorSurfaceParts"
 import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
@@ -61,6 +31,41 @@ export const resolveActiveOutlineItemIndex = (
     }
   }
   return 0
+}
+
+const computeCursorLineAndColumn = (
+  markdown: string,
+  cursorOffset?: number | null
+): { line: number; column: number } => {
+  const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
+  let line = 1
+  let lastNewlineIndex = -1
+  for (let index = 0; index < clamped; index += 1) {
+    if (markdown.charCodeAt(index) === 10) {
+      line += 1
+      lastNewlineIndex = index
+    }
+  }
+  return {
+    line,
+    column: clamped - lastNewlineIndex,
+  }
+}
+
+export const countMarkdownTotalLinks = (markdown: string): number => {
+  if (!markdown.includes("](") && !markdown.includes("[[")) return 0
+  let count = 0
+  if (markdown.includes("](")) {
+    for (const _match of markdown.matchAll(/!?\[[^\]]*\]\([^)\s]*\)/g)) {
+      count += 1
+    }
+  }
+  if (markdown.includes("[[")) {
+    for (const _match of markdown.matchAll(/\[\[[^\]]+\]\]/g)) {
+      count += 1
+    }
+  }
+  return count
 }
 
 type NoticeTone = "idle" | "loading" | "success" | "error"
@@ -84,6 +89,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   titleInputRef: (node: HTMLTextAreaElement | null) => void
   onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
   activeCursorOffset?: number | null
+  activeSelectionRange?: { from: number; to: number } | null
   postTitle: string
   onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
   onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
@@ -121,11 +127,17 @@ const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
   return nativeEvent.isComposing === true || nativeEvent.keyCode === 229
 }
 
-export const countMarkdownLinkWarnings = (markdown: string) =>
-  [...markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]*)/g)].filter((match) => {
+export const countMarkdownLinkWarnings = (markdown: string) => {
+  if (!markdown.includes("](")) return 0
+  let count = 0
+  for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]*)/g)) {
     const href = match[1]?.trim() ?? ""
-    return !href || /^https?:\/\/$/.test(href)
-  }).length
+    if (!href || /^https?:\/\/$/.test(href)) {
+      count += 1
+    }
+  }
+  return count
+}
 
 const getCategoryInputValue = (category: string) =>
   category.trim() ? splitCategoryDisplay(category).label : ""
@@ -150,7 +162,6 @@ const LocalDraftRestoreSuggestion = ({
   selectedKey,
   onSelect,
   onDiscard,
-  onClear,
   onDismiss,
 }: LocalDraftRestoreSuggestionProps) => {
   if (!visible) return null
@@ -207,6 +218,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   titleInputRef,
   onOutlineBodyHeadingActivate,
   activeCursorOffset,
+  activeSelectionRange,
   postTitle,
   onPostTitleChange,
   onPostTitleKeyDown,
@@ -274,11 +286,21 @@ export const EditorStudioDedicatedEditorSurface = ({
     () => resolveActiveOutlineItemIndex(outlineItems, activeCursorOffset ?? lastActivatedOutlineOffset),
     [activeCursorOffset, lastActivatedOutlineOffset, outlineItems]
   )
-  const projectRepository = CONFIG.projects?.[0]
   const linkWarningCount = useMemo(
     () => countMarkdownLinkWarnings(deferredPostContent),
     [deferredPostContent]
   )
+  const totalLinkCount = useMemo(
+    () => countMarkdownTotalLinks(deferredPostContent),
+    [deferredPostContent]
+  )
+  const cursorPosition = useMemo(
+    () => computeCursorLineAndColumn(postContent, activeCursorOffset),
+    [activeCursorOffset, postContent]
+  )
+  const selectedCharCount = activeSelectionRange
+    ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from)
+    : 0
   const handleTagDraftChange = (nextValue: string) => {
     const commaSeparated = /[,，]/
     if (!commaSeparated.test(nextValue)) {
@@ -447,6 +469,14 @@ export const EditorStudioDedicatedEditorSurface = ({
 
           <EditorStudioDedicatedCanvasSection>{editorCanvas}</EditorStudioDedicatedCanvasSection>
 
+          <EditorStudioStatusBar data-testid="editor-studio-status-bar" aria-label="편집기 상태 표시줄">
+            <span>Ln {cursorPosition.line}, Col {cursorPosition.column}</span>
+            {selectedCharCount > 0 ? <span>선택 {selectedCharCount}자</span> : null}
+            <span>단어 {outlineInsights.wordCount} · 글자 {outlineInsights.characterCount}</span>
+            <span>약 {outlineInsights.readingMinutes}분 읽기</span>
+            <span>링크 {totalLinkCount}</span>
+          </EditorStudioStatusBar>
+
           {showPublishNotice ? <PublishNotice data-tone={publishNoticeTone}>{publishNoticeText}</PublishNotice> : null}
         </EditorStudioWritingColumn>
 
@@ -458,136 +488,95 @@ export const EditorStudioDedicatedEditorSurface = ({
                 ×
               </button>
             </EditorPanelHeader>
-          <label>
-            <span>공개 범위</span>
-            <select value={postVisibility} onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}>
-              {PUBLISH_VISIBILITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>요약</span>
-            <textarea
-              value={postSummary}
-              maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
-              onChange={(event) => onPostSummaryChange(event.target.value)}
+            <label>
+              <span>공개 범위</span>
+              <select value={postVisibility} onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}>
+                {PUBLISH_VISIBILITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>요약</span>
+              <textarea
+                value={postSummary}
+                maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
+                onChange={(event) => onPostSummaryChange(event.target.value)}
+              />
+              <small>
+                {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
+              </small>
+            </label>
+            <label>
+              <span>분류 (선택)</span>
+              <EditorInspectorTagInputRow>
+                <input
+                  list="editor-category-suggestions"
+                  value={getCategoryInputValue(postCategory)}
+                  onChange={(event) => onPostCategoryChange(event.target.value)}
+                  onBlur={onCommitPostCategory}
+                />
+                <SecondaryButton
+                  type="button"
+                  aria-label="카테고리 지우기"
+                  onClick={() => onPostCategoryChange("")}
+                  disabled={!postCategory}
+                >
+                  지우기
+                </SecondaryButton>
+              </EditorInspectorTagInputRow>
+              <datalist id="editor-category-suggestions">
+                {categorySuggestions.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
+              <small>하나의 글에는 넓은 분류를 하나만 선택하세요. 세부 키워드는 태그로 추가할 수 있습니다.</small>
+            </label>
+            <LocalDraftRestoreSuggestion
+              visible={isLocalDraftRestoreSuggestionVisible}
+              disabled={isLocalDraftRestoreSuggestionActionsDisabled}
+              onRestore={onRestoreLocalDraft}
+              candidates={localDraftCandidates}
+              selectedKey={selectedLocalDraftCandidateKey}
+              onSelect={onSelectLocalDraftCandidate}
+              onDiscard={onDiscardLocalDraftCandidate}
+              onClear={onClearLocalDraft}
+              onDismiss={onDismissLocalDraftRestoreSuggestion}
             />
-            <small>
-              {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
-            </small>
-          </label>
-          <label>
-            <span>분류 (선택)</span>
-            <EditorInspectorTagInputRow>
-              <input
-                list="editor-category-suggestions"
-                value={getCategoryInputValue(postCategory)}
-                onChange={(event) => onPostCategoryChange(event.target.value)}
-                onBlur={onCommitPostCategory}
-              />
-              <SecondaryButton
-                type="button"
-                aria-label="카테고리 지우기"
-                onClick={() => onPostCategoryChange("")}
-                disabled={!postCategory}
-              >
-                지우기
-              </SecondaryButton>
-            </EditorInspectorTagInputRow>
-            <datalist id="editor-category-suggestions">
-              {categorySuggestions.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
-            <small>하나의 글에는 넓은 분류를 하나만 선택하세요. 세부 키워드는 태그로 추가할 수 있습니다.</small>
-          </label>
-          <LocalDraftRestoreSuggestion
-            visible={isLocalDraftRestoreSuggestionVisible}
-            disabled={isLocalDraftRestoreSuggestionActionsDisabled}
-            onRestore={onRestoreLocalDraft}
-            candidates={localDraftCandidates}
-            selectedKey={selectedLocalDraftCandidateKey}
-            onSelect={onSelectLocalDraftCandidate}
-            onDiscard={onDiscardLocalDraftCandidate}
-            onClear={onClearLocalDraft}
-            onDismiss={onDismissLocalDraftRestoreSuggestion}
-          />
-          <section>
-            <span>태그</span>
-            <EditorTagRow aria-label="발행 태그" $compact>
-              {postTags.map((tag) => (
-                <SelectedTagChip key={`inspector-${tag}`}>
-                  <span className="label">{tag}</span>
-                  <button type="button" onClick={() => onRemoveTag(tag)} aria-label={`${tag} 삭제`}>
-                    ×
-                  </button>
-                </SelectedTagChip>
-              ))}
-            </EditorTagRow>
-            <EditorInspectorTagInputRow>
-              <input
-                placeholder="태그 추가"
-                value={tagDraft}
-                onChange={(event) => handleTagDraftChange(event.target.value)}
-                onKeyDown={handleTagDraftKeyDown}
-              />
-              <button type="button" onClick={() => onAddTag(tagDraft)} aria-label="태그 추가">
-                +
-              </button>
-            </EditorInspectorTagInputRow>
-          </section>
-          {linkWarningCount > 0 ? (
-            <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
-          ) : null}
-        </EditorInspector>
+            <section>
+              <span>태그</span>
+              <EditorTagRow aria-label="발행 태그" $compact>
+                {postTags.map((tag) => (
+                  <SelectedTagChip key={`inspector-${tag}`}>
+                    <span className="label">{tag}</span>
+                    <button type="button" onClick={() => onRemoveTag(tag)} aria-label={`${tag} 삭제`}>
+                      ×
+                    </button>
+                  </SelectedTagChip>
+                ))}
+              </EditorTagRow>
+              <EditorInspectorTagInputRow>
+                <input
+                  placeholder="태그 추가"
+                  value={tagDraft}
+                  onChange={(event) => handleTagDraftChange(event.target.value)}
+                  onKeyDown={handleTagDraftKeyDown}
+                />
+                <button type="button" onClick={() => onAddTag(tagDraft)} aria-label="태그 추가">
+                  +
+                </button>
+              </EditorInspectorTagInputRow>
+            </section>
+            {linkWarningCount > 0 ? (
+              <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
+            ) : null}
+          </EditorInspector>
         ) : null}
       </EditorStudioFrame>
 
-      {isGuideOpen ? (
-        <EditorGuideBackdrop onClick={() => setIsGuideOpen(false)}>
-          <EditorGuidePanel role="dialog" aria-modal="true" aria-label="Markdown 작성 가이드" onClick={(event) => event.stopPropagation()}>
-            <header>
-              <div>
-                <span>Authoring help</span>
-                <h2>Markdown 작성 가이드</h2>
-              </div>
-              <button type="button" aria-label="가이드 닫기" onClick={() => setIsGuideOpen(false)}>×</button>
-            </header>
-            <EditorGuideBody>
-              <p>글 제목은 별도 필드가 H1 역할을 합니다. 본문은 Markdown 원문을 저장하고 같은 renderer로 미리보기와 공개 글을 표시합니다.</p>
-              <EditorGuideGrid>
-                {[
-                  ["제목과 강조", "문서 구조와 인라인 강조", "# 제목 1\n## 제목 2\n### 제목 3\n**굵게** · _기울임_"],
-                  ["목록과 인용", "일반 목록, 작업 목록, 인용문", "- 목록\n- [x] 완료\n- [ ] 예정\n> 인용문"],
-                  ["콜아웃", "TIP, INFO, WARNING, SUMMARY", "> [!TIP]\n> **제목**\n> 내용"],
-                  ["토글", "긴 보조 설명을 접어두기", ":::toggle 자세히 보기\n내용\n:::"],
-                  ["표와 코드", "GFM table과 fenced code", "| 항목 | 설명 |\n| --- | --- |\n\n```kotlin title=\"invalidatePost.kt\"\ncode\n```"],
-                  ["Mermaid", "흐름과 구조 다이어그램", "```mermaid\nflowchart LR\n A --> B\n```"],
-                  ["수식과 색상", "KaTeX block과 제한된 인라인 색상", "$$\nE = mc^2\n$$\n{{color:#155eef|강조}}"],
-                  ["미디어와 링크 카드", "이미지, bookmark, embed, file", "![설명](URL)\n:::bookmark URL\n제목\n설명\n:::"],
-                ].map(([title, description, code]) => (
-                  <section key={title}>
-                    <h3>{title}</h3>
-                    <p>{description}</p>
-                    <pre>{code}</pre>
-                  </section>
-                ))}
-              </EditorGuideGrid>
-              {projectRepository?.href ? (
-                <EditorGuideRepo>
-                  <strong>프로젝트 리포지터리</strong>
-                  <a href={projectRepository.href} target="_blank" rel="noreferrer">
-                    {projectRepository.href}
-                  </a>
-                </EditorGuideRepo>
-              ) : null}
-            </EditorGuideBody>
-          </EditorGuidePanel>
-        </EditorGuideBackdrop>
-      ) : null}
+      {isGuideOpen ? <EditorStudioGuideModal onClose={() => setIsGuideOpen(false)} /> : null}
 
       {resultPanel}
       {publishModal}

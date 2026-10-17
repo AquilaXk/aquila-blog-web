@@ -17,6 +17,15 @@ type RenderMarkdownSegmentPayload = {
   renderMarkdown: RenderMarkdownBlock
 }
 
+const DEFAULT_CALLOUT_TITLES: Record<string, string> = {
+  summary: "핵심 요약",
+  info: "배경 메모",
+  tip: "실전 팁",
+  warning: "주의 포인트",
+  example: "예시 시나리오",
+  outline: "읽기 가이드",
+}
+
 export const renderMarkdownSegment = ({
   segment,
   index,
@@ -38,10 +47,38 @@ export const renderMarkdownSegment = ({
   }
 
   if (segment.type === "callout") {
+    if (segment.foldable) {
+      const resolvedTitle =
+        segment.title ||
+        DEFAULT_CALLOUT_TITLES[segment.kind] ||
+        segment.kind.toUpperCase()
+      return (
+        <details
+          key={`callout-${index}`}
+          className={`aq-callout aq-callout-box aq-admonition aq-admonition-${segment.kind}`}
+          data-callout={segment.kind}
+          data-callout-foldable="true"
+          open={!segment.defaultCollapsed}
+        >
+          <summary className="aq-callout-head aq-callout-header aq-callout-title">
+            <span className="aq-callout-emoji" aria-hidden="true">
+              {segment.emoji}
+            </span>
+            <strong className="aq-callout-title">{resolvedTitle}</strong>
+            <span className="aq-callout-fold-chevron" aria-hidden="true" />
+          </summary>
+          <div className="aq-callout-box-text aq-callout-body aq-callout-content">
+            {renderMarkdown(segment.content, `callout-body-${index}`, true)}
+          </div>
+        </details>
+      )
+    }
+
     return (
       <div
         key={`callout-${index}`}
         className={`aq-callout aq-callout-box aq-admonition aq-admonition-${segment.kind}`}
+        data-callout={segment.kind}
       >
         <div className="aq-callout-box-text">
           <div className="aq-callout-head" data-has-title={segment.title ? "true" : "false"}>
