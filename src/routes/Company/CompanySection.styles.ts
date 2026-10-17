@@ -317,7 +317,12 @@ export const StatList = styled.dl`
   }
 
   @media (max-width: ${breakpoint.sm}px) {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 1.35rem 1.15rem;
+
+    dd {
+      font-size: 0.90625rem;
+    }
   }
 `
+
 

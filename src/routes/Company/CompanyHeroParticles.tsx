@@ -13,10 +13,56 @@ type ParticleSeed = {
   colorIndex: number
 }
 
+export type ParticleClearanceSpec = {
+  clearRx: number
+  clearRy: number
+  innerStop: number
+  outerStop: number
+  maxAlpha: number
+}
+
 export const smoothstep = (edge0: number, edge1: number, value: number) => {
   if (edge0 === edge1) return 0
   const clamped = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
   return clamped * clamped * (3 - 2 * clamped)
+}
+
+export const resolveParticleClearance = (
+  width: number,
+  height: number
+): ParticleClearanceSpec => {
+  if (width < 768) {
+    return {
+      clearRx: Math.max(width * 0.56, 210),
+      clearRy: Math.max(height * 0.46, 220),
+      innerStop: 0.86,
+      outerStop: 1.18,
+      maxAlpha: 0.48,
+    }
+  }
+  return {
+    clearRx: Math.min(width * 0.48, 420),
+    clearRy: Math.min(height * 0.36, 230),
+    innerStop: 0.76,
+    outerStop: 1.16,
+    maxAlpha: 0.76,
+  }
+}
+
+export const computeCenterClearance = (
+  screenX: number,
+  screenY: number,
+  width: number,
+  height: number,
+  spec: ParticleClearanceSpec = resolveParticleClearance(width, height)
+) => {
+  const halfWidth = width * 0.5
+  const halfHeight = height * 0.5
+  return smoothstep(
+    spec.innerStop,
+    spec.outerStop,
+    Math.hypot((screenX - halfWidth) / spec.clearRx, (screenY - halfHeight) / spec.clearRy)
+  )
 }
 
 export const createParticleSeeds = (cols: number, rows: number, paletteLength: number): ParticleSeed[] => {
@@ -163,8 +209,7 @@ const CompanyHeroParticles: React.FC = () => {
       const baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
       const halfWidth = width * 0.5
       const halfHeight = height * 0.5
-      const clearRx = Math.min(width * 0.48, 420)
-      const clearRy = Math.min(height * 0.36, 230)
+      const clearanceSpec = resolveParticleClearance(width, height)
 
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i]
@@ -211,13 +256,15 @@ const CompanyHeroParticles: React.FC = () => {
 
         const screenX = (finalX + 1) * halfWidth
         const screenY = (finalY + 1) * halfHeight
-        const centerClearance = smoothstep(
-          0.76,
-          1.16,
-          Math.hypot((screenX - halfWidth) / clearRx, (screenY - halfHeight) / clearRy)
+        const centerClearance = computeCenterClearance(
+          screenX,
+          screenY,
+          width,
+          height,
+          clearanceSpec
         )
         const alpha =
-          Math.min(0.76, Math.max(0.08, p.scale * 0.34)) * centerClearance
+          Math.min(clearanceSpec.maxAlpha, Math.max(0.08, p.scale * 0.34)) * centerClearance
 
         if (alpha < 0.05) continue
 

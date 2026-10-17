@@ -92,6 +92,14 @@ export const NoticeBanner = styled.div`
       }
     }
 
+    @media (max-width: ${breakpoint.sm}px) {
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       transition: none;
 
@@ -126,7 +134,9 @@ export const SurfaceHeader = styled.header`
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 0.35rem;
+    min-height: 0;
+    padding: 0.45rem ${SECTION_PADDING_X};
+    row-gap: 0.2rem;
   }
 `
 
@@ -170,7 +180,7 @@ export const SurfaceNav = styled.nav`
     flex-wrap: wrap;
     justify-content: flex-start;
     margin-left: -0.5rem;
-    row-gap: 0.25rem;
+    row-gap: 0.15rem;
   }
 `
 
@@ -191,6 +201,11 @@ export const NavLink = styled.a`
   &:hover {
     color: ${light.inkPrimary};
     background: ${light.surfaceHoverTint};
+  }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    padding: 0 0.65rem;
+    font-size: 0.90625rem;
   }
 `
 
@@ -269,6 +284,8 @@ export const HeaderAction = styled(PillAction)`
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     grid-row: 1;
     grid-column: 2;
+    padding: 0 0.95rem;
+    font-size: 0.875rem;
   }
 `
 
@@ -277,6 +294,10 @@ export const Hero = styled.section`
   overflow: hidden;
   padding: clamp(5.5rem, 11vw, 9.5rem) ${SECTION_PADDING_X} clamp(5.5rem, 11vw, 9.5rem);
   text-align: center;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    padding: 3.5rem ${SECTION_PADDING_X} 3.75rem;
+  }
 `
 
 export const HeroAccent = styled.div`
@@ -308,6 +329,11 @@ export const HeroTitle = styled.h1`
     color: ${light.inkSecondary};
     font-weight: ${fontWeight.medium};
   }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    font-size: clamp(2rem, 8.2vw, 2.45rem);
+    line-height: 1.14;
+  }
 `
 
 export const HeroLead = styled.p`
@@ -325,6 +351,14 @@ export const HeroActions = styled.div`
   justify-content: center;
   gap: 0.75rem;
   margin-top: 0.25rem;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    width: 100%;
+
+    a {
+      flex: 1 1 11rem;
+    }
+  }
 `
 
 export const HeroShowcase = styled.figure`

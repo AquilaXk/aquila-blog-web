@@ -116,10 +116,24 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     })
   }
 
-  test("헤더 내비와 CTA는 44px 터치 타겟을 유지한다", async ({ page }) => {
+  test("헤더 내비와 CTA는 44px 터치 타겟을 유지하고 모바일 공지 배너·통계 그리드가 정돈된다", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto("/company")
     await expectTouchTargets(page, "header a")
+
+    const noticeLink = page.getByRole("link", { name: /EasySubway 전국 정식 출시 준비 중/ })
+    await expectWithinViewport(page, noticeLink, "공지 배너")
+    const noticeBox = await noticeLink.boundingBox()
+    expect(noticeBox).not.toBeNull()
+    expect(noticeBox?.height ?? 99).toBeLessThanOrEqual(46)
+
+    const statItems = page.locator("#approach dl > div")
+    await expect(statItems).toHaveCount(4)
+    const stat0Box = await statItems.nth(0).boundingBox()
+    const stat1Box = await statItems.nth(1).boundingBox()
+    expect(stat0Box).not.toBeNull()
+    expect(stat1Box).not.toBeNull()
+    expect(Math.abs((stat0Box?.y ?? 0) - (stat1Box?.y ?? 99))).toBeLessThanOrEqual(2)
   })
 
   test("프로덕트 쇼케이스 목업이 원본 비율(1080x2340 · 1920x733)을 유지하고 중복 노출되지 않는다", async ({
@@ -271,6 +285,20 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
       await expectWithinViewport(page, nav.getByRole("link", { name: label }), label)
     }
     await expectTouchTargets(page, "header a")
+
+    // 모바일 히어로 폰 목업 비례 폭 및 2x2 기술 명세 그리드 검증
+    const heroPhoneFrame = page.locator("main figure").first()
+    const heroPhoneBox = await heroPhoneFrame.boundingBox()
+    expect(heroPhoneBox).not.toBeNull()
+    expect(heroPhoneBox?.width ?? 999).toBeLessThanOrEqual(270)
+
+    const techCells = page.getByRole("region", { name: "정식 출시 기술 명세" }).locator("dl > div")
+    await expect(techCells).toHaveCount(4)
+    const cell0Box = await techCells.nth(0).boundingBox()
+    const cell1Box = await techCells.nth(1).boundingBox()
+    expect(cell0Box).not.toBeNull()
+    expect(cell1Box).not.toBeNull()
+    expect(Math.abs((cell0Box?.y ?? 0) - (cell1Box?.y ?? 99))).toBeLessThanOrEqual(2)
 
     // 모바일 앵커 내비게이션 시 헤더에 가려지지 않음을 검증 (scroll-margin-top 버그 방지)
     const header = page.locator("header")
