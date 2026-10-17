@@ -51,7 +51,6 @@ import {
   wikilinkCompletionSource,
 } from "./markdownEditorCompletions"
 import {
-  buildDecorations,
   compositionField,
   computeMinimalDocChange,
   decorationField,

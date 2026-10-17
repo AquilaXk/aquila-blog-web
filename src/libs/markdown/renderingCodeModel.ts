@@ -95,12 +95,15 @@ export const extractCodeHighlightSpec = (meta: string): string => {
   return match?.[1]?.replace(/\s+/g, "") || ""
 }
 
+const MAX_HIGHLIGHT_LINE_NUMBER = 100_000
+const MAX_HIGHLIGHT_TOTAL_LINES = 2_000
+
 export const parseHighlightedLineNumbers = (meta: string): Set<number> => {
   const result = new Set<number>()
   if (!meta) return result
   const rawSpec = meta.includes("{") ? extractCodeHighlightSpec(meta) : meta
   const tokens = rawSpec.split(",")
-  for (let i = 0; i < tokens.length; i += 1) {
+  for (let i = 0; i < tokens.length && result.size < MAX_HIGHLIGHT_TOTAL_LINES; i += 1) {
     const token = tokens[i].trim()
     if (!token) continue
     const dashIndex = token.indexOf("-")
@@ -108,19 +111,29 @@ export const parseHighlightedLineNumbers = (meta: string): Set<number> => {
       const start = Number.parseInt(token.slice(0, dashIndex), 10)
       const end = Number.parseInt(token.slice(dashIndex + 1), 10)
       if (
-        Number.isFinite(start) &&
-        Number.isFinite(end) &&
+        Number.isSafeInteger(start) &&
+        Number.isSafeInteger(end) &&
         start > 0 &&
+        start <= MAX_HIGHLIGHT_LINE_NUMBER &&
         end >= start
       ) {
-        const cappedEnd = Math.min(end, start + 2000)
-        for (let line = start; line <= cappedEnd; line += 1) {
+        const cappedEnd = Math.min(
+          end,
+          start + MAX_HIGHLIGHT_TOTAL_LINES,
+          MAX_HIGHLIGHT_LINE_NUMBER
+        )
+        for (let line = start; line <= cappedEnd && result.size < MAX_HIGHLIGHT_TOTAL_LINES; line += 1) {
           result.add(line)
         }
       }
     } else {
       const single = Number.parseInt(token, 10)
-      if (Number.isFinite(single) && single > 0) {
+      if (
+        Number.isSafeInteger(single) &&
+        single > 0 &&
+        single <= MAX_HIGHLIGHT_LINE_NUMBER &&
+        result.size < MAX_HIGHLIGHT_TOTAL_LINES
+      ) {
         result.add(single)
       }
     }

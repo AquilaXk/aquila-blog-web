@@ -15,6 +15,7 @@ import {
 import { resolveCalloutBlockquote } from "../../src/libs/markdown/calloutRegistry"
 import { renderFormulaToHtml } from "../../src/libs/markdown/formula"
 import { createMarkdownDocumentInsights } from "../../src/libs/markdown/markdownDocumentInsights"
+import { openMermaidOverlay } from "../../src/libs/markdown/mermaidRuntimeOverlay"
 import { renderImmediateCodeToHtml } from "../../src/libs/markdown/prismRuntime"
 import {
   extractCodeHighlightSpec,
@@ -328,5 +329,135 @@ test.describe("Wave 3 — Issue #261: Obsidian UX Parity & Bit-Level Optimizatio
     })
     expect(formulaFirst).toBe(formulaSecond)
     expect(formulaFirst).toContain("katex")
+  })
+
+  test("F1 & F2 regression: openMermaidOverlay copies source code and parseHighlightedLineNumbers enforces safe bounds", async () => {
+    // F2: Safe integer & MAX_HIGHLIGHT_LINE_NUMBER (100_000) & MAX_HIGHLIGHT_TOTAL_LINES (2_000)
+    const outOfBoundsSingle = parseHighlightedLineNumbers("{100001,9007199254740992}")
+    expect(outOfBoundsSingle.size).toBe(0)
+
+    const multiRangeCapped = parseHighlightedLineNumbers("{1-1500,2000-3500,4000}")
+    expect(multiRangeCapped.size).toBe(2000)
+    expect(multiRangeCapped.has(1)).toBe(true)
+    expect(multiRangeCapped.has(1500)).toBe(true)
+    expect(multiRangeCapped.has(2499)).toBe(true)
+    expect(multiRangeCapped.has(2500)).toBe(false)
+    expect(multiRangeCapped.has(4000)).toBe(false)
+
+    const unsafeRange = parseHighlightedLineNumbers("{9007199254740992-9007199254742992}")
+    expect(unsafeRange.size).toBe(0)
+
+    // F1: openMermaidOverlay renders copy button when sourceText is provided and copies to clipboard
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+    const prevNav = Object.getOwnPropertyDescriptor(globalThis, "navigator")
+    let copiedText = ""
+
+    const createMockElement = (tag: string): any => {
+      const listeners = new Map<string, Array<(e: any) => void>>()
+      const children: any[] = []
+      const attrs: Record<string, string> = {}
+      const styleObj: Record<string, any> = {
+        setProperty(k: string, v: string) {
+          this[k] = v
+        },
+      }
+      return {
+        tagName: tag.toUpperCase(),
+        type: "",
+        className: "",
+        textContent: "",
+        innerHTML: "",
+        style: styleObj,
+        children,
+        attributes: attrs,
+        setAttribute(k: string, v: string) {
+          attrs[k] = v
+        },
+        getAttribute(k: string) {
+          return attrs[k] ?? null
+        },
+        removeAttribute(k: string) {
+          delete attrs[k]
+        },
+        appendChild(child: any) {
+          children.push(child)
+          return child
+        },
+        querySelector() {
+          return null
+        },
+        querySelectorAll() {
+          return []
+        },
+        addEventListener(type: string, fn: (e: any) => void) {
+          const list = listeners.get(type) ?? []
+          list.push(fn)
+          listeners.set(type, list)
+        },
+        removeEventListener() {},
+        trigger(type: string, event: any = {}) {
+          for (const fn of listeners.get(type) ?? []) {
+            fn(event)
+          }
+        },
+        focus() {},
+        remove() {},
+      }
+    }
+
+    const bodyEl = createMockElement("body")
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      writable: true,
+      value: {
+        activeElement: null,
+        body: bodyEl,
+         documentElement: createMockElement("html"),
+        createElement: (tag: string) => createMockElement(tag),
+        addEventListener() {},
+        removeEventListener() {},
+      },
+    })
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      writable: true,
+      value: {
+        clipboard: {
+          writeText: async (text: string) => {
+            copiedText = text
+          },
+        },
+      },
+    })
+
+    try {
+      const cleanup = openMermaidOverlay("<svg></svg>", null, "flowchart LR\n  A --> B")
+      expect(typeof cleanup).toBe("function")
+      const overlayEl = bodyEl.children[0]
+      const panelEl = overlayEl.children[0]
+      const actionsBarEl = panelEl.children[0]
+      const buttons = actionsBarEl.children as any[]
+      const copyBtn = buttons.find((b) => b.getAttribute("aria-label") === "Mermaid 원본 코드 복사")
+      expect(copyBtn).toBeDefined()
+      expect(copyBtn.textContent).toBe("코드 복사")
+      expect(buttons[buttons.length - 1].getAttribute("aria-label")).toBe("닫기")
+
+      copyBtn.trigger("click")
+      await Promise.resolve()
+      expect(copiedText).toBe("flowchart LR\n  A --> B")
+      expect(copyBtn.textContent).toBe("복사됨")
+      cleanup?.()
+    } finally {
+      if (prevDoc) {
+        Object.defineProperty(globalThis, "document", prevDoc)
+      } else {
+        delete (globalThis as Record<string, unknown>).document
+      }
+      if (prevNav) {
+        Object.defineProperty(globalThis, "navigator", prevNav)
+      } else {
+        delete (globalThis as Record<string, unknown>).navigator
+      }
+    }
   })
 })

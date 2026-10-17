@@ -5,12 +5,16 @@ const FOCUSABLE_SELECTOR =
 
 export const openMermaidOverlay = (
   svgMarkup: string,
-  previousCleanup?: (() => void) | null
+  previousCleanup?: (() => void) | null,
+  sourceText = ""
 ) => {
   if (typeof document === "undefined") return null
 
   previousCleanup?.()
-  const previousFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const previousFocusedElement =
+    typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
 
   const overlay = document.createElement("div")
   overlay.setAttribute("data-aq-mermaid-overlay", "true")
@@ -106,6 +110,27 @@ export const openMermaidOverlay = (
   actionsBar.appendChild(zoomOutButton)
   actionsBar.appendChild(zoomResetButton)
   actionsBar.appendChild(zoomInButton)
+
+  if (sourceText.trim()) {
+    const copySourceButton = createActionBtn("코드 복사", "Mermaid 원본 코드 복사")
+    copySourceButton.addEventListener("click", () => {
+      const writePromise =
+        typeof navigator !== "undefined" ? navigator.clipboard?.writeText(sourceText) : undefined
+      if (!writePromise) {
+        copySourceButton.textContent = "복사 실패"
+        return
+      }
+      void writePromise
+        .then(() => {
+          copySourceButton.textContent = "복사됨"
+        })
+        .catch(() => {
+          copySourceButton.textContent = "복사 실패"
+        })
+    })
+    actionsBar.appendChild(copySourceButton)
+  }
+
   actionsBar.appendChild(closeButton)
 
   panel.appendChild(actionsBar)
