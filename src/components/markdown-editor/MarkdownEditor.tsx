@@ -27,6 +27,7 @@ import {
 } from "./markdownEditorCommandRegistryModel"
 import {
   createMarkdownEditorTable,
+  getMarkdownEditorTableEditAvailability,
   isMarkdownEditorTableSelection,
   planMarkdownEditorTableEdit,
   type MarkdownEditorTableEdit,
@@ -319,21 +320,7 @@ export const MarkdownEditor = ({
       return null
     }
     const { from, to } = activeTableSelection
-    return {
-      addRow: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, TABLE_ADD_ROW_EDIT)),
-      deleteRow: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "delete-row" })),
-      addColumn: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "add-column" })),
-      deleteColumn: Boolean(planMarkdownEditorTableEdit(draftValue, from, to, { kind: "delete-column" })),
-      alignLeft: Boolean(
-        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "left" })
-      ),
-      alignCenter: Boolean(
-        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "center" })
-      ),
-      alignRight: Boolean(
-        planMarkdownEditorTableEdit(draftValue, from, to, { kind: "set-alignment", alignment: "right" })
-      ),
-    }
+    return getMarkdownEditorTableEditAvailability(draftValue, from, to)
   }, [activeTableSelection, disabled, draftValue])
 
   const isTableEditDisabled = (edit: MarkdownEditorTableEdit) => {
@@ -858,6 +845,7 @@ export const MarkdownEditor = ({
           ref={liveSurfaceRef}
           value={draftValue}
           disabled={disabled}
+          disableMermaid={disableMermaid}
           mode={viewMode}
           onToggleViewMode={cycleViewMode}
           ariaDescription={TEXTAREA_KEYBOARD_HELP}

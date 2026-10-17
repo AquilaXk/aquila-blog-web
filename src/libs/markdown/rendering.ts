@@ -44,11 +44,12 @@ export const resolveMarkdownRenderModel = ({
 }): MarkdownRenderModel => {
   const normalizedContent = normalizeMarkdownForRender(content || "")
   const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
-  const normalizedContentHtml = trustedContentHtml?.html.trim() || ""
-  const sanitizedContentHtml = filterTrustedPostImageHtml(normalizeContentHtmlForMermaid(normalizedContentHtml))
-
   // 원문 markdown이 있으면 interactive block 책임은 항상 클라이언트 markdown 파이프라인에 둔다.
-  const resolvedContentHtml = normalizedContent ? "" : sanitizedContentHtml
+  const resolvedContentHtml = normalizedContent
+    ? ""
+    : filterTrustedPostImageHtml(
+        normalizeContentHtmlForMermaid(trustedContentHtml?.html.trim() || "")
+      )
   const footnoteModel = resolvedContentHtml
     ? { footnotes: [], marker: "", segments: [] }
     : createDocumentFootnoteModel({ source: cleanedMarkdown, segments: parseMarkdownSegments(cleanedMarkdown) })

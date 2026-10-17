@@ -81,13 +81,20 @@ export const measureHybridRail = (
   }
 }
 
-export const applyHybridRail = (inner: HTMLElement | null, metrics: HybridRailMetrics) => {
+export const applyHybridRail = (
+  inner: HTMLElement | null,
+  metrics: HybridRailMetrics,
+  cachedTopOffset?: number
+) => {
   if (!inner || !metrics.enabled || !metrics.stickyBlocked) {
     clearInlineRailStyle(inner)
     return
   }
 
-  const topOffset = resolveRailTopOffset()
+  const topOffset =
+    typeof cachedTopOffset === "number" && Number.isFinite(cachedTopOffset)
+      ? cachedTopOffset
+      : resolveRailTopOffset()
   const startFixedScrollY = metrics.railTopDoc - topOffset
   const endFixedScrollY = metrics.articleBottomDoc - topOffset - metrics.innerHeight
 

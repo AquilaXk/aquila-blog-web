@@ -227,7 +227,7 @@ export const resolveFormatShortcut = (event: {
 
   if (!event.shiftKey && key === "i") return "italic"
   if (!event.shiftKey && key === "k") return "link"
-  if (!event.shiftKey && key === "e") return "inlineCode"
+  if (event.shiftKey && (key === "c" || key === "C")) return "inlineCode"
   if (event.shiftKey && (key === "x" || key === "X")) return "strikethrough"
   return null
 }

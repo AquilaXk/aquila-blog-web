@@ -12,6 +12,9 @@ interface MermaidEffectOptions {
   lazyViewport?: boolean
 }
 
+export const shouldScheduleMermaidResize = (lastWidth: number, nextWidth: number) =>
+  Math.abs(Math.floor(nextWidth) - Math.floor(lastWidth)) >= 2
+
 const useMermaidEffect = (
   rootRef?: RefObject<HTMLElement | null>,
   contentKey?: string,
@@ -123,7 +126,16 @@ const useMermaidEffect = (
         scheduleRun()
       }
     }
-    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleRun) : null
+    let lastObservedWidth = Math.floor(root.getBoundingClientRect().width)
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            const nextWidth = Math.floor(root.getBoundingClientRect().width)
+            if (!shouldScheduleMermaidResize(lastObservedWidth, nextWidth)) return
+            lastObservedWidth = nextWidth
+            scheduleRun()
+          })
+        : null
     resizeObserver?.observe(root)
     mutationObserver =
       observeMutations && typeof MutationObserver !== "undefined"

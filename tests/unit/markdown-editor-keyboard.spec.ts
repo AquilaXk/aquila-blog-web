@@ -62,9 +62,10 @@ test.describe("markdown editor keyboard model", () => {
     expect(resolveFormatShortcut({ key: "k", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })).toBe(
       "link"
     )
-    expect(resolveFormatShortcut({ key: "e", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })).toBe(
+    expect(resolveFormatShortcut({ key: "c", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })).toBe(
       "inlineCode"
     )
+    expect(resolveFormatShortcut({ key: "e", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })).toBeNull()
     expect(resolveFormatShortcut({ key: "x", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })).toBe(
       "strikethrough"
     )

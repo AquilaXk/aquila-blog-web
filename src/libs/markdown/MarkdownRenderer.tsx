@@ -1,4 +1,4 @@
-import { type CSSProperties, type FC, memo, useEffect, useMemo, useRef } from "react"
+import { type CSSProperties, type FC, type ReactNode, memo, useEffect, useMemo, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
@@ -53,6 +53,268 @@ const resolveMarkdownTableCellAlignment = (node: unknown, propAlignment: unknown
   return typeof alignment === "string" ? alignment : undefined
 }
 
+const REMARK_PLUGINS_DEFAULT = [remarkGfm]
+const REMARK_PLUGINS_MATH = [remarkGfm, remarkMath]
+const REHYPE_PLUGINS_DEFAULT: never[] = []
+const REHYPE_PLUGINS_MATH = [rehypeKatex]
+
+export const createMarkdownComponentVariants = ({
+  footnotes,
+  footnoteMarker,
+  tableLayouts,
+  tableRenderIndexRef,
+  imageRenderOrderRef,
+}: {
+  footnotes: ReturnType<typeof resolveMarkdownRenderModel>["footnotes"]
+  footnoteMarker: string
+  tableLayouts: ReturnType<typeof resolveMarkdownRenderModel>["tableLayouts"]
+  tableRenderIndexRef: { current: number }
+  imageRenderOrderRef: { current: number }
+}) => {
+  const sharedComponents: Record<string, unknown> = {
+    blockquote({ children }: { children?: ReactNode }) {
+      return <MarkdownBlockquote>{children}</MarkdownBlockquote>
+    },
+    table({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) {
+      const layout = tableLayouts[tableRenderIndexRef.current] || null
+      tableRenderIndexRef.current += 1
+      return (
+        <MarkdownTableRenderer layout={layout} {...props}>
+          {children}
+        </MarkdownTableRenderer>
+      )
+    },
+    tr({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) {
+      return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
+    },
+    th({
+      children,
+      node,
+      ...props
+    }: {
+      children?: ReactNode
+      node?: unknown
+      align?: unknown
+      style?: unknown
+      className?: string
+    }) {
+      return (
+        <MarkdownTableCellRenderer
+          as="th"
+          alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
+          className={props.className}
+        >
+          {children}
+        </MarkdownTableCellRenderer>
+      )
+    },
+    td({
+      children,
+      node,
+      ...props
+    }: {
+      children?: ReactNode
+      node?: unknown
+      align?: unknown
+      style?: unknown
+      className?: string
+    }) {
+      return (
+        <MarkdownTableCellRenderer
+          as="td"
+          alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
+          className={props.className}
+        >
+          {children}
+        </MarkdownTableCellRenderer>
+      )
+    },
+    img({ src, alt }: { src?: string; alt?: string }) {
+      const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
+      if (!imageSrc) {
+        const blockedLabel = alt || "차단된 이미지"
+        return (
+          <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>
+            {blockedLabel}
+          </span>
+        )
+      }
+      const isFirstImage = imageRenderOrderRef.current === 0
+      imageRenderOrderRef.current += 1
+
+      let imgWidth: number | undefined
+      let imgHeight: number | undefined
+      try {
+        const parsed = new URL(imageSrc, "https://dummy.local")
+        const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
+        const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
+        if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
+        if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
+      } catch {}
+
+      const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
+
+      return (
+        <figure
+          className="aq-image-frame"
+          style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageSrc}
+            alt={alt || ""}
+            width={imgWidth}
+            height={imgHeight}
+            style={aspectRatio ? { aspectRatio } : undefined}
+            loading={isFirstImage ? "eager" : "lazy"}
+            fetchPriority={isFirstImage ? "high" : undefined}
+            decoding="async"
+          />
+          {alt ? <figcaption>{alt}</figcaption> : null}
+        </figure>
+      )
+    },
+    a({
+      children,
+      href,
+      title,
+      node: _node,
+      ...props
+    }: {
+      children?: ReactNode
+      href?: string
+      title?: string
+      node?: unknown
+    } & Record<string, unknown>) {
+      return (
+        <MarkdownFootnoteReferenceLink
+          footnotes={footnotes}
+          marker={footnoteMarker}
+          href={href}
+          title={title}
+          {...props}
+        >
+          {children}
+        </MarkdownFootnoteReferenceLink>
+      )
+    },
+    code({
+      node,
+      className,
+      children,
+      ...props
+    }: {
+      node?: unknown
+      className?: string
+      children?: ReactNode
+    } & Record<string, unknown>) {
+      const rawFromChildren =
+        typeof children === "string"
+          ? children
+          : Array.isArray(children)
+            ? children
+                .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+                .join("\n")
+            : extractTextFromMarkdownNode(children)
+      const raw = rawFromChildren || extractTextFromCodeAst(node)
+      const isInlineCode = !className && !raw.includes("\n")
+
+      if (isInlineCode) {
+        return (
+          <code className="aq-inline-code" {...props}>
+            {children}
+          </code>
+        )
+      }
+
+      return (
+        <code className={className} data-raw-code={raw} {...props}>
+          {children}
+        </code>
+      )
+    },
+    pre({
+      node,
+      children,
+      className: _className,
+      ...props
+    }: {
+      node?: unknown
+      children?: ReactNode
+      className?: string
+    } & Record<string, unknown>) {
+      const { language, title, rawCode } = extractCodeMetaFromPreChildren(children, node)
+      const mermaidSource = extractNormalizedMermaidSource(rawCode)
+      const shouldRenderMermaid = language === "mermaid" || isMermaidSource(rawCode)
+
+      if (shouldRenderMermaid) {
+        return (
+          <pre
+            className="aq-mermaid"
+            data-aq-mermaid="true"
+            data-mermaid-rendered="pending"
+            data-mermaid-source={mermaidSource || rawCode}
+          >
+            <code className="language-mermaid">{mermaidSource || rawCode}</code>
+          </pre>
+        )
+      }
+
+      const mergedClassName = "aq-code aq-pretty-pre"
+      const initialCodePresentation = renderImmediateCodeToHtml({
+        source: rawCode,
+        language,
+      })
+
+      return (
+        <PrettyCodeBlock
+          language={initialCodePresentation.language}
+          title={title}
+          rawCode={rawCode}
+          preElement={
+            <pre {...props} className={mergedClassName}>
+              <code
+                className={`language-${initialCodePresentation.language}`}
+                data-language={initialCodePresentation.language}
+                data-prism-language={initialCodePresentation.language}
+                data-prism-source={rawCode}
+                data-raw-code={rawCode}
+                dangerouslySetInnerHTML={{ __html: initialCodePresentation.html }}
+              />
+            </pre>
+          }
+        />
+      )
+    },
+  }
+
+  const defaultComponents = {
+    ...sharedComponents,
+    p({ children }: { children?: ReactNode }) {
+      return <MarkdownParagraph inCallout={false}>{children}</MarkdownParagraph>
+    },
+  }
+  const calloutComponents = {
+    ...sharedComponents,
+    p({ children }: { children?: ReactNode }) {
+      return <MarkdownParagraph inCallout={true}>{children}</MarkdownParagraph>
+    },
+  }
+  const inlineComponents = {
+    ...sharedComponents,
+    p({ children }: { children?: ReactNode }) {
+      return <>{children}</>
+    },
+  }
+
+  return {
+    getComponents(inCallout = false, inlineOnly = false) {
+      if (inlineOnly) return inlineComponents
+      return inCallout ? calloutComponents : defaultComponents
+    },
+  }
+}
+
 const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   content,
   trustedContentHtml,
@@ -63,6 +325,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
 }) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const imageRenderOrderRef = useRef(0)
+  const tableRenderIndexRef = useRef(0)
   const renderModel = useMemo(
     () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
     [content, trustedContentHtml]
@@ -84,177 +347,32 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     imageRenderOrderRef.current = 0
   }, [renderKey])
 
-  let tableRenderIndex = 0
+  const componentVariants = useMemo(
+    () =>
+      createMarkdownComponentVariants({
+        footnotes,
+        footnoteMarker,
+        tableLayouts,
+        tableRenderIndexRef,
+        imageRenderOrderRef,
+      }),
+    [footnoteMarker, footnotes, tableLayouts]
+  )
+
+  tableRenderIndexRef.current = 0
+  imageRenderOrderRef.current = 0
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
     const hasMath = markdown.includes("$")
     return (
       <ReactMarkdown
         key={key}
-        remarkPlugins={hasMath ? [remarkGfm, remarkMath] : [remarkGfm]}
-        rehypePlugins={hasMath ? [rehypeKatex] : []}
-        components={{
-          p({ children }) {
-            if (inlineOnly) return <>{children}</>
-            return <MarkdownParagraph inCallout={inCallout}>{children}</MarkdownParagraph>
-          },
-          blockquote({ children }) {
-            return <MarkdownBlockquote>{children}</MarkdownBlockquote>
-          },
-          table({ children, ...props }) {
-            const layout = tableLayouts[tableRenderIndex] || null
-            tableRenderIndex += 1
-            return (
-              <MarkdownTableRenderer layout={layout} {...props}>
-                {children}
-              </MarkdownTableRenderer>
-            )
-          },
-          tr({ children, ...props }) {
-            return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
-          },
-          th({ children, node, ...props }) {
-            return (
-              <MarkdownTableCellRenderer
-                as="th"
-                alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-                className={props.className}
-              >
-                {children}
-              </MarkdownTableCellRenderer>
-            )
-          },
-          td({ children, node, ...props }) {
-            return (
-              <MarkdownTableCellRenderer
-                as="td"
-                alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-                className={props.className}
-              >
-                {children}
-              </MarkdownTableCellRenderer>
-            )
-          },
-          img({ src, alt }) {
-            const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
-            if (!imageSrc) {
-              const blockedLabel = alt || "차단된 이미지"
-              return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
-            }
-            const isFirstImage = imageRenderOrderRef.current === 0
-            imageRenderOrderRef.current += 1
-
-            let imgWidth: number | undefined
-            let imgHeight: number | undefined
-            try {
-              const parsed = new URL(imageSrc, "https://dummy.local")
-              const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
-              const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
-              if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
-              if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
-            } catch {}
-
-            const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
-
-            return (
-              <figure
-                className="aq-image-frame"
-                style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageSrc}
-                  alt={alt || ""}
-                  width={imgWidth}
-                  height={imgHeight}
-                  style={aspectRatio ? { aspectRatio } : undefined}
-                  loading={isFirstImage ? "eager" : "lazy"}
-                  fetchPriority={isFirstImage ? "high" : undefined}
-                  decoding="async"
-                />
-                {alt ? <figcaption>{alt}</figcaption> : null}
-              </figure>
-            )
-          },
-        a({ children, href, title, node: _node, ...props }) {
-          return (
-            <MarkdownFootnoteReferenceLink footnotes={footnotes} marker={footnoteMarker} href={href} title={title} {...props}>
-              {children}
-            </MarkdownFootnoteReferenceLink>
-          )
-        },
-        code({ node, className, children, ...props }) {
-          const rawFromChildren =
-            typeof children === "string"
-              ? children
-              : Array.isArray(children)
-                ? children.map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : "")).join("\n")
-                : extractTextFromMarkdownNode(children)
-          const raw = rawFromChildren || extractTextFromCodeAst(node)
-          const isInlineCode = !className && !raw.includes("\n")
-
-          if (isInlineCode) {
-            return (
-              <code className="aq-inline-code" {...props}>
-                {children}
-              </code>
-            )
-          }
-
-          return (
-            <code className={className} data-raw-code={raw} {...props}>
-              {children}
-            </code>
-          )
-        },
-        pre({ node, children, className: _className, ...props }) {
-          const { language, title, rawCode } = extractCodeMetaFromPreChildren(children, node)
-          const mermaidSource = extractNormalizedMermaidSource(rawCode)
-          const shouldRenderMermaid = language === "mermaid" || isMermaidSource(rawCode)
-
-          if (shouldRenderMermaid) {
-            return (
-              <pre
-                className="aq-mermaid"
-                data-aq-mermaid="true"
-                data-mermaid-rendered="pending"
-                data-mermaid-source={mermaidSource || rawCode}
-              >
-                <code className="language-mermaid">{mermaidSource || rawCode}</code>
-              </pre>
-            )
-          }
-
-          const mergedClassName = "aq-code aq-pretty-pre"
-          const initialCodePresentation = renderImmediateCodeToHtml({
-            source: rawCode,
-            language,
-          })
-
-          return (
-            <PrettyCodeBlock
-              language={initialCodePresentation.language}
-              title={title}
-              rawCode={rawCode}
-              preElement={
-                <pre {...props} className={mergedClassName}>
-                  <code
-                    className={`language-${initialCodePresentation.language}`}
-                    data-language={initialCodePresentation.language}
-                    data-prism-language={initialCodePresentation.language}
-                    data-prism-source={rawCode}
-                    data-raw-code={rawCode}
-                    dangerouslySetInnerHTML={{ __html: initialCodePresentation.html }}
-                  />
-                </pre>
-              }
-            />
-          )
-        },
-      }}
-    >
-      {markdown}
-    </ReactMarkdown>
+        remarkPlugins={hasMath ? REMARK_PLUGINS_MATH : REMARK_PLUGINS_DEFAULT}
+        rehypePlugins={hasMath ? REHYPE_PLUGINS_MATH : REHYPE_PLUGINS_DEFAULT}
+        components={componentVariants.getComponents(inCallout, inlineOnly)}
+      >
+        {markdown}
+      </ReactMarkdown>
     )
   }
 

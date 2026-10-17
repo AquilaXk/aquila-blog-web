@@ -188,4 +188,4 @@ const PostHeader: React.FC<Props> = ({
   )
 }
 
-export default PostHeader
+export default React.memo(PostHeader)

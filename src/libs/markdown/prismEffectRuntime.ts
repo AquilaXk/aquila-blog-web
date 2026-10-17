@@ -107,9 +107,16 @@ export const createPrismEffectRuntime = ({
     return targets
   }
 
+  const isMermaidCodeBlock = (block: HTMLElement) =>
+    block.classList.contains("language-mermaid") ||
+    block.getAttribute("data-language") === "mermaid" ||
+    Boolean(
+      block.closest("pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']")
+    )
+
   const hasCodeBlockMissingLineWrappers = () =>
     Array.from(root.querySelectorAll<HTMLElement>("pre > code")).some(
-      (block) => !block.querySelector("[data-line]")
+      (block) => !isMermaidCodeBlock(block) && !block.querySelector("[data-line]")
     )
 
   const highlightCodeBlocks = async (codeBlocks: HTMLElement[]) => {

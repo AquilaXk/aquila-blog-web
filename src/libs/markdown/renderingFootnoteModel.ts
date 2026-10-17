@@ -143,7 +143,9 @@ export const createDocumentFootnoteModel = ({
 
   const parsedSegments: ParsedSegment[] = segments.flatMap((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return []
-    return [{ index, segment, tree: parseMarkdownAst(segment.content) }]
+    const { content } = segment
+    if (!content.includes("[^")) return []
+    return [{ index, segment, tree: parseMarkdownAst(content) }]
   })
   const footnoteDefinitions = new Map<string, DefinitionRecord>()
   const ordinaryDefinitions = new Map<string, DefinitionRecord>()
@@ -165,7 +167,8 @@ export const createDocumentFootnoteModel = ({
   }
 
   const { combinedSource, ranges } = buildCombinedSource(parsedSegments)
-  const combinedTree = parseMarkdownAst(combinedSource)
+  const combinedTree =
+    parsedSegments.length === 1 ? parsedSegments[0].tree : parseMarkdownAst(combinedSource)
   let rangeCursor = 0
   visitRootVisibleNodes(combinedTree, (node) => {
     if (node.type !== "footnoteReference" || !node.identifier) return
@@ -245,7 +248,9 @@ export const createDocumentFootnoteModel = ({
 
   const transformedSegments = segments.map((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return segment
-    return { ...segment, content: applySourcePatches(segment.content, patchesBySegment.get(index) || []) }
+    const patches = patchesBySegment.get(index)
+    if (!patches || patches.length === 0) return { ...segment }
+    return { ...segment, content: applySourcePatches(segment.content, patches) }
   })
   const immutableFootnotes = Object.freeze(
     footnotes.map((footnote) => Object.freeze({ ...footnote, referenceIds: Object.freeze([...footnote.referenceIds]) }))

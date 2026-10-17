@@ -54,6 +54,9 @@ export const markdownEditorCommands = [
   },
 ] as const satisfies readonly MarkdownEditorCommandDescriptor[]
 
+export const INLINE_CODE_SHORTCUT = "Mod+Shift+C" as const
+export const VIEW_MODE_CYCLE_SHORTCUT = "Mod+E" as const
+
 export const validateMarkdownEditorCommands = (commands: readonly MarkdownEditorCommandDescriptor[]) => {
   const ids = new Set<string>()
   const shortcuts = new Set<string>()
@@ -63,6 +66,9 @@ export const validateMarkdownEditorCommands = (commands: readonly MarkdownEditor
     ids.add(command.id)
 
     if (command.shortcut) {
+      if ((command.shortcut as string) === VIEW_MODE_CYCLE_SHORTCUT) {
+        throw new Error(`Reserved shortcut: ${command.shortcut}`)
+      }
       if (shortcuts.has(command.shortcut)) throw new Error(`Duplicate command shortcut: ${command.shortcut}`)
       shortcuts.add(command.shortcut)
     }

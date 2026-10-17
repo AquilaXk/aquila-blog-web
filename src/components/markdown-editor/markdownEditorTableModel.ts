@@ -38,9 +38,21 @@ type ActiveTable = {
 }
 
 const MIN_ROWS = 2
-const MAX_ROWS = 6
+const MAX_CREATE_ROWS = 6
 const MIN_CREATE_COLUMNS = 2
-const MAX_COLUMNS = 6
+const MAX_CREATE_COLUMNS = 6
+export const MAX_EDIT_ROWS = 200
+export const MAX_EDIT_COLUMNS = 32
+
+export type MarkdownEditorTableEditAvailability = {
+  addRow: boolean
+  deleteRow: boolean
+  addColumn: boolean
+  deleteColumn: boolean
+  alignLeft: boolean
+  alignCenter: boolean
+  alignRight: boolean
+}
 
 const isEscapedPipe = (value: string, index: number) => {
   let backslashes = 0
@@ -85,33 +97,79 @@ const parseDelimiterAlignment = (value: string): MarkdownEditorTableAlignment | 
   return value.endsWith(":") ? "right" : "left"
 }
 
-const lineBounds = (value: string) => {
-  const lines: Array<{ text: string; start: number; end: number }> = []
-  let start = 0
-  for (let index = 0; index <= value.length; index += 1) {
-    if (index === value.length || value[index] === "\n") {
-      lines.push({ text: value.slice(start, index), start, end: index })
-      start = index + 1
+const collectLocalLineWindow = (
+  value: string,
+  offset: number,
+  maxLinesEachWay: number
+) => {
+  const clamped = Math.max(0, Math.min(offset, value.length))
+  const cursorLineStart = clamped === 0 ? 0 : value.lastIndexOf("\n", clamped - 1) + 1
+  const cursorNextBreak = value.indexOf("\n", clamped)
+  const cursorLineEnd = cursorNextBreak === -1 ? value.length : cursorNextBreak
+  const cursorLineText = value.slice(cursorLineStart, cursorLineEnd)
+
+  if (!cursorLineText.startsWith("|") || !cursorLineText.endsWith("|")) {
+    return []
+  }
+
+  const before: Array<{ text: string; start: number; end: number }> = []
+  let scanStart = cursorLineStart
+  for (let count = 0; count < maxLinesEachWay && scanStart > 0; count += 1) {
+    const lineEnd = scanStart - 1
+    const lineStart = lineEnd === 0 ? 0 : value.lastIndexOf("\n", lineEnd - 1) + 1
+    const text = value.slice(lineStart, lineEnd)
+    before.push({ text, start: lineStart, end: lineEnd })
+    scanStart = lineStart
+    if (!text.startsWith("|") && !isMetadataLine(text)) {
+      break
     }
   }
-  return lines
+  before.reverse()
+
+  const after: Array<{ text: string; start: number; end: number }> = []
+  let scanEnd = cursorLineEnd
+  for (let count = 0; count < maxLinesEachWay && scanEnd < value.length; count += 1) {
+    const lineStart = scanEnd + 1
+    const nextBreak = value.indexOf("\n", lineStart)
+    const lineEnd = nextBreak === -1 ? value.length : nextBreak
+    const text = value.slice(lineStart, lineEnd)
+    after.push({ text, start: lineStart, end: lineEnd })
+    scanEnd = lineEnd
+    if (!text.startsWith("|")) {
+      break
+    }
+  }
+
+  return [
+    ...before,
+    { text: cursorLineText, start: cursorLineStart, end: cursorLineEnd },
+    ...after,
+  ]
 }
 
 const isOffsetInsideFencedCode = (value: string, offset: number) => {
+  const limit = Math.max(0, Math.min(offset, value.length))
   let marker = ""
   let length = 0
-  for (const line of lineBounds(value.slice(0, Math.max(0, Math.min(offset, value.length))))) {
-    const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line.text)
-    if (!match) continue
-    const fence = match[2] ?? ""
-    const info = match[3] ?? ""
-    if (marker === "") {
-      marker = fence[0] ?? ""
-      length = fence.length
-    } else if (fence[0] === marker && fence.length >= length && info.trim() === "") {
-      marker = ""
-      length = 0
+  let lineStart = 0
+  while (lineStart <= limit) {
+    const nextBreak = value.indexOf("\n", lineStart)
+    const lineEnd = nextBreak === -1 || nextBreak > limit ? limit : nextBreak
+    const lineText = value.slice(lineStart, lineEnd)
+    const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(lineText)
+    if (match) {
+      const fence = match[2] ?? ""
+      const info = match[3] ?? ""
+      if (marker === "") {
+        marker = fence[0] ?? ""
+        length = fence.length
+      } else if (fence[0] === marker && fence.length >= length && info.trim() === "") {
+        marker = ""
+        length = 0
+      }
     }
+    if (nextBreak === -1 || nextBreak >= limit) break
+    lineStart = nextBreak + 1
   }
   return marker !== ""
 }
@@ -122,8 +180,10 @@ const findCellAtOffset = (row: TableRow, offset: number) =>
   row.cells.findIndex((cell) => offset >= cell.contextStart && offset <= cell.contextEnd)
 
 const findActiveTable = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
-  if (selectionStart !== selectionEnd || isOffsetInsideFencedCode(value, selectionStart)) return null
-  const lines = lineBounds(value)
+  if (selectionStart !== selectionEnd) return null
+  const lines = collectLocalLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
+  if (lines.length < 3) return null
+  if (isOffsetInsideFencedCode(value, selectionStart)) return null
 
   for (let headerIndex = 0; headerIndex + 2 < lines.length; headerIndex += 1) {
     const headerLine = lines[headerIndex]!
@@ -143,7 +203,7 @@ const findActiveTable = (value: string, selectionStart: number, selectionEnd: nu
       if (!cells || cells.length !== headerCells.length) break
       body.push({ cells, start: line.start, end: line.end })
     }
-    if (body.length === 0 || headerCells.length > MAX_COLUMNS || body.length + 1 > MAX_ROWS) continue
+    if (body.length === 0 || headerCells.length > MAX_EDIT_COLUMNS || body.length + 1 > MAX_EDIT_ROWS) continue
 
     const header: TableRow = { cells: headerCells, start: headerLine.start, end: headerLine.end }
     const rows = [header, ...body]
@@ -206,9 +266,9 @@ export const createMarkdownEditorTable = (rows: number, columns: number): Markdo
     !Number.isInteger(rows) ||
     !Number.isInteger(columns) ||
     rows < MIN_ROWS ||
-    rows > MAX_ROWS ||
+    rows > MAX_CREATE_ROWS ||
     columns < MIN_CREATE_COLUMNS ||
-    columns > MAX_COLUMNS
+    columns > MAX_CREATE_COLUMNS
   ) {
     return null
   }
@@ -228,7 +288,7 @@ export const planMarkdownEditorTableEdit = (
   if (!table) return null
 
   if (edit.kind === "add-row") {
-    if (table.body.length + 2 > MAX_ROWS) return null
+    if (table.body.length + 2 > MAX_EDIT_ROWS) return null
     const insertAt = Math.max(0, table.activeRow)
     table.body.splice(insertAt, 0, {
       cells: table.header.cells.map(() => ({
@@ -252,7 +312,7 @@ export const planMarkdownEditorTableEdit = (
   }
 
   if (edit.kind === "add-column") {
-    if (table.header.cells.length >= MAX_COLUMNS) return null
+    if (table.header.cells.length >= MAX_EDIT_COLUMNS) return null
     const insertAt = table.activeColumn + 1
     const emptyCell = () => ({
       value: "",
@@ -280,6 +340,24 @@ export const planMarkdownEditorTableEdit = (
   return planForTable(table, table.activeRow, table.activeColumn)
 }
 
+export const getMarkdownEditorTableEditAvailability = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): MarkdownEditorTableEditAvailability | null => {
+  const table = findActiveTable(value, selectionStart, selectionEnd)
+  if (!table) return null
+  return {
+    addRow: table.body.length + 2 <= MAX_EDIT_ROWS,
+    deleteRow: table.activeRow > 0 && table.body.length + 1 > MIN_ROWS,
+    addColumn: table.header.cells.length < MAX_EDIT_COLUMNS,
+    deleteColumn: table.header.cells.length > 1,
+    alignLeft: true,
+    alignCenter: true,
+    alignRight: true,
+  }
+}
+
 export const isMarkdownEditorTableSelection = (
   value: string,
   selectionStart: number,
@@ -300,7 +378,7 @@ export const planMarkdownEditorTableTab = (
   if (target >= 0 && target < totalRows * table.header.cells.length) {
     return planForTable(table, Math.floor(target / table.header.cells.length), target % table.header.cells.length)
   }
-  if (direction === "previous" || totalRows >= MAX_ROWS) return null
+  if (direction === "previous" || totalRows >= MAX_EDIT_ROWS) return null
   table.body.push({
     cells: table.header.cells.map(() => ({
       value: "",

@@ -65,6 +65,7 @@ import {
   MarkdownImageWidget,
   MarkdownMarkerWidget,
   MarkdownMathWidget,
+  MarkdownMermaidWidget,
   MarkdownRuleWidget,
   MarkdownTableWidget,
   MarkdownTaskWidget,
@@ -84,6 +85,7 @@ type MarkdownEditorSnapshot = {
 type MarkdownEditorLiveSurfaceProps = {
   value: string
   disabled: boolean
+  disableMermaid?: boolean
   mode?: "live" | "source" | "reading"
   ariaDescription: string
   onToggleViewMode?: () => void
@@ -121,11 +123,12 @@ export type MarkdownEditorLiveSurfaceHandle = {
 
 const externalDocumentChange = Annotation.define<boolean>()
 const preserveUploadError = Annotation.define<boolean>()
-const setComposition = StateEffect.define<boolean>()
+export const setComposition = StateEffect.define<boolean>()
 const setPointerSelecting = StateEffect.define<boolean>()
 const setEditorMode = StateEffect.define<"live" | "source" | "reading">()
+export const setDisableMermaid = StateEffect.define<boolean>()
 
-const compositionField = StateField.define<boolean>({
+export const compositionField = StateField.define<boolean>({
   create: () => false,
   update: (composing, transaction) => {
     for (const effect of transaction.effects) {
@@ -135,7 +138,7 @@ const compositionField = StateField.define<boolean>({
   },
 })
 
-const pointerSelectingField = StateField.define<boolean>({
+export const pointerSelectingField = StateField.define<boolean>({
   create: () => false,
   update: (selecting, transaction) => {
     for (const effect of transaction.effects) {
@@ -145,13 +148,23 @@ const pointerSelectingField = StateField.define<boolean>({
   },
 })
 
-const editorModeField = StateField.define<"live" | "source" | "reading">({
+export const editorModeField = StateField.define<"live" | "source" | "reading">({
   create: () => "live",
   update: (mode, transaction) => {
     for (const effect of transaction.effects) {
       if (effect.is(setEditorMode)) return effect.value
     }
     return mode
+  },
+})
+
+export const disableMermaidField = StateField.define<boolean>({
+  create: () => false,
+  update: (disabled, transaction) => {
+    for (const effect of transaction.effects) {
+      if (effect.is(setDisableMermaid)) return effect.value
+    }
+    return disabled
   },
 })
 
@@ -172,6 +185,7 @@ type TableReplacementSpec = RangeSpec & { markdown: string }
 type CalloutReplacementSpec = RangeSpec & { type: string; title: string; content: string }
 type ImageReplacementSpec = RangeSpec & { alt: string; src: string }
 type MathReplacementSpec = RangeSpec & { math: string; displayMode: boolean }
+type MermaidReplacementSpec = RangeSpec & { source: string }
 
 let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
 const getDocString = (doc: EditorState["doc"]): string => {
@@ -183,6 +197,29 @@ const getDocString = (doc: EditorState["doc"]): string => {
   return text
 }
 
+export const computeMinimalDocChange = (current: string, next: string) => {
+  let from = 0
+  const minLen = Math.min(current.length, next.length)
+  while (from < minLen && current.charCodeAt(from) === next.charCodeAt(from)) {
+    from += 1
+  }
+  let currentEnd = current.length
+  let nextEnd = next.length
+  while (
+    currentEnd > from &&
+    nextEnd > from &&
+    current.charCodeAt(currentEnd - 1) === next.charCodeAt(nextEnd - 1)
+  ) {
+    currentEnd -= 1
+    nextEnd -= 1
+  }
+  return {
+    from,
+    to: currentEnd,
+    insert: next.slice(from, nextEnd),
+  }
+}
+
 let cachedDocBlocksEntry: {
   doc: EditorState["doc"]
   tree: ReturnType<typeof syntaxTree>
@@ -191,6 +228,7 @@ let cachedDocBlocksEntry: {
   callouts: CalloutReplacementSpec[]
   images: ImageReplacementSpec[]
   maths: MathReplacementSpec[]
+  mermaids: MermaidReplacementSpec[]
 } | null = null
 
 const getCachedDocBlocks = (state: EditorState) => {
@@ -207,6 +245,7 @@ const getCachedDocBlocks = (state: EditorState) => {
   const tables: TableReplacementSpec[] = []
   const callouts: CalloutReplacementSpec[] = []
   const images: ImageReplacementSpec[] = []
+  const mermaids: MermaidReplacementSpec[] = []
 
   tree.iterate({
     enter(node) {
@@ -241,6 +280,22 @@ const getCachedDocBlocks = (state: EditorState) => {
             src: match[2] ?? "",
           })
         }
+      } else if (node.name === "FencedCode") {
+        const raw = markdownValue.slice(node.from, node.to)
+        const lines = raw.split(/\r?\n/)
+        const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(lines[0] ?? "")
+        const closeLine = lines[lines.length - 1] ?? ""
+        if (
+          openMatch &&
+          lines.length >= 2 &&
+          /^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)
+        ) {
+          mermaids.push({
+            from: node.from,
+            to: node.to,
+            source: lines.slice(1, -1).join("\n"),
+          })
+        }
       }
     },
   })
@@ -266,22 +321,26 @@ const getCachedDocBlocks = (state: EditorState) => {
     callouts,
     images,
     maths,
+    mermaids,
   }
   return cachedDocBlocksEntry
 }
 
-const buildDecorations = (state: EditorState): DecorationSet => {
-  const currentMode = state.field(editorModeField)
-  if (currentMode === "source" || state.field(compositionField)) {
+export const buildDecorations = (state: EditorState): DecorationSet => {
+  const currentMode = state.field(editorModeField, false) ?? "live"
+  if (currentMode === "source") {
     return Decoration.none
   }
 
-  const { markdownValue, tree, tables, callouts, images, maths } = getCachedDocBlocks(state)
+  const { markdownValue, tree, tables, callouts, images, maths, mermaids } =
+    getCachedDocBlocks(state)
   const selections = state.selection.ranges.map(({ from, to }) => ({ from, to }))
-  const isComposing = state.field(compositionField)
+  const isComposing = state.field(compositionField, false) ?? false
+  const disableMermaid = state.field(disableMermaidField, false) ?? false
   const compSel = state.selection.main
-  const compFrom = compSel.from
-  const compTo = compSel.to
+  const compLine = isComposing ? state.doc.lineAt(compSel.head) : null
+  const compFrom = compLine ? Math.min(compSel.from, compLine.from) : compSel.from
+  const compTo = compLine ? Math.max(compSel.to, compLine.to) : compSel.to
 
   const isEligibleReplacement = (from: number, to: number) =>
     !isTokenActive(from, to, selections) && !(isComposing && compFrom <= to && compTo >= from)
@@ -290,12 +349,16 @@ const buildDecorations = (state: EditorState): DecorationSet => {
   const calloutReplacements = callouts.filter((item) => isEligibleReplacement(item.from, item.to))
   const imageReplacements = images.filter((item) => isEligibleReplacement(item.from, item.to))
   const mathReplacements = maths.filter((item) => isEligibleReplacement(item.from, item.to))
+  const mermaidReplacements = disableMermaid
+    ? []
+    : mermaids.filter((item) => isEligibleReplacement(item.from, item.to))
 
   const replacedRanges = [
     ...tableReplacements,
     ...calloutReplacements,
     ...imageReplacements,
     ...mathReplacements,
+    ...mermaidReplacements,
   ]
 
   const isOverlappedByWidget = (from: number, to: number) =>
@@ -315,6 +378,7 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     if (isOverlappedByWidget(spec.from, spec.to)) continue
 
     const isUnderComposition = isComposing && compFrom <= spec.to && compTo >= spec.from
+    if (isUnderComposition) continue
 
     if (
       spec.kind === "hide-mark" &&
@@ -453,6 +517,14 @@ const buildDecorations = (state: EditorState): DecorationSet => {
     )
   }
 
+  for (const mermaid of mermaidReplacements) {
+    decorations.push(
+      Decoration.replace({
+        widget: new MarkdownMermaidWidget(mermaid.source, mermaid.from),
+      }).range(mermaid.from, mermaid.to)
+    )
+  }
+
   return Decoration.set(decorations, true)
 }
 
@@ -469,7 +541,8 @@ const decorationField = StateField.define<DecorationSet>({
         (effect) =>
           effect.is(setComposition) ||
           effect.is(setPointerSelecting) ||
-          effect.is(setEditorMode)
+          effect.is(setEditorMode) ||
+          effect.is(setDisableMermaid)
       )
       ? buildDecorations(transaction.state)
       : decorations.map(transaction.changes)
@@ -698,6 +771,31 @@ const liveSurfaceTheme = EditorView.theme({
     backgroundColor: "rgba(128, 128, 128, 0.1)",
     fontWeight: "600",
   },
+  ".cm-live-mermaid": {
+    margin: "12px 0",
+    padding: "12px 16px",
+    borderRadius: "6px",
+    border: "1px solid rgba(128, 128, 128, 0.24)",
+    overflowX: "auto",
+    cursor: "pointer",
+  },
+  ".cm-live-mermaid svg": {
+    display: "block",
+    maxWidth: "100%",
+    height: "auto",
+    margin: "0 auto",
+  },
+  ".cm-live-mermaid-error": {
+    fontSize: "12px",
+    fontWeight: "600",
+    marginBottom: "6px",
+    opacity: 0.85,
+  },
+  ".cm-live-mermaid-fallback": {
+    margin: "0",
+    fontSize: "13px",
+    whiteSpace: "pre-wrap",
+  },
   "@media (max-width: 820px)": {
     ".cm-content": { padding: "18px 16px 32px 16px", maxWidth: "100%" },
   },
@@ -710,6 +808,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
   {
     value,
     disabled,
+    disableMermaid = false,
     mode = "live",
     ariaDescription,
     onToggleViewMode,
@@ -731,7 +830,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onToggleViewModeRef = useRef(onToggleViewMode)
   const editableCompartmentRef = useRef(new Compartment())
   const historyCompartmentRef = useRef(new Compartment())
-  const initialStateRef = useRef({ value, disabled, ariaDescription })
+  const initialStateRef = useRef({ value, disabled, disableMermaid, ariaDescription })
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
   onRequestFocusTitleRef.current = onRequestFocusTitle
@@ -807,6 +906,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         compositionField,
         pointerSelectingField,
         editorModeField,
+        disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         decorationField,
         liveSurfaceTheme,
         EditorView.contentAttributes.of({
@@ -903,24 +1003,29 @@ export const MarkdownEditorLiveSurface = forwardRef<
     view.dispatch({ effects: setEditorMode.of(mode) })
   }, [mode])
 
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: setDisableMermaid.of(Boolean(disableMermaid)) })
+  }, [disableMermaid])
+
   // CM6 Undo/Redo preservation: external doc sync without clearing history
   useEffect(() => {
     const view = viewRef.current
-    if (!view || getDocString(view.state.doc) === value) return
+    if (!view) return
+    const currentDoc = getDocString(view.state.doc)
+    if (currentDoc === value) return
     const selection = view.state.selection.main
     const nextAnchor = Math.min(selection.anchor, value.length)
     const nextHead = Math.min(selection.head, value.length)
-    const historyCompartment = historyCompartmentRef.current
     view.dispatch({
       annotations: [
         externalDocumentChange.of(true),
         Transaction.addToHistory.of(false),
       ],
-      effects: historyCompartment.reconfigure([]),
-      changes: { from: 0, to: view.state.doc.length, insert: value },
+      changes: computeMinimalDocChange(currentDoc, value),
       selection: EditorSelection.range(nextAnchor, nextHead),
     })
-    view.dispatch({ effects: historyCompartment.reconfigure(history()) })
   }, [value])
 
   useImperativeHandle(

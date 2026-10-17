@@ -3,6 +3,7 @@ import { history, undo, undoDepth } from "@codemirror/commands"
 import { Compartment, EditorState, Transaction } from "@codemirror/state"
 import { readFileSync } from "fs"
 import path from "path"
+import { computeMinimalDocChange } from "../../src/components/markdown-editor/MarkdownEditorLiveSurface"
 import { registeredBrowserStorageKeys } from "../../src/libs/privacy/browserStorageRegistry"
 
 const sourcePath = (...parts: string[]) => path.resolve(__dirname, "../../src", ...parts)
@@ -38,7 +39,7 @@ test.describe("markdown editor live surface contract", () => {
     )
   })
 
-  test("clears previous undo history when the controlled document is restored", () => {
+  test("preserves previous undo history when the controlled document is synced externally without recording the sync", () => {
     const historyCompartment = new Compartment()
     let state = EditorState.create({
       doc: "initial",
@@ -46,27 +47,29 @@ test.describe("markdown editor live surface contract", () => {
     })
     state = state.update({ changes: { from: state.doc.length, insert: " edit" } }).state
     state = state.update({
-      changes: { from: 0, to: state.doc.length, insert: "restored" },
+      changes: computeMinimalDocChange(state.doc.toString(), "initial edit\nfooter"),
       annotations: Transaction.addToHistory.of(false),
-      effects: historyCompartment.reconfigure([]),
     }).state
-    state = state.update({ effects: historyCompartment.reconfigure(history()) }).state
 
-    expect(undoDepth(state)).toBe(0)
-    expect(undo({
-      state,
-      dispatch: () => {
-        throw new Error("A restored document must not retain stale undo events")
-      },
-    })).toBe(false)
+    expect(undoDepth(state)).toBeGreaterThan(0)
+    let undoneText = ""
+    expect(
+      undo({
+        state,
+        dispatch: (tr) => {
+          undoneText = tr.state.doc.toString()
+        },
+      })
+    ).toBe(true)
+    expect(undoneText).toBe("initial\nfooter")
 
     const surfaceSource = readFileSync(
       sourcePath("components", "markdown-editor", "MarkdownEditorLiveSurface.tsx"),
       "utf8"
     )
-    expect(surfaceSource).toContain("historyCompartmentRef")
-    expect(surfaceSource).toContain("historyCompartment.reconfigure([])")
-    expect(surfaceSource).toContain("historyCompartment.reconfigure(history())")
+    expect(surfaceSource).toContain("Transaction.addToHistory.of(false)")
+    expect(surfaceSource).toContain("computeMinimalDocChange")
+    expect(surfaceSource).not.toContain("historyCompartment.reconfigure([])")
   })
 
   test("keeps the planned selection when a failed upload removes its placeholder", () => {
