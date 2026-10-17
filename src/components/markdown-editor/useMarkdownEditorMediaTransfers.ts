@@ -417,15 +417,6 @@ export const useMarkdownEditorMediaTransfers = ({
         }
         return
       }
-
-      if (from === to) return
-
-      const url = parseSingleHttpUrl(readClipboardPlainText(event.clipboardData))
-      if (!url) return
-
-      event.preventDefault()
-      const selectedText = valueRef.current.slice(from, to)
-      applyPlannedMarkdownMutation(planLinkifySelectionWithUrl(from, to, selectedText, url))
     },
     [
       applyPlannedMarkdownMutation,

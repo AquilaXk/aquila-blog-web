@@ -15,6 +15,10 @@ interface MermaidEffectOptions {
 export const shouldScheduleMermaidResize = (lastWidth: number, nextWidth: number) =>
   Math.abs(Math.floor(nextWidth) - Math.floor(lastWidth)) >= 2
 
+let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
+let lastInitializedThemeKey: string | null = null
+let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
+
 const useMermaidEffect = (
   rootRef?: RefObject<HTMLElement | null>,
   contentKey?: string,
@@ -38,29 +42,34 @@ const useMermaidEffect = (
     let rerunRequested = false
     let mutationObserver: MutationObserver | null = null
     let scheduledRunFrame: number | null = null
-    let mermaidPromise: Promise<MermaidRuntimeInstance> | null = null
     let lastMermaidParseWarning: string | null = null
     const retryTimers = new Set<number>()
     const preset = resolveMermaidPreset(effectiveScheme)
 
     const getMermaid = async () => {
-      if (!mermaidPromise) {
-        mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
+      if (!sharedMermaidPromise) {
+        sharedMermaidPromise = import("mermaid").then(({ default: mermaid }) => {
           const mermaidRuntime = mermaid as MermaidRuntimeInstance
           mermaidRuntime.parseError = (error) => {
-            lastMermaidParseWarning = String(error || "Mermaid parse error")
+            activeMermaidParseWarningHandler?.(error)
           }
-
-          mermaidRuntime.initialize({
-            startOnLoad: false,
-            ...preset.config,
-          })
-
           return mermaidRuntime
         })
       }
 
-      return mermaidPromise
+      const mermaidRuntime = await sharedMermaidPromise
+      activeMermaidParseWarningHandler = (error) => {
+        lastMermaidParseWarning = String(error || "Mermaid parse error")
+      }
+      if (lastInitializedThemeKey !== preset.themeKey) {
+        mermaidRuntime.initialize({
+          startOnLoad: false,
+          ...preset.config,
+        })
+        lastInitializedThemeKey = preset.themeKey
+      }
+
+      return mermaidRuntime
     }
 
     const controller = createMermaidRuntimeController({
@@ -78,9 +87,9 @@ const useMermaidEffect = (
       },
     })
 
-    const scheduleRun = () => {
+    const scheduleRun = (forceResetCache = false) => {
       if (disposed) return
-      controller.resetLayoutCache()
+      controller.resetLayoutCache(forceResetCache)
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         rerunRequested = true
         return
@@ -133,7 +142,7 @@ const useMermaidEffect = (
             const nextWidth = Math.floor(root.getBoundingClientRect().width)
             if (!shouldScheduleMermaidResize(lastObservedWidth, nextWidth)) return
             lastObservedWidth = nextWidth
-            scheduleRun()
+            scheduleRun(true)
           })
         : null
     resizeObserver?.observe(root)

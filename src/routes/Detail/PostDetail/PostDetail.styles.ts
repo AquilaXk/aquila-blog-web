@@ -40,6 +40,7 @@ export const StyledWrapper = styled.div `
       height: 100%;
       transform: scaleX(0);
       transform-origin: left center;
+      will-change: transform;
       background: var(--aq-accent-link);
     }
   }

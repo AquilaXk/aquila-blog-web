@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
+import { isOffsetInsideFencedCodeBlock, planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import {
   planToggleListCommand,
   type MarkdownEditorListCommand,
@@ -80,6 +80,57 @@ type MarkdownEditorProps = {
 }
 
 type TextareaSelection = MarkdownEditorFocusSelection
+
+const SLASH_TRIGGER_PATTERN = /(?:^|\s)\/([^\s/]*)$/
+
+export const matchSlashCommandTrigger = (
+  markdown: string,
+  selection: TextareaSelection
+): { query: string; slashFrom: number } | null => {
+  const pos = selection.from
+  if (pos === 0 || selection.from !== selection.to) return null
+  const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
+  const lineText = markdown.slice(lineStart, pos)
+  const match = SLASH_TRIGGER_PATTERN.exec(lineText)
+  if (!match) return null
+  if (isOffsetInsideFencedCodeBlock(markdown, pos)) return null
+  const query = match[1] ?? ""
+  return {
+    query,
+    slashFrom: pos - query.length - 1,
+  }
+}
+
+export const resolveSlashCommandMutation = (
+  spec: { id: string; snippet: string },
+  slashStart: number,
+  selectionEnd: number
+): PlannedTextMutation => {
+  if (spec.snippet === "__TABLE__") {
+    const table = createMarkdownEditorTable(2, 2)
+    if (table) {
+      const cursor = slashStart + table.cursorOffset
+      return {
+        rangeStart: slashStart,
+        rangeEnd: selectionEnd,
+        replacement: table.snippet,
+        selectionStart: cursor,
+        selectionEnd: cursor,
+      }
+    }
+  }
+  if (spec.id === "code-block") {
+    const cursor = slashStart + 6
+    return {
+      rangeStart: slashStart,
+      rangeEnd: selectionEnd,
+      replacement: spec.snippet,
+      selectionStart: cursor,
+      selectionEnd: cursor,
+    }
+  }
+  return planReplaceSelection(slashStart, selectionEnd, spec.snippet)
+}
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
@@ -438,18 +489,6 @@ export const MarkdownEditor = ({
       insertUploadedMarkdown,
     })
 
-  const { handleTextareaKeyDown } = useMarkdownEditorTextareaKeyboard({
-    disabled,
-    valueRef,
-    allowNativeTabAfterEscapeRef,
-    rememberTextareaSelection,
-    applyMutationPlan,
-    applyRecordedMutation: applyMutationPlan,
-    setTextareaSelection: setEditorSelection,
-    onRequestSave,
-    onToggleViewMode: cycleViewMode,
-  })
-
   const [slashMenuState, setSlashMenuState] = useState<{
     isOpen: boolean
     position: { top: number; left: number } | null
@@ -461,13 +500,33 @@ export const MarkdownEditor = ({
     query: "",
     slashFrom: 0,
   })
+  const slashMenuOpenRef = useRef(slashMenuState.isOpen)
+  slashMenuOpenRef.current = slashMenuState.isOpen
+
+  const isCompletionOrSlashMenuActive = useCallback(
+    () => slashMenuOpenRef.current || Boolean(liveSurfaceRef.current?.isCompletionActive?.()),
+    []
+  )
+
+  const { handleTextareaKeyDown } = useMarkdownEditorTextareaKeyboard({
+    disabled,
+    valueRef,
+    allowNativeTabAfterEscapeRef,
+    rememberTextareaSelection,
+    applyMutationPlan,
+    applyRecordedMutation: applyMutationPlan,
+    setTextareaSelection: setEditorSelection,
+    onRequestSave,
+    onToggleViewMode: cycleViewMode,
+    isCompletionActive: isCompletionOrSlashMenuActive,
+  })
 
   const handleSelectSlashItem = useCallback(
-    (snippet: string) => {
+    (spec: { id: string; snippet: string }) => {
       const selection = selectionRef.current
       const start = slashMenuState.slashFrom
       const end = selection.to
-      applyMutationPlan(planReplaceSelection(start, end, snippet))
+      applyMutationPlan(resolveSlashCommandMutation(spec, start, end))
       setSlashMenuState({ isOpen: false, position: null, query: "", slashFrom: 0 })
     },
     [applyMutationPlan, slashMenuState.slashFrom]
@@ -489,41 +548,17 @@ export const MarkdownEditor = ({
       label: spec.label,
       description: spec.description,
       icon: spec.icon,
-      action: () =>
-        handleSelectSlashItem(
-          spec.snippet === "__TABLE__" ? createMarkdownEditorTable(2, 2) + "\n" : spec.snippet
-        ),
+      action: () => handleSelectSlashItem(spec),
     }))
   }, [handleSelectSlashItem, slashMenuState.query])
 
   const checkSlashCommand = useCallback((markdown: string, selection: TextareaSelection) => {
-    const pos = selection.from
-    if (pos === 0 || selection.from !== selection.to) {
-      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
-      return
-    }
-    const lineStart = markdown.lastIndexOf("\n", pos - 1) + 1
-    const lineText = markdown.slice(lineStart, pos)
-    const lastSlashIndex = lineText.lastIndexOf("/")
-
-    if (lastSlashIndex === -1) {
+    const trigger = matchSlashCommandTrigger(markdown, selection)
+    if (!trigger) {
       setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
       return
     }
 
-    const beforeSlash = lineText.slice(0, lastSlashIndex)
-    if (beforeSlash.length > 0 && !/\s$/.test(beforeSlash)) {
-      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
-      return
-    }
-
-    const query = lineText.slice(lastSlashIndex + 1)
-    if (/\s/.test(query)) {
-      setSlashMenuState((prev) => (prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev))
-      return
-    }
-
-    const slashAbsolutePos = lineStart + lastSlashIndex
     const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
     let coords = { top: 240, left: 340 }
     if (selectionObj && selectionObj.rangeCount > 0) {
@@ -540,17 +575,19 @@ export const MarkdownEditor = ({
     setSlashMenuState((prev) => ({
       isOpen: true,
       position: prev.isOpen && prev.position ? prev.position : coords,
-      query,
-      slashFrom: slashAbsolutePos,
+      query: trigger.query,
+      slashFrom: trigger.slashFrom,
     }))
   }, [])
 
   const handleLiveSelectionChange = useCallback(
-    (selection: TextareaSelection) => {
+    (selection: TextareaSelection, docChanged = false) => {
       selectionRef.current = selection
       handleFindReplaceSelectionChange(selection)
       updateActiveTableSelection(valueRef.current, selection)
-      checkSlashCommand(valueRef.current, selection)
+      if (!docChanged) {
+        checkSlashCommand(valueRef.current, selection)
+      }
     },
     [checkSlashCommand, handleFindReplaceSelectionChange, updateActiveTableSelection]
   )

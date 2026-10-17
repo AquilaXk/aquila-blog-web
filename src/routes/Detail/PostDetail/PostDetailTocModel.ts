@@ -11,14 +11,58 @@ export type TocItem = {
 
 export const buildInitialTocFromMarkdown = (markdown: string): TocItem[] => {
   if (!markdown.trim()) return []
-  return createMarkdownDocumentInsights(markdown).headings.map(({ slug, label, level }) => ({
-    id: slug,
-    text: label,
-    level,
-  }))
+  const slugAllocator = createMarkdownHeadingSlugAllocator()
+  return createMarkdownDocumentInsights(markdown)
+    .headings.filter((heading): heading is typeof heading & { level: 2 | 3 | 4 } => heading.level >= 2)
+    .map(({ label, level }) => ({
+      id: slugAllocator.allocate(label),
+      text: label,
+      level,
+    }))
 }
 
 const TOC_SELECTOR = ".aq-markdown h2, .aq-markdown h3, .aq-markdown h4"
+const TOC_MUTATION_HEADING_SELECTOR = "h1, h2, h3, h4"
+const TOC_MUTATION_IGNORED_SELECTOR = ".aq-mermaid, .aq-code-block, svg"
+
+const resolveMutationElement = (node: Node | null | undefined): Element | null => {
+  if (!node) return null
+  if (typeof (node as Element).matches === "function") return node as Element
+  return node.parentElement ?? null
+}
+
+const isIgnoredTocMutationElement = (element: Element): boolean => {
+  if (typeof SVGElement !== "undefined" && element instanceof SVGElement) return true
+  if (element.tagName?.toLowerCase() === "svg") return true
+  if (element.matches?.(TOC_MUTATION_IGNORED_SELECTOR)) return true
+  return Boolean(element.closest?.(TOC_MUTATION_IGNORED_SELECTOR))
+}
+
+const nodeTouchesHeading = (node: Node | null | undefined, checkDescendants: boolean): boolean => {
+  const element = resolveMutationElement(node)
+  if (!element || isIgnoredTocMutationElement(element)) return false
+  if (element.matches?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  if (element.closest?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  if (checkDescendants && element.querySelector?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  return false
+}
+
+export const shouldSyncTocFromMutations = (mutations: Iterable<MutationRecord>): boolean => {
+  for (const mutation of Array.from(mutations)) {
+    if (mutation.type === "characterData") {
+      if (nodeTouchesHeading(mutation.target, false)) return true
+      continue
+    }
+    if (nodeTouchesHeading(mutation.target, false)) return true
+    for (const added of Array.from(mutation.addedNodes ?? [])) {
+      if (nodeTouchesHeading(added, true)) return true
+    }
+    for (const removed of Array.from(mutation.removedNodes ?? [])) {
+      if (nodeTouchesHeading(removed, true)) return true
+    }
+  }
+  return false
+}
 
 const normalizeHeadingText = (value: string): string =>
   value

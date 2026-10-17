@@ -4,7 +4,7 @@ import {
   createMarkdownHeadingSlugAllocator,
 } from "../../src/libs/markdown/markdownDocumentInsights"
 
-test("collects H2-H4 source ranges, skips fenced source, and allocates Unicode slugs", () => {
+test("collects H1-H4 source ranges, skips fenced source, and allocates Unicode slugs", () => {
   const markdown = [
     "# Title",
     "## 첫 번째",
@@ -19,6 +19,7 @@ test("collects H2-H4 source ranges, skips fenced source, and allocates Unicode s
   const insights = createMarkdownDocumentInsights(markdown)
 
   expect(insights.headings).toEqual([
+    { level: 1, label: "Title", offset: 0, range: { start: 0, end: 7 }, slug: "title" },
     { level: 2, label: "첫 번째", offset: 8, range: { start: 8, end: 15 }, slug: "첫-번째" },
     { level: 4, label: "Details", offset: 41, range: { start: 41, end: 57 }, slug: "details" },
     { level: 2, label: "첫 번째", offset: 58, range: { start: 58, end: 65 }, slug: "첫-번째-2" },

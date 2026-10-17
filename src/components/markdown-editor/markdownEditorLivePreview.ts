@@ -172,15 +172,27 @@ const decorationForNode = (
   return kind ? { from: node.from, to: node.to, kind } : null
 }
 
-export const buildMarkdownLivePreviewPlan = (
-  markdown: string,
-  documentNode: MarkdownSyntaxNode,
-  selections: readonly MarkdownLiveSelection[],
-  composing = false
-): MarkdownLivePreviewDecoration[] => {
-  if (composing) return []
+export type MarkdownLivePreviewPlanEntry = {
+  decoration: MarkdownLivePreviewDecoration
+  hideWhenActiveRange?: MarkdownLiveSourceRange
+  secondaryHideWhenActiveRange?: MarkdownLiveSourceRange
+}
 
-  const decorations: MarkdownLivePreviewDecoration[] = []
+const cachedPreviewEntriesByNode = new WeakMap<
+  MarkdownSyntaxNode,
+  { markdown: string; entries: readonly MarkdownLivePreviewPlanEntry[] }
+>()
+
+export const buildMarkdownLivePreviewEntries = (
+  markdown: string,
+  documentNode: MarkdownSyntaxNode
+): readonly MarkdownLivePreviewPlanEntry[] => {
+  const cached = cachedPreviewEntriesByNode.get(documentNode)
+  if (cached && cached.markdown === markdown) {
+    return cached.entries
+  }
+
+  const entries: MarkdownLivePreviewPlanEntry[] = []
   const literalRanges: MarkdownLiveSourceRange[] = []
 
   const collectLiterals = (node: MarkdownSyntaxNode) => {
@@ -192,7 +204,6 @@ export const buildMarkdownLivePreviewPlan = (
   }
   collectLiterals(documentNode)
 
-  // Wikilink tokens ([[target]] or [[target|alias]])
   const wikilinkRanges: MarkdownLiveSourceRange[] = []
   for (const match of markdown.matchAll(/\[\[([^\]\r\n]+)\]\]/g)) {
     const from = match.index
@@ -206,32 +217,31 @@ export const buildMarkdownLivePreviewPlan = (
     const alias = rawAlias ? rawAlias : undefined
     if (!target) continue
 
-    wikilinkRanges.push({ from, to })
-
-    if (!isTokenActive(from, to, selections)) {
-      decorations.push({ from, to, kind: "wikilink", target, alias })
-    }
+    const activeRange = { from, to }
+    wikilinkRanges.push(activeRange)
+    entries.push({
+      decoration: { from, to, kind: "wikilink", target, alias },
+      hideWhenActiveRange: activeRange,
+    })
   }
 
-  // Inactive validated color tokens
   for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
     const from = match.index
     const to = from + match[0].length
-    if (isTokenActive(from, to, selections)) continue
     if (literalRanges.some((range) => from >= range.from && to <= range.to)) continue
     if (wikilinkRanges.some((range) => from >= range.from && to <= range.to)) continue
     const color = resolveInlineColorValue(match[1])
     if (!color) continue
     const bodyFrom = from + match[0].indexOf("|") + 1
     const bodyTo = to - 2
-    decorations.push(
-      { from, to: bodyFrom, kind: "hide-mark" },
-      { from: bodyFrom, to: bodyTo, kind: "inline-color", color },
-      { from: bodyTo, to, kind: "hide-mark" }
+    const activeRange = { from, to }
+    entries.push(
+      { decoration: { from, to: bodyFrom, kind: "hide-mark" }, hideWhenActiveRange: activeRange },
+      { decoration: { from: bodyFrom, to: bodyTo, kind: "inline-color", color }, hideWhenActiveRange: activeRange },
+      { decoration: { from: bodyTo, to, kind: "hide-mark" }, hideWhenActiveRange: activeRange }
     )
   }
 
-  // Highlight tokens (==text==)
   for (const match of markdown.matchAll(/(?<!=)==((?:[^\r\n=]|=(?!=))+?)==(?!=)/g)) {
     const from = match.index
     const to = from + match[0].length
@@ -241,14 +251,12 @@ export const buildMarkdownLivePreviewPlan = (
 
     const bodyFrom = from + 2
     const bodyTo = to - 2
-    decorations.push({ from: bodyFrom, to: bodyTo, kind: "highlight" })
-
-    if (!isTokenActive(from, to, selections)) {
-      decorations.push(
-        { from, to: bodyFrom, kind: "hide-mark" },
-        { from: bodyTo, to, kind: "hide-mark" }
-      )
-    }
+    const activeRange = { from, to }
+    entries.push(
+      { decoration: { from: bodyFrom, to: bodyTo, kind: "highlight" } },
+      { decoration: { from, to: bodyFrom, kind: "hide-mark" }, hideWhenActiveRange: activeRange },
+      { decoration: { from: bodyTo, to, kind: "hide-mark" }, hideWhenActiveRange: activeRange }
+    )
   }
 
   const visit = (
@@ -268,16 +276,14 @@ export const buildMarkdownLivePreviewPlan = (
       return
     }
 
-    // Fine-grained token disclosure
     if (node.name === "HeaderMark") {
       const headingNode = parent
-      if (headingNode && isTokenActive(headingNode.from, headingNode.to, selections)) {
-        // Cursor is on this heading line, header mark is revealed
-        return
-      }
       let to = node.to
       while (to < markdown.length && (markdown[to] === " " || markdown[to] === "\t")) to += 1
-      decorations.push({ from: node.from, to, kind: "hide-mark" })
+      entries.push({
+        decoration: { from: node.from, to, kind: "hide-mark" },
+        hideWhenActiveRange: headingNode ? { from: headingNode.from, to: headingNode.to } : undefined,
+      })
       return
     }
 
@@ -287,46 +293,129 @@ export const buildMarkdownLivePreviewPlan = (
       node.name === "CodeMark" ||
       node.name === "LinkMark"
     ) {
-      if (parent && isTokenActive(parent.from, parent.to, selections)) {
-        // Active token: disclose raw delimiter marks
-        return
-      }
-      if (activeHeading && isTokenActive(activeHeading.from, activeHeading.to, selections)) {
-        return
-      }
-      decorations.push({ from: node.from, to: node.to, kind: "hide-mark" })
+      entries.push({
+        decoration: { from: node.from, to: node.to, kind: "hide-mark" },
+        hideWhenActiveRange: parent ? { from: parent.from, to: parent.to } : undefined,
+        secondaryHideWhenActiveRange: activeHeading
+          ? { from: activeHeading.from, to: activeHeading.to }
+          : undefined,
+      })
       return
     }
 
     if (node.name === "URL" && (parent?.name === "Link" || parent?.name === "Image")) {
-      if (parent && isTokenActive(parent.from, parent.to, selections)) {
-        // Active link/image: disclose URL
-        return
-      }
-      decorations.push({ from: node.from, to: node.to, kind: "hide-mark" })
+      entries.push({
+        decoration: { from: node.from, to: node.to, kind: "hide-mark" },
+        hideWhenActiveRange: parent ? { from: parent.from, to: parent.to } : undefined,
+      })
       return
     }
 
     if (node.name === "HorizontalRule") {
-      if (!isTokenActive(node.from, node.to, selections)) {
-        decorations.push({ from: node.from, to: node.to, kind: "horizontal-rule" })
-      }
+      entries.push({
+        decoration: { from: node.from, to: node.to, kind: "horizontal-rule" },
+        hideWhenActiveRange: { from: node.from, to: node.to },
+      })
       return
     }
 
     if (node.name === "FencedCode") {
-      decorations.push({ from: node.from, to: node.to, kind: "fenced-code" })
+      entries.push({ decoration: { from: node.from, to: node.to, kind: "fenced-code" } })
       return
     }
 
     const decoration = decorationForNode(markdown, node, parent)
     if (decoration && decoration.kind !== "hide-mark" && decoration.kind !== "horizontal-rule") {
-      decorations.push(decoration)
+      entries.push({ decoration })
     }
 
     for (const child of listChildren(node)) visit(child, node, activeHeading)
   }
 
   visit(documentNode, null, null)
+  cachedPreviewEntriesByNode.set(documentNode, { markdown, entries })
+  return entries
+}
+
+export const resolveMarkdownLivePreviewPlanFromEntries = (
+  entries: readonly MarkdownLivePreviewPlanEntry[],
+  selections: readonly MarkdownLiveSelection[],
+  composing = false
+): MarkdownLivePreviewDecoration[] => {
+  if (composing) return []
+  const decorations: MarkdownLivePreviewDecoration[] = []
+  for (const entry of entries) {
+    if (
+      entry.hideWhenActiveRange &&
+      isTokenActive(entry.hideWhenActiveRange.from, entry.hideWhenActiveRange.to, selections)
+    ) {
+      continue
+    }
+    if (
+      entry.secondaryHideWhenActiveRange &&
+      isTokenActive(
+        entry.secondaryHideWhenActiveRange.from,
+        entry.secondaryHideWhenActiveRange.to,
+        selections
+      )
+    ) {
+      continue
+    }
+    decorations.push(entry.decoration)
+  }
   return decorations
+}
+
+export const buildMarkdownLivePreviewPlan = (
+  markdown: string,
+  documentNode: MarkdownSyntaxNode,
+  selections: readonly MarkdownLiveSelection[],
+  composing = false
+): MarkdownLivePreviewDecoration[] => {
+  if (composing) return []
+  const entries = buildMarkdownLivePreviewEntries(markdown, documentNode)
+  return resolveMarkdownLivePreviewPlanFromEntries(entries, selections, composing)
+}
+
+export const computeMarkdownFoldRange = (
+  state: {
+    doc: {
+      lines: number
+      lineAt: (pos: number) => { number: number; from: number; to: number; text: string }
+      line: (lineNo: number) => { number: number; from: number; to: number; text: string }
+    }
+  },
+  lineStart: number,
+  _lineEnd?: number
+): { from: number; to: number } | null => {
+  const line = state.doc.lineAt(lineStart)
+  const headingMatch = /^\s{0,3}(#{1,6})\s+/.exec(line.text)
+  if (headingMatch) {
+    const level = headingMatch[1].length
+    let endPos = line.to
+    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
+      const nextLine = state.doc.line(lineNo)
+      const nextHeading = /^\s{0,3}(#{1,6})\s+/.exec(nextLine.text)
+      if (nextHeading && nextHeading[1].length <= level) {
+        break
+      }
+      endPos = nextLine.to
+    }
+    return endPos > line.to ? { from: line.to, to: endPos } : null
+  }
+
+  const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line.text)
+  if (fenceMatch) {
+    const fence = fenceMatch[1]
+    const marker = fence[0]
+    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
+      const nextLine = state.doc.line(lineNo)
+      const closeMatch = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(nextLine.text)
+      if (closeMatch && closeMatch[1][0] === marker && closeMatch[1].length >= fence.length) {
+        return nextLine.to > line.to ? { from: line.to, to: nextLine.to } : null
+      }
+    }
+  }
+
+  return null
 }

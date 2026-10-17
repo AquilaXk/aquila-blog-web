@@ -80,6 +80,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     min-width: 0;
     margin: 30px 0;
     overflow-x: hidden;
+    contain: layout style;
   }
 
   .aq-table-scroll {

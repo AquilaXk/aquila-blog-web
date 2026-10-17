@@ -16,6 +16,7 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     background: ${theme.publicDesign.readableSurface};
     box-shadow: none;
     scrollbar-width: thin;
+    contain: layout style;
   }
 
   .aq-mermaid[data-mermaid-wide="true"] {

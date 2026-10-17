@@ -383,6 +383,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
   const [restoredLocalDraft, setRestoredLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
   const [dismissedLocalDraft, setDismissedLocalDraft] = useState<LocalDraftFingerprintSnapshot[]>([])
   const postIdTransitionEditorFingerprintRef = useRef<string | null>(null)
+  const cachedRestorableDraftRef = useRef<{
+    source: LocalDraftSource
+    candidates: LocalDraftFingerprintSnapshot[]
+    fingerprint: string | null
+  } | null>(null)
   const prevEditorModeRef = useRef(editorMode)
   const prevPostIdRef = useRef(postId)
   const isPostIdTransitionGated = isLocalDraftAutosaveGatedForPostIdTransition(
@@ -545,6 +550,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
       return
     }
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
+    cachedRestorableDraftRef.current = {
+      source,
+      candidates: localDraftCandidates,
+      fingerprint: currentLocalDraftFingerprint,
+    }
     setLocalDraftSavedAt(payload.savedAt)
     setLocalDraftSlotLabel(describeLocalDraftSlot(payload))
 
@@ -561,6 +571,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     buildLocalDraftFingerprint,
     getCurrentPostContent,
     lastLocalDraftFingerprintRef,
+    localDraftCandidates,
     localDraftCore,
     persistLocalDraft,
     setLocalDraftSavedAt,
@@ -704,6 +715,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
     }
     // Keep editor fingerprint as baseline so autosave does not recreate the cleared slot.
     lastLocalDraftFingerprintRef.current = localDraftFingerprint
+    cachedRestorableDraftRef.current = {
+      source: draftSource,
+      candidates: localDraftCandidates,
+      fingerprint: null,
+    }
     signalLocalDraftRemoved(draftSource)
     setLocalDraftSavedAt("")
     setLocalDraftSlotLabel("")
@@ -717,6 +733,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
   }, [
     draftSource,
     lastLocalDraftFingerprintRef,
+    localDraftCandidates,
     localDraftFingerprint,
     removeLocalDraft,
     signalLocalDraftRemoved,
@@ -777,26 +794,41 @@ export const useEditorStudioLocalDraftLifecycle = ({
       postTags.length > 0 ||
       postCategory.trim().length > 0
 
-    const pendingDraft = readLocalDraft(draftSource)
-    const pendingRestorableDraftFingerprint =
-      pendingDraft?.savedAt
-        ? buildLocalDraftFingerprint({
-            title: pendingDraft.title,
-            content: pendingDraft.content,
-            summary: pendingDraft.summary,
-            summarySource: pendingDraft.summarySource,
-            summaryIntent: pendingDraft.summaryIntent,
-            thumbnailUrl: pendingDraft.thumbnailUrl,
-            thumbnailFocusX: pendingDraft.thumbnailFocusX,
-            thumbnailFocusY: pendingDraft.thumbnailFocusY,
-            thumbnailZoom: pendingDraft.thumbnailZoom,
-            tags: dedupeStrings(pendingDraft.tags),
-            category: pendingDraft.category
-              ? normalizeCategoryValue(pendingDraft.category)
-              : "",
-            visibility: pendingDraft.visibility,
-          })
-        : null
+    let pendingRestorableDraftFingerprint: string | null = null
+    const cached = cachedRestorableDraftRef.current
+    if (
+      cached &&
+      localDraftSourcesEqual(cached.source, draftSource) &&
+      cached.candidates === localDraftCandidates
+    ) {
+      pendingRestorableDraftFingerprint = cached.fingerprint
+    } else {
+      const pendingDraft = readLocalDraft(draftSource)
+      pendingRestorableDraftFingerprint =
+        pendingDraft?.savedAt
+          ? buildLocalDraftFingerprint({
+              title: pendingDraft.title,
+              content: pendingDraft.content,
+              summary: pendingDraft.summary,
+              summarySource: pendingDraft.summarySource,
+              summaryIntent: pendingDraft.summaryIntent,
+              thumbnailUrl: pendingDraft.thumbnailUrl,
+              thumbnailFocusX: pendingDraft.thumbnailFocusX,
+              thumbnailFocusY: pendingDraft.thumbnailFocusY,
+              thumbnailZoom: pendingDraft.thumbnailZoom,
+              tags: dedupeStrings(pendingDraft.tags),
+              category: pendingDraft.category
+                ? normalizeCategoryValue(pendingDraft.category)
+                : "",
+              visibility: pendingDraft.visibility,
+            })
+          : null
+      cachedRestorableDraftRef.current = {
+        source: draftSource,
+        candidates: localDraftCandidates,
+        fingerprint: pendingRestorableDraftFingerprint,
+      }
+    }
 
     const decision = decideLocalDraftAutosave({
       loadingKey,
@@ -841,6 +873,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     isPostLoadInFlight,
     lastLocalDraftFingerprintRef,
     loadingKey,
+    localDraftCandidates,
     localDraftFingerprint,
     normalizeCategoryValue,
     postCategory,

@@ -1,3 +1,4 @@
+import { memo } from "react"
 import Link from "next/link"
 import { formatDate } from "src/libs/utils"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
@@ -27,7 +28,7 @@ const getRelatedPostMeta = (post: TPost) => {
   return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "")}`
 }
 
-export const RelatedPostsSection = ({
+const RelatedPostsSectionComponent = ({
   showRelatedTagSkeleton,
   relatedByTagPosts,
   showRelatedAuthorSkeleton,
@@ -62,3 +63,6 @@ export const RelatedPostsSection = ({
     </RelatedSection>
   )
 }
+
+export const RelatedPostsSection = memo(RelatedPostsSectionComponent)
+RelatedPostsSection.displayName = "RelatedPostsSection"

@@ -54,15 +54,23 @@ for (const status of [404, 503]) {
   })
 }
 
-test("does not duplicate initialAdminProfile in props", async () => {
+test("includes initialAdminProfile in props to prevent redundant hydration refetch", async () => {
   globalThis.fetch = (async (input) => {
     if (String(input).includes("/posts/101")) return json(200, post)
-    return json(200, { username: "Aquila", nickname: "Aquila" })
+    return json(200, {
+      username: "Aquila",
+      name: "Aquila",
+      nickname: "Aquila",
+      profileImageUrl: "",
+    })
   }) as typeof fetch
   const res = response()
   const result = await buildCanonicalPostDetailServerProps("101", res.res)
   if ("props" in result) {
-    expect((result.props as Record<string, unknown>).initialAdminProfile).toBeUndefined()
+    expect((result.props as Record<string, unknown>).initialAdminProfile).toMatchObject({
+      username: "Aquila",
+      nickname: "Aquila",
+    })
   }
 })
 

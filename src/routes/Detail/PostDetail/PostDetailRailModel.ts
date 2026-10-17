@@ -23,9 +23,19 @@ const getHeaderHeightFromCssVar = () => {
 
 export const resolveRailTopOffset = () => getHeaderHeightFromCssVar() + DETAIL_RAIL_GAP_FROM_HEADER_PX
 
-const hasStickyBlockingAncestor = (node: HTMLElement | null) => {
+let stickyBlockingAncestorCache = new WeakMap<HTMLElement, boolean>()
+
+export const invalidateStickyBlockingAncestorCache = () => {
+  stickyBlockingAncestorCache = new WeakMap<HTMLElement, boolean>()
+}
+
+export const hasStickyBlockingAncestor = (node: HTMLElement | null) => {
   if (typeof window === "undefined" || !node) return false
+  const cached = stickyBlockingAncestorCache.get(node)
+  if (cached !== undefined) return cached
+
   let current = node.parentElement
+  let blocked = false
 
   while (current && current !== document.body && current !== document.documentElement) {
     const style = window.getComputedStyle(current)
@@ -33,12 +43,14 @@ const hasStickyBlockingAncestor = (node: HTMLElement | null) => {
       STICKY_BLOCKING_OVERFLOW_VALUES.has(style.overflowY) ||
       STICKY_BLOCKING_OVERFLOW_VALUES.has(style.overflow)
     ) {
-      return true
+      blocked = true
+      break
     }
     current = current.parentElement
   }
 
-  return false
+  stickyBlockingAncestorCache.set(node, blocked)
+  return blocked
 }
 
 export const clearInlineRailStyle = (inner: HTMLElement | null) => {

@@ -22,9 +22,11 @@ import {
   LanguageDescription,
   LanguageSupport,
   defaultHighlightStyle,
+  foldKeymap,
+  foldService,
   syntaxHighlighting,
 } from "@codemirror/language"
-import { autocompletion } from "@codemirror/autocomplete"
+import { autocompletion, completionStatus } from "@codemirror/autocomplete"
 import {
   javascriptLanguage,
   typescriptLanguage,
@@ -55,11 +57,15 @@ import { GFM } from "@lezer/markdown"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 import { buildUploadReplacementTransactions } from "./markdownEditorUploadReplacement"
 import {
-  buildMarkdownLivePreviewPlan,
+  buildMarkdownLivePreviewEntries,
+  computeMarkdownFoldRange,
   isTokenActive,
+  resolveMarkdownLivePreviewPlanFromEntries,
   type MarkdownLivePreviewDecoration,
+  type MarkdownLivePreviewPlanEntry,
   type MarkdownLiveSelection,
 } from "./markdownEditorLivePreview"
+export { computeMarkdownFoldRange } from "./markdownEditorLivePreview"
 import {
   MarkdownCalloutWidget,
   MarkdownImageWidget,
@@ -94,7 +100,7 @@ type MarkdownEditorLiveSurfaceProps = {
     editorFocused: boolean,
     options?: { clearUploadError?: boolean }
   ) => void
-  onSelectionChange: (selection: MarkdownLiveSelection) => void
+  onSelectionChange: (selection: MarkdownLiveSelection, docChanged?: boolean) => void
   onRequestFocusTitle?: () => void
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement>
   onPasteCapture?: ClipboardEventHandler<HTMLDivElement>
@@ -119,6 +125,7 @@ export type MarkdownEditorLiveSurfaceHandle = {
   readSnapshot: () => MarkdownEditorSnapshot
   posAtCoords: (coords: { x: number; y: number }) => number | null
   setSelection: (selection: MarkdownLiveSelection) => void
+  isCompletionActive?: () => boolean
 }
 
 const externalDocumentChange = Annotation.define<boolean>()
@@ -224,6 +231,7 @@ let cachedDocBlocksEntry: {
   doc: EditorState["doc"]
   tree: ReturnType<typeof syntaxTree>
   markdownValue: string
+  previewEntries: readonly MarkdownLivePreviewPlanEntry[]
   tables: TableReplacementSpec[]
   callouts: CalloutReplacementSpec[]
   images: ImageReplacementSpec[]
@@ -242,6 +250,7 @@ const getCachedDocBlocks = (state: EditorState) => {
   }
 
   const markdownValue = getDocString(state.doc)
+  const previewEntries = buildMarkdownLivePreviewEntries(markdownValue, tree.topNode)
   const tables: TableReplacementSpec[] = []
   const callouts: CalloutReplacementSpec[] = []
   const images: ImageReplacementSpec[] = []
@@ -317,6 +326,7 @@ const getCachedDocBlocks = (state: EditorState) => {
     doc: state.doc,
     tree,
     markdownValue,
+    previewEntries,
     tables,
     callouts,
     images,
@@ -332,7 +342,7 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
     return Decoration.none
   }
 
-  const { markdownValue, tree, tables, callouts, images, maths, mermaids } =
+  const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } =
     getCachedDocBlocks(state)
   const selections = state.selection.ranges.map(({ from, to }) => ({ from, to }))
   const isComposing = state.field(compositionField, false) ?? false
@@ -364,11 +374,7 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   const isOverlappedByWidget = (from: number, to: number) =>
     replacedRanges.some((r) => from < r.to && to > r.from)
 
-  const plan = buildMarkdownLivePreviewPlan(
-    markdownValue,
-    tree.topNode,
-    selections
-  )
+  const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections)
   const taskRanges = plan.filter(({ kind }) => kind === "task")
   const decorations: Range<Decoration>[] = []
   const styledHeadingLineStarts = new Set<number>()
@@ -895,13 +901,14 @@ export const MarkdownEditorLiveSurface = forwardRef<
           extensions: GFM,
           codeLanguages,
         }),
+        foldService.of(computeMarkdownFoldRange),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         autocompletion({
           override: [wikilinkCompletionSource, codeLanguageCompletionSource],
         }),
         scrollPastEnd(),
         historyCompartment.of(history()),
-        keymap.of([...customKeymaps, ...historyKeymap, ...defaultKeymap]),
+        keymap.of([...customKeymaps, ...foldKeymap, ...historyKeymap, ...defaultKeymap]),
         EditorView.lineWrapping,
         compositionField,
         pointerSelectingField,
@@ -968,7 +975,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
           }
           if (update.selectionSet || update.docChanged) {
             const selection = update.state.selection.main
-            onSelectionChangeRef.current({ from: selection.from, to: selection.to })
+            onSelectionChangeRef.current({ from: selection.from, to: selection.to }, update.docChanged)
           }
         }),
       ],
@@ -978,7 +985,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
     view.scrollDOM.tabIndex = 0
     viewRef.current = view
     const selection = view.state.selection.main
-    onSelectionChangeRef.current({ from: selection.from, to: selection.to })
+    onSelectionChangeRef.current({ from: selection.from, to: selection.to }, false)
 
     return () => {
       viewRef.current = null
@@ -1009,7 +1016,6 @@ export const MarkdownEditorLiveSurface = forwardRef<
     view.dispatch({ effects: setDisableMermaid.of(Boolean(disableMermaid)) })
   }, [disableMermaid])
 
-  // CM6 Undo/Redo preservation: external doc sync without clearing history
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
@@ -1054,7 +1060,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
           annotations: [
             ...(options?.addToHistory === false && !options.replaceTransientContent
               ? [Transaction.addToHistory.of(false)]
-              : []),
+              : [Transaction.userEvent.of("input.type")]),
             ...preservedAnnotations,
           ],
           changes: {
@@ -1097,6 +1103,11 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const from = Math.max(0, Math.min(selection.from, view.state.doc.length))
         const to = Math.max(0, Math.min(selection.to, view.state.doc.length))
         view.dispatch({ selection: EditorSelection.range(from, to) })
+      },
+      isCompletionActive: () => {
+        const view = viewRef.current
+        if (!view) return false
+        return completionStatus(view.state) === "active"
       },
     }),
     [disabled, value]
