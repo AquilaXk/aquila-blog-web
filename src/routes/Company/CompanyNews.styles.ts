@@ -220,6 +220,14 @@ export const ContactBand = styled.div`
     line-height: 1.65;
     color: ${light.inkSecondary};
   }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    padding: 1.75rem 1.35rem;
+
+    a {
+      width: 100%;
+    }
+  }
 `
 
 const PRINCIPLE_RULE = `1px solid ${light.borderBrand}`

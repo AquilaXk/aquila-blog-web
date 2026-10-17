@@ -5,7 +5,12 @@ import {
   CompanyFeatureExplorerView,
   formatCapabilityIndex,
 } from "../../src/routes/Company/CompanyFeatureCarousel"
-import { createParticleSeeds, smoothstep } from "../../src/routes/Company/CompanyHeroParticles"
+import {
+  computeCenterClearance,
+  createParticleSeeds,
+  resolveParticleClearance,
+  smoothstep,
+} from "../../src/routes/Company/CompanyHeroParticles"
 import * as Sec from "../../src/routes/Company/CompanySection.styles"
 import {
   BLOG_URL,
@@ -249,7 +254,7 @@ test("formatCapabilityIndex는 1-based 두 자리 모노스페이스 인덱스�
   expect(formatCapabilityIndex(5)).toBe("06")
 })
 
-test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 보간과 정규화된 입자 시드를 생성한다", () => {
+test("CompanyHeroParticles의 smoothstep, createParticleSeeds, resolveParticleClearance는 모바일 390px 본문·CTA 영역의 입자 침범을 완전히 차단한다", () => {
   expect(smoothstep(0, 1, -0.5)).toBe(0)
   expect(smoothstep(0, 1, 0.5)).toBe(0.5)
   expect(smoothstep(2, 6, 4)).toBe(0.5)
@@ -266,6 +271,26 @@ test("CompanyHeroParticles의 smoothstep과 createParticleSeeds는 링 필드 �
     expect(seed.colorIndex).toBeGreaterThanOrEqual(0)
     expect(seed.colorIndex).toBeLessThan(5)
   }
+
+  // 390x520 모바일 히어로: 중앙 타이포 + 리드 문단 + 하단 CTA 버튼 영역(|dx| <= 170, |dy| <= 185)은 clearance 0이어야 함
+  const mobileSpec = resolveParticleClearance(390, 520)
+  expect(mobileSpec.maxAlpha).toBeLessThanOrEqual(0.5)
+  expect(computeCenterClearance(195, 260, 390, 520)).toBe(0)
+  expect(computeCenterClearance(195, 260 + 180, 390, 520)).toBe(0)
+  expect(computeCenterClearance(195, 260 - 180, 390, 520)).toBe(0)
+  expect(computeCenterClearance(195 + 165, 260, 390, 520)).toBe(0)
+  expect(computeCenterClearance(12, 16, 390, 520)).toBeGreaterThan(0.4)
+
+  // 1440x640 데스크톱 히어로: 중앙 카피는 보호하고 좌우 링 필드는 온전히 노출
+  const desktopSpec = resolveParticleClearance(1440, 640)
+  expect(desktopSpec.maxAlpha).toBeCloseTo(0.76, 2)
+  expect(computeCenterClearance(720, 320, 1440, 640)).toBe(0)
+  expect(computeCenterClearance(180, 140, 1440, 640)).toBe(1)
+
+  const zeroHeightSpec = resolveParticleClearance(800, 0)
+  expect(zeroHeightSpec.clearRx).toBeGreaterThanOrEqual(1)
+  expect(zeroHeightSpec.clearRy).toBeGreaterThanOrEqual(1)
+  expect(computeCenterClearance(400, 0, 800, 0)).toBe(0)
 })
 
 test("COMPANY_STATS는 중복 100% 수치 없이 4개 고유 운영 지표를 정의하고 푸터는 2개 내비 그룹을 채운다", () => {
@@ -278,6 +303,7 @@ test("COMPANY_STATS는 중복 100% 수치 없이 4개 고유 운영 지표를 �
   expect(COMPANY_FOOTER_LINK_GROUPS).toHaveLength(2)
   expect(COMPANY_FOOTER_LINK_GROUPS.map((group) => group.title)).toEqual(["제품", "탐색 & 문의"])
 })
+
 
 
 

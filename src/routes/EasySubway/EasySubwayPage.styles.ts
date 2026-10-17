@@ -103,14 +103,16 @@ export const SurfaceHeader = styled.header`
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     flex-wrap: wrap;
-    row-gap: 0.35rem;
+    min-height: 0;
+    padding: 0.45rem ${SECTION_PADDING_X};
+    row-gap: 0.2rem;
   }
 `
 
 export const BrandLink = styled.a`
   ${focusVisibleRing};
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.5rem;
   min-height: 44px;
   border-radius: ${radius.sm}px;
@@ -141,7 +143,7 @@ export const HeaderLinks = styled.nav`
     flex-wrap: wrap;
     justify-content: flex-start;
     margin-left: -0.5rem;
-    row-gap: 0.25rem;
+    row-gap: 0.15rem;
   }
 `
 
@@ -164,7 +166,8 @@ export const NavLink = styled.a`
   }
 
   @media (max-width: ${breakpoint.sm}px) {
-    padding: 0 0.5rem;
+    padding: 0 0.55rem;
+    font-size: 0.90625rem;
   }
 `
 
@@ -245,6 +248,12 @@ export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
   padding: 0 1.15rem;
   border-radius: ${radius.pill}px;
+
+  @media (max-width: ${layoutBreakpoint.navCompact}px) {
+    margin-left: auto;
+    padding: 0 0.95rem;
+    font-size: 0.875rem;
+  }
 `
 
 export const StatusBadge = styled.span`
@@ -283,6 +292,10 @@ export const Hero = styled.section`
   overflow: hidden;
   padding: clamp(4.5rem, 9vw, 7rem) ${SECTION_PADDING_X} clamp(3.5rem, 7vw, 5.5rem);
   background: ${light.surface};
+
+  @media (max-width: ${breakpoint.sm}px) {
+    padding: 3.25rem ${SECTION_PADDING_X} 3rem;
+  }
 `
 
 export const HeroCopy = styled.div`
@@ -311,6 +324,11 @@ export const HeroTitle = styled.h1`
     font-weight: ${fontWeight.medium};
     color: ${light.inkSecondary};
   }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    font-size: clamp(2rem, 8.2vw, 2.4rem);
+    line-height: 1.14;
+  }
 `
 
 export const HeroLead = styled.p`
@@ -329,6 +347,14 @@ export const HeroActions = styled.div`
   justify-content: center;
   gap: 0.75rem;
   margin-top: 0.25rem;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    width: 100%;
+
+    a {
+      flex: 1 1 11rem;
+    }
+  }
 `
 
 export const PhoneFrame = styled.figure<{ $width?: string }>`
@@ -346,6 +372,10 @@ export const PhoneFrame = styled.figure<{ $width?: string }>`
     width: 100%;
     height: auto;
     border-radius: 1.55rem;
+  }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    width: min(76%, 16rem);
   }
 
   @media (forced-colors: active) {

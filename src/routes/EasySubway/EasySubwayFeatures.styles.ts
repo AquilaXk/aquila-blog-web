@@ -213,4 +213,9 @@ export const TimelinePhoneFrame = styled.figure`
     height: auto;
     border-radius: 1.35rem;
   }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    width: min(74%, 15rem);
+  }
 `
+

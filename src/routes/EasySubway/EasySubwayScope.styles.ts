@@ -17,7 +17,7 @@ export const TechSpecGrid = styled.dl`
   }
 
   @media (max-width: ${breakpoint.sm}px) {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 1.35rem 1.15rem;
   }
 `
 
@@ -130,6 +130,15 @@ export const ContactActionGroup = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+
+  @media (max-width: ${breakpoint.sm}px) {
+    width: 100%;
+
+    > a,
+    > button {
+      flex: 1 1 10rem;
+    }
+  }
 `
 
 export const CopyEmailButton = styled.button`
@@ -212,5 +221,9 @@ export const ContactBand = styled.div`
     font-size: 1.03125rem;
     line-height: 1.65;
     color: ${light.inkSecondary};
+  }
+
+  @media (max-width: ${breakpoint.sm}px) {
+    padding: 1.75rem 1.35rem;
   }
 `
