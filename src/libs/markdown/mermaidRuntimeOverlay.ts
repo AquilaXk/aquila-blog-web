@@ -3,6 +3,174 @@ import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+export const createOverlayActionButton = (label: string, ariaLabel: string): HTMLButtonElement => {
+  const button = document.createElement("button")
+  button.type = "button"
+  button.textContent = label
+  button.setAttribute("aria-label", ariaLabel)
+  button.style.display = "inline-flex"
+  button.style.alignItems = "center"
+  button.style.justifyContent = "center"
+  button.style.minHeight = "44px"
+  button.style.padding = "0 0.8rem"
+  button.style.borderRadius = "999px"
+  button.style.border = "1px solid rgba(255, 255, 255, 0.2)"
+  button.style.background = "rgba(15, 23, 42, 0.7)"
+  button.style.color = "#f3f4f6"
+  button.style.fontSize = "0.82rem"
+  button.style.fontWeight = "700"
+  button.style.cursor = "pointer"
+  return button
+}
+
+export const handleZoomShortcutKey = (
+  event: KeyboardEvent,
+  handlers: {
+    onZoomIn: () => void
+    onZoomOut: () => void
+    onZoomReset: () => void
+  }
+): boolean => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault()
+    handlers.onZoomIn()
+    return true
+  }
+  if (event.key === "-" || event.key === "_") {
+    event.preventDefault()
+    handlers.onZoomOut()
+    return true
+  }
+  if (event.key === "0") {
+    event.preventDefault()
+    handlers.onZoomReset()
+    return true
+  }
+  return false
+}
+
+export const attachStageDragPan = (
+  stage: HTMLElement,
+  getZoomLevel: () => number
+): (() => void) => {
+  let dragging = false
+  let activePointerId: number | null = null
+  let startX = 0
+  let startY = 0
+  let startScrollLeft = 0
+  let startScrollTop = 0
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (getZoomLevel() <= 1) return
+    if (typeof event.button === "number" && event.button !== 0) return
+    dragging = true
+    activePointerId = event.pointerId
+    startX = event.clientX
+    startY = event.clientY
+    startScrollLeft = stage.scrollLeft
+    startScrollTop = stage.scrollTop
+    stage.style.cursor = "grabbing"
+    stage.setPointerCapture?.(event.pointerId)
+  }
+
+  const handlePointerMove = (event: PointerEvent) => {
+    if (!dragging) return
+    if (activePointerId !== null && event.pointerId !== activePointerId) return
+    stage.scrollLeft = startScrollLeft - (event.clientX - startX)
+    stage.scrollTop = startScrollTop - (event.clientY - startY)
+  }
+
+  const stopDragging = () => {
+    if (!dragging) return
+    dragging = false
+    if (activePointerId !== null) {
+      stage.releasePointerCapture?.(activePointerId)
+      activePointerId = null
+    }
+    stage.style.cursor = getZoomLevel() > 1 ? "grab" : ""
+  }
+
+  stage.addEventListener("pointerdown", handlePointerDown)
+  stage.addEventListener("pointermove", handlePointerMove)
+  stage.addEventListener("pointerup", stopDragging)
+  stage.addEventListener("pointercancel", stopDragging)
+
+  return () => {
+    stage.removeEventListener("pointerdown", handlePointerDown)
+    stage.removeEventListener("pointermove", handlePointerMove)
+    stage.removeEventListener("pointerup", stopDragging)
+    stage.removeEventListener("pointercancel", stopDragging)
+  }
+}
+
+export const trapOverlayTabFocus = (event: KeyboardEvent, overlay: HTMLElement) => {
+  if (event.key !== "Tab") return
+
+  const focusable = Array.from(overlay.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute("disabled") &&
+      element.tabIndex !== -1 &&
+      element.offsetParent !== null
+  )
+  if (!focusable.length) return
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement as HTMLElement | null
+
+  if (event.shiftKey) {
+    if (!active || active === first || !overlay.contains(active)) {
+      event.preventDefault()
+      last.focus()
+    }
+    return
+  }
+
+  if (!active || active === last || !overlay.contains(active)) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+const resolvePreviousActiveElement = (): HTMLElement | null =>
+  typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null
+
+const configureMermaidStageSvg = (stageSvg: SVGSVGElement | null) => {
+  if (!stageSvg) return
+  stageSvg.removeAttribute("width")
+  stageSvg.removeAttribute("height")
+  stageSvg.style.maxWidth = "none"
+  stageSvg.style.width = "max-content"
+  stageSvg.style.height = "auto"
+  stageSvg.style.display = "block"
+  stageSvg.style.transition = "transform 0.14s ease"
+}
+
+const appendCopySourceButtonIfPresent = (actionsBar: HTMLElement, sourceText: string) => {
+  const trimmed = sourceText.trim()
+  if (!trimmed) return
+  const copySourceButton = createOverlayActionButton("코드 복사", "Mermaid 원본 코드 복사")
+  copySourceButton.addEventListener("click", () => {
+    const writePromise =
+      typeof navigator !== "undefined" ? navigator.clipboard?.writeText(sourceText) : undefined
+    if (!writePromise) {
+      copySourceButton.textContent = "복사 실패"
+      return
+    }
+    void writePromise
+      .then(() => {
+        copySourceButton.textContent = "복사됨"
+      })
+      .catch(() => {
+        copySourceButton.textContent = "복사 실패"
+      })
+  })
+  actionsBar.appendChild(copySourceButton)
+}
+
 export const openMermaidOverlay = (
   svgMarkup: string,
   previousCleanup?: (() => void) | null,
@@ -11,10 +179,7 @@ export const openMermaidOverlay = (
   if (typeof document === "undefined") return null
 
   previousCleanup?.()
-  const previousFocusedElement =
-    typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
+  const previousFocusedElement = resolvePreviousActiveElement()
 
   const overlay = document.createElement("div")
   overlay.setAttribute("data-aq-mermaid-overlay", "true")
@@ -40,26 +205,6 @@ export const openMermaidOverlay = (
   panel.style.background = "rgba(11, 16, 23, 0.98)"
   panel.style.padding = "0.75rem"
 
-  const createActionBtn = (label: string, ariaLabel: string) => {
-    const button = document.createElement("button")
-    button.type = "button"
-    button.textContent = label
-    button.setAttribute("aria-label", ariaLabel)
-    button.style.display = "inline-flex"
-    button.style.alignItems = "center"
-    button.style.justifyContent = "center"
-    button.style.minHeight = "44px"
-    button.style.padding = "0 0.8rem"
-    button.style.borderRadius = "999px"
-    button.style.border = "1px solid rgba(255, 255, 255, 0.2)"
-    button.style.background = "rgba(15, 23, 42, 0.7)"
-    button.style.color = "#f3f4f6"
-    button.style.fontSize = "0.82rem"
-    button.style.fontWeight = "700"
-    button.style.cursor = "pointer"
-    return button
-  }
-
   const actionsBar = document.createElement("div")
   actionsBar.className = "aq-mermaid-modal-actions"
   actionsBar.style.display = "flex"
@@ -68,10 +213,10 @@ export const openMermaidOverlay = (
   actionsBar.style.gap = "0.45rem"
   actionsBar.style.marginBottom = "0.56rem"
 
-  const zoomOutButton = createActionBtn("-", "축소")
-  const zoomResetButton = createActionBtn("100%", "배율 초기화")
-  const zoomInButton = createActionBtn("+", "확대")
-  const closeButton = createActionBtn("닫기", "닫기")
+  const zoomOutButton = createOverlayActionButton("-", "축소")
+  const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
+  const zoomInButton = createOverlayActionButton("+", "확대")
+  const closeButton = createOverlayActionButton("닫기", "닫기")
 
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
@@ -83,21 +228,14 @@ export const openMermaidOverlay = (
   const applyZoom = (nextZoom: number) => {
     zoomLevel = Math.max(0.5, Math.min(2.5, Math.round(nextZoom * 100) / 100))
     zoomResetButton.textContent = `${Math.round(zoomLevel * 100)}%`
+    stage.style.cursor = zoomLevel > 1 ? "grab" : ""
     if (stageSvg) {
       stageSvg.style.transform = `scale(${zoomLevel})`
       stageSvg.style.transformOrigin = "top left"
     }
   }
 
-  if (stageSvg) {
-    stageSvg.removeAttribute("width")
-    stageSvg.removeAttribute("height")
-    stageSvg.style.maxWidth = "none"
-    stageSvg.style.width = "max-content"
-    stageSvg.style.height = "auto"
-    stageSvg.style.display = "block"
-    stageSvg.style.transition = "transform 0.14s ease"
-  }
+  configureMermaidStageSvg(stageSvg)
 
   const handleZoomOut = () => applyZoom(zoomLevel - 0.25)
   const handleZoomReset = () => applyZoom(1)
@@ -110,27 +248,7 @@ export const openMermaidOverlay = (
   actionsBar.appendChild(zoomOutButton)
   actionsBar.appendChild(zoomResetButton)
   actionsBar.appendChild(zoomInButton)
-
-  if (sourceText.trim()) {
-    const copySourceButton = createActionBtn("코드 복사", "Mermaid 원본 코드 복사")
-    copySourceButton.addEventListener("click", () => {
-      const writePromise =
-        typeof navigator !== "undefined" ? navigator.clipboard?.writeText(sourceText) : undefined
-      if (!writePromise) {
-        copySourceButton.textContent = "복사 실패"
-        return
-      }
-      void writePromise
-        .then(() => {
-          copySourceButton.textContent = "복사됨"
-        })
-        .catch(() => {
-          copySourceButton.textContent = "복사 실패"
-        })
-    })
-    actionsBar.appendChild(copySourceButton)
-  }
-
+  appendCopySourceButtonIfPresent(actionsBar, sourceText)
   actionsBar.appendChild(closeButton)
 
   panel.appendChild(actionsBar)
@@ -138,6 +256,7 @@ export const openMermaidOverlay = (
   overlay.appendChild(panel)
   document.body.appendChild(overlay)
 
+  const detachDragPan = attachStageDragPan(stage, () => zoomLevel)
   const releaseBodyScrollLock = acquireBodyScrollLock()
   let closed = false
   let closeOverlay: () => void
@@ -149,32 +268,17 @@ export const openMermaidOverlay = (
       return
     }
 
-    if (event.key !== "Tab") return
-
-    const focusable = Array.from(overlay.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-      (element) =>
-        !element.hasAttribute("disabled") &&
-        element.tabIndex !== -1 &&
-        element.offsetParent !== null
-    )
-    if (!focusable.length) return
-
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    const active = document.activeElement as HTMLElement | null
-
-    if (event.shiftKey) {
-      if (!active || active === first || !overlay.contains(active)) {
-        event.preventDefault()
-        last.focus()
-      }
+    if (
+      handleZoomShortcutKey(event, {
+        onZoomIn: handleZoomIn,
+        onZoomOut: handleZoomOut,
+        onZoomReset: handleZoomReset,
+      })
+    ) {
       return
     }
 
-    if (!active || active === last || !overlay.contains(active)) {
-      event.preventDefault()
-      first.focus()
-    }
+    trapOverlayTabFocus(event, overlay)
   }
 
   const handleOverlayClick = (event: MouseEvent) => {
@@ -186,6 +290,7 @@ export const openMermaidOverlay = (
   closeOverlay = () => {
     if (closed) return
     closed = true
+    detachDragPan()
     releaseBodyScrollLock()
     overlay.remove()
     document.removeEventListener("keydown", handleOverlayKeyDown)

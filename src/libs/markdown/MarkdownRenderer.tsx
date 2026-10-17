@@ -1,4 +1,14 @@
-import { type CSSProperties, type FC, type ReactNode, memo, useEffect, useMemo, useRef } from "react"
+import {
+  type CSSProperties,
+  type FC,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
@@ -12,6 +22,7 @@ import {
   resolveMarkdownRenderModel,
 } from "src/libs/markdown/rendering"
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
+import { openImageLightboxOverlay } from "src/libs/markdown/imageLightboxOverlay"
 import useMermaidEffect from "src/libs/markdown/hooks/useMermaidEffect"
 import useResponsiveTableEffect from "src/libs/markdown/hooks/useResponsiveTableEffect"
 import useInlineColorEffect from "src/libs/markdown/hooks/useInlineColorEffect"
@@ -39,6 +50,49 @@ import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.t
 
 export { markdownGuide } from "src/libs/markdown/rendering"
 
+export const buildHeadingAnchorUrl = (locationHref: string, headingId: string): string => {
+  const trimmedId = headingId.trim().replace(/^#/, "")
+  const hashIndex = locationHref.indexOf("#")
+  const baseHref = hashIndex >= 0 ? locationHref.slice(0, hashIndex) : locationHref
+  if (!trimmedId) return baseHref
+  return `${baseHref}#${trimmedId}`
+}
+
+const handleHeadingAnchorClick = (target: Element): boolean => {
+  const heading = target.closest<HTMLElement>("h2[id], h3[id], h4[id]")
+  if (!heading?.id || target.closest("a")) return false
+  if (typeof window === "undefined") return false
+  const selectionText = window.getSelection?.()?.toString().trim() ?? ""
+  if (selectionText.length > 0) return false
+
+  window.history.replaceState(null, "", `#${heading.id}`)
+  const fullUrl = buildHeadingAnchorUrl(window.location.href, heading.id)
+  void navigator.clipboard?.writeText(fullUrl)?.catch(() => undefined)
+  heading.dataset.anchorCopied = "true"
+  window.setTimeout(() => {
+    delete heading.dataset.anchorCopied
+  }, 1500)
+  return true
+}
+
+const handleImageLightboxClick = (target: Element): boolean => {
+  if (target.closest("a[href], .aq-image-resize-handle")) return false
+  const image = target.closest<HTMLImageElement>(".aq-image-frame img")
+  if (!image) return false
+  const frame = image.closest<HTMLElement>(".aq-image-frame")
+  if (frame?.dataset.editable === "true") return false
+  const src = image.getAttribute("src") || image.src
+  if (!src) return false
+  const caption = frame?.querySelector("figcaption")?.textContent || undefined
+  openImageLightboxOverlay({
+    src,
+    alt: image.getAttribute("alt") || "",
+    caption,
+    trigger: image,
+  })
+  return true
+}
+
 const resolveMarkdownTableCellAlignment = (node: unknown, propAlignment: unknown, style: unknown) => {
   const nodeProperties = (node as { properties?: { align?: unknown; style?: unknown } } | null)?.properties
   const nodeAlignment = nodeProperties?.align
@@ -47,8 +101,8 @@ const resolveMarkdownTableCellAlignment = (node: unknown, propAlignment: unknown
       ? (style as { textAlign?: unknown }).textAlign
       : undefined
   const serializedStyle = typeof nodeProperties?.style === "string" ? nodeProperties.style : ""
-  const serializedStyleAlignment = serializedStyle
-    .match(/text-align:\s*(left|center|right)/i)?.[1]
+  const serializedStyleAlignment = /text-align:\s*(left|center|right)/i
+    .exec(serializedStyle)?.[1]
     ?.toLowerCase()
   const alignment = propAlignment || nodeAlignment || styleAlignment || serializedStyleAlignment
   return typeof alignment === "string" ? alignment : undefined
@@ -87,7 +141,7 @@ export const hasLikelyMarkdownMath = (markdown: string): boolean => {
     while (cursor < currentLineEnd) {
       const nextDollar = markdown.indexOf("$", cursor)
       if (nextDollar === -1 || nextDollar >= currentLineEnd) break
-      if (nextDollar === 0 || markdown.charCodeAt(nextDollar - 1) !== 92) {
+      if (nextDollar === 0 || markdown.codePointAt(nextDollar - 1) !== 92) {
         dollarCountOnLine += 1
         if (dollarCountOnLine >= 2) return true
       }
@@ -249,14 +303,16 @@ export const createMarkdownComponentVariants = ({
       className?: string
       children?: ReactNode
     } & Record<string, unknown>) {
-      const rawFromChildren =
-        typeof children === "string"
-          ? children
-          : Array.isArray(children)
-            ? children
-                .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
-                .join("\n")
-            : extractTextFromMarkdownNode(children)
+      let rawFromChildren = ""
+      if (typeof children === "string") {
+        rawFromChildren = children
+      } else if (Array.isArray(children)) {
+        rawFromChildren = children
+          .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+          .join("\n")
+      } else {
+        rawFromChildren = extractTextFromMarkdownNode(children)
+      }
       const raw = rawFromChildren || extractTextFromCodeAst(node)
       const isInlineCode = !className && !raw.includes("\n")
 
@@ -393,6 +449,16 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     imageRenderOrderRef.current = 0
   }, [renderKey])
 
+  const handleRootClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (editableImages) return
+      if (!(event.target instanceof Element)) return
+      if (handleImageLightboxClick(event.target)) return
+      handleHeadingAnchorClick(event.target)
+    },
+    [editableImages]
+  )
+
   const componentVariants = useMemo(
     () =>
       createMarkdownComponentVariants({
@@ -427,6 +493,8 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
       <MarkdownRendererRoot
         ref={rootRef}
         className="aq-markdown"
+        data-editable={editableImages ? "true" : undefined}
+        onClick={handleRootClick}
         dangerouslySetInnerHTML={{ __html: resolvedContentHtml }}
       />
     )
@@ -437,7 +505,12 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   let standaloneImageIndex = -1
 
   return (
-    <MarkdownRendererRoot ref={rootRef} className="aq-markdown">
+    <MarkdownRendererRoot
+      ref={rootRef}
+      className="aq-markdown"
+      data-editable={editableImages ? "true" : undefined}
+      onClick={handleRootClick}
+    >
       {segments.map((segment, index) => {
         const imageIndex = segment.type === "image" ? (standaloneImageIndex += 1) : -1
         return renderMarkdownSegment({

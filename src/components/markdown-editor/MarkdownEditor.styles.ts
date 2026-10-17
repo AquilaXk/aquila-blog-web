@@ -327,32 +327,17 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     }
   `}
 
-  @media (max-width: 820px) {
-    font-size: 15px;
-  }
-
-  [data-testid="markdown-editor-live-surface"] {
-    height: 100%;
-  }
+  @media (max-width: 820px) { font-size: 15px; }
+  [data-testid="markdown-editor-live-surface"] { height: 100%; }
 
   .cm-editor {
     height: 100%;
     background: ${({ theme }) => theme.publicDesign.readableSurface};
     color: ${({ theme }) => theme.colors.gray12};
   }
-
-  .cm-editor.cm-focused {
-    outline: none;
-  }
-
-  .cm-scroller {
-    overscroll-behavior: contain;
-  }
-
-  .cm-content {
-    caret-color: ${({ theme }) => theme.colors.gray12};
-  }
-
+  .cm-editor.cm-focused { outline: none; }
+  .cm-scroller { overscroll-behavior: contain; }
+  .cm-content { caret-color: ${({ theme }) => theme.colors.gray12}; }
   .cm-placeholder {
     color: ${({ theme }) => theme.colors.gray9};
     font-style: normal;
@@ -364,10 +349,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   & .cm-focused .cm-selectionBackground {
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(56, 139, 253, 0.45)" : "rgba(9, 105, 218, 0.32)")};
   }
-
-  .cm-cursor {
-    border-left-color: ${({ theme }) => theme.colors.gray12};
-  }
+  .cm-cursor { border-left-color: ${({ theme }) => theme.colors.gray12}; }
 
   .cm-live-heading {
     color: ${({ theme }) => theme.colors.gray12};
@@ -375,44 +357,16 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     font-weight: 700;
     letter-spacing: -0.03em;
   }
-
-  .cm-live-heading-1 {
-    font-size: 2em;
-    line-height: 1.28;
-    margin-top: 1.1em;
-    margin-bottom: 0.4em;
-  }
-
-  .cm-live-heading-2 {
-    font-size: 1.6em;
-    line-height: 1.34;
-    margin-top: 1em;
-    margin-bottom: 0.35em;
-  }
-
+  .cm-live-heading-1 { font-size: 2em; line-height: 1.28; margin-top: 1.1em; margin-bottom: 0.4em; }
+  .cm-live-heading-2 { font-size: 1.6em; line-height: 1.34; margin-top: 1em; margin-bottom: 0.35em; }
   .cm-live-heading-3,
   .cm-live-heading-4,
   .cm-live-heading-5,
-  .cm-live-heading-6 {
-    font-size: 1.3em;
-    line-height: 1.4;
-    margin-top: 0.9em;
-    margin-bottom: 0.3em;
-  }
+  .cm-live-heading-6 { font-size: 1.3em; line-height: 1.4; margin-top: 0.9em; margin-bottom: 0.3em; }
 
-  .cm-live-strong {
-    color: ${({ theme }) => theme.colors.gray12};
-    font-weight: 750;
-  }
-
-  .cm-live-emphasis {
-    font-style: italic;
-  }
-
-  .cm-live-strikethrough {
-    text-decoration: line-through;
-    text-decoration-thickness: 1px;
-  }
+  .cm-live-strong { color: ${({ theme }) => theme.colors.gray12}; font-weight: 750; }
+  .cm-live-emphasis { font-style: italic; }
+  .cm-live-strikethrough { text-decoration: line-through; text-decoration-thickness: 1px; }
 
   .cm-live-inline-code {
     border: 1px solid ${({ theme }) => theme.publicDesign.border};
@@ -545,6 +499,27 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-live-heading-line-2 { padding-top: 0.5em; padding-bottom: 0.18em; }
   .cm-live-list { border-left: 1px solid ${({ theme }) => theme.colors.gray5}; padding-left: 2px; }
 
+  .cm-line.cm-live-code-line {
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    border-left: 1px solid ${({ theme }) => theme.publicDesign.border};
+    border-right: 1px solid ${({ theme }) => theme.publicDesign.border};
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .cm-line.cm-live-code-fence-open {
+    border-top: 1px solid ${({ theme }) => theme.publicDesign.border};
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding-top: 4px;
+  }
+  .cm-line.cm-live-code-body-line { padding-top: 1px; padding-bottom: 1px; }
+  .cm-line.cm-live-code-fence-close {
+    border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding-bottom: 4px;
+  }
+
   .cm-live-code-fence-open[data-code-lang] {
     position: relative;
     &::after {
@@ -581,8 +556,5 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     line-height: 1.65;
   }
 
-  &[aria-disabled="true"] .cm-editor {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
+  &[aria-disabled="true"] .cm-editor { cursor: not-allowed; opacity: 0.7; }
 `
