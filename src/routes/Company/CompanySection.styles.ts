@@ -140,9 +140,9 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(1.5rem, 3vw, 2.5rem);
+  padding: ${({ $layout }) => ($layout === "phone" ? "clamp(1.25rem, 2.5vw, 2rem)" : "0")};
   border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
+  border-radius: ${({ $layout }) => ($layout === "phone" ? `${radius.lg}px` : `${radius.md}px`)};
   background: ${light.surface};
   overflow: hidden;
 
@@ -155,8 +155,8 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
     display: block;
     width: 100%;
     height: auto;
-    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.35rem" : `${radius.md}px`)};
-    box-shadow: ${variables.ui.card.shadowFloating};
+    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.35rem" : "0")};
+    box-shadow: ${({ $layout }) => ($layout === "phone" ? variables.ui.card.shadowFloating : "none")};
   }
 `
 
@@ -264,27 +264,22 @@ export const ProductAction = styled.a`
 export const StoryLayout = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  align-items: start;
+  align-items: end;
   gap: clamp(1.75rem, 5vw, 4.5rem);
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
   }
 `
 
 export const StoryHeadline = styled.h2`
   margin: 0;
-  font-size: clamp(1.9rem, 4vw, 2.9rem);
-  line-height: 1.16;
+  font-size: clamp(1.75rem, 3.4vw, 2.65rem);
+  line-height: 1.18;
   letter-spacing: -0.025em;
   font-weight: ${fontWeight.medium};
   color: ${light.inkPrimary};
-
-  strong {
-    display: block;
-    font-weight: ${fontWeight.medium};
-    color: ${light.inkSecondary};
-  }
 `
 
 export const StatList = styled.dl`

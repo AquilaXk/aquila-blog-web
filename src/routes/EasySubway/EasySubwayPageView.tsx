@@ -1,20 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useCallback, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { CONFIG } from "site.config"
-import EasySubwayLineArt from "src/routes/EasySubway/EasySubwayLineArt"
 import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
 import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
 import useScrollReveal from "src/routes/EasySubway/useScrollReveal"
 import {
   COMPANY_SURFACE,
   COMPANY_URL,
-  COMPARISON_TRACKS,
   CONTACT_MAILTO,
-  FAQ_ITEMS,
   OFFICIAL_METRO_BADGES,
   PRODUCT_FEATURES,
   PRODUCT_FOOTER_LINKS,
-  PRODUCT_META_FACTS,
   PRODUCT_RELEASE_STATUS,
   PRODUCT_SCREENSHOT,
   PRODUCT_SCREENSHOT_ALT,
@@ -22,10 +18,101 @@ import {
   PRODUCT_SURFACE,
   TIMELINE_SCREENSHOT,
   TIMELINE_SCREENSHOT_ALT,
+  type MetroBadgeItem,
 } from "src/routes/EasySubway/EasySubwayPageModel"
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
 
 const [PICK_FEATURE, ROUTE_FEATURE] = PRODUCT_FEATURES
+
+const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 15 }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+export const EasySubwayMetroDirectory: React.FC<{ badges?: MetroBadgeItem[] }> = ({
+  badges = OFFICIAL_METRO_BADGES,
+}) => (
+  <div style={{ marginTop: "clamp(3rem, 6vw, 4.5rem)" }} data-reveal>
+    <S.Eyebrow>지원 노선 데이터</S.Eyebrow>
+    <S.MetroSectionTitle>공식 20개 노선 무장애 데이터 연동</S.MetroSectionTitle>
+    <S.MetroSectionLead>
+      수도권 핵심 20개 도시철도 노선의 엘리베이터, 휠체어 리프트 및 환승 동선 정보를 실측 기준으로
+      제공합니다.
+    </S.MetroSectionLead>
+    <S.MetroBadgeGrid>
+      {badges.map((badge) => (
+        <S.MetroBadgeCard key={badge.id} data-reveal data-reveal-group="metro-badges">
+          <picture>
+            <source
+              srcSet={`/easysubway/badges/${badge.fileName.replace(/\.png$/, ".webp")}`}
+              type="image/webp"
+            />
+            <img
+              src={`/easysubway/badges/${badge.fileName}`}
+              alt=""
+              aria-hidden="true"
+              width={28}
+              height={28}
+              loading="lazy"
+              decoding="async"
+            />
+          </picture>
+          <span>{badge.name}</span>
+        </S.MetroBadgeCard>
+      ))}
+    </S.MetroBadgeGrid>
+  </div>
+)
+
+export const EasySubwayCopyEmailButton: React.FC<{
+  status: "idle" | "copied" | "failed"
+  onClick?: () => void
+}> = ({ status, onClick }) => (
+  <S.CopyEmailButton
+    type="button"
+    onClick={onClick}
+    aria-label={
+      status === "copied"
+        ? "이메일 주소가 복사되었습니다"
+        : status === "failed"
+          ? "이메일 주소 복사에 실패했습니다"
+          : "이메일 주소 복사"
+    }
+  >
+    <S.CopyIconWrapper aria-hidden="true">
+      {status === "copied" ? (
+        <svg viewBox="0 0 24 24">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+        </svg>
+      ) : status === "failed" ? (
+        <svg viewBox="0 0 24 24">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+        </svg>
+      )}
+    </S.CopyIconWrapper>
+    <span>
+      {status === "copied"
+        ? "복사 완료"
+        : status === "failed"
+          ? "복사 실패"
+          : "이메일 주소 복사"}
+    </span>
+  </S.CopyEmailButton>
+)
 
 /**
  * `surfaceUrl`은 요청 호스트로 resolve한 이 표면의 공개 URL이다(페이지의 canonical과 같은 값).
@@ -41,14 +128,33 @@ type Props = {
 const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
   const surfaceRef = useScrollReveal<HTMLDivElement>()
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle")
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current)
+      }
+    }
+  }, [])
+
+  const scheduleCopyReset = useCallback((nextStatus: "copied" | "failed") => {
+    setCopyStatus(nextStatus)
+    if (copyResetTimerRef.current) {
+      clearTimeout(copyResetTimerRef.current)
+    }
+    copyResetTimerRef.current = setTimeout(() => {
+      setCopyStatus("idle")
+      copyResetTimerRef.current = null
+    }, 2000)
+  }, [])
 
   const handleCopyEmail = useCallback(async () => {
     const email = PRODUCT_SURFACE.contactEmail
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(email)
-        setCopyStatus("copied")
-        setTimeout(() => setCopyStatus("idle"), 2000)
+        scheduleCopyReset("copied")
         return
       }
       if (typeof document !== "undefined" && document.execCommand) {
@@ -62,18 +168,15 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
         const successful = document.execCommand("copy")
         document.body.removeChild(textarea)
         if (successful) {
-          setCopyStatus("copied")
-          setTimeout(() => setCopyStatus("idle"), 2000)
+          scheduleCopyReset("copied")
           return
         }
       }
-      setCopyStatus("failed")
-      setTimeout(() => setCopyStatus("idle"), 2000)
+      scheduleCopyReset("failed")
     } catch {
-      setCopyStatus("failed")
-      setTimeout(() => setCopyStatus("idle"), 2000)
+      scheduleCopyReset("failed")
     }
-  }, [])
+  }, [scheduleCopyReset])
 
   return (
     <S.ProductSurface ref={surfaceRef}>
@@ -92,22 +195,25 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
 
       <main>
         <S.Hero>
-          <S.LineArtLayer $align="bottom">
-            <EasySubwayLineArt />
-          </S.LineArtLayer>
-          <S.HeroCopy>
+          <S.HeroCopy data-reveal>
             <S.StatusBadge>{PRODUCT_RELEASE_STATUS}</S.StatusBadge>
             <S.HeroTitle>
               갈 수 있는 길을
-              <strong>먼저 보여주는 지하철</strong>
+              <span>먼저 보여주는 지하철</span>
             </S.HeroTitle>
             <S.HeroLead>
-              계단과 환승 동선을 함께 계산해 <S.InlineHighlight>끝까지 이동할 수 있는 경로</S.InlineHighlight>
-              를 먼저 내놓습니다.
+              계단과 환승 동선을 함께 계산해 끝까지 이동할 수 있는 경로를 먼저 내놓습니다.
             </S.HeroLead>
+            <S.HeroActions>
+              <S.ButtonAction href="#features">
+                <span>핵심 기능 살펴보기</span>
+                <ArrowRightGlyph size={15} />
+              </S.ButtonAction>
+              <S.SecondaryPillAction href="#scope">제공 범위 확인하기</S.SecondaryPillAction>
+            </S.HeroActions>
           </S.HeroCopy>
-          <S.HeroPhoneWrap>
-            <S.PhoneFrame $width="21.5rem">
+          <S.HeroPhoneWrap data-reveal data-reveal-delay="100">
+            <S.PhoneFrame $width="20.5rem">
               <picture>
                 <source srcSet="/easysubway/station-detail.webp" type="image/webp" />
                 <img
@@ -124,45 +230,17 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
           </S.HeroPhoneWrap>
         </S.Hero>
 
-        <S.Section $tone="raised" id="overview">
-          <S.SectionInner>
-            <S.IntroLayout data-reveal>
-              <div>
-                <S.Eyebrow>제품 개요</S.Eyebrow>
-                <S.DisplayHeading>
-                  교통약자의 이동 경로를
-                  <strong>직접 검증합니다</strong>
-                </S.DisplayHeading>
-              </div>
-              <S.IntroAside>
-                공공데이터와 현장 실측을 바탕으로 <strong>휠체어와 유모차 이동에 필요한 편의시설</strong>을 직접 검증합니다.
-              </S.IntroAside>
-            </S.IntroLayout>
-            <S.MetaFactRow>
-              {PRODUCT_META_FACTS.map((fact) => (
-                <div key={fact.id} data-reveal data-reveal-group="overview-facts">
-                  <dt>{fact.label}</dt>
-                  <dd>
-                    <S.MetaBadge $accent={fact.accent}>{fact.value}</S.MetaBadge>
-                  </dd>
-                </div>
-              ))}
-            </S.MetaFactRow>
-          </S.SectionInner>
-        </S.Section>
-
-        <S.Section id="features">
+        <S.Section $tone="raised" id="features">
           <S.SectionInner>
             <S.IntroLayout data-reveal>
               <div>
                 <S.Eyebrow>핵심 기능</S.Eyebrow>
                 <S.DisplayHeading>
-                  노선도 한 화면에서
-                  <strong>역 선택과 이동 경로를 확인합니다</strong>
+                  노선도 한 화면에서 역 선택과 이동 경로를 확인합니다
                 </S.DisplayHeading>
               </div>
               <S.IntroAside>
-                노선도 화면에서 <strong>출발·경유·도착역 선택</strong>과 <strong>환승 경로 확인</strong>을 한 번에
+                노선도 화면에서 출발·경유·도착역 선택과 엘리베이터 중심의 환승 경로 확인을 한 번에
                 진행할 수 있습니다.
               </S.IntroAside>
             </S.IntroLayout>
@@ -172,7 +250,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                 <S.FeatureIndex>{PICK_FEATURE.tag}</S.FeatureIndex>
                 <S.FeatureName>{PICK_FEATURE.name}</S.FeatureName>
                 <S.FeatureBody>
-                  {PICK_FEATURE.lead} <S.InlineHighlight>{PICK_FEATURE.keyword}</S.InlineHighlight>
+                  {PICK_FEATURE.lead} {PICK_FEATURE.keyword}
                   {PICK_FEATURE.tail}
                 </S.FeatureBody>
               </div>
@@ -203,7 +281,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                 <S.FeatureIndex>{ROUTE_FEATURE.tag}</S.FeatureIndex>
                 <S.FeatureName>{ROUTE_FEATURE.name}</S.FeatureName>
                 <S.FeatureBody>
-                  {ROUTE_FEATURE.lead} <S.InlineHighlight>{ROUTE_FEATURE.keyword}</S.InlineHighlight>
+                  {ROUTE_FEATURE.lead} {ROUTE_FEATURE.keyword}
                   {ROUTE_FEATURE.tail}
                 </S.FeatureBody>
               </div>
@@ -223,205 +301,41 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                         />
                       </picture>
                     </S.TimelinePhoneFrame>
-                    <S.TimelineCalloutCluster>
-                      <S.TimelineCalloutCard>
-                        <S.CalloutHeader>
-                          <picture>
-                            <source srcSet="/easysubway/badges/seoul_4_compact_256.webp" type="image/webp" />
-                            <img
-                              src="/easysubway/badges/seoul_4_compact_256.png"
-                              alt="4호선"
-                              width={22}
-                              height={22}
-                            />
-                          </picture>
-                          <S.CalloutTag>빠른 환승·하차</S.CalloutTag>
-                        </S.CalloutHeader>
-                        <strong>9-2 승차 위치 안내</strong>
-                        <p>환승 엘리베이터 바로 앞으로 내릴 수 있는 최적의 승차 위치(칸·문)를 제시합니다.</p>
-                      </S.TimelineCalloutCard>
-                      <S.TimelineCalloutCard>
-                        <S.CalloutHeader>
-                          <S.CalloutIconSvg aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                              <path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 2v16h10V4H7zm2 2h6v2H9V6zm1 6l2-2 2 2h-1.5v3h-1v-3H10zm0 5l2 2 2-2h-1.5v-3h-1v3H10z" />
-                            </svg>
-                          </S.CalloutIconSvg>
-                          <S.CalloutTag>단차 0cm 이동</S.CalloutTag>
-                        </S.CalloutHeader>
-                        <strong>엘리베이터 직결 동선</strong>
-                        <p>계단과 턱을 배제하고 지상 출구부터 승강장까지 100% 수직 이동 경로를 시각화합니다.</p>
-                      </S.TimelineCalloutCard>
-                      <S.TimelineCalloutCard>
-                        <S.CalloutHeader>
-                          <S.CalloutIconSvg aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                              <path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 11v-2c-1.54.02-3.09-.75-4.07-1.83l-1.29-1.43c-.17-.19-.38-.34-.61-.45-.01 0-.01-.01-.02-.01H13c-.35-.2-.75-.31-1.18-.31C10.26 6.97 9 8.24 9 9.8v4.44c0 .43.18.84.49 1.14l2.84 2.76c.49.48 1.13.73 1.78.73.55 0 1.09-.18 1.54-.53l2.86-2.22c.65-.5.99-1.3.89-2.12zm-8.5 7c-2.48 0-4.5-2.02-4.5-4.5 0-1.82 1.09-3.39 2.66-4.09l.4 1.95c-.86.47-1.46 1.37-1.46 2.41 0 1.52 1.23 2.75 2.75 2.75 1.18 0 2.18-.74 2.57-1.78l1.96.42C14.3 19.33 12.57 20 10.5 20z" />
-                            </svg>
-                          </S.CalloutIconSvg>
-                          <S.CalloutTag>교통약자 특화</S.CalloutTag>
-                        </S.CalloutHeader>
-                        <strong>휠체어·유모차 맞춤 동선</strong>
-                        <p>단차 없는 지상 출구와 경사로를 우선 연계해 휠체어와 유모차 이동을 보장합니다.</p>
-                      </S.TimelineCalloutCard>
-                    </S.TimelineCalloutCluster>
                   </S.TimelineShowcase>
                 </S.FeatureStage>
               </div>
             </S.FeatureBlock>
 
-            <div style={{ marginTop: "clamp(2rem, 4vw, 3rem)" }}>
-              {/* [Phase 1 P0] 교통약자를 위한 무장애 경로 기준 컴포넌트 */}
-              <EasySubwayRouteSpecTable />
-            </div>
+            <EasySubwayRouteSpecTable />
           </S.SectionInner>
         </S.Section>
 
-        {/* [P2] 일반 지도앱 vs EasySubway 1:1 비교 섹션 */}
-        <S.Section id="compare">
+        <S.Section id="scope">
           <S.SectionInner>
-            <S.IntroLayout data-reveal>
-              <div>
-                <S.Eyebrow>비교 가이드</S.Eyebrow>
-                <S.DisplayHeading>
-                  일반 지도앱 vs
-                  <strong>EasySubway 무장애 경로</strong>
-                </S.DisplayHeading>
-              </div>
-              <S.IntroAside>
-                계단과 단차를 고려하지 않는 일반 길찾기와 달리, <strong>교통약자가 실제로 끝까지 완주할 수 있는 동선</strong>을 제공합니다.
-              </S.IntroAside>
-            </S.IntroLayout>
+            <div id="overview">
+              <S.IntroLayout data-reveal>
+                <div>
+                  <S.Eyebrow>제공 범위 및 검증 기준</S.Eyebrow>
+                  <S.DisplayHeading>
+                    검증을 마친 전국 도시철도 기준과 노선 데이터를 제공합니다
+                  </S.DisplayHeading>
+                </div>
+                <S.IntroAside>
+                  공공데이터와 현장 실측을 바탕으로 수도권과 광역시 주요 노선의 이동편의시설 정보를
+                  선별하여 반영합니다.
+                </S.IntroAside>
+              </S.IntroLayout>
 
-            <S.ComparisonGrid>
-              {COMPARISON_TRACKS.map((track) => (
-                <S.ComparisonCard
-                  key={track.id}
-                  $variant={track.badgeVariant}
-                  data-reveal
-                  data-reveal-delay={track.id === "easysubway" ? "120" : "60"}
-                >
-                  <S.ComparisonCardHeader>
-                    <S.ComparisonBadge $variant={track.badgeVariant}>
-                      {track.label}
-                    </S.ComparisonBadge>
-                    <S.ComparisonTitle>{track.title}</S.ComparisonTitle>
-                  </S.ComparisonCardHeader>
-                  <S.ComparisonList>
-                    {track.points.map((pt, i) => (
-                      <li key={i}>
-                        {track.id === "easysubway" ? (
-                          <S.ComparisonCheckIcon aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                            </svg>
-                          </S.ComparisonCheckIcon>
-                        ) : (
-                          <S.ComparisonCrossIcon aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
-                            </svg>
-                          </S.ComparisonCrossIcon>
-                        )}
-                        <div>
-                          <strong>{pt.title}</strong>
-                          <p>{pt.description}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </S.ComparisonList>
-                </S.ComparisonCard>
-              ))}
-            </S.ComparisonGrid>
-          </S.SectionInner>
-        </S.Section>
-
-        <S.Section $tone="raised" id="scope">
-          <S.SectionInner>
-            <S.IntroLayout data-reveal>
-              <div>
-                <S.Eyebrow>서비스 검증 기준</S.Eyebrow>
-                <S.DisplayHeading>
-                  안전한 이동을 보장하는
-                  <strong>데이터 검증 기준</strong>
-                </S.DisplayHeading>
+              <div style={{ marginTop: "clamp(2rem, 4vw, 3rem)" }}>
+                <EasySubwayTechSpecGrid />
               </div>
-              <S.IntroAside>
-                수도권과 광역시 주요 노선에서 <strong>검증을 통과한 이동편의시설 데이터</strong>만 선별하여 반영합니다.
-              </S.IntroAside>
-            </S.IntroLayout>
-            <div style={{ marginTop: "clamp(2rem, 4vw, 3rem)" }}>
-              <EasySubwayTechSpecGrid />
             </div>
 
-            {/* [P1] 공식 20개 노선 뱃지 그리드 */}
-            <div style={{ marginTop: "clamp(2.5rem, 5vw, 3.5rem)" }} data-reveal>
-              <S.Eyebrow>지원 노선 데이터</S.Eyebrow>
-              <S.MetroSectionTitle>
-                공식 20개 노선 무장애 데이터 연동
-              </S.MetroSectionTitle>
-              <S.MetroSectionLead>
-                4호선 하늘색 원형을 포함한 수도권 핵심 20개 도시철도 노선의 엘리베이터 및 환승 정보를 실측 데이터로 제공합니다.
-              </S.MetroSectionLead>
-              <S.MetroBadgeGrid>
-                {OFFICIAL_METRO_BADGES.map((badge) => (
-                  <S.MetroBadgeCard key={badge.id} data-reveal data-reveal-group="metro-badges">
-                    <picture>
-                      <source
-                        srcSet={`/easysubway/badges/${badge.fileName.replace(/\.png$/, ".webp")}`}
-                        type="image/webp"
-                      />
-                      <img
-                        src={`/easysubway/badges/${badge.fileName}`}
-                        alt={badge.name}
-                        width={26}
-                        height={26}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </picture>
-                    <span>{badge.name}</span>
-                  </S.MetroBadgeCard>
-                ))}
-              </S.MetroBadgeGrid>
-            </div>
+            <EasySubwayMetroDirectory />
           </S.SectionInner>
         </S.Section>
 
-        {/* [P2] FAQ 자주 묻는 질문 4종 */}
-        <S.Section id="faq">
-          <S.SectionInner>
-            <S.IntroLayout data-reveal>
-              <div>
-                <S.Eyebrow>자주 묻는 질문</S.Eyebrow>
-                <S.DisplayHeading>
-                  EasySubway에 대해
-                  <strong>궁금한 점을 확인하세요</strong>
-                </S.DisplayHeading>
-              </div>
-              <S.IntroAside>
-                서비스 무료 이용 여부, 지원 노선, 무추적 원칙 등 자주 묻는 질문 4종을 확인하실 수 있습니다.
-              </S.IntroAside>
-            </S.IntroLayout>
-
-            <S.FaqSection role="region" aria-label="자주 묻는 질문">
-              <S.FaqList>
-                {FAQ_ITEMS.map((item, idx) => (
-                  <S.FaqCard key={item.id} data-reveal data-reveal-group="faq-items">
-                    <S.FaqQuestionHeader>
-                      <S.FaqQuestionNumber>Q{idx + 1}</S.FaqQuestionNumber>
-                      <S.FaqQuestionText>{item.question}</S.FaqQuestionText>
-                    </S.FaqQuestionHeader>
-                    <S.FaqAnswerText>{item.answer}</S.FaqAnswerText>
-                  </S.FaqCard>
-                ))}
-              </S.FaqList>
-            </S.FaqSection>
-          </S.SectionInner>
-        </S.Section>
-
-        {/* [P2] 명확한 액션 라벨 및 원클릭 복사 CTA */}
-        <S.Section>
+        <S.Section $tone="raised">
           <S.ContactBand data-reveal>
             <div>
               <h2>출시 소식과 협업 문의</h2>
@@ -431,66 +345,35 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
               </p>
             </div>
             <S.ContactActionGroup>
-              <S.ButtonAction href={CONTACT_MAILTO}>서비스 문의하기</S.ButtonAction>
-              <S.CopyEmailButton
-                type="button"
-                onClick={handleCopyEmail}
-                aria-label={
-                  copyStatus === "copied"
-                    ? "이메일 주소가 복사되었습니다"
-                    : copyStatus === "failed"
-                      ? "이메일 주소 복사에 실패했습니다"
-                      : "이메일 주소 복사"
-                }
-              >
-                <S.CopyIconWrapper aria-hidden="true">
-                  {copyStatus === "copied" ? (
-                    <svg viewBox="0 0 24 24">
-                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                    </svg>
-                  ) : copyStatus === "failed" ? (
-                    <svg viewBox="0 0 24 24">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24">
-                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
-                    </svg>
-                  )}
-                </S.CopyIconWrapper>
-                <span>
-                  {copyStatus === "copied"
-                    ? "복사 완료!"
-                    : copyStatus === "failed"
-                      ? "복사 실패"
-                      : "이메일 복사"}
-                </span>
-                <S.CopyEmailAddress>{PRODUCT_SURFACE.contactEmail}</S.CopyEmailAddress>
-              </S.CopyEmailButton>
+              <S.ButtonAction href={CONTACT_MAILTO}>
+                <span>서비스 문의하기</span>
+                <ArrowRightGlyph size={15} />
+              </S.ButtonAction>
+              <EasySubwayCopyEmailButton status={copyStatus} onClick={handleCopyEmail} />
             </S.ContactActionGroup>
           </S.ContactBand>
         </S.Section>
       </main>
 
-    <S.SurfaceFooter>
-      <S.FooterInner>
-        <S.FooterBrand>
-          <strong>{PRODUCT_SURFACE.name}</strong>
-          <span>교통약자를 먼저 생각한 지하철 길찾기</span>
-          <small>
-            © {CONFIG.since} {COMPANY_SURFACE.name}
-          </small>
-        </S.FooterBrand>
-        <S.FooterLinks aria-label="제품 관련 링크">
-          {PRODUCT_FOOTER_LINKS.map((link) => (
-            <a key={link.label} href={link.href}>
-              {link.label}
-            </a>
-          ))}
-        </S.FooterLinks>
-      </S.FooterInner>
-    </S.SurfaceFooter>
-  </S.ProductSurface>
+      <S.SurfaceFooter>
+        <S.FooterInner>
+          <S.FooterBrand>
+            <strong>{PRODUCT_SURFACE.name}</strong>
+            <span>교통약자를 먼저 생각한 지하철 길찾기</span>
+            <small>
+              © {CONFIG.since} {COMPANY_SURFACE.name}
+            </small>
+          </S.FooterBrand>
+          <S.FooterLinks aria-label="제품 관련 링크">
+            {PRODUCT_FOOTER_LINKS.map((link) => (
+              <a key={link.label} href={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </S.FooterLinks>
+        </S.FooterInner>
+      </S.SurfaceFooter>
+    </S.ProductSurface>
   )
 }
 

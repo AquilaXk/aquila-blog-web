@@ -54,8 +54,8 @@ export const NewsHeaderAction = styled.a`
 export const NewsGrid = styled.ul`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(1rem, 2vw, 1.5rem);
-  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  gap: clamp(2rem, 3.5vw, 2.75rem);
+  margin: clamp(2.25rem, 4vw, 3.25rem) 0 0;
   padding: 0;
   list-style: none;
 
@@ -70,15 +70,15 @@ export const NewsCard = styled.a`
   flex-direction: column;
   gap: 0.85rem;
   height: 100%;
-  padding: clamp(1.35rem, 2.2vw, 1.75rem);
-  border: 1px solid ${light.border};
-  border-radius: ${radius.lg}px;
-  background: ${light.surface};
+  padding: 1.35rem 0 0;
+  border-top: 1px solid ${light.border};
+  border-radius: 0;
+  background: transparent;
   text-decoration: none;
   transition: border-color ${TRANSITION};
 
   &:hover {
-    border-color: ${light.borderStrong};
+    border-top-color: ${light.borderStrong};
   }
 
   &:hover h3,
