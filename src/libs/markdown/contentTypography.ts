@@ -3,7 +3,12 @@ import { css } from "@emotion/react"
 type ThemeLike = {
   colors: Record<string, string>
   scheme?: "light" | "dark"
-  publicDesign: { accent: string; accentHover: string }
+  publicDesign: {
+    accent: string
+    accentHover: string
+    inlineCodeBg?: string
+    inlineCodeBorder?: string
+  }
 }
 
 export const articleTypographyScale = {
@@ -141,9 +146,18 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   ${selector} .aq-inline-code {
     border-radius: 0.42rem;
     padding: 0.14em 0.4em 0.16em;
-    background: rgba(255, 255, 255, 0.075);
+    background: var(
+      --aq-inline-code-bg,
+      ${theme.publicDesign.inlineCodeBg ??
+      (theme.scheme === "dark" ? "rgba(255, 255, 255, 0.075)" : "rgba(15, 23, 36, 0.055)")}
+    );
     color: #ff6b6b;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 0 0 1px
+      var(
+        --aq-inline-code-border,
+        ${theme.publicDesign.inlineCodeBorder ??
+        (theme.scheme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 36, 0.12)")}
+      );
     letter-spacing: -0.01em;
     font-size: ${articleTypographyScale.codeFontSize};
     line-height: ${articleTypographyScale.codeLineHeight};

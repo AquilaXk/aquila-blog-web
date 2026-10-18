@@ -113,24 +113,34 @@ export const getDocString = (doc: EditorState["doc"]): string => {
 export const computeMinimalDocChange = (current: string, next: string) => {
   let from = 0
   const minLen = Math.min(current.length, next.length)
-  while (from < minLen && current.codePointAt(from) === next.codePointAt(from)) {
+  while (from < minLen && current.charCodeAt(from) === next.charCodeAt(from)) {
     from += 1
+  }
+  if (
+    from > 0 &&
+    ((current.charCodeAt(from - 1) & 0xfc00) === 0xd800 ||
+      (next.charCodeAt(from - 1) & 0xfc00) === 0xd800)
+  ) {
+    from -= 1
   }
   let currentEnd = current.length
   let nextEnd = next.length
   while (
     currentEnd > from &&
     nextEnd > from &&
-    current.codePointAt(currentEnd - 1) === next.codePointAt(nextEnd - 1)
+    current.charCodeAt(currentEnd - 1) === next.charCodeAt(nextEnd - 1)
   ) {
     currentEnd -= 1
     nextEnd -= 1
   }
-  return {
-    from,
-    to: currentEnd,
-    insert: next.slice(from, nextEnd),
+  if (
+    (currentEnd < current.length && (current.charCodeAt(currentEnd) & 0xfc00) === 0xdc00) ||
+    (nextEnd < next.length && (next.charCodeAt(nextEnd) & 0xfc00) === 0xdc00)
+  ) {
+    currentEnd += 1
+    nextEnd += 1
   }
+  return { from, to: currentEnd, insert: next.slice(from, nextEnd) }
 }
 
 let cachedDocBlocksEntry: {

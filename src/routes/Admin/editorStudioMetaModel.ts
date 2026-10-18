@@ -436,7 +436,11 @@ export const composeEditorContent = (
 }
 
 export const buildLocalDraftFingerprint = (payload: LocalDraftFingerprintPayload) =>
-  JSON.stringify(payload)
+  JSON.stringify({
+    ...payload,
+    content: computeContentFingerprint(payload.content),
+    summary: computeContentFingerprint(payload.summary),
+  })
 
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
   let fenceMarker: "`" | "~" | null = null

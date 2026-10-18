@@ -30,10 +30,6 @@ prismRuntime.manual = true
 let prismLoader: Promise<PrismLike> | null = null
 const loadedLoaders = new Set<string>()
 const failedLoaders = new Set<string>()
-const loadedSyncLoaders = new Set<string>()
-const failedSyncLoaders = new Set<string>()
-
-const syncRequire = (specifier: string) => require(specifier)
 
 const prismGrammarAliases: Record<string, string[]> = {
   html: ["markup"],
@@ -44,61 +40,9 @@ const prismGrammarAliases: Record<string, string[]> = {
   sh: ["bash"],
   shell: ["bash"],
   yml: ["yaml"],
+  md: ["markdown"],
+  py: ["python"],
   kt: ["kotlin"],
-}
-
-const prismImmediateLanguageLoaders: Record<string, (() => unknown)[]> = {
-  markup: [() => syncRequire("prismjs/components/prism-markup.js")],
-  html: [() => syncRequire("prismjs/components/prism-markup.js")],
-  xml: [() => syncRequire("prismjs/components/prism-markup.js")],
-  svg: [() => syncRequire("prismjs/components/prism-markup.js")],
-  javascript: [
-    () => syncRequire("prismjs/components/prism-markup-templating.js"),
-    () => syncRequire("prismjs/components/prism-javascript.js"),
-  ],
-  js: [
-    () => syncRequire("prismjs/components/prism-markup-templating.js"),
-    () => syncRequire("prismjs/components/prism-javascript.js"),
-  ],
-  jsx: [
-    () => syncRequire("prismjs/components/prism-markup.js"),
-    () => syncRequire("prismjs/components/prism-markup-templating.js"),
-    () => syncRequire("prismjs/components/prism-javascript.js"),
-    () => syncRequire("prismjs/components/prism-jsx.js"),
-  ],
-  typescript: [
-    () => syncRequire("prismjs/components/prism-markup-templating.js"),
-    () => syncRequire("prismjs/components/prism-javascript.js"),
-    () => syncRequire("prismjs/components/prism-typescript.js"),
-  ],
-  ts: [
-    () => syncRequire("prismjs/components/prism-markup-templating.js"),
-    () => syncRequire("prismjs/components/prism-javascript.js"),
-    () => syncRequire("prismjs/components/prism-typescript.js"),
-  ],
-  bash: [() => syncRequire("prismjs/components/prism-bash.js")],
-  shell: [() => syncRequire("prismjs/components/prism-bash.js")],
-  sh: [() => syncRequire("prismjs/components/prism-bash.js")],
-  json: [() => syncRequire("prismjs/components/prism-json.js")],
-  yaml: [() => syncRequire("prismjs/components/prism-yaml.js")],
-  yml: [() => syncRequire("prismjs/components/prism-yaml.js")],
-  markdown: [() => syncRequire("prismjs/components/prism-markdown.js")],
-  md: [() => syncRequire("prismjs/components/prism-markdown.js")],
-  sql: [() => syncRequire("prismjs/components/prism-sql.js")],
-  python: [() => syncRequire("prismjs/components/prism-python.js")],
-  py: [() => syncRequire("prismjs/components/prism-python.js")],
-  java: [
-    () => syncRequire("prismjs/components/prism-clike.js"),
-    () => syncRequire("prismjs/components/prism-java.js"),
-  ],
-  kotlin: [
-    () => syncRequire("prismjs/components/prism-clike.js"),
-    () => syncRequire("prismjs/components/prism-kotlin.js"),
-  ],
-  kt: [
-    () => syncRequire("prismjs/components/prism-clike.js"),
-    () => syncRequire("prismjs/components/prism-kotlin.js"),
-  ],
 }
 
 const prismLanguageLoaders: Record<string, (() => Promise<unknown>)[]> = {
@@ -277,33 +221,9 @@ export const ensurePrismLanguages = async (languages: string[]) => {
 
 const isGenericLanguage = (language: string) => ["", "text", "plain", "plaintext", "txt"].includes(language)
 
-const ensureImmediatePrismLanguages = (language: string) => {
-  const loaders = prismImmediateLanguageLoaders[language] || []
-
-  for (const load of loaders) {
-    const cacheKey = `${language}:${load.toString()}`
-    if (loadedSyncLoaders.has(cacheKey)) continue
-    if (failedSyncLoaders.has(cacheKey)) continue
-    try {
-      load()
-      loadedSyncLoaders.add(cacheKey)
-    } catch (error) {
-      failedSyncLoaders.add(cacheKey)
-      console.warn(`[prism] immediate language loader failed: ${language}`, error)
-    }
-  }
-}
-
 const resolvePrismGrammar = (language: string) => {
   const prismLanguages = (Prism as PrismLike).languages || {}
   const candidates = [language, ...(prismGrammarAliases[language] || [])]
-
-  for (const candidate of candidates) {
-    const grammar = prismLanguages[candidate]
-    if (grammar) return grammar
-  }
-
-  ensureImmediatePrismLanguages(language)
 
   for (const candidate of candidates) {
     const grammar = prismLanguages[candidate]

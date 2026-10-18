@@ -14,25 +14,119 @@ import {
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
-import { EditorStudioDeleteConfirmDialog } from "./EditorStudioDeleteConfirmDialog"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
 import { deriveComposeViewModel, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
-import { buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
-import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
-import { Main, HeroCard, HeroIntro, StudioStatusItem, StudioStatusStrip, WorkspaceGrid, WorkspaceMain } from "./EditorStudioWorkspaceControllerRoot.styles"
-import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard } from "./EditorStudioWorkspaceControllerRootModel"
+import { buildEditorStateFingerprint, detectPublishPlaceholderIssue, type LocalDraftSource } from "./editorStudioMetaModel"
+import { isLocalDraftRestoreSuggestionEligible, type LocalDraftFingerprintSnapshot } from "./useEditorStudioDraftLifecycleModel"
+import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
+
+type EditorStudioWorkspaceControllerRootViewBag = {
+  [key: string]: unknown
+  addTagsToPost: (tags: string[]) => void
+  addTagToPost: (tag: string) => void
+  applyFirstBodyImageToThumbnail: () => void
+  clearLocalDraft: () => void
+  discardLocalDraftCandidate: () => void
+  closePublishModal: () => void
+  commitPreviewThumbTransform: (next: { focusX: number; focusY: number; zoom: number }) => void
+  customCategoryCatalog: string[]
+  deferredContentDerived: { firstImage: string }
+  dismissedLocalDraft: LocalDraftFingerprintSnapshot[]
+  dismissLocalDraftRestoreSuggestion: () => void
+  disabled: (key: string) => boolean
+  editorMode: "create" | "edit"
+  finalizePreviewThumbPointer: any
+  handleMarkdownEditorChange: (next: string, meta?: { editorFocused: boolean }) => void
+  handleMarkdownEditorFileUpload: (file: File) => Promise<{
+    url?: string
+    name?: string
+    mimeType?: string
+    sizeBytes?: number
+    description?: string
+  }>
+  handleMarkdownEditorImageUpload: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>
+  handleConfirmPublish: () => Promise<void>
+  handleExitDedicatedEditor: () => void
+  handleFlushMarkdownReady: (flushFn: (() => string) | null) => void
+  commitPostCategory: () => void
+  handlePostCategoryChange: (value: string) => void
+  handlePostSummaryChange: (value: string) => void
+  handlePreviewThumbPointerDown: any
+  handlePreviewThumbPointerMove: any
+  handleThumbnailImageFileChange: any
+  handleThumbnailPaste: any
+  handleThumbnailUrlModalChange: (value: string) => void
+  handleTitleChange: any
+  handleTitleFieldRef: (node: HTMLTextAreaElement | null) => void
+  handleTitleKeyDown: any
+  handleFocusTitle: () => void
+  isCompactMobileLayout: boolean
+  isDedicatedEditorRoute: boolean
+  isDedicatedNewEditorRoute: boolean
+  isMobileMetaEditorOpen: boolean
+  isMobileThumbnailEditorOpen: boolean
+  isNewEditorBootstrapPending: boolean
+  isPreviewThumbDragging: boolean
+  isPreviewThumbnailError: boolean
+  isPublishModalOpen: boolean
+  isTempDraftMode: boolean
+  getCurrentPostContent: () => string
+  lastLocalDraftFingerprintRef: { current: string }
+  loadingKey: string
+  localDraftCandidate: LocalDraftFingerprintSnapshot | null
+  localDraftCandidates: LocalDraftFingerprintSnapshot[]
+  localDraftSavedAt: string
+  localDraftSource: LocalDraftSource
+  openPublishModal: (type: PublishActionType) => void
+  openThumbnailFileInput: () => void
+  postCategory: string
+  postContent: string
+  postId: string
+  postSummary: string
+  postSummarySource: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE"
+  summaryIntent: SummaryIntent
+  postTags: string[]
+  postThumbnailFocusX: number
+  postThumbnailFocusY: number
+  postThumbnailUrl: string
+  postThumbnailZoom: number
+  postTitle: string
+  postVisibility: any
+  publishActionType: PublishActionType
+  publishModalNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
+  publishNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
+  previewThumbFrameRef: any
+  previewThumbTransformRef: { current: { focusX: number; focusY: number; zoom: number } }
+  resetThumbnailToAutoMode: () => void
+  removeTagFromPost: (tag: string) => void
+  restoreLocalDraft: () => void
+  selectLocalDraftCandidate: (key: string) => void
+  restoredLocalDraft: LocalDraftFingerprintSnapshot[]
+  result: string
+  safePreviewThumbnail: string
+  serverBaselineEditorFingerprintRef: { current: string }
+  sessionMember: unknown
+  setIsMobileMetaEditorOpen: (updater: (current: boolean) => boolean) => void
+  setIsMobileThumbnailEditorOpen: (updater: (current: boolean) => boolean) => void
+  setIsPreviewThumbnailError: (value: boolean) => void
+  setPostVisibility: (value: any) => void
+  setTagDraft: (value: string) => void
+  tagDraft: string
+  thumbnailImageFileInputRef: any
+  thumbnailImageFileName: string
+}
 
 type EditorStudioWorkspaceControllerRootViewProps = {
-  props: Record<string, any>
+  props: EditorStudioWorkspaceControllerRootViewBag
 }
 
 export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioWorkspaceControllerRootViewProps) => {
   const {
     addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
-    closeDeleteConfirm, closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
-    deleteConfirmNotice, deleteConfirmState, deletePostsFromList, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
+    closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
+    dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
     disabled, editorMode, finalizePreviewThumbPointer, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
     commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
@@ -47,7 +141,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishNotice, previewThumbFrameRef, previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost,
     restoreLocalDraft, selectLocalDraftCandidate, restoredLocalDraft, result, safePreviewThumbnail,
     serverBaselineEditorFingerprintRef, sessionMember, setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen,
-    setIsPreviewThumbnailError, setPostVisibility, setTagDraft, studioSurface, tagDraft, thumbnailImageFileInputRef,
+    setIsPreviewThumbnailError, setPostVisibility, setTagDraft, tagDraft, thumbnailImageFileInputRef,
     thumbnailImageFileName,
   } = props
   const [isMarkdownUploading, setIsMarkdownUploading] = useState(false)
@@ -119,11 +213,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       }),
     [currentVisibilityText, editorMode, isTempDraftMode, postId, postSummary, postTags, postTitle]
   )
-  const {
-    hasSelectedManagedPost,
-    currentPostLabel,
-    composePageTitle,
-  } = composeViewModel
+  const { hasSelectedManagedPost } = composeViewModel
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
   const publishPlaceholderIssue = hasEditorMinimumFields
@@ -154,7 +244,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     localDraftSavedAt,
     pristineCreateFingerprint,
   })
-  const eligibleLocalDraftCandidates = localDraftCandidates.filter((candidate: any) => isLocalDraftRestoreSuggestionEligible({
+  const eligibleLocalDraftCandidates = localDraftCandidates.filter((candidate) => isLocalDraftRestoreSuggestionEligible({
     candidate,
     currentSource: localDraftSource,
     editorFingerprint: editorStateFingerprint,
@@ -164,8 +254,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   }))
   const isLocalDraftRestoreSuggestionVisible = eligibleLocalDraftCandidates.length > 0
   const selectedLocalDraftCandidateKey = eligibleLocalDraftCandidates.some(
-    (candidate: any) => candidate.key === localDraftCandidate?.key
-  ) ? localDraftCandidate.key : ""
+    (candidate) => candidate.key === localDraftCandidate?.key
+  ) ? (localDraftCandidate?.key ?? "") : ""
   const getIsEditorUnsavedDirty = useCallback(() => {
     const liveContent =
       typeof getCurrentPostContent === "function" ? getCurrentPostContent() : postContent
@@ -240,7 +330,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishActionButtonDisabled,
     publishActionTriggerDisabled,
   } = publishActionViewModel
-  const isCompactManageSurface = isCompactMobileLayout && studioSurface === "manage"
   const shouldShowPublishModalNotice = publishModalNotice.tone !== "idle"
   const isCompactSplitPreview = false
   const shouldShowPublishNotice = publishNotice.tone !== "idle"
@@ -409,7 +498,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         isLocalDraftRestoreSuggestionVisible={isLocalDraftRestoreSuggestionVisible}
         isLocalDraftRestoreSuggestionActionsDisabled={loadingKey.length > 0}
         onRestoreLocalDraft={restoreLocalDraft}
-        localDraftCandidates={eligibleLocalDraftCandidates.map((candidate: any) => ({ key: candidate.key, label: candidate.label }))}
+        localDraftCandidates={eligibleLocalDraftCandidates.map((candidate) => ({ key: candidate.key, label: candidate.label ?? candidate.key }))}
         selectedLocalDraftCandidateKey={selectedLocalDraftCandidateKey}
         onSelectLocalDraftCandidate={selectLocalDraftCandidate}
         onDiscardLocalDraftCandidate={discardLocalDraftCandidate}
@@ -448,91 +537,5 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     )
   }
 
-  return (
-    <Main>
-      <HeroCard data-compact-manage={isCompactManageSurface}>
-        <HeroIntro data-compact-manage={isCompactManageSurface}>
-          <h1>{composePageTitle}</h1>
-          <p>제목과 본문에 집중하고, 발행 전 설정은 오른쪽에서 차분하게 마무리합니다.</p>
-          <StudioStatusStrip aria-label="글 작업실 상태 요약">
-            <StudioStatusItem>
-              <span>현재 작업</span>
-              <strong>{composePageTitle}</strong>
-            </StudioStatusItem>
-            {currentPostLabel ? (
-              <StudioStatusItem>
-                <span>원고</span>
-                <strong>{currentPostLabel}</strong>
-              </StudioStatusItem>
-            ) : null}
-            <StudioStatusItem data-optional="true">
-              <span>공개 범위</span>
-              <strong>{currentVisibilityText}</strong>
-            </StudioStatusItem>
-            {composeStatusText ? (
-              <StudioStatusItem data-optional="true">
-                <span>저장 상태</span>
-                <strong>{composeStatusText}</strong>
-              </StudioStatusItem>
-            ) : null}
-          </StudioStatusStrip>
-        </HeroIntro>
-      </HeroCard>
-
-      <WorkspaceGrid>
-        <WorkspaceMain>
-        <EditorStudioDeleteConfirmDialog
-          state={deleteConfirmState}
-          noticeTone={deleteConfirmNotice.tone}
-          noticeText={deleteConfirmNotice.text}
-          isDeleteDisabled={loadingKey === "deletePost"}
-          onClose={closeDeleteConfirm}
-          onConfirm={async (state) => {
-            const ok = await deletePostsFromList(state.ids)
-            if (ok) closeDeleteConfirm()
-          }}
-        />
-
-        {isPublishModalOpen ? (
-          <EditorStudioPublishModal
-            closeToggleLabel="접기"
-            isCompactMobileLayout={isCompactMobileLayout}
-            isMobileMetaEditorOpen={isMobileMetaEditorOpen}
-            isMobileThumbnailEditorOpen={isMobileThumbnailEditorOpen}
-            loadingKey={loadingKey}
-            modalNotice={publishModalNotice}
-            postVisibility={postVisibility}
-            previewMetaEditorPanel={previewMetaEditorPanel}
-            publishActionButtonDisabled={publishActionButtonDisabled}
-            publishActionButtonText={publishActionButtonText}
-            publishActionTitle={publishActionTitle}
-            setupDescription="썸네일 위치와 글 요약을 조정합니다."
-            shouldShowNotice={shouldShowPublishModalNotice}
-            thumbnailEditorPanel={thumbnailEditorPanel}
-            visibilityOptions={PUBLISH_VISIBILITY_OPTIONS}
-            onClose={closePublishModal}
-            onConfirmPublish={() => void handleConfirmPublish()}
-            onPostVisibilityChange={setPostVisibility}
-            onToggleMobileMetaEditor={() => setIsMobileMetaEditorOpen((current: boolean) => !current)}
-            onToggleMobileThumbnailEditor={() => setIsMobileThumbnailEditorOpen((current: boolean) => !current)}
-          />
-        ) : null}
-
-        </WorkspaceMain>
-
-      </WorkspaceGrid>
-
-      <EditorStudioResultLogPanel
-        eyebrow="실행 로그"
-        idleDescription="접어서 숨길 수 있습니다"
-        idleTitle="최근 작업 응답 보기"
-        loadingDescription={(currentLoadingKey) => `실행 중: ${currentLoadingKey}`}
-        loadingKey={loadingKey}
-        loadingTitle="작업 응답 확인 중"
-        result={result}
-        variant="standard"
-      />
-      {unsavedExitDialog}
-    </Main>
-  )
+  return null
 }

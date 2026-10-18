@@ -73,7 +73,11 @@ export const StorageMeter = styled.div`
     display: block;
     height: 0.28rem;
     border-radius: 4px;
-    background: linear-gradient(90deg, ${accentGold} 0 22%, ${surfaceMuted} 22% 100%);
+    background: linear-gradient(
+      90deg,
+      ${accentGold} 0 var(--cloud-storage-usage, 22%),
+      ${surfaceMuted} var(--cloud-storage-usage, 22%) 100%
+    );
   }
 `
 
