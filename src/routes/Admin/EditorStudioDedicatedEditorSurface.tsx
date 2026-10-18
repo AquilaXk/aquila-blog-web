@@ -1,7 +1,7 @@
 import type {
   ChangeEventHandler, KeyboardEvent as ReactKeyboardEvent, KeyboardEventHandler, ReactNode, Ref,
 } from "react"
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
 import {
@@ -256,7 +256,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
-  const handleToggleZenMode = () => {
+  const handleToggleZenMode = useCallback(() => {
     if (isZenMode) {
       setIsOutlineOpen(true)
       setIsInspectorOpen(true)
@@ -264,13 +264,21 @@ export const EditorStudioDedicatedEditorSurface = ({
       setIsOutlineOpen(false)
       setIsInspectorOpen(false)
     }
-  }
+  }, [isZenMode])
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault()
+        handleToggleZenMode()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [handleToggleZenMode])
 
   const deferredPostContent = useDeferredValue(postContent)
-  const outlineInsights = useMemo(
-    () => createMarkdownDocumentInsights(deferredPostContent),
-    [deferredPostContent]
-  )
+  const outlineInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
   const outlineItems = useMemo(() => {
     const title = postTitle.trim()
     return [
@@ -287,21 +295,13 @@ export const EditorStudioDedicatedEditorSurface = ({
     () => resolveActiveOutlineItemIndex(outlineItems, activeCursorOffset ?? lastActivatedOutlineOffset),
     [activeCursorOffset, lastActivatedOutlineOffset, outlineItems]
   )
-  const linkWarningCount = useMemo(
-    () => countMarkdownLinkWarnings(deferredPostContent),
-    [deferredPostContent]
-  )
-  const totalLinkCount = useMemo(
-    () => countMarkdownTotalLinks(deferredPostContent),
-    [deferredPostContent]
-  )
+  const linkWarningCount = useMemo(() => countMarkdownLinkWarnings(deferredPostContent), [deferredPostContent])
+  const totalLinkCount = useMemo(() => countMarkdownTotalLinks(deferredPostContent), [deferredPostContent])
   const cursorPosition = useMemo(
     () => computeCursorLineAndColumn(postContent, activeCursorOffset),
     [activeCursorOffset, postContent]
   )
-  const selectedCharCount = activeSelectionRange
-    ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from)
-    : 0
+  const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
   const handleTagDraftChange = (nextValue: string) => {
     const commaSeparated = /[,，]/
     if (!commaSeparated.test(nextValue)) {
@@ -362,7 +362,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             $active={isZenMode}
             onClick={handleToggleZenMode}
             aria-label="집중 모드 토글"
-            title="집중 모드 (사이드바 숨김)"
+            title="집중 모드 (사이드바 숨김 · Cmd/Ctrl+Shift+F)"
           >
             {isZenMode ? "집중 모드 켜짐" : "집중 모드"}
           </EditorSidebarToggleButton>
@@ -442,12 +442,16 @@ export const EditorStudioDedicatedEditorSurface = ({
             />
             <MobilePropertiesToggle
               type="button"
+              $visibleOnDesktop={isZenMode}
               onClick={() => setIsMobilePropertiesOpen((prev) => !prev)}
               aria-label="속성 정보 토글"
             >
               속성 {isMobilePropertiesOpen ? "접기 ▲" : `펼치기 (${postTags.length}개 태그) ▼`}
             </MobilePropertiesToggle>
-            <EditorHeaderMetaRow $collapsedOnMobile={!isMobilePropertiesOpen}>
+            <EditorHeaderMetaRow
+              $collapsedOnMobile={!isMobilePropertiesOpen}
+              $collapsedInZen={isZenMode && !isMobilePropertiesOpen}
+            >
               <EditorTagRow aria-label="태그 입력" $compact={isCompactSplitPreview}>
                 {postTags.map((tag) => (
                   <SelectedTagChip key={tag}>

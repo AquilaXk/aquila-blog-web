@@ -4,6 +4,28 @@ import { INLINE_COLOR_TOKEN_REGEX, resolveInlineColorValue } from "../../libs/ma
 const fallbackMarkdownParser = parser.configure(GFM)
 
 export const ENTRY_FLAG_IN_TASK = 1
+export const ENTRY_FLAG_HAS_PRIMARY_HIDE = 2
+export const ENTRY_FLAG_HAS_SECONDARY_HIDE = 4
+export const ENTRY_KIND_MASK = 0x1f
+
+const KIND_TO_CODE: Record<string, number> = {
+  "hide-mark": 0, heading: 1, strong: 2, emphasis: 3, strikethrough: 4,
+  "inline-code": 5, link: 6, task: 7, quote: 8, "quote-mark": 9,
+  list: 10, "list-marker": 11, "fenced-code": 12, "horizontal-rule": 13,
+  "inline-color": 14, highlight: 15, wikilink: 16,
+}
+
+export const packLivePreviewEntryMeta = (
+  kind: MarkdownLivePreviewDecoration["kind"],
+  flags = 0,
+  level = 0
+): number => ((KIND_TO_CODE[kind] ?? 0) & ENTRY_KIND_MASK) | ((flags & 0xff) << 5) | ((level & 0x7) << 13)
+
+export const unpackLivePreviewEntryMeta = (packed: number) => ({
+  kindCode: packed & ENTRY_KIND_MASK,
+  flags: (packed >>> 5) & 0xff,
+  level: (packed >>> 13) & 0x7,
+})
 
 export type MarkdownLiveSelection = {
   from: number
@@ -128,6 +150,26 @@ export const hasIntervalOverlap = (
   return false
 }
 
+export const hasEnclosingInterval = (
+  sortedRanges: ReadonlyArray<{ from: number; to: number }>,
+  from: number,
+  to: number
+): boolean => {
+  let low = 0
+  let high = sortedRanges.length - 1
+  let candidate = -1
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    if (sortedRanges[mid].from <= from) {
+      candidate = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return candidate !== -1 && sortedRanges[candidate].to >= to
+}
+
 export const resolveMarkdownLiveSourceRanges = (
   markdown: string,
   documentNode: MarkdownSyntaxNode,
@@ -215,6 +257,7 @@ export type MarkdownLivePreviewPlanEntry = {
   to: number
   kind: MarkdownLivePreviewDecoration["kind"]
   flags?: number
+  packedMeta: number
   decoration: MarkdownLivePreviewDecoration
   hideWhenActiveRange?: MarkdownLiveSourceRange
   secondaryHideWhenActiveRange?: MarkdownLiveSourceRange
@@ -226,14 +269,22 @@ const createPlanEntry = (
   decoration: MarkdownLivePreviewDecoration,
   hideWhenActiveRange?: MarkdownLiveSourceRange,
   secondaryHideWhenActiveRange?: MarkdownLiveSourceRange
-): MarkdownLivePreviewPlanEntry => ({
-  from: decoration.from,
-  to: decoration.to,
-  kind: decoration.kind,
-  decoration,
-  hideWhenActiveRange,
-  secondaryHideWhenActiveRange,
-})
+): MarkdownLivePreviewPlanEntry => {
+  const hideFlags =
+    (hideWhenActiveRange ? ENTRY_FLAG_HAS_PRIMARY_HIDE : 0) |
+    (secondaryHideWhenActiveRange ? ENTRY_FLAG_HAS_SECONDARY_HIDE : 0)
+  const flags = (decoration.flags ?? 0) | hideFlags
+  return {
+    from: decoration.from,
+    to: decoration.to,
+    kind: decoration.kind,
+    flags: decoration.flags,
+    packedMeta: packLivePreviewEntryMeta(decoration.kind, flags, decoration.level ?? 0),
+    decoration,
+    hideWhenActiveRange,
+    secondaryHideWhenActiveRange,
+  }
+}
 
 const cachedPreviewEntriesByNode = new WeakMap<
   MarkdownSyntaxNode,
@@ -241,12 +292,7 @@ const cachedPreviewEntriesByNode = new WeakMap<
 >()
 
 const LITERAL_NODE_NAMES = new Set([
-  "InlineCode",
-  "FencedCode",
-  "CodeBlock",
-  "HTMLBlock",
-  "HTMLTag",
-  "URL",
+  "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag", "URL",
 ])
 
 const collectLiteralRanges = (rootNode: MarkdownSyntaxNode): MarkdownLiveSourceRange[] => {
@@ -290,11 +336,11 @@ const collectRegexPlanEntries = (
   }
 
   if (markdown.includes("{{color:")) {
-    for (const match of markdown.matchAll(new RegExp(INLINE_COLOR_TOKEN_REGEX))) {
+    INLINE_COLOR_TOKEN_REGEX.lastIndex = 0
+    for (const match of markdown.matchAll(INLINE_COLOR_TOKEN_REGEX)) {
       const from = match.index
       const to = from + match[0].length
-      if (literalRanges.some((range) => from >= range.from && to <= range.to)) continue
-      if (wikilinkRanges.some((range) => from >= range.from && to <= range.to)) continue
+      if (hasEnclosingInterval(literalRanges, from, to) || hasEnclosingInterval(wikilinkRanges, from, to)) continue
       const color = resolveInlineColorValue(match[1])
       if (!color) continue
       const bodyFrom = from + match[0].indexOf("|") + 1
@@ -312,8 +358,7 @@ const collectRegexPlanEntries = (
     for (const match of markdown.matchAll(HIGHLIGHT_TOKEN_REGEX)) {
       const from = match.index
       const to = from + match[0].length
-      if (hasIntervalOverlap(literalRanges, from, to)) continue
-      if (hasIntervalOverlap(wikilinkRanges, from, to)) continue
+      if (hasIntervalOverlap(literalRanges, from, to) || hasIntervalOverlap(wikilinkRanges, from, to)) continue
       if (!match[1]?.trim()) continue
 
       const bodyFrom = from + 2
@@ -359,6 +404,7 @@ const tagEntriesInsideTasks = (
         const nextFlags = (entry.flags ?? 0) | ENTRY_FLAG_IN_TASK
         entry.flags = nextFlags
         entry.decoration.flags = nextFlags
+        entry.packedMeta |= ENTRY_FLAG_IN_TASK << 5
         break
       }
     }
@@ -394,9 +440,7 @@ export const buildMarkdownLivePreviewEntries = (
       return
     }
 
-    if (wikilinkRanges.some((w) => node.from >= w.from && node.to <= w.to)) {
-      return
-    }
+    if (hasEnclosingInterval(wikilinkRanges, node.from, node.to)) return
 
     if (node.name === "HeaderMark") {
       let to = node.to
@@ -489,22 +533,29 @@ export const resolveMarkdownLivePreviewPlanFromEntries = (
 ): MarkdownLivePreviewDecoration[] => {
   if (composing) return []
   const decorations: MarkdownLivePreviewDecoration[] = []
+  const hasSelections = selections.length > 0
+  const primaryBit = ENTRY_FLAG_HAS_PRIMARY_HIDE << 5
+  const secondaryBit = ENTRY_FLAG_HAS_SECONDARY_HIDE << 5
   for (const entry of entries) {
-    if (
-      entry.hideWhenActiveRange &&
-      isTokenActive(entry.hideWhenActiveRange.from, entry.hideWhenActiveRange.to, selections)
-    ) {
-      continue
-    }
-    if (
-      entry.secondaryHideWhenActiveRange &&
-      isTokenActive(
-        entry.secondaryHideWhenActiveRange.from,
-        entry.secondaryHideWhenActiveRange.to,
-        selections
-      )
-    ) {
-      continue
+    if (hasSelections) {
+      if (
+        (entry.packedMeta & primaryBit) !== 0 &&
+        entry.hideWhenActiveRange &&
+        isTokenActive(entry.hideWhenActiveRange.from, entry.hideWhenActiveRange.to, selections)
+      ) {
+        continue
+      }
+      if (
+        (entry.packedMeta & secondaryBit) !== 0 &&
+        entry.secondaryHideWhenActiveRange &&
+        isTokenActive(
+          entry.secondaryHideWhenActiveRange.from,
+          entry.secondaryHideWhenActiveRange.to,
+          selections
+        )
+      ) {
+        continue
+      }
     }
     decorations.push(entry.decoration)
   }

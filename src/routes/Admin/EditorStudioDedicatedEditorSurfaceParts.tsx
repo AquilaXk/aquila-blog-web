@@ -474,7 +474,7 @@ export const TitleInput = styled.textarea<{
   font-size: 36px;
   font-weight: 850;
   line-height: 1.25;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.03em;
   resize: none;
   overflow: hidden;
   white-space: pre-wrap;
@@ -495,8 +495,11 @@ export const TitleInput = styled.textarea<{
     font-size: 28px;
   }
 `;
-export const EditorHeaderMetaRow = styled.div<{ $collapsedOnMobile?: boolean }>`
-  display: flex;
+export const EditorHeaderMetaRow = styled.div<{
+  $collapsedOnMobile?: boolean;
+  $collapsedInZen?: boolean;
+}>`
+  display: ${({ $collapsedInZen }) => ($collapsedInZen ? "none" : "flex")};
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
@@ -508,8 +511,8 @@ export const EditorHeaderMetaRow = styled.div<{ $collapsedOnMobile?: boolean }>`
   }
 `;
 
-export const MobilePropertiesToggle = styled.button`
-  display: none;
+export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolean }>`
+  display: ${({ $visibleOnDesktop }) => ($visibleOnDesktop ? "inline-flex" : "none")};
   align-items: center;
   gap: 4px;
   background: transparent;

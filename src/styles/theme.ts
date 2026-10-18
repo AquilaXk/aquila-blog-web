@@ -17,6 +17,8 @@ export type PublicDesignTokens = {
   accent: string
   accentHover: string
   accentMuted: string
+  inlineCodeBg: string
+  inlineCodeBorder: string
   shadow: string
 }
 
@@ -52,6 +54,8 @@ export const createPublicDesignTokens = (scheme: SchemeType): PublicDesignTokens
     accent: scheme === "light" ? "#155eef" : "#78a7ff",
     accentHover: scheme === "light" ? "#0d4ed8" : "#9bbdff",
     accentMuted: scheme === "light" ? "#edf4ff" : "#17243d",
+    inlineCodeBg: scheme === "light" ? "rgba(15, 23, 36, 0.055)" : "rgba(255, 255, 255, 0.075)",
+    inlineCodeBorder: scheme === "light" ? "rgba(15, 23, 36, 0.12)" : "rgba(255, 255, 255, 0.12)",
     shadow: variables.ui.card.shadow,
   }
 }

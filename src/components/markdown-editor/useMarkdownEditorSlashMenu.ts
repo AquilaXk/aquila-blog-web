@@ -48,8 +48,16 @@ export const resolveSlashCommandMutation = (
       }
     }
   }
-  if (spec.id === "code-block") {
-    const cursor = slashStart + 6
+  const cursorOffsetBySpecId: Record<string, number> = {
+    "code-block": 6,
+    math: 3,
+    mermaid: 11,
+    toggle: 16,
+    bookmark: 20,
+  }
+  const innerOffset = cursorOffsetBySpecId[spec.id]
+  if (innerOffset !== undefined) {
+    const cursor = slashStart + innerOffset
     return {
       rangeStart: slashStart,
       rangeEnd: selectionEnd,
