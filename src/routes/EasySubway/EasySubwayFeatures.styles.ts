@@ -1,6 +1,6 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
-import { marketingLight as light } from "src/design-system/marketingPalette"
+import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 
 export const FeatureBlock = styled.div<{ $reverse?: boolean }>`
   display: grid;
@@ -201,21 +201,25 @@ export const TimelinePhoneFrame = styled.figure`
   flex: 0 0 auto;
   width: min(100%, 17.5rem);
   margin: 0 auto;
-  padding: 0.45rem;
-  border: 1px solid ${light.border};
-  border-radius: 1.75rem;
-  background: ${light.surface};
+  padding: 0.5rem;
+  border: 1px solid ${dark.borderStrong};
+  border-radius: 1.85rem;
+  background: ${dark.fieldDeep};
   box-shadow: ${light.phoneShadow};
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 1.35rem;
+    border-radius: 1.4rem;
   }
 
   @media (max-width: ${breakpoint.sm}px) {
     width: min(74%, 15rem);
+  }
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
   }
 `
 

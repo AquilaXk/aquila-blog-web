@@ -1,7 +1,7 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { marketingLight as light } from "src/design-system/marketingPalette"
+import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 
 export {
   DetailCrop,
@@ -361,10 +361,10 @@ export const PhoneFrame = styled.figure<{ $width?: string }>`
   position: relative;
   margin: 0;
   width: min(94%, ${({ $width }) => $width || "20.5rem"});
-  padding: 0.5rem;
-  border: 1px solid ${light.border};
+  padding: 0.55rem;
+  border: 1px solid ${dark.borderStrong};
   border-radius: 2rem;
-  background: ${light.surface};
+  background: ${dark.fieldDeep};
   box-shadow: ${light.phoneShadow};
 
   img {

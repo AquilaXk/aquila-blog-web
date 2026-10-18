@@ -144,6 +144,17 @@ test.describe("공개 표면 스모크: 회사 소개", () => {
     await expect(phone).toBeVisible()
     expect(await measureRenderedAspectRatio(phone)).toBeCloseTo(SCREENSHOT_ASPECT_RATIO, 2)
 
+    const phoneBezel = phone.locator("xpath=ancestor::picture[1]")
+    const companyBezelStyle = await phoneBezel.evaluate((el) => {
+      const style = window.getComputedStyle(el)
+      return {
+        backgroundColor: style.backgroundColor,
+        paddingTop: style.paddingTop,
+      }
+    })
+    expect(companyBezelStyle.backgroundColor).toBe("rgb(22, 25, 45)")
+    expect(Number.parseFloat(companyBezelStyle.paddingTop)).toBeGreaterThan(0)
+
     const blogCapture = page.locator("[data-ui='company-showcase-aquilalog']")
     await expect(blogCapture).toBeVisible()
     expect(await measureRenderedAspectRatio(blogCapture)).toBeCloseTo(BLOG_CAPTURE_ASPECT_RATIO, 2)
@@ -416,12 +427,41 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     })
   }
 
-  test("hero 폰 목업은 원본 비율을 유지하고 확대 컷만 잘린 컷으로 밝힌다", async ({ page }) => {
+  test("hero·타임라인 폰 목업은 다크 스마트폰 베젤과 원본 비율을 유지하고 확대 컷만 잘린 컷으로 밝힌다", async ({
+    page,
+  }) => {
     await page.goto("/easysubway")
-    // 전면 노출은 hero 한 번이며 1080x2340 원본 비율이어야 한다.
-    const heroPhone = page.locator("main figure img").first()
+    // 전면 노출은 hero 한 번이며 1080x2340 원본 비율과 물리적 다크 스마트폰 베젤을 가져야 한다.
+    const heroFrame = page.locator("main figure").first()
+    const heroPhone = heroFrame.locator("img")
     await expect(heroPhone).toBeVisible()
     expect(await measureRenderedAspectRatio(heroPhone)).toBeCloseTo(SCREENSHOT_ASPECT_RATIO, 2)
+
+    const heroBezelStyle = await heroFrame.evaluate((el) => {
+      const style = window.getComputedStyle(el)
+      return {
+        backgroundColor: style.backgroundColor,
+        paddingTop: style.paddingTop,
+      }
+    })
+    expect(heroBezelStyle.backgroundColor).toBe("rgb(22, 25, 45)")
+    expect(Number.parseFloat(heroBezelStyle.paddingTop)).toBeGreaterThan(0)
+
+    const timelineFrame = page.locator("#features figure").last()
+    const timelinePhone = timelineFrame.locator("img")
+    await expect(timelinePhone).toBeVisible()
+    expect(await measureRenderedAspectRatio(timelinePhone)).toBeCloseTo(SCREENSHOT_ASPECT_RATIO, 2)
+
+    const timelineBezelStyle = await timelineFrame.evaluate((el) => {
+      const style = window.getComputedStyle(el)
+      return {
+        backgroundColor: style.backgroundColor,
+        paddingTop: style.paddingTop,
+      }
+    })
+    expect(timelineBezelStyle.backgroundColor).toBe("rgb(22, 25, 45)")
+    expect(Number.parseFloat(timelineBezelStyle.paddingTop)).toBeGreaterThan(0)
+
     // 기능 블록의 확대 컷은 잘린 컷이므로 캡션이 그 사실을 밝혀야 한다.
     await expect(page.locator("#features figcaption")).toContainText("화면 일부")
   })

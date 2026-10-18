@@ -31,7 +31,7 @@ export const PRODUCT_SCREENSHOT_SIZE = {
 
 export const TIMELINE_SCREENSHOT = "/easysubway/timeline-detail.png"
 export const TIMELINE_SCREENSHOT_ALT =
-  "EasySubway 실제 무장애 타임라인 경로 결과 화면. 4호선 빠른 하차 9-2칸 및 엘리베이터 동선 안내."
+  "EasySubway 실제 무장애 타임라인 경로 결과 화면. 강남역에서 양재역까지 빠른 환승 3-2칸 및 엘리베이터 가까운 문 8-1 동선 안내."
 
 export type ProductFeature = {
   id: string
