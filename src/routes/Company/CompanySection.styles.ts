@@ -153,6 +153,10 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
     border-radius: ${({ $layout }) => ($layout === "phone" ? "1.85rem" : "0")};
     background: ${({ $layout }) => ($layout === "phone" ? dark.fieldDeep : "transparent")};
     box-shadow: ${({ $layout }) => ($layout === "phone" ? light.phoneShadow : "none")};
+
+    @media (forced-colors: active) {
+      border-color: CanvasText;
+    }
   }
 
   img {

@@ -82,15 +82,14 @@ export const COMPANY_NOTICE: CompanyNoticeLink = {
 }
 
 /**
- * 히어로 와이드 카드의 비주얼.
+ * 프로덕트 쇼케이스 내 블로그 비주얼.
  *
- * 브라우저 프레임 안의 컷은 라이브 공개 블로그(`CONFIG.link`) 홈을 1440 폭으로 캡처한 것이다.
- * 실제로 운영 중인 화면이라 자리를 채우는 껍데기가 아니며, 캡처 범위는 헤더·히어로·목차까지로
- * 잘라 글 목록의 외부 썸네일이 들어가지 않게 했다.
+ * 라이브 공개 블로그(`CONFIG.link`) 홈 화면을 1920x733 비율로 캡처한 정적 자산이며,
+ * 상단 내비게이션·주제별 태그 목차·검색창과 최근 글 목록 상단을 담는다.
  */
 export const BLOG_CAPTURE = "/company/blog-home.webp"
 export const BLOG_CAPTURE_ALT =
-  "AquilaLog 기술 블로그 홈 화면. 상단 내비게이션과 소개 헤드라인, 주제별 태그 목차, 검색창과 최근 기술 글 목록이 보인다."
+  "AquilaLog 기술 블로그 홈 화면. 상단 내비게이션과 좌측 주제별 태그 목차, 검색창과 최근 기술 글 목록이 보인다."
 export const BLOG_CAPTURE_SIZE = { width: 1920, height: 733 } as const
 
 /**
