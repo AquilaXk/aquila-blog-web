@@ -1,8 +1,7 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { marketingLight as light } from "src/design-system/marketingPalette"
-import { variables } from "src/styles"
+import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 import { MOTION_EASE_OUT, TRANSITION } from "src/routes/Company/CompanyPage.styles"
 
 export {
@@ -143,20 +142,25 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
   padding: ${({ $layout }) => ($layout === "phone" ? "clamp(1.25rem, 2.5vw, 2rem)" : "0")};
   border: 1px solid ${light.border};
   border-radius: ${({ $layout }) => ($layout === "phone" ? `${radius.lg}px` : `${radius.md}px`)};
-  background: ${light.surface};
+  background: ${({ $layout }) => ($layout === "phone" ? light.surfaceScaffold : light.surface)};
   overflow: hidden;
 
   picture {
     display: block;
-    width: ${({ $layout }) => ($layout === "phone" ? "min(100%, 14.5rem)" : "100%")};
+    width: ${({ $layout }) => ($layout === "phone" ? "min(100%, 15.25rem)" : "100%")};
+    padding: ${({ $layout }) => ($layout === "phone" ? "0.5rem" : "0")};
+    border: ${({ $layout }) => ($layout === "phone" ? `1px solid ${dark.borderStrong}` : "none")};
+    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.85rem" : "0")};
+    background: ${({ $layout }) => ($layout === "phone" ? dark.fieldDeep : "transparent")};
+    box-shadow: ${({ $layout }) => ($layout === "phone" ? light.phoneShadow : "none")};
   }
 
   img {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.35rem" : "0")};
-    box-shadow: ${({ $layout }) => ($layout === "phone" ? variables.ui.card.shadowFloating : "none")};
+    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.4rem" : "0")};
+    box-shadow: none;
   }
 `
 

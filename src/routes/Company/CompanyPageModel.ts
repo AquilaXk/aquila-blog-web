@@ -90,7 +90,7 @@ export const COMPANY_NOTICE: CompanyNoticeLink = {
  */
 export const BLOG_CAPTURE = "/company/blog-home.webp"
 export const BLOG_CAPTURE_ALT =
-  "AquilaLog 기술 블로그 홈 화면. 상단 내비게이션과 소개 헤드라인, FOCUS·UPDATED·REPOSITORY 메타 목록, 주제별 글 수 목차가 보인다."
+  "AquilaLog 기술 블로그 홈 화면. 상단 내비게이션과 소개 헤드라인, 주제별 태그 목차, 검색창과 최근 기술 글 목록이 보인다."
 export const BLOG_CAPTURE_SIZE = { width: 1920, height: 733 } as const
 
 /**
