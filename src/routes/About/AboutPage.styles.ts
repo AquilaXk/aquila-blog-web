@@ -103,6 +103,11 @@ export const StyledWrapper = styled.div`
     min-width: 0;
   }
 
+  section[data-has-divider="true"] {
+    padding-top: 24px;
+    border-top: 1px solid var(--aq-border);
+  }
+
   .about-grid h2 {
     margin: 0 0 16px;
     color: var(--aq-text);
@@ -178,6 +183,11 @@ export const StyledWrapper = styled.div`
     .about-grid {
       grid-template-columns: 1fr;
       gap: 34px;
+    }
+
+    .stack-row {
+      grid-template-columns: minmax(76px, 104px) minmax(0, 1fr);
+      gap: 12px;
     }
 
     .profile-inline {

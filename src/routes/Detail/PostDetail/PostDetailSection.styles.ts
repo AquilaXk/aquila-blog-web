@@ -36,6 +36,26 @@ export const MobileSummaryBar = styled.div `
     button strong {
       display: none;
     }
+
+    > span {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      border-radius: 6px;
+      border: 1px solid ${({ theme }) => theme.colors.gray6};
+      background: ${({ theme }) => theme.publicDesign.readableSurface};
+      color: ${({ theme }) => theme.colors.gray10};
+      font-size: 0.8125rem;
+      font-weight: 650;
+
+      > span {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+    }
   }
 `;
 export const RelatedSection = styled.section `
@@ -64,6 +84,10 @@ export const RelatedSection = styled.section `
     min-width: 0;
   }
 
+  li + li a {
+    border-top: 1px solid var(--aq-border);
+  }
+
   li a {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -71,7 +95,6 @@ export const RelatedSection = styled.section `
     gap: 20px;
     min-width: 0;
     padding: 18px 0;
-    border-top: 1px solid var(--aq-border);
     color: var(--aq-text);
     text-decoration: none;
     transition: color 0.18s cubic-bezier(0.215, 0.61, 0.355, 1);

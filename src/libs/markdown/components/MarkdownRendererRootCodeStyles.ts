@@ -362,6 +362,14 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
       --aq-code-gutter-gap: 0.46rem;
     }
 
+    .aq-code-block .aq-code {
+      padding: 14px 16px;
+    }
+
+    .aq-code-toolbar {
+      padding: 6px 12px;
+    }
+
     .aq-code-copy {
       font-size: 0.74rem;
     }
