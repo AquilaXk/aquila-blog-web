@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder as border,
   adminBorderStrong as borderStrong,
@@ -103,11 +104,12 @@ export const DetailActionLink = styled.a`
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: ${textSecondary};
+  color: ${textMuted};
   font-size: 0.81rem;
   font-weight: 820;
   text-decoration: none;
   white-space: nowrap;
+  ${focusVisibleRing}
 
   &:hover,
   &:focus-visible {

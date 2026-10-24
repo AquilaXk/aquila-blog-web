@@ -3,7 +3,6 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminAppBackground as appBackground,
   adminBorder as border,
-  adminBorderStrong as borderStrong,
   adminGold as accentGold,
   adminSurface as surface,
   adminSurfaceAccent as surfaceAccent,
@@ -260,13 +259,15 @@ export const FileTable = styled.table`
     grid-column: 1 / -1;
   }
 
-  tbody tr[data-selected="true"] {
-    background: ${surfaceAccent};
+  tbody tr:not([data-loading-row="true"]):hover,
+  tbody tr:not([data-loading-row="true"]):focus-within {
+    background: ${surfaceMuted};
   }
 
-  tbody tr:hover,
-  tbody tr:focus-within {
-    background: ${surfaceMuted};
+  tbody tr[data-selected="true"],
+  tbody tr[data-selected="true"]:hover,
+  tbody tr[data-selected="true"]:focus-within {
+    background: ${surfaceAccent};
   }
 
   tbody tr td:first-of-type {
@@ -371,11 +372,6 @@ export const FileThumbnailFrame = styled.span`
   svg {
     width: 1.25rem;
     height: 1.25rem;
-  }
-
-  &[data-selected="true"] {
-    background: transparent;
-    color: ${accentGold};
   }
 `
 

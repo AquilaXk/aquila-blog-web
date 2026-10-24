@@ -165,8 +165,12 @@ test.describe("관리자 표면 공통 계약", () => {
     expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain(
       "grid-template-columns: 2.25rem minmax(0, 1fr) 6rem 10.5rem;",
     )
+    expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain(
+      'tbody tr[data-selected="true"]:focus-within',
+    )
     expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain("display: grid;")
     expect(getStyledComponentBlock(cloudStyleSource, "FileThumbnailFrame")).toContain("border-radius: 0;")
+    expect(getStyledComponentBlock(cloudStyleSource, "FileThumbnailFrame")).not.toContain('&[data-selected="true"]')
   })
 
   test("관리자 공통 프리미티브는 포커스 표시와 모바일 스냅 계약을 가진다", () => {
