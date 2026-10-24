@@ -188,13 +188,15 @@ const isYamlLine = (line: string): boolean => {
 
 const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = false) => {
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
-  const lines = normalized.split("\n")
-  if (!FRONTMATTER_DELIMITER_REGEX.test(lines[0] || "")) {
+  const firstBreak = normalized.indexOf("\n")
+  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
+  if (!FRONTMATTER_DELIMITER_REGEX.test(firstLine)) {
     return {
       metadataLines: [] as string[],
       body: normalized,
     }
   }
+  const lines = normalized.split("\n")
 
   for (let index = 1; index < lines.length; index += 1) {
     if (!FRONTMATTER_DELIMITER_REGEX.test(lines[index] || "")) continue
@@ -225,6 +227,14 @@ const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = fals
 
 const stripLeadingEditorMetadataLines = (content: string) => {
   const normalized = content.replace(/\r\n?/g, "\n")
+  const firstBreak = normalized.indexOf("\n")
+  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
+  if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
+    return {
+      consumed: 0,
+      body: normalized,
+    }
+  }
   const lines = normalized.split("\n")
   let consumed = 0
 
@@ -296,24 +306,11 @@ export const buildEditorStateFingerprint = ({
   tags,
   category,
   visibility,
-}: {
-  title: string
-  content: string
-  summary: string
-  summarySource: LocalDraftPayload["summarySource"]
-  summaryIntent: SummaryIntent
-  thumbnailUrl: string
-  thumbnailFocusX: number
-  thumbnailFocusY: number
-  thumbnailZoom: number
-  tags: string[]
-  category: string
-  visibility: PostVisibility
-}) =>
+}: LocalDraftFingerprintPayload) =>
   JSON.stringify({
     title,
-    content,
-    summary,
+    content: computeContentFingerprint(content),
+    summary: computeContentFingerprint(summary),
     summarySource,
     summaryIntent,
     thumbnailUrl,
@@ -428,36 +425,49 @@ export const composeEditorContent = (
 }
 
 export const buildLocalDraftFingerprint = (payload: LocalDraftFingerprintPayload) =>
-  JSON.stringify({
-    ...payload,
-    content: computeContentFingerprint(payload.content),
-    summary: computeContentFingerprint(payload.summary),
-  })
+  buildEditorStateFingerprint(payload)
+
+const TOGGLE_TITLE_PLACEHOLDER_LINE = `:::toggle ${EDITOR_TOGGLE_TITLE_PLACEHOLDER}`
+
+const updateFenceMarker = (
+  current: "`" | "~" | null,
+  trimmed: string
+): { marker: "`" | "~" | null; isFenceLine: boolean } => {
+  const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed)
+  if (!fenceMatch) return { marker: current, isFenceLine: false }
+  const nextMarker = fenceMatch[1][0] as "`" | "~"
+  if (!current) return { marker: nextMarker, isFenceLine: true }
+  return { marker: current === nextMarker ? null : current, isFenceLine: true }
+}
+
+const detectPlaceholderLineIssue = (trimmed: string): string | null => {
+  if (trimmed === EDITOR_BODY_PLACEHOLDER) {
+    return "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
+  }
+  if (trimmed === TOGGLE_TITLE_PLACEHOLDER_LINE) {
+    return "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
+  }
+  return null
+}
 
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
   let fenceMarker: "`" | "~" | null = null
+  let cursor = 0
 
-  for (const rawLine of content.replace(/\r\n/g, "\n").split("\n")) {
+  while (cursor <= content.length) {
+    const nextBreak = content.indexOf("\n", cursor)
+    const rawLine = nextBreak === -1 ? content.slice(cursor) : content.slice(cursor, nextBreak)
     const trimmed = rawLine.trim()
-    if (!trimmed) continue
-
-    const fenceMatch = trimmed.match(/^(`{3,}|~{3,})/)
-    if (fenceMatch) {
-      const nextMarker = fenceMatch[1][0] as "`" | "~"
-      if (!fenceMarker) fenceMarker = nextMarker
-      else if (fenceMarker === nextMarker) fenceMarker = null
-      continue
+    if (trimmed) {
+      const fenceState = updateFenceMarker(fenceMarker, trimmed)
+      fenceMarker = fenceState.marker
+      if (!fenceState.isFenceLine && !fenceMarker && !trimmed.startsWith(">")) {
+        const lineIssue = detectPlaceholderLineIssue(trimmed)
+        if (lineIssue) return lineIssue
+      }
     }
-
-    if (fenceMarker || trimmed.startsWith(">")) continue
-
-    if (trimmed === EDITOR_BODY_PLACEHOLDER) {
-      return "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
-    }
-
-    if (trimmed === `:::toggle ${EDITOR_TOGGLE_TITLE_PLACEHOLDER}`) {
-      return "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
-    }
+    if (nextBreak === -1) break
+    cursor = nextBreak + 1
   }
 
   if (hasNonCanonicalPostImageSource(content)) {

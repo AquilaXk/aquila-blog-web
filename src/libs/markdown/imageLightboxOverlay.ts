@@ -47,8 +47,8 @@ const appendCaptionIfPresent = (panel: HTMLElement, captionText: string) => {
   captionEl.textContent = trimmed
   captionEl.style.margin = "0"
   captionEl.style.padding = "0.55rem 0.9rem"
-  captionEl.style.borderTop = "1px solid var(--aq-border, #e2e8f0)"
-  captionEl.style.color = "var(--aq-text-secondary, #334155)"
+  captionEl.style.borderTop = "1px solid var(--aq-border)"
+  captionEl.style.color = "var(--aq-text-secondary)"
   captionEl.style.fontSize = "0.84rem"
   captionEl.style.lineHeight = "1.5"
   captionEl.style.textAlign = "center"
@@ -89,10 +89,9 @@ export const openImageLightboxOverlay = (
   panel.style.overflow = "hidden"
   panel.style.display = "grid"
   panel.style.gridTemplateRows = "auto minmax(0, 1fr) auto"
-  panel.style.borderRadius = "4px"
-  panel.style.border = "1px solid var(--aq-border-strong, #cbd5e1)"
-  panel.style.background = "var(--aq-surface, #ffffff)"
-  panel.style.boxShadow = "0 20px 56px rgba(15, 23, 42, 0.22)"
+  panel.style.borderRadius = "6px"
+  panel.style.border = "1px solid var(--aq-border-strong)"
+  panel.style.background = "var(--aq-surface-elevated)"
   panel.style.padding = "0"
 
   const actionsBar = document.createElement("div")
@@ -102,13 +101,18 @@ export const openImageLightboxOverlay = (
   actionsBar.style.justifyContent = "flex-end"
   actionsBar.style.gap = "0.4rem"
   actionsBar.style.padding = "0.65rem 0.9rem"
-  actionsBar.style.borderBottom = "1px solid var(--aq-border, #e2e8f0)"
-  actionsBar.style.background = "var(--aq-page-bg, #f8fafc)"
+  actionsBar.style.borderBottom = "1px solid var(--aq-border)"
+  actionsBar.style.background = "var(--aq-page-bg)"
 
   const zoomOutButton = createOverlayActionButton("-", "축소")
   const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
   const zoomInButton = createOverlayActionButton("+", "확대")
   const closeButton = createOverlayActionButton("닫기", "닫기")
+  for (const btn of [zoomOutButton, zoomResetButton, zoomInButton, closeButton]) {
+    btn.style.minWidth = "44px"
+    btn.style.minHeight = "44px"
+    btn.style.borderRadius = "6px"
+  }
 
   const stage = document.createElement("div")
   stage.className = "aq-image-lightbox-stage"

@@ -101,29 +101,53 @@ const normalizeCardThumbnailSource = (raw: string) => {
   }
 }
 
-const markdownWithoutCode = (content: string) => {
-  const visibleLines: string[] = []
-  let fence: { marker: "`" | "~"; length: number } | null = null
+type CodeFenceState = { marker: "`" | "~"; length: number }
 
-  for (const line of content.replace(/\r\n?/g, "\n").split("\n")) {
+const updateCodeFenceState = (
+  fence: CodeFenceState | null,
+  trimmedLine: string
+): { nextFence: CodeFenceState | null; skipLine: boolean } => {
+  if (!fence) {
+    const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmedLine)
+    if (!fenceMatch) return { nextFence: null, skipLine: false }
+    return {
+      nextFence: { marker: fenceMatch[1][0] as "`" | "~", length: fenceMatch[1].length },
+      skipLine: true,
+    }
+  }
+  const closingMatch = /^(`+|~+)\s*$/.exec(trimmedLine)
+  const isClosing =
+    Boolean(closingMatch) &&
+    closingMatch![1][0] === fence.marker &&
+    closingMatch![1].length >= fence.length
+  return { nextFence: isClosing ? null : fence, skipLine: true }
+}
+
+const markdownWithoutCode = (content: string) => {
+  if (
+    !content.includes("`") &&
+    !content.includes("~~~") &&
+    !content.includes("    ") &&
+    !content.includes("\t")
+  ) {
+    return content
+  }
+  const visibleLines: string[] = []
+  let fence: CodeFenceState | null = null
+  let cursor = 0
+
+  while (cursor <= content.length) {
+    const nextBreak = content.indexOf("\n", cursor)
+    const rawLine = nextBreak === -1 ? content.slice(cursor) : content.slice(cursor, nextBreak)
+    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine
     const containerLine = stripBlockquotePrefixes(line)
-    const trimmedLine = containerLine.trim()
-    const fenceMatch = trimmedLine.match(/^(`{3,}|~{3,})/)
-    if (!fence && fenceMatch) {
-      const marker = fenceMatch[1][0] as "`" | "~"
-      fence = { marker, length: fenceMatch[1].length }
-      continue
+    const fenceStep = updateCodeFenceState(fence, containerLine.trim())
+    fence = fenceStep.nextFence
+    if (!fenceStep.skipLine && !/^( {4}|\t)/.test(containerLine)) {
+      visibleLines.push(line.includes("`") ? line.replace(/(`+)[^`]*\1/g, "") : line)
     }
-    if (fence) {
-      const closingMatch = trimmedLine.match(/^(`+|~+)\s*$/)
-      if (closingMatch && closingMatch[1][0] === fence.marker && closingMatch[1].length >= fence.length) {
-        fence = null
-      }
-      continue
-    }
-    if (!/^( {4}|\t)/.test(containerLine)) {
-      visibleLines.push(line.replace(/(`+)[^`]*\1/g, ""))
-    }
+    if (nextBreak === -1) break
+    cursor = nextBreak + 1
   }
 
   return visibleLines.join("\n")
@@ -136,6 +160,7 @@ const isEscapedMarkdownMarker = (content: string, index: number) => {
 }
 
 const markdownCardThumbnailSources = (content: string) => {
+  if (!content.includes("aq-")) return []
   const sources: string[] = []
   let pendingMetadata: { kind: string; thumbnailUrl: string } | null = null
   const lines = content.split("\n")
@@ -170,13 +195,16 @@ const markdownCardThumbnailSources = (content: string) => {
 }
 
 export const hasNonCanonicalPostImageSource = (content: string): boolean => {
+  if (!/!\[|aq-(?:bookmark|embed)/i.test(content)) return false
   const visibleContent = markdownWithoutCode(content)
   const definitions = new Map<string, string>()
-  for (const line of visibleContent.split("\n")) {
-    const match = stripBlockquotePrefixes(line).match(/^\s{0,3}\[([^\]]+)]:\s*<?([^\s>]+)>?/)
-    if (!match) continue
-    const label = normalizeReferenceLabel(match[1])
-    if (!definitions.has(label)) definitions.set(label, match[2])
+  if (visibleContent.includes("]:")) {
+    for (const line of visibleContent.split("\n")) {
+      const match = stripBlockquotePrefixes(line).match(/^\s{0,3}\[([^\]]+)]:\s*<?([^\s>]+)>?/)
+      if (!match) continue
+      const label = normalizeReferenceLabel(match[1])
+      if (!definitions.has(label)) definitions.set(label, match[2])
+    }
   }
   const destinations = [...visibleContent.matchAll(/!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g)]
     .filter((match) => !isEscapedMarkdownMarker(visibleContent, match.index ?? 0))

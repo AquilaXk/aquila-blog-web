@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminAccentText,
   adminAppBackground,
@@ -99,6 +100,7 @@ export const PrimaryActionLink = styled.a`
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 820;
+  ${focusVisibleRing}
 
   &:hover {
     background: ${adminTealHover};
@@ -118,6 +120,7 @@ export const SecondaryActionLink = styled.a`
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 780;
+  ${focusVisibleRing}
 `
 
 export const MetricGrid = styled.section`
@@ -242,10 +245,12 @@ export const PanelHeader = styled.div`
   }
 
   a {
+    border-radius: 4px;
     color: ${adminAccentText};
     font-size: 0.76rem;
     font-weight: 780;
     text-decoration: none;
+    ${focusVisibleRing}
   }
 `
 
@@ -272,6 +277,7 @@ export const ContentRow = styled.a`
   border-bottom: 1px solid ${adminBorder};
   color: inherit;
   text-decoration: none;
+  ${focusVisibleRing}
 
   &:first-of-type {
     padding-top: 0.88rem;

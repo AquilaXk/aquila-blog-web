@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
   adminBorder,
@@ -41,8 +42,8 @@ export const BaseButton = styled.button`
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+    color 0.18s ease;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     min-height: ${control.lg}px;
@@ -52,13 +53,11 @@ export const BaseButton = styled.button`
     border-color: ${adminBorderStrong};
     background: ${adminSurfaceMuted};
     color: ${adminTextPrimary};
-    transform: translateY(-1px);
   }
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.72;
-    transform: none;
   }
 `
 
@@ -78,7 +77,6 @@ export const GhostButton = styled(BaseButton)`
     border-color: transparent;
     background: transparent;
     color: ${({ theme }) => theme.colors.gray12};
-    transform: none;
   }
 `
 
@@ -113,7 +111,6 @@ export const MiniButton = styled(BaseButton)`
     border-color: transparent;
     background: transparent;
     color: ${({ theme }) => theme.colors.gray12};
-    transform: none;
   }
 `
 
@@ -133,11 +130,13 @@ export const PreviewAnchor = styled.a`
   min-height: 0;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: ${adminGold};
   font-size: 0.8rem;
   font-weight: 700;
   text-decoration: none;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     min-height: ${control.lg}px;

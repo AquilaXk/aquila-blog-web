@@ -41,8 +41,6 @@ export const Global = () => {
           --aq-on-accent: ${lightColors.accentControlText};
           --aq-focus-ring: ${lightColors.indigo8};
           --aq-feed-chip-bg: ${lightDesign.readableSurface};
-          --aq-feed-hero-glow: ${lightDesign.accentMuted};
-          --aq-card-cover-bg: linear-gradient(135deg, ${lightDesign.accentMuted}, ${lightColors.gray2}), ${lightDesign.readableSurface};
         }
 
         html[data-aquila-scheme="dark"] {
@@ -64,8 +62,6 @@ export const Global = () => {
           --aq-on-accent: ${darkColors.gray1};
           --aq-focus-ring: ${darkColors.indigo8};
           --aq-feed-chip-bg: ${darkDesign.surfaceElevated};
-          --aq-feed-hero-glow: ${darkDesign.accentMuted};
-          --aq-card-cover-bg: linear-gradient(135deg, ${darkDesign.accentMuted}, ${darkColors.gray2}), ${darkDesign.readableSurface};
         }
 
         body {
@@ -176,12 +172,13 @@ export const Global = () => {
         a:focus-visible,
         button:focus-visible,
         [role="button"]:focus-visible,
+        summary:focus-visible,
+        [role="listbox"]:focus-visible,
         input:focus-visible,
         textarea:focus-visible,
         select:focus-visible {
-          outline: 2px solid ${theme.colors.indigo8};
+          outline: 2px solid var(--aq-focus-ring);
           outline-offset: 2px;
-          border-radius: 0.5rem;
         }
 
         input {

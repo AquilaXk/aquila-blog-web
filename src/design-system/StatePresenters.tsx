@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { type HTMLAttributes, type ReactNode } from "react"
+import { focusVisibleRing } from "./focusRing"
 import { editorialLabel, semanticColors } from "./tokens"
 import { duration, easing, respectReducedMotion } from "./motion"
 
@@ -131,6 +132,7 @@ const ErrorStateShell = styled.section`
 
   .actions button,
   .actions a {
+    ${focusVisibleRing};
     display: inline-flex;
     align-items: center;
     justify-content: center;

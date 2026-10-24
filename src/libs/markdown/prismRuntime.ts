@@ -28,8 +28,8 @@ prismRuntime.manual = true
 ;(globalThis as { Prism?: PrismLike }).Prism = prismRuntime
 
 let prismLoader: Promise<PrismLike> | null = null
-const loadedLoaders = new Set<string>()
-const failedLoaders = new Set<string>()
+const loadedLoaders = new Set<() => Promise<unknown>>()
+const failedLoaders = new Set<() => Promise<unknown>>()
 
 const prismGrammarAliases: Record<string, string[]> = {
   html: ["markup"],
@@ -139,8 +139,8 @@ const resolvePrismLanguage = (source: string, language?: string | null) => {
     : normalizedLanguage
 }
 
-export const inferPrismLanguageFromSource = (source: string): string => {
-  const sample = source.trim()
+export const inferPrismLanguageFromSource = (rawValue: string): string => {
+  const sample = rawValue.length > 4096 ? rawValue.slice(0, 4096).trim() : rawValue.trim()
   if (!sample) return "text"
 
   if (/^\s*[{[][\s\S]*[}\]]\s*$/.test(sample) && /"\s*:/.test(sample)) return "json"
@@ -205,14 +205,13 @@ export const ensurePrismLanguages = async (languages: string[]) => {
     const loaders = prismLanguageLoaders[language] || []
 
     for (const load of loaders) {
-      const cacheKey = `${language}:${load.toString()}`
-      if (loadedLoaders.has(cacheKey)) continue
-      if (failedLoaders.has(cacheKey)) continue
+      if (loadedLoaders.has(load)) continue
+      if (failedLoaders.has(load)) continue
       try {
         await load()
-        loadedLoaders.add(cacheKey)
+        loadedLoaders.add(load)
       } catch (error) {
-        failedLoaders.add(cacheKey)
+        failedLoaders.add(load)
         console.warn(`[prism] language loader failed: ${language}`, error)
       }
     }

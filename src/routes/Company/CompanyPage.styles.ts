@@ -58,7 +58,7 @@ export const NoticeBanner = styled.div`
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    min-height: 36px;
+    min-height: 44px;
     padding: 0.25rem 0.95rem;
     border-radius: ${radius.pill}px;
     border: 1px solid ${light.border};

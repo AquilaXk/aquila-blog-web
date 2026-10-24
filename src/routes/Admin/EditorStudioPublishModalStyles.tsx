@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 
 export {
   PublishDialog,
@@ -62,6 +63,7 @@ export const VisibilityOptionButton = styled.button`
     border-color 0.18s ease,
     background-color 0.18s ease,
     box-shadow 0.18s ease;
+  ${focusVisibleRing}
 
   strong {
     color: ${({ theme }) => theme.colors.gray12};
@@ -166,9 +168,11 @@ export const CompactPublishEditorToggle = styled.button`
   min-height: 44px;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  ${focusVisibleRing}
 
   > div {
     display: grid;

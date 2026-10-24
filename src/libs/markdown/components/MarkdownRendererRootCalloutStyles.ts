@@ -164,6 +164,13 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     margin-bottom: 0;
   }
 
+  .aq-callout-fold > summary:focus-visible,
+  .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head:focus-visible {
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head .aq-callout-emoji {
     margin-top: 0;
   }

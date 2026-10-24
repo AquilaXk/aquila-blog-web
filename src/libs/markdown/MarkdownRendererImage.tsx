@@ -61,6 +61,7 @@ export const MarkdownImageFigure = memo(
           fetchPriority={eager ? "high" : undefined}
           decoding="async"
           draggable={false}
+          tabIndex={0}
         />
         {editable ? (
           <button

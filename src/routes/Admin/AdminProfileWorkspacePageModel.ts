@@ -186,30 +186,47 @@ export const useAdminProfileWorkspacePageModel = ({
 
 
 
+  const serializedRemoteDraft = useMemo(() => serializeProfileWorkspaceContent(remoteDraft), [remoteDraft])
+  const serializedPublishedSnapshot = useMemo(
+    () => serializeProfileWorkspaceContent(publishedSnapshot),
+    [publishedSnapshot]
+  )
+  const serializedRemoteSections = useMemo(
+    () => ({
+      identity: serializeWorkspaceSection(remoteDraft, "identity"),
+      about: serializeWorkspaceSection(remoteDraft, "about"),
+      home: serializeWorkspaceSection(remoteDraft, "home"),
+      links: serializeWorkspaceSection(remoteDraft, "links"),
+    }),
+    [remoteDraft]
+  )
+  const publishedDiffBySection = useMemo(
+    () => ({
+      identity: serializedRemoteSections.identity !== serializeWorkspaceSection(publishedSnapshot, "identity"),
+      about: serializedRemoteSections.about !== serializeWorkspaceSection(publishedSnapshot, "about"),
+      home: serializedRemoteSections.home !== serializeWorkspaceSection(publishedSnapshot, "home"),
+      links: serializedRemoteSections.links !== serializeWorkspaceSection(publishedSnapshot, "links"),
+    }),
+    [publishedSnapshot, serializedRemoteSections]
+  )
   const hasWorkspaceUnsavedChanges = useMemo(
-    () => serializeProfileWorkspaceContent(draft) !== serializeProfileWorkspaceContent(remoteDraft),
-    [draft, remoteDraft]
+    () => serializeProfileWorkspaceContent(draft) !== serializedRemoteDraft,
+    [draft, serializedRemoteDraft]
   )
   const hasDisplayNameDirty = useMemo(() => {
     const currentDisplayName = (sessionMember?.nickname || sessionMember?.username || "").trim()
     return displayNameInput.trim() !== currentDisplayName
   }, [displayNameInput, sessionMember?.nickname, sessionMember?.username])
   const hasUnsavedChanges = hasDisplayNameDirty || hasWorkspaceUnsavedChanges
-  const hasPublishedDiff = useMemo(
-    () => serializeProfileWorkspaceContent(remoteDraft) !== serializeProfileWorkspaceContent(publishedSnapshot),
-    [publishedSnapshot, remoteDraft]
-  )
+  const hasPublishedDiff = serializedRemoteDraft !== serializedPublishedSnapshot
   const sectionStateMap = useMemo(() => {
     return WORKSPACE_SECTIONS.reduce<Record<WorkspaceSectionId, { dirty: boolean; publishedDiff: boolean }>>(
       (acc, section) => {
         acc[section.id] = {
           dirty:
             (section.id === "identity" ? hasDisplayNameDirty : false) ||
-            serializeWorkspaceSection(draft, section.id) !==
-              serializeWorkspaceSection(remoteDraft, section.id),
-          publishedDiff:
-            serializeWorkspaceSection(remoteDraft, section.id) !==
-            serializeWorkspaceSection(publishedSnapshot, section.id),
+            serializeWorkspaceSection(draft, section.id) !== serializedRemoteSections[section.id],
+          publishedDiff: publishedDiffBySection[section.id],
         }
         return acc
       },
@@ -220,7 +237,7 @@ export const useAdminProfileWorkspacePageModel = ({
         links: { dirty: false, publishedDiff: false },
       }
     )
-  }, [draft, hasDisplayNameDirty, publishedSnapshot, remoteDraft])
+  }, [draft, hasDisplayNameDirty, publishedDiffBySection, serializedRemoteSections])
 
   useEffect(() => {
     if (typeof window === "undefined" || !sessionMember || !hasUnsavedChanges) return
@@ -344,13 +361,8 @@ export const useAdminProfileWorkspacePageModel = ({
     })
   }, [buildDraftPayload, sessionMember?.id])
 
-
-
-
-
   const handleSaveDraft = useCallback(async () => {
-    if (!sessionMember?.id) return
-    if (!validateDraftBeforePersistence()) return
+    if (!sessionMember?.id || !validateDraftBeforePersistence()) return
 
     const normalizedDisplayName = displayNameInput.trim()
     const shouldSaveDisplayName = hasDisplayNameDirty
@@ -361,19 +373,16 @@ export const useAdminProfileWorkspacePageModel = ({
       return
     }
 
+    const saveBoth = shouldSaveWorkspace && shouldSaveDisplayName
+    let loadingText = "임시 저장 중..."
+    if (saveBoth) loadingText = "임시 저장과 계정 이름 저장을 함께 처리하고 있습니다..."
+    else if (shouldSaveDisplayName) loadingText = "계정 이름을 저장하고 있습니다..."
+
     let workspaceSaved = false
 
     try {
       setLoadingKey("save")
-      setWorkspaceNotice({
-        tone: "loading",
-        text:
-          shouldSaveWorkspace && shouldSaveDisplayName
-            ? "임시 저장과 계정 이름 저장을 함께 처리하고 있습니다..."
-            : shouldSaveDisplayName
-              ? "계정 이름을 저장하고 있습니다..."
-              : "임시 저장 중...",
-      })
+      setWorkspaceNotice({ tone: "loading", text: loadingText })
 
       if (shouldSaveWorkspace) {
         const nextWorkspace = await saveWorkspaceDraft()
@@ -385,23 +394,17 @@ export const useAdminProfileWorkspacePageModel = ({
         await persistDisplayName(sessionMember.id, normalizedDisplayName)
       }
 
-      setWorkspaceNotice({
-        tone: "success",
-        text:
-          shouldSaveWorkspace && shouldSaveDisplayName
-            ? "임시 저장과 계정 이름 업데이트를 완료했습니다."
-            : shouldSaveDisplayName
-              ? "계정 이름을 저장했습니다."
-              : "임시 저장했습니다.",
-      })
+      let successText = "임시 저장했습니다."
+      if (saveBoth) successText = "임시 저장과 계정 이름 업데이트를 완료했습니다."
+      else if (shouldSaveDisplayName) successText = "계정 이름을 저장했습니다."
+
+      setWorkspaceNotice({ tone: "success", text: successText })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const failureText =
-        shouldSaveWorkspace && shouldSaveDisplayName
-          ? "임시 저장 또는 계정 이름 저장 실패"
-          : shouldSaveDisplayName
-            ? "계정 이름 저장 실패"
-            : "임시 저장 실패"
+      let failureText = "임시 저장 실패"
+      if (saveBoth) failureText = "임시 저장 또는 계정 이름 저장 실패"
+      else if (shouldSaveDisplayName) failureText = "계정 이름 저장 실패"
+
       setWorkspaceNotice({
         tone: "error",
         text:
@@ -413,14 +416,8 @@ export const useAdminProfileWorkspacePageModel = ({
       setLoadingKey("")
     }
   }, [
-    applyWorkspaceState,
-    displayNameInput,
-    hasDisplayNameDirty,
-    hasWorkspaceUnsavedChanges,
-    persistDisplayName,
-    saveWorkspaceDraft,
-    sessionMember?.id,
-    validateDraftBeforePersistence,
+    applyWorkspaceState, displayNameInput, hasDisplayNameDirty, hasWorkspaceUnsavedChanges,
+    persistDisplayName, saveWorkspaceDraft, sessionMember?.id, validateDraftBeforePersistence,
   ])
 
   const handlePublish = useCallback(async () => {

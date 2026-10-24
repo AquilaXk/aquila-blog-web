@@ -209,9 +209,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   const hasSelectedManagedPost = editorMode === "edit" && postId.trim().length > 0
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
-  const publishPlaceholderIssue = hasEditorMinimumFields
-    ? detectPublishPlaceholderIssue(postContent)
-    : null
+  const publishPlaceholderIssue = useMemo(
+    () => (hasEditorMinimumFields ? detectPublishPlaceholderIssue(postContent) : null),
+    [hasEditorMinimumFields, postContent]
+  )
   const editorPersistenceState = deriveEditorPersistenceState({
     editorMode,
     hasSelectedManagedPost,

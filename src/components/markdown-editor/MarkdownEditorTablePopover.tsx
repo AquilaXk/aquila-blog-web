@@ -19,6 +19,31 @@ type MarkdownEditorTablePopoverProps = {
   actions: readonly MarkdownEditorToolbarMenuAction[]
 }
 
+const moveTablePopoverMenuFocus = (panel: HTMLElement, key: string): boolean => {
+  const items = Array.from(
+    panel.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")
+  )
+  if (items.length === 0) return false
+  const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+  if (key === "ArrowDown") {
+    items[currentIndex < 0 ? 0 : (currentIndex + 1) % items.length]?.focus()
+    return true
+  }
+  if (key === "ArrowUp") {
+    items[currentIndex <= 0 ? items.length - 1 : currentIndex - 1]?.focus()
+    return true
+  }
+  if (key === "Home") {
+    items[0]?.focus()
+    return true
+  }
+  if (key === "End") {
+    items.at(-1)?.focus()
+    return true
+  }
+  return false
+}
+
 export const MarkdownEditorTablePopover = ({
   rows,
   columns,
@@ -120,6 +145,14 @@ export const MarkdownEditorTablePopover = ({
               event.preventDefault()
               event.stopPropagation()
               closePopover(true)
+              return
+            }
+            if (
+              !(event.target instanceof HTMLSelectElement) &&
+              moveTablePopoverMenuFocus(event.currentTarget, event.key)
+            ) {
+              event.preventDefault()
+              event.stopPropagation()
             }
           }}
         >

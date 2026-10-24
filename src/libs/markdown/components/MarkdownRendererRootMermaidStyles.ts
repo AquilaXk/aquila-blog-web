@@ -91,55 +91,72 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
 
   .aq-mermaid-error-state {
     margin: 28px;
-    border-radius: 0;
-    border: 1px solid ${ (theme.scheme === "dark" ? "rgba(217, 119, 6, 0.46)" : "rgba(217, 119, 6, 0.42)")};
-    background: ${ (theme.scheme === "dark" ? "rgba(120, 53, 15, 0.16)" : "rgba(254, 243, 199, 0.88)")};
+    border: 0;
+    border-left: 2px solid ${theme.colors.statusDangerBorder};
+    border-radius: 0 6px 6px 0;
+    background: var(--aq-surface-subtle);
+    color: var(--aq-text);
     padding: 0.88rem 0.94rem;
   }
 
+  .aq-mermaid-error-badge {
+    border-radius: 4px;
+    border: 1px solid var(--aq-border-strong);
+    background: var(--aq-surface-elevated);
+    color: var(--aq-text-secondary);
+  }
+
   .aq-mermaid-error-title {
-    color: ${ (theme.scheme === "dark" ? "#fde68a" : "#92400e")};
+    color: var(--aq-text);
     font-size: 0.9rem;
     font-weight: 700;
     margin-bottom: 0.36rem;
   }
 
+  .aq-mermaid-error-summary,
   .aq-mermaid-error-description {
     margin: 0 0 0.38rem;
-    color: ${ (theme.scheme === "dark" ? "rgba(254, 240, 138, 0.92)" : "#7c2d12")};
+    color: var(--aq-text-secondary);
     font-size: 0.84rem;
     line-height: 1.52;
   }
 
   .aq-mermaid-error-guidance {
     margin: 0 0 0.52rem;
-    color: ${ (theme.scheme === "dark" ? "rgba(254, 240, 138, 0.86)" : "#9a3412")};
+    color: var(--aq-text-secondary);
     font-size: 0.78rem;
     line-height: 1.5;
   }
 
   .aq-mermaid-error-guidance code {
-    border-radius: 0;
-    border: 1px solid ${ (theme.scheme === "dark" ? "rgba(251, 191, 36, 0.3)" : "rgba(217, 119, 6, 0.32)")};
-    background: ${ (theme.scheme === "dark" ? "rgba(120, 53, 15, 0.24)" : "rgba(255, 251, 235, 0.92)")};
+    border-radius: 4px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-elevated);
     padding: 0.08rem 0.34rem;
     font-size: 0.74rem;
-    color: ${ (theme.scheme === "dark" ? "#fde68a" : "#92400e")};
+    color: var(--aq-text);
   }
 
   .aq-mermaid-error-details {
     margin-top: 0.34rem;
+    color: var(--aq-text-secondary);
   }
 
   .aq-mermaid-error-details > summary {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    color: ${ (theme.scheme === "dark" ? "rgba(253, 230, 138, 0.94)" : "#b45309")};
+    color: var(--aq-text-secondary);
     font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
     list-style: none;
+  }
+
+  .aq-mermaid-error-details > summary:focus-visible {
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   .aq-mermaid-error-details > summary::-webkit-details-marker {
@@ -149,12 +166,13 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   .aq-mermaid-error-code {
     display: block;
     white-space: pre-wrap;
-    color: ${ (theme.scheme === "dark" ? "#fef3c7" : "#7c2d12")};
+    color: var(--aq-text);
     font-size: 0.78rem;
     line-height: 1.5;
+    border: 0;
+    border-top: 1px solid var(--aq-border);
     border-radius: 0;
-    border: 1px solid ${ (theme.scheme === "dark" ? "rgba(251, 191, 36, 0.22)" : "rgba(217, 119, 6, 0.24)")};
-    background: ${ (theme.scheme === "dark" ? "rgba(120, 53, 15, 0.18)" : "rgba(255, 251, 235, 0.82)")};
+    background: transparent;
     margin-top: 0.34rem;
     padding: 0.48rem 0.58rem;
   }
@@ -212,6 +230,14 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     .aq-mermaid-expand-btn {
       top: 9px;
       right: 9px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .aq-mermaid-expand-btn {
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0 0.75rem;
     }
   }
 `

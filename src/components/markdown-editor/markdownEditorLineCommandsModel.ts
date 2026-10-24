@@ -2,34 +2,16 @@ import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type MarkdownEditorLineCommand = "move-up" | "move-down" | "duplicate" | "delete"
 
-type LogicalLine = {
-  start: number
-  end: number
+type SelectedBlockOffsets = {
+  blockStart: number
+  blockEnd: number
 }
 
-const logicalLines = (value: string): LogicalLine[] => {
-  const lines: LogicalLine[] = []
-  let start = 0
-
-  for (let index = 0; index <= value.length; index += 1) {
-    if (index === value.length || value[index] === "\n") {
-      lines.push({ start, end: index })
-      start = index + 1
-    }
-  }
-
-  return lines
-}
-
-const lineIndexAt = (lines: LogicalLine[], offset: number) => {
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!
-    if (offset <= line.end || index === lines.length - 1) return index
-  }
-  return lines.length - 1
-}
-
-const selectedLineRange = (value: string, selectionStart: number, selectionEnd: number) => {
+const resolveSelectedBlockOffsets = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): SelectedBlockOffsets | null => {
   if (
     !Number.isInteger(selectionStart) ||
     !Number.isInteger(selectionEnd) ||
@@ -40,33 +22,42 @@ const selectedLineRange = (value: string, selectionStart: number, selectionEnd: 
     return null
   }
 
-  const lines = logicalLines(value)
-  const start = lineIndexAt(lines, selectionStart)
-  const end = selectionStart === selectionEnd ? start : lineIndexAt(lines, selectionEnd - 1)
-  return { lines, start, end }
+  const blockStart =
+    selectionStart === 0 ? 0 : value.lastIndexOf("\n", selectionStart - 1) + 1
+  const endProbe = selectionStart === selectionEnd ? selectionStart : selectionEnd - 1
+  const nextBreak = value.indexOf("\n", endProbe)
+  const blockEnd = nextBreak === -1 ? value.length : nextBreak
+  return { blockStart, blockEnd }
 }
 
 const planMove = (
   value: string,
-  lines: LogicalLine[],
-  start: number,
-  end: number,
+  blockStart: number,
+  blockEnd: number,
   selectionStart: number,
   selectionEnd: number,
   direction: "up" | "down"
 ): PlannedTextMutation | null => {
-  const adjacent = direction === "up" ? start - 1 : end + 1
-  if (adjacent < 0 || adjacent >= lines.length) return null
+  if (direction === "up" && blockStart === 0) return null
+  if (direction === "down" && blockEnd === value.length) return null
 
-  const first = direction === "up" ? adjacent : start
-  const last = direction === "up" ? end : adjacent
-  const rangeStart = lines[first]!.start
-  const rangeEnd = lines[last]!.end
-  const before = value.slice(lines[start]!.start, lines[end]!.end)
-  const after = value.slice(lines[adjacent]!.start, lines[adjacent]!.end)
+  let adjStart = 0
+  let adjEnd = 0
+  if (direction === "up") {
+    adjEnd = blockStart - 1
+    adjStart = adjEnd === 0 ? 0 : value.lastIndexOf("\n", adjEnd - 1) + 1
+  } else {
+    adjStart = blockEnd + 1
+    const nextBreak = value.indexOf("\n", adjStart)
+    adjEnd = nextBreak === -1 ? value.length : nextBreak
+  }
+
+  const rangeStart = direction === "up" ? adjStart : blockStart
+  const rangeEnd = direction === "up" ? blockEnd : adjEnd
+  const before = value.slice(blockStart, blockEnd)
+  const after = value.slice(adjStart, adjEnd)
   const replacement = direction === "up" ? `${before}\n${after}` : `${after}\n${before}`
   const movedBlockStart = rangeStart + (direction === "up" ? 0 : after.length + 1)
-  const blockStart = lines[start]!.start
   const relativeSelectionStart = Math.min(selectionStart - blockStart, before.length)
   const relativeSelectionEnd = Math.min(selectionEnd - blockStart, before.length)
 
@@ -81,32 +72,32 @@ const planMove = (
 
 const planDuplicate = (
   value: string,
-  lines: LogicalLine[],
-  start: number,
-  end: number,
+  blockStart: number,
+  blockEnd: number,
   selectionStart: number,
   selectionEnd: number
 ): PlannedTextMutation => {
-  const rangeStart = lines[start]!.start
-  const rangeEnd = lines[end]!.end
-  const block = value.slice(rangeStart, rangeEnd)
-  const copiedBlockStart = rangeEnd + 1
-  const relativeSelectionStart = Math.min(selectionStart - rangeStart, block.length)
-  const relativeSelectionEnd = Math.min(selectionEnd - rangeStart, block.length)
+  const block = value.slice(blockStart, blockEnd)
+  const copiedBlockStart = blockEnd + 1
+  const relativeSelectionStart = Math.min(selectionStart - blockStart, block.length)
+  const relativeSelectionEnd = Math.min(selectionEnd - blockStart, block.length)
 
   return {
-    rangeStart,
-    rangeEnd,
+    rangeStart: blockStart,
+    rangeEnd: blockEnd,
     replacement: `${block}\n${block}`,
     selectionStart: copiedBlockStart + relativeSelectionStart,
     selectionEnd: copiedBlockStart + relativeSelectionEnd,
   }
 }
 
-const planDelete = (value: string, lines: LogicalLine[], start: number, end: number): PlannedTextMutation => {
-  const hasFollowingLine = end < lines.length - 1
-  const rangeStart = hasFollowingLine ? lines[start]!.start : start > 0 ? lines[start]!.start - 1 : 0
-  const rangeEnd = hasFollowingLine ? lines[end]!.end + 1 : lines[end]!.end
+const planDelete = (value: string, blockStart: number, blockEnd: number): PlannedTextMutation => {
+  const hasFollowingLine = blockEnd < value.length
+  let rangeStart = blockStart
+  if (!hasFollowingLine) {
+    rangeStart = blockStart > 0 ? blockStart - 1 : 0
+  }
+  const rangeEnd = hasFollowingLine ? blockEnd + 1 : blockEnd
   return { rangeStart, rangeEnd, replacement: "", selectionStart: rangeStart, selectionEnd: rangeStart }
 }
 
@@ -116,12 +107,12 @@ export const planMarkdownEditorLineCommand = (
   selectionEnd: number,
   command: MarkdownEditorLineCommand
 ): PlannedTextMutation | null => {
-  const selection = selectedLineRange(value, selectionStart, selectionEnd)
+  const selection = resolveSelectedBlockOffsets(value, selectionStart, selectionEnd)
   if (!selection) return null
 
-  const { lines, start, end } = selection
-  if (command === "move-up") return planMove(value, lines, start, end, selectionStart, selectionEnd, "up")
-  if (command === "move-down") return planMove(value, lines, start, end, selectionStart, selectionEnd, "down")
-  if (command === "duplicate") return planDuplicate(value, lines, start, end, selectionStart, selectionEnd)
-  return planDelete(value, lines, start, end)
+  const { blockStart, blockEnd } = selection
+  if (command === "move-up") return planMove(value, blockStart, blockEnd, selectionStart, selectionEnd, "up")
+  if (command === "move-down") return planMove(value, blockStart, blockEnd, selectionStart, selectionEnd, "down")
+  if (command === "duplicate") return planDuplicate(value, blockStart, blockEnd, selectionStart, selectionEnd)
+  return planDelete(value, blockStart, blockEnd)
 }

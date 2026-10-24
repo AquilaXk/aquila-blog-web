@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminAppBackground as appBackground,
   adminBorder as border,
@@ -399,6 +400,7 @@ export const DocumentFallbackBox = styled.div`
     font-size: 0.78rem;
     font-weight: 850;
     text-decoration: none;
+    ${focusVisibleRing}
   }
 `
 
@@ -457,7 +459,7 @@ export const ProgressTrack = styled.div`
     height: 100%;
     width: var(--progress, 0%);
     border-radius: inherit;
-    background: linear-gradient(90deg, ${accentGold}, ${accentTeal});
+    background: ${accentTeal};
     transition: width 180ms ease;
   }
 `

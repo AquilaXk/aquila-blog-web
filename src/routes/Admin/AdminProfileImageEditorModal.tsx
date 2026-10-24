@@ -1,5 +1,6 @@
-import { useEffect, type PointerEventHandler, type Ref } from "react"
+import { useRef, type PointerEventHandler, type Ref } from "react"
 import AppIcon from "src/components/icons/AppIcon"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import { PROFILE_IMAGE_EDIT_MAX_ZOOM, PROFILE_IMAGE_EDIT_MIN_ZOOM } from "src/libs/profileImageUpload"
 import type { ProfileImageHistoryItem } from "src/routes/Admin/AdminProfilePersistenceModel"
 import {
@@ -70,22 +71,18 @@ export default function AdminProfileImageEditorModal({
   previewUrl,
   zoom,
 }: AdminProfileImageEditorModalProps) {
+  const modalCardRef = useRef<HTMLElement | null>(null)
   const closeWhenIdle = () => {
     if (isUploading) return
     onRequestClose()
   }
 
-  useEffect(() => {
-    if (isUploading) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        onRequestClose()
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isUploading, onRequestClose])
+  const { handleKeyDown } = useModalFocusTrap({
+    open: true,
+    onClose: closeWhenIdle,
+    containerRef: modalCardRef,
+    paused: isUploading,
+  })
 
   return (
     <ModalOverlay
@@ -96,12 +93,23 @@ export default function AdminProfileImageEditorModal({
         }
       }}
     >
-      <ModalCard role="dialog" aria-modal="true" aria-label="프로필 이미지 편집">
+      <ModalCard
+        ref={modalCardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="프로필 이미지 편집"
+        onKeyDown={handleKeyDown}
+      >
         <ModalHeader>
           <div>
             <h2>프로필 이미지 편집</h2>
           </div>
-          <ModalCloseButton type="button" disabled={isUploading} onClick={closeWhenIdle}>
+          <ModalCloseButton
+            type="button"
+            aria-label="프로필 이미지 편집 닫기"
+            disabled={isUploading}
+            onClick={closeWhenIdle}
+          >
             <AppIcon name="close" />
           </ModalCloseButton>
         </ModalHeader>

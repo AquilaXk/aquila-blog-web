@@ -52,13 +52,11 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
-    border: 1px solid ${ theme.colors.gray6};
-    background: ${ (theme.scheme === "dark" ? "rgba(15, 23, 42, 0.82)" : "rgba(255, 255, 255, 0.92)")};
-    color: ${ theme.colors.gray12};
+    border-radius: 4px;
+    background: var(--aq-surface-elevated);
+    border: 1px solid var(--aq-border-strong);
+    color: var(--aq-text);
     cursor: ew-resize;
-    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.2);
-    backdrop-filter: blur(8px);
 
     @media (max-width: 768px) {
       min-width: 44px;
@@ -204,5 +202,16 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     margin-left: 0.35rem;
     color: ${theme.publicDesign.accent};
     text-decoration: none;
+  }
+
+  @media (pointer: coarse) {
+    a[data-footnote-ref],
+    a[data-footnote-backref] {
+      min-width: 28px;
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 `

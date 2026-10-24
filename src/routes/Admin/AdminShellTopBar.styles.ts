@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
 import {
   adminBorder,
@@ -46,6 +47,7 @@ export const CompactNavLink = styled.a`
   border: 1px solid transparent;
   color: ${adminTextSecondary};
   text-decoration: none;
+  ${focusVisibleRing}
 
   span {
     display: inline;
@@ -95,6 +97,7 @@ export const SecondaryTopAction = styled.a`
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 780;
+  ${focusVisibleRing}
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     min-height: ${control.lg}px;
@@ -114,6 +117,7 @@ export const PrimaryTopAction = styled.a`
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 820;
+  ${focusVisibleRing}
 
   &:hover {
     background: ${adminTealHover};
