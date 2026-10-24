@@ -13,7 +13,7 @@ import {
   readMermaidCache,
   writeMermaidCache,
 } from "src/libs/markdown/mermaidRuntimeConfig"
-import { openMermaidOverlay } from "src/libs/markdown/mermaidRuntimeOverlay"
+import { openMermaidOverlay, shouldIgnoreStageClickForZoom } from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
   createMermaidRenderTimeoutError,
   isMermaidRenderTimeoutError,
@@ -280,10 +280,11 @@ export const createMermaidRuntimeController = ({
       ? Number.POSITIVE_INFINITY
       : Math.min(760, Math.floor(window.innerHeight * 0.74))
     const usesDesktopWideLane = complexityLevel !== "high" && maxDisplayWidth > containerWidth + 24
+    const effectiveMaxDisplayWidth = Math.max(240, maxDisplayWidth - (isMobileViewport ? 20 : 40))
 
     let scale = 1
-    if (intrinsicWidth > maxDisplayWidth) {
-      scale = Math.min(scale, maxDisplayWidth / intrinsicWidth)
+    if (intrinsicWidth > effectiveMaxDisplayWidth) {
+      scale = Math.min(scale, effectiveMaxDisplayWidth / intrinsicWidth)
     }
     if (intrinsicHeight * scale > maxReadableHeight) {
       scale = Math.min(scale, maxReadableHeight / intrinsicHeight)
@@ -322,12 +323,12 @@ export const createMermaidRuntimeController = ({
     svgElement.removeAttribute("height")
 
     stage.title = "클릭하여 크게 보기"
-    stage.addEventListener("click", () => {
-      mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
+    stage.addEventListener("click", (event) => {
+      if (!shouldIgnoreStageClickForZoom(event)) {
+        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
+      }
     })
-
     block.querySelectorAll(".aq-mermaid-expand-btn").forEach((button) => button.remove())
-
     if (needsExpandAction) {
       const expandButton = document.createElement("button")
       expandButton.type = "button"

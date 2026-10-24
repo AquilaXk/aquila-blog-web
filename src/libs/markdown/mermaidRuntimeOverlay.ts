@@ -138,6 +138,14 @@ const resolvePreviousActiveElement = (): HTMLElement | null =>
     ? document.activeElement
     : null
 
+export const shouldIgnoreStageClickForZoom = (event: MouseEvent): boolean => {
+  const target = typeof Element !== "undefined" && event.target instanceof Element ? event.target : null
+  if (target?.closest("a, button")) return true
+  const selectionText =
+    typeof window !== "undefined" ? (window.getSelection?.()?.toString().trim() ?? "") : ""
+  return selectionText.length > 0
+}
+
 const configureMermaidStageSvg = (stageSvg: SVGSVGElement | null) => {
   if (!stageSvg) return
   stageSvg.removeAttribute("width")
@@ -146,6 +154,7 @@ const configureMermaidStageSvg = (stageSvg: SVGSVGElement | null) => {
   stageSvg.style.width = "max-content"
   stageSvg.style.height = "auto"
   stageSvg.style.display = "block"
+  stageSvg.style.margin = "0 auto"
   stageSvg.style.transition = "transform 0.14s ease"
 }
 
@@ -228,9 +237,7 @@ export const openMermaidOverlay = (
   stage.style.overflow = "auto"
   stage.style.padding = "1.5rem"
   stage.style.background = "var(--aq-surface, #ffffff)"
-  stage.style.display = "flex"
-  stage.style.justifyContent = "center"
-  stage.style.alignItems = "flex-start"
+  stage.style.display = "block"
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup
   const stageSvg = typeof stage.querySelector === "function" ? stage.querySelector("svg") : null
