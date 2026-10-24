@@ -277,6 +277,11 @@ export const FilterContextBar = styled.div`
       background: var(--aq-accent-muted);
       color: var(--aq-text);
     }
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: 2px;
+    }
   }
 
   @media (max-width: 768px) {

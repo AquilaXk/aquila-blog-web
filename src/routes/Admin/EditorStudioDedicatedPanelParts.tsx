@@ -1,6 +1,8 @@
-import { useEffect } from "react"
+import { useRef } from "react"
 import styled from "@emotion/styled"
 import { CONFIG } from "site.config"
+import { focusVisibleRing } from "src/design-system/focusRing"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 
 export const EditorStudioStatusBar = styled.footer`
   display: flex;
@@ -79,6 +81,7 @@ export const EditorPanelHeader = styled.div`
     line-height: 1;
     border-radius: 4px;
     transition: all 0.15s ease;
+    ${focusVisibleRing}
 
     &:hover {
       color: ${({ theme }) => theme.colors.gray12};
@@ -145,8 +148,8 @@ export const EditorOutlineItem = styled.button`
   }
 
   &[data-active="true"] {
-    background: rgba(35, 131, 226, 0.08);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
+    background: ${({ theme }) => theme.publicDesign.accentMuted};
+    color: ${({ theme }) => theme.publicDesign.accent};
     font-weight: 600;
   }
 
@@ -156,21 +159,11 @@ export const EditorOutlineItem = styled.button`
     justify-content: center;
     padding: 1px 5px;
     border-radius: 4px;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
     font: 700 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
+    color: ${({ theme }) => theme.colors.gray11};
     flex-shrink: 0;
-  }
-
-  &[data-level="2"] span {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.22)" : "#f6f3f9")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
-  }
-
-  &[data-level="3"] span,
-  &[data-level="4"] span {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
   }
 
   strong {
@@ -344,10 +337,12 @@ export const EditorGuidePanel = styled.aside`
 
   header button {
     border: 0;
+    border-radius: 4px;
     background: transparent;
     color: ${({ theme }) => theme.colors.gray10};
     font-size: 1.2rem;
     cursor: pointer;
+    ${focusVisibleRing}
   }
 `
 
@@ -437,24 +432,21 @@ export const EditorGuideRepo = styled.div`
 
 export const EditorStudioGuideModal = ({ onClose }: { onClose: () => void }) => {
   const projectRepository = CONFIG.projects?.[0]
-
-  useEffect(() => {
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const { handleKeyDown } = useModalFocusTrap({
+    open: true,
+    onClose,
+    containerRef: dialogRef,
+  })
 
   return (
     <EditorGuideBackdrop onClick={onClose}>
       <EditorGuidePanel
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Markdown 작성 가이드"
+        onKeyDown={handleKeyDown}
         onClick={(event) => event.stopPropagation()}
       >
         <header>

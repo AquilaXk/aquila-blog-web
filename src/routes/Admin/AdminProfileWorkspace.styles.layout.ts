@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
   AdminPaneHeader,
@@ -115,6 +116,7 @@ export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
   border-bottom: 1px solid ${({ theme }) => theme.colors.gray5};
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};
+  ${focusVisibleRing}
 
   &[data-active="true"] {
     border-left: 0;
@@ -232,7 +234,7 @@ export const AvatarWorkspaceCard = styled.div`
   .avatarPreview {
     width: 88px;
     height: 88px;
-    border-radius: 999px;
+    border-radius: 50%;
     overflow: hidden;
   }
 
@@ -382,7 +384,7 @@ export const AboutSectionCard = styled.div`
   display: grid;
   gap: 0.72rem;
   padding: 0.9rem;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
 `
@@ -461,7 +463,7 @@ export const InlineActionRow = styled.div`
 
 export const EmptyStateCard = styled.div`
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px dashed ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
   display: grid;
@@ -482,7 +484,7 @@ export const SegmentedControl = styled.div`
   display: inline-flex;
   gap: 0.36rem;
   padding: 0.25rem;
-  border-radius: 8px;
+  border-radius: 2px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
 `
@@ -495,6 +497,7 @@ export const SegmentButton = styled.button`
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};
   font-weight: 700;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     min-height: ${control.lg}px;

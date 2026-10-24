@@ -16,7 +16,11 @@ import {
   SLASH_COMMAND_SPECS,
   resolveSlashCommandMutation,
 } from "../../src/components/markdown-editor/useMarkdownEditorSlashMenu"
-import { buildLocalDraftFingerprint } from "../../src/routes/Admin/editorStudioMetaModel"
+import {
+  buildEditorStateFingerprint,
+  buildLocalDraftFingerprint,
+} from "../../src/routes/Admin/editorStudioMetaModel"
+import { renderImmediateCodeToHtml } from "../../src/libs/markdown/prismRuntime"
 import { createPublicDesignTokens } from "../../src/styles/theme"
 
 const repoRoot = resolve(__dirname, "../..")
@@ -124,43 +128,50 @@ test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal",
   })
 
   test("5. FNV-1a draft fingerprint & removal of redundant syncRequire / orphaned files", () => {
-    const largeBody = "x".repeat(10_000)
-    const fp1 = buildLocalDraftFingerprint({
+    const largeBody = "x".repeat(50_000)
+    const payload1 = {
       title: "Title",
       content: largeBody,
       summary: "Summary",
-      summarySource: "MANUAL",
-      summaryIntent: { kind: "auto" },
+      summarySource: "MANUAL" as const,
+      summaryIntent: { kind: "auto" as const },
       thumbnailUrl: "",
       thumbnailFocusX: 50,
       thumbnailFocusY: 50,
       thumbnailZoom: 1,
       tags: ["rust"],
       category: "Dev",
-      visibility: "PUBLIC_LISTED",
-    })
-    const fp2 = buildLocalDraftFingerprint({
-      title: "Title",
+      visibility: "PUBLIC_LISTED" as const,
+    }
+    const payload2 = {
+      ...payload1,
       content: largeBody + "y",
-      summary: "Summary",
-      summarySource: "MANUAL",
-      summaryIntent: { kind: "auto" },
-      thumbnailUrl: "",
-      thumbnailFocusX: 50,
-      thumbnailFocusY: 50,
-      thumbnailZoom: 1,
-      tags: ["rust"],
-      category: "Dev",
-      visibility: "PUBLIC_LISTED",
-    })
+    }
+    const fp1 = buildLocalDraftFingerprint(payload1)
+    const fp2 = buildLocalDraftFingerprint(payload2)
+    const stateFp1 = buildEditorStateFingerprint(payload1)
+    const stateFp2 = buildEditorStateFingerprint(payload2)
     expect(fp1.length).toBeLessThan(300)
     expect(fp1).not.toBe(fp2)
+    expect(stateFp1).toBe(fp1)
+    expect(stateFp2).toBe(fp2)
+    expect(stateFp1.length).toBeLessThan(300)
+
+    const markdownEditorStylesSrc = readRepoFile(
+      "src/components/markdown-editor/MarkdownEditor.styles.ts"
+    )
+    expect(markdownEditorStylesSrc).not.toContain("border-radius: 9999px;")
+    expect(markdownEditorStylesSrc).toContain("padding: 1px 7px 1px 5px;\n    margin: 0 2px;\n    border-radius: 4px;")
 
     const prismSrc = readRepoFile("src/libs/markdown/prismRuntime.ts")
     expect(prismSrc).not.toContain("syncRequire")
     expect(prismSrc).not.toContain("prismImmediateLanguageLoaders")
     expect(prismSrc).toContain('md: ["markdown"]')
     expect(prismSrc).toContain('py: ["python"]')
+
+    const largeJson = `{"key":"${"a".repeat(5000)}","count":42}`
+    const renderedLargeJson = renderImmediateCodeToHtml({ source: largeJson })
+    expect(renderedLargeJson.language).toBe("json")
 
     const nextConfigSrc = readRepoFile("next.config.js")
     expect(nextConfigSrc).not.toContain("ignoreWarnings")

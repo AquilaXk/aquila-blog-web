@@ -101,8 +101,31 @@ const matchQuotedStrongAt = (value: string, start: number): QuotedStrongMatch | 
 const matchQuotedEmphasisAt = (value: string, start: number): QuotedStrongMatch | null =>
   matchBoundaryDelimitedSpanAt(value, start, QUOTED_EMPHASIS_MARKERS, true)
 
+const hasStringChildMatching = (
+  children: ReactNode,
+  predicate: (text: string) => boolean
+): boolean => {
+  if (typeof children === "string") return predicate(children)
+  if (!children || typeof children === "number" || typeof children === "boolean") return false
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      if (hasStringChildMatching(child, predicate)) return true
+    }
+    return false
+  }
+  if (typeof children === "object" && "type" in children) {
+    return false
+  }
+  return true
+}
+
+const hasStrongSyntax = (text: string): boolean => text.includes("**") || text.includes("__")
+const hasEmphasisSyntax = (text: string): boolean => text.includes("*") || text.includes("_")
+const hasInlineColorSyntax = (text: string): boolean => text.includes("{{")
+const hasSoftBreakSyntax = (text: string): boolean => text.includes("\n")
+
 const restoreQuotedStrongText = (value: string): ReactNode[] => {
-  if (!value.includes("**") && !value.includes("__")) {
+  if (!hasStrongSyntax(value)) {
     return [value]
   }
 
@@ -136,14 +159,16 @@ const restoreQuotedStrongText = (value: string): ReactNode[] => {
   return nodes
 }
 
-const normalizeQuotedStrongChildren = (children: ReactNode) =>
-  Children.toArray(children).flatMap((child) => {
+const normalizeQuotedStrongChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasStrongSyntax)) return children
+  return Children.toArray(children).flatMap((child) => {
     if (typeof child !== "string") return [child]
     return restoreQuotedStrongText(child)
   })
+}
 
 const restoreQuotedEmphasisText = (value: string): ReactNode[] => {
-  if (!value.includes("*") && !value.includes("_")) {
+  if (!hasEmphasisSyntax(value)) {
     return [value]
   }
 
@@ -177,11 +202,13 @@ const restoreQuotedEmphasisText = (value: string): ReactNode[] => {
   return nodes
 }
 
-const normalizeQuotedEmphasisChildren = (children: ReactNode) =>
-  Children.toArray(children).flatMap((child) => {
+const normalizeQuotedEmphasisChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasEmphasisSyntax)) return children
+  return Children.toArray(children).flatMap((child) => {
     if (typeof child !== "string") return [child]
     return restoreQuotedEmphasisText(child)
   })
+}
 
 const restoreSerializedMarkdownChildren = (serialized: string, sourceChildren: ReactNode[]) => {
   if (!serialized) return []
@@ -206,7 +233,8 @@ const restoreSerializedMarkdownChildren = (serialized: string, sourceChildren: R
   return nodes
 }
 
-const normalizeInlineColorChildren = (children: ReactNode) => {
+const normalizeInlineColorChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasInlineColorSyntax)) return children
   const sourceChildren = Children.toArray(children)
   if (sourceChildren.length === 0) return sourceChildren
 
@@ -265,14 +293,15 @@ const normalizeInlineColorChildren = (children: ReactNode) => {
   return nodes
 }
 
-const normalizeSoftBreakChildren = (children: ReactNode) => {
+const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasSoftBreakSyntax)) return children
   const nodes: ReactNode[] = []
   let breakIndex = 0
 
-  Children.toArray(children).forEach((child) => {
+  for (const child of Children.toArray(children)) {
     if (typeof child !== "string") {
       nodes.push(child)
-      return
+      continue
     }
 
     const parts = child.split("\n")
@@ -283,7 +312,7 @@ const normalizeSoftBreakChildren = (children: ReactNode) => {
         breakIndex += 1
       }
     })
-  })
+  }
 
   return nodes
 }

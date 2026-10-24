@@ -72,6 +72,7 @@ const BubbleActionButton = styled.button`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
+  @media (pointer: coarse) { min-width: 36px; min-height: 36px; }
 `
 
 const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
@@ -174,7 +175,7 @@ const ColorSwatchDot = styled.span<{ $color: string }>`
   display: inline-block;
   width: 11px;
   height: 11px;
-  border-radius: 999px;
+  border-radius: 3px;
   background: ${({ $color }) => $color};
   border: 1px solid rgba(15, 23, 42, 0.16);
   flex-shrink: 0;

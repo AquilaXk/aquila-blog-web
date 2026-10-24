@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   AdminInfoLinkCard,
   AdminInfoList,
@@ -151,6 +152,7 @@ export const HeaderLink = styled.a`
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 780;
+  ${focusVisibleRing}
 
   &[data-variant="primary"] {
     border-color: ${adminTealBorder};
@@ -421,6 +423,7 @@ export const LaunchLink = styled.a`
   text-decoration: none;
   font-size: 0.88rem;
   font-weight: 780;
+  ${focusVisibleRing}
 `
 
 export const LogLines = styled.div`

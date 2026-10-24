@@ -1,5 +1,6 @@
 import {
   type FC,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   memo,
@@ -53,8 +54,11 @@ import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.t
 export { markdownGuide } from "src/libs/markdown/rendering"
 
 const handleImageLightboxClick = (target: Element): boolean => {
-  if (target.closest("a[href], .aq-image-resize-handle")) return false
-  const image = target.closest<HTMLImageElement>(".aq-image-frame img")
+  if (target.closest("a, button, .aq-image-resize-handle")) return false
+  const image =
+    target instanceof HTMLImageElement
+      ? target
+      : target.closest<HTMLImageElement>(".aq-image-frame img")
   if (!image) return false
   const frame = image.closest<HTMLElement>(".aq-image-frame")
   if (frame?.dataset.editable === "true") return false
@@ -408,13 +412,33 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
 
   useEffect(() => {
     imageRenderOrderRef.current = 0
-  }, [renderKey])
+    const root = rootRef.current
+    if (!root || editableImages) return
+    for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+      if (!image.closest("a, button") && !image.hasAttribute("tabindex")) {
+        image.tabIndex = 0
+      }
+    }
+  }, [editableImages, renderKey])
 
   const handleRootClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (editableImages) return
       if (!(event.target instanceof Element)) return
       handleImageLightboxClick(event.target)
+    },
+    [editableImages]
+  )
+
+  const handleRootKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (editableImages) return
+      if (event.key !== "Enter" && event.key !== " ") return
+      if (!(event.target instanceof HTMLImageElement)) return
+      if (!event.target.closest(".aq-markdown") || event.target.closest("a, button")) return
+      if (handleImageLightboxClick(event.target)) {
+        event.preventDefault()
+      }
     },
     [editableImages]
   )
@@ -455,6 +479,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         className="aq-markdown"
         data-editable={editableImages ? "true" : undefined}
         onClick={handleRootClick}
+        onKeyDown={handleRootKeyDown}
         dangerouslySetInnerHTML={{ __html: resolvedContentHtml }}
       />
     )
@@ -470,6 +495,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
       className="aq-markdown"
       data-editable={editableImages ? "true" : undefined}
       onClick={handleRootClick}
+      onKeyDown={handleRootKeyDown}
     >
       {segments.map((segment, index) => {
         const imageIndex = segment.type === "image" ? (standaloneImageIndex += 1) : -1

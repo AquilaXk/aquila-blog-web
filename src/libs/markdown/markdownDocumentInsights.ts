@@ -22,18 +22,22 @@ export type MarkdownDocumentInsights = {
 const FENCE_OPEN_PATTERN = /^\s{0,3}(`{3,}|~{3,})/
 const ATX_HEADING_PATTERN = /^\s{0,3}(#{1,4})\s+(.+?)(?:\s+#+)?\s*$/
 
-const isUnicodeWhitespace = (code: number): boolean =>
-  code === 0x20 ||
-  (code >= 0x09 && code <= 0x0d) ||
-  code === 0xa0 ||
-  code === 0x1680 ||
-  (code >= 0x2000 && code <= 0x200a) ||
-  code === 0x2028 ||
-  code === 0x2029 ||
-  code === 0x202f ||
-  code === 0x205f ||
-  code === 0x3000 ||
-  code === 0xfeff
+const isUnicodeWhitespace = (code: number): boolean => {
+  if (code <= 0x7f) {
+    return code === 0x20 || (code >= 0x09 && code <= 0x0d)
+  }
+  return (
+    code === 0xa0 ||
+    code === 0x1680 ||
+    (code >= 0x2000 && code <= 0x200a) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0x202f ||
+    code === 0x205f ||
+    code === 0x3000 ||
+    code === 0xfeff
+  )
+}
 
 export const countCodePoints = (text: string): number => {
   let count = 0
@@ -46,19 +50,8 @@ export const countCodePoints = (text: string): number => {
   return count
 }
 
-export const countWords = (text: string): number => {
-  let words = 0
-  let inWord = false
-  for (let index = 0; index < text.length; index += 1) {
-    if (isUnicodeWhitespace(text.codePointAt(index) ?? 0)) {
-      inWord = false
-    } else if (!inWord) {
-      inWord = true
-      words += 1
-    }
-  }
-  return words
-}
+export const countWords = (text: string): number =>
+  countTrimmedCodePointsAndWords(text).wordCount
 
 const findTrimmedBounds = (text: string): { start: number; end: number } => {
   let start = 0
@@ -102,9 +95,43 @@ const countTrimmedCodePointsAndWords = (
   return { characterCount, wordCount }
 }
 
-const formatMarkdownHeadingLabel = (text: string) => {
+export const hasHeadingInlineSyntax = (text: string): boolean => {
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.codePointAt(index) ?? 0
+    if (
+      code === 0x60 ||
+      code === 0x21 ||
+      code === 0x5b ||
+      code === 0x2a ||
+      code === 0x5f ||
+      code === 0x7e ||
+      code === 0x5c
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+const collapseAsciiWhitespace = (text: string): string => {
+  let needsCollapse = false
+  const len = text.length
+  for (let index = 0; index < len; index += 1) {
+    const code = text.codePointAt(index) ?? 0
+    if (code === 0x09 || (code === 0x20 && index > 0 && text.codePointAt(index - 1) === 0x20)) {
+      needsCollapse = true
+      break
+    }
+  }
+  return needsCollapse ? text.replace(/[ \t]+/g, " ").trim() : text.trim()
+}
+
+export const formatMarkdownHeadingLabel = (text: string): string => {
+  if (!hasHeadingInlineSyntax(text)) {
+    return collapseAsciiWhitespace(text)
+  }
   const codeSpans: string[] = []
-  return text
+  const formatted = text
     .replace(/`([^`]+)`/g, (_, code: string) => {
       const token = `@@CODE_SPAN_${codeSpans.length}@@`
       codeSpans.push(code)
@@ -118,7 +145,7 @@ const formatMarkdownHeadingLabel = (text: string) => {
     .replace(/(^|[^\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/~~(.*?)~~/g, "$1")
     .replace(/@@CODE_SPAN_(\d+)@@/g, (_, index: string) => codeSpans[Number(index)] ?? "")
-    .trim()
+  return collapseAsciiWhitespace(formatted)
 }
 
 const toMarkdownHeadingSlug = (value: string) => {
@@ -169,6 +196,17 @@ const updateActiveFenceState = (line: string, activeFence: ActiveFenceState): Ac
     return null
   }
   return activeFence
+}
+
+const hasAtxHeadingPrefixAt = (markdown: string, firstNonSpace: number, lineEnd: number): boolean => {
+  let cursor = firstNonSpace
+  while (cursor < lineEnd && cursor - firstNonSpace < 5 && markdown.codePointAt(cursor) === 0x23) {
+    cursor += 1
+  }
+  const hashCount = cursor - firstNonSpace
+  if (hashCount < 1 || hashCount > 4 || cursor >= lineEnd) return false
+  const nextCode = markdown.codePointAt(cursor) ?? 0
+  return nextCode === 0x20 || nextCode === 0x09
 }
 
 const appendMarkdownHeadingInsight = (
@@ -232,7 +270,7 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
 
     if (firstChar === 96 || firstChar === 126) {
       activeFence = updateActiveFenceState(markdown.slice(lineStart, lineEnd), activeFence)
-    } else if (!activeFence && firstChar === 35) {
+    } else if (!activeFence && firstChar === 35 && hasAtxHeadingPrefixAt(markdown, firstNonSpace, lineEnd)) {
       appendMarkdownHeadingInsight(
         markdown.slice(lineStart, lineEnd),
         offset,

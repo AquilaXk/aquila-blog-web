@@ -248,7 +248,8 @@ export const StyledWrapper = styled.div `
       text-transform: uppercase;
     }
 
-    .tocDepthToggle {
+    .tocDepthToggle,
+    .tocToggle {
       border: 1px solid var(--aq-border);
       border-radius: 6px;
       background: var(--aq-surface);
@@ -264,6 +265,11 @@ export const StyledWrapper = styled.div `
       &:hover {
         color: var(--aq-text);
         border-color: var(--aq-border-strong);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--aq-focus-ring);
+        outline-offset: 2px;
       }
     }
 

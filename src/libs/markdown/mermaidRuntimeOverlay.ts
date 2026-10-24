@@ -11,12 +11,13 @@ export const createOverlayActionButton = (label: string, ariaLabel: string): HTM
   button.style.display = "inline-flex"
   button.style.alignItems = "center"
   button.style.justifyContent = "center"
+  button.style.minWidth = "44px"
   button.style.minHeight = "44px"
   button.style.padding = "0 0.8rem"
-  button.style.borderRadius = "4px"
-  button.style.border = "1px solid var(--aq-border-strong, #c8ccd2)"
-  button.style.background = "var(--aq-surface, #ffffff)"
-  button.style.color = "var(--aq-text, #0f1724)"
+  button.style.borderRadius = "6px"
+  button.style.border = "1px solid var(--aq-border-strong)"
+  button.style.background = "var(--aq-surface)"
+  button.style.color = "var(--aq-text)"
   button.style.fontSize = "0.78rem"
   button.style.fontWeight = "600"
   button.style.cursor = "pointer"
@@ -116,7 +117,7 @@ export const trapOverlayTabFocus = (event: KeyboardEvent, overlay: HTMLElement) 
   if (!focusable.length) return
 
   const first = focusable[0]
-  const last = focusable[focusable.length - 1]
+  const last = focusable.at(-1)!
   const active = document.activeElement as HTMLElement | null
 
   if (event.shiftKey) {
@@ -211,10 +212,9 @@ export const openMermaidOverlay = (
   panel.style.display = "flex"
   panel.style.flexDirection = "column"
   panel.style.overflow = "hidden"
-  panel.style.borderRadius = "4px"
-  panel.style.border = "1px solid var(--aq-border-strong, #c8ccd2)"
-  panel.style.background = "var(--aq-surface, #ffffff)"
-  panel.style.boxShadow = "0 20px 48px rgba(15, 23, 36, 0.18)"
+  panel.style.borderRadius = "6px"
+  panel.style.border = "1px solid var(--aq-border-strong)"
+  panel.style.background = "var(--aq-surface)"
   panel.style.padding = "0"
 
   const actionsBar = document.createElement("div")
@@ -225,8 +225,8 @@ export const openMermaidOverlay = (
   actionsBar.style.flexWrap = "wrap"
   actionsBar.style.gap = "0.45rem"
   actionsBar.style.padding = "0.65rem 0.85rem"
-  actionsBar.style.background = "var(--aq-page-bg, #f7f7f5)"
-  actionsBar.style.borderBottom = "1px solid var(--aq-border, #dfe1e5)"
+  actionsBar.style.background = "var(--aq-page-bg)"
+  actionsBar.style.borderBottom = "1px solid var(--aq-border)"
 
   const zoomOutButton = createOverlayActionButton("-", "축소")
   const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
@@ -236,7 +236,7 @@ export const openMermaidOverlay = (
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
   stage.style.padding = "1.5rem"
-  stage.style.background = "var(--aq-surface, #ffffff)"
+  stage.style.background = "var(--aq-surface)"
   stage.style.display = "block"
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup

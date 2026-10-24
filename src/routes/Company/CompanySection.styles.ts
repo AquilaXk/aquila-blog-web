@@ -133,20 +133,19 @@ export const ProductShowcaseMedia = styled.div<{ $layout?: "phone" | "desktop" }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: ${({ $layout }) => ($layout === "phone" ? "clamp(1.25rem, 2.5vw, 2rem)" : "0")};
-  border: 1px solid ${light.border};
-  border-radius: ${({ $layout }) => ($layout === "phone" ? `${radius.lg}px` : `${radius.md}px`)};
-  background: ${({ $layout }) => ($layout === "phone" ? light.surfaceScaffold : light.surface)};
-  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
 
   picture {
     display: block;
     width: ${({ $layout }) => ($layout === "phone" ? "min(100%, 15.25rem)" : "100%")};
     padding: ${({ $layout }) => ($layout === "phone" ? "0.5rem" : "0")};
-    border: ${({ $layout }) => ($layout === "phone" ? `1px solid ${dark.borderStrong}` : "none")};
-    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.85rem" : "0")};
-    background: ${({ $layout }) => ($layout === "phone" ? dark.fieldDeep : "transparent")};
+    border: ${({ $layout }) => ($layout === "phone" ? `1px solid ${dark.borderStrong}` : `1px solid ${light.border}`)};
+    border-radius: ${({ $layout }) => ($layout === "phone" ? "1.85rem" : `${radius.md}px`)};
+    background: ${({ $layout }) => ($layout === "phone" ? dark.fieldDeep : light.surface)};
     box-shadow: ${({ $layout }) => ($layout === "phone" ? light.phoneShadow : "none")};
+    overflow: hidden;
 
     @media (forced-colors: active) {
       border-color: CanvasText;

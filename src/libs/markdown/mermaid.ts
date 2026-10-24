@@ -132,7 +132,38 @@ const normalizeSequenceParticipantAliases = (source: string) => {
   return normalized.join("\n")
 }
 
+const isLikelyFenceLeadCode = (code: number): boolean =>
+  code === 0x60 ||
+  code === 0x7e ||
+  code === 0x5c ||
+  code === 0x27 ||
+  code === 0xb4 ||
+  code === 0x2cb ||
+  code === 0x2018 ||
+  code === 0x2019 ||
+  code === 0xff40 ||
+  (code >= 0x200b && code <= 0x200d) ||
+  code === 0xfeff
+
+const hasUniformMarkerRun = (fence: string, marker: string): boolean => {
+  for (const char of fence) {
+    if (char !== marker) return false
+  }
+  return true
+}
+
 const parseFenceLine = (rawLine: string) => {
+  let cursor = 0
+  while (
+    cursor < rawLine.length &&
+    (rawLine.codePointAt(cursor) === 0x20 || rawLine.codePointAt(cursor) === 0x09)
+  ) {
+    cursor += 1
+  }
+  if (cursor >= rawLine.length || !isLikelyFenceLeadCode(rawLine.codePointAt(cursor) ?? 0)) {
+    return null
+  }
+
   const normalized = normalizeFenceChars(stripInvisibleChars(rawLine)).trim()
   const unescapedEscapedFence = normalized.replaceAll("\\`", "`").replaceAll("\\~", "~")
   const unescaped = unescapedEscapedFence.startsWith("\\")
@@ -143,7 +174,7 @@ const parseFenceLine = (rawLine: string) => {
 
   const fence = match[1]
   const marker = fence[0]
-  if (!fence.split("").every((char) => char === marker)) return null
+  if (!hasUniformMarkerRun(fence, marker)) return null
 
   return {
     marker,
@@ -295,34 +326,35 @@ const WRAP_MIN_TRIGGER_UNITS = 32
 const MERMAID_WRAP_SKIP_DIRECTIVE_PATTERN =
   /^\s*(?:%%|subgraph\b|end\b|style\b|linkStyle\b|classDef\b|class\b|click\b)/i
 
-const computeTextUnits = (text: string) =>
-  Array.from(text).reduce((total, char) => {
-    const codePoint = char.codePointAt(0) || 0
-    const isWide =
-      (codePoint >= 0x1100 && codePoint <= 0x11ff) ||
-      (codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
-      (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-      (codePoint >= 0xff01 && codePoint <= 0xff60) ||
-      (codePoint >= 0xffe0 && codePoint <= 0xffe6)
-    return total + (isWide ? 1.7 : 1)
-  }, 0)
+export const computeTextUnits = (text: string): number => {
+  let sum = 0
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.codePointAt(i) ?? 0
+    if (code > 0xffff) i += 1
+    sum += code > 0x7f ? 1.75 : 1
+  }
+  return sum
+}
 
 const mergeSoftWrapChunks = (chunks: string[]) => {
   const lines: string[] = []
   let current = ""
+  let currentUnits = 0
 
-  chunks.forEach((chunk) => {
+  for (const chunk of chunks) {
     const trimmed = chunk.trim()
-    if (!trimmed) return
-    const next = current ? `${current} ${trimmed}` : trimmed
-    if (computeTextUnits(next) <= WRAP_LINE_MAX_UNITS) {
-      current = next
-      return
+    if (!trimmed) continue
+    const chunkUnits = computeTextUnits(trimmed)
+    const nextUnits = current ? currentUnits + 1 + chunkUnits : chunkUnits
+    if (nextUnits <= WRAP_LINE_MAX_UNITS) {
+      current = current ? `${current} ${trimmed}` : trimmed
+      currentUnits = nextUnits
+      continue
     }
     if (current) lines.push(current)
     current = trimmed
-  })
+    currentUnits = chunkUnits
+  }
 
   if (current) lines.push(current)
   return lines
@@ -330,19 +362,26 @@ const mergeSoftWrapChunks = (chunks: string[]) => {
 
 const splitLongToken = (token: string) => {
   const output: string[] = []
-  let current = ""
+  let chunkStart = 0
+  let currentUnits = 0
 
-  Array.from(token).forEach((char) => {
-    const next = `${current}${char}`
-    if (computeTextUnits(next) > WRAP_LINE_MAX_UNITS && current.length > 0) {
-      output.push(current)
-      current = char
-      return
+  for (let index = 0; index < token.length; ) {
+    const code = token.codePointAt(index) ?? 0
+    const step = code > 0xffff ? 2 : 1
+    const charUnits = code > 0x7f ? 1.75 : 1
+    if (currentUnits + charUnits > WRAP_LINE_MAX_UNITS && index > chunkStart) {
+      output.push(token.slice(chunkStart, index))
+      chunkStart = index
+      currentUnits = charUnits
+    } else {
+      currentUnits += charUnits
     }
-    current = next
-  })
+    index += step
+  }
 
-  if (current) output.push(current)
+  if (chunkStart < token.length) {
+    output.push(token.slice(chunkStart))
+  }
   return output
 }
 

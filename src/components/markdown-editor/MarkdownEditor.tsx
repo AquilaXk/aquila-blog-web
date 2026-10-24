@@ -393,8 +393,16 @@ export const MarkdownEditor = ({
 
   const [viewMode, setViewMode] = useState<"live" | "source" | "reading">("live")
   const cycleViewMode = useCallback(() => {
-    setViewMode((prev) => (prev === "live" ? "source" : prev === "source" ? "reading" : "live"))
+    setViewMode((prev) => {
+      if (prev === "live") return "source"
+      if (prev === "source") return "reading"
+      return "live"
+    })
   }, [])
+  const handleCloseFindReplace = useCallback(() => {
+    findReplace.closePanel()
+    liveSurfaceRef.current?.focus(selectionRef.current)
+  }, [findReplace])
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
@@ -512,7 +520,7 @@ export const MarkdownEditor = ({
           currentMatch={findReplace.currentMatch}
           disabled={findReplace.panelDisabled}
           onCaseSensitiveChange={findReplace.updateCaseSensitive}
-          onClose={findReplace.closePanel}
+          onClose={handleCloseFindReplace}
           onNext={() => findReplace.move("next")}
           onPrevious={() => findReplace.move("previous")}
           onQueryChange={findReplace.updateQuery}

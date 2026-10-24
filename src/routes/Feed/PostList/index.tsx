@@ -42,7 +42,7 @@ const EmptyPostStateInner: React.FC<EmptyPostStateProps> = ({ hasFilter, onClear
       <div className="emptyIcon" aria-hidden="true">
         <AppIcon name={hasFilter ? "search" : "edit"} />
       </div>
-      <h3>{hasFilter ? t("emptyFilterTitle") : t("emptyNoPostsTitle")}</h3>
+      <h2>{hasFilter ? t("emptyFilterTitle") : t("emptyNoPostsTitle")}</h2>
       <p>{hasFilter ? t("emptyFilterDesc") : t("emptyNoPostsDesc")}</p>
       <div className="emptyActions">
         {hasFilter ? (
@@ -267,7 +267,7 @@ const StyledWrapper = styled.div`
     .emptyIcon {
       width: 2.1rem;
       height: 2.1rem;
-      border-radius: 8px;
+      border-radius: 6px;
       border: 1px solid ${({ theme }) => theme.colors.gray6};
       background: transparent;
       color: ${({ theme }) => theme.colors.gray10};
@@ -277,6 +277,7 @@ const StyledWrapper = styled.div`
       justify-content: center;
     }
 
+    h2,
     h3 {
       margin: 0;
       color: ${({ theme }) => theme.colors.gray12};
@@ -333,13 +334,15 @@ const StyledWrapper = styled.div`
     }
 
     .actionBtn--primary {
-      border-color: ${({ theme }) => theme.colors.blue7};
-      color: ${({ theme }) => theme.colors.blue11};
+      background: var(--aq-text);
+      border-color: var(--aq-text);
+      color: var(--aq-page-bg);
 
       &:hover {
-        border-color: ${({ theme }) => theme.colors.blue8};
-        background: ${({ theme }) => theme.colors.blue3};
-        color: ${({ theme }) => theme.colors.blue11};
+        opacity: 0.88;
+        background: var(--aq-text);
+        border-color: var(--aq-text);
+        color: var(--aq-page-bg);
       }
     }
   }
@@ -364,12 +367,12 @@ const StyledWrapper = styled.div`
       height: 2.1rem;
       border-radius: 6px;
       border: 1px solid ${({ theme }) => theme.colors.gray6};
-      color: ${({ theme }) => theme.colors.blue10};
+      color: var(--aq-text-secondary);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 1rem;
-      background: ${({ theme }) => theme.colors.gray2};
+      background: var(--aq-surface-subtle);
     }
 
     .searchLoadingCopy {
@@ -431,6 +434,16 @@ const StyledWrapper = styled.div`
       color: ${({ theme }) => theme.colors.gray10};
       font-size: 0.8rem;
       line-height: 1.5;
+    }
+
+    .loadMoreButton {
+      border: 1px solid var(--aq-border-strong);
+      color: var(--aq-text);
+
+      &:hover:not(:disabled) {
+        border-color: var(--aq-text);
+        background: var(--aq-surface-subtle);
+      }
     }
   }
 

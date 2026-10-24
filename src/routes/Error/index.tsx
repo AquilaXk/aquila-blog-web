@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
+import { focusVisibleRing } from "src/design-system/focusRing"
 
 const CustomError = () => {
   return (
@@ -79,7 +80,9 @@ const StyledWrapper = styled.div`
     margin-top: 0.4rem;
   }
 
+  .actions button,
   .actions a {
+    ${focusVisibleRing};
     display: inline-flex;
     align-items: center;
     justify-content: center;

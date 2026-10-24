@@ -267,6 +267,10 @@ export const FindReplaceInput = styled.input`
     outline: 2px solid ${({ theme }) => theme.colors.blue8};
     outline-offset: 1px;
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const FindReplaceCheckbox = styled.label`
@@ -298,6 +302,10 @@ export const FindReplaceActions = styled.div`
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 
   button:focus-visible {
@@ -429,13 +437,10 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     gap: 4px;
     padding: 1px 7px 1px 5px;
     margin: 0 2px;
-    border-radius: 9999px;
-    background: ${({ theme }) =>
-      theme.scheme === "dark" ? "rgba(168, 85, 247, 0.18)" : "rgba(124, 58, 237, 0.1)"};
-    border: 1px solid
-      ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.35)" : "rgba(124, 58, 237, 0.22)"};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#7c3aed")};
+    border-radius: 4px;
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    color: ${({ theme }) => theme.publicDesign.accent};
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.4;
@@ -445,11 +450,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
     &:hover {
-      background: ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(124, 58, 237, 0.18)"};
-      border-color: ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.5)" : "rgba(124, 58, 237, 0.35)"};
-      color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9")};
+      background: ${({ theme }) => theme.publicDesign.accentMuted};
+      border-color: ${({ theme }) => theme.publicDesign.borderStrong};
+      color: ${({ theme }) => theme.publicDesign.accent};
       text-decoration: none;
     }
 
@@ -563,11 +566,10 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       top: 50%;
       transform: translateY(-50%);
       padding: 1px 7px;
-      border-radius: 999px;
-      border: 1px solid rgba(35, 131, 226, 0.25);
-      background: ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7"};
-      color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
+      border-radius: 4px;
+      border: 1px solid ${({ theme }) => theme.publicDesign.border};
+      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+      color: ${({ theme }) => theme.colors.gray11};
       font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       text-transform: lowercase;
       pointer-events: none;
