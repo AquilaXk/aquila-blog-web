@@ -209,7 +209,6 @@ export const SectionHeading = styled(AdminSectionHeading)`
   align-items: flex-start;
 `
 
-// 패밀리룩(1221): 상태 배지는 파스텔 면 대신 헤어라인 보더 + 상태 텍스트로 표현.
 export const StatusBadge = styled(AdminStatusPill)`
   min-height: 34px;
   padding: 0 0.78rem;

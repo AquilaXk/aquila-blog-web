@@ -283,7 +283,6 @@ export const ToastCard = styled.div`
   line-height: 1.58;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 
-  /* 패밀리룩(1221): 토스트는 파스텔 tone 면 대신 중립 카드 + tone 보더/텍스트 */
   &[data-tone="success"] {
     border-color: ${({ theme }) => theme.colors.green8};
     color: ${({ theme }) => theme.colors.green11};

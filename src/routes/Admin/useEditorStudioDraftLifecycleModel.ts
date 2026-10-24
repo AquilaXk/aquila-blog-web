@@ -66,9 +66,7 @@ type UseEditorStudioLocalDraftLifecycleParams = {
   setPostTags: StudioSetState<string[]>
   setPostCategory: StudioSetState<string>
   setPostVisibility: StudioSetState<PostVisibility>
-  setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
-  setLocalDraftSlotLabel: StudioSetState<string>
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
   dedupeStrings: (items: string[]) => string[]
   normalizeCategoryValue: (value: string) => string
@@ -87,8 +85,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
   persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
   postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
   postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
-  removeLocalDraft, setEditorMode, setIsTempDraftMode, setKnownTags, setLocalDraftSavedAt,
-  setLocalDraftSlotLabel, setPostCategory, setPostContent, setPostId, setPostSummary,
+  removeLocalDraft, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
+  setPostCategory, setPostContent, setPostId, setPostSummary,
   setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
   setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
   setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
@@ -250,7 +248,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
       persistLocalDraft(payload)
     } catch {
       setLocalDraftSavedAt("")
-      setLocalDraftSlotLabel("")
       setPublishStatus({
         tone: "error",
         text: "브라우저 임시저장에 실패했습니다. 현재 원고를 복사하거나 서버에 저장한 뒤 페이지를 닫아주세요.",
@@ -264,7 +261,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
       fingerprint: currentLocalDraftFingerprint,
     }
     setLocalDraftSavedAt(payload.savedAt)
-    setLocalDraftSlotLabel(describeLocalDraftSlot(payload))
 
     if (!options?.silent) {
       setPublishStatus(
@@ -278,7 +274,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
   }, [
     buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
     localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt,
-    setLocalDraftSlotLabel, setPublishStatus,
+    setPublishStatus,
   ])
 
   const restoreLocalDraft = useCallback((candidateKey?: string) => {
@@ -362,9 +358,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostCategory(draft.category)
     setPostVisibility(draft.visibility)
 
-    setKnownTags((prev) => dedupeStrings([...prev, ...draft.tags]).sort((a, b) => a.localeCompare(b)))
     setLocalDraftSavedAt(draft.savedAt || "")
-    setLocalDraftSlotLabel(describeLocalDraftSlot(draft))
     setPublishStatus(
       {
         tone: "success",
@@ -375,8 +369,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
   }, [
     buildLocalDraftFingerprint, dedupeStrings, draftSource, lastLocalDraftFingerprintRef,
     lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, normalizeCategoryValue, postId,
-    localDraftCandidate, setEditorMode, setIsTempDraftMode, setKnownTags, setLocalDraftSavedAt,
-    setLocalDraftSlotLabel, setPostCategory, setPostContent, setPostId, setPostSummary,
+    localDraftCandidate, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
+    setPostCategory, setPostContent, setPostId, setPostSummary,
     setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
     setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
     setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
@@ -397,7 +391,6 @@ export const useEditorStudioLocalDraftLifecycle = ({
     }
     signalLocalDraftRemoved(draftSource)
     setLocalDraftSavedAt("")
-    setLocalDraftSlotLabel("")
     setPublishStatus(
       {
         tone: "success",
@@ -407,7 +400,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     )
   }, [
     draftSource, lastLocalDraftFingerprintRef, localDraftCandidates, localDraftFingerprint,
-    removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt, setLocalDraftSlotLabel,
+    removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt,
     setPublishStatus,
   ])
 

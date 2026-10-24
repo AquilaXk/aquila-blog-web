@@ -38,18 +38,6 @@ export const getVisibilityLabel = (
   return "전체 공개"
 }
 
-export const deriveEditorContentMetrics = (content: string) => {
-  const trimmedLength = content.trim().length
-  const lineCount = content ? content.split("\n").length : 0
-  const imageCount = (content.match(/!\[[^\]]*\]\([^)]+\)/g) || []).length
-
-  return {
-    trimmedLength,
-    lineCount,
-    imageCount,
-  }
-}
-
 export const deriveComposeViewModel = ({
   editorMode,
   isTempDraftMode,

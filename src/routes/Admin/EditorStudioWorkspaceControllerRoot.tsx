@@ -81,8 +81,6 @@ type MarkdownEditorChangeMeta = {
 
 type EditorStudioWorkspaceControllerProps = AdminPageProps
 
-const ignoreState = () => undefined
-
 export const EditorStudioWorkspaceController = ({
   initialMember,
 }: EditorStudioWorkspaceControllerProps) => {
@@ -116,11 +114,11 @@ export const EditorStudioWorkspaceController = ({
   const [postVisibility, setPostVisibility] = useState<PostVisibility>("PUBLIC_LISTED")
   const [publishNotice, setPublishNotice] = useState<NoticeState>({
     tone: "idle",
-    text: "작성 후 ‘글 작성’을 누르면 결과가 여기에 표시됩니다.",
+    text: "",
   })
   const [publishModalNotice, setPublishModalNotice] = useState<NoticeState>({
     tone: "idle",
-    text: "발행 전 설정을 점검한 뒤 실행하면 결과가 여기에 표시됩니다.",
+    text: "",
   })
   const postContentLiveRef = useRef(postContent)
   const flushEditorMarkdownRef = useRef<MarkdownEditorFlush | null>(null)
@@ -201,7 +199,6 @@ export const EditorStudioWorkspaceController = ({
     postTitle,
     queryClient,
     setEditorMode,
-    setGlobalNotice: ignoreState,
     setIsTempDraftMode,
     setLoadingKey,
     setPostId,
@@ -289,7 +286,6 @@ export const EditorStudioWorkspaceController = ({
     postCategory,
     postVisibility,
     editorMode,
-    isCompactMobileLayout,
     setEditorMode,
     setIsTempDraftMode,
     setPostId,
@@ -307,13 +303,10 @@ export const EditorStudioWorkspaceController = ({
     setPostTags,
     setPostCategory,
     setPostVisibility,
-    setKnownTags: ignoreState,
     setLocalDraftSavedAt,
-    setLocalDraftSlotLabel: ignoreState,
     setLoadingKey,
     setResult,
     setIsNewEditorBootstrapPending,
-    setMobileComposeStep: ignoreState,
     activateComposeSurface,
     setPublishStatus,
     dedupeStrings,
@@ -487,9 +480,7 @@ export const EditorStudioWorkspaceController = ({
     setPostSummary,
     setPostSummarySource,
     setSummaryIntent,
-    setKnownTags: ignoreState,
     setLocalDraftSavedAt,
-    setLocalDraftSlotLabel: ignoreState,
     setPublishStatus,
     setLoadingKey,
     setResult,
@@ -546,7 +537,6 @@ export const EditorStudioWorkspaceController = ({
     handleModifyPost,
     handlePublishTempDraft,
     handleWritePost,
-    isCompactMobileLayout,
     isPreviewThumbnailError,
     loadingKey,
     publishActionType,
@@ -555,7 +545,6 @@ export const EditorStudioWorkspaceController = ({
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
-    setMobileComposeStep: ignoreState,
     setPublishActionType,
     setPublishModalNotice,
   })

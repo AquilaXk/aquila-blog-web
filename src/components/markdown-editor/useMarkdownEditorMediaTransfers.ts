@@ -337,7 +337,6 @@ export const useMarkdownEditorMediaTransfers = ({
       })
 
       if (jobs.length > 0) {
-        // Reserve every placeholder at the original caret before any upload await.
         insertAtActiveSelection(
           jobs.map((job) => job.placeholder).join(""),
           { clearUploadError: false }
@@ -350,7 +349,6 @@ export const useMarkdownEditorMediaTransfers = ({
 
       if (jobs.length === 0) return
 
-      // Keep onUploadingChange(true) for the whole batch — no false flash between files.
       setUploadInFlight(jobs.length)
       try {
         for (const job of jobs) {
@@ -391,7 +389,6 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
-      // Prioritize URL linkify when text is selected and valid URL is pasted
       const { from, to } = resolveActiveSelection()
       if (from < to) {
         const plainText = readClipboardPlainText(event.clipboardData)

@@ -26,7 +26,6 @@ export const resolveFeedSortTriggerKeyDown = (
   if (options.length <= 0) {
     return { type: "open", activeIndex: -1 }
   }
-  // Match mouse open: highlight the currently selected sort so Enter keeps the same value.
   const selectedIndex = options.findIndex((option) => option.value === selected)
   return { type: "open", activeIndex: selectedIndex >= 0 ? selectedIndex : 0 }
 }

@@ -261,7 +261,6 @@ export const useEditorStudioUnsavedExitGuard = ({
     }
   }, [clearAllowNavigation, enabled, readIsDirty, router])
 
-  // Keep this module .ts (no JSX) so next lint/eslint can parse it.
   const dialog = createElement(ConfirmDialog, {
     open: confirmOpen,
     titleId,

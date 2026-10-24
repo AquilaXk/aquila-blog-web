@@ -2,10 +2,11 @@ import { WidgetType, type EditorView } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
 import "katex/dist/katex.min.css"
 
-let cachedKatex: any = null
-let katexLoadPromise: Promise<any> | null = null
+type KatexRuntime = { renderToString: (math: string, options: { displayMode: boolean; throwOnError: boolean }) => string }
+let cachedKatex: KatexRuntime | null = null
+let katexLoadPromise: Promise<KatexRuntime | null> | null = null
 
-const getKatex = (): any => {
+const getKatex = (): KatexRuntime | null => {
   if (cachedKatex) return cachedKatex
   if (!katexLoadPromise && typeof window !== "undefined") {
     katexLoadPromise = import("katex")
@@ -143,9 +144,7 @@ export class MarkdownTaskWidget extends WidgetType {
             targetTo = targetFrom + match[2].length
           }
         }
-      } catch {
-        // Fall back to stored coordinates
-      }
+      } catch {}
       const current = view.state.doc.sliceString(targetFrom, targetTo)
       const next = this.checked ? "[ ]" : "[x]"
       if (/\[[ xX]\]/.test(current)) {
@@ -177,18 +176,14 @@ export class MarkdownMathWidget extends WidgetType {
       try {
         span.innerHTML = katex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
         return span
-      } catch {
-        // Fallback to text
-      }
+      } catch {}
     } else if (katexLoadPromise) {
       void katexLoadPromise.then(() => {
         try {
           if (cachedKatex) {
             span.innerHTML = cachedKatex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
           }
-        } catch {
-          // Keep text
-        }
+        } catch {}
       })
     }
     span.textContent = this.displayMode ? `$$ ${this.math} $$` : `$${this.math}$`
@@ -228,9 +223,7 @@ const moveCursorToWidgetOrigin = (
   try {
     const domPos = view.posAtDOM(el)
     if (typeof domPos === "number") resolvedFrom = domPos
-  } catch {
-    // Fall back to stored coordinate
-  }
+  } catch {}
   if (resolvedFrom !== undefined) {
     view.focus()
     view.dispatch({

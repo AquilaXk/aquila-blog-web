@@ -502,12 +502,12 @@ export const apiFetch = async <T>(
       return payload
     }
 
-    const body = await response.text()
+    const body: unknown = await response.text()
     if (canUseRevalidateCache && etag) {
       setRevalidateCacheEntry(url, etag, body, response.headers.get("cache-control"))
     }
     observeServerOutcome("2xx")
-    return body as unknown as T
+    return body as T
     } catch (error) {
       if (!serverOutcomeObserved) observeServerOutcome(classifyServerApiFetchError(error, requestInit.signal))
       throw error

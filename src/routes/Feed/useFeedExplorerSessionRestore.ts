@@ -265,9 +265,7 @@ export const useFeedExplorerSessionRestore = ({
       const queryData = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(feedQueryKey)
       writeSnapshotPagesToSessionStorage(snapshotKey, state.savedAt, queryData)
       pruneFeedExplorerStateStorage(window.sessionStorage)
-    } catch {
-      // ignore sessionStorage quota/permission errors
-    }
+    } catch {}
   }, [queryClient, sortMode])
 
   useEffect(() => {

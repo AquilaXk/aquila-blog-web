@@ -1,3 +1,4 @@
+import type { Theme } from "@emotion/react"
 import styled from "@emotion/styled"
 import {
   DEFAULT_SORT,
@@ -70,7 +71,7 @@ export const AdminPostsWorkspaceFilterToolbar: React.FC<AdminPostsWorkspaceFilte
   </StickyFilterToolbar>
 )
 
-const baseButton = ({ theme }: { theme: any }) => `
+const baseButton = ({ theme }: { theme: Theme }) => `
   min-height: 48px;
   border-radius: 6px;
   border: 1px solid ${theme.colors.gray5};

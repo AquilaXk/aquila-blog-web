@@ -16,7 +16,6 @@ import {
   CLIENT_RUNTIME_RECOVERY_SCRIPT,
 } from "src/libs/security/documentInlineScripts"
 
-// 런타임 주입(AQUILA_BUILD_SHA) → 빌드 시점 인라인(NEXT_PUBLIC_AQUILA_BUILD_SHA) → CI(GITHUB_SHA) 순으로 읽는다.
 const AQUILA_BUILD_SHA =
   process.env.AQUILA_BUILD_SHA ||
   process.env.NEXT_PUBLIC_AQUILA_BUILD_SHA ||
@@ -87,7 +86,6 @@ class MyDocument extends Document<SurfaceAwareDocumentProps> {
             ></link>
           )}
           <meta name="aquila-build-sha" content={AQUILA_BUILD_SHA} />
-          {/* google search console */}
           {CONFIG.googleSearchConsole.enable === true && (
             <>
               <meta
@@ -96,7 +94,6 @@ class MyDocument extends Document<SurfaceAwareDocumentProps> {
               />
             </>
           )}
-          {/* naver search advisor */}
           {CONFIG.naverSearchAdvisor.enable === true && (
             <>
               <meta

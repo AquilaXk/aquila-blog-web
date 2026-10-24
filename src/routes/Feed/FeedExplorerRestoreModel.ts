@@ -187,8 +187,6 @@ export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
     ...(post.category?.length ? { category: post.category } : {}),
     likesCount: typeof post.likesCount === "number" ? post.likesCount : 0,
     hitCount: typeof post.hitCount === "number" ? post.hitCount : 0,
-
-    // Legacy compatibility fields
     date: { start_date: dateStart },
     type: ["Post"],
     status: ["Public"],

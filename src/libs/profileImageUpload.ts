@@ -44,7 +44,6 @@ export type ProfileImageSourceSize = {
 
 const IMAGE_UPLOAD_POLICIES: Record<ImageUploadTarget, ImageUploadPolicy> = {
   profile: {
-    // 실무 기준: 프로필 이미지는 2MB 이내 + 긴 변 1024px 제한.
     maxBytes: 2 * MEGABYTE,
     targetBytes: 700 * 1024,
     maxLongEdge: 1024,
@@ -52,7 +51,6 @@ const IMAGE_UPLOAD_POLICIES: Record<ImageUploadTarget, ImageUploadPolicy> = {
     outputMimeTypes: ["image/webp", "image/jpeg", "image/png"],
   },
   post: {
-    // 실무 기준: 본문 이미지는 8MB 이내 + 긴 변 2560px 제한.
     maxBytes: 8 * MEGABYTE,
     targetBytes: 3_500 * 1024,
     maxLongEdge: 2560,

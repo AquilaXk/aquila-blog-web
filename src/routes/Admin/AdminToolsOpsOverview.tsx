@@ -322,7 +322,7 @@ export const AdminToolsOpsOverview = (props: Props) => {
           <HeroCopy>
             <span>Operations</span>
             <h1>운영 상태와 복구</h1>
-            <p>배포 슬롯, readiness, 로그와 주요 시스템 지표를 확인합니다.</p>
+            <p>배포 슬롯, 준비 상태, 실시간 로그와 주요 지표를 확인합니다.</p>
           </HeroCopy>
           <HeroActions>
             <StatusChip data-tone={toOpsTone(props.overviewStatusLabel)}>

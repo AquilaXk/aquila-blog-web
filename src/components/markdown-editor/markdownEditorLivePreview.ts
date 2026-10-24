@@ -384,7 +384,7 @@ const tagEntriesInsideTasks = (
 
 export const buildMarkdownLivePreviewEntries = (
   markdown: string,
-  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode as unknown as MarkdownSyntaxNode
+  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode
 ): readonly MarkdownLivePreviewPlanEntry[] => {
   const cached = cachedPreviewEntriesByNode.get(documentNode)
   if (cached && cached.markdown === markdown) {

@@ -40,7 +40,6 @@ type UseEditorStudioWorkspaceControllerRuntimeArgs = {
   postTitle: string
   queryClient: QueryClient
   setEditorMode: Dispatch<SetStateAction<EditorMode>>
-  setGlobalNotice: Dispatch<SetStateAction<NoticeState>>
   setIsTempDraftMode: Dispatch<SetStateAction<boolean>>
   setLoadingKey: Dispatch<SetStateAction<string>>
   setPostId: Dispatch<SetStateAction<string>>
@@ -58,7 +57,6 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
   postTitle,
   queryClient,
   setEditorMode,
-  setGlobalNotice,
   setIsTempDraftMode,
   setLoadingKey,
   setPostId,
@@ -87,18 +85,15 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
   const run = useCallback(async (key: string, fn: () => Promise<JsonValue>) => {
     try {
       setLoadingKey(key)
-      setGlobalNotice({ tone: "loading", text: `작업 실행 중: ${key}` })
       const data = await fn()
       setResult(pretty(data))
-      setGlobalNotice({ tone: "success", text: `작업 완료: ${key}` })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setResult(pretty({ error: message }))
-      setGlobalNotice({ tone: "error", text: `작업 실패: ${message}` })
     } finally {
       setLoadingKey("")
     }
-  }, [setGlobalNotice, setLoadingKey, setResult])
+  }, [setLoadingKey, setResult])
 
   const disabled = useCallback((key: string) => loadingKey.length > 0 && loadingKey !== key, [loadingKey])
 
@@ -162,7 +157,6 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
   const setPublishStatus = useCallback(
     (next: NoticeState, target: PublishNoticeTarget = "auto") => {
-      setGlobalNotice(next)
       if (target === "page") {
         setPublishNotice(next)
         return
@@ -180,7 +174,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
       setPublishNotice(next)
     },
-    [isPublishModalOpen, setGlobalNotice, setPublishModalNotice, setPublishNotice]
+    [isPublishModalOpen, setPublishModalNotice, setPublishNotice]
   )
 
   return {

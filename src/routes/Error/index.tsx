@@ -1,8 +1,6 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
 
-// 패밀리룩(1223): "4?4" 제네릭 중앙 정렬 + 필 버튼 → 좌측 정렬 에디토리얼(모노 라벨 +
-// 대형 헤드라인 + 헤어라인 + 사각/잉크 컨트롤). 404/500이 동일 오류 UI 문법을 공유한다.
 const CustomError = () => {
   return (
     <StyledWrapper>

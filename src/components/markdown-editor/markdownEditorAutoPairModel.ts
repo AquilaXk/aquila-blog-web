@@ -105,7 +105,6 @@ export const planMarkdownEditorAutoPairInsert = (
 ): MarkdownEditorAutoPairAction | null => {
   if (!canAutoPair(value, selectionStart, selectionEnd, key)) return null
 
-  // If text is selected, check selection wrap map
   if (selectionStart < selectionEnd) {
     if (
       key === "(" &&

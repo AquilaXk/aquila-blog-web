@@ -469,7 +469,6 @@ export const StatusPill = styled.span`
   text-align: center;
   white-space: nowrap;
 
-  /* 패밀리룩(1221): 파스텔 상태 면 대신 중립 base + 상태 텍스트 */
   &[data-status="failed"] {
     color: ${({ theme }) => theme.colors.statusDangerText};
   }

@@ -85,10 +85,10 @@ test.describe("markdown editor live surface contract", () => {
   })
 
   test("keeps toolbar, find, focus, paste, drop, and upload paths on the live surface", () => {
-    const editorSource = readFileSync(
-      sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"),
-      "utf8"
-    )
+    const editorSource = [
+      readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"), "utf8"),
+      readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditorToolbar.tsx"), "utf8"),
+    ].join("\n")
 
     expect(editorSource).toContain('aria-label="Markdown 작성 도구"')
     expect(editorSource).toContain("onFocusRequestReady")

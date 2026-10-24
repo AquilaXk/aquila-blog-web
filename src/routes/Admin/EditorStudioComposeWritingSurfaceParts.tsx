@@ -442,7 +442,6 @@ export const Button = styled.button `
     cursor: not-allowed;
   }
 `;
-// 패밀리룩(1222): 파란 발행 버튼 하드코딩 → 공용 accent 사각 컨트롤(scheme별 글자색)
 export const PrimaryButton = styled(Button) `
   border-radius: 6px;
   padding: 0.6rem 0.88rem;

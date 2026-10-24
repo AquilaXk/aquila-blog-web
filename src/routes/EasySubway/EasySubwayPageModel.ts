@@ -63,7 +63,6 @@ export type MetroBadgeItem = {
   fileName: string
 }
 
-/** 두 블록 모두 실제 서비스 동작과 무장애 이동 가치를 긍정형 평문으로 서술한다. */
 export const PRODUCT_FEATURES: ProductFeature[] = [
   {
     id: "station-pick",
@@ -85,21 +84,20 @@ export const PRODUCT_FEATURES: ProductFeature[] = [
   },
 ]
 
-/** 무장애 이동 경로 4대 에디토리얼 명세표 데이터 */
 export const BARRIER_FREE_ROUTE_SPECS: RouteSpecItem[] = [
   {
     id: "vertical-transit",
     category: "수직 이동 · 단차 0cm",
     title: "엘리베이터 직결 동선",
     description:
-      "계단과 턱을 배제하고 지상 출구부터 승강장까지 100% 엘리베이터와 경사로로 이어지는 수직 이동 경로를 안내합니다.",
+      "계단과 단차 없이 지상 출구부터 승강장까지 엘리베이터와 경사로로만 이어지는 동선을 안내합니다.",
   },
   {
     id: "transfer-optimization",
     category: "환승 연계 · 빠른 환승",
     title: "9-2 승차 위치 안내",
     description:
-      "환승 엘리베이터 및 휠체어 리프트 바로 앞으로 내릴 수 있는 최적의 승차 위치(칸·문 번호)를 제시합니다.",
+      "환승 엘리베이터와 휠체어 리프트 바로 앞에 내리는 칸·문 번호를 안내합니다.",
   },
   {
     id: "station-facilities",
@@ -117,7 +115,6 @@ export const BARRIER_FREE_ROUTE_SPECS: RouteSpecItem[] = [
   },
 ]
 
-/** 4열 에디토리얼 기술 명세표 데이터 */
 export const TECH_SPEC_ITEMS: TechSpecItem[] = [
   {
     id: "coverage",

@@ -79,7 +79,6 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   primaryActionDisabled: boolean
   primaryActionLabel: string
   onPrimaryAction: () => void
-  isCompactSplitPreview: boolean
   postTags: string[]
   tagDraft: string
   onTagDraftChange: (value: string) => void
@@ -209,7 +208,6 @@ export const EditorStudioDedicatedEditorSurface = ({
   primaryActionDisabled,
   primaryActionLabel,
   onPrimaryAction,
-  isCompactSplitPreview,
   postTags,
   tagDraft,
   onTagDraftChange,
@@ -426,12 +424,10 @@ export const EditorStudioDedicatedEditorSurface = ({
 
         <EditorStudioWritingColumn
           data-testid="editor-writing-column"
-          $compact={isCompactSplitPreview}
           $zenMode={isZenMode}
         >
-          <EditorStudioDedicatedMetaSection $compact={isCompactSplitPreview}>
+          <EditorStudioDedicatedMetaSection>
             <TitleInput
-              $compact={isCompactSplitPreview}
               ref={handleTitleInputRef}
               id="post-title"
               placeholder="제목을 입력하세요"
@@ -452,7 +448,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               $collapsedOnMobile={!isMobilePropertiesOpen}
               $collapsedInZen={isZenMode && !isMobilePropertiesOpen}
             >
-              <EditorTagRow aria-label="태그 입력" $compact={isCompactSplitPreview}>
+              <EditorTagRow aria-label="태그 입력">
                 {postTags.map((tag) => (
                   <SelectedTagChip key={tag}>
                     <span className="label">{tag}</span>
@@ -468,7 +464,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   onKeyDown={handleTagDraftKeyDown}
                 />
               </EditorTagRow>
-              <EditorHeaderMetaPill $compact={isCompactSplitPreview}>본문 형식 · Markdown</EditorHeaderMetaPill>
+              <EditorHeaderMetaPill>본문 형식 · Markdown</EditorHeaderMetaPill>
             </EditorHeaderMetaRow>
           </EditorStudioDedicatedMetaSection>
 
@@ -552,7 +548,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             />
             <section>
               <span>태그</span>
-              <EditorTagRow aria-label="발행 태그" $compact>
+              <EditorTagRow aria-label="발행 태그">
                 {postTags.map((tag) => (
                   <SelectedTagChip key={`inspector-${tag}`}>
                     <span className="label">{tag}</span>

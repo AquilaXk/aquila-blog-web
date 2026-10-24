@@ -54,9 +54,7 @@ export const usePostDetailEngagementActions = ({
           prev ? { ...prev, hitCount: response.data.hitCount } : prev
         )
       })
-      .catch(() => {
-        // 조회수 증가는 사용자 경험을 막지 않도록 실패를 조용히 흡수한다.
-      })
+      .catch(() => {})
 
     return () => {
       cancelled = true

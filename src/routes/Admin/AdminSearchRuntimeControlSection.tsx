@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
 import { ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
@@ -132,55 +132,61 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
   const statusInFlight = useRef(false)
   const restoredOperationId = useRef<string | null>(null)
 
-  const consumeReceipt = (
-    response: unknown,
-    sessionRecord: SearchRuntimeControlSessionRecord,
-    acceptedOnly = false
-  ) => {
-    const receipt = acceptedOnly
-      ? AdminSearchRuntimeControlModel.parseAcceptedOperationReceipt(
-          sessionRecord.control,
-          response
+  const consumeReceipt = useCallback(
+    (
+      response: unknown,
+      sessionRecord: SearchRuntimeControlSessionRecord,
+      acceptedOnly = false
+    ) => {
+      const receipt = acceptedOnly
+        ? AdminSearchRuntimeControlModel.parseAcceptedOperationReceipt(
+            sessionRecord.control,
+            response
+          )
+        : AdminSearchRuntimeControlModel.parseOperationReceipt(
+            sessionRecord.control,
+            response
+          )
+      if (
+        !receipt ||
+        !AdminSearchRuntimeControlModel.receiptMatchesRequest(
+          receipt,
+          sessionRecord
         )
-      : AdminSearchRuntimeControlModel.parseOperationReceipt(
-          sessionRecord.control,
-          response
-        )
-    if (
-      !receipt ||
-      !AdminSearchRuntimeControlModel.receiptMatchesRequest(
-        receipt,
-        sessionRecord
-      )
-    ) {
-      setNotice("The operation response could not be verified.")
-      return false
-    }
-    setDisplay(AdminSearchRuntimeControlModel.toSafeDisplay(receipt))
-    setNotice("")
-    setClearableFailure(false)
-    return true
-  }
+      ) {
+        setNotice("The operation response could not be verified.")
+        return false
+      }
+      setDisplay(AdminSearchRuntimeControlModel.toSafeDisplay(receipt))
+      setNotice("")
+      setClearableFailure(false)
+      return true
+    },
+    []
+  )
 
-  const checkStatus = async (sessionRecord = record) => {
-    if (!sessionRecord || disabled || statusInFlight.current) return
-    statusInFlight.current = true
-    setBusy(true)
-    try {
-      const response = await apiFetch(
-        `/system/api/v1/adm/operations/${sessionRecord.operationId}`,
-        { cache: "no-store" }
-      )
-      consumeReceipt(response, sessionRecord)
-    } catch (error) {
-      const failure = describeFailure(error)
-      setClearableFailure(failure.clearable)
-      setNotice(failure.message)
-    } finally {
-      statusInFlight.current = false
-      setBusy(false)
-    }
-  }
+  const checkStatus = useCallback(
+    async (sessionRecord = record) => {
+      if (!sessionRecord || disabled || statusInFlight.current) return
+      statusInFlight.current = true
+      setBusy(true)
+      try {
+        const response = await apiFetch(
+          `/system/api/v1/adm/operations/${sessionRecord.operationId}`,
+          { cache: "no-store" }
+        )
+        consumeReceipt(response, sessionRecord)
+      } catch (error) {
+        const failure = describeFailure(error)
+        setClearableFailure(failure.clearable)
+        setNotice(failure.message)
+      } finally {
+        statusInFlight.current = false
+        setBusy(false)
+      }
+    },
+    [consumeReceipt, disabled, record]
+  )
 
   useEffect(() => {
     try {
@@ -213,9 +219,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       return
     restoredOperationId.current = null
     void checkStatus(record)
-    // A reload performs one explicit current-operation read for its saved request.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, record])
+  }, [checkStatus, disabled, record])
 
   const postRecord = async (
     sessionRecord: SearchRuntimeControlSessionRecord

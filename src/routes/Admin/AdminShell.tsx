@@ -47,7 +47,6 @@ type NavItem = {
   id: AdminShellSection | "write"
   href: string
   label: string
-  /** ≤adminCompact CompactNav용 짧은 라벨 (P5-2: icon-only 금지) */
   shortLabel: string
   icon: IconName
 }

@@ -211,7 +211,6 @@ export const PublishModalNotice = styled.div`
     background: transparent;
   }
 
-  /* 패밀리룩(1222): 파스텔 상태 알림 면 → 헤어라인 보더 + 상태 텍스트 */
   &[data-tone="loading"] {
     color: ${({ theme }) => theme.colors.blue11};
     border: 1px solid ${({ theme }) => theme.colors.blue7};

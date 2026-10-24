@@ -229,7 +229,6 @@ const admitLocalDraftSlot = (source: LocalDraftSource, storageKey: string) => {
   if (typeof window === "undefined") return
   if (window.localStorage.getItem(storageKey) !== null) return
   const entries = listDraftEntries(source)
-  // 만료된 슬롯만 정리하고, 아직 유효한 다른 원고를 지워 공간을 확보하지 않는다.
   if (!entries.some((entry) => entry.key === storageKey) && entries.length >= LOCAL_DRAFT_POST_SLOT_LIMIT) {
     throw new DOMException("Local draft slots are full", "QuotaExceededError")
   }
@@ -276,7 +275,6 @@ export const captureLocalDraftCleanup = (source: LocalDraftSource): (() => boole
     const submitted = storage.getItem(key)
     return () => {
       try {
-        // 같은 문서만 쓰는 슬롯에서 요청 이후 자동 저장된 원고는 보존한다.
         if (submitted === null || storage.getItem(key) !== submitted) return false
         storage.removeItem(key)
         window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
@@ -286,7 +284,6 @@ export const captureLocalDraftCleanup = (source: LocalDraftSource): (() => boole
       }
     }
   } catch {
-    // 저장소 실패가 이미 완료된 서버 저장을 실패로 바꾸지 않는다.
     return () => false
   }
 }

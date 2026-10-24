@@ -154,7 +154,6 @@ const useAuthSession = () => {
     try {
       await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })
     } catch {
-      // 서버 응답과 무관하게 프론트 인증 상태는 즉시 비운다.
     } finally {
       setMe(null)
     }

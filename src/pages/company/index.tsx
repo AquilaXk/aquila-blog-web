@@ -67,7 +67,6 @@ const loadCompanyNews = async (): Promise<CompanyNewsItem[]> => {
       summary: toCompanyNewsSummary(post.summary),
       date: toCompanyNewsDate(post.modifiedAt || post.modifiedTime || post.createdAt || post.createdTime || ""),
       href: `${BLOG_URL}/posts/${post.id}`,
-      // 썸네일이 없는 글도 있다. 없는 자산을 지어내지 않고 에디토리얼 텍스트 카드로 렌더한다.
       thumbnail: toCompanyNewsThumbnail(post.thumbnail),
     }))
   } catch {
@@ -89,7 +88,7 @@ export const getServerSideProps: GetServerSideProps<CompanyPageProps> = withSsrM
 const CompanyPage: NextPageWithLayout<CompanyPageProps> = ({ canonicalUrl, news }) => (
   <>
     <MetaConfig
-      title={`${COMPANY_SURFACE.name} — 이동의 문턱을 낮추는 소프트웨어`}
+      title={`${COMPANY_SURFACE.name} · 이동의 문턱을 낮추는 소프트웨어`}
       description="Aquila Software는 교통약자가 먼저 쓸 수 있는 길찾기를 만듭니다. 검증한 데이터와 직접 운영하는 인프라 위에 제품을 올립니다."
       type="website"
       url={canonicalUrl}

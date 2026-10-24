@@ -362,7 +362,6 @@ export const StyledWrapper = styled.div `
     }
   }
 
-  /* P5-2: phone 전용 접이식 목차 — 821px+에서는 우 TOC rail만 사용 */
   .mobileToc {
     display: none;
   }

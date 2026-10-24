@@ -85,7 +85,7 @@ const RootLayout = ({
     refetchOnMount: shouldRefetchAdminProfile,
     staleTimeMs: shouldRefetchAdminProfile ? 0 : undefined,
   })
-  const effectiveScheme = "light" // intentional light-only; do not wire dark/toggle
+  const effectiveScheme = "light"
   const effectiveBlogDesign = isAdminRoute ? adminProfile?.blogDesign || "legacy" : "legacy"
   const headerBlogTitle = (isPublicBlogRoute && adminProfile?.blogTitle?.trim()) || CONFIG.blog.title
 

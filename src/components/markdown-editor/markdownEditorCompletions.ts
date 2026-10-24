@@ -68,7 +68,6 @@ export const wikilinkCompletionSource = (
 
   const startPos = line.from + textBefore.length - (match[1]?.length ?? 0)
 
-  // Collect headings from the current document as wikilink targets
   const docText = context.state.doc.toString()
   const headingMatches = Array.from(docText.matchAll(/^#{1,6}[ \t]+([^\r\n]+)$/gm))
   const headingOptions = headingMatches.map((m) => {
@@ -81,7 +80,6 @@ export const wikilinkCompletionSource = (
     }
   })
 
-  // Include registered internal blog posts
   const postOptions = registeredPostSuggestions.map((post) => ({
     label: post.title,
     type: "text",

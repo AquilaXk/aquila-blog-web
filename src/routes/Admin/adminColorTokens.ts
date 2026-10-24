@@ -1,9 +1,6 @@
 import type { Theme } from "@emotion/react"
 import { colors, createPublicDesignTokens } from "src/styles"
 
-// 패밀리룩 토큰 통합(#1218): 관리자 팔레트는 더 이상 자체 블루를 하드코딩하지 않고
-// 공용 semantic 토큰(colors + publicDesign)에서 값을 파생한다. 라이트/다크 대칭은
-// 공용 팔레트가 보장하며, 파스텔 tint는 color-mix로 포인트 블루에서 유도한다.
 const lightColors = colors.light
 const darkColors = colors.dark
 const lightDesign = createPublicDesignTokens("light")

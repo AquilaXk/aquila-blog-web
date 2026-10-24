@@ -10,7 +10,6 @@ import {
   DASHBOARD_COLLECTION_FAILED_LABEL,
   DASHBOARD_DATA_MISSING_LABEL,
   EMPTY_INITIAL_SNAPSHOT,
-  formatAge,
   formatDashboardFreshnessLabel,
   formatInstant,
   getSystemHealthStatusLabel,

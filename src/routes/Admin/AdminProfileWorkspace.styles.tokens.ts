@@ -94,7 +94,6 @@ export const PrimaryButton = styled(BaseButton)`
   }
 `
 
-// 패밀리룩(1221): 발행 버튼은 그린 파스텔 대신 기준 accent primary 컨트롤을 쓴다.
 export const PublishButton = PrimaryButton
 
 export const MiniButton = styled(BaseButton)`

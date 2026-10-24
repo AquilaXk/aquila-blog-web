@@ -26,7 +26,6 @@ type NoticeTone = "idle" | "loading" | "success" | "error"
 type PublishNotice = { tone: NoticeTone; text: string }
 type PublishTarget = "page" | "modal"
 type EditorMode = "create" | "edit"
-type ComposeMobileStudioStep = "edit" | "publish"
 
 type ResolvedEditorMetaSnapshot = {
   body: string
@@ -99,7 +98,6 @@ type UseEditorStudioDraftLifecycleParams = {
   postCategory: string
   postVisibility: PostVisibility
   editorMode: EditorMode
-  isCompactMobileLayout: boolean
   setEditorMode: StudioSetState<EditorMode>
   setIsTempDraftMode: StudioSetState<boolean>
   setPostId: StudioSetState<string>
@@ -117,13 +115,10 @@ type UseEditorStudioDraftLifecycleParams = {
   setPostTags: StudioSetState<string[]>
   setPostCategory: StudioSetState<string>
   setPostVisibility: StudioSetState<PostVisibility>
-  setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
-  setLocalDraftSlotLabel: StudioSetState<string>
   setLoadingKey: StudioSetState<string>
   setResult: StudioSetState<string>
   setIsNewEditorBootstrapPending: StudioSetState<boolean>
-  setMobileComposeStep: StudioSetState<ComposeMobileStudioStep>
   activateComposeSurface: () => void
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
   dedupeStrings: (items: string[]) => string[]
@@ -160,7 +155,7 @@ type UseEditorStudioDraftLifecycleParams = {
 export const useEditorStudioDraftLifecycle = ({
   activateComposeSurface, buildEditorStateFingerprint, buildEmptyEditorMetaSnapshot,
   buildLocalDraftFingerprint, dedupeStrings, defaultThumbnailFocusX, defaultThumbnailFocusY,
-  defaultThumbnailZoom, editorMode, isBlankServerTempDraft, isCompactMobileLayout,
+  defaultThumbnailZoom, editorMode, isBlankServerTempDraft,
   lastLocalDraftFingerprintRef, lastWriteFingerprintRef, lastWriteIdempotencyKeyRef,
   loadingKey, normalizeCategoryValue, persistLocalDraft, postCategory, postContent,
   getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent,
@@ -168,8 +163,8 @@ export const useEditorStudioDraftLifecycle = ({
   postTitle, postVersion, postVisibility, pretty, readLocalDraft, removeLocalDraft,
   requestTempPostWithConflictRetry, resolveEditorMetaSnapshot, router,
   serverBaselineEditorFingerprintRef, setEditorMode, setIsNewEditorBootstrapPending,
-  setIsTempDraftMode, setKnownTags, setLoadingKey, setLocalDraftSavedAt,
-  setLocalDraftSlotLabel, setMobileComposeStep, setPostCategory, setPostContent,
+  setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
+  setPostCategory, setPostContent,
   setPostId, setPostSummary, setPostSummarySource, setSummaryIntent, setPostTags,
   setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom,
   setPostTitle, setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl,
@@ -195,8 +190,8 @@ export const useEditorStudioDraftLifecycle = ({
     persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
     postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
     postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
-    removeLocalDraft, setEditorMode, setIsTempDraftMode, setKnownTags, setLocalDraftSavedAt,
-    setLocalDraftSlotLabel, setPostCategory, setPostContent, setPostId, setPostSummary,
+    removeLocalDraft, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
+    setPostCategory, setPostContent, setPostId, setPostSummary,
     setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
     setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
     setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
@@ -241,14 +236,11 @@ export const useEditorStudioDraftLifecycle = ({
       },
       "page"
     )
-    if (isCompactMobileLayout) {
-      setMobileComposeStep("edit")
-    }
   }, [
     activateComposeSurface, defaultThumbnailFocusX, defaultThumbnailFocusY,
-    defaultThumbnailZoom, isCompactMobileLayout, lastWriteFingerprintRef,
+    defaultThumbnailZoom, lastWriteFingerprintRef,
     lastWriteIdempotencyKeyRef, serverBaselineEditorFingerprintRef, setEditorMode,
-    setIsTempDraftMode, setMobileComposeStep, setLoadingKey, setPostCategory,
+    setIsTempDraftMode, setLoadingKey, setPostCategory,
     setPostContent, setPostId, setPostSummary, setPostSummarySource, setSummaryIntent,
     setPostTags, setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl,
     setPostThumbnailZoom, setPostTitle, setPostVersion, setPreviewThumbnailSourceUrl,
@@ -263,18 +255,14 @@ export const useEditorStudioDraftLifecycle = ({
     setIsTempDraftMode(isServerTempDraftPost(post))
     lastWriteFingerprintRef.current = ""
     lastWriteIdempotencyKeyRef.current = ""
-    if (isCompactMobileLayout) {
-      setMobileComposeStep("edit")
-    }
   }, [
-    activateComposeSurface, isCompactMobileLayout, lastWriteFingerprintRef,
+    activateComposeSurface, lastWriteFingerprintRef,
     lastWriteIdempotencyKeyRef, setEditorMode, setIsTempDraftMode,
-    setMobileComposeStep, setPostId, setPostVersion,
+    setPostId, setPostVersion,
   ])
 
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
-      // 저장된 HTML은 파생 데이터이므로 현재 Markdown을 복구·대체하지 않는다.
       const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
       const shouldMaskTempTitle = isServerTempDraftPost(post)
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
@@ -325,14 +313,12 @@ export const useEditorStudioDraftLifecycle = ({
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
   ) => {
-    // 늦은 응답은 새 조회·새 글·복원 작업이 소유한 원고와 상태를 변경하지 않는다.
     const generation = ++loadGenerationRef.current
     const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postOne")
       const normalizedTargetPostId = targetPostId.trim()
-      // 빈 본문도 현재 원문이다. 조회 실패를 과거 SSR 본문으로 대체하지 않는다.
       const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       if (!isCurrentLoad()) return
       const resolvedPost = post
@@ -431,9 +417,6 @@ export const useEditorStudioDraftLifecycle = ({
         },
         "page"
       )
-      if (isCompactMobileLayout) {
-        setMobileComposeStep("edit")
-      }
       setResult(pretty(response))
     } catch (error) {
       if (!isCurrentLoad()) return
@@ -450,7 +433,6 @@ export const useEditorStudioDraftLifecycle = ({
     beginLocalDraftPostLoad,
     buildEditorStateFingerprint,
     endLocalDraftPostLoad,
-    isCompactMobileLayout,
     pretty,
     requestTempPostWithConflictRetry,
     resolveLoadedPostState,
@@ -459,7 +441,6 @@ export const useEditorStudioDraftLifecycle = ({
     setIsNewEditorBootstrapPending,
     setIsTempDraftMode,
     setLoadingKey,
-    setMobileComposeStep,
     setPostTitle,
     setPostVisibility,
     setPublishStatus,

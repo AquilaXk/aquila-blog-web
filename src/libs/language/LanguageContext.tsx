@@ -44,9 +44,7 @@ export const getClientStoredLanguage = (): SiteLanguage | null => {
       const parsedStorage = parseLanguagePreference(`${LANGUAGE_COOKIE_KEY}=${fromStorage}`)
       if (parsedStorage) return parsedStorage
     }
-  } catch {
-    // Ignore storage/cookie read failures in sandboxed contexts
-  }
+  } catch {}
   return null
 }
 
@@ -54,15 +52,11 @@ export const setClientStoredLanguage = (lang: SiteLanguage): void => {
   if (typeof document === "undefined") return
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
-  } catch {
-    // Ignore localStorage access failures
-  }
+  } catch {}
   try {
     document.cookie = `${LANGUAGE_COOKIE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`
     document.documentElement.lang = lang === "ko" ? "ko-KR" : "en-US"
-  } catch {
-    // Ignore cookie/document access failures
-  }
+  } catch {}
 }
 
 export const LanguageContext = createContext<LanguageContextValue>({
