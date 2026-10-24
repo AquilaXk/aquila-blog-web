@@ -4,7 +4,6 @@ import {
   adminAppBackground,
   adminBorder,
   adminControlText,
-  adminGoldTintFocus,
   adminSurface,
   adminSurfaceRaised,
   adminTeal,
@@ -384,7 +383,6 @@ export const StatusRow = styled.div`
     height: 0.48rem;
     border-radius: 50%;
     background: ${adminTeal};
-    box-shadow: 0 0 0 4px ${adminGoldTintFocus};
   }
 
   strong {
@@ -405,7 +403,6 @@ export const StatusRow = styled.div`
 
   &[data-tone="warn"] i {
     background: ${adminAccentText};
-    box-shadow: 0 0 0 4px ${adminGoldTintFocus};
   }
 
   &[data-kind="activity"] {

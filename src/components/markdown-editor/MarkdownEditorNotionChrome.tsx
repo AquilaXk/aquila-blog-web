@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
+import {
+  useEffect, useMemo, useRef, useState,
+  type KeyboardEvent as ReactKeyboardEvent, type RefObject,
+} from "react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { zIndexes } from "src/styles/zIndexes"
-import {
-  isOffsetInsideFencedCodeBlock,
-  type MarkdownFormatShortcut,
-} from "./markdownEditorKeyboardModel"
+import { isOffsetInsideFencedCodeBlock, type MarkdownFormatShortcut } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
-import {
-  planReplaceSelection,
-  type PlannedTextMutation,
-} from "./markdownEditorTextMutation"
+import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type MarkdownEditorNotionChromeProps = {
   containerRef: RefObject<HTMLElement | null>
@@ -21,14 +18,8 @@ type MarkdownEditorNotionChromeProps = {
   selection: { from: number; to: number }
   isSlashMenuOpen: boolean
   isFindReplaceOpen: boolean
-  resolveCoords: (
-    pos: number
-  ) => { top: number; bottom: number; left: number; right: number } | null
-  onApplySnippet: (
-    before: string,
-    after?: string,
-    options?: { toggle?: boolean }
-  ) => void
+  resolveCoords: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
+  onApplySnippet: (before: string, after?: string, options?: { toggle?: boolean }) => void
   onApplyFormatShortcut: (shortcut: MarkdownFormatShortcut) => void
   onApplyListCommand: (command: MarkdownEditorListCommand) => void
   onStripBlockPrefix: () => void
@@ -41,6 +32,8 @@ const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
   z-index: ${zIndexes.dropdownMenu + 5};
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -114,7 +107,7 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  @media (max-width: 820px) {
+  @media (max-width: 720px) {
     display: none;
   }
 `
@@ -192,21 +185,119 @@ const BlockMenuItemButton = styled.button`
   }
 `
 
+const resolveCurrentBlockKind = (trimmed: string) => {
+  if (trimmed.startsWith("### ")) return "h3"
+  if (trimmed.startsWith("## ")) return "h2"
+  if (trimmed.startsWith("# ")) return "h1"
+  if (/^[-*+]\s+\[[ xX]\]\s/.test(trimmed)) return "task"
+  if (/^[-*+]\s/.test(trimmed)) return "unordered"
+  if (/^\d+\.\s/.test(trimmed)) return "ordered"
+  if (trimmed.startsWith("> ")) return "quote"
+  return "paragraph"
+}
+
+const computeActiveLineState = (value: string, from: number) => {
+  const lineStart = from > 0 ? value.lastIndexOf("\n", from - 1) + 1 : 0
+  const nextBreak = value.indexOf("\n", from)
+  const lineEnd = nextBreak === -1 ? value.length : nextBreak
+  const lineText = value.slice(lineStart, lineEnd)
+  return {
+    activeLineStart: lineStart,
+    activeLineEnd: lineEnd,
+    activeLineText: lineText,
+    currentBlockKind: resolveCurrentBlockKind(lineText.trimStart()),
+    insideFence: isOffsetInsideFencedCodeBlock(value, from),
+  }
+}
+
+type CoordsRect = { top: number; bottom: number; left: number; right: number }
+
+const computeBubbleToolbarPosition = (
+  canShowBubble: boolean,
+  selection: { from: number; to: number },
+  resolveCoords: (pos: number) => CoordsRect | null,
+  container: HTMLElement | null
+): { top: number; left: number } | null => {
+  if (!canShowBubble) return null
+  const startCoords = resolveCoords(selection.from)
+  const endCoords = resolveCoords(selection.to)
+  const containerRect = container?.getBoundingClientRect() ?? null
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
+  const estimatedWidth = Math.min(410, viewportWidth - 24)
+
+  if (startCoords && endCoords && startCoords.bottom > 0 && endCoords.bottom > 0) {
+    if (containerRect && (endCoords.bottom < containerRect.top || startCoords.top > containerRect.bottom)) {
+      return null
+    }
+    const centerX = (startCoords.left + endCoords.right) / 2
+    const left = Math.max(12, Math.min(Math.round(centerX - estimatedWidth / 2), viewportWidth - estimatedWidth - 12))
+    const placeBelow = startCoords.top - (containerRect?.top ?? 0) < 52
+    const top = placeBelow
+      ? Math.min(viewportHeight - 52, Math.round(Math.max(startCoords.bottom, endCoords.bottom) + 8))
+      : Math.max(12, Math.round(startCoords.top - 44))
+    return { top, left }
+  }
+
+  if (containerRect && containerRect.height > 0) {
+    return {
+      top: Math.round(containerRect.top + 48),
+      left: Math.max(12, Math.min(Math.round(containerRect.left + 24), viewportWidth - estimatedWidth - 12)),
+    }
+  }
+  return null
+}
+
+const computeGutterTopPosition = (
+  canShowGutterPlus: boolean,
+  activeLineStart: number,
+  resolveCoords: (pos: number) => CoordsRect | null,
+  container: HTMLElement | null
+): number | null => {
+  if (!canShowGutterPlus) return null
+  const containerRect = container?.getBoundingClientRect() ?? null
+  if (!containerRect || containerRect.height <= 0) return null
+  const lineCoords = resolveCoords(activeLineStart)
+  if (lineCoords && lineCoords.bottom > lineCoords.top) {
+    const rawTop = lineCoords.top - containerRect.top + (lineCoords.bottom - lineCoords.top - 22) / 2
+    return rawTop >= 0 && rawTop <= containerRect.height - 22 ? Math.round(rawTop) : null
+  }
+  return activeLineStart === 0 ? 24 : null
+}
+
+const moveBlockMenuFocus = (
+  key: string,
+  items: HTMLButtonElement[],
+  currentIndex: number,
+  onClose: () => void
+): boolean => {
+  if (key === "ArrowDown") {
+    items[currentIndex < 0 ? 0 : (currentIndex + 1) % items.length]?.focus()
+    return true
+  }
+  if (key === "ArrowUp") {
+    items[currentIndex <= 0 ? items.length - 1 : currentIndex - 1]?.focus()
+    return true
+  }
+  if (key === "Home") {
+    items[0]?.focus()
+    return true
+  }
+  if (key === "End") {
+    items.at(-1)?.focus()
+    return true
+  }
+  if (key === "Escape") {
+    onClose()
+    return true
+  }
+  return false
+}
+
 export const MarkdownEditorNotionChrome = ({
-  containerRef,
-  mode,
-  disabled,
-  value,
-  selection,
-  isSlashMenuOpen,
-  isFindReplaceOpen,
-  resolveCoords,
-  onApplySnippet,
-  onApplyFormatShortcut,
-  onApplyListCommand,
-  onStripBlockPrefix,
-  onApplyLineCommand,
-  onTriggerSlashCommand,
+  containerRef, mode, disabled, value, selection, isSlashMenuOpen, isFindReplaceOpen,
+  resolveCoords, onApplySnippet, onApplyFormatShortcut, onApplyListCommand,
+  onStripBlockPrefix, onApplyLineCommand, onTriggerSlashCommand,
 }: MarkdownEditorNotionChromeProps) => {
   const [isDismissed, setIsDismissed] = useState(false)
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false)
@@ -239,11 +330,7 @@ export const MarkdownEditorNotionChrome = ({
     window.addEventListener("resize", bumpLayout)
     window.addEventListener("scroll", bumpLayout, true)
     return () => {
-      if (
-        rafId !== null &&
-        typeof window !== "undefined" &&
-        typeof window.cancelAnimationFrame === "function"
-      ) {
+      if (rafId !== null && typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
         window.cancelAnimationFrame(rafId)
       }
       container?.removeEventListener("scroll", bumpLayout, true)
@@ -252,49 +339,39 @@ export const MarkdownEditorNotionChrome = ({
     }
   }, [containerRef, disabled, mode])
 
-  const selectedText =
-    selection.from < selection.to ? value.slice(selection.from, selection.to) : ""
+  const { activeLineStart, activeLineEnd, activeLineText, currentBlockKind, insideFence } = useMemo(
+    () => computeActiveLineState(value, selection.from),
+    [value, selection.from]
+  )
+
+  const selectedText = useMemo(
+    () => (selection.from < selection.to && selection.to - selection.from <= 600 ? value.slice(selection.from, selection.to) : ""),
+    [selection.from, selection.to, value]
+  )
   const canShowBubble =
-    mode === "live" &&
-    !disabled &&
-    !isSlashMenuOpen &&
-    !isFindReplaceOpen &&
-    !isDismissed &&
-    selection.from < selection.to &&
-    selection.to - selection.from <= 600 &&
-    selectedText.trim().length > 0 &&
-    !isOffsetInsideFencedCodeBlock(value, selection.from) &&
-    !/^\s*(`{3,}|~{3,})/.test(selectedText)
+    mode === "live" && !disabled && !isSlashMenuOpen && !isFindReplaceOpen && !isDismissed &&
+    selection.from < selection.to && selection.to - selection.from <= 600 &&
+    selectedText.trim().length > 0 && !insideFence && !/^\s*(`{3,}|~{3,})/.test(selectedText)
 
   useEffect(() => {
     if (!canShowBubble && !isBlockMenuOpen) return
-
     const handleMouseDownCapture = (event: MouseEvent) => {
       const target = event.target as Node | null
       if (!target) return
-      if (isBlockMenuOpen) {
-        if (
-          !blockMenuRef.current?.contains(target) &&
-          !gutterHandleRef.current?.contains(target)
-        ) {
-          setIsBlockMenuOpen(false)
-        }
+      if (isBlockMenuOpen && !blockMenuRef.current?.contains(target) && !gutterHandleRef.current?.contains(target)) {
+        setIsBlockMenuOpen(false)
       }
-      if (canShowBubble) {
-        if (bubbleRef.current?.contains(target)) return
+      if (canShowBubble && !bubbleRef.current?.contains(target)) {
         const element = target instanceof Element ? target : target.parentElement
-        if (element?.closest('[data-testid="markdown-editor-content"]')) return
-        setIsDismissed(true)
+        if (!element?.closest('[data-testid="markdown-editor-content"]')) setIsDismissed(true)
       }
     }
-
     const handleKeyDownCapture = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsDismissed(true)
         setIsBlockMenuOpen(false)
       }
     }
-
     document.addEventListener("mousedown", handleMouseDownCapture, true)
     window.addEventListener("keydown", handleKeyDownCapture, true)
     return () => {
@@ -305,69 +382,16 @@ export const MarkdownEditorNotionChrome = ({
 
   const bubblePosition = useMemo(() => {
     void layoutTick
-    if (!canShowBubble) return null
-    const startCoords = resolveCoords(selection.from)
-    const endCoords = resolveCoords(selection.to)
-    const containerRect = containerRef.current?.getBoundingClientRect() ?? null
-    const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
-    const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-
-    if (startCoords && endCoords && startCoords.bottom > 0 && endCoords.bottom > 0) {
-      if (
-        containerRect &&
-        (endCoords.bottom < containerRect.top || startCoords.top > containerRect.bottom)
-      ) {
-        return null
-      }
-      const centerX = (startCoords.left + endCoords.right) / 2
-      const left = Math.max(12, Math.min(Math.round(centerX - 205), viewportWidth - 420))
-      const placeBelow = startCoords.top - (containerRect?.top ?? 0) < 52
-      const top = placeBelow
-        ? Math.min(
-            viewportHeight - 52,
-            Math.round(Math.max(startCoords.bottom, endCoords.bottom) + 8)
-          )
-        : Math.max(12, Math.round(startCoords.top - 44))
-      return { top, left }
-    }
-
-    if (containerRect && containerRect.height > 0) {
-      return {
-        top: Math.round(containerRect.top + 48),
-        left: Math.max(12, Math.round(containerRect.left + 24)),
-      }
-    }
-
-    return null
-  }, [canShowBubble, containerRef, layoutTick, resolveCoords, selection.from, selection.to])
+    return computeBubbleToolbarPosition(canShowBubble, selection, resolveCoords, containerRef.current)
+  }, [canShowBubble, containerRef, layoutTick, resolveCoords, selection])
 
   const canShowGutterPlus =
-    mode === "live" &&
-    !disabled &&
-    !isSlashMenuOpen &&
-    selection.from === selection.to &&
-    !isOffsetInsideFencedCodeBlock(value, selection.from)
+    mode === "live" && !disabled && !isSlashMenuOpen && selection.from === selection.to && !insideFence
 
   const gutterTop = useMemo(() => {
     void layoutTick
-    if (!canShowGutterPlus) return null
-    const containerRect = containerRef.current?.getBoundingClientRect() ?? null
-    if (!containerRect || containerRect.height <= 0) return null
-    const activeLineStart =
-      selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
-    const lineCoords = resolveCoords(activeLineStart)
-    if (lineCoords && lineCoords.bottom > lineCoords.top) {
-      const rawTop =
-        lineCoords.top -
-        containerRect.top +
-        (lineCoords.bottom - lineCoords.top - 22) / 2
-      if (rawTop >= 0 && rawTop <= containerRect.height - 22) {
-        return Math.round(rawTop)
-      }
-      return null
-    }
-    return activeLineStart === 0 ? 24 : null
-  }, [canShowGutterPlus, containerRef, layoutTick, resolveCoords, selection.from, value])
+    return computeGutterTopPosition(canShowGutterPlus, activeLineStart, resolveCoords, containerRef.current)
+  }, [activeLineStart, canShowGutterPlus, containerRef, layoutTick, resolveCoords])
 
   const blockMenuPosition = useMemo(() => {
     void layoutTick
@@ -376,28 +400,33 @@ export const MarkdownEditorNotionChrome = ({
     if (!containerRect) return null
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-    const top = Math.max(
-      12,
-      Math.min(Math.round(containerRect.top + gutterTop + 26), viewportHeight - 368)
-    )
-    const left = Math.max(
-      12,
-      Math.min(Math.round(containerRect.left + 22), viewportWidth - 216)
-    )
+    const top = Math.max(12, Math.min(Math.round(containerRect.top + gutterTop + 26), viewportHeight - 368))
+    const left = Math.max(12, Math.min(Math.round(containerRect.left + 22), viewportWidth - 216))
     return { top, left }
   }, [canShowGutterPlus, containerRef, gutterTop, isBlockMenuOpen, layoutTick])
 
+  useEffect(() => {
+    if (!isBlockMenuOpen || !blockMenuPosition) return
+    blockMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  }, [blockMenuPosition, isBlockMenuOpen])
+
+  const handleBlockMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(blockMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+    const handled = moveBlockMenuFocus(event.key, items, currentIndex, () => {
+      setIsBlockMenuOpen(false)
+      gutterHandleRef.current?.focus()
+    })
+    if (handled) event.preventDefault()
+  }
+
   const handleTriggerSlashAtCurrentLine = () => {
     setIsBlockMenuOpen(false)
-    const lineStart =
-      selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
-    const nextBreak = value.indexOf("\n", selection.from)
-    const lineEnd = nextBreak === -1 ? value.length : nextBreak
-    const lineText = value.slice(lineStart, lineEnd)
     const plan =
-      lineText.trim().length === 0
+      activeLineText.trim().length === 0
         ? planReplaceSelection(selection.from, selection.to, "/")
-        : planReplaceSelection(lineEnd, lineEnd, "\n/")
+        : planReplaceSelection(activeLineEnd, activeLineEnd, "\n/")
     onTriggerSlashCommand(plan)
   }
 
@@ -467,6 +496,7 @@ export const MarkdownEditorNotionChrome = ({
             aria-label="현재 줄 블록 메뉴"
             aria-haspopup="menu"
             aria-expanded={isBlockMenuOpen}
+            data-block-kind={currentBlockKind}
             data-testid="markdown-block-gutter-handle"
             $top={gutterTop}
             $left={22}
@@ -485,6 +515,7 @@ export const MarkdownEditorNotionChrome = ({
           data-testid="markdown-block-action-menu"
           $top={blockMenuPosition.top}
           $left={blockMenuPosition.left}
+          onKeyDown={handleBlockMenuKeyDown}
         >
           <BlockMenuSectionHeader aria-hidden="true">블록 전환</BlockMenuSectionHeader>
           {turnIntoItems.map((item) => (

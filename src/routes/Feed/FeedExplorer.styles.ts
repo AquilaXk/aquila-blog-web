@@ -68,11 +68,16 @@ export const ExplorerCard = styled.section`
   }
 
   .sortTrigger:hover,
-  .sortTrigger:focus-visible,
   .sortTrigger[aria-expanded="true"] {
     border-color: var(--aq-text);
     color: var(--aq-text);
-    outline: none;
+  }
+
+  .sortTrigger:focus-visible {
+    border-color: var(--aq-text);
+    color: var(--aq-text);
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
   }
 
   .sortChevron {
@@ -131,14 +136,19 @@ export const ExplorerCard = styled.section`
   }
 
   .sortOption:hover,
-  .sortOption:focus-visible,
   .sortOption[data-active="true"] {
     background: var(--aq-surface-elevated);
     color: var(--aq-text);
-    outline: none;
   }
 
-  .sortOption[data-active="true"]::before {
+  .sortOption:focus-visible {
+    background: var(--aq-surface-elevated);
+    color: var(--aq-text);
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .sortOption[aria-selected="true"]::before {
     content: "✓";
     font-weight: 900;
   }

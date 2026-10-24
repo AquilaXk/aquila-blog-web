@@ -118,10 +118,10 @@ const ActionRow = styled.div<{ $actionRowBackground?: (theme: Theme) => string }
   flex-wrap: wrap;
   width: fit-content;
   max-width: 100%;
-  padding: 0.42rem 0.48rem;
-  border-radius: 8px;
-  background: ${({ theme, $actionRowBackground }) =>
-    $actionRowBackground ? $actionRowBackground(theme) : theme.colors.gray2};
+  border-top: 1px solid ${({ theme }) => theme.colors.gray5};
+  padding-top: 12px;
+  background: transparent;
+  border-radius: 0;
 `
 
 const GhostButton = styled.button`
@@ -140,6 +140,10 @@ const GhostButton = styled.button`
   &:hover {
     background: ${({ theme }) => theme.colors.gray3};
     color: ${({ theme }) => theme.colors.gray12};
+  }
+
+  @media (max-width: 768px) {
+    min-height: 44px;
   }
 `
 
@@ -167,5 +171,9 @@ const ConfirmButton = styled.button`
     &:hover {
       background: color-mix(in srgb, ${({ theme }) => theme.colors.statusDangerBorder} 12%, transparent);
     }
+  }
+
+  @media (max-width: 768px) {
+    min-height: 44px;
   }
 `

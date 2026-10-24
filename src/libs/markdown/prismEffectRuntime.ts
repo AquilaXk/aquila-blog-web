@@ -89,25 +89,21 @@ export const isMermaidCodeBlock = (block: Element): boolean =>
     block.closest?.("pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']")
   )
 
+const isRemovedElementRequiringPrismRescan = (element: Element): boolean => {
+  if (isMermaidCodeBlock(element)) return false
+  if (element.matches("code")) return true
+  if (element.matches("pre")) {
+    const codeChildren = Array.from(element.querySelectorAll("code"))
+    return codeChildren.length === 0 || codeChildren.some((child) => !isMermaidCodeBlock(child))
+  }
+  const nestedCodeBlocks = Array.from(element.querySelectorAll("pre > code"))
+  return nestedCodeBlocks.some((child) => !isMermaidCodeBlock(child))
+}
+
 export const shouldRescanPrismOnRemovedNodes = (removedNodes: Iterable<Node>): boolean => {
-  for (const node of Array.from(removedNodes)) {
+  for (const node of removedNodes) {
     if (!node || typeof (node as Element).matches !== "function") continue
-    const element = node as Element
-    if (isMermaidCodeBlock(element)) continue
-    if (element.matches("code")) {
-      return true
-    }
-    if (element.matches("pre")) {
-      const codeChildren = Array.from(element.querySelectorAll("code"))
-      if (codeChildren.length > 0 && codeChildren.every((code) => isMermaidCodeBlock(code))) {
-        continue
-      }
-      return true
-    }
-    const nestedCodeBlocks = Array.from(element.querySelectorAll("pre > code"))
-    if (nestedCodeBlocks.some((block) => !isMermaidCodeBlock(block))) {
-      return true
-    }
+    if (isRemovedElementRequiringPrismRescan(node as Element)) return true
   }
   return false
 }

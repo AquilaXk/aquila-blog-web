@@ -232,15 +232,6 @@ const PreviewThumbFrame = styled.div`
     will-change: top, left, width, height;
   }
 
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.16) 100%);
-    opacity: 0.9;
-    pointer-events: none;
-  }
-
   .placeholder {
     width: 100%;
     height: 100%;
@@ -376,8 +367,9 @@ const ZoomValue = styled.span`
   align-items: center;
   justify-content: center;
   min-height: 30px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
+  background: ${({ theme }) => theme.colors.gray2};
   padding: 0 0.55rem;
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.78rem;
@@ -397,24 +389,20 @@ const ThumbnailSourceStatus = styled.span`
   align-items: center;
   width: fit-content;
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
+  background: ${({ theme }) => theme.colors.gray2};
   padding: 0 0.54rem;
   color: ${({ theme }) => theme.colors.gray10};
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
 
-  &[data-tone="manual"] {
-    border-color: ${({ theme }) => theme.colors.blue7};
-    background: ${({ theme }) => theme.colors.blue3};
-    color: ${({ theme }) => theme.colors.blue11};
-  }
-
+  &[data-tone="manual"],
   &[data-tone="auto"] {
-    border-color: ${({ theme }) => theme.colors.green7};
-    background: ${({ theme }) => theme.colors.green3};
-    color: ${({ theme }) => theme.colors.green11};
+    border-color: ${({ theme }) => theme.colors.gray6};
+    background: ${({ theme }) => theme.colors.gray2};
+    color: ${({ theme }) => theme.colors.gray11};
   }
 `
 

@@ -124,7 +124,9 @@ export const splitCategoryDisplay = (value: string): ParsedCategoryDisplay => {
   }
 }
 
+const KO_COLLATOR = new Intl.Collator("ko")
+
 export const normalizeCategoryValue = (value: string) => splitCategoryDisplay(value).value
 
 export const compareCategoryValues = (a: string, b: string) =>
-  splitCategoryDisplay(a).label.localeCompare(splitCategoryDisplay(b).label, "ko")
+  KO_COLLATOR.compare(splitCategoryDisplay(a).label, splitCategoryDisplay(b).label)

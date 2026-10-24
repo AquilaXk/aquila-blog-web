@@ -22,7 +22,6 @@ import {
 } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
-import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
 import { deriveEditorPersistenceState, derivePublishActionViewModel, type PostVisibility, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
@@ -148,7 +147,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     postId, postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
     postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility, publishActionType, publishModalNotice,
     publishNotice, previewThumbFrameRef, previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost,
-    restoreLocalDraft, selectLocalDraftCandidate, restoredLocalDraft, result, safePreviewThumbnail,
+    restoreLocalDraft, selectLocalDraftCandidate, restoredLocalDraft, safePreviewThumbnail,
     serverBaselineEditorFingerprintRef, sessionMember, setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen,
     setIsPreviewThumbnailError, setPostVisibility, setTagDraft, tagDraft, thumbnailImageFileInputRef,
     thumbnailImageFileName,
@@ -418,22 +417,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     isDedicatedNewEditorRoute &&
     !postId.trim() &&
     (isNewEditorBootstrapPending || loadingKey === "postTemp")
-  const shouldShowResultPanel = Boolean(loadingKey || result)
-  const dedicatedEditorResultPanel = useMemo(
-    () =>
-      shouldShowResultPanel ? (
-        <EditorStudioResultLogPanel
-          idleDescription="원본 응답을 확인할 수 있습니다"
-          idleTitle="최근 작업 응답"
-          loadingDescription={(currentLoadingKey) => `실행 중: ${currentLoadingKey}`}
-          loadingKey={loadingKey}
-          loadingTitle="작업 응답 확인 중"
-          result={result}
-          variant="dedicated"
-        />
-      ) : null,
-    [loadingKey, result, shouldShowResultPanel]
-  )
 
   if (!sessionMember) {
     return null
@@ -496,7 +479,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onDiscardLocalDraftCandidate={discardLocalDraftCandidate}
         onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
         onClearLocalDraft={clearLocalDraft}
-        resultPanel={dedicatedEditorResultPanel}
         publishModal={
           isPublishModalOpen ? (
             <EditorStudioPublishModal

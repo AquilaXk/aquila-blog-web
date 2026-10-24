@@ -33,37 +33,51 @@ export const resolveActiveOutlineItemIndex = (
   return 0
 }
 
-const computeCursorLineAndColumn = (
+let cachedNewlineOffsets: { markdown: string; offsets: number[] } | null = null
+
+const getNewlineOffsets = (markdown: string): number[] => {
+  if (cachedNewlineOffsets?.markdown === markdown) return cachedNewlineOffsets.offsets
+  const offsets: number[] = []
+  let pos = markdown.indexOf("\n", 0)
+  while (pos !== -1) {
+    offsets.push(pos)
+    pos = markdown.indexOf("\n", pos + 1)
+  }
+  cachedNewlineOffsets = { markdown, offsets }
+  return offsets
+}
+
+export const computeCursorLineAndColumn = (
   markdown: string,
   cursorOffset?: number | null
 ): { line: number; column: number } => {
   const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
-  let line = 1
-  let lastNewlineIndex = -1
-  for (let index = 0; index < clamped; index += 1) {
-    if (markdown.codePointAt(index) === 10) {
-      line += 1
-      lastNewlineIndex = index
+  if (clamped === 0) return { line: 1, column: 1 }
+  const offsets = getNewlineOffsets(markdown)
+  let low = 0
+  let high = offsets.length - 1
+  let lastIdx = -1
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    if (offsets[mid]! < clamped) {
+      lastIdx = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
     }
   }
-  return {
-    line,
-    column: clamped - lastNewlineIndex,
-  }
+  const lastNewlineIndex = lastIdx === -1 ? -1 : offsets[lastIdx]!
+  return { line: lastIdx + 2, column: clamped - lastNewlineIndex }
 }
 
 export const countMarkdownTotalLinks = (markdown: string): number => {
   if (!markdown.includes("](") && !markdown.includes("[[")) return 0
   let count = 0
   if (markdown.includes("](")) {
-    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s\r\n]*\)/g)) {
-      count += 1
-    }
+    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s]*\)/g)) count += 1
   }
   if (markdown.includes("[[")) {
-    for (const _match of markdown.matchAll(/\[\[[^\][\r\n]+\]\]/g)) {
-      count += 1
-    }
+    for (const _match of markdown.matchAll(/\[\[[^\][\r\n]+\]\]/g)) count += 1
   }
   return count
 }
@@ -115,7 +129,6 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onDiscardLocalDraftCandidate: () => void
   onDismissLocalDraftRestoreSuggestion: () => void
   onClearLocalDraft: () => void
-  resultPanel: ReactNode
   publishModal: ReactNode
 }
 
@@ -245,7 +258,6 @@ export const EditorStudioDedicatedEditorSurface = ({
   onDiscardLocalDraftCandidate,
   onDismissLocalDraftRestoreSuggestion,
   onClearLocalDraft,
-  resultPanel,
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false)
@@ -337,9 +349,7 @@ export const EditorStudioDedicatedEditorSurface = ({
 
       <EditorStudioDedicatedTopBar>
         <EditorStudioTopBarLead>
-          <EditorExitAction type="button" onClick={onExit}>
-            ← 글 관리
-          </EditorExitAction>
+          <EditorExitAction type="button" onClick={onExit}>← 글 관리</EditorExitAction>
           <EditorSidebarToggleButton
             type="button"
             $active={isOutlineOpen}
@@ -372,27 +382,19 @@ export const EditorStudioDedicatedEditorSurface = ({
           >
             메타 패널
           </EditorSidebarToggleButton>
-          <SecondaryButton type="button" onClick={() => setIsGuideOpen(true)}>
-            Markdown 가이드
-          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setIsGuideOpen(true)}>Markdown 가이드</SecondaryButton>
           <PrimaryButton type="button" disabled={primaryActionDisabled} onClick={onPrimaryAction}>
             {primaryActionLabel}
           </PrimaryButton>
         </EditorStudioTopBarActions>
       </EditorStudioDedicatedTopBar>
 
-      <EditorStudioFrame
-        data-testid="editor-studio-frame"
-        $showOutline={isOutlineOpen}
-        $showInspector={isInspectorOpen}
-      >
+      <EditorStudioFrame data-testid="editor-studio-frame" $showOutline={isOutlineOpen} $showInspector={isInspectorOpen}>
         {isOutlineOpen ? (
           <EditorOutline aria-label="문서 목차">
             <EditorPanelHeader>
               <h3>문서 목차</h3>
-              <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>
-                ×
-              </button>
+              <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>×</button>
             </EditorPanelHeader>
             {outlineItems.length > 0 ? (
               outlineItems.map((item, index) => (
@@ -582,7 +584,6 @@ export const EditorStudioDedicatedEditorSurface = ({
 
       {isGuideOpen ? <EditorStudioGuideModal onClose={() => setIsGuideOpen(false)} /> : null}
 
-      {resultPanel}
       {publishModal}
     </EditorStudioRoot>
   )

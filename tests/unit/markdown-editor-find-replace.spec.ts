@@ -93,4 +93,16 @@ test.describe("markdown editor find and replace model", () => {
     expect(planMarkdownEditorReplaceAll(value, "", "next")).toBeNull()
     expect(planMarkdownEditorReplaceAll(value, "missing", "next")).toBeNull()
   })
+
+  test("scans multi-thousand-line documents in linear time with exact case-insensitive and scoped offsets", () => {
+    const repeated = Array.from({ length: 500 }, (_, idx) => `Line ${idx}: Alpha beta ALPHA gamma`).join("\n")
+    const matches = findMarkdownEditorMatches(repeated, "alpha")
+    expect(matches).toHaveLength(1000)
+    expect(matches[0]).toEqual({ start: 8, end: 13 })
+    expect(matches[1]).toEqual({ start: 19, end: 24 })
+
+    const caseSensitiveMatches = findMarkdownEditorMatches(repeated, "ALPHA", { caseSensitive: true })
+    expect(caseSensitiveMatches).toHaveLength(500)
+    expect(caseSensitiveMatches[0]).toEqual({ start: 19, end: 24 })
+  })
 })

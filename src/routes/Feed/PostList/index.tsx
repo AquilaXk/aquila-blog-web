@@ -326,6 +326,10 @@ const StyledWrapper = styled.div`
       &:active {
         transform: scale(0.97);
       }
+
+      @media (max-width: 768px) {
+        min-height: 44px;
+      }
     }
 
     .actionBtn--primary {
@@ -474,6 +478,10 @@ const StyledWrapper = styled.div`
     &:disabled {
       cursor: wait;
       opacity: 0.72;
+    }
+
+    @media (max-width: 768px) {
+      min-height: 44px;
     }
   }
 
