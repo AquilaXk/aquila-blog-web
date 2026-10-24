@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
   AdminActionCardButton,
@@ -252,6 +253,7 @@ export const Input = styled.input`
   color: ${({ theme }) => theme.colors.gray12};
   padding: 0.82rem 0.92rem;
   font-size: 0.95rem;
+  ${focusVisibleRing}
 `
 
 export const TextArea = styled.textarea`
@@ -265,6 +267,7 @@ export const TextArea = styled.textarea`
   font-size: 0.95rem;
   line-height: 1.6;
   resize: vertical;
+  ${focusVisibleRing}
 `
 
 export const PrimaryButton = styled.button`
@@ -277,6 +280,7 @@ export const PrimaryButton = styled.button`
   font-size: 0.84rem;
   font-weight: 800;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:disabled {
     opacity: 0.56;
@@ -291,10 +295,10 @@ export const PrimaryButton = styled.button`
 export const DangerPanel = styled.div`
   display: grid;
   gap: 0.9rem;
-  padding: 0.96rem;
-  border-radius: 8px;
-  border: 1px solid ${({ theme }) => theme.colors.statusDangerBorder};
-  background: rgba(239, 68, 68, 0.06);
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
 
   fieldset {
     border: 0;
@@ -353,6 +357,7 @@ export const DangerButton = styled.button`
   font-size: 0.84rem;
   font-weight: 800;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:disabled {
     opacity: 0.5;
@@ -383,6 +388,7 @@ export const ResultFilterButton = styled.button`
   font-size: 0.78rem;
   font-weight: 800;
   cursor: pointer;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     min-height: ${control.lg}px;
@@ -488,6 +494,7 @@ export const HistoryButton = styled.button`
   background: transparent;
   color: ${({ theme }) => theme.colors.gray12};
   cursor: pointer;
+  ${focusVisibleRing}
 
   &[data-active="true"] {
     border-color: ${({ theme }) => theme.colors.accentBorder};

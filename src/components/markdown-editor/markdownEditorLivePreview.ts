@@ -509,22 +509,12 @@ export const resolveMarkdownLivePreviewPlanFromEntries = (
   const secondaryBit = ENTRY_FLAG_HAS_SECONDARY_HIDE << 5
   for (const entry of entries) {
     if (hasSelections) {
-      if (
-        (entry.packedMeta & primaryBit) !== 0 &&
-        entry.hideWhenActiveRange &&
-        isTokenActive(entry.hideWhenActiveRange.from, entry.hideWhenActiveRange.to, selections)
-      ) {
+      const primaryRange = entry.hideWhenActiveRange
+      if ((entry.packedMeta & primaryBit) !== 0 && primaryRange && isTokenActive(primaryRange.from, primaryRange.to, selections)) {
         continue
       }
-      if (
-        (entry.packedMeta & secondaryBit) !== 0 &&
-        entry.secondaryHideWhenActiveRange &&
-        isTokenActive(
-          entry.secondaryHideWhenActiveRange.from,
-          entry.secondaryHideWhenActiveRange.to,
-          selections
-        )
-      ) {
+      const secondaryRange = entry.secondaryHideWhenActiveRange
+      if ((entry.packedMeta & secondaryBit) !== 0 && secondaryRange && isTokenActive(secondaryRange.from, secondaryRange.to, selections)) {
         continue
       }
     }
@@ -538,30 +528,34 @@ export const buildMarkdownLivePreviewPlan = (
   documentNode: MarkdownSyntaxNode,
   selections: readonly MarkdownLiveSelection[],
   composing = false
-): MarkdownLivePreviewDecoration[] => {
-  if (composing) return []
-  const entries = buildMarkdownLivePreviewEntries(markdown, documentNode)
-  return resolveMarkdownLivePreviewPlanFromEntries(entries, selections, composing)
-}
+): MarkdownLivePreviewDecoration[] =>
+  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown, documentNode), selections, composing)
 
 export const buildMarkdownLivePreviewDecorationSpecs = (
   markdown: string,
   selections: readonly MarkdownLiveSelection[],
   composing = false
-): MarkdownLivePreviewDecoration[] => {
-  if (composing) return []
-  const entries = buildMarkdownLivePreviewEntries(markdown)
-  return resolveMarkdownLivePreviewPlanFromEntries(entries, selections, composing)
+): MarkdownLivePreviewDecoration[] =>
+  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown), selections, composing)
+
+const stepFoldFence = (fence: string, text: string): { fence: string; isFenceLine: boolean } => {
+  let cursor = 0
+  while (cursor < 3 && (text[cursor] === " " || text[cursor] === "\t")) cursor += 1
+  const marker = text[cursor]
+  if (marker !== "`" && marker !== "~") return { fence, isFenceLine: false }
+  const runStart = cursor
+  while (text[cursor] === marker) cursor += 1
+  const fenceRun = text.slice(runStart, cursor)
+  if (fenceRun.length < 3) return { fence, isFenceLine: false }
+  if (!fence) return { fence: fenceRun, isFenceLine: true }
+  const closes = fenceRun.startsWith(fence[0]!) && fenceRun.length >= fence.length && !text.slice(cursor).trim()
+  return { fence: closes ? "" : fence, isFenceLine: true }
 }
 
+type FoldDocLine = { number: number; from: number; to: number; text: string }
+
 export const computeMarkdownFoldRange = (
-  state: {
-    doc: {
-      lines: number
-      lineAt: (pos: number) => { number: number; from: number; to: number; text: string }
-      line: (lineNo: number) => { number: number; from: number; to: number; text: string }
-    }
-  },
+  state: { doc: { lines: number; lineAt: (pos: number) => FoldDocLine; line: (lineNo: number) => FoldDocLine } },
   lineStart: number,
   _lineEnd?: number
 ): { from: number; to: number } | null => {
@@ -570,11 +564,14 @@ export const computeMarkdownFoldRange = (
   if (headingMatch) {
     const level = headingMatch[1].length
     let endPos = line.to
+    let activeFence = ""
     for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
       const nextLine = state.doc.line(lineNo)
-      const nextHeading = /^\s{0,3}(#{1,6})\s+/.exec(nextLine.text)
-      if (nextHeading && nextHeading[1].length <= level) {
-        break
+      const fenceStep = stepFoldFence(activeFence, nextLine.text)
+      activeFence = fenceStep.fence
+      if (!fenceStep.isFenceLine && !activeFence) {
+        const nextHeading = /^\s{0,3}(#{1,6})\s+/.exec(nextLine.text)
+        if (nextHeading && nextHeading[1].length <= level) break
       }
       endPos = nextLine.to
     }

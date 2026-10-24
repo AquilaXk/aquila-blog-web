@@ -160,40 +160,10 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     width: 32px;
     height: 32px;
     border-radius: 6px;
-    border: 1px solid ${({ theme }) => theme.colors.gray6};
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
     background: ${({ theme }) => theme.publicDesign.readableSurface};
-    color: ${({ theme }) => theme.publicDesign.accent};
+    color: ${({ theme }) => theme.colors.gray11};
     flex-shrink: 0;
-  }
-
-  .icon[data-tone="blue"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
-    border-color: rgba(35, 131, 226, 0.25);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
-  }
-
-  .icon[data-tone="green"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
-    border-color: rgba(16, 185, 129, 0.25);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#34d399" : "#448361")};
-  }
-
-  .icon[data-tone="amber"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.2)" : "#fbf3db")};
-    border-color: rgba(245, 158, 11, 0.28);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fbbf24" : "#cb912f")};
-  }
-
-  .icon[data-tone="purple"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.22)" : "#f6f3f9")};
-    border-color: rgba(144, 101, 176, 0.25);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#9065b0")};
-  }
-
-  .icon[data-tone="pink"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(235, 87, 87, 0.2)" : "#fdebec")};
-    border-color: rgba(235, 87, 87, 0.25);
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#f87171" : "#d44c47")};
   }
 
   .icon.icon-emoji {
@@ -229,12 +199,12 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
 const isEmojiIcon = (icon: string) =>
   /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
 
-const resolveSlashItemTone = (item: SlashMenuItem): "blue" | "green" | "amber" | "purple" | "pink" => {
-  if (item.id.startsWith("heading-") || item.id === "callout-info" || item.id === "table") return "blue"
-  if (item.id.includes("list") || item.id === "callout-tip" || item.id === "code-block") return "green"
-  if (item.id === "quote" || item.id === "divider" || item.id === "callout-warning" || item.id === "math") return "amber"
-  if (item.id === "callout-danger" || item.id === "image" || item.id === "attachment") return "pink"
-  return "purple"
+const resolveNextSlashMenuIndex = (key: string, prev: number, count: number): number | null => {
+  if (key === "ArrowDown") return count > 0 ? (prev + 1) % count : 0
+  if (key === "ArrowUp") return count > 0 ? (prev - 1 + count) % count : 0
+  if (key === "Home") return 0
+  if (key === "End") return count > 0 ? count - 1 : 0
+  return null
 }
 
 export const MarkdownEditorSlashMenu = ({
@@ -267,29 +237,18 @@ export const MarkdownEditorSlashMenu = ({
         return
       }
 
-      if (event.key === "ArrowDown") {
+      const nextIndex = resolveNextSlashMenuIndex(event.key, selectedIndex, items.length)
+      if (nextIndex !== null) {
         event.preventDefault()
         event.stopPropagation()
-        setSelectedIndex((prev) => (items.length > 0 ? (prev + 1) % items.length : 0))
-        return
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault()
-        event.stopPropagation()
-        setSelectedIndex((prev) =>
-          items.length > 0 ? (prev - 1 + items.length) % items.length : 0
-        )
+        setSelectedIndex(nextIndex)
         return
       }
 
       if ((event.key === "Enter" || event.key === "Tab") && items.length > 0) {
         event.preventDefault()
         event.stopPropagation()
-        const selected = items[selectedIndex]
-        if (selected) {
-          selected.action()
-        }
+        items[selectedIndex]?.action()
       }
     }
 
@@ -344,7 +303,6 @@ export const MarkdownEditorSlashMenu = ({
               >
                 <span
                   className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
-                  data-tone={resolveSlashItemTone(item)}
                   aria-hidden="true"
                 >
                   {item.icon}

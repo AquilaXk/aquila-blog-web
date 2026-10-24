@@ -178,21 +178,23 @@ export const planListEnterContinuation = (
   if (matched.kind === "ordered") {
     const nextNumber = matched.number + 1
     const nextMarker = `${matched.indent}${nextNumber}. `
-    const rest = value.slice(lineEnd + 1)
-    const restLines = rest.split("\n")
     let currentNum = nextNumber
     const renumbered: string[] = []
     let spanEnd = lineEnd
+    let cursor = lineEnd + 1
 
-    for (const rLine of restLines) {
+    while (cursor <= value.length) {
+      const nextLineBreak = value.indexOf("\n", cursor)
+      const rLine = nextLineBreak === -1 ? value.slice(cursor) : value.slice(cursor, nextLineBreak)
       const rMatch = matchListMarkerLine(rLine)
-      if (rMatch && rMatch.kind === "ordered" && rMatch.indent === matched.indent) {
-        currentNum += 1
-        renumbered.push(`${rMatch.indent}${currentNum}. ${rMatch.content}`)
-        spanEnd += 1 + rLine.length
-      } else {
+      if (rMatch?.kind !== "ordered" || rMatch.indent !== matched.indent) {
         break
       }
+      currentNum += 1
+      renumbered.push(`${rMatch.indent}${currentNum}. ${rMatch.content}`)
+      spanEnd += 1 + rLine.length
+      if (nextLineBreak === -1) break
+      cursor = nextLineBreak + 1
     }
 
     if (renumbered.length > 0) {

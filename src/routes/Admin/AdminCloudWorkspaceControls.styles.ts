@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder as border,
   adminBorderStrong as borderStrong,
@@ -55,6 +56,7 @@ export const SearchClearButton = styled.button`
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:hover,
   &:focus-visible {
@@ -161,6 +163,7 @@ export const SecondaryButton = styled.button`
   font-weight: 820;
   white-space: nowrap;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:disabled {
     cursor: not-allowed;
@@ -257,6 +260,7 @@ export const GhostButton = styled.button`
   font-weight: 820;
   white-space: nowrap;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:hover,
   &:focus-visible {
@@ -423,9 +427,9 @@ export const EmptyTableState = styled.div`
     content: "";
     width: 2.75rem;
     height: 2.75rem;
-    border-radius: 999px;
+    border-radius: 4px;
     border: 1px solid ${border};
-    background: linear-gradient(135deg, ${surfaceRaised}, ${surfaceMuted});
+    background: ${surfaceRaised};
   }
 
   strong {

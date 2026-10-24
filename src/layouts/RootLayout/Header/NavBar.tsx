@@ -137,8 +137,19 @@ const NavBar = () => {
               </button>
               {primaryLinks.map(([id, , to, labelKey]) => {
                 const label = t(labelKey)
+                const isActive =
+                  (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
+                  (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
+                  (id === "about" && router.pathname === "/about")
                 return (
-                  <Link key={to} href={to} data-nav-id={id} aria-label={label} onClick={closeMobileMenu}>
+                  <Link
+                    key={to}
+                    href={to}
+                    data-nav-id={id}
+                    aria-label={label}
+                    aria-current={isActive ? "page" : undefined}
+                    onClick={closeMobileMenu}
+                  >
                     {label}
                   </Link>
                 )
@@ -170,20 +181,19 @@ const NavBar = () => {
       <ul className="primaryLinks">
         {primaryLinks.map(([id, , to, labelKey]) => {
           const label = t(labelKey)
+          const isActive =
+            (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
+            (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
+            (id === "about" && router.pathname === "/about")
           return (
             <li key={id}>
               <Link
                 href={to}
                 data-nav-id={id}
                 aria-label={label}
+                aria-current={isActive ? "page" : undefined}
                 data-ui="nav-control"
-                data-active={
-                  (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
-                  (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
-                  (id === "about" && router.pathname === "/about")
-                    ? "true"
-                    : "false"
-                }
+                data-active={isActive ? "true" : "false"}
               >
                 {label}
               </Link>

@@ -161,6 +161,8 @@ export const renderAdminProfileLinksSection = (props: AdminProfileWorkspaceSecti
                           <IconOptionButton
                             key={option.id}
                             type="button"
+                            role="option"
+                            aria-selected={option.id === item.icon}
                             data-selected={option.id === item.icon}
                             onClick={() => {
                               updateLinkItem(section, index, "icon", option.id)

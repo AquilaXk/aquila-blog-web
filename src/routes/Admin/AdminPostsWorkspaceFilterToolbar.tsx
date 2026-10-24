@@ -1,5 +1,6 @@
 import type { Theme } from "@emotion/react"
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   DEFAULT_SORT,
   type ListSort,
@@ -94,7 +95,7 @@ const StickyFilterToolbar = styled.div`
   @media (max-width: 767px) {
     gap: 0.52rem;
     padding: 0.58rem 0.62rem;
-    border-radius: 12px;
+    border-radius: 0;
   }
 `
 
@@ -140,9 +141,10 @@ const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`
   background: ${({ theme, "data-active": active }) => (active ? theme.colors.gray1 : theme.colors.gray2)};
   color: ${({ theme }) => theme.colors.gray12};
   border-color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray6 : theme.colors.gray5)};
+  ${focusVisibleRing}
 
   @media (max-width: 767px) {
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 0.46rem;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -164,11 +166,12 @@ const SearchField = styled.div`
     color: ${({ theme }) => theme.colors.gray12};
     padding: 0 0.95rem;
     font-size: 0.95rem;
+    ${focusVisibleRing}
   }
 
   @media (max-width: 767px) {
     input {
-      min-height: 38px;
+      min-height: 44px;
       border-radius: 6px;
       padding: 0 0.7rem;
       font-size: 0.86rem;
@@ -191,5 +194,6 @@ const SortField = styled.div`
     padding: 0 0.8rem;
     font-size: 0.9rem;
     font-weight: 760;
+    ${focusVisibleRing}
   }
 `

@@ -5,6 +5,7 @@ import { apiFetch } from "src/apis/backend/client"
 import AppIcon, { type IconName } from "src/components/icons/AppIcon"
 import BrandLogoMark from "src/components/branding/BrandMark"
 import ProfileImage from "src/components/ProfileImage"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { useAdminShellProfile } from "src/hooks/useAdminShellProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { toAdminLoginPath } from "src/libs/router"
@@ -112,6 +113,16 @@ const SECTION_TITLES: Record<AdminShellSection, string> = {
   tools: "운영 도구",
 }
 
+const resolveProfileStatusLabel = (
+  isProfileError: boolean,
+  isProfileLoading: boolean,
+  profile: AdminProfile | null | undefined
+) => {
+  if (isProfileError) return "프로필 정보를 불러올 수 없습니다."
+  if (isProfileLoading && !profile) return "프로필 정보를 불러오는 중입니다."
+  return "관리자"
+}
+
 const AdminShell = ({ currentSection, member, profileSnapshot = null, children }: AdminShellProps) => {
   const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()
   const sidebarIdentityInitial = sidebarIdentityName.slice(0, 2).toUpperCase()
@@ -172,13 +183,7 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
             </SidebarAvatar>
             <ProfileCopy>
               <strong>{sidebarIdentityName}</strong>
-              <span>
-                {isProfileError
-                  ? "프로필 정보를 불러올 수 없습니다."
-                  : isProfileLoading && !profile
-                    ? "프로필 정보를 불러오는 중입니다."
-                    : "관리자"}
-              </span>
+              <span>{resolveProfileStatusLabel(isProfileError, isProfileLoading, profile)}</span>
             </ProfileCopy>
           </SidebarProfileIdentity>
           <SidebarLogoutAction type="button" aria-label="Logout" onClick={() => void handleLogout()}>
@@ -322,6 +327,7 @@ const NavLink = styled.a`
   color: inherit;
   text-decoration: none;
   transition: background 140ms ease, color 140ms ease;
+  ${focusVisibleRing}
 
   > span {
     width: 1.05rem;
@@ -391,6 +397,7 @@ const SidebarLogoutAction = styled.button`
   background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   cursor: pointer;
+  ${focusVisibleRing}
 `
 
 const SidebarAvatar = styled.div`
@@ -481,6 +488,7 @@ const ResponsiveLogoutAction = styled.button`
   background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   cursor: pointer;
+  ${focusVisibleRing}
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     display: inline-flex;

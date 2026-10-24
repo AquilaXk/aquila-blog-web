@@ -27,6 +27,12 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     line-height: 1.4;
   }
 
+  .aq-toggle > summary:focus-visible {
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   .aq-toggle__title {
     display: block;
     min-width: 0;

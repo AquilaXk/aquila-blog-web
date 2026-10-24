@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
   AdminInfoPanelCard,
@@ -60,6 +61,7 @@ export const PreviewHeaderActions = styled.div`
 
 export const PreviewToggleButton = styled.button`
   display: none;
+  ${focusVisibleRing}
 
   @media (max-width: 760px) {
     display: inline-flex;
@@ -132,7 +134,7 @@ export const PreviewProfileCard = styled.div`
   .avatar {
     width: 72px;
     height: 72px;
-    border-radius: 999px;
+    border-radius: 50%;
     overflow: hidden;
   }
 
@@ -306,7 +308,7 @@ export const ModalNotice = styled(ToastCard)`
 export const AvatarFallback = styled.div`
   width: 100%;
   height: 100%;
-  border-radius: 999px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   background: ${({ theme }) => theme.colors.gray4};
@@ -329,7 +331,7 @@ export const ModalCard = styled.section`
   width: min(640px, 100%);
   max-height: min(92vh, 860px);
   overflow: auto;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
@@ -366,6 +368,7 @@ export const ModalCloseButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     width: ${control.lg}px;
@@ -409,6 +412,7 @@ export const ModalHistoryItem = styled.div`
   > button:first-child {
     width: 76px;
     border: 0;
+    border-radius: 6px;
     background: transparent;
     color: ${({ theme }) => theme.colors.gray11};
     display: grid;
@@ -416,6 +420,7 @@ export const ModalHistoryItem = styled.div`
     justify-items: center;
     padding: 0;
     cursor: pointer;
+    ${focusVisibleRing}
 
     &:disabled {
       cursor: default;
@@ -425,7 +430,7 @@ export const ModalHistoryItem = styled.div`
   img {
     width: 64px;
     height: 64px;
-    border-radius: 999px;
+    border-radius: 50%;
     object-fit: cover;
     border: 2px solid ${({ theme }) => theme.colors.gray6};
     background: ${({ theme }) => theme.colors.gray1};
@@ -452,6 +457,7 @@ export const ModalHistoryAction = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  ${focusVisibleRing}
 
   @media (max-width: 1100px) {
     width: ${control.lg}px;
@@ -477,7 +483,7 @@ export const ModalEditorFrame = styled.div`
   max-width: 360px;
   justify-self: center;
   aspect-ratio: 1 / 1;
-  border-radius: 999px;
+  border-radius: 50%;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
   overflow: hidden;

@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test"
 import {
+  countCodePoints,
+  countWords,
   createMarkdownDocumentInsights,
   createMarkdownHeadingSlugAllocator,
+  formatMarkdownHeadingLabel,
+  hasHeadingInlineSyntax,
 } from "../../src/libs/markdown/markdownDocumentInsights"
 
 test("collects H1-H4 source ranges, skips fenced source, and allocates Unicode slugs", () => {
@@ -91,3 +95,29 @@ test("computes heading ranges in textarea-normalized coordinates for CRLF source
     { offset: 15, range: { start: 15, end: 25 } },
   ])
 })
+
+test("fast-paths plain heading labels and strips inline syntax on formatted headings", () => {
+  expect(hasHeadingInlineSyntax("Plain Heading Title")).toBe(false)
+  expect(hasHeadingInlineSyntax("Heading with `code`")).toBe(true)
+  expect(formatMarkdownHeadingLabel("  Plain   Heading \t Title  ")).toBe("Plain Heading Title")
+  expect(
+    formatMarkdownHeadingLabel("**Bold**   _italic_ \t ~~strike~~ ![alt](img.png) [link](url) `literal_code`")
+  ).toBe("Bold italic strike alt link literal_code")
+})
+
+test("counts surrogate pairs accurately in words and code points and skips non-H1..H4 hash lines", () => {
+  const emojiText = "🚀🔥   💡✨   한글"
+  expect(countCodePoints(emojiText)).toBe(Array.from(emojiText).length)
+  expect(countWords(emojiText)).toBe(3)
+  const emojiInsights = createMarkdownDocumentInsights(emojiText)
+  expect(emojiInsights.characterCount).toBe(Array.from(emojiText).length)
+  expect(emojiInsights.wordCount).toBe(3)
+
+  const insights = createMarkdownDocumentInsights(
+    ["#hashtag without space", "##### H5 ignored", "###\tTab Heading 🚀"].join("\n")
+  )
+  expect(insights.headings).toHaveLength(1)
+  expect(insights.headings[0]?.label).toBe("Tab Heading 🚀")
+  expect(insights.headings[0]?.level).toBe(3)
+})
+

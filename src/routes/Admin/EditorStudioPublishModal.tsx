@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import type { PostVisibility } from "./editorStudioState"
 import {
   EditorStudioPublishCardSettings,
@@ -71,22 +72,20 @@ export const EditorStudioPublishModal = ({
   onToggleMobileMetaEditor,
   onToggleMobileThumbnailEditor,
 }: EditorStudioPublishModalProps) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null)
   const isCloseDisabled =
     loadingKey === "writePost" ||
     loadingKey === "modifyPost" ||
     loadingKey === "publishTempPost"
+  const closeWhenIdle = () => {
+    if (!isCloseDisabled) onClose()
+  }
 
-  useEffect(() => {
-    if (isCloseDisabled) return
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isCloseDisabled, onClose])
+  const { handleKeyDown } = useModalFocusTrap({
+    open: true,
+    onClose: closeWhenIdle,
+    containerRef: dialogRef,
+  })
 
   return (
     <PublishModalBackdrop
@@ -96,10 +95,12 @@ export const EditorStudioPublishModal = ({
       }}
     >
       <PublishDialog
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={publishActionTitle}
         data-variant={variant}
+        onKeyDown={handleKeyDown}
         onClick={(event) => event.stopPropagation()}
       >
         <PublishModalHeader>

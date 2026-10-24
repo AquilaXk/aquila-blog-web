@@ -17,7 +17,7 @@ const InitialLoadErrorState: React.FC<Props> = ({ hasFilter, onRetryInitialLoad 
       </div>
       <h3>{hasFilter ? t("initialErrorFilterTitle") : t("initialErrorTitle")}</h3>
       <p>{t("initialErrorDesc")}</p>
-      <button type="button" onClick={onRetryInitialLoad}>
+      <button type="button" className="retryBtn" onClick={onRetryInitialLoad}>
         {t("initialErrorRetry")}
       </button>
     </StyledWrapper>
@@ -30,6 +30,7 @@ const StyledWrapper = styled.section`
   grid-column: 1 / -1;
   border-top: 1px solid ${({ theme }) => theme.colors.red6};
   border-bottom: 1px solid ${({ theme }) => theme.colors.red6};
+  border-radius: 6px;
   min-height: 10rem;
   padding: 1rem 0;
   display: grid;
@@ -41,7 +42,7 @@ const StyledWrapper = styled.section`
   .initialLoadErrorIcon {
     width: 2.1rem;
     height: 2.1rem;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid ${({ theme }) => theme.colors.red6};
     color: ${({ theme }) => theme.colors.red11};
     display: inline-flex;
@@ -66,16 +67,22 @@ const StyledWrapper = styled.section`
     line-height: 1.55;
   }
 
-  button {
+  button,
+  .retryBtn {
     min-height: 36px;
     padding: 0 0.82rem;
-    border-radius: 8px;
-    border: 1px solid ${({ theme }) => theme.colors.blue7};
-    background: transparent;
-    color: ${({ theme }) => theme.colors.blue11};
+    border-radius: 6px;
+    border: 1px solid var(--aq-border-strong);
+    background: var(--aq-surface-elevated);
+    color: var(--aq-text);
     font-size: 0.84rem;
     font-weight: 700;
     cursor: pointer;
+
+    &:hover {
+      border-color: var(--aq-text);
+      background: var(--aq-surface-subtle);
+    }
 
     @media (max-width: 768px) {
       min-height: 44px;

@@ -28,8 +28,8 @@ prismRuntime.manual = true
 ;(globalThis as { Prism?: PrismLike }).Prism = prismRuntime
 
 let prismLoader: Promise<PrismLike> | null = null
-const loadedLoaders = new Set<string>()
-const failedLoaders = new Set<string>()
+const loadedLoaders = new Set<() => Promise<unknown>>()
+const failedLoaders = new Set<() => Promise<unknown>>()
 
 const prismGrammarAliases: Record<string, string[]> = {
   html: ["markup"],
@@ -139,11 +139,12 @@ const resolvePrismLanguage = (source: string, language?: string | null) => {
     : normalizedLanguage
 }
 
-export const inferPrismLanguageFromSource = (source: string): string => {
-  const sample = source.trim()
-  if (!sample) return "text"
+export const inferPrismLanguageFromSource = (rawValue: string): string => {
+  const trimmed = rawValue.trim()
+  if (!trimmed) return "text"
+  const sample = trimmed.length > 4096 ? trimmed.slice(0, 4096) : trimmed
 
-  if (/^\s*[{[][\s\S]*[}\]]\s*$/.test(sample) && /"\s*:/.test(sample)) return "json"
+  if (/^[{[]/.test(sample) && /[}\]]$/.test(trimmed) && /"\s*:/.test(sample)) return "json"
   if (/(^|\n)\s*(fun|val|var|data class|object|companion object)\b/.test(sample)) return "kotlin"
   if (/(^|\n)\s*(public|private|protected)\s+(class|interface|enum)\b/.test(sample)) return "java"
   if (/(^|\n)\s*(interface|type)\s+\w+/.test(sample) || /:\s*(string|number|boolean|unknown|any)\b/.test(sample))
@@ -205,14 +206,13 @@ export const ensurePrismLanguages = async (languages: string[]) => {
     const loaders = prismLanguageLoaders[language] || []
 
     for (const load of loaders) {
-      const cacheKey = `${language}:${load.toString()}`
-      if (loadedLoaders.has(cacheKey)) continue
-      if (failedLoaders.has(cacheKey)) continue
+      if (loadedLoaders.has(load)) continue
+      if (failedLoaders.has(load)) continue
       try {
         await load()
-        loadedLoaders.add(cacheKey)
+        loadedLoaders.add(load)
       } catch (error) {
-        failedLoaders.add(cacheKey)
+        failedLoaders.add(load)
         console.warn(`[prism] language loader failed: ${language}`, error)
       }
     }
