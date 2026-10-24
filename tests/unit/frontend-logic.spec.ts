@@ -30,6 +30,8 @@ import { normalizeApiRequestPath } from "../../src/libs/backend/requestPath"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
 import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
 import {
+  applyCloudFolderFilter,
+  extractCloudFolders,
   isCloudSearchPending,
   resolveCloudEmptyTitle,
   resolveCloudSearchParams,
@@ -336,5 +338,18 @@ caption
     expect(sortCloudFiles(sampleFiles, "OLDEST").map((f) => f.id)).toEqual([3, 1, 2])
     expect(sortCloudFiles(sampleFiles, "NAME").map((f) => f.id)).toEqual([1, 3, 2])
     expect(sortCloudFiles(sampleFiles, "SIZE").map((f) => f.id)).toEqual([3, 2, 1])
+
+    expect(extractCloudFolders(sampleFiles)).toEqual(["ops", "photos", "videos"])
+    expect(extractCloudFolders(sampleFiles, "/archive/2026/")).toEqual([
+      "archive/2026",
+      "ops",
+      "photos",
+      "videos",
+    ])
+    expect(applyCloudFolderFilter("", "ops")).toBe("/ops")
+    expect(applyCloudFolderFilter("점검", "/ops/")).toBe("/ops 점검")
+    expect(applyCloudFolderFilter("/ops 점검", "ops")).toBe("점검")
+    expect(applyCloudFolderFilter("/ops 점검", "photos")).toBe("/photos 점검")
+    expect(applyCloudFolderFilter("/ops 점검", "")).toBe("점검")
   })
 })

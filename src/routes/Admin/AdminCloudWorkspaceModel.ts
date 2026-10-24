@@ -119,6 +119,33 @@ export const resolveCloudSearchParams = (input: string): CloudSearchParams => {
   }
 }
 
+export const extractCloudFolders = (
+  files: readonly CloudFile[],
+  activeFolderPath = "",
+): string[] => {
+  const folders = new Set<string>()
+  const normalizedActive = normalizeCloudFolderPathSearch(activeFolderPath)
+  if (normalizedActive) folders.add(normalizedActive)
+  files.forEach((file) => {
+    const normalized = normalizeCloudFolderPathSearch(file.folderPath)
+    if (normalized) folders.add(normalized)
+  })
+  return Array.from(folders).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
+}
+
+export const applyCloudFolderFilter = (currentSearchText: string, folderPath: string): string => {
+  const current = resolveCloudSearchParams(currentSearchText)
+  const normalizedTarget = normalizeCloudFolderPathSearch(folderPath)
+  const currentFolder = normalizeCloudFolderPathSearch(current.folderPath ?? "")
+  const currentKeyword = (current.keyword ?? "").trim()
+
+  if (!normalizedTarget || normalizedTarget === currentFolder) {
+    return currentKeyword
+  }
+
+  return currentKeyword ? `/${normalizedTarget} ${currentKeyword}` : `/${normalizedTarget}`
+}
+
 const toCloudTimestamp = (value?: string): number => {
   if (!value) return 0
   const parsed = Date.parse(value)

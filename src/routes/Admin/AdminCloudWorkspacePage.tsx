@@ -14,8 +14,8 @@ import {
   DetailPanel, DetailPreviewBox, DetailScrim, DetailSummary, EmptyTableState, FileIdentity,
   FileMetaLine, FileNameButton, FileNameStack, FileTable, FileTableScroll, FileTypeIcon, FilterGroup,
   GhostButton, IconButton, LoadingTableStatus, Notice, PrimaryButton, RowCheckbox, SearchClearButton,
-  SearchDetail, SearchInput, SecondaryButton, SelectBoxCell, SkeletonRow, SkeletonRows, SortSelect,
-  ToastViewport, UploadInput, UploadZone, ViewModeButton,
+  SearchDetail, SearchInput, SearchTrailing, SecondaryButton, SelectBoxCell, SkeletonRow, SkeletonRows,
+  SortSelect, ToastViewport, UploadInput, UploadZone, ViewModeButton,
 } from "./AdminCloudWorkspace.styles"
 import { useAdminCloudWorkspaceActions } from "./useAdminCloudWorkspaceActions"
 
@@ -141,7 +141,7 @@ const CloudFileTableSection = ({
                         {getCloudKindIconLabel(file)}
                       </FileTypeIcon>
                       <span>{getCloudKindLabel(file.mediaKind)}</span>
-                      {folderLabel ? <span>/{folderLabel}</span> : null}
+                      {folderLabel ? <span data-folder-badge="true">/{folderLabel}</span> : null}
                     </FileMetaLine>
                   </FileNameStack>
                 </FileIdentity>
@@ -160,6 +160,7 @@ type CloudFileDetailDrawerProps = {
   detailMode: "drawer" | "inline"
   onClose: () => void
   onCopyFileLink: (file: CloudFile) => Promise<void>
+  onRequestDeleteFile: (file: CloudFile) => void
   onUpdateFile: (fileId: number, payload: { originalFilename: string; folderPath: string }) => Promise<boolean>
   selectedFile: CloudFile
 }
@@ -168,6 +169,7 @@ const CloudFileDetailDrawer = ({
   detailMode,
   onClose,
   onCopyFileLink,
+  onRequestDeleteFile,
   onUpdateFile,
   selectedFile,
 }: CloudFileDetailDrawerProps) => {
@@ -198,14 +200,7 @@ const CloudFileDetailDrawer = ({
           <PreviewDrawer file={selectedFile} />
         </DetailPreviewBox>
         <DetailSummary>
-          <FileThumbnail file={selectedFile} selected />
-          <div>
-            <strong>{selectedFile.originalFilename}</strong>
-            <p>
-              {getCloudKindBadge(selectedFile)} · {getCloudKindLabel(selectedFile.mediaKind)} ·{" "}
-              {formatCloudFileSize(selectedFile.byteSize)}
-            </p>
-          </div>
+          <strong>{selectedFile.originalFilename}</strong>
         </DetailSummary>
         <ActionGroup>
           <DetailActionLink
@@ -226,6 +221,9 @@ const CloudFileDetailDrawer = ({
             }}
           >
             정보 수정
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => onRequestDeleteFile(selectedFile)}>
+            파일 삭제
           </SecondaryButton>
         </ActionGroup>
         {editingFileId === selectedFile.id ? (
@@ -291,8 +289,10 @@ const CloudFileDetailDrawer = ({
 
 const AdminCloudWorkspacePage = () => {
   const {
+    activeFolderPath,
     activeUploadCount,
     allVisibleChecked,
+    availableFolders,
     checkedFileIds,
     closeDeleteConfirm,
     completedUploadCount,
@@ -310,7 +310,9 @@ const AdminCloudWorkspacePage = () => {
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
     handlePreviewFile,
+    handleRequestDeleteFile,
     handleRetryUpload,
+    handleSelectFolder,
     handleToggleAllChecked,
     handleToggleChecked,
     handleUpdateFile,
@@ -389,14 +391,16 @@ const AdminCloudWorkspacePage = () => {
                 onCompositionStart={() => setIsComposing(true)}
                 onCompositionEnd={() => setIsComposing(false)}
               />
-              {keyword ? (
-                <SearchClearButton type="button" aria-label="검색어 지우기" onClick={() => setKeyword("")}>
-                  지우기
-                </SearchClearButton>
-              ) : null}
-              <SearchDetail aria-busy={toBooleanAttr(isSearchBusy)}>
-                {formatSearchDetailText(isSearchBusy, keyword)}
-              </SearchDetail>
+              <SearchTrailing>
+                {keyword ? (
+                  <SearchClearButton type="button" aria-label="검색어 지우기" onClick={() => setKeyword("")}>
+                    지우기
+                  </SearchClearButton>
+                ) : null}
+                <SearchDetail aria-busy={toBooleanAttr(isSearchBusy)}>
+                  {formatSearchDetailText(isSearchBusy, keyword)}
+                </SearchDetail>
+              </SearchTrailing>
             </CloudSearchField>
           </CloudTitleBar>
 
@@ -483,6 +487,28 @@ const AdminCloudWorkspacePage = () => {
             </ActionGroup>
           </ActionBar>
 
+          {availableFolders.length > 0 ? (
+            <FilterGroup aria-label="폴더 필터">
+              <GhostButton
+                type="button"
+                data-active={toBooleanAttr(!activeFolderPath)}
+                onClick={() => handleSelectFolder("")}
+              >
+                전체 폴더
+              </GhostButton>
+              {availableFolders.map((folder) => (
+                <GhostButton
+                  key={folder}
+                  type="button"
+                  data-active={toBooleanAttr(activeFolderPath === folder)}
+                  onClick={() => handleSelectFolder(folder)}
+                >
+                  /{folder}
+                </GhostButton>
+              ))}
+            </FilterGroup>
+          ) : null}
+
           <AdminCloudUploadQueue
             uploadQueue={uploadQueue}
             activeUploadCount={activeUploadCount}
@@ -516,6 +542,7 @@ const AdminCloudWorkspacePage = () => {
             detailMode={detailMode}
             onClose={() => setIsDetailPanelOpen(false)}
             onCopyFileLink={handleCopyFileLink}
+            onRequestDeleteFile={handleRequestDeleteFile}
             onUpdateFile={handleUpdateFile}
             selectedFile={selectedFile}
           />

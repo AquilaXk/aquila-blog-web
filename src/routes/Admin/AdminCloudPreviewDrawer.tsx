@@ -7,6 +7,7 @@ import {
   issueCloudExternalPlaybackToken,
   type CloudFile,
 } from "src/apis/backend/cloud"
+import AppIcon, { type IconName } from "src/components/icons/AppIcon"
 import { PLAYBACK_SPEEDS, getCloudKindBadge } from "./AdminCloudWorkspaceModel"
 import {
   ActionGroup,
@@ -128,7 +129,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [renderState, setRenderState] = useState("미리보기 준비")
+  const [renderState, setRenderState] = useState<string | null>(null)
 
   useEffect(() => {
     if (file.mediaKind !== "DOCUMENT") return
@@ -138,7 +139,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
     setCurrentPage(1)
     setPageCount(0)
     setPdfDoc(null)
-    setRenderState("미리보기 준비")
+    setRenderState(null)
     const releasePdfWorkerTerminationHandler = installPdfWorkerTerminationRejectionHandler()
 
     const loadDocument = async () => {
@@ -179,7 +180,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
 
     const renderPage = async () => {
       try {
-        setRenderState("미리보기 준비")
+        setRenderState(null)
         const page = await pdfDoc.getPage(currentPage)
         if (cancelled) return
         const viewport = page.getViewport({ scale: 1.1 })
@@ -225,7 +226,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
       </PreviewHeader>
       <PdfCanvas ref={canvasRef} aria-label={`${file.originalFilename} PDF 미리보기`} />
       <InlineList aria-label="PDF 문서 제어">
-        <span>{renderState}</span>
+        {renderState ? <span>{renderState}</span> : null}
         <span>
           {currentPage} / {pageCount || 1}쪽
         </span>
@@ -466,25 +467,21 @@ type FileThumbnailProps = {
   selected: boolean
 }
 
-const getThumbnailKindLabel = (mediaKind: CloudFile["mediaKind"]) => {
-  if (mediaKind === "PHOTO") return "사진"
-  if (mediaKind === "VIDEO") return "영상"
-  return "문서"
+const getThumbnailIconName = (mediaKind: CloudFile["mediaKind"]): IconName => {
+  if (mediaKind === "PHOTO") return "camera"
+  if (mediaKind === "VIDEO") return "laptop"
+  return "file"
 }
 
-export const FileThumbnail = ({ file, selected }: FileThumbnailProps) => {
-  const kindMark = getThumbnailKindLabel(file.mediaKind)
-
-  return (
-    <FileThumbnailFrame
-      aria-hidden="true"
-      data-kind={file.mediaKind}
-      data-selected={selected ? "true" : "false"}
-    >
-      {kindMark}
-    </FileThumbnailFrame>
-  )
-}
+export const FileThumbnail = ({ file, selected }: FileThumbnailProps) => (
+  <FileThumbnailFrame
+    aria-hidden="true"
+    data-kind={file.mediaKind}
+    data-selected={selected ? "true" : "false"}
+  >
+    <AppIcon name={getThumbnailIconName(file.mediaKind)} />
+  </FileThumbnailFrame>
+)
 
 export const FileTableHead = () => (
   <thead>

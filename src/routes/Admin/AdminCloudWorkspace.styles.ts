@@ -36,6 +36,10 @@ export const CloudWorkspace = styled.section`
 
   &[data-detail-open="true"][data-detail-mode="inline"] {
     grid-template-columns: minmax(0, 5.7fr) minmax(20rem, 3fr);
+
+    tbody {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   &[data-detail-open="true"][data-detail-mode="drawer"] {
@@ -65,8 +69,8 @@ export const CloudTitleBar = styled.header`
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 1.875rem;
-  margin-bottom: 1.75rem;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
 
   span {
     color: ${accentGold};
@@ -104,8 +108,8 @@ export const SearchInput = styled.input`
   width: 100%;
   min-height: 2.42rem;
   border: 0;
-  border-radius: 6px;
-  padding: 0 4.5rem 0 2.45rem;
+  border-radius: 2px;
+  padding: 0 7.5rem 0 2.45rem;
   background: ${surfaceRaised};
   color: ${textPrimary};
   font-size: 0.86rem;
@@ -124,14 +128,14 @@ export const SearchInput = styled.input`
 export const UploadZone = styled.button`
   display: grid;
   place-items: center;
-  gap: 0.38rem;
+  gap: 0.25rem;
   width: 100%;
-  min-height: 8.65rem;
-  margin: 0 0 1.375rem;
+  min-height: 4.75rem;
+  margin: 0 0 1.15rem;
   border: 1px dashed ${borderStrong};
-  border-radius: 0;
-  padding: 1.75rem;
-  background: ${surface};
+  border-radius: 2px;
+  padding: 0.9rem 1.25rem;
+  background: transparent;
   color: ${textMuted};
   text-align: center;
   cursor: pointer;
@@ -143,13 +147,13 @@ export const UploadZone = styled.button`
   strong {
     display: block;
     color: ${textPrimary};
-    font-size: 0.96rem;
+    font-size: 0.9rem;
     font-weight: 850;
   }
 
   span {
     color: ${textMuted};
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
   }
 
@@ -220,13 +224,13 @@ export const FileTable = styled.table`
   tbody tr {
     display: grid;
     grid-template-columns: 1.6rem minmax(0, 1fr) auto;
-    grid-template-rows: minmax(4.2rem, auto) auto;
-    gap: 0.55rem 0.52rem;
+    grid-template-rows: auto auto;
+    gap: 0.65rem 0.52rem;
     align-items: center;
     min-width: 0;
-    min-height: 9.25rem;
+    min-height: 6.75rem;
     border: 1px solid ${border};
-    padding: 0.875rem;
+    padding: 0.8rem 0.875rem;
     background: ${surface};
     transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
   }
@@ -315,31 +319,28 @@ export const FileThumbnailFrame = styled.span`
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px solid ${border};
+  border: 0;
   border-radius: 0;
-  background: ${surfaceRaised};
+  background: ${surfaceMuted};
   color: ${accentGold};
   font-size: 0.68rem;
   font-weight: 900;
 
-  &[data-kind="DOCUMENT"] {
-    background: ${surfaceAccent};
-  }
-
-  &[data-kind="VIDEO"] {
-    background: ${surfaceMuted};
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   &[data-selected="true"] {
-    border-color: ${borderStrong};
-    box-shadow: inset 0 0 0 1px ${borderStrong};
+    background: ${surfaceAccent};
+    color: ${accentGold};
   }
 `
 
 export const SkeletonRow = styled.span`
   display: block;
   height: 0.78rem;
-  border-radius: 4px;
+  border-radius: 2px;
   background: linear-gradient(90deg, ${surfaceRaised}, ${surfaceMuted}, ${surfaceRaised});
   background-size: 220% 100%;
   animation: admin-cloud-skeleton 1.2s ease-in-out infinite;
@@ -369,8 +370,8 @@ export const DocumentFallbackBox = styled.div`
   place-items: center;
   min-height: 12rem;
   padding: 1.25rem;
-  border: 1px solid ${border};
-  border-radius: 8px;
+  border: 0;
+  border-radius: 2px;
   background: ${surfaceRaised};
   color: ${textSecondary};
   text-align: center;
@@ -390,8 +391,8 @@ export const DocumentFallbackBox = styled.div`
   }
 
   a {
-    border: 1px solid ${borderStrong};
-    border-radius: 6px;
+    border: 0;
+    border-radius: 2px;
     padding: 0.45rem 0.7rem;
     background: ${surfaceMuted};
     color: ${textPrimary};
@@ -403,14 +404,15 @@ export const DocumentFallbackBox = styled.div`
 
 export const InlineList = styled.div`
   display: flex;
-  gap: 0.4rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
   align-items: center;
 
   span {
-    border: 1px solid ${border};
-    border-radius: 4px;
-    padding: 0.25rem 0.48rem;
+    border: 0;
+    border-radius: 2px;
+    padding: 0;
+    background: transparent;
     color: ${textSecondary};
     font-size: 0.72rem;
     font-weight: 760;
@@ -421,7 +423,7 @@ export const StatusPill = styled.span`
   justify-self: end;
   min-width: 3.55rem;
   max-width: 5.6rem;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 0.22rem 0.45rem;
   background: ${surfaceRaised};
   color: ${accentGold};
@@ -447,7 +449,7 @@ export const ProgressTrack = styled.div`
   grid-column: 1 / -1;
   height: 0.28rem;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: 2px;
   background: ${surfaceMuted};
 
   span {

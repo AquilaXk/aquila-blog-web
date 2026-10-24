@@ -1473,6 +1473,14 @@ test.describe("관리자 클라우드", () => {
     const rowsBySize = page.locator("tbody tr")
     await expect(rowsBySize.first()).toContainText("deploy-walkthrough.mp4")
 
+    const folderFilterGroup = page.getByLabel("폴더 필터")
+    await expect(folderFilterGroup).toBeVisible()
+    await folderFilterGroup.getByRole("button", { name: "/ops" }).click()
+    await expect(page.getByLabel("클라우드 파일 검색")).toHaveValue("/ops")
+    await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
+    await folderFilterGroup.getByRole("button", { name: "전체 폴더" }).click()
+    await expect(page.getByLabel("클라우드 파일 검색")).toHaveValue("")
+
     const searchInput = page.getByLabel("클라우드 파일 검색")
     await searchInput.fill("/ops 점검")
     await expect(page.getByRole("button", { name: "검색어 지우기" })).toBeVisible()
@@ -1507,6 +1515,12 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByText("파일 링크를 복사했습니다.")).toBeVisible()
     const copiedLink = await page.evaluate(() => (window as unknown as { __adminCloudCopiedText?: string }).__adminCloudCopiedText)
     expect(copiedLink).toContain("/system/api/v1/adm/cloud/files/101/content")
+
+    await detailPanel.getByRole("button", { name: "파일 삭제" }).click()
+    const deleteDialog = page.getByRole("dialog", { name: "파일 삭제" })
+    await expect(deleteDialog).toBeVisible()
+    await deleteDialog.getByRole("button", { name: "취소" }).click()
+    await expect(deleteDialog).toHaveCount(0)
 
     await detailPanel.getByRole("button", { name: "정보 수정" }).click()
     await detailPanel.getByLabel("파일 이름 수정").fill("연간 운영 점검 리포트.pdf")

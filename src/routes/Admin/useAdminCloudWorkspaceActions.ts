@@ -22,11 +22,13 @@ import { useDebouncedValue } from "src/hooks/useDebouncedValue"
 import { resolveCloudErrorMessage } from "./AdminCloudPreviewDrawer"
 import {
   CLOUD_FILTERS,
+  applyCloudFolderFilter,
   applyUploadQueueFailure,
   applyUploadQueueProgress,
   applyUploadQueueSuccess,
   createUploadQueueItem,
   doesCloudFileMatchFilters,
+  extractCloudFolders,
   isAbortLikeError,
   isUploadActive,
   mergeCloudFiles,
@@ -88,6 +90,7 @@ export const useAdminCloudWorkspaceActions = () => {
   const [toast, setToast] = useState<CloudToastState>(null)
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
   const [optimisticFiles, setOptimisticFiles] = useState<CloudFile[]>([])
+  const [knownFolders, setKnownFolders] = useState<string[]>([])
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false)
   const [isDragActive, setIsDragActive] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null)
@@ -116,6 +119,15 @@ export const useAdminCloudWorkspaceActions = () => {
     () => sortCloudFiles(mergeCloudFiles(visibleOptimisticFiles, serverFiles), sortMode),
     [serverFiles, sortMode, visibleOptimisticFiles]
   )
+  const parsedSearch = useMemo(() => resolveCloudSearchParams(keyword), [keyword])
+  const activeFolderPath = parsedSearch.folderPath || ""
+  const availableFolders = useMemo(() => {
+    const combined = new Set([
+      ...knownFolders,
+      ...extractCloudFolders(files, activeFolderPath),
+    ])
+    return Array.from(combined).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
+  }, [activeFolderPath, files, knownFolders])
   const selectedFile = files.find((file) => file.id === selectedFileId) || files[0] || null
   const isDetailDrawerMode = files.length > 8
   const shouldShowDetailPanel = isDetailPanelOpen && selectedFile !== null
@@ -125,6 +137,19 @@ export const useAdminCloudWorkspaceActions = () => {
   const deleteDialogRef = useRef<HTMLDivElement | null>(null)
   const deleteCancelButtonRef = useRef<HTMLButtonElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const discovered = extractCloudFolders([...optimisticFiles, ...serverFiles])
+    if (discovered.length === 0) return
+    setKnownFolders((current) => {
+      const merged = Array.from(new Set([...current, ...discovered])).sort((a, b) =>
+        a.localeCompare(b, "ko", { numeric: true })
+      )
+      return merged.length === current.length && merged.every((item, index) => item === current[index])
+        ? current
+        : merged
+    })
+  }, [optimisticFiles, serverFiles])
 
   useEffect(() => {
     if (selectedFileId && files.some((file) => file.id === selectedFileId)) return
@@ -462,6 +487,14 @@ export const useAdminCloudWorkspaceActions = () => {
     await queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
   }
 
+  const handleSelectFolder = (folderPath: string) => {
+    setKeyword((current) => applyCloudFolderFilter(current, folderPath))
+  }
+
+  const handleRequestDeleteFile = (file: CloudFile) => {
+    setDeleteConfirm({ files: [file] })
+  }
+
   const handleDeleteSelected = () => {
     const targets = files.filter((file) => checkedFileIds.includes(file.id))
     if (targets.length === 0) return
@@ -486,8 +519,10 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   return {
+    activeFolderPath,
     activeUploadCount,
     allVisibleChecked,
+    availableFolders,
     checkedFileIds,
     closeDeleteConfirm,
     completedUploadCount,
@@ -505,7 +540,9 @@ export const useAdminCloudWorkspaceActions = () => {
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
     handlePreviewFile,
+    handleRequestDeleteFile,
     handleRetryUpload,
+    handleSelectFolder,
     handleToggleAllChecked,
     handleToggleChecked,
     handleUpdateFile,

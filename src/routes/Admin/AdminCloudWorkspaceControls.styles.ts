@@ -18,6 +18,7 @@ export const CloudSearchField = styled.label`
   position: relative;
   display: flex;
   align-items: center;
+  width: min(19.5rem, 100%);
   min-width: 0;
 
   svg {
@@ -28,25 +29,31 @@ export const CloudSearchField = styled.label`
   }
 `
 
-export const SearchDetail = styled.span`
+export const SearchTrailing = styled.span`
   position: absolute;
-  right: 0.85rem;
+  right: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+`
+
+export const SearchDetail = styled.span`
   color: ${textMuted};
   font-size: 0.75rem;
   font-weight: 750;
+  white-space: nowrap;
   pointer-events: none;
 `
 
 export const SearchClearButton = styled.button`
-  position: absolute;
-  right: 0.5rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 0.2rem 0.45rem;
   background: ${surfaceMuted};
   color: ${textSecondary};
   font-size: 0.74rem;
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 
   &:hover,
@@ -57,10 +64,10 @@ export const SearchClearButton = styled.button`
 
 export const SortSelect = styled.select`
   min-height: 2.25rem;
-  border: 1px solid ${border};
-  border-radius: 5px;
+  border: 0;
+  border-radius: 2px;
   padding: 0 0.65rem;
-  background: ${surface};
+  background: ${surfaceMuted};
   color: ${textSecondary};
   font-size: 0.8rem;
   font-weight: 800;
@@ -68,7 +75,7 @@ export const SortSelect = styled.select`
 
   &:focus-visible {
     outline: none;
-    border-color: ${borderStrong};
+    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
   }
 `
 
@@ -114,7 +121,7 @@ export const UploadInput = styled.input`
 
 export const PrimaryButton = styled.button`
   border: 0;
-  border-radius: 5px;
+  border-radius: 2px;
   min-height: 2.25rem;
   padding: 0 0.82rem;
   display: inline-flex;
@@ -141,7 +148,7 @@ export const PrimaryButton = styled.button`
 
 export const SecondaryButton = styled.button`
   border: 0;
-  border-radius: 5px;
+  border-radius: 2px;
   min-height: 2.25rem;
   padding: 0 0.82rem;
   display: inline-flex;
@@ -167,15 +174,14 @@ export const IconButton = styled.button`
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border: 1px solid ${border};
-  border-radius: 5px;
-  background: ${surface};
+  border: 0;
+  border-radius: 2px;
+  background: ${surfaceMuted};
   color: ${textSecondary};
   cursor: pointer;
 
   &[data-active="true"] {
     color: ${accentGold};
-    border-color: ${borderStrong};
     background: ${surfaceAccent};
   }
 
@@ -197,10 +203,10 @@ export const ViewModeButton = styled.button`
   justify-content: center;
   gap: 0.35rem;
   flex-shrink: 0;
-  border: 1px solid ${border};
-  border-radius: 5px;
+  border: 0;
+  border-radius: 2px;
   padding: 0 0.64rem;
-  background: ${surface};
+  background: ${surfaceMuted};
   color: ${textSecondary};
   font-size: 0.8rem;
   font-weight: 820;
@@ -209,7 +215,6 @@ export const ViewModeButton = styled.button`
 
   &[data-active="true"] {
     color: ${accentGold};
-    border-color: ${borderStrong};
     background: ${surfaceAccent};
   }
 
@@ -226,29 +231,40 @@ export const ViewModeButton = styled.button`
 
 export const FilterGroup = styled.div`
   display: flex;
-  gap: 0.32rem;
+  gap: 0.25rem;
   align-items: center;
   flex-wrap: wrap;
+
+  &[aria-label="폴더 필터"] {
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.875rem;
+    border-bottom: 1px solid ${border};
+  }
 `
 
 export const GhostButton = styled.button`
-  border: 1px solid transparent;
-  border-radius: 5px;
-  min-height: 2.25rem;
-  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 2px;
+  min-height: 2rem;
+  padding: 0 0.62rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  background: ${surfaceMuted};
-  color: ${textSecondary};
-  font-size: 0.82rem;
+  background: transparent;
+  color: ${textMuted};
+  font-size: 0.81rem;
   font-weight: 820;
   white-space: nowrap;
   cursor: pointer;
 
+  &:hover,
+  &:focus-visible {
+    background: ${surfaceMuted};
+    color: ${textPrimary};
+  }
+
   &[data-active="true"] {
-    border-color: ${borderStrong};
     background: ${surfaceAccent};
     color: ${accentGold};
   }
@@ -286,16 +302,17 @@ export const RowCheckbox = styled.input`
 `
 
 export const FileTypeIcon = styled.span`
-  min-width: 2.45rem;
-  flex: 0 0 2.65rem;
-  height: 1.58rem;
+  min-width: 2rem;
+  flex: 0 0 auto;
+  height: 1.25rem;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  background: ${surfaceRaised};
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 2px;
+  padding: 0;
+  background: transparent;
   color: ${accentGold};
-  border: 1px solid ${border};
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -304,15 +321,13 @@ export const FileTypeIcon = styled.span`
   white-space: nowrap;
 
   &[data-selected="true"] {
-    background: ${surfaceMuted};
-    border-color: ${borderStrong};
     color: ${textPrimary};
   }
 `
 
 export const FileIdentity = styled.div`
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
+  grid-template-columns: 3.3rem minmax(0, 1fr);
   gap: 0.72rem;
   align-items: center;
   min-width: 0;
@@ -333,7 +348,12 @@ export const FileMetaLine = styled.span`
   font-size: 0.74rem;
   font-weight: 760;
 
-  > span:not([data-file-kind-badge]) {
+  > span:not([data-folder-badge]) {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  > span[data-folder-badge="true"] {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -363,9 +383,8 @@ export const FileNameButton = styled.button`
   outline: none;
 
   strong {
-    display: grid;
-    grid-template-columns: minmax(0, auto) auto;
-    justify-content: start;
+    display: flex;
+    align-items: baseline;
     min-width: 0;
     max-width: 100%;
   }
