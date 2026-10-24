@@ -259,7 +259,8 @@ export const openMermaidOverlay = (
     if (stageSvg) {
       if (baseWidth > 0 && baseHeight > 0) {
         stageSvg.style.width = `${Math.round(baseWidth * zoomLevel)}px`
-        stageSvg.style.height = `${Math.round(baseHeight * zoomLevel)}px`
+        stageSvg.style.height = zoomLevel === 1 ? "auto" : `${Math.round(baseHeight * zoomLevel)}px`
+        stageSvg.style.maxWidth = zoomLevel === 1 ? "100%" : "none"
         stageSvg.style.transform = "none"
       } else {
         stageSvg.style.transform = `scale(${zoomLevel})`

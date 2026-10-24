@@ -2,6 +2,7 @@ import { css, type Theme } from "@emotion/react"
 
 export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   .aq-mermaid {
+    position: relative;
     margin: 30px 0;
     display: block;
     width: 100%;
@@ -11,8 +12,8 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     -webkit-overflow-scrolling: touch;
     white-space: normal;
     padding: 0;
-    border: 1px solid ${theme.colors.gray6};
-    border-radius: 0;
+    border: 1px solid ${theme.colors.gray5};
+    border-radius: 6px;
     background: ${theme.publicDesign.readableSurface};
     box-shadow: none;
     scrollbar-width: thin;
@@ -45,7 +46,7 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     align-items: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 24px 20px;
+    padding: 42px 20px 22px;
     cursor: zoom-in;
   }
 
@@ -156,36 +157,50 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid-expand-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
     width: fit-content;
-    margin: 0 12px 12px auto;
-    min-height: 36px;
+    margin: 0;
+    height: 26px;
+    min-height: 26px;
     border-radius: 4px;
     border: 1px solid ${theme.colors.gray6};
-    background: ${theme.colors.gray2};
-    color: ${theme.colors.gray12};
-    padding: 0 12px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
-    font-size: 0.75rem;
+    background: color-mix(in srgb, ${theme.publicDesign.readableSurface} 94%, transparent);
+    backdrop-filter: blur(4px);
+    color: ${theme.colors.gray11};
+    padding: 0 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+    font-size: 11px;
     font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
     cursor: pointer;
   }
 
+  .aq-mermaid-expand-btn::after {
+    content: "";
+    position: absolute;
+    inset: -9px -6px;
+  }
+
   .aq-mermaid[data-mermaid-expandable="true"] .aq-mermaid-expand-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
   }
 
   @media (max-width: 820px) {
     .aq-mermaid-stage {
-      padding: 14px 10px;
+      padding: 38px 10px 14px;
     }
 
     .aq-mermaid-expand-btn {
-      margin: 0 10px 10px auto;
-      min-height: 44px;
-      padding: 0 14px;
+      top: 7px;
+      right: 7px;
     }
   }
 `
