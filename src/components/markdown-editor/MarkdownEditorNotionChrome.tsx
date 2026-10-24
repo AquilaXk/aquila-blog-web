@@ -192,6 +192,24 @@ const BlockMenuItemButton = styled.button`
   }
 `
 
+const ColorSwatchDot = styled.span<{ $color: string }>`
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: ${({ $color }) => $color};
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  flex-shrink: 0;
+`
+
+const NOTION_COLOR_SWATCH_SPECS = [
+  { label: "글자 파란색", token: "sky", hex: "#2383e2" },
+  { label: "글자 초록색", token: "emerald", hex: "#10b981" },
+  { label: "글자 주황색", token: "amber", hex: "#f59e0b" },
+  { label: "글자 보라색", token: "violet", hex: "#9065b0" },
+  { label: "글자 빨간색", token: "rose", hex: "#eb5757" },
+] as const
+
 export const MarkdownEditorNotionChrome = ({
   containerRef,
   mode,
@@ -239,11 +257,7 @@ export const MarkdownEditorNotionChrome = ({
     window.addEventListener("resize", bumpLayout)
     window.addEventListener("scroll", bumpLayout, true)
     return () => {
-      if (
-        rafId !== null &&
-        typeof window !== "undefined" &&
-        typeof window.cancelAnimationFrame === "function"
-      ) {
+      if (rafId !== null && typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
         window.cancelAnimationFrame(rafId)
       }
       container?.removeEventListener("scroll", bumpLayout, true)
@@ -320,13 +334,10 @@ export const MarkdownEditorNotionChrome = ({
         return null
       }
       const centerX = (startCoords.left + endCoords.right) / 2
-      const left = Math.max(12, Math.min(Math.round(centerX - 205), viewportWidth - 420))
+      const left = Math.max(12, Math.min(Math.round(centerX - 240), viewportWidth - 490))
       const placeBelow = startCoords.top - (containerRect?.top ?? 0) < 52
       const top = placeBelow
-        ? Math.min(
-            viewportHeight - 52,
-            Math.round(Math.max(startCoords.bottom, endCoords.bottom) + 8)
-          )
+        ? Math.min(viewportHeight - 52, Math.round(Math.max(startCoords.bottom, endCoords.bottom) + 8))
         : Math.max(12, Math.round(startCoords.top - 44))
       return { top, left }
     }
@@ -358,13 +369,8 @@ export const MarkdownEditorNotionChrome = ({
     const lineCoords = resolveCoords(activeLineStart)
     if (lineCoords && lineCoords.bottom > lineCoords.top) {
       const rawTop =
-        lineCoords.top -
-        containerRect.top +
-        (lineCoords.bottom - lineCoords.top - 22) / 2
-      if (rawTop >= 0 && rawTop <= containerRect.height - 22) {
-        return Math.round(rawTop)
-      }
-      return null
+        lineCoords.top - containerRect.top + (lineCoords.bottom - lineCoords.top - 22) / 2
+      return rawTop >= 0 && rawTop <= containerRect.height - 22 ? Math.round(rawTop) : null
     }
     return activeLineStart === 0 ? 24 : null
   }, [canShowGutterPlus, containerRef, layoutTick, resolveCoords, selection.from, value])
@@ -376,21 +382,14 @@ export const MarkdownEditorNotionChrome = ({
     if (!containerRect) return null
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-    const top = Math.max(
-      12,
-      Math.min(Math.round(containerRect.top + gutterTop + 26), viewportHeight - 368)
-    )
-    const left = Math.max(
-      12,
-      Math.min(Math.round(containerRect.left + 22), viewportWidth - 216)
-    )
+    const top = Math.max(12, Math.min(Math.round(containerRect.top + gutterTop + 26), viewportHeight - 368))
+    const left = Math.max(12, Math.min(Math.round(containerRect.left + 22), viewportWidth - 216))
     return { top, left }
   }, [canShowGutterPlus, containerRef, gutterTop, isBlockMenuOpen, layoutTick])
 
   const handleTriggerSlashAtCurrentLine = () => {
     setIsBlockMenuOpen(false)
-    const lineStart =
-      selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
+    const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
     const nextBreak = value.indexOf("\n", selection.from)
     const lineEnd = nextBreak === -1 ? value.length : nextBreak
     const lineText = value.slice(lineStart, lineEnd)
@@ -438,11 +437,7 @@ export const MarkdownEditorNotionChrome = ({
     { label: "선택 영역 기울임", glyph: "I", run: () => onApplyFormatShortcut("italic") },
     { label: "선택 영역 취소선", glyph: "S", run: () => onApplyFormatShortcut("strikethrough") },
     { label: "선택 영역 인라인 코드", glyph: "<>", run: () => onApplyFormatShortcut("inlineCode") },
-    {
-      label: "선택 영역 하이라이트",
-      glyph: "==",
-      run: () => onApplySnippet("==", "==", { toggle: true }),
-    },
+    { label: "선택 영역 하이라이트", glyph: "==", run: () => onApplySnippet("==", "==", { toggle: true }) },
     { label: "선택 영역 링크", glyph: "🔗", run: () => onApplyFormatShortcut("link") },
   ]
 
@@ -500,6 +495,22 @@ export const MarkdownEditorNotionChrome = ({
             </BlockMenuItemButton>
           ))}
           <BlockMenuSectionDivider aria-hidden="true" />
+          <BlockMenuSectionHeader aria-hidden="true">글자 색상</BlockMenuSectionHeader>
+          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+            <BlockMenuItemButton
+              key={swatch.label}
+              type="button"
+              role="menuitem"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => runMenuAction(() => onApplySnippet(`{{color:${swatch.token}|`, "}}"))}
+            >
+              <span className="glyph" aria-hidden="true">
+                <ColorSwatchDot $color={swatch.hex} />
+              </span>
+              <span>{swatch.label}</span>
+            </BlockMenuItemButton>
+          ))}
+          <BlockMenuSectionDivider aria-hidden="true" />
           <BlockMenuSectionHeader aria-hidden="true">블록 작업</BlockMenuSectionHeader>
           {lineActionItems.map((item) => (
             <BlockMenuItemButton
@@ -545,6 +556,19 @@ export const MarkdownEditorNotionChrome = ({
               onClick={item.run}
             >
               {item.glyph}
+            </BubbleActionButton>
+          ))}
+          <BubbleDivider aria-hidden="true" />
+          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+            <BubbleActionButton
+              key={swatch.label}
+              type="button"
+              aria-label={`선택 영역 ${swatch.label}`}
+              title={swatch.label}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onApplySnippet(`{{color:${swatch.token}|`, "}}", { toggle: true })}
+            >
+              <ColorSwatchDot $color={swatch.hex} />
             </BubbleActionButton>
           ))}
         </SelectionBubbleToolbar>

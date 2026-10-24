@@ -369,11 +369,13 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   }
   .cm-cursor { border-left-color: ${({ theme }) => theme.colors.gray12}; }
 
-  .cm-live-heading {
+  .cm-live-heading,
+  .cm-live-heading *:not(.cm-live-link):not(.cm-live-strikethrough) {
     color: ${({ theme }) => theme.colors.gray12};
     font-family: var(--aq-font-sans);
     font-weight: 700;
     letter-spacing: -0.03em;
+    text-decoration: none !important;
   }
   .cm-live-heading-1 { font-size: 2em; line-height: 1.28; margin-top: 1.1em; margin-bottom: 0.4em; }
   .cm-live-heading-2 { font-size: 1.6em; line-height: 1.34; margin-top: 1em; margin-bottom: 0.35em; }
@@ -387,13 +389,15 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-live-strikethrough { text-decoration: line-through; text-decoration-thickness: 1px; }
 
   .cm-live-inline-code {
-    border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    border: none;
     border-radius: 4px;
-    padding: 0.12em 0.38em;
-    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-    color: ${({ theme }) => theme.colors.gray11};
+    padding: 0.14em 0.4em;
+    background: ${({ theme }) =>
+      theme.scheme === "dark" ? "rgba(110, 118, 129, 0.25)" : "rgba(135, 131, 120, 0.15)"};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#ff7b72" : "#eb5757")};
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.88em;
+    font-size: 0.87em;
+    font-weight: 500;
   }
 
   .cm-live-link {
@@ -422,8 +426,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     border: 1px solid
       ${({ theme }) =>
         theme.scheme === "dark" ? "rgba(168, 85, 247, 0.35)" : "rgba(124, 58, 237, 0.22)"};
-    color: ${({ theme }) =>
-      theme.scheme === "dark" ? "#c084fc" : "#7c3aed"};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#7c3aed")};
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.4;
@@ -437,8 +440,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
         theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(124, 58, 237, 0.18)"};
       border-color: ${({ theme }) =>
         theme.scheme === "dark" ? "rgba(168, 85, 247, 0.5)" : "rgba(124, 58, 237, 0.35)"};
-      color: ${({ theme }) =>
-        theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9"};
+      color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9")};
       text-decoration: none;
     }
 
@@ -455,17 +457,10 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     align-items: center;
     justify-content: center;
     opacity: 0.8;
-
-    svg {
-      display: block;
-      width: 11px;
-      height: 11px;
-    }
+    svg { display: block; width: 11px; height: 11px; }
   }
 
-  .cm-live-wikilink-text {
-    display: inline-block;
-  }
+  .cm-live-wikilink-text { display: inline-block; }
 
   .cm-live-color :is(.cm-live-strong, .cm-live-inline-code, .cm-live-link) {
     color: inherit;
@@ -478,9 +473,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     border-top: 1px solid ${({ theme }) => theme.colors.gray7};
   }
 
-  .cm-live-quote {
-    color: ${({ theme }) => theme.colors.gray10};
-  }
+  .cm-live-quote { color: ${({ theme }) => theme.colors.gray10}; }
 
   .cm-live-quote-marker {
     display: inline-block;
@@ -533,7 +526,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-live-list { border-left: 1px solid ${({ theme }) => theme.colors.gray5}; padding-left: 2px; }
 
   .cm-line.cm-live-code-line {
-    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    background: ${({ theme }) =>
+      theme.scheme === "dark" ? theme.publicDesign.surfaceElevated : "#f7f6f3"};
     border-left: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-right: 1px solid ${({ theme }) => theme.publicDesign.border};
     padding-left: 12px;
@@ -563,9 +557,10 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       transform: translateY(-50%);
       padding: 1px 7px;
       border-radius: 999px;
-      border: 1px solid ${({ theme }) => theme.publicDesign.border};
-      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-      color: ${({ theme }) => theme.colors.gray10};
+      border: 1px solid rgba(35, 131, 226, 0.25);
+      background: ${({ theme }) =>
+        theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7"};
+      color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
       font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       text-transform: lowercase;
       pointer-events: none;

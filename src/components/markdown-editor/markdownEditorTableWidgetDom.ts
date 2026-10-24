@@ -229,6 +229,8 @@ export const createTableToolbarElement = (params: {
   const canAddCol = () => grid.headers.length < MAX_EDIT_COLUMNS
 
   const actionSpecs: Array<{
+    group: "options" | "align" | "row" | "col" | "source"
+    groupStart?: boolean
     label: string
     ariaLabel: string
     testId?: string
@@ -237,22 +239,9 @@ export const createTableToolbarElement = (params: {
     isDisabled?: (row: number, col: number) => boolean
     onSelect?: (button: HTMLButtonElement) => void
   }> = [
-    { label: "위에 행 추가", ariaLabel: "표 위에 행 추가", action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
-    { label: "아래에 행 추가", ariaLabel: "표 아래에 행 추가", action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
-    { label: "행 위로 이동", ariaLabel: "표 행 위로 이동", action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
-    { label: "행 아래로 이동", ariaLabel: "표 행 아래로 이동", action: { kind: "move-row-down" }, isDisabled: (row) => row < 1 || row >= grid.rows.length },
-    { label: "행 복제", ariaLabel: "표 행 복제", action: { kind: "duplicate-row" }, isDisabled: () => !canAddRow() },
-    { label: "행 삭제", ariaLabel: "표 행 삭제", action: { kind: "delete-row" }, isDisabled: (row) => row === 0 || grid.rows.length <= 1 },
-    { label: "왼쪽에 열 추가", ariaLabel: "표 왼쪽에 열 추가", action: { kind: "insert-column-left" }, isDisabled: () => !canAddCol() },
-    { label: "오른쪽에 열 추가", ariaLabel: "표 오른쪽에 열 추가", action: { kind: "add-column" }, isDisabled: () => !canAddCol() },
-    { label: "열 왼쪽으로 이동", ariaLabel: "표 열 왼쪽으로 이동", action: { kind: "move-column-left" }, isDisabled: (_row, col) => col < 1 },
-    { label: "열 오른쪽으로 이동", ariaLabel: "표 열 오른쪽으로 이동", action: { kind: "move-column-right" }, isDisabled: (_row, col) => col >= grid.headers.length - 1 },
-    { label: "열 삭제", ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
-    { label: "왼쪽 정렬", ariaLabel: "표 열 왼쪽 정렬", action: { kind: "set-alignment", alignment: "left" } },
-    { label: "가운데 정렬", ariaLabel: "표 열 가운데 정렬", action: { kind: "set-alignment", alignment: "center" } },
-    { label: "오른쪽 정렬", ariaLabel: "표 열 오른쪽 정렬", action: { kind: "set-alignment", alignment: "right" } },
     {
-      label: "제목 열",
+      group: "options",
+      label: "▤ 제목열",
       ariaLabel: "표 제목 열 강조 전환",
       testId: "cm-live-table-toggle-header-col",
       ariaPressed: visualOptions.headerColumn,
@@ -263,7 +252,8 @@ export const createTableToolbarElement = (params: {
       },
     },
     {
-      label: "너비 맞춤",
+      group: "options",
+      label: "↔ 너비맞춤",
       ariaLabel: "표 페이지 너비 맞춤 전환",
       testId: "cm-live-table-toggle-full-width",
       ariaPressed: visualOptions.fitPageWidth,
@@ -273,7 +263,21 @@ export const createTableToolbarElement = (params: {
         btn.setAttribute("aria-pressed", String(visualOptions.fitPageWidth))
       },
     },
-    { label: "원본 편집", ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
+    { group: "align", groupStart: true, label: "≡좌", ariaLabel: "표 열 왼쪽 정렬", action: { kind: "set-alignment", alignment: "left" } },
+    { group: "align", label: "≡중", ariaLabel: "표 열 가운데 정렬", action: { kind: "set-alignment", alignment: "center" } },
+    { group: "align", label: "≡우", ariaLabel: "표 열 오른쪽 정렬", action: { kind: "set-alignment", alignment: "right" } },
+    { group: "row", groupStart: true, label: "+행↑", ariaLabel: "표 위에 행 추가", action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
+    { group: "row", label: "+행↓", ariaLabel: "표 아래에 행 추가", action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
+    { group: "row", label: "행↑", ariaLabel: "표 행 위로 이동", action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
+    { group: "row", label: "행↓", ariaLabel: "표 행 아래로 이동", action: { kind: "move-row-down" }, isDisabled: (row) => row < 1 || row >= grid.rows.length },
+    { group: "row", label: "⧉행", ariaLabel: "표 행 복제", action: { kind: "duplicate-row" }, isDisabled: () => !canAddRow() },
+    { group: "row", label: "✕행", ariaLabel: "표 행 삭제", action: { kind: "delete-row" }, isDisabled: (row) => row === 0 || grid.rows.length <= 1 },
+    { group: "col", groupStart: true, label: "+열←", ariaLabel: "표 왼쪽에 열 추가", action: { kind: "insert-column-left" }, isDisabled: () => !canAddCol() },
+    { group: "col", label: "+열→", ariaLabel: "표 오른쪽에 열 추가", action: { kind: "add-column" }, isDisabled: () => !canAddCol() },
+    { group: "col", label: "열←", ariaLabel: "표 열 왼쪽으로 이동", action: { kind: "move-column-left" }, isDisabled: (_row, col) => col < 1 },
+    { group: "col", label: "열→", ariaLabel: "표 열 오른쪽으로 이동", action: { kind: "move-column-right" }, isDisabled: (_row, col) => col >= grid.headers.length - 1 },
+    { group: "col", label: "✕열", ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
+    { group: "source", groupStart: true, label: "</> 원본", ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
   ]
 
   for (const spec of actionSpecs) {
@@ -281,6 +285,9 @@ export const createTableToolbarElement = (params: {
     btn.type = "button"
     btn.className = "cm-live-table-toolbar-btn"
     btn.setAttribute("aria-label", spec.ariaLabel)
+    btn.setAttribute("title", spec.ariaLabel)
+    btn.setAttribute("data-group", spec.group)
+    if (spec.groupStart) btn.setAttribute("data-group-start", "true")
     if (spec.testId) btn.setAttribute("data-testid", spec.testId)
     if (spec.ariaPressed !== undefined) btn.setAttribute("aria-pressed", String(spec.ariaPressed))
     btn.textContent = spec.label
