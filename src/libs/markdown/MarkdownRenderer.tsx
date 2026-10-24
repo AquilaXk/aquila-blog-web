@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type FC,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -21,6 +20,7 @@ import {
   parseHighlightedLineNumbers,
   resolveMarkdownRenderModel,
 } from "src/libs/markdown/rendering"
+import { resolveMarkdownImageDimensions } from "src/libs/markdown/renderingImageModel"
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
 import { openImageLightboxOverlay } from "src/libs/markdown/imageLightboxOverlay"
 import useMermaidEffect from "src/libs/markdown/hooks/useMermaidEffect"
@@ -30,6 +30,7 @@ import usePrismEffect from "src/libs/markdown/hooks/usePrismEffect"
 import PrettyCodeBlock from "src/libs/markdown/components/PrettyCodeBlock"
 import MarkdownRendererRoot from "src/libs/markdown/components/MarkdownRendererRoot"
 import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
+import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
 import {
   MarkdownBlockquote,
   MarkdownParagraph,
@@ -234,39 +235,20 @@ export const createMarkdownComponentVariants = ({
           </span>
         )
       }
-      const isFirstImage = imageRenderOrderRef.current === 0
+      const imageIndex = imageRenderOrderRef.current
       imageRenderOrderRef.current += 1
-
-      let imgWidth: number | undefined
-      let imgHeight: number | undefined
-      try {
-        const parsed = new URL(imageSrc, "https://dummy.local")
-        const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
-        const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
-        if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
-        if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
-      } catch {}
-
-      const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
+      const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
 
       return (
-        <figure
-          className="aq-image-frame"
-          style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageSrc}
-            alt={alt || ""}
-            width={imgWidth}
-            height={imgHeight}
-            style={aspectRatio ? { aspectRatio } : undefined}
-            loading={isFirstImage ? "eager" : "lazy"}
-            fetchPriority={isFirstImage ? "high" : undefined}
-            decoding="async"
-          />
-          {alt ? <figcaption>{alt}</figcaption> : null}
-        </figure>
+        <MarkdownImageFigure
+          src={imageSrc}
+          alt={alt || ""}
+          widthPx={widthPx}
+          heightPx={heightPx}
+          aspectRatio={aspectRatio}
+          eager={imageIndex === 0}
+          imageIndex={imageIndex}
+        />
       )
     },
     a({

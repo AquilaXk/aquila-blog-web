@@ -11,7 +11,7 @@ const slugify = (value: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
 
-const normalizeMetaItems = (raw: string): string[] => {
+export const normalizeMetaItems = (raw: string): string[] => {
   const normalized = raw.trim().replace(/^\[|\]$/g, "")
   if (!normalized) return []
 
@@ -126,7 +126,7 @@ const pickPreferredImageUrl = (...candidates: Array<string | null | undefined>) 
   return ""
 }
 
-const POST_SUMMARY_SOURCES = new Set<PostSummarySource>([
+export const POST_SUMMARY_SOURCES = new Set<PostSummarySource>([
   "MANUAL",
   "LEADING_BLOCK",
   "EXTRACTED",
@@ -134,7 +134,7 @@ const POST_SUMMARY_SOURCES = new Set<PostSummarySource>([
   "NONE",
 ])
 
-const normalizeCanonicalSummary = ({
+export const normalizeCanonicalSummary = ({
   summary,
   summarySource,
 }: {
@@ -187,8 +187,6 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     ...(normalizedCategories.length > 0 ? { category: normalizedCategories } : {}),
     likesCount: post.likesCount ?? 0,
     hitCount: post.hitCount ?? 0,
-
-    // Legacy compatibility fields
     date: { start_date: postCreatedAt.slice(0, 10) },
     type: ["Post"],
     status: toStatus(post.published ?? false, post.listed ?? false),

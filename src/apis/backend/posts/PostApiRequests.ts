@@ -1,6 +1,6 @@
 import { normalizeTagQuery } from "src/libs/query/normalize"
 import type { TPost } from "src/types"
-import { ApiError, apiFetch } from "../client"
+import { apiFetch } from "../client"
 import type {
   ApiPostDto,
   ApiTagCountDto,
@@ -36,6 +36,14 @@ export { getPostDetailById, getPostDetailBySlug } from "./PostApiDetailRequests"
 
 let postsBootstrapSsrCache = new Map<string, { value: PostsBootstrapResult; cachedAt: number }>()
 let pendingPostsBootstrapPromises = new Map<string, Promise<PostsBootstrapResult>>()
+
+const toTagCountMap = (rows: readonly ApiTagCountDto[]): Record<string, number> =>
+  rows.reduce<Record<string, number>>((acc, row) => {
+    const normalizedTag = normalizeTagQuery(row.tag)
+    if (!normalizedTag) return acc
+    acc[normalizedTag] = Number.isFinite(row.count) ? row.count : 0
+    return acc
+  }, {})
 
 const toPostsPageResult = (
   response: PageDto<ApiPostDto>,
@@ -73,6 +81,45 @@ const toPostsCursorPageResult = (
     nextCursor: typeof response.nextCursor === "string" ? response.nextCursor : null,
     paginationMode: "cursor",
   }
+}
+
+const fetchPostsPageResult = async ({
+  endpoint,
+  page = 1,
+  pageSize = PAGE_SIZE,
+  signal,
+  paginationMode,
+}: {
+  endpoint: string
+  page?: number
+  pageSize?: number
+  signal?: AbortSignal
+  paginationMode?: "page"
+}): Promise<ExplorePostsPage> => {
+  const fallbackPageNumber = toValidPage(page)
+  const fallbackPageSize = toValidPageSize(pageSize)
+  recordRuntimeEndpoint(endpoint, "page")
+  const response = await apiFetch<PageDto<ApiPostDto>>(endpoint, { signal })
+  return toPostsPageResult(response, fallbackPageNumber, fallbackPageSize, paginationMode)
+}
+
+const fetchPostsCursorPageResult = async ({
+  buildEndpoint,
+  pageSize = PAGE_SIZE,
+  cursor,
+  signal,
+}: {
+  buildEndpoint: (params: { pageSize: number; cursor?: string }) => string
+  pageSize?: number
+  cursor?: string
+  signal?: AbortSignal
+}): Promise<ExplorePostsPage> => {
+  const safePageSize = toValidPageSize(pageSize)
+  const normalizedCursor = typeof cursor === "string" && cursor.trim() ? cursor.trim() : undefined
+  const endpoint = buildEndpoint({ pageSize: safePageSize, cursor: normalizedCursor })
+  recordRuntimeEndpoint(endpoint, "cursor")
+  const response = await apiFetch<CursorPageDto<ApiPostDto>>(endpoint, { signal })
+  return toPostsCursorPageResult(response, safePageSize)
 }
 
 export const resetPostsRequestCaches = () => {
@@ -115,12 +162,7 @@ export const getPostsBootstrap = async ({
       hasNext: feed.hasNext === true,
       nextCursor: typeof feed.nextCursor === "string" ? feed.nextCursor : null,
       pageSize: Number.isFinite(feed.pageSize) ? Math.max(1, Math.trunc(feed.pageSize)) : toValidPageSize(pageSize),
-      tagCounts: response.tags.reduce<Record<string, number>>((acc, row) => {
-        const normalizedTag = normalizeTagQuery(row.tag)
-        if (!normalizedTag) return acc
-        acc[normalizedTag] = Number.isFinite(row.count) ? row.count : 0
-        return acc
-      }, {}),
+      tagCounts: toTagCountMap(response.tags),
     }
   }
 
@@ -191,28 +233,14 @@ export const getExplorePostsPage = async ({
   page = 1,
   pageSize = PAGE_SIZE,
   signal,
-}: ExplorePostsParams = {}): Promise<ExplorePostsPage> => {
-  const fallbackPageNumber = toValidPage(page)
-  const fallbackPageSize = toValidPageSize(pageSize)
-  const response = await apiFetch<PageDto<ApiPostDto>>(
-    (() => {
-      const endpoint = buildExplorePath({
-        kw,
-        tag,
-        order,
-        sortMode,
-        page,
-        pageSize,
-      })
-      recordRuntimeEndpoint(endpoint, "page")
-      return endpoint
-    })(),
-    {
-      signal,
-    }
-  )
-  return toPostsPageResult(response, fallbackPageNumber, fallbackPageSize, "page")
-}
+}: ExplorePostsParams = {}): Promise<ExplorePostsPage> =>
+  fetchPostsPageResult({
+    endpoint: buildExplorePath({ kw, tag, order, sortMode, page, pageSize }),
+    page,
+    pageSize,
+    signal,
+    paginationMode: "page",
+  })
 
 export const getFeedPostsPage = async ({
   order = "desc",
@@ -220,27 +248,14 @@ export const getFeedPostsPage = async ({
   page = 1,
   pageSize = PAGE_SIZE,
   signal,
-}: Pick<ExplorePostsParams, "order" | "sortMode" | "page" | "pageSize" | "signal"> = {}): Promise<ExplorePostsPage> => {
-  const fallbackPageNumber = toValidPage(page)
-  const fallbackPageSize = toValidPageSize(pageSize)
-  const response = await apiFetch<PageDto<ApiPostDto>>(
-    (() => {
-      const endpoint = buildFeedPath({
-        order,
-        sortMode,
-        page,
-        pageSize,
-      })
-      recordRuntimeEndpoint(endpoint, "page")
-      return endpoint
-    })(),
-    {
-      signal,
-    }
-  )
-
-  return toPostsPageResult(response, fallbackPageNumber, fallbackPageSize, "page")
-}
+}: Pick<ExplorePostsParams, "order" | "sortMode" | "page" | "pageSize" | "signal"> = {}): Promise<ExplorePostsPage> =>
+  fetchPostsPageResult({
+    endpoint: buildFeedPath({ order, sortMode, page, pageSize }),
+    page,
+    pageSize,
+    signal,
+    paginationMode: "page",
+  })
 
 export const getFeedPostsCursorPage = async ({
   order = "desc",
@@ -254,27 +269,14 @@ export const getFeedPostsCursorPage = async ({
   pageSize?: number
   cursor?: string
   signal?: AbortSignal
-}): Promise<ExplorePostsPage> => {
-  const safePageSize = toValidPageSize(pageSize)
-  const normalizedCursor = typeof cursor === "string" && cursor.trim() ? cursor.trim() : undefined
-  const response = await apiFetch<CursorPageDto<ApiPostDto>>(
-    (() => {
-      const endpoint = buildFeedCursorPath({
-        order,
-        sortMode,
-        pageSize: safePageSize,
-        cursor: normalizedCursor,
-      })
-      recordRuntimeEndpoint(endpoint, "cursor")
-      return endpoint
-    })(),
-    {
-      signal,
-    }
-  )
-
-  return toPostsCursorPageResult(response, safePageSize)
-}
+}): Promise<ExplorePostsPage> =>
+  fetchPostsCursorPageResult({
+    buildEndpoint: ({ pageSize: safePageSize, cursor: normalizedCursor }) =>
+      buildFeedCursorPath({ order, sortMode, pageSize: safePageSize, cursor: normalizedCursor }),
+    pageSize,
+    cursor,
+    signal,
+  })
 
 export const getExplorePostsCursorPage = async ({
   tag = "",
@@ -290,28 +292,14 @@ export const getExplorePostsCursorPage = async ({
   pageSize?: number
   cursor?: string
   signal?: AbortSignal
-}): Promise<ExplorePostsPage> => {
-  const safePageSize = toValidPageSize(pageSize)
-  const normalizedCursor = typeof cursor === "string" && cursor.trim() ? cursor.trim() : undefined
-  const response = await apiFetch<CursorPageDto<ApiPostDto>>(
-    (() => {
-      const endpoint = buildExploreCursorPath({
-        tag,
-        order,
-        sortMode,
-        pageSize: safePageSize,
-        cursor: normalizedCursor,
-      })
-      recordRuntimeEndpoint(endpoint, "cursor")
-      return endpoint
-    })(),
-    {
-      signal,
-    }
-  )
-
-  return toPostsCursorPageResult(response, safePageSize)
-}
+}): Promise<ExplorePostsPage> =>
+  fetchPostsCursorPageResult({
+    buildEndpoint: ({ pageSize: safePageSize, cursor: normalizedCursor }) =>
+      buildExploreCursorPath({ tag, order, sortMode, pageSize: safePageSize, cursor: normalizedCursor }),
+    pageSize,
+    cursor,
+    signal,
+  })
 
 export const getSearchPostsPage = async ({
   kw = "",
@@ -320,36 +308,17 @@ export const getSearchPostsPage = async ({
   page = 1,
   pageSize = PAGE_SIZE,
   signal,
-}: ExplorePostsParams = {}): Promise<ExplorePostsPage> => {
-  const fallbackPageNumber = toValidPage(page)
-  const fallbackPageSize = toValidPageSize(pageSize)
-  const response = await apiFetch<PageDto<ApiPostDto>>(
-    (() => {
-      const endpoint = buildSearchPath({
-        kw,
-        order,
-        sortMode,
-        page,
-        pageSize,
-      })
-      recordRuntimeEndpoint(endpoint, "page")
-      return endpoint
-    })(),
-    {
-      signal,
-    }
-  )
-  return toPostsPageResult(response, fallbackPageNumber, fallbackPageSize)
-}
+}: ExplorePostsParams = {}): Promise<ExplorePostsPage> =>
+  fetchPostsPageResult({
+    endpoint: buildSearchPath({ kw, order, sortMode, page, pageSize }),
+    page,
+    pageSize,
+    signal,
+  })
 
 export const getTagCounts = async (): Promise<Record<string, number>> => {
   const rows = await apiFetch<ApiTagCountDto[]>(POSTS_TAGS_API_PATH)
-  return rows.reduce<Record<string, number>>((acc, row) => {
-    const normalizedTag = normalizeTagQuery(row.tag)
-    if (!normalizedTag) return acc
-    acc[normalizedTag] = Number.isFinite(row.count) ? row.count : 0
-    return acc
-  }, {})
+  return toTagCountMap(rows)
 }
 
 export const getRelatedPostsByAuthor = async ({

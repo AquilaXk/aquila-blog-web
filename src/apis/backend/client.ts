@@ -103,11 +103,11 @@ export type ApiFetchOptions = RequestInit & {
   backendProxy?: BackendProxyMode
 }
 
-const isServer = typeof window === "undefined"
+const isServer = () => typeof window === "undefined"
 
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, "")
 
-const browserInFlightGetRequests = new Map<string, Promise<unknown>>()
+const browserInFlightGetRequests = new Map<string, { url: string; promise: Promise<unknown> }>()
 
 const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null | undefined) => {
   if (error instanceof ApiError) {
@@ -123,15 +123,12 @@ const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null 
 }
 
 export const evictBrowserRevalidateCacheEntries = (predicate: (url: string) => boolean) => {
-  if (isServer) return
+  if (isServer()) return
   evictBrowserRevalidatePayloadCacheEntries(predicate)
 
   const inFlightKeysToDelete: string[] = []
-  browserInFlightGetRequests.forEach((_, key) => {
-    const separatorIndex = key.indexOf(":")
-    if (separatorIndex < 0) return
-    const url = key.slice(separatorIndex + 1)
-    if (url && predicate(url)) inFlightKeysToDelete.push(key)
+  browserInFlightGetRequests.forEach((entry, key) => {
+    if (entry.url && predicate(entry.url)) inFlightKeysToDelete.push(key)
   })
   inFlightKeysToDelete.forEach((key) => {
     browserInFlightGetRequests.delete(key)
@@ -173,7 +170,6 @@ const looksLikeInternalDiagnosticMessage = (message: string) =>
 const resolveBodyUserMessage = (body: string) => {
   const { message } = parseJsonBodyMessage(body)
   if (!message) return ""
-  // Only expose localized copy that is not an internal diagnostic dump.
   if (!/[가-힣]/.test(message)) return ""
   if (looksLikeInternalDiagnosticMessage(message)) return ""
   return message
@@ -308,7 +304,7 @@ export const getApiBaseUrl = () => {
   const serverUrl = process.env.BACKEND_INTERNAL_URL
   const publicUrl = process.env.NEXT_PUBLIC_BACKEND_URL
 
-  if (isServer) {
+  if (isServer()) {
     if (serverUrl) return stripTrailingSlash(serverUrl)
     if (process.env.NODE_ENV === "production") {
       // 운영 SSR은 내부 API 경로를 강제해 외부 edge/tunnel 우회를 차단한다.
@@ -323,7 +319,6 @@ export const getApiBaseUrl = () => {
     const { hostname } = window.location
     const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1"
     if (!isLocalHost && process.env.NODE_ENV === "production") {
-      // 운영에서 API URL이 비어 있으면 추측 대신 즉시 확인 가능한 에러를 낸다.
       throw new Error("NEXT_PUBLIC_BACKEND_URL is required in production.")
     }
   }
@@ -348,7 +343,7 @@ export const apiFetch = async <T>(
   const { timeoutMs: _timeoutMs, backendProxy = "auto", ...requestInit } = init
   const url = getApiRequestUrl(safePath, { backendProxy })
   const headers = new Headers(requestInit.headers || {})
-  const serverMetrics = isServer ? createServerApiFetchMetricsContext(safePath, headers) : null
+  const serverMetrics = isServer() ? createServerApiFetchMetricsContext(safePath, headers) : null
   let serverOutcomeObserved = false
   const observeServerOutcome = (result: Parameters<ServerApiFetchMetricsContext["observe"]>[0]) => {
     if (!serverMetrics) return
@@ -365,13 +360,13 @@ export const apiFetch = async <T>(
     requestInit.credentials ??
     (isReadMethod ? (getRequestPolicy?.credentials ?? DEFAULT_GET_REQUEST_POLICY.credentials) : "include")
   const canUseRevalidateCache =
-    !isServer &&
+    !isServer() &&
     method === "GET" &&
     !hasBody &&
     getRequestPolicy?.cacheMode !== "no-store" &&
     requestInit.cache !== "no-store"
   const canUseInFlightDedupe =
-    !isServer &&
+    !isServer() &&
     isReadMethod &&
     !hasBody &&
     !requestInit.signal &&
@@ -391,7 +386,7 @@ export const apiFetch = async <T>(
 
   if (inFlightKey) {
     const existing = browserInFlightGetRequests.get(inFlightKey)
-    if (existing) return existing as Promise<T>
+    if (existing) return existing.promise as Promise<T>
   }
 
   const executeRequest = async (): Promise<T> => {
@@ -402,7 +397,7 @@ export const apiFetch = async <T>(
       isReadMethod &&
       !requestInit.signal &&
       getRetryCount > 0 &&
-      !isServer
+      !isServer()
     const maxAttempts = canRetryTransientRead ? getRetryCount + 1 : 1
     let response: Response | null = null
 
@@ -524,8 +519,10 @@ export const apiFetch = async <T>(
   }
 
   const inFlightPromise = executeRequest().finally(() => {
-    browserInFlightGetRequests.delete(inFlightKey)
+    if (browserInFlightGetRequests.get(inFlightKey)?.promise === inFlightPromise) {
+      browserInFlightGetRequests.delete(inFlightKey)
+    }
   })
-  browserInFlightGetRequests.set(inFlightKey, inFlightPromise as Promise<unknown>)
+  browserInFlightGetRequests.set(inFlightKey, { url, promise: inFlightPromise as Promise<unknown> })
   return inFlightPromise
 }

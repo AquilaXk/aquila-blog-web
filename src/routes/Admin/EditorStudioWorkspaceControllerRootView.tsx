@@ -23,7 +23,6 @@ import { isLocalDraftRestoreSuggestionEligible, type LocalDraftFingerprintSnapsh
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 
 type EditorStudioWorkspaceControllerRootViewBag = {
-  [key: string]: unknown
   addTagsToPost: (tags: string[]) => void
   addTagToPost: (tag: string) => void
   applyFirstBodyImageToThumbnail: () => void

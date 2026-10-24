@@ -13,22 +13,7 @@ const E2E_ROOT_SPEC_ADVISORY_LIMIT = 800
 
 const normalizePath = (value) => value.split(path.sep).join("/")
 
-const productionSoftAllowlist = {
-  "src/routes/Admin/EditorStudioWorkspaceControllerRoot.tsx": {
-    issue: "#398",
-    reason:
-      "editor studio route orchestrator is below the 1,000 line hard budget after root split",
-    expires:
-      "split below 600 when routing/runtime state can be moved without re-coupling the editor flow",
-  },
-  "src/routes/Admin/EditorStudioWorkspaceControllerRootView.tsx": {
-    issue: "#398",
-    reason:
-      "editor studio root view owns the dedicated editor/admin layout bridge and remains below hard budget",
-    expires:
-      "split below 600 when view props are reduced by a narrower editor surface contract",
-  },
-}
+const productionSoftAllowlist = {}
 
 const e2eRootAllowlist = {}
 
@@ -314,7 +299,6 @@ const ownershipRules = [
     required: [
       'from "./EditorStudioWorkspaceControllerRootModel"',
       'from "./EditorStudioWorkspaceControllerRootView"',
-      'from "./useEditorStudioAdminPostFlow"',
       'from "./useEditorStudioDraftLifecycle"',
       'from "./useEditorStudioPersistence"',
       'from "./useEditorStudioRouting"',
