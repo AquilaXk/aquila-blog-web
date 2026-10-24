@@ -34,6 +34,10 @@ const StyledWrapper = styled(Link)`
   letter-spacing: -0.03em;
   line-height: 1.1;
 
+  @media (max-width: 768px) {
+    min-height: 44px;
+  }
+
   .brandMark {
     display: block;
     flex-shrink: 0;

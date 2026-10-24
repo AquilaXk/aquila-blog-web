@@ -36,11 +36,12 @@ const StyledWrapper = styled.div`
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: var(--aq-page-bg);
+    pointer-events: none;
     z-index: -1;
-    width: 100vw;
-    transform: translateX(-50%);
-    background-color: var(--aq-page-bg);
   }
 
   @media (max-width: 768px) {

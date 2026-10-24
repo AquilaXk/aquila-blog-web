@@ -355,7 +355,14 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   }
   .cm-editor.cm-focused { outline: none; }
   .cm-scroller { overscroll-behavior: contain; }
-  .cm-content { caret-color: ${({ theme }) => theme.colors.gray12}; }
+  .cm-content {
+    caret-color: ${({ theme }) => theme.colors.gray12};
+    padding-left: 44px;
+
+    @media (max-width: 720px) {
+      padding-left: 16px;
+    }
+  }
   .cm-placeholder {
     color: ${({ theme }) => theme.colors.gray9};
     font-style: normal;
@@ -445,9 +452,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     }
 
     &:focus-visible {
-      outline: 2px solid
-        ${({ theme }) =>
-          theme.scheme === "dark" ? "rgba(168, 85, 247, 0.7)" : "rgba(124, 58, 237, 0.6)"};
+      outline: 2px solid var(--aq-accent-link, #155eef);
       outline-offset: 1px;
     }
   }
@@ -568,6 +573,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     }
   }
 
+  .cm-gutters { background: transparent; border-right: 0; }
   .cm-foldGutter .cm-gutterElement {
     padding: 0 4px;
     color: ${({ theme }) => theme.colors.gray9};

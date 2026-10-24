@@ -49,7 +49,10 @@ const PostDetail: React.FC = () => {
     () => createMarkdownDocumentInsights(data?.content ?? ""),
     [data?.content]
   )
-  const initialToc = useMemo(() => buildInitialTocFromMarkdown(data?.content ?? ""), [data?.content])
+  const initialToc = useMemo(
+    () => buildInitialTocFromMarkdown(data?.content ?? "", documentInsights.headings),
+    [data?.content, documentInsights.headings]
+  )
   const [tocItems, setTocItems] = useState<TocItem[]>(initialToc)
   const [activeTocId, setActiveTocId] = useState<string>(() => initialToc[0]?.id ?? "")
   const [showDetailedToc, setShowDetailedToc] = useState(false)
@@ -57,6 +60,7 @@ const PostDetail: React.FC = () => {
   const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
   const visibleTocItemsRef = useRef<TocItem[]>([])
   const headingOffsetsRef = useRef<HeadingOffset[]>([])
+  const hasMountedTocOffsetsRef = useRef(false)
   const railTopOffsetRef = useRef(85)
   const scrollableHeightRef = useRef(1)
   const showFloatingLikeRef = useRef(false)
@@ -117,6 +121,10 @@ const PostDetail: React.FC = () => {
 
   useEffect(() => {
     visibleTocItemsRef.current = visibleTocItems
+    if (!hasMountedTocOffsetsRef.current) {
+      hasMountedTocOffsetsRef.current = true
+      if (articleRef.current) return
+    }
     headingOffsetsRef.current = measureHeadingOffsets(
       visibleTocItems,
       typeof window !== "undefined" ? window.scrollY : 0

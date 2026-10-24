@@ -21,7 +21,6 @@ import {
   MetricCard,
   MetricGrid,
   Panel,
-  PanelDots,
   PanelHeader,
   SecondaryActionLink,
   StatusList,
@@ -75,7 +74,6 @@ export const AdminHubSurfaceSections = ({
       <Panel>
         <PanelHeader>
           <h2>최근 콘텐츠</h2>
-          <PanelDots aria-hidden="true">•••</PanelDots>
         </PanelHeader>
         {contentItems.length > 0 ? (
           <ContentList aria-label="최근 콘텐츠">

@@ -253,8 +253,12 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    const fenceMarker = parseFenceMarker(line)
-    const directiveMetadataComment = parseCardMetadataComment(line)
+    const trimmed = line.trim()
+    const firstCode = trimmed.codePointAt(0)
+    const fenceMarker =
+      firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
+    const directiveMetadataComment =
+      !activeFenceMarker && firstCode === 60 ? parseCardMetadataComment(trimmed) : null
 
     if (activeFenceMarker) {
       markdownBuffer.push(line)
@@ -278,7 +282,8 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
-    const standaloneImage = parseStandaloneMarkdownImageLine(line)
+    const standaloneImage =
+      firstCode === 33 ? parseStandaloneMarkdownImageLine(trimmed) : null
     if (standaloneImage) {
       flushMarkdown()
       segments.push({
@@ -295,7 +300,10 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
-    const customDirectiveMatch = line.trim().match(CUSTOM_DIRECTIVE_PATTERN)
+    const customDirectiveMatch =
+      firstCode === 58 || firstCode === 91
+        ? CUSTOM_DIRECTIVE_PATTERN.exec(trimmed)
+        : null
     if (customDirectiveMatch) {
       const directive = customDirectiveMatch[1]?.toLowerCase()
       const url = normalizeSafeMarkdownUrl(customDirectiveMatch[2] || "")
@@ -357,7 +365,10 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
 
     pendingDirectiveMetadata = null
 
-    if (FORMULA_BLOCK_START_PATTERN.test(line.trim())) {
+    if (
+      (firstCode === 36 || firstCode === 92) &&
+      FORMULA_BLOCK_START_PATTERN.test(trimmed)
+    ) {
       const bodyLines: string[] = []
       let closed = false
 

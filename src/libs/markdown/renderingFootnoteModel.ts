@@ -129,19 +129,21 @@ export const createDocumentFootnoteModel = ({
   source: string
   segments: MarkdownSegment[]
 }): DocumentFootnoteModel => {
-  const marker = `aq-footnote:${source.length}:${hashString(source)}`
-  const buildUnchangedResult = (): DocumentFootnoteModel =>
+  const buildUnchangedResult = (markerValue: string): DocumentFootnoteModel =>
     Object.freeze({
       footnotes: Object.freeze([]),
-      marker,
+      marker: markerValue,
       segments: segments.map((segment) =>
         isMarkdownCapableSegment(segment) ? { ...segment } : segment
       ),
     })
 
   if (!source.includes("[^") || !FOOTNOTE_DEFINITION_PATTERN.test(source)) {
-    return buildUnchangedResult()
+    return buildUnchangedResult(`aq-footnote:${source.length}:0`)
   }
+
+  const scopeId = hashString(source)
+  const marker = `aq-footnote:${source.length}:${scopeId}`
 
   const parsedSegments: ParsedSegment[] = segments.flatMap((segment, index) => {
     if (!isMarkdownCapableSegment(segment)) return []
@@ -167,7 +169,7 @@ export const createDocumentFootnoteModel = ({
   }
 
   if (footnoteDefinitions.size === 0) {
-    return buildUnchangedResult()
+    return buildUnchangedResult(marker)
   }
 
   const parsedIndices = new Set(parsedSegments.map((item) => item.index))

@@ -20,6 +20,7 @@ const PostDetailMobileToc = ({ items, activeTocId, onNavigate }: PostDetailMobil
               <button
                 type="button"
                 data-active={activeTocId === item.id}
+                aria-current={activeTocId === item.id ? "location" : undefined}
                 title={item.text}
                 aria-label={item.text}
                 onClick={(event) => {

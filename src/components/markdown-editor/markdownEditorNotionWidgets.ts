@@ -415,18 +415,26 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     header.className = "cm-live-toggle-header"
     const caret = document.createElement("span")
     caret.className = "cm-live-toggle-caret"
+    caret.tabIndex = 0
+    caret.setAttribute("tabindex", "0")
     caret.setAttribute("role", "button")
+    caret.setAttribute("aria-expanded", "true")
     caret.setAttribute("aria-label", "토글 접기/펼치기")
     caret.textContent = "▼"
+    const toggleCollapse = (event: Event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      isCollapsed = root.classList.toggle("is-collapsed")
+      caret.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
+      caret.textContent = isCollapsed ? "▶" : "▼"
+    }
     caret.addEventListener("mousedown", (e) => {
       e.preventDefault()
       e.stopPropagation()
     })
-    caret.addEventListener("click", (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      isCollapsed = root.classList.toggle("is-collapsed")
-      caret.textContent = isCollapsed ? "▶" : "▼"
+    caret.addEventListener("click", toggleCollapse)
+    caret.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") toggleCollapse(event)
     })
 
     const titleSpan = document.createElement("span")

@@ -1,3 +1,4 @@
+import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type MarkdownEditorTableAlignment = "left" | "center" | "right"
@@ -171,83 +172,97 @@ const collectLocalLineWindow = (
   ]
 }
 
-const isOffsetInsideFencedCode = (value: string, offset: number) => {
-  if (!value.includes("```") && !value.includes("~~~")) return false
-  const limit = Math.max(0, Math.min(offset, value.length))
-  let marker = ""
-  let length = 0
-  let lineStart = 0
-  while (lineStart <= limit) {
-    const nextBreak = value.indexOf("\n", lineStart)
-    const lineEnd = nextBreak === -1 || nextBreak > limit ? limit : nextBreak
-    const lineText = value.slice(lineStart, lineEnd)
-    const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(lineText)
-    if (match) {
-      const fence = match[2] ?? ""
-      const info = match[3] ?? ""
-      if (marker === "") {
-        marker = fence[0] ?? ""
-        length = fence.length
-      } else if (fence[0] === marker && fence.length >= length && info.trim() === "") {
-        marker = ""
-        length = 0
-      }
-    }
-    if (nextBreak === -1 || nextBreak >= limit) break
-    lineStart = nextBreak + 1
-  }
-  return marker !== ""
-}
+const isOffsetInsideFencedCode = (value: string, offset: number) =>
+  isOffsetInsideFencedCodeBlock(value, offset)
 
 const isMetadataLine = (line: string) => /^\s*<!--\s*aq-table(?:\s|$)/i.test(line)
 
 const findCellAtOffset = (row: TableRow, offset: number) =>
   row.cells.findIndex((cell) => offset >= cell.contextStart && offset <= cell.contextEnd)
 
-const findActiveTable = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
+let lastActiveTableCache: {
+  value: string
+  selectionStart: number
+  selectionEnd: number
+  table: ActiveTable | null
+} | null = null
+
+type LocalLineSlice = { text: string; start: number; end: number }
+
+const collectTableBodyRows = (
+  lines: LocalLineSlice[],
+  startIndex: number,
+  expectedColumnCount: number
+): TableRow[] => {
+  const body: TableRow[] = []
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index]!
+    const cells = splitTableCells(line.text, line.start)
+    if (cells?.length !== expectedColumnCount) break
+    body.push({ cells, start: line.start, end: line.end })
+  }
+  return body
+}
+
+const parseActiveTableAtHeader = (
+  lines: LocalLineSlice[],
+  headerIndex: number,
+  selectionStart: number
+): ActiveTable | null => {
+  const headerLine = lines[headerIndex]!
+  const delimiterLine = lines[headerIndex + 1]!
+  const headerCells = splitTableCells(headerLine.text, headerLine.start)
+  const delimiterCells = splitTableCells(delimiterLine.text, delimiterLine.start)
+  if (!headerCells || !delimiterCells || headerCells.length !== delimiterCells.length) return null
+  if (headerIndex > 0 && isMetadataLine(lines[headerIndex - 1]!.text)) return null
+
+  const alignments = delimiterCells.map((cell) => parseDelimiterAlignment(cell.value))
+  if (alignments.includes(null)) return null
+
+  const body = collectTableBodyRows(lines, headerIndex + 2, headerCells.length)
+  if (body.length === 0 || headerCells.length > MAX_EDIT_COLUMNS || body.length + 1 > MAX_EDIT_ROWS) return null
+
+  const header: TableRow = { cells: headerCells, start: headerLine.start, end: headerLine.end }
+  const rows = [header, ...body]
+  const activeRow = rows.findIndex((row) => findCellAtOffset(row, selectionStart) !== -1)
+  if (activeRow === -1) return null
+  const activeColumn = findCellAtOffset(rows[activeRow]!, selectionStart)
+  if (activeColumn === -1) return null
+
+  return {
+    header,
+    alignments: alignments as MarkdownEditorTableAlignment[],
+    body,
+    rangeStart: header.start,
+    rangeEnd: body.at(-1)!.end,
+    activeRow,
+    activeColumn,
+  }
+}
+
+const findActiveTableUncached = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
   if (selectionStart !== selectionEnd || !value.includes("|")) return null
   const lines = collectLocalLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
-  if (lines.length < 3) return null
-  if (isOffsetInsideFencedCode(value, selectionStart)) return null
+  if (lines.length < 3 || isOffsetInsideFencedCode(value, selectionStart)) return null
 
   for (let headerIndex = 0; headerIndex + 2 < lines.length; headerIndex += 1) {
-    const headerLine = lines[headerIndex]!
-    const delimiterLine = lines[headerIndex + 1]!
-    const headerCells = splitTableCells(headerLine.text, headerLine.start)
-    const delimiterCells = splitTableCells(delimiterLine.text, delimiterLine.start)
-    if (!headerCells || !delimiterCells || headerCells.length !== delimiterCells.length) continue
-    if (headerIndex > 0 && isMetadataLine(lines[headerIndex - 1]!.text)) continue
-
-    const alignments = delimiterCells.map((cell) => parseDelimiterAlignment(cell.value))
-    if (alignments.some((alignment) => alignment === null)) continue
-
-    const body: TableRow[] = []
-    for (let index = headerIndex + 2; index < lines.length; index += 1) {
-      const line = lines[index]!
-      const cells = splitTableCells(line.text, line.start)
-      if (!cells || cells.length !== headerCells.length) break
-      body.push({ cells, start: line.start, end: line.end })
-    }
-    if (body.length === 0 || headerCells.length > MAX_EDIT_COLUMNS || body.length + 1 > MAX_EDIT_ROWS) continue
-
-    const header: TableRow = { cells: headerCells, start: headerLine.start, end: headerLine.end }
-    const rows = [header, ...body]
-    const activeRow = rows.findIndex((row) => findCellAtOffset(row, selectionStart) !== -1)
-    if (activeRow === -1) continue
-    const activeColumn = findCellAtOffset(rows[activeRow]!, selectionStart)
-    if (activeColumn === -1) continue
-
-    return {
-      header,
-      alignments: alignments as MarkdownEditorTableAlignment[],
-      body,
-      rangeStart: header.start,
-      rangeEnd: body[body.length - 1]!.end,
-      activeRow,
-      activeColumn,
-    }
+    const candidate = parseActiveTableAtHeader(lines, headerIndex, selectionStart)
+    if (candidate) return candidate
   }
   return null
+}
+
+const findActiveTable = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
+  if (
+    lastActiveTableCache?.value === value &&
+    lastActiveTableCache.selectionStart === selectionStart &&
+    lastActiveTableCache.selectionEnd === selectionEnd
+  ) {
+    return lastActiveTableCache.table
+  }
+  const table = findActiveTableUncached(value, selectionStart, selectionEnd)
+  lastActiveTableCache = { value, selectionStart, selectionEnd, table }
+  return table
 }
 
 const serializeRow = (cells: string[]) => `| ${cells.join(" | ")} |`

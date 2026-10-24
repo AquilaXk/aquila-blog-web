@@ -55,7 +55,7 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
   .aq-link-card-copy small,
   .aq-embed-copy small {
     margin-bottom: 5px;
-    color: ${ theme.publicDesign.accent};
+    color: var(--aq-muted, ${ theme.colors.gray11});
     font: 700 10px / 1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     letter-spacing: 0;
     text-transform: uppercase;
@@ -108,7 +108,7 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    color: ${ theme.colors.blue8};
+    color: ${ theme.publicDesign.accent};
     font-size: 0.84rem;
     font-weight: 700;
     text-decoration: none;

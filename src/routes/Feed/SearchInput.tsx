@@ -45,6 +45,12 @@ export default SearchInput
 const StyledWrapper = styled.div`
   min-width: 0;
 
+  &:focus-within > .field {
+    border-color: var(--aq-focus-ring);
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
+  }
+
   > .field {
     display: flex;
     align-items: center;

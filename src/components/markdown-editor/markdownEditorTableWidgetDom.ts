@@ -146,10 +146,18 @@ export const attachColumnResizeHandle = (
     if (typeof colEl.removeAttribute === "function") colEl.removeAttribute("data-col-width")
   })
 
-  resizer.addEventListener("mousedown", (event: MouseEvent) => {
-    if (event.button !== 0) return
+  let isResizing = false
+
+  const startResize = (
+    event: MouseEvent | PointerEvent,
+    moveEventName: "mousemove" | "pointermove",
+    upEventNames: readonly ("mouseup" | "pointerup" | "pointercancel")[]
+  ) => {
+    if (typeof event.button === "number" && event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
+    if (isResizing) return
+    isResizing = true
 
     const startX = event.clientX
     const configuredWidth = visualOptions.columnWidths[colIndex] ?? 0
@@ -169,7 +177,7 @@ export const attachColumnResizeHandle = (
       colEl.setAttribute("data-col-width", String(nextWidth))
     }
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMove = (moveEvent: MouseEvent | PointerEvent) => {
       hasMoved = true
       latestClientX = moveEvent.clientX
       if (rafId === null) {
@@ -183,22 +191,35 @@ export const attachColumnResizeHandle = (
       }
     }
 
-    const handleMouseUp = () => {
+    const handleUp = () => {
+      isResizing = false
       if (rafId !== null && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(rafId)
         rafId = null
       }
       if (hasMoved) applyWidth(latestClientX)
       if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
-        window.removeEventListener("mousemove", handleMouseMove)
-        window.removeEventListener("mouseup", handleMouseUp)
+        window.removeEventListener(moveEventName, handleMove)
+        for (const upName of upEventNames) {
+          window.removeEventListener(upName, handleUp)
+        }
       }
     }
 
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-      window.addEventListener("mousemove", handleMouseMove)
-      window.addEventListener("mouseup", handleMouseUp)
+      window.addEventListener(moveEventName, handleMove)
+      for (const upName of upEventNames) {
+        window.addEventListener(upName, handleUp)
+      }
     }
+  }
+
+  resizer.addEventListener("pointerdown", (event: PointerEvent) => {
+    startResize(event, "pointermove", ["pointerup", "pointercancel"])
+  })
+
+  resizer.addEventListener("mousedown", (event: MouseEvent) => {
+    startResize(event, "mousemove", ["mouseup"])
   })
 
   th.appendChild(resizer)

@@ -10,10 +10,12 @@ type TagsQueryData = {
   totalCount: number
 }
 
+const KO_COLLATOR = new Intl.Collator("ko")
+
 const toTagsQueryData = (tagCounts: Record<string, number>): TagsQueryData => {
   const tagEntries = Object.entries(tagCounts).sort((a, b) => {
     if (b[1] !== a[1]) return b[1] - a[1]
-    return a[0].localeCompare(b[0], "ko")
+    return KO_COLLATOR.compare(a[0], b[0])
   })
 
   return {

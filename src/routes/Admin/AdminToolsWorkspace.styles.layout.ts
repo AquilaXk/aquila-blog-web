@@ -295,6 +295,13 @@ export const DangerPanel = styled.div`
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.statusDangerBorder};
   background: rgba(239, 68, 68, 0.06);
+
+  fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
 `
 
 export const SandboxSection = styled.div`

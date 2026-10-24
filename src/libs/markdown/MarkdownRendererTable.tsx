@@ -110,31 +110,39 @@ export const MarkdownTableRenderer = ({
     if (!scrollElement) return
     const tableElement = scrollElement.querySelector("table")
 
-    const syncScrollHint = () => {
+    const syncDetectedColumns = () => {
       const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
       if (domCols > 0) {
         setDetectedColumnCount(domCols)
       }
+    }
+
+    const syncScrollHint = () => {
       const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
       const remaining = overflowAmount - scrollElement.scrollLeft
       setHasScrollLeft(scrollElement.scrollLeft > 2)
       setShowScrollHint(overflowAmount > 1 && remaining > 1)
     }
 
-    syncScrollHint()
+    const syncTableMetrics = () => {
+      syncDetectedColumns()
+      syncScrollHint()
+    }
+
+    syncTableMetrics()
     scrollElement.addEventListener("scroll", syncScrollHint, { passive: true })
-    window.addEventListener("resize", syncScrollHint)
+    window.addEventListener("resize", syncTableMetrics)
 
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => syncScrollHint())
+      resizeObserver = new ResizeObserver(() => syncTableMetrics())
       resizeObserver.observe(scrollElement)
       if (tableElement) resizeObserver.observe(tableElement)
     }
 
     return () => {
       scrollElement.removeEventListener("scroll", syncScrollHint)
-      window.removeEventListener("resize", syncScrollHint)
+      window.removeEventListener("resize", syncTableMetrics)
       resizeObserver?.disconnect()
     }
   }, [explicitTableWidth, isWideOverflowTable, usesExplicitNormalWidth])

@@ -36,6 +36,8 @@ export const MarkdownFootnoteReferenceLink = ({
   }
   const occurrence = footnote.referenceIds.indexOf(referenceId) + 1
   const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
+  const fallbackSuffix = `${footnote.identifier}-${occurrence}`
+  const tooltipId = `aq-footnote-tooltip-${referenceId || fallbackSuffix}`
 
   return (
     <sup className="aq-footnote-reference">
@@ -44,13 +46,13 @@ export const MarkdownFootnoteReferenceLink = ({
         href={href}
         id={referenceId}
         data-footnote-ref
-        aria-describedby="aq-footnote-heading"
+        aria-describedby={plainTextPreview ? tooltipId : "aq-footnote-heading"}
         aria-label={`각주 ${footnote.number} 참조 ${occurrence}`}
       >
         {children}
       </a>
       {plainTextPreview ? (
-        <span className="aq-footnote-popover" role="tooltip">
+        <span id={tooltipId} className="aq-footnote-popover" role="tooltip">
           {plainTextPreview}
         </span>
       ) : null}

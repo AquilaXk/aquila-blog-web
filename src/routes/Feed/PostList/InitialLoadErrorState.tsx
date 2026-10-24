@@ -76,5 +76,9 @@ const StyledWrapper = styled.section`
     font-size: 0.84rem;
     font-weight: 700;
     cursor: pointer;
+
+    @media (max-width: 768px) {
+      min-height: 44px;
+    }
   }
 `
