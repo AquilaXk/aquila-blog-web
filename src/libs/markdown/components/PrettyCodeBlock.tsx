@@ -34,28 +34,31 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   highlightLines,
   preElement,
 }) => {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
   const lineCount = useMemo(() => countRawCodeLines(rawCode), [rawCode])
   const isCollapsible = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
   const [isCollapsed, setIsCollapsed] = useState(isCollapsible)
   const label = title?.trim() || toLanguageLabel(language)
+  const copied = copyState === "copied"
+  const copyFailed = copyState === "failed"
 
   useEffect(() => {
     setIsCollapsed(lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD)
   }, [lineCount])
 
   useEffect(() => {
-    if (!copied) return
-    const timeout = window.setTimeout(() => setCopied(false), 1400)
+    if (copyState === "idle") return
+    const timeout = window.setTimeout(() => setCopyState("idle"), 1400)
     return () => window.clearTimeout(timeout)
-  }, [copied])
+  }, [copyState])
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(rawCode)
-      setCopied(true)
+      setCopyState("copied")
     } catch (error) {
       console.warn("[code-block] copy failed", error)
+      setCopyState("failed")
     }
   }
 
@@ -69,12 +72,12 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
         <span className="aq-code-title">{label}</span>
         <button
           type="button"
-          className={`aq-code-copy${copied ? " is-copied" : ""}`}
+          className={`aq-code-copy${copied ? " is-copied" : ""}${copyFailed ? " is-failed" : ""}`}
           onClick={handleCopy}
-          aria-label={copied ? "코드가 복사되었습니다" : "코드 복사"}
-          title={copied ? "복사됨" : "복사"}
+          aria-label={copied ? "코드가 복사되었습니다" : copyFailed ? "코드 복사에 실패했습니다" : "코드 복사"}
+          title={copied ? "복사됨" : copyFailed ? "복사 실패" : "복사"}
         >
-          {copied ? "COPIED" : "COPY"}
+          {copied ? "COPIED" : copyFailed ? "Copy failed" : "COPY"}
         </button>
       </div>
       <div className="aq-code-body">

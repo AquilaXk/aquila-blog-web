@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "src/apis/backend/client"
+import { normalizeMetaItems } from "src/apis/backend/posts/PostApiMappers"
 import {
   hasNonCanonicalPostImageSource,
   isCanonicalPostImageUploadUrl,
@@ -84,17 +85,6 @@ const EDITOR_TOGGLE_TITLE_PLACEHOLDER = "토글 제목"
 export const PREVIEW_SUMMARY_MAX_LENGTH = 150
 export const PREVIEW_SUMMARY_MAX_CONTENT_LENGTH = 50_000
 
-const normalizeMetaItems = (raw: string): string[] => {
-  const normalized = raw.trim().replace(/^\[|\]$/g, "")
-  if (!normalized) return []
-
-  return dedupeStrings(
-    normalized
-      .split(",")
-      .map((token) => token.trim().replace(/^['"]|['"]$/g, ""))
-  )
-}
-
 const normalizeMetaScalar = (raw: string) => raw.trim().replace(/^['"]|['"]$/g, "")
 
 export const extractFirstMarkdownImage = (content: string): string => {
@@ -102,12 +92,14 @@ export const extractFirstMarkdownImage = (content: string): string => {
   return match?.[1]?.trim() || ""
 }
 
+const FNV1A_32_OFFSET_BASIS = 2166136261
+const FNV1A_32_PRIME = 16777619
+
 export const computeContentFingerprint = (content: string): string => {
-  // Lightweight FNV-1a style hash to gate repeated derived calculations.
-  let hash = 2166136261
+  let hash = FNV1A_32_OFFSET_BASIS
   for (let index = 0; index < content.length; index += 1) {
     hash ^= content.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
+    hash = Math.imul(hash, FNV1A_32_PRIME)
   }
   return `${content.length}:${hash >>> 0}`
 }

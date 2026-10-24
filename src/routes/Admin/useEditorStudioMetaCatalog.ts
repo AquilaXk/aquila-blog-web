@@ -1,85 +1,55 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react"
-import { apiFetch } from "src/apis/backend/client"
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react"
+import { compareCategoryValues, normalizeCategoryValue } from "src/libs/utils"
+import { dedupeStrings } from "./editorStudioMetaModel"
 import {
-  dedupeStrings,
-  type MetaUsageMap,
-} from "./editorStudioMetaModel"
-
-type NoticeState = {
-  tone: "idle" | "loading" | "success" | "error"
-  text: string
-}
-
-type TagUsageDto = {
-  tag: string
-  count: number
-}
+  CATEGORY_CATALOG_STORAGE_KEY,
+  TAG_CATALOG_STORAGE_KEY,
+  persistCatalog,
+  readStoredCatalog,
+} from "./editorStudioStorageModel"
 
 type UseEditorStudioMetaCatalogParams = {
-  customTagCatalog: string[]
-  postTags: string[]
-  tagUsageMap: MetaUsageMap
-  setCustomTagCatalog: Dispatch<SetStateAction<string[]>>
-  setKnownTags: Dispatch<SetStateAction<string[]>>
-  setMetaCatalogLoading: Dispatch<SetStateAction<boolean>>
-  setMetaNotice: Dispatch<SetStateAction<NoticeState>>
+  postCategory: string
+  setPostCategory: Dispatch<SetStateAction<string>>
   setPostTags: Dispatch<SetStateAction<string[]>>
   setTagDraft: Dispatch<SetStateAction<string>>
-  setTagUsageMap: Dispatch<SetStateAction<MetaUsageMap>>
 }
 
 export const useEditorStudioMetaCatalog = ({
-  customTagCatalog,
-  setCustomTagCatalog,
-  setKnownTags,
-  setMetaCatalogLoading,
-  setMetaNotice,
+  postCategory,
+  setPostCategory,
   setPostTags,
   setTagDraft,
-  setTagUsageMap,
-  tagUsageMap,
 }: UseEditorStudioMetaCatalogParams) => {
-  const refreshEditorMetaCatalog = useCallback(async () => {
-    setMetaCatalogLoading(true)
+  const [customTagCatalog, setCustomTagCatalog] = useState<string[]>([])
+  const [customCategoryCatalog, setCustomCategoryCatalog] = useState<string[]>([])
 
-    try {
-      const nextTagUsageMap: MetaUsageMap = {}
-      const tagRows = await apiFetch<TagUsageDto[]>("/post/api/v1/posts/tags").catch(() => [] as TagUsageDto[])
-
-      tagRows.forEach((row) => {
-        const key = typeof row.tag === "string" ? row.tag.trim() : ""
-        if (!key) return
-        nextTagUsageMap[key] = Number.isFinite(row.count) ? row.count : 0
-      })
-
-      setTagUsageMap(nextTagUsageMap)
-      setKnownTags(
-        dedupeStrings([...Object.keys(nextTagUsageMap), ...customTagCatalog]).sort((a, b) =>
-          a.localeCompare(b)
-        )
+  useEffect(() => {
+    setCustomTagCatalog(readStoredCatalog(TAG_CATALOG_STORAGE_KEY))
+    setCustomCategoryCatalog(
+      dedupeStrings(readStoredCatalog(CATEGORY_CATALOG_STORAGE_KEY).map(normalizeCategoryValue)).sort(
+        compareCategoryValues
       )
-    } finally {
-      setMetaCatalogLoading(false)
-    }
-  }, [customTagCatalog, setKnownTags, setMetaCatalogLoading, setTagUsageMap])
+    )
+  }, [])
+
+  useEffect(() => {
+    persistCatalog(TAG_CATALOG_STORAGE_KEY, customTagCatalog)
+  }, [customTagCatalog])
+
+  useEffect(() => {
+    persistCatalog(CATEGORY_CATALOG_STORAGE_KEY, customCategoryCatalog)
+  }, [customCategoryCatalog])
 
   const addTagsToPost = useCallback((values: string[]) => {
     const normalizedTags = dedupeStrings(values.map((value) => value.trim()).filter(Boolean))
     if (normalizedTags.length === 0) return []
 
     setPostTags((prev) => dedupeStrings([...prev, ...normalizedTags]))
-    setKnownTags((prev) => dedupeStrings([...prev, ...normalizedTags]).sort((a, b) => a.localeCompare(b)))
     setCustomTagCatalog((prev) => dedupeStrings([...prev, ...normalizedTags]).sort((a, b) => a.localeCompare(b)))
-    setMetaNotice({
-      tone: "success",
-      text:
-        normalizedTags.length === 1
-          ? `태그 "${normalizedTags[0]}"를 추가했습니다. 현재 글에서 바로 사용할 수 있습니다.`
-          : `태그 ${normalizedTags.length}개를 추가했습니다. 현재 글에서 바로 사용할 수 있습니다.`,
-    })
 
     return normalizedTags
-  }, [setCustomTagCatalog, setKnownTags, setMetaNotice, setPostTags])
+  }, [setPostTags])
 
   const addTagToPost = useCallback((value: string) => {
     const added = addTagsToPost([value])
@@ -90,31 +60,30 @@ export const useEditorStudioMetaCatalog = ({
     setPostTags((prev) => prev.filter((tag) => tag !== value))
   }, [setPostTags])
 
-  const deleteTagFromCatalog = useCallback((tag: string) => {
-    const usageCount = tagUsageMap[tag] || 0
+  const handlePostCategoryChange = useCallback((value: string) => {
+    setPostCategory(value)
+  }, [setPostCategory])
 
-    if (usageCount > 0) {
-      setMetaNotice({
-        tone: "error",
-        text: `사용 중인 태그 "${tag}"는 삭제할 수 없습니다. 현재 ${usageCount}개 글에서 사용 중입니다.`,
-      })
+  const commitPostCategory = useCallback(() => {
+    if (!postCategory.trim()) {
+      setPostCategory("")
       return
     }
-
-    setCustomTagCatalog((prev) => prev.filter((item) => item !== tag))
-    setKnownTags((prev) => prev.filter((item) => item !== tag))
-    setPostTags((prev) => prev.filter((item) => item !== tag))
-    setMetaNotice({
-      tone: "success",
-      text: `태그 "${tag}"를 카탈로그에서 삭제했습니다.`,
+    const category = normalizeCategoryValue(postCategory)
+    setPostCategory(category)
+    if (!category) return
+    setCustomCategoryCatalog((current) => {
+      if (current.includes(category)) return current
+      return dedupeStrings([...current, category]).sort(compareCategoryValues)
     })
-  }, [setCustomTagCatalog, setKnownTags, setMetaNotice, setPostTags, tagUsageMap])
+  }, [postCategory, setPostCategory])
 
   return {
     addTagsToPost,
     addTagToPost,
-    deleteTagFromCatalog,
-    refreshEditorMetaCatalog,
+    commitPostCategory,
+    customCategoryCatalog,
+    handlePostCategoryChange,
     removeTagFromPost,
   }
 }

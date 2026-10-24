@@ -20,12 +20,7 @@ import {
 
 type UseEditorStudioUnsavedExitGuardParams = {
   enabled: boolean
-  /** Render-time dirty (closes dialog when a save clears dirty). */
   isDirty: boolean
-  /**
-   * Navigation-time dirty check. Prefer live markdown (flush / postContentLiveRef)
-   * so focused typing is not lost behind a lagged postContent transition.
-   */
   getIsDirty?: () => boolean
 }
 
@@ -65,10 +60,8 @@ export const useEditorStudioUnsavedExitGuard = ({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const pendingRef = useRef<PendingNavigation | null>(null)
   const allowNavigationRef = useRef(false)
-  /** Set when forced exit is allowed so preferHardNavigation reload skips beforeunload. */
   const allowBeforeUnloadBypassRef = useRef(false)
   const pendingRouteIntentRef = useRef<EditorRouteNavigationIntent | null>(null)
-  /** Last Next.js history.state while settled on the editor (before a blocked pop). */
   const editorHistoryStateRef = useRef<unknown>(null)
   const getIsDirtyRef = useRef(getIsDirty)
   const isDirtyRef = useRef(isDirty)
@@ -89,9 +82,6 @@ export const useEditorStudioUnsavedExitGuard = ({
     setConfirmOpen(false)
   }, [])
 
-  // Clean save / guard disable must not leave a stale confirm + pending navigation.
-  // Require live dirty clear too so a dialog opened from getIsDirty is not closed
-  // while postContent is still catching up behind startTransition.
   useEffect(() => {
     if (!enabled) {
       closeConfirm()
@@ -109,16 +99,12 @@ export const useEditorStudioUnsavedExitGuard = ({
     if (!pending) return
 
     if (pending.kind === "action") {
-      // handleExitDedicatedEditor uses router.replace and will hit routeChangeStart.
-      // Keep allow until routeChangeComplete / routeChangeError clears it.
       allowNavigationRef.current = true
       pending.action?.()
       return
     }
 
     if (pending.kind === "history") {
-      // Block path restored the editor URL with pushState on top of the destination,
-      // so confirm is always history.back() — no forward/back classification.
       allowNavigationRef.current = true
       window.history.back()
       return
@@ -174,7 +160,6 @@ export const useEditorStudioUnsavedExitGuard = ({
     }) as typeof router.replace
 
     router.beforePopState(({ as }) => {
-      // Allowed retry after confirm — clear here so a microtask cannot race popstate.
       if (allowNavigationRef.current) {
         clearAllowNavigation()
         return true
@@ -189,8 +174,6 @@ export const useEditorStudioUnsavedExitGuard = ({
 
       pendingRef.current = { kind: "history" }
       setConfirmOpen(true)
-      // Browser already applied the pop; restore editor URL with the pre-pop Next
-      // history state so later Back can re-render the editor (not URL-only).
       restoreEditorUrlAfterBlockedHistoryPop(
         router.asPath,
         window.history,
@@ -213,7 +196,6 @@ export const useEditorStudioUnsavedExitGuard = ({
       if (allowNavigationRef.current) return
       if (nextUrl === router.asPath) return
       if (isSamePathEditorSurfaceNavigation(router.asPath, nextUrl)) return
-      // Temp-post bootstrap replace must proceed even if the new editor is already dirty.
       if (isEditorStudioBootstrapNavigation(router.asPath, nextUrl)) return
 
       pendingRef.current = {
@@ -238,7 +220,6 @@ export const useEditorStudioUnsavedExitGuard = ({
     const handleRouteChangeError = () => {
       clearAllowNavigation()
       allowBeforeUnloadBypassRef.current = false
-      // Keep scheduled admin-loss marks; only drop an in-flight active bypass.
       clearActiveForcedEditorExitUrl()
     }
 
@@ -261,7 +242,6 @@ export const useEditorStudioUnsavedExitGuard = ({
     }
   }, [clearAllowNavigation, enabled, readIsDirty, router])
 
-  // Keep this module .ts (no JSX) so next lint/eslint can parse it.
   const dialog = createElement(ConfirmDialog, {
     open: confirmOpen,
     titleId,

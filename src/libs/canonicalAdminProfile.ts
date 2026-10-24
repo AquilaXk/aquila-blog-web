@@ -7,7 +7,6 @@ const strings = (value: Record<string, unknown>, keys: string[], required = fals
 const array = (value: unknown, accepts: (item: unknown) => boolean) =>
   value === undefined || (Array.isArray(value) && value.every(accepts))
 
-// 화면에서 소비하는 형태만 확인한다. 빈 값·추가 필드·원본 객체는 변경하지 않는다.
 export const parseCanonicalAdminProfile = (value: unknown): AdminProfile => {
   if (!isRecord(value) ||
     !strings(value, ["username", "name", "nickname", "profileImageUrl"], true) ||

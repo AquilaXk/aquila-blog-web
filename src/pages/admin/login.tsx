@@ -88,9 +88,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
         setEmail(normalizeAuthEmail(savedEmail))
         setSaveEmail(true)
       }
-    } catch {
-      // Browser storage is optional for login preferences.
-    }
+    } catch {}
     setHydrated(true)
   }, [])
 
@@ -120,9 +118,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
         return
       }
       window.localStorage.removeItem(ADMIN_SAVED_EMAIL_STORAGE_KEY)
-    } catch {
-      // Browser storage is optional for login preferences.
-    }
+    } catch {}
   }
 
   const resetChallenge = () => {

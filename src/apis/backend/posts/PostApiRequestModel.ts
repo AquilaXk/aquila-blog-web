@@ -63,9 +63,7 @@ export const recordRuntimeEndpoint = (path: string, paginationMode: "page" | "cu
     const next = [...parsed, entry].slice(-POSTS_ENDPOINT_TRACE_MAX)
     window.sessionStorage.setItem(POSTS_ENDPOINT_TRACE_KEY, JSON.stringify(next))
     traceWindow.__aqPostEndpointTrace = next
-  } catch {
-    // ignore trace storage failures
-  }
+  } catch {}
 
   if (paginationMode === "cursor") {
     console.info("[posts-runtime-endpoint] cursor endpoint detected", path)

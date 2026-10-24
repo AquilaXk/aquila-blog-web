@@ -1,4 +1,13 @@
-import { useCallback, useMemo, useState } from "react"
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type ChangeEventHandler,
+  type ClipboardEventHandler,
+  type KeyboardEventHandler,
+  type PointerEventHandler,
+  type RefObject,
+} from "react"
 import {
   clampThumbnailZoom,
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -15,7 +24,7 @@ import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
-import { deriveComposeViewModel, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PublishActionType } from "./editorStudioState"
+import { deriveEditorPersistenceState, derivePublishActionViewModel, type PostVisibility, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
 import { buildEditorStateFingerprint, detectPublishPlaceholderIssue, type LocalDraftSource } from "./editorStudioMetaModel"
@@ -23,7 +32,6 @@ import { isLocalDraftRestoreSuggestionEligible, type LocalDraftFingerprintSnapsh
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 
 type EditorStudioWorkspaceControllerRootViewBag = {
-  [key: string]: unknown
   addTagsToPost: (tags: string[]) => void
   addTagToPost: (tag: string) => void
   applyFirstBodyImageToThumbnail: () => void
@@ -37,7 +45,7 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   dismissLocalDraftRestoreSuggestion: () => void
   disabled: (key: string) => boolean
   editorMode: "create" | "edit"
-  finalizePreviewThumbPointer: any
+  finalizePreviewThumbPointer: PointerEventHandler<HTMLDivElement>
   handleMarkdownEditorChange: (next: string, meta?: { editorFocused: boolean }) => void
   handleMarkdownEditorFileUpload: (file: File) => Promise<{
     url?: string
@@ -53,14 +61,14 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   commitPostCategory: () => void
   handlePostCategoryChange: (value: string) => void
   handlePostSummaryChange: (value: string) => void
-  handlePreviewThumbPointerDown: any
-  handlePreviewThumbPointerMove: any
-  handleThumbnailImageFileChange: any
-  handleThumbnailPaste: any
+  handlePreviewThumbPointerDown: PointerEventHandler<HTMLDivElement>
+  handlePreviewThumbPointerMove: PointerEventHandler<HTMLDivElement>
+  handleThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
+  handleThumbnailPaste: ClipboardEventHandler<HTMLElement>
   handleThumbnailUrlModalChange: (value: string) => void
-  handleTitleChange: any
+  handleTitleChange: ChangeEventHandler<HTMLTextAreaElement>
   handleTitleFieldRef: (node: HTMLTextAreaElement | null) => void
-  handleTitleKeyDown: any
+  handleTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
   handleFocusTitle: () => void
   isCompactMobileLayout: boolean
   isDedicatedEditorRoute: boolean
@@ -93,11 +101,11 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   postThumbnailUrl: string
   postThumbnailZoom: number
   postTitle: string
-  postVisibility: any
+  postVisibility: PostVisibility
   publishActionType: PublishActionType
   publishModalNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
   publishNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
-  previewThumbFrameRef: any
+  previewThumbFrameRef: RefObject<HTMLDivElement | null>
   previewThumbTransformRef: { current: { focusX: number; focusY: number; zoom: number } }
   resetThumbnailToAutoMode: () => void
   removeTagFromPost: (tag: string) => void
@@ -111,10 +119,10 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   setIsMobileMetaEditorOpen: (updater: (current: boolean) => boolean) => void
   setIsMobileThumbnailEditorOpen: (updater: (current: boolean) => boolean) => void
   setIsPreviewThumbnailError: (value: boolean) => void
-  setPostVisibility: (value: any) => void
+  setPostVisibility: (nextVisibility: PostVisibility) => void
   setTagDraft: (value: string) => void
   tagDraft: string
-  thumbnailImageFileInputRef: any
+  thumbnailImageFileInputRef: RefObject<HTMLInputElement | null>
   thumbnailImageFileName: string
 }
 
@@ -149,7 +157,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   const handleMarkdownUploadingChange = useCallback((nextIsUploading: boolean) => {
     setIsMarkdownUploading(nextIsUploading)
   }, [])
-  const currentFlags = toFlags(postVisibility)
   const pristineCreateFingerprint = useMemo(
     () =>
       buildEditorStateFingerprint({
@@ -199,21 +206,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       postVisibility,
     ]
   )
-  const currentVisibilityText = getVisibilityLabel(currentFlags.published, currentFlags.listed)
-  const composeViewModel = useMemo(
-    () =>
-      deriveComposeViewModel({
-        editorMode,
-        isTempDraftMode,
-        postId,
-        postTitle,
-        postSummary,
-        postTags,
-        currentVisibilityText,
-      }),
-    [currentVisibilityText, editorMode, isTempDraftMode, postId, postSummary, postTags, postTitle]
-  )
-  const { hasSelectedManagedPost } = composeViewModel
+  const hasSelectedManagedPost = editorMode === "edit" && postId.trim().length > 0
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
   const publishPlaceholderIssue = hasEditorMinimumFields
@@ -277,7 +270,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         category: postCategory,
         visibility: postVisibility,
       }),
-      // Read baselines at navigation time so a just-finished save is respected.
       serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
       localDraftFingerprint: lastLocalDraftFingerprintRef.current,
       localDraftSavedAt,
@@ -331,7 +323,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishActionTriggerDisabled,
   } = publishActionViewModel
   const shouldShowPublishModalNotice = publishModalNotice.tone !== "idle"
-  const isCompactSplitPreview = false
   const shouldShowPublishNotice = publishNotice.tone !== "idle"
   const isThumbnailUploadDisabled = disabled("uploadThumbnail")
   const handleThumbnailZoomModalChange = useCallback(
@@ -468,7 +459,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         primaryActionDisabled={publishActionTriggerDisabled}
         primaryActionLabel="발행하기"
         onPrimaryAction={() => openPublishModal(editorPrimaryActionType)}
-        isCompactSplitPreview={isCompactSplitPreview}
         postTags={postTags}
         tagDraft={tagDraft}
         onTagDraftChange={setTagDraft}

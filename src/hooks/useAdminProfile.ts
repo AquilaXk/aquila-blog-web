@@ -21,7 +21,6 @@ export const refreshAdminProfileCache = async (queryClient: QueryClient): Promis
     setAdminProfileCache(queryClient, await fetchPublicAdminProfile())
     return true
   } catch {
-    // 갱신 실패 시 이전 프로필이나 세션 데이터로 공개본을 복원하지 않는다.
     return false
   }
 }

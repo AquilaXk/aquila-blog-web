@@ -14,7 +14,6 @@ type Props = {
 const BrandMark: React.FC<Props> = ({ className, priority = false }) => {
   return (
     <span className={className} aria-hidden="true">
-      {/* Hot path icon: keep native img to avoid next/image runtime cost in shared header bundle. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand-mascot.d43c0dc3.png"
@@ -29,5 +28,20 @@ const BrandMark: React.FC<Props> = ({ className, priority = false }) => {
     </span>
   )
 }
+
+export const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
 
 export default BrandMark

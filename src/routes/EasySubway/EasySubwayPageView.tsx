@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { CONFIG } from "site.config"
+import { ArrowRightGlyph } from "src/components/branding/BrandMark"
 import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
 import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
 import useScrollReveal from "src/routes/EasySubway/useScrollReveal"
@@ -23,21 +24,6 @@ import {
 import * as S from "src/routes/EasySubway/EasySubwayPage.styles"
 
 const [PICK_FEATURE, ROUTE_FEATURE] = PRODUCT_FEATURES
-
-const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 15 }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
 
 export const EasySubwayMetroDirectory: React.FC<{ badges?: MetroBadgeItem[] }> = ({
   badges = OFFICIAL_METRO_BADGES,
@@ -270,7 +256,7 @@ const EasySubwayPageView: React.FC<Props> = ({ surfaceUrl }) => {
                         />
                       </picture>
                     </div>
-                    <figcaption>노선도 화면 일부 — 역 선택 시 출발·경유·도착 지정</figcaption>
+                    <figcaption>노선도 화면 일부. 역을 눌러 출발·경유·도착을 바로 지정합니다.</figcaption>
                   </S.DetailCrop>
                 </S.FeatureStage>
               </div>

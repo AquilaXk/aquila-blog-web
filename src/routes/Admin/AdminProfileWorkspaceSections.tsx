@@ -1,5 +1,3 @@
-import type { AuthMember } from "src/hooks/useAuthSession"
-import type { ProfileWorkspaceContent } from "src/libs/profileWorkspace"
 import { clampProfileImageEditZoom } from "src/libs/profileImageUpload"
 import AdminShell from "src/routes/Admin/AdminShell"
 import {
@@ -19,6 +17,7 @@ import {
   WorkspaceShell,
 } from "src/routes/Admin/AdminProfileWorkspace.styles"
 import { WORKSPACE_SECTIONS } from "src/routes/Admin/AdminProfileWorkspaceModel"
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 import AdminProfileImageEditorModal from "src/routes/Admin/AdminProfileImageEditorModal"
 import AdminProfilePreviewRail from "src/routes/Admin/AdminProfilePreviewRail"
 import { renderAdminProfileWorkspaceSection } from "src/routes/Admin/AdminProfileWorkspaceSectionRenderer"
@@ -28,7 +27,7 @@ import {
   AdminWorkspaceHeroLayout,
 } from "src/routes/Admin/AdminSurfacePrimitives"
 
-export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
+export const AdminProfileWorkspaceSections = (props: AdminProfileWorkspaceSectionProps) => {
   const {
     activeSection,
     displayNameInput,
@@ -45,7 +44,6 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
     hasPublishedDiff,
     hasUnsavedChanges,
     imageNotice,
-    initialMember,
     initialProfileSnapshot,
     isPreviewExpanded,
     isProfileImageDraftDragging,
@@ -71,11 +69,7 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
     setPreviewMode,
     workspaceNotice,
     clearProfileImageDraft,
-  } = props as Record<string, any> & {
-    draft: ProfileWorkspaceContent
-    initialMember: AuthMember
-    publishedSnapshot: ProfileWorkspaceContent
-  }
+  } = props
   const displayName = (displayNameInput ?? "").trim() || sessionMember.nickname || sessionMember.username || "관리자"
   const previewContent = previewMode === "published" ? publishedSnapshot : draft
   const missingExposureItems: string[] = []
@@ -97,7 +91,7 @@ export const AdminProfileWorkspaceSections = (props: Record<string, any>) => {
 
 
   return (
-    <AdminShell currentSection="profile" member={sessionMember || initialMember} profileSnapshot={initialProfileSnapshot}>
+    <AdminShell currentSection="profile" member={sessionMember} profileSnapshot={initialProfileSnapshot}>
       <Main>
       <input
         ref={profileImageFileInputRef}

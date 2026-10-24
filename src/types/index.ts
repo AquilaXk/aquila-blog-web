@@ -4,7 +4,6 @@ import { EmotionCache } from "@emotion/cache"
 import { ReactElement, ReactNode } from "react"
 import type { components } from "@shared/contracts"
 
-// TODO: refactor types
 export type NextPageWithLayout<PageProps = {}> = NextPage<PageProps> & {
   getLayout?: (page: ReactElement) => ReactNode
 }
@@ -42,7 +41,6 @@ export type TPost = {
   actorCanModify?: boolean
   actorCanDelete?: boolean
 
-  // Legacy Notion schema compatibility fields
   date?: { start_date: string }
   type?: TPostType[]
   status?: TPostStatus[]

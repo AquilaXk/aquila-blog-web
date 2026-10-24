@@ -9,13 +9,9 @@ import {
   useState,
   useTransition,
 } from "react"
-import { apiFetch } from "src/apis/backend/client"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import useAuthSession from "src/hooks/useAuthSession"
-import {
-  compareCategoryValues,
-  normalizeCategoryValue,
-} from "src/libs/utils"
+import { normalizeCategoryValue } from "src/libs/utils"
 import {
   toFlags,
   toVisibility,
@@ -23,16 +19,13 @@ import {
   type PostVisibility,
   type PublishActionType,
 } from "./editorStudioState"
-import { useEditorStudioAdminPostFlow } from "./useEditorStudioAdminPostFlow"
 import { useEditorStudioDraftLifecycle } from "./useEditorStudioDraftLifecycle"
 import { useEditorStudioPersistence } from "./useEditorStudioPersistence"
 import { useEditorStudioRouting } from "./useEditorStudioRouting"
-import { useEditorStudioListConditions } from "./useEditorStudioListConditions"
 import { useEditorStudioThumbnailControls } from "./useEditorStudioThumbnailControls"
 import { useEditorStudioThumbnailPreview } from "./useEditorStudioThumbnailPreview"
 import { useEditorStudioMetaCatalog } from "./useEditorStudioMetaCatalog"
 import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFlow"
-import { useEditorStudioUtilityCommands } from "./useEditorStudioUtilityCommands"
 import { useEditorStudioWorkspaceControllerRuntime } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioWorkspaceControllerRootView } from "./EditorStudioWorkspaceControllerRootView"
 import {
@@ -46,11 +39,9 @@ import {
   normalizeSafeImageUrl,
   normalizeSafePreviewThumbnailUrl,
   resolveEditorMetaSnapshot,
-  type LocalDraftSource,
-  type MetaUsageMap,
   type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
-import { replaceShallowRoutePreservingScroll, toAdminLoginPath } from "src/libs/router"
+import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import type { AdminPageProps } from "src/libs/server/adminPage"
 import {
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -59,18 +50,13 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import {
-  CATEGORY_CATALOG_STORAGE_KEY,
-  TAG_CATALOG_STORAGE_KEY,
-  persistCatalog,
   persistLocalDraft,
   readLocalDraft,
-  readStoredCatalog,
   removeLocalDraft,
 } from "./editorStudioStorageModel"
 import {
   ADMIN_POSTS_WORKSPACE_ROUTE,
   EDITOR_NEW_ROUTE_PATH,
-  GLOBAL_NOTICE_IDLE_TEXT,
   buildEffectiveThumbnailUrl,
   buildEmptyEditorMetaSnapshot,
   extractImageFileFromClipboard,
@@ -81,14 +67,11 @@ import {
   requestTempPostWithConflictRetry,
   toEditorPostRoute,
   uploadWithConflictRetry,
-  type ComposeMobileStudioStep,
-  type ManageMobileStudioStep,
   type NoticeState,
   type PostForEditor,
   type CanonicalSummaryState,
   type SummaryIntent,
   type RsData,
-  type StudioSurface,
 } from "./EditorStudioWorkspaceControllerRootModel"
 
 type MarkdownEditorFlush = () => string
@@ -103,7 +86,7 @@ export const EditorStudioWorkspaceController = ({
 }: EditorStudioWorkspaceControllerProps) => {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { me, authStatus, setMe } = useAuthSession()
+  const { me, authStatus } = useAuthSession()
   // SSR admin 스냅샷이 있는 전용 편집 라우트는 hydration/auth race 동안에도
   // 최초 보호 상태를 유지해야 한다. bare `me === null`만 보고 즉시 로그인으로
   // 보내면 WebKit 같은 브라우저에서 false logout redirect가 발생할 수 있다.
@@ -128,31 +111,15 @@ export const EditorStudioWorkspaceController = ({
   const [postTags, setPostTags] = useState<string[]>([])
   const [postCategory, setPostCategory] = useState("")
   const [tagDraft, setTagDraft] = useState("")
-  const [customTagCatalog, setCustomTagCatalog] = useState<string[]>([])
-  const [customCategoryCatalog, setCustomCategoryCatalog] = useState<string[]>([])
-  const [knownTags, setKnownTags] = useState<string[]>([])
-  const [tagUsageMap, setTagUsageMap] = useState<MetaUsageMap>({})
-  const [, setMetaCatalogLoading] = useState(false)
   const [postVisibility, setPostVisibility] = useState<PostVisibility>("PUBLIC_LISTED")
   const [publishNotice, setPublishNotice] = useState<NoticeState>({
     tone: "idle",
-    text: "작성 후 ‘글 작성’을 누르면 결과가 여기에 표시됩니다.",
+    text: "",
   })
   const [publishModalNotice, setPublishModalNotice] = useState<NoticeState>({
     tone: "idle",
-    text: "발행 전 설정을 점검한 뒤 실행하면 결과가 여기에 표시됩니다.",
+    text: "",
   })
-  const [globalNotice, setGlobalNotice] = useState<NoticeState>({
-    tone: "idle",
-    text: GLOBAL_NOTICE_IDLE_TEXT,
-  })
-  const [metaNotice, setMetaNotice] = useState<NoticeState>({
-    tone: "idle",
-    text: "기존 글의 태그를 선택하거나 새 값을 추가할 수 있습니다. 사용 중인 태그는 삭제할 수 없습니다.",
-  })
-  const [activeMetaPanel, setActiveMetaPanel] = useState<"tag" | "category" | null>(null)
-  const [isComposeAssistOpen, setIsComposeAssistOpen] = useState(false)
-  const [isComposeUtilityOpen, setIsComposeUtilityOpen] = useState(false)
   const postContentLiveRef = useRef(postContent)
   const flushEditorMarkdownRef = useRef<MarkdownEditorFlush | null>(null)
   const deferredContentDerivedCacheRef = useRef<{
@@ -166,10 +133,6 @@ export const EditorStudioWorkspaceController = ({
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState("")
-  const [localDraftSlotLabel, setLocalDraftSlotLabel] = useState("")
-  const [mobileManageStep, setMobileManageStep] = useState<ManageMobileStudioStep>("query")
-  const [mobileComposeStep, setMobileComposeStep] = useState<ComposeMobileStudioStep>("edit")
-  const [studioSurface, setStudioSurface] = useState<StudioSurface>("compose")
   const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(false)
   const [isMobileThumbnailEditorOpen, setIsMobileThumbnailEditorOpen] = useState(false)
   const [isMobileMetaEditorOpen, setIsMobileMetaEditorOpen] = useState(false)
@@ -184,7 +147,6 @@ export const EditorStudioWorkspaceController = ({
       return
     }
 
-    // 외부 문서 동기화는 편집기에서 제외하므로 빈 문자열도 실제 입력으로 반영한다.
     if (meta?.editorFocused) {
       postContentLiveRef.current = nextMarkdown
       startPostContentTransition(() => {
@@ -210,32 +172,10 @@ export const EditorStudioWorkspaceController = ({
     return postContentLiveRef.current
   }, [])
 
-  const {
-    listPage,
-    listPageSize,
-    listKw,
-    setListKw,
-    listSort,
-    listScope,
-    setListScope,
-    listQuickPreset,
-    setListQuickPreset,
-    isListAdvancedOpen,
-    handleListPageChange,
-    handleListPageSizeChange,
-    handleListSortChange,
-    applyListQuickPreset,
-    resetListFilters,
-    toggleListAdvanced,
-  } = useEditorStudioListConditions()
-  const [isDirectLoadOpen, setIsDirectLoadOpen] = useState(false)
-  const [isSelectedToolsOpen, setIsSelectedToolsOpen] = useState(false)
-
   const isDedicatedEditorRoute = router.pathname.startsWith("/admin/editor")
   const isDedicatedNewEditorRoute = isDedicatedEditorRoute && router.pathname === EDITOR_NEW_ROUTE_PATH
   const [isNewEditorBootstrapPending, setIsNewEditorBootstrapPending] = useState(isDedicatedNewEditorRoute)
   const redirectingRef = useRef(false)
-  const hydratedAdminIdRef = useRef<number | null>(null)
   const autoLoadedPostIdRef = useRef<string | null>(null)
   const autoCreatedTempDraftRef = useRef(false)
   const tempPostRequestRef = useRef<Promise<RsData<PostForEditor>> | null>(null)
@@ -246,13 +186,11 @@ export const EditorStudioWorkspaceController = ({
   const {
     disabled,
     handleFocusTitle,
-    handleSelectedPostIdChange,
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
     publishModalHintByAction,
     refreshPublicPostReadViews,
-    run,
     setPublishStatus,
   } = useEditorStudioWorkspaceControllerRuntime({
     isPublishModalOpen,
@@ -261,7 +199,6 @@ export const EditorStudioWorkspaceController = ({
     postTitle,
     queryClient,
     setEditorMode,
-    setGlobalNotice,
     setIsTempDraftMode,
     setLoadingKey,
     setPostId,
@@ -270,15 +207,6 @@ export const EditorStudioWorkspaceController = ({
     setPublishModalNotice,
     setPublishNotice,
     setResult,
-  })
-
-  const {
-    handleHitPost,
-    handleReadPostCount,
-    handleReadSystemHealth,
-  } = useEditorStudioUtilityCommands({
-    postId,
-    run,
   })
 
   useEffect(() => {
@@ -300,19 +228,7 @@ export const EditorStudioWorkspaceController = ({
     return () => media.removeListener(sync)
   }, [])
 
-  useEffect(() => {
-    setStudioSurface("compose")
-  }, [])
-
-  const activateManageSurface = useCallback(() => {
-    setStudioSurface("manage")
-    if (!router.isReady) return
-    const nextQuery = { ...router.query, surface: "manage" }
-    void replaceShallowRoutePreservingScroll(router, { query: nextQuery })
-  }, [router])
-
   const activateComposeSurface = useCallback(() => {
-    setStudioSurface("compose")
     if (!router.isReady) return
     const nextQuery = { ...router.query }
     delete nextQuery.surface
@@ -333,7 +249,6 @@ export const EditorStudioWorkspaceController = ({
     setPreviewThumbnailSourceUrl(snapshot.thumbnailUrl)
     setPostTags(snapshot.tags)
     setPostCategory(snapshot.category)
-    setKnownTags((prev) => dedupeStrings([...prev, ...snapshot.tags]).sort((a, b) => a.localeCompare(b)))
     return snapshot
   }, [])
 
@@ -350,10 +265,7 @@ export const EditorStudioWorkspaceController = ({
     restoreLocalDraft,
     selectLocalDraftCandidate,
     discardLocalDraftCandidate,
-    saveLocalDraft,
     signalLocalDraftBaselineReady,
-    signalLocalDraftRemoved,
-    switchToCreateMode,
   } = useEditorStudioDraftLifecycle({
     router,
     toEditorPostRoute,
@@ -374,7 +286,6 @@ export const EditorStudioWorkspaceController = ({
     postCategory,
     postVisibility,
     editorMode,
-    isCompactMobileLayout,
     setEditorMode,
     setIsTempDraftMode,
     setPostId,
@@ -392,13 +303,10 @@ export const EditorStudioWorkspaceController = ({
     setPostTags,
     setPostCategory,
     setPostVisibility,
-    setKnownTags,
     setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
     setLoadingKey,
     setResult,
     setIsNewEditorBootstrapPending,
-    setMobileComposeStep,
     activateComposeSurface,
     setPublishStatus,
     dedupeStrings,
@@ -447,8 +355,6 @@ export const EditorStudioWorkspaceController = ({
     return next
   }, [deferredPostContent])
 
-  const resolvedPreviewSummary = postSummary
-
   const handlePostSummaryChange = useCallback((summary: string) => {
     if (summary.trim()) {
       setPostSummary(summary)
@@ -492,7 +398,7 @@ export const EditorStudioWorkspaceController = ({
   } = useEditorStudioThumbnailPreview({
     safePreviewThumbnail,
     isPublishModalOpen,
-    isComposeAssistOpen,
+    isComposeAssistOpen: false,
     postThumbnailFocusX,
     postThumbnailFocusY,
     postThumbnailZoom,
@@ -523,20 +429,15 @@ export const EditorStudioWorkspaceController = ({
   const {
     addTagsToPost,
     addTagToPost,
-    deleteTagFromCatalog,
-    refreshEditorMetaCatalog,
+    commitPostCategory,
+    customCategoryCatalog,
+    handlePostCategoryChange,
     removeTagFromPost,
   } = useEditorStudioMetaCatalog({
-    customTagCatalog,
-    postTags,
-    setCustomTagCatalog,
-    setKnownTags,
-    setMetaCatalogLoading,
-    setMetaNotice,
+    postCategory,
+    setPostCategory,
     setPostTags,
     setTagDraft,
-    setTagUsageMap,
-    tagUsageMap,
   })
 
   const {
@@ -579,9 +480,7 @@ export const EditorStudioWorkspaceController = ({
     setPostSummary,
     setPostSummarySource,
     setSummaryIntent,
-    setKnownTags,
     setLocalDraftSavedAt,
-    setLocalDraftSlotLabel,
     setPublishStatus,
     setLoadingKey,
     setResult,
@@ -604,49 +503,6 @@ export const EditorStudioWorkspaceController = ({
     uploadWithConflictRetry,
     normalizeSafeImageUrl,
     extractImageFileFromClipboard,
-  })
-
-  const {
-    adminPostRows,
-    adminPostTotal,
-    adminPostViewRows,
-    closeDeleteConfirm,
-    deleteConfirmNotice,
-    deleteConfirmState,
-    deletePostsFromList,
-    deletedListNotice,
-    handleUndoSoftDelete,
-    hardDeleteDeletedPostFromList,
-    isAllVisiblePostsSelected,
-    loadAdminPosts,
-    modifiedSortOrder,
-    openDeleteConfirm,
-    restoreDeletedPostFromList,
-    selectedPostIdSet,
-    selectedPostIds,
-    setModifiedSortOrder,
-    setSelectedPostIds,
-    softDeleteUndoState,
-    togglePostSelection,
-    toggleSelectAllVisiblePosts,
-  } = useEditorStudioAdminPostFlow({
-    activateManageSurface,
-    isCompactMobileLayout,
-    listKw,
-    listPage,
-    listPageSize,
-    listQuickPreset,
-    listScope,
-    listSort,
-    postId,
-    pretty,
-    refreshPublicPostReadViews,
-    setGlobalNotice,
-    setListQuickPreset,
-    setLoadingKey,
-    setMobileManageStep,
-    setResult,
-    switchToCreateMode,
   })
 
   const { handleExitDedicatedEditor } = useEditorStudioRouting({
@@ -672,57 +528,6 @@ export const EditorStudioWorkspaceController = ({
     handleLoadOrCreateTempPost,
   })
 
-  useEffect(() => {
-    setCustomTagCatalog(readStoredCatalog(TAG_CATALOG_STORAGE_KEY))
-    setCustomCategoryCatalog(
-      dedupeStrings(readStoredCatalog(CATEGORY_CATALOG_STORAGE_KEY).map(normalizeCategoryValue)).sort(
-        compareCategoryValues
-      )
-    )
-  }, [])
-
-  useEffect(() => {
-    persistCatalog(TAG_CATALOG_STORAGE_KEY, customTagCatalog)
-  }, [customTagCatalog])
-
-  useEffect(() => {
-    persistCatalog(CATEGORY_CATALOG_STORAGE_KEY, customCategoryCatalog)
-  }, [customCategoryCatalog])
-
-  const handlePostCategoryChange = useCallback((value: string) => {
-    setPostCategory(value)
-  }, [])
-
-  const commitPostCategory = useCallback(() => {
-    if (!postCategory.trim()) {
-      setPostCategory("")
-      return
-    }
-    const category = normalizeCategoryValue(postCategory)
-    setPostCategory(category)
-    if (!category) return
-    setCustomCategoryCatalog((current) => {
-      if (current.includes(category)) return current
-      return dedupeStrings([...current, category]).sort(compareCategoryValues)
-    })
-  }, [postCategory])
-
-  useEffect(() => {
-    setKnownTags((prev) =>
-      dedupeStrings([...prev, ...Object.keys(tagUsageMap), ...customTagCatalog, ...postTags]).sort((a, b) =>
-        a.localeCompare(b)
-      )
-    )
-  }, [customTagCatalog, postTags, tagUsageMap])
-
-  useEffect(() => {
-    if (!sessionMember) return
-    if (hydratedAdminIdRef.current === sessionMember.id) return
-
-    hydratedAdminIdRef.current = sessionMember.id
-    void refreshEditorMetaCatalog()
-  }, [refreshEditorMetaCatalog, sessionMember])
-
   const {
     closePublishModal,
     handleConfirmPublish,
@@ -732,7 +537,6 @@ export const EditorStudioWorkspaceController = ({
     handleModifyPost,
     handlePublishTempDraft,
     handleWritePost,
-    isCompactMobileLayout,
     isPreviewThumbnailError,
     loadingKey,
     publishActionType,
@@ -741,70 +545,32 @@ export const EditorStudioWorkspaceController = ({
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
-    setMobileComposeStep,
     setPublishActionType,
     setPublishModalNotice,
   })
 
-  const handleContinueSelectedPostEditing = useCallback(() => {
-    openPublishModal("modify")
-  }, [openPublishModal])
-
-  const handleCreateNewPostFromSelectedPanel = useCallback(() => {
-    switchToCreateMode({ keepContent: false })
-  }, [switchToCreateMode])
-
-  const handleLogout = useCallback(async () => {
-    await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
-    setMe(null)
-    const rawNextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-    window.location.href = toAdminLoginPath(rawNextPath, "/admin/editor/new")
-  }, [setMe])
-
-  const handleDeleteSelectedPost = useCallback(() => {
-    openDeleteConfirm([Number.parseInt(postId, 10)], postTitle)
-  }, [openDeleteConfirm, postId, postTitle])
-
   return (
     <EditorStudioWorkspaceControllerRootView
       props={{
-        activeMetaPanel, addTagsToPost, addTagToPost, adminPostRows, adminPostTotal,
-        adminPostViewRows, applyFirstBodyImageToThumbnail, applyListQuickPreset, clearLocalDraft, closeDeleteConfirm,
-        closePublishModal, commitPreviewThumbTransform,
-        deferredPostContent, deferredContentDerived, deleteConfirmNotice, deleteConfirmState, deletePostsFromList,
-        customCategoryCatalog, deletedListNotice, dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
-        deleteTagFromCatalog, disabled, editorMode, finalizePreviewThumbPointer, getCurrentPostContent, globalNotice,
-        handleMarkdownEditorChange, handleMarkdownEditorFileUpload, handleMarkdownEditorImageUpload, handleConfirmPublish, handleContinueSelectedPostEditing, handlePostSummaryChange,
-        handleCreateNewPostFromSelectedPanel, handleDeleteSelectedPost, handleExitDedicatedEditor, handleFlushMarkdownReady, handleFocusTitle, handleHitPost,
-        handleListPageChange, handleListPageSizeChange, handleListSortChange, handleLogout,
-        handleLoadOrCreateTempPost, handlePreviewThumbPointerDown, handlePreviewThumbPointerMove,
-        handleReadPostCount, handleReadSystemHealth,
-        handleSelectedPostIdChange, handleThumbnailImageFileChange, handleThumbnailPaste, handleThumbnailUrlModalChange, handleTitleChange,
-        handleTitleFieldRef, handleTitleKeyDown, handleUndoSoftDelete,
-        hardDeleteDeletedPostFromList, isAllVisiblePostsSelected, isCompactMobileLayout, isComposeAssistOpen, isComposeUtilityOpen,
-        isDedicatedEditorRoute, isDedicatedNewEditorRoute, isDirectLoadOpen, isListAdvancedOpen, isMobileMetaEditorOpen,
-        isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError, isPublishModalOpen,
-        isSelectedToolsOpen, isTempDraftMode, knownTags, lastLocalDraftFingerprintRef, listKw,
-        listPage,
-        listPageSize, listQuickPreset, listScope, listSort, loadAdminPosts,
-        loadPostForEditor, loadingKey, localDraftCandidate, localDraftCandidates, localDraftSavedAt, localDraftSlotLabel, localDraftSource, metaNotice,
-        mobileComposeStep, mobileManageStep, modifiedSortOrder, openDeleteConfirm,
-        openPublishModal, openThumbnailFileInput, postCategory, postContent, postId,
-        postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl,
-        postThumbnailZoom, postTitle, postVersion, postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
-        previewThumbTransformRef, resolvedPreviewSummary, resetListFilters, resetThumbnailToAutoMode,
-        removeTagFromPost, restoreDeletedPostFromList, restoreLocalDraft, selectLocalDraftCandidate, discardLocalDraftCandidate, result, safePreviewThumbnail,
-        saveLocalDraft,
-        selectedPostIdSet, selectedPostIds, serverBaselineEditorFingerprintRef, sessionMember, setActiveMetaPanel,
-        setIsComposeAssistOpen, setIsComposeUtilityOpen, setIsDirectLoadOpen,
-        setIsMobileMetaEditorOpen,
-        setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setIsSelectedToolsOpen, setListKw, setListScope,
-        setMobileComposeStep,
-        setMobileManageStep, setModifiedSortOrder, setPostId, setPostSummary, setPostVisibility,
-        setSelectedPostIds, setTagDraft,
-        softDeleteUndoState, studioSurface, tagDraft, tagUsageMap, restoredLocalDraft,
-        thumbnailImageFileInputRef, thumbnailImageFileName, toggleListAdvanced, togglePostSelection, toggleSelectAllVisiblePosts,
-        commitPostCategory, handlePostCategoryChange,
+        addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
+        closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
+        dismissedLocalDraft, dismissLocalDraftRestoreSuggestion, disabled, editorMode, finalizePreviewThumbPointer,
+        getCurrentPostContent, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
+        handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
+        commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
+        handlePreviewThumbPointerMove, handleThumbnailImageFileChange, handleThumbnailPaste,
+        handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
+        isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
+        isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
+        isPublishModalOpen, isTempDraftMode, lastLocalDraftFingerprintRef, loadingKey, localDraftCandidate,
+        localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal, openThumbnailFileInput,
+        postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
+        postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
+        publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef, previewThumbTransformRef,
+        resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, selectLocalDraftCandidate,
+        restoredLocalDraft, result, safePreviewThumbnail, serverBaselineEditorFingerprintRef, sessionMember,
+        setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setPostVisibility,
+        setTagDraft, tagDraft, thumbnailImageFileInputRef, thumbnailImageFileName,
       }}
     />
   )

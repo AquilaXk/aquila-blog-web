@@ -1,4 +1,5 @@
-import type { AboutProjectBlock, AboutSectionBlock, ProfileWorkspaceContent } from "src/libs/profileWorkspace"
+import type { AboutProjectBlock, AboutSectionBlock } from "src/libs/profileWorkspace"
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 import {
   AboutProjectCard,
   AboutProjectList,
@@ -22,7 +23,7 @@ import {
   TextArea,
 } from "src/routes/Admin/AdminProfileWorkspace.styles"
 
-export const renderAdminProfileAboutSection = (props: Record<string, any>) => {
+export const renderAdminProfileAboutSection = (props: AdminProfileWorkspaceSectionProps) => {
   const {
     addAboutItem,
     addAboutProject,
@@ -37,7 +38,7 @@ export const renderAdminProfileAboutSection = (props: Record<string, any>) => {
     updateAboutProject,
     updateAboutSection,
     updateDraft,
-  } = props as Record<string, any> & { draft: ProfileWorkspaceContent }
+  } = props
 
   return (
     <SectionStack>

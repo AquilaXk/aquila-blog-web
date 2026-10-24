@@ -52,7 +52,6 @@ export {
   resolveSlashCommandMutation,
   SLASH_COMMAND_SPECS,
 } from "./useMarkdownEditorSlashMenu"
-// Slash & toolbar contract descriptors: slashFrom, 제목 1 (H1), 인용구, 코드 블록, id: "media.file", aria-label="Markdown 작성 도구"
 
 type MarkdownChangeMeta = {
   editorFocused: boolean
@@ -243,7 +242,6 @@ export const MarkdownEditor = ({
     [applyMutationPlan, commitMarkdown, updateActiveTableSelection]
   )
 
-  // Must proceed even when the editor UI is temporarily disabled
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
       const commitOptions = { clearUploadError: false as const }

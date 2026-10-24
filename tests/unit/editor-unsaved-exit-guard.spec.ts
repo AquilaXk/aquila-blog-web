@@ -12,12 +12,16 @@ import {
   isEditorUnsavedDirtyByFingerprint,
   isForcedEditorExitUrl,
   isSamePathEditorSurfaceNavigation,
-  markForcedEditorExitUrl,
   scheduleForcedEditorExitUrl,
   resolveEditorRouteNavigationRetry,
   restoreEditorUrlAfterBlockedHistoryPop,
   shouldBlockEditorBeforeUnload,
 } from "../../src/routes/Admin/editorStudioUnsavedExitGuard"
+
+const activateForcedExit = (url: string) => {
+  scheduleForcedEditorExitUrl(url)
+  activateScheduledForcedEditorExitIfMatching(url)
+}
 
 test.describe("editor unsaved exit guard helpers", () => {
   test("detects dirty from fingerprint diffs even when title and body are empty", () => {
@@ -134,7 +138,7 @@ test.describe("editor unsaved exit guard helpers", () => {
     expect(isForcedEditorExitUrl("/")).toBe(false)
     expect(isForcedEditorExitUrl("/?utm=1")).toBe(false)
 
-    markForcedEditorExitUrl("/")
+    activateForcedExit("/")
     expect(isForcedEditorExitUrl("/")).toBe(true)
     expect(isForcedEditorExitUrl("/?utm=1")).toBe(true)
     expect(isForcedEditorExitUrl("/admin/posts")).toBe(false)
@@ -164,7 +168,7 @@ test.describe("editor unsaved exit guard helpers", () => {
     clearScheduledForcedEditorExitUrl()
 
     expect(isForcedEditorExitUrl("/")).toBe(false)
-    markForcedEditorExitUrl("/")
+    activateForcedExit("/")
     expect(allowForcedEditorExitRoute("/")).toBe(true)
     expect(isForcedEditorExitUrl("/")).toBe(false)
   })
@@ -197,7 +201,7 @@ test.describe("editor unsaved exit guard helpers", () => {
 
   test("active clear on route abort preserves scheduled forced-exit marks", () => {
     clearForcedEditorExitUrl()
-    markForcedEditorExitUrl("/")
+    activateForcedExit("/")
     scheduleForcedEditorExitUrl("/")
     // Unrelated abort must drop only the in-flight active mark.
     clearActiveForcedEditorExitUrl()
@@ -250,13 +254,13 @@ test.describe("editor unsaved exit guard helpers", () => {
 
   test("consumes forced-exit mark on clean early-return navigation paths", () => {
     clearForcedEditorExitUrl()
-    markForcedEditorExitUrl("/")
+    activateForcedExit("/")
 
     expect(allowForcedEditorExitRoute("/")).toBe(true)
     expect(isForcedEditorExitUrl("/")).toBe(false)
     expect(allowForcedEditorExitRoute("/")).toBe(false)
 
-    markForcedEditorExitUrl("/")
+    activateForcedExit("/")
     expect(allowForcedEditorExitRoute("/admin/posts")).toBe(false)
     expect(isForcedEditorExitUrl("/")).toBe(true)
     clearForcedEditorExitUrl()

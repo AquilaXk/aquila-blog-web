@@ -12,7 +12,6 @@ type UseEditorStudioPublishModalFlowParams = {
   handleModifyPost: () => Promise<boolean>
   handlePublishTempDraft: () => Promise<boolean>
   handleWritePost: () => Promise<boolean>
-  isCompactMobileLayout: boolean
   isPreviewThumbnailError: boolean
   loadingKey: string
   publishActionType: PublishActionType
@@ -21,7 +20,6 @@ type UseEditorStudioPublishModalFlowParams = {
   setIsMobileMetaEditorOpen: Dispatch<SetStateAction<boolean>>
   setIsMobileThumbnailEditorOpen: Dispatch<SetStateAction<boolean>>
   setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>
-  setMobileComposeStep: Dispatch<SetStateAction<"edit" | "publish">>
   setPublishActionType: Dispatch<SetStateAction<PublishActionType>>
   setPublishModalNotice: Dispatch<SetStateAction<NoticeState>>
 }
@@ -31,7 +29,6 @@ export const useEditorStudioPublishModalFlow = ({
   handleModifyPost,
   handlePublishTempDraft,
   handleWritePost,
-  isCompactMobileLayout,
   isPreviewThumbnailError,
   loadingKey,
   publishActionType,
@@ -40,7 +37,6 @@ export const useEditorStudioPublishModalFlow = ({
   setIsMobileMetaEditorOpen,
   setIsMobileThumbnailEditorOpen,
   setIsPublishModalOpen,
-  setMobileComposeStep,
   setPublishActionType,
   setPublishModalNotice,
 }: UseEditorStudioPublishModalFlowParams) => {
@@ -55,19 +51,14 @@ export const useEditorStudioPublishModalFlow = ({
     setIsMobileThumbnailEditorOpen(shouldOpenThumbnailEditorByDefault)
     setIsMobileMetaEditorOpen(!shouldOpenThumbnailEditorByDefault)
     setIsPublishModalOpen(true)
-    if (isCompactMobileLayout) {
-      setMobileComposeStep("publish")
-    }
   }, [
     activateComposeSurface,
-    isCompactMobileLayout,
     isPreviewThumbnailError,
     publishModalHintByAction,
     safePreviewThumbnail,
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,
     setIsPublishModalOpen,
-    setMobileComposeStep,
     setPublishActionType,
     setPublishModalNotice,
   ])
@@ -83,16 +74,11 @@ export const useEditorStudioPublishModalFlow = ({
       text: publishModalHintByAction(publishActionType),
     })
     setIsPublishModalOpen(false)
-    if (isCompactMobileLayout) {
-      setMobileComposeStep("edit")
-    }
   }, [
-    isCompactMobileLayout,
     loadingKey,
     publishActionType,
     publishModalHintByAction,
     setIsPublishModalOpen,
-    setMobileComposeStep,
     setPublishModalNotice,
   ])
 

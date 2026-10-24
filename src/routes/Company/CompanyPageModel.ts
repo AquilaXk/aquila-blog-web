@@ -18,45 +18,16 @@ export const CONTACT_MAILTO = `mailto:${COMPANY_SURFACE.contactEmail}`
  */
 export const PRODUCT_URL = PRODUCT_SURFACE.url
 
-/**
- * 아이콘 이름. 값은 `CompanyIcon`이 옮겨 적은 Lucide 아이콘 파일 이름 그대로다 - 이름만 보고
- * 원본을 대조할 수 있게 하려는 것이며, 의미 매핑은 각 카드·타일에 붙은 주석이 소유한다.
- */
-export type CompanyIconName =
-  | "accessibility"
-  | "map-pinned"
-  | "file-check-2"
-  | "wifi-off"
-  | "server"
-  | "shield-check"
-  | "train-front"
-  | "notebook-pen"
-  | "workflow"
-  | "hard-drive"
-  | "check"
-
 export type CompanyNoticeLink = {
   label: string
   href: string
 }
 
-export type CompanyWordmark = {
-  id: string
-  label: string
-}
-
 export type CompanyFeatureCard = {
   id: string
   tag: string
-  icon: CompanyIconName
   title: string
   body: string
-}
-
-export type CompanyWorkTile = {
-  id: string
-  label: string
-  icon: CompanyIconName
 }
 
 export type CompanyStat = {
@@ -75,9 +46,8 @@ export type CompanyNewsItem = {
   thumbnail: string
 }
 
-/** 헤더 위 공지 스트립. 제품 출시 상태는 제품 모델의 단일 값을 쓴다. */
 export const COMPANY_NOTICE: CompanyNoticeLink = {
-  label: `EasySubway ${PRODUCT_SURFACE.releaseStatus} — 제품 소개 보기`,
+  label: `EasySubway ${PRODUCT_SURFACE.releaseStatus} · 제품 소개 보기`,
   href: PRODUCT_URL,
 }
 
@@ -102,25 +72,12 @@ export const PRODUCT_SCREENSHOT_SIZE = {
   height: PRODUCT_SURFACE.screenshot.height,
 } as const
 
-/** @deprecated 모노크롬 워드마크 스트립은 슬롭 정리로 제거되었습니다. */
-export const COMPANY_WORDMARKS: CompanyWordmark[] = [
-  { id: "easysubway", label: "EASYSUBWAY" },
-  { id: "aquilalog", label: "AQUILALOG" },
-  { id: "datapack", label: "DATA PIPELINE" },
-  { id: "homeserver", label: "HOMESERVER OPS" },
-]
-
-/**
- * 2대 플래그십 프로덕트 전용 쇼케이스 모델.
- * 실제 서비스 화면 캡처, 핵심 가치 설명, 서비스 바로가기 링크를 담는다.
- */
 export type CompanyProductShowcase = {
   id: "easysubway" | "aquilalog"
   badge: string
   title: string
   summary: string
   description: string
-  highlights: string[]
   image: {
     src: string
     alt: string
@@ -140,12 +97,7 @@ export const COMPANY_PRODUCT_SHOWCASES: CompanyProductShowcase[] = [
     title: "EasySubway",
     summary: "교통약자의 이동 문턱을 낮추는 지하철 경로 안내",
     description:
-      "휠체어·유모차 이용자와 어르신이 겪는 계단과 환승 장벽을 최소화하는 맞춤형 경로를 최우선으로 제공합니다.",
-    highlights: [
-      "엘리베이터 및 완만한 환승 우선 경로 안내",
-      "노선도 한 화면에서 출발·경유·도착지 원스톱 탐색",
-      "철도 공공데이터 기반 실시간 역사 정보 반영",
-    ],
+      "휠체어·유모차 이용자와 어르신이 계단 없이 이동할 수 있도록 엘리베이터 중심 경로와 승차 위치를 안내합니다.",
     image: {
       src: PRODUCT_SCREENSHOT,
       alt: PRODUCT_SCREENSHOT_ALT,
@@ -161,14 +113,9 @@ export const COMPANY_PRODUCT_SHOWCASES: CompanyProductShowcase[] = [
     id: "aquilalog",
     badge: "엔지니어링 & 테크 블로그",
     title: "AquilaLog",
-    summary: "시스템 설계와 운영 경험을 투명하게 기록하는 지식 플랫폼",
+    summary: "시스템 설계와 운영 과정을 기록하는 기술 블로그",
     description:
-      "백엔드 아키텍처, 자체 인프라 블루그린 무중단 배포, 데이터 무결성 검증 파이프라인의 엔지니어링 과정을 상세히 공유합니다.",
-    highlights: [
-      "실전 인프라 장애 트러블슈팅과 해결 기록",
-      "자체 홈서버 독립 운영 및 무중단 배포 노하우",
-      "엄격한 품질 게이트와 기술 부채 개선 과정 공유",
-    ],
+      "백엔드 설계, 홈서버 블루그린 배포, 공공데이터 검증 과정을 기록합니다.",
     image: {
       src: BLOG_CAPTURE,
       alt: BLOG_CAPTURE_ALT,
@@ -182,102 +129,45 @@ export const COMPANY_PRODUCT_SHOWCASES: CompanyProductShowcase[] = [
   },
 ]
 
-/**
- * 하단 기술 신뢰성 및 운영 원칙.
- * 내부 인프라와 품질 원칙을 제품 카드와 분리해 기술적 토대로 설명한다.
- */
-export type CompanyReliabilityItem = {
-  id: string
-  tag: string
-  title: string
-  description: string
-}
-
-export const COMPANY_RELIABILITY_ITEMS: CompanyReliabilityItem[] = [
-  {
-    id: "pipeline",
-    tag: "DATA PIPELINE",
-    title: "데이터 검증 파이프라인",
-    description:
-      "역명, 시설물, 환승 동선 등 공공데이터 원본과 UI 표면의 일치 여부를 배포마다 자동 대조하여 데이터 정합성을 철저히 보장합니다.",
-  },
-  {
-    id: "infrastructure",
-    tag: "INFRASTRUCTURE",
-    title: "자체 인프라 & 무중단 배포",
-    description:
-      "외부 클라우드 종속을 낮추고 직접 소유·운영하는 홈서버 환경 위에 컨테이너 기반 Blue-Green 무중단 배포와 실시간 모니터링을 가동합니다.",
-  },
-  {
-    id: "quality",
-    tag: "QUALITY GATES",
-    title: "엄격한 품질 게이트",
-    description:
-      "웹 접근성 표준 준수, 렌더링 성능, 번들 및 리소스 예산을 사전에 자동 검증하여 결함 없는 프로덕션 릴리즈를 유지합니다.",
-  },
-]
-
-/**
- * 핵심 역량 카드. 고객/이용자 지향의 가치 언어로 실제 제품 판단과 사용자 혜택을 명시한다.
- */
 export const COMPANY_FEATURE_CARDS: CompanyFeatureCard[] = [
   {
     id: "accessibility",
     tag: "ACCESSIBILITY",
-    icon: "accessibility",
     title: "계단과 환승 동선을 먼저 계산합니다",
-    body: "엘리베이터와 완만한 환승 경로를 기본값으로 탐색하여 휠체어와 유모차도 안심하고 이동할 수 있습니다.",
+    body: "엘리베이터와 완만한 환승 경로를 기본값으로 탐색하여 휠체어와 유모차도 이동할 수 있습니다.",
   },
   {
     id: "route-ui",
     tag: "ROUTE UI",
-    icon: "map-pinned",
     title: "노선도 한 화면에서 바로 길을 찾습니다",
-    body: "역을 터치하는 즉시 출발·경유·도착지를 지정할 수 있어 목록과 지도를 오갈 필요 없이 직관적으로 탐색합니다.",
+    body: "역을 터치해 출발·경유·도착지를 바로 지정하고 노선도 한 화면에서 탐색합니다.",
   },
   {
     id: "data-integrity",
     tag: "DATA INTEGRITY",
-    icon: "file-check-2",
-    title: "철저한 데이터 검증으로 오류를 방지합니다",
-    body: "철도 공공데이터와 실제 역사 시설을 정기적으로 대조하여 어긋남 없는 정확한 출구 및 편의시설 정보를 제공합니다.",
+    title: "데이터 검증으로 오류를 방지합니다",
+    body: "철도 공공데이터와 실제 역사 시설을 정기적으로 대조해 출구와 편의시설 정보를 제공합니다.",
   },
   {
     id: "resilience",
     tag: "RESILIENCE",
-    icon: "wifi-off",
     title: "오프라인에서도 노선도와 역 조회가 동작합니다",
-    body: "통신이 불안정한 지하 환경에서도 기기 내 데이터로 노선도와 역 정보를 즉시 탐색할 수 있습니다.",
+    body: "통신이 불안정한 지하 환경에서도 기기 내 데이터로 노선도와 역 정보를 바로 탐색합니다.",
   },
   {
     id: "operations",
     tag: "OPERATIONS",
-    icon: "server",
     title: "자체 인프라로 서비스 지속성을 지킵니다",
-    body: "빌드부터 배포, 관제까지 직접 통제하는 인프라를 통해 외부 환경 변화에도 흔들림 없이 서비스를 유지합니다.",
+    body: "빌드부터 배포, 관제까지 직접 운영하는 인프라로 서비스를 유지합니다.",
   },
   {
     id: "quality",
     tag: "QUALITY GATE",
-    icon: "shield-check",
-    title: "검증된 안정성만 프로덕션에 배포합니다",
-    body: "웹 접근성, 렌더링 성능, 보안 기준을 자동 게이트로 엄격히 통과한 검증된 결과물만 배포합니다.",
+    title: "검증된 빌드만 프로덕션에 배포합니다",
+    body: "웹 접근성, 렌더링 성능, 보안 기준을 자동 게이트로 통과한 빌드만 배포합니다.",
   },
 ]
 
-/** @deprecated 구 6개 타일 그리드는 2대 프로덕트 쇼케이스로 개편되었습니다. */
-export const COMPANY_WORK_TILES: CompanyWorkTile[] = [
-  { id: "easysubway", label: "EasySubway", icon: "train-front" },
-  { id: "aquilalog", label: "AquilaLog 기술 블로그", icon: "notebook-pen" },
-  { id: "pipeline", label: "데이터 검증 파이프라인", icon: "workflow" },
-  { id: "homeserver", label: "자체 인프라 운영", icon: "hard-drive" },
-  { id: "accessibility", label: "접근성 설계", icon: "accessibility" },
-  { id: "gates", label: "품질 게이트", icon: "shield-check" },
-]
-
-/**
- * 통계 지표. 숫자인 척하는 텍스트 대신 정량 지표 중심의 간결하고 명확한 팩트 리스트로 제공한다.
- */
 export const COMPANY_STATS: CompanyStat[] = [
   { id: "services", value: "2개", label: "직접 운영 중인 공개 서비스 (EasySubway · AquilaLog)" },
   { id: "coverage", value: "20개 노선", label: "수도권 및 광역시 도시철도 무장애 실측 데이터 연동" },
@@ -285,7 +175,6 @@ export const COMPANY_STATS: CompanyStat[] = [
   { id: "barrier", value: "0원", label: "회원가입·결제·위치 추적 없이 모든 기능 즉시 이용" },
 ]
 
-/** 비전 체크리스트. 지킬 수 있는 문장만 남긴다. */
 export const COMPANY_PRINCIPLES = [
   "검증한 범위만 공개합니다",
   "모르는 것은 모른다고 표시합니다",
@@ -313,7 +202,6 @@ export const COMPANY_FOOTER_LINK_GROUPS = [
   },
 ] as const
 
-/** canonical 요약을 그대로 전달하고, 없는 값에는 별도 문구를 만들지 않는다. */
 export const toCompanyNewsSummary = (summary: string | undefined) => summary ?? ""
 
 /**

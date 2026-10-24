@@ -118,9 +118,9 @@ export const isOperationalStatusMissing = (value: string | null | undefined) => 
   return !normalized || normalized === "UNKNOWN"
 }
 
-export const normalizeOperationalStatusLabel = (value: string | null | undefined) => {
+export const normalizeOperationalStatusLabel = (value: string | null | undefined): string => {
   const normalized = value?.trim()
-  if (isOperationalStatusMissing(normalized)) return DATA_MISSING_STATUS_LABEL
+  if (!normalized || isOperationalStatusMissing(normalized)) return DATA_MISSING_STATUS_LABEL
   if (normalized === "UP" || normalized === "READY") return "정상"
   if (normalized === "CONNECTION_FAILED" || normalized === "DOWN" || normalized === "ERROR") return "오류"
   if (normalized === "MISCONFIGURED") return CHECK_REQUIRED_STATUS_LABEL

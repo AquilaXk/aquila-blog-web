@@ -82,10 +82,10 @@ test.describe("markdown editor attachment upload model", () => {
 
   test("writer host forwards onFileUpload into MarkdownEditor onUploadFile", () => {
     const writerHostSource = readFileSync(sourcePath("routes", "Admin", "WriterEditorHost.tsx"), "utf8")
-    const markdownEditorSource = readFileSync(
-      sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"),
-      "utf8"
-    )
+    const markdownEditorSource = [
+      readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditor.tsx"), "utf8"),
+      readFileSync(sourcePath("components", "markdown-editor", "MarkdownEditorToolbar.tsx"), "utf8"),
+    ].join("\n")
     const mediaTransfersSource = readFileSync(
       sourcePath("components", "markdown-editor", "useMarkdownEditorMediaTransfers.ts"),
       "utf8"

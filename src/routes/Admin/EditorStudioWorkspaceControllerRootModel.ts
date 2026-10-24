@@ -22,6 +22,7 @@ import type {
   ApiPostModifyRequest,
   ApiPostWriteRequest,
 } from "src/apis/backend/posts/PostApiDtos"
+import { normalizeCanonicalSummary } from "src/apis/backend/posts/PostApiMappers"
 
 export const MARKDOWN_EDITOR_MERMAID_ENABLED = process.env.NEXT_PUBLIC_EDITOR_V2_MERMAID_ENABLED !== "false"
 export const ADMIN_POSTS_WORKSPACE_ROUTE = "/admin/posts"
@@ -61,14 +62,6 @@ export type CanonicalSummaryState = {
   intent: SummaryIntent
 }
 
-const SUMMARY_SOURCES = new Set<CanonicalSummaryState["summarySource"]>([
-  "MANUAL",
-  "LEADING_BLOCK",
-  "EXTRACTED",
-  "MIGRATED",
-  "NONE",
-])
-
 export const toCreateSummaryWriteFields = (
   intent: SummaryIntent,
 ): Pick<ApiPostWriteRequest, "summaryMode" | "summary"> => {
@@ -93,24 +86,30 @@ const resolveCanonicalSummaryResult = (
 ): { ok: true; state: CanonicalSummaryState } | { ok: false; state: CanonicalSummaryState } => {
   if (response == null || typeof response !== "object") return { ok: false, state: current }
   const { summary, source } = response as { summary?: unknown; source?: unknown }
-  if (typeof summary !== "string" || !SUMMARY_SOURCES.has(source as CanonicalSummaryState["summarySource"])) {
+  try {
+    const normalized = normalizeCanonicalSummary({ summary, summarySource: source })
+    return {
+      ok: true,
+      state: {
+        summary: normalized.summary,
+        summarySource: normalized.summarySource,
+        intent,
+      },
+    }
+  } catch {
     return { ok: false, state: current }
-  }
-  const summarySource = source as CanonicalSummaryState["summarySource"]
-  if ((summarySource === "NONE") !== (summary.length === 0)) return { ok: false, state: current }
-  if (summarySource !== "NONE" && summary.trim().length === 0) return { ok: false, state: current }
-  return {
-    ok: true,
-    state: {
-      summary,
-      summarySource,
-      intent,
-    },
   }
 }
 
 export const resolvePersistedSummaryResult = (current: CanonicalSummaryState, response: unknown) =>
   resolveCanonicalSummaryResult(current, response, { kind: "unchanged" })
+
+const isSameCanonicalSummaryState = (left: CanonicalSummaryState, right: CanonicalSummaryState) =>
+  left.summary === right.summary &&
+  left.summarySource === right.summarySource &&
+  left.intent.kind === right.intent.kind &&
+  (left.intent.kind !== "manual" ||
+    (right.intent.kind === "manual" && left.intent.summary === right.intent.summary))
 
 export const resolveSummaryWriteCompletion = (
   request: CanonicalSummaryState,
@@ -120,13 +119,10 @@ export const resolveSummaryWriteCompletion = (
   const resolved = resolvePersistedSummaryResult(request, response)
   if (!resolved.ok) return resolved
 
-  // 저장된 baseline과 요청 이후 입력은 별개다. 새 입력의 AUTO/MANUAL 의도도 보존한다.
-  const unchanged = request.summary === current.summary &&
-    request.summarySource === current.summarySource &&
-    request.intent.kind === current.intent.kind &&
-    (request.intent.kind !== "manual" ||
-      (current.intent.kind === "manual" && request.intent.summary === current.intent.summary))
-  return { ...resolved, editorState: unchanged ? resolved.state : current }
+  return {
+    ...resolved,
+    editorState: isSameCanonicalSummaryState(request, current) ? resolved.state : current,
+  }
 }
 
 import type { RsData } from "src/types"
@@ -137,31 +133,6 @@ export type NoticeState = {
   tone: NoticeTone
   text: string
 }
-export type StudioSurface = "manage" | "compose"
-export type MobileStudioStep = "query" | "list" | "edit" | "publish"
-export type ManageMobileStudioStep = "query" | "list"
-export type ComposeMobileStudioStep = "edit" | "publish"
-
-export const GLOBAL_NOTICE_IDLE_TEXT = "운영 작업 상태가 여기에 표시됩니다."
-export const MANAGE_MOBILE_STUDIO_STEPS = ["query", "list"] as const
-export const COMPOSE_MOBILE_STUDIO_STEPS = ["edit", "publish"] as const
-
-export const MOBILE_STUDIO_STEP_LABEL: Record<MobileStudioStep, string> = {
-  query: "조회",
-  list: "목록",
-  edit: "편집",
-  publish: "발행",
-}
-
-export const MOBILE_STUDIO_STEP_DESCRIPTION: Record<MobileStudioStep, string> = {
-  query: "페이지/키워드/정렬 조건을 먼저 정리하고 목록을 불러오세요.",
-  list: "목록에서 대상 글을 선택하거나 post id를 확인해 편집 단계로 넘깁니다.",
-  edit: "본문, 태그, 메타를 정리한 뒤 발행 설정으로 이동합니다.",
-  publish: "노출 범위와 카드 미리보기를 확인하고 최종 반영하세요.",
-}
-
-export const getMobileStudioStepMoveLabel = (step: MobileStudioStep) =>
-  `${MOBILE_STUDIO_STEP_LABEL[step]}${MOBILE_STUDIO_STEP_LABEL[step].endsWith("집") ? "으로" : "로"} 이동`
 
 const PROFILE_IMAGE_UPLOAD_RETRY_DELAY_MS = 700
 const IMAGE_UPLOAD_CONFLICT_MAX_RETRIES = 3
@@ -214,8 +185,6 @@ export const PUBLISH_VISIBILITY_OPTIONS: Array<{
     description: "관리자만 확인합니다.",
   },
 ]
-
-export const SHOW_LEGACY_UTILITY_STUDIO = process.env.NEXT_PUBLIC_SHOW_LEGACY_UTILITY_STUDIO === "true"
 
 export const pretty = (value: unknown) => JSON.stringify(value, null, 2)
 

@@ -1,8 +1,20 @@
+import type { RefObject } from "react"
+import type { AuthMember } from "src/hooks/useAuthSession"
+import type { AdminProfile } from "src/types/adminProfile"
 import AdminShell from "./AdminShell"
 import { AdminPostsWorkspaceFeedbackLayer } from "./AdminPostsWorkspaceFeedbackLayer"
 import { AdminPostsWorkspaceFilterToolbar } from "./AdminPostsWorkspaceFilterToolbar"
 import { AdminPostsWorkspaceList } from "./AdminPostsWorkspaceList"
-import { DEFAULT_PAGE } from "./AdminPostsWorkspaceModel"
+import {
+  DEFAULT_PAGE,
+  type AdminPostListItem,
+  type ListSort,
+  type ListState,
+  type PostListScope,
+  type PostStatusFilter,
+  type WorkspaceConfirmState,
+  type WorkspaceToastState,
+} from "./AdminPostsWorkspaceModel"
 import {
   HeroSection,
   ListSection,
@@ -14,7 +26,39 @@ import {
 } from "./AdminPostsWorkspacePageSections"
 import { AdminWorkspaceHeroActions, AdminWorkspaceHeroLayout } from "./AdminSurfacePrimitives"
 
-export const AdminPostsWorkspacePageView = (props: Record<string, any>) => {
+export type AdminPostsWorkspacePageViewProps = {
+  confirmState: WorkspaceConfirmState
+  handleConfirmAction: () => void | Promise<void>
+  handleToastAction: () => void | Promise<void>
+  initialProfileSnapshot?: AdminProfile | null
+  isListLoading: boolean
+  listError: string
+  listKw: string
+  listPage: string
+  listPageSize: string
+  listScope: PostListScope
+  listStatus: PostStatusFilter
+  listSectionRef: RefObject<HTMLElement | null>
+  listSort: ListSort
+  listState: ListState
+  loadList: () => void | Promise<void>
+  mutationPending: { rowId: number; kind: "delete" | "restore" | "hardDelete" } | null
+  handleDeletePost: (row: AdminPostListItem) => void | Promise<void>
+  onHardDeletePost: (row: AdminPostListItem) => void | Promise<void>
+  onRestorePost: (row: AdminPostListItem) => void | Promise<void>
+  openWriteRoute: (query?: Record<string, string>) => void | Promise<void>
+  sessionMember: AuthMember
+  setConfirmState: (value: WorkspaceConfirmState) => void
+  setListKw: (value: string) => void
+  setListPage: (value: string) => void
+  setListStatus: (value: PostStatusFilter) => void
+  setListSort: (value: ListSort) => void
+  setToast: (value: WorkspaceToastState) => void
+  shouldRenderMobileList: boolean
+  toast: WorkspaceToastState
+}
+
+export const AdminPostsWorkspacePageView = (props: AdminPostsWorkspacePageViewProps) => {
   const {
     confirmState,
     handleConfirmAction,

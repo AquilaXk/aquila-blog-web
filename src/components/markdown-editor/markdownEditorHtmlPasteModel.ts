@@ -56,7 +56,6 @@ const TABLE_CELL_TAGS = new Set(["td", "th"])
 
 const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}\[\]|<>~]/g, "\\$&")
 
-/** Canonical whitespace used for untrusted HTML text nodes and alt text. */
 export const normalizeHtmlPasteText = (value: string): string => {
   const normalized = String(value)
     .replace(/\r\n?/g, "\n")
@@ -92,14 +91,12 @@ export const createHtmlPasteEmptyResult = (): HtmlPasteImportResult => ({
   message: HTML_PASTE_EMPTY_CONTENT_MESSAGE,
 })
 
-/** `none` is reserved for the absence of HTML clipboard data, never a conversion fallback. */
 export const resolveSafeHtmlPasteImportBoundary = (html: string | null): HtmlPasteImportResult | null => {
   if (html === null) return { kind: "none" }
   if (!normalizeHtmlPasteText(html).trim()) return createHtmlPasteEmptyResult()
   return null
 }
 
-/** Only credential-free absolute HTTP(S) links become Markdown destinations. */
 export const resolveSafeHtmlPasteHref = (rawHref: string): string | null => {
   const href = rawHref.trim()
   if (!href) return null
@@ -304,7 +301,6 @@ const serializeBlock = (node: Node): string => {
   return blocks.join("\n\n")
 }
 
-/** Converts only the HTML clipboard allowlist; unsupported markup becomes safe text. */
 export const convertSafeHtmlPasteToMarkdown = (html: string | null): HtmlPasteImportResult => {
   if (html === null) return { kind: "none" }
   const boundary = resolveSafeHtmlPasteImportBoundary(html)

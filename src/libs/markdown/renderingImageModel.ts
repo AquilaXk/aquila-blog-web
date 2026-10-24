@@ -28,6 +28,67 @@ export type ParsedStandaloneMarkdownImage = {
   align?: "left" | "center" | "wide" | "full"
 }
 
+export const resolveMarkdownImageDimensions = (
+  rawUrl: string,
+  explicitWidth?: number,
+  explicitHeight?: number
+): {
+  widthPx?: number
+  heightPx?: number
+  aspectRatio?: string
+} => {
+  let urlWidth: number | undefined
+  let urlHeight: number | undefined
+  try {
+    const parsedUrl = new URL(rawUrl, "https://dummy.local")
+    const w = parsedUrl.searchParams.get("w") || parsedUrl.searchParams.get("width")
+    const h = parsedUrl.searchParams.get("h") || parsedUrl.searchParams.get("height")
+    if (w && /^\d+$/.test(w)) urlWidth = Number.parseInt(w, 10)
+    if (h && /^\d+$/.test(h)) urlHeight = Number.parseInt(h, 10)
+  } catch {}
+
+  const hasExplicitRatio = explicitWidth != null && explicitHeight != null && explicitWidth > 0 && explicitHeight > 0
+  const hasUrlRatio = urlWidth != null && urlHeight != null && urlWidth > 0 && urlHeight > 0
+
+  let widthPx: number | undefined
+  let heightPx: number | undefined
+  let aspectRatio: string | undefined
+
+  if (hasExplicitRatio) {
+    aspectRatio = `${explicitWidth} / ${explicitHeight}`
+    widthPx = clampImageWidthPx(explicitWidth!)
+    heightPx = clampImageDimensionPx(Math.round(widthPx * (explicitHeight! / explicitWidth!)))
+  } else if (hasUrlRatio) {
+    aspectRatio = `${urlWidth} / ${urlHeight}`
+    if (explicitWidth != null) {
+      widthPx = clampImageWidthPx(explicitWidth)
+      heightPx = clampImageDimensionPx(Math.round(widthPx * (urlHeight! / urlWidth!)))
+    } else if (explicitHeight != null) {
+      heightPx = clampImageDimensionPx(explicitHeight)
+      widthPx = clampImageWidthPx(Math.round(heightPx * (urlWidth! / urlHeight!)))
+    } else if (urlWidth! > 960 || urlWidth! < 180) {
+      widthPx = clampImageWidthPx(urlWidth!)
+      heightPx = clampImageDimensionPx(Math.round(widthPx * (urlHeight! / urlWidth!)))
+    } else {
+      widthPx = urlWidth
+      heightPx = urlHeight
+    }
+  } else {
+    widthPx = explicitWidth != null
+      ? clampImageWidthPx(explicitWidth)
+      : urlWidth
+        ? clampImageWidthPx(urlWidth)
+        : undefined
+    heightPx = explicitHeight != null
+      ? clampImageDimensionPx(explicitHeight)
+      : urlHeight
+        ? clampImageDimensionPx(urlHeight)
+        : undefined
+  }
+
+  return { widthPx, heightPx, aspectRatio }
+}
+
 export const parseStandaloneMarkdownImageLine = (
   line: string
 ): ParsedStandaloneMarkdownImage | null => {
@@ -60,66 +121,18 @@ export const parseStandaloneMarkdownImageLine = (
 
   if (!src) return null
 
-  let urlWidth: number | undefined
-  let urlHeight: number | undefined
-  try {
-    const parsedUrl = new URL(src, "https://dummy.local")
-    const w = parsedUrl.searchParams.get("w") || parsedUrl.searchParams.get("width")
-    const h = parsedUrl.searchParams.get("h") || parsedUrl.searchParams.get("height")
-    if (w && /^\d+$/.test(w)) urlWidth = Number.parseInt(w, 10)
-    if (h && /^\d+$/.test(h)) urlHeight = Number.parseInt(h, 10)
-  } catch {}
-
-  const hasExplicitRatio = explicitWidth != null && explicitHeight != null && explicitWidth > 0 && explicitHeight > 0
-  const hasUrlRatio = urlWidth != null && urlHeight != null && urlWidth > 0 && urlHeight > 0
-
-  let finalWidth: number | undefined
-  let finalHeight: number | undefined
-  let aspectRatio: string | undefined
-
-  if (hasExplicitRatio) {
-    aspectRatio = `${explicitWidth} / ${explicitHeight}`
-    finalWidth = clampImageWidthPx(explicitWidth!)
-    finalHeight = clampImageDimensionPx(Math.round(finalWidth * (explicitHeight! / explicitWidth!)))
-  } else if (hasUrlRatio) {
-    aspectRatio = `${urlWidth} / ${urlHeight}`
-    if (explicitWidth != null) {
-      finalWidth = clampImageWidthPx(explicitWidth)
-      finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
-    } else if (explicitHeight != null) {
-      finalHeight = clampImageDimensionPx(explicitHeight)
-      finalWidth = clampImageWidthPx(Math.round(finalHeight * (urlWidth! / urlHeight!)))
-    } else {
-      if (urlWidth! > 960) {
-        finalWidth = clampImageWidthPx(urlWidth!)
-        finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
-      } else if (urlWidth! < 180) {
-        finalWidth = clampImageWidthPx(urlWidth!)
-        finalHeight = clampImageDimensionPx(Math.round(finalWidth * (urlHeight! / urlWidth!)))
-      } else {
-        finalWidth = urlWidth
-        finalHeight = urlHeight
-      }
-    }
-  } else {
-    finalWidth = explicitWidth != null
-      ? clampImageWidthPx(explicitWidth)
-      : urlWidth
-        ? clampImageWidthPx(urlWidth)
-        : undefined
-    finalHeight = explicitHeight != null
-      ? clampImageDimensionPx(explicitHeight)
-      : urlHeight
-        ? clampImageDimensionPx(urlHeight)
-        : undefined
-  }
+  const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(
+    src,
+    explicitWidth,
+    explicitHeight
+  )
 
   return {
     alt,
     src,
     title,
-    widthPx: finalWidth,
-    heightPx: finalHeight,
+    widthPx,
+    heightPx,
     aspectRatio,
     align: normalizeImageAlign(alignFromSuffixMatch?.[1]),
   }

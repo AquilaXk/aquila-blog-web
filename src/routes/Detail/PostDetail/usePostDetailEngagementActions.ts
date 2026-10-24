@@ -22,14 +22,6 @@ export const usePostDetailEngagementActions = ({
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
   const [hitCount, setHitCount] = useState(data?.hitCount ?? 0)
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
-  const shareProgressLabel =
-    shareFeedback === "failed"
-      ? "재시도"
-      : shareFeedback === "shared"
-        ? "복사 완료"
-        : shareFeedback === "copied"
-          ? "복사 완료"
-          : null
 
   useEffect(() => {
     if (!data) return
@@ -54,9 +46,7 @@ export const usePostDetailEngagementActions = ({
           prev ? { ...prev, hitCount: response.data.hitCount } : prev
         )
       })
-      .catch(() => {
-        // 조회수 증가는 사용자 경험을 막지 않도록 실패를 조용히 흡수한다.
-      })
+      .catch(() => {})
 
     return () => {
       cancelled = true
@@ -86,7 +76,8 @@ export const usePostDetailEngagementActions = ({
   const handleSharePost = useCallback(async () => {
     if (!data) return
     const canonicalPath = toCanonicalPostPath(postId)
-    const shareUrl = typeof window !== "undefined" ? window.location.href : canonicalPath
+    const shareUrl =
+      typeof window !== "undefined" ? window.location.href.split("#")[0] : canonicalPath
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
@@ -120,6 +111,5 @@ export const usePostDetailEngagementActions = ({
     hitCount,
     handleSharePost,
     shareFeedback,
-    shareProgressLabel,
   }
 }

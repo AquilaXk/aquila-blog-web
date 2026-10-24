@@ -293,7 +293,6 @@ export const AdminStatusPill = styled.span<{ $size?: "sm" | "md" }>`
     color: ${({ theme }) => adminMutedText(theme)};
   }
 
-  /* 패밀리룩(1220): 상태 칩은 파스텔 면 대신 헤어라인 보더 + 상태 텍스트로 표현한다. */
   &[data-tone="accent"] {
     border-color: ${({ theme }) => adminStrongBorder(theme)};
     color: ${adminGold};

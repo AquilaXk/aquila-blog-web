@@ -142,8 +142,6 @@ test.describe("admin tools state contract", () => {
     expect(modelSource).toContain("export const getDiagnosticFallbackStatusLabel =")
     expect(source).toContain("const isSystemHealthConnectionUnavailable = systemHealthQuery.isError && !hasSystemHealthStatus")
     expect(source).toContain("getDiagnosticFallbackStatusLabel(isQueueLoading, taskQueueDiagnosticsError)")
-    expect(source).toContain("getDiagnosticFallbackStatusLabel(isCleanupLoading, cleanupDiagnosticsError)")
-    expect(source).toContain("getDiagnosticFallbackStatusLabel(isAuthLoading, authSecurityEventsError)")
     expect(source).not.toContain('? "갱신 중"\\n        : DATA_MISSING_STATUS_LABEL')
   })
 

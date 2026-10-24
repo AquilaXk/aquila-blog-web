@@ -2,22 +2,22 @@ import { DEFAULT_CATEGORY } from "src/constants"
 
 const CATEGORY_STORAGE_SEPARATOR = "::"
 
-export const CATEGORY_ICON_OPTIONS = [
-  { id: "folder", label: "폴더" },
-  { id: "folder-open", label: "열린 폴더" },
-  { id: "stack", label: "목록" },
-  { id: "book-open", label: "오픈 북" },
-  { id: "book", label: "북" },
-  { id: "note", label: "문서" },
-  { id: "monitor", label: "개발" },
-  { id: "lab", label: "실험" },
-  { id: "settings", label: "설정" },
-  { id: "rocket", label: "출시" },
-  { id: "chart", label: "분석" },
-  { id: "archive", label: "보관" },
+const CATEGORY_ICON_IDS = [
+  "folder",
+  "folder-open",
+  "stack",
+  "book-open",
+  "book",
+  "note",
+  "monitor",
+  "lab",
+  "settings",
+  "rocket",
+  "chart",
+  "archive",
 ] as const
 
-export type CategoryIconId = (typeof CATEGORY_ICON_OPTIONS)[number]["id"] | "all"
+type CategoryIconId = (typeof CATEGORY_ICON_IDS)[number] | "all"
 
 export type ParsedCategoryDisplay = {
   iconId: CategoryIconId
@@ -26,7 +26,7 @@ export type ParsedCategoryDisplay = {
   isDefault: boolean
 }
 
-const KNOWN_ICON_IDS = new Set<string>(CATEGORY_ICON_OPTIONS.map((option) => option.id))
+const KNOWN_ICON_IDS = new Set<string>(CATEGORY_ICON_IDS)
 
 const LEGACY_EMOJI_ICON_MAP: Record<string, CategoryIconId> = {
   "📁": "folder",
@@ -43,7 +43,7 @@ const LEGACY_EMOJI_ICON_MAP: Record<string, CategoryIconId> = {
   "📊": "chart",
 }
 
-const DEFAULT_ICON_ID: CategoryIconId = CATEGORY_ICON_OPTIONS[0].id
+const DEFAULT_ICON_ID: CategoryIconId = CATEGORY_ICON_IDS[0]
 
 const normalizeLabel = (value: string) => value.trim().replace(/\s+/g, " ")
 
@@ -63,7 +63,7 @@ export const isDefaultCategoryValue = (value?: string) => {
   )
 }
 
-export const composeCategoryDisplay = (
+const composeCategoryDisplay = (
   label: string,
   iconId: CategoryIconId = DEFAULT_ICON_ID
 ): string => {
@@ -128,8 +128,3 @@ export const normalizeCategoryValue = (value: string) => splitCategoryDisplay(va
 
 export const compareCategoryValues = (a: string, b: string) =>
   splitCategoryDisplay(a).label.localeCompare(splitCategoryDisplay(b).label, "ko")
-
-export const getCategorySearchText = (value: string) => {
-  const parsed = splitCategoryDisplay(value)
-  return `${parsed.label} ${parsed.value}`.trim()
-}

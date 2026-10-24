@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { CONFIG } from "site.config"
-import BrandMark from "src/components/branding/BrandMark"
+import BrandMark, { ArrowRightGlyph } from "src/components/branding/BrandMark"
 import CompanyFeatureCarousel from "src/routes/Company/CompanyFeatureCarousel"
 import CompanyHeroParticles from "src/routes/Company/CompanyHeroParticles"
 import {
@@ -35,21 +35,6 @@ const NAV_ITEMS = [
 
 const visibleNavItems = (hasNews: boolean) =>
   NAV_ITEMS.filter((item) => item.id !== NEWS_SECTION_ID || hasNews)
-
-const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
 
 const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
   const surfaceRef = useCompanySurfaceMotion<HTMLDivElement>()
@@ -112,7 +97,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                 <S.SectionHeading>제품에 실제로 들어간 판단</S.SectionHeading>
               </div>
               <S.SectionAside>
-                사용자의 실제 이용 경험과 이동 안전에 초점을 맞춰 구현했습니다.
+                지하철 무장애 경로 안내 앱과 기술 블로그를 직접 개발하고 운영합니다.
               </S.SectionAside>
             </Sec.CarouselHead>
             <CompanyFeatureCarousel />
@@ -174,8 +159,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                 <Sec.StoryHeadline>작은 팀이 끝까지 봅니다</Sec.StoryHeadline>
               </div>
               <S.SectionAside>
-                기획부터 개발, 인프라 운영까지 유기적으로 연결하여 사용자의 목소리를 빠르게 제품에
-                반영합니다.
+                기획, 개발, 인프라 운영을 직접 맡아 현장의 이동 불편을 제품에서 바로 고칩니다.
               </S.SectionAside>
             </Sec.StoryLayout>
             <Sec.StatList data-reveal data-reveal-group="approach-stats">

@@ -1,4 +1,6 @@
 import Link from "next/link"
+import type { AdminProfile } from "src/hooks/useAdminProfile"
+import type { AuthMember } from "src/hooks/useAuthSession"
 import {
   Chart,
   ChartBar,
@@ -25,12 +27,35 @@ import {
   StatusRow,
   StatusRows,
 } from "src/routes/Admin/AdminDashboardWorkspace.styles"
+import type {
+  DashboardChartBar,
+  DashboardKpiCard,
+  DashboardLogRow,
+  DashboardPriorityRow,
+} from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import { DashboardRefreshControls } from "src/routes/Admin/AdminDashboardWorkspaceSections"
 import AdminShell from "src/routes/Admin/AdminShell"
 
 const PrioritySummaryLink = PrioritySummary.withComponent(Link)
 
-export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
+type AdminDashboardWorkspaceViewProps = {
+  chartBars: DashboardChartBar[]
+  chartEmptyLabel: string
+  collectionFailed: boolean
+  snapshotCollectionFailed: boolean
+  dashboardStatusLabel: string
+  dashboardStatusTone: "neutral" | "good" | "warn"
+  freshnessLabel: string | null
+  initialProfileSnapshot?: AdminProfile | null
+  isRefreshing: boolean
+  kpiCards: DashboardKpiCard[]
+  logRows: DashboardLogRow[]
+  onRefresh: () => void
+  priorityRows: DashboardPriorityRow[]
+  sessionMember: AuthMember
+}
+
+export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewProps) => {
   const {
     chartBars,
     chartEmptyLabel,
@@ -57,7 +82,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
               <HeroCopy>
                 <span>Operations</span>
                 <h1>운영 상태와 복구</h1>
-                <p>배포 슬롯, readiness, 로그와 주요 시스템 지표를 확인합니다.</p>
+                <p>배포 슬롯, 준비 상태, 실시간 로그와 주요 지표를 확인합니다.</p>
               </HeroCopy>
               <HeroActions>
                 <StatusChip data-tone={dashboardStatusTone}>{dashboardStatusLabel}</StatusChip>
@@ -74,7 +99,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
           </HeroPanel>
 
           <ServiceRail data-ui="monitoring-service-rail">
-            {kpiCards.map((item: any) => (
+            {kpiCards.map((item) => (
               <MetricCard key={item.key} data-tone={item.tone}>
                 <MetricCopy>
                   <span>{item.label}</span>
@@ -98,7 +123,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
               <Chart aria-label="운영 스냅샷 기반 지표 차트">
                 {chartBars.length ? (
                   <ChartBars>
-                    {chartBars.map((bar: any) => (
+                    {chartBars.map((bar) => (
                       <ChartBar
                         key={bar.key}
                         aria-label={`${bar.label} ${bar.height}`}
@@ -120,7 +145,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
                 <h2>Steady-state guard</h2>
               </PanelHeader>
               <StatusRows data-ui="dashboard-guard-rows">
-                {priorityRows.map((row: any) => (
+                {priorityRows.map((row) => (
                   <StatusRow key={row.key} data-tone={row.tone}>
                     <span>
                       <StatusDot data-tone={row.tone} aria-hidden="true" />
@@ -151,7 +176,7 @@ export const AdminDashboardWorkspaceView = (props: Record<string, any>) => {
                 )}
               </PanelHeader>
               <LogLines>
-                {logRows.map((row: any) => (
+                {logRows.map((row) => (
                   <LogLine key={row.key} data-tone={row.tone}>
                     <span>{row.time}</span>
                     <p>

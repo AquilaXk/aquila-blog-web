@@ -242,8 +242,6 @@ export const SecondaryPillAction = styled.a`
   }
 `
 
-export const PillAction = ButtonAction
-
 export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
   padding: 0 1.15rem;
@@ -284,8 +282,6 @@ export const StatusBadge = styled.span`
     }
   }
 `
-
-export const StatusPill = StatusBadge
 
 export const Hero = styled.section`
   position: relative;

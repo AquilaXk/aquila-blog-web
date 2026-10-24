@@ -146,11 +146,6 @@ export const StyledWrapper = styled.div `
       background: var(--aq-surface);
       color: var(--aq-accent-link);
     }
-
-    &:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -181,14 +176,6 @@ export const StyledWrapper = styled.div `
     .floatingActionButton[data-tooltip]:hover::after,
     .floatingActionButton[data-tooltip]:focus-visible::after {
       opacity: 1;
-    }
-  }
-
-  .floatingLikeButton[data-active="true"] {
-    border-color: var(--aq-accent-link);
-
-    svg {
-      color: var(--aq-accent-link);
     }
   }
 
@@ -258,14 +245,6 @@ export const StyledWrapper = styled.div `
       font-weight: 750;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-    }
-
-    .rightRailMeta {
-      color: var(--aq-muted);
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.6875rem;
-      line-height: 1.2;
-      font-weight: 620;
     }
 
     .tocDepthToggle {
@@ -362,7 +341,6 @@ export const StyledWrapper = styled.div `
     }
   }
 
-  /* P5-2: phone 전용 접이식 목차 — 821px+에서는 우 TOC rail만 사용 */
   .mobileToc {
     display: none;
   }
@@ -464,15 +442,5 @@ export const BodySection = styled.div `
   border-top: 0;
   width: 100%;
   min-width: 0;
-
-  .leadSummary {
-    margin: 0 0 42px;
-    padding: 4px 0 4px 20px;
-    border-left: 3px solid var(--aq-accent-link);
-    color: var(--aq-text-secondary);
-    font-size: 1.125rem;
-    line-height: 1.75;
-    word-break: keep-all;
-  }
 `;
 export { MobileSummaryBar, RelatedSection, RelatedSkeletonItem } from "./PostDetailSection.styles";

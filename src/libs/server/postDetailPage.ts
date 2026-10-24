@@ -40,7 +40,6 @@ export const buildCanonicalPostDetailServerProps = async (
   res: Pick<ServerResponse, "setHeader">,
   req?: { headers?: { cookie?: string } },
 ): Promise<GetServerSidePropsResult<DetailPageProps>> => {
-  // 상세 본문의 공개 권한은 요청마다 확인하며 HTML/data 응답도 공유 캐시에 남기지 않는다.
   res.setHeader("Cache-Control", "private, no-store")
   registerServerApiFetchMetrics()
   const queryClient = createQueryClient()
@@ -48,7 +47,6 @@ export const buildCanonicalPostDetailServerProps = async (
   if (!IS_QA_CLIENT_FETCH_MODE && (!Number.isInteger(numericPostId) || numericPostId <= 0)) {
     return { notFound: true }
   }
-  // QA에서는 브라우저가 API 응답을 주입한다. 실제 서버 장애를 성공으로 바꾸는 경로가 아니다.
   const [postDetail, adminProfileSeed] = await Promise.all([
     IS_QA_CLIENT_FETCH_MODE ? Promise.resolve(null) : getPostDetailById(postId),
     resolveStaticAdminProfileSeed(fetchPublicAdminProfile),

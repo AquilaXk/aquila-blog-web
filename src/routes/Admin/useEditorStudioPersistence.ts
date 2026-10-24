@@ -108,9 +108,7 @@ type UseEditorStudioPersistenceParams = {
   setPostSummary: StudioSetState<string>
   setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
   setSummaryIntent: StudioSetState<SummaryIntent>
-  setKnownTags: StudioSetState<string[]>
   setLocalDraftSavedAt: StudioSetState<string>
-  setLocalDraftSlotLabel: StudioSetState<string>
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
   setLoadingKey: StudioSetState<string>
   setResult: StudioSetState<string>
@@ -149,8 +147,8 @@ export const useEditorStudioPersistence = ({
   postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion,
   postVisibility, pretty, refreshPublicPostReadViews, serverBaselineEditorFingerprintRef,
   signalLocalDraftBaselineReady, setEditorMode, setIsPreviewThumbnailError,
-  setIsTempDraftMode, setKnownTags, setLoadingKey, setLocalDraftSavedAt,
-  setLocalDraftSlotLabel, setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
+  setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
+  setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
   setPostThumbnailUrl, setPostThumbnailZoom, setPostVersion, setPostSummary,
   setPostSummarySource, setSummaryIntent, setPreviewThumbnailSourceUrl, setPublishStatus,
   setResult, setThumbnailImageFileName, toFlags, uploadWithConflictRetry,
@@ -356,7 +354,6 @@ export const useEditorStudioPersistence = ({
       })
       if (removedSubmittedDraft) {
         setLocalDraftSavedAt("")
-        setLocalDraftSlotLabel("")
       }
 
       setPublishStatus(
@@ -366,7 +363,6 @@ export const useEditorStudioPersistence = ({
         ),
         "page"
       )
-      setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
       return true
     } catch (error) {
       const recovery = resolveEditorFailureRecovery(error, {
@@ -386,7 +382,7 @@ export const useEditorStudioPersistence = ({
     lastWriteIdempotencyKeyRef, postCategory, postId, summaryIntent, postTags, postTitle,
     postVisibility, pretty, refreshPublicPostReadViews, reportValidationError,
     serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, setEditorMode,
-    setIsTempDraftMode, setKnownTags, setLoadingKey, setLocalDraftSavedAt, setLocalDraftSlotLabel,
+    setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
     setPostId, setPostVersion, setPublishStatus, setResult, toFlags, validateContentPreflight,
   ])
 
@@ -414,7 +410,6 @@ export const useEditorStudioPersistence = ({
       if (!canonicalSummary) return false
       const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
 
-      setKnownTags((prev) => dedupeStrings([...prev, ...postTags]).sort((a, b) => a.localeCompare(b)))
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
@@ -428,7 +423,6 @@ export const useEditorStudioPersistence = ({
       })
       if (removedSubmittedDraft) {
         setLocalDraftSavedAt("")
-        setLocalDraftSlotLabel("")
       }
       setPublishStatus(
         await resolvePostSaveRefresh(
@@ -453,10 +447,10 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
-    lastLocalDraftFingerprintRef, postId, postTags, postTitle, postVersion, postVisibility,
+    lastLocalDraftFingerprintRef, postId, postTitle, postVersion, postVisibility,
     pretty, refreshPublicPostReadViews, reportValidationError, serverBaselineEditorFingerprintRef,
-    signalLocalDraftBaselineReady, setIsTempDraftMode, setKnownTags, setLoadingKey,
-    setLocalDraftSavedAt, setLocalDraftSlotLabel, setPostVersion, setPublishStatus, setResult,
+    signalLocalDraftBaselineReady, setIsTempDraftMode, setLoadingKey,
+    setLocalDraftSavedAt, setPostVersion, setPublishStatus, setResult,
     validateContentPreflight,
   ])
 
@@ -495,7 +489,6 @@ export const useEditorStudioPersistence = ({
       })
       if (removedSubmittedDraft) {
         setLocalDraftSavedAt("")
-        setLocalDraftSlotLabel("")
       }
       setPublishStatus(
         await resolvePostSaveRefresh(
@@ -522,7 +515,7 @@ export const useEditorStudioPersistence = ({
     buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
     lastLocalDraftFingerprintRef, postId, postVersion, pretty, refreshPublicPostReadViews,
     reportValidationError, serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady,
-    setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt, setLocalDraftSlotLabel,
+    setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
     setPostVersion, setPublishStatus, setResult, validateContentPreflight,
   ])
 

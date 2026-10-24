@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
 import { ADMIN_TASK_DLQ_REPLAY_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
@@ -87,51 +87,57 @@ export const AdminTaskDlqReplaySection = ({
   const restoredOperationId = useRef<string | null>(null)
   const restoredStatusRequestedOperationId = useRef<string | null>(null)
 
-  const consumeReceipt = (
-    response: unknown,
-    expectedOperationId: string,
-    acceptedOnly = false
-  ) => {
-    const receipt = acceptedOnly
-      ? AdminTaskDlqReplayModel.parseAcceptedOperationReceipt(response)
-      : AdminTaskDlqReplayModel.parseOperationReceipt(response)
-    if (receipt?.operationId !== expectedOperationId) {
-      setNotice("The operation response could not be verified.")
-      return false
-    }
-    const safeDisplay = AdminTaskDlqReplayModel.toSafeDisplay(receipt)
-    setDisplay(safeDisplay)
-    setNotice("")
-    setConflict(false)
-    if (
-      AdminTaskDlqReplayModel.classifyReceipt(receipt) === "terminal" &&
-      !refreshedOperationIds.current.has(receipt.operationId)
-    ) {
-      refreshedOperationIds.current.add(receipt.operationId)
-      onTerminalReceipt()
-    }
-    return true
-  }
+  const consumeReceipt = useCallback(
+    (
+      response: unknown,
+      expectedOperationId: string,
+      acceptedOnly = false
+    ) => {
+      const receipt = acceptedOnly
+        ? AdminTaskDlqReplayModel.parseAcceptedOperationReceipt(response)
+        : AdminTaskDlqReplayModel.parseOperationReceipt(response)
+      if (receipt?.operationId !== expectedOperationId) {
+        setNotice("The operation response could not be verified.")
+        return false
+      }
+      const safeDisplay = AdminTaskDlqReplayModel.toSafeDisplay(receipt)
+      setDisplay(safeDisplay)
+      setNotice("")
+      setConflict(false)
+      if (
+        AdminTaskDlqReplayModel.classifyReceipt(receipt) === "terminal" &&
+        !refreshedOperationIds.current.has(receipt.operationId)
+      ) {
+        refreshedOperationIds.current.add(receipt.operationId)
+        onTerminalReceipt()
+      }
+      return true
+    },
+    [onTerminalReceipt]
+  )
 
-  const checkStatus = async (sessionRecord = record) => {
-    if (!sessionRecord || disabled || statusInFlight.current) return
-    statusInFlight.current = true
-    setBusy(true)
-    try {
-      const response = await apiFetch(
-        `/system/api/v1/adm/operations/${sessionRecord.operationId}`,
-        { cache: "no-store" }
-      )
-      consumeReceipt(response, sessionRecord.operationId)
-    } catch (error) {
-      const failure = describeFailure(error)
-      setConflict(failure.conflict)
-      setNotice(failure.message)
-    } finally {
-      statusInFlight.current = false
-      setBusy(false)
-    }
-  }
+  const checkStatus = useCallback(
+    async (sessionRecord = record) => {
+      if (!sessionRecord || disabled || statusInFlight.current) return
+      statusInFlight.current = true
+      setBusy(true)
+      try {
+        const response = await apiFetch(
+          `/system/api/v1/adm/operations/${sessionRecord.operationId}`,
+          { cache: "no-store" }
+        )
+        consumeReceipt(response, sessionRecord.operationId)
+      } catch (error) {
+        const failure = describeFailure(error)
+        setConflict(failure.conflict)
+        setNotice(failure.message)
+      } finally {
+        statusInFlight.current = false
+        setBusy(false)
+      }
+    },
+    [consumeReceipt, disabled, record]
+  )
 
   useEffect(() => {
     let restored: TaskDlqReplaySessionRecord | null = null
@@ -161,9 +167,7 @@ export const AdminTaskDlqReplaySection = ({
       return
     restoredStatusRequestedOperationId.current = record.operationId
     void checkStatus(record)
-    // Reload restoration performs one explicit current-result read for the saved operation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, record])
+  }, [checkStatus, disabled, record])
 
   const postRecord = async (sessionRecord: TaskDlqReplaySessionRecord) => {
     if (disabled || postInFlight.current) return

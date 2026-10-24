@@ -73,16 +73,6 @@ export type MarkdownLivePreviewDecoration = {
 
 export type MarkdownLivePreviewDecorationSpec = MarkdownLivePreviewDecoration
 
-const HIDDEN_MARK_NODES = new Set([
-  "HeaderMark",
-  "EmphasisMark",
-  "StrikethroughMark",
-  "LinkMark",
-  "CodeMark",
-  "CodeInfo",
-  "TaskMarker",
-])
-
 const WIKILINK_TOKEN_REGEX = /\[\[([^\]\r\n]+)\]\]/g
 const HIGHLIGHT_TOKEN_REGEX = /(?<!=)==((?:[^\r\n=]|=(?!=))+?)==(?!=)/g
 
@@ -209,27 +199,12 @@ export const isTokenActive = (
   return false
 }
 
-const decorationForNode = (
-  markdown: string,
-  node: MarkdownSyntaxNode,
-  parent: MarkdownSyntaxNode | null
-): MarkdownLivePreviewDecoration | null => {
+const decorationForNode = (node: MarkdownSyntaxNode): MarkdownLivePreviewDecoration | null => {
   if (node.name === "ListMark") {
     return { from: node.from, to: node.to, kind: "list-marker" }
   }
   if (node.name === "QuoteMark") {
     return { from: node.from, to: node.to, kind: "quote-mark" }
-  }
-  if (node.name === "HeaderMark") {
-    let to = node.to
-    while (to < markdown.length && (markdown[to] === " " || markdown[to] === "\t")) to += 1
-    return { from: node.from, to, kind: "hide-mark" }
-  }
-  if (HIDDEN_MARK_NODES.has(node.name)) {
-    return { from: node.from, to: node.to, kind: "hide-mark" }
-  }
-  if (node.name === "URL" && (parent?.name === "Link" || parent?.name === "Image")) {
-    return { from: node.from, to: node.to, kind: "hide-mark" }
   }
   if (/^ATXHeading[1-6]$/.test(node.name)) {
     return { from: node.from, to: node.to, kind: "heading", level: Number(node.name.at(-1)) }
@@ -245,8 +220,6 @@ const decorationForNode = (
     Blockquote: "quote",
     BulletList: "list",
     OrderedList: "list",
-    FencedCode: "fenced-code",
-    HorizontalRule: "horizontal-rule",
   }
   const kind = kindByNode[node.name]
   return kind ? { from: node.from, to: node.to, kind } : null
@@ -262,8 +235,6 @@ export type MarkdownLivePreviewPlanEntry = {
   hideWhenActiveRange?: MarkdownLiveSourceRange
   secondaryHideWhenActiveRange?: MarkdownLiveSourceRange
 }
-
-export type MarkdownLivePreviewEntry = MarkdownLivePreviewPlanEntry
 
 const createPlanEntry = (
   decoration: MarkdownLivePreviewDecoration,
@@ -413,7 +384,7 @@ const tagEntriesInsideTasks = (
 
 export const buildMarkdownLivePreviewEntries = (
   markdown: string,
-  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode as unknown as MarkdownSyntaxNode
+  documentNode: MarkdownSyntaxNode = fallbackMarkdownParser.parse(markdown).topNode
 ): readonly MarkdownLivePreviewPlanEntry[] => {
   const cached = cachedPreviewEntriesByNode.get(documentNode)
   if (cached && cached.markdown === markdown) {
@@ -507,8 +478,8 @@ export const buildMarkdownLivePreviewEntries = (
       taskRanges.push({ from: node.from, to: node.to })
     }
 
-    const decoration = decorationForNode(markdown, node, parent)
-    if (decoration && decoration.kind !== "hide-mark" && decoration.kind !== "horizontal-rule") {
+    const decoration = decorationForNode(node)
+    if (decoration) {
       entries.push(createPlanEntry(decoration))
     }
 

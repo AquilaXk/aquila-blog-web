@@ -193,7 +193,6 @@ export const Global = () => {
           box-sizing: border-box;
         }
 
-        // init textarea
         textarea {
           border: none;
           background-color: transparent;

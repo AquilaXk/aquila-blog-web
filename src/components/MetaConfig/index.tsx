@@ -54,7 +54,6 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
       <meta charSet="UTF-8" />
       <meta name="description" content={props.description} />
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-      {/* og */}
       <meta property="og:type" content={props.type} />
       <meta property="og:title" content={props.title} />
       <meta property="og:description" content={props.description} />
@@ -62,12 +61,10 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
       <meta property="og:site_name" content={siteName} />
       {CONFIG.lang && <meta property="og:locale" content={CONFIG.lang} />}
       {props.image && <meta property="og:image" content={props.image} />}
-      {/* twitter */}
       <meta name="twitter:title" content={props.title} />
       <meta name="twitter:description" content={props.description} />
       <meta name="twitter:card" content="summary_large_image" />
       {props.image && <meta name="twitter:image" content={props.image} />}
-      {/* post */}
       {props.type === "Post" && (
         <>
           {props.date && (

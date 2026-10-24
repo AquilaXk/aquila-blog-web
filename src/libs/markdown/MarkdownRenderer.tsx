@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type FC,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -21,6 +20,7 @@ import {
   parseHighlightedLineNumbers,
   resolveMarkdownRenderModel,
 } from "src/libs/markdown/rendering"
+import { resolveMarkdownImageDimensions } from "src/libs/markdown/renderingImageModel"
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
 import { openImageLightboxOverlay } from "src/libs/markdown/imageLightboxOverlay"
 import useMermaidEffect from "src/libs/markdown/hooks/useMermaidEffect"
@@ -30,6 +30,7 @@ import usePrismEffect from "src/libs/markdown/hooks/usePrismEffect"
 import PrettyCodeBlock from "src/libs/markdown/components/PrettyCodeBlock"
 import MarkdownRendererRoot from "src/libs/markdown/components/MarkdownRendererRoot"
 import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
+import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
 import {
   MarkdownBlockquote,
   MarkdownParagraph,
@@ -49,31 +50,6 @@ import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
 export { markdownGuide } from "src/libs/markdown/rendering"
-
-export const buildHeadingAnchorUrl = (locationHref: string, headingId: string): string => {
-  const trimmedId = headingId.trim().replace(/^#/, "")
-  const hashIndex = locationHref.indexOf("#")
-  const baseHref = hashIndex >= 0 ? locationHref.slice(0, hashIndex) : locationHref
-  if (!trimmedId) return baseHref
-  return `${baseHref}#${trimmedId}`
-}
-
-const handleHeadingAnchorClick = (target: Element): boolean => {
-  const heading = target.closest<HTMLElement>("h2[id], h3[id], h4[id]")
-  if (!heading?.id || target.closest("a")) return false
-  if (typeof window === "undefined") return false
-  const selectionText = window.getSelection?.()?.toString().trim() ?? ""
-  if (selectionText.length > 0) return false
-
-  window.history.replaceState(null, "", `#${heading.id}`)
-  const fullUrl = buildHeadingAnchorUrl(window.location.href, heading.id)
-  void navigator.clipboard?.writeText(fullUrl)?.catch(() => undefined)
-  heading.dataset.anchorCopied = "true"
-  window.setTimeout(() => {
-    delete heading.dataset.anchorCopied
-  }, 1500)
-  return true
-}
 
 const handleImageLightboxClick = (target: Element): boolean => {
   if (target.closest("a[href], .aq-image-resize-handle")) return false
@@ -234,39 +210,20 @@ export const createMarkdownComponentVariants = ({
           </span>
         )
       }
-      const isFirstImage = imageRenderOrderRef.current === 0
+      const imageIndex = imageRenderOrderRef.current
       imageRenderOrderRef.current += 1
-
-      let imgWidth: number | undefined
-      let imgHeight: number | undefined
-      try {
-        const parsed = new URL(imageSrc, "https://dummy.local")
-        const w = parsed.searchParams.get("w") || parsed.searchParams.get("width")
-        const h = parsed.searchParams.get("h") || parsed.searchParams.get("height")
-        if (w && /^\d+$/.test(w)) imgWidth = Number.parseInt(w, 10)
-        if (h && /^\d+$/.test(h)) imgHeight = Number.parseInt(h, 10)
-      } catch {}
-
-      const aspectRatio = imgWidth && imgHeight ? `${imgWidth} / ${imgHeight}` : undefined
+      const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
 
       return (
-        <figure
-          className="aq-image-frame"
-          style={aspectRatio ? ({ aspectRatio } as CSSProperties) : undefined}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageSrc}
-            alt={alt || ""}
-            width={imgWidth}
-            height={imgHeight}
-            style={aspectRatio ? { aspectRatio } : undefined}
-            loading={isFirstImage ? "eager" : "lazy"}
-            fetchPriority={isFirstImage ? "high" : undefined}
-            decoding="async"
-          />
-          {alt ? <figcaption>{alt}</figcaption> : null}
-        </figure>
+        <MarkdownImageFigure
+          src={imageSrc}
+          alt={alt || ""}
+          widthPx={widthPx}
+          heightPx={heightPx}
+          aspectRatio={aspectRatio}
+          eager={imageIndex === 0}
+          imageIndex={imageIndex}
+        />
       )
     },
     a({
@@ -453,8 +410,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (editableImages) return
       if (!(event.target instanceof Element)) return
-      if (handleImageLightboxClick(event.target)) return
-      handleHeadingAnchorClick(event.target)
+      handleImageLightboxClick(event.target)
     },
     [editableImages]
   )

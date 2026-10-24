@@ -173,7 +173,6 @@ export const replaceRoute = async (
   }
 
   if (preferHardNavigation && typeof window !== "undefined") {
-    // full document reload without client-side URL redirect sink
     window.location.reload()
   }
 }
@@ -194,7 +193,6 @@ export const pushRoute = async (
   }
 
   if (preferHardNavigation && typeof window !== "undefined") {
-    // full document reload without client-side URL redirect sink
     window.location.reload()
   }
 }

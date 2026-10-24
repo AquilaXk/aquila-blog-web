@@ -25,10 +25,6 @@ export const CarouselHead = styled.div`
   gap: 1.5rem 2.5rem;
 `
 
-/**
- * 3x2 1px 헤어라인 에디토리얼 역량 그리드.
- * 카드 박스·그림자·원형 아이콘 배지·파스텔 알약 태그를 배제하고 1px 구획선과 타이포 위계로만 구성한다.
- */
 export const FeatureGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -75,8 +71,6 @@ export const FeatureMeta = styled.div`
   gap: 0.5rem;
   margin-bottom: 0.15rem;
 `
-
-export const FeatureIconPanel = FeatureMeta
 
 export const FeatureIndex = styled.span`
   font-family: ${editorialLabel.fontFamily};
@@ -207,26 +201,6 @@ export const ProductBadge = styled.span`
   letter-spacing: ${editorialLabel.letterSpacing};
   text-transform: ${editorialLabel.textTransform};
   color: ${light.accentText};
-`
-
-export const ProductHighlightList = styled.ul`
-  display: none;
-`
-
-export const ReliabilityBlock = styled.div`
-  display: none;
-`
-
-export const ReliabilityHeader = styled.div`
-  display: none;
-`
-
-export const ReliabilityList = styled.ul`
-  display: none;
-`
-
-export const ReliabilityItem = styled.li`
-  display: none;
 `
 
 export const ProductAction = styled.a`

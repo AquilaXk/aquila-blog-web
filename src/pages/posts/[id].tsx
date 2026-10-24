@@ -9,7 +9,6 @@ import {
   buildCanonicalPostDetailServerProps,
 } from "src/libs/server/postDetailPage"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
-import type { PublicAdminProfileSource } from "src/libs/adminProfileSource"
 import { buildPostDetailMetadata } from "src/routes/Detail/PostDetail/postDetailMetadataModel"
 import { ErrorState } from "src/design-system/StatePresenters"
 import { resolvePostDetailRenderState } from "src/routes/Detail/postDetailRenderState"
@@ -19,11 +18,7 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
   return await buildCanonicalPostDetailServerProps(postId, res, req)
 })
 
-type DetailPageProps = {
-  initialAdminProfileSource: PublicAdminProfileSource
-}
-
-const CanonicalPostPage: NextPageWithLayout<DetailPageProps> = () => {
+const CanonicalPostPage: NextPageWithLayout = () => {
   const { post, isNotFound, isError, isPending, refetch } = usePostQuery()
   const renderState = resolvePostDetailRenderState({
     isNotFound,

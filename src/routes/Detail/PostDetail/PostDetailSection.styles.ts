@@ -32,28 +32,9 @@ export const MobileSummaryBar = styled.div `
       color: ${({ theme }) => (theme.colors.accentLink)};
     }
 
-    button[data-active="true"][data-tone="danger"] {
-      border-color: ${({ theme }) => theme.colors.statusDangerBorder};
-      background: ${({ theme }) => theme.colors.statusDangerSurface};
-      color: ${({ theme }) => theme.colors.statusDangerText};
-    }
-
     button span,
     button strong {
       display: none;
-    }
-
-    .mobileSummaryLikeFeedback {
-      flex: 1 1 100%;
-      margin: 0;
-      padding: 8px 10px;
-      border-radius: 6px;
-      border: 1px solid ${({ theme }) => theme.colors.statusDangerBorder};
-      background: ${({ theme }) => theme.colors.statusDangerSurface};
-      color: ${({ theme }) => theme.colors.statusDangerText};
-      font-size: 13px;
-      line-height: 1.35;
-      font-weight: 600;
     }
   }
 `;
@@ -63,18 +44,6 @@ export const RelatedSection = styled.section `
   border-top: 1px solid var(--aq-border);
   content-visibility: auto;
   contain-intrinsic-size: 1px 420px;
-
-  .monoLabel {
-    display: inline-flex;
-    margin-bottom: 12px;
-    color: var(--aq-accent-link, var(--aq-accent));
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
 
   h3 {
     margin: 0 0 22px;

@@ -1,9 +1,9 @@
 import type { NextRouter } from "next/router"
 
 export const primaryLinks = [
-  ["notes", "Notes", "/"],
-  ["topics", "Topics", "/#topics"],
-  ["about", "About", "/about"],
+  ["notes", "Notes", "/", "navNotes"],
+  ["topics", "Topics", "/#topics", "navTopics"],
+  ["about", "About", "/about", "navAbout"],
 ] as const
 
 export const SearchIcon = () => (

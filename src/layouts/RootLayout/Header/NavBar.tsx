@@ -75,17 +75,13 @@ const NavBar = () => {
       }
     })()
 
+    const clearInFlightFocus = () => {
+      if (focusFeedSearchInFlightRef.current === run) {
+        focusFeedSearchInFlightRef.current = null
+      }
+    }
     focusFeedSearchInFlightRef.current = run
-    void run
-      .finally(() => {
-        if (focusFeedSearchInFlightRef.current === run) {
-          focusFeedSearchInFlightRef.current = null
-        }
-      })
-      .catch(() => {
-        // call-site handlers report the rejection; absorb finally-chain rejection only
-      })
-
+    void run.then(clearInFlightFocus, clearInFlightFocus)
     return run
   }, [router])
 
@@ -140,8 +136,8 @@ const NavBar = () => {
                 <span>{t("navSearch")}</span>
                 <kbd>{SEARCH_SHORTCUT_HINT}</kbd>
               </button>
-              {primaryLinks.map(([id, , to]) => {
-                const label = id === "notes" ? t("navNotes") : id === "topics" ? t("navTopics") : t("navAbout")
+              {primaryLinks.map(([id, , to, labelKey]) => {
+                const label = t(labelKey)
                 return (
                   <Link key={to} href={to} data-nav-id={id} aria-label={label} onClick={closeMobileMenu}>
                     {label}
@@ -172,8 +168,8 @@ const NavBar = () => {
   return (
     <StyledWrapper>
       <ul className="primaryLinks">
-        {primaryLinks.map(([id, , to]) => {
-          const label = id === "notes" ? t("navNotes") : id === "topics" ? t("navTopics") : t("navAbout")
+        {primaryLinks.map(([id, , to, labelKey]) => {
+          const label = t(labelKey)
           return (
             <li key={id}>
               <Link
@@ -497,34 +493,6 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .loginLink,
-  .adminLink,
-  .logoutBtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 36px;
-    padding: 0 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 750;
-    border-radius: 6px;
-    text-decoration: none;
-  }
-
-  .loginLink,
-  .logoutBtn {
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface);
-    color: var(--aq-text);
-    cursor: pointer;
-  }
-
-  .adminLink {
-    border: 1px solid var(--aq-text);
-    background: var(--aq-text);
-    color: var(--aq-page-bg);
-  }
-
   .mobileMenuButton {
     display: none;
     place-items: center;
@@ -570,13 +538,6 @@ const StyledWrapper = styled.div`
     }
 
     .searchTrigger {
-      height: ${control.lg}px;
-      min-height: ${control.lg}px;
-    }
-
-    .loginLink,
-    .adminLink,
-    .logoutBtn {
       height: ${control.lg}px;
       min-height: ${control.lg}px;
     }

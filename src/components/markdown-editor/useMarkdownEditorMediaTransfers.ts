@@ -51,7 +51,6 @@ type UseMarkdownEditorMediaTransfersArgs = {
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
   applyPlannedMarkdownMutation: (plan: PlannedTextMutation, options?: MarkdownMutationOptions) => boolean
   applyRecordedMarkdownMutation: (plan: PlannedTextMutation) => boolean
-  /** Placeholder replace/remove after async upload — must not steal focus from other controls. */
   applyBackgroundMarkdownMutation: (plan: PlannedTextMutation) => boolean
   resolveActiveSelection: () => TextareaSelection
   resolveDropTargetPosition?: (coords: { x: number; y: number }) => number | null
@@ -100,11 +99,6 @@ export const useMarkdownEditorMediaTransfers = ({
     [applyPlannedMarkdownMutation, resolveActiveSelection]
   )
 
-  /**
-   * Replace placeholder in-place when still present.
-   * If missing: append only when the document generation is unchanged (user edited placeholder).
-   * If generation advanced (draft restore / external replace), drop the completion silently.
-   */
   const replaceExactOrAppend = useCallback(
     (
       exact: string,
@@ -337,7 +331,6 @@ export const useMarkdownEditorMediaTransfers = ({
       })
 
       if (jobs.length > 0) {
-        // Reserve every placeholder at the original caret before any upload await.
         insertAtActiveSelection(
           jobs.map((job) => job.placeholder).join(""),
           { clearUploadError: false }
@@ -350,7 +343,6 @@ export const useMarkdownEditorMediaTransfers = ({
 
       if (jobs.length === 0) return
 
-      // Keep onUploadingChange(true) for the whole batch — no false flash between files.
       setUploadInFlight(jobs.length)
       try {
         for (const job of jobs) {
@@ -391,7 +383,6 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
-      // Prioritize URL linkify when text is selected and valid URL is pasted
       const { from, to } = resolveActiveSelection()
       if (from < to) {
         const plainText = readClipboardPlainText(event.clipboardData)

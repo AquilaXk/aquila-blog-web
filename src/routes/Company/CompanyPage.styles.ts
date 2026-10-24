@@ -1,16 +1,8 @@
 import styled from "@emotion/styled"
 import { breakpoint, editorialLabel, fontWeight, layoutBreakpoint, radius } from "src/design-system/tokens"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
-import { variables } from "src/styles"
+import { marketingLight as light } from "src/design-system/marketingPalette"
 
-/**
- * 회사 표면의 chrome(공지 스트립 · 헤더 · 히어로 · footer)과 섹션 공통 프리미티브.
- * 섹션별 레이아웃은 `CompanySection.styles.ts`에 있다.
- *
- * 미니멀한 라이트 테마를 유지하며 불필요한 배경 장식(그리드 라인, 글로우 타원, 부유 알약 등)을 배제한다.
- * 그림자는 히어로 폰 목업과 프로덕트 쇼케이스 미디어에 한해 적용한다.
- */
 export const CONTENT_MAX_WIDTH = "75rem"
 export const SECTION_PADDING_Y = "clamp(4.5rem, 10vw, 10rem)"
 export const SECTION_PADDING_X = "clamp(1.25rem, 5vw, 3rem)"
@@ -306,10 +298,6 @@ export const Hero = styled.section`
   }
 `
 
-export const HeroAccent = styled.div`
-  display: none;
-`
-
 export const HeroCopy = styled.div`
   position: relative;
   z-index: 1;
@@ -364,32 +352,6 @@ export const HeroActions = styled.div`
     a {
       flex: 1 1 11rem;
     }
-  }
-`
-
-export const HeroShowcase = styled.figure`
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: center;
-  margin: clamp(2.5rem, 5vw, 4rem) auto 0;
-  padding: 0;
-`
-
-export const HeroPhoneFrame = styled.div`
-  position: relative;
-  width: min(100%, clamp(16rem, 28vw, 21rem));
-  padding: 0.5rem;
-  border: 1px solid ${dark.hairline};
-  border-radius: 2rem;
-  background: ${dark.field};
-  box-shadow: ${variables.ui.card.shadowFloating};
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 1.6rem;
   }
 `
 

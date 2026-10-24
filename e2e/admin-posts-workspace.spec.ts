@@ -69,7 +69,6 @@ test.describe("admin posts workspace link contract", () => {
     const source = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminPostsWorkspacePage.tsx"), "utf8")
 
     expect(source).toContain("POSTS_LIST_LOAD_ERROR_MESSAGE")
-    expect(source).toContain("RECENT_POSTS_UNAVAILABLE_MESSAGE")
     expect(source).not.toContain("글 목록을 불러오지 못했습니다: ${message}")
     expect(source).not.toContain("최근 글을 불러오지 못했습니다: ${message}")
   })
@@ -94,7 +93,10 @@ test.describe("admin posts workspace link contract", () => {
   })
 
   test("V4 markdown editor는 code title snippet과 단일 live surface를 유지한다", () => {
-    const source = readFileSync(path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.tsx"), "utf8")
+    const source = [
+      readFileSync(path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.tsx"), "utf8"),
+      readFileSync(path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditorToolbar.tsx"), "utf8"),
+    ].join("\n")
     const styleSource = readFileSync(
       path.resolve(__dirname, "../src/components/markdown-editor/MarkdownEditor.styles.ts"),
       "utf8"
@@ -105,14 +107,14 @@ test.describe("admin posts workspace link contract", () => {
       path.resolve(__dirname, "../src/routes/Admin/EditorStudioWorkspaceControllerRoot.tsx"),
       "utf8"
     )
-    const guideSource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedEditorSurface.tsx"),
-      "utf8"
-    )
-    const editorPartsSource = readFileSync(
-      path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedEditorSurfaceParts.tsx"),
-      "utf8"
-    )
+    const guideSource = [
+      readFileSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedEditorSurface.tsx"), "utf8"),
+      readFileSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedPanelParts.tsx"), "utf8"),
+    ].join("\n")
+    const editorPartsSource = [
+      readFileSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedEditorSurfaceParts.tsx"), "utf8"),
+      readFileSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioDedicatedPanelParts.tsx"), "utf8"),
+    ].join("\n")
     const controllerSource = readFileSync(
       path.resolve(__dirname, "../src/routes/Admin/EditorStudioWorkspaceControllerRootView.tsx"),
       "utf8"
@@ -123,7 +125,7 @@ test.describe("admin posts workspace link contract", () => {
     const editorWritingColumnStyle =
       editorPartsSource.match(/export const EditorStudioWritingColumn[\s\S]*?`;/)?.[0] ?? ""
     const editorCanvasSectionStyle =
-      editorPartsSource.match(/export const EditorStudioDedicatedCanvasSection[\s\S]*?`;/)?.[0] ?? ""
+      editorPartsSource.match(/export const EditorStudioDedicatedCanvasSection = styled\.section`[\s\S]*?\n`/)?.[0] ?? ""
     const publishNoticeStyle = editorPartsSource.match(/export const PublishNotice[\s\S]*?`;/)?.[0] ?? ""
     const editorTagRowStyle = editorPartsSource.match(/export const EditorTagRow[\s\S]*?`;/)?.[0] ?? ""
     const selectedTagChipStyle = editorPartsSource.match(/export const SelectedTagChip[\s\S]*?`;/)?.[0] ?? ""
@@ -131,7 +133,7 @@ test.describe("admin posts workspace link contract", () => {
     const editorMetaSectionStyle =
       editorPartsSource.match(/export const EditorStudioDedicatedMetaSection[\s\S]*?`;/)?.[0] ?? ""
     const titleInputStyle = editorPartsSource.match(/export const TitleInput[\s\S]*?`;/)?.[0] ?? ""
-    const editorInspectorStyle = editorPartsSource.match(/export const EditorInspector = styled\.aside`[\s\S]*?`;/)?.[0] ?? ""
+    const editorInspectorStyle = editorPartsSource.match(/export const EditorInspector = styled\.aside`[\s\S]*?\n`/)?.[0] ?? ""
     const inspectorTagInputRowStyle =
       editorPartsSource.match(/export const EditorInspectorTagInputRow[\s\S]*?`;/)?.[0] ?? ""
     const inspectorFullWidthActionStyle =
@@ -211,15 +213,15 @@ test.describe("admin posts workspace link contract", () => {
     expect(guideSource).not.toContain("onRecommend")
     expect(guideSource).not.toContain("isRecommend")
     expect(guideSource).toContain("placeholder=\"태그 추가\"")
-    expect(guideSource).not.toContain("useDeferredValue")
+    expect(guideSource).toContain("useDeferredValue")
     expect(guideSource).not.toContain("documentInsights")
     expect(guideSource).not.toContain("캐시가 빨라질수록 더 중요해지는 무효화 전략")
     expect(guideSource).not.toContain("ETag, Redis, CDN surrogate key")
     expect(guideSource).not.toContain("2026.06.19")
     expect(guideSource).not.toContain("2.1K")
     expect(guideSource).toContain("const countMarkdownLinkWarnings = (markdown: string)")
-    expect(guideSource).toContain("return !href || /^https?:\\/\\/$/.test(href)")
-    expect(guideSource).toContain("const linkWarningCount = countMarkdownLinkWarnings(postContent)")
+    expect(guideSource).toContain("!href || /^https?:\\/\\/$/.test(href)")
+    expect(guideSource).toContain("countMarkdownLinkWarnings(deferredPostContent)")
     expect(guideSource).toContain("<h3>발행 설정</h3>")
     expect(guideSource).toContain("<span>공개 범위</span>")
     expect(guideSource).toContain("<span>요약</span>")
@@ -280,7 +282,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(editorHeaderMetaRowStyle).toContain("margin-top: 10px;")
     expect(editorHeaderMetaRowStyle).not.toContain("justify-content: space-between;")
     expect(editorWritingColumnStyle).toContain("position: relative;")
-    expect(editorWritingColumnStyle).toContain("grid-template-rows: auto minmax(0, 1fr);")
+    expect(editorWritingColumnStyle).toContain("grid-template-rows: auto minmax(0, 1fr) auto;")
     expect(editorWritingColumnStyle).toContain("overflow: hidden;")
     expect(editorCanvasSectionStyle).toContain("overflow: hidden;")
     expect(editorCanvasSectionStyle).toContain("border: 0;")
@@ -326,7 +328,7 @@ test.describe("admin posts workspace link contract", () => {
       "utf8"
     )
 
-    expect(mapperSource).toContain('name: post.authorName || post.authorUsername || "익명"')
+    expect(mapperSource).toContain('post.authorName || post.authorUsername || "익명"')
     expect(headerSource).toContain("<h1 className=\"title\">{data.title}</h1>")
     expect(headerSource).toContain('alt={`${authorName} profile image`}')
     expect(headerSource).toContain("width={38}")
@@ -353,19 +355,19 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerStyleSource).not.toContain("height: 48px;")
     expect(headerStyleSource).not.toContain("border-bottom: 1px solid #dfe1e5;")
     expect(headerSource).toContain("const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null")
-    expect(headerSource).toContain('const authorName = postAuthor?.name?.trim() || "익명"')
-    expect(headerSource).toContain('const authorImageSrc = postAuthor?.profile_photo || ""')
+    expect(headerSource).toContain('postAuthor?.name?.trim() || "익명"')
+    expect(headerSource).toContain('postAuthor?.profile_photo || ""')
     expect(headerSource).not.toContain("usingAdminFallback")
     expect(headerSource).not.toContain("adminProfile?.profileImageUrl")
     expect(headerSource).not.toContain("profileImageDirectUrl")
     expect(headerSource).toContain('const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()')
-    expect(headerSource).toContain("const heroLabels = primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]")
+    expect(headerSource).toContain("primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]")
     expect(headerSource).not.toContain("CONFIG.profile.image")
     expect(headerSource).toContain('<span className="avatarFallback" aria-hidden="true" />')
     expect(headerStyleSource).toContain(".avatarFallback")
     expect(headerStyleSource).toContain(".avatarFallback::before")
     expect(headerStyleSource).toContain(".avatarFallback::after")
-    expect(headerSource).toContain("{authorName && (")
+    expect(headerSource).toContain("if (!authorName) return null")
     expect(headerSource).toContain("<strong>{authorName}</strong>")
     expect(headerSource).not.toContain("useRootAdminProfile")
     expect(metadataSource).toContain('post.author?.find((author) => author.name.trim().length > 0)?.name.trim() ||\n  "익명"')
@@ -377,7 +379,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(headerSource).toContain("<span className=\"statChip\">{viewText}</span>")
     expect(headerSource).toContain("UPDATED {modifiedAt}")
     expect(headerSource).not.toContain("댓글 {data.commentsCount ?? 0}")
-    expect(headerSource).toContain("{likesCount ?? data.likesCount ?? 0}")
+    expect(headerSource).toContain("likesCount ?? data.likesCount ?? 0")
     expect(headerSource).not.toContain("캐시가 빨라질수록")
     expect(headerSource).not.toContain("ETag")
     expect(headerSource).not.toContain("2.1K")

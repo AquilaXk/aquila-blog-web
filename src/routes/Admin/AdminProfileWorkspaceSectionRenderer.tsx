@@ -1,9 +1,10 @@
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 import { renderAdminProfileAboutSection } from "src/routes/Admin/AdminProfileWorkspaceAboutSection"
 import { renderAdminProfileHomeSection } from "src/routes/Admin/AdminProfileWorkspaceHomeDesignSections"
 import { renderAdminProfileIdentitySection } from "src/routes/Admin/AdminProfileWorkspaceIdentitySection"
 import { renderAdminProfileLinksSection } from "src/routes/Admin/AdminProfileWorkspaceLinksSection"
 
-export const renderAdminProfileWorkspaceSection = (props: Record<string, any>) => {
+export const renderAdminProfileWorkspaceSection = (props: AdminProfileWorkspaceSectionProps) => {
   switch (props.activeSection) {
     case "identity":
       return renderAdminProfileIdentitySection(props)

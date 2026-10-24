@@ -64,14 +64,12 @@ export const FloatingActionRail = memo(function FloatingActionRail({
 type MobileSummaryActionsProps = {
   likesCount: number
   shareFeedback: ShareFeedback
-  shareProgressLabel: string | null
   onSharePost: () => void
 }
 
 export const MobileSummaryActions = memo(function MobileSummaryActions({
   likesCount,
   shareFeedback,
-  shareProgressLabel,
   onSharePost,
 }: MobileSummaryActionsProps) {
   return (
@@ -97,7 +95,6 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
       >
         <AppIcon name="share" />
         <span>{shareFeedback === "copied" ? "복사" : shareFeedback === "shared" ? "복사" : shareFeedback === "failed" ? "실패" : "공유"}</span>
-        {shareProgressLabel ? <strong>{shareProgressLabel}</strong> : null}
       </button>
     </MobileSummaryBar>
   )
@@ -136,7 +133,7 @@ export const RightTocRail = memo(function RightTocRail({
         <nav ref={innerRef as Ref<HTMLElement>} className="rightRailInner" aria-label="목차">
           <div className="rightRailHead">
             <div className="rightRailTitleGroup">
-              <h2 className="rightRailTitle">On this page</h2>
+              <h2 className="rightRailTitle">목차</h2>
             </div>
             {hasDepth4Toc && (
               <button

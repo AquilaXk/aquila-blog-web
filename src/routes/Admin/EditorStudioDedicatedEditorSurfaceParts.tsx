@@ -299,7 +299,6 @@ export const EditorStudioFrame = styled.div<{
 `;
 
 export const EditorStudioWritingColumn = styled.section<{
-  $compact?: boolean;
   $zenMode?: boolean;
 }>`
   position: relative;
@@ -312,9 +311,7 @@ export const EditorStudioWritingColumn = styled.section<{
   margin: ${({ $zenMode }) => ($zenMode ? "0 auto" : "0")};
   width: 100%;
 `;
-export const EditorStudioDedicatedMetaSection = styled.section<{
-    $compact?: boolean;
-}> `
+export const EditorStudioDedicatedMetaSection = styled.section`
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -333,9 +330,7 @@ export const EditorStudioDedicatedMetaSection = styled.section<{
     box-sizing: border-box;
   }
 `;
-export const EditorTagRow = styled.div<{
-    $compact?: boolean;
-}> `
+export const EditorTagRow = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -457,9 +452,7 @@ export const EditorInspectorFullWidthAction = styled(SecondaryButton)`
   margin-top: 8px;
 `;
 
-export const TitleInput = styled.textarea<{
-    $compact?: boolean;
-}> `
+export const TitleInput = styled.textarea`
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -529,15 +522,13 @@ export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolea
     display: inline-flex;
   }
 `;
-export const EditorHeaderMetaPill = styled.span<{
-    $compact?: boolean;
-}> `
+export const EditorHeaderMetaPill = styled.span`
   display: inline-flex;
   align-items: center;
   min-height: 26px;
   padding: 0;
   color: ${({ theme }) => theme.colors.gray10};
-  font-size: ${({ $compact }) => ($compact ? "0.72rem" : "0.78rem")};
+  font-size: 0.78rem;
   font-weight: 600;
   line-height: 1;
 `;
