@@ -89,7 +89,6 @@ const PostDetail: React.FC = () => {
     hitCount,
     handleSharePost,
     shareFeedback,
-    shareProgressLabel,
   } = usePostDetailEngagementActions({
     data,
     postId,
@@ -108,7 +107,6 @@ const PostDetail: React.FC = () => {
   const {
     relatedByAuthorPosts,
     relatedByTagPosts,
-    relatedTag,
     shouldFetchRelated,
     showRelatedAuthorSkeleton,
     showRelatedTagSkeleton,
@@ -293,7 +291,7 @@ const PostDetail: React.FC = () => {
         headingOffsetsRef.current = measureHeadingOffsets(items, window.scrollY)
       }
 
-      const anchorTop = railTopOffsetRef.current + 12
+      const anchorTop = railTopOffsetRef.current + 24
       const activeBoundary = anchorTop + 4
       return resolveActiveTocIdFromOffsets(headingOffsetsRef.current, window.scrollY, activeBoundary)
     }
@@ -426,7 +424,6 @@ const PostDetail: React.FC = () => {
             <MobileSummaryActions
               likesCount={data.likesCount ?? 0}
               shareFeedback={shareFeedback}
-              shareProgressLabel={shareProgressLabel}
               onSharePost={handleSharePost}
             />
           ) : null}
@@ -449,7 +446,6 @@ const PostDetail: React.FC = () => {
           {isPostType && <div ref={relatedPrefetchTriggerRef} className="relatedPrefetchTrigger" aria-hidden="true" />}
           {isPostType && shouldFetchRelated ? (
             <RelatedPostsSection
-              relatedTag={relatedTag}
               showRelatedTagSkeleton={showRelatedTagSkeleton}
               relatedByTagPosts={relatedByTagPosts}
               showRelatedAuthorSkeleton={showRelatedAuthorSkeleton}

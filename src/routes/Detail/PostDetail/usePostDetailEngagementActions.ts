@@ -22,14 +22,6 @@ export const usePostDetailEngagementActions = ({
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
   const [hitCount, setHitCount] = useState(data?.hitCount ?? 0)
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
-  const shareProgressLabel =
-    shareFeedback === "failed"
-      ? "재시도"
-      : shareFeedback === "shared"
-        ? "복사 완료"
-        : shareFeedback === "copied"
-          ? "복사 완료"
-          : null
 
   useEffect(() => {
     if (!data) return
@@ -119,6 +111,5 @@ export const usePostDetailEngagementActions = ({
     hitCount,
     handleSharePost,
     shareFeedback,
-    shareProgressLabel,
   }
 }

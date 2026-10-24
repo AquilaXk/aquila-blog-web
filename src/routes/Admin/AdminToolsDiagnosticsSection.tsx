@@ -25,11 +25,26 @@ import {
   formatAge,
   formatInstant,
   formatRetryPolicy,
+  getFreshnessMeta,
+  type DiagnosticTab,
 } from "src/routes/Admin/AdminToolsWorkspaceModel"
+import type { TaskQueueDiagnostics } from "src/routes/Admin/AdminToolsWorkspacePageState"
 import { AdminTaskDlqReplaySection } from "src/routes/Admin/AdminTaskDlqReplaySection"
 import { AdminSearchRuntimeControlSection } from "src/routes/Admin/AdminSearchRuntimeControlSection"
 
-export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
+export type AdminToolsDiagnosticsSectionProps = {
+  activeDiagnosticTab: DiagnosticTab | null
+  fetchTaskQueueDiagnostics: () => Promise<void>
+  hasTaskQueueDiagnostics: boolean
+  isBusy: boolean
+  isQueueLoading: boolean
+  setActiveDiagnosticTab: (tab: DiagnosticTab | null) => void
+  taskQueueDiagnostics: TaskQueueDiagnostics | null
+  taskQueueDiagnosticsError: string
+  taskQueueFreshness: ReturnType<typeof getFreshnessMeta>
+}
+
+export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSectionProps) => {
   const {
     activeDiagnosticTab,
     fetchTaskQueueDiagnostics,
@@ -134,7 +149,7 @@ export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
                 <small>{taskQueueDiagnostics.taskTypes.length}개</small>
               </DetailsSummary>
               <CompactList>
-                {taskQueueDiagnostics.taskTypes.map((taskType: any) => (
+                {taskQueueDiagnostics.taskTypes.map((taskType) => (
                   <CompactListItem key={taskType.taskType}>
                     <div>
                       <strong>{taskType.label}</strong>
@@ -158,7 +173,7 @@ export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
                 <small>{taskQueueDiagnostics.recentFailures.length}건</small>
               </DetailsSummary>
               <CompactList>
-                {taskQueueDiagnostics.recentFailures.map((sample: any) => (
+                {taskQueueDiagnostics.recentFailures.map((sample) => (
                   <CompactListItem key={`failed-${sample.taskId}`}>
                     <div>
                       <strong>{sample.label}</strong>
@@ -178,7 +193,7 @@ export const AdminToolsDiagnosticsSection = (props: Record<string, any>) => {
 
           <AdminTaskDlqReplaySection
             disabled={isBusy}
-            taskTypeSuggestions={taskQueueDiagnostics?.taskTypes.map((taskType: any) => taskType.taskType) || []}
+            taskTypeSuggestions={taskQueueDiagnostics?.taskTypes.map((taskType) => taskType.taskType) || []}
             onTerminalReceipt={() => void fetchTaskQueueDiagnostics()}
           />
           <AdminSearchRuntimeControlSection disabled={isBusy} />

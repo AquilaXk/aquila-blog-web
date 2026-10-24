@@ -1,4 +1,4 @@
-import type { ProfileWorkspaceContent } from "src/libs/profileWorkspace"
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 import {
   FieldBox,
   FieldGrid,
@@ -10,8 +10,8 @@ import {
   TextArea,
 } from "src/routes/Admin/AdminProfileWorkspace.styles"
 
-export const renderAdminProfileHomeSection = (props: Record<string, any>) => {
-  const { draft, updateDraft } = props as Record<string, any> & { draft: ProfileWorkspaceContent }
+export const renderAdminProfileHomeSection = (props: AdminProfileWorkspaceSectionProps) => {
+  const { draft, updateDraft } = props
 
   return (
     <SectionStack>

@@ -11,7 +11,6 @@ export const buildUploadReplacementTransactions = (
   const deletion = state.update({
     annotations: [Transaction.addToHistory.of(false), ...annotations],
     changes: { from: plan.rangeStart, to: plan.rangeEnd, insert: "" },
-    // 최종 커서 좌표는 삽입 후 문서 기준이므로, 중간 삭제 상태에는 자동 매핑을 사용한다.
     ...(!plan.replacement
       ? { selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd) }
       : {}),

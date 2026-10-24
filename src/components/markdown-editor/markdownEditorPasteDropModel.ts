@@ -5,10 +5,8 @@ import {
   validateMarkdownAttachmentSize,
 } from "./markdownEditorUploadModel"
 
-/** Stable per-upload token so concurrent same-name placeholders never collide. */
 export const createUploadPlaceholderId = (): string => createSecureRandomUuid()
 
-/** Normalize + escape file names used inside uploading placeholders. */
 export const sanitizeUploadPlaceholderFileName = (fileName: string): string => {
   const normalized = String(fileName || "")
     .replace(/[\r\n\u2028\u2029]+/g, " ")
@@ -16,17 +14,14 @@ export const sanitizeUploadPlaceholderFileName = (fileName: string): string => {
   return escapeMarkdownLinkLabel(normalized || "file")
 }
 
-/** Append missing-placeholder results only when the document was not externally replaced. */
 export const shouldAppendMissingPlaceholder = (
   startedGeneration: number,
   currentGeneration: number
 ): boolean => startedGeneration === currentGeneration
 
-/** GitHub-style uploading image placeholder (Korean label + unique upload id). */
 export const buildUploadingImagePlaceholder = (fileName: string, uploadId: string): string =>
   `![업로드 중: ${sanitizeUploadPlaceholderFileName(fileName)} · ${uploadId}…]()`
 
-/** Uploading attachment placeholder aligned with image paste/drop UX. */
 export const buildUploadingAttachmentPlaceholder = (fileName: string, uploadId: string): string =>
   `[업로드 중: ${sanitizeUploadPlaceholderFileName(fileName)} · ${uploadId}…]()`
 
@@ -72,7 +67,6 @@ export type ReservedTransferJob =
   | { kind: "image"; file: File; placeholder: string }
   | { kind: "attachment"; file: File; placeholder: string }
 
-/** Plan placeholders/errors for a multi-file paste/drop without awaiting uploads. */
 export const planTransferFileReservations = (
   files: readonly File[],
   options: {
@@ -112,10 +106,6 @@ export const planTransferFileReservations = (
   return { jobs, errors }
 }
 
-/**
- * Prefer the full clipboard `files` collection for multi-file paste.
- * Fall back to item-based image extraction only when `files` is empty.
- */
 export const resolvePasteMediaRoute = (
   clipboardData: DataTransfer | null,
   options: { canUploadImage: boolean; canUploadFile: boolean }
@@ -147,13 +137,11 @@ export const readClipboardPlainText = (clipboardData: DataTransfer | null): stri
 export const hasClipboardHtml = (clipboardData: DataTransfer | null): boolean =>
   Boolean(clipboardData && Array.from(clipboardData.types || []).includes("text/html"))
 
-/** `null` means the HTML MIME type is absent; an empty string is present-but-invalid HTML. */
 export const readClipboardHtml = (clipboardData: DataTransfer | null): string | null => {
   if (!hasClipboardHtml(clipboardData)) return null
   return String(clipboardData?.getData("text/html") || "")
 }
 
-/** True when clipboard text is a single http(s) URL with no surrounding whitespace tokens. */
 export const parseSingleHttpUrl = (text: string): string | null => {
   const trimmed = text.trim()
   if (!trimmed || /\s/.test(trimmed)) return null
@@ -166,7 +154,6 @@ export const parseSingleHttpUrl = (text: string): string | null => {
   }
 }
 
-/** Escape characters that break Markdown inline link destinations. */
 export const escapeMarkdownLinkDestination = (url: string): string =>
   url.replace(/[\\()]/g, "\\$&")
 
@@ -239,7 +226,6 @@ export const planReplaceExactSubstring = (
   }
 }
 
-/** Append markdown at EOF while preserving the caller's current caret/selection. */
 export const planAppendAtEnd = (
   value: string,
   markdown: string,
@@ -256,6 +242,5 @@ export const planAppendAtEnd = (
   }
 }
 
-/** Strip leading/trailing newlines from toolbar-style embed/link markdown for in-place placeholder swap. */
 export const toInlineMarkdownSnippet = (markdown: string): string =>
   markdown.replace(/^\n+/, "").replace(/\n+$/, "")

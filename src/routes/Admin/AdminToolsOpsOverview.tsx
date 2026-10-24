@@ -25,14 +25,24 @@ import {
   CalmMessage,
   FreshnessBadge,
 } from "src/routes/Admin/AdminToolsWorkspace.styles"
+import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import {
   CONNECTION_UNAVAILABLE_STATUS_LABEL,
   DATA_EMPTY_STATUS_LABEL,
   DATA_MISSING_STATUS_LABEL,
   SECTION_IDS,
   formatInstant,
+  getFreshnessMeta,
+  type DiagnosticTab,
+  type JsonValue,
+  type SectionKey,
   type SystemHealthPayload,
 } from "src/routes/Admin/AdminToolsWorkspaceModel"
+import type {
+  AuthSecurityEvent,
+  TaskQueueDiagnostics,
+  UploadedFileCleanupDiagnostics,
+} from "src/routes/Admin/AdminToolsWorkspacePageState"
 
 type OpsTone = "good" | "neutral" | "warn"
 
@@ -59,7 +69,30 @@ type OpsLogRow = {
   tone: OpsTone
 }
 
-type Props = Record<string, any>
+export type AdminToolsOpsOverviewProps = {
+  authSecurityEvents: AuthSecurityEvent[]
+  cleanupDiagnostics: UploadedFileCleanupDiagnostics | null
+  dashboardSnapshot: DashboardSnapshotPayload | null
+  executeAction: <T extends JsonValue>(
+    key: string,
+    fn: () => Promise<T>,
+    options?: {
+      onSuccess?: (data: T) => void
+      onError?: (message: string) => void
+    }
+  ) => Promise<T | null>
+  fetchSystemHealthCached: () => Promise<SystemHealthPayload>
+  focusSection: (section: SectionKey, tab?: DiagnosticTab) => void
+  loadingKey: string
+  overviewStatusLabel: string
+  queueStatusLabel: string
+  recentCheckedLabel: string
+  setSystemHealthCheckedAt: (value: string | null) => void
+  systemHealthFreshness: ReturnType<typeof getFreshnessMeta>
+  systemHealthQuery: { data?: SystemHealthPayload | null }
+  systemHealthStatus: string
+  taskQueueDiagnostics: TaskQueueDiagnostics | null
+}
 
 const toOpsTone = (value: string | null | undefined): OpsTone => {
   const normalized = value?.trim()
@@ -90,7 +123,7 @@ const readHealthCheck = (
   key: string
 ) => readStringField(health?.checks, key)
 
-const buildBars = (props: Props): OpsBar[] => {
+const buildBars = (props: AdminToolsOpsOverviewProps): OpsBar[] => {
   const dashboardSnapshot = props.dashboardSnapshot
   const values = dashboardSnapshot
     ? [
@@ -212,7 +245,7 @@ const buildBars = (props: Props): OpsBar[] => {
   }))
 }
 
-export const AdminToolsOpsOverview = (props: Props) => {
+export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
   const health = props.systemHealthQuery.data ?? null
   const isActionBusy = Boolean(props.loadingKey)
   const version = readStringField(health, "version") || "dev"

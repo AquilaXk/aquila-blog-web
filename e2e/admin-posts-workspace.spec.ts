@@ -69,7 +69,6 @@ test.describe("admin posts workspace link contract", () => {
     const source = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminPostsWorkspacePage.tsx"), "utf8")
 
     expect(source).toContain("POSTS_LIST_LOAD_ERROR_MESSAGE")
-    expect(source).toContain("RECENT_POSTS_UNAVAILABLE_MESSAGE")
     expect(source).not.toContain("글 목록을 불러오지 못했습니다: ${message}")
     expect(source).not.toContain("최근 글을 불러오지 못했습니다: ${message}")
   })

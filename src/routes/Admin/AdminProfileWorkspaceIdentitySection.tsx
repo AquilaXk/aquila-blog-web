@@ -1,5 +1,5 @@
 import ProfileImage from "src/components/ProfileImage"
-import type { ProfileWorkspaceContent } from "src/libs/profileWorkspace"
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 import {
   AvatarWorkspaceCard,
   FieldBox,
@@ -12,7 +12,7 @@ import {
   TextArea,
 } from "src/routes/Admin/AdminProfileWorkspace.styles"
 
-export const renderAdminProfileIdentitySection = (props: Record<string, any>) => {
+export const renderAdminProfileIdentitySection = (props: AdminProfileWorkspaceSectionProps) => {
   const {
     displayNameInput,
     draft,
@@ -22,7 +22,7 @@ export const renderAdminProfileIdentitySection = (props: Record<string, any>) =>
     setDisplayNameInput,
     setIsProfileImageEditorOpen,
     updateDraft,
-  } = props as Record<string, any> & { draft: ProfileWorkspaceContent }
+  } = props
   const displayName = displayNameInput.trim() || sessionMember?.nickname || sessionMember?.username || "관리자"
 
   return (

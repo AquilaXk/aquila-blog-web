@@ -158,19 +158,6 @@ export const StyledWrapper = styled.header `
     }
   }
 
-  .metaText {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.42rem;
-    color: var(--aq-muted);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.6875rem;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-    font-weight: 550;
-  }
-
   .metaUtilities {
     display: inline-flex;
     align-items: center;
@@ -244,15 +231,6 @@ export const StyledWrapper = styled.header `
     svg {
       font-size: 0.95rem;
     }
-
-    &[data-active="true"] {
-      background: transparent;
-      color: var(--aq-text);
-
-      svg {
-        color: var(--aq-accent-link, var(--aq-accent));
-      }
-    }
   }
 
   .shareButton {
@@ -281,13 +259,6 @@ export const StyledWrapper = styled.header `
       border-color: var(--aq-border-strong, var(--aq-text));
       background: var(--aq-surface-elevated, transparent);
     }
-  }
-
-  .dot {
-    width: 0.22rem;
-    height: 0.22rem;
-    border-radius: 50%;
-    background: var(--aq-subtle);
   }
 
   .statChip {
@@ -354,7 +325,6 @@ export const StyledWrapper = styled.header `
   }
 
   @media (min-width: 821px) {
-    .likeButton[data-hide-desktop="true"],
     .shareButton[data-hide-desktop="true"],
     .shareFeedbackPill[data-hide-desktop="true"] {
       display: none;

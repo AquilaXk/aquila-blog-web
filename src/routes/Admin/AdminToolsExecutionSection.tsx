@@ -2,7 +2,6 @@ import { apiFetch } from "src/apis/backend/client"
 import AdminToolsExecutionRail from "src/routes/Admin/AdminToolsExecutionRail"
 import {
   ActionRow,
-  ActionRowButton,
   CalmMessage,
   CompactCodeList,
   CompactList,
@@ -20,15 +19,54 @@ import {
   MetricCard,
   MetricGrid,
   QuietButton,
-  SandboxHeader,
-  SandboxSection,
   SectionHeading,
   SectionTitleBlock,
   WorkspaceSection,
 } from "src/routes/Admin/AdminToolsWorkspace.styles"
-import { SECTION_IDS, formatInstant } from "src/routes/Admin/AdminToolsWorkspaceModel"
+import {
+  SECTION_IDS,
+  formatInstant,
+  getFreshnessMeta,
+  type DiagnosticTab,
+  type JsonValue,
+  type SectionKey,
+  type SystemHealthPayload,
+} from "src/routes/Admin/AdminToolsWorkspaceModel"
+import type {
+  AuthSecurityEvent,
+  UploadedFileCleanupDiagnostics,
+} from "src/routes/Admin/AdminToolsWorkspacePageState"
 
-export const AdminToolsExecutionSection = (props: Record<string, any>) => {
+export type AdminToolsExecutionSectionProps = {
+  activeDiagnosticTab: DiagnosticTab | null
+  authFreshness: ReturnType<typeof getFreshnessMeta>
+  authSecurityEvents: AuthSecurityEvent[]
+  authSecurityEventsError: string
+  cleanupDiagnostics: UploadedFileCleanupDiagnostics | null
+  cleanupDiagnosticsError: string
+  cleanupFreshness: ReturnType<typeof getFreshnessMeta>
+  executeAction: <T extends JsonValue>(
+    key: string,
+    fn: () => Promise<T>,
+    options?: {
+      onSuccess?: (data: T) => void
+      onError?: (message: string) => void
+    }
+  ) => Promise<T | null>
+  fetchAuthSecurityEvents: () => Promise<void>
+  fetchCleanupDiagnostics: () => Promise<void>
+  fetchSystemHealthCached: () => Promise<SystemHealthPayload>
+  focusSection: (section: SectionKey, tab?: DiagnosticTab) => void
+  hasAuthDiagnostics: boolean
+  hasCleanupDiagnostics: boolean
+  isAuthLoading: boolean
+  isBusy: boolean
+  isCleanupLoading: boolean
+  setActiveDiagnosticTab: (tab: DiagnosticTab | null) => void
+  setSystemHealthCheckedAt: (value: string | null) => void
+}
+
+export const AdminToolsExecutionSection = (props: AdminToolsExecutionSectionProps) => {
   const {
     activeDiagnosticTab,
     authFreshness,
@@ -155,7 +193,7 @@ export const AdminToolsExecutionSection = (props: Record<string, any>) => {
                 <CalmMessage>{isAuthLoading ? "로딩 중" : "없음"}</CalmMessage>
               ) : authSecurityEvents.length > 0 ? (
                 <CompactList>
-                  {authSecurityEvents.map((event: any) => (
+                  {authSecurityEvents.map((event) => (
                     <CompactListItem key={event.id}>
                       <div>
                         <strong>{event.eventType}</strong>

@@ -242,7 +242,6 @@ export const MarkdownEditor = ({
     [applyMutationPlan, commitMarkdown, updateActiveTableSelection]
   )
 
-  // Must proceed even when the editor UI is temporarily disabled
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
       const commitOptions = { clearUploadError: false as const }

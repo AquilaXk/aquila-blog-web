@@ -43,7 +43,6 @@ export const isComposingEditorKeyboardEvent = (event: {
 
 const FENCE_LINE_RE = /^(?<indent> {0,3})(?<fence>`{3,}|~{3,})(?<info>.*)$/
 
-/** True when caret offset is on a content line inside an open ```/~~~ fence. */
 export const isOffsetInsideFencedCodeBlock = (value: string, offset: number): boolean => {
   const clamped = Math.max(0, Math.min(offset, value.length))
   const before = value.slice(0, clamped)

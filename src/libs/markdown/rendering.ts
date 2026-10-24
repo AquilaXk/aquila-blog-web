@@ -46,7 +46,6 @@ export const resolveMarkdownRenderModel = ({
 }): MarkdownRenderModel => {
   const normalizedContent = normalizeMarkdownForRender(content || "")
   const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
-  // 원문 markdown이 있으면 interactive block 책임은 항상 클라이언트 markdown 파이프라인에 둔다.
   const resolvedContentHtml = normalizedContent
     ? ""
     : filterTrustedPostImageHtml(

@@ -1,6 +1,5 @@
 const normalizeLineEndings = (raw: string) => raw.replace(/\r\n?/g, "\n")
 
-// 에디터/IME 환경에 따라 code fence가 백틱이 아닌 유사 문자(' 포함)로 입력되는 경우를 교정한다.
 const normalizeFenceChars = (raw: string) => raw.replace(/[｀´ˋ'‘’]/g, "`")
 const stripInvisibleChars = (raw: string) => raw.replace(/[\u200B-\u200D\uFEFF]/g, "")
 const SEQUENCE_DECLARATION_REGEX = /\b(participant|actor)\s+(.+?)(?=\s+(?:participant|actor)\s+|$)/gi
@@ -178,7 +177,6 @@ const extractFirstFencedMermaidSource = (normalized: string) => {
     body.push(lines[index])
   }
 
-  // 닫힘 fence 누락 시에도 가능한 범위까지 본문을 반환해 렌더 경로를 유지한다.
   return body.join("\n").trim()
 }
 
@@ -254,9 +252,6 @@ export const stepFenceNormalization = (
     return activeFenceMarker
   }
 
-  // fenced block 내부에서 같은 마커(```/~~~)로 시작한 라인은 닫힘 fence로 취급한다.
-  // 실사용에서 "```4", "``` )" 같은 IME 오입력이 자주 발생해 미리보기/상세 렌더가 깨진다.
-  // 닫힘 뒤 꼬리 텍스트는 다음 줄로 보존해 사용자 입력 손실을 막는다.
   normalized.push(activeFenceMarker.repeat(3))
   if (parsed.tail.length > 0) {
     normalized.push(parsed.tail)
@@ -264,8 +259,6 @@ export const stepFenceNormalization = (
   return null
 }
 
-// IME/키보드 오타로 깨진 일반 fenced code block까지 렌더 단계에서 복구한다.
-// 예: "```4" -> "```" + "4"
 export const normalizeEscapedMarkdownFences = (raw: string): string => {
   if (!hasPotentialFenceCharacters(raw)) {
     return raw
@@ -279,7 +272,6 @@ export const normalizeEscapedMarkdownFences = (raw: string): string => {
     activeFenceMarker = stepFenceNormalization(line, activeFenceMarker, normalized)
   }
 
-  // 닫힘 fence 누락으로 이후 문단 전체가 code block 되는 현상을 미리보기/상세에서 차단한다.
   if (activeFenceMarker) {
     normalized.push(activeFenceMarker.repeat(3))
   }

@@ -18,7 +18,6 @@ import {
   formatInstant,
   getDiagnosticFallbackStatusLabel,
   getFreshnessMeta,
-  getSystemHealthSummary,
   isOperationalStatusMissing,
   isExecutionResultFilter,
   normalizeOperationalStatusLabel,
@@ -64,8 +63,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   const [authSecurityEventsError, setAuthSecurityEventsError] = useState("")
   const [authSecurityCheckedAt, setAuthSecurityCheckedAt] = useState<string | null>(initialSnapshot.authSecurityCheckedAt)
   const [systemHealthCheckedAt, setSystemHealthCheckedAt] = useState<string | null>(initialSnapshot.systemHealthFetchedAt)
-  const [activeSection, setActiveSection] = useState<SectionKey>("diagnostics")
-  const [sectionJumpTarget, setSectionJumpTarget] = useState<SectionKey | null>(null)
   const [activeDiagnosticTab, setActiveDiagnosticTab] = useState<DiagnosticTab | null>(null)
   const [freshnessClock, setFreshnessClock] = useState<number | null>(null)
   const systemHealthQuery = useQuery({
@@ -238,29 +235,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   }, [systemHealthCheckedAt, systemHealthQuery.data])
 
   useEffect(() => {
-    if (!sectionJumpTarget || typeof window === "undefined") return
-
-    const target = document.getElementById(SECTION_IDS[sectionJumpTarget])
-    if (!target) return
-
-    const frame = window.requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [sectionJumpTarget])
-
-  useEffect(() => {
-    if (!sectionJumpTarget || typeof window === "undefined") return
-
-    const timeout = window.setTimeout(() => {
-      setSectionJumpTarget((current) => (current === sectionJumpTarget ? null : current))
-    }, 1600)
-
-    return () => window.clearTimeout(timeout)
-  }, [sectionJumpTarget])
-
-  useEffect(() => {
     if (typeof window === "undefined") return
     const savedFilter = window.sessionStorage.getItem(RESULTS_FILTER_STORAGE_KEY)
     if (!savedFilter || !isExecutionResultFilter(savedFilter)) return
@@ -271,35 +245,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
     if (typeof window === "undefined") return
     window.sessionStorage.setItem(RESULTS_FILTER_STORAGE_KEY, resultsFilter)
   }, [resultsFilter])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const next = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-        if (!next) return
-        const section = next.target.getAttribute("data-ops-section") as SectionKey | null
-        if (section) {
-          setActiveSection(section)
-          setSectionJumpTarget((current) => (current === section ? null : current))
-        }
-      },
-      {
-        rootMargin: "-20% 0px -60% 0px",
-        threshold: [0.1, 0.25, 0.5, 0.75],
-      }
-    )
-
-    const nodes = Object.values(SECTION_IDS)
-      .map((id) => document.getElementById(id))
-      .filter((node): node is HTMLElement => Boolean(node))
-
-    nodes.forEach((node) => observer.observe(node))
-    return () => observer.disconnect()
-  }, [])
 
   const filteredExecutions = useMemo(() => {
     return executions.filter((entry) => {
@@ -335,8 +280,6 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   const cleanupFreshness = getFreshnessMeta(cleanupCheckedAt, freshnessClock)
   const authFreshness = getFreshnessMeta(authSecurityCheckedAt, freshnessClock)
   const systemHealthFreshness = getFreshnessMeta(systemHealthCheckedAt, freshnessClock)
-  const systemHealthSummary = getSystemHealthSummary(systemHealthQuery.data ?? null)
-  const systemHealthFetchedAt = systemHealthCheckedAt ? formatInstant(systemHealthCheckedAt) : "-"
   const isQueueLoading = loadingKey === "taskQueueStatus"
   const isCleanupLoading = loadingKey === "cleanupStatus"
   const isAuthLoading = loadingKey === "authSecurityEvents"
@@ -353,27 +296,8 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
         : taskQueueDiagnostics
           ? "정상"
           : DATA_EMPTY_STATUS_LABEL
-  const cleanupStatusLabel = !hasCleanupDiagnostics
-    ? getDiagnosticFallbackStatusLabel(isCleanupLoading, cleanupDiagnosticsError)
-    : cleanupDiagnostics?.blockedBySafetyThreshold ? CHECK_REQUIRED_STATUS_LABEL : "정상"
-  const authSecurityStatusLabel =
-    !hasAuthDiagnostics
-      ? getDiagnosticFallbackStatusLabel(isAuthLoading, authSecurityEventsError)
-      : authSecurityEvents.length > 0
-      ? authSecurityEvents[0]?.eventType === "IP_SECURITY_MISMATCH_BLOCKED"
-        ? CHECK_REQUIRED_STATUS_LABEL
-        : "최근 기록"
-      : "정상"
 
-  const recentCheckedLabel = useMemo(() => {
-    const values = [
-      systemHealthCheckedAt,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .sort()
-
-    return values.length ? formatInstant(values[values.length - 1]) : "-"
-  }, [systemHealthCheckedAt])
+  const recentCheckedLabel = systemHealthCheckedAt ? formatInstant(systemHealthCheckedAt) : "-"
 
   const overviewStatusLabel =
     isSystemHealthConnectionUnavailable
@@ -384,42 +308,59 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
           ? DATA_EMPTY_STATUS_LABEL
           : "정상"
 
-  const attentionItems = [
-    isSystemHealthConnectionUnavailable ? "공통 데이터 연결을 먼저 확인하세요." : null,
-    hasSystemHealthStatus && rawSystemHealthStatus !== "UP" ? "서비스 상태를 먼저 확인하세요." : null,
-  ]
-    .filter((item): item is string => Boolean(item))
-    .slice(0, 3)
-
-  const quickLinks = [
-    {
-      label: "작업 큐",
-      status: queueStatusLabel,
-      section: "diagnostics" as SectionKey,
-      tab: "queue" as DiagnosticTab,
-    },
-    {
-      label: "파일 정리",
-      status: cleanupStatusLabel,
-      section: "execution" as SectionKey,
-      tab: "cleanup" as DiagnosticTab,
-    },
-    {
-      label: "인증 보안",
-      status: authSecurityStatusLabel,
-      section: "execution" as SectionKey,
-      tab: "auth" as DiagnosticTab,
-    },
-  ]
-
   const focusSection = (section: SectionKey, tab?: DiagnosticTab) => {
     if (tab) setActiveDiagnosticTab(tab)
-    setActiveSection(section)
-    setSectionJumpTarget(section)
+    if (typeof window !== "undefined") {
+      document.getElementById(SECTION_IDS[section])?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
   }
   if (!sessionMember) return null
-  const toolsWorkspaceSectionProps = { queryClient, sessionMember, initialProfileSnapshot, loadingKey, setLoadingKey, executions, setExecutions, selectedExecutionId, setSelectedExecutionId, resultsFilter, setResultsFilter, taskQueueDiagnostics, setTaskQueueDiagnostics, taskQueueDiagnosticsError, setTaskQueueDiagnosticsError, taskQueueCheckedAt, setTaskQueueCheckedAt, cleanupDiagnostics, setCleanupDiagnostics, cleanupDiagnosticsError, setCleanupDiagnosticsError, cleanupCheckedAt, setCleanupCheckedAt, authSecurityEvents, setAuthSecurityEvents, authSecurityEventsError, setAuthSecurityEventsError, authSecurityCheckedAt, setAuthSecurityCheckedAt, systemHealthCheckedAt, setSystemHealthCheckedAt, activeSection, setActiveSection, sectionJumpTarget, setSectionJumpTarget, activeDiagnosticTab, setActiveDiagnosticTab, freshnessClock, setFreshnessClock, systemHealthQuery, dashboardSnapshot: dashboardSnapshotQuery.data ?? initialDashboardSnapshot ?? null, fetchSystemHealthCached, pushExecution, executeAction, fetchTaskQueueDiagnostics, fetchCleanupDiagnostics, fetchAuthSecurityEvents, filteredExecutions, resultFilterCounts, selectedExecution, rawSystemHealthStatus, hasSystemHealthStatus, isSystemHealthConnectionUnavailable, systemHealthStatus, taskQueueFreshness, cleanupFreshness, authFreshness, systemHealthFreshness, systemHealthSummary, systemHealthFetchedAt, isQueueLoading, isCleanupLoading, isAuthLoading, hasTaskQueueDiagnostics, hasAuthDiagnostics, hasCleanupDiagnostics, queueStatusLabel, cleanupStatusLabel, authSecurityStatusLabel, recentCheckedLabel, overviewStatusLabel, attentionItems, quickLinks, focusSection }
-  return <AdminToolsWorkspaceSections {...toolsWorkspaceSectionProps} />
+  return (
+    <AdminToolsWorkspaceSections
+      activeDiagnosticTab={activeDiagnosticTab}
+      authFreshness={authFreshness}
+      authSecurityEvents={authSecurityEvents}
+      authSecurityEventsError={authSecurityEventsError}
+      cleanupDiagnostics={cleanupDiagnostics}
+      cleanupDiagnosticsError={cleanupDiagnosticsError}
+      cleanupFreshness={cleanupFreshness}
+      dashboardSnapshot={dashboardSnapshotQuery.data ?? initialDashboardSnapshot ?? null}
+      executeAction={executeAction}
+      executions={executions}
+      fetchAuthSecurityEvents={fetchAuthSecurityEvents}
+      fetchCleanupDiagnostics={fetchCleanupDiagnostics}
+      fetchSystemHealthCached={fetchSystemHealthCached}
+      fetchTaskQueueDiagnostics={fetchTaskQueueDiagnostics}
+      filteredExecutions={filteredExecutions}
+      focusSection={focusSection}
+      freshnessClock={freshnessClock}
+      hasAuthDiagnostics={hasAuthDiagnostics}
+      hasCleanupDiagnostics={hasCleanupDiagnostics}
+      hasTaskQueueDiagnostics={hasTaskQueueDiagnostics}
+      initialProfileSnapshot={initialProfileSnapshot}
+      isAuthLoading={isAuthLoading}
+      isCleanupLoading={isCleanupLoading}
+      isQueueLoading={isQueueLoading}
+      loadingKey={loadingKey}
+      overviewStatusLabel={overviewStatusLabel}
+      queueStatusLabel={queueStatusLabel}
+      recentCheckedLabel={recentCheckedLabel}
+      resultFilterCounts={resultFilterCounts}
+      resultsFilter={resultsFilter}
+      selectedExecution={selectedExecution}
+      sessionMember={sessionMember}
+      setActiveDiagnosticTab={setActiveDiagnosticTab}
+      setResultsFilter={setResultsFilter}
+      setSelectedExecutionId={setSelectedExecutionId}
+      setSystemHealthCheckedAt={setSystemHealthCheckedAt}
+      systemHealthFreshness={systemHealthFreshness}
+      systemHealthQuery={systemHealthQuery}
+      systemHealthStatus={systemHealthStatus}
+      taskQueueDiagnostics={taskQueueDiagnostics}
+      taskQueueDiagnosticsError={taskQueueDiagnosticsError}
+      taskQueueFreshness={taskQueueFreshness}
+    />
+  )
 }
 
 export default AdminToolsPage

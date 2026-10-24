@@ -24,65 +24,6 @@ export const toFlags = (visibility: PostVisibility): VisibilityFlags => {
   return { published: true, listed: true }
 }
 
-export const getVisibilityLabel = (
-  visibilityOrPublished: PostVisibility | boolean,
-  listed?: boolean
-) => {
-  const visibility =
-    typeof visibilityOrPublished === "boolean"
-      ? toVisibility(visibilityOrPublished, Boolean(listed))
-      : visibilityOrPublished
-
-  if (visibility === "PRIVATE") return "비공개"
-  if (visibility === "PUBLIC_UNLISTED") return "링크 공개"
-  return "전체 공개"
-}
-
-export const deriveComposeViewModel = ({
-  editorMode,
-  isTempDraftMode,
-  postId,
-  postTitle,
-  postSummary,
-  postTags,
-  currentVisibilityText,
-}: {
-  editorMode: EditorMode
-  isTempDraftMode: boolean
-  postId: string
-  postTitle: string
-  postSummary: string
-  postTags: string[]
-  currentVisibilityText: string
-}) => {
-  const hasSelectedManagedPost = editorMode === "edit" && postId.trim().length > 0
-  const trimmedPostTitle = postTitle.trim()
-  const trimmedPostSummary = postSummary.trim()
-
-  return {
-    editorModeLabel: editorMode === "edit" ? "원고 편집" : "새 글",
-    hasSelectedManagedPost,
-    currentPostLabel: hasSelectedManagedPost
-      ? `${trimmedPostTitle || "제목 없음"} · #${postId}`
-      : trimmedPostTitle,
-    selectedPostLabel: hasSelectedManagedPost
-      ? `선택된 글 ID #${postId}`
-      : "선택된 글이 없습니다.",
-    tagSummaryText: postTags.length > 0 ? `${postTags.length}개 선택` : "미선택",
-    composePageTitle: editorMode === "edit" ? "원고 편집" : "새 글",
-    composeSurfaceSubtitle: hasSelectedManagedPost
-      ? `#${postId} 원고를 다듬고 있습니다.`
-      : "기술 원고를 차분하게 다듬는 공간입니다.",
-    composeHeroSummary: [
-      currentVisibilityText,
-      trimmedPostSummary ? `요약 ${trimmedPostSummary.length}자` : "요약 자동",
-      postTags.length > 0 ? `태그 ${postTags.length}개` : "태그 미설정",
-    ],
-    composeCallToActionLabel:
-      editorMode === "create" ? "발행 준비" : isTempDraftMode ? "새 글 작성" : "수정 사항 확인",
-  }
-}
-
 export const derivePublishActionViewModel = ({
   publishActionType,
   editorMode,

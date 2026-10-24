@@ -24,7 +24,7 @@ import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioResultLogPanel } from "./EditorStudioResultLogPanel"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
-import { deriveComposeViewModel, deriveEditorPersistenceState, derivePublishActionViewModel, getVisibilityLabel, toFlags, type PostVisibility, type PublishActionType } from "./editorStudioState"
+import { deriveEditorPersistenceState, derivePublishActionViewModel, type PostVisibility, type PublishActionType } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
 import { buildEditorStateFingerprint, detectPublishPlaceholderIssue, type LocalDraftSource } from "./editorStudioMetaModel"
@@ -157,7 +157,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   const handleMarkdownUploadingChange = useCallback((nextIsUploading: boolean) => {
     setIsMarkdownUploading(nextIsUploading)
   }, [])
-  const currentFlags = toFlags(postVisibility)
   const pristineCreateFingerprint = useMemo(
     () =>
       buildEditorStateFingerprint({
@@ -207,21 +206,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       postVisibility,
     ]
   )
-  const currentVisibilityText = getVisibilityLabel(currentFlags.published, currentFlags.listed)
-  const composeViewModel = useMemo(
-    () =>
-      deriveComposeViewModel({
-        editorMode,
-        isTempDraftMode,
-        postId,
-        postTitle,
-        postSummary,
-        postTags,
-        currentVisibilityText,
-      }),
-    [currentVisibilityText, editorMode, isTempDraftMode, postId, postSummary, postTags, postTitle]
-  )
-  const { hasSelectedManagedPost } = composeViewModel
+  const hasSelectedManagedPost = editorMode === "edit" && postId.trim().length > 0
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
   const publishPlaceholderIssue = hasEditorMinimumFields
@@ -285,7 +270,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         category: postCategory,
         visibility: postVisibility,
       }),
-      // Read baselines at navigation time so a just-finished save is respected.
       serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
       localDraftFingerprint: lastLocalDraftFingerprintRef.current,
       localDraftSavedAt,

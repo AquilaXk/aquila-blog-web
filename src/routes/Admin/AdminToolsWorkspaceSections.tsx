@@ -1,15 +1,45 @@
+import type { AuthMember } from "src/hooks/useAuthSession"
+import type { AdminProfile } from "src/types/adminProfile"
 import AdminShell from "src/routes/Admin/AdminShell"
-import { AdminToolsDiagnosticsSection } from "src/routes/Admin/AdminToolsDiagnosticsSection"
-import { AdminToolsExecutionSection } from "src/routes/Admin/AdminToolsExecutionSection"
-import { AdminToolsOpsOverview } from "src/routes/Admin/AdminToolsOpsOverview"
+import {
+  AdminToolsDiagnosticsSection,
+  type AdminToolsDiagnosticsSectionProps,
+} from "src/routes/Admin/AdminToolsDiagnosticsSection"
+import {
+  AdminToolsExecutionSection,
+  type AdminToolsExecutionSectionProps,
+} from "src/routes/Admin/AdminToolsExecutionSection"
+import {
+  AdminToolsOpsOverview,
+  type AdminToolsOpsOverviewProps,
+} from "src/routes/Admin/AdminToolsOpsOverview"
 import AdminToolsResultsPanel from "src/routes/Admin/AdminToolsResultsPanel"
+import type {
+  ExecutionEntry,
+  ExecutionResultFilter,
+} from "src/routes/Admin/AdminToolsWorkspaceModel"
 import {
   Main,
   WorkspaceColumn,
   WorkspaceShell,
 } from "src/routes/Admin/AdminToolsWorkspace.styles"
 
-export const AdminToolsWorkspaceSections = (props: Record<string, any>) => {
+export type AdminToolsWorkspaceSectionsProps = AdminToolsOpsOverviewProps &
+  Omit<AdminToolsDiagnosticsSectionProps, "isBusy"> &
+  Omit<AdminToolsExecutionSectionProps, "isBusy"> & {
+    executions: ExecutionEntry[]
+    filteredExecutions: ExecutionEntry[]
+    freshnessClock: number | null
+    initialProfileSnapshot?: AdminProfile | null
+    resultFilterCounts: Record<ExecutionResultFilter, number>
+    resultsFilter: ExecutionResultFilter
+    selectedExecution: ExecutionEntry | null
+    sessionMember: AuthMember
+    setResultsFilter: (filter: ExecutionResultFilter) => void
+    setSelectedExecutionId: (id: string | null) => void
+  }
+
+export const AdminToolsWorkspaceSections = (props: AdminToolsWorkspaceSectionsProps) => {
   const {
     executions,
     filteredExecutions,

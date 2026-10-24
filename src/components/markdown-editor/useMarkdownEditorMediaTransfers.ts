@@ -51,7 +51,6 @@ type UseMarkdownEditorMediaTransfersArgs = {
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
   applyPlannedMarkdownMutation: (plan: PlannedTextMutation, options?: MarkdownMutationOptions) => boolean
   applyRecordedMarkdownMutation: (plan: PlannedTextMutation) => boolean
-  /** Placeholder replace/remove after async upload — must not steal focus from other controls. */
   applyBackgroundMarkdownMutation: (plan: PlannedTextMutation) => boolean
   resolveActiveSelection: () => TextareaSelection
   resolveDropTargetPosition?: (coords: { x: number; y: number }) => number | null
@@ -100,11 +99,6 @@ export const useMarkdownEditorMediaTransfers = ({
     [applyPlannedMarkdownMutation, resolveActiveSelection]
   )
 
-  /**
-   * Replace placeholder in-place when still present.
-   * If missing: append only when the document generation is unchanged (user edited placeholder).
-   * If generation advanced (draft restore / external replace), drop the completion silently.
-   */
   const replaceExactOrAppend = useCallback(
     (
       exact: string,

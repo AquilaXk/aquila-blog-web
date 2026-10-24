@@ -5,7 +5,6 @@ import {
   normalizeProfileLinkHref,
   type ProfileCardLinkItem,
 } from "src/constants/profileCardLinks"
-import type { ProfileWorkspaceContent } from "src/libs/profileWorkspace"
 import {
   DangerButton,
   DragHandleButton,
@@ -34,10 +33,10 @@ import {
   SegmentButton,
   SegmentedControl,
 } from "src/routes/Admin/AdminProfileWorkspace.styles"
-import type { LinkTab } from "src/routes/Admin/AdminProfileWorkspaceModel"
 import type { OpenIconPicker } from "src/routes/Admin/AdminProfileWorkspacePageDraftActions"
+import type { AdminProfileWorkspaceSectionProps } from "src/routes/Admin/AdminProfileWorkspacePageModel"
 
-export const renderAdminProfileLinksSection = (props: Record<string, any>) => {
+export const renderAdminProfileLinksSection = (props: AdminProfileWorkspaceSectionProps) => {
   const {
     appendLinkItem,
     dragOverLinkIndex,
@@ -55,7 +54,7 @@ export const renderAdminProfileLinksSection = (props: Record<string, any>) => {
     setLinkTab,
     setOpenIconPicker,
     updateLinkItem,
-  } = props as Record<string, any> & { draft: ProfileWorkspaceContent; linkTab: LinkTab }
+  } = props
   const visibleLinks: ProfileCardLinkItem[] = linkTab === "service" ? draft.serviceLinks : draft.contactLinks
 
   return (

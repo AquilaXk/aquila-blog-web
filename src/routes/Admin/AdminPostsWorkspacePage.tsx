@@ -1,20 +1,17 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { NextPage } from "next"
 import { useRouter } from "next/router"
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import { apiFetch } from "src/apis/backend/client"
 import useAuthSession from "src/hooks/useAuthSession"
 import { pushRoute } from "src/libs/router"
-import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import {
   buildListEndpoint,
   buildRowTitle,
-  canOpenCanonicalPost,
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
   DEFAULT_SORT,
-  POSTS_WORKSPACE_DEFERRED_PANEL_TIMEOUT_MS,
   POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS,
   POSTS_WORKSPACE_MOBILE_LIST_QUERY,
   sanitizeNumberInput,
@@ -26,16 +23,13 @@ import {
   type PostStatusFilter,
   type PostWriteResult,
   type WorkspaceConfirmState,
-  type WorkspaceRecentAction,
   type WorkspaceToastState,
 } from "./AdminPostsWorkspaceModel"
 import {
   EMPTY_INITIAL_SNAPSHOT,
   POSTS_LIST_LOAD_ERROR_MESSAGE,
-  RECENT_POSTS_UNAVAILABLE_MESSAGE,
   buildPostsWorkspacePageCommands,
   type AdminPostsWorkspacePageProps,
-  type IdleWindow,
 } from "./AdminPostsWorkspacePageCommands"
 import { AdminPostsWorkspacePageView } from "./AdminPostsWorkspacePageView"
 
@@ -52,12 +46,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   const queryClient = useQueryClient()
   const { me, authStatus } = useAuthSession()
   const sessionMember = authStatus === "loading" || authStatus === "unavailable" ? initialMember : me || initialMember
-  const hasInitialRecentPosts = initialSnapshot.recentFetchedAt !== null
   const hasInitialListState = initialSnapshot.listState !== null
-
-  const [recentPosts, setRecentPosts] = useState<AdminPostListItem[]>(() => initialSnapshot.recentPosts)
-  const [isRecentLoading, setIsRecentLoading] = useState(!hasInitialRecentPosts)
-  const [recentError, setRecentError] = useState("")
 
   const [listScope, setListScope] = useState<PostListScope>("active")
   const [listStatus, setListStatus] = useState<PostStatusFilter>("all")
@@ -71,53 +60,12 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   const [confirmState, setConfirmState] = useState<WorkspaceConfirmState>(null)
   const [toast, setToast] = useState<WorkspaceToastState>(null)
   const [mutationPending, setMutationPending] = useState<{ rowId: number; kind: "delete" | "restore" | "hardDelete" } | null>(null)
-  const [recentActions, setRecentActions] = useState<WorkspaceRecentAction[]>([])
-  const [showDeferredSupportPanels, setShowDeferredSupportPanels] = useState(false)
   const [shouldRenderMobileList, setShouldRenderMobileList] = useState(false)
 
-  const continueSectionRef = useRef<HTMLDivElement | null>(null)
   const listSectionRef = useRef<HTMLElement | null>(null)
   const listRequestIdRef = useRef(0)
-  const recentRequestIdRef = useRef(0)
   const skipInitialListFetchRef = useRef(hasInitialListState)
   const isInitialListMountRef = useRef(true)
-  const isDefaultRecentSource =
-    listScope === "active" &&
-    listStatus === "all" &&
-    !listKw.trim() &&
-    sanitizeNumberInput(listPage, DEFAULT_PAGE) === DEFAULT_PAGE &&
-    listSort === DEFAULT_SORT
-
-  const loadRecentPosts = useCallback(async () => {
-    const requestId = recentRequestIdRef.current + 1
-    recentRequestIdRef.current = requestId
-    setIsRecentLoading(true)
-    setRecentError("")
-
-    try {
-      const data = await apiFetch<PageDto<AdminPostListItem>>(buildListEndpoint("active", {
-        page: "1",
-        pageSize: "8",
-        kw: "",
-        sort: DEFAULT_SORT,
-      }))
-
-      if (recentRequestIdRef.current !== requestId) return
-
-      const rows = [...(data.content || [])]
-        .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
-        .slice(0, 5)
-      setRecentPosts(rows)
-    } catch {
-      if (recentRequestIdRef.current !== requestId) return
-      setRecentError(RECENT_POSTS_UNAVAILABLE_MESSAGE)
-      setRecentPosts([])
-    } finally {
-      if (recentRequestIdRef.current === requestId) {
-        setIsRecentLoading(false)
-      }
-    }
-  }, [])
 
   const loadList = useCallback(async () => {
     const requestId = listRequestIdRef.current + 1
@@ -144,65 +92,20 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         total: data.pageable?.totalElements ?? data.content?.length ?? 0,
         loadedAt: new Date().toISOString(),
       })
-
-      if (isDefaultRecentSource) {
-        recentRequestIdRef.current += 1
-        const rows = [...(data.content || [])]
-          .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
-          .slice(0, 5)
-        setRecentPosts(rows)
-        setRecentError("")
-        setIsRecentLoading(false)
-      }
     } catch {
       if (listRequestIdRef.current !== requestId) return
       setListError(POSTS_LIST_LOAD_ERROR_MESSAGE)
       setListState({ rows: [], total: 0, loadedAt: "" })
-      if (isDefaultRecentSource) {
-        setRecentError(RECENT_POSTS_UNAVAILABLE_MESSAGE)
-        setRecentPosts([])
-        setIsRecentLoading(false)
-      }
     } finally {
       if (listRequestIdRef.current === requestId) {
         setIsListLoading(false)
       }
     }
-  }, [isDefaultRecentSource, listKw, listPage, listPageSize, listScope, listSort, listStatus])
+  }, [listKw, listPage, listPageSize, listScope, listSort, listStatus])
 
   const refreshWorkspaceLists = useCallback(async () => {
-    if (isDefaultRecentSource) {
-      await loadList()
-      return
-    }
-    await Promise.all([loadList(), loadRecentPosts()])
-  }, [isDefaultRecentSource, loadList, loadRecentPosts])
-
-  useEffect(() => {
-    if (!hasInitialListState || hasInitialRecentPosts) return
-    void loadRecentPosts()
-  }, [hasInitialListState, hasInitialRecentPosts, loadRecentPosts])
-
-  useEffect(() => {
-    if (showDeferredSupportPanels || typeof window === "undefined") return
-
-    const idleWindow = window as IdleWindow
-    const activate = () => setShowDeferredSupportPanels(true)
-
-    if (typeof idleWindow.requestIdleCallback === "function") {
-      const handle = idleWindow.requestIdleCallback(activate, {
-        timeout: POSTS_WORKSPACE_DEFERRED_PANEL_TIMEOUT_MS,
-      })
-      return () => {
-        if (typeof idleWindow.cancelIdleCallback === "function") {
-          idleWindow.cancelIdleCallback(handle)
-        }
-      }
-    }
-
-    const handle = window.setTimeout(activate, 320)
-    return () => window.clearTimeout(handle)
-  }, [showDeferredSupportPanels])
+    await loadList()
+  }, [loadList])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -292,72 +195,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
     setToast(next)
   }, [])
 
-  const copyPostDetailLink = useCallback(
-    async (row: Pick<AdminPostListItem, "id" | "title" | "published" | "listed" | "tempDraft">) => {
-      if (!canOpenCanonicalPost(row)) {
-        showToast({ tone: "error", text: `#${row.id} ${buildRowTitle(row)}는 아직 공개 링크가 없습니다.` })
-        return
-      }
-      const url = postsWorkspaceCommands.buildCanonicalPostUrl(row.id)
-      try {
-        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(url)
-          showToast({ tone: "success", text: `#${row.id} ${buildRowTitle(row)} 링크를 복사했습니다.` })
-          return
-        }
-        if (typeof window !== "undefined") {
-          window.prompt("링크를 복사하세요.", url)
-          showToast({ tone: "success", text: `#${row.id} ${buildRowTitle(row)} 링크를 표시했습니다.` })
-          return
-        }
-        throw new Error("링크를 복사할 수 없는 환경입니다.")
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        showToast({ tone: "error", text: `링크 복사 실패: ${message}` })
-      }
-    },
-    [showToast]
-  )
-
-  const openCanonicalPost = useCallback(
-    async (
-      event: MouseEvent<HTMLAnchorElement>,
-      row: Pick<AdminPostListItem, "id" | "published" | "listed" | "tempDraft">
-    ) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return
-      }
-
-      event.preventDefault()
-      if (!canOpenCanonicalPost(row)) return
-      await pushRoute(router, toCanonicalPostPath(row.id))
-    },
-    [router]
-  )
-
-  const pushRecentAction = useCallback(
-    (tone: WorkspaceRecentAction["tone"], label: string, detail: string, stateLabel: string) => {
-    const entry: WorkspaceRecentAction = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      tone,
-      label,
-      detail,
-      stateLabel,
-      occurredAt: new Date().toISOString(),
-    }
-
-    setRecentActions((current) => [entry, ...current].slice(0, 4))
-    },
-    []
-  )
-
   const performDeletePost = useCallback(
     async (row: Pick<AdminPostListItem, "id" | "title" | "published" | "listed" | "tempDraft">) => {
       try {
@@ -376,16 +213,14 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
             rowTitle: buildRowTitle(row),
           },
         })
-        pushRecentAction("success", "글 삭제", `#${row.id} ${buildRowTitle(row)} 글을 삭제했습니다.`, "되돌리기 가능")
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         showToast({ tone: "error", text: `삭제 실패: ${message}` })
-        pushRecentAction("error", "삭제 실패", `#${row.id} ${buildRowTitle(row)} · ${message}`, "재시도 필요")
       } finally {
         setMutationPending(null)
       }
     },
-    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
+    [queryClient, refreshWorkspaceLists, showToast]
   )
 
   const performRestorePost = useCallback(
@@ -400,16 +235,14 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
           tone: "success",
           text: `#${row.id} ${buildRowTitle(row)} 글을 복구했습니다.`,
         })
-        pushRecentAction("success", "글 복구", `#${row.id} ${buildRowTitle(row)} 글을 복구했습니다.`, "복구 완료")
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         showToast({ tone: "error", text: `복구 실패: ${message}` })
-        pushRecentAction("error", "복구 실패", `#${row.id} ${buildRowTitle(row)} · ${message}`, "재시도 필요")
       } finally {
         setMutationPending(null)
       }
     },
-    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
+    [queryClient, refreshWorkspaceLists, showToast]
   )
 
   const performHardDeletePost = useCallback(
@@ -424,16 +257,14 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
           tone: "success",
           text: `#${row.id} ${buildRowTitle(row)} 글을 영구삭제했습니다.`,
         })
-        pushRecentAction("success", "영구삭제", `#${row.id} ${buildRowTitle(row)} 글을 영구삭제했습니다.`, "영구 반영")
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         showToast({ tone: "error", text: `영구삭제 실패: ${message}` })
-        pushRecentAction("error", "영구삭제 실패", `#${row.id} ${buildRowTitle(row)} · ${message}`, "재시도 필요")
       } finally {
         setMutationPending(null)
       }
     },
-    [pushRecentAction, queryClient, refreshWorkspaceLists, showToast]
+    [queryClient, refreshWorkspaceLists, showToast]
   )
 
   const handleDeletePost = useCallback(
@@ -471,13 +302,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       })
     },
     []
-  )
-
-  const handleContinueRecent = useCallback(
-    async (row: AdminPostListItem) => {
-      await openWriteRoute({ postId: String(row.id) })
-    },
-    [openWriteRoute]
   )
 
   const handleStatusFilterChange = useCallback((nextStatus: PostStatusFilter) => {
@@ -521,17 +345,11 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   return (
     <AdminPostsWorkspacePageView
       confirmState={confirmState}
-      continueSectionRef={continueSectionRef}
-      copyPostDetailLink={copyPostDetailLink}
       handleConfirmAction={handleConfirmAction}
-      handleContinueRecent={handleContinueRecent}
       handleDeletePost={handleDeletePost}
-      handleHardDeletePost={handleHardDeletePost}
-      handleRestorePost={handleRestorePost}
       handleToastAction={handleToastAction}
       initialProfileSnapshot={initialProfileSnapshot}
       isListLoading={isListLoading}
-      isRecentLoading={isRecentLoading}
       listError={listError}
       listKw={listKw}
       listPage={listPage}
@@ -542,13 +360,8 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       listSort={listSort}
       listState={listState}
       loadList={loadList}
-      loadRecentPosts={loadRecentPosts}
       mutationPending={mutationPending}
-      openCanonicalPost={openCanonicalPost}
       openWriteRoute={openWriteRoute}
-      recentActions={recentActions}
-      recentError={recentError}
-      recentPosts={recentPosts}
       sessionMember={sessionMember}
       setConfirmState={setConfirmState}
       setListKw={setListKw}
@@ -559,7 +372,6 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       onHardDeletePost={handleHardDeletePost}
       onRestorePost={handleRestorePost}
       shouldRenderMobileList={shouldRenderMobileList}
-      showDeferredSupportPanels={showDeferredSupportPanels}
       toast={toast}
     />
   )

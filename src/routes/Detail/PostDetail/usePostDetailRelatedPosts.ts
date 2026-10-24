@@ -82,11 +82,6 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
   )
 
   useEffect(() => {
-    const isPostDetail = detailType === "Post"
-    if (!isPostDetail || !data?.id) {
-      setShouldFetchRelated(false)
-      return
-    }
     setShouldFetchRelated(false)
   }, [data?.id, detailType])
 
@@ -157,10 +152,8 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
   }, [data?.id, detailType, prefetchTriggerRef, shouldFetchRelated])
 
   return {
-    detailType,
     relatedByAuthorPosts,
     relatedByTagPosts,
-    relatedTag,
     shouldFetchRelated,
     showRelatedAuthorSkeleton,
     showRelatedTagSkeleton,

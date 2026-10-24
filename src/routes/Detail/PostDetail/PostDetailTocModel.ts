@@ -135,17 +135,6 @@ export const createObserverRegistry = () => {
     add(() => window.removeEventListener(type, handler, options))
   }
 
-  const addIntersectionObserver = (
-    targets: HTMLElement[],
-    callback: IntersectionObserverCallback,
-    options?: IntersectionObserverInit
-  ) => {
-    if (!targets.length || typeof IntersectionObserver === "undefined") return
-    const observer = new IntersectionObserver(callback, options)
-    targets.forEach((target) => observer.observe(target))
-    add(() => observer.disconnect())
-  }
-
   const addResizeObserver = (targets: HTMLElement[], callback: ResizeObserverCallback) => {
     if (!targets.length || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(callback)
@@ -162,7 +151,6 @@ export const createObserverRegistry = () => {
   return {
     add,
     addWindowEvent,
-    addIntersectionObserver,
     addResizeObserver,
     cleanup,
   }

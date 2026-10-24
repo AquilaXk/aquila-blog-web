@@ -88,7 +88,7 @@ test.describe("admin bootstrap state contract", () => {
     expect(toolsModelSource).toContain("timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE")
     expect(toolsWorkspaceSource).toContain("const [freshnessClock, setFreshnessClock] = useState<number | null>(null)")
     expect(toolsWorkspaceSource).toContain("const systemHealthFreshness = getFreshnessMeta(systemHealthCheckedAt, freshnessClock)")
-    expect(toolsWorkspaceSource).toContain("const systemHealthFetchedAt = systemHealthCheckedAt ? formatInstant(systemHealthCheckedAt) : \"-\"")
+    expect(toolsWorkspaceSource).toContain("const recentCheckedLabel = systemHealthCheckedAt ? formatInstant(systemHealthCheckedAt) : \"-\"")
   })
 
   test("운영 대시보드는 auth/session 선조회 대신 protected bootstrap으로 health summary를 first paint에 주입한다", () => {

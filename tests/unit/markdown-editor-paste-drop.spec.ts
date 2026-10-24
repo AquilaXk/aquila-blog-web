@@ -351,7 +351,6 @@ test.describe("markdown editor paste/drop model", () => {
     expect(editorSource).toContain("applyBackgroundMarkdownMutation")
     expect(editorSource).toContain("clearUploadError")
     expect(editorSource).toContain("documentGenerationRef")
-    expect(editorSource).toContain("Must proceed even when the editor UI is temporarily disabled")
     expect(editorSource).not.toMatch(
       /applyBackgroundMarkdownMutation = useCallback\(\s*\(plan: PlannedTextMutation\) => \{\s*if \(disabled\) return false/
     )

@@ -24,7 +24,6 @@ type Props = {
   shareFeedback?: "copied" | "shared" | "failed" | null
   onSharePost?: () => void
   deckSummary?: string
-  interactiveTags?: boolean
   showEngagement?: boolean
   showReadingTime?: boolean
   readingMinutes?: number
@@ -38,7 +37,6 @@ const resolvePostAuthorMeta = (data: PostDetail) => {
   return {
     authorName,
     authorImageSrc,
-    authorRole: "",
   }
 }
 
@@ -70,7 +68,7 @@ const resolveHeroLabels = (data: PostDetail): string[] => {
 
 export const resolvePostHeaderViewModel = (props: Props) => {
   const { data, likesCount, hitCount, shareFeedback = null, deckSummary } = props
-  const { authorName, authorImageSrc, authorRole } = resolvePostAuthorMeta(data)
+  const { authorName, authorImageSrc } = resolvePostAuthorMeta(data)
   const { publishedAt, modifiedAt } = resolvePostDates(data)
   const heroLabels = resolveHeroLabels(data)
   const rawThumbnail = data.thumbnail || ""
@@ -89,7 +87,6 @@ export const resolvePostHeaderViewModel = (props: Props) => {
   return {
     authorName,
     authorImageSrc,
-    authorRole,
     heroLabels,
     publishedAt,
     modifiedAt,
@@ -107,8 +104,7 @@ export const resolvePostHeaderViewModel = (props: Props) => {
 const PostHeaderAuthorMeta: React.FC<{
   authorName: string
   authorImageSrc: string
-  authorRole: string
-}> = ({ authorName, authorImageSrc, authorRole }) => {
+}> = ({ authorName, authorImageSrc }) => {
   if (!authorName) return null
   return (
     <div className="author">
@@ -127,7 +123,6 @@ const PostHeaderAuthorMeta: React.FC<{
       </div>
       <div className="authorText">
         <strong>{authorName}</strong>
-        {authorRole ? <div className="metaText">{authorRole}</div> : null}
       </div>
     </div>
   )
@@ -244,7 +239,6 @@ const PostHeader: React.FC<Props> = (props) => {
         <PostHeaderAuthorMeta
           authorName={vm.authorName}
           authorImageSrc={vm.authorImageSrc}
-          authorRole={vm.authorRole}
         />
         {showEngagement ? (
           <PostHeaderEngagementSection

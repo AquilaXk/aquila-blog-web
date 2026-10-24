@@ -3,7 +3,7 @@ import styled from "@emotion/styled"
 type EditorStudioResultLogPanelProps = {
   loadingKey: string
   result: string
-  variant: "dedicated" | "standard"
+  variant?: "dedicated"
   eyebrow?: string
   loadingTitle: string
   idleTitle: string
@@ -14,7 +14,7 @@ type EditorStudioResultLogPanelProps = {
 export const EditorStudioResultLogPanel = ({
   loadingKey,
   result,
-  variant,
+  variant = "dedicated",
   eyebrow,
   loadingTitle,
   idleTitle,
@@ -53,16 +53,6 @@ const ResultLogPanel = styled.section`
     margin-bottom: 1.5rem;
   }
 
-  &[data-variant="standard"] {
-    margin-top: 1rem;
-    border-radius: 0;
-    border: 0;
-    border-top: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
-    background: transparent;
-    overflow: hidden;
-  }
-
   details {
     display: grid;
   }
@@ -80,10 +70,6 @@ const ResultLogPanel = styled.section`
     gap: 0.8rem;
   }
 
-  &[data-variant="standard"] summary {
-    padding: 0.95rem 1rem;
-  }
-
   summary::-webkit-details-marker {
     display: none;
   }
@@ -97,11 +83,6 @@ const ResultLogPanel = styled.section`
     font-size: 0.92rem;
   }
 
-  &[data-variant="standard"] strong {
-    margin-top: 0.18rem;
-    font-size: 0.96rem;
-  }
-
   span {
     color: ${({ theme }) => theme.colors.gray10};
     line-height: 1.5;
@@ -109,26 +90,6 @@ const ResultLogPanel = styled.section`
 
   &[data-variant="dedicated"] span {
     font-size: 0.76rem;
-  }
-
-  &[data-variant="standard"] span {
-    color: ${({ theme }) => theme.colors.gray11};
-    font-size: 0.78rem;
-    white-space: nowrap;
-  }
-
-  &[data-variant="standard"] > details > pre {
-    margin: 0 1rem 1rem;
-  }
-
-  @media (max-width: 720px) {
-    &[data-variant="standard"] summary {
-      flex-direction: column;
-    }
-
-    &[data-variant="standard"] span {
-      white-space: normal;
-    }
   }
 `
 

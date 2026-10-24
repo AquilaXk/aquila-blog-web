@@ -51,7 +51,6 @@ export const EMPTY_INITIAL_SNAPSHOT: AdminPostsWorkspaceInitialSnapshot = {
 const ADMIN_POSTS_SSR_LIST_CACHE_KEY = `admin-posts:list:${DEFAULT_SORT}:page=1:size=${DEFAULT_PAGE_SIZE}`
 const ADMIN_POSTS_SSR_LIST_CACHE_TTL_MS = 5_000
 export const POSTS_LIST_LOAD_ERROR_MESSAGE = "글 목록 서버와 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
-export const RECENT_POSTS_UNAVAILABLE_MESSAGE = "목록 연결 후 최근 수정 글을 표시합니다."
 
 const toEditorRoute = (query?: Record<string, string>) => {
   if (query?.postId) {

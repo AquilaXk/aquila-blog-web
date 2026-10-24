@@ -8,7 +8,6 @@ import { RelatedSection, RelatedSkeletonItem } from "./PostDetail.styles"
 const RELATED_SKELETON_COUNT = 2
 
 type RelatedPostsSectionProps = {
-  relatedTag: string
   showRelatedTagSkeleton: boolean
   relatedByTagPosts: TPost[]
   showRelatedAuthorSkeleton: boolean
@@ -43,7 +42,6 @@ const RelatedPostsSectionComponent = ({
 
   return (
     <RelatedSection aria-label="관련 글">
-      <span className="monoLabel">Continue reading</span>
       <h3>관련 글</h3>
       <ul>
         {showSkeleton
