@@ -58,7 +58,7 @@ type LogicalLine = {
   intersectsFence: boolean
 }
 
-const fenceLine = /^(?:(?: {0,3}> ?)+)?(?:[ \t]*(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
+const fenceLine = /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 
 const logicalLines = (value: string): LogicalLine[] => {
   const lines = value.split("\n")

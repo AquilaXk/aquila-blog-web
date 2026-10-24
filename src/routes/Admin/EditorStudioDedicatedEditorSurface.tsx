@@ -5,14 +5,14 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
 import {
-  EditorExitAction, EditorHeaderMetaPill, EditorHeaderMetaRow, MobilePropertiesToggle,
+  EditorExitAction, EditorHeaderMetaPill, EditorHeaderMetaRow, EditorHiddenFileInput,
   EditorInspector, EditorInspectorTagInputRow, EditorOutline, EditorOutlineItem,
   EditorPanelHeader, EditorSidebarToggleButton, EditorStudioDedicatedCanvasSection,
   EditorStudioDedicatedMetaSection, EditorStudioDedicatedTopBar, EditorStudioFrame,
   EditorStudioGuideModal, EditorStudioLoadingState, EditorStudioPageHeading, EditorStudioRoot,
-  EditorStudioSaveState, EditorStudioStatusBar, EditorStudioTopBarActions,
+  EditorStudioSaveState, EditorStudioStatusBar, EditorStudioTopBarActions, EditorStudioTopBarLead,
   EditorStudioWritingColumn, EditorTagRow, InlineMetaInput, LocalDraftRestoreCard,
-  PrimaryButton, PublishNotice, SelectedTagChip, SecondaryButton, TitleInput,
+  MobilePropertiesToggle, PrimaryButton, PublishNotice, SelectedTagChip, SecondaryButton, TitleInput,
 } from "./EditorStudioDedicatedEditorSurfaceParts"
 import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
@@ -99,6 +99,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onPostCategoryChange: (value: string) => void
   onCommitPostCategory: () => void
   categorySuggestions: string[]
+  tagSuggestions?: string[]
   postVisibility: PostVisibility
   onPostVisibilityChange: (value: PostVisibility) => void
   editorCanvas: ReactNode
@@ -228,6 +229,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   onPostCategoryChange,
   onCommitPostCategory,
   categorySuggestions,
+  tagSuggestions = [],
   postVisibility,
   onPostVisibilityChange,
   editorCanvas,
@@ -328,16 +330,13 @@ export const EditorStudioDedicatedEditorSurface = ({
   return (
     <EditorStudioRoot>
       <EditorStudioPageHeading>글 편집</EditorStudioPageHeading>
-      <input
-        ref={thumbnailImageFileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={onThumbnailImageFileChange}
-        style={{ display: "none" }}
-      />
+      <EditorHiddenFileInput ref={thumbnailImageFileInputRef} type="file" accept="image/*" onChange={onThumbnailImageFileChange} />
+      <datalist id="editor-tag-suggestions">
+        {tagSuggestions.filter((tag) => !postTags.includes(tag)).map((tag) => <option key={tag} value={tag} />)}
+      </datalist>
 
       <EditorStudioDedicatedTopBar>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <EditorStudioTopBarLead>
           <EditorExitAction type="button" onClick={onExit}>
             ← 글 관리
           </EditorExitAction>
@@ -350,7 +349,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           >
             목차
           </EditorSidebarToggleButton>
-        </div>
+        </EditorStudioTopBarLead>
 
         {saveStateText ? <EditorStudioSaveState data-tone={saveStateTone}>{saveStateText}</EditorStudioSaveState> : <span />}
 
@@ -447,6 +446,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             <EditorHeaderMetaRow
               $collapsedOnMobile={!isMobilePropertiesOpen}
               $collapsedInZen={isZenMode && !isMobilePropertiesOpen}
+              $collapsedWhenInspectorOpen={isInspectorOpen && !isZenMode}
             >
               <EditorTagRow aria-label="태그 입력">
                 {postTags.map((tag) => (
@@ -458,6 +458,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   </SelectedTagChip>
                 ))}
                 <InlineMetaInput
+                  list="editor-tag-suggestions"
                   placeholder="태그 입력 후 Enter"
                   value={tagDraft}
                   onChange={(event) => handleTagDraftChange(event.target.value)}
@@ -515,6 +516,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               <EditorInspectorTagInputRow>
                 <input
                   list="editor-category-suggestions"
+                  placeholder="분류 입력 또는 선택"
                   value={getCategoryInputValue(postCategory)}
                   onChange={(event) => onPostCategoryChange(event.target.value)}
                   onBlur={onCommitPostCategory}
@@ -560,6 +562,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               </EditorTagRow>
               <EditorInspectorTagInputRow>
                 <input
+                  list="editor-tag-suggestions"
                   placeholder="태그 추가"
                   value={tagDraft}
                   onChange={(event) => handleTagDraftChange(event.target.value)}

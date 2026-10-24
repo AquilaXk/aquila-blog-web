@@ -4,7 +4,6 @@ type EditorStudioResultLogPanelProps = {
   loadingKey: string
   result: string
   variant?: "dedicated"
-  eyebrow?: string
   loadingTitle: string
   idleTitle: string
   loadingDescription: (loadingKey: string) => string
@@ -15,7 +14,6 @@ export const EditorStudioResultLogPanel = ({
   loadingKey,
   result,
   variant = "dedicated",
-  eyebrow,
   loadingTitle,
   idleTitle,
   loadingDescription,
@@ -28,7 +26,6 @@ export const EditorStudioResultLogPanel = ({
       <details open={Boolean(loadingKey)}>
         <summary>
           <div>
-            {eyebrow ? <ResultLogEyebrow>{eyebrow}</ResultLogEyebrow> : null}
             <strong>{loadingKey ? loadingTitle : idleTitle}</strong>
           </div>
           <span>{loadingKey ? loadingDescription(loadingKey) : idleDescription}</span>
@@ -91,10 +88,6 @@ const ResultLogPanel = styled.section`
   &[data-variant="dedicated"] span {
     font-size: 0.76rem;
   }
-`
-
-const ResultLogEyebrow = styled.span`
-  display: none;
 `
 
 const ResultLogBody = styled.pre`

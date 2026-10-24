@@ -716,7 +716,15 @@ test.describe("live Markdown writing surface", () => {
     await fillMarkdown(page, "Cat cat cat")
     await page.getByRole("button", { name: "더보기 메뉴" }).click()
     await page.getByRole("menuitem", { name: "찾기 및 바꾸기" }).click()
-    await page.getByLabel("찾을 내용").fill("cat")
+    const findInput = page.getByLabel("찾을 내용")
+    await expect(findInput).toBeFocused()
+    await findInput.fill("cat")
+    await findInput.press("Enter")
+    await expect(findInput).toBeFocused()
+    await expect(page.getByRole("status")).toContainText("1 / 3")
+    await page.keyboard.press("Enter")
+    await expect(findInput).toBeFocused()
+    await expect(page.getByRole("status")).toContainText("2 / 3")
     await page.getByLabel("바꿀 내용").fill("dog")
     await page.getByRole("button", { name: "모두 바꾸기" }).click()
     await expect.poll(() => readMarkdown(page)).toBe("dog dog dog")
@@ -1396,4 +1404,130 @@ test.describe("live Markdown writing surface", () => {
       return lineBox.y >= bodyBox.y && lineBox.y + lineBox.height <= bodyBox.y + bodyBox.height + 1
     }).toBe(true)
   })
+
+  test("supports Notion floating selection bubble, left-gutter plus slash trigger, and live input rules", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 840 })
+    await routeAuthenticatedEditor(page, "Notion writing line")
+    await openEditorDraft(page)
+
+    await selectMarkdownRange(page, 0, 6)
+    const selectionBubble = page.getByRole("toolbar", { name: "선택 텍스트 빠른 서식" })
+    await expect(selectionBubble).toBeVisible()
+    await selectionBubble.getByRole("button", { name: "선택 영역 하이라이트" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+
+    await selectMarkdownRange(page, 0, 10)
+    await expect(selectionBubble).toBeVisible()
+    await selectionBubble.getByRole("button", { name: "선택 영역 제목 2" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("## ==Notion== writing line")
+
+    await selectMarkdownRangeWithoutAssertion(page, 3, 3)
+    await editorContent(page).press("Backspace")
+    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+
+    await fillMarkdown(page, "")
+    const gutterPlus = page.getByRole("button", { name: "현재 줄에 블록 삽입" })
+    await expect(gutterPlus).toBeVisible()
+    await gutterPlus.click()
+    const slashMenu = page.getByRole("menu", { name: "빠른 삽입 메뉴" })
+    await expect(slashMenu).toBeVisible()
+    await page.keyboard.type("ul")
+    await expect(slashMenu.getByRole("menuitem", { name: /글머리 기호 목록/ })).toBeVisible()
+    await page.keyboard.press("Tab")
+    await expect(slashMenu).toHaveCount(0)
+    await expect.poll(() => readMarkdown(page)).toBe("- ")
+
+    await fillMarkdown(page, "")
+    await editorContent(page).focus()
+    await page.keyboard.type("[] 할 일 항목")
+    await expect.poll(() => readMarkdown(page)).toBe("- [ ] 할 일 항목")
+
+    await selectMarkdownRangeWithoutAssertion(page, 6, 6)
+    const gutterHandle = page.getByRole("button", { name: "현재 줄 블록 메뉴" })
+    await expect(gutterHandle).toBeVisible()
+    await gutterHandle.click()
+    const blockActionMenu = page.getByRole("menu", { name: "블록 작업 메뉴" })
+    await expect(blockActionMenu).toBeVisible()
+    await blockActionMenu.getByRole("menuitem", { name: "일반 문단으로 전환" }).click()
+    await expect(blockActionMenu).toHaveCount(0)
+    await expect.poll(() => readMarkdown(page)).toBe("할 일 항목")
+
+    await selectMarkdownRangeWithoutAssertion(page, 2, 2)
+    await gutterHandle.click()
+    await expect(blockActionMenu).toBeVisible()
+    await blockActionMenu.getByRole("menuitem", { name: "현재 줄 복제" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("할 일 항목\n할 일 항목")
+
+    const toggleDoc = ":::toggle 토글 제목\n숨겨진 본문\n:::\n\n다음 문단"
+    await fillMarkdown(page, toggleDoc)
+    const tailOffset = toggleDoc.indexOf("다음 문단") + 2
+    await selectMarkdownRangeWithoutAssertion(page, tailOffset, tailOffset)
+    const toggleWidget = page.getByTestId("cm-live-toggle-widget")
+    await expect(toggleWidget).toBeVisible()
+    await expect(toggleWidget).toContainText("토글 제목")
+    await expect(toggleWidget).toContainText("숨겨진 본문")
+
+    const tableDoc = [
+      "| 이름 | 역할 |",
+      "| --- | --- |",
+      "| 앨리스 | 관리자 |",
+      "",
+      "표 밖 문단",
+    ].join("\n")
+    await fillMarkdown(page, tableDoc)
+    const outsideTableOffset = tableDoc.indexOf("표 밖 문단") + 2
+    await selectMarkdownRangeWithoutAssertion(page, outsideTableOffset, outsideTableOffset)
+
+    const tableWidget = page.getByTestId("cm-live-table-widget")
+    await expect(tableWidget).toBeVisible()
+    await tableWidget.getByRole("button", { name: "표 제목 열 강조 전환" }).click()
+    await expect(tableWidget).toHaveAttribute("data-header-col", "true")
+    await tableWidget.getByRole("button", { name: "표 페이지 너비 맞춤 전환" }).click()
+    await expect(tableWidget).toHaveAttribute("data-full-width", "true")
+
+    await tableWidget.locator("td").first().click()
+
+    const cellInput = tableWidget.getByTestId("cm-live-table-cell-input")
+    await expect(cellInput).toBeVisible()
+    await expect(cellInput).toHaveValue("앨리스")
+    await cellInput.fill("밥")
+    await cellInput.press("ArrowRight")
+
+    await expect(tableWidget).toBeVisible()
+    await expect(tableWidget).toHaveAttribute("data-header-col", "true")
+    await expect(tableWidget).toHaveAttribute("data-full-width", "true")
+    await expect(cellInput).toBeVisible()
+    await expect(cellInput).toHaveValue("관리자")
+    const pasteDefaultPrevented = await cellInput.evaluate((input) => {
+      const clipboardData = new DataTransfer()
+      clipboardData.setData("text/html", "<strong>가로채기 금지</strong>")
+      clipboardData.setData("text/plain", "가로채기 금지")
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData,
+      })
+      input.dispatchEvent(pasteEvent)
+      return pasteEvent.defaultPrevented
+    })
+    expect(pasteDefaultPrevented).toBe(false)
+    await cellInput.fill("작성자")
+    await cellInput.press("Escape")
+
+    await expect(tableWidget).toBeVisible()
+    await expect(
+      tableWidget.locator('td[data-cell-row="1"][data-cell-col="1"]')
+    ).toHaveClass(/is-active-cell/)
+    await tableWidget.getByTestId("cm-live-table-add-row").click()
+    await expect(tableWidget.locator("tbody tr")).toHaveCount(2)
+
+    await tableWidget.getByTestId("cm-live-table-add-col").click()
+    await expect(tableWidget.locator("thead th")).toHaveCount(3)
+    await page.keyboard.press("Escape")
+
+    await expect.poll(() => readMarkdown(page)).toContain("| 이름 | 역할 |  |")
+    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자 |  |")
+  })
 })
+
+
