@@ -22,7 +22,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     gap: 10px;
     list-style: none;
     padding: 15px 17px;
-    color: var(--color-gray12);
+    color: ${theme.colors.gray12};
     font-weight: 780;
     line-height: 1.4;
   }
@@ -44,7 +44,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     height: 20px;
     flex: 0 0 20px;
     border: 1px solid ${theme.publicDesign.borderStrong};
-    color: var(--color-gray10);
+    color: ${theme.colors.gray10};
     font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
   }
 
@@ -58,7 +58,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
 
   .aq-toggle__body {
     padding: 0 17px 17px 47px;
-    color: var(--color-gray10);
+    color: ${theme.colors.gray11};
   }
 
   .aq-toggle[open] > .aq-toggle__body:first-of-type {
@@ -238,8 +238,18 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
   }
 
   @media (max-width: 820px) {
+    .aq-toggle > summary {
+      padding: 14px;
+    }
+
     .aq-toggle__body {
-      padding: 0 14px 14px 20px;
+      padding: 0 14px 14px 44px;
+    }
+
+    .aq-table-scroll {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     table,
@@ -255,6 +265,19 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
       width: max-content;
       min-width: 100%;
       max-width: none;
+    }
+
+    table th,
+    table td,
+    .aq-table th,
+    .aq-table td {
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: normal;
+      font-size: 0.95rem;
+      line-height: 1.58;
+      padding: 0.66rem 0.72rem;
+      min-width: max(${TABLE_MIN_COLUMN_WIDTH_PX}px, 10ch);
     }
   }
 

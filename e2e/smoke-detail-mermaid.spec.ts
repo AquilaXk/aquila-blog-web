@@ -379,7 +379,17 @@ test.describe("core smoke detail mermaid", () => {
     })
     .toBeGreaterThan(0)
   await expect(page.locator("pre.aq-mermaid[data-mermaid-complexity='high']")).toHaveCount(1)
-  await expect(page.locator("pre.aq-mermaid[data-mermaid-expandable='true'] .aq-mermaid-expand-btn")).toBeVisible()
+  const expandButton = page.locator("pre.aq-mermaid[data-mermaid-expandable='true'] .aq-mermaid-expand-btn").first()
+  await expect(expandButton).toBeVisible()
+  await expandButton.click()
+  const overlayDialog = page.locator("[data-aq-mermaid-overlay='true']")
+  await expect(overlayDialog).toBeVisible()
+  const panelBackground = await overlayDialog.locator("> div").first().evaluate((node) => {
+    return window.getComputedStyle(node).backgroundColor
+  })
+  expect(["rgb(255, 255, 255)", "rgba(255, 255, 255, 1)"]).toContain(panelBackground)
+  await overlayDialog.getByRole("button", { name: "닫기" }).click()
+  await expect(overlayDialog).toHaveCount(0)
 
   const overflow = await page.evaluate(() => {
     const html = document.documentElement

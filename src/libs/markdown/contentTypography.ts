@@ -40,10 +40,10 @@ export const articleTypographyScale = {
   codeLineHeight: "23px",
   codeFontSizeMobile: "0.85rem",
   codeLineHeightMobile: "20.4px",
-  calloutTitleFontSize: "1.0625rem",
-  calloutTitleLineHeight: "28px",
-  calloutTitleFontSizeMobile: "1rem",
-  calloutTitleLineHeightMobile: "24px",
+  calloutTitleFontSize: "0.975rem",
+  calloutTitleLineHeight: "22px",
+  calloutTitleFontSizeMobile: "0.95rem",
+  calloutTitleLineHeightMobile: "22px",
 } as const
 
 export const markdownContentTypography = (selector: string, theme: ThemeLike) => css`
@@ -151,7 +151,7 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
       ${theme.publicDesign.inlineCodeBg ??
       (theme.scheme === "dark" ? "rgba(255, 255, 255, 0.075)" : "rgba(15, 23, 36, 0.055)")}
     );
-    color: #ff6b6b;
+    color: var(--aq-inline-code-fg, ${theme.colors.gray12});
     box-shadow: inset 0 0 0 1px
       var(
         --aq-inline-code-border,

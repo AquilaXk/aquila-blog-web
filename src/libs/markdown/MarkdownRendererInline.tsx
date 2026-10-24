@@ -13,51 +13,81 @@ const INLINE_COLOR_CHILD_PLACEHOLDER_PREFIX = "__AQ_INLINE_COLOR_CHILD_"
 const INLINE_COLOR_CHILD_PLACEHOLDER_SUFFIX = "__"
 const INLINE_COLOR_CHILD_PLACEHOLDER_REGEX = /__AQ_INLINE_COLOR_CHILD_(\d+)__/g
 const INLINE_COLOR_RENDER_REGEX = /\{\{\s*color\s*:\s*([^|{}]+?)\s*\|([\s\S]+?)\s*\}\}/gi
-const QUOTED_STRONG_QUOTE_PAIRS = [
-  ['"', '"'],
-  ["“", "”"],
-  ["‘", "’"],
-  ["«", "»"],
-  ["「", "」"],
-  ["『", "』"],
-  ["〈", "〉"],
-  ["《", "》"],
-] as const
-
-const QUOTED_STRONG_QUOTE_MARKERS = QUOTED_STRONG_QUOTE_PAIRS.flatMap(([openQuote, closeQuote]) =>
-  openQuote === closeQuote ? [openQuote] : [openQuote, closeQuote]
-)
-
 const isLetterOrNumber = (value: string) => /[\p{L}\p{N}]/u.test(value)
+const isPunctuationOrSymbol = (value: string) => /[\p{P}\p{S}]/u.test(value)
 
 type QuotedStrongMatch = {
   end: number
   quotedText: string
 }
 
-const matchQuotedStrongAt = (value: string, start: number): QuotedStrongMatch | null => {
-  for (const marker of QUOTED_STRONG_MARKERS) {
+const hasAdjacentSameMarker = (value: string, start: number, marker: string) => {
+  const prevChar = start > 0 ? value[start - 1] || "" : ""
+  const nextChar = value[start + marker.length] || ""
+  return prevChar === marker || nextChar === marker
+}
+
+const findClosingMarkerIndex = (
+  value: string,
+  marker: string,
+  contentStart: number,
+  disallowAdjacentSameMarker: boolean
+) => {
+  let searchFrom = contentStart
+  while (searchFrom < value.length) {
+    const closeIndex = value.indexOf(marker, searchFrom)
+    if (closeIndex < 0) return -1
+    if (disallowAdjacentSameMarker && value[closeIndex + marker.length] === marker) {
+      searchFrom = closeIndex + marker.length + 1
+      continue
+    }
+    return closeIndex
+  }
+  return -1
+}
+
+const hasPunctuationBoundarySpan = (
+  value: string,
+  start: number,
+  suffixIndex: number,
+  inner: string
+) => {
+  if (!inner || inner.includes("\n") || /^\s|\s$/.test(inner)) return false
+  const prefixChar = start > 0 ? value[start - 1] || "" : ""
+  const suffixChar = value[suffixIndex] || ""
+  const firstInnerChar = inner.at(0) || ""
+  const lastInnerChar = inner.at(-1) || ""
+  return (
+    (isPunctuationOrSymbol(lastInnerChar) && isLetterOrNumber(suffixChar)) ||
+    (isPunctuationOrSymbol(firstInnerChar) && isLetterOrNumber(prefixChar))
+  )
+}
+
+const matchBoundaryDelimitedSpanAt = (
+  value: string,
+  start: number,
+  markers: readonly string[],
+  disallowAdjacentSameMarker = false
+): QuotedStrongMatch | null => {
+  for (const marker of markers) {
     if (!value.startsWith(marker, start)) continue
+    if (disallowAdjacentSameMarker && hasAdjacentSameMarker(value, start, marker)) continue
 
-    for (const [openQuote, closeQuote] of QUOTED_STRONG_QUOTE_PAIRS) {
-      const quoteStart = start + marker.length
-      if (!value.startsWith(openQuote, quoteStart)) continue
+    const contentStart = start + marker.length
+    const closeIndex = findClosingMarkerIndex(
+      value,
+      marker,
+      contentStart,
+      disallowAdjacentSameMarker
+    )
+    if (closeIndex < 0) continue
 
-      const contentStart = quoteStart + openQuote.length
-      const closingToken = `${closeQuote}${marker}`
-      const closeIndex = value.indexOf(closingToken, contentStart)
-      if (closeIndex < 0) continue
-
-      const suffixIndex = closeIndex + closingToken.length
-      const suffixChar = value[suffixIndex] || ""
-      if (!suffixChar || !isLetterOrNumber(suffixChar)) continue
-
-      const inner = value.slice(contentStart, closeIndex)
-      if (!inner.trim()) continue
-
+    const inner = value.slice(contentStart, closeIndex)
+    const suffixIndex = closeIndex + marker.length
+    if (hasPunctuationBoundarySpan(value, start, suffixIndex, inner)) {
       return {
         end: suffixIndex,
-        quotedText: `${openQuote}${inner}${closeQuote}`,
+        quotedText: inner,
       }
     }
   }
@@ -65,41 +95,14 @@ const matchQuotedStrongAt = (value: string, start: number): QuotedStrongMatch | 
   return null
 }
 
-const matchQuotedEmphasisAt = (value: string, start: number): QuotedStrongMatch | null => {
-  for (const marker of QUOTED_EMPHASIS_MARKERS) {
-    if (!value.startsWith(marker, start)) continue
+const matchQuotedStrongAt = (value: string, start: number): QuotedStrongMatch | null =>
+  matchBoundaryDelimitedSpanAt(value, start, QUOTED_STRONG_MARKERS, false)
 
-    for (const [openQuote, closeQuote] of QUOTED_STRONG_QUOTE_PAIRS) {
-      const quoteStart = start + marker.length
-      if (!value.startsWith(openQuote, quoteStart)) continue
-
-      const contentStart = quoteStart + openQuote.length
-      const closingToken = `${closeQuote}${marker}`
-      const closeIndex = value.indexOf(closingToken, contentStart)
-      if (closeIndex < 0) continue
-
-      const suffixIndex = closeIndex + closingToken.length
-      const suffixChar = value[suffixIndex] || ""
-      if (!suffixChar || !isLetterOrNumber(suffixChar)) continue
-
-      const inner = value.slice(contentStart, closeIndex)
-      if (!inner.trim()) continue
-
-      return {
-        end: suffixIndex,
-        quotedText: `${openQuote}${inner}${closeQuote}`,
-      }
-    }
-  }
-
-  return null
-}
+const matchQuotedEmphasisAt = (value: string, start: number): QuotedStrongMatch | null =>
+  matchBoundaryDelimitedSpanAt(value, start, QUOTED_EMPHASIS_MARKERS, true)
 
 const restoreQuotedStrongText = (value: string): ReactNode[] => {
-  if (
-    (!value.includes("**") && !value.includes("__")) ||
-    !QUOTED_STRONG_QUOTE_MARKERS.some((quote) => value.includes(quote))
-  ) {
+  if (!value.includes("**") && !value.includes("__")) {
     return [value]
   }
 
@@ -140,10 +143,7 @@ const normalizeQuotedStrongChildren = (children: ReactNode) =>
   })
 
 const restoreQuotedEmphasisText = (value: string): ReactNode[] => {
-  if (
-    (!value.includes("*") && !value.includes("_")) ||
-    !QUOTED_STRONG_QUOTE_MARKERS.some((quote) => value.includes(quote))
-  ) {
+  if (!value.includes("*") && !value.includes("_")) {
     return [value]
   }
 
@@ -290,11 +290,16 @@ const normalizeSoftBreakChildren = (children: ReactNode) => {
 
 const MarkdownBlockquoteContext = createContext(false)
 
-export const MarkdownParagraph = ({ children, inCallout = false }: { children: ReactNode; inCallout?: boolean }) => {
-  const inBlockquote = useContext(MarkdownBlockquoteContext)
+export const normalizeMarkdownInlineChildren = (children: ReactNode) => {
   let normalizedChildren = normalizeInlineColorChildren(children)
   normalizedChildren = normalizeQuotedStrongChildren(normalizedChildren)
   normalizedChildren = normalizeQuotedEmphasisChildren(normalizedChildren)
+  return normalizedChildren
+}
+
+export const MarkdownParagraph = ({ children, inCallout = false }: { children: ReactNode; inCallout?: boolean }) => {
+  const inBlockquote = useContext(MarkdownBlockquoteContext)
+  let normalizedChildren = normalizeMarkdownInlineChildren(children)
   if (inBlockquote) {
     normalizedChildren = normalizeSoftBreakChildren(normalizedChildren)
   }

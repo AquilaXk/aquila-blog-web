@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { ApiError } from "../../src/apis/backend/client"
 import {
+  CLOUD_SYNC_UPLOAD_MAX_BYTES,
+  type CloudFile,
+  getCloudFileDownloadUrl,
   isDefinitiveStaleVideoUploadSessionError,
   isExplicitUploadAbort,
+  isResumableVideoUploadFile,
 } from "../../src/apis/backend/cloud"
 import {
   buildExploreCursorPath,
@@ -26,9 +30,14 @@ import { normalizeApiRequestPath } from "../../src/libs/backend/requestPath"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
 import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
 import {
+  applyCloudFolderFilter,
+  extractCloudFolders,
   isCloudSearchPending,
   resolveCloudEmptyTitle,
+  resolveCloudSearchParams,
   shouldShowCloudEmptyLoading,
+  sortCloudFiles,
+  updateCachedCloudFilesForMutation,
 } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 
 test.describe("frontend pure logic contracts", () => {
@@ -259,5 +268,100 @@ caption
     expect(viewSource).toContain("snapshotCollectionFailed")
     expect(viewSource).not.toMatch(/Public read latency[\s\S]*collectionFailed \?/)
     expect(viewSource).not.toMatch(/Live logs[\s\S]*collectionFailed \?/)
+  })
+
+  test("cloud upload limit, folder+keyword search parsing, and file sorting stay deterministic", () => {
+    expect(CLOUD_SYNC_UPLOAD_MAX_BYTES).toBe(95 * 1024 * 1024)
+    expect(getCloudFileDownloadUrl(42)).toMatch(/\/system\/api\/v1\/adm\/cloud\/files\/42\/content\?download=true$/)
+
+    const makeSizedFile = (name: string, type: string, size: number) => {
+      const file = new File(["x"], name, { type })
+      Object.defineProperty(file, "size", { value: size })
+      return file
+    }
+
+    expect(isResumableVideoUploadFile(makeSizedFile("clip.mp4", "video/mp4", 95 * 1024 * 1024))).toBe(false)
+    expect(isResumableVideoUploadFile(makeSizedFile("clip.mp4", "video/mp4", 95 * 1024 * 1024 + 1))).toBe(true)
+    expect(isResumableVideoUploadFile(makeSizedFile("archive.pdf", "application/pdf", 95 * 1024 * 1024 + 1))).toBe(
+      false
+    )
+
+    expect(resolveCloudSearchParams("/ops 점검")).toEqual({
+      folderPath: "ops",
+      keyword: "점검",
+    })
+    expect(resolveCloudSearchParams("/ops")).toEqual({
+      folderPath: "ops",
+      keyword: "",
+    })
+    expect(resolveCloudSearchParams("  deploy  ")).toEqual({
+      folderPath: "",
+      keyword: "deploy",
+    })
+
+    const sampleFiles: CloudFile[] = [
+      {
+        id: 1,
+        ownerMemberId: 1,
+        originalFilename: "alpha-report.pdf",
+        contentType: "application/pdf",
+        mediaKind: "DOCUMENT",
+        byteSize: 512,
+        folderPath: "ops",
+        createdAt: "2026-03-10T10:00:00Z",
+        modifiedAt: "2026-03-11T10:00:00Z",
+      },
+      {
+        id: 2,
+        ownerMemberId: 1,
+        originalFilename: "gamma-photo.png",
+        contentType: "image/png",
+        mediaKind: "PHOTO",
+        byteSize: 2048,
+        folderPath: "photos",
+        createdAt: "2026-03-12T10:00:00Z",
+        modifiedAt: "2026-03-15T10:00:00Z",
+      },
+      {
+        id: 3,
+        ownerMemberId: 1,
+        originalFilename: "beta-clip.mp4",
+        contentType: "video/mp4",
+        mediaKind: "VIDEO",
+        byteSize: 8192,
+        folderPath: "videos",
+        createdAt: "2026-03-08T10:00:00Z",
+        modifiedAt: "2026-03-09T10:00:00Z",
+      },
+    ]
+
+    expect(sortCloudFiles(sampleFiles, "LATEST").map((f) => f.id)).toEqual([2, 1, 3])
+    expect(sortCloudFiles(sampleFiles, "OLDEST").map((f) => f.id)).toEqual([3, 1, 2])
+    expect(sortCloudFiles(sampleFiles, "NAME").map((f) => f.id)).toEqual([1, 3, 2])
+    expect(sortCloudFiles(sampleFiles, "SIZE").map((f) => f.id)).toEqual([3, 2, 1])
+
+    expect(extractCloudFolders(sampleFiles)).toEqual(["ops", "photos", "videos"])
+    expect(extractCloudFolders(sampleFiles, "/archive/2026/")).toEqual([
+      "archive/2026",
+      "ops",
+      "photos",
+      "videos",
+    ])
+    expect(applyCloudFolderFilter("", "ops")).toBe("/ops")
+    expect(applyCloudFolderFilter("점검", "/ops/")).toBe("/ops 점검")
+    expect(applyCloudFolderFilter("/ops 점검", "ops")).toBe("점검")
+    expect(applyCloudFolderFilter("/ops 점검", "photos")).toBe("/photos 점검")
+    expect(applyCloudFolderFilter("/ops 점검", "")).toBe("점검")
+
+    const movedFile: CloudFile = { ...sampleFiles[0]!, folderPath: "ops/2026" }
+    expect(
+      updateCachedCloudFilesForMutation(sampleFiles, movedFile, "ALL", "").map((f) => f.folderPath),
+    ).toEqual(["ops/2026", "photos", "videos"])
+    expect(
+      updateCachedCloudFilesForMutation([sampleFiles[0]!], movedFile, "ALL", "/ops").map((f) => f.id),
+    ).toEqual([])
+    expect(
+      updateCachedCloudFilesForMutation([], movedFile, "ALL", "/ops/2026").map((f) => f.id),
+    ).toEqual([1])
   })
 })

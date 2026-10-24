@@ -133,8 +133,8 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     left: 50%;
     bottom: calc(100% + 8px);
     transform: translateX(-50%) translateY(4px);
-    min-width: 180px;
-    max-width: min(320px, 80vw);
+    min-width: 160px;
+    max-width: min(280px, calc(100vw - 32px));
     padding: 8px 11px;
     border: 1px solid ${theme.colors.gray6};
     background: ${theme.publicDesign.surfaceElevated};
@@ -181,6 +181,18 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
 
   .aq-footnotes > ol > li {
     margin-bottom: 0.5rem;
+  }
+
+  .aq-footnotes > ol > li > p {
+    display: inline;
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .aq-footnotes > ol > li > p + p {
+    display: block;
+    margin-top: 0.35rem;
   }
 
   .aq-footnotes a[data-footnote-backref] {

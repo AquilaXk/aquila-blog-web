@@ -86,28 +86,6 @@ export const DetailHeader = styled.div`
   }
 `
 
-export const DetailTabs = styled.div`
-  display: flex;
-  gap: 0.35rem;
-  border-bottom: 1px solid ${border};
-`
-
-export const DetailTab = styled.button`
-  border: 0;
-  border-bottom: 2px solid transparent;
-  padding: 0 0.15rem 0.45rem;
-  background: transparent;
-  color: ${textMuted};
-  font-size: 0.84rem;
-  font-weight: 850;
-  cursor: pointer;
-
-  &[data-active="true"] {
-    color: ${accentGold};
-    border-bottom-color: ${accentGold};
-  }
-`
-
 export const DetailPreviewBox = styled.div`
   display: grid;
   align-items: start;
@@ -116,10 +94,67 @@ export const DetailPreviewBox = styled.div`
   overflow: auto;
 `
 
+export const DetailActionLink = styled.a`
+  border: 0;
+  border-radius: 2px;
+  min-height: 2.25rem;
+  padding: 0 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: ${surfaceMuted};
+  color: ${textPrimary};
+  font-size: 0.83rem;
+  font-weight: 820;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    background: ${surfaceRaised};
+  }
+`
+
+export const DetailEditForm = styled.form`
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.85rem 0;
+  border: 0;
+  border-top: 1px solid ${border};
+  border-bottom: 1px solid ${border};
+  border-radius: 0;
+  background: transparent;
+`
+
+export const DetailEditField = styled.label`
+  display: grid;
+  gap: 0.25rem;
+  color: ${textSecondary};
+  font-size: 0.76rem;
+  font-weight: 800;
+`
+
+export const DetailEditInput = styled.input`
+  width: 100%;
+  min-height: 2.1rem;
+  border: 1px solid ${border};
+  border-radius: 2px;
+  padding: 0 0.6rem;
+  background: ${surface};
+  color: ${textPrimary};
+  font-size: 0.82rem;
+  font-weight: 760;
+
+  &:focus-visible {
+    outline: none;
+    border-color: ${borderStrong};
+  }
+`
+
 export const DetailSummary = styled.div`
   display: grid;
-  grid-template-columns: 3.2rem minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
   align-items: center;
   min-width: 0;
   padding: 0.75rem 0;
@@ -143,14 +178,16 @@ export const DetailSummary = styled.div`
 
 export const DetailMetaList = styled.dl`
   display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr);
-  gap: 0.68rem 0.8rem;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0 0.8rem;
   margin: 0;
 
   dt {
     display: flex;
     align-items: center;
     gap: 0.38rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid ${border};
     color: ${textMuted};
     font-size: 0.8rem;
     font-weight: 800;
@@ -167,6 +204,8 @@ export const DetailMetaList = styled.dl`
 
   dd {
     margin: 0;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid ${border};
     color: ${textPrimary};
     font-size: 0.82rem;
     font-weight: 780;
@@ -209,9 +248,9 @@ export const PdfCanvas = styled.canvas`
   max-width: 100%;
   max-height: min(52vh, 34rem);
   display: block;
-  border: 1px solid ${border};
-  border-radius: 8px;
-  background: ${surfaceRaised};
+  border: 0;
+  border-radius: 2px;
+  background: ${surfaceMuted};
   object-fit: contain;
 `
 
@@ -222,7 +261,7 @@ export const PhotoFrame = styled.div`
   width: 100%;
   min-height: 12rem;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 2px;
   background: ${surfaceMuted};
 
   img {

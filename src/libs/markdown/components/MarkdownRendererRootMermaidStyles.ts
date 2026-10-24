@@ -2,6 +2,7 @@ import { css, type Theme } from "@emotion/react"
 
 export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   .aq-mermaid {
+    position: relative;
     margin: 30px 0;
     display: block;
     width: 100%;
@@ -45,7 +46,8 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     align-items: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 28px;
+    padding: 36px 20px 20px;
+    cursor: zoom-in;
   }
 
   .aq-mermaid[data-mermaid-wide="true"] .aq-mermaid-stage {
@@ -61,6 +63,10 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     margin: 0 auto;
     background: transparent;
     overflow: visible;
+  }
+
+  .aq-mermaid-stage > svg .edgeLabel rect {
+    opacity: 0.94;
   }
 
   .aq-mermaid-stage > svg foreignObject,
@@ -126,6 +132,9 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid-error-details > summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: ${ (theme.scheme === "dark" ? "rgba(253, 230, 138, 0.94)" : "#b45309")};
     font-size: 0.78rem;
     font-weight: 700;
@@ -151,22 +160,58 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid-expand-btn {
-    margin: 0.45rem 0 0;
-    min-height: 32px;
-    border-radius: 0;
-    border: 1px solid ${ theme.colors.gray6};
-    background: ${ theme.colors.gray2};
-    color: ${ theme.colors.gray11};
-    padding: 0 0.75rem;
-    font-size: 0.76rem;
-    font-weight: 700;
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    z-index: 2;
+    width: fit-content;
+    margin: 0;
+    height: 26px;
+    min-height: 26px;
+    border-radius: 4px;
+    border: 1px solid ${theme.colors.gray6};
+    background: color-mix(in srgb, ${theme.publicDesign.readableSurface} 94%, transparent);
+    backdrop-filter: blur(4px);
+    color: ${theme.colors.gray11};
+    padding: 0 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
     cursor: pointer;
+  }
+
+  .aq-mermaid-expand-btn::after {
+    content: "";
+    position: absolute;
+    inset: -9px -6px;
   }
 
   .aq-mermaid[data-mermaid-expandable="true"] .aq-mermaid-expand-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
   }
 
+  @media (max-width: 820px) {
+    .aq-mermaid[data-mermaid-wide="true"] {
+      width: 100%;
+      max-width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      overflow-x: auto;
+    }
+
+    .aq-mermaid-stage {
+      padding: 36px 10px 14px;
+    }
+
+    .aq-mermaid-expand-btn {
+      top: 9px;
+      right: 9px;
+    }
+  }
 `

@@ -10,7 +10,9 @@ import {
 } from "react"
 import {
   deleteCloudFile,
+  getCloudFileContentUrl,
   listCloudFiles,
+  updateCloudFile,
   uploadCloudFile,
   type CloudFile,
   type CloudMediaKind,
@@ -20,11 +22,23 @@ import { useDebouncedValue } from "src/hooks/useDebouncedValue"
 import { resolveCloudErrorMessage } from "./AdminCloudPreviewDrawer"
 import {
   CLOUD_FILTERS,
+  applyCloudFolderFilter,
+  applyUploadQueueFailure,
+  applyUploadQueueProgress,
+  applyUploadQueueSuccess,
+  createUploadQueueItem,
   doesCloudFileMatchFilters,
+  extractCloudFolders,
+  isAbortLikeError,
   isUploadActive,
   mergeCloudFiles,
+  normalizeCloudFolderPathSearch,
+  preferClientFilenameForUploadedFile,
   resolveCloudSearchParams,
+  sortCloudFiles,
+  updateCachedCloudFilesForMutation,
   type CloudMediaFilter,
+  type CloudSortMode,
   type UploadQueueItem,
 } from "./AdminCloudWorkspaceModel"
 
@@ -42,110 +56,15 @@ const getCachedCloudQueryFilters = (queryKey: readonly unknown[]) => ({
   keyword: typeof queryKey[2] === "string" ? queryKey[2] : "",
 })
 
-let nextUploadQueueItemSequence = 1
-
-const createUploadQueueItem = (file: File): UploadQueueItem => {
-  const sequence = nextUploadQueueItemSequence
-  nextUploadQueueItemSequence += 1
-  return {
-    id: `${Date.now()}-${file.name}-${file.size}-${sequence}`,
-    file,
-    name: file.name,
-    byteSize: file.size,
-    status: "queued",
-    progress: 0,
-    message: "업로드 대기 중",
-  }
-}
-
-const applyUploadQueueProgress = (
-  current: UploadQueueItem[],
-  targetId: string,
-  progress: number,
-  message: string
-): UploadQueueItem[] =>
-  current.map((item) =>
-    item.id === targetId && item.status !== "cancelled" ? { ...item, progress, message } : item
-  )
-
-const applyUploadQueueSuccess = (
-  current: UploadQueueItem[],
-  targetId: string,
-  uploadedFileId: number
-): UploadQueueItem[] =>
-  current.map((item) =>
-    item.id === targetId && item.status !== "cancelled"
-      ? {
-          ...item,
-          status: "done",
-          progress: 100,
-          message: "업로드 완료",
-          uploadedFileId,
-        }
-      : item
-  )
-
-const applyUploadQueueFailure = (
-  current: UploadQueueItem[],
-  targetId: string,
-  aborted: boolean,
-  failureMessage: string
-): UploadQueueItem[] =>
-  current.map((item) =>
-    item.id === targetId
-      ? {
-          ...item,
-          status: aborted ? "cancelled" : "failed",
-          progress: aborted ? 0 : 100,
-          message: failureMessage,
-        }
-      : item
-  )
-
 const resolveBulkDeleteFailureMessage = (
   deletedCount: number,
   failedCount: number,
   firstFailure: PromiseRejectedResult | undefined
 ): string => {
-  if (deletedCount > 0) {
-    return `${deletedCount}개 삭제 완료, ${failedCount}개 실패`
-  }
-  if (firstFailure) {
-    return toUserFacingMessage(firstFailure.reason)
-  }
+  if (deletedCount > 0) return `${deletedCount}개 삭제 완료, ${failedCount}개 실패`
+  if (firstFailure) return toUserFacingMessage(firstFailure.reason)
   return `${failedCount}개 파일 삭제 실패`
 }
-
-const sanitizeClientFilenameForDisplayFallback = (filename: string) => {
-  const normalized = filename
-    .replace(/[\r\n\t]/g, " ")
-    .replace(/[\\/]/g, "_")
-    .replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-
-  return Array.from(normalized).slice(0, 255).join("")
-}
-
-const preferClientFilenameForUploadedFile = (uploaded: CloudFile, clientFilename: string): CloudFile => {
-  const normalizedClientFilename = sanitizeClientFilenameForDisplayFallback(clientFilename)
-  if (!normalizedClientFilename) return uploaded
-  const serverFilename = uploaded.originalFilename.trim()
-  if (normalizedClientFilename === serverFilename) return uploaded
-
-  const clientHasReadableUnicode = /[^\x00-\x7F]/u.test(normalizedClientFilename)
-  const serverLostReadableUnicode = !/[^\x00-\x7F]/u.test(serverFilename)
-  const serverLooksLikePlaceholder = /_{4,}/.test(serverFilename)
-  if (!clientHasReadableUnicode || !serverLostReadableUnicode || !serverLooksLikePlaceholder) return uploaded
-
-  return {
-    ...uploaded,
-    originalFilename: normalizedClientFilename,
-  }
-}
-
-const isAbortLikeError = (error: unknown) =>
-  error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError")
 
 type DeleteConfirmState = {
   files: CloudFile[]
@@ -163,6 +82,7 @@ export const useAdminCloudWorkspaceActions = () => {
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const uploadControllersRef = useRef<Map<string, AbortController>>(new Map())
   const [filter, setFilter] = useState<CloudMediaFilter>("ALL")
+  const [sortMode, setSortMode] = useState<CloudSortMode>("LATEST")
   const [keyword, setKeyword] = useState("")
   const [isComposing, setIsComposing] = useState(false)
   const debouncedKeyword = useDebouncedValue(keyword, isComposing)
@@ -172,7 +92,9 @@ export const useAdminCloudWorkspaceActions = () => {
   const [toast, setToast] = useState<CloudToastState>(null)
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
   const [optimisticFiles, setOptimisticFiles] = useState<CloudFile[]>([])
+  const [knownFolders, setKnownFolders] = useState<string[]>([])
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false)
+  const [isDragActive, setIsDragActive] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null)
   const [isDeletePending, setIsDeletePending] = useState(false)
 
@@ -196,9 +118,15 @@ export const useAdminCloudWorkspaceActions = () => {
     [debouncedKeyword, filter, optimisticFiles]
   )
   const files = useMemo(
-    () => mergeCloudFiles(visibleOptimisticFiles, serverFiles),
-    [serverFiles, visibleOptimisticFiles]
+    () => sortCloudFiles(mergeCloudFiles(visibleOptimisticFiles, serverFiles), sortMode),
+    [serverFiles, sortMode, visibleOptimisticFiles]
   )
+  const parsedSearch = useMemo(() => resolveCloudSearchParams(keyword), [keyword])
+  const activeFolderPath = parsedSearch.folderPath || ""
+  const availableFolders = useMemo(() => {
+    const combined = new Set([...knownFolders, ...extractCloudFolders(files)])
+    return Array.from(combined).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
+  }, [files, knownFolders])
   const selectedFile = files.find((file) => file.id === selectedFileId) || files[0] || null
   const isDetailDrawerMode = files.length > 8
   const shouldShowDetailPanel = isDetailPanelOpen && selectedFile !== null
@@ -210,6 +138,23 @@ export const useAdminCloudWorkspaceActions = () => {
   const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
+    const isUnfiltered = filter === "ALL" && !debouncedKeyword.trim()
+    if (isUnfiltered && (!filesQuery.isSuccess || filesQuery.isPlaceholderData)) return
+    const discovered = extractCloudFolders(mergeCloudFiles(optimisticFiles, serverFiles))
+    if (!isUnfiltered && discovered.length === 0) return
+    setKnownFolders((current) => {
+      const next = isUnfiltered
+        ? discovered
+        : Array.from(new Set([...current, ...discovered])).sort((a, b) =>
+            a.localeCompare(b, "ko", { numeric: true })
+          )
+      return next.length === current.length && next.every((item, index) => item === current[index])
+        ? current
+        : next
+    })
+  }, [debouncedKeyword, filesQuery.isPlaceholderData, filesQuery.isSuccess, filter, optimisticFiles, serverFiles])
+
+  useEffect(() => {
     if (selectedFileId && files.some((file) => file.id === selectedFileId)) return
     setSelectedFileId(files[0]?.id ?? null)
   }, [files, selectedFileId])
@@ -217,6 +162,25 @@ export const useAdminCloudWorkspaceActions = () => {
   useEffect(() => {
     setCheckedFileIds((current) => current.filter((id) => files.some((file) => file.id === id)))
   }, [files])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => {
+      setToast((current) => (current === toast ? null : current))
+    }, 4200)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  useEffect(() => {
+    if (!shouldShowDetailPanel || deleteConfirm) return
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      setIsDetailPanelOpen(false)
+    }
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [deleteConfirm, shouldShowDetailPanel])
 
   useEffect(() => {
     if (!deleteConfirm) return
@@ -274,7 +238,7 @@ export const useAdminCloudWorkspaceActions = () => {
 
     const run = async () => {
       try {
-        const uploaded = await uploadCloudFile(nextUpload.file, "", controller.signal, {
+        const uploaded = await uploadCloudFile(nextUpload.file, nextUpload.folderPath, controller.signal, {
           onProgress: ({ progress, message }) => {
             setUploadQueue((current) => applyUploadQueueProgress(current, nextUpload.id, progress, message))
           },
@@ -306,8 +270,15 @@ export const useAdminCloudWorkspaceActions = () => {
 
   const queueUploadFiles = (selectedFiles: File[]) => {
     if (selectedFiles.length === 0) return
+    const activeFolderPath =
+      resolveCloudSearchParams(keyword).folderPath ||
+      resolveCloudSearchParams(debouncedKeyword).folderPath ||
+      ""
 
-    setUploadQueue((current) => [...current, ...selectedFiles.map(createUploadQueueItem)])
+    setUploadQueue((current) => [
+      ...current,
+      ...selectedFiles.map((file) => createUploadQueueItem(file, activeFolderPath)),
+    ])
   }
 
   const handleUploadSelect = (event: ChangeEvent<HTMLInputElement>) => {
@@ -315,12 +286,20 @@ export const useAdminCloudWorkspaceActions = () => {
     event.currentTarget.value = ""
   }
 
-  const handleUploadDragOver = (event: ReactDragEvent<HTMLButtonElement>) => {
+  const handleUploadDragOver = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault()
+    setIsDragActive(true)
   }
 
-  const handleUploadDrop = (event: ReactDragEvent<HTMLButtonElement>) => {
+  const handleUploadDragLeave = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault()
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+    setIsDragActive(false)
+  }
+
+  const handleUploadDrop = (event: ReactDragEvent<HTMLElement>) => {
+    event.preventDefault()
+    setIsDragActive(false)
     queueUploadFiles(Array.from(event.dataTransfer.files || []))
   }
 
@@ -372,14 +351,73 @@ export const useAdminCloudWorkspaceActions = () => {
     setSelectedFileId(fileId)
   }
 
+  const handleUpdateFile = async (
+    fileId: number,
+    payload: { originalFilename: string; folderPath: string }
+  ): Promise<boolean> => {
+    try {
+      const updated = await updateCloudFile(fileId, payload)
+      const nextOptimistic = optimisticFiles.map((item) => (item.id === fileId ? updated : item))
+      setOptimisticFiles(nextOptimistic)
+      const remainingFiles: CloudFile[] = [...nextOptimistic, updated]
+      queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
+        if (!Array.isArray(current)) return
+        const { filter: cachedFilter, keyword: cachedKeyword } = getCachedCloudQueryFilters(queryKey)
+        const nextFiles = updateCachedCloudFilesForMutation(current, updated, cachedFilter, cachedKeyword)
+        queryClient.setQueryData(queryKey, nextFiles)
+        remainingFiles.push(...nextFiles)
+      })
+      setKnownFolders(extractCloudFolders(remainingFiles))
+      const updatedFolder = normalizeCloudFolderPathSearch(updated.folderPath)
+      if (activeFolderPath && activeFolderPath !== updatedFolder) {
+        setKeyword((current) => applyCloudFolderFilter(current, updatedFolder))
+      }
+      void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
+      setToast({ tone: "success", text: "파일 정보를 수정했습니다." })
+      return true
+    } catch (error) {
+      setToast({ tone: "error", text: toUserFacingMessage(error) })
+      return false
+    }
+  }
+
+  const handleCopyFileLink = async (file: CloudFile): Promise<void> => {
+    const linkUrl =
+      typeof window !== "undefined"
+        ? new URL(getCloudFileContentUrl(file.id), window.location.origin).toString()
+        : getCloudFileContentUrl(file.id)
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(linkUrl)
+        setToast({ tone: "success", text: "파일 링크를 복사했습니다." })
+        return
+      } catch {
+        if (typeof window !== "undefined" && typeof window.prompt === "function") {
+          window.prompt("파일 링크를 복사하세요.", linkUrl)
+          setToast({ tone: "success", text: "파일 링크를 복사했습니다." })
+          return
+        }
+      }
+    }
+    if (typeof window !== "undefined" && typeof window.prompt === "function") {
+      window.prompt("파일 링크를 복사하세요.", linkUrl)
+      setToast({ tone: "success", text: "파일 링크를 복사했습니다." })
+    }
+  }
+
   const removeDeletedFilesFromCloudCaches = (deletedIds: Set<number>) => {
+    const remainingFiles: CloudFile[] = optimisticFiles.filter((file) => !deletedIds.has(file.id))
     queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
       if (!Array.isArray(current)) return
-      queryClient.setQueryData(
-        queryKey,
-        current.filter((file) => !deletedIds.has(file.id))
-      )
+      const nextFiles = current.filter((file) => !deletedIds.has(file.id))
+      queryClient.setQueryData(queryKey, nextFiles)
+      remainingFiles.push(...nextFiles)
     })
+    const nextFolders = extractCloudFolders(remainingFiles)
+    setKnownFolders(nextFolders)
+    if (activeFolderPath && !nextFolders.includes(activeFolderPath)) {
+      setKeyword((current) => applyCloudFolderFilter(current, ""))
+    }
   }
 
   const closeDeleteConfirm = () => {
@@ -461,6 +499,14 @@ export const useAdminCloudWorkspaceActions = () => {
     await queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
   }
 
+  const handleSelectFolder = (folderPath: string) => {
+    setKeyword((current) => applyCloudFolderFilter(current, folderPath))
+  }
+
+  const handleRequestDeleteFile = (file: CloudFile) => {
+    setDeleteConfirm({ files: [file] })
+  }
+
   const handleDeleteSelected = () => {
     const targets = files.filter((file) => checkedFileIds.includes(file.id))
     if (targets.length === 0) return
@@ -485,8 +531,10 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   return {
+    activeFolderPath,
     activeUploadCount,
     allVisibleChecked,
+    availableFolders,
     checkedFileIds,
     closeDeleteConfirm,
     completedUploadCount,
@@ -500,17 +548,23 @@ export const useAdminCloudWorkspaceActions = () => {
     handleCancelUpload,
     handleClearFinishedUploads,
     handleConfirmDelete,
+    handleCopyFileLink,
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
     handlePreviewFile,
+    handleRequestDeleteFile,
     handleRetryUpload,
+    handleSelectFolder,
     handleToggleAllChecked,
     handleToggleChecked,
+    handleUpdateFile,
+    handleUploadDragLeave,
     handleUploadDragOver,
     handleUploadDrop,
     handleUploadSelect,
     isDetailDrawerMode,
     isDeletePending,
+    isDragActive,
     keyword,
     notice,
     selectedFile,
@@ -519,8 +573,10 @@ export const useAdminCloudWorkspaceActions = () => {
     setIsDetailPanelOpen,
     setKeyword,
     setSelectedFileId,
+    setSortMode,
     setToast,
     shouldShowDetailPanel,
+    sortMode,
     toast,
     uploadInputRef,
     uploadQueue,
