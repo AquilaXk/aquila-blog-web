@@ -16,12 +16,7 @@ import {
 } from "./markdownEditorTableWidgetDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
-type PendingTableCellActivation = {
-  from: number
-  row: number
-  col: number
-  openEditor?: boolean
-}
+type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean }
 
 type ActiveCellEditorSession = {
   row: number
@@ -33,11 +28,7 @@ type ActiveCellEditorSession = {
 }
 
 type TableDomController = {
-  update: (
-    nextMarkdown: string,
-    nextFrom: number | undefined,
-    nextTo: number | undefined
-  ) => boolean
+  update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean
 }
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
@@ -69,9 +60,7 @@ const patchSingleTableCell = (
   const hasInput =
     typeof cellEl.querySelector === "function" &&
     cellEl.querySelector(".cm-live-table-cell-input") !== null
-  if (prevText !== nextText || hasInput) {
-    restoreCellDisplay(cellEl, nextText)
-  }
+  if (prevText !== nextText || hasInput) restoreCellDisplay(cellEl, nextText)
 }
 
 const patchTableCellsInPlace = (
@@ -116,8 +105,7 @@ export class MarkdownTableWidget extends WidgetType {
 
   updateDOM(dom: HTMLElement, _view: EditorView) {
     const controller = tableDomControllers.get(dom)
-    if (!controller) return false
-    return controller.update(this.markdown, this.from, this.to)
+    return controller ? controller.update(this.markdown, this.from, this.to) : false
   }
 
   toDOM(view?: EditorView) {
@@ -143,6 +131,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     let activeRow = 0
     let activeCol = 0
+    let selectedMode: "cell" | "row" | "col" = "cell"
     let activeSession: ActiveCellEditorSession | null = null
 
     const resolveRange = (): { from: number; to: number } | null => {
@@ -162,14 +151,20 @@ export class MarkdownTableWidget extends WidgetType {
       return { from, to }
     }
 
+    const getPreservedCellControls = (cellEl: HTMLElement): HTMLElement[] =>
+      typeof cellEl.querySelector !== "function"
+        ? []
+        : [
+            cellEl.querySelector<HTMLElement>(".cm-live-table-col-handle"),
+            cellEl.querySelector<HTMLElement>(".cm-live-table-row-handle"),
+            cellEl.querySelector<HTMLElement>(".cm-live-table-col-resizer"),
+          ].filter((el): el is HTMLElement => el !== null)
+
     const restoreCellDisplay = (cellEl: HTMLElement, rawText: string) => {
-      const resizer =
-        typeof cellEl.querySelector === "function"
-          ? cellEl.querySelector(".cm-live-table-col-resizer")
-          : null
+      const controls = getPreservedCellControls(cellEl)
       cellEl.textContent = ""
       appendInlineMarkdownNodes(cellEl, rawText)
-      if (resizer) cellEl.appendChild(resizer)
+      for (const control of controls) cellEl.appendChild(control)
     }
 
     const flushActiveCellMarkdown = (): string => {
@@ -189,18 +184,15 @@ export class MarkdownTableWidget extends WidgetType {
     const executeGridAction = (
       action: MarkdownTableGridAction,
       rowOverride = activeRow,
-      colOverride = activeCol
+      colOverride = activeCol,
+      openEditor?: boolean
     ) => {
       if (!view.state.facet(EditorView.editable)) return
       const baseMarkdown = flushActiveCellMarkdown()
       const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
       if (!outcome) {
         if (baseMarkdown !== currentMarkdown) {
-          dispatchTableMarkdown(baseMarkdown, {
-            row: rowOverride,
-            col: colOverride,
-            openEditor: false,
-          })
+          dispatchTableMarkdown(baseMarkdown, { row: rowOverride, col: colOverride, openEditor: false })
         }
         return
       }
@@ -210,7 +202,30 @@ export class MarkdownTableWidget extends WidgetType {
       dispatchTableMarkdown(outcome.markdown, {
         row: outcome.nextRow,
         col: outcome.nextCol,
+        openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
       })
+    }
+
+    const selectColumn = (col: number) => {
+      if (!view.state.facet(EditorView.editable)) return
+      const committed = flushActiveCellMarkdown()
+      activeCol = Math.max(0, Math.min(col, grid.headers.length - 1))
+      selectedMode = "col"
+      syncActiveCellHighlight()
+      if (committed !== currentMarkdown) {
+        dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+      }
+    }
+
+    const selectRow = (row: number) => {
+      if (!view.state.facet(EditorView.editable)) return
+      const committed = flushActiveCellMarkdown()
+      activeRow = Math.max(0, Math.min(row, grid.rows.length))
+      selectedMode = "row"
+      syncActiveCellHighlight()
+      if (committed !== currentMarkdown) {
+        dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+      }
     }
 
     const { toolbar, toolbarButtons, canAddRow, canAddCol } = createTableToolbarElement({
@@ -229,26 +244,40 @@ export class MarkdownTableWidget extends WidgetType {
       },
     })
 
-    const { gridRow, addRowBtn, cellElements } = createInteractiveTableSurface({
-      grid,
-      visualOptions,
-      canAddCol,
-      canAddRow,
-      onActivateCell: (row, col) => activateCellEditor(row, col),
-      onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
-      onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
-    })
+    const buildSurface = () =>
+      createInteractiveTableSurface({
+        grid,
+        visualOptions,
+        canAddCol,
+        canAddRow,
+        onActivateCell: (row, col) => activateCellEditor(row, col),
+        onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
+        onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
+        onSelectColumn: (col) => selectColumn(col),
+        onSelectRow: (row) => selectRow(row),
+        onMoveColumnTo: (fromCol, toCol) => {
+          selectedMode = "col"
+          executeGridAction({ kind: "move-column-to", targetCol: toCol }, activeRow, fromCol, false)
+        },
+        onMoveRowTo: (fromRow, toRow) => {
+          selectedMode = "row"
+          executeGridAction({ kind: "move-row-to", targetRow: toRow }, fromRow, activeCol, false)
+        },
+      })
+
+    let { gridRow, addRowBtn, cellElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
           const el = rowEls[c]!
-          if (r === activeRow && c === activeCol) {
-            el.classList.add("is-active-cell")
-          } else {
-            el.classList.remove("is-active-cell")
-          }
+          if (r === activeRow && c === activeCol) el.classList.add("is-active-cell")
+          else el.classList.remove("is-active-cell")
+          if (selectedMode === "col" && c === activeCol) el.classList.add("is-selected-col")
+          else el.classList.remove("is-selected-col")
+          if (selectedMode === "row" && r === activeRow) el.classList.add("is-selected-row")
+          else el.classList.remove("is-selected-row")
         }
       }
       for (const entry of toolbarButtons) {
@@ -298,6 +327,9 @@ export class MarkdownTableWidget extends WidgetType {
           : {}),
         annotations: [Transaction.userEvent.of("input")],
       })
+      if (currentMarkdown !== nextMarkdown) {
+        update(nextMarkdown, range.from, range.from + nextMarkdown.length)
+      }
     }
 
     const activateCellEditor = (row: number, col: number) => {
@@ -306,6 +338,7 @@ export class MarkdownTableWidget extends WidgetType {
       const clampedCol = Math.max(0, Math.min(col, grid.headers.length - 1))
       activeRow = clampedRow
       activeCol = clampedCol
+      selectedMode = "cell"
       syncActiveCellHighlight()
 
       if (
@@ -333,10 +366,7 @@ export class MarkdownTableWidget extends WidgetType {
           ? (grid.headers[clampedCol] ?? "")
           : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
 
-      const resizer =
-        typeof cellEl.querySelector === "function"
-          ? cellEl.querySelector(".cm-live-table-col-resizer")
-          : null
+      const controls = getPreservedCellControls(cellEl)
       cellEl.textContent = ""
       const input = document.createElement("input")
       input.type = "text"
@@ -345,7 +375,7 @@ export class MarkdownTableWidget extends WidgetType {
       input.setAttribute("aria-label", "표 셀 편집")
       input.value = initialValue
       cellEl.appendChild(input)
-      if (resizer) cellEl.appendChild(resizer)
+      for (const control of controls) cellEl.appendChild(control)
 
       const session: ActiveCellEditorSession = {
         row: clampedRow,
@@ -387,11 +417,7 @@ export class MarkdownTableWidget extends WidgetType {
             nextValue
           )
           if (updated && updated !== currentMarkdown) {
-            dispatchTableMarkdown(updated, {
-              row: clampedRow,
-              col: clampedCol,
-              openEditor: false,
-            })
+            dispatchTableMarkdown(updated, { row: clampedRow, col: clampedCol, openEditor: false })
             return
           }
         }
@@ -472,9 +498,7 @@ export class MarkdownTableWidget extends WidgetType {
         } catch {}
       }
       focusInput()
-      if (typeof queueMicrotask === "function") {
-        queueMicrotask(focusInput)
-      }
+      if (typeof queueMicrotask === "function") queueMicrotask(focusInput)
     }
 
     const applyPendingCellActivation = () => {
@@ -508,27 +532,42 @@ export class MarkdownTableWidget extends WidgetType {
       }
 
       const nextGrid = parseMarkdownTableGrid(nextMarkdown)
-      if (
-        nextGrid?.headers.length !== grid.headers.length ||
-        nextGrid.rows.length !== grid.rows.length
-      ) {
-        return false
-      }
+      if (!nextGrid) return false
 
       if (activeSession && !activeSession.handled) {
         activeSession.handled = true
         activeSession = null
       }
 
-      patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
+      const sameShape =
+        nextGrid.headers.length === grid.headers.length &&
+        nextGrid.rows.length === grid.rows.length
+
+      if (sameShape) patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
 
       grid.headers.splice(0, grid.headers.length, ...nextGrid.headers)
       grid.alignments.splice(0, grid.alignments.length, ...nextGrid.alignments)
-      grid.rows.splice(
-        0,
-        grid.rows.length,
-        ...nextGrid.rows.map((row) => [...row])
-      )
+      grid.rows.splice(0, grid.rows.length, ...nextGrid.rows.map((row) => [...row]))
+
+      if (!sameShape) {
+        while (visualOptions.columnWidths.length < grid.headers.length) {
+          visualOptions.columnWidths.push(0)
+        }
+        if (visualOptions.columnWidths.length > grid.headers.length) {
+          visualOptions.columnWidths.length = grid.headers.length
+        }
+        const nextSurface = buildSurface()
+        gridRow = nextSurface.gridRow
+        addRowBtn = nextSurface.addRowBtn
+        cellElements = nextSurface.cellElements
+        wrap.textContent = ""
+        wrap.appendChild(toolbar)
+        wrap.appendChild(gridRow)
+        wrap.appendChild(addRowBtn)
+      }
+
+      activeRow = Math.max(0, Math.min(activeRow, grid.rows.length))
+      activeCol = Math.max(0, Math.min(activeCol, grid.headers.length - 1))
       currentMarkdown = nextMarkdown
       currentFrom = nextFrom
       currentTo = nextTo
@@ -539,14 +578,11 @@ export class MarkdownTableWidget extends WidgetType {
     }
 
     tableDomControllers.set(wrap, { update })
-
     wrap.appendChild(toolbar)
     wrap.appendChild(gridRow)
     wrap.appendChild(addRowBtn)
-
     syncActiveCellHighlight()
     applyPendingCellActivation()
-
     return wrap
   }
 }

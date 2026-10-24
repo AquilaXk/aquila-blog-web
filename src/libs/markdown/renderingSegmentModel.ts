@@ -83,9 +83,10 @@ const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
     }
   }
 
-  const legacyMatch = resolveCalloutLegacyEmoji(line)
+  const unbracketed = line.replace(/^\[([^\s\]]+)\](?=\s|$)/, "$1")
+  const legacyMatch = resolveCalloutLegacyEmoji(unbracketed)
   if (!legacyMatch) return null
-  const inlineTitle = line.slice(legacyMatch.emoji.length).trim()
+  const inlineTitle = unbracketed.slice(legacyMatch.emoji.length).trim()
   return {
     kind: legacyMatch.kind,
     title: inlineTitle,

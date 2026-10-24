@@ -319,15 +319,16 @@ export const EditorStudioDedicatedMetaSection = styled.section`
   display: grid;
   gap: 0;
   border: 0;
-  border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
+  border-bottom: 0;
   border-radius: 0;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  padding: 22px 32px 17px;
+  padding: 28px 32px 12px 64px;
 
   @media (max-width: 820px) {
     width: 100vw;
     max-width: 100vw;
     box-sizing: border-box;
+    padding: 18px 16px 12px 16px;
   }
 `;
 export const EditorTagRow = styled.div`

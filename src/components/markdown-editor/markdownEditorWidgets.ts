@@ -1,6 +1,7 @@
 import { WidgetType, type EditorView } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
 import "katex/dist/katex.min.css"
+import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
 
 type KatexRuntime = { renderToString: (math: string, options: { displayMode: boolean; throwOnError: boolean }) => string }
 let cachedKatex: KatexRuntime | null = null
@@ -10,10 +11,7 @@ const getKatex = (): KatexRuntime | null => {
   if (cachedKatex) return cachedKatex
   if (!katexLoadPromise && typeof window !== "undefined") {
     katexLoadPromise = import("katex")
-      .then((mod) => {
-        cachedKatex = mod.default || mod
-        return cachedKatex
-      })
+      .then((mod) => (cachedKatex = mod.default || mod))
       .catch(() => null)
   }
   return null
@@ -26,11 +24,9 @@ export class MarkdownMarkerWidget extends WidgetType {
   ) {
     super()
   }
-
   eq(other: MarkdownMarkerWidget) {
     return other.label === this.label && other.className === this.className
   }
-
   toDOM() {
     const marker = document.createElement("span")
     marker.className = this.className
@@ -44,7 +40,6 @@ export class MarkdownRuleWidget extends WidgetType {
   eq() {
     return true
   }
-
   toDOM() {
     const rule = document.createElement("span")
     rule.setAttribute("role", "separator")
@@ -54,12 +49,10 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}]+?)\s*\|\s*([^{}]+?)\s*\}\}/gi
 
-const isSafeInlineHref = (href: string): boolean => {
-  const trimmed = href.trim()
-  return /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(trimmed)
-}
+const isSafeInlineHref = (href: string): boolean =>
+  /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(href.trim())
 
 const createInlineMathSpan = (math: string): HTMLElement => {
   const span = document.createElement("span")
@@ -84,7 +77,7 @@ const createInlineMathSpan = (math: string): HTMLElement => {
 }
 
 export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
-  if (!/[`*~=$[]/.test(text)) {
+  if (!/[`*~=$[{]/.test(text)) {
     container.textContent = text
     return
   }
@@ -131,6 +124,17 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
         link.target = "_blank"
         link.rel = "noopener noreferrer"
         container.appendChild(link)
+      } else {
+        container.appendChild(document.createTextNode(match[0]))
+      }
+    } else if (match[10] !== undefined && match[11] !== undefined) {
+      const color = resolveInlineColorValue(match[10])
+      if (color) {
+        const span = document.createElement("span")
+        span.className = "cm-live-color"
+        if (span.style) span.style.color = color
+        span.textContent = match[11]
+        container.appendChild(span)
       } else {
         container.appendChild(document.createTextNode(match[0]))
       }

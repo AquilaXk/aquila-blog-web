@@ -288,15 +288,21 @@ export const MarkdownEditor = ({
         return !tableEditAvailability.addRow
       case "move-row-up":
       case "move-row-down":
+      case "move-row-to":
       case "delete-row":
         return !tableEditAvailability.deleteRow
       case "add-column":
       case "insert-column-left":
+      case "duplicate-column":
         return !tableEditAvailability.addColumn
       case "move-column-left":
       case "move-column-right":
+      case "move-column-to":
       case "delete-column":
         return !tableEditAvailability.deleteColumn
+      case "clear-row":
+      case "clear-column":
+        return false
       case "set-alignment":
         if (edit.alignment === "left") return !tableEditAvailability.alignLeft
         if (edit.alignment === "center") return !tableEditAvailability.alignCenter
