@@ -54,7 +54,7 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$([^$\r\n]+)\$|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
 
 const isSafeInlineHref = (href: string): boolean => {
   const trimmed = href.trim()
@@ -118,11 +118,11 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
       mark.className = "cm-live-highlight"
       mark.textContent = match[5]
       container.appendChild(mark)
-    } else if (match[6] !== undefined) {
-      container.appendChild(createInlineMathSpan(match[6]))
-    } else if (match[7] !== undefined && match[8] !== undefined) {
-      const label = match[7]
-      const href = match[8]
+    } else if (match[6] !== undefined || match[7] !== undefined) {
+      container.appendChild(createInlineMathSpan((match[6] ?? match[7])!))
+    } else if (match[8] !== undefined && match[9] !== undefined) {
+      const label = match[8]
+      const href = match[9]
       if (isSafeInlineHref(href)) {
         const link = document.createElement("a")
         link.className = "cm-live-link"

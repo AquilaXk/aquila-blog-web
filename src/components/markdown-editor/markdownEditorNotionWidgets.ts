@@ -32,6 +32,7 @@ export type NotionCalloutContainerBlock = {
   icon: string
   title: string
   body: string
+  bodyOffset: number
 }
 
 export type NotionToggleContainerBlock = {
@@ -40,6 +41,7 @@ export type NotionToggleContainerBlock = {
   to: number
   title: string
   body: string
+  bodyOffset: number
 }
 
 export type NotionBookmarkContainerBlock = {
@@ -57,8 +59,8 @@ export type NotionContainerBlock =
   | NotionBookmarkContainerBlock
 
 type OpenContainerCandidate =
-  | { kind: "callout"; from: number; rawHeader: string; bodyLines: string[] }
-  | { kind: "toggle"; from: number; rawTitle: string; bodyLines: string[] }
+  | { kind: "callout"; from: number; bodyOffset: number; rawHeader: string; bodyLines: string[] }
+  | { kind: "toggle"; from: number; bodyOffset: number; rawTitle: string; bodyLines: string[] }
   | { kind: "bookmark"; from: number; url: string; inlineTitle: string; bodyLines: string[] }
 
 const CALLOUT_TONE_KEYWORD_MAP: Record<string, { tone: NotionCalloutTone; icon: string }> = {
@@ -110,7 +112,9 @@ const parseCalloutContainerPayload = (
   if (rest.length > 0) {
     const firstSpace = rest.search(/[ \t]/)
     const firstToken = (firstSpace === -1 ? rest : rest.slice(0, firstSpace)).toLowerCase()
-    const mappedKeyword = CALLOUT_TONE_KEYWORD_MAP[firstToken]
+    const mappedKeyword = Object.hasOwn(CALLOUT_TONE_KEYWORD_MAP, firstToken)
+      ? CALLOUT_TONE_KEYWORD_MAP[firstToken]
+      : undefined
     if (mappedKeyword) {
       tone = mappedKeyword.tone
       icon = mappedKeyword.icon
@@ -207,6 +211,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
           icon: parsed.icon,
           title: parsed.title,
           body: parsed.body,
+          bodyOffset: candidate.bodyOffset,
         })
       } else if (candidate.kind === "toggle") {
         blocks.push({
@@ -215,6 +220,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
           to: lineEnd,
           title: candidate.rawTitle.trim() || "토글 블록",
           body: candidate.bodyLines.join("\n").trim(),
+          bodyOffset: candidate.bodyOffset,
         })
       } else {
         const nonEmptyLines = candidate.bodyLines.map((l) => l.trim()).filter(Boolean)
@@ -237,6 +243,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
       candidate = {
         kind: "callout",
         from: lineStart,
+        bodyOffset: Math.max(0, offset - lineStart),
         rawHeader: (calloutMatch[1] ?? "").trim(),
         bodyLines: [],
       }
@@ -248,6 +255,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
       candidate = {
         kind: "toggle",
         from: lineStart,
+        bodyOffset: Math.max(0, offset - lineStart),
         rawTitle: (toggleMatch[1] ?? "").trim(),
         bodyLines: [],
       }
@@ -324,7 +332,8 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
     readonly title: string,
     readonly body: string,
     readonly from: number,
-    readonly to: number
+    readonly to: number,
+    readonly bodyOffset = 11 + title.length + 1
   ) {
     super()
   }
@@ -337,7 +346,8 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
       other.title === this.title &&
       other.body === this.body &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.bodyOffset === this.bodyOffset
     )
   }
 
@@ -365,7 +375,7 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
       const bodyEl = document.createElement("div")
       bodyEl.className = "cm-live-callout-body"
       appendInlineMarkdownNodes(bodyEl, this.body)
-      bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, 11 + this.title.length + 1)
+      bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, this.bodyOffset)
       root.appendChild(bodyEl)
     }
     return root
@@ -377,7 +387,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     readonly title: string,
     readonly body: string,
     readonly from: number,
-    readonly to: number
+    readonly to: number,
+    readonly bodyOffset = 10 + title.length + 1
   ) {
     super()
   }
@@ -388,7 +399,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
       other.title === this.title &&
       other.body === this.body &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.bodyOffset === this.bodyOffset
     )
   }
 
@@ -428,7 +440,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     bodyEl.className = `cm-live-toggle-body${this.body ? "" : " is-empty"}`
     if (this.body) appendInlineMarkdownNodes(bodyEl, this.body)
     else bodyEl.textContent = "내용을 입력하려면 클릭하세요..."
-    bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, 10 + this.title.length + 1)
+    bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, this.bodyOffset)
     root.appendChild(bodyEl)
     return root
   }
@@ -545,9 +557,9 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
 
     const widget =
       block.kind === "callout"
-        ? new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to)
+        ? new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
         : block.kind === "toggle"
-          ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to)
+          ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
           : new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
 
     decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to))

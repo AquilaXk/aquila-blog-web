@@ -39,6 +39,7 @@ import {
   SLASH_COMMAND_SPECS,
 } from "src/components/markdown-editor/useMarkdownEditorSlashMenu"
 import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
+import { parseMarkdownSegments } from "src/libs/markdown/renderingSegmentModel"
 
 test.describe("Notion-parity Markdown editor model", () => {
   test("recognizes block line prefix snippets and toggles headings and blockquotes at line start", () => {
@@ -275,6 +276,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         to: doc.indexOf("\n\n:::bookmark"),
         title: "상세 설명",
         body: "숨겨진 첫째 줄\n숨겨진 둘째 줄",
+        bodyOffset: ":::toggle 상세 설명\n".length,
       },
       {
         kind: "bookmark",
@@ -766,6 +768,28 @@ test.describe("Notion-parity Markdown editor model", () => {
     const strongRange = ranges.find((r) => r.className === "cm-live-strong")
     expect(strongRange).toBeDefined()
     expect(doc.slice(strongRange!.from, strongRange!.to)).toBe("**중요**")
+
+    const stateInTaskBody = state.update({
+      selection: { anchor: line1Start + 8 },
+    }).state
+    const bodyRanges: Array<{ from: number; to: number; widget: unknown }> = []
+    stateInTaskBody.field(decorationField).between(0, doc.length, (from, to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      bodyRanges.push({ from, to, widget: spec.widget ?? null })
+    })
+    expect(bodyRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(2)
+    expect(bodyRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeDefined()
+
+    const stateOnTaskPrefix = state.update({
+      selection: { anchor: line1Start + 3 },
+    }).state
+    const prefixRanges: Array<{ from: number; to: number; widget: unknown }> = []
+    stateOnTaskPrefix.field(decorationField).between(0, doc.length, (from, to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      prefixRanges.push({ from, to, widget: spec.widget ?? null })
+    })
+    expect(prefixRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(1)
+    expect(prefixRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeUndefined()
   })
 
   test("parses :::callout container blocks and switches between CalloutWidget and active container line classes", () => {
@@ -789,6 +813,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         icon: "💡",
         title: "노션 라이브 프리뷰 팁",
         body: "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
+        bodyOffset: ":::\ncallout 💡 노션 라이브 프리뷰 팁".length,
       },
       {
         kind: "callout",
@@ -798,7 +823,22 @@ test.describe("Notion-parity Markdown editor model", () => {
         icon: "⚠️",
         title: "주의사항 안내",
         body: "경고 본문입니다.",
+        bodyOffset: ":::callout warning 주의사항 안내\n".length,
       },
+    ])
+
+    const renderedSegments = parseMarkdownSegments(doc)
+    expect(renderedSegments).toEqual([
+      expect.objectContaining({
+        type: "callout",
+        kind: "tip",
+        title: "노션 라이브 프리뷰 팁",
+      }),
+      expect.objectContaining({
+        type: "callout",
+        kind: "warning",
+        title: "주의사항 안내",
+      }),
     ])
 
     const stateInactive = EditorState.create({
@@ -877,6 +917,13 @@ test.describe("Notion-parity Markdown editor model", () => {
         "MARK:cm-live-highlight:강조",
         "SPAN:cm-live-math cm-live-math-inline:O(1)",
         "A:cm-live-link:링크",
+      ])
+
+      const mathAndCurrency = makeFakeNode("div")
+      appendInlineMarkdownNodes(mathAndCurrency, "수식 $$x^2$$ 및 가격은 $10에서 $20입니다")
+      const mathElements = mathAndCurrency.children.filter((c: any) => c.tagName)
+      expect(mathElements.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
+        "SPAN:cm-live-math cm-live-math-inline:x^2",
       ])
     } finally {
       if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)

@@ -336,12 +336,15 @@ const appendActiveAwareWidgetSpec = (
   ) {
     return false
   }
-  if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
 
   if (spec.kind === "task") {
     const markerMatch = /^\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.from, spec.to))
     const markerTo =
       spec.from + (markerMatch ? markerMatch[0].length : Math.min(3, spec.to - spec.from))
+    let prefixFrom = spec.from
+    while (prefixFrom > 0 && /[ \t]/.test(ctx.markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+    if (prefixFrom > 0 && /[-+*]/.test(ctx.markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+    if (isTokenActive(prefixFrom, markerTo, ctx.selections)) return true
     const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, markerTo))
     ctx.decorations.push(
       Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, markerTo) }).range(
@@ -349,24 +352,35 @@ const appendActiveAwareWidgetSpec = (
         markerTo
       )
     )
-  } else if (spec.kind === "wikilink") {
+    return true
+  }
+
+  if (spec.kind === "list-marker") {
+    const taskGapMatch = /^([ \t]+)\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.to, spec.to + 8))
+    if (taskGapMatch) {
+      if (!isTokenActive(spec.from, spec.to + taskGapMatch[0].length, ctx.selections)) {
+        ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + taskGapMatch[1].length))
+      }
+      return true
+    }
+    if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
+    const source = ctx.markdownValue.slice(spec.from, spec.to)
+    const label = /^\d/.test(source) ? source : "•"
+    const deco =
+      label === "•"
+        ? BULLET_MARKER_DECORATION
+        : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
+    ctx.decorations.push(deco.range(spec.from, spec.to))
+    return true
+  }
+
+  if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
+  if (spec.kind === "wikilink") {
     ctx.decorations.push(
       Decoration.replace({
         widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
       }).range(spec.from, spec.to)
     )
-  } else if (spec.kind === "list-marker") {
-    if (/^[ \t]+\[[ xX]\]/.test(ctx.markdownValue.slice(spec.to, spec.to + 6))) {
-      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + 1))
-    } else {
-      const source = ctx.markdownValue.slice(spec.from, spec.to)
-      const label = /^\d/.test(source) ? source : "•"
-      const deco =
-        label === "•"
-          ? BULLET_MARKER_DECORATION
-          : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
-      ctx.decorations.push(deco.range(spec.from, spec.to))
-    }
   } else {
     ctx.decorations.push(QUOTE_MARKER_DECORATION.range(spec.from, spec.to))
   }

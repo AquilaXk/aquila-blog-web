@@ -502,6 +502,10 @@ export const EditorHeaderMetaRow = styled.div<{
   min-width: 0;
   margin-top: 10px;
 
+  @media (min-width: 1101px) {
+    input { ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "display: none;" : "display: inline-flex;")} }
+  }
+
   @media (max-width: 820px) {
     ${({ $collapsedOnMobile }) => ($collapsedOnMobile ? "display: none;" : "display: flex;")}
   }

@@ -384,6 +384,48 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
+    if (line.startsWith(":::callout")) {
+      const rawHeader = line.replace(/^:::callout\s*/, "").trim()
+      const bodyLines: string[] = []
+      let closed = false
+
+      for (let j = i + 1; j < lines.length; j += 1) {
+        if (lines[j].trim() === ":::") {
+          flushMarkdown()
+          const firstSpace = rawHeader.search(/\s/)
+          const firstToken = firstSpace === -1 ? rawHeader : rawHeader.slice(0, firstSpace)
+          const restTitle = firstSpace === -1 ? "" : rawHeader.slice(firstSpace).trim()
+          const tokenCallout = firstToken ? resolveCalloutBlockquote(firstToken) : null
+          const resolvedHeader: ParsedCalloutHeader =
+            parseCalloutHeader(rawHeader) ??
+            (tokenCallout
+              ? {
+                  kind: tokenCallout.kind,
+                  title: restTitle,
+                  emoji: tokenCallout.callout.marker,
+                }
+              : {
+                  kind: "info",
+                  title: rawHeader,
+                  emoji: infoCalloutMarker,
+                })
+          segments.push(buildCalloutSegment(resolvedHeader, bodyLines))
+          i = j
+          closed = true
+          break
+        }
+        bodyLines.push(lines[j])
+      }
+
+      if (!closed) {
+        markdownBuffer.push(line)
+        markdownBuffer.push(...bodyLines)
+      }
+
+      i += 1
+      continue
+    }
+
     if (line.startsWith(":::toggle")) {
       const title = line.replace(/^:::toggle\s*/, "").trim() || "토글"
       const bodyLines: string[] = []

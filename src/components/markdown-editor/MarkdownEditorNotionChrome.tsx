@@ -405,6 +405,26 @@ export const MarkdownEditorNotionChrome = ({
     action()
   }
 
+  const applyLineColorSwatch = (token: string) => {
+    if (selection.from < selection.to) {
+      onApplySnippet(`{{color:${token}|`, "}}", { toggle: true })
+      return
+    }
+    const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
+    const nextBreak = value.indexOf("\n", selection.from)
+    const lineEnd = nextBreak === -1 ? value.length : nextBreak
+    const lineText = value.slice(lineStart, lineEnd)
+    const prefixMatch =
+      /^(?:[ \t]*(?:#{1,6}[ \t]+|>+[ \t]*|(?:[-+*]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?))/.exec(lineText)
+    const bodyOffset = prefixMatch ? prefixMatch[0].length : 0
+    const rawBody = lineText.slice(bodyOffset)
+    const existingColorMatch = /^\{\{color:[^|{}]+\|([\s\S]*)\}\}$/.exec(rawBody)
+    const innerText = (existingColorMatch ? existingColorMatch[1] ?? "" : rawBody) || "강조 텍스트"
+    onTriggerSlashCommand(
+      planReplaceSelection(lineStart + bodyOffset, lineEnd, `{{color:${token}|${innerText}}}`)
+    )
+  }
+
   const turnIntoItems = [
     { label: "일반 문단으로 전환", glyph: "T", run: () => onStripBlockPrefix() },
     { label: "제목 1로 블록 전환", glyph: "H1", run: () => onApplySnippet("# ", "") },
@@ -502,7 +522,7 @@ export const MarkdownEditorNotionChrome = ({
               type="button"
               role="menuitem"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => runMenuAction(() => onApplySnippet(`{{color:${swatch.token}|`, "}}"))}
+              onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}
             >
               <span className="glyph" aria-hidden="true">
                 <ColorSwatchDot $color={swatch.hex} />
