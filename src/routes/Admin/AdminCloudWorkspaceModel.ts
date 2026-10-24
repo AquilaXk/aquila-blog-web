@@ -2,12 +2,14 @@ import type { CloudFile, CloudMediaKind } from "src/apis/backend/cloud"
 import { formatFileSize } from "src/libs/utils"
 
 export type CloudMediaFilter = "ALL" | CloudMediaKind
+export type CloudSortMode = "LATEST" | "OLDEST" | "NAME" | "SIZE"
 export type UploadQueueStatus = "queued" | "uploading" | "done" | "failed" | "cancelled"
 export type UploadQueueItem = {
   id: string
   file: File
   name: string
   byteSize: number
+  folderPath: string
   status: UploadQueueStatus
   progress: number
   message: string
@@ -15,8 +17,8 @@ export type UploadQueueItem = {
   retryCount?: number
 }
 export type CloudSearchParams = {
-  folderPath: string
-  keyword: string
+  folderPath?: string
+  keyword?: string
 }
 
 export const CLOUD_FILTERS: Array<{ value: CloudMediaFilter; label: string }> = [
@@ -24,6 +26,13 @@ export const CLOUD_FILTERS: Array<{ value: CloudMediaFilter; label: string }> = 
   { value: "DOCUMENT", label: "문서" },
   { value: "PHOTO", label: "사진" },
   { value: "VIDEO", label: "동영상" },
+]
+
+export const CLOUD_SORT_OPTIONS: ReadonlyArray<{ key: CloudSortMode; label: string }> = [
+  { key: "LATEST", label: "최신순" },
+  { key: "OLDEST", label: "오래된순" },
+  { key: "NAME", label: "이름순" },
+  { key: "SIZE", label: "크기순" },
 ]
 
 export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
@@ -94,14 +103,92 @@ export const isUploadActive = (status: UploadQueueStatus) => status === "queued"
 
 export const normalizeCloudFolderPathSearch = (value: string) => value.trim().replace(/^\/+|\/+$/g, "")
 
-export const resolveCloudSearchParams = (value: string): CloudSearchParams => {
-  const normalized = value.trim()
-  if (!normalized.startsWith("/")) return { folderPath: "", keyword: normalized }
+export const resolveCloudSearchParams = (input: string): CloudSearchParams => {
+  const trimmed = input.trim()
+  if (!trimmed) return { folderPath: "", keyword: "" }
+  if (!trimmed.startsWith("/")) return { folderPath: "", keyword: trimmed }
+
+  const spaceIndex = trimmed.search(/\s/)
+  const rawFolder = spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex)
+  const rawKeyword = spaceIndex === -1 ? "" : trimmed.slice(spaceIndex + 1).trim()
+  const folderPath = normalizeCloudFolderPathSearch(rawFolder)
 
   return {
-    folderPath: normalizeCloudFolderPathSearch(normalized),
-    keyword: "",
+    folderPath,
+    keyword: rawKeyword,
   }
+}
+
+export const extractCloudFolders = (
+  files: readonly CloudFile[],
+  activeFolderPath = "",
+): string[] => {
+  const folders = new Set<string>()
+  const normalizedActive = normalizeCloudFolderPathSearch(activeFolderPath)
+  if (normalizedActive) folders.add(normalizedActive)
+  files.forEach((file) => {
+    const normalized = normalizeCloudFolderPathSearch(file.folderPath)
+    if (normalized) folders.add(normalized)
+  })
+  return Array.from(folders).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
+}
+
+export const applyCloudFolderFilter = (currentSearchText: string, folderPath: string): string => {
+  const current = resolveCloudSearchParams(currentSearchText)
+  const normalizedTarget = normalizeCloudFolderPathSearch(folderPath)
+  const currentFolder = normalizeCloudFolderPathSearch(current.folderPath ?? "")
+  const currentKeyword = (current.keyword ?? "").trim()
+
+  if (!normalizedTarget || normalizedTarget === currentFolder) {
+    return currentKeyword
+  }
+
+  return currentKeyword ? `/${normalizedTarget} ${currentKeyword}` : `/${normalizedTarget}`
+}
+
+export const updateCachedCloudFilesForMutation = (
+  current: readonly CloudFile[],
+  updated: CloudFile,
+  filter: CloudMediaFilter,
+  keyword: string,
+): CloudFile[] => {
+  if (!doesCloudFileMatchFilters(updated, filter, keyword)) {
+    return current.filter((item) => item.id !== updated.id)
+  }
+  if (current.some((item) => item.id === updated.id)) {
+    return current.map((item) => (item.id === updated.id ? updated : item))
+  }
+  return [updated, ...current]
+}
+
+const toCloudTimestamp = (value?: string): number => {
+  if (!value) return 0
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+export const sortCloudFiles = (
+  files: readonly CloudFile[],
+  sortMode: CloudSortMode,
+): CloudFile[] => {
+  const copy = [...files]
+  copy.sort((a, b) => {
+    if (sortMode === "OLDEST") {
+      const timeDiff = toCloudTimestamp(a.createdAt) - toCloudTimestamp(b.createdAt)
+      return timeDiff !== 0 ? timeDiff : a.id - b.id
+    }
+    if (sortMode === "NAME") {
+      const nameDiff = a.originalFilename.localeCompare(b.originalFilename, "ko", { numeric: true })
+      return nameDiff !== 0 ? nameDiff : a.id - b.id
+    }
+    if (sortMode === "SIZE") {
+      const sizeDiff = b.byteSize - a.byteSize
+      return sizeDiff !== 0 ? sizeDiff : b.id - a.id
+    }
+    const timeDiff = toCloudTimestamp(b.createdAt) - toCloudTimestamp(a.createdAt)
+    return timeDiff !== 0 ? timeDiff : b.id - a.id
+  })
+  return copy
 }
 
 export const doesCloudFileMatchFilters = (
@@ -110,7 +197,7 @@ export const doesCloudFileMatchFilters = (
   searchText: string,
 ) => {
   const searchParams = resolveCloudSearchParams(searchText)
-  const normalizedKeyword = searchParams.keyword.toLowerCase()
+  const normalizedKeyword = (searchParams.keyword ?? "").toLowerCase()
   const matchesKind = filter === "ALL" || file.mediaKind === filter
   const matchesFolderPath =
     !searchParams.folderPath ||
@@ -171,7 +258,7 @@ export const mergeCloudFiles = (primary: CloudFile[], secondary: CloudFile[]) =>
   return merged
 }
 
-export const getCloudSummary = (files: CloudFile[]) => {
+export const getCloudSummary = (files: readonly CloudFile[]) => {
   const totalBytes = files.reduce((sum, file) => sum + file.byteSize, 0)
   const countByKind = files.reduce(
     (summary, file) => {
@@ -183,9 +270,102 @@ export const getCloudSummary = (files: CloudFile[]) => {
 
   return {
     totalCount: files.length,
+    totalBytes,
     totalSize: formatCloudFileSize(totalBytes),
     documentCount: countByKind.DOCUMENT,
     photoCount: countByKind.PHOTO,
     videoCount: countByKind.VIDEO,
   }
 }
+
+let nextUploadQueueItemSequence = 1
+
+export const createUploadQueueItem = (file: File, folderPath: string): UploadQueueItem => {
+  const sequence = nextUploadQueueItemSequence
+  nextUploadQueueItemSequence += 1
+  return {
+    id: `${Date.now()}-${file.name}-${file.size}-${sequence}`,
+    file,
+    name: file.name,
+    byteSize: file.size,
+    folderPath,
+    status: "queued",
+    progress: 0,
+    message: "업로드 대기 중",
+  }
+}
+
+export const applyUploadQueueProgress = (
+  current: UploadQueueItem[],
+  targetId: string,
+  progress: number,
+  message: string
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId && item.status !== "cancelled" ? { ...item, progress, message } : item
+  )
+
+export const applyUploadQueueSuccess = (
+  current: UploadQueueItem[],
+  targetId: string,
+  uploadedFileId: number
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId && item.status !== "cancelled"
+      ? {
+          ...item,
+          status: "done",
+          progress: 100,
+          message: "업로드 완료",
+          uploadedFileId,
+        }
+      : item
+  )
+
+export const applyUploadQueueFailure = (
+  current: UploadQueueItem[],
+  targetId: string,
+  aborted: boolean,
+  failureMessage: string
+): UploadQueueItem[] =>
+  current.map((item) =>
+    item.id === targetId
+      ? {
+          ...item,
+          status: aborted ? "cancelled" : "failed",
+          progress: aborted ? 0 : 100,
+          message: failureMessage,
+        }
+      : item
+  )
+
+const sanitizeClientFilenameForDisplayFallback = (filename: string) => {
+  const normalized = filename
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/[\\/]/g, "_")
+    .replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return Array.from(normalized).slice(0, 255).join("")
+}
+
+export const preferClientFilenameForUploadedFile = (uploaded: CloudFile, clientFilename: string): CloudFile => {
+  const normalizedClientFilename = sanitizeClientFilenameForDisplayFallback(clientFilename)
+  if (!normalizedClientFilename) return uploaded
+  const serverFilename = uploaded.originalFilename.trim()
+  if (normalizedClientFilename === serverFilename) return uploaded
+
+  const clientHasReadableUnicode = /[^\x00-\x7F]/u.test(normalizedClientFilename)
+  const serverLostReadableUnicode = !/[^\x00-\x7F]/u.test(serverFilename)
+  const serverLooksLikePlaceholder = /_{4,}/.test(serverFilename)
+  if (!clientHasReadableUnicode || !serverLostReadableUnicode || !serverLooksLikePlaceholder) return uploaded
+
+  return {
+    ...uploaded,
+    originalFilename: normalizedClientFilename,
+  }
+}
+
+export const isAbortLikeError = (error: unknown) =>
+  error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError")
