@@ -102,6 +102,10 @@ test.describe("mobile layout public", () => {
     await page.getByRole("button", { name: "검색" }).click()
     await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
     await expect(page.getByLabel("Search posts by keyword")).toBeFocused()
+
+    await menuButton.click()
+    await page.locator(".mobileLangToggleBtn").click()
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
   })
 
   test("iPhone 15 Pro about 페이지는 V4 프로필 본문과 원형 avatar 계약을 유지한다", async ({ page }) => {
@@ -304,6 +308,7 @@ test.describe("mobile layout public", () => {
   expect(historicalLikeCountBox).not.toBeNull()
   expect(shareBox).not.toBeNull()
 
+  expect(historicalLikeCountBox?.height ?? 0).toBeGreaterThanOrEqual(44)
   expect((historicalLikeCountBox?.height ?? 0)).toBeLessThanOrEqual(72)
   expect(Math.abs((historicalLikeCountBox?.y ?? 0) - (shareBox?.y ?? 0))).toBeLessThanOrEqual(4)
 })

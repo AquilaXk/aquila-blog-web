@@ -121,9 +121,6 @@ const StyledWrapper = styled.div`
   }
 
   @media (max-width: 820px) {
-    flex: 1 1 0%;
-    min-width: 0;
-
     > .field {
       height: auto;
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
@@ -132,12 +129,20 @@ const StyledWrapper = styled.div`
     }
 
     > .field > .mid {
-      width: 100%;
-      flex: 1 1 0%;
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
       padding: 0.34rem 0;
       font-size: 0.82rem;
       line-height: 1.45;
+    }
+  }
+
+  @media (max-width: 768px) {
+    flex: 1 1 0%;
+    min-width: 0;
+
+    > .field > .mid {
+      width: 100%;
+      flex: 1 1 0%;
     }
   }
 `

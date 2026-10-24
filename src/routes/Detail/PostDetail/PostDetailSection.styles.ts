@@ -157,7 +157,10 @@ export const RelatedSkeletonItem = styled.li `
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 20px;
   padding: 18px 0;
-  border-top: 1px solid var(--aq-border);
+
+  & + & {
+    border-top: 1px solid var(--aq-border);
+  }
 
   .titleLine,
   .metaLine {

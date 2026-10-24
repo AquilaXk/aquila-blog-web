@@ -539,9 +539,6 @@ const StyledWrapper = styled.div`
 
     .langToggleBtn {
       display: none;
-      min-height: ${control.lg}px;
-      height: ${control.lg}px;
-      padding: 0 10px;
     }
 
     .searchTrigger {
