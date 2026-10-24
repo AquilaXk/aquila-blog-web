@@ -14,188 +14,54 @@ export type SlashMenuItem = {
   action: () => void
 }
 
-export const SLASH_COMMAND_SPECS = [
-  {
-    id: "heading-1",
-    label: "제목 1 (H1)",
-    description: "가장 큰 섹션 제목",
-    icon: "H1",
-    snippet: "# ",
-    group: "기본 블록",
-    keywords: ["h1", "heading1", "title", "제목1", "대제목"],
-  },
-  {
-    id: "heading-2",
-    label: "제목 2 (H2)",
-    description: "중간 섹션 제목",
-    icon: "H2",
-    snippet: "## ",
-    group: "기본 블록",
-    keywords: ["h2", "heading2", "subtitle", "제목2", "중제목"],
-  },
-  {
-    id: "heading-3",
-    label: "제목 3 (H3)",
-    description: "작은 소제목",
-    icon: "H3",
-    snippet: "### ",
-    group: "기본 블록",
-    keywords: ["h3", "heading3", "제목3", "소제목"],
-  },
-  {
-    id: "bullet-list",
-    label: "글머리 기호 목록 (Bullet)",
-    description: "순서 없는 글머리 목록",
-    icon: "•",
-    snippet: "- ",
-    group: "기본 블록",
-    keywords: ["ul", "bullet", "list", "글머리", "목록"],
-  },
-  {
-    id: "ordered-list",
-    label: "번호 매기기 목록 (Numbered)",
-    description: "순서 있는 번호 목록",
-    icon: "1.",
-    snippet: "1. ",
-    group: "기본 블록",
-    keywords: ["ol", "numbered", "ordered", "번호", "순서", "목록"],
-  },
-  {
-    id: "task-list",
-    label: "할 일 목록 (Todo)",
-    description: "체크박스 목록",
-    icon: "☑",
-    snippet: "- [ ] ",
-    group: "기본 블록",
-    keywords: ["todo", "task", "check", "할일", "체크리스트"],
-  },
-  {
-    id: "quote",
-    label: "인용구 (Quote)",
-    description: "참고 문헌이나 인용문",
-    icon: "”",
-    snippet: "> ",
-    group: "기본 블록",
-    keywords: ["quote", "blockquote", "인용"],
-  },
-  {
-    id: "divider",
-    label: "구분선 (Divider)",
-    description: "가로 구분선",
-    icon: "—",
-    snippet: "\n---\n\n",
-    group: "기본 블록",
-    keywords: ["hr", "divider", "line", "구분선", "선"],
-  },
-  {
-    id: "callout-info",
-    label: "콜아웃 정보 (Info)",
-    description: "참고 및 배경 정보 블록",
-    icon: "ℹ️",
-    snippet: "> [!INFO]\n> ",
-    group: "콜아웃 · 확장",
-    keywords: ["callout", "info", "note", "콜아웃", "정보", "안내"],
-  },
-  {
-    id: "callout-tip",
-    label: "콜아웃 팁 (Tip)",
-    description: "유용한 팁 및 힌트 블록",
-    icon: "💡",
-    snippet: "> [!TIP]\n> ",
-    group: "콜아웃 · 확장",
-    keywords: ["callout", "tip", "hint", "콜아웃", "팁", "힌트"],
-  },
-  {
-    id: "callout-warning",
-    label: "콜아웃 주의 (Warning)",
-    description: "주의사항 및 경고 블록",
-    icon: "⚠️",
-    snippet: "> [!WARNING]\n> ",
-    group: "콜아웃 · 확장",
-    keywords: ["callout", "warning", "주의", "경고"],
-  },
-  {
-    id: "callout-danger",
-    label: "콜아웃 위험 (Danger)",
-    description: "위험 및 중요 경고 블록",
-    icon: "🚨",
-    snippet: "> [!DANGER]\n> ",
-    group: "콜아웃 · 확장",
-    keywords: ["callout", "danger", "alert", "위험"],
-  },
-  {
-    id: "toggle",
-    label: "접기/펼치기 (Toggle)",
-    description: "접고 펼치는 상세 블록",
-    icon: "▸",
-    snippet: ":::toggle 토글 제목\n\n:::",
-    group: "콜아웃 · 확장",
-    keywords: ["toggle", "details", "collapse", "접기", "토글"],
-  },
-  {
-    id: "code-block",
-    label: "코드 블록 (Code)",
-    description: "언어 구문 강조 코드 블록",
-    icon: "</>",
-    snippet: "```ts\n\n```",
-    group: "미디어 · 수식 · 표",
-    keywords: ["code", "fence", "코드"],
-  },
-  {
-    id: "table",
-    label: "표 (Table)",
-    description: "기본 표 삽입",
-    icon: "▦",
-    snippet: "__TABLE__",
-    group: "미디어 · 수식 · 표",
-    keywords: ["table", "grid", "표", "테이블"],
-  },
-  {
-    id: "math",
-    label: "수식 블록 (Math)",
-    description: "LaTeX 수식 블록 ($$)",
-    icon: "∑",
-    snippet: "$$\n\n$$",
-    group: "미디어 · 수식 · 표",
-    keywords: ["math", "latex", "katex", "수식"],
-  },
-  {
-    id: "mermaid",
-    label: "다이어그램 (Mermaid)",
-    description: "Mermaid 순서도 및 구조도",
-    icon: "◇",
-    snippet: "```mermaid\ngraph TD\n  A --> B\n```",
-    group: "미디어 · 수식 · 표",
-    keywords: ["mermaid", "diagram", "chart", "다이어그램"],
-  },
-  {
-    id: "image",
-    label: "이미지 업로드 (Image)",
-    description: "이미지 파일 업로드 및 삽입",
-    icon: "🖼️",
-    snippet: "__IMAGE_UPLOAD__",
-    group: "미디어 · 수식 · 표",
-    keywords: ["image", "img", "photo", "picture", "이미지", "사진", "그림"],
-  },
-  {
-    id: "attachment",
-    label: "파일 첨부 (File)",
-    description: "첨부 파일 업로드 및 링크 삽입",
-    icon: "📎",
-    snippet: "__FILE_UPLOAD__",
-    group: "미디어 · 수식 · 표",
-    keywords: ["file", "attach", "attachment", "upload", "파일", "첨부", "업로드"],
-  },
-  {
-    id: "bookmark",
-    label: "북마크 카드 (Bookmark)",
-    description: "외부 링크 카드 블록",
-    icon: "🔖",
-    snippet: ":::bookmark https://\n\n:::",
-    group: "미디어 · 수식 · 표",
-    keywords: ["bookmark", "link", "url", "embed", "북마크", "링크"],
-  },
-] as const
+export type SlashCommandSpec = {
+  id: string
+  label: string
+  description: string
+  icon: string
+  snippet: string
+  group: SlashCommandGroup
+  keywords: string[]
+}
+
+const SLASH_COMMAND_SPEC_ROWS = [
+  "heading-1|기본 블록|H1|제목 1 (H1)|가장 큰 섹션 제목|h1,heading1,title,제목1,대제목|# ",
+  "heading-2|기본 블록|H2|제목 2 (H2)|중간 섹션 제목|h2,heading2,subtitle,제목2,중제목|## ",
+  "heading-3|기본 블록|H3|제목 3 (H3)|작은 소제목|h3,heading3,제목3,소제목|### ",
+  "bullet-list|기본 블록|•|글머리 기호 목록 (Bullet)|순서 없는 글머리 목록|ul,bullet,list,글머리,목록|- ",
+  "ordered-list|기본 블록|1.|번호 매기기 목록 (Numbered)|순서 있는 번호 목록|ol,numbered,ordered,번호,순서,목록|1. ",
+  "task-list|기본 블록|☑|할 일 목록 (Todo)|체크박스 목록|todo,task,check,할일,체크리스트|- [ ] ",
+  "quote|기본 블록|”|인용구 (Quote)|참고 문헌이나 인용문|quote,blockquote,인용|> ",
+  "divider|기본 블록|—|구분선 (Divider)|가로 구분선|hr,divider,line,구분선,선|\n---\n\n",
+  "callout-info|콜아웃 · 확장|ℹ️|콜아웃 정보 (Info)|참고 및 배경 정보 블록|callout,info,note,콜아웃,정보,안내|> [!INFO]\n> ",
+  "callout-tip|콜아웃 · 확장|💡|콜아웃 팁 (Tip)|유용한 팁 및 힌트 블록|callout,tip,hint,콜아웃,팁,힌트|> [!TIP]\n> ",
+  "callout-warning|콜아웃 · 확장|⚠️|콜아웃 주의 (Warning)|주의사항 및 경고 블록|callout,warning,주의,경고|> [!WARNING]\n> ",
+  "callout-danger|콜아웃 · 확장|🚨|콜아웃 위험 (Danger)|위험 및 중요 경고 블록|callout,danger,alert,위험|> [!DANGER]\n> ",
+  "toggle|콜아웃 · 확장|▸|접기/펼치기 (Toggle)|접고 펼치는 상세 블록|toggle,details,collapse,접기,토글|:::toggle 토글 제목\n\n:::",
+  "code-block|미디어 · 수식 · 표|</>|코드 블록 (Code)|언어 구문 강조 코드 블록|code,fence,코드|```ts\n\n```",
+  "table|미디어 · 수식 · 표|▦|표 (Table)|기본 표 삽입|table,grid,표,테이블|__TABLE__",
+  "math|미디어 · 수식 · 표|∑|수식 블록 (Math)|LaTeX 수식 블록 ($$)|math,latex,katex,수식|$$\n\n$$",
+  "mermaid|미디어 · 수식 · 표|◇|다이어그램 (Mermaid)|Mermaid 순서도 및 구조도|mermaid,diagram,chart,다이어그램|```mermaid\ngraph TD\n  A --> B\n```",
+  "image|미디어 · 수식 · 표|🖼️|이미지 업로드 (Image)|이미지 파일 업로드 및 삽입|image,img,photo,picture,이미지,사진,그림|__IMAGE_UPLOAD__",
+  "attachment|미디어 · 수식 · 표|📎|파일 첨부 (File)|첨부 파일 업로드 및 링크 삽입|file,attach,attachment,upload,파일,첨부,업로드|__FILE_UPLOAD__",
+  "bookmark|미디어 · 수식 · 표|🔖|북마크 카드 (Bookmark)|외부 링크 카드 블록|bookmark,link,url,embed,북마크,링크|:::bookmark https://\n\n:::",
+]
+
+export const SLASH_COMMAND_SPECS: readonly SlashCommandSpec[] = SLASH_COMMAND_SPEC_ROWS.map(
+  (row) => {
+    const [id = "", group = "기본 블록", icon = "", label = "", description = "", kw = "", snippet = ""] =
+      row.split("|")
+    return {
+      id,
+      label,
+      description,
+      icon,
+      snippet,
+      group: group as SlashCommandGroup,
+      keywords: kw.split(","),
+    }
+  }
+)
 
 type MarkdownEditorSlashMenuProps = {
   isOpen: boolean
