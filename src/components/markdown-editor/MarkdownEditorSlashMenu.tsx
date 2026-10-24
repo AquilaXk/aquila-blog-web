@@ -1,32 +1,182 @@
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { zIndexes } from "src/styles/zIndexes"
+
+export type SlashCommandGroup = "기본 블록" | "콜아웃 · 확장" | "미디어 · 수식 · 표"
 
 export type SlashMenuItem = {
   id: string
   label: string
   description: string
   icon: string
+  group?: SlashCommandGroup
   action: () => void
 }
 
 export const SLASH_COMMAND_SPECS = [
-  { id: "heading-1", label: "제목 1 (H1)", description: "가장 큰 섹션 제목", icon: "H1", snippet: "# " },
-  { id: "heading-2", label: "제목 2 (H2)", description: "중간 섹션 제목", icon: "H2", snippet: "## " },
-  { id: "heading-3", label: "제목 3 (H3)", description: "작은 소제목", icon: "H3", snippet: "### " },
-  { id: "quote", label: "인용구 (Quote)", description: "참고 문헌이나 인용문", icon: "”", snippet: "> " },
-  { id: "code-block", label: "코드 블록 (Code)", description: "언어 구문 강조 코드 블록", icon: "</>", snippet: "```ts\n\n```" },
-  { id: "callout-info", label: "콜아웃 정보 (Info)", description: "참고 및 배경 정보 블록", icon: "ℹ️", snippet: "> [!INFO]\n> " },
-  { id: "callout-tip", label: "콜아웃 팁 (Tip)", description: "유용한 팁 및 힌트 블록", icon: "💡", snippet: "> [!TIP]\n> " },
-  { id: "callout-warning", label: "콜아웃 주의 (Warning)", description: "주의사항 및 경고 블록", icon: "⚠️", snippet: "> [!WARNING]\n> " },
-  { id: "toggle", label: "토글 블록 (Toggle)", description: "접고 펼치는 상세 블록", icon: "▸", snippet: ":::toggle 토글 제목\n\n:::" },
-  { id: "math", label: "수식 블록 (Math)", description: "LaTeX 수식 블록 ($$)", icon: "∑", snippet: "$$\n\n$$" },
-  { id: "mermaid", label: "다이어그램 (Mermaid)", description: "Mermaid 순서도 및 구조도", icon: "◇", snippet: "```mermaid\ngraph TD\n  A --> B\n```" },
-  { id: "bookmark", label: "북마크 링크 (Bookmark)", description: "외부 링크 카드 블록", icon: "🔖", snippet: ":::bookmark https://\n\n:::" },
-  { id: "task-list", label: "할 일 목록 (Todo)", description: "체크박스 목록", icon: "☑", snippet: "- [ ] " },
-  { id: "table", label: "표 (Table)", description: "기본 표 삽입", icon: "▦", snippet: "__TABLE__" },
-  { id: "divider", label: "구분선 (Divider)", description: "가로 구분선", icon: "—", snippet: "\n---\n\n" },
+  {
+    id: "heading-1",
+    label: "제목 1 (H1)",
+    description: "가장 큰 섹션 제목",
+    icon: "H1",
+    snippet: "# ",
+    group: "기본 블록",
+    keywords: ["h1", "heading1", "title", "제목1", "대제목"],
+  },
+  {
+    id: "heading-2",
+    label: "제목 2 (H2)",
+    description: "중간 섹션 제목",
+    icon: "H2",
+    snippet: "## ",
+    group: "기본 블록",
+    keywords: ["h2", "heading2", "subtitle", "제목2", "중제목"],
+  },
+  {
+    id: "heading-3",
+    label: "제목 3 (H3)",
+    description: "작은 소제목",
+    icon: "H3",
+    snippet: "### ",
+    group: "기본 블록",
+    keywords: ["h3", "heading3", "제목3", "소제목"],
+  },
+  {
+    id: "bullet-list",
+    label: "글머리 기호 목록 (Bullet)",
+    description: "순서 없는 글머리 목록",
+    icon: "•",
+    snippet: "- ",
+    group: "기본 블록",
+    keywords: ["ul", "bullet", "list", "글머리", "목록"],
+  },
+  {
+    id: "ordered-list",
+    label: "번호 매기기 목록 (Numbered)",
+    description: "순서 있는 번호 목록",
+    icon: "1.",
+    snippet: "1. ",
+    group: "기본 블록",
+    keywords: ["ol", "numbered", "ordered", "번호", "순서", "목록"],
+  },
+  {
+    id: "task-list",
+    label: "할 일 목록 (Todo)",
+    description: "체크박스 목록",
+    icon: "☑",
+    snippet: "- [ ] ",
+    group: "기본 블록",
+    keywords: ["todo", "task", "check", "할일", "체크리스트"],
+  },
+  {
+    id: "quote",
+    label: "인용구 (Quote)",
+    description: "참고 문헌이나 인용문",
+    icon: "”",
+    snippet: "> ",
+    group: "기본 블록",
+    keywords: ["quote", "blockquote", "인용"],
+  },
+  {
+    id: "divider",
+    label: "구분선 (Divider)",
+    description: "가로 구분선",
+    icon: "—",
+    snippet: "\n---\n\n",
+    group: "기본 블록",
+    keywords: ["hr", "divider", "line", "구분선", "선"],
+  },
+  {
+    id: "callout-info",
+    label: "콜아웃 정보 (Info)",
+    description: "참고 및 배경 정보 블록",
+    icon: "ℹ️",
+    snippet: "> [!INFO]\n> ",
+    group: "콜아웃 · 확장",
+    keywords: ["callout", "info", "note", "콜아웃", "정보", "안내"],
+  },
+  {
+    id: "callout-tip",
+    label: "콜아웃 팁 (Tip)",
+    description: "유용한 팁 및 힌트 블록",
+    icon: "💡",
+    snippet: "> [!TIP]\n> ",
+    group: "콜아웃 · 확장",
+    keywords: ["callout", "tip", "hint", "콜아웃", "팁", "힌트"],
+  },
+  {
+    id: "callout-warning",
+    label: "콜아웃 주의 (Warning)",
+    description: "주의사항 및 경고 블록",
+    icon: "⚠️",
+    snippet: "> [!WARNING]\n> ",
+    group: "콜아웃 · 확장",
+    keywords: ["callout", "warning", "주의", "경고"],
+  },
+  {
+    id: "callout-danger",
+    label: "콜아웃 위험 (Danger)",
+    description: "위험 및 중요 경고 블록",
+    icon: "🚨",
+    snippet: "> [!DANGER]\n> ",
+    group: "콜아웃 · 확장",
+    keywords: ["callout", "danger", "alert", "위험"],
+  },
+  {
+    id: "toggle",
+    label: "접기/펼치기 (Toggle)",
+    description: "접고 펼치는 상세 블록",
+    icon: "▸",
+    snippet: ":::toggle 토글 제목\n\n:::",
+    group: "콜아웃 · 확장",
+    keywords: ["toggle", "details", "collapse", "접기", "토글"],
+  },
+  {
+    id: "code-block",
+    label: "코드 블록 (Code)",
+    description: "언어 구문 강조 코드 블록",
+    icon: "</>",
+    snippet: "```ts\n\n```",
+    group: "미디어 · 수식 · 표",
+    keywords: ["code", "fence", "코드"],
+  },
+  {
+    id: "table",
+    label: "표 (Table)",
+    description: "기본 표 삽입",
+    icon: "▦",
+    snippet: "__TABLE__",
+    group: "미디어 · 수식 · 표",
+    keywords: ["table", "grid", "표", "테이블"],
+  },
+  {
+    id: "math",
+    label: "수식 블록 (Math)",
+    description: "LaTeX 수식 블록 ($$)",
+    icon: "∑",
+    snippet: "$$\n\n$$",
+    group: "미디어 · 수식 · 표",
+    keywords: ["math", "latex", "katex", "수식"],
+  },
+  {
+    id: "mermaid",
+    label: "다이어그램 (Mermaid)",
+    description: "Mermaid 순서도 및 구조도",
+    icon: "◇",
+    snippet: "```mermaid\ngraph TD\n  A --> B\n```",
+    group: "미디어 · 수식 · 표",
+    keywords: ["mermaid", "diagram", "chart", "다이어그램"],
+  },
+  {
+    id: "bookmark",
+    label: "북마크 카드 (Bookmark)",
+    description: "외부 링크 카드 블록",
+    icon: "🔖",
+    snippet: ":::bookmark https://\n\n:::",
+    group: "미디어 · 수식 · 표",
+    keywords: ["bookmark", "link", "url", "embed", "북마크", "링크"],
+  },
 ] as const
 
 type MarkdownEditorSlashMenuProps = {
@@ -42,7 +192,7 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   width: 280px;
-  max-height: 360px;
+  max-height: 380px;
   overflow-y: auto;
   padding: 6px;
   border-radius: 8px;
@@ -73,7 +223,23 @@ const SlashMenuHeading = styled.div`
   letter-spacing: 0.06em;
   color: ${({ theme }) => theme.colors.gray9};
   border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+`
+
+const SlashGroupHeader = styled.div`
+  padding: 6px 8px 3px;
+  font: 650 11px/1.2 var(--aq-font-sans);
+  color: ${({ theme }) => theme.colors.gray9};
+  user-select: none;
+`
+
+const SlashMenuFooter = styled.div`
+  margin-top: 4px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid ${({ theme }) => theme.publicDesign.border};
+  font: 500 11px/1.2 var(--aq-font-sans);
+  color: ${({ theme }) => theme.colors.gray9};
+  user-select: none;
 `
 
 const SlashMenuEmpty = styled.div`
@@ -88,7 +254,7 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border: 0;
   border-radius: 6px;
   background: ${({ theme, $active }) => ($active ? theme.publicDesign.surfaceElevated : "transparent")};
@@ -146,7 +312,8 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
   }
 `
 
-const isEmojiIcon = (icon: string) => /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
+const isEmojiIcon = (icon: string) =>
+  /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
 
 export const MarkdownEditorSlashMenu = ({
   isOpen,
@@ -173,24 +340,30 @@ export const MarkdownEditorSlashMenu = ({
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault()
+        event.stopPropagation()
         onClose()
         return
       }
 
       if (event.key === "ArrowDown") {
         event.preventDefault()
+        event.stopPropagation()
         setSelectedIndex((prev) => (items.length > 0 ? (prev + 1) % items.length : 0))
         return
       }
 
       if (event.key === "ArrowUp") {
         event.preventDefault()
-        setSelectedIndex((prev) => (items.length > 0 ? (prev - 1 + items.length) % items.length : 0))
+        event.stopPropagation()
+        setSelectedIndex((prev) =>
+          items.length > 0 ? (prev - 1 + items.length) % items.length : 0
+        )
         return
       }
 
-      if (event.key === "Enter") {
+      if ((event.key === "Enter" || event.key === "Tab") && items.length > 0) {
         event.preventDefault()
+        event.stopPropagation()
         const selected = items[selectedIndex]
         if (selected) {
           selected.action()
@@ -223,37 +396,48 @@ export const MarkdownEditorSlashMenu = ({
       $top={position.top}
       $left={position.left}
       role="menu"
-      aria-label="빠른 서식 삽입 메뉴"
+      aria-label="빠른 삽입 메뉴"
     >
       <SlashMenuHeading>블록 빠른 삽입</SlashMenuHeading>
       {items.length === 0 ? (
         <SlashMenuEmpty>일치하는 명령어가 없습니다</SlashMenuEmpty>
       ) : (
-        items.map((item, index) => (
-          <SlashMenuItemButton
-            key={item.id}
-            ref={(node) => {
-              itemRefs.current[index] = node
-            }}
-            type="button"
-            role="menuitem"
-            $active={index === selectedIndex}
-            onClick={() => item.action()}
-            onMouseEnter={() => setSelectedIndex(index)}
-          >
-            <span
-              className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
-              aria-hidden="true"
-            >
-              {item.icon}
-            </span>
-            <div className="text-group">
-              <span className="label">{item.label}</span>
-              <span className="description">{item.description}</span>
-            </div>
-          </SlashMenuItemButton>
-        ))
+        items.map((item, index) => {
+          const showGroupHeader =
+            Boolean(item.group) && item.group !== items[index - 1]?.group
+          return (
+            <Fragment key={item.id}>
+              {showGroupHeader ? (
+                <SlashGroupHeader aria-hidden="true">{item.group}</SlashGroupHeader>
+              ) : null}
+              <SlashMenuItemButton
+                ref={(node) => {
+                  itemRefs.current[index] = node
+                }}
+                type="button"
+                role="menuitem"
+                $active={index === selectedIndex}
+                onClick={() => item.action()}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <span
+                  className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
+                  aria-hidden="true"
+                >
+                  {item.icon}
+                </span>
+                <div className="text-group">
+                  <span className="label">{item.label}</span>
+                  <span className="description">{item.description}</span>
+                </div>
+              </SlashMenuItemButton>
+            </Fragment>
+          )
+        })
       )}
+      <SlashMenuFooter aria-hidden="true">
+        ↑↓ 이동 · Enter/Tab 선택 · Esc 닫기
+      </SlashMenuFooter>
     </SlashMenuContainer>
   )
 }

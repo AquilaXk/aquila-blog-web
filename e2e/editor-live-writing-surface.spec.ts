@@ -1404,4 +1404,42 @@ test.describe("live Markdown writing surface", () => {
       return lineBox.y >= bodyBox.y && lineBox.y + lineBox.height <= bodyBox.y + bodyBox.height + 1
     }).toBe(true)
   })
+
+  test("supports Notion floating selection bubble, left-gutter plus slash trigger, and live input rules", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 840 })
+    await routeAuthenticatedEditor(page, "Notion writing line")
+    await openEditorDraft(page)
+
+    await selectMarkdownRange(page, 0, 6)
+    const selectionBubble = page.getByRole("toolbar", { name: "선택 텍스트 빠른 서식" })
+    await expect(selectionBubble).toBeVisible()
+    await selectionBubble.getByRole("button", { name: "선택 영역 하이라이트" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+
+    await selectMarkdownRange(page, 0, 10)
+    await expect(selectionBubble).toBeVisible()
+    await selectionBubble.getByRole("button", { name: "선택 영역 제목 2" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("## ==Notion== writing line")
+
+    await selectMarkdownRangeWithoutAssertion(page, 3, 3)
+    await editorContent(page).press("Backspace")
+    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+
+    await fillMarkdown(page, "")
+    const gutterPlus = page.getByRole("button", { name: "현재 줄에 블록 삽입" })
+    await expect(gutterPlus).toBeVisible()
+    await gutterPlus.click()
+    const slashMenu = page.getByRole("menu", { name: "빠른 삽입 메뉴" })
+    await expect(slashMenu).toBeVisible()
+    await page.keyboard.type("ul")
+    await expect(slashMenu.getByRole("menuitem", { name: /글머리 기호 목록/ })).toBeVisible()
+    await page.keyboard.press("Tab")
+    await expect(slashMenu).toHaveCount(0)
+    await expect.poll(() => readMarkdown(page)).toBe("- ")
+
+    await fillMarkdown(page, "")
+    await editorContent(page).focus()
+    await page.keyboard.type("[] 할 일 항목")
+    await expect.poll(() => readMarkdown(page)).toBe("- [ ] 할 일 항목")
+  })
 })

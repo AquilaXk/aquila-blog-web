@@ -30,6 +30,21 @@ export const matchSlashCommandTrigger = (
   }
 }
 
+export const filterSlashCommandSpecs = (query: string, disableMermaid = false) => {
+  const q = query.trim().toLowerCase()
+  const availableSpecs = disableMermaid
+    ? SLASH_COMMAND_SPECS.filter((spec) => spec.id !== "mermaid")
+    : SLASH_COMMAND_SPECS
+  if (!q) return availableSpecs
+  return availableSpecs.filter(
+    (spec) =>
+      spec.label.toLowerCase().includes(q) ||
+      spec.description.toLowerCase().includes(q) ||
+      spec.id.toLowerCase().includes(q) ||
+      spec.keywords.some((kw) => kw.toLowerCase().includes(q))
+  )
+}
+
 export const resolveSlashCommandMutation = (
   spec: { id: string; snippet: string },
   slashStart: number,
@@ -110,24 +125,13 @@ export const useMarkdownEditorSlashMenu = ({
   )
 
   const slashMenuItems: SlashMenuItem[] = useMemo(() => {
-    const q = slashMenuState.query.trim().toLowerCase()
-    const availableSpecs = disableMermaid
-      ? SLASH_COMMAND_SPECS.filter((spec) => spec.id !== "mermaid")
-      : SLASH_COMMAND_SPECS
-    const specs = !q
-      ? availableSpecs
-      : availableSpecs.filter(
-          (spec) =>
-            spec.label.toLowerCase().includes(q) ||
-            spec.description.toLowerCase().includes(q) ||
-            spec.id.toLowerCase().includes(q)
-        )
-
+    const specs = filterSlashCommandSpecs(slashMenuState.query, disableMermaid)
     return specs.map((spec) => ({
       id: spec.id,
       label: spec.label,
       description: spec.description,
       icon: spec.icon,
+      group: spec.group,
       action: () => handleSelectSlashItem(spec),
     }))
   }, [disableMermaid, handleSelectSlashItem, slashMenuState.query])

@@ -310,6 +310,7 @@ export const FindReplaceActions = styled.div`
 `
 
 export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
@@ -335,6 +336,14 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       user-select: none;
     }
   `}
+
+  .cm-line.cm-live-empty-line::after {
+    content: attr(data-placeholder);
+    color: ${({ theme }) => theme.colors.gray9};
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.65;
+  }
 
   @media (max-width: 820px) { font-size: 15px; }
   [data-testid="markdown-editor-live-surface"] { height: 100%; }

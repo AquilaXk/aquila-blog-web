@@ -15,6 +15,10 @@ import {
   planMarkdownEditorAutoPairBackspace,
   planMarkdownEditorAutoPairInsert,
 } from "./markdownEditorAutoPairModel"
+import {
+  planNotionBlockPrefixBackspace,
+  planNotionSpaceInputRule,
+} from "./markdownEditorNotionModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
@@ -162,6 +166,23 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (event.metaKey || event.ctrlKey || event.altKey) return false
 
       const { from, to } = rememberTextareaSelection()
+      if (event.key === "Backspace") {
+        const prefixPlan = planNotionBlockPrefixBackspace(valueRef.current, from, to)
+        if (prefixPlan) {
+          event.preventDefault()
+          applyRecordedMutation(prefixPlan)
+          return true
+        }
+      }
+      if (event.key === " ") {
+        const spacePlan = planNotionSpaceInputRule(valueRef.current, from, to)
+        if (spacePlan) {
+          event.preventDefault()
+          applyRecordedMutation(spacePlan)
+          return true
+        }
+      }
+
       const action = event.key === "Backspace"
         ? planMarkdownEditorAutoPairBackspace(valueRef.current, from, to)
         : planMarkdownEditorAutoPairInsert(valueRef.current, from, to, event.key)
@@ -195,7 +216,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
 
   const handleTextareaKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      if (disabled || isComposingEditorKeyboardEvent(event)) return
+      if (disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)) return
 
       if (
         isCompletionActive?.() &&

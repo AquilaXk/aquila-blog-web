@@ -80,6 +80,7 @@ import {
   liveSurfaceTheme,
   selectNextOccurrenceCommand,
 } from "./markdownEditorLiveSurfaceCommands"
+import { activeEmptyLineField } from "./markdownEditorNotionModel"
 
 type MarkdownEditorSnapshot = {
   documentValue: string
@@ -240,6 +241,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         editorModeField,
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         decorationField,
+        activeEmptyLineField,
         liveSurfaceTheme,
         EditorView.contentAttributes.of({
           "aria-label": "Markdown 본문",
