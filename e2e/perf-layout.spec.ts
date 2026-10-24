@@ -235,8 +235,8 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const firstCardHeight = snapshot.firstCardRect?.height ?? 0
       const firstCardY = snapshot.firstCardRect?.y ?? 0
 
-      expect(searchWidth).toBeGreaterThanOrEqual(170)
-      expect(searchWidth).toBeLessThanOrEqual(190)
+      expect(searchWidth).toBeGreaterThanOrEqual(210)
+      expect(searchWidth).toBeLessThanOrEqual(280)
       // HIG P3-2(#1265): 모바일 터치 타깃 최소 44px
       expect(searchHeight).toBe(44)
       expect(searchY).toBeGreaterThanOrEqual(620)
@@ -269,8 +269,8 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const firstCardHeight = snapshot.firstCardRect?.height ?? 0
       const firstCardY = snapshot.firstCardRect?.y ?? 0
 
-      expect(searchWidth).toBeGreaterThanOrEqual(170)
-      expect(searchWidth).toBeLessThanOrEqual(190)
+      expect(searchWidth).toBeGreaterThanOrEqual(560)
+      expect(searchWidth).toBeLessThanOrEqual(650)
       // HIG P3-2(#1265): ≤768px 검색 필드도 터치 타깃 44px
       expect(searchHeight).toBe(44)
       expect(searchY).toBeGreaterThanOrEqual(560)

@@ -238,6 +238,10 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
   }
 
   @media (max-width: 820px) {
+    .aq-toggle__body {
+      padding: 0 14px 14px 20px;
+    }
+
     table,
     .aq-table {
       width: 100%;

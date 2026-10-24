@@ -377,6 +377,7 @@ export const StyledWrapper = styled.div `
     .mobileTocSummary {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       min-height: ${control.lg}px;
       padding: 0 0.9rem;
       color: var(--aq-text);
@@ -389,12 +390,29 @@ export const StyledWrapper = styled.div `
       &::-webkit-details-marker {
         display: none;
       }
+
+      &::after {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid var(--aq-muted);
+        border-bottom: 1.5px solid var(--aq-muted);
+        transform: translateY(-2px) rotate(45deg);
+        transition: transform 180ms ease;
+      }
+    }
+
+    .mobileToc[open] .mobileTocSummary::after {
+      transform: translateY(1px) rotate(225deg);
     }
 
     .mobileTocList {
       margin: 0;
       padding: 0 0.5rem 0.5rem;
       list-style: none;
+      border-top: 1px solid var(--aq-border);
+      max-height: min(52dvh, 360px);
+      overflow-y: auto;
     }
 
     .mobileTocList li {
