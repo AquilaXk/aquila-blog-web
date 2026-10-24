@@ -63,9 +63,9 @@ test.describe("PostDetailTocModel decoupled layout reading", () => {
 
   test("buildInitialTocFromMarkdown reuses pre-extracted headings and resolveActiveTocIdFromOffsets resolves large sorted offset lists via binary search", () => {
     const preExtracted = [
-      { level: 1 as const, label: "Title", slug: "title", offset: 0, range: { start: 0, end: 7 } },
-      { level: 2 as const, label: "First", slug: "first", offset: 8, range: { start: 8, end: 16 } },
-      { level: 3 as const, label: "Second", slug: "second", offset: 17, range: { start: 17, end: 27 } },
+      { id: "title", level: 1 as const, label: "Title", slug: "title", offset: 0, range: { start: 0, end: 7 } },
+      { id: "first", level: 2 as const, label: "First", slug: "first", offset: 8, range: { start: 8, end: 16 } },
+      { id: "second", level: 3 as const, label: "Second", slug: "second", offset: 17, range: { start: 17, end: 27 } },
     ]
     expect(buildInitialTocFromMarkdown("# Title\n## First\n### Second", preExtracted)).toEqual([
       { id: "first", text: "First", level: 2 },

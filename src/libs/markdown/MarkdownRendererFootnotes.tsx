@@ -36,7 +36,8 @@ export const MarkdownFootnoteReferenceLink = ({
   }
   const occurrence = footnote.referenceIds.indexOf(referenceId) + 1
   const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
-  const tooltipId = `aq-footnote-tooltip-${referenceId || `${footnote.identifier}-${occurrence}`}`
+  const fallbackSuffix = `${footnote.identifier}-${occurrence}`
+  const tooltipId = `aq-footnote-tooltip-${referenceId || fallbackSuffix}`
 
   return (
     <sup className="aq-footnote-reference">

@@ -254,7 +254,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   while (i < lines.length) {
     const line = lines[i]
     const trimmed = line.trim()
-    const firstCode = trimmed.charCodeAt(0)
+    const firstCode = trimmed.codePointAt(0)
     const fenceMarker =
       firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
     const directiveMetadataComment =
@@ -302,7 +302,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
 
     const customDirectiveMatch =
       firstCode === 58 || firstCode === 91
-        ? trimmed.match(CUSTOM_DIRECTIVE_PATTERN)
+        ? CUSTOM_DIRECTIVE_PATTERN.exec(trimmed)
         : null
     if (customDirectiveMatch) {
       const directive = customDirectiveMatch[1]?.toLowerCase()

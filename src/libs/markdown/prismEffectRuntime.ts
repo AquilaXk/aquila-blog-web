@@ -89,34 +89,21 @@ export const isMermaidCodeBlock = (block: Element): boolean =>
     block.closest?.("pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']")
   )
 
+const isRemovedElementRequiringPrismRescan = (element: Element): boolean => {
+  if (isMermaidCodeBlock(element)) return false
+  if (element.matches("code")) return true
+  if (element.matches("pre")) {
+    const codeChildren = Array.from(element.querySelectorAll("code"))
+    return codeChildren.length === 0 || codeChildren.some((child) => !isMermaidCodeBlock(child))
+  }
+  const nestedCodeBlocks = Array.from(element.querySelectorAll("pre > code"))
+  return nestedCodeBlocks.some((child) => !isMermaidCodeBlock(child))
+}
+
 export const shouldRescanPrismOnRemovedNodes = (removedNodes: Iterable<Node>): boolean => {
   for (const node of removedNodes) {
     if (!node || typeof (node as Element).matches !== "function") continue
-    const element = node as Element
-    if (isMermaidCodeBlock(element)) continue
-    if (element.matches("code")) {
-      return true
-    }
-    if (element.matches("pre")) {
-      const codeChildren = element.querySelectorAll("code")
-      let allMermaid = codeChildren.length > 0
-      for (let i = 0; i < codeChildren.length; i += 1) {
-        if (!isMermaidCodeBlock(codeChildren[i])) {
-          allMermaid = false
-          break
-        }
-      }
-      if (allMermaid) {
-        continue
-      }
-      return true
-    }
-    const nestedCodeBlocks = element.querySelectorAll("pre > code")
-    for (let i = 0; i < nestedCodeBlocks.length; i += 1) {
-      if (!isMermaidCodeBlock(nestedCodeBlocks[i])) {
-        return true
-      }
-    }
+    if (isRemovedElementRequiringPrismRescan(node as Element)) return true
   }
   return false
 }
@@ -295,9 +282,7 @@ export const createPrismEffectRuntime = ({
         scheduleRun({ block: targetBlock })
       }
 
-      const addedNodes = mutation.addedNodes
-      for (let i = 0; i < addedNodes.length; i += 1) {
-        const node = addedNodes[i]
+      for (const node of Array.from(mutation.addedNodes)) {
         if (isPrismTokenNode(node)) continue
         const addedBlock = resolveCodeBlockFromNode(node, root)
         if (!addedBlock) continue

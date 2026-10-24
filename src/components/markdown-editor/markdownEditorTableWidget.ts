@@ -4,6 +4,7 @@ import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
   parseMarkdownTableGrid,
+  type MarkdownTableGrid,
   type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
 import {
@@ -41,6 +42,59 @@ type TableDomController = {
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
+
+const syncTableFromDataset = (wrap: HTMLElement, from: number | undefined) => {
+  if (from !== undefined) {
+    if (wrap.dataset) wrap.dataset.tableFrom = String(from)
+    return
+  }
+  if (wrap.dataset) delete wrap.dataset.tableFrom
+}
+
+const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string =>
+  r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? "")
+
+const patchSingleTableCell = (
+  cellEl: HTMLElement,
+  prevAlign: string,
+  nextAlign: string,
+  prevText: string,
+  nextText: string,
+  restoreCellDisplay: (el: HTMLElement, text: string) => void
+) => {
+  if (prevAlign !== nextAlign) {
+    if (cellEl.style) cellEl.style.textAlign = nextAlign
+    if (cellEl.dataset) cellEl.dataset.align = nextAlign
+  }
+  const hasInput =
+    typeof cellEl.querySelector === "function" &&
+    cellEl.querySelector(".cm-live-table-cell-input") !== null
+  if (prevText !== nextText || hasInput) {
+    restoreCellDisplay(cellEl, nextText)
+  }
+}
+
+const patchTableCellsInPlace = (
+  cellElements: HTMLElement[][],
+  grid: MarkdownTableGrid,
+  nextGrid: MarkdownTableGrid,
+  restoreCellDisplay: (el: HTMLElement, text: string) => void
+) => {
+  for (let r = 0; r <= nextGrid.rows.length; r += 1) {
+    for (let c = 0; c < nextGrid.headers.length; c += 1) {
+      const cellEl = cellElements[r]?.[c]
+      if (!cellEl) continue
+      patchSingleTableCell(
+        cellEl,
+        grid.alignments[c] ?? "left",
+        nextGrid.alignments[c] ?? "left",
+        readGridCellText(grid, r, c),
+        readGridCellText(nextGrid, r, c),
+        restoreCellDisplay
+      )
+    }
+  }
+}
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -81,10 +135,8 @@ export class MarkdownTableWidget extends WidgetType {
     let currentFrom = this.from
     let currentTo = this.to
 
-    wrap.setAttribute("data-testid", "cm-live-table-widget")
-    if (currentFrom !== undefined) {
-      wrap.setAttribute("data-table-from", String(currentFrom))
-    }
+    if (wrap.dataset) wrap.dataset.testid = "cm-live-table-widget"
+    syncTableFromDataset(wrap, currentFrom)
 
     const visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length)
     syncTableVisualWrapAttributes(wrap, visualOptions)
@@ -450,19 +502,14 @@ export class MarkdownTableWidget extends WidgetType {
       if (nextMarkdown === currentMarkdown) {
         currentFrom = nextFrom
         currentTo = nextTo
-        if (currentFrom !== undefined) {
-          wrap.setAttribute("data-table-from", String(currentFrom))
-        } else if (typeof wrap.removeAttribute === "function") {
-          wrap.removeAttribute("data-table-from")
-        }
+        syncTableFromDataset(wrap, currentFrom)
         applyPendingCellActivation()
         return true
       }
 
       const nextGrid = parseMarkdownTableGrid(nextMarkdown)
       if (
-        !nextGrid ||
-        nextGrid.headers.length !== grid.headers.length ||
+        nextGrid?.headers.length !== grid.headers.length ||
         nextGrid.rows.length !== grid.rows.length
       ) {
         return false
@@ -473,27 +520,7 @@ export class MarkdownTableWidget extends WidgetType {
         activeSession = null
       }
 
-      for (let r = 0; r <= nextGrid.rows.length; r += 1) {
-        for (let c = 0; c < nextGrid.headers.length; c += 1) {
-          const cellEl = cellElements[r]?.[c]
-          if (!cellEl) continue
-          const prevAlign = grid.alignments[c] ?? "left"
-          const nextAlign = nextGrid.alignments[c] ?? "left"
-          if (prevAlign !== nextAlign) {
-            if (cellEl.style) cellEl.style.textAlign = nextAlign
-            cellEl.setAttribute("data-align", nextAlign)
-          }
-          const prevText = r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? "")
-          const nextText =
-            r === 0 ? (nextGrid.headers[c] ?? "") : (nextGrid.rows[r - 1]?.[c] ?? "")
-          const hasInput =
-            typeof cellEl.querySelector === "function" &&
-            cellEl.querySelector(".cm-live-table-cell-input") !== null
-          if (prevText !== nextText || hasInput) {
-            restoreCellDisplay(cellEl, nextText)
-          }
-        }
-      }
+      patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
 
       grid.headers.splice(0, grid.headers.length, ...nextGrid.headers)
       grid.alignments.splice(0, grid.alignments.length, ...nextGrid.alignments)
@@ -505,11 +532,7 @@ export class MarkdownTableWidget extends WidgetType {
       currentMarkdown = nextMarkdown
       currentFrom = nextFrom
       currentTo = nextTo
-      if (currentFrom !== undefined) {
-        wrap.setAttribute("data-table-from", String(currentFrom))
-      } else if (typeof wrap.removeAttribute === "function") {
-        wrap.removeAttribute("data-table-from")
-      }
+      syncTableFromDataset(wrap, currentFrom)
       syncActiveCellHighlight()
       applyPendingCellActivation()
       return true

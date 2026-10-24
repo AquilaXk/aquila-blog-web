@@ -41,10 +41,45 @@ const normalizeScope = (
 
 const caseInsensitiveSearchCollator = new Intl.Collator("en", { usage: "search", sensitivity: "accent" })
 
-const foldCaseInsensitive = (value: string) => value.toLowerCase().replace(/\u03c2/g, "\u03c3")
+const foldCaseInsensitive = (value: string) => value.toLowerCase().replaceAll("\u03c2", "\u03c3")
 
 const matchesQuery = (candidate: string, query: string, caseSensitive: boolean) =>
   caseSensitive ? candidate === query : caseInsensitiveSearchCollator.compare(candidate, query) === 0
+
+const findCaseSensitiveMatches = (
+  value: string,
+  query: string,
+  scope: MarkdownEditorTextRange
+): MarkdownEditorTextRange[] => {
+  const matches: MarkdownEditorTextRange[] = []
+  let cursor = scope.start
+  while (cursor <= scope.end - query.length) {
+    const hit = value.indexOf(query, cursor)
+    if (hit < 0 || hit + query.length > scope.end) break
+    matches.push({ start: hit, end: hit + query.length })
+    cursor = hit + query.length
+  }
+  return matches
+}
+
+const findFoldedMatches = (
+  foldedSlice: string,
+  foldedQuery: string,
+  queryLen: number,
+  scopeStart: number
+): MarkdownEditorTextRange[] => {
+  const matches: MarkdownEditorTextRange[] = []
+  const sliceLen = foldedSlice.length
+  let relCursor = 0
+  while (relCursor <= sliceLen - foldedQuery.length) {
+    const hit = foldedSlice.indexOf(foldedQuery, relCursor)
+    if (hit < 0) break
+    const start = scopeStart + hit
+    matches.push({ start, end: start + queryLen })
+    relCursor = hit + queryLen
+  }
+  return matches
+}
 
 export const findMarkdownEditorMatches = (
   value: string,
@@ -54,17 +89,8 @@ export const findMarkdownEditorMatches = (
   if (query === "") return []
   const scope = normalizeScope(value, options.scope)
   if (!scope || query.length > scope.end - scope.start) return []
-
-  const matches: MarkdownEditorTextRange[] = []
   if (options.caseSensitive === true) {
-    let cursor = scope.start
-    while (cursor <= scope.end - query.length) {
-      const hit = value.indexOf(query, cursor)
-      if (hit < 0 || hit + query.length > scope.end) break
-      matches.push({ start: hit, end: hit + query.length })
-      cursor = hit + query.length
-    }
-    return matches
+    return findCaseSensitiveMatches(value, query, scope)
   }
 
   const sliceLen = scope.end - scope.start
@@ -72,17 +98,10 @@ export const findMarkdownEditorMatches = (
   const foldedSlice = foldCaseInsensitive(rawSlice)
   const foldedQuery = foldCaseInsensitive(query)
   if (foldedSlice.length === sliceLen && foldedQuery.length === query.length) {
-    let relCursor = 0
-    while (relCursor <= sliceLen - foldedQuery.length) {
-      const hit = foldedSlice.indexOf(foldedQuery, relCursor)
-      if (hit < 0) break
-      const start = scope.start + hit
-      matches.push({ start, end: start + query.length })
-      relCursor = hit + query.length
-    }
-    return matches
+    return findFoldedMatches(foldedSlice, foldedQuery, query.length, scope.start)
   }
 
+  const matches: MarkdownEditorTextRange[] = []
   for (let start = scope.start; start <= scope.end - query.length; ) {
     const end = start + query.length
     if (matchesQuery(value.slice(start, end), query, false)) {

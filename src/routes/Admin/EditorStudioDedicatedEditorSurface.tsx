@@ -36,7 +36,7 @@ export const resolveActiveOutlineItemIndex = (
 let cachedNewlineOffsets: { markdown: string; offsets: number[] } | null = null
 
 const getNewlineOffsets = (markdown: string): number[] => {
-  if (cachedNewlineOffsets && cachedNewlineOffsets.markdown === markdown) return cachedNewlineOffsets.offsets
+  if (cachedNewlineOffsets?.markdown === markdown) return cachedNewlineOffsets.offsets
   const offsets: number[] = []
   let pos = markdown.indexOf("\n", 0)
   while (pos !== -1) {
@@ -74,7 +74,7 @@ export const countMarkdownTotalLinks = (markdown: string): number => {
   if (!markdown.includes("](") && !markdown.includes("[[")) return 0
   let count = 0
   if (markdown.includes("](")) {
-    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s\r\n]*\)/g)) count += 1
+    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s]*\)/g)) count += 1
   }
   if (markdown.includes("[[")) {
     for (const _match of markdown.matchAll(/\[\[[^\][\r\n]+\]\]/g)) count += 1

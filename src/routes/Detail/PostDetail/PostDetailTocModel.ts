@@ -53,14 +53,11 @@ const nodeTouchesHeading = (node: Node | null | undefined, checkDescendants: boo
 
 const nodeCollectionTouchesHeading = (nodes: Iterable<Node> | ArrayLike<Node> | null | undefined): boolean => {
   if (!nodes) return false
-  if (typeof (nodes as ArrayLike<Node>).length === "number") {
-    const list = nodes as ArrayLike<Node>
-    for (let i = 0; i < list.length; i += 1) {
-      if (nodeTouchesHeading(list[i], true)) return true
-    }
-    return false
-  }
-  for (const node of nodes as Iterable<Node>) {
+  const list: Iterable<Node> =
+    typeof (nodes as ArrayLike<Node>).length === "number"
+      ? Array.from(nodes as ArrayLike<Node>)
+      : (nodes as Iterable<Node>)
+  for (const node of list) {
     if (nodeTouchesHeading(node, true)) return true
   }
   return false
