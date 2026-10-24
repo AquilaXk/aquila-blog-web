@@ -49,38 +49,6 @@ export const CloudWorkspace = styled.section`
   }
 `
 
-export const StorageMeter = styled.div`
-  display: grid;
-  gap: 0.5rem;
-  margin-top: auto;
-  min-width: 0;
-  padding-top: 0.75rem;
-
-  strong {
-    color: ${accentGold};
-    font-size: 0.86rem;
-    font-weight: 850;
-  }
-
-  p {
-    margin: 0;
-    color: ${textSecondary};
-    font-size: 0.78rem;
-    font-weight: 700;
-  }
-
-  span {
-    display: block;
-    height: 0.28rem;
-    border-radius: 4px;
-    background: linear-gradient(
-      90deg,
-      ${accentGold} 0 var(--cloud-storage-usage, 22%),
-      ${surfaceMuted} var(--cloud-storage-usage, 22%) 100%
-    );
-  }
-`
-
 export const CloudContent = styled.div`
   display: grid;
   align-content: start;
@@ -137,7 +105,7 @@ export const SearchInput = styled.input`
   min-height: 2.42rem;
   border: 0;
   border-radius: 6px;
-  padding: 0 3.25rem 0 2.45rem;
+  padding: 0 4.5rem 0 2.45rem;
   background: ${surfaceRaised};
   color: ${textPrimary};
   font-size: 0.86rem;
@@ -189,6 +157,11 @@ export const UploadZone = styled.button`
   &:focus-visible {
     border-color: ${accentGold};
     background: ${surfaceRaised};
+  }
+
+  &[data-drag-active="true"] {
+    border-color: ${accentGold};
+    background: ${surfaceAccent};
   }
 
   &:focus-visible {
@@ -350,7 +323,7 @@ export const FileThumbnailFrame = styled.span`
   font-weight: 900;
 
   &[data-kind="DOCUMENT"] {
-    background: var(--admin-surface-accent, #edf3ff);
+    background: ${surfaceAccent};
   }
 
   &[data-kind="VIDEO"] {
@@ -360,13 +333,6 @@ export const FileThumbnailFrame = styled.span`
   &[data-selected="true"] {
     border-color: ${borderStrong};
     box-shadow: inset 0 0 0 1px ${borderStrong};
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: ${surfaceMuted};
   }
 `
 
@@ -435,16 +401,11 @@ export const DocumentFallbackBox = styled.div`
   }
 `
 
-export const Timeline = styled.div`
-  height: 0.45rem;
-  border-radius: 4px;
-  background: linear-gradient(90deg, ${accentGold} 0 34%, ${accentTeal} 34% 36%, ${surfaceMuted} 36% 100%);
-`
-
 export const InlineList = styled.div`
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
+  align-items: center;
 
   span {
     border: 1px solid ${border};

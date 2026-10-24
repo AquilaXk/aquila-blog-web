@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element -- private cloud content needs browser-owned auth cookies. */
+/* eslint-disable @next/next/no-img-element */
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 import { type KeyboardEvent as ReactKeyboardEvent, type RefObject, useEffect, useRef, useState } from "react"
 import {
@@ -29,7 +29,6 @@ import {
 } from "./AdminCloudWorkspace.styles"
 
 const PDF_STANDARD_FONT_DATA_URL = "/pdfjs/standard_fonts/"
-const PDF_LOADED_TASK_DESTROY_DELAY_MS = 3000
 
 const isPdfDocumentFile = (file: CloudFile) => file.contentType.toLowerCase() === "application/pdf"
 
@@ -89,12 +88,6 @@ const swallowPromiseRejection = (promise: Promise<unknown> | undefined) => {
   void promise?.catch(() => undefined)
 }
 
-const scheduleLoadedPdfTaskDestroy = (loadingTask: PDFDocumentLoadingTask | null) => {
-  window.setTimeout(() => {
-    swallowPromiseRejection(loadingTask?.destroy())
-  }, PDF_LOADED_TASK_DESTROY_DELAY_MS)
-}
-
 const cleanupPdfDocumentAfterRender = async (
   pdfDocument: PDFDocumentProxy,
   loadingTask: PDFDocumentLoadingTask | null
@@ -102,9 +95,9 @@ const cleanupPdfDocumentAfterRender = async (
   try {
     await pdfDocument.cleanup()
   } catch {
-    // 이미 해제된 문서 리소스 정리는 사용자에게 노출하지 않는다.
+    undefined
   }
-  scheduleLoadedPdfTaskDestroy(loadingTask)
+  swallowPromiseRejection(loadingTask?.destroy())
 }
 
 const ignorePdfPreviewTeardownRejection = (
@@ -134,7 +127,10 @@ type PdfPreviewProps = {
 
 const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const renderTaskRef = useRef<RenderTask | null>(null)
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [renderState, setRenderState] = useState("미리보기 준비")
 
   useEffect(() => {
@@ -142,10 +138,13 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
     let cancelled = false
     let loadingTask: PDFDocumentLoadingTask | null = null
     let pdfDocument: PDFDocumentProxy | null = null
-    let renderTask: RenderTask | null = null
+    setCurrentPage(1)
+    setPageCount(0)
+    setPdfDoc(null)
+    setRenderState("미리보기 준비")
     const releasePdfWorkerTerminationHandler = installPdfWorkerTerminationRejectionHandler()
 
-    const render = async () => {
+    const loadDocument = async () => {
       try {
         const pdfjs = await import("pdfjs-dist")
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
@@ -154,14 +153,42 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
           standardFontDataUrl: PDF_STANDARD_FONT_DATA_URL,
           withCredentials: true,
         })
-        void loadingTask.promise.catch(() => {
-          // cleanup이 먼저 실행된 경우 await 경로 밖에서도 worker 종료 reject를 소비한다.
-        })
+        swallowPromiseRejection(loadingTask.promise)
         const pdf = await loadingTask.promise
         pdfDocument = pdf
         if (cancelled) return
         setPageCount(pdf.numPages)
-        const page = await pdf.getPage(1)
+        setPdfDoc(pdf)
+      } catch {
+        if (!cancelled) setRenderState("미리보기를 불러오지 못했습니다")
+      }
+    }
+
+    void loadDocument()
+
+    return () => {
+      cancelled = true
+      try {
+        renderTaskRef.current?.cancel()
+      } catch {
+        undefined
+      }
+      ignorePdfPreviewTeardownRejection(loadingTask, pdfDocument, renderTaskRef.current)
+      renderTaskRef.current = null
+      releasePdfWorkerTerminationHandler(10000)
+    }
+  }, [contentUrl, file.id, file.mediaKind])
+
+  useEffect(() => {
+    if (!pdfDoc) return
+    let cancelled = false
+    let renderTask: RenderTask | null = null
+
+    const renderPage = async () => {
+      try {
+        setRenderState("미리보기 준비")
+        const page = await pdfDoc.getPage(currentPage)
+        if (cancelled) return
         const viewport = page.getViewport({ scale: 1.1 })
         const canvas = canvasRef.current
         const context = canvas?.getContext("2d")
@@ -178,29 +205,29 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
           viewport,
           transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
         })
-        void renderTask.promise.catch(() => {
-          // 파일 전환/패널 닫기 중 render task 취소가 pageerror로 번지는 것을 막는다.
-        })
+        renderTaskRef.current = renderTask
+        swallowPromiseRejection(renderTask.promise)
         await renderTask.promise
         if (!cancelled) setRenderState("미리보기 완료")
       } catch {
-        if (!cancelled) setRenderState("미리보기 대기")
+        if (!cancelled) setRenderState("미리보기를 불러오지 못했습니다")
       }
     }
 
-    void render()
+    void renderPage()
 
     return () => {
       cancelled = true
       try {
         renderTask?.cancel()
       } catch {
-        // loading task 종료가 먼저 끝난 경우 render task도 이미 취소 상태일 수 있다.
+        undefined
       }
-      ignorePdfPreviewTeardownRejection(loadingTask, pdfDocument, renderTask)
-      releasePdfWorkerTerminationHandler(10000)
+      if (renderTaskRef.current === renderTask) {
+        renderTaskRef.current = null
+      }
     }
-  }, [contentUrl, file.mediaKind])
+  }, [pdfDoc, currentPage])
 
   return (
     <PreviewStage>
@@ -210,8 +237,29 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
       <PdfCanvas ref={canvasRef} aria-label={`${file.originalFilename} PDF 미리보기`} />
       <InlineList aria-label="PDF 문서 제어">
         <span>{renderState}</span>
-        <span>1 / {pageCount || 1}</span>
-        <span>확대 110%</span>
+        <span>
+          {currentPage} / {pageCount || 1}쪽
+        </span>
+        {pageCount > 1 ? (
+          <>
+            <GhostButton
+              type="button"
+              aria-label="이전 페이지"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              이전 페이지
+            </GhostButton>
+            <GhostButton
+              type="button"
+              aria-label="다음 페이지"
+              disabled={currentPage >= pageCount}
+              onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
+            >
+              다음 페이지
+            </GhostButton>
+          </>
+        ) : null}
       </InlineList>
     </PreviewStage>
   )
@@ -366,10 +414,6 @@ const VideoPreview = ({ file, contentUrl }: VideoPreviewProps) => {
           <track kind="captions" />
         </video>
         <PlayerBar aria-label="클라우드 동영상 재생 제어">
-          <InlineList>
-            <span>브라우저 기본 재생</span>
-            <span>원본 파일 재생</span>
-          </InlineList>
           <FilterGroup aria-label="동영상 재생 속도">
             {PLAYBACK_SPEEDS.map((candidate) => (
               <GhostButton
@@ -435,7 +479,7 @@ type FileThumbnailProps = {
 }
 
 export const FileThumbnail = ({ file, selected }: FileThumbnailProps) => {
-  const badge = getCloudKindBadge(file)
+  const kindMark = file.mediaKind === "PHOTO" ? "사진" : file.mediaKind === "VIDEO" ? "영상" : "문서"
 
   return (
     <FileThumbnailFrame
@@ -443,7 +487,7 @@ export const FileThumbnail = ({ file, selected }: FileThumbnailProps) => {
       data-kind={file.mediaKind}
       data-selected={selected ? "true" : "false"}
     >
-      {badge}
+      {kindMark}
     </FileThumbnailFrame>
   )
 }

@@ -14,75 +14,6 @@ import {
   adminTextSecondary as textSecondary,
 } from "src/routes/Admin/adminColorTokens"
 
-export const CloudNavigationRail = styled.aside`
-  display: grid;
-  align-content: start;
-  gap: 1.25rem;
-  min-width: 0;
-  padding: 1.25rem 1rem;
-  border-right: 1px solid ${border};
-  background: ${surfaceRaised};
-
-  @media (max-width: 840px) {
-    border-right: 0;
-    border-bottom: 1px solid ${border};
-    padding: 0.9rem;
-  }
-`
-
-export const CloudNavGroup = styled.div`
-  display: grid;
-  gap: 0.18rem;
-  min-width: 0;
-`
-
-export const CloudNavDivider = styled.hr`
-  width: 100%;
-  border: 0;
-  border-top: 1px solid ${border};
-  margin: 0.25rem 0;
-`
-
-export const CloudNavButton = styled.button`
-  width: 100%;
-  min-height: 2.3rem;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  border: 0;
-  border-radius: 0;
-  padding: 0.35rem 0.45rem;
-  background: transparent;
-  color: ${textPrimary};
-  font-size: 0.9rem;
-  font-weight: 760;
-  text-align: left;
-  cursor: pointer;
-
-  span:first-of-type {
-    width: 1.35rem;
-    display: inline-grid;
-    place-items: center;
-    color: ${textMuted};
-    font-size: 0.86rem;
-  }
-
-  small {
-    color: ${accentGold};
-    font-size: 0.76rem;
-    font-weight: 850;
-  }
-
-  &[data-active="true"] {
-    color: ${accentGold};
-    background: ${surfaceAccent};
-  }
-
-  &:hover {
-    background: ${surfaceMuted};
-  }
-`
-
 export const CloudSearchField = styled.label`
   position: relative;
   display: flex;
@@ -103,6 +34,42 @@ export const SearchDetail = styled.span`
   color: ${textMuted};
   font-size: 0.75rem;
   font-weight: 750;
+  pointer-events: none;
+`
+
+export const SearchClearButton = styled.button`
+  position: absolute;
+  right: 0.5rem;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.2rem 0.45rem;
+  background: ${surfaceMuted};
+  color: ${textSecondary};
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    color: ${textPrimary};
+  }
+`
+
+export const SortSelect = styled.select`
+  min-height: 2.25rem;
+  border: 1px solid ${border};
+  border-radius: 5px;
+  padding: 0 0.65rem;
+  background: ${surface};
+  color: ${textSecondary};
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    border-color: ${borderStrong};
+  }
 `
 
 export const ActionBar = styled.div`
@@ -294,7 +261,7 @@ export const GhostButton = styled.button`
 
 export const Notice = styled.p`
   margin: 0;
-  max-width: 10rem;
+  max-width: min(28rem, 100%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

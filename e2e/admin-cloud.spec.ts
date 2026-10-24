@@ -184,8 +184,8 @@ const setupAdminCloudMocks = async (
   const failUploadOnceNames = new Set(options.failUploadOnceNames ?? [])
   const failedVideoPartOnceNumbers = new Set<number>()
   let didFailVideoSessionGet = false
-  const initialFiles = options.initialFiles ?? CLOUD_FILES
-  const lookupOnlyFiles = options.lookupOnlyFiles ?? []
+  const initialFiles = (options.initialFiles ?? CLOUD_FILES).map((item) => ({ ...item }))
+  const lookupOnlyFiles = (options.lookupOnlyFiles ?? []).map((item) => ({ ...item }))
   let videoSessionFilename = "대용량 교육 영상.mp4"
   let videoSessionByteSize = 101 * 1024 * 1024
   let nextUploadId = 204
@@ -355,6 +355,29 @@ const setupAdminCloudMocks = async (
       return
     }
 
+    if (method === "PATCH" && id) {
+      const target = [...uploadedFiles, ...lookupOnlyFiles, ...initialFiles].find((item) => String(item.id) === id)
+      if (!target) {
+        await fulfillJson(route, { resultCode: "404-1", msg: "클라우드 파일을 찾을 수 없습니다." }, 404)
+        return
+      }
+      const payload = JSON.parse(request.postData() || "{}") as { originalFilename?: string; folderPath?: string }
+      if (typeof payload.originalFilename === "string" && payload.originalFilename.trim()) {
+        target.originalFilename = payload.originalFilename.trim()
+      }
+      if (typeof payload.folderPath === "string") {
+        const normalizedFolder = normalizeFolderPathParam(payload.folderPath)
+        target.folderPath = normalizedFolder ? `/${normalizedFolder}` : "/"
+      }
+      target.modifiedAt = "2026-06-13T09:00:00Z"
+      await fulfillJson(route, {
+        resultCode: "200-1",
+        msg: "클라우드 파일 정보가 수정되었습니다.",
+        data: target,
+      })
+      return
+    }
+
     if (method === "DELETE" && id) {
       if (failedDeleteIds.has(id)) {
         await fulfillJson(route, { resultCode: "500-1", msg: "클라우드 파일 삭제에 실패했습니다." }, 500)
@@ -393,6 +416,29 @@ const setupAdminCloudMocks = async (
       return
     }
 
+    if (request.method() === "PATCH" && id) {
+      const target = [...uploadedFiles, ...lookupOnlyFiles, ...initialFiles].find((item) => String(item.id) === id)
+      if (!target) {
+        await fulfillJson(route, { resultCode: "404-1", msg: "클라우드 파일을 찾을 수 없습니다." }, 404)
+        return
+      }
+      const payload = JSON.parse(request.postData() || "{}") as { originalFilename?: string; folderPath?: string }
+      if (typeof payload.originalFilename === "string" && payload.originalFilename.trim()) {
+        target.originalFilename = payload.originalFilename.trim()
+      }
+      if (typeof payload.folderPath === "string") {
+        const normalizedFolder = normalizeFolderPathParam(payload.folderPath)
+        target.folderPath = normalizedFolder ? `/${normalizedFolder}` : "/"
+      }
+      target.modifiedAt = "2026-06-13T09:00:00Z"
+      await fulfillJson(route, {
+        resultCode: "200-1",
+        msg: "클라우드 파일 정보가 수정되었습니다.",
+        data: target,
+      })
+      return
+    }
+
     if (request.method() === "DELETE" && id) {
       if (failedDeleteIds.has(id)) {
         await fulfillJson(route, { resultCode: "500-1", msg: "클라우드 파일 삭제에 실패했습니다." }, 500)
@@ -428,7 +474,7 @@ const setupAdminCloudMocks = async (
         contentType: metadata.contentType,
         byteSize: route.request().postDataBuffer()?.byteLength ?? 0,
         mediaKind: metadata.mediaKind,
-        folderPath: "/",
+        folderPath: getUploadTextField(route, "folderPath") || "/",
         createdAt: "2026-06-12T12:00:00Z",
         modifiedAt: "2026-06-12T12:00:00Z",
       }
@@ -1391,5 +1437,60 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByRole("row", { name: new RegExp(displayName) })).toBeVisible()
     await expect(page.getByRole("row", { name: /보고서.*cod\.exe\.pdf/ })).toHaveCount(1)
     await expect(page.getByLabel("클라우드 상세정보").getByText(displayName)).toBeVisible()
+  })
+
+  test("파일 정렬, 검색어 지우기, 상세 패널 다운로드·링크 복사·정보 수정이 동작한다", async ({ page }) => {
+    await setupAdminCloudMocks(page)
+    await page.addInitScript(() => {
+      Object.assign(window, { __adminCloudCopiedText: "" })
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            Object.assign(window, { __adminCloudCopiedText: text })
+          },
+        },
+      })
+    })
+
+    await page.goto("/admin/cloud")
+
+    const sortSelect = page.getByLabel("파일 정렬")
+    await expect(sortSelect).toBeVisible()
+    await sortSelect.selectOption("SIZE")
+    const rowsBySize = page.locator("tbody tr")
+    await expect(rowsBySize.first()).toContainText("deploy-walkthrough.mp4")
+
+    const searchInput = page.getByLabel("클라우드 파일 검색")
+    await searchInput.fill("/ops 점검")
+    await expect(page.getByRole("button", { name: "검색어 지우기" })).toBeVisible()
+    await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
+    await page.getByRole("button", { name: "검색어 지우기" }).click()
+    await expect(searchInput).toHaveValue("")
+
+    await page.locator('button[title="운영 점검 리포트.pdf"]').click()
+    const detailPanel = page.getByLabel("클라우드 상세정보")
+    await expect(detailPanel).toBeVisible()
+
+    const downloadLink = detailPanel.getByRole("link", { name: "다운로드" })
+    await expect(downloadLink).toHaveAttribute(
+      "href",
+      /\/system\/api\/v1\/adm\/cloud\/files\/101\/content\?download=true$/
+    )
+
+    await detailPanel.getByRole("button", { name: "링크 복사" }).click()
+    await expect(page.getByText("파일 링크를 복사했습니다.")).toBeVisible()
+    const copiedLink = await page.evaluate(() => (window as unknown as { __adminCloudCopiedText?: string }).__adminCloudCopiedText)
+    expect(copiedLink).toContain("/system/api/v1/adm/cloud/files/101/content")
+
+    await detailPanel.getByRole("button", { name: "정보 수정" }).click()
+    await detailPanel.getByLabel("파일 이름 수정").fill("연간 운영 점검 리포트.pdf")
+    await detailPanel.getByLabel("폴더 경로 수정").fill("ops/2026")
+    await detailPanel.getByRole("button", { name: "저장" }).click()
+
+    await expect(page.getByText("파일 정보를 수정했습니다.")).toBeVisible()
+    await expect(detailPanel.getByText("연간 운영 점검 리포트.pdf")).toBeVisible()
+    await expect(detailPanel.getByText("/ops/2026")).toBeVisible()
+    await expect(page.getByRole("row", { name: /연간 운영 점검 리포트\.pdf/ })).toBeVisible()
   })
 })

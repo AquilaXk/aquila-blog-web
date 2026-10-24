@@ -9,7 +9,7 @@ type RsDataCloudFileDto = components["schemas"]["RsDataCloudFileDto"]
 type RsDataVoid = components["schemas"]["RsDataVoid"]
 
 const CLOUD_UPLOAD_TIMEOUT_MS = 10 * 60_000 + 30_000
-const CLOUD_SYNC_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+export const CLOUD_SYNC_UPLOAD_MAX_BYTES = 95 * 1024 * 1024
 const CLOUD_VIDEO_RESUMABLE_PART_BYTES = 64 * 1024 * 1024
 const CLOUD_VIDEO_RESUMABLE_CHUNK_TIMEOUT_MS = 5 * 60_000
 const CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX = "aquila-cloud-video-upload-session"
@@ -103,6 +103,9 @@ const appendQuery = (path: string, params: Record<string, string | undefined>) =
 
 export const getCloudFileContentUrl = (fileId: number) =>
   getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content`)
+
+export const getCloudFileDownloadUrl = (fileId: number): string =>
+  getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content?download=true`)
 
 const normalizeCloudExternalPlaybackToken = (
   fileId: number,
@@ -292,8 +295,6 @@ const clearStoredVideoUploadSessionId = (storageKey: string) => {
 }
 
 const isMatchingVideoUploadSessionFile = (session: CloudVideoUploadSession, file: File) =>
-  // The localStorage key already includes the browser's original filename and mtime.
-  // Server-side NFC normalization or metadata truncation must not discard a resumable session.
   session.byteSize === file.size
 
 export const isDefinitiveStaleVideoUploadSessionError = (error: unknown) =>
@@ -386,6 +387,27 @@ const uploadCloudVideoFileResumable = async (
     }
     throw error
   }
+}
+
+export const updateCloudFile = async (
+  fileId: number,
+  payload: { originalFilename?: string; folderPath?: string },
+): Promise<CloudFile> => {
+  const response = await apiFetch<RsDataCloudFileDto | CloudFileDto>(
+    `/system/api/v1/adm/cloud/files/${fileId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  )
+  const fileData =
+    response && typeof response === "object" && "data" in response && response.data
+      ? response.data
+      : (response as CloudFileDto | undefined)
+  if (!fileData) {
+    throw new Error("클라우드 파일 수정 응답이 비어 있습니다.")
+  }
+  return normalizeCloudFile(fileData)
 }
 
 export const deleteCloudFile = async (fileId: number) =>

@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { ApiError } from "../../src/apis/backend/client"
 import {
+  CLOUD_SYNC_UPLOAD_MAX_BYTES,
+  type CloudFile,
+  getCloudFileDownloadUrl,
   isDefinitiveStaleVideoUploadSessionError,
   isExplicitUploadAbort,
 } from "../../src/apis/backend/cloud"
@@ -28,7 +31,9 @@ import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../
 import {
   isCloudSearchPending,
   resolveCloudEmptyTitle,
+  resolveCloudSearchParams,
   shouldShowCloudEmptyLoading,
+  sortCloudFiles,
 } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 
 test.describe("frontend pure logic contracts", () => {
@@ -259,5 +264,64 @@ caption
     expect(viewSource).toContain("snapshotCollectionFailed")
     expect(viewSource).not.toMatch(/Public read latency[\s\S]*collectionFailed \?/)
     expect(viewSource).not.toMatch(/Live logs[\s\S]*collectionFailed \?/)
+  })
+
+  test("cloud upload limit, folder+keyword search parsing, and file sorting stay deterministic", () => {
+    expect(CLOUD_SYNC_UPLOAD_MAX_BYTES).toBe(95 * 1024 * 1024)
+    expect(getCloudFileDownloadUrl(42)).toMatch(/\/system\/api\/v1\/adm\/cloud\/files\/42\/content\?download=true$/)
+
+    expect(resolveCloudSearchParams("/ops 점검")).toEqual({
+      folderPath: "ops",
+      keyword: "점검",
+    })
+    expect(resolveCloudSearchParams("/ops")).toEqual({
+      folderPath: "ops",
+      keyword: "",
+    })
+    expect(resolveCloudSearchParams("  deploy  ")).toEqual({
+      folderPath: "",
+      keyword: "deploy",
+    })
+
+    const sampleFiles: CloudFile[] = [
+      {
+        id: 1,
+        ownerMemberId: 1,
+        originalFilename: "beta-report.pdf",
+        contentType: "application/pdf",
+        mediaKind: "DOCUMENT",
+        byteSize: 2048,
+        folderPath: "ops",
+        createdAt: "2026-03-10T10:00:00Z",
+        modifiedAt: "2026-03-11T10:00:00Z",
+      },
+      {
+        id: 2,
+        ownerMemberId: 1,
+        originalFilename: "alpha-photo.png",
+        contentType: "image/png",
+        mediaKind: "PHOTO",
+        byteSize: 8192,
+        folderPath: "photos",
+        createdAt: "2026-03-12T10:00:00Z",
+        modifiedAt: "2026-03-15T10:00:00Z",
+      },
+      {
+        id: 3,
+        ownerMemberId: 1,
+        originalFilename: "gamma-clip.mp4",
+        contentType: "video/mp4",
+        mediaKind: "VIDEO",
+        byteSize: 512,
+        folderPath: "videos",
+        createdAt: "2026-03-08T10:00:00Z",
+        modifiedAt: "2026-03-09T10:00:00Z",
+      },
+    ]
+
+    expect(sortCloudFiles(sampleFiles, "LATEST").map((f) => f.id)).toEqual([2, 1, 3])
+    expect(sortCloudFiles(sampleFiles, "OLDEST").map((f) => f.id)).toEqual([3, 1, 2])
+    expect(sortCloudFiles(sampleFiles, "NAME").map((f) => f.id)).toEqual([2, 1, 3])
+    expect(sortCloudFiles(sampleFiles, "SIZE").map((f) => f.id)).toEqual([2, 1, 3])
   })
 })

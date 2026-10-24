@@ -1,4 +1,5 @@
-import type { CloudFile } from "src/apis/backend/cloud"
+import { useState } from "react"
+import { getCloudFileDownloadUrl, type CloudFile } from "src/apis/backend/cloud"
 import AppIcon from "src/components/icons/AppIcon"
 import {
   CloudDeleteConfirmDialog,
@@ -8,13 +9,17 @@ import {
 } from "./AdminCloudPreviewDrawer"
 import {
   CLOUD_FILTERS,
+  CLOUD_SORT_OPTIONS,
+  type CloudSortMode,
   formatCloudDate,
   formatCloudFileSize,
   getCloudFilenameParts,
   getCloudKindBadge,
   getCloudKindIconLabel,
   getCloudKindLabel,
+  getCloudSummary,
   isCloudSearchPending,
+  normalizeCloudFolderPathSearch,
   resolveCloudEmptyTitle,
   shouldShowCloudEmptyLoading,
 } from "./AdminCloudWorkspaceModel"
@@ -27,14 +32,16 @@ import {
   CloudSearchField,
   CloudTitleBar,
   CloudWorkspace,
+  DetailActionLink,
+  DetailEditField,
+  DetailEditForm,
+  DetailEditInput,
   DetailHeader,
   DetailMetaList,
   DetailPanel,
   DetailPreviewBox,
   DetailScrim,
   DetailSummary,
-  DetailTab,
-  DetailTabs,
   EmptyTableState,
   FileIdentity,
   FileMetaLine,
@@ -50,12 +57,14 @@ import {
   Notice,
   PrimaryButton,
   RowCheckbox,
+  SearchClearButton,
   SearchDetail,
   SearchInput,
   SecondaryButton,
   SelectBoxCell,
   SkeletonRow,
   SkeletonRows,
+  SortSelect,
   ToastViewport,
   UploadInput,
   UploadZone,
@@ -143,6 +152,7 @@ const CloudFileTableSection = ({
           const checked = checkedFileIds.includes(file.id)
           const selected = shouldShowDetailPanel && selectedFile?.id === file.id
           const filenameParts = getCloudFilenameParts(file.originalFilename)
+          const folderLabel = normalizeCloudFolderPathSearch(file.folderPath)
           return (
             <tr key={file.id} role="row" data-selected={selected ? "true" : "false"}>
               <SelectBoxCell>
@@ -176,6 +186,7 @@ const CloudFileTableSection = ({
                         {getCloudKindIconLabel(file)}
                       </FileTypeIcon>
                       <span>{getCloudKindLabel(file.mediaKind)}</span>
+                      {folderLabel ? <span>/{folderLabel}</span> : null}
                     </FileMetaLine>
                   </FileNameStack>
                 </FileIdentity>
@@ -207,17 +218,21 @@ const AdminCloudWorkspacePage = () => {
     handleCancelUpload,
     handleClearFinishedUploads,
     handleConfirmDelete,
+    handleCopyFileLink,
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
     handlePreviewFile,
     handleRetryUpload,
     handleToggleAllChecked,
     handleToggleChecked,
+    handleUpdateFile,
+    handleUploadDragLeave,
     handleUploadDragOver,
     handleUploadDrop,
     handleUploadSelect,
     isDetailDrawerMode,
     isDeletePending,
+    isDragActive,
     keyword,
     notice,
     selectedFile,
@@ -226,13 +241,21 @@ const AdminCloudWorkspacePage = () => {
     setIsDetailPanelOpen,
     setKeyword,
     setSelectedFileId,
+    setSortMode,
     setToast,
     shouldShowDetailPanel,
+    sortMode,
     toast,
     uploadInputRef,
     uploadQueue,
   } = useAdminCloudWorkspaceActions()
 
+  const [editingFileId, setEditingFileId] = useState<number | null>(null)
+  const [draftFilename, setDraftFilename] = useState("")
+  const [draftFolderPath, setDraftFolderPath] = useState("")
+  const [isUpdatePending, setIsUpdatePending] = useState(false)
+
+  const summary = getCloudSummary(files)
   const isFileListError = filesQuery.isError
   const isSearchPending = isCloudSearchPending(keyword, debouncedKeyword)
   const isSearchBusy = filesQuery.isFetching || isSearchPending
@@ -258,12 +281,20 @@ const AdminCloudWorkspacePage = () => {
         data-detail-open={shouldShowDetailPanel ? "true" : "false"}
         data-detail-mode={detailMode}
       >
-        <CloudContent>
+        <CloudContent
+          data-drag-active={isDragActive ? "true" : "false"}
+          onDragOver={handleUploadDragOver}
+          onDragLeave={handleUploadDragLeave}
+          onDrop={handleUploadDrop}
+        >
           <CloudTitleBar>
             <div>
               <span>Storage</span>
               <h1>미디어 라이브러리</h1>
-              <p>글 이미지, 첨부 파일과 업로드 lifecycle을 관리합니다.</p>
+              <p>
+                글 이미지와 첨부 미디어 파일을 관리합니다.
+                {files.length > 0 ? ` 총 ${summary.totalCount}개 · ${summary.totalSize}` : ""}
+              </p>
             </div>
             <CloudSearchField>
               <AppIcon name="search" />
@@ -275,8 +306,13 @@ const AdminCloudWorkspacePage = () => {
                 onCompositionStart={() => setIsComposing(true)}
                 onCompositionEnd={() => setIsComposing(false)}
               />
+              {keyword ? (
+                <SearchClearButton type="button" aria-label="검색어 지우기" onClick={() => setKeyword("")}>
+                  지우기
+                </SearchClearButton>
+              ) : null}
               <SearchDetail aria-busy={isSearchBusy ? "true" : "false"}>
-                {isSearchBusy ? "검색 중" : "파일"}
+                {isSearchBusy ? "검색 중" : keyword ? "파일" : "/폴더명 검색어"}
               </SearchDetail>
             </CloudSearchField>
           </CloudTitleBar>
@@ -284,13 +320,15 @@ const AdminCloudWorkspacePage = () => {
           <UploadZone
             type="button"
             aria-label="파일을 끌어놓거나 클릭해 업로드"
+            data-drag-active={isDragActive ? "true" : "false"}
             onClick={() => uploadInputRef.current?.click()}
             onDragOver={handleUploadDragOver}
+            onDragLeave={handleUploadDragLeave}
             onDrop={handleUploadDrop}
           >
             <AppIcon name="cloud" />
             <strong>파일을 끌어놓거나 클릭해 업로드</strong>
-            <span>사진 50MB · 문서 100MB · 동영상 5GB 이하</span>
+            <span>사진 50MB · 문서/압축 95MB · 동영상 8GB 이하</span>
           </UploadZone>
 
           <ActionBar>
@@ -336,6 +374,17 @@ const AdminCloudWorkspacePage = () => {
                   </GhostButton>
                 ))}
               </FilterGroup>
+              <SortSelect
+                aria-label="파일 정렬"
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value as CloudSortMode)}
+              >
+                {CLOUD_SORT_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </SortSelect>
               <ViewModeButton
                 type="button"
                 aria-label="상세 패널 보기"
@@ -389,21 +438,10 @@ const AdminCloudWorkspacePage = () => {
             <DetailPanel aria-label="클라우드 상세정보" data-mode={detailMode}>
               <DetailHeader>
                 <h2>파일 정보</h2>
-                <IconButton
-                  type="button"
-                  aria-label="상세 패널 닫기"
-                  onClick={() => {
-                    setIsDetailPanelOpen(false)
-                  }}
-                >
+                <IconButton type="button" aria-label="상세 패널 닫기" onClick={() => setIsDetailPanelOpen(false)}>
                   ×
                 </IconButton>
               </DetailHeader>
-              <DetailTabs>
-                <DetailTab type="button" data-active="true">
-                  상세정보
-                </DetailTab>
-              </DetailTabs>
               <DetailPreviewBox>
                 <PreviewDrawer file={selectedFile} />
               </DetailPreviewBox>
@@ -417,6 +455,69 @@ const AdminCloudWorkspacePage = () => {
                   </p>
                 </div>
               </DetailSummary>
+              <ActionGroup>
+                <DetailActionLink
+                  href={getCloudFileDownloadUrl(selectedFile.id)}
+                  download={selectedFile.originalFilename}
+                >
+                  다운로드
+                </DetailActionLink>
+                <SecondaryButton type="button" onClick={() => void handleCopyFileLink(selectedFile)}>
+                  링크 복사
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => {
+                    setEditingFileId(selectedFile.id)
+                    setDraftFilename(selectedFile.originalFilename)
+                    setDraftFolderPath(selectedFile.folderPath || "")
+                  }}
+                >
+                  정보 수정
+                </SecondaryButton>
+              </ActionGroup>
+              {editingFileId === selectedFile.id ? (
+                <DetailEditForm
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    setIsUpdatePending(true)
+                    void handleUpdateFile(selectedFile.id, {
+                      originalFilename: draftFilename,
+                      folderPath: draftFolderPath,
+                    })
+                      .then((updated) => {
+                        if (updated) setEditingFileId(null)
+                      })
+                      .finally(() => setIsUpdatePending(false))
+                  }}
+                >
+                  <DetailEditField>
+                    <span>파일 이름</span>
+                    <DetailEditInput
+                      aria-label="파일 이름 수정"
+                      value={draftFilename}
+                      onChange={(event) => setDraftFilename(event.target.value)}
+                    />
+                  </DetailEditField>
+                  <DetailEditField>
+                    <span>폴더 경로</span>
+                    <DetailEditInput
+                      aria-label="폴더 경로 수정"
+                      placeholder="예: ops/reports"
+                      value={draftFolderPath}
+                      onChange={(event) => setDraftFolderPath(event.target.value)}
+                    />
+                  </DetailEditField>
+                  <ActionGroup>
+                    <PrimaryButton type="submit" disabled={isUpdatePending}>
+                      저장
+                    </PrimaryButton>
+                    <SecondaryButton type="button" disabled={isUpdatePending} onClick={() => setEditingFileId(null)}>
+                      취소
+                    </SecondaryButton>
+                  </ActionGroup>
+                </DetailEditForm>
+              ) : null}
               <DetailMetaList>
                 <dt>
                   <span aria-hidden="true">

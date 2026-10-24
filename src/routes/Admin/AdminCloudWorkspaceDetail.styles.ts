@@ -86,34 +86,68 @@ export const DetailHeader = styled.div`
   }
 `
 
-export const DetailTabs = styled.div`
-  display: flex;
-  gap: 0.35rem;
-  border-bottom: 1px solid ${border};
-`
-
-export const DetailTab = styled.button`
-  border: 0;
-  border-bottom: 2px solid transparent;
-  padding: 0 0.15rem 0.45rem;
-  background: transparent;
-  color: ${textMuted};
-  font-size: 0.84rem;
-  font-weight: 850;
-  cursor: pointer;
-
-  &[data-active="true"] {
-    color: ${accentGold};
-    border-bottom-color: ${accentGold};
-  }
-`
-
 export const DetailPreviewBox = styled.div`
   display: grid;
   align-items: start;
   min-height: 12.5rem;
   background: transparent;
   overflow: auto;
+`
+
+export const DetailActionLink = styled.a`
+  border: 1px solid ${border};
+  border-radius: 5px;
+  min-height: 2.25rem;
+  padding: 0 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: ${surfaceMuted};
+  color: ${textPrimary};
+  font-size: 0.83rem;
+  font-weight: 820;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    border-color: ${borderStrong};
+    background: ${surfaceRaised};
+  }
+`
+
+export const DetailEditForm = styled.form`
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid ${border};
+  border-radius: 6px;
+  background: ${surfaceRaised};
+`
+
+export const DetailEditField = styled.label`
+  display: grid;
+  gap: 0.25rem;
+  color: ${textSecondary};
+  font-size: 0.76rem;
+  font-weight: 800;
+`
+
+export const DetailEditInput = styled.input`
+  width: 100%;
+  min-height: 2.1rem;
+  border: 1px solid ${border};
+  border-radius: 4px;
+  padding: 0 0.6rem;
+  background: ${surface};
+  color: ${textPrimary};
+  font-size: 0.82rem;
+  font-weight: 760;
+
+  &:focus-visible {
+    outline: none;
+    border-color: ${borderStrong};
+  }
 `
 
 export const DetailSummary = styled.div`

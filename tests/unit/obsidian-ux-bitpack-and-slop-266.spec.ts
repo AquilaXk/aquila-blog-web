@@ -169,6 +169,6 @@ test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal",
     expect(rootViewSrc).not.toContain("isDedicatedPostEditorRoute ?")
 
     const cloudStylesSrc = readRepoFile("src/routes/Admin/AdminCloudWorkspace.styles.ts")
-    expect(cloudStylesSrc).toContain("var(--cloud-storage-usage, 22%)")
+    expect(cloudStylesSrc).not.toContain("StorageMeter")
   })
 })
