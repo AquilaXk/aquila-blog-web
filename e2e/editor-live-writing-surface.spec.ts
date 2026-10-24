@@ -1480,15 +1480,22 @@ test.describe("live Markdown writing surface", () => {
 
     const tableWidget = page.getByTestId("cm-live-table-widget")
     await expect(tableWidget).toBeVisible()
+    await tableWidget.getByRole("button", { name: "표 제목 열 강조 전환" }).click()
+    await expect(tableWidget).toHaveAttribute("data-header-col", "true")
+    await tableWidget.getByRole("button", { name: "표 페이지 너비 맞춤 전환" }).click()
+    await expect(tableWidget).toHaveAttribute("data-full-width", "true")
+
     await tableWidget.locator("td").first().click()
 
     const cellInput = tableWidget.getByTestId("cm-live-table-cell-input")
     await expect(cellInput).toBeVisible()
     await expect(cellInput).toHaveValue("앨리스")
     await cellInput.fill("밥")
-    await cellInput.press("Tab")
+    await cellInput.press("ArrowRight")
 
     await expect(tableWidget).toBeVisible()
+    await expect(tableWidget).toHaveAttribute("data-header-col", "true")
+    await expect(tableWidget).toHaveAttribute("data-full-width", "true")
     await expect(cellInput).toBeVisible()
     await expect(cellInput).toHaveValue("관리자")
     const pasteDefaultPrevented = await cellInput.evaluate((input) => {

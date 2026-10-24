@@ -328,6 +328,9 @@ export const liveSurfaceTheme = EditorView.theme({
     flexDirection: "column",
     gap: "6px",
   },
+  '.cm-live-table-wrap[data-full-width="true"]': {
+    width: "100%",
+  },
   ".cm-live-table-toolbar": {
     display: "flex",
     flexWrap: "wrap",
@@ -348,6 +351,11 @@ export const liveSurfaceTheme = EditorView.theme({
     lineHeight: "1.4",
     cursor: "pointer",
   },
+  '.cm-live-table-toolbar-btn[aria-pressed="true"]': {
+    backgroundColor: "rgba(59, 130, 246, 0.14)",
+    borderColor: "rgba(59, 130, 246, 0.45)",
+    fontWeight: "600",
+  },
   ".cm-live-table-toolbar-btn:disabled": {
     opacity: 0.4,
     cursor: "not-allowed",
@@ -357,11 +365,18 @@ export const liveSurfaceTheme = EditorView.theme({
     alignItems: "stretch",
     gap: "4px",
   },
+  '.cm-live-table-wrap[data-full-width="true"] .cm-live-table-grid-row': {
+    width: "100%",
+  },
   ".cm-live-table": {
     borderCollapse: "collapse",
     flex: "1 1 auto",
     width: "100%",
     fontSize: "0.9em",
+  },
+  '.cm-live-table-wrap[data-full-width="true"] .cm-live-table': {
+    width: "100%",
+    tableLayout: "fixed",
   },
   ".cm-live-table th, .cm-live-table td": {
     border: "1px solid rgba(128, 128, 128, 0.3)",
@@ -371,8 +386,23 @@ export const liveSurfaceTheme = EditorView.theme({
     minWidth: "64px",
   },
   ".cm-live-table th": {
+    position: "relative",
     backgroundColor: "rgba(128, 128, 128, 0.1)",
     fontWeight: "600",
+  },
+  '.cm-live-table-wrap[data-header-col="true"] .cm-live-table tbody td:first-child': {
+    background: "color-mix(in srgb, var(--surface-elevated, var(--surface)) 92%, var(--text) 8%)",
+    fontWeight: "600",
+  },
+  ".cm-live-table-col-resizer": {
+    position: "absolute",
+    top: "0",
+    right: "-3px",
+    width: "6px",
+    height: "100%",
+    cursor: "col-resize",
+    userSelect: "none",
+    zIndex: "2",
   },
   ".cm-live-table th.is-active-cell, .cm-live-table td.is-active-cell": {
     padding: "2px 4px",

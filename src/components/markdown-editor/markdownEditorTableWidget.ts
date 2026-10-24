@@ -3,12 +3,16 @@ import { WidgetType, EditorView } from "@codemirror/view"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
-  MAX_EDIT_COLUMNS,
-  MAX_EDIT_ROWS,
   parseMarkdownTableGrid,
-  type MarkdownTableGrid,
   type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
+import {
+  createInteractiveTableSurface,
+  createTableToolbarElement,
+  getOrCreateTableVisualOptions,
+  renderStaticTableElement,
+  syncTableVisualWrapAttributes,
+} from "./markdownEditorTableWidgetDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 type PendingTableCellActivation = {
@@ -28,44 +32,6 @@ type ActiveCellEditorSession = {
 }
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
-
-const renderStaticTableElement = (grid: MarkdownTableGrid): HTMLTableElement => {
-  const table = document.createElement("table")
-  table.className = "cm-live-table"
-
-  const thead = document.createElement("thead")
-  const headRow = document.createElement("tr")
-  for (let col = 0; col < grid.headers.length; col += 1) {
-    const th = document.createElement("th")
-    const align = grid.alignments[col] ?? "left"
-    if (th.style) th.style.textAlign = align
-    th.setAttribute("data-align", align)
-    appendInlineMarkdownNodes(th, grid.headers[col] ?? "")
-    headRow.appendChild(th)
-  }
-  thead.appendChild(headRow)
-  table.appendChild(thead)
-
-  if (grid.rows.length > 0) {
-    const tbody = document.createElement("tbody")
-    for (let rowIdx = 0; rowIdx < grid.rows.length; rowIdx += 1) {
-      const row = grid.rows[rowIdx]!
-      const tr = document.createElement("tr")
-      for (let col = 0; col < grid.headers.length; col += 1) {
-        const td = document.createElement("td")
-        const align = grid.alignments[col] ?? "left"
-        if (td.style) td.style.textAlign = align
-        td.setAttribute("data-align", align)
-        appendInlineMarkdownNodes(td, row[col] ?? "")
-        tr.appendChild(td)
-      }
-      tbody.appendChild(tr)
-    }
-    table.appendChild(tbody)
-  }
-
-  return table
-}
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -101,22 +67,18 @@ export class MarkdownTableWidget extends WidgetType {
       wrap.setAttribute("data-table-from", String(this.from))
     }
 
+    const visualOptions = getOrCreateTableVisualOptions(this.from ?? 0, grid.headers.length)
+    syncTableVisualWrapAttributes(wrap, visualOptions)
+
     let activeRow = 0
     let activeCol = 0
     let activeSession: ActiveCellEditorSession | null = null
-    const cellElements: HTMLElement[][] = []
-    const toolbarButtons: Array<{
-      button: HTMLButtonElement
-      isDisabled: (row: number, col: number) => boolean
-    }> = []
 
     const resolveRange = (): { from: number; to: number } | null => {
       let resolvedFrom = this.from
       try {
         const domPos = view.posAtDOM(wrap)
-        if (typeof domPos === "number" && domPos >= 0) {
-          resolvedFrom = domPos
-        }
+        if (typeof domPos === "number" && domPos >= 0) resolvedFrom = domPos
       } catch {}
       if (resolvedFrom === undefined) return null
       const docLen = view.state.doc.length
@@ -130,9 +92,81 @@ export class MarkdownTableWidget extends WidgetType {
     }
 
     const restoreCellDisplay = (cellEl: HTMLElement, rawText: string) => {
+      const resizer =
+        typeof cellEl.querySelector === "function"
+          ? cellEl.querySelector(".cm-live-table-col-resizer")
+          : null
       cellEl.textContent = ""
       appendInlineMarkdownNodes(cellEl, rawText)
+      if (resizer) cellEl.appendChild(resizer)
     }
+
+    const flushActiveCellMarkdown = (): string => {
+      if (!activeSession || activeSession.handled) return this.markdown
+      const session = activeSession
+      session.handled = true
+      activeSession = null
+      const nextValue = session.input.value
+      restoreCellDisplay(session.cellEl, nextValue)
+      if (nextValue === session.initialValue) return this.markdown
+      return (
+        applyMarkdownTableGridCellEdit(this.markdown, session.row, session.col, nextValue) ??
+        this.markdown
+      )
+    }
+
+    const executeGridAction = (
+      action: MarkdownTableGridAction,
+      rowOverride = activeRow,
+      colOverride = activeCol
+    ) => {
+      if (!view.state.facet(EditorView.editable)) return
+      const baseMarkdown = flushActiveCellMarkdown()
+      const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
+      if (!outcome) {
+        if (baseMarkdown !== this.markdown) {
+          dispatchTableMarkdown(baseMarkdown, {
+            row: rowOverride,
+            col: colOverride,
+            openEditor: false,
+          })
+        }
+        return
+      }
+      activeRow = outcome.nextRow
+      activeCol = outcome.nextCol
+      syncActiveCellHighlight()
+      dispatchTableMarkdown(outcome.markdown, {
+        row: outcome.nextRow,
+        col: outcome.nextCol,
+      })
+    }
+
+    const { toolbar, toolbarButtons, canAddRow, canAddCol } = createTableToolbarElement({
+      grid,
+      wrap,
+      visualOptions,
+      executeGridAction: (action) => executeGridAction(action),
+      onEditSource: () => {
+        const range = resolveRange()
+        if (!range) return
+        view.focus()
+        view.dispatch({
+          selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)),
+          scrollIntoView: true,
+        })
+      },
+    })
+
+    const { gridRow, addRowBtn, cellElements } = createInteractiveTableSurface({
+      grid,
+      visualOptions,
+      canAddCol,
+      canAddRow,
+      onActivateCell: (row, col) => activateCellEditor(row, col),
+      onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
+      onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
+    })
 
     const syncActiveCellHighlight = () => {
       for (let r = 0; r < cellElements.length; r += 1) {
@@ -149,20 +183,6 @@ export class MarkdownTableWidget extends WidgetType {
       for (const entry of toolbarButtons) {
         entry.button.disabled = entry.isDisabled(activeRow, activeCol)
       }
-    }
-
-    const flushActiveCellMarkdown = (): string => {
-      if (!activeSession || activeSession.handled) return this.markdown
-      const session = activeSession
-      session.handled = true
-      activeSession = null
-      const nextValue = session.input.value
-      restoreCellDisplay(session.cellEl, nextValue)
-      if (nextValue === session.initialValue) return this.markdown
-      return (
-        applyMarkdownTableGridCellEdit(this.markdown, session.row, session.col, nextValue) ??
-        this.markdown
-      )
     }
 
     const dispatchTableMarkdown = (
@@ -209,33 +229,6 @@ export class MarkdownTableWidget extends WidgetType {
       })
     }
 
-    const executeGridAction = (
-      action: MarkdownTableGridAction,
-      rowOverride = activeRow,
-      colOverride = activeCol
-    ) => {
-      if (!view.state.facet(EditorView.editable)) return
-      const baseMarkdown = flushActiveCellMarkdown()
-      const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
-      if (!outcome) {
-        if (baseMarkdown !== this.markdown) {
-          dispatchTableMarkdown(baseMarkdown, {
-            row: rowOverride,
-            col: colOverride,
-            openEditor: false,
-          })
-        }
-        return
-      }
-      activeRow = outcome.nextRow
-      activeCol = outcome.nextCol
-      syncActiveCellHighlight()
-      dispatchTableMarkdown(outcome.markdown, {
-        row: outcome.nextRow,
-        col: outcome.nextCol,
-      })
-    }
-
     const activateCellEditor = (row: number, col: number) => {
       if (!view.state.facet(EditorView.editable)) return
       const clampedRow = Math.max(0, Math.min(row, grid.rows.length))
@@ -269,6 +262,10 @@ export class MarkdownTableWidget extends WidgetType {
           ? (grid.headers[clampedCol] ?? "")
           : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
 
+      const resizer =
+        typeof cellEl.querySelector === "function"
+          ? cellEl.querySelector(".cm-live-table-col-resizer")
+          : null
       cellEl.textContent = ""
       const input = document.createElement("input")
       input.type = "text"
@@ -277,6 +274,7 @@ export class MarkdownTableWidget extends WidgetType {
       input.setAttribute("aria-label", "표 셀 편집")
       input.value = initialValue
       cellEl.appendChild(input)
+      if (resizer) cellEl.appendChild(resizer)
 
       const session: ActiveCellEditorSession = {
         row: clampedRow,
@@ -352,6 +350,30 @@ export class MarkdownTableWidget extends WidgetType {
           return
         }
 
+        if (
+          event.key === "ArrowLeft" &&
+          hasNoModifiers &&
+          input.selectionStart === 0 &&
+          input.selectionEnd === 0 &&
+          (clampedRow > 0 || clampedCol > 0)
+        ) {
+          event.preventDefault()
+          executeGridAction({ kind: "tab", direction: "previous" }, clampedRow, clampedCol)
+          return
+        }
+
+        if (
+          event.key === "ArrowRight" &&
+          hasNoModifiers &&
+          input.selectionStart === input.value.length &&
+          input.selectionEnd === input.value.length &&
+          (clampedRow < grid.rows.length || clampedCol < grid.headers.length - 1)
+        ) {
+          event.preventDefault()
+          executeGridAction({ kind: "tab", direction: "next" }, clampedRow, clampedCol)
+          return
+        }
+
         if ((event.key === "ArrowUp" || event.key === "ArrowDown") && hasNoModifiers) {
           event.preventDefault()
           const delta = event.key === "ArrowUp" ? -1 : 1
@@ -383,163 +405,6 @@ export class MarkdownTableWidget extends WidgetType {
         queueMicrotask(focusInput)
       }
     }
-
-    const toolbar = document.createElement("div")
-    toolbar.className = "cm-live-table-toolbar"
-    toolbar.setAttribute("role", "toolbar")
-    toolbar.setAttribute("aria-label", "표 빠른 편집 도구")
-    toolbar.setAttribute("data-testid", "cm-live-table-toolbar")
-
-    const canAddRow = () => grid.rows.length + 2 <= MAX_EDIT_ROWS
-    const canAddCol = () => grid.headers.length < MAX_EDIT_COLUMNS
-
-    const actionSpecs: Array<{
-      label: string
-      ariaLabel: string
-      action?: MarkdownTableGridAction
-      isDisabled?: (row: number, col: number) => boolean
-      onSelect?: () => void
-    }> = [
-      { label: "위에 행 추가", ariaLabel: "표 위에 행 추가", action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
-      { label: "아래에 행 추가", ariaLabel: "표 아래에 행 추가", action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
-      { label: "행 위로 이동", ariaLabel: "표 행 위로 이동", action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
-      { label: "행 아래로 이동", ariaLabel: "표 행 아래로 이동", action: { kind: "move-row-down" }, isDisabled: (row) => row < 1 || row >= grid.rows.length },
-      { label: "행 복제", ariaLabel: "표 행 복제", action: { kind: "duplicate-row" }, isDisabled: () => !canAddRow() },
-      { label: "행 삭제", ariaLabel: "표 행 삭제", action: { kind: "delete-row" }, isDisabled: (row) => row === 0 || grid.rows.length <= 1 },
-      { label: "왼쪽에 열 추가", ariaLabel: "표 왼쪽에 열 추가", action: { kind: "insert-column-left" }, isDisabled: () => !canAddCol() },
-      { label: "오른쪽에 열 추가", ariaLabel: "표 오른쪽에 열 추가", action: { kind: "add-column" }, isDisabled: () => !canAddCol() },
-      { label: "열 왼쪽으로 이동", ariaLabel: "표 열 왼쪽으로 이동", action: { kind: "move-column-left" }, isDisabled: (_row, col) => col < 1 },
-      { label: "열 오른쪽으로 이동", ariaLabel: "표 열 오른쪽으로 이동", action: { kind: "move-column-right" }, isDisabled: (_row, col) => col >= grid.headers.length - 1 },
-      { label: "열 삭제", ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
-      { label: "왼쪽 정렬", ariaLabel: "표 열 왼쪽 정렬", action: { kind: "set-alignment", alignment: "left" } },
-      { label: "가운데 정렬", ariaLabel: "표 열 가운데 정렬", action: { kind: "set-alignment", alignment: "center" } },
-      { label: "오른쪽 정렬", ariaLabel: "표 열 오른쪽 정렬", action: { kind: "set-alignment", alignment: "right" } },
-      {
-        label: "원본 편집",
-        ariaLabel: "표 마크다운 원본 편집",
-        onSelect: () => {
-          const range = resolveRange()
-          if (!range) return
-          view.focus()
-          view.dispatch({
-            selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)),
-            scrollIntoView: true,
-          })
-        },
-      },
-    ]
-
-    for (const spec of actionSpecs) {
-      const btn = document.createElement("button")
-      btn.type = "button"
-      btn.className = "cm-live-table-toolbar-btn"
-      btn.setAttribute("aria-label", spec.ariaLabel)
-      btn.textContent = spec.label
-      btn.addEventListener("mousedown", (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-      })
-      btn.addEventListener("click", (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        if (spec.onSelect) spec.onSelect()
-        else if (spec.action) executeGridAction(spec.action)
-      })
-      if (spec.isDisabled) toolbarButtons.push({ button: btn, isDisabled: spec.isDisabled })
-      toolbar.appendChild(btn)
-    }
-
-    const gridRow = document.createElement("div")
-    gridRow.className = "cm-live-table-grid-row"
-
-    const table = document.createElement("table")
-    table.className = "cm-live-table"
-
-    const bindInteractiveCell = (cellEl: HTMLElement, row: number, col: number, text: string) => {
-      const align = grid.alignments[col] ?? "left"
-      if (cellEl.style) cellEl.style.textAlign = align
-      cellEl.setAttribute("data-align", align)
-      cellEl.setAttribute("data-cell-row", String(row))
-      cellEl.setAttribute("data-cell-col", String(col))
-      appendInlineMarkdownNodes(cellEl, text)
-
-      const handleActivate = (event: MouseEvent) => {
-        if (event.button !== 0) return
-        const target = event.target as HTMLElement | null
-        if (target?.closest("a") || target?.tagName === "INPUT") return
-        event.preventDefault()
-        event.stopPropagation()
-        activateCellEditor(row, col)
-      }
-      cellEl.addEventListener("mousedown", handleActivate)
-      cellEl.addEventListener("click", handleActivate)
-    }
-
-    const thead = document.createElement("thead")
-    const headTr = document.createElement("tr")
-    const headCellEls: HTMLElement[] = []
-    for (let col = 0; col < grid.headers.length; col += 1) {
-      const th = document.createElement("th")
-      bindInteractiveCell(th, 0, col, grid.headers[col] ?? "")
-      headCellEls.push(th)
-      headTr.appendChild(th)
-    }
-    cellElements.push(headCellEls)
-    thead.appendChild(headTr)
-    table.appendChild(thead)
-
-    const tbody = document.createElement("tbody")
-    for (let rowIdx = 0; rowIdx < grid.rows.length; rowIdx += 1) {
-      const row = grid.rows[rowIdx]!
-      const tr = document.createElement("tr")
-      const rowCellEls: HTMLElement[] = []
-      for (let col = 0; col < grid.headers.length; col += 1) {
-        const td = document.createElement("td")
-        bindInteractiveCell(td, rowIdx + 1, col, row[col] ?? "")
-        rowCellEls.push(td)
-        tr.appendChild(td)
-      }
-      cellElements.push(rowCellEls)
-      tbody.appendChild(tr)
-    }
-    table.appendChild(tbody)
-
-    const addColBtn = document.createElement("button")
-    addColBtn.type = "button"
-    addColBtn.className = "cm-live-table-add-col"
-    addColBtn.setAttribute("aria-label", "표 오른쪽에 새 열 추가")
-    addColBtn.setAttribute("data-testid", "cm-live-table-add-col")
-    addColBtn.textContent = "+"
-    addColBtn.disabled = !canAddCol()
-    addColBtn.addEventListener("mousedown", (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-    })
-    addColBtn.addEventListener("click", (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1)
-    })
-
-    gridRow.appendChild(table)
-    gridRow.appendChild(addColBtn)
-
-    const addRowBtn = document.createElement("button")
-    addRowBtn.type = "button"
-    addRowBtn.className = "cm-live-table-add-row"
-    addRowBtn.setAttribute("aria-label", "표 아래에 새 행 추가")
-    addRowBtn.setAttribute("data-testid", "cm-live-table-add-row")
-    addRowBtn.textContent = "+ 새 행"
-    addRowBtn.disabled = !canAddRow()
-    addRowBtn.addEventListener("mousedown", (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-    })
-    addRowBtn.addEventListener("click", (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      executeGridAction({ kind: "add-row" }, grid.rows.length, 0)
-    })
 
     wrap.appendChild(toolbar)
     wrap.appendChild(gridRow)
