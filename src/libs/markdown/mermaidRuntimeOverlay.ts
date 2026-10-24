@@ -16,7 +16,7 @@ export const createOverlayActionButton = (label: string, ariaLabel: string): HTM
   button.style.padding = "0 0.8rem"
   button.style.borderRadius = "6px"
   button.style.border = "1px solid var(--aq-border-strong)"
-  button.style.background = "var(--aq-surface-elevated)"
+  button.style.background = "var(--aq-surface)"
   button.style.color = "var(--aq-text)"
   button.style.fontSize = "0.78rem"
   button.style.fontWeight = "600"
@@ -214,7 +214,7 @@ export const openMermaidOverlay = (
   panel.style.overflow = "hidden"
   panel.style.borderRadius = "6px"
   panel.style.border = "1px solid var(--aq-border-strong)"
-  panel.style.background = "var(--aq-surface-elevated)"
+  panel.style.background = "var(--aq-surface)"
   panel.style.padding = "0"
 
   const actionsBar = document.createElement("div")
@@ -236,7 +236,7 @@ export const openMermaidOverlay = (
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
   stage.style.padding = "1.5rem"
-  stage.style.background = "var(--aq-surface-elevated)"
+  stage.style.background = "var(--aq-surface)"
   stage.style.display = "block"
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup

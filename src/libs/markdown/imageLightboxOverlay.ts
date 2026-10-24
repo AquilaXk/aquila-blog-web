@@ -91,7 +91,7 @@ export const openImageLightboxOverlay = (
   panel.style.gridTemplateRows = "auto minmax(0, 1fr) auto"
   panel.style.borderRadius = "6px"
   panel.style.border = "1px solid var(--aq-border-strong)"
-  panel.style.background = "var(--aq-surface-elevated)"
+  panel.style.background = "var(--aq-surface)"
   panel.style.padding = "0"
 
   const actionsBar = document.createElement("div")
