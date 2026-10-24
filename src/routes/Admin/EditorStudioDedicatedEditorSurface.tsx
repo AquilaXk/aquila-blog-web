@@ -467,6 +467,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   onKeyDown={handleTagDraftKeyDown}
                 />
               </EditorTagRow>
+              {postCategory.trim() ? <EditorHeaderMetaPill data-testid="editor-category-meta-pill">분류 · {getCategoryInputValue(postCategory)}</EditorHeaderMetaPill> : null}
               <EditorHeaderMetaPill>본문 형식 · Markdown</EditorHeaderMetaPill>
             </EditorHeaderMetaRow>
           </EditorStudioDedicatedMetaSection>

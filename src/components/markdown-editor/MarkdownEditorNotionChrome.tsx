@@ -404,7 +404,13 @@ export const MarkdownEditorNotionChrome = ({
     if (!containerRect) return null
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-    const top = Math.max(12, Math.min(Math.round(containerRect.top + gutterTop + 26), viewportHeight - 368))
+    const menuHeight = 388
+    const rawBelowTop = Math.round(containerRect.top + gutterTop + 26)
+    const rawAboveTop = Math.round(containerRect.top + gutterTop - menuHeight - 6)
+    const top =
+      rawBelowTop + menuHeight > viewportHeight - 12 && rawAboveTop >= 12
+        ? rawAboveTop
+        : Math.max(12, Math.min(rawBelowTop, viewportHeight - menuHeight - 12))
     const left = Math.max(12, Math.min(Math.round(containerRect.left + 22), viewportWidth - 216))
     return { top, left }
   }, [canShowGutterPlus, containerRef, gutterTop, isBlockMenuOpen, layoutTick])

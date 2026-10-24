@@ -3,9 +3,12 @@ import { WidgetType, EditorView } from "@codemirror/view"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
+  applyMarkdownTableGridPaste,
+  applyTableCellInlineFormat,
   parseMarkdownTableGrid,
   type MarkdownTableGrid,
   type MarkdownTableGridAction,
+  type TableCellInlineFormatKind,
 } from "./markdownEditorTableModel"
 import {
   applyTableColumnWidthsAction,
@@ -19,19 +22,8 @@ import {
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean }
-
-type ActiveCellEditorSession = {
-  row: number
-  col: number
-  cellEl: HTMLElement
-  input: HTMLInputElement
-  initialValue: string
-  handled: boolean
-}
-
-type TableDomController = {
-  update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean
-}
+type ActiveCellEditorSession = { row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean }
+type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean }
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
@@ -59,9 +51,7 @@ const patchSingleTableCell = (
     if (cellEl.style) cellEl.style.textAlign = nextAlign
     if (cellEl.dataset) cellEl.dataset.align = nextAlign
   }
-  const hasInput =
-    typeof cellEl.querySelector === "function" &&
-    cellEl.querySelector(".cm-live-table-cell-input") !== null
+  const hasInput = typeof cellEl.querySelector === "function" && cellEl.querySelector(".cm-live-table-cell-input") !== null
   if (prevText !== nextText || hasInput) restoreCellDisplay(cellEl, nextText)
 }
 
@@ -97,12 +87,7 @@ export class MarkdownTableWidget extends WidgetType {
   }
 
   eq(other: MarkdownTableWidget) {
-    return (
-      other instanceof MarkdownTableWidget &&
-      other.markdown === this.markdown &&
-      other.from === this.from &&
-      other.to === this.to
-    )
+    return other instanceof MarkdownTableWidget && other.markdown === this.markdown && other.from === this.from && other.to === this.to
   }
 
   updateDOM(dom: HTMLElement, _view: EditorView) {
@@ -115,7 +100,6 @@ export class MarkdownTableWidget extends WidgetType {
     wrap.className = "cm-live-table-wrap"
     const grid = parseMarkdownTableGrid(this.markdown)
     if (!grid) return wrap
-
     if (!view) {
       wrap.appendChild(renderStaticTableElement(grid))
       return wrap
@@ -124,7 +108,6 @@ export class MarkdownTableWidget extends WidgetType {
     let currentMarkdown = this.markdown
     let currentFrom = this.from
     let currentTo = this.to
-
     if (wrap.dataset) wrap.dataset.testid = "cm-live-table-widget"
     syncTableFromDataset(wrap, currentFrom)
 
@@ -145,12 +128,8 @@ export class MarkdownTableWidget extends WidgetType {
       if (resolvedFrom === undefined) return null
       const docLen = view.state.doc.length
       const from = Math.max(0, Math.min(resolvedFrom, docLen))
-      const span =
-        currentFrom !== undefined && currentTo !== undefined
-          ? Math.max(0, currentTo - currentFrom)
-          : currentMarkdown.length
-      const to = Math.max(from, Math.min(from + span, docLen))
-      return { from, to }
+      const span = currentFrom !== undefined && currentTo !== undefined ? Math.max(0, currentTo - currentFrom) : currentMarkdown.length
+      return { from, to: Math.max(from, Math.min(from + span, docLen)) }
     }
 
     const getPreservedCellControls = (cellEl: HTMLElement): HTMLElement[] =>
@@ -177,33 +156,18 @@ export class MarkdownTableWidget extends WidgetType {
       const nextValue = session.input.value
       restoreCellDisplay(session.cellEl, nextValue)
       if (nextValue === session.initialValue) return currentMarkdown
-      return (
-        applyMarkdownTableGridCellEdit(currentMarkdown, session.row, session.col, nextValue) ??
-        currentMarkdown
-      )
+      return applyMarkdownTableGridCellEdit(currentMarkdown, session.row, session.col, nextValue) ?? currentMarkdown
     }
 
-    const executeGridAction = (
-      action: MarkdownTableGridAction,
-      rowOverride = activeRow,
-      colOverride = activeCol,
-      openEditor?: boolean
-    ) => {
+    const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
       if (!view.state.facet(EditorView.editable)) return
       const baseMarkdown = flushActiveCellMarkdown()
       const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
       if (!outcome) {
-        if (baseMarkdown !== currentMarkdown) {
-          dispatchTableMarkdown(baseMarkdown, { row: rowOverride, col: colOverride, openEditor: false })
-        }
+        if (baseMarkdown !== currentMarkdown) dispatchTableMarkdown(baseMarkdown, { row: rowOverride, col: colOverride, openEditor: false })
         return
       }
-      applyTableColumnWidthsAction(
-        visualOptions.columnWidths,
-        grid.headers.length,
-        colOverride,
-        action
-      )
+      applyTableColumnWidthsAction(visualOptions.columnWidths, grid.headers.length, colOverride, action)
       activeRow = outcome.nextRow
       activeCol = outcome.nextCol
       syncActiveCellHighlight()
@@ -220,9 +184,7 @@ export class MarkdownTableWidget extends WidgetType {
       activeCol = Math.max(0, Math.min(col, grid.headers.length - 1))
       selectedMode = "col"
       syncActiveCellHighlight()
-      if (committed !== currentMarkdown) {
-        dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
-      }
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
     }
 
     const selectRow = (row: number) => {
@@ -231,9 +193,7 @@ export class MarkdownTableWidget extends WidgetType {
       activeRow = Math.max(0, Math.min(row, grid.rows.length))
       selectedMode = "row"
       syncActiveCellHighlight()
-      if (committed !== currentMarkdown) {
-        dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
-      }
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
     }
 
     const { toolbar, toolbarButtons, canAddRow, canAddCol } = createTableToolbarElement({
@@ -245,10 +205,7 @@ export class MarkdownTableWidget extends WidgetType {
         const range = resolveRange()
         if (!range) return
         view.focus()
-        view.dispatch({
-          selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)),
-          scrollIntoView: true,
-        })
+        view.dispatch({ selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)), scrollIntoView: true })
       },
     })
 
@@ -261,6 +218,8 @@ export class MarkdownTableWidget extends WidgetType {
         onActivateCell: (row, col) => activateCellEditor(row, col),
         onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
         onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
+        onAddRowAndColumn: () =>
+          executeGridAction({ kind: "add-row-and-column" }, grid.rows.length, grid.headers.length - 1),
         onSelectColumn: (col) => selectColumn(col),
         onSelectRow: (row) => selectRow(row),
         onMoveColumnTo: (fromCol, toCol) => {
@@ -276,6 +235,7 @@ export class MarkdownTableWidget extends WidgetType {
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
+      wrap.setAttribute("data-active-mode", selectedMode)
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
@@ -398,19 +358,31 @@ export class MarkdownTableWidget extends WidgetType {
       const stopBubble = (event: Event) => {
         event.stopPropagation()
       }
-      for (const eventName of [
-        "mousedown",
-        "mouseup",
-        "click",
-        "dblclick",
-        "input",
-        "beforeinput",
-        "paste",
-        "compositionstart",
-        "compositionend",
-      ]) {
+      for (const eventName of ["mousedown", "mouseup", "click", "dblclick", "input", "beforeinput", "compositionstart", "compositionend"]) {
         input.addEventListener(eventName, stopBubble)
       }
+
+      input.addEventListener("paste", (event: ClipboardEvent) => {
+        event.stopPropagation()
+        const pastedText = event.clipboardData?.getData("text/plain") ?? ""
+        if (!pastedText.includes("\t") && !pastedText.includes("\n") && !pastedText.includes("\r")) return
+        const baseMarkdown =
+          input.value !== initialValue
+            ? (applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, input.value) ?? currentMarkdown)
+            : currentMarkdown
+        const outcome = applyMarkdownTableGridPaste(baseMarkdown, clampedRow, clampedCol, pastedText)
+        if (!outcome) return
+        event.preventDefault()
+        session.handled = true
+        if (activeSession === session) activeSession = null
+        const nextGrid = parseMarkdownTableGrid(outcome.markdown)
+        if (nextGrid) {
+          while (visualOptions.columnWidths.length < nextGrid.headers.length) visualOptions.columnWidths.push(0)
+        }
+        activeRow = outcome.nextRow
+        activeCol = outcome.nextCol
+        dispatchTableMarkdown(outcome.markdown, { row: outcome.nextRow, col: outcome.nextCol, openEditor: false })
+      })
 
       const commitAndCloseSession = () => {
         if (session.handled) return
@@ -418,12 +390,7 @@ export class MarkdownTableWidget extends WidgetType {
         if (activeSession === session) activeSession = null
         const nextValue = input.value
         if (nextValue !== initialValue) {
-          const updated = applyMarkdownTableGridCellEdit(
-            currentMarkdown,
-            clampedRow,
-            clampedCol,
-            nextValue
-          )
+          const updated = applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, nextValue)
           if (updated && updated !== currentMarkdown) {
             dispatchTableMarkdown(updated, { row: clampedRow, col: clampedCol, openEditor: false })
             return
@@ -436,18 +403,40 @@ export class MarkdownTableWidget extends WidgetType {
         event.stopPropagation()
         if (event.isComposing || event.keyCode === 229) return
 
-        if (event.key === "Tab") {
+        const applyInlineShortcut = (kind: TableCellInlineFormatKind) => {
           event.preventDefault()
-          executeGridAction(
-            { kind: "tab", direction: event.shiftKey ? "previous" : "next" },
-            clampedRow,
-            clampedCol
+          const res = applyTableCellInlineFormat(
+            input.value,
+            input.selectionStart ?? input.value.length,
+            input.selectionEnd ?? input.value.length,
+            kind
           )
+          input.value = res.value
+          try {
+            input.setSelectionRange(res.selectionStart, res.selectionEnd)
+          } catch {}
+        }
+
+        if (event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          applyInlineShortcut("line-break")
           return
         }
 
-        const hasNoModifiers =
-          !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+        if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+          const lowerKey = event.key.toLowerCase()
+          if (!event.shiftKey && lowerKey === "b") return applyInlineShortcut("bold")
+          if (!event.shiftKey && lowerKey === "i") return applyInlineShortcut("italic")
+          if (!event.shiftKey && lowerKey === "e") return applyInlineShortcut("code")
+          if (event.shiftKey && (lowerKey === "x" || lowerKey === "s")) return applyInlineShortcut("strikethrough")
+        }
+
+        if (event.key === "Tab") {
+          event.preventDefault()
+          executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, clampedRow, clampedCol)
+          return
+        }
+
+        const hasNoModifiers = !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
 
         if (event.key === "Enter" && hasNoModifiers) {
           event.preventDefault()

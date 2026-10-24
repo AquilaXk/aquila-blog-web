@@ -107,10 +107,7 @@ export const createTableColGroup = (
   return { colgroup, cols }
 }
 
-export const syncTableColGroupWidths = (
-  cols: readonly HTMLElement[],
-  columnWidths: readonly number[]
-) => {
+export const syncTableColGroupWidths = (cols: readonly HTMLElement[], columnWidths: readonly number[]) => {
   for (let col = 0; col < cols.length; col += 1) {
     const colEl = cols[col]
     if (!colEl) continue
@@ -153,6 +150,8 @@ export const applyTableColumnWidthsAction = (
     columnWidths.splice(clampedCol, 0, 0)
   } else if (action.kind === "add-column") {
     columnWidths.splice(clampedCol + 1, 0, 0)
+  } else if (action.kind === "add-row-and-column" && columnCount < MAX_EDIT_COLUMNS) {
+    columnWidths.push(0)
   } else if (action.kind === "duplicate-column") {
     columnWidths.splice(clampedCol + 1, 0, columnWidths[clampedCol] ?? 0)
   } else if (action.kind === "delete-column" && columnCount > 1) {
@@ -378,29 +377,18 @@ export const createInteractiveTableSurface = (params: {
   onActivateCell: (row: number, col: number) => void
   onAddColumn: () => void
   onAddRow: () => void
+  onAddRowAndColumn?: () => void
   onSelectColumn?: (col: number) => void
   onSelectRow?: (row: number) => void
   onMoveColumnTo?: (fromCol: number, toCol: number) => void
   onMoveRowTo?: (fromRow: number, toRow: number) => void
 }): {
   gridRow: HTMLDivElement
-  addRowBtn: HTMLButtonElement
+  addRowBtn: HTMLElement
   cellElements: HTMLElement[][]
   colElements: HTMLElement[]
 } => {
-  const {
-    grid,
-    visualOptions,
-    canAddCol,
-    canAddRow,
-    onActivateCell,
-    onAddColumn,
-    onAddRow,
-    onSelectColumn,
-    onSelectRow,
-    onMoveColumnTo,
-    onMoveRowTo,
-  } = params
+  const { grid, visualOptions, canAddCol, canAddRow, onActivateCell, onAddColumn, onAddRow, onAddRowAndColumn, onSelectColumn, onSelectRow, onMoveColumnTo, onMoveRowTo } = params
   const cellElements: HTMLElement[][] = []
   const gridRow = document.createElement("div")
   gridRow.className = "cm-live-table-grid-row"
@@ -558,14 +546,7 @@ export const createInteractiveTableSurface = (params: {
   }
   table.appendChild(tbody)
 
-  const createAddBarButton = (
-    className: string,
-    ariaLabel: string,
-    testId: string,
-    label: string,
-    disabled: boolean,
-    onSelect: () => void
-  ) => {
+  const createAddBarButton = (className: string, ariaLabel: string, testId: string, label: string, disabled: boolean, onSelect: () => void) => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.className = className
@@ -588,6 +569,11 @@ export const createInteractiveTableSurface = (params: {
   const addColBtn = createAddBarButton("cm-live-table-add-col", "표 오른쪽에 새 열 추가", "cm-live-table-add-col", "+", !canAddCol(), onAddColumn)
   gridRow.appendChild(table)
   gridRow.appendChild(addColBtn)
+  const footerRow = document.createElement("div")
+  footerRow.className = "cm-live-table-footer-row"
   const addRowBtn = createAddBarButton("cm-live-table-add-row", "표 아래에 새 행 추가", "cm-live-table-add-row", "+ 새 행", !canAddRow(), onAddRow)
-  return { gridRow, addRowBtn, cellElements, colElements: cols }
+  const addCornerBtn = createAddBarButton("cm-live-table-add-corner", "표 행과 열 동시 추가", "cm-live-table-add-corner", "+", !canAddRow() && !canAddCol(), () => onAddRowAndColumn?.())
+  footerRow.appendChild(addRowBtn)
+  footerRow.appendChild(addCornerBtn)
+  return { gridRow, addRowBtn: footerRow, cellElements, colElements: cols }
 }
