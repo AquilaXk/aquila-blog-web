@@ -20,6 +20,7 @@ import {
   buildEditorStateFingerprint,
   buildLocalDraftFingerprint,
 } from "../../src/routes/Admin/editorStudioMetaModel"
+import { renderImmediateCodeToHtml } from "../../src/libs/markdown/prismRuntime"
 import { createPublicDesignTokens } from "../../src/styles/theme"
 
 const repoRoot = resolve(__dirname, "../..")
@@ -167,6 +168,10 @@ test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal",
     expect(prismSrc).not.toContain("prismImmediateLanguageLoaders")
     expect(prismSrc).toContain('md: ["markdown"]')
     expect(prismSrc).toContain('py: ["python"]')
+
+    const largeJson = `{"key":"${"a".repeat(5000)}","count":42}`
+    const renderedLargeJson = renderImmediateCodeToHtml({ source: largeJson })
+    expect(renderedLargeJson.language).toBe("json")
 
     const nextConfigSrc = readRepoFile("next.config.js")
     expect(nextConfigSrc).not.toContain("ignoreWarnings")

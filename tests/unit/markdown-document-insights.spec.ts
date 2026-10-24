@@ -101,7 +101,7 @@ test("fast-paths plain heading labels and strips inline syntax on formatted head
   expect(hasHeadingInlineSyntax("Heading with `code`")).toBe(true)
   expect(formatMarkdownHeadingLabel("  Plain   Heading \t Title  ")).toBe("Plain Heading Title")
   expect(
-    formatMarkdownHeadingLabel("**Bold** _italic_ ~~strike~~ ![alt](img.png) [link](url) `literal_code`")
+    formatMarkdownHeadingLabel("**Bold**   _italic_ \t ~~strike~~ ![alt](img.png) [link](url) `literal_code`")
   ).toBe("Bold italic strike alt link literal_code")
 })
 
@@ -109,6 +109,9 @@ test("counts surrogate pairs accurately in words and code points and skips non-H
   const emojiText = "🚀🔥   💡✨   한글"
   expect(countCodePoints(emojiText)).toBe(Array.from(emojiText).length)
   expect(countWords(emojiText)).toBe(3)
+  const emojiInsights = createMarkdownDocumentInsights(emojiText)
+  expect(emojiInsights.characterCount).toBe(Array.from(emojiText).length)
+  expect(emojiInsights.wordCount).toBe(3)
 
   const insights = createMarkdownDocumentInsights(
     ["#hashtag without space", "##### H5 ignored", "###\tTab Heading 🚀"].join("\n")

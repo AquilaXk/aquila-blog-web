@@ -140,10 +140,11 @@ const resolvePrismLanguage = (source: string, language?: string | null) => {
 }
 
 export const inferPrismLanguageFromSource = (rawValue: string): string => {
-  const sample = rawValue.length > 4096 ? rawValue.slice(0, 4096).trim() : rawValue.trim()
-  if (!sample) return "text"
+  const trimmed = rawValue.trim()
+  if (!trimmed) return "text"
+  const sample = trimmed.length > 4096 ? trimmed.slice(0, 4096) : trimmed
 
-  if (/^\s*[{[][\s\S]*[}\]]\s*$/.test(sample) && /"\s*:/.test(sample)) return "json"
+  if (/^[{[]/.test(sample) && /[}\]]$/.test(trimmed) && /"\s*:/.test(sample)) return "json"
   if (/(^|\n)\s*(fun|val|var|data class|object|companion object)\b/.test(sample)) return "kotlin"
   if (/(^|\n)\s*(public|private|protected)\s+(class|interface|enum)\b/.test(sample)) return "java"
   if (/(^|\n)\s*(interface|type)\s+\w+/.test(sample) || /:\s*(string|number|boolean|unknown|any)\b/.test(sample))

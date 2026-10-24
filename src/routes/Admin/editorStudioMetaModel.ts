@@ -429,13 +429,15 @@ export const buildLocalDraftFingerprint = (payload: LocalDraftFingerprintPayload
 
 const TOGGLE_TITLE_PLACEHOLDER_LINE = `:::toggle ${EDITOR_TOGGLE_TITLE_PLACEHOLDER}`
 
+type FenceMarker = "`" | "~"
+
 const updateFenceMarker = (
-  current: "`" | "~" | null,
+  current: FenceMarker | null,
   trimmed: string
-): { marker: "`" | "~" | null; isFenceLine: boolean } => {
+): { marker: FenceMarker | null; isFenceLine: boolean } => {
   const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed)
   if (!fenceMatch) return { marker: current, isFenceLine: false }
-  const nextMarker = fenceMatch[1][0] as "`" | "~"
+  const nextMarker = fenceMatch[1][0] as FenceMarker
   if (!current) return { marker: nextMarker, isFenceLine: true }
   return { marker: current === nextMarker ? null : current, isFenceLine: true }
 }
@@ -451,7 +453,7 @@ const detectPlaceholderLineIssue = (trimmed: string): string | null => {
 }
 
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
-  let fenceMarker: "`" | "~" | null = null
+  let fenceMarker: FenceMarker | null = null
   let cursor = 0
 
   while (cursor <= content.length) {

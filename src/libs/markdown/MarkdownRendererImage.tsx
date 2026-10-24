@@ -29,6 +29,13 @@ export const MarkdownImageFigure = memo(
     const effectiveAspectRatio =
       aspectRatio || (effectiveWidthPx && effectiveHeightPx ? `${effectiveWidthPx} / ${effectiveHeightPx}` : undefined)
     const safeSrc = normalizeSafeMarkdownImageSrc(src)
+
+    useEffect(() => {
+      const image = frameRef.current?.querySelector<HTMLImageElement>("img")
+      if (!image || editable || image.closest("a, button")) return
+      image.tabIndex = 0
+    }, [editable, safeSrc])
+
     const frameStyle: CSSProperties | undefined =
       effectiveWidthPx || effectiveAspectRatio
         ? ({
@@ -61,7 +68,6 @@ export const MarkdownImageFigure = memo(
           fetchPriority={eager ? "high" : undefined}
           decoding="async"
           draggable={false}
-          tabIndex={0}
         />
         {editable ? (
           <button

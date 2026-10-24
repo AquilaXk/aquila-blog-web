@@ -81,7 +81,6 @@ export default function AdminProfileImageEditorModal({
     open: true,
     onClose: closeWhenIdle,
     containerRef: modalCardRef,
-    paused: isUploading,
   })
 
   return (

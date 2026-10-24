@@ -412,7 +412,14 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
 
   useEffect(() => {
     imageRenderOrderRef.current = 0
-  }, [renderKey])
+    const root = rootRef.current
+    if (!root || editableImages) return
+    for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+      if (!image.closest("a, button") && !image.hasAttribute("tabindex")) {
+        image.tabIndex = 0
+      }
+    }
+  }, [editableImages, renderKey])
 
   const handleRootClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {

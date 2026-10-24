@@ -539,21 +539,23 @@ export const buildMarkdownLivePreviewDecorationSpecs = (
   composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown), selections, composing)
 
 const stepFoldFence = (fence: string, text: string): { fence: string; isFenceLine: boolean } => {
-  const match = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(text)
-  if (!match) return { fence, isFenceLine: false }
-  if (!fence) return { fence: match[1]!, isFenceLine: true }
-  const closes = match[1]![0] === fence[0] && match[1]!.length >= fence.length && !match[2]?.trim()
+  let cursor = 0
+  while (cursor < 3 && (text[cursor] === " " || text[cursor] === "\t")) cursor += 1
+  const marker = text[cursor]
+  if (marker !== "`" && marker !== "~") return { fence, isFenceLine: false }
+  const runStart = cursor
+  while (text[cursor] === marker) cursor += 1
+  const fenceRun = text.slice(runStart, cursor)
+  if (fenceRun.length < 3) return { fence, isFenceLine: false }
+  if (!fence) return { fence: fenceRun, isFenceLine: true }
+  const closes = fenceRun.startsWith(fence[0]!) && fenceRun.length >= fence.length && !text.slice(cursor).trim()
   return { fence: closes ? "" : fence, isFenceLine: true }
 }
 
+type FoldDocLine = { number: number; from: number; to: number; text: string }
+
 export const computeMarkdownFoldRange = (
-  state: {
-    doc: {
-      lines: number
-      lineAt: (pos: number) => { number: number; from: number; to: number; text: string }
-      line: (lineNo: number) => { number: number; from: number; to: number; text: string }
-    }
-  },
+  state: { doc: { lines: number; lineAt: (pos: number) => FoldDocLine; line: (lineNo: number) => FoldDocLine } },
   lineStart: number,
   _lineEnd?: number
 ): { from: number; to: number } | null => {

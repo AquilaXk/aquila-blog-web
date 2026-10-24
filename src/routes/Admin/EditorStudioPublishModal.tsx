@@ -77,12 +77,14 @@ export const EditorStudioPublishModal = ({
     loadingKey === "writePost" ||
     loadingKey === "modifyPost" ||
     loadingKey === "publishTempPost"
+  const closeWhenIdle = () => {
+    if (!isCloseDisabled) onClose()
+  }
 
   const { handleKeyDown } = useModalFocusTrap({
     open: true,
-    onClose,
+    onClose: closeWhenIdle,
     containerRef: dialogRef,
-    paused: isCloseDisabled,
   })
 
   return (

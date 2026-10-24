@@ -50,23 +50,8 @@ export const countCodePoints = (text: string): number => {
   return count
 }
 
-export const countWords = (text: string): number => {
-  let words = 0
-  let inWord = false
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.codePointAt(index) ?? 0
-    if (isUnicodeWhitespace(code)) {
-      inWord = false
-    } else if (!inWord) {
-      inWord = true
-      words += 1
-    }
-    if (code > 0xffff) {
-      index += 1
-    }
-  }
-  return words
-}
+export const countWords = (text: string): number =>
+  countTrimmedCodePointsAndWords(text).wordCount
 
 const findTrimmedBounds = (text: string): { start: number; end: number } => {
   let start = 0
@@ -146,7 +131,7 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
     return collapseAsciiWhitespace(text)
   }
   const codeSpans: string[] = []
-  return text
+  const formatted = text
     .replace(/`([^`]+)`/g, (_, code: string) => {
       const token = `@@CODE_SPAN_${codeSpans.length}@@`
       codeSpans.push(code)
@@ -160,7 +145,7 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
     .replace(/(^|[^\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/~~(.*?)~~/g, "$1")
     .replace(/@@CODE_SPAN_(\d+)@@/g, (_, index: string) => codeSpans[Number(index)] ?? "")
-    .trim()
+  return collapseAsciiWhitespace(formatted)
 }
 
 const toMarkdownHeadingSlug = (value: string) => {

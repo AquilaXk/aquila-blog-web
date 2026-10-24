@@ -74,12 +74,42 @@ const stepCompletionFence = (
   fence: string,
   lineText: string
 ): { fence: string; isFenceLine: boolean } => {
-  const match = /^(?: {0,3})(`{3,}|~{3,})(.*)$/.exec(lineText)
-  if (!match) return { fence, isFenceLine: false }
-  if (!fence) return { fence: match[1]!, isFenceLine: true }
+  let cursor = 0
+  while (cursor < 3 && lineText[cursor] === " ") {
+    cursor += 1
+  }
+  const marker = lineText[cursor]
+  if (marker !== "`" && marker !== "~") {
+    return { fence, isFenceLine: false }
+  }
+  const runStart = cursor
+  while (lineText[cursor] === marker) {
+    cursor += 1
+  }
+  const fenceRun = lineText.slice(runStart, cursor)
+  if (fenceRun.length < 3) {
+    return { fence, isFenceLine: false }
+  }
+  if (!fence) return { fence: fenceRun, isFenceLine: true }
   const closes =
-    match[1]![0] === fence[0] && match[1]!.length >= fence.length && !match[2]?.trim()
+    fenceRun.startsWith(fence[0]!) &&
+    fenceRun.length >= fence.length &&
+    !lineText.slice(cursor).trim()
   return { fence: closes ? "" : fence, isFenceLine: true }
+}
+
+const extractHeadingCompletionTitle = (lineText: string): string => {
+  let hashes = 0
+  while (hashes < 6 && lineText[hashes] === "#") {
+    hashes += 1
+  }
+  if (hashes === 0 || lineText[hashes] === "#") return ""
+  let cursor = hashes
+  while (lineText[cursor] === " " || lineText[cursor] === "\t") {
+    cursor += 1
+  }
+  if (cursor === hashes) return ""
+  return lineText.slice(cursor).trim()
 }
 
 const collectDocumentHeadingOptions = (doc: CompletionContext["state"]["doc"]): Completion[] => {
@@ -95,8 +125,7 @@ const collectDocumentHeadingOptions = (doc: CompletionContext["state"]["doc"]): 
     activeFence = fenceStep.fence
     if (fenceStep.isFenceLine || activeFence) continue
 
-    const headingMatch = /^#{1,6}[ \t]+([^\r\n]+)$/.exec(lineText)
-    const title = headingMatch?.[1]?.trim() ?? ""
+    const title = extractHeadingCompletionTitle(lineText)
     if (title) {
       options.push({
         label: `#${title}`,

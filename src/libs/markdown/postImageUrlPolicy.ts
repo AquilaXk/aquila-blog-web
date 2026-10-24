@@ -117,9 +117,9 @@ const updateCodeFenceState = (
   }
   const closingMatch = /^(`+|~+)\s*$/.exec(trimmedLine)
   const isClosing =
-    Boolean(closingMatch) &&
-    closingMatch![1][0] === fence.marker &&
-    closingMatch![1].length >= fence.length
+    closingMatch !== null &&
+    closingMatch[1].startsWith(fence.marker) &&
+    closingMatch[1].length >= fence.length
   return { nextFence: isClosing ? null : fence, skipLine: true }
 }
 
@@ -159,6 +159,21 @@ const isEscapedMarkdownMarker = (content: string, index: number) => {
   return slashCount % 2 === 1
 }
 
+const parseCardMetadataLine = (
+  metadataMatch: RegExpMatchArray
+): { kind: string; thumbnailUrl: string } | null => {
+  try {
+    const payload = JSON.parse(metadataMatch[2]) as Record<string, unknown>
+    const thumbnailUrl =
+      typeof payload.thumbnailUrl === "string"
+        ? normalizeCardThumbnailSource(payload.thumbnailUrl)
+        : ""
+    return thumbnailUrl ? { kind: metadataMatch[1].toLowerCase(), thumbnailUrl } : null
+  } catch {
+    return null
+  }
+}
+
 const markdownCardThumbnailSources = (content: string) => {
   if (!content.includes("aq-")) return []
   const sources: string[] = []
@@ -167,23 +182,13 @@ const markdownCardThumbnailSources = (content: string) => {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    const metadataMatch = line.match(CARD_METADATA_PATTERN)
+    const metadataMatch = CARD_METADATA_PATTERN.exec(line)
     if (metadataMatch) {
-      try {
-        const payload = JSON.parse(metadataMatch[2]) as Record<string, unknown>
-        const thumbnailUrl = typeof payload.thumbnailUrl === "string"
-          ? normalizeCardThumbnailSource(payload.thumbnailUrl)
-          : ""
-        pendingMetadata = thumbnailUrl
-          ? { kind: metadataMatch[1].toLowerCase(), thumbnailUrl }
-          : null
-      } catch {
-        pendingMetadata = null
-      }
+      pendingMetadata = parseCardMetadataLine(metadataMatch)
       continue
     }
 
-    const directiveMatch = line.trim().match(CARD_DIRECTIVE_PATTERN)
+    const directiveMatch = CARD_DIRECTIVE_PATTERN.exec(line.trim())
     const hasClosingMarker = lines.slice(index + 1).some((candidate) => candidate.trim() === ":::")
     if (pendingMetadata && directiveMatch?.[1].toLowerCase() === pendingMetadata.kind && hasClosingMarker) {
       sources.push(pendingMetadata.thumbnailUrl)
@@ -194,23 +199,24 @@ const markdownCardThumbnailSources = (content: string) => {
   return sources
 }
 
-export const hasNonCanonicalPostImageSource = (content: string): boolean => {
-  if (!/!\[|aq-(?:bookmark|embed)/i.test(content)) return false
-  const visibleContent = markdownWithoutCode(content)
+const collectImageReferenceDefinitions = (visibleContent: string): Map<string, string> => {
   const definitions = new Map<string, string>()
-  if (visibleContent.includes("]:")) {
-    for (const line of visibleContent.split("\n")) {
-      const match = stripBlockquotePrefixes(line).match(/^\s{0,3}\[([^\]]+)]:\s*<?([^\s>]+)>?/)
-      if (!match) continue
-      const label = normalizeReferenceLabel(match[1])
-      if (!definitions.has(label)) definitions.set(label, match[2])
-    }
+  if (!visibleContent.includes("]:")) return definitions
+  for (const line of visibleContent.split("\n")) {
+    const match = /^\s{0,3}\[([^\]]+)]:\s*<?([^\s>]+)>?/.exec(stripBlockquotePrefixes(line))
+    if (!match) continue
+    const label = normalizeReferenceLabel(match[1])
+    if (!definitions.has(label)) definitions.set(label, match[2])
   }
-  const destinations = [...visibleContent.matchAll(/!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g)]
-    .filter((match) => !isEscapedMarkdownMarker(visibleContent, match.index ?? 0))
-    .map((match) => match[1])
-  destinations.push(...markdownCardThumbnailSources(visibleContent))
+  return definitions
+}
 
+const collectReferenceImageDestinations = (
+  visibleContent: string,
+  definitions: ReadonlyMap<string, string>
+): string[] => {
+  if (definitions.size === 0) return []
+  const destinations: string[] = []
   for (const match of visibleContent.matchAll(/!\[([^\]]*)]\[([^\]]*)]/g)) {
     if (isEscapedMarkdownMarker(visibleContent, match.index ?? 0)) continue
     const destination = definitions.get(normalizeReferenceLabel(match[2] || match[1]))
@@ -221,6 +227,20 @@ export const hasNonCanonicalPostImageSource = (content: string): boolean => {
     const destination = definitions.get(normalizeReferenceLabel(match[1]))
     if (destination) destinations.push(destination)
   }
+  return destinations
+}
+
+export const hasNonCanonicalPostImageSource = (content: string): boolean => {
+  if (!/!\[|aq-(?:bookmark|embed)/i.test(content)) return false
+  const visibleContent = markdownWithoutCode(content)
+  const definitions = collectImageReferenceDefinitions(visibleContent)
+  const destinations = [...visibleContent.matchAll(/!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g)]
+    .filter((match) => !isEscapedMarkdownMarker(visibleContent, match.index ?? 0))
+    .map((match) => match[1])
+  destinations.push(
+    ...markdownCardThumbnailSources(visibleContent),
+    ...collectReferenceImageDestinations(visibleContent, definitions)
+  )
 
   return destinations.some((destination) => !isCanonicalPostImageUploadUrl(destination))
 }

@@ -146,8 +146,8 @@ const isLikelyFenceLeadCode = (code: number): boolean =>
   code === 0xfeff
 
 const hasUniformMarkerRun = (fence: string, marker: string): boolean => {
-  for (let index = 0; index < fence.length; index += 1) {
-    if (fence[index] !== marker) return false
+  for (const char of fence) {
+    if (char !== marker) return false
   }
   return true
 }

@@ -187,7 +187,7 @@ export const planListEnterContinuation = (
       const nextLineBreak = value.indexOf("\n", cursor)
       const rLine = nextLineBreak === -1 ? value.slice(cursor) : value.slice(cursor, nextLineBreak)
       const rMatch = matchListMarkerLine(rLine)
-      if (!rMatch || rMatch.kind !== "ordered" || rMatch.indent !== matched.indent) {
+      if (rMatch?.kind !== "ordered" || rMatch.indent !== matched.indent) {
         break
       }
       currentNum += 1
