@@ -1,4 +1,4 @@
-import type { PointerEventHandler, Ref } from "react"
+import { useEffect, type PointerEventHandler, type Ref } from "react"
 import AppIcon from "src/components/icons/AppIcon"
 import { PROFILE_IMAGE_EDIT_MAX_ZOOM, PROFILE_IMAGE_EDIT_MIN_ZOOM } from "src/libs/profileImageUpload"
 import type { ProfileImageHistoryItem } from "src/routes/Admin/AdminProfilePersistenceModel"
@@ -74,6 +74,18 @@ export default function AdminProfileImageEditorModal({
     if (isUploading) return
     onRequestClose()
   }
+
+  useEffect(() => {
+    if (isUploading) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onRequestClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isUploading, onRequestClose])
 
   return (
     <ModalOverlay

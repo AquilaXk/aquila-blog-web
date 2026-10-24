@@ -150,13 +150,15 @@ const normalizeMalformedTrailingSpaceEmphasisSegment = (segment: string) => {
   return normalized
 }
 
-const normalizeMalformedTrailingSpaceEmphasisLine = (line: string) =>
-  line
+const normalizeMalformedTrailingSpaceEmphasisLine = (line: string) => {
+  if (!line.includes("*") && !line.includes("_")) return line
+  return line
     .split(/(`+[^`\n]*`+)/g)
     .map((segment, index) =>
       index % 2 === 1 ? segment : normalizeMalformedTrailingSpaceEmphasisSegment(segment)
     )
     .join("")
+}
 
 const normalizeMalformedTrailingSpaceEmphasis = (markdown: string) => {
   if ((!markdown.includes("*") && !markdown.includes("_")) || !markdown.includes(" ")) return markdown

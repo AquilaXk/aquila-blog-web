@@ -106,8 +106,15 @@ const LoadingShell = styled.section`
   margin-top: 1rem;
   padding-bottom: 2rem;
 
-  > div {
-    border-radius: 12px;
+  .eyebrow,
+  .title,
+  .avatar,
+  .meta,
+  .summary,
+  .railCard,
+  .cover,
+  .line {
+    border-radius: 2px;
     background: ${({ theme }) => theme.colors.gray3};
     animation: detail-skeleton-pulse 1.2s ease-in-out infinite;
   }
@@ -127,6 +134,7 @@ const LoadingShell = styled.section`
   .title {
     height: 52px;
     width: min(72%, 560px);
+    border-radius: 4px;
   }
 
   .metaRow {
@@ -138,7 +146,7 @@ const LoadingShell = styled.section`
   .avatar {
     width: 42px;
     height: 42px;
-    border-radius: 999px;
+    border-radius: 4px;
   }
 
   .meta {
@@ -164,7 +172,7 @@ const LoadingShell = styled.section`
 
   .railCard {
     height: 124px;
-    border-radius: 18px;
+    border-radius: 4px;
   }
 
   .bodyCard {
@@ -175,7 +183,7 @@ const LoadingShell = styled.section`
   .cover {
     height: min(34vh, 280px);
     width: 100%;
-    border-radius: 20px;
+    border-radius: 4px;
   }
 
   .line {

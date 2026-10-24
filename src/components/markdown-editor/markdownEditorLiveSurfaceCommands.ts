@@ -391,7 +391,7 @@ export const liveSurfaceTheme = EditorView.theme({
     fontWeight: "600",
   },
   '.cm-live-table-wrap[data-header-col="true"] .cm-live-table tbody td:first-child': {
-    background: "color-mix(in srgb, var(--surface-elevated, var(--surface)) 92%, var(--text) 8%)",
+    background: "color-mix(in srgb, var(--aq-surface) 92%, var(--aq-text) 8%)",
     fontWeight: "600",
   },
   ".cm-live-table-col-resizer": {

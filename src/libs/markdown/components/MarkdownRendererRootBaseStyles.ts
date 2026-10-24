@@ -59,6 +59,11 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     cursor: ew-resize;
     box-shadow: 0 12px 28px rgba(2, 6, 23, 0.2);
     backdrop-filter: blur(8px);
+
+    @media (max-width: 768px) {
+      min-width: 44px;
+      min-height: 44px;
+    }
   }
 
   .aq-image-frame[data-editable="true"] .aq-image-resize-handle span {

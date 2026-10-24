@@ -1,3 +1,37 @@
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>()
+const dateTimePartsFormatterCache = new Map<string, Intl.DateTimeFormat>()
+
+const getDateFormatter = (lang: string, timeZone: string): Intl.DateTimeFormat => {
+  const key = `${lang}|${timeZone}`
+  const cached = dateFormatterCache.get(key)
+  if (cached) return cached
+  const formatter = new Intl.DateTimeFormat(lang, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone,
+  })
+  dateFormatterCache.set(key, formatter)
+  return formatter
+}
+
+const getDateTimePartsFormatter = (lang: string, timeZone: string): Intl.DateTimeFormat => {
+  const key = `${lang}|${timeZone}`
+  const cached = dateTimePartsFormatterCache.get(key)
+  if (cached) return cached
+  const formatter = new Intl.DateTimeFormat(lang, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  })
+  dateTimePartsFormatterCache.set(key, formatter)
+  return formatter
+}
+
 export const formatDate = (
   input: string | number | Date,
   lang: string = "en-US",
@@ -12,14 +46,7 @@ export const formatDate = (
       return ""
     }
 
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      timeZone,
-    }
-
-    return date.toLocaleDateString(lang, options)
+    return getDateFormatter(lang, timeZone).format(date)
   } catch {
     return ""
   }
@@ -45,26 +72,28 @@ const toParts = (
   const date = toDate(input)
   if (!date) return null
 
-  const formatter = new Intl.DateTimeFormat(lang, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone,
-  })
-
+  const formatter = getDateTimePartsFormatter(lang, timeZone)
   const parts = formatter.formatToParts(date)
-  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value || ""
+  let year = ""
+  let month = ""
+  let day = ""
+  let hour = ""
+  let minute = ""
+
+  for (const part of parts) {
+    if (part.type === "year") year = part.value
+    else if (part.type === "month") month = part.value
+    else if (part.type === "day") day = part.value
+    else if (part.type === "hour") hour = part.value
+    else if (part.type === "minute") minute = part.value
+  }
 
   return {
-    year: lookup("year"),
-    month: lookup("month"),
-    day: lookup("day"),
-    hour: lookup("hour"),
-    minute: lookup("minute"),
+    year,
+    month,
+    day,
+    hour,
+    minute,
   }
 }
 

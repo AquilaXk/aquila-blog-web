@@ -355,7 +355,14 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   }
   .cm-editor.cm-focused { outline: none; }
   .cm-scroller { overscroll-behavior: contain; }
-  .cm-content { caret-color: ${({ theme }) => theme.colors.gray12}; }
+  .cm-content {
+    caret-color: ${({ theme }) => theme.colors.gray12};
+    padding-left: 44px;
+
+    @media (max-width: 720px) {
+      padding-left: 16px;
+    }
+  }
   .cm-placeholder {
     color: ${({ theme }) => theme.colors.gray9};
     font-style: normal;
@@ -416,14 +423,10 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     gap: 4px;
     padding: 1px 7px 1px 5px;
     margin: 0 2px;
-    border-radius: 9999px;
-    background: ${({ theme }) =>
-      theme.scheme === "dark" ? "rgba(168, 85, 247, 0.18)" : "rgba(124, 58, 237, 0.1)"};
-    border: 1px solid
-      ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.35)" : "rgba(124, 58, 237, 0.22)"};
-    color: ${({ theme }) =>
-      theme.scheme === "dark" ? "#c084fc" : "#7c3aed"};
+    border-radius: 4px;
+    background: var(--aq-surface-subtle, rgba(148, 163, 184, 0.12));
+    border: 1px solid var(--aq-border, rgba(148, 163, 184, 0.32));
+    color: var(--aq-accent-link, #155eef);
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.4;
@@ -433,19 +436,14 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
     &:hover {
-      background: ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(124, 58, 237, 0.18)"};
-      border-color: ${({ theme }) =>
-        theme.scheme === "dark" ? "rgba(168, 85, 247, 0.5)" : "rgba(124, 58, 237, 0.35)"};
-      color: ${({ theme }) =>
-        theme.scheme === "dark" ? "#d8b4fe" : "#6d28d9"};
+      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+      border-color: ${({ theme }) => theme.publicDesign.borderStrong};
+      color: var(--aq-accent-link, #155eef);
       text-decoration: none;
     }
 
     &:focus-visible {
-      outline: 2px solid
-        ${({ theme }) =>
-          theme.scheme === "dark" ? "rgba(168, 85, 247, 0.7)" : "rgba(124, 58, 237, 0.6)"};
+      outline: 2px solid var(--aq-accent-link, #155eef);
       outline-offset: 1px;
     }
   }
@@ -562,7 +560,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       top: 50%;
       transform: translateY(-50%);
       padding: 1px 7px;
-      border-radius: 999px;
+      border-radius: 4px;
       border: 1px solid ${({ theme }) => theme.publicDesign.border};
       background: ${({ theme }) => theme.publicDesign.surfaceElevated};
       color: ${({ theme }) => theme.colors.gray10};
@@ -571,6 +569,11 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       pointer-events: none;
       user-select: none;
     }
+  }
+
+  .cm-gutters {
+    background: transparent;
+    border-right: 0;
   }
 
   .cm-foldGutter .cm-gutterElement {

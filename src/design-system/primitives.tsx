@@ -69,12 +69,16 @@ const StyledChip = styled.button<{ $selected: boolean }>`
   padding: 0 ${space[3]}px;
   border: 1px solid ${({ theme, $selected }) =>
     $selected ? semanticColors(theme).accent : semanticColors(theme).border};
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.xs}px;
   background: ${({ theme, $selected }) =>
     $selected ? semanticColors(theme).accentSurface : semanticColors(theme).surface};
   color: ${({ theme, $selected }) =>
     $selected ? semanticColors(theme).accentLink : semanticColors(theme).textSecondary};
   font-weight: ${fontWeight.semibold};
+
+  @media (max-width: 768px) {
+    min-height: ${control.lg}px;
+  }
 `
 
 export const Chip = forwardRef<HTMLButtonElement, ChipProps>(
@@ -92,7 +96,7 @@ export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 const StyledBadge = styled.span<{ $tone: BadgeTone }>`
   min-height: ${control.sm}px;
   padding: 0 ${space[3]}px;
-  border-radius: ${radius.pill}px;
+  border-radius: 2px;
   display: inline-flex;
   align-items: center;
   color: ${({ theme, $tone }) => {

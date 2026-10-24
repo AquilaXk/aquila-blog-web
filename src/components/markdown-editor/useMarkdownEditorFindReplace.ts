@@ -51,9 +51,13 @@ export const useMarkdownEditorFindReplace = ({
   const [panel, setPanel] = useState<FindPanelSession | null>(null)
 
   useEffect(() => {
-    setPanel((current) =>
-      current && current.documentValue !== draftValue ? { ...current, activeMatch: null, stale: true } : current
-    )
+    setPanel((current) => {
+      if (!current || current.documentValue === draftValue) return current
+      if (!current.scope) {
+        return { ...current, documentValue: draftValue, activeMatch: null, stale: false }
+      }
+      return { ...current, activeMatch: null, stale: true }
+    })
   }, [draftValue])
 
   const matches = useMemo(

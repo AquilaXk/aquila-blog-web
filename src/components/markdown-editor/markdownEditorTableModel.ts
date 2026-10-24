@@ -1,3 +1,4 @@
+import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type MarkdownEditorTableAlignment = "left" | "center" | "right"
@@ -171,40 +172,22 @@ const collectLocalLineWindow = (
   ]
 }
 
-const isOffsetInsideFencedCode = (value: string, offset: number) => {
-  if (!value.includes("```") && !value.includes("~~~")) return false
-  const limit = Math.max(0, Math.min(offset, value.length))
-  let marker = ""
-  let length = 0
-  let lineStart = 0
-  while (lineStart <= limit) {
-    const nextBreak = value.indexOf("\n", lineStart)
-    const lineEnd = nextBreak === -1 || nextBreak > limit ? limit : nextBreak
-    const lineText = value.slice(lineStart, lineEnd)
-    const match = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(lineText)
-    if (match) {
-      const fence = match[2] ?? ""
-      const info = match[3] ?? ""
-      if (marker === "") {
-        marker = fence[0] ?? ""
-        length = fence.length
-      } else if (fence[0] === marker && fence.length >= length && info.trim() === "") {
-        marker = ""
-        length = 0
-      }
-    }
-    if (nextBreak === -1 || nextBreak >= limit) break
-    lineStart = nextBreak + 1
-  }
-  return marker !== ""
-}
+const isOffsetInsideFencedCode = (value: string, offset: number) =>
+  isOffsetInsideFencedCodeBlock(value, offset)
 
 const isMetadataLine = (line: string) => /^\s*<!--\s*aq-table(?:\s|$)/i.test(line)
 
 const findCellAtOffset = (row: TableRow, offset: number) =>
   row.cells.findIndex((cell) => offset >= cell.contextStart && offset <= cell.contextEnd)
 
-const findActiveTable = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
+let lastActiveTableCache: {
+  value: string
+  selectionStart: number
+  selectionEnd: number
+  table: ActiveTable | null
+} | null = null
+
+const findActiveTableUncached = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
   if (selectionStart !== selectionEnd || !value.includes("|")) return null
   const lines = collectLocalLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
   if (lines.length < 3) return null
@@ -248,6 +231,20 @@ const findActiveTable = (value: string, selectionStart: number, selectionEnd: nu
     }
   }
   return null
+}
+
+const findActiveTable = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
+  if (
+    lastActiveTableCache &&
+    lastActiveTableCache.value === value &&
+    lastActiveTableCache.selectionStart === selectionStart &&
+    lastActiveTableCache.selectionEnd === selectionEnd
+  ) {
+    return lastActiveTableCache.table
+  }
+  const table = findActiveTableUncached(value, selectionStart, selectionEnd)
+  lastActiveTableCache = { value, selectionStart, selectionEnd, table }
+  return table
 }
 
 const serializeRow = (cells: string[]) => `| ${cells.join(" | ")} |`

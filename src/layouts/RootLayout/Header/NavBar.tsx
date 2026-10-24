@@ -269,7 +269,6 @@ const MobileMenuPanel = styled.div`
   border: 1px solid var(--aq-border-strong);
   border-radius: 6px;
   background: var(--aq-surface);
-  box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--aq-text) 14%, transparent);
   padding: 6px;
   pointer-events: auto;
 

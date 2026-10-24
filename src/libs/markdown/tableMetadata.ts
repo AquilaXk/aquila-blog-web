@@ -295,15 +295,18 @@ const isTableSeparatorLine = (line: string) =>
   !isIndentedCodeLine(line) &&
   /^\s*\|?(?:\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$/.test(line)
 
-const isLikelyTableRow = (line: string) => {
-  if (isIndentedCodeLine(line) || countGfmTableCells(line) < 2) return false
+const isLikelyTableRow = (line: string, precountedCells?: number) => {
+  const cellCount = precountedCells ?? countGfmTableCells(line)
+  if (isIndentedCodeLine(line) || cellCount < 2) return false
   const trimmed = line.trim()
   return /^\|?.+\|.+\|?$/.test(trimmed)
 }
 
 const isLikelyGfmTable = (headerLine: string, separatorLine: string) => {
-  if (!isLikelyTableRow(headerLine) || !isTableSeparatorLine(separatorLine)) return false
-  return countGfmTableCells(headerLine) === countGfmTableCells(separatorLine)
+  if (!isTableSeparatorLine(separatorLine)) return false
+  const headerCells = countGfmTableCells(headerLine)
+  if (!isLikelyTableRow(headerLine, headerCells)) return false
+  return headerCells === countGfmTableCells(separatorLine)
 }
 
 export const stepFencedCodeState = (

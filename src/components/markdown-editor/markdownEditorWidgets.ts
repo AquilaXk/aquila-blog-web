@@ -122,14 +122,18 @@ export class MarkdownTaskWidget extends WidgetType {
   toDOM(view: EditorView) {
     const checkbox = document.createElement("span")
     checkbox.className = `cm-live-task-checkbox ${this.checked ? "is-checked" : ""}`
+    checkbox.tabIndex = 0
+    checkbox.setAttribute("tabindex", "0")
     checkbox.setAttribute("role", "checkbox")
     checkbox.setAttribute("aria-checked", this.checked ? "true" : "false")
     checkbox.setAttribute("aria-label", "Toggle task item")
-    checkbox.dataset.from = String(this.from)
-    checkbox.dataset.to = String(this.to)
+    if (checkbox.dataset) {
+      checkbox.dataset.from = String(this.from)
+      checkbox.dataset.to = String(this.to)
+    }
     checkbox.textContent = this.checked ? "✓" : ""
 
-    checkbox.addEventListener("mousedown", (e) => {
+    const toggleTask = (e: Event) => {
       e.preventDefault()
       e.stopPropagation()
       let targetFrom = this.from
@@ -152,6 +156,13 @@ export class MarkdownTaskWidget extends WidgetType {
           changes: { from: targetFrom, to: targetTo, insert: next },
           annotations: [Transaction.userEvent.of("input")],
         })
+      }
+    }
+
+    checkbox.addEventListener("mousedown", toggleTask)
+    checkbox.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        toggleTask(e)
       }
     })
 
@@ -308,11 +319,24 @@ export class MarkdownCalloutWidget extends WidgetType {
       appendInlineMarkdownNodes(body, strippedContent)
       root.appendChild(body)
 
-      header.addEventListener("mousedown", (e) => {
+      header.tabIndex = 0
+      header.setAttribute("tabindex", "0")
+      header.setAttribute("role", "button")
+      header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
+
+      const toggleCallout = (e: Event) => {
         e.preventDefault()
         e.stopPropagation()
         isCollapsed = root.classList.toggle("is-collapsed")
+        header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
         foldIcon.textContent = isCollapsed ? "▶" : "▼"
+      }
+
+      header.addEventListener("mousedown", toggleCallout)
+      header.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          toggleCallout(e)
+        }
       })
 
       if (view) {

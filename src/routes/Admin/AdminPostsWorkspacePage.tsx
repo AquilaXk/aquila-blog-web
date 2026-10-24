@@ -12,7 +12,6 @@ import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
   DEFAULT_SORT,
-  POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS,
   POSTS_WORKSPACE_MOBILE_LIST_QUERY,
   sanitizeNumberInput,
   type AdminPostListItem,
@@ -111,22 +110,9 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
     if (typeof window === "undefined") return
 
     const mediaQuery = window.matchMedia(POSTS_WORKSPACE_MOBILE_LIST_QUERY)
-    let timer: number | null = null
 
     const sync = () => {
-      if (timer !== null) {
-        window.clearTimeout(timer)
-        timer = null
-      }
-
-      if (!mediaQuery.matches) {
-        setShouldRenderMobileList(false)
-        return
-      }
-
-      timer = window.setTimeout(() => {
-        setShouldRenderMobileList(true)
-      }, POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS)
+      setShouldRenderMobileList(mediaQuery.matches)
     }
 
     sync()
@@ -134,18 +120,12 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", sync)
       return () => {
-        if (timer !== null) {
-          window.clearTimeout(timer)
-        }
         mediaQuery.removeEventListener("change", sync)
       }
     }
 
     mediaQuery.addListener(sync)
     return () => {
-      if (timer !== null) {
-        window.clearTimeout(timer)
-      }
       mediaQuery.removeListener(sync)
     }
   }, [])

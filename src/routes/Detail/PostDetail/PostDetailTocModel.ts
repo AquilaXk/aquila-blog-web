@@ -1,6 +1,7 @@
 import {
   createMarkdownDocumentInsights,
   createMarkdownHeadingSlugAllocator,
+  type MarkdownDocumentHeading,
 } from "../../../libs/markdown/markdownDocumentInsights"
 
 export type TocItem = {
@@ -9,10 +10,14 @@ export type TocItem = {
   level: 2 | 3 | 4
 }
 
-export const buildInitialTocFromMarkdown = (markdown: string): TocItem[] => {
+export const buildInitialTocFromMarkdown = (
+  markdown: string,
+  precomputedHeadings?: readonly MarkdownDocumentHeading[]
+): TocItem[] => {
   if (!markdown.trim()) return []
-  return createMarkdownDocumentInsights(markdown)
-    .headings.filter((heading): heading is typeof heading & { level: 2 | 3 | 4 } => heading.level >= 2)
+  const headings = precomputedHeadings ?? createMarkdownDocumentInsights(markdown).headings
+  return headings
+    .filter((heading): heading is typeof heading & { level: 2 | 3 | 4 } => heading.level >= 2)
     .map(({ id, slug, label, level }) => ({
       id: id || slug,
       text: label,
@@ -46,19 +51,30 @@ const nodeTouchesHeading = (node: Node | null | undefined, checkDescendants: boo
   return false
 }
 
+const nodeCollectionTouchesHeading = (nodes: Iterable<Node> | ArrayLike<Node> | null | undefined): boolean => {
+  if (!nodes) return false
+  if (typeof (nodes as ArrayLike<Node>).length === "number") {
+    const list = nodes as ArrayLike<Node>
+    for (let i = 0; i < list.length; i += 1) {
+      if (nodeTouchesHeading(list[i], true)) return true
+    }
+    return false
+  }
+  for (const node of nodes as Iterable<Node>) {
+    if (nodeTouchesHeading(node, true)) return true
+  }
+  return false
+}
+
 export const shouldSyncTocFromMutations = (mutations: Iterable<MutationRecord>): boolean => {
-  for (const mutation of Array.from(mutations)) {
+  for (const mutation of mutations) {
     if (mutation.type === "characterData") {
       if (nodeTouchesHeading(mutation.target, false)) return true
       continue
     }
     if (nodeTouchesHeading(mutation.target, false)) return true
-    for (const added of Array.from(mutation.addedNodes ?? [])) {
-      if (nodeTouchesHeading(added, true)) return true
-    }
-    for (const removed of Array.from(mutation.removedNodes ?? [])) {
-      if (nodeTouchesHeading(removed, true)) return true
-    }
+    if (nodeCollectionTouchesHeading(mutation.addedNodes)) return true
+    if (nodeCollectionTouchesHeading(mutation.removedNodes)) return true
   }
   return false
 }
@@ -186,10 +202,17 @@ export const resolveActiveTocIdFromOffsets = (
 ): string => {
   if (!offsets.length) return ""
   const threshold = scrollY + boundaryOffset
+  let lo = 0
+  let hi = offsets.length - 1
   let activeId = offsets[0].id
-  for (const offset of offsets) {
-    if (offset.topDoc > threshold) break
-    activeId = offset.id
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    if (offsets[mid].topDoc <= threshold) {
+      activeId = offsets[mid].id
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
   }
   return activeId
 }

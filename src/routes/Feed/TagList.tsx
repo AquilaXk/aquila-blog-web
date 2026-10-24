@@ -205,13 +205,13 @@ export default memo(TagList)
 const StyledWrapper = styled.div`
   min-width: 0;
   --feed-tag-border: var(--aq-border);
-  --feed-tag-border-strong: var(--aq-accent);
+  --feed-tag-border-strong: var(--aq-border-strong);
   --feed-tag-hover-border: var(--aq-subtle);
   --feed-tag-surface: var(--aq-surface);
   --feed-tag-surface-elevated: var(--aq-surface-elevated);
   --feed-tag-accent: var(--aq-accent);
-  --feed-tag-accent-text: var(--aq-accent);
-  --feed-tag-accent-muted: var(--aq-accent-muted);
+  --feed-tag-accent-text: var(--aq-text);
+  --feed-tag-accent-muted: var(--aq-surface-subtle);
 
   .desktopPanel {
     display: none;
@@ -409,7 +409,7 @@ const StyledWrapper = styled.div`
     text-align: left;
     white-space: nowrap;
     min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
-    border-radius: 999px;
+    border-radius: 2px;
     border: 0;
     background: transparent;
     padding: 0.34rem 0.82rem;
@@ -423,7 +423,7 @@ const StyledWrapper = styled.div`
       content: "";
       position: absolute;
       inset: 5px 0;
-      border-radius: 999px;
+      border-radius: 2px;
       border: 1px solid var(--feed-tag-border);
       background: var(--feed-tag-surface);
       transition: all 0.125s ease-in;
@@ -442,11 +442,11 @@ const StyledWrapper = styled.div`
     }
 
     &[data-active="true"] {
-      color: var(--feed-tag-accent-text);
+      color: var(--aq-text);
 
       &::after {
-        border-color: var(--feed-tag-border-strong);
-        background: var(--feed-tag-accent-muted);
+        border-color: var(--aq-border-strong);
+        background: var(--aq-surface-subtle);
       }
     }
 
@@ -472,7 +472,7 @@ const StyledWrapper = styled.div`
   }
 
   .chipRail button[data-active="true"] .count {
-    color: var(--feed-tag-accent-text);
+    color: var(--aq-text);
   }
 
   .chipRail .chipToggle {
@@ -505,7 +505,7 @@ const StyledWrapper = styled.div`
     .chipRail button {
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
       padding: 0.28rem 0.82rem;
-      border-radius: 999px;
+      border-radius: 2px;
 
       &::after {
         inset: 6px 0;

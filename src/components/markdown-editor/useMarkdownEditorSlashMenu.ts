@@ -186,10 +186,14 @@ export const useMarkdownEditorSlashMenu = ({
       }
 
       let coords = { top: 240, left: 340 }
+      const computeSlashMenuTop = (rect: { top: number; bottom: number }) =>
+        rect.bottom + 340 > window.innerHeight && rect.top > 356
+          ? Math.max(12, Math.round(rect.top - 340))
+          : Math.min(rect.bottom + 8, window.innerHeight - 380)
       const viewRect = resolveSlashCoords?.(trigger.slashFrom) ?? null
       if (viewRect && viewRect.bottom > 0 && typeof window !== "undefined") {
         coords = {
-          top: Math.min(viewRect.bottom + 8, window.innerHeight - 380),
+          top: computeSlashMenuTop(viewRect),
           left: Math.max(12, Math.min(viewRect.left, window.innerWidth - 300)),
         }
       } else {
@@ -199,7 +203,7 @@ export const useMarkdownEditorSlashMenu = ({
           const rect = range.getBoundingClientRect()
           if (rect.bottom > 0) {
             coords = {
-              top: Math.min(rect.bottom + 8, window.innerHeight - 380),
+              top: computeSlashMenuTop(rect),
               left: Math.max(12, Math.min(rect.left, window.innerWidth - 300)),
             }
           }

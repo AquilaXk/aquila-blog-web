@@ -133,8 +133,13 @@ const StyledWrapper = styled.a`
   min-width: 0;
   max-width: 760px;
   padding: 20px 0;
+  border-bottom: 1px solid var(--aq-border);
   color: var(--aq-text);
   text-decoration: none;
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
 
   &:focus-visible {
     outline: 2px solid var(--aq-focus-ring);

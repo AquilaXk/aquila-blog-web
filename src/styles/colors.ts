@@ -24,7 +24,7 @@ const nearBlackDarkGray = {
   gray6: "#363636",
   gray7: "#414141",
   gray8: "#4f4f4f",
-  gray9: "#666666",
+  gray9: "#8f96a3",
   gray10: "#b2b2b2",
   gray11: "#d8d8d8",
   gray12: "#f5f5f5",
@@ -39,7 +39,7 @@ const balancedLightGray = {
   gray6: "#c8d2de",
   gray7: "#b5c1ce",
   gray8: "#9ca8b7",
-  gray9: "#778396",
+  gray9: "#5c6470",
   gray10: "#566273",
   gray11: "#36414f",
   gray12: "#0f1724",
@@ -47,7 +47,7 @@ const balancedLightGray = {
 
 const semanticLight = {
   accentLink: blue.blue10,
-  accentControl: blue.blue9,
+  accentControl: "#155eef",
   accentControlHover: blue.blue10,
   accentControlText: "#ffffff",
   accentSurfaceSubtle: blue.blue3,

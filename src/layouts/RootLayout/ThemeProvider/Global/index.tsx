@@ -27,6 +27,7 @@ export const Global = () => {
           --aq-page-bg-image: ${lightDesign.pageBackgroundImage};
           --aq-surface: ${lightDesign.readableSurface};
           --aq-surface-elevated: ${lightDesign.surfaceElevated};
+          --aq-surface-subtle: ${lightDesign.surfaceElevated};
           --aq-border: ${lightDesign.border};
           --aq-border-strong: ${lightDesign.borderStrong};
           --aq-text: ${lightColors.gray12};
@@ -49,6 +50,7 @@ export const Global = () => {
           --aq-page-bg-image: ${darkDesign.pageBackgroundImage};
           --aq-surface: ${darkDesign.readableSurface};
           --aq-surface-elevated: ${darkDesign.surfaceElevated};
+          --aq-surface-subtle: ${darkDesign.surfaceElevated};
           --aq-border: ${darkDesign.border};
           --aq-border-strong: ${darkDesign.borderStrong};
           --aq-text: ${darkColors.gray12};

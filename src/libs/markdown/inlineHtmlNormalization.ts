@@ -108,6 +108,16 @@ export const normalizeLegacyInlineHtmlMarkdown = (markdown: string) => {
   return markdown
     .split("\n")
     .map((line) => {
+      if (
+        !activeFenceMarker &&
+        !line.includes("<") &&
+        !line.includes("&lt;") &&
+        !line.includes("`") &&
+        !line.includes("~")
+      ) {
+        return line
+      }
+
       const trimmedStart = line.trimStart()
       const fenceMatch = trimmedStart.match(FENCE_MARKER_PATTERN)
 

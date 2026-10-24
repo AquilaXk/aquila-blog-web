@@ -49,7 +49,7 @@ export const StyledWrapper = styled.header `
     align-items: center;
     gap: 0.42rem;
     margin-bottom: 0.875rem;
-    color: var(--aq-accent-link, var(--aq-accent));
+    color: var(--aq-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.6875rem;
     font-weight: 700;

@@ -356,16 +356,13 @@ export const StatusDot = styled.i`
   border-radius: 50%;
   flex: 0 0 auto;
   background: ${adminTeal};
-  box-shadow: 0 0 0 4px color-mix(in srgb, ${adminTeal} 14%, transparent);
 
   &[data-tone="warn"] {
     background: ${adminAccentText};
-    box-shadow: 0 0 0 4px color-mix(in srgb, ${adminAccentText} 14%, transparent);
   }
 
   &[data-tone="neutral"] {
     background: ${adminTextSecondary};
-    box-shadow: 0 0 0 4px rgba(91, 107, 129, 0.12);
   }
 `
 
