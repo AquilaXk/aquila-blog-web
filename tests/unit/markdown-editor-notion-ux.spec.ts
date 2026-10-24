@@ -547,6 +547,15 @@ test.describe("Notion-parity Markdown editor model", () => {
       nextCol: 2,
     })
 
+    const unclosedBracketTable = [
+      "| ColA | ColB | ColC |",
+      "| --- | --- | --- |",
+      "| [[unclosed | [[Guide|User Guide]] | {{color:emerald|완료}} |",
+    ].join("\n")
+    expect(parseMarkdownTableGrid(unclosedBracketTable)?.rows).toEqual([
+      ["[[unclosed", "[[Guide|User Guide]]", "{{color:emerald|완료}}"],
+    ])
+
     const doc = [
       "# Title",
       "Paragraph outside",
@@ -798,11 +807,24 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.querySelectorAll("td")[2].classList.contains("is-selected-row")).toBe(true)
       expect(dom.querySelectorAll("td")[3].classList.contains("is-selected-row")).toBe(true)
 
+      resizers[0].trigger("mousedown", { clientX: 100 })
+      for (const fn of windowListeners.get("mousemove") ?? []) fn({ clientX: 180 })
+      for (const fn of windowListeners.get("mouseup") ?? []) fn({ clientX: 180 })
+      expect(colEls[0].getAttribute("data-col-width")).toBe("200")
+
       colHandles[0].trigger("dragstart", { dataTransfer: { effectAllowed: "", setData() {} } })
       dom.querySelectorAll("th")[1].trigger("dragover")
       expect(dom.querySelectorAll("th")[1].classList.contains("is-drop-target-col")).toBe(true)
       dom.querySelectorAll("th")[1].trigger("drop")
       expect(lastDispatchedInsert).toBe("| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |")
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(dom.querySelectorAll("col")[0].getAttribute("data-col-width")).toBeNull()
+      expect(dom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
 
       const updatedRowHandles = dom.querySelectorAll(".cm-live-table-row-handle")
       updatedRowHandles[1].trigger("dragstart", { dataTransfer: { effectAllowed: "", setData() {} } })

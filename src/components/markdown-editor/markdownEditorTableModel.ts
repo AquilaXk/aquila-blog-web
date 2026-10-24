@@ -87,8 +87,8 @@ const isProtectedPipe = (value: string, index: number) => {
   const before = value.slice(0, index)
   const after = value.slice(index + 1)
   return (
-    (before.lastIndexOf("{{") > before.lastIndexOf("}}") && after.includes("}}")) ||
-    (before.lastIndexOf("[[") > before.lastIndexOf("]]") && after.includes("]]"))
+    (/\{\{\s*color\s*:\s*[^|{}]+$/i.test(before) && /^[^{}|]*\}\}/.test(after)) ||
+    (/\[\[[^|\[\]]+$/.test(before) && /^[^\[\]|]*\]\]/.test(after))
   )
 }
 

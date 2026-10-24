@@ -8,10 +8,12 @@ import {
   type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
 import {
+  applyTableColumnWidthsAction,
   createInteractiveTableSurface,
   createTableToolbarElement,
   getOrCreateTableVisualOptions,
   renderStaticTableElement,
+  syncTableColGroupWidths,
   syncTableVisualWrapAttributes,
 } from "./markdownEditorTableWidgetDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
@@ -196,6 +198,12 @@ export class MarkdownTableWidget extends WidgetType {
         }
         return
       }
+      applyTableColumnWidthsAction(
+        visualOptions.columnWidths,
+        grid.headers.length,
+        colOverride,
+        action
+      )
       activeRow = outcome.nextRow
       activeCol = outcome.nextCol
       syncActiveCellHighlight()
@@ -265,7 +273,7 @@ export class MarkdownTableWidget extends WidgetType {
         },
       })
 
-    let { gridRow, addRowBtn, cellElements } = buildSurface()
+    let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
       for (let r = 0; r < cellElements.length; r += 1) {
@@ -543,23 +551,23 @@ export class MarkdownTableWidget extends WidgetType {
         nextGrid.headers.length === grid.headers.length &&
         nextGrid.rows.length === grid.rows.length
 
-      if (sameShape) patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
+      if (sameShape) {
+        patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
+        syncTableColGroupWidths(colElements, visualOptions.columnWidths)
+      }
 
       grid.headers.splice(0, grid.headers.length, ...nextGrid.headers)
       grid.alignments.splice(0, grid.alignments.length, ...nextGrid.alignments)
       grid.rows.splice(0, grid.rows.length, ...nextGrid.rows.map((row) => [...row]))
 
       if (!sameShape) {
-        while (visualOptions.columnWidths.length < grid.headers.length) {
-          visualOptions.columnWidths.push(0)
-        }
-        if (visualOptions.columnWidths.length > grid.headers.length) {
-          visualOptions.columnWidths.length = grid.headers.length
-        }
+        while (visualOptions.columnWidths.length < grid.headers.length) visualOptions.columnWidths.push(0)
+        if (visualOptions.columnWidths.length > grid.headers.length) visualOptions.columnWidths.length = grid.headers.length
         const nextSurface = buildSurface()
         gridRow = nextSurface.gridRow
         addRowBtn = nextSurface.addRowBtn
         cellElements = nextSurface.cellElements
+        colElements = nextSurface.colElements
         wrap.textContent = ""
         wrap.appendChild(toolbar)
         wrap.appendChild(gridRow)

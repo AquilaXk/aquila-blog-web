@@ -48,22 +48,23 @@ export const getOrCreateTableVisualOptions = (
 }
 
 export const setBooleanDataAttribute = (el: HTMLElement, attr: string, enabled: boolean) => {
-  if (enabled) {
-    el.setAttribute(attr, "true")
-  } else if (typeof el.removeAttribute === "function") {
-    el.removeAttribute(attr)
-  } else if (typeof el.toggleAttribute === "function") {
-    el.toggleAttribute(attr, false)
-  }
+  if (enabled) el.setAttribute(attr, "true")
+  else if (typeof el.removeAttribute === "function") el.removeAttribute(attr)
+  else if (typeof el.toggleAttribute === "function") el.toggleAttribute(attr, false)
 }
 
-export const syncTableVisualWrapAttributes = (
-  wrap: HTMLElement,
-  visualOptions: TableVisualOptions
-) => {
+export const syncTableVisualWrapAttributes = (wrap: HTMLElement, visualOptions: TableVisualOptions) => {
   setBooleanDataAttribute(wrap, "data-header-row", visualOptions.headerRow)
   setBooleanDataAttribute(wrap, "data-header-col", visualOptions.headerColumn)
   setBooleanDataAttribute(wrap, "data-full-width", visualOptions.fitPageWidth)
+}
+
+const createAlignedTableCell = (tag: "th" | "td", align: string, text: string) => {
+  const cell = document.createElement(tag)
+  if (cell.style) cell.style.textAlign = align
+  cell.setAttribute("data-align", align)
+  appendInlineMarkdownNodes(cell, text)
+  return cell
 }
 
 export const renderStaticTableElement = (grid: MarkdownTableGrid): HTMLTableElement => {
@@ -72,28 +73,17 @@ export const renderStaticTableElement = (grid: MarkdownTableGrid): HTMLTableElem
   const thead = document.createElement("thead")
   const headRow = document.createElement("tr")
   for (let col = 0; col < grid.headers.length; col += 1) {
-    const th = document.createElement("th")
-    const align = grid.alignments[col] ?? "left"
-    if (th.style) th.style.textAlign = align
-    th.setAttribute("data-align", align)
-    appendInlineMarkdownNodes(th, grid.headers[col] ?? "")
-    headRow.appendChild(th)
+    headRow.appendChild(createAlignedTableCell("th", grid.alignments[col] ?? "left", grid.headers[col] ?? ""))
   }
   thead.appendChild(headRow)
   table.appendChild(thead)
 
   if (grid.rows.length > 0) {
     const tbody = document.createElement("tbody")
-    for (let rowIdx = 0; rowIdx < grid.rows.length; rowIdx += 1) {
-      const row = grid.rows[rowIdx]!
+    for (const row of grid.rows) {
       const tr = document.createElement("tr")
       for (let col = 0; col < grid.headers.length; col += 1) {
-        const td = document.createElement("td")
-        const align = grid.alignments[col] ?? "left"
-        if (td.style) td.style.textAlign = align
-        td.setAttribute("data-align", align)
-        appendInlineMarkdownNodes(td, row[col] ?? "")
-        tr.appendChild(td)
+        tr.appendChild(createAlignedTableCell("td", grid.alignments[col] ?? "left", row[col] ?? ""))
       }
       tbody.appendChild(tr)
     }
@@ -110,16 +100,64 @@ export const createTableColGroup = (
   const cols: HTMLElement[] = []
   for (let col = 0; col < columnCount; col += 1) {
     const colEl = document.createElement("col")
+    colgroup.appendChild(colEl)
+    cols.push(colEl)
+  }
+  syncTableColGroupWidths(cols, columnWidths)
+  return { colgroup, cols }
+}
+
+export const syncTableColGroupWidths = (
+  cols: readonly HTMLElement[],
+  columnWidths: readonly number[]
+) => {
+  for (let col = 0; col < cols.length; col += 1) {
+    const colEl = cols[col]
+    if (!colEl) continue
     const width = columnWidths[col] ?? 0
     if (width > 0) {
       const rounded = Math.round(width)
       if (colEl.style) colEl.style.width = `${rounded}px`
       colEl.setAttribute("data-col-width", String(rounded))
+    } else {
+      if (colEl.style) colEl.style.width = ""
+      if (typeof colEl.removeAttribute === "function") colEl.removeAttribute("data-col-width")
     }
-    colgroup.appendChild(colEl)
-    cols.push(colEl)
   }
-  return { colgroup, cols }
+}
+
+export const applyTableColumnWidthsAction = (
+  columnWidths: number[],
+  columnCount: number,
+  colIndex: number,
+  action: MarkdownTableGridAction
+) => {
+  while (columnWidths.length < columnCount) columnWidths.push(0)
+  if (columnWidths.length > columnCount) columnWidths.length = columnCount
+  const clampedCol = Math.max(0, Math.min(colIndex, columnCount - 1))
+  if (action.kind === "move-column-left" && clampedCol > 0) {
+    const prev = columnWidths[clampedCol - 1] ?? 0
+    columnWidths[clampedCol - 1] = columnWidths[clampedCol] ?? 0
+    columnWidths[clampedCol] = prev
+  } else if (action.kind === "move-column-right" && clampedCol < columnCount - 1) {
+    const next = columnWidths[clampedCol + 1] ?? 0
+    columnWidths[clampedCol + 1] = columnWidths[clampedCol] ?? 0
+    columnWidths[clampedCol] = next
+  } else if (action.kind === "move-column-to") {
+    const targetCol = Math.max(0, Math.min(action.targetCol, columnCount - 1))
+    if (targetCol !== clampedCol) {
+      const [moved] = columnWidths.splice(clampedCol, 1)
+      columnWidths.splice(targetCol, 0, moved ?? 0)
+    }
+  } else if (action.kind === "insert-column-left") {
+    columnWidths.splice(clampedCol, 0, 0)
+  } else if (action.kind === "add-column") {
+    columnWidths.splice(clampedCol + 1, 0, 0)
+  } else if (action.kind === "duplicate-column") {
+    columnWidths.splice(clampedCol + 1, 0, columnWidths[clampedCol] ?? 0)
+  } else if (action.kind === "delete-column" && columnCount > 1) {
+    columnWidths.splice(clampedCol, 1)
+  }
 }
 
 export const attachColumnResizeHandle = (
@@ -252,6 +290,24 @@ export const createTableToolbarElement = (params: {
   const canAddRow = () => grid.rows.length + 2 <= MAX_EDIT_ROWS
   const canAddCol = () => grid.headers.length < MAX_EDIT_COLUMNS
 
+  const toggleOptionSpec = (
+    label: string,
+    ariaLabel: string,
+    testId: string,
+    key: "headerRow" | "headerColumn" | "fitPageWidth"
+  ) => ({
+    group: "options" as const,
+    label,
+    ariaLabel,
+    testId,
+    ariaPressed: visualOptions[key],
+    onSelect: (btn: HTMLButtonElement) => {
+      visualOptions[key] = !visualOptions[key]
+      syncTableVisualWrapAttributes(wrap, visualOptions)
+      btn.setAttribute("aria-pressed", String(visualOptions[key]))
+    },
+  })
+
   const actionSpecs: Array<{
     group: "options" | "align" | "row" | "col" | "source"
     groupStart?: boolean
@@ -263,42 +319,9 @@ export const createTableToolbarElement = (params: {
     isDisabled?: (row: number, col: number) => boolean
     onSelect?: (button: HTMLButtonElement) => void
   }> = [
-    {
-      group: "options",
-      label: "▤ 제목행",
-      ariaLabel: "표 제목 행 강조 전환",
-      testId: "cm-live-table-toggle-header-row",
-      ariaPressed: visualOptions.headerRow,
-      onSelect: (btn) => {
-        visualOptions.headerRow = !visualOptions.headerRow
-        syncTableVisualWrapAttributes(wrap, visualOptions)
-        btn.setAttribute("aria-pressed", String(visualOptions.headerRow))
-      },
-    },
-    {
-      group: "options",
-      label: "▤ 제목열",
-      ariaLabel: "표 제목 열 강조 전환",
-      testId: "cm-live-table-toggle-header-col",
-      ariaPressed: visualOptions.headerColumn,
-      onSelect: (btn) => {
-        visualOptions.headerColumn = !visualOptions.headerColumn
-        syncTableVisualWrapAttributes(wrap, visualOptions)
-        btn.setAttribute("aria-pressed", String(visualOptions.headerColumn))
-      },
-    },
-    {
-      group: "options",
-      label: "↔ 너비맞춤",
-      ariaLabel: "표 페이지 너비 맞춤 전환",
-      testId: "cm-live-table-toggle-full-width",
-      ariaPressed: visualOptions.fitPageWidth,
-      onSelect: (btn) => {
-        visualOptions.fitPageWidth = !visualOptions.fitPageWidth
-        syncTableVisualWrapAttributes(wrap, visualOptions)
-        btn.setAttribute("aria-pressed", String(visualOptions.fitPageWidth))
-      },
-    },
+    toggleOptionSpec("▤ 제목행", "표 제목 행 강조 전환", "cm-live-table-toggle-header-row", "headerRow"),
+    toggleOptionSpec("▤ 제목열", "표 제목 열 강조 전환", "cm-live-table-toggle-header-col", "headerColumn"),
+    toggleOptionSpec("↔ 너비맞춤", "표 페이지 너비 맞춤 전환", "cm-live-table-toggle-full-width", "fitPageWidth"),
     { group: "align", groupStart: true, label: "≡좌", ariaLabel: "표 열 왼쪽 정렬", action: { kind: "set-alignment", alignment: "left" } },
     { group: "align", label: "≡중", ariaLabel: "표 열 가운데 정렬", action: { kind: "set-alignment", alignment: "center" } },
     { group: "align", label: "≡우", ariaLabel: "표 열 오른쪽 정렬", action: { kind: "set-alignment", alignment: "right" } },
@@ -363,6 +386,7 @@ export const createInteractiveTableSurface = (params: {
   gridRow: HTMLDivElement
   addRowBtn: HTMLButtonElement
   cellElements: HTMLElement[][]
+  colElements: HTMLElement[]
 } => {
   const {
     grid,
@@ -426,9 +450,7 @@ export const createInteractiveTableSurface = (params: {
     colHandle.setAttribute("aria-label", `${col + 1}열 선택 및 이동`)
     colHandle.setAttribute("draggable", "true")
     colHandle.textContent = "⋯"
-    colHandle.addEventListener("mousedown", (event: MouseEvent) => {
-      event.stopPropagation()
-    })
+    colHandle.addEventListener("mousedown", (event: MouseEvent) => event.stopPropagation())
     colHandle.addEventListener("click", (event: MouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
@@ -448,20 +470,14 @@ export const createInteractiveTableSurface = (params: {
       event.stopPropagation()
       th.classList.add("is-drop-target-col")
     })
-    th.addEventListener("dragleave", () => {
-      th.classList.remove("is-drop-target-col")
-    })
+    th.addEventListener("dragleave", () => th.classList.remove("is-drop-target-col"))
     th.addEventListener("drop", (event: DragEvent) => {
       event.preventDefault()
       event.stopPropagation()
       th.classList.remove("is-drop-target-col")
       const fromCol = draggedCol
       draggedCol = null
-      if (fromCol !== null && fromCol !== col) {
-        const [movedWidth] = visualOptions.columnWidths.splice(fromCol, 1)
-        visualOptions.columnWidths.splice(col, 0, movedWidth ?? 0)
-        onMoveColumnTo?.(fromCol, col)
-      }
+      if (fromCol !== null && fromCol !== col) onMoveColumnTo?.(fromCol, col)
     })
     th.appendChild(colHandle)
   }
@@ -475,9 +491,7 @@ export const createInteractiveTableSurface = (params: {
     rowHandle.setAttribute("aria-label", row === 0 ? "제목 행 선택" : `${row}행 선택 및 이동`)
     rowHandle.setAttribute("draggable", row > 0 ? "true" : "false")
     rowHandle.textContent = "⋮⋮"
-    rowHandle.addEventListener("mousedown", (event: MouseEvent) => {
-      event.stopPropagation()
-    })
+    rowHandle.addEventListener("mousedown", (event: MouseEvent) => event.stopPropagation())
     rowHandle.addEventListener("click", (event: MouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
@@ -498,18 +512,14 @@ export const createInteractiveTableSurface = (params: {
         event.stopPropagation()
         tr.classList.add("is-drop-target-row")
       })
-      tr.addEventListener("dragleave", () => {
-        tr.classList.remove("is-drop-target-row")
-      })
+      tr.addEventListener("dragleave", () => tr.classList.remove("is-drop-target-row"))
       tr.addEventListener("drop", (event: DragEvent) => {
         event.preventDefault()
         event.stopPropagation()
         tr.classList.remove("is-drop-target-row")
         const fromRow = draggedRow
         draggedRow = null
-        if (fromRow !== null && fromRow !== row) {
-          onMoveRowTo?.(fromRow, row)
-        }
+        if (fromRow !== null && fromRow !== row) onMoveRowTo?.(fromRow, row)
       })
     }
     cellEl.appendChild(rowHandle)
@@ -548,42 +558,36 @@ export const createInteractiveTableSurface = (params: {
   }
   table.appendChild(tbody)
 
-  const addColBtn = document.createElement("button")
-  addColBtn.type = "button"
-  addColBtn.className = "cm-live-table-add-col"
-  addColBtn.setAttribute("aria-label", "표 오른쪽에 새 열 추가")
-  addColBtn.setAttribute("data-testid", "cm-live-table-add-col")
-  addColBtn.textContent = "+"
-  addColBtn.disabled = !canAddCol()
-  addColBtn.addEventListener("mousedown", (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-  })
-  addColBtn.addEventListener("click", (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onAddColumn()
-  })
+  const createAddBarButton = (
+    className: string,
+    ariaLabel: string,
+    testId: string,
+    label: string,
+    disabled: boolean,
+    onSelect: () => void
+  ) => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = className
+    btn.setAttribute("aria-label", ariaLabel)
+    btn.setAttribute("data-testid", testId)
+    btn.textContent = label
+    btn.disabled = disabled
+    btn.addEventListener("mousedown", (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+    })
+    btn.addEventListener("click", (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onSelect()
+    })
+    return btn
+  }
 
+  const addColBtn = createAddBarButton("cm-live-table-add-col", "표 오른쪽에 새 열 추가", "cm-live-table-add-col", "+", !canAddCol(), onAddColumn)
   gridRow.appendChild(table)
   gridRow.appendChild(addColBtn)
-
-  const addRowBtn = document.createElement("button")
-  addRowBtn.type = "button"
-  addRowBtn.className = "cm-live-table-add-row"
-  addRowBtn.setAttribute("aria-label", "표 아래에 새 행 추가")
-  addRowBtn.setAttribute("data-testid", "cm-live-table-add-row")
-  addRowBtn.textContent = "+ 새 행"
-  addRowBtn.disabled = !canAddRow()
-  addRowBtn.addEventListener("mousedown", (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-  })
-  addRowBtn.addEventListener("click", (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onAddRow()
-  })
-
-  return { gridRow, addRowBtn, cellElements }
+  const addRowBtn = createAddBarButton("cm-live-table-add-row", "표 아래에 새 행 추가", "cm-live-table-add-row", "+ 새 행", !canAddRow(), onAddRow)
+  return { gridRow, addRowBtn, cellElements, colElements: cols }
 }
