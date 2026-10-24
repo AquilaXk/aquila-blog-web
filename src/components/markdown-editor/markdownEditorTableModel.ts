@@ -198,7 +198,7 @@ const collectTableBodyRows = (
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index]!
     const cells = splitTableCells(line.text, line.start)
-    if (!cells || cells.length !== expectedColumnCount) break
+    if (cells?.length !== expectedColumnCount) break
     body.push({ cells, start: line.start, end: line.end })
   }
   return body
@@ -217,7 +217,7 @@ const parseActiveTableAtHeader = (
   if (headerIndex > 0 && isMetadataLine(lines[headerIndex - 1]!.text)) return null
 
   const alignments = delimiterCells.map((cell) => parseDelimiterAlignment(cell.value))
-  if (alignments.some((alignment) => alignment === null)) return null
+  if (alignments.includes(null)) return null
 
   const body = collectTableBodyRows(lines, headerIndex + 2, headerCells.length)
   if (body.length === 0 || headerCells.length > MAX_EDIT_COLUMNS || body.length + 1 > MAX_EDIT_ROWS) return null
