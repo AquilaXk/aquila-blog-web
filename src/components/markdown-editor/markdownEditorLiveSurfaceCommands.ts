@@ -328,7 +328,10 @@ export const liveSurfaceTheme = EditorView.theme({
   '.cm-live-table-wrap[data-full-width="true"]': { width: "100%" },
   ".cm-live-table-toolbar": {
     display: "inline-flex",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    maxWidth: "100%",
+    scrollbarWidth: "none",
     alignItems: "center",
     alignSelf: "flex-start",
     gap: "2px",
@@ -359,6 +362,10 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-live-table-toolbar-btn:hover:not(:disabled)": {
     backgroundColor: "rgba(35, 131, 226, 0.1)",
     color: "#2383e2",
+  },
+  '.cm-live-table-wrap[data-active-mode="row"] .cm-live-table-toolbar-btn[data-group="row"]:not(:disabled), .cm-live-table-wrap[data-active-mode="col"] .cm-live-table-toolbar-btn[data-group="col"]:not(:disabled)': {
+    backgroundColor: "rgba(35, 131, 226, 0.08)",
+    color: "#14569b",
   },
   '.cm-live-table-toolbar-btn[aria-pressed="true"]': {
     backgroundColor: "rgba(35, 131, 226, 0.14)",
@@ -484,6 +491,7 @@ export const liveSurfaceTheme = EditorView.theme({
     padding: "0",
     margin: "0",
   },
+  ".cm-live-table-footer-row": { display: "flex", alignItems: "stretch", gap: "4px" },
   ".cm-live-table-add-col": {
     display: "inline-flex",
     alignItems: "center",
@@ -497,17 +505,37 @@ export const liveSurfaceTheme = EditorView.theme({
     fontSize: "14px",
     opacity: 0.72,
   },
-  ".cm-live-table-add-col:hover:not(:disabled), .cm-live-table-add-row:hover:not(:disabled)": {
+  ".cm-live-table-add-corner": {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "24px",
+    height: "26px",
+    flexShrink: "0",
+    border: "1px dashed rgba(128, 128, 128, 0.26)",
+    backgroundColor: "rgba(135, 131, 120, 0.04)",
+    color: "inherit",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    opacity: 0.72,
+  },
+  ".cm-live-table-add-col:hover:not(:disabled), .cm-live-table-add-row:hover:not(:disabled), .cm-live-table-add-corner:hover:not(:disabled)": {
     borderColor: "rgba(35, 131, 226, 0.45)",
     backgroundColor: "rgba(35, 131, 226, 0.08)",
     color: "#2383e2",
     opacity: 1,
+  },
+  ".cm-live-table-add-col:disabled, .cm-live-table-add-row:disabled, .cm-live-table-add-corner:disabled": {
+    opacity: 0.35,
+    cursor: "not-allowed",
   },
   ".cm-live-table-add-row": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     height: "26px",
+    flex: "1 1 auto",
     width: "100%",
     border: "1px dashed rgba(128, 128, 128, 0.26)",
     backgroundColor: "rgba(135, 131, 120, 0.04)",

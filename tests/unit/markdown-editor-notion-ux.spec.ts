@@ -23,6 +23,8 @@ import {
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
+  applyMarkdownTableGridPaste,
+  applyTableCellInlineFormat,
   getMarkdownEditorTableEditAvailability,
   parseMarkdownTableGrid,
   planMarkdownEditorTableEdit,
@@ -864,12 +866,111 @@ test.describe("Notion-parity Markdown editor model", () => {
       activeInput.trigger("keydown", { key: "ArrowLeft" })
       activeInput = dom.querySelector(".cm-live-table-cell-input")
       expect(activeInput.value).toBe("X1")
+
+      activeInput.setSelectionRange(0, activeInput.value.length)
+      activeInput.trigger("keydown", { key: "b", metaKey: true })
+      expect(activeInput.value).toBe("**X1**")
+      activeInput.trigger("keydown", { key: "b", metaKey: true })
+      expect(activeInput.value).toBe("X1")
+
+      activeInput.setSelectionRange(activeInput.value.length, activeInput.value.length)
+      activeInput.trigger("keydown", { key: "Enter", shiftKey: true })
+      expect(activeInput.value).toBe("X1<br>")
+
+      let pastePrevented = false
+      activeInput.trigger("paste", {
+        clipboardData: {
+          getData: (type: string) => (type === "text/plain" ? "P1\tP2\nQ1\tQ2" : ""),
+        },
+        preventDefault: () => {
+          pastePrevented = true
+        },
+      })
+      expect(pastePrevented).toBe(true)
+      expect(lastDispatchedInsert).toBe(
+        ["| ColX | ColY | ColZ |", "| --- | --- | --- |", "| P1 | P2 | Z1 |", "| Q1 | Q2 |  |"].join("\n")
+      )
+
+      const cornerBtn = dom.querySelector('[data-testid="cm-live-table-add-corner"]')
+      expect(cornerBtn).not.toBeNull()
+      cornerBtn.trigger("click")
+      expect(lastDispatchedInsert).toBe(
+        [
+          "| ColX | ColY | ColZ |  |",
+          "| --- | --- | --- | --- |",
+          "| P1 | P2 | Z1 |  |",
+          "| Q1 | Q2 |  |  |",
+          "|  |  |  |  |",
+        ].join("\n")
+      )
     } finally {
       if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
       else delete (globalThis as Record<string, unknown>).document
       if (prevWin) Object.defineProperty(globalThis, "window", prevWin)
       else delete (globalThis as Record<string, unknown>).window
     }
+  })
+
+  test("supports TSV/CSV multi-cell paste, inline cell formatting helpers, and add-row-and-column action", () => {
+    const baseTable = ["| H1 | H2 |", "| --- | --- |", "| R1C1 | R1C2 |"].join("\n")
+    expect(applyMarkdownTableGridAction(baseTable, 1, 1, { kind: "add-row-and-column" })).toEqual({
+      markdown: [
+        "| H1 | H2 |  |",
+        "| --- | --- | --- |",
+        "| R1C1 | R1C2 |  |",
+        "|  |  |  |",
+      ].join("\n"),
+      nextRow: 2,
+      nextCol: 2,
+    })
+
+    expect(applyMarkdownTableGridPaste(baseTable, 1, 1, "SingleCell")).toBeNull()
+    expect(applyMarkdownTableGridPaste(baseTable, 1, 1, "SingleCellWithTrailingNewline\r\n")).toBeNull()
+
+    const pasted = applyMarkdownTableGridPaste(baseTable, 1, 1, "A|1\tB1\nA2\tB2\n")
+    expect(pasted).toEqual({
+      markdown: [
+        "| H1 | H2 |  |",
+        "| --- | --- | --- |",
+        "| R1C1 | A\\|1 | B1 |",
+        "|  | A2 | B2 |",
+      ].join("\n"),
+      nextRow: 2,
+      nextCol: 2,
+      pastedRows: 2,
+      pastedCols: 2,
+    })
+
+    expect(applyTableCellInlineFormat("hello", 0, 5, "bold")).toEqual({
+      value: "**hello**",
+      selectionStart: 2,
+      selectionEnd: 7,
+    })
+    expect(applyTableCellInlineFormat("**hello**", 2, 7, "bold")).toEqual({
+      value: "hello",
+      selectionStart: 0,
+      selectionEnd: 5,
+    })
+    expect(applyTableCellInlineFormat("hello", 0, 5, "italic")).toEqual({
+      value: "*hello*",
+      selectionStart: 1,
+      selectionEnd: 6,
+    })
+    expect(applyTableCellInlineFormat("hello", 0, 5, "strikethrough")).toEqual({
+      value: "~~hello~~",
+      selectionStart: 2,
+      selectionEnd: 7,
+    })
+    expect(applyTableCellInlineFormat("hello", 0, 5, "code")).toEqual({
+      value: "`hello`",
+      selectionStart: 1,
+      selectionEnd: 6,
+    })
+    expect(applyTableCellInlineFormat("line1", 5, 5, "line-break")).toEqual({
+      value: "line1<br>",
+      selectionStart: 9,
+      selectionEnd: 9,
+    })
   })
 
   test("replaces only [x]/[ ] in task list items while hiding leading bullet and preserving task body text", () => {
@@ -1031,7 +1132,7 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(activeLineClasses[2]).toContain("cm-live-container-line-close")
   })
 
-  test("renders inline code, strikethrough, highlight, math, and links in appendInlineMarkdownNodes and resolves emerald/amber colors", () => {
+  test("renders inline code, strikethrough, highlight, math, <br>, and links in appendInlineMarkdownNodes and resolves emerald/amber colors", () => {
     expect(resolveInlineColorValue("emerald")).toBe("#10b981")
     expect(resolveInlineColorValue("amber")).toBe("#f59e0b")
 
@@ -1066,7 +1167,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const container = makeFakeNode("div")
       appendInlineMarkdownNodes(
         container,
-        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}}"
+        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}} 줄1<br>줄2"
       )
       const elementChildren = container.children.filter((c: any) => c.tagName)
       expect(elementChildren.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
@@ -1078,6 +1179,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         "SPAN:cm-live-math cm-live-math-inline:O(1)",
         "A:cm-live-link:링크",
         "SPAN:cm-live-color:완료",
+        "BR::",
       ])
 
       const mathAndCurrency = makeFakeNode("div")

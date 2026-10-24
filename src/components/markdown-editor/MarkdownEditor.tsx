@@ -295,6 +295,8 @@ export const MarkdownEditor = ({
       case "insert-column-left":
       case "duplicate-column":
         return !tableEditAvailability.addColumn
+      case "add-row-and-column":
+        return !tableEditAvailability.addRow && !tableEditAvailability.addColumn
       case "move-column-left":
       case "move-column-right":
       case "move-column-to":

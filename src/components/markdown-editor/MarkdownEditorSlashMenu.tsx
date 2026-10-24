@@ -86,18 +86,6 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   display: flex;
   flex-direction: column;
   gap: 2px;
-  animation: slashMenuFadeIn 0.12s ease-out;
-
-  @keyframes slashMenuFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
 `
 
 const SlashMenuHeading = styled.div`
@@ -166,6 +154,41 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     flex-shrink: 0;
   }
 
+  .icon[data-tone="heading"],
+  .icon[data-tone="callout-info"],
+  .icon[data-tone="table"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#14569b")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.34)" : "rgba(20, 86, 155, 0.16)")};
+  }
+
+  .icon[data-tone="list"],
+  .icon[data-tone="code"],
+  .icon[data-tone="math"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.2)" : "#f6f3f9")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.34)" : "rgba(91, 54, 120, 0.16)")};
+  }
+
+  .icon[data-tone="callout-tip"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.32)" : "rgba(37, 92, 62, 0.16)")};
+  }
+
+  .icon[data-tone="callout-warning"],
+  .icon[data-tone="media"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.2)" : "#fbf3db")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fcd34d" : "#78490a")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.32)" : "rgba(120, 73, 10, 0.16)")};
+  }
+
+  .icon[data-tone="callout-danger"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(239, 68, 68, 0.2)" : "#fdebec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fca5a5" : "#9c2520")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(239, 68, 68, 0.32)" : "rgba(156, 37, 32, 0.16)")};
+  }
+
   .icon.icon-emoji {
     font-size: 16px;
     line-height: 1;
@@ -198,6 +221,17 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
 
 const isEmojiIcon = (icon: string) =>
   /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
+
+const resolveSlashItemTone = (item: SlashMenuItem): string => {
+  if (item.id.startsWith("heading-")) return "heading"
+  if (item.id === "bullet-list" || item.id === "ordered-list" || item.id === "task-list") return "list"
+  if (item.id === "callout-info" || item.id === "callout-tip" || item.id === "callout-warning" || item.id === "callout-danger") return item.id
+  if (item.id === "code-block") return "code"
+  if (item.id === "table") return "table"
+  if (item.id === "math" || item.id === "mermaid") return "math"
+  if (item.id === "image" || item.id === "attachment" || item.id === "bookmark") return "media"
+  return "default"
+}
 
 const resolveNextSlashMenuIndex = (key: string, prev: number, count: number): number | null => {
   if (key === "ArrowDown") return count > 0 ? (prev + 1) % count : 0
@@ -303,6 +337,7 @@ export const MarkdownEditorSlashMenu = ({
               >
                 <span
                   className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
+                  data-tone={resolveSlashItemTone(item)}
                   aria-hidden="true"
                 >
                   {item.icon}

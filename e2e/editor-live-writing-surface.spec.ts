@@ -1522,21 +1522,30 @@ test.describe("live Markdown writing surface", () => {
     })
     expect(pasteDefaultPrevented).toBe(false)
     await cellInput.fill("작성자")
+    await cellInput.press("Shift+Enter")
+    await expect(cellInput).toHaveValue("작성자<br>")
     await cellInput.press("Escape")
 
     await expect(tableWidget).toBeVisible()
     await expect(
       tableWidget.locator('td[data-cell-row="1"][data-cell-col="1"]')
     ).toHaveClass(/is-active-cell/)
+    await expect(
+      tableWidget.locator('td[data-cell-row="1"][data-cell-col="1"] br')
+    ).toHaveCount(1)
     await tableWidget.getByTestId("cm-live-table-add-row").click()
     await expect(tableWidget.locator("tbody tr")).toHaveCount(2)
 
     await tableWidget.getByTestId("cm-live-table-add-col").click()
     await expect(tableWidget.locator("thead th")).toHaveCount(3)
+
+    await tableWidget.getByTestId("cm-live-table-add-corner").click()
+    await expect(tableWidget.locator("tbody tr")).toHaveCount(3)
+    await expect(tableWidget.locator("thead th")).toHaveCount(4)
     await page.keyboard.press("Escape")
 
-    await expect.poll(() => readMarkdown(page)).toContain("| 이름 | 역할 |  |")
-    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자 |  |")
+    await expect.poll(() => readMarkdown(page)).toContain("| 이름 | 역할 |  |  |")
+    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자<br> |  |  |")
   })
 })
 

@@ -319,7 +319,7 @@ export const EditorStudioDedicatedMetaSection = styled.section`
   display: grid;
   gap: 0;
   border: 0;
-  border-bottom: 0;
+  border-bottom: 1px solid transparent;
   border-radius: 0;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   padding: 28px 32px 12px 64px;
@@ -504,7 +504,7 @@ export const EditorHeaderMetaRow = styled.div<{
   margin-top: 10px;
 
   @media (min-width: 1101px) {
-    input { ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "display: none;" : "display: inline-flex;")} }
+    input { ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "max-width: 148px;" : "display: inline-flex;")} }
   }
 
   @media (max-width: 820px) {

@@ -10,17 +10,14 @@ export type MarkdownEditorTableEdit =
         | "duplicate-row" | "clear-row" | "delete-row" | "add-column"
         | "insert-column-left" | "move-column-left" | "move-column-right"
         | "duplicate-column" | "clear-column" | "delete-column"
+        | "add-row-and-column"
     }
   | { kind: "move-row-to"; targetRow: number }
   | { kind: "move-column-to"; targetCol: number }
   | { kind: "set-alignment"; alignment: MarkdownEditorTableAlignment }
 
 export type MarkdownEditorTableTabDirection = "next" | "previous" | "prev"
-
-export type MarkdownEditorTableSnippet = {
-  snippet: string
-  cursorOffset: number
-}
+export type MarkdownEditorTableSnippet = { snippet: string; cursorOffset: number }
 
 export type MarkdownTableGrid = {
   headers: string[]
@@ -34,27 +31,12 @@ export type MarkdownTableGridAction =
   | { kind: "enter" }
 
 type TableCell = {
-  value: string
-  contextStart: number
-  contextEnd: number
-  sourceStart: number
-  sourceEnd: number
+  value: string; contextStart: number; contextEnd: number; sourceStart: number; sourceEnd: number
 }
-
-type TableRow = {
-  cells: TableCell[]
-  start: number
-  end: number
-}
-
+type TableRow = { cells: TableCell[]; start: number; end: number }
 type ActiveTable = {
-  header: TableRow
-  alignments: MarkdownEditorTableAlignment[]
-  body: TableRow[]
-  rangeStart: number
-  rangeEnd: number
-  activeRow: number
-  activeColumn: number
+  header: TableRow; alignments: MarkdownEditorTableAlignment[]; body: TableRow[]
+  rangeStart: number; rangeEnd: number; activeRow: number; activeColumn: number
 }
 
 const MIN_ROWS = 2
@@ -65,13 +47,8 @@ export const MAX_EDIT_ROWS = 200
 export const MAX_EDIT_COLUMNS = 32
 
 export type MarkdownEditorTableEditAvailability = {
-  addRow: boolean
-  deleteRow: boolean
-  addColumn: boolean
-  deleteColumn: boolean
-  alignLeft: boolean
-  alignCenter: boolean
-  alignRight: boolean
+  addRow: boolean; deleteRow: boolean; addColumn: boolean; deleteColumn: boolean
+  alignLeft: boolean; alignCenter: boolean; alignRight: boolean
 }
 
 const isEscapedPipe = (value: string, index: number) => {
@@ -446,6 +423,18 @@ const mutateTableGrid = (
       grid.alignments[activeCol] = action.alignment
       return { nextRow: activeRow, nextCol: activeCol }
     }
+    case "add-row-and-column": {
+      if (colCount >= MAX_EDIT_COLUMNS && grid.rows.length + 2 > MAX_EDIT_ROWS) return null
+      if (colCount < MAX_EDIT_COLUMNS) {
+        grid.headers.push("")
+        grid.alignments.push("left")
+        for (const row of grid.rows) row.push("")
+      }
+      if (grid.rows.length + 2 <= MAX_EDIT_ROWS) {
+        grid.rows.push(Array.from({ length: grid.headers.length }, () => ""))
+      }
+      return { nextRow: grid.rows.length, nextCol: grid.headers.length - 1 }
+    }
   }
 }
 
@@ -589,3 +578,11 @@ export const applyMarkdownTableGridAction = (
     nextCol: outcome.nextCol,
   }
 }
+
+export {
+  applyMarkdownTableGridPaste,
+  applyTableCellInlineFormat,
+  type MarkdownTablePasteOutcome,
+  type TableCellInlineFormatKind,
+  type TableCellInlineFormatOutcome,
+} from "./markdownEditorTableCellModel"

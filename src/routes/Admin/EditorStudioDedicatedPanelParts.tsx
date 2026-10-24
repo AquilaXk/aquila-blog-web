@@ -166,6 +166,24 @@ export const EditorOutlineItem = styled.button`
     flex-shrink: 0;
   }
 
+  &[data-level="1"] span {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.34)" : "rgba(20, 86, 155, 0.18)")};
+  }
+
+  &[data-level="2"] span {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.22)" : "#f6f3f9")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.34)" : "rgba(91, 54, 120, 0.18)")};
+  }
+
+  &[data-level="3"] span {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
+    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.32)" : "rgba(37, 92, 62, 0.18)")};
+  }
+
   strong {
     min-width: 0;
     font-weight: normal;

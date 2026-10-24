@@ -23,14 +23,14 @@ export const EditorToolbar = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 48px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px;
-  padding: 6px 24px 6px 56px;
-  border-top: 1px solid ${({ theme }) => theme.publicDesign.border};
+  padding: 4px 24px 4px 64px;
+  border-top: 0;
   border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
@@ -409,8 +409,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     border: none;
     border-radius: 4px;
     padding: 0.14em 0.4em;
-    background: ${({ theme }) =>
-      theme.scheme === "dark" ? "rgba(110, 118, 129, 0.25)" : "rgba(135, 131, 120, 0.15)"};
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(110, 118, 129, 0.25)" : "rgba(135, 131, 120, 0.15)")};
     color: ${({ theme }) => (theme.scheme === "dark" ? "#ff7b72" : "#eb5757")};
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.87em;
@@ -438,9 +437,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     padding: 1px 7px 1px 5px;
     margin: 0 2px;
     border-radius: 4px;
-    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-    border: 1px solid ${({ theme }) => theme.publicDesign.border};
-    color: ${({ theme }) => theme.publicDesign.accent};
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.18)" : "rgba(144, 101, 176, 0.12)")};
+    border: 1px solid ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.32)" : "rgba(144, 101, 176, 0.24)")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#6940a5")};
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.4;
@@ -450,9 +449,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
     &:hover {
-      background: ${({ theme }) => theme.publicDesign.accentMuted};
-      border-color: ${({ theme }) => theme.publicDesign.borderStrong};
-      color: ${({ theme }) => theme.publicDesign.accent};
+      background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(144, 101, 176, 0.2)")};
+      border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.45)" : "rgba(144, 101, 176, 0.36)")};
+      color: ${({ theme }) => (theme.scheme === "dark" ? "#f3e8ff" : "#532c8c")};
       text-decoration: none;
     }
 
@@ -536,8 +535,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-live-list { border-left: 1px solid ${({ theme }) => theme.colors.gray5}; padding-left: 2px; }
 
   .cm-line.cm-live-code-line {
-    background: ${({ theme }) =>
-      theme.scheme === "dark" ? theme.publicDesign.surfaceElevated : "#f7f6f3"};
+    background: ${({ theme }) => (theme.scheme === "dark" ? theme.publicDesign.surfaceElevated : "#f7f6f3")};
     border-left: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-right: 1px solid ${({ theme }) => theme.publicDesign.border};
     padding-left: 12px;
@@ -567,9 +565,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       transform: translateY(-50%);
       padding: 1px 7px;
       border-radius: 4px;
-      border: 1px solid ${({ theme }) => theme.publicDesign.border};
-      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-      color: ${({ theme }) => theme.colors.gray11};
+      border: 1px solid ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.32)" : "rgba(20, 86, 155, 0.16)")};
+      background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.18)" : "#e9f3f7")};
+      color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#14569b")};
       font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       text-transform: lowercase;
       pointer-events: none;

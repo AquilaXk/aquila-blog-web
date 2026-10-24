@@ -294,7 +294,7 @@ test.describe("admin posts workspace link contract", () => {
     expect(publishNoticeStyle).toContain("bottom: 18px;")
     expect(publishNoticeStyle).toContain("border-radius: 6px;")
     expect(publishNoticeStyle).not.toContain("border-radius: 10px;")
-    expect(editorPartsSource).toContain("padding: 22px 32px 17px;")
+    expect(editorPartsSource).toContain("padding: 28px 32px 12px 64px;")
     expect(editorPartsSource).not.toContain("export const EditorInspectorPreview")
     expect(editorPartsSource).toContain("@media (max-width: 1100px)")
     expect(editorPartsSource).toContain('"200px minmax(0, 1fr)"')

@@ -18,10 +18,7 @@ const getKatex = (): KatexRuntime | null => {
 }
 
 export class MarkdownMarkerWidget extends WidgetType {
-  constructor(
-    private readonly label: string,
-    private readonly className: string
-  ) {
+  constructor(private readonly label: string, private readonly className: string) {
     super()
   }
   eq(other: MarkdownMarkerWidget) {
@@ -37,9 +34,7 @@ export class MarkdownMarkerWidget extends WidgetType {
 }
 
 export class MarkdownRuleWidget extends WidgetType {
-  eq() {
-    return true
-  }
+  eq() { return true }
   toDOM() {
     const rule = document.createElement("span")
     rule.setAttribute("role", "separator")
@@ -49,7 +44,7 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}]+?)\s*\|\s*([^{}]+?)\s*\}\}/gi
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}]+?)\s*\|\s*([^{}]+?)\s*\}\}|(<br\s*\/?>)|\[\[([^\][\r\n|]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/gi
 
 const isSafeInlineHref = (href: string): boolean =>
   /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(href.trim())
@@ -77,7 +72,7 @@ const createInlineMathSpan = (math: string): HTMLElement => {
 }
 
 export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
-  if (!/[`*~=$[{]/.test(text)) {
+  if (!/[`*~=$[{<]/.test(text)) {
     container.textContent = text
     return
   }
@@ -138,6 +133,13 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
       } else {
         container.appendChild(document.createTextNode(match[0]))
       }
+    } else if (match[12] !== undefined) {
+      container.appendChild(document.createElement("br"))
+    } else if (match[13] !== undefined) {
+      const span = document.createElement("span")
+      span.className = "cm-live-wikilink"
+      span.textContent = (match[14] ?? match[13]).trim()
+      container.appendChild(span)
     }
     lastIndex = match.index + match[0].length
   }
@@ -147,11 +149,7 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
 }
 
 export class MarkdownTaskWidget extends WidgetType {
-  constructor(
-    private readonly checked: boolean,
-    private readonly from: number,
-    private readonly to: number
-  ) {
+  constructor(private readonly checked: boolean, private readonly from: number, private readonly to: number) {
     super()
   }
 
@@ -407,11 +405,7 @@ export class MarkdownWikilinkWidget extends WidgetType {
   }
 
   eq(other: MarkdownWikilinkWidget) {
-    return (
-      other instanceof MarkdownWikilinkWidget &&
-      other.target === this.target &&
-      other.alias === this.alias
-    )
+    return other instanceof MarkdownWikilinkWidget && other.target === this.target && other.alias === this.alias
   }
 
   toDOM(view: EditorView) {
@@ -512,11 +506,7 @@ export class MarkdownMermaidWidget extends WidgetType {
   }
 
   eq(other: MarkdownMermaidWidget) {
-    return (
-      other instanceof MarkdownMermaidWidget &&
-      other.source === this.source &&
-      other.customRenderer === this.customRenderer
-    )
+    return other instanceof MarkdownMermaidWidget && other.source === this.source && other.customRenderer === this.customRenderer
   }
 
   toDOM(view?: EditorView) {
