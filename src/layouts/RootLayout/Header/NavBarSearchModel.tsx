@@ -36,7 +36,6 @@ export const isTypingTarget = (target: EventTarget | null) => {
 }
 
 const FEED_SEARCH_ROUTE_TIMEOUT_MS = 8_000
-export const SEARCH_SHORTCUT_HINT = "⌘K"
 
 export const reportFocusFeedSearchFailure = (error: unknown) => {
   console.error("[NavBar] failed to focus feed search input", error)

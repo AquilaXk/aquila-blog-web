@@ -17,10 +17,10 @@ export const StyledWrapper = styled.div `
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
+    left: 0;
+    right: 0;
     z-index: -1;
-    width: 100vw;
-    transform: translateX(-50%);
+    width: 100%;
     background: var(--aq-page-bg);
     pointer-events: none;
   }
@@ -156,9 +156,9 @@ export const StyledWrapper = styled.div `
     .floatingActionButton[data-tooltip]::after {
       content: attr(data-tooltip);
       position: absolute;
-      left: calc(100% + 0.6rem);
-      top: 50%;
-      transform: translateY(-50%);
+      left: 50%;
+      top: calc(100% + 0.45rem);
+      transform: translateX(-50%);
       white-space: nowrap;
       padding: 0.3rem 0.48rem;
       border-radius: 4px;
@@ -171,6 +171,7 @@ export const StyledWrapper = styled.div `
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.15s ease;
+      z-index: 4;
     }
 
     .floatingActionButton[data-tooltip]:hover::after,
@@ -377,6 +378,7 @@ export const StyledWrapper = styled.div `
     .mobileTocSummary {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       min-height: ${control.lg}px;
       padding: 0 0.9rem;
       color: var(--aq-text);
@@ -389,12 +391,29 @@ export const StyledWrapper = styled.div `
       &::-webkit-details-marker {
         display: none;
       }
+
+      &::after {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid var(--aq-muted);
+        border-bottom: 1.5px solid var(--aq-muted);
+        transform: translateY(-2px) rotate(45deg);
+        transition: transform 180ms ease;
+      }
+    }
+
+    .mobileToc[open] .mobileTocSummary::after {
+      transform: translateY(1px) rotate(225deg);
     }
 
     .mobileTocList {
       margin: 0;
       padding: 0 0.5rem 0.5rem;
       list-style: none;
+      border-top: 1px solid var(--aq-border);
+      max-height: min(52dvh, 360px);
+      overflow-y: auto;
     }
 
     .mobileTocList li {

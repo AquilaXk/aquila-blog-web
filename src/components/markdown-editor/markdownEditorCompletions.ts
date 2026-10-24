@@ -87,17 +87,8 @@ export const wikilinkCompletionSource = (
     apply: `${post.title}]]`,
   }))
 
-  const defaultNoteOptions =
-    registeredPostSuggestions.length > 0
-      ? []
-      : [
-          { label: "Overview", type: "text", detail: "Note link", apply: "Overview]]" },
-          { label: "Architecture", type: "text", detail: "Note link", apply: "Architecture]]" },
-          { label: "Guide", type: "text", detail: "Note link", apply: "Guide]]" },
-          { label: "Development", type: "text", detail: "Note link", apply: "Development]]" },
-        ]
-
-  const allOptions = [...headingOptions, ...postOptions, ...defaultNoteOptions]
+  const allOptions = [...headingOptions, ...postOptions]
+  if (allOptions.length === 0) return null
 
   return {
     from: startPos,

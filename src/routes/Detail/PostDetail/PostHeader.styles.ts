@@ -308,6 +308,7 @@ export const StyledWrapper = styled.header `
       margin-left: 0;
     }
 
+    .backLink,
     .shareFeedbackPill,
     .shareButton {
       min-height: ${control.lg}px;

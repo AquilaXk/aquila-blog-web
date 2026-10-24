@@ -105,6 +105,9 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
   }
 
   .aq-embed-header a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: ${ theme.colors.blue8};
     font-size: 0.84rem;
     font-weight: 700;

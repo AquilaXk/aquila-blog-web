@@ -214,10 +214,11 @@ export const FilterContextBar = styled.div`
   color: var(--aq-muted);
 
   .contextMain {
+    flex: 1 1 0%;
     min-width: 0;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.38rem;
   }
 
@@ -236,6 +237,8 @@ export const FilterContextBar = styled.div`
   }
 
   .filterSummary {
+    flex: 1 1 0%;
+    min-width: 0;
     color: var(--aq-muted);
     font-size: 0.74rem;
     line-height: 1.35;
@@ -244,21 +247,6 @@ export const FilterContextBar = styled.div`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .statusBadge {
-    display: none;
-    align-items: center;
-    gap: 0.28rem;
-    min-height: 1.7rem;
-    padding: 0 0.58rem;
-    border-radius: 4px;
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface-elevated);
-    color: var(--aq-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    white-space: nowrap;
   }
 
   .resetButton {
@@ -292,12 +280,6 @@ export const FilterContextBar = styled.div`
     .filterSummary {
       font-size: 0.71rem;
       max-width: 100%;
-    }
-
-    .statusBadge {
-      max-width: 100%;
-      white-space: normal;
-      line-height: 1.35;
     }
 
     .resetButton {

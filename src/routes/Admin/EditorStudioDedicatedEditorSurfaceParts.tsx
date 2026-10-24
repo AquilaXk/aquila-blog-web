@@ -344,7 +344,7 @@ export const SelectedTagChip = styled.span `
   min-width: 0;
   max-width: 100%;
   min-height: 26px;
-  border-radius: 0;
+  border-radius: 5px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: transparent;
   overflow: hidden;
@@ -396,7 +396,7 @@ export const InlineMetaInput = styled.input `
   flex: 1 1 12rem;
   min-width: 11rem;
   border: 0;
-  border-bottom: 1px dashed ${({ theme }) => theme.colors.gray6};
+  border-bottom: 1px solid transparent;
   outline: none;
   min-height: 32px;
   padding: 0 0.12rem;
@@ -405,15 +405,19 @@ export const InlineMetaInput = styled.input `
   color: ${({ theme }) => theme.colors.gray12};
   font-size: 0.86rem;
   font-weight: 500;
+  transition: border-color 0.16s ease;
 
   &::placeholder {
     color: ${({ theme }) => theme.colors.gray10};
   }
 
+  &:hover {
+    border-bottom-color: ${({ theme }) => theme.colors.gray6};
+  }
+
   &:focus-visible {
     outline: none;
-    border-color: ${({ theme }) => theme.colors.blue8};
-    box-shadow: 0 0 0 4px ${({ theme }) => theme.colors.blue4};
+    border-bottom-color: ${({ theme }) => theme.colors.blue8};
   }
 `;
 
@@ -491,6 +495,7 @@ export const TitleInput = styled.textarea`
 export const EditorHeaderMetaRow = styled.div<{
   $collapsedOnMobile?: boolean;
   $collapsedInZen?: boolean;
+  $collapsedWhenInspectorOpen?: boolean;
 }>`
   display: ${({ $collapsedInZen }) => ($collapsedInZen ? "none" : "flex")};
   align-items: center;
@@ -499,9 +504,23 @@ export const EditorHeaderMetaRow = styled.div<{
   min-width: 0;
   margin-top: 10px;
 
+  @media (min-width: 1101px) {
+    ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "display: none;" : "")}
+  }
+
   @media (max-width: 820px) {
     ${({ $collapsedOnMobile }) => ($collapsedOnMobile ? "display: none;" : "display: flex;")}
   }
+`;
+
+export const EditorHiddenFileInput = styled.input`
+  display: none;
+`;
+
+export const EditorStudioTopBarLead = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
 
 export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolean }>`

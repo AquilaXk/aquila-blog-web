@@ -60,10 +60,20 @@ test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal",
     expect(mermaidPlan.replacement).toBe("```mermaid\ngraph TD\n  A --> B\n```")
     expect(mermaidPlan.selectionStart).toBe(15)
 
+    const bookmarkSpec = SLASH_COMMAND_SPECS.find((s) => s.id === "bookmark")!
+    const bookmarkPlan = resolveSlashCommandMutation(bookmarkSpec, 0, 9)
+    expect(bookmarkPlan.replacement).toBe(":::bookmark https://\n\n:::")
+    expect(bookmarkPlan.selectionStart).toBe(20)
+
     const surfaceSrc = readRepoFile("src/routes/Admin/EditorStudioDedicatedEditorSurface.tsx")
     expect(surfaceSrc).toContain('event.key.toLowerCase() === "f"')
     expect(surfaceSrc).toContain("$visibleOnDesktop={isZenMode}")
     expect(surfaceSrc).toContain("$collapsedInZen={isZenMode && !isMobilePropertiesOpen}")
+    expect(surfaceSrc).toContain("$collapsedWhenInspectorOpen={isInspectorOpen && !isZenMode}")
+
+    const panelPartsSrc = readRepoFile("src/routes/Admin/EditorStudioDedicatedPanelParts.tsx")
+    expect(panelPartsSrc).not.toContain("Authoring help")
+    expect(panelPartsSrc).not.toContain("#0f1728")
   })
 
   test("3. Bit-packed Live Preview metadata & O(log N) binary search for inline-color and wikilinks", () => {
@@ -103,12 +113,10 @@ test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal",
   })
 
   test("4. Bitwise UTF-16 surrogate pair boundary clamping in computeMinimalDocChange", () => {
-    // "😀" = \uD83D\uDE00, "🫠" = \uD83E\uDE00 (differ on high surrogate, share trailing low surrogate \uDE00)
     const prev = "Hello \uD83D\uDE00 world"
     const next = "Hello \uD83E\uDE00 world"
     const diff = computeMinimalDocChange(prev, next)
     expect(diff).not.toBeNull()
-    // Must not split inside the surrogate pair at index 7; must span [6, 8]
     expect(diff!.from).toBe(6)
     expect(diff!.to).toBe(8)
     expect(diff!.insert).toBe("\uD83E\uDE00")

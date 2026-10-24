@@ -80,6 +80,8 @@ import {
   liveSurfaceTheme,
   selectNextOccurrenceCommand,
 } from "./markdownEditorLiveSurfaceCommands"
+import { activeEmptyLineField } from "./markdownEditorNotionModel"
+import { notionContainerBlockField } from "./markdownEditorNotionWidgets"
 
 type MarkdownEditorSnapshot = {
   documentValue: string
@@ -122,6 +124,7 @@ export type MarkdownEditorLiveSurfaceHandle = {
   focus: (selection?: MarkdownLiveSelection) => void
   readSnapshot: () => MarkdownEditorSnapshot
   posAtCoords: (coords: { x: number; y: number }) => number | null
+  coordsAtPos?: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
   setSelection: (selection: MarkdownLiveSelection) => void
   isCompletionActive?: () => boolean
 }
@@ -239,6 +242,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
         editorModeField,
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         decorationField,
+        notionContainerBlockField,
+        activeEmptyLineField,
         liveSurfaceTheme,
         EditorView.contentAttributes.of({
           "aria-label": "Markdown 본문",
@@ -420,6 +425,12 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const view = viewRef.current
         if (!view) return null
         return view.posAtCoords(coords)
+      },
+      coordsAtPos: (pos) => {
+        const view = viewRef.current
+        if (!view) return null
+        const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
+        return view.coordsAtPos(clamped)
       },
       setSelection: (selection) => {
         const view = viewRef.current

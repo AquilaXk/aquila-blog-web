@@ -83,6 +83,7 @@ export const useEditorStudioMetaCatalog = ({
     addTagToPost,
     commitPostCategory,
     customCategoryCatalog,
+    customTagCatalog,
     handlePostCategoryChange,
     removeTagFromPost,
   }

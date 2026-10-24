@@ -10,10 +10,11 @@ import {
 import {
   isMarkdownEditorTableSelection,
   planMarkdownEditorTableCellNavigation,
+  planMarkdownEditorTableEnter,
   planMarkdownEditorTableTab,
 } from "./markdownEditorTableModel"
 
-export { planMarkdownEditorTableCellNavigation }
+export { planMarkdownEditorTableCellNavigation, planMarkdownEditorTableEnter }
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import { matchListMarkerLine } from "./markdownEditorListCommandsModel"
 import { resolveMarkdownEditorCommandShortcut } from "./markdownEditorCommandRegistryModel"
@@ -43,47 +44,95 @@ export const isComposingEditorKeyboardEvent = (event: {
 
 const FENCE_LINE_RE = /^(?<indent> {0,3})(?<fence>`{3,}|~{3,})(?<info>.*)$/
 
-export const isOffsetInsideFencedCodeBlock = (value: string, offset: number): boolean => {
-  const clamped = Math.max(0, Math.min(offset, value.length))
-  const before = value.slice(0, clamped)
-  const lines = before.split("\n")
+type FenceInterval = {
+  openStart: number
+  openEnd: number
+  closeStart: number
+  closeEnd: number
+  unclosed: boolean
+}
+
+let cachedFenceIntervals: { value: string; intervals: readonly FenceInterval[] } | null = null
+
+const getFenceIntervals = (value: string): readonly FenceInterval[] => {
+  if (cachedFenceIntervals && cachedFenceIntervals.value === value) {
+    return cachedFenceIntervals.intervals
+  }
+  const intervals: FenceInterval[] = []
   let inFence = false
   let openMarker = ""
   let openLen = 0
+  let openStart = 0
+  let openEnd = 0
+  let lineStart = 0
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? ""
-    const isCurrentLine = index === lines.length - 1
+  while (lineStart <= value.length) {
+    const nextBreak = value.indexOf("\n", lineStart)
+    const lineEnd = nextBreak === -1 ? value.length : nextBreak
+    const line = value.slice(lineStart, lineEnd)
     const match = FENCE_LINE_RE.exec(line)
-    if (!match?.groups) {
-      if (isCurrentLine) return inFence
-      continue
+    if (match?.groups) {
+      const fence = match.groups.fence ?? ""
+      const marker = fence[0] ?? ""
+      const len = fence.length
+      const info = match.groups.info ?? ""
+      if (!inFence) {
+        inFence = true
+        openMarker = marker
+        openLen = len
+        openStart = lineStart
+        openEnd = lineEnd
+      } else if (marker === openMarker && len >= openLen && info.trim() === "") {
+        intervals.push({
+          openStart,
+          openEnd,
+          closeStart: lineStart,
+          closeEnd: lineEnd,
+          unclosed: false,
+        })
+        inFence = false
+        openMarker = ""
+        openLen = 0
+      }
     }
-
-    const fence = match.groups.fence ?? ""
-    const marker = fence[0] ?? ""
-    const len = fence.length
-    const info = match.groups.info ?? ""
-
-    if (!inFence) {
-      if (isCurrentLine) return false
-      inFence = true
-      openMarker = marker
-      openLen = len
-      continue
-    }
-
-    if (marker === openMarker && len >= openLen && info.trim() === "") {
-      if (isCurrentLine) return false
-      inFence = false
-      openMarker = ""
-      openLen = 0
-    } else if (isCurrentLine) {
-      return true
-    }
+    if (nextBreak === -1) break
+    lineStart = nextBreak + 1
   }
 
-  return inFence
+  if (inFence) {
+    intervals.push({
+      openStart,
+      openEnd,
+      closeStart: value.length + 1,
+      closeEnd: value.length + 1,
+      unclosed: true,
+    })
+  }
+
+  cachedFenceIntervals = { value, intervals }
+  return intervals
+}
+
+export const isOffsetInsideFencedCodeBlock = (value: string, offset: number): boolean => {
+  if (!value.includes("```") && !value.includes("~~~")) return false
+  const clamped = Math.max(0, Math.min(offset, value.length))
+  const intervals = getFenceIntervals(value)
+  if (intervals.length === 0) return false
+
+  let low = 0
+  let high = intervals.length - 1
+  let candidate = -1
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    if (intervals[mid]!.openEnd < clamped) {
+      candidate = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  if (candidate === -1) return false
+  return clamped < intervals[candidate]!.closeStart
 }
 
 export { matchListMarkerLine }
