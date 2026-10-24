@@ -135,4 +135,14 @@ const StyledWrapper = styled.div`
       line-height: 1.45;
     }
   }
+
+  @media (max-width: 768px) {
+    flex: 1 1 0%;
+    min-width: 0;
+
+    > .field > .mid {
+      width: 100%;
+      flex: 1 1 0%;
+    }
+  }
 `

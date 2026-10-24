@@ -53,17 +53,6 @@ const resolveFilterSummary = (normalizedQuery: string, currentTag: string | unde
   return parts.join(" · ")
 }
 
-const resolveContextStatusLabel = (
-  isInitialLoading: boolean,
-  hasFilter: boolean,
-  showBootstrapDegraded: boolean,
-  resultCount: number
-) => {
-  if (isInitialLoading) return hasFilter ? "검색 결과를 불러오는 중..." : "피드를 불러오는 중..."
-  if (showBootstrapDegraded && resultCount > 0) return "최근 저장된 글을 먼저 표시 중"
-  return ""
-}
-
 const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
   const { t } = useLanguage()
   const [q, setQ] = useState("")
@@ -209,10 +198,6 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const filterSummary = useMemo(
     () => resolveFilterSummary(normalizedQuery, currentTag),
     [currentTag, normalizedQuery]
-  )
-  const contextStatusLabel = useMemo(
-    () => resolveContextStatusLabel(isInitialLoading, hasFilter, showBootstrapDegraded, resultCount),
-    [hasFilter, isInitialLoading, resultCount, showBootstrapDegraded]
   )
 
   const handleClearFilters = useCallback(() => {
@@ -367,23 +352,18 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
               </div>
             </div>
           </ExplorerCard>
-          {(hasFilter || contextStatusLabel) && (
+          {hasFilter && (
             <FilterContextBar>
               <div className="contextMain">
                 <strong className="contextCount">
-                  {hasFilter
-                    ? `${resultCount}${t("filterResultUnit")}`
-                    : `${t("filterFeedPrefix")}${resultCount}${t("filterResultUnit")}`}
+                  {`${resultCount}${t("filterResultUnit")}`}
                 </strong>
-                {hasFilter && <span className="filterSummary">{filterSummary}</span>}
-                {contextStatusLabel ? <span className="statusBadge">{contextStatusLabel}</span> : null}
+                <span className="filterSummary">{filterSummary}</span>
               </div>
               <div className="contextActions">
-                {hasFilter && (
-                  <button type="button" className="resetButton" onClick={handleClearFilters}>
-                    {t("filterReset")}
-                  </button>
-                )}
+                <button type="button" className="resetButton" onClick={handleClearFilters}>
+                  {t("filterReset")}
+                </button>
               </div>
             </FilterContextBar>
           )}

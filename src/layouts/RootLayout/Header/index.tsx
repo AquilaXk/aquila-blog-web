@@ -153,7 +153,7 @@ const StyledWrapper = styled.div`
 
       > a {
         min-width: 0;
-        max-width: 42vw;
+        max-width: calc(100vw - 5.5rem);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

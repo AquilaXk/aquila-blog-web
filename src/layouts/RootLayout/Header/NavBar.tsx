@@ -14,7 +14,6 @@ import {
   MenuIcon,
   primaryLinks,
   reportFocusFeedSearchFailure,
-  SEARCH_SHORTCUT_HINT,
   SearchIcon,
   waitForFeedSearchRoute,
   waitForFocusTrapRestore,
@@ -133,8 +132,8 @@ const NavBar = () => {
                 aria-keyshortcuts="Meta+K Control+K"
                 onClick={requestFocusFeedSearch}
               >
+                <SearchIcon />
                 <span>{t("navSearch")}</span>
-                <kbd>{SEARCH_SHORTCUT_HINT}</kbd>
               </button>
               {primaryLinks.map(([id, , to, labelKey]) => {
                 const label = t(labelKey)
@@ -152,6 +151,7 @@ const NavBar = () => {
                   title={language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}
                   onClick={() => {
                     toggleLanguage()
+                    closeMobileMenu()
                   }}
                   data-language={language}
                 >
@@ -250,7 +250,12 @@ const MobileMenuBackdrop = styled.div`
   position: fixed;
   inset: 0;
   z-index: ${zIndexes.mobileNavOverlay};
-  background: color-mix(in srgb, var(--aq-text) 28%, transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent var(--app-header-height, 59px),
+    color-mix(in srgb, var(--aq-text) 14%, transparent) var(--app-header-height, 59px)
+  );
   pointer-events: auto;
 `
 
@@ -260,10 +265,11 @@ const MobileMenuPanel = styled.div`
   right: max(0.75rem, env(safe-area-inset-right, 0px));
   z-index: ${zIndexes.mobileNavOverlay};
   display: grid;
-  width: min(220px, calc(100vw - 1.5rem));
+  width: min(240px, calc(100vw - 1.5rem));
   border: 1px solid var(--aq-border-strong);
   border-radius: 6px;
   background: var(--aq-surface);
+  box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--aq-text) 14%, transparent);
   padding: 6px;
   pointer-events: auto;
 
@@ -286,15 +292,28 @@ const MobileMenuPanel = styled.div`
     cursor: pointer;
   }
 
+  button[data-ui="mobile-nav-search"] {
+    justify-content: flex-start;
+    gap: 8px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      color: var(--aq-muted);
+    }
+  }
+
   .mobileLangSwitchRow {
     display: flex;
-    padding: 2px 2px 8px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid var(--aq-border);
+    margin-top: 4px;
+    padding: 6px 2px 2px;
+    border-top: 1px solid var(--aq-border);
 
     .mobileLangToggleBtn {
       display: inline-flex;
       align-items: center;
+      justify-content: flex-start;
       gap: 8px;
       width: 100%;
       min-height: ${control.lg}px;
@@ -325,19 +344,6 @@ const MobileMenuPanel = styled.div`
         outline-offset: 1px;
       }
     }
-  }
-
-  kbd {
-    border: 1px solid var(--aq-border);
-    border-radius: 4px;
-    background: var(--aq-surface-elevated);
-    padding: 0.15rem 0.35rem;
-    color: var(--aq-muted);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.625rem;
-    line-height: 1;
-    font-weight: 700;
-    box-shadow: 0 1px 0 1px var(--aq-border);
   }
 `
 
@@ -532,9 +538,7 @@ const StyledWrapper = styled.div`
     }
 
     .langToggleBtn {
-      min-height: ${control.lg}px;
-      height: ${control.lg}px;
-      padding: 0 10px;
+      display: none;
     }
 
     .searchTrigger {

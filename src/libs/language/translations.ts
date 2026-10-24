@@ -20,7 +20,6 @@ const translationTable = {
   sortLikes: ["좋아요순", "Likes"],
   pinnedPostsHeader: ["고정된 글", "Pinned Posts"],
   filterResultUnit: ["개", " posts"],
-  filterFeedPrefix: ["피드 ", "Feed "],
   filterReset: ["초기화", "Reset"],
   emptyFilterTitle: ["검색 결과가 없습니다.", "No posts found."],
   emptyFilterDesc: ["다른 검색어를 입력해보세요.", "Try searching with different keywords."],
