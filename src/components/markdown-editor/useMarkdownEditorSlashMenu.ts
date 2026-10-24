@@ -72,9 +72,13 @@ export const resolveSlashCommandMutation = (
 export const useMarkdownEditorSlashMenu = ({
   selectionRef,
   applyMutationPlan,
+  disableMermaid = false,
+  resolveSlashCoords,
 }: {
   selectionRef: MutableRefObject<SlashSelection>
   applyMutationPlan: (plan: PlannedTextMutation) => boolean
+  disableMermaid?: boolean
+  resolveSlashCoords?: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
 }) => {
   const [slashMenuState, setSlashMenuState] = useState<{
     isOpen: boolean
@@ -107,9 +111,12 @@ export const useMarkdownEditorSlashMenu = ({
 
   const slashMenuItems: SlashMenuItem[] = useMemo(() => {
     const q = slashMenuState.query.trim().toLowerCase()
+    const availableSpecs = disableMermaid
+      ? SLASH_COMMAND_SPECS.filter((spec) => spec.id !== "mermaid")
+      : SLASH_COMMAND_SPECS
     const specs = !q
-      ? SLASH_COMMAND_SPECS
-      : SLASH_COMMAND_SPECS.filter(
+      ? availableSpecs
+      : availableSpecs.filter(
           (spec) =>
             spec.label.toLowerCase().includes(q) ||
             spec.description.toLowerCase().includes(q) ||
@@ -123,37 +130,51 @@ export const useMarkdownEditorSlashMenu = ({
       icon: spec.icon,
       action: () => handleSelectSlashItem(spec),
     }))
-  }, [handleSelectSlashItem, slashMenuState.query])
+  }, [disableMermaid, handleSelectSlashItem, slashMenuState.query])
 
-  const checkSlashCommand = useCallback((markdown: string, selection: SlashSelection) => {
-    const trigger = matchSlashCommandTrigger(markdown, selection)
-    if (!trigger) {
-      setSlashMenuState((prev) =>
-        prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev
-      )
-      return
-    }
+  const checkSlashCommand = useCallback(
+    (markdown: string, selection: SlashSelection) => {
+      const trigger = matchSlashCommandTrigger(markdown, selection)
+      if (!trigger) {
+        setSlashMenuState((prev) =>
+          prev.isOpen ? { ...prev, isOpen: false, position: null, query: "" } : prev
+        )
+        return
+      }
 
-    const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
-    let coords = { top: 240, left: 340 }
-    if (selectionObj && selectionObj.rangeCount > 0) {
-      const range = selectionObj.getRangeAt(0)
-      const rect = range.getBoundingClientRect()
-      if (rect.bottom > 0) {
+      let coords = { top: 240, left: 340 }
+      const viewRect = resolveSlashCoords?.(trigger.slashFrom) ?? null
+      if (viewRect && viewRect.bottom > 0 && typeof window !== "undefined") {
         coords = {
-          top: Math.min(rect.bottom + 8, window.innerHeight - 380),
-          left: Math.min(rect.left, window.innerWidth - 300),
+          top: Math.min(viewRect.bottom + 8, window.innerHeight - 380),
+          left: Math.max(12, Math.min(viewRect.left, window.innerWidth - 300)),
+        }
+      } else {
+        const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
+        if (selectionObj && selectionObj.rangeCount > 0) {
+          const range = selectionObj.getRangeAt(0)
+          const rect = range.getBoundingClientRect()
+          if (rect.bottom > 0) {
+            coords = {
+              top: Math.min(rect.bottom + 8, window.innerHeight - 380),
+              left: Math.max(12, Math.min(rect.left, window.innerWidth - 300)),
+            }
+          }
         }
       }
-    }
 
-    setSlashMenuState((prev) => ({
-      isOpen: true,
-      position: prev.isOpen && prev.position ? prev.position : coords,
-      query: trigger.query,
-      slashFrom: trigger.slashFrom,
-    }))
-  }, [])
+      setSlashMenuState((prev) => ({
+        isOpen: true,
+        position:
+          prev.isOpen && prev.position && prev.slashFrom === trigger.slashFrom
+            ? prev.position
+            : coords,
+        query: trigger.query,
+        slashFrom: trigger.slashFrom,
+      }))
+    },
+    [resolveSlashCoords]
+  )
 
   return {
     slashMenuState,

@@ -428,6 +428,11 @@ export const MarkdownEditor = ({
       insertUploadedMarkdown,
     })
 
+  const resolveSlashCoords = useCallback(
+    (pos: number) => liveSurfaceRef.current?.coordsAtPos?.(pos) ?? null,
+    []
+  )
+
   const {
     slashMenuState,
     slashMenuOpenRef,
@@ -437,6 +442,8 @@ export const MarkdownEditor = ({
   } = useMarkdownEditorSlashMenu({
     selectionRef,
     applyMutationPlan,
+    disableMermaid,
+    resolveSlashCoords,
   })
 
   const isCompletionOrSlashMenuActive = useCallback(

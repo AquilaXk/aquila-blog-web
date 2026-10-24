@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import styled from "@emotion/styled"
 import { CONFIG } from "site.config"
 
@@ -325,13 +326,6 @@ export const EditorGuidePanel = styled.aside`
     border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   }
 
-  header span {
-    color: ${({ theme }) => theme.publicDesign.accent};
-    font: 750 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
   h2 {
     margin: 0;
     color: ${({ theme }) => theme.colors.gray12};
@@ -395,8 +389,10 @@ export const EditorGuideGrid = styled.div`
     min-height: 5.6rem;
     padding: 11px;
     overflow: auto;
-    background: #0f1728;
-    color: #dbe7ff;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    border-radius: 6px;
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    color: ${({ theme }) => theme.colors.gray12};
     font: 650 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -432,6 +428,18 @@ export const EditorGuideRepo = styled.div`
 
 export const EditorStudioGuideModal = ({ onClose }: { onClose: () => void }) => {
   const projectRepository = CONFIG.projects?.[0]
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [onClose])
+
   return (
     <EditorGuideBackdrop onClick={onClose}>
       <EditorGuidePanel
@@ -442,7 +450,6 @@ export const EditorStudioGuideModal = ({ onClose }: { onClose: () => void }) => 
       >
         <header>
           <div>
-            <span>Authoring help</span>
             <h2>Markdown 작성 가이드</h2>
           </div>
           <button type="button" aria-label="가이드 닫기" onClick={onClose}>

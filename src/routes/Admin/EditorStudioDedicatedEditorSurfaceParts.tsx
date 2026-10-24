@@ -491,6 +491,7 @@ export const TitleInput = styled.textarea`
 export const EditorHeaderMetaRow = styled.div<{
   $collapsedOnMobile?: boolean;
   $collapsedInZen?: boolean;
+  $collapsedWhenInspectorOpen?: boolean;
 }>`
   display: ${({ $collapsedInZen }) => ($collapsedInZen ? "none" : "flex")};
   align-items: center;
@@ -499,9 +500,23 @@ export const EditorHeaderMetaRow = styled.div<{
   min-width: 0;
   margin-top: 10px;
 
+  @media (min-width: 1101px) {
+    ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "display: none;" : "")}
+  }
+
   @media (max-width: 820px) {
     ${({ $collapsedOnMobile }) => ($collapsedOnMobile ? "display: none;" : "display: flex;")}
   }
+`;
+
+export const EditorHiddenFileInput = styled.input`
+  display: none;
+`;
+
+export const EditorStudioTopBarLead = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
 
 export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolean }>`

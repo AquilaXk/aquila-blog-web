@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState } from "react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { zIndexes } from "src/styles/zIndexes"
@@ -23,7 +23,7 @@ export const SLASH_COMMAND_SPECS = [
   { id: "toggle", label: "토글 블록 (Toggle)", description: "접고 펼치는 상세 블록", icon: "▸", snippet: ":::toggle 토글 제목\n\n:::" },
   { id: "math", label: "수식 블록 (Math)", description: "LaTeX 수식 블록 ($$)", icon: "∑", snippet: "$$\n\n$$" },
   { id: "mermaid", label: "다이어그램 (Mermaid)", description: "Mermaid 순서도 및 구조도", icon: "◇", snippet: "```mermaid\ngraph TD\n  A --> B\n```" },
-  { id: "bookmark", label: "북마크 링크 (Bookmark)", description: "외부 링크 카드 블록", icon: "🔖", snippet: "@[bookmark](https://)" },
+  { id: "bookmark", label: "북마크 링크 (Bookmark)", description: "외부 링크 카드 블록", icon: "🔖", snippet: ":::bookmark https://\n\n:::" },
   { id: "task-list", label: "할 일 목록 (Todo)", description: "체크박스 목록", icon: "☑", snippet: "- [ ] " },
   { id: "table", label: "표 (Table)", description: "기본 표 삽입", icon: "▦", snippet: "__TABLE__" },
   { id: "divider", label: "구분선 (Divider)", description: "가로 구분선", icon: "—", snippet: "\n---\n\n" },
@@ -156,10 +156,16 @@ export const MarkdownEditorSlashMenu = ({
 }: MarkdownEditorSlashMenuProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   useEffect(() => {
     setSelectedIndex(0)
   }, [isOpen, items])
+
+  useEffect(() => {
+    if (!isOpen) return
+    itemRefs.current[selectedIndex]?.scrollIntoView?.({ block: "nearest" })
+  }, [isOpen, selectedIndex])
 
   useEffect(() => {
     if (!isOpen) return
@@ -226,6 +232,9 @@ export const MarkdownEditorSlashMenu = ({
         items.map((item, index) => (
           <SlashMenuItemButton
             key={item.id}
+            ref={(node) => {
+              itemRefs.current[index] = node
+            }}
             type="button"
             role="menuitem"
             $active={index === selectedIndex}

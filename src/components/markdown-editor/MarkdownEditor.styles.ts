@@ -47,6 +47,15 @@ export const ToolbarGroup = styled.div`
   min-width: 0;
   max-width: 100%;
   overflow: visible;
+
+  &[data-align="end"] {
+    margin-left: auto;
+  }
+`
+
+export const ToolbarQuoteGlyph = styled.span`
+  font-size: 15px;
+  line-height: 1;
 `
 
 export const ToolbarButton = styled.button<{ $active?: boolean }>`
@@ -216,9 +225,9 @@ export const ToolbarHiddenInput = styled.input`
 
 export const ToolbarError = styled.div`
   padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid rgba(248, 81, 73, 0.35);
-  background: rgba(248, 81, 73, 0.1);
-  color: #ffb4ad;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.red7};
+  background: ${({ theme }) => theme.colors.red3};
+  color: ${({ theme }) => theme.colors.red11};
   font-size: 0.86rem;
   font-weight: 600;
 `
@@ -488,10 +497,19 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     align-items: center;
     justify-content: center;
     margin-right: 0.45em;
+    border-radius: 3px;
     border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
     color: ${({ theme }) => theme.colors.gray12};
     font: 800 0.75em/1 ui-monospace, monospace;
     vertical-align: -0.08em;
+    cursor: pointer;
+    user-select: none;
+
+    &.is-checked {
+      background: ${({ theme }) => theme.publicDesign.accent};
+      border-color: ${({ theme }) => theme.publicDesign.accent};
+      color: #fff;
+    }
   }
 
   .cm-live-heading-line { position: relative; padding-top: 0.35em; padding-bottom: 0.15em; }

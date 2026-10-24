@@ -47,7 +47,7 @@ test.describe("markdown editor completions model", () => {
     const result = codeLanguageCompletionSource(context)
 
     expect(result).not.toBeNull()
-    expect(result?.from).toBe(3) // starts at the prefix
+    expect(result?.from).toBe(3)
   })
 
   test("codeLanguageCompletionSource returns null when not on a fence line", () => {
@@ -72,7 +72,6 @@ test.describe("markdown editor completions model", () => {
     expect(result).not.toBeNull()
     expect(result?.from).toBe(pos)
 
-    // Heading links
     expect(result?.options).toContainEqual(
       expect.objectContaining({
         label: "#Getting Started",
@@ -88,7 +87,6 @@ test.describe("markdown editor completions model", () => {
       })
     )
 
-    // Internal blog posts
     expect(result?.options).toContainEqual(
       expect.objectContaining({
         label: "First Blog Post",
@@ -102,6 +100,14 @@ test.describe("markdown editor completions model", () => {
         apply: "React Architecture Guide]]",
       })
     )
+  })
+
+  test("wikilinkCompletionSource returns null when no headings or registered posts exist", () => {
+    const doc = "Paragraph without headings: [["
+    const context = createMockContext(doc, doc.length)
+    const result = wikilinkCompletionSource(context)
+
+    expect(result).toBeNull()
   })
 
   test("wikilinkCompletionSource returns null when not preceded by [[", () => {

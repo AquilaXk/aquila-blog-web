@@ -87,9 +87,6 @@ export const EditorStudioWorkspaceController = ({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { me, authStatus } = useAuthSession()
-  // SSR admin 스냅샷이 있는 전용 편집 라우트는 hydration/auth race 동안에도
-  // 최초 보호 상태를 유지해야 한다. bare `me === null`만 보고 즉시 로그인으로
-  // 보내면 WebKit 같은 브라우저에서 false logout redirect가 발생할 수 있다.
   const sessionMember = me || initialMember
   const [result, setResult] = useState<string>("")
   const [loadingKey, setLoadingKey] = useState<string>("")
@@ -431,6 +428,7 @@ export const EditorStudioWorkspaceController = ({
     addTagToPost,
     commitPostCategory,
     customCategoryCatalog,
+    customTagCatalog,
     handlePostCategoryChange,
     removeTagFromPost,
   } = useEditorStudioMetaCatalog({
@@ -553,7 +551,7 @@ export const EditorStudioWorkspaceController = ({
     <EditorStudioWorkspaceControllerRootView
       props={{
         addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
-        closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
+        closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, customTagCatalog, deferredContentDerived,
         dismissedLocalDraft, dismissLocalDraftRestoreSuggestion, disabled, editorMode, finalizePreviewThumbPointer,
         getCurrentPostContent, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
         handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,

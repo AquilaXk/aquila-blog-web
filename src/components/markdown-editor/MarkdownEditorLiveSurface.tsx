@@ -122,6 +122,7 @@ export type MarkdownEditorLiveSurfaceHandle = {
   focus: (selection?: MarkdownLiveSelection) => void
   readSnapshot: () => MarkdownEditorSnapshot
   posAtCoords: (coords: { x: number; y: number }) => number | null
+  coordsAtPos?: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
   setSelection: (selection: MarkdownLiveSelection) => void
   isCompletionActive?: () => boolean
 }
@@ -420,6 +421,12 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const view = viewRef.current
         if (!view) return null
         return view.posAtCoords(coords)
+      },
+      coordsAtPos: (pos) => {
+        const view = viewRef.current
+        if (!view) return null
+        const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
+        return view.coordsAtPos(clamped)
       },
       setSelection: (selection) => {
         const view = viewRef.current
