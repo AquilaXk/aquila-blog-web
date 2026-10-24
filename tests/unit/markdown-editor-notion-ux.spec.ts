@@ -941,6 +941,25 @@ test.describe("Notion-parity Markdown editor model", () => {
       pastedCols: 2,
     })
 
+    const csvPasted = applyMarkdownTableGridPaste(
+      baseTable,
+      1,
+      0,
+      '"Alpha, Inc.",120\n"Beta, LLC",240\n'
+    )
+    expect(csvPasted).toEqual({
+      markdown: [
+        "| H1 | H2 |",
+        "| --- | --- |",
+        "| Alpha, Inc. | 120 |",
+        "| Beta, LLC | 240 |",
+      ].join("\n"),
+      nextRow: 2,
+      nextCol: 1,
+      pastedRows: 2,
+      pastedCols: 2,
+    })
+
     expect(applyTableCellInlineFormat("hello", 0, 5, "bold")).toEqual({
       value: "**hello**",
       selectionStart: 2,
@@ -950,6 +969,21 @@ test.describe("Notion-parity Markdown editor model", () => {
       value: "hello",
       selectionStart: 0,
       selectionEnd: 5,
+    })
+    expect(applyTableCellInlineFormat("**hello**", 2, 7, "italic")).toEqual({
+      value: "***hello***",
+      selectionStart: 3,
+      selectionEnd: 8,
+    })
+    expect(applyTableCellInlineFormat("***hello***", 3, 8, "italic")).toEqual({
+      value: "**hello**",
+      selectionStart: 2,
+      selectionEnd: 7,
+    })
+    expect(applyTableCellInlineFormat("**hello**", 0, 9, "italic")).toEqual({
+      value: "***hello***",
+      selectionStart: 1,
+      selectionEnd: 10,
     })
     expect(applyTableCellInlineFormat("hello", 0, 5, "italic")).toEqual({
       value: "*hello*",
@@ -1167,7 +1201,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const container = makeFakeNode("div")
       appendInlineMarkdownNodes(
         container,
-        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}} 줄1<br>줄2"
+        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}} 줄1<br>줄2 [[문서]] [[Target|별칭]]"
       )
       const elementChildren = container.children.filter((c: any) => c.tagName)
       expect(elementChildren.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
@@ -1180,6 +1214,8 @@ test.describe("Notion-parity Markdown editor model", () => {
         "A:cm-live-link:링크",
         "SPAN:cm-live-color:완료",
         "BR::",
+        "SPAN:cm-live-wikilink:문서",
+        "SPAN:cm-live-wikilink:별칭",
       ])
 
       const mathAndCurrency = makeFakeNode("div")

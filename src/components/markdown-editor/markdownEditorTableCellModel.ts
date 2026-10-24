@@ -4,6 +4,11 @@ import {
   parseMarkdownTableGrid,
   serializeMarkdownTableGrid,
 } from "./markdownEditorTableModel"
+import {
+  applyPlannedTextMutationToValue,
+  planReplaceSelection,
+  planToggleWrapSelection,
+} from "./markdownEditorTextMutation"
 
 export type MarkdownTablePasteOutcome = {
   markdown: string
@@ -36,6 +41,46 @@ const INLINE_FORMAT_DELIMITERS: Record<
   strikethrough: "~~",
 }
 
+const parseCsvRow = (line: string): string[] => {
+  const cells: string[] = []
+  let current = ""
+  let inQuotes = false
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"'
+        i += 1
+      } else if (ch === '"') {
+        inQuotes = false
+      } else {
+        current += ch
+      }
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ",") {
+      cells.push(current)
+      current = ""
+    } else {
+      current += ch
+    }
+  }
+  cells.push(current)
+  return cells
+}
+
+const splitPastedTableRows = (trimmedText: string): string[][] => {
+  const lines = trimmedText.split("\n")
+  if (trimmedText.includes("\t")) {
+    return lines.map((line) => line.split("\t"))
+  }
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0)
+  if (nonEmptyLines.length > 0 && nonEmptyLines.every((line) => line.includes(","))) {
+    return lines.map(parseCsvRow)
+  }
+  return lines.map((line) => [line])
+}
+
 export const applyMarkdownTableGridPaste = (
   markdown: string,
   startRow: number,
@@ -45,7 +90,7 @@ export const applyMarkdownTableGridPaste = (
   const normalized = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
   if (!normalized.includes("\t") && !normalized.includes("\n")) return null
   const trimmedTrailing = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized
-  const matrix = trimmedTrailing.split("\n").map((line) => line.split("\t"))
+  const matrix = splitPastedTableRows(trimmedTrailing)
   const maxCols = Math.max(0, ...matrix.map((row) => row.length))
   if (matrix.length <= 1 && maxCols <= 1) return null
 
@@ -114,45 +159,12 @@ export const applyTableCellInlineFormat = (
   const end = Math.max(start, Math.min(selectionEnd, value.length))
 
   if (kind === "line-break") {
-    const next = `${value.slice(0, start)}<br>${value.slice(end)}`
-    return { value: next, selectionStart: start + 4, selectionEnd: start + 4 }
+    return applyPlannedTextMutationToValue(value, planReplaceSelection(start, end, "<br>"))
   }
 
   const delim = INLINE_FORMAT_DELIMITERS[kind]
-  const len = delim.length
-
-  if (
-    start >= len &&
-    value.slice(start - len, start) === delim &&
-    value.slice(end, end + len) === delim
-  ) {
-    const unwrapped = `${value.slice(0, start - len)}${value.slice(start, end)}${value.slice(end + len)}`
-    return {
-      value: unwrapped,
-      selectionStart: start - len,
-      selectionEnd: end - len,
-    }
-  }
-
-  if (
-    end - start >= len * 2 &&
-    value.slice(start, start + len) === delim &&
-    value.slice(end - len, end) === delim
-  ) {
-    const inner = value.slice(start + len, end - len)
-    const unwrapped = `${value.slice(0, start)}${inner}${value.slice(end)}`
-    return {
-      value: unwrapped,
-      selectionStart: start,
-      selectionEnd: end - len * 2,
-    }
-  }
-
-  const selected = value.slice(start, end)
-  const wrapped = `${value.slice(0, start)}${delim}${selected}${delim}${value.slice(end)}`
-  return {
-    value: wrapped,
-    selectionStart: start + len,
-    selectionEnd: end + len,
-  }
+  return applyPlannedTextMutationToValue(
+    value,
+    planToggleWrapSelection(value, start, end, delim, delim)
+  )
 }

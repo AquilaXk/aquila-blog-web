@@ -48,6 +48,18 @@ export const planWrapSelection = (
   }
 }
 
+const countAsterisksBefore = (text: string, index: number): number => {
+  let count = 0
+  for (let i = index - 1; i >= 0 && text[i] === "*"; i -= 1) count += 1
+  return count
+}
+
+const countAsterisksAfter = (text: string, index: number): number => {
+  let count = 0
+  for (let i = index; i < text.length && text[i] === "*"; i += 1) count += 1
+  return count
+}
+
 export const planToggleWrapSelection = (
   value: string,
   selectionStart: number,
@@ -56,12 +68,17 @@ export const planToggleWrapSelection = (
   after: string
 ): PlannedTextMutation => {
   const selected = value.slice(selectionStart, selectionEnd)
+  const isSingleAsterisk = before === "*" && after === "*"
 
-  if (
+  const hasSurroundingMatch =
     selectionStart >= before.length &&
     value.slice(selectionStart - before.length, selectionStart) === before &&
-    value.slice(selectionEnd, selectionEnd + after.length) === after
-  ) {
+    value.slice(selectionEnd, selectionEnd + after.length) === after &&
+    (!isSingleAsterisk ||
+      (countAsterisksBefore(value, selectionStart) % 2 === 1 &&
+        countAsterisksAfter(value, selectionEnd) % 2 === 1))
+
+  if (hasSurroundingMatch) {
     return {
       rangeStart: selectionStart - before.length,
       rangeEnd: selectionEnd + after.length,
@@ -71,11 +88,15 @@ export const planToggleWrapSelection = (
     }
   }
 
-  if (
+  const hasEnclosedMatch =
     selected.startsWith(before) &&
     selected.endsWith(after) &&
-    selected.length >= before.length + after.length
-  ) {
+    selected.length >= before.length + after.length &&
+    (!isSingleAsterisk ||
+      (countAsterisksAfter(selected, 0) % 2 === 1 &&
+        countAsterisksBefore(selected, selected.length) % 2 === 1))
+
+  if (hasEnclosedMatch) {
     const inner = selected.slice(before.length, selected.length - after.length)
     return {
       rangeStart: selectionStart,
