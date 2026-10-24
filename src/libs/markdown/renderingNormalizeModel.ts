@@ -138,12 +138,12 @@ const normalizeMalformedTrailingSpaceEmphasisSegment = (segment: string) => {
   )
 
   normalized = normalized.replace(
-    /(^|[^*])\*([^*\s\n](?:[^*\n]*?[^*\s\n])?)([^\S\n]*)\*(?!\*)/g,
+    /(^|[^*])\*([^*\s](?:[^*\n]*?[^*\s])?)([^\S\n]*)\*(?!\*)/g,
     (_match, prefix: string, inner: string) => `${prefix}*${inner}*`
   )
 
   normalized = normalized.replace(
-    /(^|[^_])_([^_\s\n](?:[^_\n]*?[^_\s\n])?)([^\S\n]*)_(?!_)/g,
+    /(^|[^_])_([^_\s](?:[^_\n]*?[^_\s])?)([^\S\n]*)_(?!_)/g,
     (_match, prefix: string, inner: string) => `${prefix}_${inner}_`
   )
 

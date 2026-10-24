@@ -21,6 +21,48 @@ type QuotedStrongMatch = {
   quotedText: string
 }
 
+const hasAdjacentSameMarker = (value: string, start: number, marker: string) => {
+  const prevChar = start > 0 ? value[start - 1] || "" : ""
+  const nextChar = value[start + marker.length] || ""
+  return prevChar === marker || nextChar === marker
+}
+
+const findClosingMarkerIndex = (
+  value: string,
+  marker: string,
+  contentStart: number,
+  disallowAdjacentSameMarker: boolean
+) => {
+  let searchFrom = contentStart
+  while (searchFrom < value.length) {
+    const closeIndex = value.indexOf(marker, searchFrom)
+    if (closeIndex < 0) return -1
+    if (disallowAdjacentSameMarker && value[closeIndex + marker.length] === marker) {
+      searchFrom = closeIndex + marker.length + 1
+      continue
+    }
+    return closeIndex
+  }
+  return -1
+}
+
+const hasPunctuationBoundarySpan = (
+  value: string,
+  start: number,
+  suffixIndex: number,
+  inner: string
+) => {
+  if (!inner || inner.includes("\n") || /^\s|\s$/.test(inner)) return false
+  const prefixChar = start > 0 ? value[start - 1] || "" : ""
+  const suffixChar = value[suffixIndex] || ""
+  const firstInnerChar = inner.at(0) || ""
+  const lastInnerChar = inner.at(-1) || ""
+  return (
+    (isPunctuationOrSymbol(lastInnerChar) && isLetterOrNumber(suffixChar)) ||
+    (isPunctuationOrSymbol(firstInnerChar) && isLetterOrNumber(prefixChar))
+  )
+}
+
 const matchBoundaryDelimitedSpanAt = (
   value: string,
   start: number,
@@ -29,43 +71,24 @@ const matchBoundaryDelimitedSpanAt = (
 ): QuotedStrongMatch | null => {
   for (const marker of markers) {
     if (!value.startsWith(marker, start)) continue
-    if (disallowAdjacentSameMarker) {
-      const prevChar = start > 0 ? value[start - 1] || "" : ""
-      const nextChar = value[start + marker.length] || ""
-      if (prevChar === marker || nextChar === marker) continue
-    }
+    if (disallowAdjacentSameMarker && hasAdjacentSameMarker(value, start, marker)) continue
 
     const contentStart = start + marker.length
-    let searchFrom = contentStart
-    while (searchFrom < value.length) {
-      const closeIndex = value.indexOf(marker, searchFrom)
-      if (closeIndex < 0) break
+    const closeIndex = findClosingMarkerIndex(
+      value,
+      marker,
+      contentStart,
+      disallowAdjacentSameMarker
+    )
+    if (closeIndex < 0) continue
 
-      if (disallowAdjacentSameMarker && value[closeIndex + marker.length] === marker) {
-        searchFrom = closeIndex + marker.length + 1
-        continue
+    const inner = value.slice(contentStart, closeIndex)
+    const suffixIndex = closeIndex + marker.length
+    if (hasPunctuationBoundarySpan(value, start, suffixIndex, inner)) {
+      return {
+        end: suffixIndex,
+        quotedText: inner,
       }
-
-      const inner = value.slice(contentStart, closeIndex)
-      if (!inner || inner.includes("\n") || /^\s|\s$/.test(inner)) break
-
-      const suffixIndex = closeIndex + marker.length
-      const prefixChar = start > 0 ? value[start - 1] || "" : ""
-      const suffixChar = value[suffixIndex] || ""
-      const firstInnerChar = inner[0] || ""
-      const lastInnerChar = inner[inner.length - 1] || ""
-
-      const hasPunctuationBoundary =
-        (isPunctuationOrSymbol(lastInnerChar) && isLetterOrNumber(suffixChar)) ||
-        (isPunctuationOrSymbol(firstInnerChar) && isLetterOrNumber(prefixChar))
-
-      if (hasPunctuationBoundary) {
-        return {
-          end: suffixIndex,
-          quotedText: inner,
-        }
-      }
-      break
     }
   }
 

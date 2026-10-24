@@ -244,8 +244,8 @@ export const openMermaidOverlay = (
   const viewBoxRaw = stageSvg?.getAttribute?.("viewBox") || ""
   const viewBoxParts = viewBoxRaw
     .split(/\s+/)
-    .map((v) => Number(v))
-    .filter((v) => Number.isFinite(v))
+    .map(Number)
+    .filter(Number.isFinite)
   const baseWidth = viewBoxParts.length === 4 && viewBoxParts[2] > 0 ? viewBoxParts[2] : 0
   const baseHeight = viewBoxParts.length === 4 && viewBoxParts[3] > 0 ? viewBoxParts[3] : 0
   let zoomLevel = 1
