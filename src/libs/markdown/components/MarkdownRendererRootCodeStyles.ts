@@ -1,5 +1,4 @@
 import { css, type Theme } from "@emotion/react"
-import { TABLE_MIN_COLUMN_WIDTH_PX } from "src/libs/markdown/tableMetadata"
 import { articleTypographyScale } from "src/libs/markdown/contentTypography"
 
 export const markdownRendererRootCodeStyles = (theme: Theme) => css`
@@ -71,7 +70,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
   }
 
   .aq-code-copy.is-copied {
-    color: ${ (theme.scheme === "dark" ? "#98c379" : "#15803d")};
+    color: #86efac;
   }
 
   .aq-code-body {
@@ -99,6 +98,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     align-items: center;
     justify-content: center;
     width: 100%;
+    min-height: 44px;
     padding: 9px 14px;
     border: 0;
     border-top: 1px solid #27334a;
@@ -179,7 +179,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     top: 0;
     width: var(--aq-code-gutter-width);
     text-align: right;
-    color: #6d768b;
+    color: #8b95a7;
     user-select: none;
   }
 
@@ -312,50 +312,6 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
       line-height: ${articleTypographyScale.codeLineHeightMobile};
     }
 
-    .aq-callout.aq-admonition .aq-callout-title {
-      font-size: ${articleTypographyScale.calloutTitleFontSizeMobile};
-      line-height: ${articleTypographyScale.calloutTitleLineHeightMobile};
-    }
-
-    .aq-callout.aq-admonition .aq-markdown-text {
-      font-size: ${articleTypographyScale.bodyFontSizeMobile};
-      line-height: ${articleTypographyScale.bodyLineHeightMobile};
-    }
-
-    .aq-table-scroll {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    table,
-    .aq-table {
-      width: 100%;
-      min-width: 100%;
-      max-width: 100%;
-      table-layout: fixed;
-    }
-
-    table[data-overflow-mode="wide"],
-    .aq-table.aq-table-wide {
-      width: max-content;
-      min-width: 100%;
-      max-width: none;
-    }
-
-    table th,
-    table td,
-    .aq-table th,
-    .aq-table td {
-      white-space: normal;
-      overflow-wrap: break-word;
-      word-break: normal;
-      font-size: 0.95rem;
-      line-height: 1.58;
-      padding: 0.66rem 0.72rem;
-      min-width: max(${TABLE_MIN_COLUMN_WIDTH_PX}px, 10ch);
-    }
-
     .aq-code-block {
       --aq-code-gutter-width: 1.16rem;
       --aq-code-gutter-gap: 0.46rem;
@@ -371,18 +327,6 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
 
     .aq-code-copy {
       font-size: 0.74rem;
-    }
-
-    .aq-mermaid {
-      padding-bottom: 0.24rem;
-    }
-
-    .aq-mermaid[data-mermaid-wide="true"] {
-      width: 100%;
-      max-width: 100%;
-      margin-left: 0;
-      margin-right: 0;
-      overflow-x: auto;
     }
   }
 

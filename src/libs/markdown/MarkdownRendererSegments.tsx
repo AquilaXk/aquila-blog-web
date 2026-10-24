@@ -130,7 +130,7 @@ export const renderMarkdownSegment = ({
           data-callout-foldable="true"
           open={!segment.defaultCollapsed}
         >
-          <summary className="aq-callout-head aq-callout-header aq-callout-title">
+          <summary className="aq-callout-head aq-callout-header">
             <span className="aq-callout-emoji" aria-hidden="true">
               {renderCalloutIcon(segment.kind)}
             </span>

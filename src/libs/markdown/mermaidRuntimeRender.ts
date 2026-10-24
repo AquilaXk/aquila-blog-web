@@ -297,7 +297,7 @@ export const createMermaidRuntimeController = ({
     const roundedHeight = Math.max(1, Math.round(intrinsicHeight * scale))
     const stageWidth = usesDesktopWideLane ? maxDisplayWidth : containerWidth
     const needsExpandAction = intrinsicWidth > 0
-    stage.style.width = `${stageWidth}px`
+    stage.style.width = usesDesktopWideLane ? `${stageWidth}px` : "100%"
     stage.style.minHeight = `${roundedHeight}px`
     stage.style.display = "flex"
     stage.style.justifyContent = "center"
@@ -342,6 +342,7 @@ export const createMermaidRuntimeController = ({
 
     block.style.minHeight = ""
     stage.style.minHeight = ""
+    stage.style.minWidth = "0"
   }
 
   let enqueueRender: (block: HTMLElement) => void = () => {}
@@ -399,8 +400,7 @@ export const createMermaidRuntimeController = ({
       block.dataset.mermaidRendered = "pending"
       block.dataset.mermaidPreset = preset.mode
     }
-
-    const visibleWidth = Math.floor(blockRect.width)
+    const visibleWidth = block.clientWidth || Math.floor(blockRect.width)
     if (visibleWidth <= 0) {
       if (scheduleRetry(block)) return
       block.dataset.mermaidRendered = "error"

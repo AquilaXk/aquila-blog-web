@@ -12,8 +12,8 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     -webkit-overflow-scrolling: touch;
     white-space: normal;
     padding: 0;
-    border: 1px solid ${theme.colors.gray5};
-    border-radius: 6px;
+    border: 1px solid ${theme.colors.gray6};
+    border-radius: 0;
     background: ${theme.publicDesign.readableSurface};
     box-shadow: none;
     scrollbar-width: thin;
@@ -46,7 +46,7 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     align-items: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 42px 20px 22px;
+    padding: 36px 20px 20px;
     cursor: zoom-in;
   }
 
@@ -132,6 +132,9 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid-error-details > summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: ${ (theme.scheme === "dark" ? "rgba(253, 230, 138, 0.94)" : "#b45309")};
     font-size: 0.78rem;
     font-weight: 700;
@@ -158,8 +161,8 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
 
   .aq-mermaid-expand-btn {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 9px;
+    right: 9px;
     z-index: 2;
     width: fit-content;
     margin: 0;
@@ -194,13 +197,21 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   @media (max-width: 820px) {
+    .aq-mermaid[data-mermaid-wide="true"] {
+      width: 100%;
+      max-width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      overflow-x: auto;
+    }
+
     .aq-mermaid-stage {
-      padding: 38px 10px 14px;
+      padding: 36px 10px 14px;
     }
 
     .aq-mermaid-expand-btn {
-      top: 7px;
-      right: 7px;
+      top: 9px;
+      right: 9px;
     }
   }
 `

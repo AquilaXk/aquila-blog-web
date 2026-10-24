@@ -152,6 +152,8 @@ test.describe("core smoke detail blocks and typography", () => {
           ":::toggle 더 보기",
           "토글 내부 본문입니다.",
           ":::",
+          "",
+          "분산 시스템에서는 **인증 시점(Handshake)**과 **메시지 라우팅 시점(STOMP Frame)**의 책임을 분리합니다.",
         ].join("\n"),
         summary: "",
         summarySource: "NONE",
@@ -208,6 +210,12 @@ test.describe("core smoke detail blocks and typography", () => {
   await expect(page.getByText(/^Information$/)).toHaveCount(0)
   await page.getByText("더 보기").click()
   await expect(page.getByText("토글 내부 본문입니다.")).toBeVisible()
+  const multiBoldParagraph = page.locator(".aq-markdown > p").filter({ hasText: "분산 시스템에서는" })
+  await expect(multiBoldParagraph).toHaveText(
+    "분산 시스템에서는 인증 시점(Handshake)과 메시지 라우팅 시점(STOMP Frame)의 책임을 분리합니다."
+  )
+  await expect(multiBoldParagraph.locator("strong").nth(0)).toHaveText("인증 시점(Handshake)")
+  await expect(multiBoldParagraph.locator("strong").nth(1)).toHaveText("메시지 라우팅 시점(STOMP Frame)")
 
   const toggleSummary = page.locator(".aq-toggle > summary").first()
   const toggleMetrics = await toggleSummary.evaluate((element) => {

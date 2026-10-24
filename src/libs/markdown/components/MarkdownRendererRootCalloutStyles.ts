@@ -5,12 +5,12 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
   .aq-callout.aq-admonition {
     --ad-accent: ${theme.publicDesign.accent};
     --ad-body-bg: ${theme.publicDesign.readableSurface};
-    --ad-border: color-mix(in srgb, var(--ad-accent) 18%, ${theme.colors.gray5});
+    --ad-border: ${theme.colors.gray6};
     --ad-text: ${theme.colors.gray12};
     position: relative;
     border: 1px solid var(--ad-border);
     border-left: 3px solid var(--ad-accent);
-    border-radius: 6px;
+    border-radius: 0;
     overflow: visible;
     padding: 16px 20px;
     margin: 24px 0;
@@ -28,6 +28,7 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
 
   details.aq-callout.aq-admonition {
     display: block;
+    padding: 0;
   }
 
   .aq-callout.aq-admonition > * {
@@ -65,8 +66,8 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
   }
 
   details.aq-callout.aq-admonition > .aq-callout-box-text {
-    padding-left: 30px;
-    margin-top: 8px;
+    padding: 0 20px 16px 50px;
+    margin-top: -2px;
   }
 
   .aq-callout.aq-admonition .aq-callout-head {
@@ -108,9 +109,9 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
 
   .aq-callout.aq-admonition .aq-callout-title {
     color: color-mix(in srgb, var(--ad-accent) 72%, ${theme.colors.gray12});
-    font-size: 0.975rem;
+    font-size: ${articleTypographyScale.calloutTitleFontSize};
     font-weight: 700;
-    line-height: 22px;
+    line-height: ${articleTypographyScale.calloutTitleLineHeight};
     letter-spacing: -0.01em;
   }
 
@@ -155,7 +156,8 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 22px;
+    min-height: 44px;
+    padding: 12px 20px;
     cursor: pointer;
     list-style: none;
     user-select: none;
@@ -192,19 +194,34 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
       margin: 20px 0;
     }
 
+    details.aq-callout.aq-admonition {
+      padding: 0;
+    }
+
     .aq-callout.aq-admonition:not(details) {
       grid-template-columns: 18px minmax(0, 1fr);
       column-gap: 10px;
     }
 
+    .aq-callout.aq-admonition .aq-callout-title {
+      font-size: ${articleTypographyScale.calloutTitleFontSizeMobile};
+      line-height: ${articleTypographyScale.calloutTitleLineHeightMobile};
+    }
+
+    .aq-callout.aq-admonition .aq-markdown-text {
+      font-size: ${articleTypographyScale.bodyFontSizeMobile};
+      line-height: ${articleTypographyScale.bodyLineHeightMobile};
+    }
+
     .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head {
       gap: 10px;
-      min-height: 22px;
+      min-height: 44px;
+      padding: 11px 16px;
     }
 
     details.aq-callout.aq-admonition > .aq-callout-box-text {
-      padding-left: 28px;
-      margin-top: 8px;
+      padding: 0 16px 14px 44px;
+      margin-top: -2px;
     }
 
     .aq-callout.aq-admonition .aq-callout-emoji {
