@@ -1,3 +1,4 @@
+import { GFM } from "@lezer/markdown"
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown"
 import { EditorState } from "@codemirror/state"
 import { EditorView } from "@codemirror/view"
@@ -14,7 +15,11 @@ import {
   planStripBlockLinePrefix,
   planToggleBlockLinePrefix,
 } from "src/components/markdown-editor/markdownEditorNotionModel"
-import { parseNotionContainerBlocks } from "src/components/markdown-editor/markdownEditorNotionWidgets"
+import {
+  MarkdownNotionCalloutBlockWidget,
+  notionContainerBlockField,
+  parseNotionContainerBlocks,
+} from "src/components/markdown-editor/markdownEditorNotionWidgets"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
@@ -25,10 +30,15 @@ import {
 } from "src/components/markdown-editor/markdownEditorTableModel"
 import { MarkdownTableWidget } from "src/components/markdown-editor/markdownEditorTableWidget"
 import {
+  appendInlineMarkdownNodes,
+  MarkdownTaskWidget,
+} from "src/components/markdown-editor/markdownEditorWidgets"
+import {
   filterSlashCommandSpecs,
   resolveSlashCommandMutation,
   SLASH_COMMAND_SPECS,
 } from "src/components/markdown-editor/useMarkdownEditorSlashMenu"
+import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
 
 test.describe("Notion-parity Markdown editor model", () => {
   test("recognizes block line prefix snippets and toggles headings and blockquotes at line start", () => {
@@ -721,6 +731,156 @@ test.describe("Notion-parity Markdown editor model", () => {
       else delete (globalThis as Record<string, unknown>).document
       if (prevWin) Object.defineProperty(globalThis, "window", prevWin)
       else delete (globalThis as Record<string, unknown>).window
+    }
+  })
+
+  test("replaces only [x]/[ ] in task list items while hiding leading bullet and preserving task body text", () => {
+    const doc = "# Title\n\n- [x] 완료된 **중요** 항목\n- [ ] 진행할 항목"
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [markdown({ base: markdownLanguage, extensions: [GFM] }), decorationField],
+    })
+    const decoSet = state.field(decorationField)
+    const ranges: Array<{ from: number; to: number; widget: unknown; className: string }> = []
+    decoSet.between(0, doc.length, (from, to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown; class?: string } }).spec ?? {}
+      ranges.push({
+        from,
+        to,
+        widget: spec.widget ?? null,
+        className: spec.class ?? "",
+      })
+    })
+
+    const taskWidgets = ranges.filter((r) => r.widget instanceof MarkdownTaskWidget)
+    expect(taskWidgets).toHaveLength(2)
+    expect(doc.slice(taskWidgets[0]!.from, taskWidgets[0]!.to)).toBe("[x]")
+    expect(doc.slice(taskWidgets[1]!.from, taskWidgets[1]!.to)).toBe("[ ]")
+
+    const line1Start = doc.indexOf("- [x]")
+    const hiddenLeadBullet = ranges.find((r) => r.from === line1Start && r.to === line1Start + 2)
+    expect(hiddenLeadBullet).toBeDefined()
+    expect(hiddenLeadBullet?.widget).toBeNull()
+
+    const strongRange = ranges.find((r) => r.className === "cm-live-strong")
+    expect(strongRange).toBeDefined()
+    expect(doc.slice(strongRange!.from, strongRange!.to)).toBe("**중요**")
+  })
+
+  test("parses :::callout container blocks and switches between CalloutWidget and active container line classes", () => {
+    const doc = [
+      ":::callout 💡 노션 라이브 프리뷰 팁",
+      "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
+      ":::",
+      "",
+      ":::callout warning 주의사항 안내",
+      "경고 본문입니다.",
+      ":::",
+    ].join("\n")
+
+    const blocks = parseNotionContainerBlocks(doc)
+    expect(blocks).toEqual([
+      {
+        kind: "callout",
+        from: 0,
+        to: doc.indexOf("\n\n:::callout warning"),
+        tone: "tip",
+        icon: "💡",
+        title: "노션 라이브 프리뷰 팁",
+        body: "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
+      },
+      {
+        kind: "callout",
+        from: doc.indexOf(":::callout warning"),
+        to: doc.length,
+        tone: "warning",
+        icon: "⚠️",
+        title: "주의사항 안내",
+        body: "경고 본문입니다.",
+      },
+    ])
+
+    const stateInactive = EditorState.create({
+      doc: `${doc}\n\n바깥 문단`,
+      selection: { anchor: doc.length + 3 },
+      extensions: [notionContainerBlockField],
+    })
+    const inactiveSet = stateInactive.field(notionContainerBlockField)
+    const inactiveWidgets: unknown[] = []
+    inactiveSet.between(0, stateInactive.doc.length, (_from, _to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      if (spec.widget) inactiveWidgets.push(spec.widget)
+    })
+    expect(inactiveWidgets).toHaveLength(2)
+    expect(inactiveWidgets[0]).toBeInstanceOf(MarkdownNotionCalloutBlockWidget)
+
+    const stateActive = stateInactive.update({
+      selection: { anchor: 5 },
+    }).state
+    const activeSet = stateActive.field(notionContainerBlockField)
+    const activeLineClasses: string[] = []
+    activeSet.between(0, doc.indexOf("\n\n:::callout warning"), (_from, _to, value) => {
+      const spec = (value as unknown as { spec?: { class?: string } }).spec ?? {}
+      if (spec.class) activeLineClasses.push(spec.class)
+    })
+    expect(activeLineClasses).toHaveLength(3)
+    expect(activeLineClasses[0]).toContain("cm-live-container-active-callout")
+    expect(activeLineClasses[0]).toContain("cm-live-container-tone-tip")
+    expect(activeLineClasses[0]).toContain("cm-live-container-line-open")
+    expect(activeLineClasses[2]).toContain("cm-live-container-line-close")
+  })
+
+  test("renders inline code, strikethrough, highlight, math, and links in appendInlineMarkdownNodes and resolves emerald/amber colors", () => {
+    expect(resolveInlineColorValue("emerald")).toBe("#10b981")
+    expect(resolveInlineColorValue("amber")).toBe("#f59e0b")
+
+    const makeFakeNode = (tag: string): any => {
+      const node: any = {
+        tagName: tag.toUpperCase(),
+        className: "",
+        textContent: "",
+        href: "",
+        target: "",
+        rel: "",
+        children: [] as any[],
+        appendChild(child: any) {
+          this.children.push(child)
+          return child
+        },
+      }
+      return node
+    }
+
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      writable: true,
+      value: {
+        createElement: (tag: string) => makeFakeNode(tag),
+        createTextNode: (text: string) => ({ nodeType: 3, textContent: text }),
+      },
+    })
+
+    try {
+      const container = makeFakeNode("div")
+      appendInlineMarkdownNodes(
+        container,
+        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com)"
+      )
+      const elementChildren = container.children.filter((c: any) => c.tagName)
+      expect(elementChildren.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
+        "CODE:cm-live-inline-code:decorationField",
+        "STRONG::굵게",
+        "EM::기울임",
+        "DEL:cm-live-strikethrough:취소",
+        "MARK:cm-live-highlight:강조",
+        "SPAN:cm-live-math cm-live-math-inline:O(1)",
+        "A:cm-live-link:링크",
+      ])
+    } finally {
+      if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
+      else delete (globalThis as Record<string, unknown>).document
     }
   })
 })

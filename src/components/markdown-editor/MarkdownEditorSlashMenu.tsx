@@ -166,6 +166,36 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     flex-shrink: 0;
   }
 
+  .icon[data-tone="blue"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
+    border-color: rgba(35, 131, 226, 0.25);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
+  }
+
+  .icon[data-tone="green"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
+    border-color: rgba(16, 185, 129, 0.25);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#34d399" : "#448361")};
+  }
+
+  .icon[data-tone="amber"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.2)" : "#fbf3db")};
+    border-color: rgba(245, 158, 11, 0.28);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fbbf24" : "#cb912f")};
+  }
+
+  .icon[data-tone="purple"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.22)" : "#f6f3f9")};
+    border-color: rgba(144, 101, 176, 0.25);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#9065b0")};
+  }
+
+  .icon[data-tone="pink"] {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(235, 87, 87, 0.2)" : "#fdebec")};
+    border-color: rgba(235, 87, 87, 0.25);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#f87171" : "#d44c47")};
+  }
+
   .icon.icon-emoji {
     font-size: 16px;
     line-height: 1;
@@ -198,6 +228,14 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
 
 const isEmojiIcon = (icon: string) =>
   /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
+
+const resolveSlashItemTone = (item: SlashMenuItem): "blue" | "green" | "amber" | "purple" | "pink" => {
+  if (item.id.startsWith("heading-") || item.id === "callout-info" || item.id === "table") return "blue"
+  if (item.id.includes("list") || item.id === "callout-tip" || item.id === "code-block") return "green"
+  if (item.id === "quote" || item.id === "divider" || item.id === "callout-warning" || item.id === "math") return "amber"
+  if (item.id === "callout-danger" || item.id === "image" || item.id === "attachment") return "pink"
+  return "purple"
+}
 
 export const MarkdownEditorSlashMenu = ({
   isOpen,
@@ -306,6 +344,7 @@ export const MarkdownEditorSlashMenu = ({
               >
                 <span
                   className={`icon ${isEmojiIcon(item.icon) ? "icon-emoji" : "icon-text"}`}
+                  data-tone={resolveSlashItemTone(item)}
                   aria-hidden="true"
                 >
                   {item.icon}

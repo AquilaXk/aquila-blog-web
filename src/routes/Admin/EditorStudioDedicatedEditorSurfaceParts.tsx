@@ -337,7 +337,7 @@ export const EditorTagRow = styled.div`
   gap: 7px;
   min-height: 26px;
 `;
-export const SelectedTagChip = styled.span `
+export const SelectedTagChip = styled.span`
   display: inline-flex;
   align-items: stretch;
   gap: 0;
@@ -345,12 +345,37 @@ export const SelectedTagChip = styled.span `
   max-width: 100%;
   min-height: 26px;
   border-radius: 5px;
-  border: 1px solid ${({ theme }) => theme.colors.gray6};
-  background: transparent;
+  border: 1px solid rgba(35, 131, 226, 0.25);
+  background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.18)" : "#e9f3f7")};
+  color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
   overflow: hidden;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
+  transition: border-color 0.18s ease, background 0.18s ease;
+
+  &:nth-of-type(6n + 2) {
+    border-color: rgba(144, 101, 176, 0.25);
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.2)" : "#f6f3f9")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#9065b0")};
+  }
+  &:nth-of-type(6n + 3) {
+    border-color: rgba(16, 185, 129, 0.25);
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.18)" : "#edf3ec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#34d399" : "#448361")};
+  }
+  &:nth-of-type(6n + 4) {
+    border-color: rgba(245, 158, 11, 0.28);
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.18)" : "#fbf3db")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fbbf24" : "#cb912f")};
+  }
+  &:nth-of-type(6n + 5) {
+    border-color: rgba(235, 87, 87, 0.25);
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(235, 87, 87, 0.18)" : "#fdebec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#f87171" : "#d44c47")};
+  }
+  &:nth-of-type(6n + 6) {
+    border-color: rgba(2, 132, 199, 0.25);
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(2, 132, 199, 0.18)" : "#e0f2fe")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#38bdf8" : "#0284c7")};
+  }
 
   .label {
     display: inline-flex;
@@ -360,7 +385,7 @@ export const SelectedTagChip = styled.span `
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0 8px;
-    color: ${({ theme }) => theme.colors.gray10};
+    color: inherit;
     font: 650 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   }
 
@@ -369,24 +394,19 @@ export const SelectedTagChip = styled.span `
     align-items: center;
     justify-content: center;
     align-self: stretch;
-    min-width: 26px;
-    padding: 0 6px;
+    min-width: 24px;
+    padding: 0 5px;
     border: 0;
-    border-left: 1px solid ${({ theme }) => theme.colors.gray6};
-    background: ${({ theme }) => theme.publicDesign.readableSurface};
-    color: ${({ theme }) => theme.colors.gray10};
+    border-left: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    opacity: 0.72;
     cursor: pointer;
     flex: 0 0 auto;
-    font-size: 0.98rem;
+    font-size: 0.94rem;
     line-height: 1;
-    transition:
-      background 0.18s ease,
-      color 0.18s ease;
-
-    &:hover {
-      background: ${({ theme }) => theme.colors.gray4};
-      color: ${({ theme }) => theme.colors.gray12};
-    }
+    transition: opacity 0.15s ease, background 0.15s ease;
+    &:hover { opacity: 1; background: rgba(15, 23, 42, 0.06); }
   }
 `;
 export const InlineMetaInput = styled.input `
@@ -406,19 +426,9 @@ export const InlineMetaInput = styled.input `
   font-size: 0.86rem;
   font-weight: 500;
   transition: border-color 0.16s ease;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.gray10};
-  }
-
-  &:hover {
-    border-bottom-color: ${({ theme }) => theme.colors.gray6};
-  }
-
-  &:focus-visible {
-    outline: none;
-    border-bottom-color: ${({ theme }) => theme.colors.blue8};
-  }
+  &::placeholder { color: ${({ theme }) => theme.colors.gray10}; }
+  &:hover { border-bottom-color: ${({ theme }) => theme.colors.gray6}; }
+  &:focus-visible { outline: none; border-bottom-color: ${({ theme }) => theme.colors.blue8}; }
 `;
 
 export const EditorInspectorTagInputRow = styled.div`
@@ -476,21 +486,9 @@ export const TitleInput = styled.textarea`
   overflow: hidden;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.gray9};
-  }
-
-  &:focus,
-  &:focus-visible {
-    outline: none;
-    box-shadow: none;
-    border-color: transparent;
-  }
-
-  @media (max-width: 820px) {
-    font-size: 28px;
-  }
+  &::placeholder { color: ${({ theme }) => theme.colors.gray9}; }
+  &:focus, &:focus-visible { outline: none; box-shadow: none; border-color: transparent; }
+  @media (max-width: 820px) { font-size: 28px; }
 `;
 export const EditorHeaderMetaRow = styled.div<{
   $collapsedOnMobile?: boolean;
@@ -503,10 +501,6 @@ export const EditorHeaderMetaRow = styled.div<{
   gap: 9px;
   min-width: 0;
   margin-top: 10px;
-
-  @media (min-width: 1101px) {
-    ${({ $collapsedWhenInspectorOpen }) => ($collapsedWhenInspectorOpen ? "display: none;" : "")}
-  }
 
   @media (max-width: 820px) {
     ${({ $collapsedOnMobile }) => ($collapsedOnMobile ? "display: none;" : "display: flex;")}

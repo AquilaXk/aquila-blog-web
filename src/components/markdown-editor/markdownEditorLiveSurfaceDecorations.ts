@@ -3,7 +3,6 @@ import { EditorState, StateEffect, StateField, type Range, type StateEffectType 
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
   buildMarkdownLivePreviewEntries,
-  ENTRY_FLAG_IN_TASK,
   hasIntervalOverlap,
   isTokenActive,
   resolveMarkdownLivePreviewPlanFromEntries,
@@ -340,11 +339,14 @@ const appendActiveAwareWidgetSpec = (
   if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
 
   if (spec.kind === "task") {
-    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, spec.to))
+    const markerMatch = /^\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.from, spec.to))
+    const markerTo =
+      spec.from + (markerMatch ? markerMatch[0].length : Math.min(3, spec.to - spec.from))
+    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, markerTo))
     ctx.decorations.push(
-      Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, spec.to) }).range(
+      Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, markerTo) }).range(
         spec.from,
-        spec.to
+        markerTo
       )
     )
   } else if (spec.kind === "wikilink") {
@@ -354,13 +356,17 @@ const appendActiveAwareWidgetSpec = (
       }).range(spec.from, spec.to)
     )
   } else if (spec.kind === "list-marker") {
-    const source = ctx.markdownValue.slice(spec.from, spec.to)
-    const label = /^\d/.test(source) ? source : "•"
-    const deco =
-      label === "•"
-        ? BULLET_MARKER_DECORATION
-        : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
-    ctx.decorations.push(deco.range(spec.from, spec.to))
+    if (/^[ \t]+\[[ xX]\]/.test(ctx.markdownValue.slice(spec.to, spec.to + 6))) {
+      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + 1))
+    } else {
+      const source = ctx.markdownValue.slice(spec.from, spec.to)
+      const label = /^\d/.test(source) ? source : "•"
+      const deco =
+        label === "•"
+          ? BULLET_MARKER_DECORATION
+          : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
+      ctx.decorations.push(deco.range(spec.from, spec.to))
+    }
   } else {
     ctx.decorations.push(QUOTE_MARKER_DECORATION.range(spec.from, spec.to))
   }
@@ -427,9 +433,7 @@ const appendSinglePlanSpecDecoration = (
   ctx: PlanSpecDecorationContext
 ): void => {
   if (spec.kind === "hide-mark") {
-    if (spec.flags === undefined || (spec.flags & ENTRY_FLAG_IN_TASK) === 0) {
-      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
-    }
+    ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
     return
   }
   if (spec.kind === "horizontal-rule") {
