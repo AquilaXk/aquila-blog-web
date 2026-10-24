@@ -30,11 +30,18 @@ export const matchSlashCommandTrigger = (
   }
 }
 
-export const filterSlashCommandSpecs = (query: string, disableMermaid = false) => {
+export const filterSlashCommandSpecs = (
+  query: string,
+  disableMermaid = false,
+  options?: { disableImageUpload?: boolean; disableFileUpload?: boolean }
+) => {
   const q = query.trim().toLowerCase()
-  const availableSpecs = disableMermaid
-    ? SLASH_COMMAND_SPECS.filter((spec) => spec.id !== "mermaid")
-    : SLASH_COMMAND_SPECS
+  const availableSpecs = SLASH_COMMAND_SPECS.filter((spec) => {
+    if (disableMermaid && spec.id === "mermaid") return false
+    if (options?.disableImageUpload && spec.id === "image") return false
+    if (options?.disableFileUpload && spec.id === "attachment") return false
+    return true
+  })
   if (!q) return availableSpecs
   return availableSpecs.filter(
     (spec) =>
@@ -50,6 +57,9 @@ export const resolveSlashCommandMutation = (
   slashStart: number,
   selectionEnd: number
 ): PlannedTextMutation => {
+  if (spec.snippet === "__IMAGE_UPLOAD__" || spec.snippet === "__FILE_UPLOAD__") {
+    return planReplaceSelection(slashStart, selectionEnd, "")
+  }
   if (spec.snippet === "__TABLE__") {
     const table = createMarkdownEditorTable(2, 2)
     if (table) {
@@ -88,11 +98,19 @@ export const useMarkdownEditorSlashMenu = ({
   selectionRef,
   applyMutationPlan,
   disableMermaid = false,
+  disableImageUpload = false,
+  disableFileUpload = false,
+  onRequestImageUpload,
+  onRequestFileUpload,
   resolveSlashCoords,
 }: {
   selectionRef: MutableRefObject<SlashSelection>
   applyMutationPlan: (plan: PlannedTextMutation) => boolean
   disableMermaid?: boolean
+  disableImageUpload?: boolean
+  disableFileUpload?: boolean
+  onRequestImageUpload?: () => void
+  onRequestFileUpload?: () => void
   resolveSlashCoords?: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
 }) => {
   const [slashMenuState, setSlashMenuState] = useState<{
@@ -120,12 +138,27 @@ export const useMarkdownEditorSlashMenu = ({
       const end = selection.to
       applyMutationPlan(resolveSlashCommandMutation(spec, start, end))
       closeSlashMenu()
+      if (spec.snippet === "__IMAGE_UPLOAD__") {
+        onRequestImageUpload?.()
+      } else if (spec.snippet === "__FILE_UPLOAD__") {
+        onRequestFileUpload?.()
+      }
     },
-    [applyMutationPlan, closeSlashMenu, selectionRef, slashMenuState.slashFrom]
+    [
+      applyMutationPlan,
+      closeSlashMenu,
+      onRequestFileUpload,
+      onRequestImageUpload,
+      selectionRef,
+      slashMenuState.slashFrom,
+    ]
   )
 
   const slashMenuItems: SlashMenuItem[] = useMemo(() => {
-    const specs = filterSlashCommandSpecs(slashMenuState.query, disableMermaid)
+    const specs = filterSlashCommandSpecs(slashMenuState.query, disableMermaid, {
+      disableImageUpload,
+      disableFileUpload,
+    })
     return specs.map((spec) => ({
       id: spec.id,
       label: spec.label,
@@ -134,7 +167,13 @@ export const useMarkdownEditorSlashMenu = ({
       group: spec.group,
       action: () => handleSelectSlashItem(spec),
     }))
-  }, [disableMermaid, handleSelectSlashItem, slashMenuState.query])
+  }, [
+    disableFileUpload,
+    disableImageUpload,
+    disableMermaid,
+    handleSelectSlashItem,
+    slashMenuState.query,
+  ])
 
   const checkSlashCommand = useCallback(
     (markdown: string, selection: SlashSelection) => {

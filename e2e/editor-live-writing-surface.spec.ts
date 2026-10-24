@@ -1441,5 +1441,30 @@ test.describe("live Markdown writing surface", () => {
     await editorContent(page).focus()
     await page.keyboard.type("[] 할 일 항목")
     await expect.poll(() => readMarkdown(page)).toBe("- [ ] 할 일 항목")
+
+    await selectMarkdownRangeWithoutAssertion(page, 6, 6)
+    const gutterHandle = page.getByRole("button", { name: "현재 줄 블록 메뉴" })
+    await expect(gutterHandle).toBeVisible()
+    await gutterHandle.click()
+    const blockActionMenu = page.getByRole("menu", { name: "블록 작업 메뉴" })
+    await expect(blockActionMenu).toBeVisible()
+    await blockActionMenu.getByRole("menuitem", { name: "일반 문단으로 전환" }).click()
+    await expect(blockActionMenu).toHaveCount(0)
+    await expect.poll(() => readMarkdown(page)).toBe("할 일 항목")
+
+    await selectMarkdownRangeWithoutAssertion(page, 2, 2)
+    await gutterHandle.click()
+    await expect(blockActionMenu).toBeVisible()
+    await blockActionMenu.getByRole("menuitem", { name: "현재 줄 복제" }).click()
+    await expect.poll(() => readMarkdown(page)).toBe("할 일 항목\n할 일 항목")
+
+    const toggleDoc = ":::toggle 토글 제목\n숨겨진 본문\n:::\n\n다음 문단"
+    await fillMarkdown(page, toggleDoc)
+    const tailOffset = toggleDoc.indexOf("다음 문단") + 2
+    await selectMarkdownRangeWithoutAssertion(page, tailOffset, tailOffset)
+    const toggleWidget = page.getByTestId("cm-live-toggle-widget")
+    await expect(toggleWidget).toBeVisible()
+    await expect(toggleWidget).toContainText("토글 제목")
+    await expect(toggleWidget).toContainText("숨겨진 본문")
   })
 })

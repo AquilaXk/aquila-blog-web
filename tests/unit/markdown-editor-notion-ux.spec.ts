@@ -3,8 +3,10 @@ import {
   isBlockLinePrefixSnippet,
   planNotionBlockPrefixBackspace,
   planNotionSpaceInputRule,
+  planStripBlockLinePrefix,
   planToggleBlockLinePrefix,
 } from "src/components/markdown-editor/markdownEditorNotionModel"
+import { parseNotionContainerBlocks } from "src/components/markdown-editor/markdownEditorNotionWidgets"
 import {
   filterSlashCommandSpecs,
   resolveSlashCommandMutation,
@@ -78,7 +80,52 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(Date.now() - startedAt).toBeLessThan(50)
   })
 
-  test("converts [] + Space into task item and >>> + Space into toggle details block", () => {
+  test("strips heading, list, task, and quote prefixes back to plain paragraph via planStripBlockLinePrefix", () => {
+    expect(planStripBlockLinePrefix("# Heading 1", 4, 4)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 11,
+      replacement: "Heading 1",
+      selectionStart: 2,
+      selectionEnd: 2,
+    })
+
+    expect(planStripBlockLinePrefix("## Heading 2", 0, 12)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 12,
+      replacement: "Heading 2",
+      selectionStart: 0,
+      selectionEnd: 9,
+    })
+
+    expect(planStripBlockLinePrefix("  - [ ] Task item", 10, 10)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 17,
+      replacement: "  Task item",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+
+    expect(planStripBlockLinePrefix("- [x] Done item", 15, 15)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 15,
+      replacement: "Done item",
+      selectionStart: 9,
+      selectionEnd: 9,
+    })
+
+    expect(planStripBlockLinePrefix("- Bullet\n1. Ordered\n> Quote", 0, 27)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 27,
+      replacement: "Bullet\nOrdered\nQuote",
+      selectionStart: 0,
+      selectionEnd: 20,
+    })
+
+    expect(planStripBlockLinePrefix("Plain paragraph", 0, 5)).toBeNull()
+    expect(planStripBlockLinePrefix("```ts\n# inside fence\n```", 7, 10)).toBeNull()
+  })
+
+  test("converts [], >>>, ---, and !!! + Space into task, toggle, divider, and callout blocks", () => {
     expect(planNotionSpaceInputRule("[]", 2, 2)).toEqual({
       rangeStart: 0,
       rangeEnd: 2,
@@ -101,6 +148,30 @@ test.describe("Notion-parity Markdown editor model", () => {
       replacement: ":::toggle 토글 제목\n\n:::",
       selectionStart: 10,
       selectionEnd: 15,
+    })
+
+    expect(planNotionSpaceInputRule("---", 3, 3)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 3,
+      replacement: "---\n",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+
+    expect(planNotionSpaceInputRule("***", 3, 3)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 3,
+      replacement: "---\n",
+      selectionStart: 4,
+      selectionEnd: 4,
+    })
+
+    expect(planNotionSpaceInputRule("!!!", 3, 3)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 3,
+      replacement: "> [!INFO]\n> ",
+      selectionStart: 12,
+      selectionEnd: 12,
     })
 
     expect(planNotionSpaceInputRule("```ts\n[]\n```", 8, 8)).toBeNull()
@@ -150,11 +221,52 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(planNotionBlockPrefixBackspace("## Heading", 4, 4)).toBeNull()
   })
 
-  test("filters slash commands by Notion keyword aliases and includes bullet and ordered list blocks", () => {
+  test("parses :::toggle and :::bookmark container blocks while ignoring fenced code blocks", () => {
+    const doc = [
+      ":::toggle 상세 설명",
+      "숨겨진 첫째 줄",
+      "숨겨진 둘째 줄",
+      ":::",
+      "",
+      ":::bookmark https://example.com",
+      "예시 사이트",
+      "외부 링크 카드 설명",
+      ":::",
+      "",
+      "```md",
+      ":::toggle 코드 안의 토글",
+      "무시되어야 함",
+      ":::",
+      "```",
+    ].join("\n")
+
+    const blocks = parseNotionContainerBlocks(doc)
+    expect(blocks).toEqual([
+      {
+        kind: "toggle",
+        from: 0,
+        to: doc.indexOf("\n\n:::bookmark"),
+        title: "상세 설명",
+        body: "숨겨진 첫째 줄\n숨겨진 둘째 줄",
+      },
+      {
+        kind: "bookmark",
+        from: doc.indexOf(":::bookmark"),
+        to: doc.indexOf("\n\n```md"),
+        url: "https://example.com",
+        title: "예시 사이트",
+        description: "외부 링크 카드 설명",
+      },
+    ])
+  })
+
+  test("filters slash commands by Notion keyword aliases and includes list, image, and file commands", () => {
     const ids = SLASH_COMMAND_SPECS.map((spec) => spec.id)
     expect(ids).toContain("bullet-list")
     expect(ids).toContain("ordered-list")
     expect(ids).toContain("task-list")
+    expect(ids).toContain("image")
+    expect(ids).toContain("attachment")
 
     expect(filterSlashCommandSpecs("h1").map((s) => s.id)).toContain("heading-1")
     expect(filterSlashCommandSpecs("todo").map((s) => s.id)).toContain("task-list")
@@ -163,6 +275,10 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(filterSlashCommandSpecs("quote").map((s) => s.id)).toContain("quote")
     expect(filterSlashCommandSpecs("table").map((s) => s.id)).toContain("table")
     expect(filterSlashCommandSpecs("hr").map((s) => s.id)).toContain("divider")
+    expect(filterSlashCommandSpecs("image").map((s) => s.id)).toContain("image")
+    expect(filterSlashCommandSpecs("이미지").map((s) => s.id)).toContain("image")
+    expect(filterSlashCommandSpecs("file").map((s) => s.id)).toContain("attachment")
+    expect(filterSlashCommandSpecs("파일").map((s) => s.id)).toContain("attachment")
 
     const bulletSpec = SLASH_COMMAND_SPECS.find((s) => s.id === "bullet-list")!
     expect(resolveSlashCommandMutation(bulletSpec, 0, 3)).toEqual({
@@ -171,6 +287,15 @@ test.describe("Notion-parity Markdown editor model", () => {
       replacement: "- ",
       selectionStart: 2,
       selectionEnd: 2,
+    })
+
+    const imageSpec = SLASH_COMMAND_SPECS.find((s) => s.id === "image")!
+    expect(resolveSlashCommandMutation(imageSpec, 0, 6)).toEqual({
+      rangeStart: 0,
+      rangeEnd: 6,
+      replacement: "",
+      selectionStart: 0,
+      selectionEnd: 0,
     })
   })
 })

@@ -1,4 +1,4 @@
-import { EditorState, StateField } from "@codemirror/state"
+import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import {
@@ -16,12 +16,18 @@ const BLOCK_LINE_PREFIXES = new Set(["# ", "## ", "### ", "#### ", "> "])
 const FENCE_DELIMITER_LINE_RE =
   /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 const EXISTING_BLOCK_PREFIX_RE = /^(#{1,6}[ \t]+|>[ \t]?)/
+const STRIP_BLOCK_PREFIX_RE =
+  /^(?<indent>[ \t]*)(?<prefix>#{1,6}[ \t]+|[-*+] \[[ xX]\] |[-*+] |\d+\. |>[ \t]?)/
 const QUOTE_PREFIX_RE = /^(>[ \t]?)/
 const NOTION_TODO_INPUT_RE = /^(?<indent>[ \t]*)\[(?<check>[ xX]?)\]$/
 const NOTION_TOGGLE_INPUT_RE = /^(?<indent>[ \t]*)>>>$/
+const NOTION_DIVIDER_INPUT_RE = /^(?<indent>[ \t]*)(?:---|[*]{3})$/
+const NOTION_CALLOUT_INPUT_RE = /^(?<indent>[ \t]*)!!!$/
 const NOTION_BACKSPACE_PREFIX_RE =
   /^(?<indent>[ \t]*)(?<prefix>#{1,6}[ \t]+|[-*+] \[[ xX]\] |[-*+] |\d+\. |> )$/
+const CHECKED_TASK_LINE_RE = /^[ \t]*[-*+][ \t]+\[[xX]\][ \t]+/
 const NOTION_TOGGLE_TEMPLATE = ":::toggle 토글 제목\n\n:::"
+const NOTION_CALLOUT_TEMPLATE = "> [!INFO]\n> "
 const ACTIVE_EMPTY_LINE_PLACEHOLDER =
   "'/'를 눌러 블록을 삽입하거나 내용을 입력하세요..."
 
@@ -79,17 +85,12 @@ const findLineIndexAt = (lines: LogicalLine[], offset: number): number => {
   return lines.length - 1
 }
 
-export const isBlockLinePrefixSnippet = (before: string, after: string): boolean =>
-  after === "" && BLOCK_LINE_PREFIXES.has(before)
-
-export const planToggleBlockLinePrefix = (
+const resolveSelectedLines = (
   value: string,
   selectionStart: number,
-  selectionEnd: number,
-  prefix: string
-): PlannedTextMutation | null => {
+  selectionEnd: number
+): LogicalLine[] | null => {
   if (
-    !BLOCK_LINE_PREFIXES.has(prefix) ||
     !Number.isInteger(selectionStart) ||
     !Number.isInteger(selectionEnd) ||
     selectionStart < 0 ||
@@ -98,7 +99,6 @@ export const planToggleBlockLinePrefix = (
   ) {
     return null
   }
-
   const lines = buildLogicalLines(value)
   const firstIndex = findLineIndexAt(lines, selectionStart)
   const lastIndex = findLineIndexAt(
@@ -107,46 +107,16 @@ export const planToggleBlockLinePrefix = (
   )
   const selected = lines.slice(firstIndex, lastIndex + 1)
   if (selected.some((line) => line.intersectsFence)) return null
+  return selected
+}
 
-  const isQuotePrefix = prefix === "> "
-  const shouldRemovePrefix = selected.every((line) => {
-    const indentLength = /^[ \t]*/.exec(line.text)?.[0].length ?? 0
-    const rest = line.text.slice(indentLength)
-    return isQuotePrefix ? QUOTE_PREFIX_RE.test(rest) : rest.startsWith(prefix)
-  })
-
-  const transformations = selected.map((line): LinePrefixTransformation => {
-    const indent = /^[ \t]*/.exec(line.text)?.[0] ?? ""
-    const rest = line.text.slice(indent.length)
-
-    if (shouldRemovePrefix) {
-      const oldPrefixLength = isQuotePrefix
-        ? (QUOTE_PREFIX_RE.exec(rest)?.[1]?.length ?? 0)
-        : prefix.length
-      const content = rest.slice(oldPrefixLength)
-      return {
-        line,
-        indentLength: indent.length,
-        oldPrefixLength,
-        newPrefixLength: 0,
-        replacement: `${indent}${content}`,
-      }
-    }
-
-    const existingPrefix = EXISTING_BLOCK_PREFIX_RE.exec(rest)?.[1] ?? ""
-    const oldPrefixLength = existingPrefix.length
-    const content = rest.slice(oldPrefixLength)
-    return {
-      line,
-      indentLength: indent.length,
-      oldPrefixLength,
-      newPrefixLength: prefix.length,
-      replacement: `${indent}${prefix}${content}`,
-    }
-  })
-
-  const rangeStart = selected[0]!.start
-  const rangeEnd = selected[selected.length - 1]!.end
+const buildMutationFromTransformations = (
+  transformations: LinePrefixTransformation[],
+  selectionStart: number,
+  selectionEnd: number
+): PlannedTextMutation => {
+  const rangeStart = transformations[0]!.line.start
+  const rangeEnd = transformations[transformations.length - 1]!.line.end
   const replacement = transformations.map((item) => item.replacement).join("\n")
   const totalDelta = replacement.length - (rangeEnd - rangeStart)
 
@@ -185,6 +155,97 @@ export const planToggleBlockLinePrefix = (
     selectionStart: rebaseOffset(selectionStart),
     selectionEnd: rebaseOffset(selectionEnd),
   }
+}
+
+export const isBlockLinePrefixSnippet = (before: string, after: string): boolean =>
+  after === "" && BLOCK_LINE_PREFIXES.has(before)
+
+export const planToggleBlockLinePrefix = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  prefix: string
+): PlannedTextMutation | null => {
+  if (!BLOCK_LINE_PREFIXES.has(prefix)) return null
+  const selected = resolveSelectedLines(value, selectionStart, selectionEnd)
+  if (!selected) return null
+
+  const isQuotePrefix = prefix === "> "
+  const shouldRemovePrefix = selected.every((line) => {
+    const indentLength = /^[ \t]*/.exec(line.text)?.[0].length ?? 0
+    const rest = line.text.slice(indentLength)
+    return isQuotePrefix ? QUOTE_PREFIX_RE.test(rest) : rest.startsWith(prefix)
+  })
+
+  const transformations = selected.map((line): LinePrefixTransformation => {
+    const indent = /^[ \t]*/.exec(line.text)?.[0] ?? ""
+    const rest = line.text.slice(indent.length)
+
+    if (shouldRemovePrefix) {
+      const oldPrefixLength = isQuotePrefix
+        ? (QUOTE_PREFIX_RE.exec(rest)?.[1]?.length ?? 0)
+        : prefix.length
+      const content = rest.slice(oldPrefixLength)
+      return {
+        line,
+        indentLength: indent.length,
+        oldPrefixLength,
+        newPrefixLength: 0,
+        replacement: `${indent}${content}`,
+      }
+    }
+
+    const existingPrefix = EXISTING_BLOCK_PREFIX_RE.exec(rest)?.[1] ?? ""
+    const oldPrefixLength = existingPrefix.length
+    const content = rest.slice(oldPrefixLength)
+    return {
+      line,
+      indentLength: indent.length,
+      oldPrefixLength,
+      newPrefixLength: prefix.length,
+      replacement: `${indent}${prefix}${content}`,
+    }
+  })
+
+  return buildMutationFromTransformations(transformations, selectionStart, selectionEnd)
+}
+
+export const planStripBlockLinePrefix = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): PlannedTextMutation | null => {
+  const selected = resolveSelectedLines(value, selectionStart, selectionEnd)
+  if (!selected) return null
+
+  const transformations = selected.map((line): LinePrefixTransformation => {
+    const match = STRIP_BLOCK_PREFIX_RE.exec(line.text)
+    if (!match?.groups) {
+      return {
+        line,
+        indentLength: 0,
+        oldPrefixLength: 0,
+        newPrefixLength: 0,
+        replacement: line.text,
+      }
+    }
+    const indent = match.groups.indent ?? ""
+    const prefix = match.groups.prefix ?? ""
+    const content = line.text.slice(indent.length + prefix.length)
+    return {
+      line,
+      indentLength: indent.length,
+      oldPrefixLength: prefix.length,
+      newPrefixLength: 0,
+      replacement: `${indent}${content}`,
+    }
+  })
+
+  if (transformations.every((item) => item.oldPrefixLength === 0)) {
+    return null
+  }
+
+  return buildMutationFromTransformations(transformations, selectionStart, selectionEnd)
 }
 
 export const planMarkdownSnippetMutation = (
@@ -233,14 +294,35 @@ export const planNotionSpaceInputRule = (
     }
   }
 
-  const toggleMatch = NOTION_TOGGLE_INPUT_RE.exec(lineBeforeCursor)
-  if (toggleMatch && lineAfterCursor.trim().length === 0) {
-    return {
-      rangeStart: lineStart,
-      rangeEnd: lineEnd,
-      replacement: NOTION_TOGGLE_TEMPLATE,
-      selectionStart: lineStart + 10,
-      selectionEnd: lineStart + 15,
+  if (lineAfterCursor.trim().length === 0) {
+    if (NOTION_TOGGLE_INPUT_RE.test(lineBeforeCursor)) {
+      return {
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
+        replacement: NOTION_TOGGLE_TEMPLATE,
+        selectionStart: lineStart + 10,
+        selectionEnd: lineStart + 15,
+      }
+    }
+
+    if (NOTION_DIVIDER_INPUT_RE.test(lineBeforeCursor)) {
+      return {
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
+        replacement: "---\n",
+        selectionStart: lineStart + 4,
+        selectionEnd: lineStart + 4,
+      }
+    }
+
+    if (NOTION_CALLOUT_INPUT_RE.test(lineBeforeCursor)) {
+      return {
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
+        replacement: NOTION_CALLOUT_TEMPLATE,
+        selectionStart: lineStart + 12,
+        selectionEnd: lineStart + 12,
+      }
     }
   }
 
@@ -274,22 +356,42 @@ export const planNotionBlockPrefixBackspace = (
 
 const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
-  if (mode !== "live" || state.doc.length === 0 || !state.selection.main.empty) {
+  if (mode !== "live" || state.doc.length === 0) {
     return Decoration.none
   }
-  const line = state.doc.lineAt(state.selection.main.head)
-  if (line.length > 0) return Decoration.none
-  if (isOffsetInsideFencedCodeBlock(getDocString(state.doc), line.from)) {
-    return Decoration.none
+
+  const docText = getDocString(state.doc)
+  const logicalLines = buildLogicalLines(docText)
+  const decorations: Range<Decoration>[] = []
+
+  const activeEmptyLineFrom = state.selection.main.empty
+    ? (() => {
+        const line = state.doc.lineAt(state.selection.main.head)
+        return line.length === 0 ? line.from : -1
+      })()
+    : -1
+
+  for (const line of logicalLines) {
+    if (line.intersectsFence) continue
+    if (line.start === activeEmptyLineFrom) {
+      decorations.push(
+        Decoration.line({
+          class: "cm-live-empty-line",
+          attributes: {
+            "data-placeholder": ACTIVE_EMPTY_LINE_PLACEHOLDER,
+          },
+        }).range(line.start)
+      )
+    } else if (CHECKED_TASK_LINE_RE.test(line.text)) {
+      decorations.push(
+        Decoration.line({
+          class: "cm-live-task-checked-line",
+        }).range(line.start)
+      )
+    }
   }
-  return Decoration.set([
-    Decoration.line({
-      class: "cm-live-empty-line",
-      attributes: {
-        "data-placeholder": ACTIVE_EMPTY_LINE_PLACEHOLDER,
-      },
-    }).range(line.from),
-  ])
+
+  return decorations.length > 0 ? Decoration.set(decorations, true) : Decoration.none
 }
 
 export const activeEmptyLineField = StateField.define<DecorationSet>({

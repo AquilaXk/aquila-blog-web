@@ -81,6 +81,7 @@ import {
   selectNextOccurrenceCommand,
 } from "./markdownEditorLiveSurfaceCommands"
 import { activeEmptyLineField } from "./markdownEditorNotionModel"
+import { notionContainerBlockField } from "./markdownEditorNotionWidgets"
 
 type MarkdownEditorSnapshot = {
   documentValue: string
@@ -241,6 +242,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         editorModeField,
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         decorationField,
+        notionContainerBlockField,
         activeEmptyLineField,
         liveSurfaceTheme,
         EditorView.contentAttributes.of({

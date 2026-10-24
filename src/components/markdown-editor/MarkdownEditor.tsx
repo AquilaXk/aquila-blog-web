@@ -1,23 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
-import {
-  planToggleListCommand,
-  type MarkdownEditorListCommand,
-} from "./markdownEditorListCommandsModel"
-import {
-  EditorRoot,
-  ToolbarError,
-  LiveEditorBody,
-} from "./MarkdownEditor.styles"
-import {
-  applyPlannedTextMutationToValue,
-  type PlannedTextMutation,
-} from "./markdownEditorTextMutation"
+import { planMarkdownEditorLineCommand, type MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
+import { planToggleListCommand, type MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
+import { EditorRoot, ToolbarError, LiveEditorBody } from "./MarkdownEditor.styles"
+import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
-import {
-  projectMarkdownEditorToolbarCommands,
-  type MarkdownEditorCommandDescriptor,
-} from "./markdownEditorCommandRegistryModel"
+import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
 import {
   createMarkdownEditorTable,
   getMarkdownEditorTableEditAvailability,
@@ -27,41 +15,20 @@ import {
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
-import {
-  type MarkdownFileUploadResult,
-  type MarkdownImageUploadResult,
-} from "./markdownEditorUploadModel"
+import { type MarkdownFileUploadResult, type MarkdownImageUploadResult } from "./markdownEditorUploadModel"
 import { modShortcutLabel } from "./markdownEditorToolbarModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
-import {
-  MarkdownEditorLiveSurface,
-  type MarkdownEditorLiveSurfaceHandle,
-} from "./MarkdownEditorLiveSurface"
-import { planMarkdownSnippetMutation } from "./markdownEditorNotionModel"
+import { MarkdownEditorLiveSurface, type MarkdownEditorLiveSurfaceHandle } from "./MarkdownEditorLiveSurface"
+import { planMarkdownSnippetMutation, planStripBlockLinePrefix } from "./markdownEditorNotionModel"
 import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
 import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
-import {
-  matchSlashCommandTrigger,
-  resolveSlashCommandMutation,
-  useMarkdownEditorSlashMenu,
-} from "./useMarkdownEditorSlashMenu"
-export {
-  matchSlashCommandTrigger,
-  resolveSlashCommandMutation,
-  SLASH_COMMAND_SPECS,
-} from "./useMarkdownEditorSlashMenu"
+import { matchSlashCommandTrigger, resolveSlashCommandMutation, useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
+export { matchSlashCommandTrigger, resolveSlashCommandMutation, SLASH_COMMAND_SPECS } from "./useMarkdownEditorSlashMenu"
 
-type MarkdownChangeMeta = {
-  editorFocused: boolean
-}
-
-export type MarkdownEditorFocusSelection = {
-  from: number
-  to: number
-}
-
+type MarkdownChangeMeta = { editorFocused: boolean }
+export type MarkdownEditorFocusSelection = { from: number; to: number }
 export type MarkdownEditorFocusRequest = (selection?: MarkdownEditorFocusSelection) => void
 
 type MarkdownEditorProps = {
@@ -386,6 +353,23 @@ export const MarkdownEditor = ({
     [applyMutationPlan, disabled, resolveActiveSelection]
   )
 
+  const applyStripBlockPrefix = useCallback(() => {
+    if (disabled) return
+    const { from, to } = resolveActiveSelection()
+    const plan = planStripBlockLinePrefix(valueRef.current, from, to)
+    if (plan) applyMutationPlan(plan)
+  }, [applyMutationPlan, disabled, resolveActiveSelection])
+
+  const applyLineCommand = useCallback(
+    (command: MarkdownEditorLineCommand) => {
+      if (disabled) return
+      const { from, to } = resolveActiveSelection()
+      const plan = planMarkdownEditorLineCommand(valueRef.current, from, to, command)
+      if (plan) applyMutationPlan(plan)
+    },
+    [applyMutationPlan, disabled, resolveActiveSelection]
+  )
+
   const insertUploadedMarkdown = useCallback(
     (markdown: string) => {
       if (insertMarkdownAtEditorSelection(markdown)) return
@@ -432,6 +416,8 @@ export const MarkdownEditor = ({
     selectionRef,
     applyMutationPlan,
     disableMermaid,
+    onRequestImageUpload: onUploadImage ? () => imageInputRef.current?.click() : undefined,
+    onRequestFileUpload: onUploadFile ? () => fileInputRef.current?.click() : undefined,
     resolveSlashCoords,
   })
 
@@ -541,6 +527,8 @@ export const MarkdownEditor = ({
           onApplySnippet={applySnippet}
           onApplyFormatShortcut={applyFormatShortcutOrAppend}
           onApplyListCommand={applyListCommand}
+          onStripBlockPrefix={applyStripBlockPrefix}
+          onApplyLineCommand={applyLineCommand}
           onTriggerSlashCommand={(plan) => {
             applyPlannedMarkdownMutation(plan)
             checkSlashCommand(valueRef.current, selectionRef.current)

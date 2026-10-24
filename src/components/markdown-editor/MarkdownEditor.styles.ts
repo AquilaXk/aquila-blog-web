@@ -513,13 +513,19 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     vertical-align: -0.08em;
     cursor: pointer;
     user-select: none;
-
     &.is-checked {
       background: ${({ theme }) => theme.publicDesign.accent};
       border-color: ${({ theme }) => theme.publicDesign.accent};
       color: #fff;
     }
   }
+  .cm-line.cm-live-task-checked-line { color: ${({ theme }) => theme.colors.gray9}; text-decoration: line-through; }
+  .cm-live-toggle-block, .cm-live-bookmark-card {
+    border-color: ${({ theme }) => theme.publicDesign.border};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+  .cm-live-bookmark-card:hover { border-color: ${({ theme }) => theme.publicDesign.borderStrong}; }
 
   .cm-live-heading-line { position: relative; padding-top: 0.35em; padding-bottom: 0.15em; }
   .cm-live-heading-line-1 { padding-top: 0.65em; padding-bottom: 0.22em; }
