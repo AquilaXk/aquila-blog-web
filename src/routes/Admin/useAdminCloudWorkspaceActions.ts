@@ -32,9 +32,11 @@ import {
   isAbortLikeError,
   isUploadActive,
   mergeCloudFiles,
+  normalizeCloudFolderPathSearch,
   preferClientFilenameForUploadedFile,
   resolveCloudSearchParams,
   sortCloudFiles,
+  updateCachedCloudFilesForMutation,
   type CloudMediaFilter,
   type CloudSortMode,
   type UploadQueueItem,
@@ -122,12 +124,9 @@ export const useAdminCloudWorkspaceActions = () => {
   const parsedSearch = useMemo(() => resolveCloudSearchParams(keyword), [keyword])
   const activeFolderPath = parsedSearch.folderPath || ""
   const availableFolders = useMemo(() => {
-    const combined = new Set([
-      ...knownFolders,
-      ...extractCloudFolders(files, activeFolderPath),
-    ])
+    const combined = new Set([...knownFolders, ...extractCloudFolders(files)])
     return Array.from(combined).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
-  }, [activeFolderPath, files, knownFolders])
+  }, [files, knownFolders])
   const selectedFile = files.find((file) => file.id === selectedFileId) || files[0] || null
   const isDetailDrawerMode = files.length > 8
   const shouldShowDetailPanel = isDetailPanelOpen && selectedFile !== null
@@ -139,17 +138,21 @@ export const useAdminCloudWorkspaceActions = () => {
   const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const discovered = extractCloudFolders([...optimisticFiles, ...serverFiles])
-    if (discovered.length === 0) return
+    const isUnfiltered = filter === "ALL" && !debouncedKeyword.trim()
+    if (isUnfiltered && (!filesQuery.isSuccess || filesQuery.isPlaceholderData)) return
+    const discovered = extractCloudFolders(mergeCloudFiles(optimisticFiles, serverFiles))
+    if (!isUnfiltered && discovered.length === 0) return
     setKnownFolders((current) => {
-      const merged = Array.from(new Set([...current, ...discovered])).sort((a, b) =>
-        a.localeCompare(b, "ko", { numeric: true })
-      )
-      return merged.length === current.length && merged.every((item, index) => item === current[index])
+      const next = isUnfiltered
+        ? discovered
+        : Array.from(new Set([...current, ...discovered])).sort((a, b) =>
+            a.localeCompare(b, "ko", { numeric: true })
+          )
+      return next.length === current.length && next.every((item, index) => item === current[index])
         ? current
-        : merged
+        : next
     })
-  }, [optimisticFiles, serverFiles])
+  }, [debouncedKeyword, filesQuery.isPlaceholderData, filesQuery.isSuccess, filter, optimisticFiles, serverFiles])
 
   useEffect(() => {
     if (selectedFileId && files.some((file) => file.id === selectedFileId)) return
@@ -354,17 +357,21 @@ export const useAdminCloudWorkspaceActions = () => {
   ): Promise<boolean> => {
     try {
       const updated = await updateCloudFile(fileId, payload)
-      setOptimisticFiles((current) =>
-        current.map((item) => (item.id === fileId ? updated : item))
-      )
+      const nextOptimistic = optimisticFiles.map((item) => (item.id === fileId ? updated : item))
+      setOptimisticFiles(nextOptimistic)
+      const remainingFiles: CloudFile[] = [...nextOptimistic, updated]
       queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
         if (!Array.isArray(current)) return
         const { filter: cachedFilter, keyword: cachedKeyword } = getCachedCloudQueryFilters(queryKey)
-        const nextFiles = doesCloudFileMatchFilters(updated, cachedFilter, cachedKeyword)
-          ? current.map((item) => (item.id === fileId ? updated : item))
-          : current.filter((item) => item.id !== fileId)
+        const nextFiles = updateCachedCloudFilesForMutation(current, updated, cachedFilter, cachedKeyword)
         queryClient.setQueryData(queryKey, nextFiles)
+        remainingFiles.push(...nextFiles)
       })
+      setKnownFolders(extractCloudFolders(remainingFiles))
+      const updatedFolder = normalizeCloudFolderPathSearch(updated.folderPath)
+      if (activeFolderPath && activeFolderPath !== updatedFolder) {
+        setKeyword((current) => applyCloudFolderFilter(current, updatedFolder))
+      }
       void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
       setToast({ tone: "success", text: "파일 정보를 수정했습니다." })
       return true
@@ -399,13 +406,18 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   const removeDeletedFilesFromCloudCaches = (deletedIds: Set<number>) => {
+    const remainingFiles: CloudFile[] = optimisticFiles.filter((file) => !deletedIds.has(file.id))
     queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
       if (!Array.isArray(current)) return
-      queryClient.setQueryData(
-        queryKey,
-        current.filter((file) => !deletedIds.has(file.id))
-      )
+      const nextFiles = current.filter((file) => !deletedIds.has(file.id))
+      queryClient.setQueryData(queryKey, nextFiles)
+      remainingFiles.push(...nextFiles)
     })
+    const nextFolders = extractCloudFolders(remainingFiles)
+    setKnownFolders(nextFolders)
+    if (activeFolderPath && !nextFolders.includes(activeFolderPath)) {
+      setKeyword((current) => applyCloudFolderFilter(current, ""))
+    }
   }
 
   const closeDeleteConfirm = () => {

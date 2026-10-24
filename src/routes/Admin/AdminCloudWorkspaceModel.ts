@@ -146,6 +146,21 @@ export const applyCloudFolderFilter = (currentSearchText: string, folderPath: st
   return currentKeyword ? `/${normalizedTarget} ${currentKeyword}` : `/${normalizedTarget}`
 }
 
+export const updateCachedCloudFilesForMutation = (
+  current: readonly CloudFile[],
+  updated: CloudFile,
+  filter: CloudMediaFilter,
+  keyword: string,
+): CloudFile[] => {
+  if (!doesCloudFileMatchFilters(updated, filter, keyword)) {
+    return current.filter((item) => item.id !== updated.id)
+  }
+  if (current.some((item) => item.id === updated.id)) {
+    return current.map((item) => (item.id === updated.id ? updated : item))
+  }
+  return [updated, ...current]
+}
+
 const toCloudTimestamp = (value?: string): number => {
   if (!value) return 0
   const parsed = Date.parse(value)

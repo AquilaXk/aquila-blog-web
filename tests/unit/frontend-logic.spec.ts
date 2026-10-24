@@ -37,6 +37,7 @@ import {
   resolveCloudSearchParams,
   shouldShowCloudEmptyLoading,
   sortCloudFiles,
+  updateCachedCloudFilesForMutation,
 } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 
 test.describe("frontend pure logic contracts", () => {
@@ -351,5 +352,16 @@ caption
     expect(applyCloudFolderFilter("/ops 점검", "ops")).toBe("점검")
     expect(applyCloudFolderFilter("/ops 점검", "photos")).toBe("/photos 점검")
     expect(applyCloudFolderFilter("/ops 점검", "")).toBe("점검")
+
+    const movedFile: CloudFile = { ...sampleFiles[0]!, folderPath: "ops/2026" }
+    expect(
+      updateCachedCloudFilesForMutation(sampleFiles, movedFile, "ALL", "").map((f) => f.folderPath),
+    ).toEqual(["ops/2026", "photos", "videos"])
+    expect(
+      updateCachedCloudFilesForMutation([sampleFiles[0]!], movedFile, "ALL", "/ops").map((f) => f.id),
+    ).toEqual([])
+    expect(
+      updateCachedCloudFilesForMutation([], movedFile, "ALL", "/ops/2026").map((f) => f.id),
+    ).toEqual([1])
   })
 })

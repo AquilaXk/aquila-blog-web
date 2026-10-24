@@ -1531,6 +1531,7 @@ test.describe("관리자 클라우드", () => {
     await expect(detailPanel.getByText("연간 운영 점검 리포트.pdf")).toBeVisible()
     await expect(detailPanel.getByText("/ops/2026")).toBeVisible()
     await expect(page.getByRole("row", { name: /연간 운영 점검 리포트\.pdf/ })).toBeVisible()
+    await expect(folderFilterGroup.getByRole("button", { name: "/ops/2026" })).toBeVisible()
 
     await page.locator('button[title$="게시.pdf"]').click()
     await expect(detailPanel.getByText("미리보기를 불러오지 못했습니다")).toBeVisible()
