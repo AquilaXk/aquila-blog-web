@@ -511,8 +511,9 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   }
 
   for (const spec of plan) {
-    if (spec.from === spec.to || hasIntervalOverlap(replacedRanges, spec.from, spec.to)) continue
-    if (isComposing && compFrom <= spec.to && compTo >= spec.from) continue
+    const checkTo = spec.kind === "task" ? Math.min(spec.to, spec.from + 3) : spec.to
+    if (spec.from === checkTo || hasIntervalOverlap(replacedRanges, spec.from, checkTo)) continue
+    if (isComposing && compFrom <= checkTo && compTo >= spec.from) continue
     appendSinglePlanSpecDecoration(spec, ctx)
   }
 

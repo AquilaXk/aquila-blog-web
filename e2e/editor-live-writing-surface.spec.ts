@@ -143,6 +143,7 @@ const readMarkdown = async (page: Page) => {
 }
 
 const fillMarkdown = async (page: Page, markdown: string) => {
+  await readMarkdown(page)
   await editorContent(page).fill(markdown)
   await expect.poll(() => readMarkdown(page)).toBe(markdown)
 }
@@ -1480,6 +1481,15 @@ test.describe("live Markdown writing surface", () => {
 
     const tableWidget = page.getByTestId("cm-live-table-widget")
     await expect(tableWidget).toBeVisible()
+    await expect(tableWidget).toHaveAttribute("data-header-row", "true")
+    await expect(tableWidget.getByTestId("cm-live-table-col-handle").first()).toBeVisible()
+    await expect(tableWidget.getByTestId("cm-live-table-row-handle").first()).toBeVisible()
+    await tableWidget.getByRole("button", { name: "표 제목 행 강조 전환" }).click()
+    await expect(tableWidget).not.toHaveAttribute("data-header-row", "true")
+    await tableWidget.getByRole("button", { name: "표 제목 행 강조 전환" }).click()
+    await expect(tableWidget).toHaveAttribute("data-header-row", "true")
+    await tableWidget.getByTestId("cm-live-table-col-handle").first().click()
+    await expect(tableWidget.locator("th").first()).toHaveClass(/is-selected-col/)
     await tableWidget.getByRole("button", { name: "표 제목 열 강조 전환" }).click()
     await expect(tableWidget).toHaveAttribute("data-header-col", "true")
     await tableWidget.getByRole("button", { name: "표 페이지 너비 맞춤 전환" }).click()

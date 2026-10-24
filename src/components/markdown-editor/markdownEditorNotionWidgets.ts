@@ -20,7 +20,7 @@ const BOOKMARK_OPEN_LINE_RE = /^:::bookmark(?:[ \t]+(\S+)(?:[ \t]+(.*))?)?$/
 const CONTAINER_CLOSE_LINE_RE = /^:::[ \t]*$/
 const HTTP_URL_PREFIX_RE = /^https?:\/\//i
 const LEADING_EMOJI_RE =
-  /^(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)(?:[ \t]+|$)/u
+  /^\[?(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)\]?(?:[ \t]+|$)/u
 
 export type NotionCalloutTone = "info" | "tip" | "warning" | "danger" | "purple" | "default"
 

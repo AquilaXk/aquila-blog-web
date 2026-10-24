@@ -499,8 +499,8 @@ export const MarkdownEditorNotionChrome = ({
     <>
       {canShowGutterPlus && gutterTop !== null ? (
         <>
-          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={4} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}>+</GutterPlusButton>
-          <GutterDragMenuButton ref={gutterHandleRef} type="button" aria-label="현재 줄 블록 메뉴" aria-haspopup="menu" aria-expanded={isBlockMenuOpen} data-block-kind={currentBlockKind} data-testid="markdown-block-gutter-handle" $top={gutterTop} $left={22} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsBlockMenuOpen((prev) => !prev)}>⋮⋮</GutterDragMenuButton>
+          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={10} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}>+</GutterPlusButton>
+          <GutterDragMenuButton ref={gutterHandleRef} type="button" aria-label="현재 줄 블록 메뉴" aria-haspopup="menu" aria-expanded={isBlockMenuOpen} data-block-kind={currentBlockKind} data-testid="markdown-block-gutter-handle" $top={gutterTop} $left={30} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsBlockMenuOpen((prev) => !prev)}>⋮⋮</GutterDragMenuButton>
         </>
       ) : null}
       {isBlockMenuOpen && blockMenuPosition ? (

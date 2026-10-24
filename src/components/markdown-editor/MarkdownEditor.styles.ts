@@ -29,12 +29,14 @@ export const EditorToolbar = styled.div`
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray6};
+  padding: 6px 24px 6px 56px;
+  border-top: 1px solid ${({ theme }) => theme.publicDesign.border};
+  border-bottom: 1px solid ${({ theme }) => theme.publicDesign.border};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
   @media (max-width: 820px) {
     gap: 8px;
+    padding: 6px 12px;
   }
 `
 
@@ -575,7 +577,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     }
   }
 
-  .cm-gutters { background: transparent; border-right: 0; }
+  .cm-gutters, .cm-editor .cm-gutters { background: transparent; border-right: 0 !important; border: 0; }
   .cm-foldGutter .cm-gutterElement {
     padding: 0 4px;
     color: ${({ theme }) => theme.colors.gray9};

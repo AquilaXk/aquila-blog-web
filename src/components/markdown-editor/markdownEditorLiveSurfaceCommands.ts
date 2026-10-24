@@ -166,6 +166,12 @@ export const codeLanguages = [
 export const liveSurfaceTheme = EditorView.theme({
   "&": { height: "100%" },
   ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
+  ".cm-gutters, &.cm-editor .cm-gutters": {
+    backgroundColor: "transparent",
+    borderRight: "none",
+    border: "0",
+    minWidth: "18px",
+  },
   ".cm-content": {
     minHeight: "640px",
     padding: "24px 32px 40px 46px",
@@ -180,30 +186,12 @@ export const liveSurfaceTheme = EditorView.theme({
     padding: "11px 14px",
     margin: "12px 0",
   },
-  ".cm-live-callout-tone-info": {
-    borderLeftColor: "#2383e2",
-    backgroundColor: "rgba(35, 131, 226, 0.08)",
-  },
-  ".cm-live-callout-tone-summary": {
-    borderLeftColor: "#06b6d4",
-    backgroundColor: "rgba(6, 182, 212, 0.08)",
-  },
-  ".cm-live-callout-tone-tip": {
-    borderLeftColor: "#10b981",
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-  },
-  ".cm-live-callout-tone-warning": {
-    borderLeftColor: "#f59e0b",
-    backgroundColor: "rgba(245, 158, 11, 0.09)",
-  },
-  ".cm-live-callout-tone-danger": {
-    borderLeftColor: "#eb5757",
-    backgroundColor: "rgba(235, 87, 87, 0.09)",
-  },
-  ".cm-live-callout-tone-purple": {
-    borderLeftColor: "#9065b0",
-    backgroundColor: "rgba(144, 101, 176, 0.09)",
-  },
+  ".cm-live-callout-tone-info": { borderLeftColor: "#2383e2", backgroundColor: "rgba(35, 131, 226, 0.08)" },
+  ".cm-live-callout-tone-summary": { borderLeftColor: "#06b6d4", backgroundColor: "rgba(6, 182, 212, 0.08)" },
+  ".cm-live-callout-tone-tip": { borderLeftColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.08)" },
+  ".cm-live-callout-tone-warning": { borderLeftColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.09)" },
+  ".cm-live-callout-tone-danger": { borderLeftColor: "#eb5757", backgroundColor: "rgba(235, 87, 87, 0.09)" },
+  ".cm-live-callout-tone-purple": { borderLeftColor: "#9065b0", backgroundColor: "rgba(144, 101, 176, 0.09)" },
   ".cm-live-callout-tone-default, .cm-live-callout-tone-outline": {
     borderLeftColor: "#787774",
     backgroundColor: "rgba(135, 131, 120, 0.09)",
@@ -225,11 +213,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-callout-fold": { fontSize: "10px", opacity: 0.7, marginLeft: "auto" },
   ".cm-live-callout.is-collapsed .cm-live-callout-body": { display: "none" },
-  ".cm-live-callout-body": {
-    marginTop: "6px",
-    opacity: 0.92,
-    whiteSpace: "pre-wrap",
-  },
+  ".cm-live-callout-body": { marginTop: "6px", opacity: 0.92, whiteSpace: "pre-wrap" },
   ".cm-line.cm-live-container-active-line": {
     paddingLeft: "14px",
     paddingRight: "14px",
@@ -240,26 +224,11 @@ export const liveSurfaceTheme = EditorView.theme({
     borderLeftColor: "#9065b0",
     backgroundColor: "rgba(144, 101, 176, 0.06)",
   },
-  ".cm-line.cm-live-container-tone-tip": {
-    borderLeftColor: "#10b981",
-    backgroundColor: "rgba(16, 185, 129, 0.07)",
-  },
-  ".cm-line.cm-live-container-tone-warning": {
-    borderLeftColor: "#f59e0b",
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
-  },
-  ".cm-line.cm-live-container-tone-danger": {
-    borderLeftColor: "#eb5757",
-    backgroundColor: "rgba(235, 87, 87, 0.08)",
-  },
-  ".cm-line.cm-live-container-tone-purple": {
-    borderLeftColor: "#9065b0",
-    backgroundColor: "rgba(144, 101, 176, 0.08)",
-  },
-  ".cm-line.cm-live-container-tone-default": {
-    borderLeftColor: "#787774",
-    backgroundColor: "rgba(135, 131, 120, 0.08)",
-  },
+  ".cm-line.cm-live-container-tone-tip": { borderLeftColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.07)" },
+  ".cm-line.cm-live-container-tone-warning": { borderLeftColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.08)" },
+  ".cm-line.cm-live-container-tone-danger": { borderLeftColor: "#eb5757", backgroundColor: "rgba(235, 87, 87, 0.08)" },
+  ".cm-line.cm-live-container-tone-purple": { borderLeftColor: "#9065b0", backgroundColor: "rgba(144, 101, 176, 0.08)" },
+  ".cm-line.cm-live-container-tone-default": { borderLeftColor: "#787774", backgroundColor: "rgba(135, 131, 120, 0.08)" },
   ".cm-line.cm-live-container-line-open": {
     paddingTop: "6px",
     borderTopLeftRadius: "6px",
@@ -298,12 +267,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-toggle-title": { cursor: "text", flex: "1 1 auto" },
   ".cm-live-toggle-block.is-collapsed .cm-live-toggle-body": { display: "none" },
-  ".cm-live-toggle-body": {
-    marginTop: "6px",
-    paddingLeft: "28px",
-    whiteSpace: "pre-wrap",
-    cursor: "text",
-  },
+  ".cm-live-toggle-body": { marginTop: "6px", paddingLeft: "28px", whiteSpace: "pre-wrap", cursor: "text" },
   ".cm-live-toggle-body.is-empty": { opacity: 0.55, fontStyle: "italic" },
   ".cm-live-bookmark-card": {
     display: "flex",
@@ -416,20 +380,79 @@ export const liveSurfaceTheme = EditorView.theme({
     tableLayout: "fixed",
   },
   ".cm-live-table th, .cm-live-table td": {
+    position: "relative",
     border: "1px solid rgba(128, 128, 128, 0.24)",
     padding: "7px 12px",
     textAlign: "left",
     cursor: "text",
     minWidth: "72px",
   },
+  ".cm-live-table th:first-child, .cm-live-table td:first-child": {
+    paddingLeft: "22px",
+  },
   ".cm-live-table th": {
-    position: "relative",
+    paddingTop: "14px",
     backgroundColor: "color-mix(in srgb, var(--surface-elevated, #f7f6f3) 90%, rgba(135, 131, 120, 0.18) 10%)",
     fontWeight: "650",
+  },
+  '.cm-live-table-wrap[data-header-row="false"] .cm-live-table th, .cm-live-table-wrap[data-testid="cm-live-table-widget"]:not([data-header-row="true"]) .cm-live-table th': {
+    backgroundColor: "transparent",
+    fontWeight: "500",
   },
   '.cm-live-table-wrap[data-header-col="true"] .cm-live-table tbody td:first-child': {
     backgroundColor: "color-mix(in srgb, var(--surface-elevated, #f7f6f3) 90%, rgba(135, 131, 120, 0.18) 10%)",
     fontWeight: "650",
+  },
+  ".cm-live-table th.is-selected-col, .cm-live-table td.is-selected-col, .cm-live-table th.is-selected-row, .cm-live-table td.is-selected-row": {
+    backgroundColor: "rgba(35, 131, 226, 0.08)",
+  },
+  ".cm-live-table th.is-drop-target-col": {
+    borderLeft: "2px solid #2383e2",
+  },
+  ".cm-live-table tr.is-drop-target-row td, .cm-live-table tr.is-drop-target-row th": {
+    borderTop: "2px solid #2383e2",
+  },
+  ".cm-live-table-col-handle": {
+    position: "absolute",
+    top: "1px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    height: "11px",
+    minWidth: "24px",
+    padding: "0 4px",
+    border: "1px solid transparent",
+    borderRadius: "4px",
+    backgroundColor: "transparent",
+    color: "#52514e",
+    fontSize: "10px",
+    lineHeight: "9px",
+    cursor: "grab",
+    opacity: 0.72,
+    zIndex: "3",
+  },
+  ".cm-live-table-row-handle": {
+    position: "absolute",
+    left: "2px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "14px",
+    height: "20px",
+    padding: "0",
+    border: "1px solid transparent",
+    borderRadius: "4px",
+    backgroundColor: "transparent",
+    color: "#52514e",
+    fontSize: "10px",
+    lineHeight: "1",
+    cursor: "grab",
+    opacity: 0.72,
+    zIndex: "3",
+  },
+  ".cm-live-table th:hover .cm-live-table-col-handle, .cm-live-table th.is-selected-col .cm-live-table-col-handle, .cm-live-table-col-handle:hover, .cm-live-table-col-handle:focus-visible, .cm-live-table tr:hover .cm-live-table-row-handle, .cm-live-table td.is-selected-row .cm-live-table-row-handle, .cm-live-table th.is-selected-row .cm-live-table-row-handle, .cm-live-table-row-handle:hover, .cm-live-table-row-handle:focus-visible": {
+    opacity: 1,
+    backgroundColor: "rgba(35, 131, 226, 0.12)",
+    borderColor: "rgba(35, 131, 226, 0.32)",
+    color: "#14569b",
   },
   ".cm-live-table-col-resizer": {
     position: "absolute",
@@ -447,7 +470,6 @@ export const liveSurfaceTheme = EditorView.theme({
     right: "-1px",
   },
   ".cm-live-table th.is-active-cell, .cm-live-table td.is-active-cell": {
-    padding: "2px 4px",
     outline: "2px solid #2383e2",
     outlineOffset: "-2px",
     backgroundColor: "rgba(35, 131, 226, 0.06)",
@@ -459,7 +481,8 @@ export const liveSurfaceTheme = EditorView.theme({
     backgroundColor: "transparent",
     color: "inherit",
     font: "inherit",
-    padding: "4px 6px",
+    padding: "0",
+    margin: "0",
   },
   ".cm-live-table-add-col": {
     display: "inline-flex",

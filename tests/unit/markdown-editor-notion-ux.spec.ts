@@ -492,6 +492,70 @@ test.describe("Notion-parity Markdown editor model", () => {
       nextCol: 1,
     })
 
+    expect(applyMarkdownTableGridAction(table, 1, 1, { kind: "clear-row" })).toEqual({
+      markdown: [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "|  |  |  |",
+        "| A2 | B2 | C2 |",
+      ].join("\n"),
+      nextRow: 1,
+      nextCol: 1,
+    })
+
+    expect(applyMarkdownTableGridAction(table, 1, 1, { kind: "clear-column" })).toEqual({
+      markdown: [
+        "| ColA |  | ColC |",
+        "| --- | :---: | ---: |",
+        "| A1 |  | C1 |",
+        "| A2 |  | C2 |",
+      ].join("\n"),
+      nextRow: 1,
+      nextCol: 1,
+    })
+
+    expect(applyMarkdownTableGridAction(table, 1, 1, { kind: "duplicate-column" })).toEqual({
+      markdown: [
+        "| ColA | ColB | ColB | ColC |",
+        "| --- | :---: | :---: | ---: |",
+        "| A1 | B1 | B1 | C1 |",
+        "| A2 | B2 | B2 | C2 |",
+      ].join("\n"),
+      nextRow: 1,
+      nextCol: 2,
+    })
+
+    expect(applyMarkdownTableGridAction(table, 1, 0, { kind: "move-row-to", targetRow: 2 })).toEqual({
+      markdown: [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A2 | B2 | C2 |",
+        "| A1 | B1 | C1 |",
+      ].join("\n"),
+      nextRow: 2,
+      nextCol: 0,
+    })
+
+    expect(applyMarkdownTableGridAction(table, 0, 0, { kind: "move-column-to", targetCol: 2 })).toEqual({
+      markdown: [
+        "| ColB | ColC | ColA |",
+        "| :---: | ---: | --- |",
+        "| B1 | C1 | A1 |",
+        "| B2 | C2 | A2 |",
+      ].join("\n"),
+      nextRow: 0,
+      nextCol: 2,
+    })
+
+    const unclosedBracketTable = [
+      "| ColA | ColB | ColC |",
+      "| --- | --- | --- |",
+      "| [[unclosed | [[Guide|User Guide]] | {{color:emerald|완료}} |",
+    ].join("\n")
+    expect(parseMarkdownTableGrid(unclosedBracketTable)?.rows).toEqual([
+      ["[[unclosed", "[[Guide|User Guide]]", "{{color:emerald|완료}}"],
+    ])
+
     const doc = [
       "# Title",
       "Paragraph outside",
@@ -544,10 +608,12 @@ test.describe("Notion-parity Markdown editor model", () => {
         tagName: tag.toUpperCase(),
         type: "",
         disabled: false,
+        draggable: false,
         isConnected: true,
         selectionStart: 0,
         selectionEnd: 0,
         style: { width: "", textAlign: "" },
+        dataset: {} as Record<string, string>,
         children,
         get className() {
           return Array.from(classes).join(" ")
@@ -665,25 +731,38 @@ test.describe("Notion-parity Markdown editor model", () => {
     })
 
     try {
-      const tableMd = "| ColA | ColB |\n| --- | --- |\n| A1 | B1 |"
+      const tableMd = "| ColA | ColB |\n| --- | --- |\n| A1 | B1 |\n| A2 | B2 |"
+      let lastDispatchedInsert = tableMd
       const fakeView = {
         posAtDOM: () => 40,
         state: {
-          doc: { length: tableMd.length + 80 },
+          doc: { length: tableMd.length + 120 },
           selection: { main: { from: 0, to: 0 } },
           facet: () => true,
         },
         focus: () => {},
-        dispatch: () => {},
+        dispatch: (tr: any) => {
+          if (tr?.changes?.insert) lastDispatchedInsert = tr.changes.insert
+        },
       } as unknown as EditorView
 
       const widget = new MarkdownTableWidget(tableMd, 40, 40 + tableMd.length)
       const dom: any = widget.toDOM(fakeView)
 
+      const headerRowBtn = dom.querySelector('[data-testid="cm-live-table-toggle-header-row"]')
       const headerColBtn = dom.querySelector('[data-testid="cm-live-table-toggle-header-col"]')
       const fullWidthBtn = dom.querySelector('[data-testid="cm-live-table-toggle-full-width"]')
+      expect(dom.getAttribute("data-header-row")).toBe("true")
+      expect(headerRowBtn.getAttribute("aria-pressed")).toBe("true")
       expect(headerColBtn.getAttribute("aria-pressed")).toBe("false")
       expect(fullWidthBtn.getAttribute("aria-pressed")).toBe("false")
+
+      headerRowBtn.trigger("click")
+      expect(dom.getAttribute("data-header-row")).toBeNull()
+      expect(headerRowBtn.getAttribute("aria-pressed")).toBe("false")
+      headerRowBtn.trigger("click")
+      expect(dom.getAttribute("data-header-row")).toBe("true")
+      expect(headerRowBtn.getAttribute("aria-pressed")).toBe("true")
 
       headerColBtn.trigger("click")
       fullWidthBtn.trigger("click")
@@ -706,6 +785,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const rerenderedDom: any = new MarkdownTableWidget(tableMd, 40, 40 + tableMd.length).toDOM(
         fakeView
       )
+      expect(rerenderedDom.getAttribute("data-header-row")).toBe("true")
       expect(rerenderedDom.getAttribute("data-header-col")).toBe("true")
       expect(rerenderedDom.getAttribute("data-full-width")).toBe("true")
       expect(rerenderedDom.querySelectorAll("col")[0].getAttribute("data-col-width")).toBe("185")
@@ -714,20 +794,76 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(colEls[0].getAttribute("data-col-width")).toBeNull()
       expect(colEls[0].style.width).toBe("")
 
+      const colHandles = dom.querySelectorAll(".cm-live-table-col-handle")
+      const rowHandles = dom.querySelectorAll(".cm-live-table-row-handle")
+      expect(colHandles).toHaveLength(2)
+      expect(rowHandles).toHaveLength(3)
+
+      colHandles[1].trigger("click")
+      expect(dom.querySelectorAll("th")[1].classList.contains("is-selected-col")).toBe(true)
+      expect(dom.querySelectorAll("td")[1].classList.contains("is-selected-col")).toBe(true)
+
+      rowHandles[2].trigger("click")
+      expect(dom.querySelectorAll("td")[2].classList.contains("is-selected-row")).toBe(true)
+      expect(dom.querySelectorAll("td")[3].classList.contains("is-selected-row")).toBe(true)
+
+      resizers[0].trigger("mousedown", { clientX: 100 })
+      for (const fn of windowListeners.get("mousemove") ?? []) fn({ clientX: 180 })
+      for (const fn of windowListeners.get("mouseup") ?? []) fn({ clientX: 180 })
+      expect(colEls[0].getAttribute("data-col-width")).toBe("200")
+
+      colHandles[0].trigger("dragstart", { dataTransfer: { effectAllowed: "", setData() {} } })
+      dom.querySelectorAll("th")[1].trigger("dragover")
+      expect(dom.querySelectorAll("th")[1].classList.contains("is-drop-target-col")).toBe(true)
+      dom.querySelectorAll("th")[1].trigger("drop")
+      expect(lastDispatchedInsert).toBe("| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |")
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(dom.querySelectorAll("col")[0].getAttribute("data-col-width")).toBeNull()
+      expect(dom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
+
+      const updatedRowHandles = dom.querySelectorAll(".cm-live-table-row-handle")
+      updatedRowHandles[1].trigger("dragstart", { dataTransfer: { effectAllowed: "", setData() {} } })
+      dom.querySelectorAll("tr")[2].trigger("dragover")
+      expect(dom.querySelectorAll("tr")[2].classList.contains("is-drop-target-row")).toBe(true)
+      dom.querySelectorAll("tr")[2].trigger("drop")
+      expect(lastDispatchedInsert).toBe("| ColB | ColA |\n| --- | --- |\n| B2 | A2 |\n| B1 | A1 |")
+
+      const sameShapeWidget = new MarkdownTableWidget(
+        "| ColX | ColY |\n| --- | --- |\n| X1 | Y1 |\n| X2 | Y2 |",
+        40,
+        100
+      )
+      expect(sameShapeWidget.updateDOM(dom, fakeView)).toBe(true)
+      expect(dom.querySelectorAll(".cm-live-table-col-handle")).toHaveLength(2)
+
+      const structuralWidget = new MarkdownTableWidget(
+        "| ColX | ColY | ColZ |\n| --- | --- | --- |\n| X1 | Y1 | Z1 |",
+        40,
+        110
+      )
+      expect(structuralWidget.updateDOM(dom, fakeView)).toBe(true)
+      expect(dom.querySelectorAll("th")).toHaveLength(3)
+      expect(dom.querySelector("tbody").querySelectorAll("tr")).toHaveLength(1)
+
       const tds = dom.querySelectorAll("td")
       tds[0].trigger("click")
       let activeInput = dom.querySelector(".cm-live-table-cell-input")
-      expect(activeInput.value).toBe("A1")
+      expect(activeInput.value).toBe("X1")
 
       activeInput.setSelectionRange(activeInput.value.length, activeInput.value.length)
       activeInput.trigger("keydown", { key: "ArrowRight" })
       activeInput = dom.querySelector(".cm-live-table-cell-input")
-      expect(activeInput.value).toBe("B1")
+      expect(activeInput.value).toBe("Y1")
 
       activeInput.setSelectionRange(0, 0)
       activeInput.trigger("keydown", { key: "ArrowLeft" })
       activeInput = dom.querySelector(".cm-live-table-cell-input")
-      expect(activeInput.value).toBe("A1")
+      expect(activeInput.value).toBe("X1")
     } finally {
       if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
       else delete (globalThis as Record<string, unknown>).document
@@ -801,11 +937,24 @@ test.describe("Notion-parity Markdown editor model", () => {
     })
     expect(returnedRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(2)
     expect(returnedRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeDefined()
+
+    const mathTaskDoc = "- [x] 수식 포함 항목 $O(V)$ 완료\n\n다음 문단"
+    const mathTaskState = EditorState.create({
+      doc: mathTaskDoc,
+      selection: { anchor: mathTaskDoc.length - 1 },
+      extensions: [markdown({ extensions: [GFM] }), decorationField],
+    })
+    const mathTaskWidgets: unknown[] = []
+    mathTaskState.field(decorationField).between(0, mathTaskDoc.length, (_from, _to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      if (spec.widget instanceof MarkdownTaskWidget) mathTaskWidgets.push(spec.widget)
+    })
+    expect(mathTaskWidgets).toHaveLength(1)
   })
 
   test("parses :::callout container blocks and switches between CalloutWidget and active container line classes", () => {
     const doc = [
-      ":::callout 💡 노션 라이브 프리뷰 팁",
+      ":::callout [💡] 노션 라이브 프리뷰 팁",
       "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
       ":::",
       "",
@@ -824,7 +973,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         icon: "💡",
         title: "노션 라이브 프리뷰 팁",
         body: "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
-        bodyOffset: ":::\ncallout 💡 노션 라이브 프리뷰 팁".length,
+        bodyOffset: ":::callout [💡] 노션 라이브 프리뷰 팁\n".length,
       },
       {
         kind: "callout",
@@ -917,7 +1066,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const container = makeFakeNode("div")
       appendInlineMarkdownNodes(
         container,
-        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com)"
+        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}}"
       )
       const elementChildren = container.children.filter((c: any) => c.tagName)
       expect(elementChildren.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
@@ -928,6 +1077,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         "MARK:cm-live-highlight:강조",
         "SPAN:cm-live-math cm-live-math-inline:O(1)",
         "A:cm-live-link:링크",
+        "SPAN:cm-live-color:완료",
       ])
 
       const mathAndCurrency = makeFakeNode("div")
