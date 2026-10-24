@@ -51,31 +51,6 @@ import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.t
 
 export { markdownGuide } from "src/libs/markdown/rendering"
 
-export const buildHeadingAnchorUrl = (locationHref: string, headingId: string): string => {
-  const trimmedId = headingId.trim().replace(/^#/, "")
-  const hashIndex = locationHref.indexOf("#")
-  const baseHref = hashIndex >= 0 ? locationHref.slice(0, hashIndex) : locationHref
-  if (!trimmedId) return baseHref
-  return `${baseHref}#${trimmedId}`
-}
-
-const handleHeadingAnchorClick = (target: Element): boolean => {
-  const heading = target.closest<HTMLElement>("h2[id], h3[id], h4[id]")
-  if (!heading?.id || target.closest("a")) return false
-  if (typeof window === "undefined") return false
-  const selectionText = window.getSelection?.()?.toString().trim() ?? ""
-  if (selectionText.length > 0) return false
-
-  window.history.replaceState(null, "", `#${heading.id}`)
-  const fullUrl = buildHeadingAnchorUrl(window.location.href, heading.id)
-  void navigator.clipboard?.writeText(fullUrl)?.catch(() => undefined)
-  heading.dataset.anchorCopied = "true"
-  window.setTimeout(() => {
-    delete heading.dataset.anchorCopied
-  }, 1500)
-  return true
-}
-
 const handleImageLightboxClick = (target: Element): boolean => {
   if (target.closest("a[href], .aq-image-resize-handle")) return false
   const image = target.closest<HTMLImageElement>(".aq-image-frame img")
@@ -435,8 +410,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (editableImages) return
       if (!(event.target instanceof Element)) return
-      if (handleImageLightboxClick(event.target)) return
-      handleHeadingAnchorClick(event.target)
+      handleImageLightboxClick(event.target)
     },
     [editableImages]
   )

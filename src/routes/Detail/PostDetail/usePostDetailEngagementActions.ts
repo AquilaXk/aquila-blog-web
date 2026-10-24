@@ -86,7 +86,8 @@ export const usePostDetailEngagementActions = ({
   const handleSharePost = useCallback(async () => {
     if (!data) return
     const canonicalPath = toCanonicalPostPath(postId)
-    const shareUrl = typeof window !== "undefined" ? window.location.href : canonicalPath
+    const shareUrl =
+      typeof window !== "undefined" ? window.location.href.split("#")[0] : canonicalPath
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {

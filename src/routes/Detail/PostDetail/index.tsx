@@ -372,9 +372,6 @@ const PostDetail: React.FC = () => {
     if (!heading) return
     const targetTop = heading.getBoundingClientRect().top + window.scrollY - (railTopOffsetRef.current + 24)
     setActiveTocId(id)
-    const hash = `#${encodeURIComponent(id)}`
-    const nextUrl = `${window.location.pathname}${window.location.search}${hash}`
-    window.history.replaceState(window.history.state, "", nextUrl)
     window.scrollTo({ top: targetTop, behavior: "smooth" })
   }, [])
 

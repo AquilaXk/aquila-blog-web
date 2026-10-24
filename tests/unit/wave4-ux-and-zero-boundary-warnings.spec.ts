@@ -16,7 +16,6 @@ import {
   handleZoomShortcutKey,
 } from "../../src/libs/markdown/mermaidRuntimeOverlay"
 import { openImageLightboxOverlay } from "../../src/libs/markdown/imageLightboxOverlay"
-import { buildHeadingAnchorUrl } from "../../src/libs/markdown/MarkdownRenderer"
 import {
   hasPotentialFenceCharacters,
   stepFenceNormalization,
@@ -260,13 +259,24 @@ test.describe("Issue #263 Wave 4 UX & Zero Boundary Warnings", () => {
     }
   })
 
-  test("R-6: buildHeadingAnchorUrl strips existing hash and appends heading id without mutating heading textContent", () => {
-    expect(buildHeadingAnchorUrl("https://blog.example.com/posts/1", "overview")).toBe(
-      "https://blog.example.com/posts/1#overview"
+  test("R-6: MarkdownRenderer and PostDetail do not attach heading # hover pseudo-elements or click hash mutations", () => {
+    const baseStylesSource = readFileSync(
+      path.resolve(__dirname, "../../src/libs/markdown/components/MarkdownRendererRootBaseStyles.ts"),
+      "utf8"
     )
-    expect(buildHeadingAnchorUrl("https://blog.example.com/posts/1#old-section", "new-section")).toBe(
-      "https://blog.example.com/posts/1#new-section"
+    const rendererSource = readFileSync(
+      path.resolve(__dirname, "../../src/libs/markdown/MarkdownRenderer.tsx"),
+      "utf8"
     )
+    const detailSource = readFileSync(
+      path.resolve(__dirname, "../../src/routes/Detail/PostDetail/index.tsx"),
+      "utf8"
+    )
+    expect(baseStylesSource).not.toContain('content: " #"')
+    expect(baseStylesSource).not.toContain("data-anchor-copied")
+    expect(rendererSource).not.toContain("handleHeadingAnchorClick")
+    expect(rendererSource).not.toContain("anchorCopied")
+    expect(detailSource).not.toContain("window.history.replaceState")
   })
 
   test("AC-3: mermaid.ts and tableMetadata.ts cognitive complexity helpers preserve exact behavior", () => {
