@@ -37,10 +37,6 @@ export const CloudWorkspace = styled.section`
 
   &[data-detail-open="true"][data-detail-mode="inline"] {
     grid-template-columns: minmax(0, 5.7fr) minmax(20rem, 3fr);
-
-    tbody {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
   }
 
   &[data-detail-open="true"][data-detail-mode="drawer"] {
@@ -127,34 +123,37 @@ export const SearchInput = styled.input`
 `
 
 export const UploadZone = styled.button`
-  display: grid;
-  place-items: center;
-  gap: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
   width: 100%;
-  min-height: 4.75rem;
-  margin: 0 0 1.15rem;
-  border: 1px dashed ${borderStrong};
+  min-height: 2.35rem;
+  margin: 0 0 0.85rem;
+  border: 0;
+  border-bottom: 1px solid ${border};
   border-radius: 2px;
-  padding: 0.9rem 1.25rem;
+  padding: 0.45rem 0.25rem;
   background: transparent;
   color: ${textMuted};
-  text-align: center;
+  text-align: left;
   cursor: pointer;
 
   svg {
     color: ${accentGold};
+    flex-shrink: 0;
   }
 
   strong {
-    display: block;
-    color: ${textPrimary};
-    font-size: 0.9rem;
-    font-weight: 850;
+    color: ${textSecondary};
+    font-size: 0.82rem;
+    font-weight: 800;
   }
 
   span {
+    margin-left: auto;
     color: ${textMuted};
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
   }
 
@@ -184,18 +183,23 @@ export const FileTable = styled.table`
   color: ${textPrimary};
 
   thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    display: block;
+    border-bottom: 1px solid ${border};
+  }
+
+  thead tr {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) 6rem 10.5rem;
+    gap: 0.75rem;
+    align-items: center;
+    min-height: 2.2rem;
+    padding: 0 0.5rem;
   }
 
   tbody {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.875rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   th,
@@ -205,12 +209,23 @@ export const FileTable = styled.table`
   }
 
   th {
-    height: 2.4rem;
-    padding: 0 0.7rem;
+    height: auto;
+    padding: 0;
     color: ${textMuted};
-    background: ${surfaceRaised};
-    font-size: 0.75rem;
+    background: transparent;
+    font-size: 0.74rem;
     font-weight: 800;
+  }
+
+  th:nth-of-type(1) {
+    font-size: 0;
+    color: transparent;
+  }
+
+  th:nth-of-type(3),
+  th:nth-of-type(4) {
+    text-align: right;
+    justify-self: end;
   }
 
   td {
@@ -224,16 +239,16 @@ export const FileTable = styled.table`
 
   tbody tr {
     display: grid;
-    grid-template-columns: 1.6rem minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    gap: 0.65rem 0.52rem;
+    grid-template-columns: 2.25rem minmax(0, 1fr) 6rem 10.5rem;
+    gap: 0.75rem;
     align-items: center;
     min-width: 0;
-    min-height: 6.75rem;
-    border: 1px solid ${border};
-    padding: 0.8rem 0.875rem;
+    min-height: 3.35rem;
+    border: 0;
+    border-bottom: 1px solid ${border};
+    padding: 0.45rem 0.5rem;
     background: ${surface};
-    transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+    transition: background 140ms ease, color 140ms ease;
   }
 
   tbody tr[data-loading-row="true"] {
@@ -247,7 +262,6 @@ export const FileTable = styled.table`
 
   tbody tr[data-selected="true"] {
     background: ${surfaceAccent};
-    border-color: ${borderStrong};
   }
 
   tbody tr:hover,
@@ -261,68 +275,95 @@ export const FileTable = styled.table`
     padding-left: 0.35rem;
   }
 
+  tbody tr:not([data-loading-row="true"]) td:first-of-type {
+    display: flex;
+    align-items: center;
+  }
+
   tbody tr[data-selected="true"] td:first-of-type {
     border-left-color: #58a6ff;
   }
 
-  th:nth-of-type(1),
   td:nth-of-type(1) {
     grid-column: 1;
     grid-row: 1;
     width: auto;
   }
 
-  th:nth-of-type(2),
   td:nth-of-type(2) {
-    grid-column: 2 / 4;
+    grid-column: 2;
     grid-row: 1;
     width: auto;
     min-width: 0;
   }
 
-  th:nth-of-type(3),
   td:nth-of-type(3) {
-    grid-column: 1 / 3;
-    grid-row: 2;
-    align-self: end;
-    width: auto;
-    color: ${textMuted};
-    font-size: 0.76rem;
-  }
-
-  th:nth-of-type(4),
-  td:nth-of-type(4) {
     grid-column: 3;
-    grid-row: 2;
-    align-self: end;
+    grid-row: 1;
+    align-self: center;
     justify-self: end;
     width: auto;
     color: ${textMuted};
-    font-size: 0.76rem;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  @media (max-width: 1180px) {
-    tbody {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  td:nth-of-type(4) {
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+    width: auto;
+    color: ${textMuted};
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {
-    tbody {
-      grid-template-columns: minmax(0, 1fr);
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      grid-template-columns: 2rem minmax(0, 1fr) auto;
+      gap: 0.25rem 0.5rem;
+    }
+
+    td:nth-of-type(2) {
+      grid-column: 2 / 4;
+      grid-row: 1;
+    }
+
+    td:nth-of-type(3) {
+      grid-column: 2;
+      grid-row: 2;
+      justify-self: start;
+    }
+
+    td:nth-of-type(4) {
+      grid-column: 3;
+      grid-row: 2;
+      justify-self: end;
     }
   }
 `
 
 export const FileThumbnailFrame = styled.span`
-  width: 3.3rem;
-  height: 3.3rem;
+  width: 2.6rem;
+  height: 2.25rem;
   display: grid;
   place-items: center;
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: ${surfaceMuted};
+  background: transparent;
   color: ${accentGold};
   font-size: 0.68rem;
   font-weight: 900;
@@ -333,7 +374,7 @@ export const FileThumbnailFrame = styled.span`
   }
 
   &[data-selected="true"] {
-    background: ${surfaceAccent};
+    background: transparent;
     color: ${accentGold};
   }
 `

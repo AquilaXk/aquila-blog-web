@@ -160,10 +160,10 @@ test.describe("관리자 표면 공통 계약", () => {
 
     expect(getStyledComponentBlock(cloudStyleSource, "CloudContent")).toContain("padding: 2rem 2.125rem 4.375rem;")
     expect(getStyledComponentBlock(cloudStyleSource, "CloudTitleBar")).toContain("align-items: flex-end;")
-    expect(getStyledComponentBlock(cloudStyleSource, "UploadZone")).toContain("border: 1px dashed ${borderStrong};")
+    expect(getStyledComponentBlock(cloudStyleSource, "UploadZone")).toContain("border-bottom: 1px solid ${border};")
     expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain('tbody tr[data-loading-row="true"]')
     expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain(
-      "grid-template-columns: repeat(3, minmax(0, 1fr));",
+      "grid-template-columns: 2.25rem minmax(0, 1fr) 6rem 10.5rem;",
     )
     expect(getStyledComponentBlock(cloudStyleSource, "FileTable")).toContain("display: grid;")
     expect(getStyledComponentBlock(cloudStyleSource, "FileThumbnailFrame")).toContain("border-radius: 0;")
