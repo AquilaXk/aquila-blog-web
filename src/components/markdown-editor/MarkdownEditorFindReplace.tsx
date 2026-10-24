@@ -74,8 +74,10 @@ export const MarkdownEditorFindReplace = ({
             if (event.key === "Enter" && !event.nativeEvent.isComposing) {
               event.preventDefault()
               if (!disabled && totalMatches > 0) {
+                const input = event.currentTarget
                 if (event.shiftKey) onPrevious()
                 else onNext()
+                input.focus()
               }
             }
           }}
@@ -92,7 +94,9 @@ export const MarkdownEditorFindReplace = ({
             if (event.key === "Enter" && !event.nativeEvent.isComposing) {
               event.preventDefault()
               if (!disabled && !replaceCurrentDisabled) {
+                const input = event.currentTarget
                 onReplaceCurrent()
+                input.focus()
               }
             }
           }}
