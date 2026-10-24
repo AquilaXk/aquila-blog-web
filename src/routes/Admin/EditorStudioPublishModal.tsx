@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import type { PostVisibility } from "./editorStudioState"
 import {
   EditorStudioPublishCardSettings,
@@ -76,8 +76,25 @@ export const EditorStudioPublishModal = ({
     loadingKey === "modifyPost" ||
     loadingKey === "publishTempPost"
 
+  useEffect(() => {
+    if (isCloseDisabled) return
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isCloseDisabled, onClose])
+
   return (
-    <PublishModalBackdrop data-variant={variant} onClick={onClose}>
+    <PublishModalBackdrop
+      data-variant={variant}
+      onClick={() => {
+        if (!isCloseDisabled) onClose()
+      }}
+    >
       <PublishDialog
         role="dialog"
         aria-modal="true"

@@ -40,6 +40,7 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   closePublishModal: () => void
   commitPreviewThumbTransform: (next: { focusX: number; focusY: number; zoom: number }) => void
   customCategoryCatalog: string[]
+  customTagCatalog: string[]
   deferredContentDerived: { firstImage: string }
   dismissedLocalDraft: LocalDraftFingerprintSnapshot[]
   dismissLocalDraftRestoreSuggestion: () => void
@@ -133,7 +134,7 @@ type EditorStudioWorkspaceControllerRootViewProps = {
 export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioWorkspaceControllerRootViewProps) => {
   const {
     addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
-    closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, deferredContentDerived,
+    closePublishModal, commitPreviewThumbTransform, customCategoryCatalog, customTagCatalog, deferredContentDerived,
     dismissedLocalDraft, dismissLocalDraftRestoreSuggestion,
     disabled, editorMode, finalizePreviewThumbPointer, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
@@ -479,6 +480,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onPostCategoryChange={handlePostCategoryChange}
         onCommitPostCategory={commitPostCategory}
         categorySuggestions={customCategoryCatalog}
+        tagSuggestions={customTagCatalog}
         postVisibility={postVisibility}
         onPostVisibilityChange={setPostVisibility}
         editorCanvas={dedicatedEditorCanvas}

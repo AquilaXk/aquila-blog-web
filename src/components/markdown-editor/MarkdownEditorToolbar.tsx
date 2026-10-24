@@ -11,6 +11,7 @@ import {
   ToolbarButton,
   ToolbarGroup,
   ToolbarHiddenInput,
+  ToolbarQuoteGlyph,
 } from "./MarkdownEditor.styles"
 import type { MarkdownEditorTableEdit } from "./markdownEditorTableModel"
 import { MarkdownEditorTablePopover } from "./MarkdownEditorTablePopover"
@@ -152,7 +153,7 @@ export const MarkdownEditorToolbar = ({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onApplySnippet(before, after)}
         >
-          {label === "”" ? <span style={{ fontSize: "15px", lineHeight: 1 }}>”</span> : label}
+          {label === "”" ? <ToolbarQuoteGlyph>”</ToolbarQuoteGlyph> : label}
         </ToolbarButton>
       ))}
 
@@ -312,7 +313,7 @@ export const MarkdownEditorToolbar = ({
         }}
       />
     </ToolbarGroup>
-    <ToolbarGroup style={{ marginLeft: "auto" }}>
+    <ToolbarGroup data-align="end">
       <ToolbarButton
         type="button"
         title={`라이브 프리뷰 (${modShortcutLabel}E)`}

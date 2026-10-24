@@ -5,6 +5,7 @@ import {
   planFormatShortcutMutation,
   planHardBreak,
   planListEnterContinuation,
+  planMarkdownEditorTableEnter,
   planTableCellTabMutation,
   resolveMarkdownEditorCommandShortcut,
   resolveFormatShortcut,
@@ -15,6 +16,10 @@ import {
   planMarkdownEditorAutoPairBackspace,
   planMarkdownEditorAutoPairInsert,
 } from "./markdownEditorAutoPairModel"
+import {
+  planNotionBlockPrefixBackspace,
+  planNotionSpaceInputRule,
+} from "./markdownEditorNotionModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
@@ -85,6 +90,13 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (event.metaKey || event.ctrlKey || event.altKey) return false
 
       const { from, to } = rememberTextareaSelection()
+      const tableEnterPlan = planMarkdownEditorTableEnter(valueRef.current, from, to)
+      if (tableEnterPlan) {
+        event.preventDefault()
+        applyMutationPlan(tableEnterPlan)
+        return true
+      }
+
       const listPlan = planListEnterContinuation(valueRef.current, from, to)
       if (!listPlan) return true
       event.preventDefault()
@@ -162,6 +174,23 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (event.metaKey || event.ctrlKey || event.altKey) return false
 
       const { from, to } = rememberTextareaSelection()
+      if (event.key === "Backspace") {
+        const prefixPlan = planNotionBlockPrefixBackspace(valueRef.current, from, to)
+        if (prefixPlan) {
+          event.preventDefault()
+          applyRecordedMutation(prefixPlan)
+          return true
+        }
+      }
+      if (event.key === " ") {
+        const spacePlan = planNotionSpaceInputRule(valueRef.current, from, to)
+        if (spacePlan) {
+          event.preventDefault()
+          applyRecordedMutation(spacePlan)
+          return true
+        }
+      }
+
       const action = event.key === "Backspace"
         ? planMarkdownEditorAutoPairBackspace(valueRef.current, from, to)
         : planMarkdownEditorAutoPairInsert(valueRef.current, from, to, event.key)
@@ -195,7 +224,13 @@ export const useMarkdownEditorTextareaKeyboard = ({
 
   const handleTextareaKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      if (disabled || isComposingEditorKeyboardEvent(event)) return
+      if (disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)) return
+
+      const targetTagName = (event.target as HTMLElement | null)?.tagName
+      if (targetTagName === "INPUT" || targetTagName === "TEXTAREA") {
+        handleSaveShortcutKeyDown(event)
+        return
+      }
 
       if (
         isCompletionActive?.() &&

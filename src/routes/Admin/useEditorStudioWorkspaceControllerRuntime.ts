@@ -24,7 +24,6 @@ type PublishNoticeTarget = "auto" | "page" | "modal"
 
 const markdownEditorFocusRequestRef: { current: MarkdownEditorFocusRequest | null } = { current: null }
 
-/** Bound from WriterEditorHost without threading through Root.tsx props. */
 export const handleMarkdownEditorFocusRequestReady = (focus: MarkdownEditorFocusRequest | null) => {
   markdownEditorFocusRequestRef.current = focus
 }
@@ -115,8 +114,8 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     } else if (event.key === "ArrowDown") {
       const target = event.currentTarget
       if (
-        target.selectionStart === target.value.length &&
-        target.selectionEnd === target.value.length
+        target.selectionStart === target.selectionEnd &&
+        !target.value.slice(target.selectionEnd).includes("\n")
       ) {
         event.preventDefault()
         markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })

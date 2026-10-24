@@ -47,6 +47,15 @@ export const ToolbarGroup = styled.div`
   min-width: 0;
   max-width: 100%;
   overflow: visible;
+
+  &[data-align="end"] {
+    margin-left: auto;
+  }
+`
+
+export const ToolbarQuoteGlyph = styled.span`
+  font-size: 15px;
+  line-height: 1;
 `
 
 export const ToolbarButton = styled.button<{ $active?: boolean }>`
@@ -216,9 +225,9 @@ export const ToolbarHiddenInput = styled.input`
 
 export const ToolbarError = styled.div`
   padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid rgba(248, 81, 73, 0.35);
-  background: rgba(248, 81, 73, 0.1);
-  color: #ffb4ad;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.red7};
+  background: ${({ theme }) => theme.colors.red3};
+  color: ${({ theme }) => theme.colors.red11};
   font-size: 0.86rem;
   font-weight: 600;
 `
@@ -301,6 +310,7 @@ export const FindReplaceActions = styled.div`
 `
 
 export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
@@ -326,6 +336,14 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       user-select: none;
     }
   `}
+
+  .cm-line.cm-live-empty-line::after {
+    content: attr(data-placeholder);
+    color: ${({ theme }) => theme.colors.gray9};
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.65;
+  }
 
   @media (max-width: 820px) { font-size: 15px; }
   [data-testid="markdown-editor-live-surface"] { height: 100%; }
@@ -488,11 +506,26 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     align-items: center;
     justify-content: center;
     margin-right: 0.45em;
+    border-radius: 3px;
     border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
     color: ${({ theme }) => theme.colors.gray12};
     font: 800 0.75em/1 ui-monospace, monospace;
     vertical-align: -0.08em;
+    cursor: pointer;
+    user-select: none;
+    &.is-checked {
+      background: ${({ theme }) => theme.publicDesign.accent};
+      border-color: ${({ theme }) => theme.publicDesign.accent};
+      color: #fff;
+    }
   }
+  .cm-line.cm-live-task-checked-line { color: ${({ theme }) => theme.colors.gray9}; text-decoration: line-through; }
+  .cm-live-toggle-block, .cm-live-bookmark-card {
+    border-color: ${({ theme }) => theme.publicDesign.border};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+  .cm-live-bookmark-card:hover { border-color: ${({ theme }) => theme.publicDesign.borderStrong}; }
 
   .cm-live-heading-line { position: relative; padding-top: 0.35em; padding-bottom: 0.15em; }
   .cm-live-heading-line-1 { padding-top: 0.65em; padding-bottom: 0.22em; }
