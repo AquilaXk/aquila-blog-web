@@ -74,19 +74,23 @@ export const renderMarkdownSegment = ({
       )
     }
 
+    const hasTitle = Boolean(segment.title)
     return (
       <div
         key={`callout-${index}`}
         className={`aq-callout aq-callout-box aq-admonition aq-admonition-${segment.kind}`}
         data-callout={segment.kind}
+        data-has-title={hasTitle ? "true" : "false"}
       >
+        <span className="aq-callout-emoji" aria-hidden="true">
+          {segment.emoji}
+        </span>
         <div className="aq-callout-box-text">
-          <div className="aq-callout-head" data-has-title={segment.title ? "true" : "false"}>
-            <span className="aq-callout-emoji" aria-hidden="true">
-              {segment.emoji}
-            </span>
-            {segment.title ? <strong className="aq-callout-title">{segment.title}</strong> : null}
-          </div>
+          {hasTitle ? (
+            <div className="aq-callout-head" data-has-title="true">
+              <strong className="aq-callout-title">{segment.title}</strong>
+            </div>
+          ) : null}
           {renderMarkdown(segment.content, `callout-body-${index}`, true)}
         </div>
       </div>

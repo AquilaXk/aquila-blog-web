@@ -317,7 +317,6 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
       line-height: ${articleTypographyScale.calloutTitleLineHeightMobile};
     }
 
-    .aq-callout.aq-admonition .aq-callout-emoji,
     .aq-callout.aq-admonition .aq-markdown-text {
       font-size: ${articleTypographyScale.bodyFontSizeMobile};
       line-height: ${articleTypographyScale.bodyLineHeightMobile};

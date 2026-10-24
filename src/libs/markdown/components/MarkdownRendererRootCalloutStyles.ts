@@ -8,16 +8,26 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     --ad-border: ${theme.colors.gray6};
     --ad-text: ${theme.colors.gray12};
     position: relative;
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 13px;
     border: 1px solid var(--ad-border);
+    border-left: 3px solid var(--ad-accent);
     border-radius: 0;
     overflow: visible;
-    padding: 19px 20px;
-    margin: 30px 0;
+    padding: 16px 20px;
+    margin: 24px 0;
     background: var(--ad-body-bg);
     color: var(--ad-text);
+  }
+
+  .aq-callout.aq-admonition:not(details) {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 0;
+    align-items: start;
+  }
+
+  details.aq-callout.aq-admonition {
+    display: block;
   }
 
   .aq-callout.aq-admonition > * {
@@ -26,37 +36,54 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
   }
 
   .aq-callout.aq-admonition .aq-callout-box-text {
-    grid-column: 2;
+    min-width: 0;
     margin-left: 0;
     padding: 0;
     color: var(--ad-text);
+
+    > :first-child {
+      margin-top: 0;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    .aq-callout-head + * {
+      margin-top: 0;
+    }
+  }
+
+  details.aq-callout.aq-admonition > .aq-callout-box-text {
+    padding-left: 36px;
+    margin-top: 10px;
   }
 
   .aq-callout.aq-admonition .aq-callout-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 0;
-    margin: 0 0 5px;
+    min-height: 24px;
+    margin: 0 0 6px;
     padding: 0;
     background: transparent;
     border-bottom: 0;
   }
 
-  .aq-callout.aq-admonition .aq-callout-head[data-has-title="false"] {
-    margin-bottom: 0;
-  }
-
   .aq-callout.aq-admonition .aq-callout-emoji {
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    margin-left: -47px;
-    border: 1px solid currentColor;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ad-accent) 12%, transparent);
     color: var(--ad-accent);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     line-height: 1;
   }
@@ -81,32 +108,23 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
 
   .aq-callout.aq-admonition-tip {
     --ad-accent: ${theme.colors.green10};
-    --ad-body-bg: color-mix(in srgb, ${theme.colors.green10} 5%, ${theme.publicDesign.readableSurface});
-    --ad-border: color-mix(in srgb, ${theme.colors.green10} 36%, ${theme.colors.gray6});
   }
 
   .aq-callout.aq-admonition-info {
     --ad-accent: ${theme.publicDesign.accent};
-    --ad-body-bg: color-mix(in srgb, ${theme.publicDesign.accent} 5%, ${theme.publicDesign.readableSurface});
-    --ad-border: color-mix(in srgb, ${theme.publicDesign.accent} 32%, ${theme.colors.gray6});
   }
 
   .aq-callout.aq-admonition-warning {
     --ad-accent: ${theme.colors.orange10};
-    --ad-body-bg: color-mix(in srgb, ${theme.colors.orange10} 6%, ${theme.publicDesign.readableSurface});
-    --ad-border: color-mix(in srgb, ${theme.colors.orange10} 42%, ${theme.colors.gray6});
   }
 
   .aq-callout.aq-admonition-outline {
-    --ad-accent: ${ (theme.scheme === "dark" ? "#94a3b8" : "#475569")};
-    --ad-body-bg: ${ (theme.scheme === "dark" ? "rgba(148, 163, 184, 0.08)" : theme.publicDesign.surfaceElevated)};
-    --ad-border: ${ theme.colors.gray6};
+    --ad-accent: ${theme.colors.gray11};
+    --ad-body-bg: ${theme.publicDesign.surfaceElevated};
   }
 
   .aq-callout.aq-admonition-example {
-    --ad-accent: ${ (theme.scheme === "dark" ? "#4ade80" : "#166534")};
-    --ad-body-bg: ${ (theme.scheme === "dark" ? "rgba(74, 222, 128, 0.08)" : "rgba(22, 101, 52, 0.04)")};
-    --ad-border: ${ (theme.scheme === "dark" ? "rgba(74, 222, 128, 0.28)" : "rgba(22, 101, 52, 0.28)")};
+    --ad-accent: ${theme.colors.indigo10};
   }
 
   .aq-callout.aq-admonition-summary {
@@ -116,15 +134,18 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
   }
 
   .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head {
-    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 24px;
     cursor: pointer;
     list-style: none;
     user-select: none;
     margin-bottom: 0;
   }
 
-  .aq-callout.aq-admonition[data-callout-foldable="true"][open] > summary.aq-callout-head {
-    margin-bottom: 5px;
+  .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head .aq-callout-emoji {
+    margin-top: 0;
   }
 
   .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head::-webkit-details-marker {
@@ -149,14 +170,30 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
 
   @media (max-width: 820px) {
     .aq-callout.aq-admonition {
-      grid-template-columns: 28px minmax(0, 1fr);
-      padding: 16px;
+      padding: 14px 16px;
+      margin: 20px 0;
+    }
+
+    .aq-callout.aq-admonition:not(details) {
+      grid-template-columns: 22px minmax(0, 1fr);
+      column-gap: 10px;
+    }
+
+    .aq-callout.aq-admonition[data-callout-foldable="true"] > summary.aq-callout-head {
+      gap: 10px;
+      min-height: 22px;
+    }
+
+    details.aq-callout.aq-admonition > .aq-callout-box-text {
+      padding-left: 32px;
+      margin-top: 8px;
     }
 
     .aq-callout.aq-admonition .aq-callout-emoji {
-      width: 26px;
-      height: 26px;
-      margin-left: -41px;
+      width: 22px;
+      height: 22px;
+      font-size: 11px;
+      line-height: 1;
     }
   }
 `

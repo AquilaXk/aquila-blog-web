@@ -13,12 +13,12 @@ export const createOverlayActionButton = (label: string, ariaLabel: string): HTM
   button.style.justifyContent = "center"
   button.style.minHeight = "44px"
   button.style.padding = "0 0.8rem"
-  button.style.borderRadius = "999px"
-  button.style.border = "1px solid rgba(255, 255, 255, 0.2)"
-  button.style.background = "rgba(15, 23, 42, 0.7)"
-  button.style.color = "#f3f4f6"
-  button.style.fontSize = "0.82rem"
-  button.style.fontWeight = "700"
+  button.style.borderRadius = "4px"
+  button.style.border = "1px solid var(--aq-border-strong, #c8ccd2)"
+  button.style.background = "var(--aq-surface, #ffffff)"
+  button.style.color = "var(--aq-text, #0f1724)"
+  button.style.fontSize = "0.78rem"
+  button.style.fontWeight = "600"
   button.style.cursor = "pointer"
   return button
 }
@@ -189,7 +189,7 @@ export const openMermaidOverlay = (
   overlay.style.position = "fixed"
   overlay.style.inset = "0"
   overlay.style.zIndex = "180"
-  overlay.style.background = "rgba(2, 6, 23, 0.7)"
+  overlay.style.background = "rgba(15, 23, 36, 0.56)"
   overlay.style.display = "grid"
   overlay.style.alignItems = "center"
   overlay.style.justifyItems = "center"
@@ -197,21 +197,27 @@ export const openMermaidOverlay = (
     "max(0.9rem, env(safe-area-inset-top, 0px)) max(0.9rem, env(safe-area-inset-right, 0px)) max(0.9rem, env(safe-area-inset-bottom, 0px)) max(0.9rem, env(safe-area-inset-left, 0px))"
 
   const panel = document.createElement("div")
-  panel.style.width = "min(96vw, 1280px)"
-  panel.style.maxHeight = "min(90dvh, 820px)"
-  panel.style.overflow = "auto"
-  panel.style.borderRadius = "14px"
-  panel.style.border = "1px solid rgba(255, 255, 255, 0.14)"
-  panel.style.background = "rgba(11, 16, 23, 0.98)"
-  panel.style.padding = "0.75rem"
+  panel.style.width = "min(96vw, 1320px)"
+  panel.style.maxHeight = "min(90dvh, 880px)"
+  panel.style.display = "flex"
+  panel.style.flexDirection = "column"
+  panel.style.overflow = "hidden"
+  panel.style.borderRadius = "4px"
+  panel.style.border = "1px solid var(--aq-border-strong, #c8ccd2)"
+  panel.style.background = "var(--aq-surface, #ffffff)"
+  panel.style.boxShadow = "0 20px 48px rgba(15, 23, 36, 0.18)"
+  panel.style.padding = "0"
 
   const actionsBar = document.createElement("div")
   actionsBar.className = "aq-mermaid-modal-actions"
   actionsBar.style.display = "flex"
   actionsBar.style.alignItems = "center"
   actionsBar.style.justifyContent = "flex-end"
+  actionsBar.style.flexWrap = "wrap"
   actionsBar.style.gap = "0.45rem"
-  actionsBar.style.marginBottom = "0.56rem"
+  actionsBar.style.padding = "0.65rem 0.85rem"
+  actionsBar.style.background = "var(--aq-page-bg, #f7f7f5)"
+  actionsBar.style.borderBottom = "1px solid var(--aq-border, #dfe1e5)"
 
   const zoomOutButton = createOverlayActionButton("-", "축소")
   const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
@@ -220,22 +226,42 @@ export const openMermaidOverlay = (
 
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
+  stage.style.padding = "1.5rem"
+  stage.style.background = "var(--aq-surface, #ffffff)"
+  stage.style.display = "flex"
+  stage.style.justifyContent = "center"
+  stage.style.alignItems = "flex-start"
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup
-  const stageSvg = stage.querySelector("svg")
+  const stageSvg = typeof stage.querySelector === "function" ? stage.querySelector("svg") : null
+  const viewBoxRaw = stageSvg?.getAttribute?.("viewBox") || ""
+  const viewBoxParts = viewBoxRaw
+    .split(/\s+/)
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v))
+  const baseWidth = viewBoxParts.length === 4 && viewBoxParts[2] > 0 ? viewBoxParts[2] : 0
+  const baseHeight = viewBoxParts.length === 4 && viewBoxParts[3] > 0 ? viewBoxParts[3] : 0
   let zoomLevel = 1
+
+  configureMermaidStageSvg(stageSvg)
 
   const applyZoom = (nextZoom: number) => {
     zoomLevel = Math.max(0.5, Math.min(2.5, Math.round(nextZoom * 100) / 100))
     zoomResetButton.textContent = `${Math.round(zoomLevel * 100)}%`
     stage.style.cursor = zoomLevel > 1 ? "grab" : ""
     if (stageSvg) {
-      stageSvg.style.transform = `scale(${zoomLevel})`
-      stageSvg.style.transformOrigin = "top left"
+      if (baseWidth > 0 && baseHeight > 0) {
+        stageSvg.style.width = `${Math.round(baseWidth * zoomLevel)}px`
+        stageSvg.style.height = `${Math.round(baseHeight * zoomLevel)}px`
+        stageSvg.style.transform = "none"
+      } else {
+        stageSvg.style.transform = `scale(${zoomLevel})`
+        stageSvg.style.transformOrigin = "top left"
+      }
     }
   }
 
-  configureMermaidStageSvg(stageSvg)
+  applyZoom(1)
 
   const handleZoomOut = () => applyZoom(zoomLevel - 0.25)
   const handleZoomReset = () => applyZoom(1)

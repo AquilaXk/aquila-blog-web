@@ -45,7 +45,8 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     align-items: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 28px;
+    padding: 24px 20px;
+    cursor: zoom-in;
   }
 
   .aq-mermaid[data-mermaid-wide="true"] .aq-mermaid-stage {
@@ -61,6 +62,10 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     margin: 0 auto;
     background: transparent;
     overflow: visible;
+  }
+
+  .aq-mermaid-stage > svg .edgeLabel rect {
+    opacity: 0.94;
   }
 
   .aq-mermaid-stage > svg foreignObject,
@@ -151,22 +156,36 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
   }
 
   .aq-mermaid-expand-btn {
-    margin: 0.45rem 0 0;
-    min-height: 32px;
-    border-radius: 0;
-    border: 1px solid ${ theme.colors.gray6};
-    background: ${ theme.colors.gray2};
-    color: ${ theme.colors.gray11};
-    padding: 0 0.75rem;
-    font-size: 0.76rem;
-    font-weight: 700;
+    width: fit-content;
+    margin: 0 12px 12px auto;
+    min-height: 36px;
+    border-radius: 4px;
+    border: 1px solid ${theme.colors.gray6};
+    background: ${theme.colors.gray2};
+    color: ${theme.colors.gray12};
+    padding: 0 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
   }
 
   .aq-mermaid[data-mermaid-expandable="true"] .aq-mermaid-expand-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
   }
 
+  @media (max-width: 820px) {
+    .aq-mermaid-stage {
+      padding: 14px 10px;
+    }
+
+    .aq-mermaid-expand-btn {
+      margin: 0 10px 10px auto;
+      min-height: 44px;
+      padding: 0 14px;
+    }
+  }
 `

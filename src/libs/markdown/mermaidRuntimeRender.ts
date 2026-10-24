@@ -295,12 +295,7 @@ export const createMermaidRuntimeController = ({
     const roundedWidth = Math.max(1, Math.round(intrinsicWidth * scale))
     const roundedHeight = Math.max(1, Math.round(intrinsicHeight * scale))
     const stageWidth = usesDesktopWideLane ? maxDisplayWidth : containerWidth
-    const isHeightClamped =
-      !isMobileViewport && intrinsicHeight > maxReadableHeight + MERMAID_EXPAND_THRESHOLD_PX
-    const needsExpandAction =
-      intrinsicWidth > maxDisplayWidth + MERMAID_EXPAND_THRESHOLD_PX ||
-      isHeightClamped ||
-      complexityLevel === "high"
+    const needsExpandAction = intrinsicWidth > 0
     stage.style.width = `${stageWidth}px`
     stage.style.minHeight = `${roundedHeight}px`
     stage.style.display = "flex"
@@ -325,6 +320,11 @@ export const createMermaidRuntimeController = ({
     svgElement.style.margin = "0 auto"
     svgElement.removeAttribute("width")
     svgElement.removeAttribute("height")
+
+    stage.title = "클릭하여 크게 보기"
+    stage.addEventListener("click", () => {
+      mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
+    })
 
     block.querySelectorAll(".aq-mermaid-expand-btn").forEach((button) => button.remove())
 
