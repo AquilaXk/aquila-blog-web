@@ -15,6 +15,7 @@ type PendingTableCellActivation = {
   from: number
   row: number
   col: number
+  openEditor?: boolean
 }
 
 type ActiveCellEditorSession = {
@@ -166,13 +167,19 @@ export class MarkdownTableWidget extends WidgetType {
 
     const dispatchTableMarkdown = (
       nextMarkdown: string,
-      targetCell?: { row: number; col: number }
+      targetCell?: { row: number; col: number; openEditor?: boolean }
     ) => {
       const range = resolveRange()
       if (!range) return
       if (nextMarkdown === this.markdown) {
         if (targetCell) {
-          activateCellEditor(targetCell.row, targetCell.col)
+          if (targetCell.openEditor === false) {
+            activeRow = Math.max(0, Math.min(targetCell.row, grid.rows.length))
+            activeCol = Math.max(0, Math.min(targetCell.col, grid.headers.length - 1))
+            syncActiveCellHighlight()
+          } else {
+            activateCellEditor(targetCell.row, targetCell.col)
+          }
         }
         return
       }
@@ -181,6 +188,7 @@ export class MarkdownTableWidget extends WidgetType {
           from: range.from,
           row: targetCell.row,
           col: targetCell.col,
+          openEditor: targetCell.openEditor,
         }
       }
       const mainSel = view.state.selection.main
@@ -211,7 +219,11 @@ export class MarkdownTableWidget extends WidgetType {
       const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
       if (!outcome) {
         if (baseMarkdown !== this.markdown) {
-          dispatchTableMarkdown(baseMarkdown)
+          dispatchTableMarkdown(baseMarkdown, {
+            row: rowOverride,
+            col: colOverride,
+            openEditor: false,
+          })
         }
         return
       }
@@ -306,7 +318,11 @@ export class MarkdownTableWidget extends WidgetType {
             nextValue
           )
           if (updated && updated !== this.markdown) {
-            dispatchTableMarkdown(updated)
+            dispatchTableMarkdown(updated, {
+              row: clampedRow,
+              col: clampedCol,
+              openEditor: false,
+            })
             return
           }
         }
@@ -537,7 +553,13 @@ export class MarkdownTableWidget extends WidgetType {
     ) {
       const target = pendingTableCellActivation
       pendingTableCellActivation = null
-      activateCellEditor(target.row, target.col)
+      if (target.openEditor === false) {
+        activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
+        activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
+        syncActiveCellHighlight()
+      } else {
+        activateCellEditor(target.row, target.col)
+      }
     }
 
     return wrap

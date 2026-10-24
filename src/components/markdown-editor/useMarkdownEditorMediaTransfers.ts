@@ -367,6 +367,9 @@ export const useMarkdownEditorMediaTransfers = ({
   const handlePaste = useCallback(
     (event: ReactClipboardEvent<HTMLElement>) => {
       if (disabled) return
+      const target = event.target as HTMLElement | null
+      const targetTagName = target?.tagName
+      if (targetTagName === "INPUT" || targetTagName === "TEXTAREA") return
 
       const mediaRoute = resolvePasteMediaRoute(event.clipboardData, {
         canUploadImage: Boolean(onUploadImage),

@@ -1491,10 +1491,26 @@ test.describe("live Markdown writing surface", () => {
     await expect(tableWidget).toBeVisible()
     await expect(cellInput).toBeVisible()
     await expect(cellInput).toHaveValue("관리자")
+    const pasteDefaultPrevented = await cellInput.evaluate((input) => {
+      const clipboardData = new DataTransfer()
+      clipboardData.setData("text/html", "<strong>가로채기 금지</strong>")
+      clipboardData.setData("text/plain", "가로채기 금지")
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData,
+      })
+      input.dispatchEvent(pasteEvent)
+      return pasteEvent.defaultPrevented
+    })
+    expect(pasteDefaultPrevented).toBe(false)
     await cellInput.fill("작성자")
     await cellInput.press("Escape")
 
     await expect(tableWidget).toBeVisible()
+    await expect(
+      tableWidget.locator('td[data-cell-row="1"][data-cell-col="1"]')
+    ).toHaveClass(/is-active-cell/)
     await tableWidget.getByTestId("cm-live-table-add-row").click()
     await expect(tableWidget.locator("tbody tr")).toHaveCount(2)
 
