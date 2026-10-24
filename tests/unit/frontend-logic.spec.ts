@@ -8,6 +8,7 @@ import {
   getCloudFileDownloadUrl,
   isDefinitiveStaleVideoUploadSessionError,
   isExplicitUploadAbort,
+  isResumableVideoUploadFile,
 } from "../../src/apis/backend/cloud"
 import {
   buildExploreCursorPath,
@@ -270,6 +271,18 @@ caption
     expect(CLOUD_SYNC_UPLOAD_MAX_BYTES).toBe(95 * 1024 * 1024)
     expect(getCloudFileDownloadUrl(42)).toMatch(/\/system\/api\/v1\/adm\/cloud\/files\/42\/content\?download=true$/)
 
+    const makeSizedFile = (name: string, type: string, size: number) => {
+      const file = new File(["x"], name, { type })
+      Object.defineProperty(file, "size", { value: size })
+      return file
+    }
+
+    expect(isResumableVideoUploadFile(makeSizedFile("clip.mp4", "video/mp4", 95 * 1024 * 1024))).toBe(false)
+    expect(isResumableVideoUploadFile(makeSizedFile("clip.mp4", "video/mp4", 95 * 1024 * 1024 + 1))).toBe(true)
+    expect(isResumableVideoUploadFile(makeSizedFile("archive.pdf", "application/pdf", 95 * 1024 * 1024 + 1))).toBe(
+      false
+    )
+
     expect(resolveCloudSearchParams("/ops 점검")).toEqual({
       folderPath: "ops",
       keyword: "점검",
@@ -287,10 +300,10 @@ caption
       {
         id: 1,
         ownerMemberId: 1,
-        originalFilename: "beta-report.pdf",
+        originalFilename: "alpha-report.pdf",
         contentType: "application/pdf",
         mediaKind: "DOCUMENT",
-        byteSize: 2048,
+        byteSize: 512,
         folderPath: "ops",
         createdAt: "2026-03-10T10:00:00Z",
         modifiedAt: "2026-03-11T10:00:00Z",
@@ -298,10 +311,10 @@ caption
       {
         id: 2,
         ownerMemberId: 1,
-        originalFilename: "alpha-photo.png",
+        originalFilename: "gamma-photo.png",
         contentType: "image/png",
         mediaKind: "PHOTO",
-        byteSize: 8192,
+        byteSize: 2048,
         folderPath: "photos",
         createdAt: "2026-03-12T10:00:00Z",
         modifiedAt: "2026-03-15T10:00:00Z",
@@ -309,10 +322,10 @@ caption
       {
         id: 3,
         ownerMemberId: 1,
-        originalFilename: "gamma-clip.mp4",
+        originalFilename: "beta-clip.mp4",
         contentType: "video/mp4",
         mediaKind: "VIDEO",
-        byteSize: 512,
+        byteSize: 8192,
         folderPath: "videos",
         createdAt: "2026-03-08T10:00:00Z",
         modifiedAt: "2026-03-09T10:00:00Z",
@@ -321,7 +334,7 @@ caption
 
     expect(sortCloudFiles(sampleFiles, "LATEST").map((f) => f.id)).toEqual([2, 1, 3])
     expect(sortCloudFiles(sampleFiles, "OLDEST").map((f) => f.id)).toEqual([3, 1, 2])
-    expect(sortCloudFiles(sampleFiles, "NAME").map((f) => f.id)).toEqual([2, 1, 3])
-    expect(sortCloudFiles(sampleFiles, "SIZE").map((f) => f.id)).toEqual([2, 1, 3])
+    expect(sortCloudFiles(sampleFiles, "NAME").map((f) => f.id)).toEqual([1, 3, 2])
+    expect(sortCloudFiles(sampleFiles, "SIZE").map((f) => f.id)).toEqual([3, 2, 1])
   })
 })

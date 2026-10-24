@@ -3,6 +3,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs
 import { type KeyboardEvent as ReactKeyboardEvent, type RefObject, useEffect, useRef, useState } from "react"
 import {
   getCloudFileContentUrl,
+  getCloudFileDownloadUrl,
   issueCloudExternalPlaybackToken,
   type CloudFile,
 } from "src/apis/backend/cloud"
@@ -92,11 +93,7 @@ const cleanupPdfDocumentAfterRender = async (
   pdfDocument: PDFDocumentProxy,
   loadingTask: PDFDocumentLoadingTask | null
 ) => {
-  try {
-    await pdfDocument.cleanup()
-  } catch {
-    undefined
-  }
+  await pdfDocument.cleanup().catch(() => undefined)
   swallowPromiseRejection(loadingTask?.destroy())
 }
 
@@ -168,11 +165,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
 
     return () => {
       cancelled = true
-      try {
-        renderTaskRef.current?.cancel()
-      } catch {
-        undefined
-      }
+      renderTaskRef.current?.cancel()
       ignorePdfPreviewTeardownRejection(loadingTask, pdfDocument, renderTaskRef.current)
       renderTaskRef.current = null
       releasePdfWorkerTerminationHandler(10000)
@@ -218,11 +211,7 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
 
     return () => {
       cancelled = true
-      try {
-        renderTask?.cancel()
-      } catch {
-        undefined
-      }
+      renderTask?.cancel()
       if (renderTaskRef.current === renderTask) {
         renderTaskRef.current = null
       }
@@ -267,10 +256,9 @@ const PdfPreview = ({ file, contentUrl }: PdfPreviewProps) => {
 
 type DocumentFallbackPreviewProps = {
   file: CloudFile
-  contentUrl: string
 }
 
-const DocumentFallbackPreview = ({ file, contentUrl }: DocumentFallbackPreviewProps) => (
+const DocumentFallbackPreview = ({ file }: DocumentFallbackPreviewProps) => (
   <PreviewStage>
     <PreviewHeader>
       <h3>문서 파일</h3>
@@ -278,7 +266,7 @@ const DocumentFallbackPreview = ({ file, contentUrl }: DocumentFallbackPreviewPr
     <DocumentFallbackBox>
       <strong>{getCloudKindBadge(file)} 파일</strong>
       <p>{file.originalFilename}</p>
-      <a href={contentUrl} download={file.originalFilename}>
+      <a href={getCloudFileDownloadUrl(file.id)} download={file.originalFilename}>
         다운로드
       </a>
     </DocumentFallbackBox>
@@ -468,7 +456,7 @@ export const PreviewDrawer = ({ file }: PreviewDrawerProps) => {
 
   const contentUrl = getCloudFileContentUrl(file.id)
   if (file.mediaKind === "DOCUMENT" && isPdfDocumentFile(file)) return <PdfPreview file={file} contentUrl={contentUrl} />
-  if (file.mediaKind === "DOCUMENT") return <DocumentFallbackPreview file={file} contentUrl={contentUrl} />
+  if (file.mediaKind === "DOCUMENT") return <DocumentFallbackPreview file={file} />
   if (file.mediaKind === "PHOTO") return <PhotoPreview file={file} contentUrl={contentUrl} />
   return <VideoPreview file={file} contentUrl={contentUrl} />
 }
@@ -478,8 +466,14 @@ type FileThumbnailProps = {
   selected: boolean
 }
 
+const getThumbnailKindLabel = (mediaKind: CloudFile["mediaKind"]) => {
+  if (mediaKind === "PHOTO") return "사진"
+  if (mediaKind === "VIDEO") return "영상"
+  return "문서"
+}
+
 export const FileThumbnail = ({ file, selected }: FileThumbnailProps) => {
-  const kindMark = file.mediaKind === "PHOTO" ? "사진" : file.mediaKind === "VIDEO" ? "영상" : "문서"
+  const kindMark = getThumbnailKindLabel(file.mediaKind)
 
   return (
     <FileThumbnailFrame

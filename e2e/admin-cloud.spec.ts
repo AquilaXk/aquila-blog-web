@@ -73,30 +73,36 @@ const pixelPng = Buffer.from(
   "base64"
 )
 
-const minimalPdf = Buffer.from(
-  [
-    "%PDF-1.4",
+const buildMinimalTwoPagePdf = () => {
+  const objects = [
     "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj",
-    "2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj",
+    "2 0 obj<</Type/Pages/Count 2/Kids[3 0 R 6 0 R]>>endobj",
     "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 220 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj",
-    "4 0 obj<</Length 44>>stream",
-    "BT /F1 18 Tf 24 68 Td (Aquila PDF Preview) Tj ET",
-    "endstream endobj",
+    "4 0 obj<</Length 48>>stream\nBT /F1 18 Tf 24 68 Td (Aquila PDF Preview) Tj ET\nendstream endobj",
     "5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj",
+    "6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 220 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj",
+  ]
+  let body = "%PDF-1.4\n"
+  const offsets: number[] = []
+  for (const obj of objects) {
+    offsets.push(Buffer.byteLength(body, "utf8"))
+    body += `${obj}\n`
+  }
+  const xrefOffset = Buffer.byteLength(body, "utf8")
+  const xrefLines = [
     "xref",
-    "0 6",
+    `0 ${objects.length + 1}`,
     "0000000000 65535 f ",
-    "0000000010 00000 n ",
-    "0000000056 00000 n ",
-    "0000000111 00000 n ",
-    "0000000231 00000 n ",
-    "0000000325 00000 n ",
-    "trailer<</Root 1 0 R/Size 6>>",
+    ...offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n `),
+    `trailer<</Root 1 0 R/Size ${objects.length + 1}>>`,
     "startxref",
-    "395",
+    String(xrefOffset),
     "%%EOF",
-  ].join("\n")
-)
+  ]
+  return Buffer.from(`${body}${xrefLines.join("\n")}`, "utf8")
+}
+
+const minimalPdf = buildMinimalTwoPagePdf()
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -158,6 +164,7 @@ const setupAdminCloudMocks = async (
     failVideoSessionGetOnceStatus?: number
     externalPlaybackTokenDelayMs?: number
     initialFiles?: CloudFileFixture[]
+    invalidPdfIds?: string[]
     listDelayMs?: number
     lookupOnlyFiles?: CloudFileFixture[]
     normalizeVideoSessionFilename?: boolean
@@ -169,6 +176,7 @@ const setupAdminCloudMocks = async (
   const requestedKinds: string[] = []
   const requestedFolderPaths: string[] = []
   const uploadedNames: string[] = []
+  const uploadedFolderPaths: string[] = []
   const uploadedClientFilenames: string[] = []
   const videoSessionCreates: string[] = []
   const videoSessionGets: string[] = []
@@ -182,6 +190,7 @@ const setupAdminCloudMocks = async (
   const failedDeleteIds = new Set(options.failDeleteIds ?? [])
   const failedUploadNames = new Set(options.failUploadNames ?? [])
   const failUploadOnceNames = new Set(options.failUploadOnceNames ?? [])
+  const invalidPdfIds = new Set(options.invalidPdfIds ?? [])
   const failedVideoPartOnceNumbers = new Set<number>()
   let didFailVideoSessionGet = false
   const initialFiles = (options.initialFiles ?? CLOUD_FILES).map((item) => ({ ...item }))
@@ -367,7 +376,7 @@ const setupAdminCloudMocks = async (
       }
       if (typeof payload.folderPath === "string") {
         const normalizedFolder = normalizeFolderPathParam(payload.folderPath)
-        target.folderPath = normalizedFolder ? `/${normalizedFolder}` : "/"
+        target.folderPath = normalizedFolder
       }
       target.modifiedAt = "2026-06-13T09:00:00Z"
       await fulfillJson(route, {
@@ -428,7 +437,7 @@ const setupAdminCloudMocks = async (
       }
       if (typeof payload.folderPath === "string") {
         const normalizedFolder = normalizeFolderPathParam(payload.folderPath)
-        target.folderPath = normalizedFolder ? `/${normalizedFolder}` : "/"
+        target.folderPath = normalizedFolder
       }
       target.modifiedAt = "2026-06-13T09:00:00Z"
       await fulfillJson(route, {
@@ -467,6 +476,8 @@ const setupAdminCloudMocks = async (
 
       if (uploadedName.includes("취소할")) await delay(700)
 
+      const rawUploadFolderPath = url.searchParams.get("folderPath") || getUploadTextField(route, "folderPath")
+      const normalizedUploadFolder = normalizeFolderPathParam(rawUploadFolderPath)
       const uploaded = {
         id: nextUploadId++,
         ownerMemberId: 1,
@@ -474,28 +485,25 @@ const setupAdminCloudMocks = async (
         contentType: metadata.contentType,
         byteSize: route.request().postDataBuffer()?.byteLength ?? 0,
         mediaKind: metadata.mediaKind,
-        folderPath: getUploadTextField(route, "folderPath") || "/",
+        folderPath: normalizedUploadFolder,
         createdAt: "2026-06-12T12:00:00Z",
         modifiedAt: "2026-06-12T12:00:00Z",
       }
 
       uploadedNames.push(uploadedName)
+      uploadedFolderPaths.push(normalizedUploadFolder)
       uploadedClientFilenames.push(clientFilename)
       if (!uploadedName.includes("취소할")) uploadedFiles.unshift(uploaded)
 
-      try {
-        await fulfillJson(
-          route,
-          {
-            resultCode: "201-1",
-            msg: "클라우드 파일이 업로드되었습니다.",
-            data: uploaded,
-          },
-          201
-        )
-      } catch {
-        // The page aborts the in-flight request when an active upload is cancelled.
-      }
+      await fulfillJson(
+        route,
+        {
+          resultCode: "201-1",
+          msg: "클라우드 파일이 업로드되었습니다.",
+          data: uploaded,
+        },
+        201
+      ).catch(() => undefined)
       return
     }
 
@@ -525,11 +533,14 @@ const setupAdminCloudMocks = async (
     requestedContentIds.push(id)
     const file = [...uploadedFiles, ...initialFiles].find((item) => String(item.id) === id)
     const contentType = file?.contentType ?? "application/octet-stream"
-    const body = contentType === "application/pdf"
-      ? minimalPdf
-      : contentType.startsWith("image/")
-        ? pixelPng
-        : Buffer.from("mock-private-cloud-content")
+    const body =
+      contentType === "application/pdf"
+        ? invalidPdfIds.has(id)
+          ? Buffer.from("invalid-pdf-bytes")
+          : minimalPdf
+        : contentType.startsWith("image/")
+          ? pixelPng
+          : Buffer.from("mock-private-cloud-content")
 
     if (options.contentDelayMs) await delay(options.contentDelayMs)
     await route.fulfill({
@@ -547,6 +558,7 @@ const setupAdminCloudMocks = async (
     requestedKinds,
     requestedFolderPaths,
     uploadedNames,
+    uploadedFolderPaths,
     uploadedClientFilenames,
     videoSessionCreates,
     videoSessionGets,
@@ -1440,7 +1452,7 @@ test.describe("관리자 클라우드", () => {
   })
 
   test("파일 정렬, 검색어 지우기, 상세 패널 다운로드·링크 복사·정보 수정이 동작한다", async ({ page }) => {
-    await setupAdminCloudMocks(page)
+    const mocks = await setupAdminCloudMocks(page, { invalidPdfIds: ["104"] })
     await page.addInitScript(() => {
       Object.assign(window, { __adminCloudCopiedText: "" })
       Object.defineProperty(navigator, "clipboard", {
@@ -1465,12 +1477,25 @@ test.describe("관리자 클라우드", () => {
     await searchInput.fill("/ops 점검")
     await expect(page.getByRole("button", { name: "검색어 지우기" })).toBeVisible()
     await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
+    await page.getByLabel("클라우드 파일 업로드").setInputFiles({
+      name: "ops-점검-추가.pdf",
+      mimeType: "application/pdf",
+      buffer: minimalPdf,
+    })
+    await expect.poll(() => mocks.uploadedFolderPaths).toContain("ops")
+    await expect(page.getByRole("row", { name: /ops-점검-추가\.pdf/ })).toBeVisible()
     await page.getByRole("button", { name: "검색어 지우기" }).click()
     await expect(searchInput).toHaveValue("")
 
     await page.locator('button[title="운영 점검 리포트.pdf"]').click()
     const detailPanel = page.getByLabel("클라우드 상세정보")
     await expect(detailPanel).toBeVisible()
+    await expect(detailPanel.getByText("미리보기 완료")).toBeVisible()
+    await expect(detailPanel.getByText("1 / 2쪽")).toBeVisible()
+    await detailPanel.getByRole("button", { name: "다음 페이지" }).click()
+    await expect(detailPanel.getByText("2 / 2쪽")).toBeVisible()
+    await detailPanel.getByRole("button", { name: "이전 페이지" }).click()
+    await expect(detailPanel.getByText("1 / 2쪽")).toBeVisible()
 
     const downloadLink = detailPanel.getByRole("link", { name: "다운로드" })
     await expect(downloadLink).toHaveAttribute(
@@ -1492,5 +1517,10 @@ test.describe("관리자 클라우드", () => {
     await expect(detailPanel.getByText("연간 운영 점검 리포트.pdf")).toBeVisible()
     await expect(detailPanel.getByText("/ops/2026")).toBeVisible()
     await expect(page.getByRole("row", { name: /연간 운영 점검 리포트\.pdf/ })).toBeVisible()
+
+    await page.locator('button[title$="게시.pdf"]').click()
+    await expect(detailPanel.getByText("미리보기를 불러오지 못했습니다")).toBeVisible()
+    await detailPanel.getByRole("button", { name: "정보 수정" }).click()
+    await expect(detailPanel.getByLabel("폴더 경로 수정")).toHaveValue("")
   })
 })

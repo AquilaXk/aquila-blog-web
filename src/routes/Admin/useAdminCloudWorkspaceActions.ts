@@ -265,6 +265,7 @@ export const useAdminCloudWorkspaceActions = () => {
 
   const handleUploadDragLeave = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault()
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
     setIsDragActive(false)
   }
 
@@ -333,13 +334,13 @@ export const useAdminCloudWorkspaceActions = () => {
       )
       queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
         if (!Array.isArray(current)) return
-        queryClient.setQueryData(
-          queryKey,
-          current.map((item) => (item.id === fileId ? updated : item))
-        )
+        const { filter: cachedFilter, keyword: cachedKeyword } = getCachedCloudQueryFilters(queryKey)
+        const nextFiles = doesCloudFileMatchFilters(updated, cachedFilter, cachedKeyword)
+          ? current.map((item) => (item.id === fileId ? updated : item))
+          : current.filter((item) => item.id !== fileId)
+        queryClient.setQueryData(queryKey, nextFiles)
       })
       void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: ["admin", "cloud", "files"] })
       setToast({ tone: "success", text: "파일 정보를 수정했습니다." })
       return true
     } catch (error) {
