@@ -69,6 +69,13 @@ test.describe("Notion-parity Markdown editor model", () => {
     })
 
     expect(planToggleBlockLinePrefix("```ts\nconst x = 1\n```", 6, 6, "## ")).toBeNull()
+
+    const deepQuote = `${"> ".repeat(32)}plain`
+    const startedAt = Date.now()
+    expect(planToggleBlockLinePrefix(deepQuote, 0, deepQuote.length, "## ")?.replacement).toBe(
+      `## ${"> ".repeat(31)}plain`
+    )
+    expect(Date.now() - startedAt).toBeLessThan(50)
   })
 
   test("converts [] + Space into task item and >>> + Space into toggle details block", () => {
@@ -91,9 +98,9 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(planNotionSpaceInputRule(">>>", 3, 3)).toEqual({
       rangeStart: 0,
       rangeEnd: 3,
-      replacement: "<details>\n<summary>토글 제목</summary>\n\n내용을 입력하세요.\n</details>",
-      selectionStart: 19,
-      selectionEnd: 24,
+      replacement: ":::toggle 토글 제목\n\n:::",
+      selectionStart: 10,
+      selectionEnd: 15,
     })
 
     expect(planNotionSpaceInputRule("```ts\n[]\n```", 8, 8)).toBeNull()

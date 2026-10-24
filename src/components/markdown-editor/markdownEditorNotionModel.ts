@@ -14,15 +14,14 @@ import {
 
 const BLOCK_LINE_PREFIXES = new Set(["# ", "## ", "### ", "#### ", "> "])
 const FENCE_DELIMITER_LINE_RE =
-  /^(?:(?: {0,3}> ?)+)?(?:[ \t]*(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
+  /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 const EXISTING_BLOCK_PREFIX_RE = /^(#{1,6}[ \t]+|>[ \t]?)/
 const QUOTE_PREFIX_RE = /^(>[ \t]?)/
 const NOTION_TODO_INPUT_RE = /^(?<indent>[ \t]*)\[(?<check>[ xX]?)\]$/
 const NOTION_TOGGLE_INPUT_RE = /^(?<indent>[ \t]*)>>>$/
 const NOTION_BACKSPACE_PREFIX_RE =
   /^(?<indent>[ \t]*)(?<prefix>#{1,6}[ \t]+|[-*+] \[[ xX]\] |[-*+] |\d+\. |> )$/
-const NOTION_TOGGLE_TEMPLATE =
-  "<details>\n<summary>토글 제목</summary>\n\n내용을 입력하세요.\n</details>"
+const NOTION_TOGGLE_TEMPLATE = ":::toggle 토글 제목\n\n:::"
 const ACTIVE_EMPTY_LINE_PLACEHOLDER =
   "'/'를 눌러 블록을 삽입하거나 내용을 입력하세요..."
 
@@ -240,8 +239,8 @@ export const planNotionSpaceInputRule = (
       rangeStart: lineStart,
       rangeEnd: lineEnd,
       replacement: NOTION_TOGGLE_TEMPLATE,
-      selectionStart: lineStart + 19,
-      selectionEnd: lineStart + 24,
+      selectionStart: lineStart + 10,
+      selectionEnd: lineStart + 15,
     }
   }
 
