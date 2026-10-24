@@ -58,7 +58,7 @@ test.describe("editor slash menu and toolbar usability", () => {
     const partsContent = readFileSync(partsFilePath, "utf8")
 
     expect(partsContent).toContain("font-size: 36px")
-    expect(partsContent).toContain("padding: 22px 32px 17px")
+    expect(partsContent).toContain("padding: 28px 32px 12px 64px")
     expect(partsContent).toContain("left: 32px")
     expect(partsContent).toContain("right: 32px")
   })
