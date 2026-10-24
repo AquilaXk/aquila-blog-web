@@ -780,7 +780,7 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(bodyRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(2)
     expect(bodyRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeDefined()
 
-    const stateOnTaskPrefix = state.update({
+    const stateOnTaskPrefix = stateInTaskBody.update({
       selection: { anchor: line1Start + 3 },
     }).state
     const prefixRanges: Array<{ from: number; to: number; widget: unknown }> = []
@@ -790,6 +790,17 @@ test.describe("Notion-parity Markdown editor model", () => {
     })
     expect(prefixRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(1)
     expect(prefixRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeUndefined()
+
+    const stateReturnedToBody = stateOnTaskPrefix.update({
+      selection: { anchor: line1Start + 8 },
+    }).state
+    const returnedRanges: Array<{ from: number; to: number; widget: unknown }> = []
+    stateReturnedToBody.field(decorationField).between(0, doc.length, (from, to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      returnedRanges.push({ from, to, widget: spec.widget ?? null })
+    })
+    expect(returnedRanges.filter((r) => r.widget instanceof MarkdownTaskWidget)).toHaveLength(2)
+    expect(returnedRanges.find((r) => r.from === line1Start && r.to === line1Start + 2)).toBeDefined()
   })
 
   test("parses :::callout container blocks and switches between CalloutWidget and active container line classes", () => {

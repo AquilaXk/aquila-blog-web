@@ -199,28 +199,32 @@ const ACTIVE_WIDGET_KINDS = new Set<MarkdownLivePreviewDecoration["kind"]>([
   "fenced-code",
 ])
 
+const resolveTaskPrefixRange = (markdownValue: string, from: number, to: number) => {
+  const markerMatch = /^\[[ xX]\]/.exec(markdownValue.slice(from, to))
+  const markerTo = from + (markerMatch ? markerMatch[0].length : Math.min(3, to - from))
+  let prefixFrom = from
+  while (prefixFrom > 0 && /[ \t]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+  if (prefixFrom > 0 && /[-+*]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+  return { from: prefixFrom, to: markerTo, markerTo }
+}
+
 const buildActiveWatchRanges = (
+  markdownValue: string,
   previewEntries: readonly MarkdownLivePreviewPlanEntry[],
-  tables: readonly RangeSpec[],
-  callouts: readonly RangeSpec[],
-  images: readonly RangeSpec[],
-  maths: readonly RangeSpec[],
-  mermaids: readonly RangeSpec[]
+  blockGroups: readonly (readonly RangeSpec[])[]
 ): RangeSpec[] => {
   const raw: RangeSpec[] = []
   for (const entry of previewEntries) {
-    if (entry.hideWhenActiveRange) {
-      raw.push({ from: entry.hideWhenActiveRange.from, to: entry.hideWhenActiveRange.to })
+    if (entry.hideWhenActiveRange) raw.push({ ...entry.hideWhenActiveRange })
+    if (entry.secondaryHideWhenActiveRange) raw.push({ ...entry.secondaryHideWhenActiveRange })
+    if (entry.kind === "task") {
+      const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
+      raw.push({ from: taskPrefix.from, to: taskPrefix.to })
+    } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
+      raw.push({ from: entry.from, to: entry.to })
     }
-    if (entry.secondaryHideWhenActiveRange) {
-      raw.push({
-        from: entry.secondaryHideWhenActiveRange.from,
-        to: entry.secondaryHideWhenActiveRange.to,
-      })
-    }
-    if (ACTIVE_WIDGET_KINDS.has(entry.kind)) raw.push({ from: entry.from, to: entry.to })
   }
-  for (const group of [tables, callouts, images, maths, mermaids]) {
+  for (const group of blockGroups) {
     for (const item of group) raw.push({ from: item.from, to: item.to })
   }
   raw.sort((a, b) => a.from - b.from || a.to - b.to)
@@ -291,14 +295,13 @@ const getCachedDocBlocks = (state: EditorState) => {
   })
 
   const maths = collectMathReplacementSpecs(markdownValue)
-  const activeWatchRanges = buildActiveWatchRanges(
-    previewEntries,
+  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [
     tables,
     callouts,
     images,
     maths,
-    mermaids
-  )
+    mermaids,
+  ])
 
   cachedDocBlocksEntry = {
     doc: state.doc,
@@ -338,19 +341,13 @@ const appendActiveAwareWidgetSpec = (
   }
 
   if (spec.kind === "task") {
-    const markerMatch = /^\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.from, spec.to))
-    const markerTo =
-      spec.from + (markerMatch ? markerMatch[0].length : Math.min(3, spec.to - spec.from))
-    let prefixFrom = spec.from
-    while (prefixFrom > 0 && /[ \t]/.test(ctx.markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
-    if (prefixFrom > 0 && /[-+*]/.test(ctx.markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
-    if (isTokenActive(prefixFrom, markerTo, ctx.selections)) return true
-    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, markerTo))
+    const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
+    if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return true
+    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, taskPrefix.markerTo))
     ctx.decorations.push(
-      Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, markerTo) }).range(
-        spec.from,
-        markerTo
-      )
+      Decoration.replace({
+        widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo),
+      }).range(spec.from, taskPrefix.markerTo)
     )
     return true
   }
