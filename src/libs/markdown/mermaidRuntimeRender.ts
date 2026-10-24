@@ -13,7 +13,7 @@ import {
   readMermaidCache,
   writeMermaidCache,
 } from "src/libs/markdown/mermaidRuntimeConfig"
-import { openMermaidOverlay } from "src/libs/markdown/mermaidRuntimeOverlay"
+import { openMermaidOverlay, shouldIgnoreStageClickForZoom } from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
   createMermaidRenderTimeoutError,
   isMermaidRenderTimeoutError,
@@ -280,10 +280,11 @@ export const createMermaidRuntimeController = ({
       ? Number.POSITIVE_INFINITY
       : Math.min(760, Math.floor(window.innerHeight * 0.74))
     const usesDesktopWideLane = complexityLevel !== "high" && maxDisplayWidth > containerWidth + 24
+    const effectiveMaxDisplayWidth = Math.max(240, maxDisplayWidth - (isMobileViewport ? 20 : 40))
 
     let scale = 1
-    if (intrinsicWidth > maxDisplayWidth) {
-      scale = Math.min(scale, maxDisplayWidth / intrinsicWidth)
+    if (intrinsicWidth > effectiveMaxDisplayWidth) {
+      scale = Math.min(scale, effectiveMaxDisplayWidth / intrinsicWidth)
     }
     if (intrinsicHeight * scale > maxReadableHeight) {
       scale = Math.min(scale, maxReadableHeight / intrinsicHeight)
@@ -295,13 +296,8 @@ export const createMermaidRuntimeController = ({
     const roundedWidth = Math.max(1, Math.round(intrinsicWidth * scale))
     const roundedHeight = Math.max(1, Math.round(intrinsicHeight * scale))
     const stageWidth = usesDesktopWideLane ? maxDisplayWidth : containerWidth
-    const isHeightClamped =
-      !isMobileViewport && intrinsicHeight > maxReadableHeight + MERMAID_EXPAND_THRESHOLD_PX
-    const needsExpandAction =
-      intrinsicWidth > maxDisplayWidth + MERMAID_EXPAND_THRESHOLD_PX ||
-      isHeightClamped ||
-      complexityLevel === "high"
-    stage.style.width = `${stageWidth}px`
+    const needsExpandAction = intrinsicWidth > 0
+    stage.style.width = usesDesktopWideLane ? `${stageWidth}px` : "100%"
     stage.style.minHeight = `${roundedHeight}px`
     stage.style.display = "flex"
     stage.style.justifyContent = "center"
@@ -326,8 +322,13 @@ export const createMermaidRuntimeController = ({
     svgElement.removeAttribute("width")
     svgElement.removeAttribute("height")
 
+    stage.title = "클릭하여 크게 보기"
+    stage.addEventListener("click", (event) => {
+      if (!shouldIgnoreStageClickForZoom(event)) {
+        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
+      }
+    })
     block.querySelectorAll(".aq-mermaid-expand-btn").forEach((button) => button.remove())
-
     if (needsExpandAction) {
       const expandButton = document.createElement("button")
       expandButton.type = "button"
@@ -341,6 +342,7 @@ export const createMermaidRuntimeController = ({
 
     block.style.minHeight = ""
     stage.style.minHeight = ""
+    stage.style.minWidth = "0"
   }
 
   let enqueueRender: (block: HTMLElement) => void = () => {}
@@ -398,8 +400,7 @@ export const createMermaidRuntimeController = ({
       block.dataset.mermaidRendered = "pending"
       block.dataset.mermaidPreset = preset.mode
     }
-
-    const visibleWidth = Math.floor(blockRect.width)
+    const visibleWidth = block.clientWidth || Math.floor(blockRect.width)
     if (visibleWidth <= 0) {
       if (scheduleRetry(block)) return
       block.dataset.mermaidRendered = "error"

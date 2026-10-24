@@ -58,14 +58,15 @@ test.describe("core smoke detail blocks and typography", () => {
     expect(codeStyleSource).toContain("font-weight: 600;")
     expect(codeStyleSource).not.toContain("@media (max-width: 768px)")
     expect(codeStyleSource).toContain("@media (max-width: 820px)")
-    expect(calloutStyleSource).toContain("grid-template-columns: 34px minmax(0, 1fr);")
-    expect(calloutStyleSource).toContain("padding: 19px 20px;")
+    expect(calloutStyleSource).toContain("grid-template-columns: 18px minmax(0, 1fr);")
+    expect(calloutStyleSource).toContain("border-left: 3px solid var(--ad-accent);")
+    expect(calloutStyleSource).toContain("padding: 16px 20px;")
     expect(calloutStyleSource).toContain("@media (max-width: 820px)")
-    expect(calloutStyleSource).toContain("grid-template-columns: 28px minmax(0, 1fr);")
-    expect(calloutStyleSource).toContain("padding: 16px;")
-    expect(calloutStyleSource).toContain("width: 26px;")
-    expect(calloutStyleSource).toContain("height: 26px;")
-    expect(calloutStyleSource).toContain("margin-left: -41px;")
+    expect(calloutStyleSource).toContain("padding: 14px 16px;")
+    expect(calloutStyleSource).toContain("width: 18px;")
+    expect(calloutStyleSource).toContain("height: 22px;")
+    expect(calloutStyleSource).not.toContain("margin-left: -47px;")
+    expect(calloutStyleSource).not.toContain("margin-left: -41px;")
     expect(cardStyleSource).toContain("margin: 24px 0;")
     expect(cardStyleSource).toContain("border-radius: 0;")
     expect(cardStyleSource).toContain("box-shadow: none;")
@@ -151,6 +152,8 @@ test.describe("core smoke detail blocks and typography", () => {
           ":::toggle 더 보기",
           "토글 내부 본문입니다.",
           ":::",
+          "",
+          "분산 시스템에서는 **인증 시점(Handshake)**과 **메시지 라우팅 시점(STOMP Frame)**의 책임을 분리합니다.",
         ].join("\n"),
         summary: "",
         summarySource: "NONE",
@@ -198,10 +201,21 @@ test.describe("core smoke detail blocks and typography", () => {
   await expect(inlineBoldInfoCallout.locator(".aq-callout-title")).toHaveCount(0)
   await expect(inlineBoldInfoCallout).toContainText("Endpoint는 연결을 여는 입구입니다.")
   await expect(inlineBoldInfoCallout.locator(".aq-markdown-text strong").first()).toHaveText("Endpoint")
+  const untitledEmojiBox = await inlineBoldInfoCallout.locator(".aq-callout-emoji").boundingBox()
+  const untitledParagraphBox = await inlineBoldInfoCallout.locator(".aq-markdown-text").first().boundingBox()
+  expect(untitledEmojiBox).not.toBeNull()
+  expect(untitledParagraphBox).not.toBeNull()
+  expect(Math.abs((untitledParagraphBox?.y ?? 0) - (untitledEmojiBox?.y ?? 999))).toBeLessThanOrEqual(8)
   await expect(page.getByText(/^Tip$/)).toHaveCount(0)
   await expect(page.getByText(/^Information$/)).toHaveCount(0)
   await page.getByText("더 보기").click()
   await expect(page.getByText("토글 내부 본문입니다.")).toBeVisible()
+  const multiBoldParagraph = page.locator(".aq-markdown > p").filter({ hasText: "분산 시스템에서는" })
+  await expect(multiBoldParagraph).toHaveText(
+    "분산 시스템에서는 인증 시점(Handshake)과 메시지 라우팅 시점(STOMP Frame)의 책임을 분리합니다."
+  )
+  await expect(multiBoldParagraph.locator("strong").nth(0)).toHaveText("인증 시점(Handshake)")
+  await expect(multiBoldParagraph.locator("strong").nth(1)).toHaveText("메시지 라우팅 시점(STOMP Frame)")
 
   const toggleSummary = page.locator(".aq-toggle > summary").first()
   const toggleMetrics = await toggleSummary.evaluate((element) => {

@@ -35,6 +35,7 @@ import {
   MarkdownBlockquote,
   MarkdownParagraph,
   extractTextFromMarkdownNode,
+  normalizeMarkdownInlineChildren,
 } from "src/libs/markdown/MarkdownRendererInline"
 import {
   MarkdownTableCellRenderer,
@@ -146,6 +147,9 @@ export const createMarkdownComponentVariants = ({
     blockquote({ children }: { children?: ReactNode }) {
       return <MarkdownBlockquote>{children}</MarkdownBlockquote>
     },
+    li({ children, node: _node, ...props }: { children?: ReactNode; node?: unknown } & Record<string, unknown>) {
+      return <li {...props}>{normalizeMarkdownInlineChildren(children)}</li>
+    },
     table({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) {
       const layout = tableLayouts[tableRenderIndexRef.current] || null
       tableRenderIndexRef.current += 1
@@ -175,7 +179,7 @@ export const createMarkdownComponentVariants = ({
           alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
           className={props.className}
         >
-          {children}
+          {normalizeMarkdownInlineChildren(children)}
         </MarkdownTableCellRenderer>
       )
     },
@@ -196,7 +200,7 @@ export const createMarkdownComponentVariants = ({
           alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
           className={props.className}
         >
-          {children}
+          {normalizeMarkdownInlineChildren(children)}
         </MarkdownTableCellRenderer>
       )
     },
@@ -362,7 +366,7 @@ export const createMarkdownComponentVariants = ({
   const inlineComponents = {
     ...sharedComponents,
     p({ children }: { children?: ReactNode }) {
-      return <>{children}</>
+      return <>{normalizeMarkdownInlineChildren(children)}</>
     },
   }
 

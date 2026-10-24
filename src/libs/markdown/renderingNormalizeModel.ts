@@ -124,26 +124,39 @@ const normalizeSplitInlineColorQuotedEmphasis = (markdown: string) => {
   return normalized
 }
 
-const normalizeMalformedTrailingSpaceEmphasisLine = (line: string) => {
-  let normalized = line
+const normalizeMalformedTrailingSpaceEmphasisSegment = (segment: string) => {
+  let normalized = segment
 
   normalized = normalized.replace(
-    /(\*\*|__)(\S(?:.*?\S)?)\s+(\1)/g,
-    (_match, marker: string, inner: string) => `${marker}${inner}${marker}`
+    /\*\*(\S(?:(?!\*\*)[^\n])*?\S|\S)([^\S\n]*)\*\*/g,
+    (_match, inner: string) => `**${inner}**`
   )
 
   normalized = normalized.replace(
-    /(^|[^*])\*([^*\n]*?\S)\s+\*(?!\*)/g,
+    /__(\S(?:(?!__)[^\n])*?\S|\S)([^\S\n]*)__/g,
+    (_match, inner: string) => `__${inner}__`
+  )
+
+  normalized = normalized.replace(
+    /(^|[^*])\*([^*\s](?:[^*\n]*?[^*\s])?)([^\S\n]*)\*(?!\*)/g,
     (_match, prefix: string, inner: string) => `${prefix}*${inner}*`
   )
 
   normalized = normalized.replace(
-    /(^|[^_])_([^_\n]*?\S)\s+_(?!_)/g,
+    /(^|[^_])_([^_\s](?:[^_\n]*?[^_\s])?)([^\S\n]*)_(?!_)/g,
     (_match, prefix: string, inner: string) => `${prefix}_${inner}_`
   )
 
   return normalized
 }
+
+const normalizeMalformedTrailingSpaceEmphasisLine = (line: string) =>
+  line
+    .split(/(`+[^`\n]*`+)/g)
+    .map((segment, index) =>
+      index % 2 === 1 ? segment : normalizeMalformedTrailingSpaceEmphasisSegment(segment)
+    )
+    .join("")
 
 const normalizeMalformedTrailingSpaceEmphasis = (markdown: string) => {
   if ((!markdown.includes("*") && !markdown.includes("_")) || !markdown.includes(" ")) return markdown
