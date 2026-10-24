@@ -54,15 +54,37 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)/g
 
 const isSafeInlineHref = (href: string): boolean => {
   const trimmed = href.trim()
   return /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(trimmed)
 }
 
+const createInlineMathSpan = (math: string): HTMLElement => {
+  const span = document.createElement("span")
+  span.className = "cm-live-math cm-live-math-inline"
+  const katex = getKatex()
+  if (katex) {
+    try {
+      span.innerHTML = katex.renderToString(math, { displayMode: false, throwOnError: false })
+      return span
+    } catch {}
+  } else if (katexLoadPromise) {
+    void katexLoadPromise.then(() => {
+      try {
+        if (cachedKatex) {
+          span.innerHTML = cachedKatex.renderToString(math, { displayMode: false, throwOnError: false })
+        }
+      } catch {}
+    })
+  }
+  span.textContent = math
+  return span
+}
+
 export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
-  if (!text.includes("`") && !text.includes("*") && !text.includes("[")) {
+  if (!/[`*~=$[]/.test(text)) {
     container.textContent = text
     return
   }
@@ -75,6 +97,7 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
     }
     if (match[1] !== undefined) {
       const code = document.createElement("code")
+      code.className = "cm-live-inline-code"
       code.textContent = match[1]
       container.appendChild(code)
     } else if (match[2] !== undefined) {
@@ -85,11 +108,24 @@ export const appendInlineMarkdownNodes = (container: HTMLElement, text: string):
       const em = document.createElement("em")
       em.textContent = match[3]
       container.appendChild(em)
-    } else if (match[4] !== undefined && match[5] !== undefined) {
-      const label = match[4]
-      const href = match[5]
+    } else if (match[4] !== undefined) {
+      const del = document.createElement("del")
+      del.className = "cm-live-strikethrough"
+      del.textContent = match[4]
+      container.appendChild(del)
+    } else if (match[5] !== undefined) {
+      const mark = document.createElement("mark")
+      mark.className = "cm-live-highlight"
+      mark.textContent = match[5]
+      container.appendChild(mark)
+    } else if (match[6] !== undefined || match[7] !== undefined) {
+      container.appendChild(createInlineMathSpan((match[6] ?? match[7])!))
+    } else if (match[8] !== undefined && match[9] !== undefined) {
+      const label = match[8]
+      const href = match[9]
       if (isSafeInlineHref(href)) {
         const link = document.createElement("a")
+        link.className = "cm-live-link"
         link.href = href.trim()
         link.textContent = label
         link.target = "_blank"

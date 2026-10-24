@@ -34,7 +34,6 @@ import {
 } from "@codemirror/state"
 import {
   EditorView,
-  scrollPastEnd,
   keymap,
   type KeyBinding,
 } from "@codemirror/view"
@@ -233,7 +232,6 @@ export const MarkdownEditorLiveSurface = forwardRef<
         autocompletion({
           override: [wikilinkCompletionSource, codeLanguageCompletionSource],
         }),
-        scrollPastEnd(),
         historyCompartment.of(history()),
         keymap.of([...customKeymaps, ...foldKeymap, ...historyKeymap, ...defaultKeymap]),
         EditorView.lineWrapping,

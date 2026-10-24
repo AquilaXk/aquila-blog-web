@@ -1,10 +1,5 @@
 import { EditorState, StateField, type Range } from "@codemirror/state"
-import {
-  Decoration,
-  EditorView,
-  WidgetType,
-  type DecorationSet,
-} from "@codemirror/view"
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view"
 import { hasIntervalOverlap, isTokenActive } from "./markdownEditorLivePreview"
 import {
   compositionField,
@@ -19,10 +14,26 @@ import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 const FENCE_DELIMITER_LINE_RE =
   /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
+const CALLOUT_OPEN_LINE_RE = /^:::callout(?:[ \t]+(.*))?$/
 const TOGGLE_OPEN_LINE_RE = /^:::toggle(?:[ \t]+(.*))?$/
 const BOOKMARK_OPEN_LINE_RE = /^:::bookmark(?:[ \t]+(\S+)(?:[ \t]+(.*))?)?$/
 const CONTAINER_CLOSE_LINE_RE = /^:::[ \t]*$/
 const HTTP_URL_PREFIX_RE = /^https?:\/\//i
+const LEADING_EMOJI_RE =
+  /^(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)(?:[ \t]+|$)/u
+
+export type NotionCalloutTone = "info" | "tip" | "warning" | "danger" | "purple" | "default"
+
+export type NotionCalloutContainerBlock = {
+  kind: "callout"
+  from: number
+  to: number
+  tone: NotionCalloutTone
+  icon: string
+  title: string
+  body: string
+  bodyOffset: number
+}
 
 export type NotionToggleContainerBlock = {
   kind: "toggle"
@@ -30,6 +41,7 @@ export type NotionToggleContainerBlock = {
   to: number
   title: string
   body: string
+  bodyOffset: number
 }
 
 export type NotionBookmarkContainerBlock = {
@@ -42,23 +54,110 @@ export type NotionBookmarkContainerBlock = {
 }
 
 export type NotionContainerBlock =
+  | NotionCalloutContainerBlock
   | NotionToggleContainerBlock
   | NotionBookmarkContainerBlock
 
 type OpenContainerCandidate =
-  | {
-      kind: "toggle"
-      from: number
-      rawTitle: string
-      bodyLines: string[]
+  | { kind: "callout"; from: number; bodyOffset: number; rawHeader: string; bodyLines: string[] }
+  | { kind: "toggle"; from: number; bodyOffset: number; rawTitle: string; bodyLines: string[] }
+  | { kind: "bookmark"; from: number; url: string; inlineTitle: string; bodyLines: string[] }
+
+const CALLOUT_TONE_KEYWORD_MAP: Record<string, { tone: NotionCalloutTone; icon: string }> = {
+  info: { tone: "info", icon: "ℹ️" },
+  note: { tone: "info", icon: "ℹ️" },
+  tip: { tone: "tip", icon: "💡" },
+  hint: { tone: "tip", icon: "💡" },
+  success: { tone: "tip", icon: "✅" },
+  check: { tone: "tip", icon: "✅" },
+  warning: { tone: "warning", icon: "⚠️" },
+  caution: { tone: "warning", icon: "⚠️" },
+  danger: { tone: "danger", icon: "🚨" },
+  error: { tone: "danger", icon: "🚨" },
+  purple: { tone: "purple", icon: "📌" },
+  summary: { tone: "purple", icon: "📌" },
+  important: { tone: "purple", icon: "📌" },
+  default: { tone: "default", icon: "💡" },
+  outline: { tone: "default", icon: "📋" },
+}
+
+const CALLOUT_EMOJI_TONE_MAP: Record<string, NotionCalloutTone> = {
+  "💡": "tip",
+  "✨": "tip",
+  "✅": "tip",
+  "ℹ️": "info",
+  "ℹ": "info",
+  "⚠️": "warning",
+  "⚠": "warning",
+  "🚨": "danger",
+  "❗": "danger",
+  "⛔": "danger",
+  "📌": "purple",
+  "📚": "purple",
+  "🧾": "purple",
+}
+
+const normalizeEmojiIcon = (raw: string): string =>
+  raw === "ℹ" ? "ℹ️" : raw === "⚠" ? "⚠️" : raw
+
+const parseCalloutContainerPayload = (
+  rawHeader: string,
+  bodyLines: readonly string[]
+): { tone: NotionCalloutTone; icon: string; title: string; body: string } => {
+  let rest = rawHeader.trim()
+  let tone: NotionCalloutTone = "info"
+  let icon = "💡"
+  let hasExplicitTone = false
+
+  if (rest.length > 0) {
+    const firstSpace = rest.search(/[ \t]/)
+    const firstToken = (firstSpace === -1 ? rest : rest.slice(0, firstSpace)).toLowerCase()
+    const mappedKeyword = Object.hasOwn(CALLOUT_TONE_KEYWORD_MAP, firstToken)
+      ? CALLOUT_TONE_KEYWORD_MAP[firstToken]
+      : undefined
+    if (mappedKeyword) {
+      tone = mappedKeyword.tone
+      icon = mappedKeyword.icon
+      hasExplicitTone = true
+      rest = firstSpace === -1 ? "" : rest.slice(firstSpace).trim()
     }
-  | {
-      kind: "bookmark"
-      from: number
-      url: string
-      inlineTitle: string
-      bodyLines: string[]
+  }
+
+  const headerEmojiMatch = LEADING_EMOJI_RE.exec(rest)
+  if (headerEmojiMatch) {
+    const rawEmoji = headerEmojiMatch[1]!
+    icon = normalizeEmojiIcon(rawEmoji)
+    if (!hasExplicitTone) {
+      tone = CALLOUT_EMOJI_TONE_MAP[icon] ?? CALLOUT_EMOJI_TONE_MAP[rawEmoji] ?? "info"
     }
+    rest = rest.slice(headerEmojiMatch[0].length).trim()
+  }
+
+  let remainingBodyLines = [...bodyLines]
+  if (rest.length === 0 && remainingBodyLines.length > 0) {
+    const firstLine = (remainingBodyLines[0] ?? "").trim()
+    const bodyEmojiMatch = LEADING_EMOJI_RE.exec(firstLine)
+    if (bodyEmojiMatch) {
+      const rawEmoji = bodyEmojiMatch[1]!
+      icon = normalizeEmojiIcon(rawEmoji)
+      if (!hasExplicitTone) {
+        tone = CALLOUT_EMOJI_TONE_MAP[icon] ?? CALLOUT_EMOJI_TONE_MAP[rawEmoji] ?? "info"
+      }
+      rest = firstLine.slice(bodyEmojiMatch[0].length).trim()
+      remainingBodyLines = remainingBodyLines.slice(1)
+    } else if (firstLine.length > 0) {
+      rest = firstLine
+      remainingBodyLines = remainingBodyLines.slice(1)
+    }
+  }
+
+  return {
+    tone,
+    icon,
+    title: rest || "콜아웃",
+    body: remainingBodyLines.join("\n").trim(),
+  }
+}
 
 export const parseNotionContainerBlocks = (docText: string): NotionContainerBlock[] => {
   if (!docText.includes(":::")) return []
@@ -87,60 +186,67 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
         inFence = true
         openFenceMarker = marker
         openFenceLength = length
-      } else if (
-        marker === openFenceMarker &&
-        length >= openFenceLength &&
-        info.trim() === ""
-      ) {
+      } else if (marker === openFenceMarker && length >= openFenceLength && info.trim() === "") {
         inFence = false
         openFenceMarker = ""
         openFenceLength = 0
       }
-      if (candidate) {
-        candidate.bodyLines.push(lineText)
-      }
+      if (candidate) candidate.bodyLines.push(lineText)
       continue
     }
 
     if (inFence) {
-      if (candidate) {
-        candidate.bodyLines.push(lineText)
-      }
+      if (candidate) candidate.bodyLines.push(lineText)
       continue
     }
 
     if (candidate && CONTAINER_CLOSE_LINE_RE.test(lineText)) {
-      if (candidate.kind === "toggle") {
-        const title = candidate.rawTitle.trim() || "토글 블록"
-        const body = candidate.bodyLines.join("\n").trim()
+      if (candidate.kind === "callout") {
+        const parsed = parseCalloutContainerPayload(candidate.rawHeader, candidate.bodyLines)
+        blocks.push({
+          kind: "callout",
+          from: candidate.from,
+          to: lineEnd,
+          tone: parsed.tone,
+          icon: parsed.icon,
+          title: parsed.title,
+          body: parsed.body,
+          bodyOffset: candidate.bodyOffset,
+        })
+      } else if (candidate.kind === "toggle") {
         blocks.push({
           kind: "toggle",
           from: candidate.from,
           to: lineEnd,
-          title,
-          body,
+          title: candidate.rawTitle.trim() || "토글 블록",
+          body: candidate.bodyLines.join("\n").trim(),
+          bodyOffset: candidate.bodyOffset,
         })
       } else {
-        const nonEmptyLines = candidate.bodyLines
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0)
+        const nonEmptyLines = candidate.bodyLines.map((l) => l.trim()).filter(Boolean)
         const hasInlineTitle = candidate.inlineTitle.length > 0
-        const title = hasInlineTitle
-          ? candidate.inlineTitle
-          : (nonEmptyLines[0] ?? candidate.url)
-        const description = hasInlineTitle
-          ? nonEmptyLines.join("\n")
-          : nonEmptyLines.slice(1).join("\n")
         blocks.push({
           kind: "bookmark",
           from: candidate.from,
           to: lineEnd,
           url: candidate.url,
-          title,
-          description,
+          title: hasInlineTitle ? candidate.inlineTitle : (nonEmptyLines[0] ?? candidate.url),
+          description: hasInlineTitle ? nonEmptyLines.join("\n") : nonEmptyLines.slice(1).join("\n"),
         })
       }
       candidate = null
+      continue
+    }
+
+    const calloutMatch = CALLOUT_OPEN_LINE_RE.exec(lineText)
+    if (calloutMatch) {
+      candidate = {
+        kind: "callout",
+        from: lineStart,
+        bodyOffset: Math.max(0, offset - lineStart),
+        rawHeader: (calloutMatch[1] ?? "").trim(),
+        bodyLines: [],
+      }
       continue
     }
 
@@ -149,6 +255,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
       candidate = {
         kind: "toggle",
         from: lineStart,
+        bodyOffset: Math.max(0, offset - lineStart),
         rawTitle: (toggleMatch[1] ?? "").trim(),
         bodyLines: [],
       }
@@ -158,23 +265,19 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
     const bookmarkMatch = BOOKMARK_OPEN_LINE_RE.exec(lineText)
     if (bookmarkMatch) {
       const url = (bookmarkMatch[1] ?? "").trim()
-      if (HTTP_URL_PREFIX_RE.test(url)) {
-        candidate = {
-          kind: "bookmark",
-          from: lineStart,
-          url,
-          inlineTitle: (bookmarkMatch[2] ?? "").trim(),
-          bodyLines: [],
-        }
-      } else {
-        candidate = null
-      }
+      candidate = HTTP_URL_PREFIX_RE.test(url)
+        ? {
+            kind: "bookmark",
+            from: lineStart,
+            url,
+            inlineTitle: (bookmarkMatch[2] ?? "").trim(),
+            bodyLines: [],
+          }
+        : null
       continue
     }
 
-    if (candidate) {
-      candidate.bodyLines.push(lineText)
-    }
+    if (candidate) candidate.bodyLines.push(lineText)
   }
 
   return blocks
@@ -199,10 +302,84 @@ const focusContainerBlockOrigin = (
     Math.min(resolvedTo, resolvedFrom + innerOffset)
   )
   view.focus()
-  view.dispatch({
-    selection: { anchor: targetAnchor },
-    scrollIntoView: true,
-  })
+  view.dispatch({ selection: { anchor: targetAnchor }, scrollIntoView: true })
+}
+
+const bindContainerActivateTarget = (
+  element: HTMLElement,
+  view: EditorView | undefined,
+  root: HTMLElement,
+  from: number,
+  to: number,
+  offset: number,
+  ignoreLinks = true
+) => {
+  const handler = (event: MouseEvent) => {
+    const target = event.target as HTMLElement | null
+    if (ignoreLinks && target?.closest("a")) return
+    event.preventDefault()
+    event.stopPropagation()
+    focusContainerBlockOrigin(view, root, from, to, offset)
+  }
+  element.addEventListener("mousedown", handler)
+  element.addEventListener("click", handler)
+}
+
+export class MarkdownNotionCalloutBlockWidget extends WidgetType {
+  constructor(
+    readonly tone: NotionCalloutTone,
+    readonly icon: string,
+    readonly title: string,
+    readonly body: string,
+    readonly from: number,
+    readonly to: number,
+    readonly bodyOffset = 11 + title.length + 1
+  ) {
+    super()
+  }
+
+  eq(other: MarkdownNotionCalloutBlockWidget) {
+    return (
+      other instanceof MarkdownNotionCalloutBlockWidget &&
+      other.tone === this.tone &&
+      other.icon === this.icon &&
+      other.title === this.title &&
+      other.body === this.body &&
+      other.from === this.from &&
+      other.to === this.to &&
+      other.bodyOffset === this.bodyOffset
+    )
+  }
+
+  toDOM(view?: EditorView) {
+    const root = document.createElement("div")
+    root.className = `cm-live-callout cm-live-callout-tone-${this.tone}`
+    root.setAttribute("data-testid", "cm-live-callout-widget")
+    root.dataset.from = String(this.from)
+    root.dataset.callout = this.tone
+
+    const header = document.createElement("div")
+    header.className = "cm-live-callout-header"
+    const badge = document.createElement("span")
+    badge.className = "cm-live-callout-icon"
+    badge.setAttribute("aria-hidden", "true")
+    badge.textContent = this.icon
+    const titleSpan = document.createElement("span")
+    titleSpan.className = "cm-live-callout-title"
+    appendInlineMarkdownNodes(titleSpan, this.title || "콜아웃")
+    header.append(badge, titleSpan)
+    root.appendChild(header)
+    bindContainerActivateTarget(header, view, root, this.from, this.to, 11)
+
+    if (this.body) {
+      const bodyEl = document.createElement("div")
+      bodyEl.className = "cm-live-callout-body"
+      appendInlineMarkdownNodes(bodyEl, this.body)
+      bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, this.bodyOffset)
+      root.appendChild(bodyEl)
+    }
+    return root
+  }
 }
 
 export class MarkdownToggleBlockWidget extends WidgetType {
@@ -210,7 +387,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     readonly title: string,
     readonly body: string,
     readonly from: number,
-    readonly to: number
+    readonly to: number,
+    readonly bodyOffset = 10 + title.length + 1
   ) {
     super()
   }
@@ -221,7 +399,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
       other.title === this.title &&
       other.body === this.body &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.bodyOffset === this.bodyOffset
     )
   }
 
@@ -234,7 +413,6 @@ export class MarkdownToggleBlockWidget extends WidgetType {
 
     const header = document.createElement("div")
     header.className = "cm-live-toggle-header"
-
     const caret = document.createElement("span")
     caret.className = "cm-live-toggle-caret"
     caret.tabIndex = 0
@@ -243,7 +421,6 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     caret.setAttribute("aria-expanded", "true")
     caret.setAttribute("aria-label", "토글 접기/펼치기")
     caret.textContent = "▼"
-
     const toggleCollapse = (event: Event) => {
       event.preventDefault()
       event.stopPropagation()
@@ -251,54 +428,27 @@ export class MarkdownToggleBlockWidget extends WidgetType {
       caret.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
       caret.textContent = isCollapsed ? "▶" : "▼"
     }
-    caret.addEventListener("mousedown", (event) => {
-      event.preventDefault()
-      event.stopPropagation()
+    caret.addEventListener("mousedown", (e) => {
+      e.preventDefault()
+      e.stopPropagation()
     })
     caret.addEventListener("click", toggleCollapse)
     caret.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (event.key === "Enter" || event.key === " ") {
-        toggleCollapse(event)
-      }
+      if (event.key === "Enter" || event.key === " ") toggleCollapse(event)
     })
 
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-toggle-title"
     appendInlineMarkdownNodes(titleSpan, this.title || "토글 블록")
-
-    const activateEditAtTitle = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target?.closest("a")) return
-      event.preventDefault()
-      event.stopPropagation()
-      focusContainerBlockOrigin(view, root, this.from, this.to, 10)
-    }
-    titleSpan.addEventListener("mousedown", activateEditAtTitle)
-    titleSpan.addEventListener("click", activateEditAtTitle)
-
-    header.appendChild(caret)
-    header.appendChild(titleSpan)
+    bindContainerActivateTarget(titleSpan, view, root, this.from, this.to, 10)
+    header.append(caret, titleSpan)
     root.appendChild(header)
 
     const bodyEl = document.createElement("div")
     bodyEl.className = `cm-live-toggle-body${this.body ? "" : " is-empty"}`
-    if (this.body) {
-      appendInlineMarkdownNodes(bodyEl, this.body)
-    } else {
-      bodyEl.textContent = "내용을 입력하려면 클릭하세요..."
-    }
-
-    const bodyOffset = 10 + this.title.length + 1
-    const activateEditAtBody = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target?.closest("a")) return
-      event.preventDefault()
-      event.stopPropagation()
-      focusContainerBlockOrigin(view, root, this.from, this.to, bodyOffset)
-    }
-    bodyEl.addEventListener("mousedown", activateEditAtBody)
-    bodyEl.addEventListener("click", activateEditAtBody)
-
+    if (this.body) appendInlineMarkdownNodes(bodyEl, this.body)
+    else bodyEl.textContent = "내용을 입력하려면 클릭하세요..."
+    bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, this.bodyOffset)
     root.appendChild(bodyEl)
     return root
   }
@@ -336,38 +486,24 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     icon.className = "cm-live-bookmark-icon"
     icon.setAttribute("aria-hidden", "true")
     icon.textContent = "🔖"
-
     const content = document.createElement("div")
     content.className = "cm-live-bookmark-content"
-
     const titleEl = document.createElement("span")
     titleEl.className = "cm-live-bookmark-title"
     titleEl.textContent = this.title || this.url
     content.appendChild(titleEl)
-
     if (this.description) {
       const descEl = document.createElement("span")
       descEl.className = "cm-live-bookmark-desc"
       descEl.textContent = this.description
       content.appendChild(descEl)
     }
-
     const urlEl = document.createElement("span")
     urlEl.className = "cm-live-bookmark-url"
     urlEl.textContent = this.url
     content.appendChild(urlEl)
-
-    root.appendChild(icon)
-    root.appendChild(content)
-
-    const activateEdit = (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      focusContainerBlockOrigin(view, root, this.from, this.to, 12)
-    }
-    root.addEventListener("mousedown", activateEdit)
-    root.addEventListener("click", activateEdit)
-
+    root.append(icon, content)
+    bindContainerActivateTarget(root, view, root, this.from, this.to, 12, false)
     return root
   }
 }
@@ -390,14 +526,10 @@ const getCachedNotionContainerBlocks = (
 
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
-  if (mode === "source" || state.doc.length === 0) {
-    return Decoration.none
-  }
+  if (mode === "source" || state.doc.length === 0) return Decoration.none
 
   const blocks = getCachedNotionContainerBlocks(state.doc)
-  if (blocks.length === 0) {
-    return Decoration.none
-  }
+  if (blocks.length === 0) return Decoration.none
 
   const composing = state.field(compositionField, false) ?? false
   const pointerSelecting = state.field(pointerSelectingField, false) ?? false
@@ -415,23 +547,30 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
         isTokenActive(block.from, block.to, selections) ||
         hasIntervalOverlap(selections, block.from, block.to))
     ) {
+      const startLineNo = state.doc.lineAt(block.from).number
+      const endLineNo = state.doc.lineAt(block.to).number
+      const toneClass = block.kind === "callout" ? ` cm-live-container-tone-${block.tone}` : ""
+      for (let lineNo = startLineNo; lineNo <= endLineNo; lineNo += 1) {
+        const line = state.doc.line(lineNo)
+        const openCls = lineNo === startLineNo ? " cm-live-container-line-open" : ""
+        const closeCls = lineNo === endLineNo ? " cm-live-container-line-close" : ""
+        decorations.push(
+          Decoration.line({
+            class: `cm-live-container-active-line cm-live-container-active-${block.kind}${toneClass}${openCls}${closeCls}`,
+          }).range(line.from)
+        )
+      }
       continue
     }
 
     const widget =
-      block.kind === "toggle"
-        ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to)
-        : new MarkdownBookmarkBlockWidget(
-            block.url,
-            block.title,
-            block.description,
-            block.from,
-            block.to
-          )
+      block.kind === "callout"
+        ? new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
+        : block.kind === "toggle"
+          ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
+          : new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
 
-    decorations.push(
-      Decoration.replace({ widget, block: true }).range(block.from, block.to)
-    )
+    decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to))
   }
 
   return decorations.length > 0 ? Decoration.set(decorations, true) : Decoration.none
@@ -456,3 +595,4 @@ export const notionContainerBlockField = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 })
+

@@ -67,9 +67,7 @@ const BubbleActionButton = styled.button`
   font: 700 12px/1 var(--aq-font-sans);
   cursor: pointer;
   transition: background-color 0.12s ease, color 0.12s ease;
-
   ${focusVisibleRing}
-
   &:hover {
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
@@ -95,21 +93,14 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
   opacity: 0.62;
   user-select: none;
   transition: opacity 0.14s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
-
   ${focusVisibleRing}
-
-  &:hover,
-  &:focus-visible,
-  &[aria-expanded="true"] {
+  &:hover, &:focus-visible, &[aria-expanded="true"] {
     opacity: 1;
     border-color: ${({ theme }) => theme.publicDesign.border};
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
-
-  @media (max-width: 720px) {
-    display: none;
-  }
+  @media (max-width: 720px) { display: none; }
 `
 
 const GutterPlusButton = styled(GutterHandleButtonBase)`
@@ -166,14 +157,8 @@ const BlockMenuItemButton = styled.button`
   text-align: left;
   cursor: pointer;
   transition: background-color 0.1s ease;
-
   ${focusVisibleRing}
-
-  &:hover,
-  &:focus-visible {
-    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-  }
-
+  &:hover, &:focus-visible { background: ${({ theme }) => theme.publicDesign.surfaceElevated}; }
   .glyph {
     display: inline-flex;
     align-items: center;
@@ -184,6 +169,24 @@ const BlockMenuItemButton = styled.button`
     flex-shrink: 0;
   }
 `
+
+const ColorSwatchDot = styled.span<{ $color: string }>`
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: ${({ $color }) => $color};
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  flex-shrink: 0;
+`
+
+const NOTION_COLOR_SWATCH_SPECS = [
+  { label: "글자 파란색", token: "sky", hex: "#2383e2" },
+  { label: "글자 초록색", token: "emerald", hex: "#10b981" },
+  { label: "글자 주황색", token: "amber", hex: "#f59e0b" },
+  { label: "글자 보라색", token: "violet", hex: "#9065b0" },
+  { label: "글자 빨간색", token: "rose", hex: "#eb5757" },
+] as const
 
 const resolveCurrentBlockKind = (trimmed: string) => {
   if (trimmed.startsWith("### ")) return "h3"
@@ -435,6 +438,26 @@ export const MarkdownEditorNotionChrome = ({
     action()
   }
 
+  const applyLineColorSwatch = (token: string) => {
+    if (selection.from < selection.to) {
+      onApplySnippet(`{{color:${token}|`, "}}", { toggle: true })
+      return
+    }
+    const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
+    const nextBreak = value.indexOf("\n", selection.from)
+    const lineEnd = nextBreak === -1 ? value.length : nextBreak
+    const lineText = value.slice(lineStart, lineEnd)
+    const prefixMatch =
+      /^(?:[ \t]*(?:#{1,6}[ \t]+|>+[ \t]*|(?:[-+*]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?))/.exec(lineText)
+    const bodyOffset = prefixMatch ? prefixMatch[0].length : 0
+    const rawBody = lineText.slice(bodyOffset)
+    const existingColorMatch = /^\{\{color:[^|{}]+\|([\s\S]*)\}\}$/.exec(rawBody)
+    const innerText = (existingColorMatch ? existingColorMatch[1] ?? "" : rawBody) || "강조 텍스트"
+    onTriggerSlashCommand(
+      planReplaceSelection(lineStart + bodyOffset, lineEnd, `{{color:${token}|${innerText}}}`)
+    )
+  }
+
   const turnIntoItems = [
     { label: "일반 문단으로 전환", glyph: "T", run: () => onStripBlockPrefix() },
     { label: "제목 1로 블록 전환", glyph: "H1", run: () => onApplySnippet("# ", "") },
@@ -467,11 +490,7 @@ export const MarkdownEditorNotionChrome = ({
     { label: "선택 영역 기울임", glyph: "I", run: () => onApplyFormatShortcut("italic") },
     { label: "선택 영역 취소선", glyph: "S", run: () => onApplyFormatShortcut("strikethrough") },
     { label: "선택 영역 인라인 코드", glyph: "<>", run: () => onApplyFormatShortcut("inlineCode") },
-    {
-      label: "선택 영역 하이라이트",
-      glyph: "==",
-      run: () => onApplySnippet("==", "==", { toggle: true }),
-    },
+    { label: "선택 영역 하이라이트", glyph: "==", run: () => onApplySnippet("==", "==", { toggle: true }) },
     { label: "선택 영역 링크", glyph: "🔗", run: () => onApplyFormatShortcut("link") },
   ]
 
@@ -479,67 +498,31 @@ export const MarkdownEditorNotionChrome = ({
     <>
       {canShowGutterPlus && gutterTop !== null ? (
         <>
-          <GutterPlusButton
-            type="button"
-            aria-label="현재 줄에 블록 삽입"
-            data-testid="markdown-block-gutter-plus"
-            $top={gutterTop}
-            $left={4}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={handleTriggerSlashAtCurrentLine}
-          >
-            +
-          </GutterPlusButton>
-          <GutterDragMenuButton
-            ref={gutterHandleRef}
-            type="button"
-            aria-label="현재 줄 블록 메뉴"
-            aria-haspopup="menu"
-            aria-expanded={isBlockMenuOpen}
-            data-block-kind={currentBlockKind}
-            data-testid="markdown-block-gutter-handle"
-            $top={gutterTop}
-            $left={22}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setIsBlockMenuOpen((prev) => !prev)}
-          >
-            ⋮⋮
-          </GutterDragMenuButton>
+          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={4} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}>+</GutterPlusButton>
+          <GutterDragMenuButton ref={gutterHandleRef} type="button" aria-label="현재 줄 블록 메뉴" aria-haspopup="menu" aria-expanded={isBlockMenuOpen} data-block-kind={currentBlockKind} data-testid="markdown-block-gutter-handle" $top={gutterTop} $left={22} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsBlockMenuOpen((prev) => !prev)}>⋮⋮</GutterDragMenuButton>
         </>
       ) : null}
       {isBlockMenuOpen && blockMenuPosition ? (
-        <BlockActionMenuPopover
-          ref={blockMenuRef}
-          role="menu"
-          aria-label="블록 작업 메뉴"
-          data-testid="markdown-block-action-menu"
-          $top={blockMenuPosition.top}
-          $left={blockMenuPosition.left}
-          onKeyDown={handleBlockMenuKeyDown}
-        >
+        <BlockActionMenuPopover ref={blockMenuRef} role="menu" aria-label="블록 작업 메뉴" data-testid="markdown-block-action-menu" $top={blockMenuPosition.top} $left={blockMenuPosition.left} onKeyDown={handleBlockMenuKeyDown}>
           <BlockMenuSectionHeader aria-hidden="true">블록 전환</BlockMenuSectionHeader>
           {turnIntoItems.map((item) => (
-            <BlockMenuItemButton
-              key={item.label}
-              type="button"
-              role="menuitem"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => runMenuAction(item.run)}
-            >
+            <BlockMenuItemButton key={item.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
               <span className="glyph" aria-hidden="true">{item.glyph}</span>
               <span>{item.label}</span>
             </BlockMenuItemButton>
           ))}
           <BlockMenuSectionDivider aria-hidden="true" />
+          <BlockMenuSectionHeader aria-hidden="true">글자 색상</BlockMenuSectionHeader>
+          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+            <BlockMenuItemButton key={swatch.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}>
+              <span className="glyph" aria-hidden="true"><ColorSwatchDot $color={swatch.hex} /></span>
+              <span>{swatch.label}</span>
+            </BlockMenuItemButton>
+          ))}
+          <BlockMenuSectionDivider aria-hidden="true" />
           <BlockMenuSectionHeader aria-hidden="true">블록 작업</BlockMenuSectionHeader>
           {lineActionItems.map((item) => (
-            <BlockMenuItemButton
-              key={item.label}
-              type="button"
-              role="menuitem"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => runMenuAction(item.run)}
-            >
+            <BlockMenuItemButton key={item.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
               <span className="glyph" aria-hidden="true">{item.glyph}</span>
               <span>{item.label}</span>
             </BlockMenuItemButton>
@@ -547,35 +530,18 @@ export const MarkdownEditorNotionChrome = ({
         </BlockActionMenuPopover>
       ) : null}
       {canShowBubble && bubblePosition ? (
-        <SelectionBubbleToolbar
-          ref={bubbleRef}
-          role="toolbar"
-          aria-label="선택 텍스트 빠른 서식"
-          data-testid="markdown-selection-bubble"
-          $top={bubblePosition.top}
-          $left={bubblePosition.left}
-        >
+        <SelectionBubbleToolbar ref={bubbleRef} role="toolbar" aria-label="선택 텍스트 빠른 서식" data-testid="markdown-selection-bubble" $top={bubblePosition.top} $left={bubblePosition.left}>
           {bubbleButtons.map((item) => (
-            <BubbleActionButton
-              key={item.label}
-              type="button"
-              aria-label={item.label}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={item.run}
-            >
-              {item.glyph}
-            </BubbleActionButton>
+            <BubbleActionButton key={item.label} type="button" aria-label={item.label} onMouseDown={(event) => event.preventDefault()} onClick={item.run}>{item.glyph}</BubbleActionButton>
           ))}
           <BubbleDivider aria-hidden="true" />
           {inlineButtons.map((item) => (
-            <BubbleActionButton
-              key={item.label}
-              type="button"
-              aria-label={item.label}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={item.run}
-            >
-              {item.glyph}
+            <BubbleActionButton key={item.label} type="button" aria-label={item.label} onMouseDown={(event) => event.preventDefault()} onClick={item.run}>{item.glyph}</BubbleActionButton>
+          ))}
+          <BubbleDivider aria-hidden="true" />
+          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+            <BubbleActionButton key={swatch.label} type="button" aria-label={`선택 영역 ${swatch.label}`} title={swatch.label} onMouseDown={(event) => event.preventDefault()} onClick={() => onApplySnippet(`{{color:${swatch.token}|`, "}}", { toggle: true })}>
+              <ColorSwatchDot $color={swatch.hex} />
             </BubbleActionButton>
           ))}
         </SelectionBubbleToolbar>

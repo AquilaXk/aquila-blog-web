@@ -3,7 +3,6 @@ import { EditorState, StateEffect, StateField, type Range, type StateEffectType 
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
   buildMarkdownLivePreviewEntries,
-  ENTRY_FLAG_IN_TASK,
   hasIntervalOverlap,
   isTokenActive,
   resolveMarkdownLivePreviewPlanFromEntries,
@@ -200,28 +199,32 @@ const ACTIVE_WIDGET_KINDS = new Set<MarkdownLivePreviewDecoration["kind"]>([
   "fenced-code",
 ])
 
+const resolveTaskPrefixRange = (markdownValue: string, from: number, to: number) => {
+  const markerMatch = /^\[[ xX]\]/.exec(markdownValue.slice(from, to))
+  const markerTo = from + (markerMatch ? markerMatch[0].length : Math.min(3, to - from))
+  let prefixFrom = from
+  while (prefixFrom > 0 && /[ \t]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+  if (prefixFrom > 0 && /[-+*]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
+  return { from: prefixFrom, to: markerTo, markerTo }
+}
+
 const buildActiveWatchRanges = (
+  markdownValue: string,
   previewEntries: readonly MarkdownLivePreviewPlanEntry[],
-  tables: readonly RangeSpec[],
-  callouts: readonly RangeSpec[],
-  images: readonly RangeSpec[],
-  maths: readonly RangeSpec[],
-  mermaids: readonly RangeSpec[]
+  blockGroups: readonly (readonly RangeSpec[])[]
 ): RangeSpec[] => {
   const raw: RangeSpec[] = []
   for (const entry of previewEntries) {
-    if (entry.hideWhenActiveRange) {
-      raw.push({ from: entry.hideWhenActiveRange.from, to: entry.hideWhenActiveRange.to })
+    if (entry.hideWhenActiveRange) raw.push({ ...entry.hideWhenActiveRange })
+    if (entry.secondaryHideWhenActiveRange) raw.push({ ...entry.secondaryHideWhenActiveRange })
+    if (entry.kind === "task") {
+      const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
+      raw.push({ from: taskPrefix.from, to: taskPrefix.to })
+    } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
+      raw.push({ from: entry.from, to: entry.to })
     }
-    if (entry.secondaryHideWhenActiveRange) {
-      raw.push({
-        from: entry.secondaryHideWhenActiveRange.from,
-        to: entry.secondaryHideWhenActiveRange.to,
-      })
-    }
-    if (ACTIVE_WIDGET_KINDS.has(entry.kind)) raw.push({ from: entry.from, to: entry.to })
   }
-  for (const group of [tables, callouts, images, maths, mermaids]) {
+  for (const group of blockGroups) {
     for (const item of group) raw.push({ from: item.from, to: item.to })
   }
   raw.sort((a, b) => a.from - b.from || a.to - b.to)
@@ -292,14 +295,13 @@ const getCachedDocBlocks = (state: EditorState) => {
   })
 
   const maths = collectMathReplacementSpecs(markdownValue)
-  const activeWatchRanges = buildActiveWatchRanges(
-    previewEntries,
+  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [
     tables,
     callouts,
     images,
     maths,
-    mermaids
-  )
+    mermaids,
+  ])
 
   cachedDocBlocksEntry = {
     doc: state.doc,
@@ -337,23 +339,28 @@ const appendActiveAwareWidgetSpec = (
   ) {
     return false
   }
-  if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
 
   if (spec.kind === "task") {
-    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, spec.to))
-    ctx.decorations.push(
-      Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, spec.to) }).range(
-        spec.from,
-        spec.to
-      )
-    )
-  } else if (spec.kind === "wikilink") {
+    const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
+    if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return true
+    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, taskPrefix.markerTo))
     ctx.decorations.push(
       Decoration.replace({
-        widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
-      }).range(spec.from, spec.to)
+        widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo),
+      }).range(spec.from, taskPrefix.markerTo)
     )
-  } else if (spec.kind === "list-marker") {
+    return true
+  }
+
+  if (spec.kind === "list-marker") {
+    const taskGapMatch = /^([ \t]+)\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.to, spec.to + 8))
+    if (taskGapMatch) {
+      if (!isTokenActive(spec.from, spec.to + taskGapMatch[0].length, ctx.selections)) {
+        ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + taskGapMatch[1].length))
+      }
+      return true
+    }
+    if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
     const source = ctx.markdownValue.slice(spec.from, spec.to)
     const label = /^\d/.test(source) ? source : "•"
     const deco =
@@ -361,6 +368,16 @@ const appendActiveAwareWidgetSpec = (
         ? BULLET_MARKER_DECORATION
         : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
     ctx.decorations.push(deco.range(spec.from, spec.to))
+    return true
+  }
+
+  if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
+  if (spec.kind === "wikilink") {
+    ctx.decorations.push(
+      Decoration.replace({
+        widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
+      }).range(spec.from, spec.to)
+    )
   } else {
     ctx.decorations.push(QUOTE_MARKER_DECORATION.range(spec.from, spec.to))
   }
@@ -427,9 +444,7 @@ const appendSinglePlanSpecDecoration = (
   ctx: PlanSpecDecorationContext
 ): void => {
   if (spec.kind === "hide-mark") {
-    if (spec.flags === undefined || (spec.flags & ENTRY_FLAG_IN_TASK) === 0) {
-      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
-    }
+    ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
     return
   }
   if (spec.kind === "horizontal-rule") {

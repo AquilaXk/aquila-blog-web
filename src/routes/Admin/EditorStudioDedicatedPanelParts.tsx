@@ -121,7 +121,7 @@ export const EditorOutlineItem = styled.button`
   text-align: left;
   cursor: pointer;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   padding: 6px 8px;
   border-radius: 6px;
@@ -135,17 +135,9 @@ export const EditorOutlineItem = styled.button`
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  &[data-level="2"] {
-    padding-left: 18px;
-  }
-
-  &[data-level="3"] {
-    padding-left: 28px;
-  }
-
-  &[data-level="4"] {
-    padding-left: 38px;
-  }
+  &[data-level="2"] { padding-left: 18px; }
+  &[data-level="3"] { padding-left: 28px; }
+  &[data-level="4"] { padding-left: 38px; }
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.publicDesign.accent};
@@ -153,15 +145,32 @@ export const EditorOutlineItem = styled.button`
   }
 
   &[data-active="true"] {
-    color: ${({ theme }) => theme.colors.gray12};
+    background: rgba(35, 131, 226, 0.08);
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
     font-weight: 600;
   }
 
   span {
-    font-size: 11px;
-    font-weight: 600;
-    color: ${({ theme }) => theme.colors.gray11};
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font: 700 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
     flex-shrink: 0;
+  }
+
+  &[data-level="2"] span {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.22)" : "#f6f3f9")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
+  }
+
+  &[data-level="3"] span,
+  &[data-level="4"] span {
+    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
   }
 
   strong {
