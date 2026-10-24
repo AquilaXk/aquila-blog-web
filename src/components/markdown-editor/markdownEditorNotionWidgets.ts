@@ -363,14 +363,29 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   }
 }
 
+let cachedContainerBlocksEntry: {
+  doc: EditorState["doc"]
+  blocks: readonly NotionContainerBlock[]
+} | null = null
+
+const getCachedNotionContainerBlocks = (
+  doc: EditorState["doc"]
+): readonly NotionContainerBlock[] => {
+  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) {
+    return cachedContainerBlocksEntry.blocks
+  }
+  const blocks = parseNotionContainerBlocks(getDocString(doc))
+  cachedContainerBlocksEntry = { doc, blocks }
+  return blocks
+}
+
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
   if (mode === "source" || state.doc.length === 0) {
     return Decoration.none
   }
 
-  const docText = getDocString(state.doc)
-  const blocks = parseNotionContainerBlocks(docText)
+  const blocks = getCachedNotionContainerBlocks(state.doc)
   if (blocks.length === 0) {
     return Decoration.none
   }

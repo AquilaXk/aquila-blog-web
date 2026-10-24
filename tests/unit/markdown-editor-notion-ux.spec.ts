@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test"
 import {
+  isOffsetInsideFencedCodeBlock,
+  planMarkdownEditorTableEnter,
+} from "src/components/markdown-editor/markdownEditorKeyboardModel"
+import {
   isBlockLinePrefixSnippet,
   planNotionBlockPrefixBackspace,
   planNotionSpaceInputRule,
@@ -7,6 +11,14 @@ import {
   planToggleBlockLinePrefix,
 } from "src/components/markdown-editor/markdownEditorNotionModel"
 import { parseNotionContainerBlocks } from "src/components/markdown-editor/markdownEditorNotionWidgets"
+import {
+  applyMarkdownTableGridAction,
+  applyMarkdownTableGridCellEdit,
+  getMarkdownEditorTableEditAvailability,
+  parseMarkdownTableGrid,
+  planMarkdownEditorTableEdit,
+  serializeMarkdownTableGrid,
+} from "src/components/markdown-editor/markdownEditorTableModel"
 import {
   filterSlashCommandSpecs,
   resolveSlashCommandMutation,
@@ -297,5 +309,193 @@ test.describe("Notion-parity Markdown editor model", () => {
       selectionStart: 0,
       selectionEnd: 0,
     })
+
+    const enterTable = [
+      "| Name | Role |",
+      "| --- | --- |",
+      "| Alice | Admin |",
+      "| Bob | Editor |",
+    ].join("\n")
+
+    const headerRolePos = enterTable.indexOf("Role")
+    const moveFromHeader = planMarkdownEditorTableEnter(enterTable, headerRolePos, headerRolePos)
+    expect(moveFromHeader).not.toBeNull()
+    expect(moveFromHeader?.replacement).toBe(enterTable)
+    expect(enterTable.slice(moveFromHeader!.selectionStart).startsWith("Admin")).toBe(true)
+
+    const aliceRolePos = enterTable.indexOf("Admin")
+    const moveFromRow0 = planMarkdownEditorTableEnter(enterTable, aliceRolePos, aliceRolePos)
+    expect(moveFromRow0).not.toBeNull()
+    expect(enterTable.slice(moveFromRow0!.selectionStart).startsWith("Editor")).toBe(true)
+
+    const bobRolePos = enterTable.indexOf("Editor")
+    const appendAtBottom = planMarkdownEditorTableEnter(enterTable, bobRolePos, bobRolePos)
+    expect(appendAtBottom).not.toBeNull()
+    expect(appendAtBottom?.replacement).toBe(
+      [
+        "| Name | Role |",
+        "| --- | --- |",
+        "| Alice | Admin |",
+        "| Bob | Editor |",
+        "|  |  |",
+      ].join("\n")
+    )
+    expect(appendAtBottom!.selectionStart).toBe(appendAtBottom!.replacement.lastIndexOf("| ") + 2)
+
+    const table = [
+      "| ColA | ColB | ColC |",
+      "| --- | :---: | ---: |",
+      "| A1 | B1 | C1 |",
+      "| A2 | B2 | C2 |",
+    ].join("\n")
+
+    const b1Offset = table.indexOf("B1")
+    const availability = getMarkdownEditorTableEditAvailability(table, b1Offset, b1Offset)
+    expect(availability).toEqual({
+      addRow: true,
+      deleteRow: true,
+      addColumn: true,
+      deleteColumn: true,
+      alignLeft: true,
+      alignCenter: true,
+      alignRight: true,
+    })
+
+    const moveRowDown = planMarkdownEditorTableEdit(table, b1Offset, b1Offset, {
+      kind: "move-row-down",
+    })
+    expect(moveRowDown?.replacement).toBe(
+      [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A2 | B2 | C2 |",
+        "| A1 | B1 | C1 |",
+      ].join("\n")
+    )
+
+    const b2Offset = table.indexOf("B2")
+    const moveRowUp = planMarkdownEditorTableEdit(table, b2Offset, b2Offset, {
+      kind: "move-row-up",
+    })
+    expect(moveRowUp?.replacement).toBe(
+      [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A2 | B2 | C2 |",
+        "| A1 | B1 | C1 |",
+      ].join("\n")
+    )
+
+    const duplicateRow = planMarkdownEditorTableEdit(table, b1Offset, b1Offset, {
+      kind: "duplicate-row",
+    })
+    expect(duplicateRow?.replacement).toBe(
+      [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A1 | B1 | C1 |",
+        "| A1 | B1 | C1 |",
+        "| A2 | B2 | C2 |",
+      ].join("\n")
+    )
+
+    const insertRowAbove = planMarkdownEditorTableEdit(table, b2Offset, b2Offset, {
+      kind: "insert-row-above",
+    })
+    expect(insertRowAbove?.replacement).toBe(
+      [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A1 | B1 | C1 |",
+        "|  |  |  |",
+        "| A2 | B2 | C2 |",
+      ].join("\n")
+    )
+
+    const insertColLeft = planMarkdownEditorTableEdit(table, b1Offset, b1Offset, {
+      kind: "insert-column-left",
+    })
+    expect(insertColLeft?.replacement).toBe(
+      [
+        "| ColA |  | ColB | ColC |",
+        "| --- | --- | :---: | ---: |",
+        "| A1 |  | B1 | C1 |",
+        "| A2 |  | B2 | C2 |",
+      ].join("\n")
+    )
+
+    const moveColLeft = planMarkdownEditorTableEdit(table, b1Offset, b1Offset, {
+      kind: "move-column-left",
+    })
+    expect(moveColLeft?.replacement).toBe(
+      [
+        "| ColB | ColA | ColC |",
+        "| :---: | --- | ---: |",
+        "| B1 | A1 | C1 |",
+        "| B2 | A2 | C2 |",
+      ].join("\n")
+    )
+
+    const moveColRight = planMarkdownEditorTableEdit(table, b1Offset, b1Offset, {
+      kind: "move-column-right",
+    })
+    expect(moveColRight?.replacement).toBe(
+      [
+        "| ColA | ColC | ColB |",
+        "| --- | ---: | :---: |",
+        "| A1 | C1 | B1 |",
+        "| A2 | C2 | B2 |",
+      ].join("\n")
+    )
+
+    const grid = parseMarkdownTableGrid(table)
+    expect(grid).toEqual({
+      headers: ["ColA", "ColB", "ColC"],
+      alignments: ["left", "center", "right"],
+      rows: [
+        ["A1", "B1", "C1"],
+        ["A2", "B2", "C2"],
+      ],
+    })
+    expect(serializeMarkdownTableGrid(grid!)).toBe(table)
+
+    const editedCellMd = applyMarkdownTableGridCellEdit(table, 1, 1, "Updated | Pipe")
+    expect(editedCellMd).toContain("Updated \\| Pipe")
+
+    const actionResult = applyMarkdownTableGridAction(table, 1, 1, { kind: "add-row" })
+    expect(actionResult).toEqual({
+      markdown: [
+        "| ColA | ColB | ColC |",
+        "| --- | :---: | ---: |",
+        "| A1 | B1 | C1 |",
+        "|  |  |  |",
+        "| A2 | B2 | C2 |",
+      ].join("\n"),
+      nextRow: 2,
+      nextCol: 1,
+    })
+
+    const doc = [
+      "# Title",
+      "Paragraph outside",
+      "```ts",
+      "const inside1 = true",
+      "```",
+      "Middle paragraph",
+      "~~~py",
+      "inside2 = 42",
+      "~~~",
+      "Trailing paragraph",
+      "```",
+      "unclosed fence body",
+    ].join("\n")
+
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("Paragraph outside"))).toBe(false)
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("const inside1"))).toBe(true)
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("Middle paragraph"))).toBe(false)
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("inside2 = 42"))).toBe(true)
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("Trailing paragraph"))).toBe(false)
+    expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("unclosed fence body"))).toBe(true)
   })
 })
+

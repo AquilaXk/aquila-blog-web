@@ -1,6 +1,7 @@
 import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
+import { hasIntervalOverlap } from "./markdownEditorLivePreview"
 import {
   editorModeField,
   getDocString,
@@ -354,44 +355,132 @@ export const planNotionBlockPrefixBackspace = (
   }
 }
 
+type NotionDocLineMeta = {
+  doc: EditorState["doc"]
+  checkedTaskLineStarts: readonly number[]
+  fencedRanges: readonly { from: number; to: number }[]
+}
+
+let cachedNotionLineMeta: NotionDocLineMeta | null = null
+
+const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineMeta => {
+  if (cachedNotionLineMeta && cachedNotionLineMeta.doc === doc) {
+    return cachedNotionLineMeta
+  }
+  const docText = getDocString(doc)
+  if (
+    !docText.includes("```") &&
+    !docText.includes("~~~") &&
+    !/\[[xX]\]/.test(docText)
+  ) {
+    cachedNotionLineMeta = {
+      doc,
+      checkedTaskLineStarts: [],
+      fencedRanges: [],
+    }
+    return cachedNotionLineMeta
+  }
+
+  const logicalLines = buildLogicalLines(docText)
+  const checkedTaskLineStarts: number[] = []
+  const fencedRanges: { from: number; to: number }[] = []
+
+  for (const line of logicalLines) {
+    if (line.intersectsFence) {
+      const rangeEnd = line.end + 1
+      const prev = fencedRanges[fencedRanges.length - 1]
+      if (prev && prev.to >= line.start) {
+        prev.to = Math.max(prev.to, rangeEnd)
+      } else {
+        fencedRanges.push({ from: line.start, to: rangeEnd })
+      }
+      continue
+    }
+    if (CHECKED_TASK_LINE_RE.test(line.text)) {
+      checkedTaskLineStarts.push(line.start)
+    }
+  }
+
+  cachedNotionLineMeta = { doc, checkedTaskLineStarts, fencedRanges }
+  return cachedNotionLineMeta
+}
+
+const resolveActiveEmptyLineFrom = (
+  state: EditorState,
+  fencedRanges: readonly { from: number; to: number }[]
+): number => {
+  if (!state.selection.main.empty) return -1
+  const line = state.doc.lineAt(state.selection.main.head)
+  if (line.length !== 0) return -1
+  if (hasIntervalOverlap(fencedRanges, line.from, line.from + 1)) return -1
+  return line.from
+}
+
+let cachedActiveEmptyLineState: {
+  doc: EditorState["doc"]
+  mode: string
+  emptyLineFrom: number
+  decorations: DecorationSet
+} | null = null
+
 const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
   if (mode !== "live" || state.doc.length === 0) {
     return Decoration.none
   }
 
-  const docText = getDocString(state.doc)
-  const logicalLines = buildLogicalLines(docText)
+  const meta = getCachedNotionLineMeta(state.doc)
+  const activeEmptyLineFrom = resolveActiveEmptyLineFrom(state, meta.fencedRanges)
+  if (
+    cachedActiveEmptyLineState &&
+    cachedActiveEmptyLineState.doc === state.doc &&
+    cachedActiveEmptyLineState.mode === mode &&
+    cachedActiveEmptyLineState.emptyLineFrom === activeEmptyLineFrom
+  ) {
+    return cachedActiveEmptyLineState.decorations
+  }
+
   const decorations: Range<Decoration>[] = []
+  let insertedActiveEmpty = activeEmptyLineFrom < 0
 
-  const activeEmptyLineFrom = state.selection.main.empty
-    ? (() => {
-        const line = state.doc.lineAt(state.selection.main.head)
-        return line.length === 0 ? line.from : -1
-      })()
-    : -1
-
-  for (const line of logicalLines) {
-    if (line.intersectsFence) continue
-    if (line.start === activeEmptyLineFrom) {
+  for (const taskLineStart of meta.checkedTaskLineStarts) {
+    if (!insertedActiveEmpty && activeEmptyLineFrom < taskLineStart) {
       decorations.push(
         Decoration.line({
           class: "cm-live-empty-line",
           attributes: {
             "data-placeholder": ACTIVE_EMPTY_LINE_PLACEHOLDER,
           },
-        }).range(line.start)
+        }).range(activeEmptyLineFrom)
       )
-    } else if (CHECKED_TASK_LINE_RE.test(line.text)) {
-      decorations.push(
-        Decoration.line({
-          class: "cm-live-task-checked-line",
-        }).range(line.start)
-      )
+      insertedActiveEmpty = true
     }
+    decorations.push(
+      Decoration.line({
+        class: "cm-live-task-checked-line",
+      }).range(taskLineStart)
+    )
   }
 
-  return decorations.length > 0 ? Decoration.set(decorations, true) : Decoration.none
+  if (!insertedActiveEmpty) {
+    decorations.push(
+      Decoration.line({
+        class: "cm-live-empty-line",
+        attributes: {
+          "data-placeholder": ACTIVE_EMPTY_LINE_PLACEHOLDER,
+        },
+      }).range(activeEmptyLineFrom)
+    )
+  }
+
+  const result = decorations.length > 0 ? Decoration.set(decorations) : Decoration.none
+  cachedActiveEmptyLineState = {
+    doc: state.doc,
+    mode,
+    emptyLineFrom: activeEmptyLineFrom,
+    decorations: result,
+  }
+  return result
 }
 
 export const activeEmptyLineField = StateField.define<DecorationSet>({

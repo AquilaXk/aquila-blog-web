@@ -223,11 +223,29 @@ export const MarkdownEditorNotionChrome = ({
   useEffect(() => {
     if (mode !== "live" || disabled) return
     const container = containerRef.current
-    const bumpLayout = () => setLayoutTick((prev) => prev + 1)
+    let rafId: number | null = null
+    const bumpLayout = () => {
+      if (rafId !== null) return
+      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+        rafId = window.requestAnimationFrame(() => {
+          rafId = null
+          setLayoutTick((prev) => prev + 1)
+        })
+      } else {
+        setLayoutTick((prev) => prev + 1)
+      }
+    }
     container?.addEventListener("scroll", bumpLayout, true)
     window.addEventListener("resize", bumpLayout)
     window.addEventListener("scroll", bumpLayout, true)
     return () => {
+      if (
+        rafId !== null &&
+        typeof window !== "undefined" &&
+        typeof window.cancelAnimationFrame === "function"
+      ) {
+        window.cancelAnimationFrame(rafId)
+      }
       container?.removeEventListener("scroll", bumpLayout, true)
       window.removeEventListener("resize", bumpLayout)
       window.removeEventListener("scroll", bumpLayout, true)

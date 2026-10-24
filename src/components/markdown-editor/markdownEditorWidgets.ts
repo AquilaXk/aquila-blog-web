@@ -330,64 +330,7 @@ export class MarkdownCalloutWidget extends WidgetType {
   }
 }
 
-export class MarkdownTableWidget extends WidgetType {
-  constructor(private readonly markdown: string) {
-    super()
-  }
-
-  eq(other: MarkdownTableWidget) {
-    return other.markdown === this.markdown
-  }
-
-  toDOM() {
-    const wrap = document.createElement("div")
-    wrap.className = "cm-live-table-wrap"
-    const table = document.createElement("table")
-    table.className = "cm-live-table"
-
-    const lines = this.markdown.trim().split("\n").filter((l) => l.trim().length > 0)
-    if (lines.length === 0) return wrap
-
-    const parseCells = (line: string): string[] =>
-      line
-        .trim()
-        .replace(/^\|/, "")
-        .replace(/\|$/, "")
-        .split(/(?<!\\)\|/)
-        .map((cell) => cell.replaceAll("\\|", "|").trim())
-
-    const headerRow = lines[0]
-    if (headerRow) {
-      const thead = document.createElement("thead")
-      const tr = document.createElement("tr")
-      for (const cell of parseCells(headerRow)) {
-        const th = document.createElement("th")
-        appendInlineMarkdownNodes(th, cell)
-        tr.appendChild(th)
-      }
-      thead.appendChild(tr)
-      table.appendChild(thead)
-    }
-
-    const bodyStartIndex = lines[1] && /^[\s|:-]+$/.test(lines[1]) ? 2 : 1
-    if (lines.length > bodyStartIndex) {
-      const tbody = document.createElement("tbody")
-      for (let i = bodyStartIndex; i < lines.length; i += 1) {
-        const tr = document.createElement("tr")
-        for (const cell of parseCells(lines[i]!)) {
-          const td = document.createElement("td")
-          appendInlineMarkdownNodes(td, cell)
-          tr.appendChild(td)
-        }
-        tbody.appendChild(tr)
-      }
-      table.appendChild(tbody)
-    }
-
-    wrap.appendChild(table)
-    return wrap
-  }
-}
+export { MarkdownTableWidget } from "./markdownEditorTableWidget"
 
 export class MarkdownWikilinkWidget extends WidgetType {
   constructor(

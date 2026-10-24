@@ -1466,5 +1466,45 @@ test.describe("live Markdown writing surface", () => {
     await expect(toggleWidget).toBeVisible()
     await expect(toggleWidget).toContainText("토글 제목")
     await expect(toggleWidget).toContainText("숨겨진 본문")
+
+    const tableDoc = [
+      "| 이름 | 역할 |",
+      "| --- | --- |",
+      "| 앨리스 | 관리자 |",
+      "",
+      "표 밖 문단",
+    ].join("\n")
+    await fillMarkdown(page, tableDoc)
+    const outsideTableOffset = tableDoc.indexOf("표 밖 문단") + 2
+    await selectMarkdownRangeWithoutAssertion(page, outsideTableOffset, outsideTableOffset)
+
+    const tableWidget = page.getByTestId("cm-live-table-widget")
+    await expect(tableWidget).toBeVisible()
+    await tableWidget.locator("td").first().click()
+
+    const cellInput = tableWidget.getByTestId("cm-live-table-cell-input")
+    await expect(cellInput).toBeVisible()
+    await expect(cellInput).toHaveValue("앨리스")
+    await cellInput.fill("밥")
+    await cellInput.press("Tab")
+
+    await expect(tableWidget).toBeVisible()
+    await expect(cellInput).toBeVisible()
+    await expect(cellInput).toHaveValue("관리자")
+    await cellInput.fill("작성자")
+    await cellInput.press("Escape")
+
+    await expect(tableWidget).toBeVisible()
+    await tableWidget.getByTestId("cm-live-table-add-row").click()
+    await expect(tableWidget.locator("tbody tr")).toHaveCount(2)
+
+    await tableWidget.getByTestId("cm-live-table-add-col").click()
+    await expect(tableWidget.locator("thead th")).toHaveCount(3)
+    await page.keyboard.press("Escape")
+
+    await expect.poll(() => readMarkdown(page)).toContain("| 이름 | 역할 |  |")
+    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자 |  |")
   })
 })
+
+

@@ -283,11 +283,18 @@ export const MarkdownEditor = ({
     if (!tableEditAvailability) return true
     switch (edit.kind) {
       case "add-row":
+      case "insert-row-above":
+      case "duplicate-row":
         return !tableEditAvailability.addRow
+      case "move-row-up":
+      case "move-row-down":
       case "delete-row":
         return !tableEditAvailability.deleteRow
       case "add-column":
+      case "insert-column-left":
         return !tableEditAvailability.addColumn
+      case "move-column-left":
+      case "move-column-right":
       case "delete-column":
         return !tableEditAvailability.deleteColumn
       case "set-alignment":
@@ -458,9 +465,8 @@ export const MarkdownEditor = ({
     ) => {
       invalidateFindReplace()
       commitMarkdown(nextMarkdown, editorFocused, options)
-      checkSlashCommand(nextMarkdown, selectionRef.current)
     },
-    [checkSlashCommand, commitMarkdown, invalidateFindReplace]
+    [commitMarkdown, invalidateFindReplace]
   )
 
   return (

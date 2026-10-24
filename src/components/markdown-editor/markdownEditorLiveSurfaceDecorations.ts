@@ -516,10 +516,9 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
 
   for (const table of tableReplacements) {
     decorations.push(
-      Decoration.replace({ widget: new MarkdownTableWidget(table.markdown) }).range(
-        table.from,
-        table.to
-      )
+      Decoration.replace({
+        widget: new MarkdownTableWidget(table.markdown, table.from, table.to),
+      }).range(table.from, table.to)
     )
   }
 
