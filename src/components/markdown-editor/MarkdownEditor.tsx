@@ -24,7 +24,7 @@ import { planMarkdownSnippetMutation, planStripBlockLinePrefix } from "./markdow
 import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
 import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
-import { matchSlashCommandTrigger, resolveSlashCommandMutation, useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
+import { useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
 export { matchSlashCommandTrigger, resolveSlashCommandMutation, SLASH_COMMAND_SPECS } from "./useMarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = { editorFocused: boolean }
