@@ -347,34 +347,34 @@ export const SelectedTagChip = styled.span`
   border-radius: 5px;
   border: 1px solid rgba(35, 131, 226, 0.25);
   background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.18)" : "#e9f3f7")};
-  color: ${({ theme }) => (theme.scheme === "dark" ? "#60a5fa" : "#2383e2")};
+  color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
   overflow: hidden;
   transition: border-color 0.18s ease, background 0.18s ease;
 
   &:nth-of-type(6n + 2) {
     border-color: rgba(144, 101, 176, 0.25);
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.2)" : "#f6f3f9")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#c084fc" : "#9065b0")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
   }
   &:nth-of-type(6n + 3) {
     border-color: rgba(16, 185, 129, 0.25);
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.18)" : "#edf3ec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#34d399" : "#448361")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
   }
   &:nth-of-type(6n + 4) {
     border-color: rgba(245, 158, 11, 0.28);
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.18)" : "#fbf3db")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fbbf24" : "#cb912f")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fcd34d" : "#78490a")};
   }
   &:nth-of-type(6n + 5) {
     border-color: rgba(235, 87, 87, 0.25);
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(235, 87, 87, 0.18)" : "#fdebec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#f87171" : "#d44c47")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#fca5a5" : "#9c2520")};
   }
   &:nth-of-type(6n + 6) {
     border-color: rgba(2, 132, 199, 0.25);
     background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(2, 132, 199, 0.18)" : "#e0f2fe")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#38bdf8" : "#0284c7")};
+    color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#075985")};
   }
 
   .label {
