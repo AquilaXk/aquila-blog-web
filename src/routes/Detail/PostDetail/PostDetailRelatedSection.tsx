@@ -33,20 +33,12 @@ export const selectUniqueRelatedPosts = (
   limit = 2
 ): TPost[] => {
   if (limit <= 0) return []
-  const result: TPost[] = []
-  const seenIds = new Set<string>()
-  const sources = [relatedByTagPosts, relatedByAuthorPosts]
-  for (let s = 0; s < sources.length; s += 1) {
-    const list = sources[s]
-    for (let i = 0; i < list.length; i += 1) {
-      const post = list[i]
-      if (!post?.id || !post?.slug || seenIds.has(post.id)) continue
-      seenIds.add(post.id)
-      result.push(post)
-      if (result.length >= limit) return result
-    }
-  }
-  return result
+  const posts = [...relatedByTagPosts, ...relatedByAuthorPosts].filter(
+    (post): post is TPost => Boolean(post?.id && post?.slug)
+  )
+  return posts
+    .filter((post, index) => posts.findIndex((item) => item.id === post.id) === index)
+    .slice(0, limit)
 }
 
 const RelatedPostsSectionComponent = ({

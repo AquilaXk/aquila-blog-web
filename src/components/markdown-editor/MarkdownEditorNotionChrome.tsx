@@ -34,6 +34,11 @@ const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
   left: ${({ $left }) => $left}px;
   max-width: calc(100vw - 24px);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -246,10 +251,14 @@ const computeBubbleToolbarPosition = (
     }
     const centerX = (Math.min(startCoords.left, endCoords.left) + Math.max(startCoords.right, endCoords.right)) / 2
     const left = Math.max(12, Math.min(Math.round(centerX - estimatedWidth / 2), viewportWidth - estimatedWidth - 12))
-    const placeBelow = startCoords.top - (containerRect?.top ?? 0) < 52
+    const bottomEdge = Math.max(startCoords.bottom, endCoords.bottom)
+    const isMobileViewport = viewportWidth <= 820
+    const placeBelow = isMobileViewport
+      ? bottomEdge + 60 <= viewportHeight
+      : startCoords.top - (containerRect?.top ?? 0) < 52
     const top = placeBelow
-      ? Math.min(viewportHeight - 52, Math.round(Math.max(startCoords.bottom, endCoords.bottom) + 8))
-      : Math.max(12, Math.round(startCoords.top - 44))
+      ? Math.min(viewportHeight - 56, Math.round(bottomEdge + 8))
+      : Math.max(12, Math.round(startCoords.top - 48))
     return { top, left }
   }
 

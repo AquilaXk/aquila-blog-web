@@ -5,6 +5,7 @@ import type {
   MarkdownEditorCommandDescriptor,
 } from "./markdownEditorCommandRegistryModel"
 import type { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
+import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import {
   EditorToolbar,
@@ -42,6 +43,7 @@ type MarkdownEditorToolbarProps = {
   onApplySnippet: (before: string, after?: string, options?: { toggle?: boolean }) => void
   onApplyFormatShortcut: (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => void
   onApplyListCommand: (command: MarkdownEditorListCommand) => void
+  onApplyLineCommand?: (command: MarkdownEditorLineCommand) => void
   onApplyBlockSnippet: (spec: BlockSnippetSpec) => void
   onInsertTable: () => void
   onApplyTableEdit: (edit: MarkdownEditorTableEdit) => void
@@ -76,6 +78,7 @@ const MarkdownEditorToolbarView = ({
   onApplySnippet,
   onApplyFormatShortcut,
   onApplyListCommand,
+  onApplyLineCommand,
   onApplyBlockSnippet,
   onInsertTable,
   onApplyTableEdit,
@@ -147,6 +150,7 @@ const MarkdownEditorToolbarView = ({
         <ToolbarButton
           key={title}
           type="button"
+          data-mobile-hidden="true"
           title={title}
           aria-label={title}
           disabled={disabled}
@@ -268,6 +272,35 @@ const MarkdownEditorToolbarView = ({
                   toggle: "toggle" in snippet && snippet.toggle,
                 }),
             })),
+          {
+            id: "format.highlight",
+            label: "하이라이트 (==)",
+            onSelect: () => onApplySnippet("==", "==", { toggle: true }),
+          },
+          ...(onApplyLineCommand
+            ? [
+                {
+                  id: "line.move-up",
+                  label: "현재 줄 위로 이동",
+                  onSelect: () => onApplyLineCommand("move-up"),
+                },
+                {
+                  id: "line.move-down",
+                  label: "현재 줄 아래로 이동",
+                  onSelect: () => onApplyLineCommand("move-down"),
+                },
+                {
+                  id: "line.duplicate",
+                  label: "현재 줄 복제",
+                  onSelect: () => onApplyLineCommand("duplicate"),
+                },
+                {
+                  id: "line.delete",
+                  label: "현재 줄 삭제",
+                  onSelect: () => onApplyLineCommand("delete"),
+                },
+              ]
+            : []),
           {
             id: "media.image",
             label: "이미지",

@@ -35,8 +35,8 @@ export const EditorToolbar = styled.div`
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
   @media (max-width: 820px) {
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 4px 6px;
+    padding: 4px 10px;
   }
 `
 
@@ -90,7 +90,16 @@ export const ToolbarButton = styled.button<{ $active?: boolean }>`
     cursor: not-allowed;
   }
 
-  @media (max-width: 768px), (pointer: coarse) { height: 44px; min-height: 44px; min-width: 44px; }
+  @media (max-width: 820px) {
+    height: 38px;
+    min-height: 38px;
+    min-width: 36px;
+    padding: 0 7px;
+
+    &[data-mobile-hidden="true"] {
+      display: none;
+    }
+  }
 `
 
 export const ToolbarSelect = styled.select`
@@ -316,7 +325,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     opacity: 0.65;
   }
 
-  @media (max-width: 820px) { font-size: 15px; }
+  @media (max-width: 820px) { font-size: 16px; line-height: 1.7; }
   [data-testid="markdown-editor-live-surface"] { height: 100%; }
 
   .cm-editor {
@@ -325,7 +334,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     color: ${({ theme }) => theme.colors.gray12};
   }
   .cm-editor.cm-focused { outline: none; }
-  .cm-scroller { overscroll-behavior: contain; }
+  .cm-scroller { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .cm-content {
     caret-color: ${({ theme }) => theme.colors.gray12};
     padding-left: 64px;

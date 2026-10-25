@@ -505,6 +505,7 @@ export const MarkdownEditor = ({
         onApplySnippet={applySnippet}
         onApplyFormatShortcut={applyFormatShortcutOrAppend}
         onApplyListCommand={applyListCommand}
+        onApplyLineCommand={applyLineCommand}
         onApplyBlockSnippet={applyBlockSnippet}
         onInsertTable={insertTable}
         onApplyTableEdit={applyTableEdit}

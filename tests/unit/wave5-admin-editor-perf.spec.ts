@@ -315,4 +315,40 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
       else delete (globalThis as Record<string, unknown>).HTMLElement
     }
   })
+
+  test("mobile blog writing surface collapses sidebars by default, preserves full-height grid canvas, and exposes line commands in more menu", () => {
+    const surfaceSource = readFileSync(
+      resolve(__dirname, "../../src/routes/Admin/EditorStudioDedicatedEditorSurface.tsx"),
+      "utf8"
+    )
+    const surfacePartsSource = readFileSync(
+      resolve(__dirname, "../../src/routes/Admin/EditorStudioDedicatedEditorSurfaceParts.tsx"),
+      "utf8"
+    )
+    const panelPartsSource = readFileSync(
+      resolve(__dirname, "../../src/routes/Admin/EditorStudioDedicatedPanelParts.tsx"),
+      "utf8"
+    )
+    const editorStylesSource = readFileSync(
+      resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts"),
+      "utf8"
+    )
+    const toolbarSource = readFileSync(
+      resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorToolbar.tsx"),
+      "utf8"
+    )
+
+    expect(surfaceSource).toContain('window.matchMedia("(max-width: 820px)")')
+    expect(surfaceSource).toContain("syncViewportPanels")
+    expect(surfacePartsSource).toContain("grid-template-columns: minmax(0, 1fr);")
+    expect(surfacePartsSource).toContain("grid-template-rows: minmax(0, 1fr);")
+    expect(panelPartsSource).toContain("max-height: min(72dvh, 520px);")
+    expect(panelPartsSource).toContain("max-height: min(78dvh, 580px);")
+    expect(editorStylesSource).toContain("@media (max-width: 820px) { font-size: 16px; line-height: 1.7; }")
+    expect(editorStylesSource).toContain("&[data-mobile-hidden=\"true\"]")
+    expect(toolbarSource).toContain('id: "line.move-up"')
+    expect(toolbarSource).toContain('id: "line.move-down"')
+    expect(toolbarSource).toContain('id: "line.duplicate"')
+    expect(toolbarSource).toContain('id: "line.delete"')
+  })
 })

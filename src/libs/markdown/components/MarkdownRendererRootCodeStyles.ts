@@ -117,7 +117,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x;
     background: #0f1728;
   }
 

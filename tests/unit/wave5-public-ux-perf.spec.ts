@@ -128,7 +128,7 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
     const codeStyles = readRepoFile(
       "src/libs/markdown/components/MarkdownRendererRootCodeStyles.ts"
     )
-    expect(codeStyles).toContain("touch-action: pan-x pan-y;")
+    expect(codeStyles).toContain("touch-action: pan-x;")
     expect(codeStyles).toContain(".aq-code-copy.is-failed")
 
     const tableStyles = readRepoFile(

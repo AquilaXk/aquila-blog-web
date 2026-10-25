@@ -28,8 +28,16 @@ export const EditorStudioStatusBar = styled.footer`
 
   @media (max-width: 820px) {
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 10px;
-    padding: 4px 12px;
+    min-height: 24px;
+    padding: 3px 12px;
+    font-size: 10.5px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 `
 
@@ -114,7 +122,17 @@ export const EditorOutline = styled.aside`
   }
 
   @media (max-width: 820px) {
-    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 160;
+    max-height: min(72dvh, 520px);
+    border-right: 0;
+    border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 `
 
@@ -223,7 +241,7 @@ export const LocalDraftRestoreCard = styled.div`
     color: ${({ theme }) => theme.colors.gray12};
     box-sizing: border-box;
     ${focusVisibleRing}
-    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; font-size: 16px; }
   }
 
   .card-actions {
@@ -322,7 +340,21 @@ export const EditorInspector = styled.aside`
   }
 
   @media (max-width: 820px) {
-    max-height: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 160;
+    max-height: min(78dvh, 580px);
+    border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 `
 
