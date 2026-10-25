@@ -103,18 +103,23 @@ export const isLikelyFileUrl = (url: string) => {
 export const resolveEmbedPreviewUrl = (url: string) => {
   try {
     const parsedUrl = new URL(url)
+    if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") return ""
     const host = parsedUrl.hostname.replace(/^www\./i, "").toLowerCase()
 
     if (host === "youtube.com" || host === "youtu.be") {
+      const embedMatch = parsedUrl.pathname.match(/^\/embed\/([a-zA-Z0-9_-]+)/)
       const videoId =
         host === "youtu.be"
           ? parsedUrl.pathname.replace(/^\/+/, "")
-          : parsedUrl.searchParams.get("v") || ""
+          : embedMatch?.[1] || parsedUrl.searchParams.get("v") || ""
       return videoId ? `https://www.youtube.com/embed/${videoId}` : ""
     }
 
-    if (host === "vimeo.com") {
-      const videoId = parsedUrl.pathname.replace(/^\/+/, "")
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const videoId =
+        host === "player.vimeo.com"
+          ? parsedUrl.pathname.replace(/^\/video\/+/, "").replace(/^\/+/, "")
+          : parsedUrl.pathname.replace(/^\/+/, "")
       return videoId ? `https://player.vimeo.com/video/${videoId}` : ""
     }
 
@@ -124,12 +129,25 @@ export const resolveEmbedPreviewUrl = (url: string) => {
     }
 
     if (hostMatches(host, "figma.com")) {
+      if (parsedUrl.pathname === "/embed") {
+        const nestedRaw = parsedUrl.searchParams.get("url") || ""
+        if (!nestedRaw) return ""
+        const nestedUrl = new URL(nestedRaw)
+        const nestedHost = nestedUrl.hostname.replace(/^www\./i, "").toLowerCase()
+        if (
+          (nestedUrl.protocol !== "https:" && nestedUrl.protocol !== "http:") ||
+          !hostMatches(nestedHost, "figma.com")
+        ) {
+          return ""
+        }
+        return `https://www.figma.com/embed?embed_host=aquila-blog&url=${encodeURIComponent(nestedUrl.toString())}`
+      }
       return `https://www.figma.com/embed?embed_host=aquila-blog&url=${encodeURIComponent(parsedUrl.toString())}`
     }
 
     if (hostMatches(host, "codepen.io")) {
       const parts = parsedUrl.pathname.split("/").filter(Boolean)
-      if (parts.length >= 3 && parts[1] === "pen") {
+      if (parts.length >= 3 && (parts[1] === "pen" || parts[1] === "embed")) {
         return `https://codepen.io/${parts[0]}/embed/${parts[2]}?default-tab=result`
       }
     }
@@ -137,6 +155,9 @@ export const resolveEmbedPreviewUrl = (url: string) => {
     if (hostMatches(host, "codesandbox.io")) {
       if (parsedUrl.pathname.startsWith("/s/")) {
         return `https://codesandbox.io/embed${parsedUrl.pathname}?view=preview`
+      }
+      if (parsedUrl.pathname.startsWith("/embed/s/")) {
+        return `https://codesandbox.io${parsedUrl.pathname}?view=preview`
       }
     }
   } catch {

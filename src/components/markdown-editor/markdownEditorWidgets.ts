@@ -44,10 +44,10 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}]+?)\s*\|\s*([^{}]+?)\s*\}\}|(<br\s*\/?>)|\[\[([^\][\r\n|]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/gi
+  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}\\]+?)\s*\\?\|\s*([^{}]+?)\s*\}\}|(<br\s*\/?>)|\[\[([^\][\r\n|\\]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/gi
 
-const isSafeInlineHref = (href: string): boolean =>
-  /^(?:\/|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(href.trim())
+export const isSafeInlineHref = (href: string): boolean =>
+  /^(?:\/(?![/\\])|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(href.trim())
 
 const createInlineMathSpan = (math: string): HTMLElement => {
   const span = document.createElement("span")

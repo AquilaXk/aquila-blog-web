@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test"
 import {
+  applyMarkdownTableGridAction,
+  applyMarkdownTableGridCellEdit,
+  applyMarkdownTableGridPaste,
   createMarkdownEditorTable,
   isMarkdownEditorTableSelection,
+  parseMarkdownTableGrid,
   planMarkdownEditorTableEdit,
   planMarkdownEditorTableTab,
+  serializeMarkdownTableGrid,
 } from "../../src/components/markdown-editor/markdownEditorTableModel"
 import { applyPlannedTextMutationToValue } from "../../src/components/markdown-editor/markdownEditorTextMutation"
 
@@ -126,4 +131,127 @@ test.describe("markdown editor table model", () => {
     expect(planMarkdownEditorTableEdit(table, delimiterCaret, delimiterCaret, { kind: "add-column" })).toBeNull()
     expect(planMarkdownEditorTableTab(table, 0, 1, "next")).toBeNull()
   })
+
+  test("preserves escaped pipes inside {{color:...}} and [[...]] and inline code when round-tripping table cells", () => {
+    const rawTable = [
+      "| Color | Link | Code | Status |",
+      "| --- | --- | --- | --- |",
+      "| {{color:red\\|hi}} | [[page\\|label]] | `a\\|b` | initial |",
+    ].join("\n")
+
+    const parsed = parseMarkdownTableGrid(rawTable)
+    expect(parsed).toEqual({
+      headers: ["Color", "Link", "Code", "Status"],
+      alignments: ["left", "left", "left", "left"],
+      rows: [["{{color:red|hi}}", "[[page|label]]", "`a|b`", "initial"]],
+    })
+
+    const updated = applyMarkdownTableGridCellEdit(rawTable, 1, 3, "done")
+    expect(updated).toBe(
+      [
+        "| Color | Link | Code | Status |",
+        "| --- | --- | --- | --- |",
+        "| {{color:red\\|hi}} | [[page\\|label]] | `a\\|b` | done |",
+      ].join("\n")
+    )
+
+    const reparsed = parseMarkdownTableGrid(updated!)
+    expect(reparsed?.headers).toHaveLength(4)
+    expect(reparsed?.rows[0]).toEqual(["{{color:red|hi}}", "[[page|label]]", "`a|b`", "done"])
+  })
+
+  test("parses and serializes blockquote and indented tables without dropping prefixes or columns", () => {
+    const fullQuoted = [
+      "> | A | B |",
+      "> | --- | --- |",
+      "> | 1 | 2 |",
+    ].join("\n")
+
+    const gridA = parseMarkdownTableGrid(fullQuoted)
+    expect(gridA).toEqual({
+      headers: ["A", "B"],
+      alignments: ["left", "left"],
+      rows: [["1", "2"]],
+    })
+    expect(serializeMarkdownTableGrid(gridA!)).toBe(fullQuoted)
+    expect(applyMarkdownTableGridCellEdit(fullQuoted, 1, 1, "20")).toBe(
+      [
+        "> | A | B |",
+        "> | --- | --- |",
+        "> | 1 | 20 |",
+      ].join("\n")
+    )
+
+    const lezerSliceQuoted = [
+      "| A | B |",
+      "> | --- | --- |",
+      "> | 1 | 2 |",
+    ].join("\n")
+
+    const gridB = parseMarkdownTableGrid(lezerSliceQuoted)
+    expect(gridB).toEqual({
+      headers: ["A", "B"],
+      alignments: ["left", "left"],
+      rows: [["1", "2"]],
+    })
+    expect(applyMarkdownTableGridCellEdit(lezerSliceQuoted, 1, 0, "10")).toBe(
+      [
+        "| A | B |",
+        "> | --- | --- |",
+        "> | 10 | 2 |",
+      ].join("\n")
+    )
+    expect(applyMarkdownTableGridAction(lezerSliceQuoted, 1, 0, { kind: "add-row" })?.markdown).toBe(
+      [
+        "| A | B |",
+        "> | --- | --- |",
+        "> | 1 | 2 |",
+        "> |  |  |",
+      ].join("\n")
+    )
+
+    const indentedTable = [
+      "  | A | B |",
+      "  | --- | --- |",
+      "  | 1 | 2 |",
+    ].join("\n")
+    expect(parseMarkdownTableGrid(indentedTable)).toEqual({
+      headers: ["A", "B"],
+      alignments: ["left", "left"],
+      rows: [["1", "2"]],
+    })
+    expect(applyMarkdownTableGridCellEdit(indentedTable, 1, 1, "99")).toBe(
+      [
+        "  | A | B |",
+        "  | --- | --- |",
+        "  | 1 | 99 |",
+      ].join("\n")
+    )
+  })
+
+  test("parses quoted TSV cells with embedded newlines and ignores multi-line prose with commas", () => {
+    const baseTable = ["| Col1 | Col2 |", "| --- | --- |", "| old1 | old2 |"].join("\n")
+
+    const quotedTsv = applyMarkdownTableGridPaste(
+      baseTable,
+      1,
+      0,
+      '"line1\nline2"\t"Say ""hi"""'
+    )
+    expect(quotedTsv).toEqual({
+      markdown: [
+        "| Col1 | Col2 |",
+        "| --- | --- |",
+        '| line1 line2 | Say "hi" |',
+      ].join("\n"),
+      nextRow: 1,
+      nextCol: 1,
+      pastedRows: 1,
+      pastedCols: 2,
+    })
+
+    const proseWithCommas = "Hello, world.\nThis is prose, not a table."
+    expect(applyMarkdownTableGridPaste(baseTable, 1, 0, proseWithCommas)).toBeNull()
+  })
 })
+

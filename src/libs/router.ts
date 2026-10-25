@@ -94,6 +94,9 @@ const normalizeNextDataPath = (value: string, fallback: string): string => {
   } else {
     routePath = routePath.replace(/\/index$/, "") || "/"
   }
+  if (!routePath.startsWith("/") || routePath.startsWith("//") || routePath.startsWith("/\\")) {
+    return fallback
+  }
 
   const params = new URLSearchParams(search)
   params.delete("next")
@@ -108,7 +111,7 @@ export const normalizeNextPath = (input: NextPathInput, fallback = "/"): string 
   if (typeof raw !== "string") return fallback
 
   const value = raw.trim()
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback
 
   if (value.startsWith("/_next/data/")) {
     return normalizeNextDataPath(value, fallback)

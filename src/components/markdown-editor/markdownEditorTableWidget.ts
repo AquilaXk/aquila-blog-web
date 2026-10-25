@@ -24,7 +24,7 @@ import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean; mode?: "cell" | "row" | "col" }
 type ActiveCellEditorSession = { row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean }
-type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean }
+type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean; destroy: () => void }
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
@@ -66,11 +66,7 @@ const patchTableCellsInPlace = (
 }
 
 export class MarkdownTableWidget extends WidgetType {
-  constructor(
-    private readonly markdown: string,
-    private readonly from?: number,
-    private readonly to?: number
-  ) {
+  constructor(private readonly markdown: string, private readonly from?: number, private readonly to?: number) {
     super()
   }
 
@@ -85,6 +81,11 @@ export class MarkdownTableWidget extends WidgetType {
   updateDOM(dom: HTMLElement, _view: EditorView) {
     const controller = tableDomControllers.get(dom)
     return controller ? controller.update(this.markdown, this.from, this.to) : false
+  }
+
+  destroy(dom: HTMLElement) {
+    tableDomControllers.get(dom)?.destroy()
+    tableDomControllers.delete(dom)
   }
 
   toDOM(view?: EditorView) {
@@ -118,16 +119,28 @@ export class MarkdownTableWidget extends WidgetType {
     let outsideListenerAttached = false
     let activeSession: ActiveCellEditorSession | null = null
 
+    const handleLifecycleFlush = () => flushAndDispatchActiveCell()
+
     const detachOutsideListener = () => {
-      if (!outsideListenerAttached || typeof document === "undefined" || typeof document.removeEventListener !== "function") return
+      if (!outsideListenerAttached) return
       outsideListenerAttached = false
-      document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+      }
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("pagehide", handleLifecycleFlush)
+        window.removeEventListener("beforeunload", handleLifecycleFlush)
+      }
     }
 
     const handleOutsideMouseDown = (event: MouseEvent) => {
-      if (!wrap.isConnected) return detachOutsideListener()
+      if (!wrap.isConnected) {
+        flushAndDispatchActiveCell()
+        return detachOutsideListener()
+      }
       const target = event.target as HTMLElement | null
       if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
+      flushAndDispatchActiveCell()
       isTableActive = false
       detachOutsideListener()
       syncActiveCellHighlight()
@@ -135,9 +148,15 @@ export class MarkdownTableWidget extends WidgetType {
 
     const markTableActive = () => {
       isTableActive = true
-      if (!outsideListenerAttached && typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      if (!outsideListenerAttached) {
         outsideListenerAttached = true
-        document.addEventListener("mousedown", handleOutsideMouseDown, true)
+        if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+          document.addEventListener("mousedown", handleOutsideMouseDown, true)
+        }
+        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+          window.addEventListener("pagehide", handleLifecycleFlush)
+          window.addEventListener("beforeunload", handleLifecycleFlush)
+        }
       }
       if (typeof view.state.doc?.lineAt !== "function") return
       const range = resolveRange()
@@ -190,6 +209,12 @@ export class MarkdownTableWidget extends WidgetType {
       return applyMarkdownTableGridCellEdit(currentMarkdown, session.row, session.col, nextValue) ?? currentMarkdown
     }
 
+    const flushAndDispatchActiveCell = () => {
+      if (!activeSession || activeSession.handled) return
+      const committed = flushActiveCellMarkdown()
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+    }
+
     const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
       if (!view.state.facet(EditorView.editable)) return
       markTableActive()
@@ -204,9 +229,7 @@ export class MarkdownTableWidget extends WidgetType {
       activeCol = outcome.nextCol
       syncActiveCellHighlight()
       dispatchTableMarkdown(outcome.markdown, {
-        row: outcome.nextRow,
-        col: outcome.nextCol,
-        openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
+        row: outcome.nextRow, col: outcome.nextCol, openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
       })
     }
 
@@ -237,6 +260,7 @@ export class MarkdownTableWidget extends WidgetType {
       executeGridAction: (action) => executeGridAction(action),
       onActivateToolbar: () => { markTableActive(); syncActiveCellHighlight() },
       onEditSource: () => {
+        flushAndDispatchActiveCell()
         const range = resolveRange()
         if (!range) return
         view.focus()
@@ -457,35 +481,30 @@ export class MarkdownTableWidget extends WidgetType {
         }
       })
 
-      input.addEventListener("blur", () => { if (input.isConnected) commitAndCloseSession() })
+      input.addEventListener("blur", () => commitAndCloseSession())
 
       const focusInput = () => {
         if (session.handled) return
-        try {
-          input.focus()
-          input.setSelectionRange(input.value.length, input.value.length)
-          input.scrollLeft = 0
-        } catch {}
+        try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); input.scrollLeft = 0 } catch {}
       }
       focusInput()
       if (typeof queueMicrotask === "function") queueMicrotask(focusInput)
     }
 
     const applyPendingCellActivation = () => {
-      if (pendingTableCellActivation && (currentFrom === undefined || pendingTableCellActivation.from === currentFrom)) {
-        const target = pendingTableCellActivation
-        pendingTableCellActivation = null
-        markTableActive()
-        if (target.openEditor === false) {
-          activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
-          activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
-          if (target.mode) selectedMode = target.mode
-          syncActiveCellHighlight()
-          focusTableWrap()
-          if (typeof queueMicrotask === "function") queueMicrotask(focusTableWrap)
-        } else {
-          activateCellEditor(target.row, target.col)
-        }
+      if (!pendingTableCellActivation || (currentFrom !== undefined && pendingTableCellActivation.from !== currentFrom)) return
+      const target = pendingTableCellActivation
+      pendingTableCellActivation = null
+      markTableActive()
+      if (target.openEditor === false) {
+        activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
+        activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
+        if (target.mode) selectedMode = target.mode
+        syncActiveCellHighlight()
+        focusTableWrap()
+        if (typeof queueMicrotask === "function") queueMicrotask(focusTableWrap)
+      } else {
+        activateCellEditor(target.row, target.col)
       }
     }
 
@@ -503,13 +522,9 @@ export class MarkdownTableWidget extends WidgetType {
       if (!nextGrid) return false
       visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
-      if (activeSession && !activeSession.handled) {
-        activeSession.handled = true
-        activeSession = null
-      }
+      if (activeSession && !activeSession.handled) { activeSession.handled = true; activeSession = null }
 
       const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
-
       if (sameShape) {
         patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
         syncTableColGroupWidths(colElements, visualOptions.columnWidths)
@@ -522,15 +537,9 @@ export class MarkdownTableWidget extends WidgetType {
       if (!sameShape) {
         while (visualOptions.columnWidths.length < grid.headers.length) visualOptions.columnWidths.push(0)
         if (visualOptions.columnWidths.length > grid.headers.length) visualOptions.columnWidths.length = grid.headers.length
-        const nextSurface = buildSurface()
-        gridRow = nextSurface.gridRow
-        addRowBtn = nextSurface.addRowBtn
-        cellElements = nextSurface.cellElements
-        colElements = nextSurface.colElements
+        ;({ gridRow, addRowBtn, cellElements, colElements } = buildSurface())
         wrap.textContent = ""
-        wrap.appendChild(toolbar)
-        wrap.appendChild(gridRow)
-        wrap.appendChild(addRowBtn)
+        for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
       }
 
       activeRow = Math.max(0, Math.min(activeRow, grid.rows.length))
@@ -547,21 +556,9 @@ export class MarkdownTableWidget extends WidgetType {
     wrap.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!isTableActive || (activeSession && !activeSession.handled)) return
       const stop = () => { event.preventDefault(); event.stopPropagation() }
-      if (event.key === "Escape") {
-        stop()
-        isTableActive = false
-        detachOutsideListener()
-        return syncActiveCellHighlight()
-      }
-      if (event.key === "Enter" || event.key === "F2") {
-        stop()
-        return activateCellEditor(activeRow, activeCol)
-      }
-      if (event.key === "Tab") {
-        stop()
-        selectedMode = "cell"
-        return executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, activeRow, activeCol, false)
-      }
+      if (event.key === "Escape") { stop(); isTableActive = false; detachOutsideListener(); return syncActiveCellHighlight() }
+      if (event.key === "Enter" || event.key === "F2") { stop(); return activateCellEditor(activeRow, activeCol) }
+      if (event.key === "Tab") { stop(); selectedMode = "cell"; return executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, activeRow, activeCol, false) }
       if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "ArrowLeft" || event.key === "ArrowRight") {
         stop()
         if (event.key === "ArrowUp") activeRow = Math.max(0, activeRow - 1)
@@ -586,10 +583,11 @@ export class MarkdownTableWidget extends WidgetType {
       }
     })
 
-    tableDomControllers.set(wrap, { update })
-    wrap.appendChild(toolbar)
-    wrap.appendChild(gridRow)
-    wrap.appendChild(addRowBtn)
+    tableDomControllers.set(wrap, {
+      update,
+      destroy: () => { flushAndDispatchActiveCell(); detachOutsideListener() },
+    })
+    for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
     syncActiveCellHighlight()
     applyPendingCellActivation()
     return wrap

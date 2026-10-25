@@ -26,6 +26,7 @@ test.describe("post image URL policy", () => {
       "https://api.aquilaxk.site/post/api/v1/images/posts/example.png",
       "https://user:pass@blog.aquilaxk.site/post/api/v1/images/posts/example.png",
       "//blog.aquilaxk.site/post/api/v1/images/posts/example.png",
+      "/\\blog.aquilaxk.site/post/api/v1/images/posts/example.png",
       "data:image/png;base64,abc",
       "blob:https://blog.aquilaxk.site/example",
       "https://blog.aquilaxk.site/post/api/v1/images/",
@@ -56,6 +57,7 @@ test.describe("post image URL policy", () => {
       expect(detectPublishPlaceholderIssue("> ![external][quoted]\n>\n> [quoted]: https://cdn.example.test/post.png")).toContain("Aquila 이미지 URL")
       expect(detectPublishPlaceholderIssue('<!-- aq-bookmark {"thumbnailUrl":"https://cdn.example.test/card.png"} -->\n:::bookmark /posts/1\n외부 카드\n:::')).toContain("Aquila 이미지 URL")
       expect(detectPublishPlaceholderIssue('<!-- aq-bookmark {"thumbnailUrl":"javascript:alert(1)"} -->\n:::bookmark /posts/1\n제거되는 카드\n:::')).toBeNull()
+      expect(detectPublishPlaceholderIssue('<!-- aq-bookmark {"thumbnailUrl":"/\\\\cdn.example.test/card.png"} -->\n:::bookmark /posts/1\n제거되는 카드\n:::')).toBeNull()
       expect(detectPublishPlaceholderIssue("```md\n![example](https://cdn.example.test/post.png)\n```\n")).toBeNull()
       expect(detectPublishPlaceholderIssue("~~~md\n![example](https://cdn.example.test/post.png)\n~~~\n")).toBeNull()
       expect(detectPublishPlaceholderIssue("````md\n![example](https://cdn.example.test/post.png)\n```\n![outside](https://cdn.example.test/post.png)\n````")).toBeNull()

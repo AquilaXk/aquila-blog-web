@@ -1008,6 +1008,19 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.getAttribute("data-active-mode")).toBeNull()
       expect(widget.ignoreEvent()).toBe(true)
 
+      const tdsAfterNav = dom.querySelectorAll("td")
+      tdsAfterNav[1].trigger("click")
+      const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforePagehide.value = "SavedOnPagehide"
+      for (const fn of windowListeners.get("pagehide") ?? []) fn({ type: "pagehide" })
+      expect(lastDispatchedInsert).toContain("| P1 | SavedOnPagehide | Z1 |  |")
+
+      tdsAfterNav[0].trigger("click")
+      const dirtyInputBeforeDestroy = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforeDestroy.value = "SavedOnDestroy"
+      ;(widget as any).destroy(dom)
+      expect(lastDispatchedInsert).toContain("| SavedOnDestroy | SavedOnPagehide | Z1 |  |")
+
       const deleteTableBtn = dom.querySelector('[data-testid="cm-live-table-delete-table"]')
       expect(deleteTableBtn).not.toBeNull()
       let deletedInsert: string | null = null

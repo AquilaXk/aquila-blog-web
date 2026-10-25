@@ -27,8 +27,13 @@ import {
   resolveDashboardDataUpdatedAt,
 } from "../../src/routes/Admin/AdminDashboardWorkspaceModel"
 import { normalizeApiRequestPath } from "../../src/libs/backend/requestPath"
+import { renderMarkdownSegment } from "../../src/libs/markdown/MarkdownRendererSegments"
+import { normalizeInlineColorToken, resolveInlineColorValue } from "../../src/libs/markdown/inlineColor"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
+import { normalizeSafeMarkdownUrl } from "../../src/libs/markdown/safeMarkdownUrl"
 import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
+import { isSafeInlineHref } from "../../src/components/markdown-editor/markdownEditorWidgets"
+import { normalizeEditorReturnRoute } from "../../src/routes/Admin/EditorStudioWorkspaceControllerRootModel"
 import {
   applyCloudFolderFilter,
   extractCloudFolders,
@@ -44,10 +49,20 @@ test.describe("frontend pure logic contracts", () => {
   test("safe redirect paths reject external and data-route inputs", () => {
     expect(normalizeNextPath("/admin/posts?tag=release")).toBe("/admin/posts?tag=release")
     expect(normalizeNextPath("//evil.example/path", "/")).toBe("/")
+    expect(normalizeNextPath("/\\evil.example/path", "/")).toBe("/")
     expect(normalizeNextPath("https://evil.example/path", "/")).toBe("/")
     expect(normalizeNextPath("/_next/data/build-id/posts/42.json?next=https%3A%2F%2Fevil.example&tag=qa")).toBe(
       "/posts/42?tag=qa"
     )
+    expect(normalizeNextPath("/_next/data/build-id//evil.example/index.json", "/")).toBe("/")
+    expect(normalizeNextPath("/_next/data/build-id/\\evil.example/index.json", "/")).toBe("/")
+    expect(normalizeSafeMarkdownUrl("/\\evil.example/path")).toBe("")
+    expect(normalizeEditorReturnRoute("/\\evil.example/path")).toBe("")
+    expect(normalizeEditorReturnRoute("/_next/data/build-id//evil.example/index.json")).toBe("")
+    expect(isSafeInlineHref("/\\evil.example/path")).toBe(false)
+    expect(isSafeInlineHref("//evil.example/path")).toBe(false)
+    expect(resolveInlineColorValue("constructor")).toBeNull()
+    expect(normalizeInlineColorToken("__proto__")).toBeNull()
   })
 
   test("admin login next paths remain within the admin surface", () => {
@@ -79,7 +94,7 @@ test.describe("frontend pure logic contracts", () => {
     expect(() => normalizeApiRequestPath("/internal/health")).toThrow(/allow-listed/)
   })
 
-  test("markdown card URLs keep safe values and strip unsafe values", () => {
+  test("markdown card URLs keep safe values, validate embedUrl, and sandbox embed iframes", () => {
     const segments = parseMarkdownSegments(`<!-- aq-bookmark {"thumbnailUrl":"javascript:alert(1)"} -->
 :::bookmark javascript:alert(1)
 Unsafe
@@ -102,6 +117,52 @@ caption
       embedUrl: "https://www.youtube.com/embed/abc",
       url: "https://www.youtube.com/watch?v=abc",
     })
+
+    const renderedSafeEmbed = JSON.stringify(
+      renderMarkdownSegment({
+        segment: embed!,
+        index: 0,
+        imageIndex: 0,
+        editableImages: false,
+        renderMarkdown: (md) => md,
+      })
+    )
+    expect(renderedSafeEmbed).toContain("https://www.youtube.com/embed/abc")
+    expect(renderedSafeEmbed).toContain("allow-scripts allow-same-origin allow-popups allow-presentation")
+
+    const renderedCraftedEmbed = JSON.stringify(
+      renderMarkdownSegment({
+        segment: {
+          type: "embed",
+          url: "https://example.com/article",
+          embedUrl: "https://evil.example/phish",
+          title: "Crafted",
+          caption: "",
+        },
+        index: 1,
+        imageIndex: 0,
+        editableImages: false,
+        renderMarkdown: (md) => md,
+      })
+    )
+    expect(renderedCraftedEmbed).not.toContain("https://evil.example/phish")
+
+    const renderedCraftedFigmaEmbed = JSON.stringify(
+      renderMarkdownSegment({
+        segment: {
+          type: "embed",
+          url: "https://example.com/article",
+          embedUrl: "https://www.figma.com/embed?url=https%3A%2F%2Fevil.example%2Fphish",
+          title: "Crafted Figma",
+          caption: "",
+        },
+        index: 2,
+        imageIndex: 0,
+        editableImages: false,
+        renderMarkdown: (md) => md,
+      })
+    )
+    expect(renderedCraftedFigmaEmbed).not.toContain("evil.example")
   })
 
   test("upload recovery predicates separate stale sessions from transient failures", () => {

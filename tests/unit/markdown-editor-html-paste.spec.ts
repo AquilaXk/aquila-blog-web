@@ -150,8 +150,52 @@ test.describe("markdown editor safe HTML paste model", () => {
       markdown: "```typescript\n  const x = 1\n  const y = 2\n```",
     })
 
-    // Restore globals
+    const docComplexTable = { body: new MockNode(1, "BODY") }
+    const complexTable = new MockNode(1, "TABLE")
+    const complexHeadTr = new MockNode(1, "TR")
+    const complexTh1 = new MockNode(1, "TH")
+    complexTh1.childNodes.push(new MockNode(3, "", "Expr"))
+    const complexTh2 = new MockNode(1, "TH")
+    complexTh2.childNodes.push(new MockNode(3, "", "Code"))
+    const complexTh3 = new MockNode(1, "TH")
+    complexTh3.childNodes.push(new MockNode(3, "", "Notes"))
+    complexHeadTr.children.push(complexTh1, complexTh2, complexTh3)
+    complexHeadTr.childNodes.push(complexTh1, complexTh2, complexTh3)
+
+    const complexBodyTr = new MockNode(1, "TR")
+    const complexTd1 = new MockNode(1, "TD")
+    complexTd1.childNodes.push(new MockNode(3, "", "a | b"))
+    const complexTd2 = new MockNode(1, "TD")
+    const inlineCodeNode = new MockNode(1, "CODE")
+    inlineCodeNode.childNodes.push(new MockNode(3, "", "a|b"))
+    complexTd2.children.push(inlineCodeNode)
+    complexTd2.childNodes.push(inlineCodeNode)
+    const complexTd3 = new MockNode(1, "TD")
+    const brNode = new MockNode(1, "BR")
+    complexTd3.children.push(brNode)
+    complexTd3.childNodes.push(new MockNode(3, "", "line 1"), brNode, new MockNode(3, "", "line 2"))
+    complexBodyTr.children.push(complexTd1, complexTd2, complexTd3)
+    complexBodyTr.childNodes.push(complexTd1, complexTd2, complexTd3)
+
+    complexTable.children.push(complexHeadTr, complexBodyTr)
+    complexTable.childNodes.push(complexHeadTr, complexBodyTr)
+    docComplexTable.body.children.push(complexTable)
+    docComplexTable.body.childNodes.push(complexTable)
+
+    ;(globalThis as any).DOMParser = class {
+      parseFromString() {
+        return docComplexTable
+      }
+    }
+
+    const complexTableResult = convertSafeHtmlPasteToMarkdown("<table>...</table>")
+    expect(complexTableResult).toEqual({
+      kind: "markdown",
+      markdown: "| Expr | Code | Notes |\n| --- | --- | --- |\n| a \\| b | `a\\|b` | line 1<br>line 2 |",
+    })
+
     ;(globalThis as any).DOMParser = originalDOMParser
     ;(globalThis as any).Node = originalNode
   })
 })
+
