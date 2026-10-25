@@ -317,12 +317,6 @@ export const StyledWrapper = styled.header `
     .actions[data-hide-mobile="true"] {
       display: none;
     }
-
-    .likeButton[data-hide-mobile="true"],
-    .shareButton[data-hide-mobile="true"],
-    .shareFeedbackPill[data-hide-mobile="true"] {
-      display: none;
-    }
   }
 
   @media (min-width: 821px) {

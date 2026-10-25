@@ -15,6 +15,17 @@ const canRestoreFocus = (element: HTMLElement) => {
   return element.matches(FOCUSABLE_SELECTOR)
 }
 
+const getFocusableElements = (container: HTMLElement | null): HTMLElement[] => {
+  if (!container) return []
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute("disabled") &&
+      element.tabIndex !== -1 &&
+      element.getAttribute("aria-hidden") !== "true" &&
+      (element.offsetParent !== null || element.getClientRects().length > 0)
+  )
+}
+
 const restoreFocus = (element: HTMLElement | null) => {
   if (!element || !canRestoreFocus(element)) return
   element.focus({ preventScroll: true })
@@ -62,8 +73,7 @@ export const useModalFocusTrap = ({
     const raf = window.requestAnimationFrame(() => {
       if (pausedRef.current) return
       const initialTarget =
-        initialFocusRef?.current ??
-        containerRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+        initialFocusRef?.current ?? getFocusableElements(containerRef.current)[0] ?? null
       initialTarget?.focus()
     })
 
@@ -97,9 +107,7 @@ export const useModalFocusTrap = ({
       const container = containerRef.current
       if (!container) return
 
-      const focusableElements = Array.from(
-        container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-      ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1)
+      const focusableElements = getFocusableElements(container)
 
       if (focusableElements.length === 0) {
         event.preventDefault()

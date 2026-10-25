@@ -45,7 +45,7 @@ export const BaseButton = styled.button`
     color 0.18s ease;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 
@@ -69,7 +69,7 @@ export const GhostButton = styled(BaseButton)`
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 
@@ -103,7 +103,7 @@ export const MiniButton = styled(BaseButton)`
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.8rem;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 
@@ -138,7 +138,7 @@ export const PreviewAnchor = styled.a`
   text-decoration: none;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `

@@ -28,6 +28,7 @@ import {
   applyUploadQueueSuccess,
   createUploadQueueItem,
   doesCloudFileMatchFilters,
+  doesCloudFileMatchSearchParams,
   extractCloudFolders,
   isAbortLikeError,
   isUploadActive,
@@ -113,10 +114,13 @@ export const useAdminCloudWorkspaceActions = () => {
     },
   })
   const serverFiles = filesQuery.data ?? EMPTY_CLOUD_FILES
-  const visibleOptimisticFiles = useMemo(
-    () => optimisticFiles.filter((file) => doesCloudFileMatchFilters(file, filter, debouncedKeyword)),
-    [debouncedKeyword, filter, optimisticFiles]
-  )
+  const visibleOptimisticFiles = useMemo(() => {
+    const searchParams = resolveCloudSearchParams(debouncedKeyword)
+    const normalizedKeyword = (searchParams.keyword ?? "").toLowerCase()
+    return optimisticFiles.filter((file) =>
+      doesCloudFileMatchSearchParams(file, filter, searchParams, normalizedKeyword)
+    )
+  }, [debouncedKeyword, filter, optimisticFiles])
   const files = useMemo(
     () => sortCloudFiles(mergeCloudFiles(visibleOptimisticFiles, serverFiles), sortMode),
     [serverFiles, sortMode, visibleOptimisticFiles]
@@ -132,7 +136,9 @@ export const useAdminCloudWorkspaceActions = () => {
   const shouldShowDetailPanel = isDetailPanelOpen && selectedFile !== null
   const activeUploadCount = uploadQueue.filter((item) => isUploadActive(item.status)).length
   const completedUploadCount = uploadQueue.filter((item) => item.status === "done").length
-  const allVisibleChecked = files.length > 0 && files.every((file) => checkedFileIds.includes(file.id))
+  const checkedFileIdSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
+  const fileIdSet = useMemo(() => new Set(files.map((file) => file.id)), [files])
+  const allVisibleChecked = files.length > 0 && files.every((file) => checkedFileIdSet.has(file.id))
   const deleteDialogRef = useRef<HTMLDivElement | null>(null)
   const deleteCancelButtonRef = useRef<HTMLButtonElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -155,13 +161,13 @@ export const useAdminCloudWorkspaceActions = () => {
   }, [debouncedKeyword, filesQuery.isPlaceholderData, filesQuery.isSuccess, filter, optimisticFiles, serverFiles])
 
   useEffect(() => {
-    if (selectedFileId && files.some((file) => file.id === selectedFileId)) return
+    if (selectedFileId && fileIdSet.has(selectedFileId)) return
     setSelectedFileId(files[0]?.id ?? null)
-  }, [files, selectedFileId])
+  }, [fileIdSet, files, selectedFileId])
 
   useEffect(() => {
-    setCheckedFileIds((current) => current.filter((id) => files.some((file) => file.id === id)))
-  }, [files])
+    setCheckedFileIds((current) => current.filter((id) => fileIdSet.has(id)))
+  }, [fileIdSet])
 
   useEffect(() => {
     if (!toast) return

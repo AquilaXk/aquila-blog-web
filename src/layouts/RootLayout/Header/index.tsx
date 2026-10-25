@@ -113,8 +113,6 @@ const StyledWrapper = styled.div`
   padding-top: env(safe-area-inset-top, 0px);
   background: var(--aq-header-bg);
   border-bottom: 1px solid var(--aq-border);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 
   .container {
     display: grid;
@@ -127,12 +125,6 @@ const StyledWrapper = styled.div`
     width: min(calc(100% - 40px), 1240px);
     min-height: 64px;
     margin: 0 auto;
-
-    @media (max-width: ${layoutBreakpoint.navCompact}px) {
-      width: min(calc(100% - 24px), 1240px);
-      min-height: 58px;
-      gap: 10px;
-    }
 
     &[data-full-width="true"] {
       @media (min-width: 768px) {
@@ -151,6 +143,9 @@ const StyledWrapper = styled.div`
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     .container {
+      width: min(calc(100% - 24px), 1240px);
+      min-height: 58px;
+      gap: 10px;
       padding-left: 0;
       padding-right: 0;
 

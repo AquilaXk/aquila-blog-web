@@ -33,54 +33,49 @@ export const resolveActiveOutlineItemIndex = (
   return 0
 }
 
-let cachedNewlineOffsets: { markdown: string; offsets: number[] } | null = null
-
-const getNewlineOffsets = (markdown: string): number[] => {
-  if (cachedNewlineOffsets?.markdown === markdown) return cachedNewlineOffsets.offsets
-  const offsets: number[] = []
-  let pos = markdown.indexOf("\n", 0)
-  while (pos !== -1) {
-    offsets.push(pos)
-    pos = markdown.indexOf("\n", pos + 1)
-  }
-  cachedNewlineOffsets = { markdown, offsets }
-  return offsets
-}
-
 export const computeCursorLineAndColumn = (
   markdown: string,
   cursorOffset?: number | null
 ): { line: number; column: number } => {
   const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
-  if (clamped === 0) return { line: 1, column: 1 }
-  const offsets = getNewlineOffsets(markdown)
-  let low = 0
-  let high = offsets.length - 1
-  let lastIdx = -1
-  while (low <= high) {
-    const mid = (low + high) >>> 1
-    if (offsets[mid]! < clamped) {
-      lastIdx = mid
-      low = mid + 1
-    } else {
-      high = mid - 1
+  let line = 1
+  let lastNewlineIndex = -1
+  for (let i = 0; i < clamped; i += 1) {
+    if (markdown.codePointAt(i) === 10) {
+      line += 1
+      lastNewlineIndex = i
     }
   }
-  const lastNewlineIndex = lastIdx === -1 ? -1 : offsets[lastIdx]!
-  return { line: lastIdx + 2, column: clamped - lastNewlineIndex }
+  return { line, column: clamped - lastNewlineIndex }
 }
 
-export const countMarkdownTotalLinks = (markdown: string): number => {
-  if (!markdown.includes("](") && !markdown.includes("[[")) return 0
-  let count = 0
-  if (markdown.includes("](")) {
-    for (const _match of markdown.matchAll(/!?\[[^\][\r\n]*\]\([^()\s]*\)/g)) count += 1
+let cachedLinkAnalysis: { markdown: string; result: { totalLinks: number; linkWarnings: number } } | null = null
+
+export const analyzeMarkdownLinks = (
+  markdown: string
+): { totalLinks: number; linkWarnings: number } => {
+  if (cachedLinkAnalysis?.markdown === markdown) return cachedLinkAnalysis.result
+  if (!markdown.includes("](") && !markdown.includes("[[")) {
+    return { totalLinks: 0, linkWarnings: 0 }
   }
-  if (markdown.includes("[[")) {
-    for (const _match of markdown.matchAll(/\[\[[^\][\r\n]+\]\]/g)) count += 1
+  let totalLinks = 0
+  let linkWarnings = 0
+  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s]*)(\))?|(\[\[[^\][\r\n]+\]\])/g)) {
+    if (match[3]) {
+      totalLinks += 1
+      continue
+    }
+    const href = match[1]?.trim() ?? ""
+    if (match[2]) totalLinks += 1
+    if (!href || /^https?:\/\/$/.test(href)) linkWarnings += 1
   }
-  return count
+  const result = { totalLinks, linkWarnings }
+  cachedLinkAnalysis = { markdown, result }
+  return result
 }
+
+export const countMarkdownTotalLinks = (markdown: string): number =>
+  analyzeMarkdownLinks(markdown).totalLinks
 
 type NoticeTone = "idle" | "loading" | "success" | "error"
 
@@ -140,17 +135,8 @@ const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
   return nativeEvent.isComposing === true || nativeEvent.keyCode === 229
 }
 
-export const countMarkdownLinkWarnings = (markdown: string) => {
-  if (!markdown.includes("](")) return 0
-  let count = 0
-  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s\r\n]*)/g)) {
-    const href = match[1]?.trim() ?? ""
-    if (!href || /^https?:\/\/$/.test(href)) {
-      count += 1
-    }
-  }
-  return count
-}
+export const countMarkdownLinkWarnings = (markdown: string) =>
+  analyzeMarkdownLinks(markdown).linkWarnings
 
 const getCategoryInputValue = (category: string) =>
   category.trim() ? splitCategoryDisplay(category).label : ""
@@ -352,6 +338,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           <EditorExitAction type="button" onClick={onExit}>← 글 관리</EditorExitAction>
           <EditorSidebarToggleButton
             type="button"
+            data-mobile-hidden="true"
             $active={isOutlineOpen}
             onClick={() => setIsOutlineOpen((prev) => !prev)}
             aria-label="문서 목차 토글"

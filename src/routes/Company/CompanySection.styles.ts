@@ -211,7 +211,7 @@ export const ProductAction = styled.a`
   min-height: 44px;
   margin-top: 0.4rem;
   padding: 0 1.25rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   font-size: 0.9375rem;

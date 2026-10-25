@@ -68,20 +68,22 @@ export const ACTION_META: Record<
   authSecurityEvents: { label: "인증 보안 기록 조회", domain: "diagnostics", tone: "infra" },
 }
 
+const TOOLS_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE,
+})
+
 export const formatInstant = (value: string | null | undefined) => {
   if (!value) return "-"
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE,
-  }).format(date)
+  return TOOLS_INSTANT_FORMATTER.format(date)
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

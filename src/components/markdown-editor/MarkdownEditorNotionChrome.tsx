@@ -72,7 +72,7 @@ const BubbleActionButton = styled.button`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
-  @media (pointer: coarse) { min-width: 36px; min-height: 36px; }
+  @media (pointer: coarse) { min-width: 44px; min-height: 44px; }
 `
 
 const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
@@ -143,6 +143,8 @@ const BlockMenuItemButton = styled.button`
   border: 0; outline: none; border-radius: 6px; background: transparent;
   color: ${({ theme }) => theme.colors.gray12}; font: 550 12.5px/1.2 var(--aq-font-sans);
   text-align: left; cursor: pointer; transition: background-color 0.1s ease;
+  ${focusVisibleRing}
+  @media (pointer: coarse) { min-height: 44px; }
   &:hover, &:focus, &:focus-visible {
     outline: none !important;
     box-shadow: none !important;

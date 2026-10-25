@@ -139,6 +139,7 @@ const DismissButton = styled.button`
   background: transparent;
   color: ${({ theme }) => semanticColors(theme).textSecondary};
   padding: 0;
+  min-width: 44px;
   min-height: 44px;
   font-size: 0.82rem;
   font-weight: 700;

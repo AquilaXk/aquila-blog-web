@@ -109,7 +109,8 @@ export const handleFenceEnter: KeyBinding = {
 
     let fenceCount = 0
     for (let lineNo = line.number + 1; lineNo <= doc.lines; lineNo += 1) {
-      if (/^\s*(`{3,}|~{3,})/.test(doc.line(lineNo).text.trim())) {
+      const trimmed = doc.line(lineNo).text.trimStart()
+      if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
         fenceCount += 1
       }
     }

@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes } from "react"
+import { focusVisibleRing } from "./focusRing"
 import { control, fontWeight, radius, semanticColors, space } from "./tokens"
 
 export { Button, IconButton } from "./interactionPrimitives"
@@ -23,6 +24,7 @@ const StyledTextField = styled.input<{ $fieldSize: ControlSize }>`
   background: ${({ theme }) => semanticColors(theme).surface};
   color: ${({ theme }) => semanticColors(theme).textPrimary};
   padding: 0 ${space[4]}px;
+  ${focusVisibleRing}
 
   &::placeholder {
     color: ${({ theme }) => semanticColors(theme).textMuted};
@@ -75,8 +77,9 @@ const StyledChip = styled.button<{ $selected: boolean }>`
   color: ${({ theme, $selected }) =>
     $selected ? semanticColors(theme).accentLink : semanticColors(theme).textSecondary};
   font-weight: ${fontWeight.semibold};
+  ${focusVisibleRing}
 
-  @media (max-width: 768px) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `

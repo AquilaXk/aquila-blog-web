@@ -68,12 +68,19 @@ export const TopBarTitle = styled.div`
   display: block;
   min-width: 0;
   margin-right: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   strong {
+    display: block;
     color: ${adminTextPrimary};
     font-size: 0.94rem;
     font-weight: 820;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 `
 

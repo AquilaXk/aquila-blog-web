@@ -142,6 +142,11 @@ const StyledIconButton = styled.button<StyledIconButtonProps>`
   `
       : ""}
 
+  @media (pointer: coarse) {
+    min-width: ${touchTargetSize};
+    min-height: ${touchTargetSize};
+  }
+
   &:disabled {
     cursor: not-allowed;
     opacity: 0.58;

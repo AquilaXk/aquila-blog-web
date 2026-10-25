@@ -255,15 +255,17 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
     })
   }, [executions, freshnessClock, resultsFilter])
 
-  const resultFilterCounts = useMemo(
-    () => ({
-      all: executions.length,
-      success: executions.filter((entry) => entry.status === "success").length,
-      error: executions.filter((entry) => entry.status === "error").length,
-      stale: executions.filter((entry) => getFreshnessMeta(entry.completedAt, freshnessClock).tone === "stale").length,
-    }),
-    [executions, freshnessClock]
-  )
+  const resultFilterCounts = useMemo(() => {
+    let success = 0
+    let error = 0
+    let stale = 0
+    for (const entry of executions) {
+      if (entry.status === "success") success += 1
+      else if (entry.status === "error") error += 1
+      if (getFreshnessMeta(entry.completedAt, freshnessClock).tone === "stale") stale += 1
+    }
+    return { all: executions.length, success, error, stale }
+  }, [executions, freshnessClock])
 
   const selectedExecution = useMemo(() => {
     if (!filteredExecutions.length) return null

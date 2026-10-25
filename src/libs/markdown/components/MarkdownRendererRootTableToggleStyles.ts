@@ -243,6 +243,13 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     border-bottom: 0;
   }
 
+  @media (max-width: 1024px) {
+    table[data-narrow-table="true"],
+    .aq-table[data-narrow-table="true"] {
+      min-width: 100%;
+    }
+  }
+
   @media (max-width: 820px) {
     .aq-toggle > summary {
       padding: 14px;

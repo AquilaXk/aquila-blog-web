@@ -75,6 +75,10 @@ export const SortSelect = styled.select`
   font-weight: 800;
   cursor: pointer;
 
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   &:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
@@ -137,6 +141,10 @@ export const PrimaryButton = styled.button`
   white-space: nowrap;
   cursor: pointer;
 
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   &:disabled {
     cursor: not-allowed;
     opacity: 0.62;
@@ -165,6 +173,10 @@ export const SecondaryButton = styled.button`
   cursor: pointer;
   ${focusVisibleRing}
 
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   &:disabled {
     cursor: not-allowed;
     background: transparent;
@@ -184,6 +196,13 @@ export const IconButton = styled.button`
   background: transparent;
   color: ${textSecondary};
   cursor: pointer;
+
+  @media (pointer: coarse) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
 
   &:hover,
   &:focus-visible {
@@ -223,6 +242,10 @@ export const ViewModeButton = styled.button`
   font-weight: 820;
   white-space: nowrap;
   cursor: pointer;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 
   &[data-active="true"] {
     color: ${accentGold};
@@ -269,6 +292,10 @@ export const GhostButton = styled.button`
   white-space: nowrap;
   cursor: pointer;
   ${focusVisibleRing}
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 
   &:hover,
   &:focus-visible {

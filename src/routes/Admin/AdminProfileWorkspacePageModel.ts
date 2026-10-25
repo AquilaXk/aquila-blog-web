@@ -11,18 +11,18 @@ import {
   normalizeProfileWorkspaceContent,
   ProfileWorkspaceContent,
   ProfileWorkspaceResponse,
-  serializeProfileWorkspaceContent,
 } from "src/libs/profileWorkspace"
 import { reconcileProfileWorkspaceDraft, saveProfileWorkspaceImage } from "src/libs/profileWorkspaceImage"
 import {
-  WORKSPACE_SECTIONS,
+  computeProfileDirtyMask,
   type LinkTab,
   type PreviewMode,
-  serializeWorkspaceSection,
   toPayloadLinks,
   validateLinkInputs,
   type WorkspaceSectionId,
 } from "src/routes/Admin/AdminProfileWorkspaceModel"
+
+export { computeProfileDirtyMask } from "src/routes/Admin/AdminProfileWorkspaceModel"
 import {
   PROFILE_UNSAVED_CHANGES_MESSAGE,
   revalidatePublicBlogAppearance,
@@ -186,58 +186,54 @@ export const useAdminProfileWorkspacePageModel = ({
 
 
 
-  const serializedRemoteDraft = useMemo(() => serializeProfileWorkspaceContent(remoteDraft), [remoteDraft])
-  const serializedPublishedSnapshot = useMemo(
-    () => serializeProfileWorkspaceContent(publishedSnapshot),
-    [publishedSnapshot]
+  const normalizedDraft = useMemo(() => normalizeProfileWorkspaceContent(draft), [draft])
+  const normalizedRemoteDraft = useMemo(() => normalizeProfileWorkspaceContent(remoteDraft), [remoteDraft])
+  const normalizedPublished = useMemo(() => normalizeProfileWorkspaceContent(publishedSnapshot), [publishedSnapshot])
+  const draftDirtyMask = useMemo(
+    () => computeProfileDirtyMask(normalizedDraft, normalizedRemoteDraft),
+    [normalizedDraft, normalizedRemoteDraft]
   )
-  const serializedRemoteSections = useMemo(
-    () => ({
-      identity: serializeWorkspaceSection(remoteDraft, "identity"),
-      about: serializeWorkspaceSection(remoteDraft, "about"),
-      home: serializeWorkspaceSection(remoteDraft, "home"),
-      links: serializeWorkspaceSection(remoteDraft, "links"),
-    }),
-    [remoteDraft]
-  )
-  const publishedDiffBySection = useMemo(
-    () => ({
-      identity: serializedRemoteSections.identity !== serializeWorkspaceSection(publishedSnapshot, "identity"),
-      about: serializedRemoteSections.about !== serializeWorkspaceSection(publishedSnapshot, "about"),
-      home: serializedRemoteSections.home !== serializeWorkspaceSection(publishedSnapshot, "home"),
-      links: serializedRemoteSections.links !== serializeWorkspaceSection(publishedSnapshot, "links"),
-    }),
-    [publishedSnapshot, serializedRemoteSections]
+  const publishedDirtyMask = useMemo(
+    () => computeProfileDirtyMask(normalizedRemoteDraft, normalizedPublished),
+    [normalizedPublished, normalizedRemoteDraft]
   )
   const hasWorkspaceUnsavedChanges = useMemo(
-    () => serializeProfileWorkspaceContent(draft) !== serializedRemoteDraft,
-    [draft, serializedRemoteDraft]
+    () =>
+      draftDirtyMask !== 0 ||
+      normalizedDraft.blogDesign !== normalizedRemoteDraft.blogDesign ||
+      normalizedDraft.legacyBlogScheme !== normalizedRemoteDraft.legacyBlogScheme,
+    [draftDirtyMask, normalizedDraft, normalizedRemoteDraft]
   )
   const hasDisplayNameDirty = useMemo(() => {
     const currentDisplayName = (sessionMember?.nickname || sessionMember?.username || "").trim()
     return displayNameInput.trim() !== currentDisplayName
   }, [displayNameInput, sessionMember?.nickname, sessionMember?.username])
   const hasUnsavedChanges = hasDisplayNameDirty || hasWorkspaceUnsavedChanges
-  const hasPublishedDiff = serializedRemoteDraft !== serializedPublishedSnapshot
-  const sectionStateMap = useMemo(() => {
-    return WORKSPACE_SECTIONS.reduce<Record<WorkspaceSectionId, { dirty: boolean; publishedDiff: boolean }>>(
-      (acc, section) => {
-        acc[section.id] = {
-          dirty:
-            (section.id === "identity" ? hasDisplayNameDirty : false) ||
-            serializeWorkspaceSection(draft, section.id) !== serializedRemoteSections[section.id],
-          publishedDiff: publishedDiffBySection[section.id],
-        }
-        return acc
+  const hasPublishedDiff =
+    publishedDirtyMask !== 0 ||
+    normalizedRemoteDraft.blogDesign !== normalizedPublished.blogDesign ||
+    normalizedRemoteDraft.legacyBlogScheme !== normalizedPublished.legacyBlogScheme
+  const sectionStateMap = useMemo<Record<WorkspaceSectionId, { dirty: boolean; publishedDiff: boolean }>>(
+    () => ({
+      identity: {
+        dirty: hasDisplayNameDirty || (draftDirtyMask & 1) !== 0,
+        publishedDiff: (publishedDirtyMask & 1) !== 0,
       },
-      {
-        identity: { dirty: false, publishedDiff: false },
-        about: { dirty: false, publishedDiff: false },
-        home: { dirty: false, publishedDiff: false },
-        links: { dirty: false, publishedDiff: false },
-      }
-    )
-  }, [draft, hasDisplayNameDirty, publishedDiffBySection, serializedRemoteSections])
+      about: {
+        dirty: (draftDirtyMask & 2) !== 0,
+        publishedDiff: (publishedDirtyMask & 2) !== 0,
+      },
+      home: {
+        dirty: (draftDirtyMask & 4) !== 0,
+        publishedDiff: (publishedDirtyMask & 4) !== 0,
+      },
+      links: {
+        dirty: (draftDirtyMask & 8) !== 0,
+        publishedDiff: (publishedDirtyMask & 8) !== 0,
+      },
+    }),
+    [draftDirtyMask, hasDisplayNameDirty, publishedDirtyMask]
+  )
 
   useEffect(() => {
     if (typeof window === "undefined" || !sessionMember || !hasUnsavedChanges) return
@@ -462,12 +458,12 @@ export const useAdminProfileWorkspacePageModel = ({
         applyWorkspaceState(nextWorkspace)
         await refreshAdminShellProfile(queryClient, sessionMember.id)
         const profileRefreshed = await refreshAdminProfileCache(queryClient)
-        const appearanceRevalidated = await revalidatePublicBlogAppearance()
-        const publicCacheRevalidated = profileRefreshed && appearanceRevalidated
+        const publicCacheRevalidated = await revalidatePublicBlogAppearance()
+        const isPublicSiteUpdated = profileRefreshed && publicCacheRevalidated
         setPreviewMode("published")
         setWorkspaceNotice({
-          tone: publicCacheRevalidated ? "success" : "error",
-          text: publicCacheRevalidated
+          tone: isPublicSiteUpdated ? "success" : "error",
+          text: isPublicSiteUpdated
             ? "공개 적용과 공개 사이트 갱신을 완료했습니다."
             : "공개 적용은 완료됐지만 공개 사이트 캐시 갱신에 실패했습니다. 잠시 후 새로고침해주세요.",
         })

@@ -325,11 +325,29 @@ export const isGfmTableAt = (lines: readonly string[], headerIndex: number): boo
 const normalizeTableSourceLineEndings = (markdown: string): string =>
   markdown.includes("\r") ? markdown.replace(/\r\n?/g, "\n") : markdown
 
+const collectPlainTableLayouts = (lines: string[]): Array<MarkdownTableLayout | null> => {
+  const layouts: Array<MarkdownTableLayout | null> = []
+  let fencedCodeBlockMarker: FencedCodeBlockMarker | null = null
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? ""
+    const wasInFencedCode = fencedCodeBlockMarker !== null
+    fencedCodeBlockMarker = stepFencedCodeState(line, fencedCodeBlockMarker)
+    if (wasInFencedCode || fencedCodeBlockMarker !== null) continue
+    if (isGfmTableAt(lines, index)) {
+      layouts.push(null)
+    }
+  }
+
+  return layouts
+}
+
 export const extractMarkdownTableLayouts = (
   markdown: string
 ): ExtractedTableLayouts => {
   const normalizedMarkdown = normalizeTableSourceLineEndings(markdown)
-  if (!normalizedMarkdown.includes("|") && !normalizedMarkdown.includes("aq-table")) {
+  const hasAqTableComment = normalizedMarkdown.includes("aq-table")
+  if (!normalizedMarkdown.includes("|") && !hasAqTableComment) {
     return {
       cleanedMarkdown: normalizedMarkdown,
       layouts: [],
@@ -337,6 +355,13 @@ export const extractMarkdownTableLayouts = (
   }
 
   const lines = normalizedMarkdown.split("\n")
+  if (!hasAqTableComment) {
+    return {
+      cleanedMarkdown: normalizedMarkdown,
+      layouts: collectPlainTableLayouts(lines),
+    }
+  }
+
   const cleanedLines: string[] = []
   const layouts: Array<MarkdownTableLayout | null> = []
   const tableHeaderLinesWithExplicitLayout = new Set<number>()

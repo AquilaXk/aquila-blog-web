@@ -21,10 +21,6 @@ export const PreviewRail = styled(AdminStickyRail)`
     position: static;
     top: auto;
   }
-
-  @media (max-width: 980px) {
-    display: none;
-  }
 `
 
 export const PreviewCardShell = styled(AdminRailCard)``
@@ -63,7 +59,7 @@ export const PreviewToggleButton = styled.button`
   display: none;
   ${focusVisibleRing}
 
-  @media (max-width: 760px) {
+  @media (max-width: 980px) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -81,7 +77,7 @@ export const PreviewToggleButton = styled.button`
 export const PreviewBody = styled.div<{ "data-expanded"?: boolean }>`
   display: grid;
 
-  @media (max-width: 760px) {
+  @media (max-width: 980px) {
     display: ${({ ["data-expanded"]: expanded }) => (expanded ? "grid" : "none")};
   }
 `
@@ -95,7 +91,7 @@ export const DockSecondaryButton = styled(BaseButton)`
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -105,7 +101,7 @@ export const DockPrimaryButton = styled(PublishButton)`
   padding: 0 1rem;
   border-radius: 6px;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -283,7 +279,7 @@ export const ToastCard = styled.div`
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
   line-height: 1.58;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
 
   &[data-tone="success"] {
     border-color: ${({ theme }) => theme.colors.green8};
@@ -334,7 +330,7 @@ export const ModalCard = styled.section`
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   padding: 1rem;
   display: grid;
   gap: 0.9rem;

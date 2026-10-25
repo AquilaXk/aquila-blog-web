@@ -260,11 +260,10 @@ const MobileMenuBackdrop = styled.div`
   position: fixed;
   inset: 0;
   z-index: ${zIndexes.mobileNavOverlay};
-  background: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent var(--app-header-height, 59px),
-    color-mix(in srgb, var(--aq-text) 14%, transparent) var(--app-header-height, 59px)
+  background: color-mix(
+    in srgb,
+    var(--aq-text) ${({ theme }) => (theme.scheme === "dark" ? "48%" : "20%")},
+    transparent
   );
   pointer-events: auto;
 `
@@ -532,6 +531,23 @@ const StyledWrapper = styled.div`
       border-color: var(--aq-border);
       background: var(--aq-surface);
       color: var(--aq-text);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .primaryLinks a,
+    .langToggleBtn,
+    .searchTrigger {
+      min-height: 44px;
+    }
+
+    .langToggleBtn,
+    .searchTrigger {
+      height: 44px;
+    }
+
+    .searchTrigger kbd {
+      display: none;
     }
   }
 

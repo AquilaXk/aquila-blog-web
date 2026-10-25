@@ -37,7 +37,7 @@ export const DetailPanel = styled.aside`
     box-shadow: none;
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1280px) {
     position: fixed;
     top: var(--app-header-height, 73px);
     right: 0;
@@ -62,7 +62,7 @@ export const DetailScrim = styled.button`
     background: rgba(0, 0, 0, 0.32);
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1280px) {
     position: fixed;
     inset: var(--app-header-height, 73px) 0 0;
     z-index: ${zIndexes.dialog - 1};
@@ -288,8 +288,9 @@ export const PhotoFallback = styled.div`
 
 export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
   position: fixed;
+  top: calc(var(--app-header-height, 61px) + 1rem);
   right: max(1rem, env(safe-area-inset-right));
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  bottom: auto;
   z-index: ${zIndexes.dialogHoverCard};
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

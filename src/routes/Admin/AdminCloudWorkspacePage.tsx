@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { getCloudFileDownloadUrl, type CloudFile } from "src/apis/backend/cloud"
 import AppIcon from "src/components/icons/AppIcon"
 import { CloudDeleteConfirmDialog, FileTableHead, FileThumbnail, PreviewDrawer } from "./AdminCloudPreviewDrawer"
@@ -58,6 +58,7 @@ const CloudFileTableSection = ({
   shouldShowDetailPanel,
   showEmptyLoading,
 }: CloudFileTableSectionProps) => {
+  const checkedFileIdSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
   if (showEmptyLoading) {
     return (
       <FileTable role="table" aria-busy="true">
@@ -104,7 +105,7 @@ const CloudFileTableSection = ({
       <FileTableHead />
       <tbody>
         {files.map((file) => {
-          const checked = checkedFileIds.includes(file.id)
+          const checked = checkedFileIdSet.has(file.id)
           const selected = shouldShowDetailPanel && selectedFile?.id === file.id
           const folderLabel = normalizeCloudFolderPathSearch(file.folderPath)
           return (
@@ -336,7 +337,7 @@ const AdminCloudWorkspacePage = () => {
     uploadQueue,
   } = useAdminCloudWorkspaceActions()
 
-  const summary = getCloudSummary(files)
+  const summary = useMemo(() => getCloudSummary(files), [files])
   const isFileListError = filesQuery.isError
   const isSearchPending = isCloudSearchPending(keyword, debouncedKeyword)
   const isSearchBusy = filesQuery.isFetching || isSearchPending

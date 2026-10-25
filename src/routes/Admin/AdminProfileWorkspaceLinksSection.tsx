@@ -202,7 +202,20 @@ export const renderAdminProfileLinksSection = (props: AdminProfileWorkspaceSecti
                   </LinkInputs>
 
                   <InlineActionRow className="linkActions">
-                    <DragHandleButton aria-hidden="true">
+                    <DragHandleButton
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${item.label || "링크"} 순서 이동`}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowUp" && index > 0) {
+                          event.preventDefault()
+                          moveLinkItem(section, index, -1)
+                        } else if (event.key === "ArrowDown" && index < visibleLinks.length - 1) {
+                          event.preventDefault()
+                          moveLinkItem(section, index, 1)
+                        }
+                      }}
+                    >
                       <AppIcon name="list" />
                       드래그 정렬
                     </DragHandleButton>

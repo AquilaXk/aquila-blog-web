@@ -259,6 +259,12 @@ export const EditorSidebarToggleButton = styled.button<{ $active?: boolean }>`
     outline: none;
     box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4};
   }
+
+  @media (max-width: 820px) {
+    &[data-mobile-hidden="true"] {
+      display: none;
+    }
+  }
 `;
 
 export const EditorStudioFrame = styled.div<{

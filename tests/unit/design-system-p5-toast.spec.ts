@@ -47,7 +47,7 @@ test("paused modal close skips restoreFocus so nested dialog keeps focus", () =>
 
 test("Admin derived controls keep compact touch min-height", () => {
   const source = readSrc("routes/Admin/AdminProfileWorkspace.styles.tokens.ts")
-  expect(source).toMatch(/export const GhostButton[\s\S]*@media \(max-width: 1100px\) \{\s*min-height: \$\{control\.lg\}px;/)
-  expect(source).toMatch(/export const MiniButton[\s\S]*@media \(max-width: 1100px\) \{\s*min-height: \$\{control\.lg\}px;/)
-  expect(source).toMatch(/export const PreviewAnchor[\s\S]*@media \(max-width: 1100px\) \{\s*min-height: \$\{control\.lg\}px;/)
+  expect(source).toMatch(/export const GhostButton[\s\S]*@media \(max-width: 1100px\)(?:, \(pointer: coarse\))? \{\s*min-height: \$\{control\.lg\}px;/)
+  expect(source).toMatch(/export const MiniButton[\s\S]*@media \(max-width: 1100px\)(?:, \(pointer: coarse\))? \{\s*min-height: \$\{control\.lg\}px;/)
+  expect(source).toMatch(/export const PreviewAnchor[\s\S]*@media \(max-width: 1100px\)(?:, \(pointer: coarse\))? \{\s*min-height: \$\{control\.lg\}px;/)
 })

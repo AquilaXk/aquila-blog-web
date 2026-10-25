@@ -2,6 +2,7 @@ import Link from "next/link"
 import { CONFIG } from "site.config"
 import styled from "@emotion/styled"
 import BrandMark from "src/components/branding/BrandMark"
+import { layoutBreakpoint } from "src/design-system/tokens"
 
 type Props = {
   blogTitle?: string
@@ -34,7 +35,7 @@ const StyledWrapper = styled(Link)`
   letter-spacing: -0.03em;
   line-height: 1.1;
 
-  @media (max-width: 768px) {
+  @media (max-width: ${layoutBreakpoint.navCompact}px), (pointer: coarse) {
     min-height: 44px;
   }
 

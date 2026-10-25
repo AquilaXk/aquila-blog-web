@@ -135,20 +135,21 @@ const parseCalloutContainerPayload = (
 export const parseNotionContainerBlocks = (docText: string): NotionContainerBlock[] => {
   if (!docText.includes(":::")) return []
 
-  const rawLines = docText.split("\n")
   const blocks: NotionContainerBlock[] = []
-  let offset = 0
+  let pos = 0
   let inFence = false
   let openFenceMarker = ""
   let openFenceLength = 0
   let candidate: OpenContainerCandidate | null = null
 
-  for (let index = 0; index < rawLines.length; index += 1) {
-    const rawLine = rawLines[index] ?? ""
+  while (pos <= docText.length) {
+    const nextBreak = docText.indexOf("\n", pos)
+    const lineStart = pos
+    const lineEnd = nextBreak === -1 ? docText.length : nextBreak
+    const rawLine = docText.slice(lineStart, lineEnd)
     const lineText = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine
-    const lineStart = offset
-    const lineEnd = offset + rawLine.length
-    offset = lineEnd + (index < rawLines.length - 1 ? 1 : 0)
+    const offset = nextBreak === -1 ? lineEnd : lineEnd + 1
+    pos = nextBreak === -1 ? docText.length + 1 : lineEnd + 1
 
     const fenceMatch = FENCE_DELIMITER_LINE_RE.exec(lineText)
     if (fenceMatch) {
@@ -482,17 +483,10 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   }
 }
 
-let cachedContainerBlocksEntry: {
-  doc: EditorState["doc"]
-  blocks: readonly NotionContainerBlock[]
-} | null = null
+let cachedContainerBlocksEntry: { doc: EditorState["doc"]; blocks: readonly NotionContainerBlock[] } | null = null
 
-const getCachedNotionContainerBlocks = (
-  doc: EditorState["doc"]
-): readonly NotionContainerBlock[] => {
-  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) {
-    return cachedContainerBlocksEntry.blocks
-  }
+const getCachedNotionContainerBlocks = (doc: EditorState["doc"]): readonly NotionContainerBlock[] => {
+  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) return cachedContainerBlocksEntry.blocks
   const blocks = parseNotionContainerBlocks(getDocString(doc))
   cachedContainerBlocksEntry = { doc, blocks }
   return blocks

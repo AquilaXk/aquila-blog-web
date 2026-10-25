@@ -9,8 +9,9 @@ import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescrip
 import {
   createMarkdownEditorTable,
   getMarkdownEditorTableEditAvailability,
-  isMarkdownEditorTableSelection,
+  packTableEditAvailabilityMask,
   planMarkdownEditorTableEdit,
+  unpackTableEditAvailabilityMask,
   type MarkdownEditorTableEdit,
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
@@ -71,7 +72,7 @@ export const MarkdownEditor = ({
   const [draftValue, setDraftValue] = useState(value)
   const [tableRows, setTableRows] = useState(2)
   const [tableColumns, setTableColumns] = useState(2)
-  const [activeTableSelection, setActiveTableSelection] = useState<TextareaSelection | null>(null)
+  const [tableEditAvailabilityMask, setTableEditAvailabilityMask] = useState(-1)
   const [editorSelection, setEditorSelectionState] = useState<TextareaSelection>({ from: 0, to: 0 })
   const liveEditorBodyRef = useRef<HTMLDivElement | null>(null)
   const liveSurfaceRef = useRef<MarkdownEditorLiveSurfaceHandle | null>(null)
@@ -103,7 +104,7 @@ export const MarkdownEditor = ({
     if (value === valueRef.current) return
     valueRef.current = value
     setDraftValue(value)
-    setActiveTableSelection(null)
+    setTableEditAvailabilityMask(-1)
     pendingFindReplaceInvalidationRef.current = true
     documentGenerationRef.current += 1
   }, [value])
@@ -126,11 +127,11 @@ export const MarkdownEditor = ({
   )
 
   const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
-    const isTable = isMarkdownEditorTableSelection(nextValue, selection.from, selection.to)
-    setActiveTableSelection((prev) => {
-      if (!isTable) return null
-      return prev && prev.from === selection.from && prev.to === selection.to ? prev : selection
-    })
+    setTableEditAvailabilityMask(
+      packTableEditAvailabilityMask(
+        getMarkdownEditorTableEditAvailability(nextValue, selection.from, selection.to)
+      )
+    )
   }, [])
 
   const setEditorSelection = useCallback((from: number, to = from) => {
@@ -272,14 +273,10 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
-  const tableEditAvailability = useMemo(() => {
-    if (disabled || !activeTableSelection) return null
-    return getMarkdownEditorTableEditAvailability(
-      draftValue,
-      activeTableSelection.from,
-      activeTableSelection.to
-    )
-  }, [activeTableSelection, disabled, draftValue])
+  const tableEditAvailability = useMemo(
+    () => (disabled ? null : unpackTableEditAvailabilityMask(tableEditAvailabilityMask)),
+    [disabled, tableEditAvailabilityMask]
+  )
 
   const isTableEditDisabled = (edit: MarkdownEditorTableEdit) => {
     if (!tableEditAvailability) return true
