@@ -94,6 +94,9 @@ const normalizeNextDataPath = (value: string, fallback: string): string => {
   } else {
     routePath = routePath.replace(/\/index$/, "") || "/"
   }
+  if (!routePath.startsWith("/") || routePath.startsWith("//") || routePath.startsWith("/\\")) {
+    return fallback
+  }
 
   const params = new URLSearchParams(search)
   params.delete("next")

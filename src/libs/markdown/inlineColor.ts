@@ -43,7 +43,7 @@ export const resolveInlineColorValue = (raw: string) => {
   if (normalizedRgb) return normalizedRgb
 
   const token = raw.trim().toLowerCase()
-  return NAMED_INLINE_COLORS[token] || null
+  return Object.hasOwn(NAMED_INLINE_COLORS, token) ? NAMED_INLINE_COLORS[token] : null
 }
 
 export const normalizeInlineColorToken = (raw: string) => {

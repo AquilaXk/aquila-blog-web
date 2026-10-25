@@ -37,7 +37,7 @@ export const normalizeEditorReturnRoute = (value: string) => {
   if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.startsWith("/\\")) return ""
   if (/[\r\n]/.test(normalized)) return ""
   if (/^\/(?:https?:|javascript:)/i.test(normalized)) return ""
-  if (normalized.startsWith("/admin/editor")) return ""
+  if (normalized.startsWith("/admin/editor") || normalized.startsWith("/_next/")) return ""
   return normalized
 }
 

@@ -28,6 +28,7 @@ import {
 } from "../../src/routes/Admin/AdminDashboardWorkspaceModel"
 import { normalizeApiRequestPath } from "../../src/libs/backend/requestPath"
 import { renderMarkdownSegment } from "../../src/libs/markdown/MarkdownRendererSegments"
+import { normalizeInlineColorToken, resolveInlineColorValue } from "../../src/libs/markdown/inlineColor"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
 import { normalizeSafeMarkdownUrl } from "../../src/libs/markdown/safeMarkdownUrl"
 import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../../src/libs/router"
@@ -53,10 +54,15 @@ test.describe("frontend pure logic contracts", () => {
     expect(normalizeNextPath("/_next/data/build-id/posts/42.json?next=https%3A%2F%2Fevil.example&tag=qa")).toBe(
       "/posts/42?tag=qa"
     )
+    expect(normalizeNextPath("/_next/data/build-id//evil.example/index.json", "/")).toBe("/")
+    expect(normalizeNextPath("/_next/data/build-id/\\evil.example/index.json", "/")).toBe("/")
     expect(normalizeSafeMarkdownUrl("/\\evil.example/path")).toBe("")
     expect(normalizeEditorReturnRoute("/\\evil.example/path")).toBe("")
+    expect(normalizeEditorReturnRoute("/_next/data/build-id//evil.example/index.json")).toBe("")
     expect(isSafeInlineHref("/\\evil.example/path")).toBe(false)
     expect(isSafeInlineHref("//evil.example/path")).toBe(false)
+    expect(resolveInlineColorValue("constructor")).toBeNull()
+    expect(normalizeInlineColorToken("__proto__")).toBeNull()
   })
 
   test("admin login next paths remain within the admin surface", () => {
