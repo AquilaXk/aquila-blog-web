@@ -48,18 +48,36 @@ const MERMAID_EDGE_TOKENS_BY_LENGTH = [...MERMAID_EDGE_TOKENS].sort(
 )
 const mermaidRenderCache = new Map<string, MermaidRenderCacheEntry>()
 
+const FENCED_MERMAID_BLOCK_PATTERN = /^[`~]{3,}\s*mermaid\b[\t ]*\n([\s\S]*?)\n[`~]{3,}\s*$/i
+
 export const isMermaidSource = (rawCode: string) => {
   const normalized = rawCode.trim()
   if (!normalized) return false
 
-  const fenced = normalized.match(/^[`~]{3,}\s*mermaid\b[\t ]*\n([\s\S]*?)\n[`~]{3,}\s*$/i)
+  const fenced =
+    normalized.startsWith("```") || normalized.startsWith("~~~")
+      ? FENCED_MERMAID_BLOCK_PATTERN.exec(normalized)
+      : null
   const body = (fenced?.[1] || normalized).trim()
   if (!body) return false
 
-  const lines = body.split("\n").map((line) => line.trim()).filter(Boolean)
-  if (!lines.length) return false
+  let lineStart = 0
+  let firstNonEmptyLine = ""
+  while (lineStart <= body.length) {
+    const lineEnd = body.indexOf("\n", lineStart)
+    const candidate = (
+      lineEnd === -1 ? body.slice(lineStart) : body.slice(lineStart, lineEnd)
+    ).trim()
+    if (candidate.length > 0) {
+      firstNonEmptyLine = candidate
+      break
+    }
+    if (lineEnd === -1) break
+    lineStart = lineEnd + 1
+  }
+  if (!firstNonEmptyLine) return false
 
-  const firstLine = lines[0].replace(/^\d+\s+/, "")
+  const firstLine = firstNonEmptyLine.replace(/^\d+\s+/, "")
   return MERMAID_SOURCE_PATTERN.test(firstLine)
 }
 

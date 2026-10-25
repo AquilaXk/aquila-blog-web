@@ -150,7 +150,7 @@ export const CopyEmailButton = styled.button`
   min-height: 46px;
   padding: 0 1.25rem;
   border: 1px solid ${light.border};
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   background: ${light.surface};
   color: ${light.inkPrimary};
   cursor: pointer;

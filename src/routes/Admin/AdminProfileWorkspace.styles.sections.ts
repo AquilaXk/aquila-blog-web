@@ -366,7 +366,7 @@ export const ModalCloseButton = styled.button`
   justify-content: center;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     width: ${control.lg}px;
     height: ${control.lg}px;
     min-width: ${control.lg}px;
@@ -455,7 +455,7 @@ export const ModalHistoryAction = styled.button`
   justify-content: center;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     width: ${control.lg}px;
     height: ${control.lg}px;
     min-width: ${control.lg}px;
@@ -517,6 +517,10 @@ export const ModalSliderWrap = styled.div`
 
   input {
     width: 100%;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 
   span {

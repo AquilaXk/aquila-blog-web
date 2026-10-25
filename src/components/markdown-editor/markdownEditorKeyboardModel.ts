@@ -217,39 +217,33 @@ export const planListEnterContinuation = (
   return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
 }
 
+const TASK_BOX_PREFIX_RE = /^[-*+][ \t]+\[([ xX])\][ \t]*/
+const BULLET_OR_ORDERED_PREFIX_RE = /^(?:[-*+]|\d+\.)[ \t]+/
+
 export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
-  const uncheckedMatch = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/.exec(lineText)
-  if (uncheckedMatch) {
-    const boxPos = uncheckedMatch[1].length
+  const trimmed = lineText.trimStart()
+  const indent = lineText.slice(0, lineText.length - trimmed.length)
+  const taskMatch = TASK_BOX_PREFIX_RE.exec(trimmed)
+  if (taskMatch) {
+    const boxPos = indent.length + taskMatch[0].indexOf("[") + 1
+    const nextMark = taskMatch[1] === " " ? "x" : " "
     return {
       replaced: true,
-      lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
+      lineText: `${lineText.slice(0, boxPos)}${nextMark}${lineText.slice(boxPos + 1)}`,
     }
   }
 
-  const checkedMatch = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/.exec(lineText)
-  if (checkedMatch) {
-    const boxPos = checkedMatch[1].length
-    return {
-      replaced: true,
-      lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
-    }
-  }
-
-  const bulletMatch = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/.exec(lineText)
+  const bulletMatch = BULLET_OR_ORDERED_PREFIX_RE.exec(trimmed)
   if (bulletMatch) {
     return {
       replaced: true,
-      lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
+      lineText: `${indent}- [ ] ${trimmed.slice(bulletMatch[0].length)}`,
     }
   }
 
-  const plainMatch = /^([ \t]*)(.*)$/.exec(lineText)
-  const indent = plainMatch?.[1] ?? ""
-  const content = plainMatch?.[2] ?? ""
   return {
     replaced: true,
-    lineText: `${indent}- [ ] ${content}`,
+    lineText: `${indent}- [ ] ${trimmed}`,
   }
 }
 

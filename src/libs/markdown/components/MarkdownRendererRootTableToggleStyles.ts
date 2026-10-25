@@ -20,6 +20,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     display: flex;
     align-items: center;
     gap: 10px;
+    min-height: 44px;
     list-style: none;
     padding: 15px 17px;
     color: ${theme.colors.gray12};
@@ -96,14 +97,10 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     top: 0;
     left: 0;
     bottom: 0;
-    width: 1.5rem;
+    width: 0;
+    border-left: 2px solid ${theme.publicDesign.borderStrong};
     pointer-events: none;
     z-index: 2;
-    background: linear-gradient(
-      to left,
-      transparent,
-      ${getTableChromePalette(theme).background}
-    );
   }
 
   .aq-table-shell[data-scroll-hint="true"]::after {
@@ -112,14 +109,10 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     top: 0;
     right: 0;
     bottom: 0;
-    width: 1.5rem;
+    width: 0;
+    border-right: 2px solid ${theme.publicDesign.borderStrong};
     pointer-events: none;
     z-index: 2;
-    background: linear-gradient(
-      to right,
-      transparent,
-      ${getTableChromePalette(theme).background}
-    );
   }
 
   .aq-table-scroll {

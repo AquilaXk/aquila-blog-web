@@ -304,6 +304,7 @@ const ThumbnailButton = styled.button`
     border-radius: 0;
     background: transparent;
     color: ${({ theme }) => theme.colors.gray11};
+    @media (pointer: coarse) { min-height: 44px; }
   }
 
   &:hover:not(:disabled) {
@@ -360,6 +361,7 @@ const ZoomControlRow = styled.div`
 const ZoomRangeInput = styled.input`
   width: 100%;
   accent-color: ${({ theme }) => theme.colors.blue9};
+  @media (pointer: coarse) { min-height: 44px; }
 `
 
 const ZoomValue = styled.span`

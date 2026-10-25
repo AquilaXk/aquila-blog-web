@@ -149,6 +149,13 @@ const CompanyHeroParticles: React.FC = () => {
     let width = 0
     let height = 0
     let dpr = 1
+    let clearance = resolveParticleClearance(1, 1)
+    let invClearRx = 1 / clearance.clearRx
+    let invClearRy = 1 / clearance.clearRy
+    let innerStopSq = clearance.innerStop * clearance.innerStop
+    let outerStopSq = clearance.outerStop * clearance.outerStop
+    let baseScale = 0.75
+    let lastFillStyle = ""
     let ringX = 0.18
     let ringY = -0.12
     let targetX = 0.18
@@ -165,6 +172,13 @@ const CompanyHeroParticles: React.FC = () => {
       dpr = Math.min(window.devicePixelRatio || 1, finePointer ? 2 : 1.5)
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
+      clearance = resolveParticleClearance(width, height)
+      invClearRx = 1 / clearance.clearRx
+      invClearRy = 1 / clearance.clearRy
+      innerStopSq = clearance.innerStop * clearance.innerStop
+      outerStopSq = clearance.outerStop * clearance.outerStop
+      baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
+      lastFillStyle = ""
     }
 
     const drawCapsule = (
@@ -181,7 +195,10 @@ const CompanyHeroParticles: React.FC = () => {
       const sin = Math.sin(angle)
       context.setTransform(cos * dpr, sin * dpr, -sin * dpr, cos * dpr, cx * dpr, cy * dpr)
       context.globalAlpha = alpha
-      context.fillStyle = color
+      if (color !== lastFillStyle) {
+        context.fillStyle = color
+        lastFillStyle = color
+      }
       context.beginPath()
       if (typeof context.roundRect === "function") {
         context.roundRect(-halfLen, -radius, halfLen * 2, radius * 2, radius)
@@ -213,10 +230,6 @@ const CompanyHeroParticles: React.FC = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
 
-      const clearance = resolveParticleClearance(width, height)
-      const innerStopSq = clearance.innerStop * clearance.innerStop
-      const outerStopSq = clearance.outerStop * clearance.outerStop
-      const baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
       const halfWidth = clearance.cx
       const halfHeight = clearance.cy
 
@@ -236,8 +249,10 @@ const CompanyHeroParticles: React.FC = () => {
           smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
         const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
 
-        const tOuter = Math.max(0, bandOuter) ** 2
-        const tInner = Math.max(0, bandInner) ** 3
+        const clampedOuter = Math.max(0, bandOuter)
+        const clampedInner = Math.max(0, bandInner)
+        const tOuter = clampedOuter * clampedOuter
+        const tInner = clampedInner * clampedInner * clampedInner
         const ambientWave =
           ((Math.sin(p.refX * 3.4 + p.seedA * 4.2 + time) +
             Math.cos(p.refY * 3.1 + p.seedB * 4.2 + time * 0.85)) *
@@ -255,7 +270,7 @@ const CompanyHeroParticles: React.FC = () => {
           Math.cos(p.refY * 12 + time * 2.2) * 0.014 * Math.min(1, dist) +
           Math.sin(p.seedB * 6.28 + time) * 0.008
 
-        const pushFactor = (tInner ** 0.75) * ringDisplacement
+        const pushFactor = Math.sqrt(tInner * Math.sqrt(tInner)) * ringDisplacement
         p.posX = p.posX * 0.8 + (p.refX + dispX - ringX) * pushFactor
         p.posY = p.posY * 0.8 + (p.refY + dispY - ringY) * pushFactor
         p.scale += (targetScale - p.scale) * 0.2
@@ -265,8 +280,8 @@ const CompanyHeroParticles: React.FC = () => {
 
         const px = (finalX + 1) * halfWidth
         const py = (finalY + 1) * halfHeight
-        const nx = (px - clearance.cx) / clearance.clearRx
-        const ny = (py - clearance.cy) / clearance.clearRy
+        const nx = (px - halfWidth) * invClearRx
+        const ny = (py - halfHeight) * invClearRy
         const normSq = nx * nx + ny * ny
         if (normSq <= innerStopSq) continue
 

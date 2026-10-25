@@ -119,6 +119,10 @@ export const SearchInput = styled.input`
     outline: none;
     box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const UploadZone = styled.button`
@@ -170,6 +174,10 @@ export const UploadZone = styled.button`
   &:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(9, 105, 218, 0.2));
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 
@@ -379,8 +387,7 @@ export const SkeletonRow = styled.span`
   display: block;
   height: 0.78rem;
   border-radius: 2px;
-  background: linear-gradient(90deg, ${surfaceRaised}, ${surfaceMuted}, ${surfaceRaised});
-  background-size: 220% 100%;
+  background: ${surfaceMuted};
   animation: admin-cloud-skeleton 1.2s ease-in-out infinite;
 
   &:nth-of-type(2) {
@@ -392,12 +399,12 @@ export const SkeletonRow = styled.span`
   }
 
   @keyframes admin-cloud-skeleton {
-    0% {
-      background-position: 0% 50%;
+    0%, 100% {
+      opacity: 0.65;
     }
 
-    100% {
-      background-position: -220% 50%;
+    50% {
+      opacity: 1;
     }
   }
 `
@@ -438,6 +445,12 @@ export const DocumentFallbackBox = styled.div`
     font-weight: 850;
     text-decoration: none;
     ${focusVisibleRing}
+
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
   }
 `
 

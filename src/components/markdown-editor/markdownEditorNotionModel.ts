@@ -47,46 +47,56 @@ type LinePrefixTransformation = {
   replacement: string
 }
 
-const buildLogicalLines = (value: string): LogicalLine[] => {
-  const rawLines = value.split("\n")
-  let offset = 0
-  let inFence = false
-  let openMarker = ""
-  let openLength = 0
-
-  return rawLines.map((text, index) => {
-    const match = FENCE_DELIMITER_LINE_RE.exec(text)
-    let intersectsFence = inFence
-    if (match) {
-      const marker = match[2]?.[0] ?? ""
-      const length = match[2]?.length ?? 0
-      const info = match[3] ?? ""
-      intersectsFence = true
-      if (!inFence) {
-        inFence = true
-        openMarker = marker
-        openLength = length
-      } else if (marker === openMarker && length >= openLength && info.trim() === "") {
-        inFence = false
-        openMarker = ""
-        openLength = 0
-      }
-    }
-    const start = offset
-    const end = offset + text.length
-    offset = end + (index < rawLines.length - 1 ? 1 : 0)
-    return { start, end, text, intersectsFence }
-  })
+type FenceState = {
+  inFence: boolean
+  openMarker: string
+  openLength: number
 }
 
-const findLineIndexAt = (lines: LogicalLine[], offset: number): number => {
-  for (let index = 0; index < lines.length; index += 1) {
-    if (offset <= lines[index]!.end) return index
+const advanceFenceState = (state: FenceState, text: string): boolean => {
+  const match = FENCE_DELIMITER_LINE_RE.exec(text)
+  if (!match) return state.inFence
+  const marker = match[2]?.[0] ?? ""
+  const length = match[2]?.length ?? 0
+  const info = match[3] ?? ""
+  if (!state.inFence) {
+    state.inFence = true
+    state.openMarker = marker
+    state.openLength = length
+  } else if (marker === state.openMarker && length >= state.openLength && info.trim() === "") {
+    state.inFence = false
+    state.openMarker = ""
+    state.openLength = 0
   }
-  return lines.length - 1
+  return true
 }
 
-const resolveSelectedLines = (
+export const forEachLogicalLine = (
+  value: string,
+  visitor: (start: number, end: number, text: string, intersectsFence: boolean) => boolean
+): void => {
+  const fenceState: FenceState = { inFence: false, openMarker: "", openLength: 0 }
+  let offset = 0
+  while (true) {
+    const nextBreak = value.indexOf("\n", offset)
+    const end = nextBreak === -1 ? value.length : nextBreak
+    const text = value.slice(offset, end)
+    const intersectsFence = advanceFenceState(fenceState, text)
+    if (!visitor(offset, end, text, intersectsFence) || nextBreak === -1) break
+    offset = end + 1
+  }
+}
+
+export const buildLogicalLines = (value: string): LogicalLine[] => {
+  const lines: LogicalLine[] = []
+  forEachLogicalLine(value, (start, end, text, intersectsFence) => {
+    lines.push({ start, end, text, intersectsFence })
+    return true
+  })
+  return lines
+}
+
+export const resolveSelectedLines = (
   value: string,
   selectionStart: number,
   selectionEnd: number
@@ -100,15 +110,23 @@ const resolveSelectedLines = (
   ) {
     return null
   }
-  const lines = buildLogicalLines(value)
-  const firstIndex = findLineIndexAt(lines, selectionStart)
-  const lastIndex = findLineIndexAt(
-    lines,
-    selectionEnd === selectionStart ? selectionEnd : selectionEnd - 1
-  )
-  const selected = lines.slice(firstIndex, lastIndex + 1)
-  if (selected.some((line) => line.intersectsFence)) return null
-  return selected
+  const lastOffset = selectionEnd === selectionStart ? selectionEnd : selectionEnd - 1
+  const selected: LogicalLine[] = []
+  let blockedByFence = false
+
+  forEachLogicalLine(value, (start, end, text, intersectsFence) => {
+    if (start > lastOffset) return false
+    if (end >= selectionStart) {
+      if (intersectsFence) {
+        blockedByFence = true
+        return false
+      }
+      selected.push({ start, end, text, intersectsFence })
+    }
+    return start < lastOffset
+  })
+
+  return blockedByFence ? null : selected
 }
 
 const buildMutationFromTransformations = (
@@ -363,7 +381,7 @@ type NotionDocLineMeta = {
 
 let cachedNotionLineMeta: NotionDocLineMeta | null = null
 
-const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineMeta => {
+export const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineMeta => {
   if (cachedNotionLineMeta && cachedNotionLineMeta.doc === doc) {
     return cachedNotionLineMeta
   }
@@ -381,25 +399,23 @@ const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineMeta => 
     return cachedNotionLineMeta
   }
 
-  const logicalLines = buildLogicalLines(docText)
   const checkedTaskLineStarts: number[] = []
   const fencedRanges: { from: number; to: number }[] = []
 
-  for (const line of logicalLines) {
-    if (line.intersectsFence) {
-      const rangeEnd = line.end + 1
+  forEachLogicalLine(docText, (start, end, text, intersectsFence) => {
+    if (intersectsFence) {
+      const rangeEnd = end + 1
       const prev = fencedRanges[fencedRanges.length - 1]
-      if (prev && prev.to >= line.start) {
+      if (prev && prev.to >= start) {
         prev.to = Math.max(prev.to, rangeEnd)
       } else {
-        fencedRanges.push({ from: line.start, to: rangeEnd })
+        fencedRanges.push({ from: start, to: rangeEnd })
       }
-      continue
+    } else if (CHECKED_TASK_LINE_RE.test(text)) {
+      checkedTaskLineStarts.push(start)
     }
-    if (CHECKED_TASK_LINE_RE.test(line.text)) {
-      checkedTaskLineStarts.push(line.start)
-    }
-  }
+    return true
+  })
 
   cachedNotionLineMeta = { doc, checkedTaskLineStarts, fencedRanges }
   return cachedNotionLineMeta

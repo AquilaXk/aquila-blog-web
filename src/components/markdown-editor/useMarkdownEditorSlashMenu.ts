@@ -30,26 +30,50 @@ export const matchSlashCommandTrigger = (
   }
 }
 
+export const SLASH_FLAG_MERMAID = 1
+export const SLASH_FLAG_IMAGE = 1 << 1
+export const SLASH_FLAG_ATTACHMENT = 1 << 2
+
+export const packSlashDisabledFeaturesMask = (options?: {
+  disableMermaid?: boolean
+  disableImageUpload?: boolean
+  disableFileUpload?: boolean
+}): number =>
+  (options?.disableMermaid ? SLASH_FLAG_MERMAID : 0) |
+  (options?.disableImageUpload ? SLASH_FLAG_IMAGE : 0) |
+  (options?.disableFileUpload ? SLASH_FLAG_ATTACHMENT : 0)
+
+const resolveSlashSpecFlagMask = (id: string): number => {
+  if (id === "mermaid") return SLASH_FLAG_MERMAID
+  if (id === "image") return SLASH_FLAG_IMAGE
+  if (id === "attachment") return SLASH_FLAG_ATTACHMENT
+  return 0
+}
+
+const INDEXED_SLASH_SPECS = SLASH_COMMAND_SPECS.map((spec) => ({
+  spec,
+  flagMask: resolveSlashSpecFlagMask(spec.id),
+  searchHaystack: `${spec.id}\n${spec.label}\n${spec.description}\n${spec.keywords.join("\n")}`.toLowerCase(),
+}))
+
 export const filterSlashCommandSpecs = (
   query: string,
   disableMermaid = false,
   options?: { disableImageUpload?: boolean; disableFileUpload?: boolean }
 ) => {
   const q = query.trim().toLowerCase()
-  const availableSpecs = SLASH_COMMAND_SPECS.filter((spec) => {
-    if (disableMermaid && spec.id === "mermaid") return false
-    if (options?.disableImageUpload && spec.id === "image") return false
-    if (options?.disableFileUpload && spec.id === "attachment") return false
-    return true
+  const disabledMask = packSlashDisabledFeaturesMask({
+    disableMermaid,
+    disableImageUpload: options?.disableImageUpload,
+    disableFileUpload: options?.disableFileUpload,
   })
-  if (!q) return availableSpecs
-  return availableSpecs.filter(
-    (spec) =>
-      spec.label.toLowerCase().includes(q) ||
-      spec.description.toLowerCase().includes(q) ||
-      spec.id.toLowerCase().includes(q) ||
-      spec.keywords.some((kw) => kw.toLowerCase().includes(q))
-  )
+  const matched: (typeof SLASH_COMMAND_SPECS)[number][] = []
+  for (const entry of INDEXED_SLASH_SPECS) {
+    if ((entry.flagMask & disabledMask) !== 0) continue
+    if (q && !entry.searchHaystack.includes(q)) continue
+    matched.push(entry.spec)
+  }
+  return matched
 }
 
 export const resolveSlashCommandMutation = (
@@ -210,15 +234,25 @@ export const useMarkdownEditorSlashMenu = ({
         }
       }
 
-      setSlashMenuState((prev) => ({
-        isOpen: true,
-        position:
-          prev.isOpen && prev.position && prev.slashFrom === trigger.slashFrom
-            ? prev.position
-            : coords,
-        query: trigger.query,
-        slashFrom: trigger.slashFrom,
-      }))
+      setSlashMenuState((prev) => {
+        if (
+          prev.isOpen &&
+          prev.position &&
+          prev.slashFrom === trigger.slashFrom &&
+          prev.query === trigger.query
+        ) {
+          return prev
+        }
+        return {
+          isOpen: true,
+          position:
+            prev.isOpen && prev.position && prev.slashFrom === trigger.slashFrom
+              ? prev.position
+              : coords,
+          query: trigger.query,
+          slashFrom: trigger.slashFrom,
+        }
+      })
     },
     [resolveSlashCoords]
   )

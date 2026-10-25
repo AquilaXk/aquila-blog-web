@@ -82,6 +82,7 @@ export const EditorPanelHeader = styled.div`
     border-radius: 4px;
     transition: all 0.15s ease;
     ${focusVisibleRing}
+    @media (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 
     &:hover {
       color: ${({ theme }) => theme.colors.gray12};
@@ -132,6 +133,7 @@ export const EditorOutlineItem = styled.button`
   font-size: 13px;
   line-height: 1.4;
   transition: background 0.15s ease, color 0.15s ease;
+  @media (pointer: coarse) { min-height: 44px; }
 
   &:hover {
     background: ${({ theme }) => theme.colors.gray3};
@@ -220,6 +222,7 @@ export const LocalDraftRestoreCard = styled.div`
     background: ${({ theme }) => theme.publicDesign.readableSurface};
     color: ${({ theme }) => theme.colors.gray12};
     box-sizing: border-box;
+    @media (pointer: coarse) { min-height: 44px; }
   }
 
   .card-actions {
@@ -230,6 +233,7 @@ export const LocalDraftRestoreCard = styled.div`
     button {
       font-size: 0.78rem;
       padding: 5px 9px;
+      @media (pointer: coarse) { min-height: 44px; }
     }
   }
 `
@@ -290,6 +294,7 @@ export const EditorInspector = styled.aside`
 
   select {
     min-height: 40px;
+    @media (pointer: coarse) { min-height: 44px; }
   }
 
   textarea {
@@ -361,6 +366,7 @@ export const EditorGuidePanel = styled.aside`
     font-size: 1.2rem;
     cursor: pointer;
     ${focusVisibleRing}
+    @media (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   }
 `
 

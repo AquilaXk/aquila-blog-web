@@ -41,7 +41,7 @@ const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   user-select: none;
 `
 
@@ -101,6 +101,7 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
+  @media (pointer: coarse) { min-height: 44px; }
   @media (max-width: 720px) { display: none; }
 `
 
@@ -125,7 +126,7 @@ const BlockActionMenuPopover = styled.div<{ $top: number; $left: number }>`
   border-radius: 9px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -145,9 +146,12 @@ const BlockMenuItemButton = styled.button`
   text-align: left; cursor: pointer; transition: background-color 0.1s ease;
   ${focusVisibleRing}
   @media (pointer: coarse) { min-height: 44px; }
-  &:hover, &:focus, &:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
+  &:hover, &:focus {
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.indigo9};
+    outline-offset: -2px;
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
   }
   &[data-active="true"] { font-weight: 650; }
@@ -167,9 +171,15 @@ const ColorSwatchMenuButton = styled.button<{ $color: string }>`
   background: ${({ theme }) => theme.publicDesign.surfaceElevated}; color: ${({ $color }) => $color};
   font: 750 11.5px/1 var(--aq-font-sans); display: inline-flex; align-items: center; justify-content: center;
   gap: 4px; cursor: pointer; outline: none;
-  &:hover, &:focus, &:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
+  ${focusVisibleRing}
+  @media (pointer: coarse) { min-height: 44px; }
+  &:hover, &:focus {
+    border-color: ${({ $color }) => $color};
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.indigo9};
+    outline-offset: -2px;
     border-color: ${({ $color }) => $color};
     background: ${({ theme }) => theme.publicDesign.readableSurface};
   }

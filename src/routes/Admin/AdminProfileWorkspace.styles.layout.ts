@@ -342,7 +342,7 @@ export const Input = styled.input`
   padding: 0.82rem 0.95rem;
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 
@@ -508,7 +508,7 @@ export const SegmentButton = styled.button`
   font-weight: 700;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 

@@ -43,6 +43,7 @@ const MOTION_EASE_OUT = "cubic-bezier(0.215, 0.61, 0.355, 1)"
 
 export const ProductSurface = styled.div`
   --aq-focus-ring: ${light.focus};
+  --es-surface-elevated: ${light.surface};
   background: ${light.surface};
   color: ${light.inkPrimary};
   word-break: keep-all;
@@ -89,9 +90,7 @@ export const SurfaceHeader = styled.header`
   gap: 1rem;
   min-height: 72px;
   padding: 0.75rem ${SECTION_PADDING_X};
-  background: ${light.surfaceGlass};
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--es-surface-elevated);
   border-bottom: 1px solid ${light.borderHairline};
   transition: background-color ${TRANSITION}, border-color ${TRANSITION};
 
@@ -153,7 +152,7 @@ export const NavLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0 0.8rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   color: ${light.inkSecondary};
   text-decoration: none;
   font-size: 0.96875rem;
@@ -179,7 +178,7 @@ export const ButtonAction = styled.a`
   gap: 0.45rem;
   min-height: 46px;
   padding: 0 1.45rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   background: ${light.inkPrimary};
   color: ${light.onAccent};
   text-decoration: none;
@@ -222,7 +221,7 @@ export const SecondaryPillAction = styled.a`
   gap: 0.45rem;
   min-height: 46px;
   padding: 0 1.35rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   color: ${light.inkPrimary};
@@ -245,7 +244,7 @@ export const SecondaryPillAction = styled.a`
 export const HeaderAction = styled(ButtonAction)`
   min-height: 44px;
   padding: 0 1.15rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
 
   @media (max-width: ${layoutBreakpoint.navCompact}px) {
     margin-left: auto;
@@ -260,7 +259,7 @@ export const StatusBadge = styled.span`
   gap: 0.45rem;
   padding: 0.3rem 0.95rem;
   border: 1px solid ${light.border};
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   background: ${light.surfaceScaffold};
   color: ${light.inkSecondary};
   font-size: 0.84375rem;

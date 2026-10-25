@@ -6,46 +6,40 @@ export type ListMarkerMatch =
   | { kind: "unordered" | "task" | "quote"; indent: string; marker: string; content: string }
   | { kind: "ordered"; indent: string; marker: string; content: string; number: number }
 
+const TASK_PREFIX_RE = /^[-*+] \[[ xX]\] (.*)$/
+const UNORDERED_PREFIX_RE = /^([-*+] )(.*)$/
+const ORDERED_PREFIX_RE = /^((\d+)\. )(.*)$/
+const QUOTE_PREFIX_RE = /^> (.*)$/
+
 export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
-  const task = /^(?<indent>\s*)(?<marker>[-*+] \[[ xX]\] )(?<content>.*)$/.exec(line)
-  if (task?.groups) {
-    return {
-      kind: "task",
-      indent: task.groups.indent ?? "",
-      marker: "- [ ] ",
-      content: task.groups.content ?? "",
-    }
+  const trimmed = line.trimStart()
+  if (!trimmed) return null
+  const indent = line.slice(0, line.length - trimmed.length)
+  const first = trimmed[0]
+
+  if (first === "-" || first === "*" || first === "+") {
+    const task = TASK_PREFIX_RE.exec(trimmed)
+    if (task) return { kind: "task", indent, marker: "- [ ] ", content: task[1] }
+    const unordered = UNORDERED_PREFIX_RE.exec(trimmed)
+    if (unordered) return { kind: "unordered", indent, marker: unordered[1], content: unordered[2] }
+    return null
   }
 
-  const unordered = /^(?<indent>\s*)(?<marker>[-*+] )(?<content>.*)$/.exec(line)
-  if (unordered?.groups) {
-    return {
-      kind: "unordered",
-      indent: unordered.groups.indent ?? "",
-      marker: unordered.groups.marker ?? "- ",
-      content: unordered.groups.content ?? "",
-    }
-  }
-
-  const ordered = /^(?<indent>\s*)(?<marker>(?<number>\d+)\. )(?<content>.*)$/.exec(line)
-  if (ordered?.groups) {
+  if (first >= "0" && first <= "9") {
+    const ordered = ORDERED_PREFIX_RE.exec(trimmed)
+    if (!ordered) return null
     return {
       kind: "ordered",
-      indent: ordered.groups.indent ?? "",
-      marker: ordered.groups.marker ?? "1. ",
-      content: ordered.groups.content ?? "",
-      number: Number.parseInt(ordered.groups.number ?? "1", 10) || 1,
+      indent,
+      marker: ordered[1],
+      content: ordered[3],
+      number: Number.parseInt(ordered[2], 10) || 1,
     }
   }
 
-  const quote = /^(?<indent>\s*)(?<marker>> )(?<content>.*)$/.exec(line)
-  if (quote?.groups) {
-    return {
-      kind: "quote",
-      indent: quote.groups.indent ?? "",
-      marker: "> ",
-      content: quote.groups.content ?? "",
-    }
+  if (first === ">") {
+    const quote = QUOTE_PREFIX_RE.exec(trimmed)
+    if (quote) return { kind: "quote", indent, marker: "> ", content: quote[1] }
   }
 
   return null
@@ -61,13 +55,16 @@ type LogicalLine = {
 const fenceLine = /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 
 const logicalLines = (value: string): LogicalLine[] => {
-  const lines = value.split("\n")
+  const result: LogicalLine[] = []
   let offset = 0
   let inFence = false
   let openMarker = ""
   let openLength = 0
 
-  return lines.map((text, index) => {
+  while (true) {
+    const nextBreak = value.indexOf("\n", offset)
+    const end = nextBreak === -1 ? value.length : nextBreak
+    const text = value.slice(offset, end)
     const match = fenceLine.exec(text)
     let intersectsFence = inFence
     if (match) {
@@ -85,10 +82,12 @@ const logicalLines = (value: string): LogicalLine[] => {
         openLength = 0
       }
     }
-    const line = { start: offset, end: offset + text.length, text, intersectsFence }
-    offset = line.end + (index < lines.length - 1 ? 1 : 0)
-    return line
-  })
+    result.push({ start: offset, end, text, intersectsFence })
+    if (nextBreak === -1) break
+    offset = end + 1
+  }
+
+  return result
 }
 
 const lineIndexAt = (lines: LogicalLine[], offset: number): number => {

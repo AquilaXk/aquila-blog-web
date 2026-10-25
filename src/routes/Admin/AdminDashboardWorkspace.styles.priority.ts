@@ -225,6 +225,10 @@ export const PrioritySummary = styled.div`
     border-color: ${adminBorder};
     color: ${adminTextPrimary};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const PriorityLink = styled(AdminTextActionLink)`
@@ -232,6 +236,10 @@ export const PriorityLink = styled(AdminTextActionLink)`
   color: ${({ theme }) => theme.colors.gray12};
   font-size: 0.8rem;
   font-weight: 780;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const InsightLink = styled(AdminTextActionLink)`
