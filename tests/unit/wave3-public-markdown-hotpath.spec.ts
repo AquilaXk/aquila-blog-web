@@ -153,11 +153,12 @@ test.describe("wave3 public pages, responsive layout, deslop, and markdown hot p
     const postDetailStyles = readRepoFile("src/routes/Detail/PostDetail/PostDetail.styles.ts")
     expect(postDetailStyles).toContain(".detailLayout[data-toc=\"false\"]")
     expect(postDetailStyles).toContain("grid-template-columns: 64px minmax(0, 740px);")
+    expect(postDetailStyles).toContain(".detailLayout,\n    .detailLayout[data-toc=\"false\"] {\n      grid-template-columns: 52px minmax(0, 1fr);")
     expect(postDetailStyles).toContain(".mobileTocBlock")
 
     const postHeaderTsx = readRepoFile("src/routes/Detail/PostDetail/PostHeader.tsx")
     const hideMobileMatches = postHeaderTsx.match(/data-hide-mobile=/g) ?? []
-    expect(hideMobileMatches.length).toBe(1)
+    expect(hideMobileMatches).toHaveLength(1)
 
     const markdownTableTsx = readRepoFile("src/libs/markdown/MarkdownRendererTable.tsx")
     expect(markdownTableTsx).not.toContain('minWidth: "680px"')

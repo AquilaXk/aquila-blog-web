@@ -342,7 +342,8 @@ export const StyledWrapper = styled.div `
   }
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
-    .detailLayout {
+    .detailLayout,
+    .detailLayout[data-toc="false"] {
       grid-template-columns: 52px minmax(0, 1fr);
       gap: 28px;
     }

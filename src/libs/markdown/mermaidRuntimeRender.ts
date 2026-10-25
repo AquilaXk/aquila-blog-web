@@ -75,7 +75,7 @@ export const createMermaidRuntimeController = ({
       block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
     const raw = block.getAttribute("data-mermaid-source") || codeBlock?.textContent || block.textContent || ""
     const cached = blockSourceCache.get(block)
-    if (cached && cached.raw === raw) return cached
+    if (cached?.raw === raw) return cached
     const desired = applyMermaidSoftWrapHints(extractNormalizedMermaidSource(raw))
     const next = { raw, desired, renderable: desired ? sanitizeRenderableMermaidSource(desired) : "" }
     blockSourceCache.set(block, next)

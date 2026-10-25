@@ -91,7 +91,7 @@ export const DockSecondaryButton = styled(BaseButton)`
   background: transparent;
   color: ${({ theme }) => theme.colors.gray11};
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -101,7 +101,7 @@ export const DockPrimaryButton = styled(PublishButton)`
   padding: 0 1rem;
   border-radius: 6px;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `

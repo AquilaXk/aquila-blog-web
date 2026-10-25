@@ -91,7 +91,7 @@ export const countMermaidEdgeTokens = (source: string) => {
   let index = 0
 
   while (index < source.length) {
-    const c = source.charCodeAt(index)
+    const c = source.codePointAt(index)
     if (c !== 60 && c !== 45 && c !== 61 && c !== 120 && c !== 111) {
       index += 1
       continue

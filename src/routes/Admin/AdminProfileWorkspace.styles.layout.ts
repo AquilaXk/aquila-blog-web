@@ -460,6 +460,10 @@ export const InlineActionRow = styled.div`
   gap: 0.42rem;
 
   .reorderButton {
+    @media (pointer: coarse) {
+      min-height: ${control.lg}px;
+    }
+
     @media (min-width: 901px) and (pointer: fine) {
       display: none;
     }

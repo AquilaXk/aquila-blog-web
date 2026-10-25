@@ -479,10 +479,9 @@ export const MarkdownEditor = ({
       options?: { clearUploadError?: boolean }
     ) => {
       invalidateFindReplace()
-      updateActiveTableSelection(nextMarkdown, selectionRef.current)
       commitMarkdown(nextMarkdown, editorFocused, options)
     },
-    [commitMarkdown, invalidateFindReplace, updateActiveTableSelection]
+    [commitMarkdown, invalidateFindReplace]
   )
 
   return (

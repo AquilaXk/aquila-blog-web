@@ -342,7 +342,7 @@ const SAVED_AT_FAST_REGEX = /^\s*\{[^{}]*"savedAt"\s*:\s*(\d+)/
 
 export const extractSavedAt = (raw: string | null) => {
   if (!raw) return 0
-  const fastMatch = raw.match(SAVED_AT_FAST_REGEX)
+  const fastMatch = SAVED_AT_FAST_REGEX.exec(raw)
   if (fastMatch) {
     const parsedFast = Number(fastMatch[1])
     if (Number.isFinite(parsedFast)) return parsedFast

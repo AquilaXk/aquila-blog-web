@@ -41,7 +41,7 @@ export const computeCursorLineAndColumn = (
   let line = 1
   let lastNewlineIndex = -1
   for (let i = 0; i < clamped; i += 1) {
-    if (markdown.charCodeAt(i) === 10) {
+    if (markdown.codePointAt(i) === 10) {
       line += 1
       lastNewlineIndex = i
     }
@@ -60,7 +60,7 @@ export const analyzeMarkdownLinks = (
   }
   let totalLinks = 0
   let linkWarnings = 0
-  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s\r\n]*)(\))?|(\[\[[^\][\r\n]+\]\])/g)) {
+  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s]*)(\))?|(\[\[[^\][\r\n]+\]\])/g)) {
     if (match[3]) {
       totalLinks += 1
       continue
