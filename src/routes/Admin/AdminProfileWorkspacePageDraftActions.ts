@@ -98,19 +98,17 @@ export const useAdminProfileWorkspaceDraftActions = ({
   const reorderLinkItems = useCallback(
     (section: LinkTab, fromIndex: number, toIndex: number) => {
       if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
-      let didReorder = false
       setDraft((current) => {
         const key = section === "service" ? "serviceLinks" : "contactLinks"
         const list = current[key]
         if (fromIndex >= list.length || toIndex >= list.length) return current
-        didReorder = true
         return {
           ...current,
           [key]: reorderListItem(list, fromIndex, toIndex),
         }
       })
       setOpenIconPicker((current) => {
-        if (!didReorder || !current || !current.startsWith(`${section}:`)) return current
+        if (!current || !current.startsWith(`${section}:`)) return current
         const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
         if (openIdx === fromIndex) return `${section}:${toIndex}`
         if (fromIndex < toIndex && openIdx > fromIndex && openIdx <= toIndex) {

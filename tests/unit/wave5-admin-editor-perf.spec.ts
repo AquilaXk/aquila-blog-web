@@ -11,6 +11,11 @@ import {
   planIndentLines,
   planOutdentLines,
 } from "../../src/components/markdown-editor/markdownEditorTextMutation"
+import {
+  getMarkdownEditorTableEditAvailability,
+  planMarkdownEditorTableEdit,
+  resolveTableCellSelectionOffset,
+} from "../../src/components/markdown-editor/markdownEditorTableModel"
 import { sortCloudFiles } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 import {
   parseEditorMeta,
@@ -165,5 +170,47 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
       '&[data-variant="drawer"] {\n      padding-top: max(0.82rem, env(safe-area-inset-top, 0px));\n    }'
     )
     expect(modalStyles).toContain('[data-variant="drawer"] & {\n    grid-template-columns: minmax(0, 1fr);\n  }')
+  })
+
+  test("resolveTableCellSelectionOffset maps live table widget coordinates to active cell offsets for toolbar edits", () => {
+    const doc = [
+      "Intro paragraph",
+      "",
+      "| ColA | ColB |",
+      "| --- | --- |",
+      "| R1A | R1B |",
+      "| R2A | R2B |",
+    ].join("\n")
+    const tableFrom = doc.indexOf("| ColA |")
+
+    const headerOffset = resolveTableCellSelectionOffset(doc, tableFrom, 0, 0)
+    expect(headerOffset).not.toBeNull()
+    expect(getMarkdownEditorTableEditAvailability(doc, headerOffset!, headerOffset!)).toEqual({
+      addRow: true,
+      deleteRow: false,
+      addColumn: true,
+      deleteColumn: true,
+      alignLeft: true,
+      alignCenter: true,
+      alignRight: true,
+    })
+
+    const bodyRow2Col2Offset = resolveTableCellSelectionOffset(doc, tableFrom, 2, 1)
+    expect(bodyRow2Col2Offset).not.toBeNull()
+    expect(getMarkdownEditorTableEditAvailability(doc, bodyRow2Col2Offset!, bodyRow2Col2Offset!)).toEqual({
+      addRow: true,
+      deleteRow: true,
+      addColumn: true,
+      deleteColumn: true,
+      alignLeft: true,
+      alignCenter: true,
+      alignRight: true,
+    })
+    const deleteRowPlan = planMarkdownEditorTableEdit(doc, bodyRow2Col2Offset!, bodyRow2Col2Offset!, {
+      kind: "delete-row",
+    })
+    expect(deleteRowPlan?.replacement).toBe(
+      ["| ColA | ColB |", "| --- | --- |", "| R1A | R1B |"].join("\n")
+    )
   })
 })

@@ -137,6 +137,7 @@ export class MarkdownTableWidget extends WidgetType {
       const target = event.target as HTMLElement | null
       if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
       flushAndDispatchActiveCell()
+      if (target && !target.closest?.(".cm-content") && target.closest?.("[data-testid='markdown-editor']")) return
       isTableActive = false
       detachOutsideListener()
       syncActiveCellHighlight()
@@ -285,8 +286,11 @@ export class MarkdownTableWidget extends WidgetType {
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
-      if (isTableActive) wrap.dataset.activeMode = selectedMode
-      else delete wrap.dataset.activeMode
+      if (isTableActive) {
+        wrap.dataset.activeMode = selectedMode; wrap.dataset.activeRow = String(activeRow); wrap.dataset.activeCol = String(activeCol)
+      } else {
+        delete wrap.dataset.activeMode; delete wrap.dataset.activeRow; delete wrap.dataset.activeCol
+      }
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
