@@ -616,7 +616,28 @@ test.describe("Notion-parity Markdown editor model", () => {
         selectionStart: 0,
         selectionEnd: 0,
         style: { width: "", textAlign: "" },
-        dataset: {} as Record<string, string>,
+        dataset: new Proxy({} as Record<string, string | undefined>, {
+          get(_target, prop) {
+            if (typeof prop !== "string") return undefined
+            const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+            return attrs.get(attrKey)
+          },
+          set(_target, prop, value) {
+            if (typeof prop === "string") {
+              const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+              if (value === undefined) attrs.delete(attrKey)
+              else attrs.set(attrKey, String(value))
+            }
+            return true
+          },
+          deleteProperty(_target, prop) {
+            if (typeof prop === "string") {
+              const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+              attrs.delete(attrKey)
+            }
+            return true
+          },
+        }),
         children,
         get className() {
           return Array.from(classes).join(" ")

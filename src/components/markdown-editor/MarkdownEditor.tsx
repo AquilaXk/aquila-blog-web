@@ -128,7 +128,7 @@ export const MarkdownEditor = ({
   const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
     const isTable = isMarkdownEditorTableSelection(nextValue, selection.from, selection.to)
     setActiveTableSelection((prev) => {
-      if (!isTable) return prev === null ? null : null
+      if (!isTable) return null
       return prev && prev.from === selection.from && prev.to === selection.to ? prev : selection
     })
   }, [])

@@ -264,8 +264,8 @@ export class MarkdownTableWidget extends WidgetType {
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
-      if (isTableActive) wrap.setAttribute("data-active-mode", selectedMode)
-      else if (typeof wrap.removeAttribute === "function") wrap.removeAttribute("data-active-mode")
+      if (isTableActive) wrap.dataset.activeMode = selectedMode
+      else delete wrap.dataset.activeMode
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
@@ -304,7 +304,9 @@ export class MarkdownTableWidget extends WidgetType {
       }
       const mainSel = view.state.selection.main
       const overlaps = mainSel.from >= range.from && mainSel.from <= range.to
-      const safeAnchor = range.from > 0 ? range.from - 1 : range.to < view.state.doc.length ? range.from + nextMarkdown.length + 1 : undefined
+      let safeAnchor: number | undefined
+      if (range.from > 0) safeAnchor = range.from - 1
+      else if (range.to < view.state.doc.length) safeAnchor = range.from + nextMarkdown.length + 1
 
       view.dispatch({
         changes: { from: range.from, to: range.to, insert: nextMarkdown },
