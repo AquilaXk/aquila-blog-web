@@ -21,6 +21,11 @@ export type TableToolbarButtonEntry = {
 const MAX_TABLE_VISUAL_OPTIONS = 128
 const tableVisualOptionsByOffset = new Map<number, TableVisualOptions>()
 
+const syncVisualOptionWidths = (options: TableVisualOptions, columnCount: number) => {
+  while (options.columnWidths.length < columnCount) options.columnWidths.push(0)
+  if (options.columnWidths.length > columnCount) options.columnWidths.length = columnCount
+}
+
 export const getOrCreateTableVisualOptions = (
   tableFrom: number,
   columnCount: number
@@ -28,8 +33,7 @@ export const getOrCreateTableVisualOptions = (
   const existing = tableVisualOptionsByOffset.get(tableFrom)
   if (existing) {
     tableVisualOptionsByOffset.delete(tableFrom)
-    while (existing.columnWidths.length < columnCount) existing.columnWidths.push(0)
-    if (existing.columnWidths.length > columnCount) existing.columnWidths.length = columnCount
+    syncVisualOptionWidths(existing, columnCount)
     tableVisualOptionsByOffset.set(tableFrom, existing)
     return existing
   }
@@ -45,6 +49,25 @@ export const getOrCreateTableVisualOptions = (
   }
   tableVisualOptionsByOffset.set(tableFrom, created)
   return created
+}
+
+export const migrateTableVisualOptionsOffset = (
+  prevFrom: number | undefined,
+  nextFrom: number | undefined,
+  columnCount: number
+): TableVisualOptions => {
+  const prevKey = prevFrom ?? 0
+  const nextKey = nextFrom ?? 0
+  if (prevKey !== nextKey && !tableVisualOptionsByOffset.has(nextKey)) {
+    const existing = tableVisualOptionsByOffset.get(prevKey)
+    if (existing) {
+      tableVisualOptionsByOffset.delete(prevKey)
+      syncVisualOptionWidths(existing, columnCount)
+      tableVisualOptionsByOffset.set(nextKey, existing)
+      return existing
+    }
+  }
+  return getOrCreateTableVisualOptions(nextKey, columnCount)
 }
 
 export const setBooleanDataAttribute = (el: HTMLElement, attr: string, enabled: boolean) => {
@@ -240,28 +263,18 @@ export const attachColumnResizeHandle = (
       if (hasMoved) applyWidth(latestClientX)
       if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
         window.removeEventListener(moveEventName, handleMove)
-        for (const upName of upEventNames) {
-          window.removeEventListener(upName, handleUp)
-        }
+        for (const upName of upEventNames) window.removeEventListener(upName, handleUp)
       }
     }
 
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener(moveEventName, handleMove)
-      for (const upName of upEventNames) {
-        window.addEventListener(upName, handleUp)
-      }
+      for (const upName of upEventNames) window.addEventListener(upName, handleUp)
     }
   }
 
-  resizer.addEventListener("pointerdown", (event: PointerEvent) => {
-    startResize(event, "pointermove", ["pointerup", "pointercancel"])
-  })
-
-  resizer.addEventListener("mousedown", (event: MouseEvent) => {
-    startResize(event, "mousemove", ["mouseup"])
-  })
-
+  resizer.addEventListener("pointerdown", (e: PointerEvent) => startResize(e, "pointermove", ["pointerup", "pointercancel"]))
+  resizer.addEventListener("mousedown", (e: MouseEvent) => startResize(e, "mousemove", ["mouseup"]))
   th.appendChild(resizer)
   return resizer
 }
@@ -272,13 +285,14 @@ export const createTableToolbarElement = (params: {
   visualOptions: TableVisualOptions
   executeGridAction: (action: MarkdownTableGridAction) => void
   onEditSource: () => void
+  onActivateToolbar?: () => void
 }): {
   toolbar: HTMLDivElement
   toolbarButtons: TableToolbarButtonEntry[]
   canAddRow: () => boolean
   canAddCol: () => boolean
 } => {
-  const { grid, wrap, visualOptions, executeGridAction, onEditSource } = params
+  const { grid, wrap, visualOptions, executeGridAction, onEditSource, onActivateToolbar } = params
   const toolbar = document.createElement("div")
   toolbar.className = "cm-live-table-toolbar"
   toolbar.setAttribute("role", "toolbar")
@@ -289,12 +303,7 @@ export const createTableToolbarElement = (params: {
   const canAddRow = () => grid.rows.length + 2 <= MAX_EDIT_ROWS
   const canAddCol = () => grid.headers.length < MAX_EDIT_COLUMNS
 
-  const toggleOptionSpec = (
-    label: string,
-    ariaLabel: string,
-    testId: string,
-    key: "headerRow" | "headerColumn" | "fitPageWidth"
-  ) => ({
+  const toggleOptionSpec = (label: string, ariaLabel: string, testId: string, key: "headerRow" | "headerColumn" | "fitPageWidth") => ({
     group: "options" as const,
     label,
     ariaLabel,
@@ -338,7 +347,7 @@ export const createTableToolbarElement = (params: {
     { group: "col", label: "⧉열", ariaLabel: "표 열 복제", action: { kind: "duplicate-column" }, isDisabled: () => !canAddCol() },
     { group: "col", label: "⌫열", ariaLabel: "표 열 내용 비우기", action: { kind: "clear-column" } },
     { group: "col", label: "✕열", ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
-    { group: "source", groupStart: true, label: "</> 원본", ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
+    { group: "source", groupStart: true, label: "</>", ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
   ]
 
   for (const spec of actionSpecs) {
@@ -359,6 +368,7 @@ export const createTableToolbarElement = (params: {
     btn.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
+      onActivateToolbar?.()
       if (spec.onSelect) spec.onSelect(btn)
       else if (spec.action) executeGridAction(spec.action)
     })
