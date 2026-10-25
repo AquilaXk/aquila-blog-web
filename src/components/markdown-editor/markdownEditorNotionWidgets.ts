@@ -197,7 +197,11 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
           bodyOffset: candidate.bodyOffset,
         })
       } else {
-        const nonEmptyLines = candidate.bodyLines.map((l) => l.trim()).filter(Boolean)
+        const nonEmptyLines: string[] = []
+        for (const raw of candidate.bodyLines) {
+          const trimmed = raw.trim()
+          if (trimmed) nonEmptyLines.push(trimmed)
+        }
         const hasInlineTitle = candidate.inlineTitle.length > 0
         blocks.push({
           kind: "bookmark",
@@ -477,8 +481,15 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     urlEl.className = "cm-live-bookmark-url"
     urlEl.textContent = this.url
     content.appendChild(urlEl)
-    root.append(icon, content)
-    bindContainerActivateTarget(root, view, root, this.from, this.to, 12, false)
+    const openLink = document.createElement("a")
+    openLink.className = "cm-live-bookmark-open"
+    openLink.href = this.url
+    openLink.target = "_blank"
+    openLink.rel = "noopener noreferrer"
+    openLink.setAttribute("aria-label", "북마크 링크 열기")
+    openLink.textContent = "↗"
+    root.append(icon, content, openLink)
+    bindContainerActivateTarget(root, view, root, this.from, this.to, 12, true)
     return root
   }
 }
@@ -501,10 +512,8 @@ const haveSameActiveContainerBlocks = (
   nextRanges: readonly { from: number; to: number }[]
 ): boolean => {
   if (blocks.length === 0) return true
-  const prevSorted = [...prevRanges].map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to)
-  const nextSorted = [...nextRanges].map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to)
   for (const block of blocks) {
-    if (isContainerBlockActive(block, prevSorted) !== isContainerBlockActive(block, nextSorted)) return false
+    if (isContainerBlockActive(block, prevRanges) !== isContainerBlockActive(block, nextRanges)) return false
   }
   return true
 }
@@ -516,10 +525,7 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
   const blocks = getCachedNotionContainerBlocks(state.doc)
   if (blocks.length === 0) return Decoration.none
 
-  const selections = [...state.selection.ranges]
-    .map(({ from, to }) => ({ from, to }))
-    .sort((a, b) => a.from - b.from || a.to - b.to)
-
+  const selections = state.selection.ranges
   const decorations: Range<Decoration>[] = []
 
   for (const block of blocks) {

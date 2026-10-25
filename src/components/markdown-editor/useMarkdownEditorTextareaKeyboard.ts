@@ -226,8 +226,12 @@ export const useMarkdownEditorTextareaKeyboard = ({
     (event: ReactKeyboardEvent<HTMLElement>) => {
       if (disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)) return
 
-      const targetTagName = (event.target as HTMLElement | null)?.tagName
-      if (targetTagName === "INPUT" || targetTagName === "TEXTAREA") {
+      const targetElement = event.target as HTMLElement | null
+      const targetTagName = targetElement?.tagName
+      const isInsideTableWidget =
+        typeof targetElement?.closest === "function" &&
+        targetElement.closest(".cm-live-table-wrap") !== null
+      if (targetTagName === "INPUT" || targetTagName === "TEXTAREA" || isInsideTableWidget) {
         handleSaveShortcutKeyDown(event)
         return
       }

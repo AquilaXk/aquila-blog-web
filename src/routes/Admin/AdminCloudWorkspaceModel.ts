@@ -160,24 +160,38 @@ export const sortCloudFiles = (
   files: readonly CloudFile[],
   sortMode: CloudSortMode,
 ): CloudFile[] => {
-  const copy = [...files]
-  copy.sort((a, b) => {
-    if (sortMode === "OLDEST") {
-      const timeDiff = toCloudTimestamp(a.createdAt) - toCloudTimestamp(b.createdAt)
-      return timeDiff !== 0 ? timeDiff : a.id - b.id
-    }
-    if (sortMode === "NAME") {
+  if (sortMode === "NAME") {
+    const copy = [...files]
+    copy.sort((a, b) => {
       const nameDiff = a.originalFilename.localeCompare(b.originalFilename, "ko", { numeric: true })
       return nameDiff !== 0 ? nameDiff : a.id - b.id
-    }
-    if (sortMode === "SIZE") {
+    })
+    return copy
+  }
+  if (sortMode === "SIZE") {
+    const copy = [...files]
+    copy.sort((a, b) => {
       const sizeDiff = b.byteSize - a.byteSize
       return sizeDiff !== 0 ? sizeDiff : b.id - a.id
-    }
-    const timeDiff = toCloudTimestamp(b.createdAt) - toCloudTimestamp(a.createdAt)
-    return timeDiff !== 0 ? timeDiff : b.id - a.id
-  })
-  return copy
+    })
+    return copy
+  }
+  const withTimestamps = files.map((file) => ({
+    file,
+    ts: toCloudTimestamp(file.createdAt),
+  }))
+  if (sortMode === "OLDEST") {
+    withTimestamps.sort((a, b) => {
+      const timeDiff = a.ts - b.ts
+      return timeDiff !== 0 ? timeDiff : a.file.id - b.file.id
+    })
+  } else {
+    withTimestamps.sort((a, b) => {
+      const timeDiff = b.ts - a.ts
+      return timeDiff !== 0 ? timeDiff : b.file.id - a.file.id
+    })
+  }
+  return withTimestamps.map((entry) => entry.file)
 }
 
 export const doesCloudFileMatchSearchParams = (
@@ -246,32 +260,40 @@ export const mergeCloudFiles = (primary: CloudFile[], secondary: CloudFile[]) =>
   const seen = new Set<number>()
   const merged: CloudFile[] = []
 
-  ;[...primary, ...secondary].forEach((file) => {
-    if (seen.has(file.id)) return
+  for (const file of primary) {
+    if (seen.has(file.id)) continue
     seen.add(file.id)
     merged.push(file)
-  })
+  }
+  for (const file of secondary) {
+    if (seen.has(file.id)) continue
+    seen.add(file.id)
+    merged.push(file)
+  }
 
   return merged
 }
 
 export const getCloudSummary = (files: readonly CloudFile[]) => {
-  const totalBytes = files.reduce((sum, file) => sum + file.byteSize, 0)
-  const countByKind = files.reduce(
-    (summary, file) => {
-      summary[file.mediaKind] += 1
-      return summary
-    },
-    { DOCUMENT: 0, PHOTO: 0, VIDEO: 0 }
-  )
+  let totalBytes = 0
+  let documentCount = 0
+  let photoCount = 0
+  let videoCount = 0
+
+  for (const file of files) {
+    totalBytes += file.byteSize
+    if (file.mediaKind === "DOCUMENT") documentCount += 1
+    else if (file.mediaKind === "PHOTO") photoCount += 1
+    else if (file.mediaKind === "VIDEO") videoCount += 1
+  }
 
   return {
     totalCount: files.length,
     totalBytes,
     totalSize: formatCloudFileSize(totalBytes),
-    documentCount: countByKind.DOCUMENT,
-    photoCount: countByKind.PHOTO,
-    videoCount: countByKind.VIDEO,
+    documentCount,
+    photoCount,
+    videoCount,
   }
 }
 

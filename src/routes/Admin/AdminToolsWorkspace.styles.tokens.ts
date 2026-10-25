@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
   AdminInlineActionRow,
@@ -95,6 +96,7 @@ export const FeaturedStatusCard = styled.button`
   background: ${adminSurfaceRaised};
   padding: 1rem;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:hover {
     border-color: ${adminBorderStrong};
@@ -141,6 +143,7 @@ export const StatusCardButton = styled.button`
   background: ${adminSurface};
   padding: 0.82rem 0.9rem;
   cursor: pointer;
+  ${focusVisibleRing}
 
   &:hover {
     border-color: ${adminBorderStrong};
@@ -320,8 +323,9 @@ export const DiagnosticsTabButton = styled.button`
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 

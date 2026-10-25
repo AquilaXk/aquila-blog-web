@@ -92,9 +92,8 @@ export const EditorExitAction = styled.button `
   font-weight: 750;
   line-height: 1;
   cursor: pointer;
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
+  @media (pointer: coarse) { min-height: 44px; }
 
   &:hover {
     background: transparent;
@@ -121,6 +120,7 @@ export const EditorStudioTopBarActions = styled.div `
     height: 38px;
     min-height: 38px;
     padding: 0 14px;
+    @media (pointer: coarse) { height: auto; min-height: 44px; }
   }
 
   @media (max-width: 1200px) {
@@ -142,8 +142,8 @@ export const EditorStudioTopBarActions = styled.div `
     padding-top: 2px;
 
     button {
-      height: 32px;
-      min-height: 32px;
+      height: auto;
+      min-height: 44px;
       padding: 0 9px;
       font-size: 0.78rem;
       white-space: nowrap;
@@ -259,6 +259,7 @@ export const EditorSidebarToggleButton = styled.button<{ $active?: boolean }>`
     outline: none;
     box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4};
   }
+  @media (pointer: coarse) { height: auto; min-height: 44px; }
 
   @media (max-width: 820px) {
     &[data-mobile-hidden="true"] {
@@ -433,6 +434,7 @@ export const InlineMetaInput = styled.input `
   font-size: 0.86rem;
   font-weight: 500;
   transition: border-color 0.16s ease;
+  @media (pointer: coarse) { min-height: 44px; }
   &::placeholder { color: ${({ theme }) => theme.colors.gray10}; }
   &:hover { border-bottom-color: ${({ theme }) => theme.colors.gray6}; }
   &:focus-visible { outline: none; border-bottom-color: ${({ theme }) => theme.colors.blue8}; }
@@ -457,6 +459,7 @@ export const EditorInspectorTagInputRow = styled.div`
   button {
     width: auto;
     min-width: 38px;
+    min-height: 44px;
     flex: 0 0 auto;
     border: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-radius: 6px;
@@ -542,8 +545,9 @@ export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolea
   font-weight: 600;
   cursor: pointer;
 
-  @media (max-width: 820px) {
+  @media (max-width: 820px), (pointer: coarse) {
     display: inline-flex;
+    min-height: 44px;
   }
 `;
 export const EditorHeaderMetaPill = styled.span`

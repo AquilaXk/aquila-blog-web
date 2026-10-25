@@ -111,7 +111,7 @@ export const marketingLight = {
   surfaceGlassElevated: "rgba(255, 255, 255, 0.96)",
   surfaceHoverTint: "rgba(31, 35, 64, 0.04)",
   borderHairline: "rgba(31, 35, 64, 0.08)",
-  phoneShadow: "0 24px 48px -12px rgba(31, 35, 64, 0.14), 0 12px 24px -8px rgba(31, 35, 64, 0.08)",
+  phoneShadow: "0 16px 32px rgba(31, 35, 64, 0.08)",
   particleColors: ["#2C64ED", "#5C6BC0", "#7480D2", "#F84242", "#FFCF03"] as const,
 } as const
 
@@ -153,7 +153,7 @@ export const marketingDark = {
   lineArtAccent: brand[600],
   graphic: brand[500],
   /** 폰 프레임 목업을 위한 정갈한 다크 입체 섀도우 토큰. */
-  phoneShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 12px 24px -8px rgba(0, 0, 0, 0.45)",
+  phoneShadow: "0 20px 40px rgba(0, 0, 0, 0.36)",
   surfaceGlass: "rgba(22, 25, 45, 0.86)",
   surfaceGlassScrolled: "rgba(22, 25, 45, 0.95)",
   particleColors: ["#7189FF", "#3074F9", "#949FE8", "#B4BCFB"] as const,

@@ -40,11 +40,13 @@ export const computeCursorLineAndColumn = (
   const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
   let line = 1
   let lastNewlineIndex = -1
-  for (let i = 0; i < clamped; i += 1) {
-    if (markdown.codePointAt(i) === 10) {
-      line += 1
-      lastNewlineIndex = i
-    }
+  let searchPos = 0
+  while (searchPos < clamped) {
+    const nextBreak = markdown.indexOf("\n", searchPos)
+    if (nextBreak === -1 || nextBreak >= clamped) break
+    line += 1
+    lastNewlineIndex = nextBreak
+    searchPos = nextBreak + 1
   }
   return { line, column: clamped - lastNewlineIndex }
 }
@@ -296,8 +298,8 @@ export const EditorStudioDedicatedEditorSurface = ({
   const linkWarningCount = useMemo(() => countMarkdownLinkWarnings(deferredPostContent), [deferredPostContent])
   const totalLinkCount = useMemo(() => countMarkdownTotalLinks(deferredPostContent), [deferredPostContent])
   const cursorPosition = useMemo(
-    () => computeCursorLineAndColumn(postContent, activeCursorOffset),
-    [activeCursorOffset, postContent]
+    () => computeCursorLineAndColumn(deferredPostContent, activeCursorOffset),
+    [activeCursorOffset, deferredPostContent]
   )
   const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
   const handleTagDraftChange = (nextValue: string) => {
@@ -324,13 +326,17 @@ export const EditorStudioDedicatedEditorSurface = ({
     titleNodeRef.current = node
     titleInputRef(node)
   }, [titleInputRef])
+  const availableTagSuggestions = useMemo(() => {
+    const selected = new Set(postTags)
+    return tagSuggestions.filter((tag) => !selected.has(tag))
+  }, [postTags, tagSuggestions])
 
   return (
     <EditorStudioRoot>
       <EditorStudioPageHeading>글 편집</EditorStudioPageHeading>
       <EditorHiddenFileInput ref={thumbnailImageFileInputRef} type="file" accept="image/*" onChange={onThumbnailImageFileChange} />
       <datalist id="editor-tag-suggestions">
-        {tagSuggestions.filter((tag) => !postTags.includes(tag)).map((tag) => <option key={tag} value={tag} />)}
+        {availableTagSuggestions.map((tag) => <option key={tag} value={tag} />)}
       </datalist>
 
       <EditorStudioDedicatedTopBar>

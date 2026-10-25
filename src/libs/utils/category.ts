@@ -75,7 +75,10 @@ const composeCategoryDisplay = (
   return `${toKnownIconId(iconId)}${CATEGORY_STORAGE_SEPARATOR}${normalizedLabel}`
 }
 
-export const splitCategoryDisplay = (value: string): ParsedCategoryDisplay => {
+const MAX_CATEGORY_CACHE_SIZE = 256
+const categoryDisplayCache = new Map<string, ParsedCategoryDisplay>()
+
+const parseCategoryDisplayUncached = (value: string): ParsedCategoryDisplay => {
   const trimmed = value.trim()
 
   if (isDefaultCategoryValue(trimmed)) {
@@ -122,6 +125,21 @@ export const splitCategoryDisplay = (value: string): ParsedCategoryDisplay => {
     value: composeCategoryDisplay(label, DEFAULT_ICON_ID),
     isDefault: false,
   }
+}
+
+export const splitCategoryDisplay = (value: string): ParsedCategoryDisplay => {
+  const cached = categoryDisplayCache.get(value)
+  if (cached) return cached
+
+  const parsed = parseCategoryDisplayUncached(value)
+  if (categoryDisplayCache.size >= MAX_CATEGORY_CACHE_SIZE) {
+    const oldestKey = categoryDisplayCache.keys().next().value
+    if (oldestKey !== undefined) {
+      categoryDisplayCache.delete(oldestKey)
+    }
+  }
+  categoryDisplayCache.set(value, parsed)
+  return parsed
 }
 
 const KO_COLLATOR = new Intl.Collator("ko")

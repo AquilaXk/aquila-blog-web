@@ -169,22 +169,33 @@ const escapeHtml = (value: string) =>
 
 const normalizeCodeLineBreaks = (value: string) => value.replace(/\r\n?|\u2028|\u2029/g, "\n")
 
-const renderLineWrappedHtml = (
+export const renderLineWrappedHtml = (
   source: string,
   highlightedLines?: ReadonlySet<number>
-) =>
-  normalizeCodeLineBreaks(source)
-    .split("\n")
-    .map((line, index) => {
-      const lineNumber = index + 1
-      const highlightedAttr = highlightedLines?.has(lineNumber)
+) => {
+  const html = normalizeCodeLineBreaks(source)
+  const hasHighlights = Boolean(highlightedLines && highlightedLines.size > 0)
+  let result = ""
+  let lineStart = 0
+  let lineNumber = 1
+
+  while (lineStart <= html.length) {
+    const lineEnd = html.indexOf("\n", lineStart)
+    const line = lineEnd === -1 ? html.slice(lineStart) : html.slice(lineStart, lineEnd)
+    const highlightedAttr =
+      hasHighlights && highlightedLines!.has(lineNumber)
         ? ' data-highlighted-line="true"'
         : ""
-      return `<span class="line" data-line="true"${highlightedAttr}>${
-        line.length > 0 ? line : "<br />"
-      }</span>`
-    })
-    .join("")
+    result += `<span class="line" data-line="true"${highlightedAttr}>${
+      line.length > 0 ? line : "<br />"
+    }</span>`
+    if (lineEnd === -1) break
+    lineStart = lineEnd + 1
+    lineNumber += 1
+  }
+
+  return result
+}
 
 export const renderPlainCodeToHtml = (
   source: string,

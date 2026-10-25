@@ -158,7 +158,7 @@ export const IconPickerButton = styled.button`
   color: ${({ theme }) => theme.colors.gray12};
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `

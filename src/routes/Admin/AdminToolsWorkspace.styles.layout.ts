@@ -287,7 +287,7 @@ export const PrimaryButton = styled.button`
     cursor: not-allowed;
   }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -364,7 +364,7 @@ export const DangerButton = styled.button`
     cursor: not-allowed;
   }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -390,7 +390,7 @@ export const ResultFilterButton = styled.button`
   cursor: pointer;
   ${focusVisibleRing}
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 

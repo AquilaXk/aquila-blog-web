@@ -60,7 +60,6 @@ export type LocalDraftPayload = {
   visibility: PostVisibility
   savedAt: string
   source: LocalDraftSource
-  /** Optimistic-lock version for post-slot drafts; create drafts omit/null. */
   postVersion?: number | null
 }
 
@@ -94,14 +93,19 @@ export const extractFirstMarkdownImage = (content: string): string => {
 
 const FNV1A_32_OFFSET_BASIS = 2166136261
 const FNV1A_32_PRIME = 16777619
+let cachedFingerprintInput = ""
+let cachedFingerprintValue = `${0}:${FNV1A_32_OFFSET_BASIS >>> 0}`
 
 export const computeContentFingerprint = (content: string): string => {
+  if (content === cachedFingerprintInput) return cachedFingerprintValue
   let hash = FNV1A_32_OFFSET_BASIS
   for (let index = 0; index < content.length; index += 1) {
     hash ^= content.charCodeAt(index)
     hash = Math.imul(hash, FNV1A_32_PRIME)
   }
-  return `${content.length}:${hash >>> 0}`
+  cachedFingerprintInput = content
+  cachedFingerprintValue = `${content.length}:${hash >>> 0}`
+  return cachedFingerprintValue
 }
 
 export const normalizeSafeImageUrl = (raw: string): string => {
@@ -232,6 +236,7 @@ const stripLeadingEditorMetadataLines = (content: string) => {
   if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
     return {
       consumed: 0,
+      metadataLines: [] as string[],
       body: normalized,
     }
   }
@@ -249,13 +254,15 @@ const stripLeadingEditorMetadataLines = (content: string) => {
 
   return {
     consumed,
+    metadataLines: consumed > 0 ? lines.slice(0, consumed) : ([] as string[]),
     body: consumed > 0 ? lines.slice(consumed).join("\n").trimStart() : normalized,
   }
 }
 
-const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
+export const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
+  if (parsedBody.trim().length > 0) return parsedBody
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
-  if (parsedBody.trim().length > 0 || normalized.trim().length === 0) return parsedBody
+  if (normalized.trim().length === 0) return parsedBody
 
   const frontmatterSplit = splitFrontmatterBlock(normalized)
   const inlineMetadataSplit = stripLeadingEditorMetadataLines(frontmatterSplit.body)
@@ -368,21 +375,18 @@ export const parseEditorMeta = (
 
   const leadingMetadataSplit = stripLeadingEditorMetadataLines(trimmed)
   if (leadingMetadataSplit.consumed > 0) {
-    trimmed
-      .split("\n")
-      .slice(0, leadingMetadataSplit.consumed)
-      .forEach((line) => {
-        const match = line.match(LEADING_EDITOR_METADATA_LINE_REGEX)
-        if (!match) return
+    leadingMetadataSplit.metadataLines.forEach((line) => {
+      const match = line.match(LEADING_EDITOR_METADATA_LINE_REGEX)
+      if (!match) return
 
-        const key = match[1].toLowerCase()
-        const value = match[2]
-        if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
-        if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
-        if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
-          thumbnail = normalizeMetaScalar(value)
-        }
-      })
+      const key = match[1].toLowerCase()
+      const value = match[2]
+      if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
+      if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
+      if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
+        thumbnail = normalizeMetaScalar(value)
+      }
+    })
     trimmed = leadingMetadataSplit.body
   }
 
@@ -452,7 +456,11 @@ const detectPlaceholderLineIssue = (trimmed: string): string | null => {
   return null
 }
 
+let cachedPlaceholderInput: string | null = null
+let cachedPlaceholderIssue: string | null = null
+
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
+  if (content === cachedPlaceholderInput) return cachedPlaceholderIssue
   let fenceMarker: FenceMarker | null = null
   let cursor = 0
 
@@ -465,16 +473,21 @@ export const detectPublishPlaceholderIssue = (content: string): string | null =>
       fenceMarker = fenceState.marker
       if (!fenceState.isFenceLine && !fenceMarker && !trimmed.startsWith(">")) {
         const lineIssue = detectPlaceholderLineIssue(trimmed)
-        if (lineIssue) return lineIssue
+        if (lineIssue) {
+          cachedPlaceholderInput = content
+          cachedPlaceholderIssue = lineIssue
+          return lineIssue
+        }
       }
     }
     if (nextBreak === -1) break
     cursor = nextBreak + 1
   }
 
-  if (hasNonCanonicalPostImageSource(content)) {
-    return "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
-  }
-
-  return null
+  const imageIssue = hasNonCanonicalPostImageSource(content)
+    ? "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
+    : null
+  cachedPlaceholderInput = content
+  cachedPlaceholderIssue = imageIssue
+  return imageIssue
 }

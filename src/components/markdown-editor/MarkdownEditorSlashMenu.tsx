@@ -76,13 +76,14 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   width: 280px;
+  max-width: calc(100vw - 24px);
   max-height: 380px;
   overflow-y: auto;
   padding: 6px;
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -136,6 +137,7 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
   transition: background-color 0.1s ease;
 
   ${focusVisibleRing}
+  @media (pointer: coarse) { min-height: 44px; }
 
   &:hover {
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
@@ -202,6 +204,7 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1 1 auto;
 
     .label {
       font-size: 14px;
@@ -217,7 +220,31 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
       margin-top: 2px;
     }
   }
+
+  .shortcut {
+    margin-left: auto;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: ${({ theme }) => theme.colors.gray9};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    flex-shrink: 0;
+  }
 `
+
+const SLASH_SHORTCUT_BY_ID: Readonly<Record<string, string>> = {
+  "heading-1": "#",
+  "heading-2": "##",
+  "heading-3": "###",
+  "bullet-list": "-",
+  "ordered-list": "1.",
+  "task-list": "[]",
+  quote: ">",
+  divider: "---",
+  toggle: ":::",
+  "code-block": "```",
+  math: "$$",
+}
 
 const isEmojiIcon = (icon: string) =>
   /\p{Extended_Pictographic}/u.test(icon) || icon === "☑" || icon === "▦"
@@ -335,6 +362,7 @@ export const MarkdownEditorSlashMenu = ({
                 role="menuitem"
                 aria-current={index === selectedIndex ? "true" : undefined}
                 $active={index === selectedIndex}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => item.action()}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
@@ -349,6 +377,11 @@ export const MarkdownEditorSlashMenu = ({
                   <span className="label">{item.label}</span>
                   <span className="description">{item.description}</span>
                 </div>
+                {SLASH_SHORTCUT_BY_ID[item.id] ? (
+                  <span className="shortcut" aria-hidden="true">
+                    {SLASH_SHORTCUT_BY_ID[item.id]}
+                  </span>
+                ) : null}
               </SlashMenuItemButton>
             </Fragment>
           )

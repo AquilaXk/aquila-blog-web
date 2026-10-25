@@ -62,6 +62,10 @@ export const SearchClearButton = styled.button`
   &:focus-visible {
     color: ${textPrimary};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const SortSelect = styled.select`
@@ -435,6 +439,10 @@ export const FileNameButton = styled.button`
     outline: none;
     color: ${accentGold};
     box-shadow: inset 0 -2px 0 #58a6ff;
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 

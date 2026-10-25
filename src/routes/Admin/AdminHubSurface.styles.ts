@@ -105,6 +105,10 @@ export const PrimaryActionLink = styled.a`
   &:hover {
     background: ${adminTealHover};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const SecondaryActionLink = styled.a`
@@ -121,6 +125,10 @@ export const SecondaryActionLink = styled.a`
   font-size: 0.82rem;
   font-weight: 780;
   ${focusVisibleRing}
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const MetricGrid = styled.section`
@@ -251,6 +259,12 @@ export const PanelHeader = styled.div`
     font-weight: 780;
     text-decoration: none;
     ${focusVisibleRing}
+
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
   }
 `
 

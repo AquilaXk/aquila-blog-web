@@ -106,7 +106,7 @@ export const SecondaryTopAction = styled.a`
   font-weight: 780;
   ${focusVisibleRing}
 
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+  @media (max-width: ${layoutBreakpoint.adminCompact}px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `
@@ -130,7 +130,7 @@ export const PrimaryTopAction = styled.a`
     background: ${adminTealHover};
   }
 
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+  @media (max-width: ${layoutBreakpoint.adminCompact}px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
 `

@@ -207,8 +207,8 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
   @media (pointer: coarse) {
     a[data-footnote-ref] {
       position: relative;
-      min-width: 28px;
-      min-height: 28px;
+      min-width: 44px;
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;

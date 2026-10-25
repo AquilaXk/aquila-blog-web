@@ -82,6 +82,11 @@ const StyledButton = styled.button<StyledButtonProps>`
     cursor: not-allowed;
     opacity: 0.58;
   }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    height: auto;
+    min-height: ${control.lg}px;
+  }
 `
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -103,7 +108,6 @@ export type IconButtonProps = Omit<
   AccessibleIconButtonName & {
     size?: ControlSize
     variant?: ButtonVariant
-    /** Expands the hit area to 44px while keeping the visual control size. */
     ensureTouchTarget?: boolean
   }
 

@@ -287,6 +287,14 @@ export const StyledWrapper = styled.header `
     padding-bottom: 52%;
   }
 
+  @media (max-width: 820px), (pointer: coarse) {
+    .backLink,
+    .shareFeedbackPill,
+    .shareButton {
+      min-height: ${control.lg}px;
+    }
+  }
+
   @media (max-width: 820px) {
     .title {
       font-size: clamp(38px, 11vw, 43px);
@@ -306,12 +314,6 @@ export const StyledWrapper = styled.header `
     .metaUtilities {
       justify-content: flex-start;
       margin-left: 0;
-    }
-
-    .backLink,
-    .shareFeedbackPill,
-    .shareButton {
-      min-height: ${control.lg}px;
     }
 
     .actions[data-hide-mobile="true"] {

@@ -173,6 +173,24 @@ export const StyledWrapper = styled.div`
     }
   }
 
+  @media (max-width: 1024px) {
+    .about-grid {
+      gap: 32px;
+    }
+
+    .stack-row {
+      grid-template-columns: 112px minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 820px), (pointer: coarse) {
+    .stack-row a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
+  }
+
   @media (max-width: 820px) {
     padding: 44px 0 70px;
 

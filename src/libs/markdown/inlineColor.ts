@@ -16,9 +16,18 @@ const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i
 const RGB_COLOR_REGEX =
   /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0|1|0?\.\d+))?\s*\)$/i
 
-const NAMED_INLINE_COLORS = Object.fromEntries(
-  INLINE_TEXT_COLOR_OPTIONS.map((option) => [option.token, option.value])
-) as Record<string, string>
+const NAMED_INLINE_COLORS: Record<string, string> = {
+  ...Object.fromEntries(INLINE_TEXT_COLOR_OPTIONS.map((option) => [option.token, option.value])),
+  blue: "#2383e2",
+  red: "#eb5757",
+  purple: "#9065b0",
+  pink: "#f472b6",
+  gray: "#787774",
+  grey: "#787774",
+  brown: "#9f6b53",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+}
 
 const normalizeHexColor = (value: string) => {
   const trimmed = value.trim().toLowerCase()

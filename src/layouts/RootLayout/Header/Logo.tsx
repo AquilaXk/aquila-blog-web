@@ -62,5 +62,9 @@ const StyledWrapper = styled(Link)`
     font-style: normal;
     letter-spacing: 0.08em;
     white-space: nowrap;
+
+    @media (max-width: 1024px) {
+      display: none;
+    }
   }
 `

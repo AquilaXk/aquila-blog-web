@@ -972,19 +972,63 @@ test.describe("Notion-parity Markdown editor model", () => {
         ].join("\n")
       )
 
-      const tdsAfterCorner = dom.querySelectorAll("td")
-      tdsAfterCorner[0].trigger("click")
-      const dirtyInputBeforeDestroy = dom.querySelector(".cm-live-table-cell-input")
-      dirtyInputBeforeDestroy.value = "SavedOnDestroy"
-      ;(widget as any).destroy(dom)
-      expect(lastDispatchedInsert).toContain("| SavedOnDestroy | P2 | Z1 |  |")
+      const toolbarBtns = dom.querySelectorAll(".cm-live-table-toolbar-btn")
+      const alignLeftBtn = toolbarBtns.find((b: any) => b.textContent === "≡좌")
+      const alignCenterBtn = toolbarBtns.find((b: any) => b.textContent === "≡중")
+      expect(alignLeftBtn.getAttribute("aria-pressed")).toBe("true")
+      expect(alignCenterBtn.getAttribute("aria-pressed")).toBe("false")
+      alignCenterBtn.trigger("click")
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(alignCenterBtn.getAttribute("aria-pressed")).toBe("true")
+      expect(alignLeftBtn.getAttribute("aria-pressed")).toBe("false")
 
-      const tdsAfterDestroy = dom.querySelectorAll("td")
-      tdsAfterDestroy[1].trigger("click")
+      dom.querySelector(".cm-live-table-cell-input")?.trigger("keydown", { key: "Escape" })
+      dom.trigger("keydown", { key: "ArrowUp" })
+      dom.trigger("keydown", { key: "ArrowLeft" })
+      dom.trigger("keydown", { key: "ArrowLeft" })
+      expect(dom.querySelectorAll("td")[5].classList.contains("is-active-cell")).toBe(true)
+      dom.trigger("keydown", { key: "Backspace" })
+      expect(lastDispatchedInsert).toContain("| Q1 |  |  |  |")
+      expect(dom.getAttribute("data-active-mode")).toBe("cell")
+      let printableStopped = false
+      dom.trigger("keydown", {
+        key: "x",
+        stopPropagation: () => {
+          printableStopped = true
+        },
+      })
+      expect(printableStopped).toBe(true)
+      dom.querySelector(".cm-live-table-cell-input")?.trigger("keydown", { key: "Escape" })
+      dom.trigger("keydown", { key: "Escape" })
+      expect(dom.getAttribute("data-active-mode")).toBeNull()
+      expect(widget.ignoreEvent()).toBe(true)
+
+      const tdsAfterNav = dom.querySelectorAll("td")
+      tdsAfterNav[1].trigger("click")
       const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
       dirtyInputBeforePagehide.value = "SavedOnPagehide"
       for (const fn of windowListeners.get("pagehide") ?? []) fn({ type: "pagehide" })
+      expect(lastDispatchedInsert).toContain("| P1 | SavedOnPagehide | Z1 |  |")
+
+      tdsAfterNav[0].trigger("click")
+      const dirtyInputBeforeDestroy = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforeDestroy.value = "SavedOnDestroy"
+      ;(widget as any).destroy(dom)
       expect(lastDispatchedInsert).toContain("| SavedOnDestroy | SavedOnPagehide | Z1 |  |")
+
+      const deleteTableBtn = dom.querySelector('[data-testid="cm-live-table-delete-table"]')
+      expect(deleteTableBtn).not.toBeNull()
+      let deletedInsert: string | null = null
+      ;(fakeView as any).dispatch = (tr: any) => {
+        if (tr?.changes && typeof tr.changes.insert === "string") deletedInsert = tr.changes.insert
+      }
+      deleteTableBtn.trigger("click")
+      expect(deletedInsert).toBe("")
     } finally {
       if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
       else delete (globalThis as Record<string, unknown>).document
@@ -1117,6 +1161,10 @@ test.describe("Notion-parity Markdown editor model", () => {
     const hiddenLeadBullet = ranges.find((r) => r.from === line1Start && r.to === line1Start + 2)
     expect(hiddenLeadBullet).toBeDefined()
     expect(hiddenLeadBullet?.widget).toBeNull()
+    const taskSpaceRange = ranges.find(
+      (r) => r.from === line1Start + 5 && r.to === line1Start + 6 && r.className === "cm-live-task-space"
+    )
+    expect(taskSpaceRange).toBeDefined()
 
     const strongRange = ranges.find((r) => r.className === "cm-live-strong")
     expect(strongRange).toBeDefined()
@@ -1313,7 +1361,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const container = makeFakeNode("div")
       appendInlineMarkdownNodes(
         container,
-        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}} 줄1<br>줄2 [[문서]] [[Target|별칭]]"
+        "속도 `decorationField` **굵게** *기울임* ~~취소~~ ==강조== $O(1)$ [링크](https://example.com) {{color:emerald|완료}} {{color:blue|파랑}} 줄1<br>줄2 [[문서]] [[Target|별칭]]"
       )
       const elementChildren = container.children.filter((c: any) => c.tagName)
       expect(elementChildren.map((c: any) => `${c.tagName}:${c.className}:${c.textContent}`)).toEqual([
@@ -1325,6 +1373,7 @@ test.describe("Notion-parity Markdown editor model", () => {
         "SPAN:cm-live-math cm-live-math-inline:O(1)",
         "A:cm-live-link:링크",
         "SPAN:cm-live-color:완료",
+        "SPAN:cm-live-color:파랑",
         "BR::",
         "SPAN:cm-live-wikilink:문서",
         "SPAN:cm-live-wikilink:별칭",

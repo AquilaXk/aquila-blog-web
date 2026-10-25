@@ -1,4 +1,4 @@
-import type { RefObject } from "react"
+import { memo, type RefObject } from "react"
 import type { BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import type {
   MarkdownEditorCommandContext,
@@ -57,7 +57,7 @@ const getToolbarCommandLabel = (command: MarkdownEditorCommandDescriptor) =>
     ? `${command.label} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
     : command.label
 
-export const MarkdownEditorToolbar = ({
+const MarkdownEditorToolbarView = ({
   disabled,
   disableMermaid,
   viewMode,
@@ -344,3 +344,5 @@ export const MarkdownEditorToolbar = ({
     </ToolbarGroup>
   </EditorToolbar>
 )
+
+export const MarkdownEditorToolbar = memo(MarkdownEditorToolbarView)

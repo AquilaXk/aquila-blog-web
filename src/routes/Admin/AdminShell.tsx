@@ -367,6 +367,10 @@ const NavLink = styled.a`
     background: ${adminSurfaceAccent};
     color: ${adminTextPrimary};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 const SidebarProfile = styled.div`
@@ -399,6 +403,11 @@ const SidebarLogoutAction = styled.button`
   color: ${adminTextSecondary};
   cursor: pointer;
   ${focusVisibleRing}
+
+  @media (pointer: coarse) {
+    width: 44px;
+    height: 44px;
+  }
 `
 
 const SidebarAvatar = styled.div`
@@ -491,7 +500,7 @@ const ResponsiveLogoutAction = styled.button`
   cursor: pointer;
   ${focusVisibleRing}
 
-  @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+  @media (max-width: ${layoutBreakpoint.adminCompact}px), (pointer: coarse) {
     display: inline-flex;
     width: ${control.lg}px;
     height: ${control.lg}px;

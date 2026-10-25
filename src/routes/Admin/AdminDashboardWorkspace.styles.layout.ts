@@ -159,6 +159,10 @@ export const HeaderLink = styled.a`
   &[data-variant="primary"]:hover {
     background: ${adminTealHover};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const ServiceRail = styled.section`
@@ -402,6 +406,10 @@ export const LaunchLink = styled.a`
   font-size: 0.88rem;
   font-weight: 780;
   ${focusVisibleRing}
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const LogLines = styled.div`

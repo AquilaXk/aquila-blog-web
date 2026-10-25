@@ -1,9 +1,19 @@
-const normalizeUnicode = (value: string) => {
+const NON_ASCII_PATTERN = /[^\u0000-\u007f]/
+const COLLAPSIBLE_WHITESPACE_PATTERN = / {2}|[^\S ]/
+
+const isPureAscii = (value: string): boolean => !NON_ASCII_PATTERN.test(value)
+
+export const normalizeUnicode = (value: string) => {
+  if (!value || isPureAscii(value)) return value
   if (typeof value.normalize !== "function") return value
   return value.normalize("NFKC")
 }
 
-const collapseWhitespace = (value: string) => value.replace(/\s+/g, " ")
+const hasCollapsibleWhitespace = (value: string): boolean =>
+  COLLAPSIBLE_WHITESPACE_PATTERN.test(value)
+
+const collapseWhitespace = (value: string) =>
+  hasCollapsibleWhitespace(value) ? value.replace(/\s+/g, " ") : value
 
 const normalizeQueryText = (value: string) => collapseWhitespace(normalizeUnicode(value).trim())
 

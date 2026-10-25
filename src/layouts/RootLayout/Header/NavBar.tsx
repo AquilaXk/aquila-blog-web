@@ -458,7 +458,7 @@ const StyledWrapper = styled.div`
 
   .searchTrigger {
     height: 36px;
-    width: 212px;
+    width: clamp(156px, 18vw, 212px);
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     display: flex;

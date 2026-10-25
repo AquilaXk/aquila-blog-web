@@ -467,7 +467,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
-    if (line.trimStart().startsWith(">")) {
+    if (firstCode === 62 && line.trimStart().startsWith(">")) {
       const blockStart = i
       const quoteLines: string[] = []
 
@@ -491,7 +491,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
-    if (/^\s*<aside(?:\s+[^>]*)?>/i.test(line)) {
+    if (firstCode === 60 && /^\s*<aside(?:\s+[^>]*)?>/i.test(line)) {
       const originalLines = [line]
       const openingMatch = line.match(/^\s*<aside(?:\s+[^>]*)?>(.*)$/i)
       const bodyLines: string[] = []

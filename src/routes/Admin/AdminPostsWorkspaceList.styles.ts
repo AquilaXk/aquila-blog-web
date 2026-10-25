@@ -103,10 +103,7 @@ export const ListSkeleton = styled.div`
     display: block;
     height: 12px;
     border-radius: 4px;
-    background: ${({ theme }) =>
-      theme.scheme === "light"
-        ? "linear-gradient(90deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.16))"
-        : "linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.12), rgba(255,255,255,0.06))"};
+    background: ${({ theme }) => theme.colors.gray3};
   }
 
   .line.short {
@@ -362,6 +359,10 @@ export const TitleButton = styled.button`
     outline: 2px solid ${({ theme }) => theme.colors.gray8};
     outline-offset: 3px;
     border-radius: 4px;
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 
