@@ -4,7 +4,7 @@ import AppIcon from "src/components/icons/AppIcon"
 import { CloudDeleteConfirmDialog, FileTableHead, FileThumbnail, PreviewDrawer } from "./AdminCloudPreviewDrawer"
 import {
   CLOUD_FILTERS, CLOUD_SORT_OPTIONS, type CloudSortMode, formatCloudDate, formatCloudFileSize,
-  getCloudFilenameParts, getCloudKindBadge, getCloudKindIconLabel, getCloudKindLabel, getCloudSummary,
+  getCloudKindBadge, getCloudKindIconLabel, getCloudKindLabel, getCloudSummary,
   isCloudSearchPending, normalizeCloudFolderPathSearch, resolveCloudEmptyTitle, shouldShowCloudEmptyLoading,
 } from "./AdminCloudWorkspaceModel"
 import AdminCloudUploadQueue from "./AdminCloudUploadQueue"
@@ -106,7 +106,6 @@ const CloudFileTableSection = ({
         {files.map((file) => {
           const checked = checkedFileIds.includes(file.id)
           const selected = shouldShowDetailPanel && selectedFile?.id === file.id
-          const filenameParts = getCloudFilenameParts(file.originalFilename)
           const folderLabel = normalizeCloudFolderPathSearch(file.folderPath)
           return (
             <tr key={file.id} role="row" data-selected={toBooleanAttr(selected)}>
@@ -127,10 +126,7 @@ const CloudFileTableSection = ({
                       title={file.originalFilename}
                       onClick={() => onPreviewFile(file.id)}
                     >
-                      <strong>
-                        <span data-filename-stem>{filenameParts.stem}</span>
-                        <span data-filename-extension>{filenameParts.extension}</span>
-                      </strong>
+                      <strong>{file.originalFilename}</strong>
                     </FileNameButton>
                     <FileMetaLine>
                       <FileTypeIcon
@@ -209,10 +205,10 @@ const CloudFileDetailDrawer = ({
           >
             다운로드
           </DetailActionLink>
-          <SecondaryButton type="button" onClick={() => void onCopyFileLink(selectedFile)}>
+          <GhostButton type="button" onClick={() => void onCopyFileLink(selectedFile)}>
             링크 복사
-          </SecondaryButton>
-          <SecondaryButton
+          </GhostButton>
+          <GhostButton
             type="button"
             onClick={() => {
               setEditingFileId(selectedFile.id)
@@ -221,10 +217,10 @@ const CloudFileDetailDrawer = ({
             }}
           >
             정보 수정
-          </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => onRequestDeleteFile(selectedFile)}>
+          </GhostButton>
+          <GhostButton type="button" onClick={() => onRequestDeleteFile(selectedFile)}>
             파일 삭제
-          </SecondaryButton>
+          </GhostButton>
         </ActionGroup>
         {editingFileId === selectedFile.id ? (
           <DetailEditForm

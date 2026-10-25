@@ -167,7 +167,9 @@ export const SecondaryButton = styled.button`
 
   &:disabled {
     cursor: not-allowed;
+    background: transparent;
     color: ${textMuted};
+    opacity: 0.55;
   }
 `
 
@@ -179,9 +181,15 @@ export const IconButton = styled.button`
   flex-shrink: 0;
   border: 0;
   border-radius: 2px;
-  background: ${surfaceMuted};
+  background: transparent;
   color: ${textSecondary};
   cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: ${surfaceMuted};
+    color: ${textPrimary};
+  }
 
   &[data-active="true"] {
     color: ${accentGold};
@@ -331,15 +339,15 @@ export const FileTypeIcon = styled.span`
 
 export const FileIdentity = styled.div`
   display: grid;
-  grid-template-columns: 3.3rem minmax(0, 1fr);
-  gap: 0.72rem;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.5rem;
   align-items: center;
   min-width: 0;
 `
 
 export const FileNameStack = styled.div`
   display: grid;
-  gap: 0.18rem;
+  gap: 0.14rem;
   min-width: 0;
 `
 
@@ -387,21 +395,11 @@ export const FileNameButton = styled.button`
   outline: none;
 
   strong {
-    display: flex;
-    align-items: baseline;
+    display: block;
     min-width: 0;
     max-width: 100%;
-  }
-
-  [data-filename-stem] {
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  [data-filename-extension] {
-    flex: 0 0 auto;
     white-space: nowrap;
   }
 
@@ -441,6 +439,7 @@ export const EmptyTableState = styled.div`
 export const LoadingTableStatus = styled.div`
   display: grid;
   place-items: center;
+  width: 100%;
   min-height: 12rem;
   color: ${textMuted};
   font-size: 0.86rem;

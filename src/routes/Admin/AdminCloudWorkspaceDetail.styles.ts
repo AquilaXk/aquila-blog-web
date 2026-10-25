@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder as border,
   adminBorderStrong as borderStrong,
@@ -97,21 +98,23 @@ export const DetailPreviewBox = styled.div`
 export const DetailActionLink = styled.a`
   border: 0;
   border-radius: 2px;
-  min-height: 2.25rem;
-  padding: 0 0.82rem;
+  min-height: 2rem;
+  padding: 0 0.62rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: ${surfaceMuted};
-  color: ${textPrimary};
-  font-size: 0.83rem;
+  background: transparent;
+  color: ${textMuted};
+  font-size: 0.81rem;
   font-weight: 820;
   text-decoration: none;
   white-space: nowrap;
+  ${focusVisibleRing}
 
   &:hover,
   &:focus-visible {
-    background: ${surfaceRaised};
+    background: ${surfaceMuted};
+    color: ${textPrimary};
   }
 `
 
