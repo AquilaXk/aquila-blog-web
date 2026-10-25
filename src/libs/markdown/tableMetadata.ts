@@ -329,7 +329,8 @@ export const extractMarkdownTableLayouts = (
   markdown: string
 ): ExtractedTableLayouts => {
   const normalizedMarkdown = normalizeTableSourceLineEndings(markdown)
-  if (!normalizedMarkdown.includes("|") && !normalizedMarkdown.includes("aq-table")) {
+  const hasAqTableComment = normalizedMarkdown.includes("aq-table")
+  if (!normalizedMarkdown.includes("|") && !hasAqTableComment) {
     return {
       cleanedMarkdown: normalizedMarkdown,
       layouts: [],
@@ -347,26 +348,30 @@ export const extractMarkdownTableLayouts = (
     const wasInFencedCode = fencedCodeBlockMarker !== null
     fencedCodeBlockMarker = stepFencedCodeState(line, fencedCodeBlockMarker)
     if (wasInFencedCode || fencedCodeBlockMarker !== null) {
-      cleanedLines.push(line)
+      if (hasAqTableComment) cleanedLines.push(line)
       continue
     }
 
-    const layout = parseMarkdownTableLayoutComment(line)
-    if (layout && isGfmTableAt(lines, index + 1)) {
-      layouts.push(layout)
-      tableHeaderLinesWithExplicitLayout.add(index + 1)
-      continue
+    if (hasAqTableComment) {
+      const layout = parseMarkdownTableLayoutComment(line)
+      if (layout && isGfmTableAt(lines, index + 1)) {
+        layouts.push(layout)
+        tableHeaderLinesWithExplicitLayout.add(index + 1)
+        continue
+      }
     }
 
     if (!tableHeaderLinesWithExplicitLayout.has(index) && isGfmTableAt(lines, index)) {
       layouts.push(null)
     }
 
-    cleanedLines.push(line)
+    if (hasAqTableComment) {
+      cleanedLines.push(line)
+    }
   }
 
   return {
-    cleanedMarkdown: cleanedLines.join("\n"),
+    cleanedMarkdown: hasAqTableComment ? cleanedLines.join("\n") : normalizedMarkdown,
     layouts,
   }
 }

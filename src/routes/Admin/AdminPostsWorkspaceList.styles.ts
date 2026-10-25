@@ -13,7 +13,7 @@ export const PrimaryInlineButton = styled(AdminTextActionButton)`
   font-size: 0.92rem;
   font-weight: 800;
 
-  @media (max-width: 820px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: 44px;
     padding: 0.45rem 0.65rem;
     display: inline-flex;
@@ -25,7 +25,7 @@ export const GhostButton = styled(AdminTextActionButton)`
   font-size: 0.88rem;
   font-weight: 700;
 
-  @media (max-width: 820px) {
+  @media (max-width: 1100px), (pointer: coarse) {
     min-height: 44px;
     padding: 0.45rem 0.65rem;
     display: inline-flex;
@@ -133,7 +133,7 @@ export const ListSkeleton = styled.div`
     display: none;
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 1100px) {
     .desktopRows {
       display: none;
     }
@@ -268,7 +268,14 @@ export const PostsDesktopTable = styled.table`
     background: ${({ theme }) => theme.colors.gray2};
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 1280px) {
+    th,
+    td {
+      padding: 0.7rem 0.6rem;
+    }
+  }
+
+  @media (max-width: 1100px) {
     display: none;
   }
 `
@@ -361,7 +368,7 @@ export const TitleButton = styled.button`
 export const MobileCardList = styled.div`
   display: none;
 
-  @media (max-width: 900px) {
+  @media (max-width: 1100px) {
     display: grid;
     gap: 0.75rem;
     padding: 0.95rem;

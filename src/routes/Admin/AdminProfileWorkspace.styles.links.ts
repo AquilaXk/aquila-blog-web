@@ -132,8 +132,9 @@ export const DragHandleButton = styled.span`
   font-weight: 700;
   cursor: grab;
   user-select: none;
+  ${focusVisibleRing}
 
-  @media (max-width: 900px) {
+  @media (max-width: 900px), (pointer: coarse) {
     display: none;
   }
 `
@@ -202,7 +203,7 @@ export const IconPickerPanel = styled.div`
   border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
   padding: 0.4rem;
   display: grid;
   gap: 0.32rem;

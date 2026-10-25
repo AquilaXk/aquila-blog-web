@@ -230,6 +230,7 @@ export default AdminShell
 
 const ShellFrame = styled.div`
   ${({ theme }) => adminSystemThemeVariables(theme)}
+  --app-header-height: 61px;
   display: grid;
   grid-template-columns: 14.5rem minmax(0, 1fr);
   gap: 0;
@@ -470,7 +471,7 @@ const TopBar = styled.header`
   border-bottom: 1px solid ${adminBorder};
   background: ${adminSurface};
 
-  @media (max-width: ${layoutBreakpoint.editorCompact}px) {
+  @media (max-width: 1100px) {
     align-items: flex-start;
     flex-wrap: wrap;
     padding: 0.72rem 0.82rem;

@@ -328,7 +328,7 @@ const StyledWrapper = styled.div`
         transform: scale(0.97);
       }
 
-      @media (max-width: 768px) {
+      @media (max-width: 820px), (pointer: coarse) {
         min-height: 44px;
       }
     }
@@ -493,7 +493,7 @@ const StyledWrapper = styled.div`
       opacity: 0.72;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 820px), (pointer: coarse) {
       min-height: 44px;
     }
   }

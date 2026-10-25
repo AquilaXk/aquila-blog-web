@@ -47,7 +47,7 @@ export const CloudWorkspace = styled.section`
     grid-template-columns: minmax(0, 1fr);
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1280px) {
     &[data-detail-open="true"][data-detail-mode] {
       grid-template-columns: minmax(0, 1fr);
     }

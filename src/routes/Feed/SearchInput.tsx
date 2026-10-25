@@ -126,7 +126,7 @@ const StyledWrapper = styled.div`
     }
   }
 
-  @media (max-width: 820px) {
+  @media (max-width: 820px), (pointer: coarse) {
     > .field {
       height: auto;
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;

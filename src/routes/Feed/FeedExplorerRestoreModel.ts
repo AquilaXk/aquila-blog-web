@@ -338,8 +338,15 @@ export const toPersistFingerprint = (state: Pick<FeedExplorerRestoreState, "q" |
   return `${state.q}\u0000${state.tag}\u0000${state.loadedPages}\u0000${scrollBucket}`
 }
 
+const SAVED_AT_FAST_REGEX = /^\s*\{[^{}]*"savedAt"\s*:\s*(\d+)/
+
 export const extractSavedAt = (raw: string | null) => {
   if (!raw) return 0
+  const fastMatch = raw.match(SAVED_AT_FAST_REGEX)
+  if (fastMatch) {
+    const parsedFast = Number(fastMatch[1])
+    if (Number.isFinite(parsedFast)) return parsedFast
+  }
   try {
     const parsed = JSON.parse(raw) as { savedAt?: unknown }
     return typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
@@ -380,7 +387,6 @@ export const pruneFeedExplorerStateStorage = (storage: Storage) => {
     })
 }
 
-/** Session restore (scroll + prefetch) is latest-only; ranked sorts must not reuse that state. */
 export const shouldRestoreFeedExplorerSession = (
   sortMode: "latest" | "views" | "likes"
 ): boolean => sortMode === "latest"

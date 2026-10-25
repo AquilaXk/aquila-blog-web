@@ -93,7 +93,7 @@ export const DEFAULT_PAGE_SIZE = "20"
 export const DEFAULT_SORT: ListSort = "MODIFIED_AT"
 export const LIST_SKELETON_ROW_COUNT = 5
 export const POSTS_WORKSPACE_MOBILE_LIST_DELAY_MS = 180
-export const POSTS_WORKSPACE_MOBILE_LIST_QUERY = "(max-width: 900px)"
+export const POSTS_WORKSPACE_MOBILE_LIST_QUERY = "(max-width: 1100px)"
 
 export const formatDateTime = (value?: string) => formatIsoDateTime(value)
 

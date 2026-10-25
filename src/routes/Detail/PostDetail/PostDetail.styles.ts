@@ -65,6 +65,14 @@ export const StyledWrapper = styled.div `
     overflow: visible;
   }
 
+  .detailLayout[data-toc="false"] {
+    grid-template-columns: 64px minmax(0, 740px);
+  }
+
+  .detailLayout[data-toc="false"] .rightRail {
+    display: none;
+  }
+
   article {
     margin: 0 auto;
     max-width: 760px;
@@ -348,7 +356,8 @@ export const StyledWrapper = styled.div `
     }
   }
 
-  .mobileToc {
+  .mobileToc,
+  .mobileTocBlock {
     display: none;
   }
 
@@ -357,9 +366,12 @@ export const StyledWrapper = styled.div `
       padding: 44px 20px 28px;
     }
 
-    .detailLayout {
+    .detailLayout,
+    .detailLayout[data-toc="true"],
+    .detailLayout[data-toc="false"] {
       width: auto;
       display: block;
+      grid-template-columns: minmax(0, 1fr);
       gap: 0;
       padding: 30px 20px 70px;
     }
@@ -373,7 +385,8 @@ export const StyledWrapper = styled.div `
       max-width: 760px;
     }
 
-    .mobileToc {
+    .mobileToc,
+    .mobileTocBlock {
       display: block;
       margin: 0 0 28px;
       border: 1px solid var(--aq-border);

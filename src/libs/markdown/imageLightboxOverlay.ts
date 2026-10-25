@@ -75,7 +75,6 @@ export const openImageLightboxOverlay = (
   overlay.style.inset = "0"
   overlay.style.zIndex = "180"
   overlay.style.background = "rgba(15, 23, 42, 0.48)"
-  overlay.style.backdropFilter = "blur(4px)"
   overlay.style.display = "grid"
   overlay.style.alignItems = "center"
   overlay.style.justifyItems = "center"

@@ -153,6 +153,19 @@ export const ExplorerCard = styled.section`
     font-weight: 900;
   }
 
+  @media (max-width: 820px), (pointer: coarse) {
+    .sortTrigger {
+      height: 44px;
+      min-height: 44px;
+      min-width: 86px;
+    }
+
+    .sortOption {
+      height: 44px;
+      min-height: 44px;
+    }
+  }
+
   @media (max-width: 768px) {
     flex-direction: column;
     align-items: start;
@@ -165,17 +178,6 @@ export const ExplorerCard = styled.section`
 
     .sortDropdown {
       flex: 0 0 auto;
-    }
-
-    .sortTrigger {
-      height: 44px;
-      min-height: 44px;
-      min-width: 86px;
-    }
-
-    .sortOption {
-      height: 44px;
-      min-height: 44px;
     }
 
     .sortMenu {
@@ -284,6 +286,13 @@ export const FilterContextBar = styled.div`
     }
   }
 
+  @media (max-width: 820px), (pointer: coarse) {
+    .resetButton {
+      min-height: 44px;
+      padding: 0 0.8rem;
+    }
+  }
+
   @media (max-width: 768px) {
     margin-top: 0.5rem;
     margin-bottom: 0;
@@ -295,11 +304,6 @@ export const FilterContextBar = styled.div`
     .filterSummary {
       font-size: 0.71rem;
       max-width: 100%;
-    }
-
-    .resetButton {
-      min-height: 44px;
-      padding: 0 0.8rem;
     }
   }
 `

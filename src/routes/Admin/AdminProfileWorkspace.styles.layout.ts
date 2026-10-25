@@ -70,6 +70,10 @@ export const WorkspaceShell = styled.section`
   gap: clamp(1.25rem, 2.6vw, 3.125rem);
   align-items: start;
 
+  @media (max-width: 1360px) {
+    gap: 1.4rem;
+  }
+
   @media (max-width: 1180px) {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.2rem;
@@ -112,6 +116,7 @@ export const SectionRail = styled(AdminWorkspaceSectionNav)`
 `
 
 export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
+  min-height: ${control.lg}px;
   border-left: 0;
   border-bottom: 1px solid ${({ theme }) => theme.colors.gray5};
   background: transparent;
@@ -455,7 +460,7 @@ export const InlineActionRow = styled.div`
   gap: 0.42rem;
 
   .reorderButton {
-    @media (min-width: 901px) {
+    @media (min-width: 901px) and (pointer: fine) {
       display: none;
     }
   }
@@ -484,7 +489,7 @@ export const SegmentedControl = styled.div`
   display: inline-flex;
   gap: 0.36rem;
   padding: 0.25rem;
-  border-radius: 2px;
+  border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray7};
   background: ${({ theme }) => theme.colors.gray2};
 `

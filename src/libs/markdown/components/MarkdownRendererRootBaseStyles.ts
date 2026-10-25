@@ -58,7 +58,7 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     color: var(--aq-text);
     cursor: ew-resize;
 
-    @media (max-width: 768px) {
+    @media (max-width: 820px), (pointer: coarse) {
       min-width: 44px;
       min-height: 44px;
     }
@@ -146,7 +146,7 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     font-weight: 450;
     line-height: 1.5;
     white-space: normal;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
     pointer-events: none;
     opacity: 0;
     visibility: hidden;
@@ -205,10 +205,24 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
   }
 
   @media (pointer: coarse) {
-    a[data-footnote-ref],
-    a[data-footnote-backref] {
+    a[data-footnote-ref] {
+      position: relative;
       min-width: 28px;
       min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: -10px;
+      }
+    }
+
+    a[data-footnote-backref] {
+      min-width: 44px;
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;

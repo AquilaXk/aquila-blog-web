@@ -59,7 +59,8 @@ const isEscapedPipe = (value: string, index: number) => {
   return backslashes % 2 === 1
 }
 
-const isProtectedPipe = (value: string, index: number) => {
+export const isProtectedPipe = (value: string, index: number): boolean => {
+  if (!value.includes("[[") && !value.includes("{{")) return isEscapedPipe(value, index)
   if (isEscapedPipe(value, index)) return true
   const before = value.slice(0, index)
   const after = value.slice(index + 1)
@@ -104,20 +105,13 @@ const parseDelimiterAlignment = (value: string): MarkdownEditorTableAlignment | 
   return value.endsWith(":") ? "right" : "left"
 }
 
-const collectLocalLineWindow = (
-  value: string,
-  offset: number,
-  maxLinesEachWay: number
-) => {
+const collectLocalLineWindow = (value: string, offset: number, maxLinesEachWay: number) => {
   const clamped = Math.max(0, Math.min(offset, value.length))
   const cursorLineStart = clamped === 0 ? 0 : value.lastIndexOf("\n", clamped - 1) + 1
   const cursorNextBreak = value.indexOf("\n", clamped)
   const cursorLineEnd = cursorNextBreak === -1 ? value.length : cursorNextBreak
   const cursorLineText = value.slice(cursorLineStart, cursorLineEnd)
-
-  if (!cursorLineText.startsWith("|") || !cursorLineText.endsWith("|")) {
-    return []
-  }
+  if (!cursorLineText.startsWith("|") || !cursorLineText.endsWith("|")) return []
 
   const before: Array<{ text: string; start: number; end: number }> = []
   let scanStart = cursorLineStart
@@ -127,9 +121,7 @@ const collectLocalLineWindow = (
     const text = value.slice(lineStart, lineEnd)
     before.push({ text, start: lineStart, end: lineEnd })
     scanStart = lineStart
-    if (!text.startsWith("|") && !isMetadataLine(text)) {
-      break
-    }
+    if (!text.startsWith("|") && !isMetadataLine(text)) break
   }
   before.reverse()
 
@@ -142,16 +134,10 @@ const collectLocalLineWindow = (
     const text = value.slice(lineStart, lineEnd)
     after.push({ text, start: lineStart, end: lineEnd })
     scanEnd = lineEnd
-    if (!text.startsWith("|")) {
-      break
-    }
+    if (!text.startsWith("|")) break
   }
 
-  return [
-    ...before,
-    { text: cursorLineText, start: cursorLineStart, end: cursorLineEnd },
-    ...after,
-  ]
+  return [...before, { text: cursorLineText, start: cursorLineStart, end: cursorLineEnd }, ...after]
 }
 
 const isOffsetInsideFencedCode = (value: string, offset: number) =>
@@ -486,11 +472,32 @@ export const getMarkdownEditorTableEditAvailability = (
   }
 }
 
-export const isMarkdownEditorTableSelection = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number
-): boolean => findActiveTable(value, selectionStart, selectionEnd) !== null
+export const packTableEditAvailabilityMask = (avail: MarkdownEditorTableEditAvailability | null): number =>
+  !avail
+    ? -1
+    : (avail.addRow ? 1 : 0) |
+      (avail.deleteRow ? 2 : 0) |
+      (avail.addColumn ? 4 : 0) |
+      (avail.deleteColumn ? 8 : 0) |
+      (avail.alignLeft ? 16 : 0) |
+      (avail.alignCenter ? 32 : 0) |
+      (avail.alignRight ? 64 : 0)
+
+export const unpackTableEditAvailabilityMask = (mask: number): MarkdownEditorTableEditAvailability | null =>
+  mask < 0
+    ? null
+    : {
+        addRow: (mask & 1) !== 0,
+        deleteRow: (mask & 2) !== 0,
+        addColumn: (mask & 4) !== 0,
+        deleteColumn: (mask & 8) !== 0,
+        alignLeft: (mask & 16) !== 0,
+        alignCenter: (mask & 32) !== 0,
+        alignRight: (mask & 64) !== 0,
+      }
+
+export const isMarkdownEditorTableSelection = (value: string, selectionStart: number, selectionEnd: number): boolean =>
+  findActiveTable(value, selectionStart, selectionEnd) !== null
 
 export const planMarkdownEditorTableTab = (
   value: string,
@@ -498,18 +505,11 @@ export const planMarkdownEditorTableTab = (
   selectionEnd: number,
   direction: MarkdownEditorTableTabDirection
 ): PlannedTextMutation | null =>
-  planActiveTableAction(value, selectionStart, selectionEnd, {
-    kind: "tab",
-    direction: direction === "next" ? "next" : "previous",
-  })
+  planActiveTableAction(value, selectionStart, selectionEnd, { kind: "tab", direction: direction === "next" ? "next" : "previous" })
 
 export const planMarkdownEditorTableCellNavigation = planMarkdownEditorTableTab
 
-export const planMarkdownEditorTableEnter = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number
-): PlannedTextMutation | null =>
+export const planMarkdownEditorTableEnter = (value: string, selectionStart: number, selectionEnd: number): PlannedTextMutation | null =>
   planActiveTableAction(value, selectionStart, selectionEnd, { kind: "enter" })
 
 const parseGridLineCells = (line: string): string[] => {

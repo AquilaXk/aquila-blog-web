@@ -59,7 +59,11 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
   const [confirmState, setConfirmState] = useState<WorkspaceConfirmState>(null)
   const [toast, setToast] = useState<WorkspaceToastState>(null)
   const [mutationPending, setMutationPending] = useState<{ rowId: number; kind: "delete" | "restore" | "hardDelete" } | null>(null)
-  const [shouldRenderMobileList, setShouldRenderMobileList] = useState(false)
+  const [shouldRenderMobileList, setShouldRenderMobileList] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(POSTS_WORKSPACE_MOBILE_LIST_QUERY).matches
+      : false
+  )
 
   const listSectionRef = useRef<HTMLElement | null>(null)
   const listRequestIdRef = useRef(0)

@@ -1,11 +1,6 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import {
-  AdminInfoLinkCard,
-  AdminInfoList,
-  AdminInfoPanelCard,
-  AdminPlainCard,
-} from "src/routes/Admin/AdminSurfacePrimitives"
+import { AdminPlainCard } from "src/routes/Admin/AdminSurfacePrimitives"
 import {
   adminAppBackground,
   adminAccentText,
@@ -104,7 +99,7 @@ export const HeroActions = styled.div`
   gap: 10px;
   justify-content: flex-end;
 
-  @media (max-width: 700px) {
+  @media (max-width: 860px) {
     justify-content: flex-start;
   }
 `
@@ -168,17 +163,13 @@ export const HeaderLink = styled.a`
 
 export const ServiceRail = styled.section`
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};
 
-  @media (max-width: 1040px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 560px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
   }
 `
 
@@ -196,26 +187,13 @@ export const MetricCard = styled.article`
     border-right: 0;
   }
 
-  @media (max-width: 1040px) {
-    &:nth-of-type(2n) {
-      border-right: 0;
-    }
-
-    &:nth-of-type(-n + 2) {
-      border-bottom: 1px solid ${adminBorder};
-    }
-  }
-
-  @media (max-width: 560px) {
+  @media (max-width: 768px) {
     min-height: 6.2rem;
     padding: 0.82rem;
+    border-right: 0;
     border-bottom: 1px solid ${adminBorder};
 
-    &:nth-of-type(odd) {
-      border-right: 1px solid ${adminBorder};
-    }
-
-    &:nth-last-of-type(-n + 2) {
+    &:last-of-type {
       border-bottom: 0;
     }
   }
@@ -285,7 +263,7 @@ export const Chart = styled.div`
 
 export const ChartBars = styled.div`
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   align-items: end;
   gap: 0.55rem;
   min-height: 16rem;
@@ -483,114 +461,4 @@ export const LogLine = styled.div`
 
 export const PanelBody = styled.div`
   background: ${adminSurface};
-`
-
-export const SnapshotLeadBody = styled(PanelBody)`
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-
-  @media (max-width: 720px) {
-    padding: 10px;
-  }
-`
-
-export const LeadMetaCard = styled(AdminInfoPanelCard)`
-  gap: 0.38rem;
-  padding: 0.72rem;
-  border-radius: 8px;
-`
-
-export const PanelFrame = styled.iframe`
-  display: block;
-  width: 100%;
-  height: 304px;
-  border: 0;
-  background: ${adminSurface};
-`
-
-export const CompactPanelBody = styled(PanelBody)`
-  overflow: hidden;
-`
-
-export const CompactPanelSummary = styled.div`
-  min-height: 86px;
-  display: grid;
-  align-content: space-between;
-  gap: 8px;
-  padding: 12px;
-
-  span {
-    color: ${({ theme }) => theme.colors.gray10};
-    font-size: 0.84rem;
-    line-height: 1.55;
-  }
-`
-
-export const PanelFallback = styled.div`
-  min-height: 210px;
-  display: grid;
-  place-items: center;
-  gap: 8px;
-  padding: 32px;
-  text-align: center;
-
-  strong {
-    font-size: 1rem;
-    font-weight: 820;
-  }
-
-  span {
-    max-width: 28rem;
-    color: ${({ theme }) => theme.colors.gray10};
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-`
-
-export const InsightRail = styled.aside`
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr;
-
-  @media (max-width: 720px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-`
-
-export const LeadMetaGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-
-  strong {
-    display: -webkit-box;
-    overflow: hidden;
-    line-height: 1.45;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    word-break: break-word;
-  }
-
-  @media (max-width: 720px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-`
-
-export const ActionList = styled(AdminInfoList)`
-  grid-template-columns: 1fr;
-  gap: 8px;
-  padding: 12px;
-
-  @media (max-width: 720px) {
-    gap: 6px;
-    padding: 9px;
-  }
-`
-
-export const ActionListLinkCard = styled(AdminInfoLinkCard)`
-  padding: 0.64rem 0.72rem;
-  border-radius: 6px;
 `

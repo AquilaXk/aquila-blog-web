@@ -60,41 +60,47 @@ const normalizeCodeTagMatch = (rawInner: string) => {
 
 export const normalizeLegacyInlineHtmlSpans = (input: string) => {
   if (!input) return input
-  if (!input.includes("<") && !input.includes("&lt;")) return input
+  const hasRawTag = input.includes("<")
+  const hasEntityTag = input.includes("&lt;")
+  if (!hasRawTag && !hasEntityTag) return input
 
   let normalized = input
-  normalized = normalized.replace(
-    /<\s*code(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*code\s*>/gi,
-    (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
-  )
-  normalized = normalized.replace(
-    /&lt;\s*code(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*code\s*&gt;/gi,
-    (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
-  )
-  normalized = normalized.replace(
-    /<\s*(?:strong|b)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:strong|b)\s*>/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "**")
-  )
-  normalized = normalized.replace(
-    /&lt;\s*(?:strong|b)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:strong|b)\s*&gt;/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "**")
-  )
-  normalized = normalized.replace(
-    /<\s*(?:em|i)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:em|i)\s*>/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "*")
-  )
-  normalized = normalized.replace(
-    /&lt;\s*(?:em|i)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:em|i)\s*&gt;/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "*")
-  )
-  normalized = normalized.replace(
-    /<\s*(?:del|s)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:del|s)\s*>/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
-  )
-  normalized = normalized.replace(
-    /&lt;\s*(?:del|s)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:del|s)\s*&gt;/gi,
-    (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
-  )
+  if (hasRawTag) {
+    normalized = normalized.replace(
+      /<\s*code(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*code\s*>/gi,
+      (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
+    )
+    normalized = normalized.replace(
+      /<\s*(?:strong|b)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:strong|b)\s*>/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "**")
+    )
+    normalized = normalized.replace(
+      /<\s*(?:em|i)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:em|i)\s*>/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "*")
+    )
+    normalized = normalized.replace(
+      /<\s*(?:del|s)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:del|s)\s*>/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
+    )
+  }
+  if (hasEntityTag) {
+    normalized = normalized.replace(
+      /&lt;\s*code(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*code\s*&gt;/gi,
+      (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
+    )
+    normalized = normalized.replace(
+      /&lt;\s*(?:strong|b)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:strong|b)\s*&gt;/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "**")
+    )
+    normalized = normalized.replace(
+      /&lt;\s*(?:em|i)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:em|i)\s*&gt;/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "*")
+    )
+    normalized = normalized.replace(
+      /&lt;\s*(?:del|s)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:del|s)\s*&gt;/gi,
+      (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
+    )
+  }
 
   return normalized
 }

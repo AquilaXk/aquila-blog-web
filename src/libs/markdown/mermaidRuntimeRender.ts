@@ -43,6 +43,8 @@ type MermaidRuntimeControllerOptions = {
   clearParseWarning: () => void
 }
 
+const blockSourceCache = new WeakMap<HTMLElement, { raw: string; desired: string; renderable: string }>()
+
 export const createMermaidRuntimeController = ({
   root,
   preset,
@@ -68,18 +70,19 @@ export const createMermaidRuntimeController = ({
   const maxRetryCount = 6
   const retryBaseDelayMs = 150
 
-  const resolveBlockDesiredSource = (block: HTMLElement) => {
+  const resolveBlockSources = (block: HTMLElement) => {
     const codeBlock =
       block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
-    return applyMermaidSoftWrapHints(
-      extractNormalizedMermaidSource(
-        block.getAttribute("data-mermaid-source") ||
-          codeBlock?.textContent ||
-          block.textContent ||
-          ""
-      )
-    )
+    const raw = block.getAttribute("data-mermaid-source") || codeBlock?.textContent || block.textContent || ""
+    const cached = blockSourceCache.get(block)
+    if (cached && cached.raw === raw) return cached
+    const desired = applyMermaidSoftWrapHints(extractNormalizedMermaidSource(raw))
+    const next = { raw, desired, renderable: desired ? sanitizeRenderableMermaidSource(desired) : "" }
+    blockSourceCache.set(block, next)
+    return next
   }
+
+  const resolveBlockDesiredSource = (block: HTMLElement) => resolveBlockSources(block).desired
 
   const isBlockAlreadyRendered = (block: HTMLElement, desiredSource?: string) => {
     if (
@@ -375,16 +378,8 @@ export const createMermaidRuntimeController = ({
       blockDataLanguage === "mermaid" ||
       codeClassName.includes("language-mermaid") ||
       codeDataLanguage === "mermaid"
-    const desiredSource = applyMermaidSoftWrapHints(
-      extractNormalizedMermaidSource(
-        block.getAttribute("data-mermaid-source") ||
-          codeBlock?.textContent ||
-          block.textContent ||
-          ""
-      )
-    )
+    const { desired: desiredSource, renderable: renderableSource } = resolveBlockSources(block)
     if (!desiredSource) return
-    const renderableSource = sanitizeRenderableMermaidSource(desiredSource)
     const looksLikeMermaid = isMermaidSource(desiredSource)
     if (!hasMermaidHint && !looksLikeMermaid) return
     if (isBlockAlreadyRendered(block, desiredSource)) return

@@ -312,6 +312,7 @@ export const MarkdownEditorSlashMenu = ({
       $left={position.left}
       role="menu"
       aria-label="빠른 삽입 메뉴"
+      aria-activedescendant={items[selectedIndex] ? `aq-slash-item-${items[selectedIndex].id}` : undefined}
     >
       <SlashMenuHeading>블록 빠른 삽입</SlashMenuHeading>
       {items.length === 0 ? (
@@ -329,8 +330,10 @@ export const MarkdownEditorSlashMenu = ({
                 ref={(node) => {
                   itemRefs.current[index] = node
                 }}
+                id={`aq-slash-item-${item.id}`}
                 type="button"
                 role="menuitem"
+                aria-current={index === selectedIndex ? "true" : undefined}
                 $active={index === selectedIndex}
                 onClick={() => item.action()}
                 onMouseEnter={() => setSelectedIndex(index)}

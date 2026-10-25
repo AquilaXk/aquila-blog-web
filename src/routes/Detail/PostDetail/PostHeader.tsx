@@ -168,7 +168,7 @@ const PostHeaderEngagementSection: React.FC<{
             ) : null}
             {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
           </div>
-          <span className="likeButton" data-hide-mobile={hideActionButtonsOnMobile}>
+          <span className="likeButton">
             <AppIcon name="heart" />
             <span>좋아요 {resolvedLikesCount}</span>
           </span>
@@ -177,7 +177,6 @@ const PostHeaderEngagementSection: React.FC<{
               type="button"
               className="shareButton"
               data-hide-desktop={hideShareActionOnDesktop}
-              data-hide-mobile={hideActionButtonsOnMobile}
               aria-label="게시글 공유"
               onClick={onSharePost}
             >
@@ -190,7 +189,6 @@ const PostHeaderEngagementSection: React.FC<{
           <span
             className="shareFeedbackPill"
             data-hide-desktop={hideShareActionOnDesktop}
-            data-hide-mobile={hideActionButtonsOnMobile}
             role="status"
             aria-live="polite"
           >

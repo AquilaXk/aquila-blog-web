@@ -60,7 +60,7 @@ export const NoticeBanner = styled.div`
     gap: 0.45rem;
     min-height: 44px;
     padding: 0.25rem 0.95rem;
-    border-radius: ${radius.pill}px;
+    border-radius: ${radius.sm}px;
     border: 1px solid ${light.border};
     background: ${light.surfaceScaffold};
     color: ${light.inkSecondary};
@@ -119,8 +119,6 @@ export const SurfaceHeader = styled.header`
   min-height: 72px;
   padding: 0.75rem ${SECTION_PADDING_X};
   background: ${light.surfaceGlass};
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid ${light.borderHairline};
   transition: background-color ${TRANSITION}, border-color ${TRANSITION};
 
@@ -189,7 +187,7 @@ export const NavLink = styled.a`
   flex: 0 0 auto;
   min-height: 44px;
   padding: 0 0.85rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   color: ${light.inkSecondary};
   text-decoration: none;
   font-size: 0.96875rem;
@@ -215,7 +213,7 @@ export const PillAction = styled.a`
   gap: 0.45rem;
   min-height: 46px;
   padding: 0 1.4rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   background: ${light.inkPrimary};
   color: ${light.onAccent};
   text-decoration: none;
@@ -254,7 +252,7 @@ export const SecondaryPillAction = styled.a`
   gap: 0.45rem;
   min-height: 46px;
   padding: 0 1.35rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   color: ${light.inkPrimary};

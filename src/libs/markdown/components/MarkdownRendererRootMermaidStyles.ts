@@ -189,7 +189,6 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     border-radius: 4px;
     border: 1px solid ${theme.colors.gray6};
     background: color-mix(in srgb, ${theme.publicDesign.readableSurface} 94%, transparent);
-    backdrop-filter: blur(4px);
     color: ${theme.colors.gray11};
     padding: 0 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
@@ -233,11 +232,14 @@ export const markdownRendererRootMermaidStyles = (theme: Theme) => css`
     }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 820px), (pointer: coarse) {
     .aq-mermaid-expand-btn {
+      height: auto;
       min-height: 44px;
       min-width: 44px;
       padding: 0 0.75rem;
+      opacity: 1;
+      pointer-events: auto;
     }
   }
 `

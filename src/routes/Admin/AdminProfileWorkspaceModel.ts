@@ -79,6 +79,23 @@ export const serializeWorkspaceSection = (
   sectionId: WorkspaceSectionId
 ) => JSON.stringify(pickWorkspaceSectionContent(normalizeProfileWorkspaceContent(content), sectionId))
 
+export const computeProfileDirtyMask = (
+  normalizedDraft: ProfileWorkspaceContent,
+  normalizedBaseline: ProfileWorkspaceContent
+): number => {
+  let mask = 0
+  for (let index = 0; index < WORKSPACE_SECTIONS.length; index += 1) {
+    const sectionId = WORKSPACE_SECTIONS[index].id
+    if (
+      JSON.stringify(pickWorkspaceSectionContent(normalizedDraft, sectionId)) !==
+      JSON.stringify(pickWorkspaceSectionContent(normalizedBaseline, sectionId))
+    ) {
+      mask |= 1 << index
+    }
+  }
+  return mask
+}
+
 export const moveListItem = <T,>(items: T[], index: number, direction: -1 | 1) => {
   const nextIndex = index + direction
   if (nextIndex < 0 || nextIndex >= items.length) return items

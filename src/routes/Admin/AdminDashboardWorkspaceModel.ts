@@ -95,15 +95,26 @@ export const resolveDashboardDataUpdatedAt = (...timestamps: number[]) => {
   return Math.min(...valid)
 }
 
+const DASHBOARD_FRESHNESS_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
+})
+
+const DASHBOARD_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
+})
+
 export const formatDashboardFreshnessLabel = (dataUpdatedAtMs: number) => {
   if (!dataUpdatedAtMs) return null
 
-  const formatted = new Intl.DateTimeFormat("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
-  }).format(new Date(dataUpdatedAtMs))
+  const formatted = DASHBOARD_FRESHNESS_FORMATTER.format(new Date(dataUpdatedAtMs))
 
   return `${formatted} 기준`
 }
@@ -140,14 +151,7 @@ export const formatInstant = (value: string | null | undefined) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
-  }).format(date)
+  return DASHBOARD_INSTANT_FORMATTER.format(date)
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

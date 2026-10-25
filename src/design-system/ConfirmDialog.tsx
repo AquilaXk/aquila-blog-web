@@ -120,7 +120,8 @@ const ActionRow = styled.div<{ $actionRowBackground?: (theme: Theme) => string }
   max-width: 100%;
   border-top: 1px solid ${({ theme }) => theme.colors.gray5};
   padding-top: 12px;
-  background: transparent;
+  background: ${({ theme, $actionRowBackground }) =>
+    $actionRowBackground ? $actionRowBackground(theme) : "transparent"};
   border-radius: 0;
 `
 
@@ -142,7 +143,7 @@ const GhostButton = styled.button`
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `
@@ -173,7 +174,7 @@ const ConfirmButton = styled.button`
     }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `

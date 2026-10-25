@@ -320,6 +320,9 @@ const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
 const MarkdownBlockquoteContext = createContext(false)
 
 export const normalizeMarkdownInlineChildren = (children: ReactNode) => {
+  if (typeof children === "string" && !/[{*_~`<\n\\]/.test(children)) {
+    return children
+  }
   let normalizedChildren = normalizeInlineColorChildren(children)
   normalizedChildren = normalizeQuotedStrongChildren(normalizedChildren)
   normalizedChildren = normalizeQuotedEmphasisChildren(normalizedChildren)

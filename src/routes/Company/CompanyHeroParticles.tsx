@@ -14,6 +14,8 @@ type ParticleSeed = {
 }
 
 export type ParticleClearanceSpec = {
+  cx: number
+  cy: number
   clearRx: number
   clearRy: number
   innerStop: number
@@ -31,8 +33,12 @@ export const resolveParticleClearance = (
   width: number,
   height: number
 ): ParticleClearanceSpec => {
+  const cx = width * 0.5
+  const cy = height * 0.5
   if (width < 768) {
     return {
+      cx,
+      cy,
       clearRx: Math.max(width * 0.56, 210),
       clearRy: Math.max(height * 0.46, 220),
       innerStop: 0.86,
@@ -41,6 +47,8 @@ export const resolveParticleClearance = (
     }
   }
   return {
+    cx,
+    cy,
     clearRx: Math.max(1, Math.min(width * 0.48, 420)),
     clearRy: Math.max(1, Math.min(height * 0.36, 230)),
     innerStop: 0.76,
@@ -56,13 +64,14 @@ export const computeCenterClearance = (
   height: number,
   spec: ParticleClearanceSpec = resolveParticleClearance(width, height)
 ) => {
-  const halfWidth = width * 0.5
-  const halfHeight = height * 0.5
-  return smoothstep(
-    spec.innerStop,
-    spec.outerStop,
-    Math.hypot((screenX - halfWidth) / spec.clearRx, (screenY - halfHeight) / spec.clearRy)
-  )
+  const cx = spec.cx ?? width * 0.5
+  const cy = spec.cy ?? height * 0.5
+  const nx = (screenX - cx) / spec.clearRx
+  const ny = (screenY - cy) / spec.clearRy
+  const normSq = nx * nx + ny * ny
+  if (normSq <= spec.innerStop * spec.innerStop) return 0
+  if (normSq >= spec.outerStop * spec.outerStop) return 1
+  return smoothstep(spec.innerStop, spec.outerStop, Math.sqrt(normSq))
 }
 
 export const createParticleSeeds = (cols: number, rows: number, paletteLength: number): ParticleSeed[] => {
@@ -140,7 +149,6 @@ const CompanyHeroParticles: React.FC = () => {
     let width = 0
     let height = 0
     let dpr = 1
-    let clearanceSpec = resolveParticleClearance(1, 1)
     let ringX = 0.18
     let ringY = -0.12
     let targetX = 0.18
@@ -155,7 +163,6 @@ const CompanyHeroParticles: React.FC = () => {
       width = Math.max(1, Math.floor(rect.width))
       height = Math.max(1, Math.floor(rect.height))
       dpr = Math.min(window.devicePixelRatio || 1, finePointer ? 2 : 1.5)
-      clearanceSpec = resolveParticleClearance(width, height)
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
     }
@@ -170,9 +177,9 @@ const CompanyHeroParticles: React.FC = () => {
       color: string,
       alpha: number
     ) => {
-      context.save()
-      context.translate(cx, cy)
-      context.rotate(angle)
+      const cos = Math.cos(angle)
+      const sin = Math.sin(angle)
+      context.setTransform(cos * dpr, sin * dpr, -sin * dpr, cos * dpr, cx * dpr, cy * dpr)
       context.globalAlpha = alpha
       context.fillStyle = color
       context.beginPath()
@@ -182,7 +189,6 @@ const CompanyHeroParticles: React.FC = () => {
         context.rect(-halfLen, -radius, halfLen * 2, radius * 2)
       }
       context.fill()
-      context.restore()
     }
 
     const renderFrame = (now: number) => {
@@ -204,13 +210,15 @@ const CompanyHeroParticles: React.FC = () => {
       const ringWidthInner = 0.075
       const ringDisplacement = 0.16
 
-      ctx.save()
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
 
+      const clearance = resolveParticleClearance(width, height)
+      const innerStopSq = clearance.innerStop * clearance.innerStop
+      const outerStopSq = clearance.outerStop * clearance.outerStop
       const baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
-      const halfWidth = width * 0.5
-      const halfHeight = height * 0.5
+      const halfWidth = clearance.cx
+      const halfHeight = clearance.cy
 
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i]
@@ -255,17 +263,19 @@ const CompanyHeroParticles: React.FC = () => {
         const finalX = p.refX + dispX + p.posX * 0.28
         const finalY = p.refY + dispY + p.posY * 0.28
 
-        const screenX = (finalX + 1) * halfWidth
-        const screenY = (finalY + 1) * halfHeight
-        const centerClearance = computeCenterClearance(
-          screenX,
-          screenY,
-          width,
-          height,
-          clearanceSpec
-        )
+        const px = (finalX + 1) * halfWidth
+        const py = (finalY + 1) * halfHeight
+        const nx = (px - clearance.cx) / clearance.clearRx
+        const ny = (py - clearance.cy) / clearance.clearRy
+        const normSq = nx * nx + ny * ny
+        if (normSq <= innerStopSq) continue
+
+        const centerClearance =
+          normSq >= outerStopSq
+            ? 1
+            : smoothstep(clearance.innerStop, clearance.outerStop, Math.sqrt(normSq))
         const alpha =
-          Math.min(clearanceSpec.maxAlpha, Math.max(0.08, p.scale * 0.34)) * centerClearance
+          Math.min(clearance.maxAlpha, Math.max(0.08, p.scale * 0.34)) * centerClearance
 
         if (alpha < 0.05) continue
 
@@ -278,8 +288,8 @@ const CompanyHeroParticles: React.FC = () => {
 
         drawCapsule(
           ctx,
-          screenX,
-          screenY,
+          px,
+          py,
           angle,
           halfLen,
           pillRadius,
@@ -288,7 +298,8 @@ const CompanyHeroParticles: React.FC = () => {
         )
       }
 
-      ctx.restore()
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.globalAlpha = 1
     }
 
     syncSize()

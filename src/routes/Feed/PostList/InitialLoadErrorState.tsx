@@ -84,7 +84,7 @@ const StyledWrapper = styled.section`
       background: var(--aq-surface-subtle);
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 820px), (pointer: coarse) {
       min-height: 44px;
     }
   }

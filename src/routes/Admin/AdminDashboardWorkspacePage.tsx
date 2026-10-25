@@ -197,8 +197,8 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
     },
   ]
 
-  const chartBars: DashboardChartBar[] = hasSnapshot
-    ? ([
+  const rawChartBars: Array<{ key: string; label: string; value: number; tone: DashboardChartBar["tone"] }> = hasSnapshot
+    ? [
         {
           key: "ready",
           label: "ready",
@@ -241,18 +241,15 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
           value: dashboardSnapshot.storageCleanup.eligibleForPurgeCount,
           tone: dashboardSnapshot.storageCleanup.eligibleForPurgeCount ? "warn" : "good",
         },
-      ] as Array<{ key: string; label: string; value: number; tone: DashboardChartBar["tone"] }>)
-        .map((item, _index, items) => {
-          const maxValue = Math.max(...items.map((bar) => bar.value), 1)
-          const height = item.value > 0 ? Math.max(14, Math.round((item.value / maxValue) * 100)) : 8
-          return {
-            key: item.key,
-            label: item.label,
-            height,
-            tone: item.tone,
-          }
-        })
+      ]
     : []
+  const maxChartBarValue = Math.max(...rawChartBars.map((bar) => bar.value), 1)
+  const chartBars: DashboardChartBar[] = rawChartBars.map((item) => ({
+    key: item.key,
+    label: item.label,
+    height: item.value > 0 ? Math.max(14, Math.round((item.value / maxChartBarValue) * 100)) : 8,
+    tone: item.tone,
+  }))
 
   const logRows: DashboardLogRow[] = hasSnapshot
     ? [

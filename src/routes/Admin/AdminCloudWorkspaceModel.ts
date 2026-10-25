@@ -78,17 +78,19 @@ export const getCloudFilenameParts = (filename: string) => {
 export const formatCloudFileSize = (bytes: number) =>
   formatFileSize(bytes, { fallback: "0 B" })
 
+const CLOUD_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+})
+
 export const formatCloudDate = (value?: string) => {
   if (!value) return "날짜 없음"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "날짜 없음"
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date)
+  return CLOUD_DATE_FORMATTER.format(date)
 }
 
 export const getUploadStatusLabel = (status: UploadQueueStatus) => {
@@ -191,19 +193,27 @@ export const sortCloudFiles = (
   return copy
 }
 
-export const doesCloudFileMatchFilters = (
+export const doesCloudFileMatchSearchParams = (
   file: CloudFile,
   filter: CloudMediaFilter,
-  searchText: string,
+  searchParams: CloudSearchParams,
+  normalizedKeyword = (searchParams.keyword ?? "").toLowerCase(),
 ) => {
-  const searchParams = resolveCloudSearchParams(searchText)
-  const normalizedKeyword = (searchParams.keyword ?? "").toLowerCase()
   const matchesKind = filter === "ALL" || file.mediaKind === filter
   const matchesFolderPath =
     !searchParams.folderPath ||
     normalizeCloudFolderPathSearch(file.folderPath) === searchParams.folderPath
   const matchesKeyword = !normalizedKeyword || file.originalFilename.toLowerCase().includes(normalizedKeyword)
   return matchesKind && matchesFolderPath && matchesKeyword
+}
+
+export const doesCloudFileMatchFilters = (
+  file: CloudFile,
+  filter: CloudMediaFilter,
+  searchText: string,
+) => {
+  const searchParams = resolveCloudSearchParams(searchText)
+  return doesCloudFileMatchSearchParams(file, filter, searchParams)
 }
 
 export type CloudEmptyStateInput = {

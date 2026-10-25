@@ -86,11 +86,16 @@ export const writeMermaidCache = (cacheKey: string, value: MermaidRenderCacheEnt
   }
 }
 
-const countMermaidEdgeTokens = (source: string) => {
+export const countMermaidEdgeTokens = (source: string) => {
   let count = 0
   let index = 0
 
   while (index < source.length) {
+    const c = source.charCodeAt(index)
+    if (c !== 60 && c !== 45 && c !== 61 && c !== 120 && c !== 111) {
+      index += 1
+      continue
+    }
     let matched = false
     for (const token of MERMAID_EDGE_TOKENS_BY_LENGTH) {
       if (!source.startsWith(token, index)) continue

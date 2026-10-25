@@ -19,7 +19,7 @@ export const NewsHeaderAction = styled.a`
   gap: 0.4rem;
   min-height: 44px;
   padding: 0 1.2rem;
-  border-radius: ${radius.pill}px;
+  border-radius: ${radius.sm}px;
   border: 1px solid ${light.border};
   background: ${light.surface};
   font-size: 0.9375rem;
@@ -60,6 +60,10 @@ export const NewsGrid = styled.ul`
   list-style: none;
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
     grid-template-columns: minmax(0, 1fr);
   }
 `

@@ -162,20 +162,21 @@ const parseCalloutContainerPayload = (
 export const parseNotionContainerBlocks = (docText: string): NotionContainerBlock[] => {
   if (!docText.includes(":::")) return []
 
-  const rawLines = docText.split("\n")
   const blocks: NotionContainerBlock[] = []
-  let offset = 0
+  let pos = 0
   let inFence = false
   let openFenceMarker = ""
   let openFenceLength = 0
   let candidate: OpenContainerCandidate | null = null
 
-  for (let index = 0; index < rawLines.length; index += 1) {
-    const rawLine = rawLines[index] ?? ""
+  while (pos <= docText.length) {
+    const nextBreak = docText.indexOf("\n", pos)
+    const lineStart = pos
+    const lineEnd = nextBreak === -1 ? docText.length : nextBreak
+    const rawLine = docText.slice(lineStart, lineEnd)
     const lineText = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine
-    const lineStart = offset
-    const lineEnd = offset + rawLine.length
-    offset = lineEnd + (index < rawLines.length - 1 ? 1 : 0)
+    const offset = nextBreak === -1 ? lineEnd : lineEnd + 1
+    pos = nextBreak === -1 ? docText.length + 1 : lineEnd + 1
 
     const fenceMatch = FENCE_DELIMITER_LINE_RE.exec(lineText)
     if (fenceMatch) {
@@ -508,21 +509,20 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   }
 }
 
-let cachedContainerBlocksEntry: {
-  doc: EditorState["doc"]
-  blocks: readonly NotionContainerBlock[]
-} | null = null
+let cachedContainerBlocksEntry: { doc: EditorState["doc"]; blocks: readonly NotionContainerBlock[] } | null = null
 
-const getCachedNotionContainerBlocks = (
-  doc: EditorState["doc"]
-): readonly NotionContainerBlock[] => {
-  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) {
-    return cachedContainerBlocksEntry.blocks
-  }
+const getCachedNotionContainerBlocks = (doc: EditorState["doc"]): readonly NotionContainerBlock[] => {
+  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) return cachedContainerBlocksEntry.blocks
   const blocks = parseNotionContainerBlocks(getDocString(doc))
   cachedContainerBlocksEntry = { doc, blocks }
   return blocks
 }
+
+const getSortedSelections = (state: EditorState) =>
+  [...state.selection.ranges].map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to)
+
+const isBlockSelectionActive = (block: NotionContainerBlock, selections: Array<{ from: number; to: number }>) =>
+  isTokenActive(block.from, block.to, selections) || hasIntervalOverlap(selections, block.from, block.to)
 
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
@@ -533,20 +533,11 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
 
   const composing = state.field(compositionField, false) ?? false
   const pointerSelecting = state.field(pointerSelectingField, false) ?? false
-  const selections = [...state.selection.ranges]
-    .map(({ from, to }) => ({ from, to }))
-    .sort((a, b) => a.from - b.from || a.to - b.to)
-
+  const selections = getSortedSelections(state)
   const decorations: Range<Decoration>[] = []
 
   for (const block of blocks) {
-    if (
-      mode === "live" &&
-      (composing ||
-        pointerSelecting ||
-        isTokenActive(block.from, block.to, selections) ||
-        hasIntervalOverlap(selections, block.from, block.to))
-    ) {
+    if (mode === "live" && (composing || pointerSelecting || isBlockSelectionActive(block, selections))) {
       const startLineNo = state.doc.lineAt(block.from).number
       const endLineNo = state.doc.lineAt(block.to).number
       const toneClass = block.kind === "callout" ? ` cm-live-container-tone-${block.tone}` : ""
@@ -579,17 +570,18 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
 export const notionContainerBlockField = StateField.define<DecorationSet>({
   create: buildNotionContainerBlockDecorations,
   update: (decorations, transaction) => {
-    if (
-      transaction.docChanged ||
-      transaction.selection ||
-      transaction.effects.some(
-        (effect) =>
-          effect.is(setComposition) ||
-          effect.is(setPointerSelecting) ||
-          effect.is(setEditorMode)
-      )
-    ) {
-      return buildNotionContainerBlockDecorations(transaction.state)
+    const hasEffect = transaction.effects.some(
+      (effect) => effect.is(setComposition) || effect.is(setPointerSelecting) || effect.is(setEditorMode)
+    )
+    if (transaction.docChanged || hasEffect) return buildNotionContainerBlockDecorations(transaction.state)
+    if (transaction.selection) {
+      const blocks = getCachedNotionContainerBlocks(transaction.state.doc)
+      if (blocks.length === 0) return decorations
+      const prevSel = getSortedSelections(transaction.startState)
+      const nextSel = getSortedSelections(transaction.state)
+      if (blocks.some((b) => isBlockSelectionActive(b, prevSel) !== isBlockSelectionActive(b, nextSel))) {
+        return buildNotionContainerBlockDecorations(transaction.state)
+      }
     }
     return decorations
   },

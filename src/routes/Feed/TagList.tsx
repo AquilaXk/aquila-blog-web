@@ -282,9 +282,11 @@ const StyledWrapper = styled.div`
     cursor: pointer;
     transition: color 0.125s ease-in;
 
-    &:hover {
-      background: transparent;
-      color: var(--aq-text);
+    @media (hover: hover) {
+      &:hover {
+        background: transparent;
+        color: var(--aq-text);
+      }
     }
 
     &:focus-visible {
@@ -316,8 +318,10 @@ const StyledWrapper = styled.div`
     padding: 4px 0;
     cursor: pointer;
 
-    &:hover {
-      color: var(--aq-text);
+    @media (hover: hover) {
+      &:hover {
+        color: var(--aq-text);
+      }
     }
 
     &:focus-visible {
@@ -343,9 +347,14 @@ const StyledWrapper = styled.div`
     text-decoration: none;
   }
 
-  .desktopList button:hover .name {
-    color: var(--aq-text);
-    font-weight: 800;
+  @media (hover: hover) {
+    .desktopList button:hover .name {
+      color: var(--aq-text);
+    }
+
+    .desktopList button:hover .count {
+      color: var(--aq-text);
+    }
   }
 
   .desktopList button .count {
@@ -354,7 +363,6 @@ const StyledWrapper = styled.div`
     font-variant-numeric: tabular-nums;
   }
 
-  .desktopList button:hover .count,
   .desktopList button[data-active="true"] .count {
     color: var(--aq-text);
   }
@@ -431,13 +439,14 @@ const StyledWrapper = styled.div`
       pointer-events: none;
     }
 
-    &:hover {
-      color: var(--aq-text);
-      font-weight: 760;
+    @media (hover: hover) {
+      &:hover {
+        color: var(--aq-text);
 
-      &::after {
-        border-color: var(--feed-tag-hover-border);
-        background: var(--feed-tag-surface-elevated);
+        &::after {
+          border-color: var(--feed-tag-hover-border);
+          background: var(--feed-tag-surface-elevated);
+        }
       }
     }
 
