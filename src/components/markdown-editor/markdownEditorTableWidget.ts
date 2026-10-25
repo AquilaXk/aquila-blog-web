@@ -208,7 +208,7 @@ export class MarkdownTableWidget extends WidgetType {
     const flushAndDispatchActiveCell = () => {
       if (!activeSession || activeSession.handled) return
       const committed = flushActiveCellMarkdown()
-      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed)
     }
 
     const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
@@ -424,7 +424,10 @@ export class MarkdownTableWidget extends WidgetType {
         if (nextValue !== initialValue) {
           const updated = applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, nextValue)
           if (updated && updated !== currentMarkdown) {
-            dispatchTableMarkdown(updated, { row: clampedRow, col: clampedCol, openEditor: false })
+            dispatchTableMarkdown(
+              updated,
+              focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined
+            )
             if (focusWrapAfter) focusTableWrap()
             return
           }

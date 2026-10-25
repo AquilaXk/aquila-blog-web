@@ -1046,6 +1046,20 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.dataset.activeCol).toBeUndefined()
 
       tdsAfterNav[1].trigger("click")
+      const dirtyInputBeforeOutsideFocus = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforeOutsideFocus.value = "SavedOnOutsideFocus"
+      for (const fn of documentListeners.get("focusin") ?? []) {
+        fn({
+          type: "focusin",
+          target: { closest: () => null },
+        })
+      }
+      expect(lastDispatchedInsert).toContain("| P1 | SavedOnOutsideFocus | Z1 |  |")
+      expect(dom.dataset.activeMode).toBeUndefined()
+      expect(dom.dataset.activeRow).toBeUndefined()
+      expect(dom.dataset.activeCol).toBeUndefined()
+
+      tdsAfterNav[1].trigger("click")
       const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
       dirtyInputBeforePagehide.value = "SavedOnPagehide"
       for (const fn of windowListeners.get("pagehide") ?? []) fn({ type: "pagehide" })
