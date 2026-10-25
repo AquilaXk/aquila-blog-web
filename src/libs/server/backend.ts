@@ -1,5 +1,4 @@
 import type { IncomingMessage } from "node:http"
-import { isIP } from "node:net"
 import {
   ApiError,
   ApiNetworkError,
@@ -24,11 +23,27 @@ const readFirstHeaderValue = (value: string | string[] | undefined): string => {
   return typeof value === "string" ? value : ""
 }
 
+const isValidIpv4 = (value: string): boolean => {
+  const parts = value.split(".")
+  if (parts.length !== 4) return false
+  return parts.every((part) => /^(?:0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255)
+}
+
+const isValidIpv6 = (value: string): boolean => {
+  if (!value.includes(":") || !/^[0-9a-fA-F:.]+$/.test(value)) return false
+  try {
+    const parsed = new URL(`http://[${value}]/`)
+    return parsed.hostname.startsWith("[") && parsed.hostname.endsWith("]")
+  } catch {
+    return false
+  }
+}
+
 const sanitizeClientIpCandidate = (raw: string | undefined): string => {
   if (!raw) return ""
   const trimmed = raw.trim().replace(/^::ffff:/i, "")
   if (!trimmed || trimmed.length > 64 || /[\r\n\0\s,]/.test(trimmed)) return ""
-  return isIP(trimmed) !== 0 ? trimmed : ""
+  return isValidIpv4(trimmed) || isValidIpv6(trimmed) ? trimmed : ""
 }
 
 export const resolveTrustedClientIp = (req: IncomingMessage): string => {
