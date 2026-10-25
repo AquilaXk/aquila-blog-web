@@ -18,6 +18,14 @@ import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
 
+const EDITOR_SURFACE_GUIDE_OPEN = 1 << 0
+const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
+const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
+const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
+const EDITOR_SURFACE_ZEN_BITS = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
+const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean) => boolean)) =>
+  (typeof next === "function" ? next((mask & bit) !== 0) : next) ? mask | bit : mask & ~bit
+
 export const resolveActiveOutlineItemIndex = (
   items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
   cursorOffset?: number | null
@@ -248,32 +256,21 @@ export const EditorStudioDedicatedEditorSurface = ({
   onClearLocalDraft,
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
-  const [panelUiMask, setPanelUiMask] = useState(6)
-  const isGuideOpen = (panelUiMask & 1) !== 0
-  const isOutlineOpen = (panelUiMask & 2) !== 0
-  const isInspectorOpen = (panelUiMask & 4) !== 0
-  const isMobilePropertiesOpen = (panelUiMask & 8) !== 0
-  const setIsGuideOpen = useCallback((v: boolean) => setPanelUiMask((m) => (v ? m | 1 : m & ~1)), [])
-  const setIsOutlineOpen = useCallback(
-    (fn: boolean | ((p: boolean) => boolean)) =>
-      setPanelUiMask((m) => ((typeof fn === "function" ? fn((m & 2) !== 0) : fn) ? m | 2 : m & ~2)),
-    []
-  )
-  const setIsInspectorOpen = useCallback(
-    (fn: boolean | ((p: boolean) => boolean)) =>
-      setPanelUiMask((m) => ((typeof fn === "function" ? fn((m & 4) !== 0) : fn) ? m | 4 : m & ~4)),
-    []
-  )
-  const setIsMobilePropertiesOpen = useCallback(
-    (fn: (p: boolean) => boolean) => setPanelUiMask((m) => (fn((m & 8) !== 0) ? m | 8 : m & ~8)),
-    []
-  )
+  const [panelUiMask, setPanelUiMask] = useState(EDITOR_SURFACE_ZEN_BITS)
+  const isGuideOpen = (panelUiMask & EDITOR_SURFACE_GUIDE_OPEN) !== 0
+  const isOutlineOpen = (panelUiMask & EDITOR_SURFACE_OUTLINE_OPEN) !== 0
+  const isInspectorOpen = (panelUiMask & EDITOR_SURFACE_INSPECTOR_OPEN) !== 0
+  const isMobilePropertiesOpen = (panelUiMask & EDITOR_SURFACE_MOBILE_PROPS_OPEN) !== 0
+  const setIsGuideOpen = useCallback((v: boolean) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_GUIDE_OPEN, v)), [])
+  const setIsOutlineOpen = useCallback((fn: boolean | ((p: boolean) => boolean)) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_OUTLINE_OPEN, fn)), [])
+  const setIsInspectorOpen = useCallback((fn: boolean | ((p: boolean) => boolean)) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_INSPECTOR_OPEN, fn)), [])
+  const setIsMobilePropertiesOpen = useCallback((fn: (p: boolean) => boolean) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_MOBILE_PROPS_OPEN, fn)), [])
   const [lastActivatedOutlineOffset, setLastActivatedOutlineOffset] = useState<number | null>(null)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
   const handleToggleZenMode = useCallback(() => {
-    setPanelUiMask((m) => ((m & 6) === 0 ? m | 6 : m & ~6))
+    setPanelUiMask((m) => ((m & EDITOR_SURFACE_ZEN_BITS) === 0 ? m | EDITOR_SURFACE_ZEN_BITS : m & ~EDITOR_SURFACE_ZEN_BITS))
   }, [])
 
   useEffect(() => {

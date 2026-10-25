@@ -7,12 +7,8 @@ import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./mar
 import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
 import {
-  createMarkdownEditorTable,
-  getMarkdownEditorTableEditAvailability,
-  packTableEditAvailabilityMask,
-  planMarkdownEditorTableEdit,
-  unpackTableEditAvailabilityMask,
-  type MarkdownEditorTableEdit,
+  createMarkdownEditorTable, getMarkdownEditorTableEditAvailability, packTableEditAvailabilityMask,
+  planMarkdownEditorTableEdit, unpackTableEditAvailabilityMask, type MarkdownEditorTableEdit,
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
@@ -51,22 +47,22 @@ type TextareaSelection = MarkdownEditorFocusSelection
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
+const flushActiveTableCellInput = (): number | null => {
+  const activeEl = typeof document !== "undefined" ? document.activeElement : null
+  if (!(activeEl instanceof HTMLElement) || !activeEl.classList.contains("cm-live-table-cell-input")) return null
+  const rawFrom = activeEl.closest<HTMLElement>(".cm-live-table-wrap")?.dataset.tableFrom
+  const tableFrom = rawFrom !== undefined ? Number.parseInt(rawFrom, 10) : Number.NaN
+  activeEl.blur()
+  return Number.isFinite(tableFrom) && tableFrom >= 0 ? tableFrom : null
+}
+
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
 
 export const MarkdownEditor = ({
-  value,
-  disabled = false,
-  disableMermaid = false,
-  onRequestFocusTitle,
-  onChange,
-  onSelectionChange,
-  onFlushMarkdownReady,
-  onFocusRequestReady,
-  onRequestSave,
-  onUploadingChange,
-  onUploadImage,
-  onUploadFile,
+  value, disabled = false, disableMermaid = false, onRequestFocusTitle, onChange,
+  onSelectionChange, onFlushMarkdownReady, onFocusRequestReady, onRequestSave,
+  onUploadingChange, onUploadImage, onUploadFile,
 }: MarkdownEditorProps) => {
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
@@ -110,7 +106,10 @@ export const MarkdownEditor = ({
   }, [value])
 
   useEffect(() => {
-    onFlushMarkdownReady?.(() => valueRef.current)
+    onFlushMarkdownReady?.(() => {
+      flushActiveTableCellInput()
+      return valueRef.current
+    })
     return () => onFlushMarkdownReady?.(null)
   }, [onFlushMarkdownReady])
 
@@ -190,8 +189,13 @@ export const MarkdownEditor = ({
   }, [invalidateFindReplace, value])
 
   const rememberTextareaSelection = useCallback(() => {
+    const flushedTableFrom = flushActiveTableCellInput()
     const snapshot = liveSurfaceRef.current?.readSnapshot()
-    if (snapshot) syncSelectionState(snapshot.selection)
+    if (flushedTableFrom !== null) {
+      syncSelectionState({ from: flushedTableFrom, to: flushedTableFrom })
+    } else if (snapshot) {
+      syncSelectionState(snapshot.selection)
+    }
     handleFindReplaceSelectionChange(selectionRef.current)
     updateActiveTableSelection(valueRef.current, selectionRef.current)
     return selectionRef.current
@@ -266,10 +270,6 @@ export const MarkdownEditor = ({
   const applyTableEdit = useCallback(
     (edit: MarkdownEditorTableEdit) => {
       if (disabled) return
-      const activeEl = typeof document !== "undefined" ? document.activeElement : null
-      if (activeEl instanceof HTMLElement && activeEl.classList.contains("cm-live-table-cell-editor")) {
-        activeEl.blur()
-      }
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
       if (plan) applyPlannedMarkdownMutation(plan)

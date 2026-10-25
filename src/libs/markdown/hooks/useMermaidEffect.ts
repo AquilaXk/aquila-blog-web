@@ -90,17 +90,18 @@ const useMermaidEffect = (
 
     const scheduleRun = (forceResetCache = false) => {
       if (disposed) return
-      controller.resetLayoutCache(forceResetCache)
+      if (forceResetCache) pendingForceResetCache = true
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         rerunRequested = true
-        if (forceResetCache) pendingForceResetCache = true
         return
       }
       if (running) {
         rerunRequested = true
-        if (forceResetCache) pendingForceResetCache = true
         return
       }
+      controller.resetLayoutCache(pendingForceResetCache)
+      pendingForceResetCache = false
+      rerunRequested = false
       if (scheduledRunFrame !== null) return
       scheduledRunFrame = window.requestAnimationFrame(() => {
         scheduledRunFrame = null
