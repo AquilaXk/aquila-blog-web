@@ -34,6 +34,7 @@ import { MarkdownTableWidget } from "src/components/markdown-editor/markdownEdit
 import {
   appendInlineMarkdownNodes,
   MarkdownTaskWidget,
+  resolveLiveCalloutTone,
 } from "src/components/markdown-editor/markdownEditorWidgets"
 import {
   filterSlashCommandSpecs,
@@ -615,7 +616,28 @@ test.describe("Notion-parity Markdown editor model", () => {
         selectionStart: 0,
         selectionEnd: 0,
         style: { width: "", textAlign: "" },
-        dataset: {} as Record<string, string>,
+        dataset: new Proxy({} as Record<string, string | undefined>, {
+          get(_target, prop) {
+            if (typeof prop !== "string") return undefined
+            const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+            return attrs.get(attrKey)
+          },
+          set(_target, prop, value) {
+            if (typeof prop === "string") {
+              const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+              if (value === undefined) attrs.delete(attrKey)
+              else attrs.set(attrKey, String(value))
+            }
+            return true
+          },
+          deleteProperty(_target, prop) {
+            if (typeof prop === "string") {
+              const attrKey = `data-${prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`
+              attrs.delete(attrKey)
+            }
+            return true
+          },
+        }),
         children,
         get className() {
           return Array.from(classes).join(" ")
@@ -751,6 +773,9 @@ test.describe("Notion-parity Markdown editor model", () => {
       const widget = new MarkdownTableWidget(tableMd, 40, 40 + tableMd.length)
       const dom: any = widget.toDOM(fakeView)
 
+      expect(dom.getAttribute("data-active-mode")).toBeNull()
+      expect(dom.querySelectorAll("th")[0].classList.contains("is-active-cell")).toBe(false)
+
       const headerRowBtn = dom.querySelector('[data-testid="cm-live-table-toggle-header-row"]')
       const headerColBtn = dom.querySelector('[data-testid="cm-live-table-toggle-header-col"]')
       const fullWidthBtn = dom.querySelector('[data-testid="cm-live-table-toggle-full-width"]')
@@ -827,6 +852,49 @@ test.describe("Notion-parity Markdown editor model", () => {
       ).toBe(true)
       expect(dom.querySelectorAll("col")[0].getAttribute("data-col-width")).toBeNull()
       expect(dom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
+
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 60, 60 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(dom.dataset.tableFrom).toBe("60")
+      const shiftedDom: any = new MarkdownTableWidget(
+        lastDispatchedInsert,
+        60,
+        60 + lastDispatchedInsert.length
+      ).toDOM(fakeView)
+      expect(shiftedDom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
+      const secondTableDom: any = new MarkdownTableWidget(
+        lastDispatchedInsert,
+        120,
+        120 + lastDispatchedInsert.length
+      ).toDOM(fakeView)
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 120, 120 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 180, 180 + lastDispatchedInsert.length).updateDOM(
+          secondTableDom,
+          fakeView
+        )
+      ).toBe(true)
+      const remountedFirstDom: any = new MarkdownTableWidget(
+        lastDispatchedInsert,
+        120,
+        120 + lastDispatchedInsert.length
+      ).toDOM(fakeView)
+      expect(remountedFirstDom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
 
       const updatedRowHandles = dom.querySelectorAll(".cm-live-table-row-handle")
       updatedRowHandles[1].trigger("dragstart", { dataTransfer: { effectAllowed: "", setData() {} } })
@@ -1149,6 +1217,36 @@ test.describe("Notion-parity Markdown editor model", () => {
     })
     expect(inactiveWidgets).toHaveLength(2)
     expect(inactiveWidgets[0]).toBeInstanceOf(MarkdownNotionCalloutBlockWidget)
+    expect(resolveLiveCalloutTone("tip").icon).toBe("💡")
+
+    const stateMovedOutside = stateInactive.update({
+      selection: { anchor: doc.length + 5 },
+    }).state
+    expect(stateMovedOutside.field(notionContainerBlockField)).toBe(inactiveSet)
+
+    const fakeCalloutDom = {
+      dataset: {
+        from: "0",
+        sig: [
+          "tip",
+          "💡",
+          "노션 라이브 프리뷰 팁",
+          "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
+          "24",
+        ].join("\0"),
+      },
+    } as unknown as HTMLElement
+    const shiftedCalloutWidget = new MarkdownNotionCalloutBlockWidget(
+      "tip",
+      "💡",
+      "노션 라이브 프리뷰 팁",
+      "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
+      32,
+      120,
+      24
+    )
+    expect(shiftedCalloutWidget.updateDOM(fakeCalloutDom)).toBe(true)
+    expect(fakeCalloutDom.dataset.from).toBe("32")
 
     const stateActive = stateInactive.update({
       selection: { anchor: 5 },

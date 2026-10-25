@@ -282,16 +282,16 @@ const moveCursorToWidgetOrigin = (
   }
 }
 
-const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: string } => {
+export const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: string } => {
   const token = rawType.toLowerCase()
-  if (["tip", "hint", "success", "check", "done"].includes(token)) return { kind: "tip", icon: "T" }
+  if (["tip", "hint", "success", "check", "done"].includes(token)) return { kind: "tip", icon: "💡" }
   if (["warning", "caution", "attention", "failure", "fail", "missing", "danger", "error", "bug"].includes(token)) {
-    return { kind: "warning", icon: "!" }
+    return { kind: "warning", icon: "⚠️" }
   }
-  if (["summary", "abstract", "tldr", "important"].includes(token)) return { kind: "summary", icon: "§" }
-  if (token === "example") return { kind: "example", icon: "✓" }
-  if (["outline", "quote", "cite"].includes(token)) return { kind: "outline", icon: "≡" }
-  return { kind: "info", icon: "i" }
+  if (["summary", "abstract", "tldr", "important"].includes(token)) return { kind: "summary", icon: "📌" }
+  if (token === "example") return { kind: "example", icon: "✨" }
+  if (["outline", "quote", "cite"].includes(token)) return { kind: "outline", icon: "💬" }
+  return { kind: "info", icon: "ℹ️" }
 }
 
 export class MarkdownCalloutWidget extends WidgetType {

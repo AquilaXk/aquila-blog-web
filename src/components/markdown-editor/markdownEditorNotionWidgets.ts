@@ -2,13 +2,9 @@ import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view"
 import { hasIntervalOverlap, isTokenActive } from "./markdownEditorLivePreview"
 import {
-  compositionField,
   editorModeField,
   getDocString,
-  pointerSelectingField,
-  setComposition,
   setEditorMode,
-  setPointerSelecting,
 } from "./markdownEditorLiveSurfaceDecorations"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
@@ -25,38 +21,15 @@ const LEADING_EMOJI_RE =
 export type NotionCalloutTone = "info" | "tip" | "warning" | "danger" | "purple" | "default"
 
 export type NotionCalloutContainerBlock = {
-  kind: "callout"
-  from: number
-  to: number
-  tone: NotionCalloutTone
-  icon: string
-  title: string
-  body: string
-  bodyOffset: number
+  kind: "callout"; from: number; to: number; tone: NotionCalloutTone; icon: string; title: string; body: string; bodyOffset: number
 }
-
 export type NotionToggleContainerBlock = {
-  kind: "toggle"
-  from: number
-  to: number
-  title: string
-  body: string
-  bodyOffset: number
+  kind: "toggle"; from: number; to: number; title: string; body: string; bodyOffset: number
 }
-
 export type NotionBookmarkContainerBlock = {
-  kind: "bookmark"
-  from: number
-  to: number
-  url: string
-  title: string
-  description: string
+  kind: "bookmark"; from: number; to: number; url: string; title: string; description: string
 }
-
-export type NotionContainerBlock =
-  | NotionCalloutContainerBlock
-  | NotionToggleContainerBlock
-  | NotionBookmarkContainerBlock
+export type NotionContainerBlock = NotionCalloutContainerBlock | NotionToggleContainerBlock | NotionBookmarkContainerBlock
 
 type OpenContainerCandidate =
   | { kind: "callout"; from: number; bodyOffset: number; rawHeader: string; bodyLines: string[] }
@@ -292,9 +265,11 @@ const focusContainerBlockOrigin = (
 ) => {
   if (!view) return
   let resolvedFrom = fallbackFrom
+  const datasetFrom = Number(root.dataset?.from)
+  if (Number.isFinite(datasetFrom) && datasetFrom >= 0) resolvedFrom = datasetFrom
   try {
     const domPos = view.posAtDOM(root)
-    if (typeof domPos === "number") resolvedFrom = domPos
+    if (typeof domPos === "number" && domPos >= 0) resolvedFrom = domPos
   } catch {}
   const resolvedTo = resolvedFrom + Math.max(0, fallbackTo - fallbackFrom)
   const targetAnchor = Math.min(
@@ -327,13 +302,8 @@ const bindContainerActivateTarget = (
 
 export class MarkdownNotionCalloutBlockWidget extends WidgetType {
   constructor(
-    readonly tone: NotionCalloutTone,
-    readonly icon: string,
-    readonly title: string,
-    readonly body: string,
-    readonly from: number,
-    readonly to: number,
-    readonly bodyOffset = 11 + title.length + 1
+    readonly tone: NotionCalloutTone, readonly icon: string, readonly title: string, readonly body: string,
+    readonly from: number, readonly to: number, readonly bodyOffset = 11 + title.length + 1
   ) {
     super()
   }
@@ -341,14 +311,15 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
   eq(other: MarkdownNotionCalloutBlockWidget) {
     return (
       other instanceof MarkdownNotionCalloutBlockWidget &&
-      other.tone === this.tone &&
-      other.icon === this.icon &&
-      other.title === this.title &&
-      other.body === this.body &&
-      other.from === this.from &&
-      other.to === this.to &&
-      other.bodyOffset === this.bodyOffset
+      other.tone === this.tone && other.icon === this.icon && other.title === this.title &&
+      other.body === this.body && other.from === this.from && other.to === this.to && other.bodyOffset === this.bodyOffset
     )
+  }
+
+  updateDOM(dom: HTMLElement) {
+    if (dom.dataset?.sig !== `${this.tone}\0${this.icon}\0${this.title}\0${this.body}\0${this.bodyOffset}`) return false
+    dom.dataset.from = String(this.from)
+    return true
   }
 
   toDOM(view?: EditorView) {
@@ -357,6 +328,7 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
     root.setAttribute("data-testid", "cm-live-callout-widget")
     root.dataset.from = String(this.from)
     root.dataset.callout = this.tone
+    root.dataset.sig = `${this.tone}\0${this.icon}\0${this.title}\0${this.body}\0${this.bodyOffset}`
 
     const header = document.createElement("div")
     header.className = "cm-live-callout-header"
@@ -384,10 +356,7 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
 
 export class MarkdownToggleBlockWidget extends WidgetType {
   constructor(
-    readonly title: string,
-    readonly body: string,
-    readonly from: number,
-    readonly to: number,
+    readonly title: string, readonly body: string, readonly from: number, readonly to: number,
     readonly bodyOffset = 10 + title.length + 1
   ) {
     super()
@@ -396,12 +365,15 @@ export class MarkdownToggleBlockWidget extends WidgetType {
   eq(other: MarkdownToggleBlockWidget) {
     return (
       other instanceof MarkdownToggleBlockWidget &&
-      other.title === this.title &&
-      other.body === this.body &&
-      other.from === this.from &&
-      other.to === this.to &&
-      other.bodyOffset === this.bodyOffset
+      other.title === this.title && other.body === this.body &&
+      other.from === this.from && other.to === this.to && other.bodyOffset === this.bodyOffset
     )
+  }
+
+  updateDOM(dom: HTMLElement) {
+    if (dom.dataset?.sig !== `${this.title}\0${this.body}\0${this.bodyOffset}`) return false
+    dom.dataset.from = String(this.from)
+    return true
   }
 
   toDOM(view?: EditorView) {
@@ -410,6 +382,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     root.className = "cm-live-toggle-block"
     root.setAttribute("data-testid", "cm-live-toggle-widget")
     root.dataset.from = String(this.from)
+    root.dataset.sig = `${this.title}\0${this.body}\0${this.bodyOffset}`
 
     const header = document.createElement("div")
     header.className = "cm-live-toggle-header"
@@ -456,11 +429,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
 
 export class MarkdownBookmarkBlockWidget extends WidgetType {
   constructor(
-    readonly url: string,
-    readonly title: string,
-    readonly description: string,
-    readonly from: number,
-    readonly to: number
+    readonly url: string, readonly title: string, readonly description: string,
+    readonly from: number, readonly to: number
   ) {
     super()
   }
@@ -468,12 +438,15 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   eq(other: MarkdownBookmarkBlockWidget) {
     return (
       other instanceof MarkdownBookmarkBlockWidget &&
-      other.url === this.url &&
-      other.title === this.title &&
-      other.description === this.description &&
-      other.from === this.from &&
-      other.to === this.to
+      other.url === this.url && other.title === this.title &&
+      other.description === this.description && other.from === this.from && other.to === this.to
     )
+  }
+
+  updateDOM(dom: HTMLElement) {
+    if (dom.dataset?.sig !== `${this.url}\0${this.title}\0${this.description}`) return false
+    dom.dataset.from = String(this.from)
+    return true
   }
 
   toDOM(view?: EditorView) {
@@ -481,6 +454,7 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     root.className = "cm-live-bookmark-card"
     root.setAttribute("data-testid", "cm-live-bookmark-widget")
     root.dataset.from = String(this.from)
+    root.dataset.sig = `${this.url}\0${this.title}\0${this.description}`
 
     const icon = document.createElement("span")
     icon.className = "cm-live-bookmark-icon"
@@ -524,6 +498,23 @@ const getCachedNotionContainerBlocks = (
   return blocks
 }
 
+const isContainerBlockActive = (block: NotionContainerBlock, selections: readonly { from: number; to: number }[]) =>
+  isTokenActive(block.from, block.to, selections) || hasIntervalOverlap(selections, block.from, block.to)
+
+const haveSameActiveContainerBlocks = (
+  blocks: readonly NotionContainerBlock[],
+  prevRanges: readonly { from: number; to: number }[],
+  nextRanges: readonly { from: number; to: number }[]
+): boolean => {
+  if (blocks.length === 0) return true
+  const prevSorted = [...prevRanges].map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to)
+  const nextSorted = [...nextRanges].map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to)
+  for (const block of blocks) {
+    if (isContainerBlockActive(block, prevSorted) !== isContainerBlockActive(block, nextSorted)) return false
+  }
+  return true
+}
+
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
   if (mode === "source" || state.doc.length === 0) return Decoration.none
@@ -531,8 +522,6 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
   const blocks = getCachedNotionContainerBlocks(state.doc)
   if (blocks.length === 0) return Decoration.none
 
-  const composing = state.field(compositionField, false) ?? false
-  const pointerSelecting = state.field(pointerSelectingField, false) ?? false
   const selections = [...state.selection.ranges]
     .map(({ from, to }) => ({ from, to }))
     .sort((a, b) => a.from - b.from || a.to - b.to)
@@ -540,13 +529,7 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
   const decorations: Range<Decoration>[] = []
 
   for (const block of blocks) {
-    if (
-      mode === "live" &&
-      (composing ||
-        pointerSelecting ||
-        isTokenActive(block.from, block.to, selections) ||
-        hasIntervalOverlap(selections, block.from, block.to))
-    ) {
+    if (mode === "live" && isContainerBlockActive(block, selections)) {
       const startLineNo = state.doc.lineAt(block.from).number
       const endLineNo = state.doc.lineAt(block.to).number
       const toneClass = block.kind === "callout" ? ` cm-live-container-tone-${block.tone}` : ""
@@ -579,19 +562,15 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
 export const notionContainerBlockField = StateField.define<DecorationSet>({
   create: buildNotionContainerBlockDecorations,
   update: (decorations, transaction) => {
-    if (
-      transaction.docChanged ||
-      transaction.selection ||
-      transaction.effects.some(
-        (effect) =>
-          effect.is(setComposition) ||
-          effect.is(setPointerSelecting) ||
-          effect.is(setEditorMode)
-      )
-    ) {
-      return buildNotionContainerBlockDecorations(transaction.state)
+    const hasModeEffect = transaction.effects.some((effect) => effect.is(setEditorMode))
+    if (!transaction.docChanged && !hasModeEffect) {
+      if (!transaction.selection) return decorations
+      const blocks = getCachedNotionContainerBlocks(transaction.state.doc)
+      if (haveSameActiveContainerBlocks(blocks, transaction.startState.selection.ranges, transaction.state.selection.ranges)) {
+        return decorations
+      }
     }
-    return decorations
+    return buildNotionContainerBlockDecorations(transaction.state)
   },
   provide: (field) => EditorView.decorations.from(field),
 })

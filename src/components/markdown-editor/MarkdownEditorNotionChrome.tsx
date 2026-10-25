@@ -118,11 +118,11 @@ const BlockActionMenuPopover = styled.div<{ $top: number; $left: number }>`
   z-index: ${zIndexes.dropdownMenu + 8};
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
-  width: 204px;
-  max-height: 360px;
+  width: 220px;
+  max-height: 480px;
   overflow-y: auto;
   padding: 5px;
-  border-radius: 8px;
+  border-radius: 9px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -133,52 +133,48 @@ const BlockActionMenuPopover = styled.div<{ $top: number; $left: number }>`
 `
 
 const BlockMenuSectionHeader = styled.div`
-  padding: 5px 8px 3px;
-  font: 650 11px/1.2 var(--aq-font-sans);
-  color: ${({ theme }) => theme.colors.gray9};
+  padding: 4px 8px 2px; font: 650 11px/1.2 var(--aq-font-sans); color: ${({ theme }) => theme.colors.gray9};
 `
-
 const BlockMenuSectionDivider = styled.div`
-  height: 1px;
-  margin: 4px 2px;
-  background: ${({ theme }) => theme.publicDesign.border};
+  height: 1px; margin: 3px 2px; background: ${({ theme }) => theme.publicDesign.border};
 `
-
 const BlockMenuItemButton = styled.button`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray12};
-  font: 550 13px/1.25 var(--aq-font-sans);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-  ${focusVisibleRing}
-  &:hover, &:focus-visible { background: ${({ theme }) => theme.publicDesign.surfaceElevated}; }
+  width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  border: 0; outline: none; border-radius: 6px; background: transparent;
+  color: ${({ theme }) => theme.colors.gray12}; font: 550 12.5px/1.2 var(--aq-font-sans);
+  text-align: left; cursor: pointer; transition: background-color 0.1s ease;
+  &:hover, &:focus, &:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+  }
+  &[data-active="true"] { font-weight: 650; }
   .glyph {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    font: 700 11px/1 ui-monospace, SFMono-Regular, monospace;
-    color: ${({ theme }) => theme.colors.gray10};
-    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+    border-radius: 5px; border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    font: 700 10.5px/1 ui-monospace, SFMono-Regular, monospace; color: ${({ theme }) => theme.colors.gray11}; flex-shrink: 0;
+  }
+  .check { margin-left: auto; font: 700 12px/1 var(--aq-font-sans); color: ${({ theme }) => theme.colors.gray10}; }
+`
+const ColorSwatchRow = styled.div`
+  display: flex; align-items: center; gap: 5px; padding: 2px 8px 3px;
+`
+const ColorSwatchMenuButton = styled.button<{ $color: string }>`
+  flex: 1 1 0; height: 24px; border-radius: 6px; border: 1px solid ${({ theme }) => theme.publicDesign.border};
+  background: ${({ theme }) => theme.publicDesign.surfaceElevated}; color: ${({ $color }) => $color};
+  font: 750 11.5px/1 var(--aq-font-sans); display: inline-flex; align-items: center; justify-content: center;
+  gap: 4px; cursor: pointer; outline: none;
+  &:hover, &:focus, &:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: ${({ $color }) => $color};
+    background: ${({ theme }) => theme.publicDesign.readableSurface};
   }
 `
-
 const ColorSwatchDot = styled.span<{ $color: string }>`
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  background: ${({ $color }) => $color};
-  border: 1px solid rgba(15, 23, 42, 0.16);
-  flex-shrink: 0;
+  display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+  background: ${({ $color }) => $color}; border: 1px solid rgba(15, 23, 42, 0.16); flex-shrink: 0;
 `
 
 const NOTION_COLOR_SWATCH_SPECS = [
@@ -205,12 +201,13 @@ const computeActiveLineState = (value: string, from: number) => {
   const nextBreak = value.indexOf("\n", from)
   const lineEnd = nextBreak === -1 ? value.length : nextBreak
   const lineText = value.slice(lineStart, lineEnd)
+  const hasFenceMarkers = value.includes("```") || value.includes("~~~")
   return {
     activeLineStart: lineStart,
     activeLineEnd: lineEnd,
     activeLineText: lineText,
     currentBlockKind: resolveCurrentBlockKind(lineText.trimStart()),
-    insideFence: isOffsetInsideFencedCodeBlock(value, from),
+    insideFence: hasFenceMarkers ? isOffsetInsideFencedCodeBlock(value, from) : false,
   }
 }
 
@@ -404,7 +401,7 @@ export const MarkdownEditorNotionChrome = ({
     if (!containerRect) return null
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-    const menuHeight = 388
+    const menuHeight = 432
     const rawBelowTop = Math.round(containerRect.top + gutterTop + 26)
     const rawAboveTop = Math.round(containerRect.top + gutterTop - menuHeight - 6)
     const top =
@@ -466,14 +463,14 @@ export const MarkdownEditorNotionChrome = ({
   }
 
   const turnIntoItems = [
-    { label: "일반 문단으로 전환", glyph: "T", run: () => onStripBlockPrefix() },
-    { label: "제목 1로 블록 전환", glyph: "H1", run: () => onApplySnippet("# ", "") },
-    { label: "제목 2로 블록 전환", glyph: "H2", run: () => onApplySnippet("## ", "") },
-    { label: "제목 3으로 블록 전환", glyph: "H3", run: () => onApplySnippet("### ", "") },
-    { label: "글머리 목록으로 블록 전환", glyph: "•", run: () => onApplyListCommand("unordered") },
-    { label: "번호 목록으로 블록 전환", glyph: "1.", run: () => onApplyListCommand("ordered") },
-    { label: "할 일 목록으로 블록 전환", glyph: "☑", run: () => onApplyListCommand("task") },
-    { label: "인용구로 블록 전환", glyph: "”", run: () => onApplySnippet("> ", "") },
+    { kind: "paragraph", label: "일반 문단으로 전환", glyph: "T", run: () => onStripBlockPrefix() },
+    { kind: "h1", label: "제목 1로 블록 전환", glyph: "H1", run: () => onApplySnippet("# ", "") },
+    { kind: "h2", label: "제목 2로 블록 전환", glyph: "H2", run: () => onApplySnippet("## ", "") },
+    { kind: "h3", label: "제목 3으로 블록 전환", glyph: "H3", run: () => onApplySnippet("### ", "") },
+    { kind: "unordered", label: "글머리 목록으로 블록 전환", glyph: "•", run: () => onApplyListCommand("unordered") },
+    { kind: "ordered", label: "번호 목록으로 블록 전환", glyph: "1.", run: () => onApplyListCommand("ordered") },
+    { kind: "task", label: "할 일 목록으로 블록 전환", glyph: "☑", run: () => onApplyListCommand("task") },
+    { kind: "quote", label: "인용구로 블록 전환", glyph: "”", run: () => onApplySnippet("> ", "") },
   ]
 
   const lineActionItems = [
@@ -513,19 +510,22 @@ export const MarkdownEditorNotionChrome = ({
         <BlockActionMenuPopover ref={blockMenuRef} role="menu" aria-label="블록 작업 메뉴" data-testid="markdown-block-action-menu" $top={blockMenuPosition.top} $left={blockMenuPosition.left} onKeyDown={handleBlockMenuKeyDown}>
           <BlockMenuSectionHeader aria-hidden="true">블록 전환</BlockMenuSectionHeader>
           {turnIntoItems.map((item) => (
-            <BlockMenuItemButton key={item.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
+            <BlockMenuItemButton key={item.label} type="button" role="menuitem" data-active={currentBlockKind === item.kind ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
               <span className="glyph" aria-hidden="true">{item.glyph}</span>
               <span>{item.label}</span>
+              {currentBlockKind === item.kind ? <span className="check" aria-hidden="true">✓</span> : null}
             </BlockMenuItemButton>
           ))}
           <BlockMenuSectionDivider aria-hidden="true" />
           <BlockMenuSectionHeader aria-hidden="true">글자 색상</BlockMenuSectionHeader>
-          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
-            <BlockMenuItemButton key={swatch.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}>
-              <span className="glyph" aria-hidden="true"><ColorSwatchDot $color={swatch.hex} /></span>
-              <span>{swatch.label}</span>
-            </BlockMenuItemButton>
-          ))}
+          <ColorSwatchRow>
+            {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+              <ColorSwatchMenuButton key={swatch.label} type="button" role="menuitem" aria-label={swatch.label} title={swatch.label} $color={swatch.hex} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}>
+                <ColorSwatchDot $color={swatch.hex} />
+                <span aria-hidden="true">A</span>
+              </ColorSwatchMenuButton>
+            ))}
+          </ColorSwatchRow>
           <BlockMenuSectionDivider aria-hidden="true" />
           <BlockMenuSectionHeader aria-hidden="true">블록 작업</BlockMenuSectionHeader>
           {lineActionItems.map((item) => (

@@ -126,9 +126,11 @@ export const MarkdownEditor = ({
   )
 
   const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
-    setActiveTableSelection(
-      isMarkdownEditorTableSelection(nextValue, selection.from, selection.to) ? selection : null
-    )
+    const isTable = isMarkdownEditorTableSelection(nextValue, selection.from, selection.to)
+    setActiveTableSelection((prev) => {
+      if (!isTable) return null
+      return prev && prev.from === selection.from && prev.to === selection.to ? prev : selection
+    })
   }, [])
 
   const setEditorSelection = useCallback((from: number, to = from) => {
@@ -318,7 +320,7 @@ export const MarkdownEditor = ({
     selectionEnd: selectionRef.current.to,
     isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
   }
-  const toolbarCommands = projectMarkdownEditorToolbarCommands()
+  const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
   const applyFormatShortcutOrAppend = useCallback(
     (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {
