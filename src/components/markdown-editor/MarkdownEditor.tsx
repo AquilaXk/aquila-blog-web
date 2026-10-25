@@ -278,45 +278,51 @@ export const MarkdownEditor = ({
     [disabled, tableEditAvailabilityMask]
   )
 
-  const isTableEditDisabled = (edit: MarkdownEditorTableEdit) => {
-    if (!tableEditAvailability) return true
-    switch (edit.kind) {
-      case "add-row":
-      case "insert-row-above":
-      case "duplicate-row":
-        return !tableEditAvailability.addRow
-      case "move-row-up":
-      case "move-row-down":
-      case "move-row-to":
-      case "delete-row":
-        return !tableEditAvailability.deleteRow
-      case "add-column":
-      case "insert-column-left":
-      case "duplicate-column":
-        return !tableEditAvailability.addColumn
-      case "add-row-and-column":
-        return !tableEditAvailability.addRow && !tableEditAvailability.addColumn
-      case "move-column-left":
-      case "move-column-right":
-      case "move-column-to":
-      case "delete-column":
-        return !tableEditAvailability.deleteColumn
-      case "clear-row":
-      case "clear-column":
-        return false
-      case "set-alignment":
-        if (edit.alignment === "left") return !tableEditAvailability.alignLeft
-        if (edit.alignment === "center") return !tableEditAvailability.alignCenter
-        return !tableEditAvailability.alignRight
-    }
-  }
+  const isTableEditDisabled = useCallback(
+    (edit: MarkdownEditorTableEdit) => {
+      if (!tableEditAvailability) return true
+      switch (edit.kind) {
+        case "add-row":
+        case "insert-row-above":
+        case "duplicate-row":
+          return !tableEditAvailability.addRow
+        case "move-row-up":
+        case "move-row-down":
+        case "move-row-to":
+        case "delete-row":
+          return !tableEditAvailability.deleteRow
+        case "add-column":
+        case "insert-column-left":
+        case "duplicate-column":
+          return !tableEditAvailability.addColumn
+        case "add-row-and-column":
+          return !tableEditAvailability.addRow && !tableEditAvailability.addColumn
+        case "move-column-left":
+        case "move-column-right":
+        case "move-column-to":
+        case "delete-column":
+          return !tableEditAvailability.deleteColumn
+        case "clear-row":
+        case "clear-column":
+          return false
+        case "set-alignment":
+          if (edit.alignment === "left") return !tableEditAvailability.alignLeft
+          if (edit.alignment === "center") return !tableEditAvailability.alignCenter
+          return !tableEditAvailability.alignRight
+      }
+    },
+    [tableEditAvailability]
+  )
 
-  const commandContext = {
-    disabled,
-    selectionStart: selectionRef.current.from,
-    selectionEnd: selectionRef.current.to,
-    isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
-  }
+  const commandContext = useMemo(
+    () => ({
+      disabled,
+      selectionStart: selectionRef.current.from,
+      selectionEnd: selectionRef.current.to,
+      isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
+    }),
+    [disabled, isTableEditDisabled]
+  )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
   const applyFormatShortcutOrAppend = useCallback(
@@ -328,19 +334,21 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
   )
 
-  const applyMarkdownEditorCommand = (command: MarkdownEditorCommandDescriptor) => {
-    const action = command.execute(commandContext)
-    if (!action) return
-    if (action.kind === "format") {
-      applyFormatShortcutOrAppend(action.shortcut)
-      return
-    }
-    if (action.kind === "block") {
-      applyBlockSnippet(codeBlockSnippet)
-      return
-    }
-    applyTableEdit(TABLE_ADD_ROW_EDIT)
-  }
+  const applyMarkdownEditorCommand = useCallback(
+    (command: MarkdownEditorCommandDescriptor) => {
+      const action = command.execute({
+        disabled,
+        selectionStart: selectionRef.current.from,
+        selectionEnd: selectionRef.current.to,
+        isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
+      })
+      if (!action) return
+      if (action.kind === "format") return applyFormatShortcutOrAppend(action.shortcut)
+      if (action.kind === "block") return applyBlockSnippet(codeBlockSnippet)
+      applyTableEdit(TABLE_ADD_ROW_EDIT)
+    },
+    [applyBlockSnippet, applyFormatShortcutOrAppend, applyTableEdit, disabled, isTableEditDisabled]
+  )
 
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
@@ -484,6 +492,9 @@ export const MarkdownEditor = ({
     [commitMarkdown, invalidateFindReplace]
   )
 
+  const handleImageFileSelect = useCallback((file: File | null) => void handleImageInput(file), [handleImageInput])
+  const handleAttachmentFileSelect = useCallback((file: File | null) => void handleFileInput(file), [handleFileInput])
+
   return (
     <EditorRoot data-testid="markdown-editor">
       <MarkdownEditorToolbar
@@ -510,8 +521,8 @@ export const MarkdownEditor = ({
         onApplyTableEdit={applyTableEdit}
         isTableEditDisabled={isTableEditDisabled}
         onOpenFindReplace={findReplace.open}
-        onImageFileSelect={(file) => void handleImageInput(file)}
-        onAttachmentFileSelect={(file) => void handleFileInput(file)}
+        onImageFileSelect={handleImageFileSelect}
+        onAttachmentFileSelect={handleAttachmentFileSelect}
         onViewModeChange={setViewMode}
       />
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}

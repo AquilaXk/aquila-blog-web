@@ -296,8 +296,8 @@ export const EditorStudioDedicatedEditorSurface = ({
   const linkWarningCount = useMemo(() => countMarkdownLinkWarnings(deferredPostContent), [deferredPostContent])
   const totalLinkCount = useMemo(() => countMarkdownTotalLinks(deferredPostContent), [deferredPostContent])
   const cursorPosition = useMemo(
-    () => computeCursorLineAndColumn(postContent, activeCursorOffset),
-    [activeCursorOffset, postContent]
+    () => computeCursorLineAndColumn(deferredPostContent, activeCursorOffset),
+    [activeCursorOffset, deferredPostContent]
   )
   const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
   const handleTagDraftChange = (nextValue: string) => {

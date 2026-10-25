@@ -55,6 +55,7 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
 }
 
 const HIDE_MARK_DECORATION = Decoration.replace({})
+const TASK_SPACE_DECORATION = Decoration.mark({ class: "cm-live-task-space" })
 const RULE_DECORATION = Decoration.replace({ widget: new MarkdownRuleWidget() })
 const QUOTE_MARKER_DECORATION = Decoration.replace({
   widget: new MarkdownMarkerWidget("", "cm-live-quote-marker"),
@@ -269,52 +270,30 @@ const getCachedDocBlocks = (state: EditorState) => {
   const callouts: CalloutReplacementSpec[] = []
   const images: ImageReplacementSpec[] = []
   const mermaids: MermaidReplacementSpec[] = []
+  const hasCalloutMarker = markdownValue.includes("[!")
+  const hasMermaidMarker = /mermaid/i.test(markdownValue)
 
   tree.iterate({
     enter(node) {
-      const slice =
-        node.name === "Table" ||
-        node.name === "Blockquote" ||
-        node.name === "Image" ||
-        node.name === "FencedCode"
-          ? markdownValue.slice(node.from, node.to)
-          : ""
       if (node.name === "Table") {
-        tables.push({ from: node.from, to: node.to, markdown: slice })
-      } else if (node.name === "Blockquote") {
-        const callout = parseCalloutBlockquoteSpec(slice, node.from, node.to)
+        tables.push({ from: node.from, to: node.to, markdown: markdownValue.slice(node.from, node.to) })
+      } else if (node.name === "Blockquote" && hasCalloutMarker) {
+        const callout = parseCalloutBlockquoteSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
         if (callout) callouts.push(callout)
       } else if (node.name === "Image") {
-        const img = parseImageReplacementSpec(slice, node.from, node.to)
+        const img = parseImageReplacementSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
         if (img) images.push(img)
-      } else if (node.name === "FencedCode") {
-        const mermaid = parseMermaidReplacementSpec(slice, node.from, node.to)
+      } else if (node.name === "FencedCode" && hasMermaidMarker) {
+        const mermaid = parseMermaidReplacementSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
         if (mermaid) mermaids.push(mermaid)
       }
     },
   })
 
   const maths = collectMathReplacementSpecs(markdownValue)
-  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [
-    tables,
-    callouts,
-    images,
-    maths,
-    mermaids,
-  ])
+  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [tables, callouts, images, maths, mermaids])
 
-  cachedDocBlocksEntry = {
-    doc: state.doc,
-    tree,
-    markdownValue,
-    previewEntries,
-    tables,
-    callouts,
-    images,
-    maths,
-    mermaids,
-    activeWatchRanges,
-  }
+  cachedDocBlocksEntry = { doc: state.doc, tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, activeWatchRanges }
   return cachedDocBlocksEntry
 }
 
@@ -349,6 +328,9 @@ const appendActiveAwareWidgetSpec = (
         widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo),
       }).range(spec.from, taskPrefix.markerTo)
     )
+    if (ctx.markdownValue[taskPrefix.markerTo] === " " || ctx.markdownValue[taskPrefix.markerTo] === "\t") {
+      ctx.decorations.push(TASK_SPACE_DECORATION.range(taskPrefix.markerTo, taskPrefix.markerTo + 1))
+    }
     return true
   }
 

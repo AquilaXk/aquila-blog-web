@@ -477,8 +477,15 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     urlEl.className = "cm-live-bookmark-url"
     urlEl.textContent = this.url
     content.appendChild(urlEl)
-    root.append(icon, content)
-    bindContainerActivateTarget(root, view, root, this.from, this.to, 12, false)
+    const openLink = document.createElement("a")
+    openLink.className = "cm-live-bookmark-open"
+    openLink.href = this.url
+    openLink.target = "_blank"
+    openLink.rel = "noopener noreferrer"
+    openLink.setAttribute("aria-label", "북마크 링크 열기")
+    openLink.textContent = "↗"
+    root.append(icon, content, openLink)
+    bindContainerActivateTarget(root, view, root, this.from, this.to, 12, true)
     return root
   }
 }

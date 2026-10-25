@@ -15,7 +15,8 @@ export type TableVisualOptions = {
 
 export type TableToolbarButtonEntry = {
   button: HTMLButtonElement
-  isDisabled: (row: number, col: number) => boolean
+  isDisabled?: (row: number, col: number) => boolean
+  align?: "left" | "center" | "right"
 }
 
 const MAX_TABLE_VISUAL_OPTIONS = 128
@@ -286,6 +287,7 @@ export const createTableToolbarElement = (params: {
   visualOptions: TableVisualOptions
   executeGridAction: (action: MarkdownTableGridAction) => void
   onEditSource: () => void
+  onDeleteTable?: () => void
   onActivateToolbar?: () => void
 }): {
   toolbar: HTMLDivElement
@@ -293,7 +295,7 @@ export const createTableToolbarElement = (params: {
   canAddRow: () => boolean
   canAddCol: () => boolean
 } => {
-  const { grid, wrap, visualOptions, executeGridAction, onEditSource, onActivateToolbar } = params
+  const { grid, wrap, visualOptions, executeGridAction, onEditSource, onDeleteTable, onActivateToolbar } = params
   const toolbar = document.createElement("div")
   toolbar.className = "cm-live-table-toolbar"
   toolbar.setAttribute("role", "toolbar")
@@ -324,6 +326,7 @@ export const createTableToolbarElement = (params: {
     ariaLabel: string
     testId?: string
     ariaPressed?: boolean
+    align?: "left" | "center" | "right"
     action?: MarkdownTableGridAction
     isDisabled?: (row: number, col: number) => boolean
     onSelect?: (button: HTMLButtonElement) => void
@@ -331,9 +334,9 @@ export const createTableToolbarElement = (params: {
     toggleOptionSpec("▤ 제목행", "표 제목 행 강조 전환", "cm-live-table-toggle-header-row", "headerRow"),
     toggleOptionSpec("▤ 제목열", "표 제목 열 강조 전환", "cm-live-table-toggle-header-col", "headerColumn"),
     toggleOptionSpec("↔ 너비맞춤", "표 페이지 너비 맞춤 전환", "cm-live-table-toggle-full-width", "fitPageWidth"),
-    { group: "align", groupStart: true, label: "≡좌", ariaLabel: "표 열 왼쪽 정렬", action: { kind: "set-alignment", alignment: "left" } },
-    { group: "align", label: "≡중", ariaLabel: "표 열 가운데 정렬", action: { kind: "set-alignment", alignment: "center" } },
-    { group: "align", label: "≡우", ariaLabel: "표 열 오른쪽 정렬", action: { kind: "set-alignment", alignment: "right" } },
+    { group: "align", groupStart: true, label: "≡좌", ariaLabel: "표 열 왼쪽 정렬", align: "left", action: { kind: "set-alignment", alignment: "left" } },
+    { group: "align", label: "≡중", ariaLabel: "표 열 가운데 정렬", align: "center", action: { kind: "set-alignment", alignment: "center" } },
+    { group: "align", label: "≡우", ariaLabel: "표 열 오른쪽 정렬", align: "right", action: { kind: "set-alignment", alignment: "right" } },
     { group: "row", groupStart: true, label: "+행↑", ariaLabel: "표 위에 행 추가", action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
     { group: "row", label: "+행↓", ariaLabel: "표 아래에 행 추가", action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
     { group: "row", label: "행↑", ariaLabel: "표 행 위로 이동", action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
@@ -349,6 +352,7 @@ export const createTableToolbarElement = (params: {
     { group: "col", label: "⌫열", ariaLabel: "표 열 내용 비우기", action: { kind: "clear-column" } },
     { group: "col", label: "✕열", ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
     { group: "source", groupStart: true, label: "</>", ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
+    { group: "source", label: "✕표", ariaLabel: "표 삭제", testId: "cm-live-table-delete-table", onSelect: () => onDeleteTable?.() },
   ]
 
   for (const spec of actionSpecs) {
@@ -373,7 +377,7 @@ export const createTableToolbarElement = (params: {
       if (spec.onSelect) spec.onSelect(btn)
       else if (spec.action) executeGridAction(spec.action)
     })
-    if (spec.isDisabled) toolbarButtons.push({ button: btn, isDisabled: spec.isDisabled })
+    if (spec.isDisabled || spec.align) toolbarButtons.push({ button: btn, isDisabled: spec.isDisabled, align: spec.align })
     toolbar.appendChild(btn)
   }
 
