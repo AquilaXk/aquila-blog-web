@@ -1,5 +1,5 @@
 const NON_ASCII_PATTERN = /[^\u0000-\u007f]/
-const COLLAPSIBLE_WHITESPACE_PATTERN = /  |[^\S ]/
+const COLLAPSIBLE_WHITESPACE_PATTERN = / {2}|[^\S ]/
 
 const isPureAscii = (value: string): boolean => !NON_ASCII_PATTERN.test(value)
 
