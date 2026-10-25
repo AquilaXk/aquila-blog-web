@@ -62,19 +62,6 @@ export const getCloudFileExtension = (filename: string) => {
   return normalized.slice(0, 4)
 }
 
-export const getCloudFilenameParts = (filename: string) => {
-  const trimmed = filename.trim()
-  const dotIndex = trimmed.lastIndexOf(".")
-  if (dotIndex <= 0 || dotIndex === trimmed.length - 1) {
-    return { stem: trimmed || "이름 없는 파일", extension: "" }
-  }
-
-  return {
-    stem: trimmed.slice(0, dotIndex),
-    extension: trimmed.slice(dotIndex),
-  }
-}
-
 export const formatCloudFileSize = (bytes: number) =>
   formatFileSize(bytes, { fallback: "0 B" })
 

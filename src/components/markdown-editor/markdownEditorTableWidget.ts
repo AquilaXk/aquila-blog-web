@@ -15,6 +15,7 @@ import {
   createInteractiveTableSurface,
   createTableToolbarElement,
   getOrCreateTableVisualOptions,
+  migrateTableVisualOptionsOffset,
   renderStaticTableElement,
   syncTableColGroupWidths,
   syncTableVisualWrapAttributes,
@@ -40,11 +41,7 @@ const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string
   r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? "")
 
 const patchSingleTableCell = (
-  cellEl: HTMLElement,
-  prevAlign: string,
-  nextAlign: string,
-  prevText: string,
-  nextText: string,
+  cellEl: HTMLElement, prevAlign: string, nextAlign: string, prevText: string, nextText: string,
   restoreCellDisplay: (el: HTMLElement, text: string) => void
 ) => {
   if (prevAlign !== nextAlign) {
@@ -56,23 +53,14 @@ const patchSingleTableCell = (
 }
 
 const patchTableCellsInPlace = (
-  cellElements: HTMLElement[][],
-  grid: MarkdownTableGrid,
-  nextGrid: MarkdownTableGrid,
+  cellElements: HTMLElement[][], grid: MarkdownTableGrid, nextGrid: MarkdownTableGrid,
   restoreCellDisplay: (el: HTMLElement, text: string) => void
 ) => {
   for (let r = 0; r <= nextGrid.rows.length; r += 1) {
     for (let c = 0; c < nextGrid.headers.length; c += 1) {
       const cellEl = cellElements[r]?.[c]
       if (!cellEl) continue
-      patchSingleTableCell(
-        cellEl,
-        grid.alignments[c] ?? "left",
-        nextGrid.alignments[c] ?? "left",
-        readGridCellText(grid, r, c),
-        readGridCellText(nextGrid, r, c),
-        restoreCellDisplay
-      )
+      patchSingleTableCell(cellEl, grid.alignments[c] ?? "left", nextGrid.alignments[c] ?? "left", readGridCellText(grid, r, c), readGridCellText(nextGrid, r, c), restoreCellDisplay)
     }
   }
 }
@@ -111,13 +99,47 @@ export class MarkdownTableWidget extends WidgetType {
     if (wrap.dataset) wrap.dataset.testid = "cm-live-table-widget"
     syncTableFromDataset(wrap, currentFrom)
 
-    const visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length)
+    let visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length)
     syncTableVisualWrapAttributes(wrap, visualOptions)
 
     let activeRow = 0
     let activeCol = 0
     let selectedMode: "cell" | "row" | "col" = "cell"
+    let isTableActive = false
+    let outsideListenerAttached = false
     let activeSession: ActiveCellEditorSession | null = null
+
+    const detachOutsideListener = () => {
+      if (!outsideListenerAttached || typeof document === "undefined" || typeof document.removeEventListener !== "function") return
+      outsideListenerAttached = false
+      document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+    }
+
+    const handleOutsideMouseDown = (event: MouseEvent) => {
+      if (!wrap.isConnected) return detachOutsideListener()
+      const target = event.target as HTMLElement | null
+      if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
+      isTableActive = false
+      detachOutsideListener()
+      syncActiveCellHighlight()
+    }
+
+    const markTableActive = () => {
+      isTableActive = true
+      if (!outsideListenerAttached && typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        outsideListenerAttached = true
+        document.addEventListener("mousedown", handleOutsideMouseDown, true)
+      }
+      if (typeof view.state.doc?.lineAt !== "function") return
+      const range = resolveRange()
+      const mainSel = view.state.selection.main
+      if (!range || mainSel.from !== mainSel.to || view.state.doc.lineAt(mainSel.from).length === 0) return
+      if (range.from > 0 && view.state.doc.lineAt(range.from - 1).length === 0) {
+        view.dispatch({ selection: EditorSelection.cursor(range.from - 1) })
+      } else if (range.to < view.state.doc.length && view.state.doc.lineAt(range.to + 1).length === 0) {
+        view.dispatch({ selection: EditorSelection.cursor(range.to + 1) })
+      }
+    }
 
     const resolveRange = (): { from: number; to: number } | null => {
       let resolvedFrom = currentFrom
@@ -161,6 +183,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
       if (!view.state.facet(EditorView.editable)) return
+      markTableActive()
       const baseMarkdown = flushActiveCellMarkdown()
       const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
       if (!outcome) {
@@ -180,6 +203,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const selectColumn = (col: number) => {
       if (!view.state.facet(EditorView.editable)) return
+      markTableActive()
       const committed = flushActiveCellMarkdown()
       activeCol = Math.max(0, Math.min(col, grid.headers.length - 1))
       selectedMode = "col"
@@ -189,6 +213,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const selectRow = (row: number) => {
       if (!view.state.facet(EditorView.editable)) return
+      markTableActive()
       const committed = flushActiveCellMarkdown()
       activeRow = Math.max(0, Math.min(row, grid.rows.length))
       selectedMode = "row"
@@ -201,6 +226,10 @@ export class MarkdownTableWidget extends WidgetType {
       wrap,
       visualOptions,
       executeGridAction: (action) => executeGridAction(action),
+      onActivateToolbar: () => {
+        markTableActive()
+        syncActiveCellHighlight()
+      },
       onEditSource: () => {
         const range = resolveRange()
         if (!range) return
@@ -235,22 +264,21 @@ export class MarkdownTableWidget extends WidgetType {
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
-      wrap.setAttribute("data-active-mode", selectedMode)
+      if (isTableActive) wrap.dataset.activeMode = selectedMode
+      else delete wrap.dataset.activeMode
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
           const el = rowEls[c]!
-          if (r === activeRow && c === activeCol) el.classList.add("is-active-cell")
+          if (isTableActive && r === activeRow && c === activeCol) el.classList.add("is-active-cell")
           else el.classList.remove("is-active-cell")
-          if (selectedMode === "col" && c === activeCol) el.classList.add("is-selected-col")
+          if (isTableActive && selectedMode === "col" && c === activeCol) el.classList.add("is-selected-col")
           else el.classList.remove("is-selected-col")
-          if (selectedMode === "row" && r === activeRow) el.classList.add("is-selected-row")
+          if (isTableActive && selectedMode === "row" && r === activeRow) el.classList.add("is-selected-row")
           else el.classList.remove("is-selected-row")
         }
       }
-      for (const entry of toolbarButtons) {
-        entry.button.disabled = entry.isDisabled(activeRow, activeCol)
-      }
+      for (const entry of toolbarButtons) entry.button.disabled = entry.isDisabled(activeRow, activeCol)
     }
 
     const dispatchTableMarkdown = (
@@ -272,36 +300,25 @@ export class MarkdownTableWidget extends WidgetType {
         return
       }
       if (targetCell) {
-        pendingTableCellActivation = {
-          from: range.from,
-          row: targetCell.row,
-          col: targetCell.col,
-          openEditor: targetCell.openEditor,
-        }
+        pendingTableCellActivation = { from: range.from, row: targetCell.row, col: targetCell.col, openEditor: targetCell.openEditor }
       }
       const mainSel = view.state.selection.main
       const overlaps = mainSel.from >= range.from && mainSel.from <= range.to
-      const safeAnchor =
-        range.from > 0
-          ? range.from - 1
-          : range.to < view.state.doc.length
-            ? range.from + nextMarkdown.length + 1
-            : undefined
+      let safeAnchor: number | undefined
+      if (range.from > 0) safeAnchor = range.from - 1
+      else if (range.to < view.state.doc.length) safeAnchor = range.from + nextMarkdown.length + 1
 
       view.dispatch({
         changes: { from: range.from, to: range.to, insert: nextMarkdown },
-        ...(overlaps && safeAnchor !== undefined
-          ? { selection: EditorSelection.cursor(safeAnchor) }
-          : {}),
+        ...(overlaps && safeAnchor !== undefined ? { selection: EditorSelection.cursor(safeAnchor) } : {}),
         annotations: [Transaction.userEvent.of("input")],
       })
-      if (currentMarkdown !== nextMarkdown) {
-        update(nextMarkdown, range.from, range.from + nextMarkdown.length)
-      }
+      if (currentMarkdown !== nextMarkdown) update(nextMarkdown, range.from, range.from + nextMarkdown.length)
     }
 
     const activateCellEditor = (row: number, col: number) => {
       if (!view.state.facet(EditorView.editable)) return
+      markTableActive()
       const clampedRow = Math.max(0, Math.min(row, grid.rows.length))
       const clampedCol = Math.max(0, Math.min(col, grid.headers.length - 1))
       activeRow = clampedRow
@@ -309,12 +326,7 @@ export class MarkdownTableWidget extends WidgetType {
       selectedMode = "cell"
       syncActiveCellHighlight()
 
-      if (
-        activeSession &&
-        !activeSession.handled &&
-        activeSession.row === clampedRow &&
-        activeSession.col === clampedCol
-      ) {
+      if (activeSession && !activeSession.handled && activeSession.row === clampedRow && activeSession.col === clampedCol) {
         activeSession.input.focus()
         return
       }
@@ -329,10 +341,7 @@ export class MarkdownTableWidget extends WidgetType {
 
       const cellEl = cellElements[clampedRow]?.[clampedCol]
       if (!cellEl) return
-      const initialValue =
-        clampedRow === 0
-          ? (grid.headers[clampedCol] ?? "")
-          : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
+      const initialValue = clampedRow === 0 ? (grid.headers[clampedCol] ?? "") : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
 
       const controls = getPreservedCellControls(cellEl)
       cellEl.textContent = ""
@@ -345,19 +354,10 @@ export class MarkdownTableWidget extends WidgetType {
       cellEl.appendChild(input)
       for (const control of controls) cellEl.appendChild(control)
 
-      const session: ActiveCellEditorSession = {
-        row: clampedRow,
-        col: clampedCol,
-        cellEl,
-        input,
-        initialValue,
-        handled: false,
-      }
+      const session: ActiveCellEditorSession = { row: clampedRow, col: clampedCol, cellEl, input, initialValue, handled: false }
       activeSession = session
 
-      const stopBubble = (event: Event) => {
-        event.stopPropagation()
-      }
+      const stopBubble = (event: Event) => event.stopPropagation()
       for (const eventName of ["mousedown", "mouseup", "click", "dblclick", "input", "beforeinput", "compositionstart", "compositionend"]) {
         input.addEventListener(eventName, stopBubble)
       }
@@ -492,6 +492,7 @@ export class MarkdownTableWidget extends WidgetType {
         try {
           input.focus()
           input.setSelectionRange(input.value.length, input.value.length)
+          input.scrollLeft = 0
         } catch {}
       }
       focusInput()
@@ -499,12 +500,10 @@ export class MarkdownTableWidget extends WidgetType {
     }
 
     const applyPendingCellActivation = () => {
-      if (
-        pendingTableCellActivation &&
-        (currentFrom === undefined || pendingTableCellActivation.from === currentFrom)
-      ) {
+      if (pendingTableCellActivation && (currentFrom === undefined || pendingTableCellActivation.from === currentFrom)) {
         const target = pendingTableCellActivation
         pendingTableCellActivation = null
+        markTableActive()
         if (target.openEditor === false) {
           activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
           activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
@@ -515,12 +514,9 @@ export class MarkdownTableWidget extends WidgetType {
       }
     }
 
-    const update = (
-      nextMarkdown: string,
-      nextFrom: number | undefined,
-      nextTo: number | undefined
-    ): boolean => {
+    const update = (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean => {
       if (nextMarkdown === currentMarkdown) {
+        visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length, visualOptions)
         currentFrom = nextFrom
         currentTo = nextTo
         syncTableFromDataset(wrap, currentFrom)
@@ -530,15 +526,14 @@ export class MarkdownTableWidget extends WidgetType {
 
       const nextGrid = parseMarkdownTableGrid(nextMarkdown)
       if (!nextGrid) return false
+      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
       if (activeSession && !activeSession.handled) {
         activeSession.handled = true
         activeSession = null
       }
 
-      const sameShape =
-        nextGrid.headers.length === grid.headers.length &&
-        nextGrid.rows.length === grid.rows.length
+      const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
 
       if (sameShape) {
         patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)

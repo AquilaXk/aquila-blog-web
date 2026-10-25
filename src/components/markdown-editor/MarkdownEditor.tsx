@@ -317,7 +317,7 @@ export const MarkdownEditor = ({
     selectionEnd: selectionRef.current.to,
     isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
   }
-  const toolbarCommands = projectMarkdownEditorToolbarCommands()
+  const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
   const applyFormatShortcutOrAppend = useCallback(
     (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {

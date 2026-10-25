@@ -557,7 +557,7 @@ export const decorationField = StateField.define<DecorationSet>({
     const hasRelevantEffect = transaction.effects.some(
       (effect) =>
         effect.is(setComposition) ||
-        effect.is(setPointerSelecting) ||
+        (effect.is(setPointerSelecting) && !effect.value) ||
         effect.is(setEditorMode) ||
         effect.is(setDisableMermaid)
     )

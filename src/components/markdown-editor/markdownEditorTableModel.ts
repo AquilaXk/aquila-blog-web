@@ -217,6 +217,9 @@ const parseActiveTableAtHeader = (
 
 const findActiveTableUncached = (value: string, selectionStart: number, selectionEnd: number): ActiveTable | null => {
   if (selectionStart !== selectionEnd || !value.includes("|")) return null
+  const lineStart = selectionStart > 0 ? value.lastIndexOf("\n", selectionStart - 1) + 1 : 0
+  const nextBreak = value.indexOf("\n", selectionStart)
+  if (!value.slice(lineStart, nextBreak === -1 ? value.length : nextBreak).includes("|")) return null
   const lines = collectLocalLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
   if (lines.length < 3 || isOffsetInsideFencedCode(value, selectionStart)) return null
 
@@ -589,9 +592,6 @@ export const applyMarkdownTableGridAction = (
 }
 
 export {
-  applyMarkdownTableGridPaste,
-  applyTableCellInlineFormat,
-  type MarkdownTablePasteOutcome,
-  type TableCellInlineFormatKind,
-  type TableCellInlineFormatOutcome,
+  applyMarkdownTableGridPaste, applyTableCellInlineFormat,
+  type MarkdownTablePasteOutcome, type TableCellInlineFormatKind, type TableCellInlineFormatOutcome,
 } from "./markdownEditorTableCellModel"
