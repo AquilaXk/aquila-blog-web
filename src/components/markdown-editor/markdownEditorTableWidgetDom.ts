@@ -54,18 +54,19 @@ export const getOrCreateTableVisualOptions = (
 export const migrateTableVisualOptionsOffset = (
   prevFrom: number | undefined,
   nextFrom: number | undefined,
-  columnCount: number
+  columnCount: number,
+  currentOptions?: TableVisualOptions
 ): TableVisualOptions => {
   const prevKey = prevFrom ?? 0
   const nextKey = nextFrom ?? 0
-  if (prevKey !== nextKey && !tableVisualOptionsByOffset.has(nextKey)) {
-    const existing = tableVisualOptionsByOffset.get(prevKey)
-    if (existing) {
+  const existing = currentOptions ?? tableVisualOptionsByOffset.get(prevKey)
+  if (existing) {
+    if (prevKey !== nextKey && tableVisualOptionsByOffset.get(prevKey) === existing) {
       tableVisualOptionsByOffset.delete(prevKey)
-      syncVisualOptionWidths(existing, columnCount)
-      tableVisualOptionsByOffset.set(nextKey, existing)
-      return existing
     }
+    syncVisualOptionWidths(existing, columnCount)
+    tableVisualOptionsByOffset.set(nextKey, existing)
+    return existing
   }
   return getOrCreateTableVisualOptions(nextKey, columnCount)
 }

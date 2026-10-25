@@ -513,8 +513,8 @@ export class MarkdownTableWidget extends WidgetType {
     }
 
     const update = (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean => {
-      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length)
       if (nextMarkdown === currentMarkdown) {
+        visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length, visualOptions)
         currentFrom = nextFrom
         currentTo = nextTo
         syncTableFromDataset(wrap, currentFrom)
@@ -524,7 +524,7 @@ export class MarkdownTableWidget extends WidgetType {
 
       const nextGrid = parseMarkdownTableGrid(nextMarkdown)
       if (!nextGrid) return false
-      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length)
+      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
       if (activeSession && !activeSession.handled) {
         activeSession.handled = true

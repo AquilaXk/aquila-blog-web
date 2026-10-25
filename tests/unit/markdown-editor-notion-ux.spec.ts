@@ -845,6 +845,29 @@ test.describe("Notion-parity Markdown editor model", () => {
         60 + lastDispatchedInsert.length
       ).toDOM(fakeView)
       expect(shiftedDom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
+      const secondTableDom: any = new MarkdownTableWidget(
+        lastDispatchedInsert,
+        120,
+        120 + lastDispatchedInsert.length
+      ).toDOM(fakeView)
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 120, 120 + lastDispatchedInsert.length).updateDOM(
+          dom,
+          fakeView
+        )
+      ).toBe(true)
+      expect(
+        new MarkdownTableWidget(lastDispatchedInsert, 180, 180 + lastDispatchedInsert.length).updateDOM(
+          secondTableDom,
+          fakeView
+        )
+      ).toBe(true)
+      const remountedFirstDom: any = new MarkdownTableWidget(
+        lastDispatchedInsert,
+        120,
+        120 + lastDispatchedInsert.length
+      ).toDOM(fakeView)
+      expect(remountedFirstDom.querySelectorAll("col")[1].getAttribute("data-col-width")).toBe("200")
       expect(
         new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
           dom,
