@@ -48,9 +48,10 @@ type TextareaSelection = MarkdownEditorFocusSelection
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
-const resolveActiveTableCellOffset = (root: HTMLElement | null, markdown: string): number | null => {
+export const resolveActiveTableCellOffset = (root: HTMLElement | null, readMarkdown: () => string): number | null => {
   const activeEl = typeof document !== "undefined" ? document.activeElement : null
   const isCellInput = activeEl instanceof HTMLElement && activeEl.classList.contains("cm-live-table-cell-input")
+  if (!isCellInput && activeEl instanceof HTMLElement && activeEl.closest?.(".cm-content") && !activeEl.closest?.(".cm-live-table-wrap")) return null
   const activeWrap =
     (isCellInput ? activeEl.closest<HTMLElement>(".cm-live-table-wrap") : null) ??
     root?.querySelector<HTMLElement>(".cm-live-table-wrap[data-active-mode]") ??
@@ -60,7 +61,7 @@ const resolveActiveTableCellOffset = (root: HTMLElement | null, markdown: string
   const tableFrom = Number.parseInt(activeWrap.dataset.tableFrom ?? "", 10)
   const row = Number.parseInt(activeWrap.dataset.activeRow ?? "0", 10)
   const col = Number.parseInt(activeWrap.dataset.activeCol ?? "0", 10)
-  return resolveTableCellSelectionOffset(markdown, tableFrom, Number.isFinite(row) ? row : 0, Number.isFinite(col) ? col : 0)
+  return resolveTableCellSelectionOffset(readMarkdown(), tableFrom, Number.isFinite(row) ? row : 0, Number.isFinite(col) ? col : 0)
 }
 
 const TEXTAREA_KEYBOARD_HELP =
@@ -114,7 +115,7 @@ export const MarkdownEditor = ({
 
   useEffect(() => {
     onFlushMarkdownReady?.(() => {
-      resolveActiveTableCellOffset(liveEditorBodyRef.current, valueRef.current)
+      resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
       return valueRef.current
     })
     return () => onFlushMarkdownReady?.(null)
@@ -196,7 +197,7 @@ export const MarkdownEditor = ({
   }, [invalidateFindReplace, value])
 
   const rememberTextareaSelection = useCallback(() => {
-    const tableCellOffset = resolveActiveTableCellOffset(liveEditorBodyRef.current, valueRef.current)
+    const tableCellOffset = resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
     const snapshot = liveSurfaceRef.current?.readSnapshot()
     if (tableCellOffset !== null) {
       syncSelectionState({ from: tableCellOffset, to: tableCellOffset })

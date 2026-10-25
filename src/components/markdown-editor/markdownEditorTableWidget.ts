@@ -121,7 +121,8 @@ export class MarkdownTableWidget extends WidgetType {
       if (!outsideListenerAttached) return
       outsideListenerAttached = false
       if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
-        document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+        document.removeEventListener("mousedown", handleOutsideInteraction, true)
+        document.removeEventListener("focusin", handleOutsideInteraction, true)
       }
       if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
         window.removeEventListener("pagehide", handleLifecycleFlush)
@@ -129,15 +130,12 @@ export class MarkdownTableWidget extends WidgetType {
       }
     }
 
-    const handleOutsideMouseDown = (event: MouseEvent) => {
-      if (!wrap.isConnected) {
-        flushAndDispatchActiveCell()
-        return detachOutsideListener()
-      }
+    const handleOutsideInteraction = (event: Event) => {
+      if (!wrap.isConnected) { flushAndDispatchActiveCell(); return detachOutsideListener() }
       const target = event.target as HTMLElement | null
       if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
       flushAndDispatchActiveCell()
-      if (target && !target.closest?.(".cm-content") && target.closest?.("[data-testid='markdown-editor']")) return
+      if (target?.closest?.("[data-table-popover]")) return
       isTableActive = false
       detachOutsideListener()
       syncActiveCellHighlight()
@@ -148,7 +146,8 @@ export class MarkdownTableWidget extends WidgetType {
       if (!outsideListenerAttached) {
         outsideListenerAttached = true
         if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-          document.addEventListener("mousedown", handleOutsideMouseDown, true)
+          document.addEventListener("mousedown", handleOutsideInteraction, true)
+          document.addEventListener("focusin", handleOutsideInteraction, true)
         }
         if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
           window.addEventListener("pagehide", handleLifecycleFlush)

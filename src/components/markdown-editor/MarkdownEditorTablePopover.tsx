@@ -98,7 +98,7 @@ export const MarkdownEditorTablePopover = ({
   }, [closePopover, disabled, open])
 
   return (
-    <ToolbarMenuRoot ref={rootRef}>
+    <ToolbarMenuRoot ref={rootRef} data-table-popover="true">
       <ToolbarMenuTrigger
         ref={triggerRef}
         type="button"

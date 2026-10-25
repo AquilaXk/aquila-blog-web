@@ -731,12 +731,21 @@ test.describe("Notion-parity Markdown editor model", () => {
 
     const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
     const prevWin = Object.getOwnPropertyDescriptor(globalThis, "window")
+    const documentListeners = new Map<string, Set<(event: any) => void>>()
     Object.defineProperty(globalThis, "document", {
       configurable: true,
       writable: true,
       value: {
         createElement: (tag: string) => createFakeElement(tag),
         createTextNode: (text: string) => ({ nodeType: 3, textContent: text }),
+        addEventListener: (type: string, fn: (event: any) => void) => {
+          const set = documentListeners.get(type) ?? new Set()
+          set.add(fn)
+          documentListeners.set(type, set)
+        },
+        removeEventListener: (type: string, fn: (event: any) => void) => {
+          documentListeners.get(type)?.delete(fn)
+        },
       },
     })
     Object.defineProperty(globalThis, "window", {
@@ -1009,6 +1018,33 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(widget.ignoreEvent()).toBe(true)
 
       const tdsAfterNav = dom.querySelectorAll("td")
+      tdsAfterNav[1].trigger("click")
+      expect(dom.dataset.activeMode).toBe("cell")
+      expect(dom.dataset.activeRow).toBe("1")
+      expect(dom.dataset.activeCol).toBe("1")
+      const dirtyInputBeforePopover = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforePopover.value = "SavedOnTablePopover"
+      for (const fn of documentListeners.get("mousedown") ?? []) {
+        fn({
+          type: "mousedown",
+          target: { closest: (sel: string) => (sel === "[data-table-popover]" ? {} : null) },
+        })
+      }
+      expect(lastDispatchedInsert).toContain("| P1 | SavedOnTablePopover | Z1 |  |")
+      expect(dom.dataset.activeMode).toBe("cell")
+      expect(dom.dataset.activeRow).toBe("1")
+      expect(dom.dataset.activeCol).toBe("1")
+
+      for (const fn of documentListeners.get("focusin") ?? []) {
+        fn({
+          type: "focusin",
+          target: { closest: () => null },
+        })
+      }
+      expect(dom.dataset.activeMode).toBeUndefined()
+      expect(dom.dataset.activeRow).toBeUndefined()
+      expect(dom.dataset.activeCol).toBeUndefined()
+
       tdsAfterNav[1].trigger("click")
       const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
       dirtyInputBeforePagehide.value = "SavedOnPagehide"

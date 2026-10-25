@@ -16,6 +16,7 @@ import {
   planMarkdownEditorTableEdit,
   resolveTableCellSelectionOffset,
 } from "../../src/components/markdown-editor/markdownEditorTableModel"
+import { resolveActiveTableCellOffset } from "../../src/components/markdown-editor/MarkdownEditor"
 import { sortCloudFiles } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 import {
   parseEditorMeta,
@@ -212,5 +213,106 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
     expect(deleteRowPlan?.replacement).toBe(
       ["| ColA | ColB |", "| --- | --- |", "| R1A | R1B |"].join("\n")
     )
+
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+    const prevElement = Object.getOwnPropertyDescriptor(globalThis, "HTMLElement")
+    class FakeElement {
+      dataset: Record<string, string | undefined> = {}
+      private classes = new Set<string>()
+      parent: FakeElement | null = null
+      blurred = false
+      constructor(classNames: string[] = []) {
+        for (const c of classNames) this.classes.add(c)
+      }
+      classList = {
+        contains: (cls: string) => this.classes.has(cls),
+      }
+      closest(selector: string): FakeElement | null {
+        let cur: FakeElement | null = this
+        while (cur) {
+          if (selector === ".cm-live-table-wrap" && cur.classes.has("cm-live-table-wrap")) return cur
+          if (selector === ".cm-content" && cur.classes.has("cm-content")) return cur
+          cur = cur.parent
+        }
+        return null
+      }
+      querySelector(selector: string): FakeElement | null {
+        if (selector === ".cm-live-table-wrap[data-active-mode]" && wrapEl.dataset.activeMode) {
+          return wrapEl
+        }
+        return null
+      }
+      blur() {
+        this.blurred = true
+        onBlurFlush?.()
+      }
+    }
+
+    const rootEl = new FakeElement()
+    const cmContentEl = new FakeElement(["cm-content"])
+    cmContentEl.parent = rootEl
+    const wrapEl = new FakeElement(["cm-live-table-wrap"])
+    wrapEl.parent = cmContentEl
+    wrapEl.dataset.tableFrom = String(tableFrom)
+    wrapEl.dataset.activeMode = "cell"
+    wrapEl.dataset.activeRow = "2"
+    wrapEl.dataset.activeCol = "1"
+    const cellInputEl = new FakeElement(["cm-live-table-cell-input"])
+    cellInputEl.parent = wrapEl
+
+    let currentMarkdown = [
+      "Intro paragraph",
+      "",
+      "| ColA | ColB |",
+      "| --- | --- |",
+      "| VeryLongCellTextBeforeFlush | R1B |",
+      "| R2A | R2B |",
+    ].join("\n")
+    let onBlurFlush: (() => void) | null = () => {
+      currentMarkdown = doc
+    }
+
+    Object.defineProperty(globalThis, "HTMLElement", {
+      configurable: true,
+      writable: true,
+      value: FakeElement,
+    })
+    try {
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        writable: true,
+        value: { activeElement: cellInputEl },
+      })
+      const flushedOffset = resolveActiveTableCellOffset(
+        rootEl as unknown as HTMLElement,
+        () => currentMarkdown
+      )
+      expect(cellInputEl.blurred).toBe(true)
+      expect(flushedOffset).toBe(bodyRow2Col2Offset)
+
+      const popoverButtonEl = new FakeElement()
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        writable: true,
+        value: { activeElement: popoverButtonEl },
+      })
+      expect(
+        resolveActiveTableCellOffset(rootEl as unknown as HTMLElement, () => currentMarkdown)
+      ).toBe(bodyRow2Col2Offset)
+
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        writable: true,
+        value: { activeElement: cmContentEl },
+      })
+      expect(
+        resolveActiveTableCellOffset(rootEl as unknown as HTMLElement, () => currentMarkdown)
+      ).toBeNull()
+    } finally {
+      if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
+      else delete (globalThis as Record<string, unknown>).document
+      if (prevElement) Object.defineProperty(globalThis, "HTMLElement", prevElement)
+      else delete (globalThis as Record<string, unknown>).HTMLElement
+    }
   })
 })
