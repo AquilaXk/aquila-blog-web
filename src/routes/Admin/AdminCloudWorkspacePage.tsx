@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { getCloudFileDownloadUrl, type CloudFile } from "src/apis/backend/cloud"
 import AppIcon from "src/components/icons/AppIcon"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import { CloudDeleteConfirmDialog, FileTableHead, FileThumbnail, PreviewDrawer } from "./AdminCloudPreviewDrawer"
 import {
   CLOUD_FILTERS, CLOUD_SORT_OPTIONS, type CloudSortMode, formatCloudDate, formatCloudFileSize,
@@ -175,6 +176,9 @@ const CloudFileDetailDrawer = ({
   const [draftFolderPath, setDraftFolderPath] = useState("")
   const [isUpdatePending, setIsUpdatePending] = useState(false)
 
+  const detailPanelRef = useRef<HTMLElement | null>(null)
+  const isDrawerMode = detailMode === "drawer"
+  const { handleKeyDown } = useModalFocusTrap({ open: isDrawerMode, onClose, containerRef: detailPanelRef })
   const normalizedFolderPath = normalizeCloudFolderPathSearch(selectedFile.folderPath || "")
   const locationLabel = normalizedFolderPath ? `/${normalizedFolderPath}` : "/"
 
@@ -186,7 +190,14 @@ const CloudFileDetailDrawer = ({
         data-mode={detailMode}
         onClick={onClose}
       />
-      <DetailPanel aria-label="클라우드 상세정보" data-mode={detailMode}>
+      <DetailPanel
+        ref={detailPanelRef}
+        role={isDrawerMode ? "dialog" : undefined}
+        aria-modal={isDrawerMode ? "true" : undefined}
+        aria-label="클라우드 상세정보"
+        data-mode={detailMode}
+        onKeyDown={handleKeyDown}
+      >
         <DetailHeader>
           <h2>파일 정보</h2>
           <IconButton type="button" aria-label="상세 패널 닫기" onClick={onClose}>

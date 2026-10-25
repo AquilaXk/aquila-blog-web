@@ -58,6 +58,10 @@ export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> =
     }
   })
 
+const LOGIN_PREF_SAVE_EMAIL = 1 << 0
+const LOGIN_PREF_KEEP_SIGNED_IN = 1 << 1
+const LOGIN_PREF_HYDRATED = 1 << 2
+
 const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   const router = useRouter()
   const destination = useMemo(
@@ -65,31 +69,37 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
     [nextPath, router.query.next]
   )
   const [email, setEmail] = useState("")
-  const [saveEmail, setSaveEmail] = useState(false)
-  const [keepSignedIn, setKeepSignedIn] = useState(false)
+  const [loginPrefMask, setLoginPrefMask] = useState(0)
+  const saveEmail = (loginPrefMask & LOGIN_PREF_SAVE_EMAIL) !== 0
+  const keepSignedIn = (loginPrefMask & LOGIN_PREF_KEEP_SIGNED_IN) !== 0
+  const hydrated = (loginPrefMask & LOGIN_PREF_HYDRATED) !== 0
+  const setSaveEmail = (v: boolean) =>
+    setLoginPrefMask((m) => (v ? m | LOGIN_PREF_SAVE_EMAIL : m & ~LOGIN_PREF_SAVE_EMAIL))
+  const setKeepSignedIn = (v: boolean) =>
+    setLoginPrefMask((m) => (v ? m | LOGIN_PREF_KEEP_SIGNED_IN : m & ~LOGIN_PREF_KEEP_SIGNED_IN))
   const [step, setStep] = useState<LoginStep>("request")
   const [challengeId, setChallengeId] = useState("")
   const [code, setCode] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
   const [error, setError] = useState("")
   const [phase, setPhase] = useState<LoginPhase>("idle")
-  const [hydrated, setHydrated] = useState(false)
   const [challengeExpiresAt, setChallengeExpiresAt] = useState<number | null>(
     null
   )
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
 
   useEffect(() => {
+    let savedBit = 0
     try {
       const savedEmail = window.localStorage.getItem(
         ADMIN_SAVED_EMAIL_STORAGE_KEY
       )
       if (savedEmail) {
         setEmail(normalizeAuthEmail(savedEmail))
-        setSaveEmail(true)
+        savedBit = LOGIN_PREF_SAVE_EMAIL
       }
     } catch {}
-    setHydrated(true)
+    setLoginPrefMask((m) => m | savedBit | LOGIN_PREF_HYDRATED)
   }, [])
 
   useEffect(() => {

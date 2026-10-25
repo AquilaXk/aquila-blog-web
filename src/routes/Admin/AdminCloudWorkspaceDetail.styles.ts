@@ -51,6 +51,7 @@ export const DetailPanel = styled.aside`
 
 export const DetailScrim = styled.button`
   display: none;
+  ${focusVisibleRing}
 
   &[data-mode="drawer"] {
     position: fixed;
@@ -117,8 +118,9 @@ export const DetailActionLink = styled.a`
     color: ${textPrimary};
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 `
 
@@ -157,7 +159,7 @@ export const DetailEditInput = styled.input`
     border-color: ${borderStrong};
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `
@@ -334,14 +336,17 @@ export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
     grid-column: 2;
     grid-row: 1 / span 2;
     border: 0;
+    border-radius: 4px;
     background: transparent;
     color: ${textSecondary};
     font-size: 0.78rem;
     font-weight: 800;
     cursor: pointer;
+    ${focusVisibleRing}
 
-    @media (pointer: coarse) {
+    @media (max-width: 768px), (pointer: coarse) {
       min-height: 44px;
+      min-width: 44px;
     }
   }
 `
@@ -428,7 +433,7 @@ export const QueuePanel = styled.section`
   background: ${surfaceRaised};
   box-shadow: none;
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     right: 0.72rem;
     bottom: 0.72rem;
     width: calc(100vw - 1.44rem);

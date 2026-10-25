@@ -45,6 +45,7 @@ type LinePrefixTransformation = {
   oldPrefixLength: number
   newPrefixLength: number
   replacement: string
+  replacementStart?: number
 }
 
 type FenceState = {
@@ -136,6 +137,12 @@ const buildMutationFromTransformations = (
 ): PlannedTextMutation => {
   const rangeStart = transformations[0]!.line.start
   const rangeEnd = transformations[transformations.length - 1]!.line.end
+  let runningReplacementStart = rangeStart
+  for (let i = 0; i < transformations.length; i += 1) {
+    const item = transformations[i]!
+    item.replacementStart = runningReplacementStart
+    runningReplacementStart += item.replacement.length + 1
+  }
   const replacement = transformations.map((item) => item.replacement).join("\n")
   const totalDelta = replacement.length - (rangeEnd - rangeStart)
 
@@ -147,11 +154,7 @@ const buildMutationFromTransformations = (
       transformations.find(({ line }) => offset <= line.end) ??
       transformations[transformations.length - 1]!
     const relative = offset - transformation.line.start
-    const replacementStart =
-      rangeStart +
-      transformations
-        .slice(0, transformations.indexOf(transformation))
-        .reduce((acc, item) => acc + item.replacement.length + 1, 0)
+    const replacementStart = transformation.replacementStart ?? rangeStart
 
     if (relative < transformation.indentLength) {
       return replacementStart + relative

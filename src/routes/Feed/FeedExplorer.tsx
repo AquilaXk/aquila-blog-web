@@ -219,8 +219,6 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const handleSortSelect = useCallback(
     (value: FeedSortMode) => {
       if (value !== sortMode) {
-        // Drop restore intent so a deep latest scrollY is not reapplied after sort change,
-        // and reset viewport so ranked/latest list swaps do not land on an empty region.
         if (!shouldRestoreFeedExplorerSession(value) || shouldRestoreFeedExplorerSession(sortMode)) {
           restoreStateRef.current = null
           hasRestoredScrollRef.current = true
@@ -295,7 +293,15 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
                 onCompositionStart={() => setIsComposing(true)}
                 onCompositionEnd={() => setIsComposing(false)}
               />
-              <div className="sortDropdown" ref={sortMenuRef}>
+              <div
+                className="sortDropdown"
+                ref={sortMenuRef}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    closeSortMenu(false)
+                  }
+                }}
+              >
                 <button
                   type="button"
                   ref={sortTriggerRef}
@@ -340,7 +346,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
                         role="option"
                         tabIndex={-1}
                         aria-selected={sortMode === option.value}
-                        data-active={sortActiveIndex === index || sortMode === option.value}
+                        data-active={sortActiveIndex === index}
+                        data-selected={sortMode === option.value}
                         onClick={() => handleSortSelect(option.value)}
                         onMouseEnter={() => setSortActiveIndex(index)}
                       >

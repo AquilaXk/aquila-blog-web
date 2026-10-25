@@ -151,19 +151,21 @@ export const planIndentLines = (
   indent = "  "
 ): PlannedTextMutation => {
   const { blockStart, blockEnd } = selectionLineBounds(value, selectionStart, selectionEnd)
-  const block = value.slice(blockStart, blockEnd)
-  const lines = block.split("\n")
+  const nextLines: string[] = []
   let cursor = blockStart
   let insertedBeforeStart = 0
   let insertedBeforeEnd = 0
 
-  const nextLines = lines.map((line) => {
-    const lineStart = cursor
-    cursor += line.length + 1
-    if (lineStart < selectionStart) insertedBeforeStart += indent.length
-    if (lineStart < selectionEnd) insertedBeforeEnd += indent.length
-    return `${indent}${line}`
-  })
+  while (cursor <= blockEnd) {
+    const nextBreak = value.indexOf("\n", cursor)
+    const lineEnd = nextBreak === -1 || nextBreak > blockEnd ? blockEnd : nextBreak
+    const line = value.slice(cursor, lineEnd)
+    if (cursor < selectionStart) insertedBeforeStart += indent.length
+    if (cursor < selectionEnd) insertedBeforeEnd += indent.length
+    nextLines.push(`${indent}${line}`)
+    if (nextBreak === -1 || nextBreak >= blockEnd) break
+    cursor = nextBreak + 1
+  }
 
   return {
     rangeStart: blockStart,
@@ -181,28 +183,44 @@ export const planOutdentLines = (
   indentSize = 2
 ): PlannedTextMutation | null => {
   const { blockStart, blockEnd } = selectionLineBounds(value, selectionStart, selectionEnd)
-  const block = value.slice(blockStart, blockEnd)
-  const lines = block.split("\n")
+  const nextLines: string[] = []
   let removedBeforeStart = 0
   let removedBeforeEnd = 0
   let removedTotal = 0
   let cursor = blockStart
 
-  const nextLines = lines.map((line) => {
-    const lineStart = cursor
-    cursor += line.length + 1
-    const match = line.match(/^( {1,2}|\t)/)
-    if (!match) return line
-    const removeCount = match[0] === "\t" ? 1 : Math.min(match[0].length, indentSize)
-    if (lineStart < selectionStart) {
-      removedBeforeStart += Math.min(removeCount, selectionStart - lineStart)
+  while (cursor <= blockEnd) {
+    const nextBreak = value.indexOf("\n", cursor)
+    const lineEnd = nextBreak === -1 || nextBreak > blockEnd ? blockEnd : nextBreak
+    let removeCount = 0
+    if (cursor < lineEnd) {
+      const firstCode = value.charCodeAt(cursor)
+      if (firstCode === 9) {
+        removeCount = 1
+      } else if (firstCode === 32) {
+        const maxSpaces = Math.min(2, indentSize)
+        while (
+          removeCount < maxSpaces &&
+          cursor + removeCount < lineEnd &&
+          value.charCodeAt(cursor + removeCount) === 32
+        ) {
+          removeCount += 1
+        }
+      }
     }
-    if (lineStart < selectionEnd) {
-      removedBeforeEnd += Math.min(removeCount, selectionEnd - lineStart)
+    if (removeCount > 0) {
+      if (cursor < selectionStart) {
+        removedBeforeStart += Math.min(removeCount, selectionStart - cursor)
+      }
+      if (cursor < selectionEnd) {
+        removedBeforeEnd += Math.min(removeCount, selectionEnd - cursor)
+      }
+      removedTotal += removeCount
     }
-    removedTotal += removeCount
-    return line.slice(removeCount)
-  })
+    nextLines.push(value.slice(cursor + removeCount, lineEnd))
+    if (nextBreak === -1 || nextBreak >= blockEnd) break
+    cursor = nextBreak + 1
+  }
 
   if (removedTotal === 0) return null
 

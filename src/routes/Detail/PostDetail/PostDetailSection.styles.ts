@@ -37,6 +37,18 @@ export const MobileSummaryBar = styled.div `
       display: none;
     }
 
+    button[data-feedback="true"] {
+      width: auto;
+      padding: 0 12px;
+      gap: 6px;
+
+      span {
+        display: inline;
+        font-size: 0.8125rem;
+        font-weight: 650;
+      }
+    }
+
     > span {
       min-height: 44px;
       display: inline-flex;
@@ -99,11 +111,13 @@ export const RelatedSection = styled.section `
     text-decoration: none;
     transition: color 0.18s cubic-bezier(0.215, 0.61, 0.355, 1);
 
-    &:hover {
-      color: var(--aq-accent-link, var(--aq-accent));
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--aq-accent-link, var(--aq-accent));
 
-      .relatedArrow {
-        transform: translateX(4px);
+        .relatedArrow {
+          transform: translateX(4px);
+        }
       }
     }
   }

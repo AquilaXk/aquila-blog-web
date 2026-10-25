@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   AdminWorkspaceHero,
   AdminWorkspaceHeroCopy,
@@ -15,7 +16,7 @@ export const Main = styled.main`
   gap: 1.5rem;
   background: ${({ theme }) => theme.colors.gray1};
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     gap: 1rem;
     padding: 1rem 0.82rem 2rem;
   }
@@ -71,9 +72,11 @@ export const PrimaryCta = styled.button`
   font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
+  ${focusVisibleRing}
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 `
 

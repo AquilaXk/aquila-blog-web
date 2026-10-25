@@ -398,43 +398,22 @@ export const SelectedTagChip = styled.span`
   }
 
   button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: stretch;
-    min-width: 24px;
-    padding: 0 5px;
-    border: 0;
-    border-left: 1px solid currentColor;
-    background: transparent;
-    color: inherit;
-    opacity: 0.72;
-    cursor: pointer;
-    flex: 0 0 auto;
-    font-size: 0.94rem;
-    line-height: 1;
-    transition: opacity 0.15s ease, background 0.15s ease;
+    display: inline-flex; align-items: center; justify-content: center; align-self: stretch;
+    min-width: 24px; padding: 0 5px; border: 0; border-left: 1px solid currentColor;
+    background: transparent; color: inherit; opacity: 0.72; cursor: pointer; flex: 0 0 auto;
+    font-size: 0.94rem; line-height: 1; transition: opacity 0.15s ease, background 0.15s ease;
     &:hover { opacity: 1; background: rgba(15, 23, 42, 0.06); }
+    &:focus-visible { opacity: 1; outline: 2px solid currentColor; outline-offset: -2px; }
+    @media (max-width: 768px), (pointer: coarse) { min-width: 44px; min-height: 44px; }
   }
 `;
 export const InlineMetaInput = styled.input `
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  flex: 1 1 12rem;
-  min-width: 11rem;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  outline: none;
-  min-height: 32px;
-  padding: 0 0.12rem;
-  border-radius: 0;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray12};
-  font-size: 0.86rem;
-  font-weight: 500;
+  width: 100%; max-width: 100%; box-sizing: border-box; flex: 1 1 12rem; min-width: 11rem;
+  border: 0; border-bottom: 1px solid transparent; outline: none; min-height: 32px;
+  padding: 0 0.12rem; border-radius: 0; background: transparent;
+  color: ${({ theme }) => theme.colors.gray12}; font-size: 0.86rem; font-weight: 500;
   transition: border-color 0.16s ease;
-  @media (pointer: coarse) { min-height: 44px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
   &::placeholder { color: ${({ theme }) => theme.colors.gray10}; }
   &:hover { border-bottom-color: ${({ theme }) => theme.colors.gray6}; }
   &:focus-visible { outline: none; border-bottom-color: ${({ theme }) => theme.colors.blue8}; }
@@ -445,29 +424,19 @@ export const EditorInspectorTagInputRow = styled.div`
   gap: 8px;
 
   input {
-    min-width: 0;
-    flex: 1 1 auto;
-    width: auto;
-    border: 1px solid ${({ theme }) => theme.publicDesign.border};
-    border-radius: 6px;
+    min-width: 0; flex: 1 1 auto; width: auto; min-height: 44px; box-sizing: border-box;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border}; border-radius: 6px;
     background: ${({ theme }) => theme.publicDesign.readableSurface};
-    color: ${({ theme }) => theme.colors.gray12};
-    font-size: 0.88rem;
-    padding: 10px;
+    color: ${({ theme }) => theme.colors.gray12}; font-size: 0.88rem; padding: 10px;
+    &:focus-visible { outline: none; border-color: ${({ theme }) => theme.colors.blue8}; box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4}; }
   }
 
   button {
-    width: auto;
-    min-width: 38px;
-    min-height: 44px;
-    flex: 0 0 auto;
-    border: 1px solid ${({ theme }) => theme.publicDesign.border};
-    border-radius: 6px;
-    padding: 0 10px;
+    width: auto; min-width: 44px; min-height: 44px; flex: 0 0 auto;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border}; border-radius: 6px; padding: 0 10px;
     background: ${({ theme }) => theme.publicDesign.readableSurface};
-    color: ${({ theme }) => theme.colors.gray12};
-    cursor: pointer;
-    white-space: nowrap;
+    color: ${({ theme }) => theme.colors.gray12}; cursor: pointer; white-space: nowrap;
+    &:focus-visible { outline: none; border-color: ${({ theme }) => theme.colors.blue8}; box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4}; }
   }
 `;
 
@@ -477,25 +446,10 @@ export const EditorInspectorFullWidthAction = styled(SecondaryButton)`
 `;
 
 export const TitleInput = styled.textarea`
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  min-height: 48px;
-  outline: none;
-  background: transparent;
-  box-shadow: none;
-  font-family: inherit;
-  font-size: 36px;
-  font-weight: 850;
-  line-height: 1.25;
-  letter-spacing: -0.03em;
-  resize: none;
-  overflow: hidden;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  width: 100%; max-width: 100%; min-width: 0; border: 0; border-radius: 0; padding: 0;
+  min-height: 48px; outline: none; background: transparent; box-shadow: none;
+  font-family: inherit; font-size: 36px; font-weight: 850; line-height: 1.25;
+  letter-spacing: -0.03em; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere;
   &::placeholder { color: ${({ theme }) => theme.colors.gray9}; }
   &:focus, &:focus-visible { outline: none; box-shadow: none; border-color: transparent; }
   @media (max-width: 820px) { font-size: 28px; }
@@ -544,10 +498,12 @@ export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolea
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  &:focus-visible { outline: none; border-color: ${({ theme }) => theme.colors.blue8}; box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.blue4}; }
 
   @media (max-width: 820px), (pointer: coarse) {
     display: inline-flex;
     min-height: 44px;
+    min-width: 44px;
   }
 `;
 export const EditorHeaderMetaPill = styled.span`

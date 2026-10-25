@@ -3,6 +3,7 @@ import { useRouter } from "next/router"
 import React, { memo, startTransition, useCallback, useMemo, useState } from "react"
 import { usePostsTotalCountQuery } from "src/hooks/usePostsTotalCountQuery"
 import { useTagsQuery } from "src/hooks/useTagsQuery"
+import { normalizeOptionalTagQuery } from "src/libs/query/normalize"
 import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import { useLanguage } from "src/libs/language"
 import {
@@ -14,6 +15,9 @@ import {
 } from "./feedUiTokens"
 
 type TagEntry = [string, number]
+
+export const TAG_EXPAND_DESKTOP = 1 << 0
+export const TAG_EXPAND_CHIP = 1 << 1
 
 const toRepresentativeTagEntries = (
   tagEntries: TagEntry[],
@@ -38,10 +42,12 @@ const toRepresentativeTagEntries = (
 const TagList: React.FC = () => {
   const router = useRouter()
   const { t } = useLanguage()
-  const currentTag =
+  const currentTag = normalizeOptionalTagQuery(
     typeof router.query.tag === "string" ? router.query.tag : undefined
-  const [desktopExpanded, setDesktopExpanded] = useState(false)
-  const [chipExpanded, setChipExpanded] = useState(false)
+  )
+  const [expandMask, setExpandMask] = useState(0)
+  const desktopExpanded = (expandMask & TAG_EXPAND_DESKTOP) !== 0
+  const chipExpanded = (expandMask & TAG_EXPAND_CHIP) !== 0
   const totalPostCount = usePostsTotalCountQuery()
   const { tagEntries } = useTagsQuery()
   const allCount = totalPostCount
@@ -148,7 +154,7 @@ const TagList: React.FC = () => {
             type="button"
             className="toggleButton"
             aria-expanded={desktopExpanded}
-            onClick={() => setDesktopExpanded((prev) => !prev)}
+            onClick={() => setExpandMask((prev) => prev ^ TAG_EXPAND_DESKTOP)}
           >
             {desktopExpanded ? t("foldTags") : `${t("moreTags")} (+${hiddenDesktopTagCount})`}
           </button>
@@ -189,7 +195,7 @@ const TagList: React.FC = () => {
             type="button"
             className="chipToggle"
             aria-expanded={chipExpanded}
-            onClick={() => setChipExpanded((prev) => !prev)}
+            onClick={() => setExpandMask((prev) => prev ^ TAG_EXPAND_CHIP)}
           >
             <span className="name">{chipExpanded ? t("foldTags") : t("moreTags")}</span>
             {!chipExpanded && <span className="count">(+{hiddenChipTagCount})</span>}
@@ -204,6 +210,7 @@ export default memo(TagList)
 
 const StyledWrapper = styled.div`
   min-width: 0;
+  scroll-margin-top: calc(var(--app-header-height, 65px) + 12px);
   --feed-tag-border: var(--aq-border);
   --feed-tag-border-strong: var(--aq-border-strong);
   --feed-tag-hover-border: var(--aq-subtle);
@@ -441,7 +448,7 @@ const StyledWrapper = styled.div`
       border-radius: 2px;
       border: 1px solid var(--feed-tag-border);
       background: var(--feed-tag-surface);
-      transition: all 0.125s ease-in;
+      transition: color 0.125s ease-in, background-color 0.125s ease-in, border-color 0.125s ease-in;
       z-index: 0;
       pointer-events: none;
     }

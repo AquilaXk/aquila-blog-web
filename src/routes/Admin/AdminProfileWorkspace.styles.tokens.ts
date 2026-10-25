@@ -24,7 +24,7 @@ export const Main = styled.main`
   display: grid;
   gap: 1rem;
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     padding: 0.85rem 0.82rem calc(2rem + env(safe-area-inset-bottom, 0px));
   }
 `
@@ -71,6 +71,7 @@ export const GhostButton = styled(BaseButton)`
 
   @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
+    min-width: 44px;
   }
 
   &:hover:not(:disabled) {
@@ -105,6 +106,7 @@ export const MiniButton = styled(BaseButton)`
 
   @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
+    min-width: 44px;
   }
 
   &:hover:not(:disabled) {
@@ -140,5 +142,6 @@ export const PreviewAnchor = styled.a`
 
   @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
+    min-width: 44px;
   }
 `

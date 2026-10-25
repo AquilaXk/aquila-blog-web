@@ -51,6 +51,28 @@ export const handleZoomShortcutKey = (
   return false
 }
 
+const isViewBoxSeparator = (code: number) => code <= 32 || code === 44
+
+export const parseSvgViewBoxNumbers = (
+  viewBox: string
+): [number, number, number, number] | null => {
+  if (!viewBox) return null
+  const len = viewBox.length
+  const out: number[] = []
+  let i = 0
+  while (i < len) {
+    while (i < len && isViewBoxSeparator(viewBox.charCodeAt(i))) i += 1
+    if (i >= len) break
+    const start = i
+    while (i < len && !isViewBoxSeparator(viewBox.charCodeAt(i))) i += 1
+    const num = Number(viewBox.slice(start, i))
+    if (!Number.isFinite(num)) return null
+    out.push(num)
+    if (out.length > 4) return null
+  }
+  return out.length === 4 ? [out[0], out[1], out[2], out[3]] : null
+}
+
 export const attachStageDragPan = (
   stage: HTMLElement,
   getZoomLevel: () => number
@@ -65,6 +87,7 @@ export const attachStageDragPan = (
   const handlePointerDown = (event: PointerEvent) => {
     if (getZoomLevel() <= 1) return
     if (typeof event.button === "number" && event.button !== 0) return
+    event.preventDefault?.()
     dragging = true
     activePointerId = event.pointerId
     startX = event.clientX
@@ -241,13 +264,9 @@ export const openMermaidOverlay = (
   stage.style.setProperty("-webkit-overflow-scrolling", "touch")
   stage.innerHTML = svgMarkup
   const stageSvg = typeof stage.querySelector === "function" ? stage.querySelector("svg") : null
-  const viewBoxRaw = stageSvg?.getAttribute?.("viewBox") || ""
-  const viewBoxParts = viewBoxRaw
-    .split(/\s+/)
-    .map(Number)
-    .filter(Number.isFinite)
-  const baseWidth = viewBoxParts.length === 4 && viewBoxParts[2] > 0 ? viewBoxParts[2] : 0
-  const baseHeight = viewBoxParts.length === 4 && viewBoxParts[3] > 0 ? viewBoxParts[3] : 0
+  const viewBoxParts = parseSvgViewBoxNumbers(stageSvg?.getAttribute?.("viewBox") || "")
+  const baseWidth = viewBoxParts && viewBoxParts[2] > 0 ? viewBoxParts[2] : 0
+  const baseHeight = viewBoxParts && viewBoxParts[3] > 0 ? viewBoxParts[3] : 0
   let zoomLevel = 1
 
   configureMermaidStageSvg(stageSvg)

@@ -248,23 +248,30 @@ export const EditorStudioDedicatedEditorSurface = ({
   onClearLocalDraft,
   publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
-  const [isGuideOpen, setIsGuideOpen] = useState(false)
-  const [isOutlineOpen, setIsOutlineOpen] = useState(true)
-  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
-  const [isMobilePropertiesOpen, setIsMobilePropertiesOpen] = useState(false)
+  const EDITOR_SURFACE_GUIDE_OPEN = 1 << 0
+  const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
+  const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
+  const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
+  const [panelUiMask, setPanelUiMask] = useState(EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN)
+  const isGuideOpen = (panelUiMask & EDITOR_SURFACE_GUIDE_OPEN) !== 0
+  const isOutlineOpen = (panelUiMask & EDITOR_SURFACE_OUTLINE_OPEN) !== 0
+  const isInspectorOpen = (panelUiMask & EDITOR_SURFACE_INSPECTOR_OPEN) !== 0
+  const isMobilePropertiesOpen = (panelUiMask & EDITOR_SURFACE_MOBILE_PROPS_OPEN) !== 0
+  const setIsGuideOpen = (v: boolean) => setPanelUiMask((m) => (v ? m | EDITOR_SURFACE_GUIDE_OPEN : m & ~EDITOR_SURFACE_GUIDE_OPEN))
+  const setIsOutlineOpen = (fn: boolean | ((p: boolean) => boolean)) =>
+    setPanelUiMask((m) => ((typeof fn === "function" ? fn((m & EDITOR_SURFACE_OUTLINE_OPEN) !== 0) : fn) ? m | EDITOR_SURFACE_OUTLINE_OPEN : m & ~EDITOR_SURFACE_OUTLINE_OPEN))
+  const setIsInspectorOpen = (fn: boolean | ((p: boolean) => boolean)) =>
+    setPanelUiMask((m) => ((typeof fn === "function" ? fn((m & EDITOR_SURFACE_INSPECTOR_OPEN) !== 0) : fn) ? m | EDITOR_SURFACE_INSPECTOR_OPEN : m & ~EDITOR_SURFACE_INSPECTOR_OPEN))
+  const setIsMobilePropertiesOpen = (fn: (p: boolean) => boolean) =>
+    setPanelUiMask((m) => (fn((m & EDITOR_SURFACE_MOBILE_PROPS_OPEN) !== 0) ? m | EDITOR_SURFACE_MOBILE_PROPS_OPEN : m & ~EDITOR_SURFACE_MOBILE_PROPS_OPEN))
   const [lastActivatedOutlineOffset, setLastActivatedOutlineOffset] = useState<number | null>(null)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
   const handleToggleZenMode = useCallback(() => {
-    if (isZenMode) {
-      setIsOutlineOpen(true)
-      setIsInspectorOpen(true)
-    } else {
-      setIsOutlineOpen(false)
-      setIsInspectorOpen(false)
-    }
-  }, [isZenMode])
+    const zenBits = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
+    setPanelUiMask((m) => ((m & zenBits) === 0 ? m | zenBits : m & ~zenBits))
+  }, [EDITOR_SURFACE_INSPECTOR_OPEN, EDITOR_SURFACE_OUTLINE_OPEN])
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {

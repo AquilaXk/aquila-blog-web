@@ -1,50 +1,30 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  type ChangeEvent,
-  type DragEvent as ReactDragEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+  type ChangeEvent, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent,
+  useCallback, useEffect, useMemo, useRef, useState,
 } from "react"
 import {
-  deleteCloudFile,
-  getCloudFileContentUrl,
-  listCloudFiles,
-  updateCloudFile,
-  uploadCloudFile,
-  type CloudFile,
-  type CloudMediaKind,
+  deleteCloudFile, getCloudFileContentUrl, listCloudFiles, updateCloudFile, uploadCloudFile,
+  type CloudFile, type CloudMediaKind,
 } from "src/apis/backend/cloud"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
 import { useDebouncedValue } from "src/hooks/useDebouncedValue"
 import { resolveCloudErrorMessage } from "./AdminCloudPreviewDrawer"
 import {
-  CLOUD_FILTERS,
-  applyCloudFolderFilter,
-  applyUploadQueueFailure,
-  applyUploadQueueProgress,
-  applyUploadQueueSuccess,
-  createUploadQueueItem,
-  doesCloudFileMatchFilters,
-  doesCloudFileMatchSearchParams,
-  extractCloudFolders,
-  isAbortLikeError,
-  isUploadActive,
-  mergeCloudFiles,
-  normalizeCloudFolderPathSearch,
-  preferClientFilenameForUploadedFile,
-  resolveCloudSearchParams,
-  sortCloudFiles,
-  updateCachedCloudFilesForMutation,
-  type CloudMediaFilter,
-  type CloudSortMode,
-  type UploadQueueItem,
+  CLOUD_FILTERS, applyCloudFolderFilter, applyUploadQueueFailure, applyUploadQueueProgress,
+  applyUploadQueueSuccess, createUploadQueueItem, doesCloudFileMatchFilters,
+  doesCloudFileMatchSearchParams, extractCloudFolders, isAbortLikeError, isUploadActive,
+  mergeCloudFiles, normalizeCloudFolderPathSearch, preferClientFilenameForUploadedFile,
+  resolveCloudSearchParams, sortCloudFiles, updateCachedCloudFilesForMutation,
+  type CloudMediaFilter, type CloudSortMode, type UploadQueueItem,
 } from "./AdminCloudWorkspaceModel"
 
 const CLOUD_QUERY_KEY = "admin-cloud-files"
 const EMPTY_CLOUD_FILES: CloudFile[] = []
+const CLOUD_UI_COMPOSING = 1 << 0
+const CLOUD_UI_DETAIL_OPEN = 1 << 1
+const CLOUD_UI_DRAG_ACTIVE = 1 << 2
+const CLOUD_UI_DELETE_PENDING = 1 << 3
 
 const mediaKindFromFilter = (filter: CloudMediaFilter): CloudMediaKind | undefined =>
   filter === "ALL" ? undefined : filter
@@ -85,7 +65,32 @@ export const useAdminCloudWorkspaceActions = () => {
   const [filter, setFilter] = useState<CloudMediaFilter>("ALL")
   const [sortMode, setSortMode] = useState<CloudSortMode>("LATEST")
   const [keyword, setKeyword] = useState("")
-  const [isComposing, setIsComposing] = useState(false)
+  const [cloudUiMask, setCloudUiMask] = useState(0)
+  const isComposing = (cloudUiMask & CLOUD_UI_COMPOSING) !== 0
+  const isDetailPanelOpen = (cloudUiMask & CLOUD_UI_DETAIL_OPEN) !== 0
+  const isDragActive = (cloudUiMask & CLOUD_UI_DRAG_ACTIVE) !== 0
+  const isDeletePending = (cloudUiMask & CLOUD_UI_DELETE_PENDING) !== 0
+  const setIsComposing = useCallback(
+    (v: boolean) => setCloudUiMask((m) => (v ? m | CLOUD_UI_COMPOSING : m & ~CLOUD_UI_COMPOSING)),
+    []
+  )
+  const setIsDetailPanelOpen = useCallback(
+    (v: boolean | ((current: boolean) => boolean)) =>
+      setCloudUiMask((m) =>
+        (typeof v === "function" ? v((m & CLOUD_UI_DETAIL_OPEN) !== 0) : v)
+          ? m | CLOUD_UI_DETAIL_OPEN
+          : m & ~CLOUD_UI_DETAIL_OPEN
+      ),
+    []
+  )
+  const setIsDragActive = useCallback(
+    (v: boolean) => setCloudUiMask((m) => (v ? m | CLOUD_UI_DRAG_ACTIVE : m & ~CLOUD_UI_DRAG_ACTIVE)),
+    []
+  )
+  const setIsDeletePending = useCallback(
+    (v: boolean) => setCloudUiMask((m) => (v ? m | CLOUD_UI_DELETE_PENDING : m & ~CLOUD_UI_DELETE_PENDING)),
+    []
+  )
   const debouncedKeyword = useDebouncedValue(keyword, isComposing)
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null)
   const [checkedFileIds, setCheckedFileIds] = useState<number[]>([])
@@ -94,10 +99,7 @@ export const useAdminCloudWorkspaceActions = () => {
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
   const [optimisticFiles, setOptimisticFiles] = useState<CloudFile[]>([])
   const [knownFolders, setKnownFolders] = useState<string[]>([])
-  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false)
-  const [isDragActive, setIsDragActive] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null)
-  const [isDeletePending, setIsDeletePending] = useState(false)
 
   const filesQuery = useQuery({
     queryKey: [CLOUD_QUERY_KEY, filter, debouncedKeyword],
@@ -186,7 +188,7 @@ export const useAdminCloudWorkspaceActions = () => {
     }
     document.addEventListener("keydown", handleEscape)
     return () => document.removeEventListener("keydown", handleEscape)
-  }, [deleteConfirm, shouldShowDetailPanel])
+  }, [deleteConfirm, setIsDetailPanelOpen, shouldShowDetailPanel])
 
   useEffect(() => {
     if (!deleteConfirm) return
@@ -272,7 +274,7 @@ export const useAdminCloudWorkspaceActions = () => {
     }
 
     void run()
-  }, [queryClient, uploadQueue])
+  }, [queryClient, setIsDetailPanelOpen, uploadQueue])
 
   const queueUploadFiles = (selectedFiles: File[]) => {
     if (selectedFiles.length === 0) return

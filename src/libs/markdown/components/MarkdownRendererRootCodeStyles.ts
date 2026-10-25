@@ -73,6 +73,11 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     color: #86efac;
   }
 
+  .aq-code-copy.is-failed {
+    color: var(--aq-danger-text, #b42318);
+    border-color: var(--aq-danger-border, #fecdca);
+  }
+
   .aq-code-body {
     position: relative;
   }
@@ -112,7 +117,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
     background: #0f1728;
   }
 

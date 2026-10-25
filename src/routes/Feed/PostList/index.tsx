@@ -142,25 +142,37 @@ const PostList: React.FC<Props> = ({
     }
 
     let disposed = false
+    const advanceBatch = () => {
+      if (disposed) return
+      setMountedCardCount((prev) =>
+        Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
+      )
+    }
+    const checkTriggerViewport = () => {
+      if (disposed || typeof window === "undefined") return
+      if (triggerNode.getBoundingClientRect().top <= window.innerHeight + 680) {
+        advanceBatch()
+      }
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return
-        if (disposed) return
-        setMountedCardCount((prev) =>
-          Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
-        )
+        if (entries.some((entry) => entry.isIntersecting)) {
+          advanceBatch()
+          return
+        }
+        checkTriggerViewport()
       },
-      {
-        root: null,
-        rootMargin: DEFERRED_MOUNT_ROOT_MARGIN,
-        threshold: 0.01,
-      }
+      { root: null, rootMargin: DEFERRED_MOUNT_ROOT_MARGIN, threshold: 0.01 }
     )
 
     observer.observe(triggerNode)
+    checkTriggerViewport()
+    window.addEventListener("scroll", checkTriggerViewport, { passive: true })
     return () => {
       disposed = true
       observer.disconnect()
+      window.removeEventListener("scroll", checkTriggerViewport)
     }
   }, [mountedCardCount, posts.length])
 
@@ -547,6 +559,10 @@ const StyledWrapper = styled.div`
   .deferredPostCardWrap {
     width: 100%;
     min-width: 0;
+  }
+
+  .deferredPostCardWrap:last-of-type > a {
+    border-bottom: 0;
   }
 
   .deferredPostCardPlaceholder {

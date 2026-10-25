@@ -551,8 +551,13 @@ export const liveSurfaceTheme = EditorView.theme({
     opacity: 0.85,
   },
   ".cm-live-mermaid-fallback": { margin: "0", fontSize: "13px", whiteSpace: "pre-wrap" },
-  "@media (pointer: coarse)": {
-    ".cm-live-table-toolbar-btn, .cm-live-table-add-col, .cm-live-table-add-corner, .cm-live-table-add-row": { minHeight: "44px", minWidth: "44px" },
+  ".cm-live-callout-header:focus-visible, .cm-live-toggle-caret:focus-visible, .cm-live-bookmark-open:focus-visible, .cm-live-table-toolbar-btn:focus-visible, .cm-live-table-col-handle:focus-visible, .cm-live-table-row-handle:focus-visible, .cm-live-table-add-col:focus-visible, .cm-live-table-add-row:focus-visible, .cm-live-table-add-corner:focus-visible": {
+    outline: "2px solid #2383e2",
+    outlineOffset: "1px",
+  },
+  "@media (max-width: 768px), (pointer: coarse)": {
+    ".cm-live-callout-header": { minHeight: "44px" },
+    ".cm-live-toggle-caret, .cm-live-bookmark-open, .cm-live-table-toolbar-btn, .cm-live-table-col-handle, .cm-live-table-row-handle, .cm-live-table-add-col, .cm-live-table-add-corner, .cm-live-table-add-row": { minHeight: "44px", minWidth: "44px" },
   },
   "@media (max-width: 820px)": {
     ".cm-content": { padding: "18px 16px 32px 16px", maxWidth: "100%" },

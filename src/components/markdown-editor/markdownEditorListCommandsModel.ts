@@ -99,9 +99,11 @@ const lineIndexAt = (lines: LogicalLine[], offset: number): number => {
 
 type LineTransformation = {
   line: LogicalLine
+  indentLength: number
   oldMarkerLength: number
   newMarkerLength: number
   replacement: string
+  replacementStart: number
 }
 
 export const planToggleListCommand = (
@@ -126,9 +128,12 @@ export const planToggleListCommand = (
   const selected = lines.slice(firstIndex, lastIndex + 1)
   if (selected.some((line) => line.intersectsFence)) return null
 
+  const rangeStart = selected[0]!.start
+  const rangeEnd = selected[selected.length - 1]!.end
   const matches = selected.map((line) => matchListMarkerLine(line.text))
   const removeMarkers = matches.every((match) => match?.kind === command)
   const orderedNumbers = new Map<string, number>()
+  let runningReplacementStart = rangeStart
   const transformations = selected.map((line, index): LineTransformation => {
     const match = matches[index]
     const indent = match?.indent ?? /^\s*/.exec(line.text)?.[0] ?? ""
@@ -146,16 +151,20 @@ export const planToggleListCommand = (
       orderedNumbers.set(indent, (orderedNumbers.get(indent) ?? 0) + 1)
     }
 
+    const lineReplacement = `${indent}${marker}${content}`
+    const replacementStart = runningReplacementStart
+    runningReplacementStart += lineReplacement.length + 1
+
     return {
       line,
+      indentLength: indent.length,
       oldMarkerLength,
       newMarkerLength: marker.length,
-      replacement: `${indent}${marker}${content}`,
+      replacement: lineReplacement,
+      replacementStart,
     }
   })
 
-  const rangeStart = selected[0]!.start
-  const rangeEnd = selected[selected.length - 1]!.end
   const replacement = transformations.map((transformation) => transformation.replacement).join("\n")
   const totalDelta = replacement.length - (rangeEnd - rangeStart)
 
@@ -165,10 +174,7 @@ export const planToggleListCommand = (
 
     const transformation = transformations.find(({ line }) => offset <= line.end) ?? transformations[transformations.length - 1]!
     const relative = offset - transformation.line.start
-    const indentLength = /^\s*/.exec(transformation.line.text)?.[0].length ?? 0
-    const replacementStart = rangeStart + transformations
-      .slice(0, transformations.indexOf(transformation))
-      .reduce((length, item) => length + item.replacement.length + 1, 0)
+    const { indentLength, replacementStart } = transformation
 
     if (relative < indentLength) return replacementStart + relative
     if (relative <= indentLength + transformation.oldMarkerLength) {

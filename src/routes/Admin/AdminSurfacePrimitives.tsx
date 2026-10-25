@@ -364,8 +364,10 @@ export const AdminTextActionButton = styled.button`
     color: ${({ theme }) => theme.colors.red11};
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
+    padding: 0 0.35rem;
   }
 `
 
@@ -396,8 +398,10 @@ export const AdminTextActionLink = styled.a`
     color: ${({ theme }) => theme.colors.red11};
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
+    padding: 0 0.35rem;
   }
 `
 

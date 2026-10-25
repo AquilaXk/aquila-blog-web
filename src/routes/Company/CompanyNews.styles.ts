@@ -33,12 +33,14 @@ export const NewsHeaderAction = styled.a`
     transition: transform 220ms ${MOTION_EASE_OUT};
   }
 
-  &:hover {
-    background: ${light.surfaceScaffold};
-    border-color: ${light.borderStrong};
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: ${light.surfaceScaffold};
+      border-color: ${light.borderStrong};
 
-    svg {
-      transform: translateX(3px);
+      svg {
+        transform: translateX(3px);
+      }
     }
   }
 
@@ -81,25 +83,26 @@ export const NewsCard = styled.a`
   text-decoration: none;
   transition: border-color ${TRANSITION};
 
-  &:hover {
-    border-top-color: ${light.borderStrong};
-  }
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-top-color: ${light.borderStrong};
+    }
 
-  &:hover h3,
-  &:hover strong {
-    color: ${light.accentText};
-  }
+    &:hover h3,
+    &:hover strong {
+      color: ${light.accentText};
+    }
 
-  &:hover [data-ui="company-news-media"] img {
-    transform: scale(1.025);
-  }
+    &:hover [data-ui="company-news-media"] img {
+      transform: scale(1.025);
+    }
 
-  &:hover [data-ui="company-news-action"] {
-    color: ${light.accentPressed};
-    gap: 0.5rem;
+    &:hover [data-ui="company-news-action"] {
+      color: ${light.accentPressed};
 
-    svg {
-      transform: translateX(3px);
+      svg {
+        transform: translateX(3px);
+      }
     }
   }
 
@@ -187,7 +190,7 @@ export const NewsAction = styled.div`
   font-size: 0.9375rem;
   font-weight: ${fontWeight.medium};
   color: ${light.accentText};
-  transition: gap ${TRANSITION}, color ${TRANSITION};
+  transition: color ${TRANSITION}, transform ${TRANSITION};
 
   svg {
     flex: 0 0 auto;

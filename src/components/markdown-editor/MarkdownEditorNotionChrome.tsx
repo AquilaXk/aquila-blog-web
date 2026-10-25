@@ -72,7 +72,7 @@ const BubbleActionButton = styled.button`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
-  @media (pointer: coarse) { min-width: 44px; min-height: 44px; }
+  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; }
 `
 
 const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
@@ -101,7 +101,7 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
-  @media (pointer: coarse) { min-height: 44px; }
+  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; }
   @media (max-width: 720px) { display: none; }
 `
 
@@ -145,7 +145,7 @@ const BlockMenuItemButton = styled.button`
   color: ${({ theme }) => theme.colors.gray12}; font: 550 12.5px/1.2 var(--aq-font-sans);
   text-align: left; cursor: pointer; transition: background-color 0.1s ease;
   ${focusVisibleRing}
-  @media (pointer: coarse) { min-height: 44px; }
+  @media (pointer: coarse), (max-width: 768px) { min-height: 44px; }
   &:hover, &:focus {
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
   }
@@ -172,7 +172,7 @@ const ColorSwatchMenuButton = styled.button<{ $color: string }>`
   font: 750 11.5px/1 var(--aq-font-sans); display: inline-flex; align-items: center; justify-content: center;
   gap: 4px; cursor: pointer; outline: none;
   ${focusVisibleRing}
-  @media (pointer: coarse) { min-height: 44px; }
+  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; }
   &:hover, &:focus {
     border-color: ${({ $color }) => $color};
     background: ${({ theme }) => theme.publicDesign.readableSurface};
@@ -432,6 +432,10 @@ export const MarkdownEditorNotionChrome = ({
   }, [blockMenuPosition, isBlockMenuOpen])
 
   const handleBlockMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Tab") {
+      setIsBlockMenuOpen(false)
+      return
+    }
     const items = Array.from(blockMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
     if (items.length === 0) return
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
@@ -458,12 +462,14 @@ export const MarkdownEditorNotionChrome = ({
 
   const applyLineColorSwatch = (token: string) => {
     if (selection.from < selection.to) {
-      if (token === "default") {
-        const stripped = selectedText.replace(/^\{\{color:[^|{}]+\|([\s\S]*)\}\}$/, "$1")
-        if (stripped !== selectedText) onTriggerSlashCommand(planReplaceSelection(selection.from, selection.to, stripped))
+      const existingMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(selectedText)
+      if (existingMatch) {
+        const inner = existingMatch[2] ?? ""
+        const replacement = token === "default" || existingMatch[1]?.trim() === token ? inner : `{{color:${token}|${inner}}}`
+        onTriggerSlashCommand(planReplaceSelection(selection.from, selection.to, replacement))
         return
       }
-      onApplySnippet(`{{color:${token}|`, "}}", { toggle: true })
+      if (token !== "default") onApplySnippet(`{{color:${token}|`, "}}", { toggle: true })
       return
     }
     const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
@@ -525,7 +531,7 @@ export const MarkdownEditorNotionChrome = ({
         </>
       ) : null}
       {isBlockMenuOpen && blockMenuPosition ? (
-        <BlockActionMenuPopover ref={blockMenuRef} role="menu" aria-label="블록 작업 메뉴" data-testid="markdown-block-action-menu" $top={blockMenuPosition.top} $left={blockMenuPosition.left} onKeyDown={handleBlockMenuKeyDown}>
+        <BlockActionMenuPopover ref={blockMenuRef} role="menu" aria-label="블록 작업 메뉴" data-testid="markdown-block-action-menu" $top={blockMenuPosition.top} $left={blockMenuPosition.left} onKeyDown={handleBlockMenuKeyDown} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsBlockMenuOpen(false) }}>
           <BlockMenuSectionHeader aria-hidden="true">블록 전환</BlockMenuSectionHeader>
           {turnIntoItems.map((item) => (
             <BlockMenuItemButton key={item.label} type="button" role="menuitem" data-active={currentBlockKind === item.kind ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>

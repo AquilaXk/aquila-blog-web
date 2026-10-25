@@ -90,11 +90,7 @@ export const ToolbarButton = styled.button<{ $active?: boolean }>`
     cursor: not-allowed;
   }
 
-  @media (pointer: coarse) {
-    height: 44px;
-    min-height: 44px;
-    min-width: 44px;
-  }
+  @media (max-width: 768px), (pointer: coarse) { height: 44px; min-height: 44px; min-width: 44px; }
 `
 
 export const ToolbarSelect = styled.select`
@@ -113,20 +109,9 @@ export const ToolbarSelect = styled.select`
   cursor: pointer;
   white-space: nowrap;
 
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  @media (pointer: coarse) {
-    height: 44px;
-    min-height: 44px;
-  }
+  &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+  @media (max-width: 768px), (pointer: coarse) { height: 44px; min-height: 44px; }
 `
 
 export const ToolbarMenuRoot = styled.div`
@@ -156,11 +141,7 @@ export const ToolbarMenuChevron = styled.span`
   color: currentColor;
   opacity: 0.75;
 
-  svg {
-    width: 12px;
-    height: 12px;
-    display: block;
-  }
+  svg { width: 12px; height: 12px; display: block; }
 `
 
 export const ToolbarMenuPanel = styled.div<{
@@ -207,14 +188,8 @@ export const ToolbarMenuItem = styled.button`
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  &:disabled {
-    opacity: 0.42;
-    cursor: not-allowed;
-  }
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
+  &:disabled { opacity: 0.42; cursor: not-allowed; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const ToolbarHiddenInput = styled.input`
@@ -263,14 +238,8 @@ export const FindReplaceInput = styled.input`
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   color: ${({ theme }) => theme.colors.gray12};
 
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
+  &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const FindReplaceCheckbox = styled.label`
@@ -280,6 +249,8 @@ export const FindReplaceCheckbox = styled.label`
   color: ${({ theme }) => theme.colors.gray10};
   font-size: 12px;
   font-weight: 700;
+  input:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const FindReplaceStatus = styled.output`
@@ -302,21 +273,11 @@ export const FindReplaceActions = styled.div`
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-
-    @media (pointer: coarse) {
-      min-height: 44px;
-    }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
   }
 
-  button:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
+  button:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
 `
 
 export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
@@ -452,10 +413,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       text-decoration: none;
     }
 
-    &:focus-visible {
-      outline: 2px solid var(--aq-accent-link, #155eef);
-      outline-offset: 1px;
-    }
+    &:focus-visible { outline: 2px solid var(--aq-accent-link, #155eef); outline-offset: 1px; }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
   }
 
   .cm-live-wikilink-icon {
@@ -512,6 +471,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     vertical-align: -0.08em;
     cursor: pointer;
     user-select: none;
+    &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+    @media (max-width: 768px), (pointer: coarse) { min-width: 24px; min-height: 24px; }
     &.is-checked {
       background: ${({ theme }) => theme.publicDesign.accent};
       border-color: ${({ theme }) => theme.publicDesign.accent};

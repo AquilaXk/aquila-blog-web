@@ -289,6 +289,8 @@ export const DetailsSummary = styled.summary`
   padding: 0.84rem 0.95rem;
   cursor: pointer;
   box-sizing: border-box;
+  border-radius: 8px;
+  ${focusVisibleRing}
 
   &::-webkit-details-marker {
     display: none;
@@ -360,7 +362,7 @@ export const DiagnosticHeader = styled.div`
     line-height: 1.55;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     flex-direction: column;
   }
 `
@@ -376,6 +378,10 @@ export const QuietButton = styled(AdminTextActionButton)`
   &:disabled {
     opacity: 0.56;
     cursor: not-allowed;
+  }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    min-width: 44px;
   }
 `
 

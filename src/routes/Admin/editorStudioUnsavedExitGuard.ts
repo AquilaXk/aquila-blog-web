@@ -39,7 +39,13 @@ export const isEditorUnsavedDirtyByFingerprint = ({
   return editorStateFingerprint !== pristineCreateFingerprint
 }
 
-const editorRoutePathname = (url: string) => url.split(/[?#]/)[0] || ""
+const editorRoutePathname = (url: string) => {
+  const queryIdx = url.indexOf("?")
+  const hashIdx = url.indexOf("#")
+  const endIdx =
+    queryIdx === -1 ? hashIdx : hashIdx === -1 ? queryIdx : Math.min(queryIdx, hashIdx)
+  return endIdx === -1 ? url : url.slice(0, endIdx)
+}
 
 let scheduledForcedEditorExitPath: string | null = null
 let activeForcedEditorExitPath: string | null = null

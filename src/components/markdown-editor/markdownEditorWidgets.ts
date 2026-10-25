@@ -453,7 +453,7 @@ export class MarkdownWikilinkWidget extends WidgetType {
     }
 
     root.addEventListener("mousedown", handleClick)
-    root.addEventListener("click", handleClick)
+    root.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation() })
     root.addEventListener("keydown", handleKeyDown)
 
     return root

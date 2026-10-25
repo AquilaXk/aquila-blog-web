@@ -1,23 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/router"
 import {
-  useDeferredValue,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
+  type SetStateAction, useDeferredValue, useCallback, useEffect, useMemo, useRef, useState, useTransition,
 } from "react"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import useAuthSession from "src/hooks/useAuthSession"
 import { normalizeCategoryValue } from "src/libs/utils"
 import {
-  toFlags,
-  toVisibility,
-  type EditorMode,
-  type PostVisibility,
-  type PublishActionType,
+  toFlags, toVisibility, type EditorMode, type PostVisibility, type PublishActionType,
 } from "./editorStudioState"
 import { useEditorStudioDraftLifecycle } from "./useEditorStudioDraftLifecycle"
 import { useEditorStudioPersistence } from "./useEditorStudioPersistence"
@@ -29,50 +19,30 @@ import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFl
 import { useEditorStudioWorkspaceControllerRuntime } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioWorkspaceControllerRootView } from "./EditorStudioWorkspaceControllerRootView"
 import {
-  buildEditorStateFingerprint,
-  buildLocalDraftFingerprint,
-  composeEditorContent,
-  computeContentFingerprint,
-  dedupeStrings,
-  detectPublishPlaceholderIssue,
-  extractFirstMarkdownImage,
-  normalizeSafeImageUrl,
-  normalizeSafePreviewThumbnailUrl,
-  resolveEditorMetaSnapshot,
-  type ResolvedEditorMetaSnapshot,
+  buildEditorStateFingerprint, buildLocalDraftFingerprint, composeEditorContent,
+  computeContentFingerprint, dedupeStrings, detectPublishPlaceholderIssue,
+  extractFirstMarkdownImage, normalizeSafeImageUrl, normalizeSafePreviewThumbnailUrl,
+  resolveEditorMetaSnapshot, type ResolvedEditorMetaSnapshot,
 } from "./editorStudioMetaModel"
 import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import type { AdminPageProps } from "src/libs/server/adminPage"
 import {
-  DEFAULT_THUMBNAIL_FOCUS_X,
-  DEFAULT_THUMBNAIL_FOCUS_Y,
-  DEFAULT_THUMBNAIL_ZOOM,
-  stripThumbnailFocusFromUrl,
+  DEFAULT_THUMBNAIL_FOCUS_X, DEFAULT_THUMBNAIL_FOCUS_Y, DEFAULT_THUMBNAIL_ZOOM, stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
+import { persistLocalDraft, readLocalDraft, removeLocalDraft } from "./editorStudioStorageModel"
 import {
-  persistLocalDraft,
-  readLocalDraft,
-  removeLocalDraft,
-} from "./editorStudioStorageModel"
-import {
-  ADMIN_POSTS_WORKSPACE_ROUTE,
-  EDITOR_NEW_ROUTE_PATH,
-  buildEffectiveThumbnailUrl,
-  buildEmptyEditorMetaSnapshot,
-  extractImageFileFromClipboard,
-  generateIdempotencyKey,
-  isBlankServerTempDraft,
-  normalizeEditorReturnRoute,
-  pretty,
-  requestTempPostWithConflictRetry,
-  toEditorPostRoute,
-  uploadWithConflictRetry,
-  type NoticeState,
-  type PostForEditor,
-  type CanonicalSummaryState,
-  type SummaryIntent,
-  type RsData,
+  ADMIN_POSTS_WORKSPACE_ROUTE, EDITOR_NEW_ROUTE_PATH, buildEffectiveThumbnailUrl,
+  buildEmptyEditorMetaSnapshot, extractImageFileFromClipboard, generateIdempotencyKey,
+  isBlankServerTempDraft, normalizeEditorReturnRoute, pretty, requestTempPostWithConflictRetry,
+  toEditorPostRoute, uploadWithConflictRetry, type NoticeState, type PostForEditor,
+  type CanonicalSummaryState, type SummaryIntent, type RsData,
 } from "./EditorStudioWorkspaceControllerRootModel"
+
+const MODAL_UI_PUBLISH_OPEN = 1 << 0
+const MODAL_UI_MOBILE_THUMB_OPEN = 1 << 1
+const MODAL_UI_MOBILE_META_OPEN = 1 << 2
+const applyBitFlag = (mask: number, bit: number, action: SetStateAction<boolean>) =>
+  (typeof action === "function" ? action((mask & bit) !== 0) : action) ? mask | bit : mask & ~bit
 
 type MarkdownEditorFlush = () => string
 type MarkdownEditorChangeMeta = {
@@ -126,13 +96,17 @@ export const EditorStudioWorkspaceController = ({
     fingerprint: "",
     firstImage: "",
   })
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
+  const [modalUiMask, setModalUiMask] = useState(0)
+  const isPublishModalOpen = (modalUiMask & MODAL_UI_PUBLISH_OPEN) !== 0
+  const isMobileThumbnailEditorOpen = (modalUiMask & MODAL_UI_MOBILE_THUMB_OPEN) !== 0
+  const isMobileMetaEditorOpen = (modalUiMask & MODAL_UI_MOBILE_META_OPEN) !== 0
+  const setIsPublishModalOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_PUBLISH_OPEN, v)), [])
+  const setIsMobileThumbnailEditorOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_MOBILE_THUMB_OPEN, v)), [])
+  const setIsMobileMetaEditorOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_MOBILE_META_OPEN, v)), [])
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState("")
   const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(false)
-  const [isMobileThumbnailEditorOpen, setIsMobileThumbnailEditorOpen] = useState(false)
-  const [isMobileMetaEditorOpen, setIsMobileMetaEditorOpen] = useState(false)
 
   useEffect(() => {
     postContentLiveRef.current = postContent

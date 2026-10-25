@@ -30,15 +30,11 @@ let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
 
 const syncTableFromDataset = (wrap: HTMLElement, from: number | undefined) => {
-  if (from !== undefined) {
-    if (wrap.dataset) wrap.dataset.tableFrom = String(from)
-    return
-  }
-  if (wrap.dataset) delete wrap.dataset.tableFrom
+  if (!wrap.dataset) return
+  if (from !== undefined) wrap.dataset.tableFrom = String(from)
+  else delete wrap.dataset.tableFrom
 }
-
-const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string =>
-  r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? "")
+const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string => (r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? ""))
 
 const patchSingleTableCell = (
   cellEl: HTMLElement, prevAlign: string, nextAlign: string, prevText: string, nextText: string,
@@ -522,7 +518,13 @@ export class MarkdownTableWidget extends WidgetType {
       if (!nextGrid) return false
       visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
-      if (activeSession && !activeSession.handled) { activeSession.handled = true; activeSession = null }
+      if (activeSession && !activeSession.handled) {
+        if (activeSession.input.value !== activeSession.initialValue && activeSession.col < nextGrid.headers.length) {
+          if (activeSession.row === 0) nextGrid.headers[activeSession.col] = activeSession.input.value
+          else if (activeSession.row - 1 < nextGrid.rows.length) nextGrid.rows[activeSession.row - 1]![activeSession.col] = activeSession.input.value
+        }
+        activeSession.handled = true; activeSession = null
+      }
 
       const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
       if (sameShape) {

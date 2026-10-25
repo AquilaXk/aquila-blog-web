@@ -137,10 +137,6 @@ const StyledWrapper = styled.a`
   color: var(--aq-text);
   text-decoration: none;
 
-  &:last-of-type {
-    border-bottom: 0;
-  }
-
   &:focus-visible {
     outline: 2px solid var(--aq-focus-ring);
     outline-offset: 4px;
@@ -250,7 +246,7 @@ const StyledWrapper = styled.a`
     bottom: 0;
     left: 0;
     height: 45%;
-    border-radius: 999px 999px 2px 2px;
+    border-radius: 50% 50% 2px 2px;
     transform: none;
   }
 

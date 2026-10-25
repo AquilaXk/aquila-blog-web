@@ -31,12 +31,23 @@ export const selectUniqueRelatedPosts = (
   relatedByTagPosts: readonly TPost[],
   relatedByAuthorPosts: readonly TPost[],
   limit = 2
-): TPost[] =>
-  limit <= 0
-    ? []
-    : [...relatedByTagPosts, ...relatedByAuthorPosts]
-        .filter((post, index, posts) => posts.findIndex((item) => item.id === post.id) === index)
-        .slice(0, limit)
+): TPost[] => {
+  if (limit <= 0) return []
+  const result: TPost[] = []
+  const seenIds = new Set<string>()
+  const sources = [relatedByTagPosts, relatedByAuthorPosts]
+  for (let s = 0; s < sources.length; s += 1) {
+    const list = sources[s]
+    for (let i = 0; i < list.length; i += 1) {
+      const post = list[i]
+      if (!post?.id || !post?.slug || seenIds.has(post.id)) continue
+      seenIds.add(post.id)
+      result.push(post)
+      if (result.length >= limit) return result
+    }
+  }
+  return result
+}
 
 const RelatedPostsSectionComponent = ({
   showRelatedTagSkeleton,

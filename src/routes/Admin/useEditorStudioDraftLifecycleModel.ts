@@ -424,7 +424,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
         setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 선택과 원고는 유지됩니다." }, "page")
         return
       }
-      setLocalDraftCandidate((selected) => candidates.find((candidate) => candidate.key === selected?.key) || null)
+      setLocalDraftCandidate((selected) => candidates.find((candidate) => candidate.key === selected?.key) || candidates[0] || null)
     }
     refresh()
     window.addEventListener("storage", refresh)

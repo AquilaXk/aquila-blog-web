@@ -34,6 +34,10 @@ import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
 const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"))
 
+export const RAIL_UI_DETAILED_TOC = 1 << 0
+export const RAIL_UI_LEFT_ACTIVE = 1 << 1
+export const RAIL_UI_RIGHT_ACTIVE = 1 << 2
+
 const PostDetail: React.FC = () => {
   const { post: data } = usePostQuery()
   const postId = data?.id ?? ""
@@ -55,9 +59,10 @@ const PostDetail: React.FC = () => {
   )
   const [tocItems, setTocItems] = useState<TocItem[]>(initialToc)
   const [activeTocId, setActiveTocId] = useState<string>(() => initialToc[0]?.id ?? "")
-  const [showDetailedToc, setShowDetailedToc] = useState(false)
-  const [leftHybridRailActive, setLeftHybridRailActive] = useState(false)
-  const [rightHybridRailActive, setRightHybridRailActive] = useState(false)
+  const [railUiMask, setRailUiMask] = useState(0)
+  const showDetailedToc = (railUiMask & RAIL_UI_DETAILED_TOC) !== 0
+  const leftHybridRailActive = (railUiMask & RAIL_UI_LEFT_ACTIVE) !== 0
+  const rightHybridRailActive = (railUiMask & RAIL_UI_RIGHT_ACTIVE) !== 0
   const visibleTocItemsRef = useRef<TocItem[]>([])
   const headingOffsetsRef = useRef<HeadingOffset[]>([])
   const hasMountedTocOffsetsRef = useRef(false)
@@ -67,6 +72,7 @@ const PostDetail: React.FC = () => {
   const showStickyTocRef = useRef(false)
   const leftHybridRailActiveRef = useRef(false)
   const rightHybridRailActiveRef = useRef(false)
+  const tocScrollLockRef = useRef<{ id: string; until: number } | null>(null)
   const hybridRailMetricsRef = useRef({
     left: {
       enabled: false,
@@ -201,7 +207,7 @@ const PostDetail: React.FC = () => {
       })
     }
 
-    setShowDetailedToc(false)
+    setRailUiMask((prev) => prev & ~RAIL_UI_DETAILED_TOC)
     syncToc()
 
     let observer: MutationObserver | null = null
@@ -268,13 +274,18 @@ const PostDetail: React.FC = () => {
       const leftNeedsHybridFallback = leftEnabled && hybridRailMetricsRef.current.left.stickyBlocked
       const rightNeedsHybridFallback = rightEnabled && hybridRailMetricsRef.current.right.stickyBlocked
 
-      if (leftHybridRailActiveRef.current !== leftNeedsHybridFallback) {
+      if (
+        leftHybridRailActiveRef.current !== leftNeedsHybridFallback ||
+        rightHybridRailActiveRef.current !== rightNeedsHybridFallback
+      ) {
         leftHybridRailActiveRef.current = leftNeedsHybridFallback
-        setLeftHybridRailActive(leftNeedsHybridFallback)
-      }
-      if (rightHybridRailActiveRef.current !== rightNeedsHybridFallback) {
         rightHybridRailActiveRef.current = rightNeedsHybridFallback
-        setRightHybridRailActive(rightNeedsHybridFallback)
+        setRailUiMask((prev) => {
+          let next = prev & ~(RAIL_UI_LEFT_ACTIVE | RAIL_UI_RIGHT_ACTIVE)
+          if (leftNeedsHybridFallback) next |= RAIL_UI_LEFT_ACTIVE
+          if (rightNeedsHybridFallback) next |= RAIL_UI_RIGHT_ACTIVE
+          return next
+        })
       }
 
       hybridRailMetricsRef.current.left.enabled = leftEnabled
@@ -306,8 +317,17 @@ const PostDetail: React.FC = () => {
 
     const scrollScheduler = createRafScheduler(() => {
       syncReadProgress()
-      const nextActiveId = resolveActiveByScrollPosition()
-      setActiveTocId((prev) => (prev === nextActiveId ? prev : nextActiveId))
+      const lock = tocScrollLockRef.current
+      if (lock && Date.now() < lock.until) {
+        const resolved = resolveActiveByScrollPosition()
+        if (resolved === lock.id) {
+          tocScrollLockRef.current = null
+        }
+      } else {
+        if (lock) tocScrollLockRef.current = null
+        const nextActiveId = resolveActiveByScrollPosition()
+        setActiveTocId((prev) => (prev === nextActiveId ? prev : nextActiveId))
+      }
       if (leftHybridRailActiveRef.current || rightHybridRailActiveRef.current) {
         syncHybridRails()
       }
@@ -362,13 +382,10 @@ const PostDetail: React.FC = () => {
       remeasureScheduler.cancel()
       clearInlineRailStyle(leftRailInnerNode)
       clearInlineRailStyle(rightRailInnerNode)
-      if (leftHybridRailActiveRef.current) {
+      if (leftHybridRailActiveRef.current || rightHybridRailActiveRef.current) {
         leftHybridRailActiveRef.current = false
-        setLeftHybridRailActive(false)
-      }
-      if (rightHybridRailActiveRef.current) {
         rightHybridRailActiveRef.current = false
-        setRightHybridRailActive(false)
+        setRailUiMask((prev) => prev & ~(RAIL_UI_LEFT_ACTIVE | RAIL_UI_RIGHT_ACTIVE))
       }
     }
   }, [data?.id, visibleTocItems])
@@ -377,12 +394,13 @@ const PostDetail: React.FC = () => {
     const heading = document.getElementById(id)
     if (!heading) return
     const targetTop = heading.getBoundingClientRect().top + window.scrollY - (railTopOffsetRef.current + 24)
+    tocScrollLockRef.current = { id, until: Date.now() + 700 }
     setActiveTocId(id)
     window.scrollTo({ top: targetTop, behavior: "smooth" })
   }, [])
 
   const handleToggleDetailedToc = useCallback(() => {
-    setShowDetailedToc((value) => !value)
+    setRailUiMask((prev) => prev ^ RAIL_UI_DETAILED_TOC)
   }, [])
 
   if (!data) return null
@@ -439,6 +457,9 @@ const PostDetail: React.FC = () => {
             <PostDetailMobileToc
               items={visibleTocItems}
               activeTocId={activeTocId}
+              hasDepth4Toc={hasDepth4Toc}
+              showDetailedToc={showDetailedToc}
+              onToggleDetailed={handleToggleDetailedToc}
               onNavigate={handleTocNavigate}
             />
           ) : null}

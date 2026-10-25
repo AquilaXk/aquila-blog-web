@@ -63,8 +63,9 @@ export const SearchClearButton = styled.button`
     color: ${textPrimary};
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 `
 
@@ -79,7 +80,7 @@ export const SortSelect = styled.select`
   font-weight: 800;
   cursor: pointer;
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 
@@ -98,7 +99,7 @@ export const ActionBar = styled.div`
   min-width: 0;
   margin-bottom: 1rem;
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     grid-template-columns: minmax(0, 1fr);
   }
 `
@@ -114,7 +115,7 @@ export const ActionGroup = styled.div`
     justify-content: flex-end;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     &[data-align="end"] {
       justify-content: flex-start;
     }
@@ -145,8 +146,9 @@ export const PrimaryButton = styled.button`
   white-space: nowrap;
   cursor: pointer;
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 
   &:disabled {
@@ -177,8 +179,9 @@ export const SecondaryButton = styled.button`
   cursor: pointer;
   ${focusVisibleRing}
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 
   &:disabled {
@@ -201,7 +204,7 @@ export const IconButton = styled.button`
   color: ${textSecondary};
   cursor: pointer;
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     width: 44px;
     height: 44px;
     min-width: 44px;
@@ -247,8 +250,9 @@ export const ViewModeButton = styled.button`
   white-space: nowrap;
   cursor: pointer;
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 
   &[data-active="true"] {
@@ -297,8 +301,9 @@ export const GhostButton = styled.button`
   cursor: pointer;
   ${focusVisibleRing}
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
   }
 
   &:hover,
@@ -342,6 +347,12 @@ export const RowCheckbox = styled.input`
   width: 1rem;
   height: 1rem;
   accent-color: ${accentGold};
+  ${focusVisibleRing}
+
+  @media (max-width: 768px), (pointer: coarse) {
+    min-width: 24px;
+    min-height: 24px;
+  }
 `
 
 export const FileTypeIcon = styled.span`
@@ -434,14 +445,13 @@ export const FileNameButton = styled.button`
     white-space: nowrap;
   }
 
-  &:focus,
   &:focus-visible {
     outline: none;
     color: ${accentGold};
     box-shadow: inset 0 -2px 0 #58a6ff;
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `

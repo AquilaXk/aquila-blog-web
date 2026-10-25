@@ -167,12 +167,16 @@ const parseImageReplacementSpec = (raw: string, from: number, to: number): Image
 }
 
 const parseMermaidReplacementSpec = (raw: string, from: number, to: number): MermaidReplacementSpec | null => {
-  const lines = raw.split(/\r?\n/)
-  if (lines.length < 2) return null
-  const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(lines[0] ?? "")
-  const closeLine = lines.at(-1) ?? ""
+  const firstBreak = raw.indexOf("\n")
+  if (firstBreak === -1) return null
+  const lastBreak = raw.lastIndexOf("\n")
+  const firstLine = raw.slice(0, firstBreak).replace(/\r$/, "")
+  const closeLine = raw.slice(lastBreak + 1).replace(/\r$/, "")
+  const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(firstLine)
   if (!openMatch || !/^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)) return null
-  return { from, to, source: lines.slice(1, -1).join("\n") }
+  const bodyEnd = lastBreak > 0 && raw.charCodeAt(lastBreak - 1) === 13 ? lastBreak - 1 : lastBreak
+  const source = firstBreak >= lastBreak ? "" : raw.slice(firstBreak + 1, bodyEnd).replace(/\r\n/g, "\n")
+  return { from, to, source }
 }
 
 const collectMathReplacementSpecs = (markdownValue: string): MathReplacementSpec[] => {

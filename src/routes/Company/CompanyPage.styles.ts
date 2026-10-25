@@ -75,12 +75,14 @@ export const NoticeBanner = styled.div`
       transition: transform 220ms ${MOTION_EASE_OUT};
     }
 
-    &:hover {
-      color: ${light.inkPrimary};
-      border-color: ${light.borderStrong};
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: ${light.inkPrimary};
+        border-color: ${light.borderStrong};
 
-      svg {
-        transform: translateX(3px);
+        svg {
+          transform: translateX(3px);
+        }
       }
     }
 
@@ -227,11 +229,13 @@ export const PillAction = styled.a`
     transition: transform 220ms ${MOTION_EASE_OUT};
   }
 
-  &:hover {
-    background: ${light.accentPressed};
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: ${light.accentPressed};
 
-    svg {
-      transform: translateX(3px);
+      svg {
+        transform: translateX(3px);
+      }
     }
   }
 

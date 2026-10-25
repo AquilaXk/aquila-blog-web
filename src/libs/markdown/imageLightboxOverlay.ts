@@ -27,6 +27,7 @@ const createLightboxImageElement = (src: string, alt: string): HTMLImageElement 
   const image = document.createElement("img")
   image.src = src
   image.alt = alt
+  image.draggable = false
   image.setAttribute("src", src)
   image.setAttribute("alt", alt)
   image.style.display = "block"
@@ -35,6 +36,7 @@ const createLightboxImageElement = (src: string, alt: string): HTMLImageElement 
   image.style.width = "auto"
   image.style.height = "auto"
   image.style.objectFit = "contain"
+  image.style.userSelect = "none"
   image.style.transition = "transform 0.14s ease"
   return image
 }
@@ -130,7 +132,7 @@ export const openImageLightboxOverlay = (
     zoomResetButton.textContent = `${Math.round(zoomLevel * 100)}%`
     stage.style.cursor = zoomLevel > 1 ? "grab" : ""
     stageImg.style.transform = `scale(${zoomLevel})`
-    stageImg.style.transformOrigin = "top left"
+    stageImg.style.transformOrigin = zoomLevel > 1 ? "top left" : "center center"
   }
 
   const handleZoomOut = () => applyZoom(zoomLevel - 0.25)

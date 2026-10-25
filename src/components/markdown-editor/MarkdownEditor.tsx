@@ -317,11 +317,11 @@ export const MarkdownEditor = ({
   const commandContext = useMemo(
     () => ({
       disabled,
-      selectionStart: selectionRef.current.from,
-      selectionEnd: selectionRef.current.to,
+      selectionStart: editorSelection.from,
+      selectionEnd: editorSelection.to,
       isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
     }),
-    [disabled, isTableEditDisabled]
+    [disabled, editorSelection, isTableEditDisabled]
   )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 

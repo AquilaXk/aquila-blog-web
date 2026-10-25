@@ -13,7 +13,11 @@ import {
   readMermaidCache,
   writeMermaidCache,
 } from "src/libs/markdown/mermaidRuntimeConfig"
-import { openMermaidOverlay, shouldIgnoreStageClickForZoom } from "src/libs/markdown/mermaidRuntimeOverlay"
+import {
+  openMermaidOverlay,
+  parseSvgViewBoxNumbers,
+  shouldIgnoreStageClickForZoom,
+} from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
   createMermaidRenderTimeoutError,
   isMermaidRenderTimeoutError,
@@ -73,7 +77,12 @@ export const createMermaidRuntimeController = ({
   const resolveBlockSources = (block: HTMLElement) => {
     const codeBlock =
       block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
-    const raw = block.getAttribute("data-mermaid-source") || codeBlock?.textContent || block.textContent || ""
+    const raw =
+      block.getAttribute("data-mermaid-source") ||
+      block.dataset.mermaidRenderedSource ||
+      codeBlock?.textContent ||
+      block.textContent ||
+      ""
     const cached = blockSourceCache.get(block)
     if (cached?.raw === raw) return cached
     const desired = applyMermaidSoftWrapHints(extractNormalizedMermaidSource(raw))
@@ -215,13 +224,9 @@ export const createMermaidRuntimeController = ({
     const svgElement = stage.querySelector("svg")
     if (!svgElement) throw new Error("Mermaid SVG 생성 실패")
 
-    const viewBox = svgElement.getAttribute("viewBox") || ""
-    const viewBoxValues = viewBox
-      .split(/\s+/)
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value))
-    const viewBoxWidth = viewBoxValues.length === 4 ? viewBoxValues[2] : NaN
-    const viewBoxHeight = viewBoxValues.length === 4 ? viewBoxValues[3] : NaN
+    const viewBoxValues = parseSvgViewBoxNumbers(svgElement.getAttribute("viewBox") || "")
+    const viewBoxWidth = viewBoxValues ? viewBoxValues[2] : NaN
+    const viewBoxHeight = viewBoxValues ? viewBoxValues[3] : NaN
     const attrWidth = Number(svgElement.getAttribute("width"))
     const attrHeight = Number(svgElement.getAttribute("height"))
     const fallbackWidth = Number.isFinite(attrWidth) && attrWidth > 0 ? attrWidth : containerWidth
@@ -384,6 +389,11 @@ export const createMermaidRuntimeController = ({
     if (!hasMermaidHint && !looksLikeMermaid) return
     if (isBlockAlreadyRendered(block, desiredSource)) return
 
+    if (!block.dataset.mermaidSource) {
+      block.dataset.mermaidSource = desiredSource
+    }
+    block.dataset.aqMermaid = "true"
+
     const premeasured = premeasuredRects.get(block)
     premeasuredRects.delete(block)
     const blockRect = premeasured && premeasured.width > 0 ? premeasured : block.getBoundingClientRect()
@@ -410,6 +420,22 @@ export const createMermaidRuntimeController = ({
     const index = renderSequence
     renderSequence += 1
 
+    const markBlockRendered = (renderedSource: string) => {
+      block.dataset.mermaidRenderedSource = renderedSource
+      block.dataset.mermaidRenderedWidth = String(Math.round(block.clientWidth || root.clientWidth || 0))
+      block.dataset.mermaidTheme = preset.themeKey
+      block.dataset.mermaidPreset = preset.mode
+      block.dataset.mermaidRendered = "true"
+      block.dataset.mermaidRetryCount = "0"
+      block.classList.remove("aq-mermaid-error")
+    }
+
+    const logOnce = (signature: string, label: string, err: unknown) => {
+      if (loggedErrorSignatures.has(signature)) return
+      loggedErrorSignatures.add(signature)
+      if (shouldLogMermaidWarnings) console.warn(label, err)
+    }
+
     try {
       await renderSourceIntoBlock({
         block,
@@ -421,19 +447,11 @@ export const createMermaidRuntimeController = ({
         blockRect,
         desktopWideLaneBounds,
       })
-
-      block.dataset.mermaidRenderedSource = desiredSource
-      block.dataset.mermaidTheme = preset.themeKey
-      block.dataset.mermaidPreset = preset.mode
-      block.dataset.mermaidRendered = "true"
-      block.dataset.mermaidRetryCount = "0"
-      block.classList.remove("aq-mermaid-error")
+      markBlockRendered(desiredSource)
     } catch (error) {
       const isSyntaxError = isMermaidSyntaxError(error)
       const isTimeoutError = isMermaidRenderTimeoutError(error)
-      if (isNegativeRectWidthError(error) && scheduleRetry(block)) {
-        return
-      }
+      if (isNegativeRectWidthError(error) && scheduleRetry(block)) return
 
       const fallbackSource = stripRiskyFlowchartDirectives(desiredSource).trim()
       if (fallbackSource && fallbackSource !== desiredSource && fallbackSource !== renderableSource) {
@@ -448,21 +466,10 @@ export const createMermaidRuntimeController = ({
             blockRect,
             desktopWideLaneBounds,
           })
-          block.dataset.mermaidRenderedSource = fallbackSource
-          block.dataset.mermaidTheme = preset.themeKey
-          block.dataset.mermaidPreset = preset.mode
-          block.dataset.mermaidRendered = "true"
-          block.dataset.mermaidRetryCount = "0"
-          block.classList.remove("aq-mermaid-error")
+          markBlockRendered(fallbackSource)
           return
         } catch (fallbackError) {
-          const signature = `fallback:${fallbackSource}:${String(fallbackError)}`
-          if (!loggedErrorSignatures.has(signature)) {
-            loggedErrorSignatures.add(signature)
-            if (shouldLogMermaidWarnings) {
-              console.warn("[mermaid] fallback render failed", fallbackError)
-            }
-          }
+          logOnce(`fallback:${fallbackSource}:${String(fallbackError)}`, "[mermaid] fallback render failed", fallbackError)
           if (!isMermaidSyntaxError(fallbackError) && !isMermaidRenderTimeoutError(fallbackError) && scheduleRetry(block)) return
         }
       }
@@ -476,13 +483,7 @@ export const createMermaidRuntimeController = ({
       block.classList.add("aq-mermaid-error")
       block.style.minHeight = ""
       block.innerHTML = renderMermaidErrorState({ source: desiredSource, error })
-      const signature = `${desiredSource}:${String(error)}`
-      if (!loggedErrorSignatures.has(signature)) {
-        loggedErrorSignatures.add(signature)
-        if (shouldLogMermaidWarnings) {
-          console.warn("[mermaid] render failed", error)
-        }
-      }
+      logOnce(`${desiredSource}:${String(error)}`, "[mermaid] render failed", error)
     }
   }
 
@@ -557,11 +558,7 @@ export const createMermaidRuntimeController = ({
             intersectingBlocks.forEach((target) => enqueueRender(target))
           }
         },
-        {
-          root: null,
-          rootMargin: MERMAID_VIEWPORT_ROOT_MARGIN,
-          threshold: 0.01,
-        }
+        { root: null, rootMargin: MERMAID_VIEWPORT_ROOT_MARGIN, threshold: 0.01 }
       )
     }
 
@@ -576,10 +573,15 @@ export const createMermaidRuntimeController = ({
 
   return {
     isRendering,
-    resetLayoutCache: (force = false) => {
-      if (!force && isRendering()) return
+    resetLayoutCache: (clearBlockCache = false) => {
+      if (!clearBlockCache && isRendering()) return
       cachedDesktopWideLaneBounds = undefined
       premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
+      if (clearBlockCache) {
+        root.querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']").forEach((block) => {
+          delete block.dataset.mermaidRendered
+        })
+      }
     },
     renderMermaidBlocks,
     dispose: () => {

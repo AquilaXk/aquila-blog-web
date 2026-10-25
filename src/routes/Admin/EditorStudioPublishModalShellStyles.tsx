@@ -47,6 +47,10 @@ export const PublishDialog = styled.div`
     max-height: min(92vh, 980px);
     padding: 0.82rem 0.82rem 0;
     gap: 0.78rem;
+
+    &[data-variant="drawer"] {
+      padding-top: max(0.82rem, env(safe-area-inset-top, 0px));
+    }
   }
 `
 

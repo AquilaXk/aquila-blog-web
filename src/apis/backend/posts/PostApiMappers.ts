@@ -29,7 +29,7 @@ type ParsedPostMeta = {
   category: string[]
 }
 
-const parsePostMeta = (content: string): ParsedPostMeta => {
+export const parsePostMeta = (content: string): ParsedPostMeta => {
   let trimmed = content.trimStart()
   const tags: string[] = []
   const categories: string[] = []
@@ -48,29 +48,38 @@ const parsePostMeta = (content: string): ParsedPostMeta => {
   if (trimmed.startsWith("---\n")) {
     const closingIndex = trimmed.indexOf("\n---", 4)
     if (closingIndex > 0) {
-      const block = trimmed.slice(4, closingIndex).split("\n")
-      block.forEach((line) => {
-        const [rawKey, ...rest] = line.split(":")
-        if (!rawKey || rest.length === 0) return
-        const key = rawKey.trim().toLowerCase()
-        const value = rest.join(":").trim()
-        if (!value) return
-
-        if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))
-        if (key === "category" || key === "categories") {
-          pushCategories(normalizeMetaItems(value))
+      let cursor = 4
+      while (cursor <= closingIndex) {
+        const nextBreak = trimmed.indexOf("\n", cursor)
+        const lineEnd = nextBreak === -1 || nextBreak > closingIndex ? closingIndex : nextBreak
+        const line = trimmed.slice(cursor, lineEnd)
+        const colonIdx = line.indexOf(":")
+        if (colonIdx > 0) {
+          const key = line.slice(0, colonIdx).trim().toLowerCase()
+          const value = line.slice(colonIdx + 1).trim()
+          if (value) {
+            if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))
+            if (key === "category" || key === "categories") {
+              pushCategories(normalizeMetaItems(value))
+            }
+          }
         }
-      })
+        if (nextBreak === -1 || nextBreak >= closingIndex) break
+        cursor = nextBreak + 1
+      }
       trimmed = trimmed.slice(closingIndex + 4).trimStart()
     }
   }
 
-  const lines = trimmed.split("\n")
   const metadataLineRegex = /^\s*(tags?|categories?)\s*:\s*(.+)\s*$/i
-  let consumed = 0
-  for (const line of lines) {
+  let cursor = 0
+  let consumedAny = false
+  while (cursor <= trimmed.length) {
+    const nextBreak = trimmed.indexOf("\n", cursor)
+    const line = nextBreak === -1 ? trimmed.slice(cursor) : trimmed.slice(cursor, nextBreak)
     if (!line.trim()) {
-      consumed += 1
+      consumedAny = true
+      cursor = nextBreak === -1 ? trimmed.length : nextBreak + 1
       break
     }
     const match = line.match(metadataLineRegex)
@@ -81,12 +90,16 @@ const parsePostMeta = (content: string): ParsedPostMeta => {
     if (key === "category" || key === "categories") {
       pushCategories(normalizeMetaItems(value))
     }
-    consumed += 1
+    consumedAny = true
+    if (nextBreak === -1) {
+      cursor = trimmed.length
+      break
+    }
+    cursor = nextBreak + 1
   }
 
-  if (consumed > 0) {
-    const rest = lines.slice(consumed).join("\n").trimStart()
-    trimmed = rest
+  if (consumedAny) {
+    trimmed = trimmed.slice(cursor).trimStart()
   }
 
   return { content: trimmed, tags, category: categories }
@@ -103,15 +116,20 @@ const toSlug = (id: number, title: string) => {
   return normalized ? `${normalized}-${id}` : `${id}`
 }
 
-const normalizeStringArray = (value?: string[]) => {
-  if (!Array.isArray(value)) return []
-  return Array.from(
-    new Set(
-      value
-        .map((item) => (typeof item === "string" ? item.trim() : ""))
-        .filter(Boolean)
-    )
-  )
+export const normalizeStringArray = (value?: string[]) => {
+  if (!Array.isArray(value) || value.length === 0) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (let i = 0; i < value.length; i += 1) {
+    const item = value[i]
+    if (typeof item !== "string") continue
+    const trimmed = item.trim()
+    if (trimmed && !seen.has(trimmed)) {
+      seen.add(trimmed)
+      result.push(trimmed)
+    }
+  }
+  return result
 }
 
 const normalizeCategoryArray = (value?: string[]) =>
@@ -204,7 +222,7 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
 }
 
 export const mapPostDetail = async (
-  post: ApiPostWithContentDto,
+  post: ApiPostWithContentDto & { thumbnail?: string },
   { allowTrustedContentHtml }: { allowTrustedContentHtml: boolean },
 ): Promise<PostDetail> => {
   const postContent = post.content ?? ""
@@ -234,6 +252,7 @@ export const mapPostDetail = async (
       title: post.title,
       summary: post.summary,
       summarySource: post.summarySource,
+      thumbnail: post.thumbnail,
       tags,
       category,
       published: post.published,
@@ -251,7 +270,9 @@ export const mapPostDetail = async (
   }
 }
 export const extractPostIdFromSlug = (slug: string): number | null => {
-  const tail = slug.split("-").pop() || ""
+  const dashIdx = slug.lastIndexOf("-")
+  const tail = dashIdx === -1 ? slug : slug.slice(dashIdx + 1)
+  if (!tail) return null
   const id = Number(tail)
   return Number.isInteger(id) && id > 0 ? id : null
 }

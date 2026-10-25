@@ -126,6 +126,7 @@ export const shouldScheduleFromTableMutations = (
 }
 
 export const syncResponsiveTables = (root: HTMLElement) => {
+  if (!root.querySelector("table")) return
   applyResponsiveTableLabels(root)
 }
 
