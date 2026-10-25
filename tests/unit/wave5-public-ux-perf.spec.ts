@@ -1,6 +1,5 @@
 import fs from "node:fs"
 import path from "node:path"
-import React from "react"
 import { expect, test } from "@playwright/test"
 import { parseSvgViewBoxNumbers } from "../../src/libs/markdown/mermaidRuntimeOverlay"
 import { normalizeSoftBreakChildren } from "../../src/libs/markdown/MarkdownRendererInline"

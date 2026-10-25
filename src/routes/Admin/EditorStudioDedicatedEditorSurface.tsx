@@ -18,13 +18,16 @@ import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
 
-const EDITOR_SURFACE_GUIDE_OPEN = 1 << 0
+const EDITOR_SURFACE_GUIDE_OPEN = 1
 const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
 const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
 const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
 const EDITOR_SURFACE_ZEN_BITS = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
-const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean) => boolean)) =>
-  (typeof next === "function" ? next((mask & bit) !== 0) : next) ? mask | bit : mask & ~bit
+const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean) => boolean)) => {
+  const enabled = typeof next === "function" ? next((mask & bit) !== 0) : next
+  return enabled ? mask | bit : mask & ~bit
+}
+const isMobileEditorViewport = () => typeof window !== "undefined" && window.innerWidth <= 820
 
 export const resolveActiveOutlineItemIndex = (
   items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
@@ -239,7 +242,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   }, [])
 
   const toggleResponsiveSidebar = useCallback((targetBit: number) => {
-    if (typeof window !== "undefined" && window.innerWidth <= 820) {
+    if (isMobileEditorViewport()) {
       setPanelUiMask((m) => {
         const nextOpen = (m & targetBit) === 0
         const cleared = m & ~EDITOR_SURFACE_ZEN_BITS
@@ -269,8 +272,8 @@ export const EditorStudioDedicatedEditorSurface = ({
         handleToggleZenMode()
         return
       }
-      if (event.key === "Escape" && typeof window !== "undefined" && window.innerWidth <= 820) {
-        setPanelUiMask((m) => ((m & EDITOR_SURFACE_ZEN_BITS) !== 0 ? m & ~EDITOR_SURFACE_ZEN_BITS : m))
+      if (event.key === "Escape" && isMobileEditorViewport()) {
+        setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
       }
     }
     window.addEventListener("keydown", onKeyDown)
@@ -410,9 +413,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   data-level={item.level}
                   data-active={index === activeOutlineIndex ? "true" : "false"}
                   onClick={() => {
-                    if (typeof window !== "undefined" && window.innerWidth <= 820) {
-                      setIsOutlineOpen(false)
-                    }
+                    if (isMobileEditorViewport()) setIsOutlineOpen(false)
                     if (item.range) {
                       setLastActivatedOutlineOffset(item.range.start)
                       onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
@@ -436,7 +437,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           data-testid="editor-writing-column"
           $zenMode={isZenMode}
           onPointerDown={() => {
-            if (typeof window !== "undefined" && window.innerWidth <= 820 && !isZenMode) {
+            if (isMobileEditorViewport() && !isZenMode) {
               setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
             }
           }}

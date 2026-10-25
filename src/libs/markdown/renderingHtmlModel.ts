@@ -273,8 +273,8 @@ export const countHtmlTags = (source: string, tagName: string, closing: boolean)
   let cached = COUNT_HTML_TAG_REGEX_CACHE[normalizedTag]
   if (!cached) {
     cached = {
-      open: new RegExp(`<${normalizedTag}\\b`, "gi"),
-      close: new RegExp(`</${normalizedTag}\\s*>`, "gi"),
+      open: new RegExp(String.raw`<${normalizedTag}\b`, "gi"),
+      close: new RegExp(String.raw`</${normalizedTag}\s*>`, "gi"),
     }
     COUNT_HTML_TAG_REGEX_CACHE[normalizedTag] = cached
   }

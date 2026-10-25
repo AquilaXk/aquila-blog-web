@@ -78,7 +78,7 @@ export const createMermaidRuntimeController = ({
     const codeBlock =
       block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
     const raw =
-      block.getAttribute("data-mermaid-source") ||
+      block.dataset.mermaidSource ||
       block.dataset.mermaidRenderedSource ||
       codeBlock?.textContent ||
       block.textContent ||
@@ -225,8 +225,8 @@ export const createMermaidRuntimeController = ({
     if (!svgElement) throw new Error("Mermaid SVG 생성 실패")
 
     const viewBoxValues = parseSvgViewBoxNumbers(svgElement.getAttribute("viewBox") || "")
-    const viewBoxWidth = viewBoxValues ? viewBoxValues[2] : NaN
-    const viewBoxHeight = viewBoxValues ? viewBoxValues[3] : NaN
+    const viewBoxWidth = viewBoxValues ? viewBoxValues[2] : Number.NaN
+    const viewBoxHeight = viewBoxValues ? viewBoxValues[3] : Number.NaN
     const attrWidth = Number(svgElement.getAttribute("width"))
     const attrHeight = Number(svgElement.getAttribute("height"))
     const fallbackWidth = Number.isFinite(attrWidth) && attrWidth > 0 ? attrWidth : containerWidth

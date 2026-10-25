@@ -51,7 +51,7 @@ export const handleZoomShortcutKey = (
   return false
 }
 
-const isViewBoxSeparator = (code: number) => code <= 32 || code === 44
+const isViewBoxSeparator = (code: number | undefined) => code !== undefined && (code <= 32 || code === 44)
 
 export const parseSvgViewBoxNumbers = (
   viewBox: string
@@ -61,10 +61,10 @@ export const parseSvgViewBoxNumbers = (
   const out: number[] = []
   let i = 0
   while (i < len) {
-    while (i < len && isViewBoxSeparator(viewBox.charCodeAt(i))) i += 1
+    while (i < len && isViewBoxSeparator(viewBox.codePointAt(i))) i += 1
     if (i >= len) break
     const start = i
-    while (i < len && !isViewBoxSeparator(viewBox.charCodeAt(i))) i += 1
+    while (i < len && !isViewBoxSeparator(viewBox.codePointAt(i))) i += 1
     const num = Number(viewBox.slice(start, i))
     if (!Number.isFinite(num)) return null
     out.push(num)

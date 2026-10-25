@@ -39,11 +39,14 @@ export const isEditorUnsavedDirtyByFingerprint = ({
   return editorStateFingerprint !== pristineCreateFingerprint
 }
 
+const resolveFirstDelimiterIndex = (queryIdx: number, hashIdx: number) => {
+  if (queryIdx === -1) return hashIdx
+  if (hashIdx === -1) return queryIdx
+  return Math.min(queryIdx, hashIdx)
+}
+
 const editorRoutePathname = (url: string) => {
-  const queryIdx = url.indexOf("?")
-  const hashIdx = url.indexOf("#")
-  const endIdx =
-    queryIdx === -1 ? hashIdx : hashIdx === -1 ? queryIdx : Math.min(queryIdx, hashIdx)
+  const endIdx = resolveFirstDelimiterIndex(url.indexOf("?"), url.indexOf("#"))
   return endIdx === -1 ? url : url.slice(0, endIdx)
 }
 

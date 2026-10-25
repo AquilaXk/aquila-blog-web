@@ -176,6 +176,28 @@ export const planIndentLines = (
   }
 }
 
+const countLeadingOutdentChars = (
+  value: string,
+  lineStart: number,
+  lineEnd: number,
+  indentSize: number
+): number => {
+  if (lineStart >= lineEnd) return 0
+  const firstCode = value.codePointAt(lineStart)
+  if (firstCode === 9) return 1
+  if (firstCode !== 32) return 0
+  const maxSpaces = Math.min(2, indentSize)
+  let removeCount = 0
+  while (
+    removeCount < maxSpaces &&
+    lineStart + removeCount < lineEnd &&
+    value.codePointAt(lineStart + removeCount) === 32
+  ) {
+    removeCount += 1
+  }
+  return removeCount
+}
+
 export const planOutdentLines = (
   value: string,
   selectionStart: number,
@@ -192,22 +214,7 @@ export const planOutdentLines = (
   while (cursor <= blockEnd) {
     const nextBreak = value.indexOf("\n", cursor)
     const lineEnd = nextBreak === -1 || nextBreak > blockEnd ? blockEnd : nextBreak
-    let removeCount = 0
-    if (cursor < lineEnd) {
-      const firstCode = value.charCodeAt(cursor)
-      if (firstCode === 9) {
-        removeCount = 1
-      } else if (firstCode === 32) {
-        const maxSpaces = Math.min(2, indentSize)
-        while (
-          removeCount < maxSpaces &&
-          cursor + removeCount < lineEnd &&
-          value.charCodeAt(cursor + removeCount) === 32
-        ) {
-          removeCount += 1
-        }
-      }
-    }
+    const removeCount = countLeadingOutdentChars(value, cursor, lineEnd, indentSize)
     if (removeCount > 0) {
       if (cursor < selectionStart) {
         removedBeforeStart += Math.min(removeCount, selectionStart - cursor)

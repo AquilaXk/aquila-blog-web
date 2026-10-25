@@ -293,6 +293,27 @@ const normalizeInlineColorChildren = (children: ReactNode): ReactNode => {
   return nodes
 }
 
+const appendSoftBreakSegments = (
+  text: string,
+  nodes: ReactNode[],
+  startBreakIndex: number
+): number => {
+  let breakIndex = startBreakIndex
+  let start = 0
+  while (start <= text.length) {
+    const nlIndex = text.indexOf("\n", start)
+    if (nlIndex < 0) {
+      if (start < text.length) nodes.push(text.slice(start))
+      break
+    }
+    if (nlIndex > start) nodes.push(text.slice(start, nlIndex))
+    nodes.push(<br key={`blockquote-soft-break-${breakIndex}`} />)
+    breakIndex += 1
+    start = nlIndex + 1
+  }
+  return breakIndex
+}
+
 export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
   if (!hasStringChildMatching(children, hasSoftBreakSyntax)) return children
   const nodes: ReactNode[] = []
@@ -303,23 +324,7 @@ export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
       nodes.push(child)
       continue
     }
-
-    let start = 0
-    while (start <= child.length) {
-      const nlIndex = child.indexOf("\n", start)
-      if (nlIndex < 0) {
-        if (start < child.length) {
-          nodes.push(child.slice(start))
-        }
-        break
-      }
-      if (nlIndex > start) {
-        nodes.push(child.slice(start, nlIndex))
-      }
-      nodes.push(<br key={`blockquote-soft-break-${breakIndex}`} />)
-      breakIndex += 1
-      start = nlIndex + 1
-    }
+    breakIndex = appendSoftBreakSegments(child, nodes, breakIndex)
   }
 
   return nodes

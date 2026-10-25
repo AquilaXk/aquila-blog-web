@@ -174,8 +174,8 @@ const parseMermaidReplacementSpec = (raw: string, from: number, to: number): Mer
   const closeLine = raw.slice(lastBreak + 1).replace(/\r$/, "")
   const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(firstLine)
   if (!openMatch || !/^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)) return null
-  const bodyEnd = lastBreak > 0 && raw.charCodeAt(lastBreak - 1) === 13 ? lastBreak - 1 : lastBreak
-  const source = firstBreak >= lastBreak ? "" : raw.slice(firstBreak + 1, bodyEnd).replace(/\r\n/g, "\n")
+  const bodyEnd = lastBreak > 0 && raw.codePointAt(lastBreak - 1) === 13 ? lastBreak - 1 : lastBreak
+  const source = firstBreak >= lastBreak ? "" : raw.slice(firstBreak + 1, bodyEnd).replaceAll("\r\n", "\n")
   return { from, to, source }
 }
 

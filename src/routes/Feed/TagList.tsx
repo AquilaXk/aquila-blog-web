@@ -16,7 +16,7 @@ import {
 
 type TagEntry = [string, number]
 
-export const TAG_EXPAND_DESKTOP = 1 << 0
+export const TAG_EXPAND_DESKTOP = 1
 export const TAG_EXPAND_CHIP = 1 << 1
 
 const toRepresentativeTagEntries = (

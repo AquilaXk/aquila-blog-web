@@ -86,7 +86,7 @@ export const useAdminProfileWorkspaceDraftActions = ({
         }
       })
       setOpenIconPicker((current) => {
-        if (!current || !current.startsWith(`${section}:`)) return current
+        if (!current?.startsWith(`${section}:`)) return current
         const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
         if (openIdx === index) return null
         return openIdx > index ? `${section}:${openIdx - 1}` : current
@@ -108,7 +108,7 @@ export const useAdminProfileWorkspaceDraftActions = ({
         }
       })
       setOpenIconPicker((current) => {
-        if (!current || !current.startsWith(`${section}:`)) return current
+        if (!current?.startsWith(`${section}:`)) return current
         const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
         if (openIdx === fromIndex) return `${section}:${toIndex}`
         if (fromIndex < toIndex && openIdx > fromIndex && openIdx <= toIndex) {

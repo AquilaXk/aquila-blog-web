@@ -34,7 +34,7 @@ import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
 const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"))
 
-export const RAIL_UI_DETAILED_TOC = 1 << 0
+export const RAIL_UI_DETAILED_TOC = 1
 export const RAIL_UI_LEFT_ACTIVE = 1 << 1
 export const RAIL_UI_RIGHT_ACTIVE = 1 << 2
 

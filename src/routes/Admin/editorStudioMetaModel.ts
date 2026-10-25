@@ -190,15 +190,23 @@ const isYamlLine = (line: string): boolean => {
   return false
 }
 
+const isSupportedFrontmatterLine = (line: string, allowArbitraryFrontmatter: boolean) => {
+  if (allowArbitraryFrontmatter) return isYamlLine(line)
+  return /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
+}
+
+const readLineSlice = (text: string, cursor: number) => {
+  const nextBreak = text.indexOf("\n", cursor)
+  const line = nextBreak === -1 ? text.slice(cursor) : text.slice(cursor, nextBreak)
+  const nextCursor = nextBreak === -1 ? text.length : nextBreak + 1
+  return { line, nextBreak, nextCursor }
+}
+
 export const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = false) => {
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
-  const firstBreak = normalized.indexOf("\n")
-  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
+  const { line: firstLine, nextBreak: firstBreak } = readLineSlice(normalized, 0)
   if (firstBreak === -1 || !FRONTMATTER_DELIMITER_REGEX.test(firstLine)) {
-    return {
-      metadataLines: [] as string[],
-      body: normalized,
-    }
+    return { metadataLines: [] as string[], body: normalized }
   }
   const metadataLines: string[] = []
   let meaningfulCount = 0
@@ -206,70 +214,49 @@ export const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter
   let cursor = firstBreak + 1
 
   while (cursor <= normalized.length) {
-    const nextBreak = normalized.indexOf("\n", cursor)
-    const line = nextBreak === -1 ? normalized.slice(cursor) : normalized.slice(cursor, nextBreak)
+    const { line, nextBreak, nextCursor } = readLineSlice(normalized, cursor)
     if (FRONTMATTER_DELIMITER_REGEX.test(line)) {
       if (meaningfulCount === 0 || !allSupported) {
         return { metadataLines: [] as string[], body: normalized }
       }
-      const rawBody = nextBreak === -1 ? "" : normalized.slice(nextBreak + 1)
-      return {
-        metadataLines,
-        body: rawBody.replace(/^\n+/, ""),
-      }
+      const rawBody = nextBreak === -1 ? "" : normalized.slice(nextCursor)
+      return { metadataLines, body: rawBody.replace(/^\n+/, "") }
     }
     metadataLines.push(line)
     if (line.trim().length > 0) {
       meaningfulCount += 1
-      const supported = allowArbitraryFrontmatter
-        ? isYamlLine(line)
-        : /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
-      if (!supported) allSupported = false
+      if (!isSupportedFrontmatterLine(line, allowArbitraryFrontmatter)) allSupported = false
     }
     if (nextBreak === -1) break
-    cursor = nextBreak + 1
+    cursor = nextCursor
   }
 
-  return {
-    metadataLines: [] as string[],
-    body: normalized,
-  }
+  return { metadataLines: [] as string[], body: normalized }
 }
 
 export const stripLeadingEditorMetadataLines = (content: string) => {
   const normalized = content.replace(/\r\n?/g, "\n")
-  const firstBreak = normalized.indexOf("\n")
-  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
+  const { line: firstLine } = readLineSlice(normalized, 0)
   if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
-    return {
-      consumed: 0,
-      metadataLines: [] as string[],
-      body: normalized,
-    }
+    return { consumed: 0, metadataLines: [] as string[], body: normalized }
   }
   const metadataLines: string[] = []
-  let consumed = 0
   let cursor = 0
 
   while (cursor <= normalized.length) {
-    const nextBreak = normalized.indexOf("\n", cursor)
-    const line = nextBreak === -1 ? normalized.slice(cursor) : normalized.slice(cursor, nextBreak)
+    const { line, nextBreak, nextCursor } = readLineSlice(normalized, cursor)
     if (!line.trim()) {
-      consumed += 1
       metadataLines.push(line)
-      cursor = nextBreak === -1 ? normalized.length : nextBreak + 1
+      cursor = nextCursor
       break
     }
     if (!LEADING_EDITOR_METADATA_LINE_REGEX.test(line)) break
-    consumed += 1
     metadataLines.push(line)
-    if (nextBreak === -1) {
-      cursor = normalized.length
-      break
-    }
-    cursor = nextBreak + 1
+    cursor = nextCursor
+    if (nextBreak === -1) break
   }
 
+  const consumed = metadataLines.length
   return {
     consumed,
     metadataLines,

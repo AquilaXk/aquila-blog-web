@@ -138,8 +138,7 @@ const buildMutationFromTransformations = (
   const rangeStart = transformations[0]!.line.start
   const rangeEnd = transformations[transformations.length - 1]!.line.end
   let runningReplacementStart = rangeStart
-  for (let i = 0; i < transformations.length; i += 1) {
-    const item = transformations[i]!
+  for (const item of transformations) {
     item.replacementStart = runningReplacementStart
     runningReplacementStart += item.replacement.length + 1
   }

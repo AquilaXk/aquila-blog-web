@@ -29,49 +29,73 @@ type ParsedPostMeta = {
   category: string[]
 }
 
+const pushUniqueStrings = (target: string[], items: string[]) => {
+  for (const item of items) {
+    if (!target.includes(item)) target.push(item)
+  }
+}
+
+const applyPostMetaKeyValue = (
+  key: string,
+  value: string,
+  tags: string[],
+  categories: string[]
+): boolean => {
+  if (key === "tag" || key === "tags") {
+    pushUniqueStrings(tags, normalizeMetaItems(value))
+    return true
+  }
+  if (key === "category" || key === "categories") {
+    pushUniqueStrings(categories, normalizeMetaItems(value).map(normalizeCategoryValue))
+    return true
+  }
+  return false
+}
+
+const parsePostMetaKeyValueLine = (line: string): { key: string; value: string } | null => {
+  const colonIdx = line.indexOf(":")
+  if (colonIdx <= 0) return null
+  const key = line.slice(0, colonIdx).trim().toLowerCase()
+  const value = line.slice(colonIdx + 1).trim()
+  if (!value) return null
+  if (key !== "tag" && key !== "tags" && key !== "category" && key !== "categories") {
+    return null
+  }
+  return { key, value }
+}
+
+const consumeFrontmatterPostMeta = (
+  trimmed: string,
+  tags: string[],
+  categories: string[]
+): string => {
+  if (!trimmed.startsWith("---\n")) return trimmed
+  const closingIndex = trimmed.indexOf("\n---", 4)
+  if (closingIndex <= 0) return trimmed
+
+  let cursor = 4
+  while (cursor <= closingIndex) {
+    const nextBreak = trimmed.indexOf("\n", cursor)
+    const lineEnd = nextBreak === -1 || nextBreak > closingIndex ? closingIndex : nextBreak
+    const parsed = parsePostMetaKeyValueLine(trimmed.slice(cursor, lineEnd))
+    if (parsed) {
+      applyPostMetaKeyValue(parsed.key, parsed.value, tags, categories)
+    }
+    if (nextBreak === -1 || nextBreak >= closingIndex) break
+    cursor = nextBreak + 1
+  }
+  return trimmed.slice(closingIndex + 4).trimStart()
+}
+
 export const parsePostMeta = (content: string): ParsedPostMeta => {
-  let trimmed = content.replace(/\r\n?/g, "\n").trimStart()
   const tags: string[] = []
   const categories: string[] = []
+  let trimmed = consumeFrontmatterPostMeta(
+    content.replace(/\r\n?/g, "\n").trimStart(),
+    tags,
+    categories
+  )
 
-  const pushTags = (items: string[]) => {
-    items.forEach((item) => {
-      if (!tags.includes(item)) tags.push(item)
-    })
-  }
-  const pushCategories = (items: string[]) => {
-    items.map(normalizeCategoryValue).forEach((item) => {
-      if (!categories.includes(item)) categories.push(item)
-    })
-  }
-
-  if (trimmed.startsWith("---\n")) {
-    const closingIndex = trimmed.indexOf("\n---", 4)
-    if (closingIndex > 0) {
-      let cursor = 4
-      while (cursor <= closingIndex) {
-        const nextBreak = trimmed.indexOf("\n", cursor)
-        const lineEnd = nextBreak === -1 || nextBreak > closingIndex ? closingIndex : nextBreak
-        const line = trimmed.slice(cursor, lineEnd)
-        const colonIdx = line.indexOf(":")
-        if (colonIdx > 0) {
-          const key = line.slice(0, colonIdx).trim().toLowerCase()
-          const value = line.slice(colonIdx + 1).trim()
-          if (value) {
-            if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))
-            if (key === "category" || key === "categories") {
-              pushCategories(normalizeMetaItems(value))
-            }
-          }
-        }
-        if (nextBreak === -1 || nextBreak >= closingIndex) break
-        cursor = nextBreak + 1
-      }
-      trimmed = trimmed.slice(closingIndex + 4).trimStart()
-    }
-  }
-
-  const metadataLineRegex = /^\s*(tags?|category|categories)\s*:\s*(.+)\s*$/i
   let cursor = 0
   let consumedAny = false
   while (cursor <= trimmed.length) {
@@ -82,14 +106,9 @@ export const parsePostMeta = (content: string): ParsedPostMeta => {
       cursor = nextBreak === -1 ? trimmed.length : nextBreak + 1
       break
     }
-    const match = line.match(metadataLineRegex)
-    if (!match) break
-    const key = match[1].toLowerCase()
-    const value = match[2]
-    if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
-    if (key === "category" || key === "categories") {
-      pushCategories(normalizeMetaItems(value))
-    }
+    const parsed = parsePostMetaKeyValueLine(line)
+    if (!parsed) break
+    applyPostMetaKeyValue(parsed.key, parsed.value, tags, categories)
     consumedAny = true
     if (nextBreak === -1) {
       cursor = trimmed.length
@@ -120,8 +139,7 @@ export const normalizeStringArray = (value?: string[]) => {
   if (!Array.isArray(value) || value.length === 0) return []
   const seen = new Set<string>()
   const result: string[] = []
-  for (let i = 0; i < value.length; i += 1) {
-    const item = value[i]
+  for (const item of value) {
     if (typeof item !== "string") continue
     const trimmed = item.trim()
     if (trimmed && !seen.has(trimmed)) {

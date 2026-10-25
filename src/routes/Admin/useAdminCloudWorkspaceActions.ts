@@ -21,7 +21,7 @@ import {
 
 const CLOUD_QUERY_KEY = "admin-cloud-files"
 const EMPTY_CLOUD_FILES: CloudFile[] = []
-const CLOUD_UI_COMPOSING = 1 << 0
+const CLOUD_UI_COMPOSING = 1
 const CLOUD_UI_DETAIL_OPEN = 1 << 1
 const CLOUD_UI_DRAG_ACTIVE = 1 << 2
 const CLOUD_UI_DELETE_PENDING = 1 << 3
@@ -76,11 +76,10 @@ export const useAdminCloudWorkspaceActions = () => {
   )
   const setIsDetailPanelOpen = useCallback(
     (v: boolean | ((current: boolean) => boolean)) =>
-      setCloudUiMask((m) =>
-        (typeof v === "function" ? v((m & CLOUD_UI_DETAIL_OPEN) !== 0) : v)
-          ? m | CLOUD_UI_DETAIL_OPEN
-          : m & ~CLOUD_UI_DETAIL_OPEN
-      ),
+      setCloudUiMask((m) => {
+        const enabled = typeof v === "function" ? v((m & CLOUD_UI_DETAIL_OPEN) !== 0) : v
+        return enabled ? m | CLOUD_UI_DETAIL_OPEN : m & ~CLOUD_UI_DETAIL_OPEN
+      }),
     []
   )
   const setIsDragActive = useCallback(

@@ -58,7 +58,7 @@ export const getServerSideProps: GetServerSideProps<AdminLoginPageProps> =
     }
   })
 
-const LOGIN_PREF_SAVE_EMAIL = 1 << 0
+const LOGIN_PREF_SAVE_EMAIL = 1
 const LOGIN_PREF_KEEP_SIGNED_IN = 1 << 1
 const LOGIN_PREF_HYDRATED = 1 << 2
 

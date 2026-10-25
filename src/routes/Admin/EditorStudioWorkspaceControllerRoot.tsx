@@ -38,11 +38,13 @@ import {
   type CanonicalSummaryState, type SummaryIntent, type RsData,
 } from "./EditorStudioWorkspaceControllerRootModel"
 
-const MODAL_UI_PUBLISH_OPEN = 1 << 0
+const MODAL_UI_PUBLISH_OPEN = 1
 const MODAL_UI_MOBILE_THUMB_OPEN = 1 << 1
 const MODAL_UI_MOBILE_META_OPEN = 1 << 2
-const applyBitFlag = (mask: number, bit: number, action: SetStateAction<boolean>) =>
-  (typeof action === "function" ? action((mask & bit) !== 0) : action) ? mask | bit : mask & ~bit
+const applyBitFlag = (mask: number, bit: number, action: SetStateAction<boolean>) => {
+  const enabled = typeof action === "function" ? action((mask & bit) !== 0) : action
+  return enabled ? mask | bit : mask & ~bit
+}
 
 type MarkdownEditorFlush = () => string
 type MarkdownEditorChangeMeta = {
