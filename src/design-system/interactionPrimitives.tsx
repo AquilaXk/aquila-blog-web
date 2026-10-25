@@ -146,7 +146,7 @@ const StyledIconButton = styled.button<StyledIconButtonProps>`
   `
       : ""}
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-width: ${touchTargetSize};
     min-height: ${touchTargetSize};
   }

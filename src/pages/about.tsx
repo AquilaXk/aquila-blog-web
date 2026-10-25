@@ -137,7 +137,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
   const timelineSection = aboutDetailSections.find((section) => isTimelineSection(section.title))
   const supplementalSections = aboutDetailSections.filter((section) => section !== timelineSection)
   const hasProfileLinks = contactLinks.length > 0 || serviceLinks.length > 0
-  const projectSectionTitle = adminProfile.aboutProjectSectionTitle || ""
+  const projectSectionTitle = adminProfile.aboutProjectSectionTitle?.trim() || "Projects"
   const projectItems: AboutProjectItem[] = (adminProfile.aboutProjects || []).map((project) => {
     const safeHref = resolveRenderableProfileLinkHref("service", project.href) || ""
     return {

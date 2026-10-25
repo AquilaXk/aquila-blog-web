@@ -28,8 +28,16 @@ export const EditorStudioStatusBar = styled.footer`
 
   @media (max-width: 820px) {
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 10px;
-    padding: 4px 12px;
+    min-height: 24px;
+    padding: 3px 12px;
+    font-size: 10.5px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 `
 
@@ -82,7 +90,7 @@ export const EditorPanelHeader = styled.div`
     border-radius: 4px;
     transition: all 0.15s ease;
     ${focusVisibleRing}
-    @media (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    @media (max-width: 768px), (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 
     &:hover {
       color: ${({ theme }) => theme.colors.gray12};
@@ -114,7 +122,17 @@ export const EditorOutline = styled.aside`
   }
 
   @media (max-width: 820px) {
-    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 160;
+    max-height: min(72dvh, 520px);
+    border-right: 0;
+    border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 `
 
@@ -133,7 +151,7 @@ export const EditorOutlineItem = styled.button`
   font-size: 13px;
   line-height: 1.4;
   transition: background 0.15s ease, color 0.15s ease;
-  @media (pointer: coarse) { min-height: 44px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 
   &:hover {
     background: ${({ theme }) => theme.colors.gray3};
@@ -222,7 +240,8 @@ export const LocalDraftRestoreCard = styled.div`
     background: ${({ theme }) => theme.publicDesign.readableSurface};
     color: ${({ theme }) => theme.colors.gray12};
     box-sizing: border-box;
-    @media (pointer: coarse) { min-height: 44px; }
+    ${focusVisibleRing}
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; font-size: 16px; }
   }
 
   .card-actions {
@@ -233,7 +252,8 @@ export const LocalDraftRestoreCard = styled.div`
     button {
       font-size: 0.78rem;
       padding: 5px 9px;
-      @media (pointer: coarse) { min-height: 44px; }
+      ${focusVisibleRing}
+      @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
     }
   }
 `
@@ -290,11 +310,12 @@ export const EditorInspector = styled.aside`
     font-size: 0.88rem;
     padding: 10px;
     box-sizing: border-box;
+    ${focusVisibleRing}
   }
 
   select {
     min-height: 40px;
-    @media (pointer: coarse) { min-height: 44px; }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
   }
 
   textarea {
@@ -319,7 +340,21 @@ export const EditorInspector = styled.aside`
   }
 
   @media (max-width: 820px) {
-    max-height: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 160;
+    max-height: min(78dvh, 580px);
+    border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 `
 
@@ -366,7 +401,7 @@ export const EditorGuidePanel = styled.aside`
     font-size: 1.2rem;
     cursor: pointer;
     ${focusVisibleRing}
-    @media (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    @media (max-width: 768px), (pointer: coarse) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   }
 `
 

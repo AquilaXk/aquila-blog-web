@@ -30,15 +30,11 @@ let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
 
 const syncTableFromDataset = (wrap: HTMLElement, from: number | undefined) => {
-  if (from !== undefined) {
-    if (wrap.dataset) wrap.dataset.tableFrom = String(from)
-    return
-  }
-  if (wrap.dataset) delete wrap.dataset.tableFrom
+  if (!wrap.dataset) return
+  if (from !== undefined) wrap.dataset.tableFrom = String(from)
+  else delete wrap.dataset.tableFrom
 }
-
-const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string =>
-  r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? "")
+const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string => (r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? ""))
 
 const patchSingleTableCell = (
   cellEl: HTMLElement, prevAlign: string, nextAlign: string, prevText: string, nextText: string,
@@ -125,7 +121,8 @@ export class MarkdownTableWidget extends WidgetType {
       if (!outsideListenerAttached) return
       outsideListenerAttached = false
       if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
-        document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+        document.removeEventListener("mousedown", handleOutsideInteraction, true)
+        document.removeEventListener("focusin", handleOutsideInteraction, true)
       }
       if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
         window.removeEventListener("pagehide", handleLifecycleFlush)
@@ -133,14 +130,12 @@ export class MarkdownTableWidget extends WidgetType {
       }
     }
 
-    const handleOutsideMouseDown = (event: MouseEvent) => {
-      if (!wrap.isConnected) {
-        flushAndDispatchActiveCell()
-        return detachOutsideListener()
-      }
+    const handleOutsideInteraction = (event: Event) => {
+      if (!wrap.isConnected) { flushAndDispatchActiveCell(); return detachOutsideListener() }
       const target = event.target as HTMLElement | null
       if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
       flushAndDispatchActiveCell()
+      if (target?.closest?.("[data-table-popover]")) return
       isTableActive = false
       detachOutsideListener()
       syncActiveCellHighlight()
@@ -151,7 +146,8 @@ export class MarkdownTableWidget extends WidgetType {
       if (!outsideListenerAttached) {
         outsideListenerAttached = true
         if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-          document.addEventListener("mousedown", handleOutsideMouseDown, true)
+          document.addEventListener("mousedown", handleOutsideInteraction, true)
+          document.addEventListener("focusin", handleOutsideInteraction, true)
         }
         if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
           window.addEventListener("pagehide", handleLifecycleFlush)
@@ -212,7 +208,7 @@ export class MarkdownTableWidget extends WidgetType {
     const flushAndDispatchActiveCell = () => {
       if (!activeSession || activeSession.handled) return
       const committed = flushActiveCellMarkdown()
-      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed)
     }
 
     const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
@@ -289,8 +285,11 @@ export class MarkdownTableWidget extends WidgetType {
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
 
     const syncActiveCellHighlight = () => {
-      if (isTableActive) wrap.dataset.activeMode = selectedMode
-      else delete wrap.dataset.activeMode
+      if (isTableActive) {
+        wrap.dataset.activeMode = selectedMode; wrap.dataset.activeRow = String(activeRow); wrap.dataset.activeCol = String(activeCol)
+      } else {
+        delete wrap.dataset.activeMode; delete wrap.dataset.activeRow; delete wrap.dataset.activeCol
+      }
       for (let r = 0; r < cellElements.length; r += 1) {
         const rowEls = cellElements[r]!
         for (let c = 0; c < rowEls.length; c += 1) {
@@ -419,18 +418,13 @@ export class MarkdownTableWidget extends WidgetType {
 
       const commitAndCloseSession = (focusWrapAfter = false) => {
         if (session.handled) return
-        session.handled = true
-        if (activeSession === session) activeSession = null
-        const nextValue = input.value
-        if (nextValue !== initialValue) {
-          const updated = applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, nextValue)
-          if (updated && updated !== currentMarkdown) {
-            dispatchTableMarkdown(updated, { row: clampedRow, col: clampedCol, openEditor: false })
-            if (focusWrapAfter) focusTableWrap()
-            return
-          }
+        const committed = flushActiveCellMarkdown()
+        if (committed !== currentMarkdown) {
+          dispatchTableMarkdown(
+            committed,
+            focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined
+          )
         }
-        restoreCellDisplay(cellEl, initialValue)
         if (focusWrapAfter) focusTableWrap()
       }
 
@@ -522,7 +516,10 @@ export class MarkdownTableWidget extends WidgetType {
       if (!nextGrid) return false
       visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
-      if (activeSession && !activeSession.handled) { activeSession.handled = true; activeSession = null }
+      if (activeSession && !activeSession.handled) {
+        activeSession.handled = true
+        activeSession = null
+      }
 
       const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
       if (sameShape) {

@@ -36,9 +36,7 @@ type UseModalFocusTrapOptions = {
   onClose: () => void
   containerRef: RefObject<HTMLElement | null>
   initialFocusRef?: RefObject<HTMLElement | null>
-  /** Prefer this connected element when the click trigger unmounts (e.g. mobile menu). */
   returnFocusRef?: RefObject<HTMLElement | null>
-  /** Nested dialog open: keep trigger restore deferred, pause Esc/Tab trap. */
   paused?: boolean
 }
 
@@ -54,8 +52,6 @@ export const useModalFocusTrap = ({
   const pausedRef = useRef(paused)
   const trapActive = open && !paused
 
-  // Keep in sync during render so close cleanup sees nested-dialog pause
-  // before effect ordering can leave a stale false and steal focus back.
   pausedRef.current = paused
 
   useEffect(() => {
@@ -116,14 +112,25 @@ export const useModalFocusTrap = ({
 
       const firstElement = focusableElements[0]
       const lastElement = focusableElements[focusableElements.length - 1]
+      const activeElement = document.activeElement as HTMLElement | null
 
-      if (event.shiftKey && document.activeElement === firstElement) {
+      if (activeElement === container || !activeElement || !container.contains(activeElement)) {
+        event.preventDefault()
+        if (event.shiftKey) {
+          lastElement.focus()
+        } else {
+          firstElement.focus()
+        }
+        return
+      }
+
+      if (event.shiftKey && activeElement === firstElement) {
         event.preventDefault()
         lastElement.focus()
         return
       }
 
-      if (!event.shiftKey && document.activeElement === lastElement) {
+      if (!event.shiftKey && activeElement === lastElement) {
         event.preventDefault()
         firstElement.focus()
       }

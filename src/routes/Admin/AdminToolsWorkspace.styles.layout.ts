@@ -336,6 +336,7 @@ export const ConfirmDeleteRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  min-height: 44px;
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.82rem;
   line-height: 1.5;

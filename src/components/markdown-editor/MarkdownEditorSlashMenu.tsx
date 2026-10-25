@@ -79,6 +79,7 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   max-width: calc(100vw - 24px);
   max-height: 380px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 6px;
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
@@ -87,6 +88,10 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   display: flex;
   flex-direction: column;
   gap: 2px;
+
+  @media (max-width: 820px) {
+    max-height: min(240px, 42dvh);
+  }
 `
 
 const SlashMenuHeading = styled.div`

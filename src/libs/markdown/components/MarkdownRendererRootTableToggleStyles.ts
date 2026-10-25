@@ -131,7 +131,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
     overscroll-behavior-y: auto;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
       `
     })()}
   }

@@ -73,6 +73,11 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     color: #86efac;
   }
 
+  .aq-code-copy.is-failed {
+    color: var(--aq-danger-text, #b42318);
+    border-color: var(--aq-danger-border, #fecdca);
+  }
+
   .aq-code-body {
     position: relative;
   }

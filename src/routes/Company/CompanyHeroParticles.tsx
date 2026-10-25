@@ -148,6 +148,10 @@ const CompanyHeroParticles: React.FC = () => {
 
     let width = 0
     let height = 0
+    let rectLeft = 0
+    let rectTop = 0
+    let rectWidth = 0
+    let rectHeight = 0
     let dpr = 1
     let clearance = resolveParticleClearance(1, 1)
     let invClearRx = 1 / clearance.clearRx
@@ -162,11 +166,25 @@ const CompanyHeroParticles: React.FC = () => {
     let targetY = -0.12
     let pointerActive = false
     let isIntersecting = true
+    let rectDirty = false
     let rafId: number | null = null
     const startTime = performance.now()
 
-    const syncSize = () => {
+    const syncRect = () => {
       const rect = container.getBoundingClientRect()
+      rectLeft = rect.left
+      rectTop = rect.top
+      rectWidth = rect.width
+      rectHeight = rect.height
+      rectDirty = false
+      return rect
+    }
+    const markRectDirty = () => {
+      rectDirty = true
+    }
+
+    const syncSize = () => {
+      const rect = syncRect()
       width = Math.max(1, Math.floor(rect.width))
       height = Math.max(1, Math.floor(rect.height))
       dpr = Math.min(window.devicePixelRatio || 1, finePointer ? 2 : 1.5)
@@ -355,10 +373,10 @@ const CompanyHeroParticles: React.FC = () => {
 
     const hostSection = container.parentElement
     const onPointerMove = (event: PointerEvent) => {
-      const rect = container.getBoundingClientRect()
-      if (!rect.width || !rect.height) return
-      const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1
-      const ny = ((event.clientY - rect.top) / rect.height) * 2 - 1
+      if (rectDirty) syncRect()
+      if (!rectWidth || !rectHeight) return
+      const nx = ((event.clientX - rectLeft) / rectWidth) * 2 - 1
+      const ny = ((event.clientY - rectTop) / rectHeight) * 2 - 1
       if (nx < -1.1 || nx > 1.1 || ny < -1.1 || ny > 1.1) {
         pointerActive = false
         return
@@ -406,6 +424,7 @@ const CompanyHeroParticles: React.FC = () => {
     window.addEventListener("resize", onResize, { passive: true })
     document.addEventListener("visibilitychange", onVisibilityChange)
     if (finePointer && hostSection) {
+      window.addEventListener("scroll", markRectDirty, { passive: true })
       hostSection.addEventListener("pointermove", onPointerMove, { passive: true })
       hostSection.addEventListener("pointerleave", onPointerLeave, { passive: true })
     }
@@ -418,6 +437,7 @@ const CompanyHeroParticles: React.FC = () => {
       window.removeEventListener("resize", onResize)
       document.removeEventListener("visibilitychange", onVisibilityChange)
       if (finePointer && hostSection) {
+        window.removeEventListener("scroll", markRectDirty)
         hostSection.removeEventListener("pointermove", onPointerMove)
         hostSection.removeEventListener("pointerleave", onPointerLeave)
       }

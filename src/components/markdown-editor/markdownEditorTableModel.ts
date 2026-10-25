@@ -493,6 +493,18 @@ export const unpackTableEditAvailabilityMask = (mask: number): MarkdownEditorTab
 export const isMarkdownEditorTableSelection = (value: string, selectionStart: number, selectionEnd: number): boolean =>
   findActiveTable(value, selectionStart, selectionEnd) !== null
 
+export const resolveTableCellSelectionOffset = (value: string, tableFrom: number, row = 0, col = 0): number | null => {
+  if (!Number.isFinite(tableFrom) || tableFrom < 0 || tableFrom >= value.length) return null
+  const firstPipe = value.indexOf("|", tableFrom)
+  const lineEnd = value.indexOf("\n", tableFrom)
+  if (firstPipe === -1 || (lineEnd !== -1 && firstPipe > lineEnd)) return null
+  const table = findActiveTable(value, firstPipe + 1, firstPipe + 1)
+  if (!table) return null
+  const targetRow = row <= 0 ? table.header : (table.body[Math.max(0, Math.min(row - 1, table.body.length - 1))] ?? table.header)
+  const targetCell = targetRow.cells[Math.max(0, Math.min(col, targetRow.cells.length - 1))]
+  return targetCell ? targetCell.sourceStart : firstPipe + 1
+}
+
 export const planMarkdownEditorTableTab = (
   value: string,
   selectionStart: number,

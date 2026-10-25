@@ -262,8 +262,24 @@ const mergeClassNames = (...classNames: string[]) => {
   return Array.from(tokens).join(" ")
 }
 
-const countHtmlTags = (source: string, tagName: string, closing: boolean) => {
-  const pattern = new RegExp(closing ? `</${tagName}\\s*>` : `<${tagName}\\b`, "gi")
+const COUNT_HTML_TAG_REGEX_CACHE: Record<string, { open: RegExp; close: RegExp }> = {
+  div: { open: /<div\b/gi, close: /<\/div\s*>/gi },
+  section: { open: /<section\b/gi, close: /<\/section\s*>/gi },
+  figure: { open: /<figure\b/gi, close: /<\/figure\s*>/gi },
+}
+
+export const countHtmlTags = (source: string, tagName: string, closing: boolean) => {
+  const normalizedTag = tagName.toLowerCase()
+  let cached = COUNT_HTML_TAG_REGEX_CACHE[normalizedTag]
+  if (!cached) {
+    cached = {
+      open: new RegExp(String.raw`<${normalizedTag}\b`, "gi"),
+      close: new RegExp(String.raw`</${normalizedTag}\s*>`, "gi"),
+    }
+    COUNT_HTML_TAG_REGEX_CACHE[normalizedTag] = cached
+  }
+  const pattern = closing ? cached.close : cached.open
+  pattern.lastIndex = 0
   return source.match(pattern)?.length ?? 0
 }
 

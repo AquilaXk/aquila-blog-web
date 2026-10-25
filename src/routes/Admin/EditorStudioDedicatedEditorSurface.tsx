@@ -18,6 +18,123 @@ import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
 
+const EDITOR_SURFACE_GUIDE_OPEN = 1
+const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
+const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
+const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
+const EDITOR_SURFACE_ZEN_BITS = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
+const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean) => boolean)) => {
+  const enabled = typeof next === "function" ? next((mask & bit) !== 0) : next
+  return enabled ? mask | bit : mask & ~bit
+}
+const isMobileEditorViewport = () => typeof window !== "undefined" && window.innerWidth <= 820
+const toggleZenBits = (mask: number) =>
+  (mask & EDITOR_SURFACE_ZEN_BITS) === 0 ? mask | EDITOR_SURFACE_ZEN_BITS : mask & ~EDITOR_SURFACE_ZEN_BITS
+const toggleResponsiveSidebarBits = (mask: number, targetBit: number) => {
+  if (!isMobileEditorViewport()) return applyBitFlag(mask, targetBit, (prev) => !prev)
+  const nextOpen = (mask & targetBit) === 0
+  const cleared = mask & ~EDITOR_SURFACE_ZEN_BITS
+  return nextOpen ? cleared | targetBit : cleared
+}
+const buildEditorOutlineItems = (
+  postTitle: string,
+  headings: ReadonlyArray<{ slug: string; offset: number; level: 1 | 2 | 3 | 4; label: string; range: { start: number; end: number } }>
+) => {
+  const title = postTitle.trim()
+  return [
+    ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
+    ...headings.map((heading) => ({
+      id: `${heading.slug}:${heading.offset}`,
+      level: heading.level,
+      label: heading.label,
+      range: heading.range,
+    })),
+  ]
+}
+const computeSelectedCharCount = (range?: { from: number; to: number } | null) =>
+  range ? Math.max(0, range.to - range.from) : 0
+const applyCommaSeparatedTagDraft = (
+  nextValue: string,
+  onTagDraftChange: (value: string) => void,
+  onAddTags: (values: string[]) => void
+) => {
+  const commaSeparated = /[,，]/
+  if (!commaSeparated.test(nextValue)) {
+    onTagDraftChange(nextValue)
+    return
+  }
+  const fragments = nextValue.split(commaSeparated)
+  const tailDraft = fragments.pop() ?? ""
+  const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
+  if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
+  onTagDraftChange(tailDraft)
+}
+const handleTagInputKeyDown = (
+  event: ReactKeyboardEvent<HTMLInputElement>,
+  onAddTag: (value: string) => void
+) => {
+  if (isComposingKeyboardEvent(event)) return
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault()
+    onAddTag(event.currentTarget.value)
+  }
+}
+const activateEditorOutlineItem = (
+  range: { start: number; end: number } | null,
+  setIsOutlineOpen: (next: boolean) => void,
+  setLastActivatedOutlineOffset: (offset: number | null) => void,
+  onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void,
+  focusTitle: () => void
+) => {
+  if (isMobileEditorViewport()) setIsOutlineOpen(false)
+  if (range) {
+    setLastActivatedOutlineOffset(range.start)
+    onOutlineBodyHeadingActivate({ from: range.start, to: range.end })
+    return
+  }
+  setLastActivatedOutlineOffset(null)
+  focusTitle()
+}
+const dismissMobilePanelsOnCanvasTap = (
+  isZenMode: boolean,
+  setPanelUiMask: (updater: (m: number) => number) => void
+) => {
+  if (isMobileEditorViewport() && !isZenMode) {
+    setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
+  }
+}
+const useResponsiveEditorPanelEffects = (
+  setPanelUiMask: (updater: (m: number) => number) => void,
+  handleToggleZenMode: () => void
+) => {
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const media = window.matchMedia("(max-width: 820px)")
+    const syncViewportPanels = (matches: boolean) => {
+      setPanelUiMask((m) => (matches ? m & ~EDITOR_SURFACE_ZEN_BITS : m | EDITOR_SURFACE_ZEN_BITS))
+    }
+    if (media.matches) syncViewportPanels(true)
+    const onChange = (event: MediaQueryListEvent) => syncViewportPanels(event.matches)
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [setPanelUiMask])
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault()
+        handleToggleZenMode()
+        return
+      }
+      if (event.key === "Escape" && isMobileEditorViewport()) {
+        setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [handleToggleZenMode, setPanelUiMask])
+}
+
 export const resolveActiveOutlineItemIndex = (
   items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
   cursorOffset?: number | null
@@ -82,51 +199,24 @@ export const countMarkdownTotalLinks = (markdown: string): number =>
 type NoticeTone = "idle" | "loading" | "success" | "error"
 
 type EditorStudioDedicatedEditorSurfaceProps = {
-  thumbnailImageFileInputRef: Ref<HTMLInputElement>
-  onThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
-  onExit: () => void
-  saveStateText: string
-  saveStateTone: string
-  primaryActionDisabled: boolean
-  primaryActionLabel: string
-  onPrimaryAction: () => void
-  postTags: string[]
-  tagDraft: string
-  onTagDraftChange: (value: string) => void
-  onAddTags: (values: string[]) => void
-  onAddTag: (value: string) => void
-  onRemoveTag: (value: string) => void
-  titleInputRef: (node: HTMLTextAreaElement | null) => void
+  thumbnailImageFileInputRef: Ref<HTMLInputElement>; onThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
+  onExit: () => void; saveStateText: string; saveStateTone: string; primaryActionDisabled: boolean
+  primaryActionLabel: string; onPrimaryAction: () => void; postTags: string[]; tagDraft: string
+  onTagDraftChange: (value: string) => void; onAddTags: (values: string[]) => void; onAddTag: (value: string) => void
+  onRemoveTag: (value: string) => void; titleInputRef: (node: HTMLTextAreaElement | null) => void
   onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
-  activeCursorOffset?: number | null
-  activeSelectionRange?: { from: number; to: number } | null
-  postTitle: string
-  onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
-  onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
-  postContent: string
-  postSummary: string
-  onPostSummaryChange: (value: string) => void
-  postCategory: string
-  onPostCategoryChange: (value: string) => void
-  onCommitPostCategory: () => void
-  categorySuggestions: string[]
-  tagSuggestions?: string[]
-  postVisibility: PostVisibility
-  onPostVisibilityChange: (value: PostVisibility) => void
-  editorCanvas: ReactNode
-  showPublishNotice: boolean
-  publishNoticeTone: NoticeTone
-  publishNoticeText: string
-  isLocalDraftRestoreSuggestionVisible: boolean
-  isLocalDraftRestoreSuggestionActionsDisabled: boolean
-  onRestoreLocalDraft: () => void
-  localDraftCandidates: Array<{ key: string; label: string }>
-  selectedLocalDraftCandidateKey: string
-  onSelectLocalDraftCandidate: (key: string) => void
-  onDiscardLocalDraftCandidate: () => void
-  onDismissLocalDraftRestoreSuggestion: () => void
-  onClearLocalDraft: () => void
-  publishModal: ReactNode
+  activeCursorOffset?: number | null; activeSelectionRange?: { from: number; to: number } | null
+  postTitle: string; onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
+  onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>; postContent: string; postSummary: string
+  onPostSummaryChange: (value: string) => void; postCategory: string; onPostCategoryChange: (value: string) => void
+  onCommitPostCategory: () => void; categorySuggestions: string[]; tagSuggestions?: string[]
+  postVisibility: PostVisibility; onPostVisibilityChange: (value: PostVisibility) => void; editorCanvas: ReactNode
+  showPublishNotice: boolean; publishNoticeTone: NoticeTone; publishNoticeText: string
+  isLocalDraftRestoreSuggestionVisible: boolean; isLocalDraftRestoreSuggestionActionsDisabled: boolean
+  onRestoreLocalDraft: () => void; localDraftCandidates: Array<{ key: string; label: string }>
+  selectedLocalDraftCandidateKey: string; onSelectLocalDraftCandidate: (key: string) => void
+  onDiscardLocalDraftCandidate: () => void; onDismissLocalDraftRestoreSuggestion: () => void
+  onClearLocalDraft: () => void; publishModal: ReactNode
 }
 
 const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -144,49 +234,25 @@ const getCategoryInputValue = (category: string) =>
   category.trim() ? splitCategoryDisplay(category).label : ""
 
 type LocalDraftRestoreSuggestionProps = {
-  visible: boolean
-  disabled: boolean
-  onRestore: () => void
-  candidates: Array<{ key: string; label: string }>
-  selectedKey: string
-  onSelect: (key: string) => void
-  onDiscard: () => void
-  onClear: () => void
-  onDismiss: () => void
+  visible: boolean; disabled: boolean; onRestore: () => void; candidates: Array<{ key: string; label: string }>
+  selectedKey: string; onSelect: (key: string) => void; onDiscard: () => void; onClear: () => void; onDismiss: () => void
 }
 
 const LocalDraftRestoreSuggestion = ({
-  visible,
-  disabled,
-  onRestore,
-  candidates,
-  selectedKey,
-  onSelect,
-  onDiscard,
-  onClear,
-  onDismiss,
+  visible, disabled, onRestore, candidates, selectedKey, onSelect, onDiscard, onClear, onDismiss,
 }: LocalDraftRestoreSuggestionProps) => {
   if (!visible) return null
-
   return (
     <LocalDraftRestoreCard role="status" aria-live="polite">
-      <div className="card-header">
-        <span>브라우저 임시글이 있습니다.</span>
-      </div>
+      <div className="card-header"><span>브라우저 임시글이 있습니다.</span></div>
       <select aria-label="복구할 브라우저 초안" disabled={disabled} value={selectedKey} onChange={(event) => onSelect(event.target.value)}>
         <option value="">초안을 선택하세요</option>
         {candidates.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
       </select>
       <div className="card-actions">
-        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
-          복구
-        </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={selectedKey ? onDiscard : onClear}>
-          삭제
-        </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
-          이번 세션에 표시 안 함
-        </SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>복구</SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={selectedKey ? onDiscard : onClear}>삭제</SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>이번 세션에 표시 안 함</SecondaryButton>
       </div>
     </LocalDraftRestoreCard>
   )
@@ -202,95 +268,44 @@ export const EditorStudioDedicatedEditorLoadingState = () => (
 )
 
 export const EditorStudioDedicatedEditorSurface = ({
-  thumbnailImageFileInputRef,
-  onThumbnailImageFileChange,
-  onExit,
-  saveStateText,
-  saveStateTone,
-  primaryActionDisabled,
-  primaryActionLabel,
-  onPrimaryAction,
-  postTags,
-  tagDraft,
-  onTagDraftChange,
-  onAddTags,
-  onAddTag,
-  onRemoveTag,
-  titleInputRef,
-  onOutlineBodyHeadingActivate,
-  activeCursorOffset,
-  activeSelectionRange,
-  postTitle,
-  onPostTitleChange,
-  onPostTitleKeyDown,
-  postContent,
-  postSummary,
-  onPostSummaryChange,
-  postCategory,
-  onPostCategoryChange,
-  onCommitPostCategory,
-  categorySuggestions,
-  tagSuggestions = [],
-  postVisibility,
-  onPostVisibilityChange,
-  editorCanvas,
-  showPublishNotice,
-  publishNoticeTone,
-  publishNoticeText,
-  isLocalDraftRestoreSuggestionVisible,
-  isLocalDraftRestoreSuggestionActionsDisabled,
-  onRestoreLocalDraft,
-  localDraftCandidates,
-  selectedLocalDraftCandidateKey,
-  onSelectLocalDraftCandidate,
-  onDiscardLocalDraftCandidate,
-  onDismissLocalDraftRestoreSuggestion,
-  onClearLocalDraft,
-  publishModal,
+  thumbnailImageFileInputRef, onThumbnailImageFileChange, onExit, saveStateText, saveStateTone,
+  primaryActionDisabled, primaryActionLabel, onPrimaryAction, postTags, tagDraft, onTagDraftChange,
+  onAddTags, onAddTag, onRemoveTag, titleInputRef, onOutlineBodyHeadingActivate, activeCursorOffset,
+  activeSelectionRange, postTitle, onPostTitleChange, onPostTitleKeyDown, postContent, postSummary,
+  onPostSummaryChange, postCategory, onPostCategoryChange, onCommitPostCategory, categorySuggestions,
+  tagSuggestions = [], postVisibility, onPostVisibilityChange, editorCanvas, showPublishNotice,
+  publishNoticeTone, publishNoticeText, isLocalDraftRestoreSuggestionVisible,
+  isLocalDraftRestoreSuggestionActionsDisabled, onRestoreLocalDraft, localDraftCandidates,
+  selectedLocalDraftCandidateKey, onSelectLocalDraftCandidate, onDiscardLocalDraftCandidate,
+  onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
-  const [isGuideOpen, setIsGuideOpen] = useState(false)
-  const [isOutlineOpen, setIsOutlineOpen] = useState(true)
-  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
-  const [isMobilePropertiesOpen, setIsMobilePropertiesOpen] = useState(false)
+  const [panelUiMask, setPanelUiMask] = useState(EDITOR_SURFACE_ZEN_BITS)
+  const isGuideOpen = (panelUiMask & EDITOR_SURFACE_GUIDE_OPEN) !== 0
+  const isOutlineOpen = (panelUiMask & EDITOR_SURFACE_OUTLINE_OPEN) !== 0
+  const isInspectorOpen = (panelUiMask & EDITOR_SURFACE_INSPECTOR_OPEN) !== 0
+  const isMobilePropertiesOpen = (panelUiMask & EDITOR_SURFACE_MOBILE_PROPS_OPEN) !== 0
+  const setIsGuideOpen = useCallback((v: boolean) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_GUIDE_OPEN, v)), [])
+  const setIsOutlineOpen = useCallback((fn: boolean | ((p: boolean) => boolean)) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_OUTLINE_OPEN, fn)), [])
+  const setIsInspectorOpen = useCallback((fn: boolean | ((p: boolean) => boolean)) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_INSPECTOR_OPEN, fn)), [])
+  const setIsMobilePropertiesOpen = useCallback((fn: (p: boolean) => boolean) => setPanelUiMask((m) => applyBitFlag(m, EDITOR_SURFACE_MOBILE_PROPS_OPEN, fn)), [])
   const [lastActivatedOutlineOffset, setLastActivatedOutlineOffset] = useState<number | null>(null)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
-  const handleToggleZenMode = useCallback(() => {
-    if (isZenMode) {
-      setIsOutlineOpen(true)
-      setIsInspectorOpen(true)
-    } else {
-      setIsOutlineOpen(false)
-      setIsInspectorOpen(false)
-    }
-  }, [isZenMode])
+  const handleToggleZenMode = useCallback(() => setPanelUiMask(toggleZenBits), [])
+  const toggleResponsiveSidebar = useCallback(
+    (targetBit: number) => setPanelUiMask((m) => toggleResponsiveSidebarBits(m, targetBit)),
+    []
+  )
 
-  useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
-        event.preventDefault()
-        handleToggleZenMode()
-      }
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [handleToggleZenMode])
+  useResponsiveEditorPanelEffects(setPanelUiMask, handleToggleZenMode)
 
   const deferredPostContent = useDeferredValue(postContent)
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
-  const outlineItems = useMemo(() => {
-    const title = postTitle.trim()
-    return [
-      ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
-      ...outlineInsights.headings.map((heading) => ({
-        id: `${heading.slug}:${heading.offset}`,
-        level: heading.level,
-        label: heading.label,
-        range: heading.range,
-      })),
-    ]
-  }, [outlineInsights.headings, postTitle])
+  const outlineItems = useMemo(
+    () => buildEditorOutlineItems(postTitle, outlineInsights.headings),
+    [outlineInsights.headings, postTitle]
+  )
   const activeOutlineIndex = useMemo(
     () => resolveActiveOutlineItemIndex(outlineItems, activeCursorOffset ?? lastActivatedOutlineOffset),
     [activeCursorOffset, lastActivatedOutlineOffset, outlineItems]
@@ -301,27 +316,11 @@ export const EditorStudioDedicatedEditorSurface = ({
     () => computeCursorLineAndColumn(deferredPostContent, activeCursorOffset),
     [activeCursorOffset, deferredPostContent]
   )
-  const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
-  const handleTagDraftChange = (nextValue: string) => {
-    const commaSeparated = /[,，]/
-    if (!commaSeparated.test(nextValue)) {
-      onTagDraftChange(nextValue)
-      return
-    }
-
-    const fragments = nextValue.split(commaSeparated)
-    const tailDraft = fragments.pop() ?? ""
-    const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
-    if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
-    onTagDraftChange(tailDraft)
-  }
-  const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
-    if (isComposingKeyboardEvent(event)) return
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault()
-      onAddTag(event.currentTarget.value)
-    }
-  }
+  const selectedCharCount = computeSelectedCharCount(activeSelectionRange)
+  const handleTagDraftChange = (nextValue: string) =>
+    applyCommaSeparatedTagDraft(nextValue, onTagDraftChange, onAddTags)
+  const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) =>
+    handleTagInputKeyDown(event, onAddTag)
   const handleTitleInputRef = useCallback((node: HTMLTextAreaElement | null) => {
     titleNodeRef.current = node
     titleInputRef(node)
@@ -330,6 +329,19 @@ export const EditorStudioDedicatedEditorSurface = ({
     const selected = new Set(postTags)
     return tagSuggestions.filter((tag) => !selected.has(tag))
   }, [postTags, tagSuggestions])
+  const localDraftRestoreCardNode = (
+    <LocalDraftRestoreSuggestion
+      visible={isLocalDraftRestoreSuggestionVisible}
+      disabled={isLocalDraftRestoreSuggestionActionsDisabled}
+      onRestore={onRestoreLocalDraft}
+      candidates={localDraftCandidates}
+      selectedKey={selectedLocalDraftCandidateKey}
+      onSelect={onSelectLocalDraftCandidate}
+      onDiscard={onDiscardLocalDraftCandidate}
+      onClear={onClearLocalDraft}
+      onDismiss={onDismissLocalDraftRestoreSuggestion}
+    />
+  )
 
   return (
     <EditorStudioRoot>
@@ -344,9 +356,8 @@ export const EditorStudioDedicatedEditorSurface = ({
           <EditorExitAction type="button" onClick={onExit}>← 글 관리</EditorExitAction>
           <EditorSidebarToggleButton
             type="button"
-            data-mobile-hidden="true"
             $active={isOutlineOpen}
-            onClick={() => setIsOutlineOpen((prev) => !prev)}
+            onClick={() => toggleResponsiveSidebar(EDITOR_SURFACE_OUTLINE_OPEN)}
             aria-label="문서 목차 토글"
             title="문서 목차 토글"
           >
@@ -359,6 +370,7 @@ export const EditorStudioDedicatedEditorSurface = ({
         <EditorStudioTopBarActions>
           <EditorSidebarToggleButton
             type="button"
+            data-mobile-hidden="true"
             $active={isZenMode}
             onClick={handleToggleZenMode}
             aria-label="집중 모드 토글"
@@ -369,7 +381,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           <EditorSidebarToggleButton
             type="button"
             $active={isInspectorOpen}
-            onClick={() => setIsInspectorOpen((prev) => !prev)}
+            onClick={() => toggleResponsiveSidebar(EDITOR_SURFACE_INSPECTOR_OPEN)}
             aria-label="메타 패널 토글"
             title="메타 패널 토글"
           >
@@ -395,16 +407,16 @@ export const EditorStudioDedicatedEditorSurface = ({
                   key={item.id}
                   type="button"
                   data-level={item.level}
-                  data-active={index === activeOutlineIndex ? "true" : "false"}
-                  onClick={() => {
-                    if (item.range) {
-                      setLastActivatedOutlineOffset(item.range.start)
-                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
-                      return
-                    }
-                    setLastActivatedOutlineOffset(null)
-                    titleNodeRef.current?.focus()
-                  }}
+                  data-active={String(index === activeOutlineIndex)}
+                  onClick={() =>
+                    activateEditorOutlineItem(
+                      item.range,
+                      setIsOutlineOpen,
+                      setLastActivatedOutlineOffset,
+                      onOutlineBodyHeadingActivate,
+                      () => titleNodeRef.current?.focus()
+                    )
+                  }
                 >
                   <span>H{item.level}</span>
                   <strong>{item.label}</strong>
@@ -419,8 +431,10 @@ export const EditorStudioDedicatedEditorSurface = ({
         <EditorStudioWritingColumn
           data-testid="editor-writing-column"
           $zenMode={isZenMode}
+          onPointerDown={() => dismissMobilePanelsOnCanvasTap(isZenMode, setPanelUiMask)}
         >
           <EditorStudioDedicatedMetaSection>
+            {!isInspectorOpen ? localDraftRestoreCardNode : null}
             <TitleInput
               ref={handleTitleInputRef}
               id="post-title"
@@ -533,17 +547,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               </datalist>
               <small>하나의 글에는 넓은 분류를 하나만 선택하세요. 세부 키워드는 태그로 추가할 수 있습니다.</small>
             </label>
-            <LocalDraftRestoreSuggestion
-              visible={isLocalDraftRestoreSuggestionVisible}
-              disabled={isLocalDraftRestoreSuggestionActionsDisabled}
-              onRestore={onRestoreLocalDraft}
-              candidates={localDraftCandidates}
-              selectedKey={selectedLocalDraftCandidateKey}
-              onSelect={onSelectLocalDraftCandidate}
-              onDiscard={onDiscardLocalDraftCandidate}
-              onClear={onClearLocalDraft}
-              onDismiss={onDismissLocalDraftRestoreSuggestion}
-            />
+            {localDraftRestoreCardNode}
             <section>
               <span>태그</span>
               <EditorTagRow aria-label="발행 태그">

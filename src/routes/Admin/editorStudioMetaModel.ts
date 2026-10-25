@@ -78,7 +78,7 @@ const PREVIEW_THUMBNAIL_ALLOWED_PATH_REGEX = /^\/post\/api\/v1\/images\/posts\/[
 const PREVIEW_THUMBNAIL_ALLOWED_QUERY_REGEX = /^\?(?:[A-Za-z0-9._~/%=&-]*)$/
 const FRONTMATTER_DELIMITER_REGEX = /^\s*---\s*$/
 const LEADING_EDITOR_METADATA_LINE_REGEX =
-  /^\s*(tags?|categories?|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*(.+)\s*$/i
+  /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*(.+)\s*$/i
 const EDITOR_BODY_PLACEHOLDER = "내용을 입력하세요."
 const EDITOR_TOGGLE_TITLE_PLACEHOLDER = "토글 제목"
 export const PREVIEW_SUMMARY_MAX_LENGTH = 150
@@ -190,72 +190,76 @@ const isYamlLine = (line: string): boolean => {
   return false
 }
 
-const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = false) => {
-  const normalized = content.replace(/\r\n?/g, "\n").trimStart()
-  const firstBreak = normalized.indexOf("\n")
-  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
-  if (!FRONTMATTER_DELIMITER_REGEX.test(firstLine)) {
-    return {
-      metadataLines: [] as string[],
-      body: normalized,
-    }
-  }
-  const lines = normalized.split("\n")
-
-  for (let index = 1; index < lines.length; index += 1) {
-    if (!FRONTMATTER_DELIMITER_REGEX.test(lines[index] || "")) continue
-    const metadataLines = lines.slice(1, index)
-    const meaningfulLines = metadataLines.filter((line) => line.trim().length > 0)
-    const isSupportedMetadata =
-      meaningfulLines.length > 0 &&
-      meaningfulLines.every((line) =>
-        allowArbitraryFrontmatter
-          ? isYamlLine(line)
-          : /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
-      )
-    if (!isSupportedMetadata) return { metadataLines: [] as string[], body: normalized }
-    return {
-      metadataLines,
-      body: lines
-        .slice(index + 1)
-        .join("\n")
-        .replace(/^\n+/, ""),
-    }
-  }
-
-  return {
-    metadataLines: [] as string[],
-    body: normalized,
-  }
+const isSupportedFrontmatterLine = (line: string, allowArbitraryFrontmatter: boolean) => {
+  if (allowArbitraryFrontmatter) return isYamlLine(line)
+  return /^\s*(tags?|category|categories|thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*\S.*$/i.test(line)
 }
 
-const stripLeadingEditorMetadataLines = (content: string) => {
-  const normalized = content.replace(/\r\n?/g, "\n")
-  const firstBreak = normalized.indexOf("\n")
-  const firstLine = firstBreak === -1 ? normalized : normalized.slice(0, firstBreak)
-  if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
-    return {
-      consumed: 0,
-      metadataLines: [] as string[],
-      body: normalized,
-    }
-  }
-  const lines = normalized.split("\n")
-  let consumed = 0
+const readLineSlice = (text: string, cursor: number) => {
+  const nextBreak = text.indexOf("\n", cursor)
+  const line = nextBreak === -1 ? text.slice(cursor) : text.slice(cursor, nextBreak)
+  const nextCursor = nextBreak === -1 ? text.length : nextBreak + 1
+  return { line, nextBreak, nextCursor }
+}
 
-  for (const line of lines) {
+export const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter = false) => {
+  const normalized = content.replace(/\r\n?/g, "\n").trimStart()
+  const { line: firstLine, nextBreak: firstBreak } = readLineSlice(normalized, 0)
+  if (firstBreak === -1 || !FRONTMATTER_DELIMITER_REGEX.test(firstLine)) {
+    return { metadataLines: [] as string[], body: normalized }
+  }
+  const metadataLines: string[] = []
+  let meaningfulCount = 0
+  let allSupported = true
+  let cursor = firstBreak + 1
+
+  while (cursor <= normalized.length) {
+    const { line, nextBreak, nextCursor } = readLineSlice(normalized, cursor)
+    if (FRONTMATTER_DELIMITER_REGEX.test(line)) {
+      if (meaningfulCount === 0 || !allSupported) {
+        return { metadataLines: [] as string[], body: normalized }
+      }
+      return { metadataLines, body: normalized.slice(nextCursor).replace(/^\n+/, "") }
+    }
+    metadataLines.push(line)
+    if (line.trim().length > 0) {
+      meaningfulCount += 1
+      if (!isSupportedFrontmatterLine(line, allowArbitraryFrontmatter)) allSupported = false
+    }
+    if (nextBreak === -1) break
+    cursor = nextCursor
+  }
+
+  return { metadataLines: [] as string[], body: normalized }
+}
+
+export const stripLeadingEditorMetadataLines = (content: string) => {
+  const normalized = content.replace(/\r\n?/g, "\n")
+  const { line: firstLine } = readLineSlice(normalized, 0)
+  if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
+    return { consumed: 0, metadataLines: [] as string[], body: normalized }
+  }
+  const metadataLines: string[] = []
+  let cursor = 0
+
+  while (cursor <= normalized.length) {
+    const { line, nextBreak, nextCursor } = readLineSlice(normalized, cursor)
     if (!line.trim()) {
-      consumed += 1
+      metadataLines.push(line)
+      cursor = nextCursor
       break
     }
     if (!LEADING_EDITOR_METADATA_LINE_REGEX.test(line)) break
-    consumed += 1
+    metadataLines.push(line)
+    cursor = nextCursor
+    if (nextBreak === -1) break
   }
 
+  const consumed = metadataLines.length
   return {
     consumed,
-    metadataLines: consumed > 0 ? lines.slice(0, consumed) : ([] as string[]),
-    body: consumed > 0 ? lines.slice(consumed).join("\n").trimStart() : normalized,
+    metadataLines,
+    body: consumed > 0 ? normalized.slice(cursor).trimStart() : normalized,
   }
 }
 
@@ -353,13 +357,13 @@ export const parseEditorMeta = (
   const frontmatterSplit = splitFrontmatterBlock(trimmed, options?.allowArbitraryFrontmatter)
   if (frontmatterSplit.metadataLines.length > 0) {
     frontmatterSplit.metadataLines.forEach((line) => {
-      const [rawKey, ...rest] = line.split(":")
-      if (!rawKey || rest.length === 0) {
+      const colonIdx = line.indexOf(":")
+      if (colonIdx <= 0) {
         if (options?.allowArbitraryFrontmatter) customFrontmatterLines.push(line)
         return
       }
-      const key = rawKey.trim().toLowerCase()
-      const value = rest.join(":").trim()
+      const key = line.slice(0, colonIdx).trim().toLowerCase()
+      const value = line.slice(colonIdx + 1).trim()
       if (!value && !options?.allowArbitraryFrontmatter) return
 
       if (key === "tags" || key === "tag") pushTags(normalizeMetaItems(value))

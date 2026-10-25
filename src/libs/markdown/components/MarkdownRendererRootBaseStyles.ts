@@ -161,6 +161,20 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     transform: translateX(-50%) translateY(0);
   }
 
+  @media (max-width: 768px) {
+    .aq-footnote-popover {
+      left: 0;
+      right: auto;
+      transform: translateY(4px);
+      max-width: min(260px, calc(100vw - 32px));
+    }
+
+    .aq-footnote-reference:hover .aq-footnote-popover,
+    .aq-footnote-reference:focus-within .aq-footnote-popover {
+      transform: translateY(0);
+    }
+  }
+
   .aq-footnotes {
     margin-top: 3rem;
     padding-top: 1.5rem;
@@ -204,7 +218,7 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     text-decoration: none;
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     a[data-footnote-ref] {
       position: relative;
       min-width: 44px;

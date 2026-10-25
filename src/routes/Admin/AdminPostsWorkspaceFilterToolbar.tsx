@@ -92,7 +92,7 @@ const StickyFilterToolbar = styled.div`
   background: transparent;
   box-shadow: none;
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     gap: 0.52rem;
     padding: 0.58rem 0.62rem;
     border-radius: 0;
@@ -114,7 +114,7 @@ const FilterRail = styled.div`
     grid-template-columns: 1fr;
   }
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
     gap: 0.5rem;
     align-items: end;
@@ -127,7 +127,7 @@ const ScopeTabs = styled.div`
   gap: 0.38rem;
   flex-wrap: wrap;
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.28rem;
@@ -143,8 +143,9 @@ const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`
   border-color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray6 : theme.colors.gray5)};
   ${focusVisibleRing}
 
-  @media (max-width: 767px), (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
+    min-width: 44px;
     padding: 0 0.46rem;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -169,7 +170,7 @@ const SearchField = styled.div`
     ${focusVisibleRing}
   }
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px), (pointer: coarse) {
     input {
       min-height: 44px;
       border-radius: 6px;

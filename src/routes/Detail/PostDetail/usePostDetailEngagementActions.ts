@@ -96,9 +96,11 @@ export const usePostDetailEngagementActions = ({
       }
 
       if (typeof window !== "undefined" && typeof window.prompt === "function") {
-        window.prompt("링크를 복사하세요.", shareUrl)
+        const promptResult = window.prompt("링크를 복사하세요.", shareUrl)
+        if (promptResult !== null) {
+          flashShareFeedback("copied")
+        }
       }
-      flashShareFeedback("copied")
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return

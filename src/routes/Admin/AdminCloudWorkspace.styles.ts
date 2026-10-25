@@ -115,12 +115,12 @@ export const SearchInput = styled.input`
     color: ${textMuted};
   }
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `
@@ -176,7 +176,7 @@ export const UploadZone = styled.button`
     box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(9, 105, 218, 0.2));
   }
 
-  @media (pointer: coarse) {
+  @media (max-width: 768px), (pointer: coarse) {
     min-height: 44px;
   }
 `
@@ -446,10 +446,11 @@ export const DocumentFallbackBox = styled.div`
     text-decoration: none;
     ${focusVisibleRing}
 
-    @media (pointer: coarse) {
+    @media (pointer: coarse), (max-width: 768px) {
       display: inline-flex;
       align-items: center;
       min-height: 44px;
+      min-width: 44px;
     }
   }
 `

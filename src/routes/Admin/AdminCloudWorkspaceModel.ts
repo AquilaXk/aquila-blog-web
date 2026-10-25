@@ -178,7 +178,7 @@ export const sortCloudFiles = (
   }
   const withTimestamps = files.map((file) => ({
     file,
-    ts: toCloudTimestamp(file.createdAt),
+    ts: toCloudTimestamp(file.modifiedAt || file.createdAt),
   }))
   if (sortMode === "OLDEST") {
     withTimestamps.sort((a, b) => {

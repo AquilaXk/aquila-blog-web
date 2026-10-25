@@ -81,7 +81,9 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
       <button
         type="button"
         data-active={Boolean(shareFeedback)}
+        data-feedback={Boolean(shareFeedback)}
         data-tone="accent"
+        aria-live="polite"
         aria-label={
           shareFeedback === "failed"
             ? "공유 실패, 다시 시도"

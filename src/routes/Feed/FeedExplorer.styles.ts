@@ -148,7 +148,13 @@ export const ExplorerCard = styled.section`
     outline-offset: 2px;
   }
 
-  .sortOption[aria-selected="true"]::before {
+  .sortOption[aria-selected="true"],
+  .sortOption[data-selected="true"] {
+    color: var(--aq-text);
+  }
+
+  .sortOption[aria-selected="true"]::before,
+  .sortOption[data-selected="true"]::before {
     content: "✓";
     font-weight: 900;
   }

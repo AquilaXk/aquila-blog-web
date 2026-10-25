@@ -224,12 +224,14 @@ export const ProductAction = styled.a`
     transition: transform 220ms ${MOTION_EASE_OUT};
   }
 
-  &:hover {
-    background: ${light.surfaceBrandChrome};
-    border-color: ${light.borderStrong};
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: ${light.surfaceBrandChrome};
+      border-color: ${light.borderStrong};
 
-    svg {
-      transform: translateX(3px);
+      svg {
+        transform: translateX(3px);
+      }
     }
   }
 

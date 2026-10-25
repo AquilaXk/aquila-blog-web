@@ -28,7 +28,7 @@ export const LinkManagerHeader = styled.div`
     font-size: 0.8rem;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -160,6 +160,7 @@ export const IconPickerButton = styled.button`
 
   @media (max-width: 1100px), (pointer: coarse) {
     min-height: ${control.lg}px;
+    min-width: 44px;
   }
 `
 
@@ -255,7 +256,7 @@ export const LinkInputs = styled.div`
     grid-template-columns: 1fr;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `

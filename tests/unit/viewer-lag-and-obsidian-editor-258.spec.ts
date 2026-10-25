@@ -138,7 +138,7 @@ test.describe("Issue #258 Track A — Viewer lag & rendering optimizations", () 
       const fakeBlock = {
         isConnected: true,
         className: "aq-mermaid",
-        dataset: {} as Record<string, string>,
+        dataset: { mermaidSource: "graph TD\nA-->B" } as Record<string, string>,
         getAttribute: (attr: string) => (attr === "data-mermaid-source" ? "graph TD\nA-->B" : null),
         querySelector: () => null,
         closest: () => null,

@@ -35,8 +35,8 @@ export const EditorToolbar = styled.div`
   background: ${({ theme }) => theme.publicDesign.readableSurface};
 
   @media (max-width: 820px) {
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 4px 6px;
+    padding: 4px 10px;
   }
 `
 
@@ -90,10 +90,15 @@ export const ToolbarButton = styled.button<{ $active?: boolean }>`
     cursor: not-allowed;
   }
 
-  @media (pointer: coarse) {
-    height: 44px;
-    min-height: 44px;
-    min-width: 44px;
+  @media (max-width: 820px) {
+    height: 38px;
+    min-height: 38px;
+    min-width: 36px;
+    padding: 0 7px;
+
+    &[data-mobile-hidden="true"] {
+      display: none;
+    }
   }
 `
 
@@ -113,20 +118,9 @@ export const ToolbarSelect = styled.select`
   cursor: pointer;
   white-space: nowrap;
 
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  @media (pointer: coarse) {
-    height: 44px;
-    min-height: 44px;
-  }
+  &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+  @media (max-width: 768px), (pointer: coarse) { height: 44px; min-height: 44px; }
 `
 
 export const ToolbarMenuRoot = styled.div`
@@ -156,11 +150,7 @@ export const ToolbarMenuChevron = styled.span`
   color: currentColor;
   opacity: 0.75;
 
-  svg {
-    width: 12px;
-    height: 12px;
-    display: block;
-  }
+  svg { width: 12px; height: 12px; display: block; }
 `
 
 export const ToolbarMenuPanel = styled.div<{
@@ -207,14 +197,8 @@ export const ToolbarMenuItem = styled.button`
     color: ${({ theme }) => theme.colors.gray12};
   }
 
-  &:disabled {
-    opacity: 0.42;
-    cursor: not-allowed;
-  }
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
+  &:disabled { opacity: 0.42; cursor: not-allowed; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const ToolbarHiddenInput = styled.input`
@@ -263,14 +247,8 @@ export const FindReplaceInput = styled.input`
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   color: ${({ theme }) => theme.colors.gray12};
 
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
+  &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const FindReplaceCheckbox = styled.label`
@@ -280,6 +258,8 @@ export const FindReplaceCheckbox = styled.label`
   color: ${({ theme }) => theme.colors.gray10};
   font-size: 12px;
   font-weight: 700;
+  input:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  @media (max-width: 768px), (pointer: coarse) { min-height: 44px; }
 `
 
 export const FindReplaceStatus = styled.output`
@@ -302,21 +282,11 @@ export const FindReplaceActions = styled.div`
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-
-    @media (pointer: coarse) {
-      min-height: 44px;
-    }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
   }
 
-  button:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue8};
-    outline-offset: 1px;
-  }
-
-  button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
+  button:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
 `
 
 export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
@@ -355,7 +325,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     opacity: 0.65;
   }
 
-  @media (max-width: 820px) { font-size: 15px; }
+  @media (max-width: 820px) { font-size: 16px; line-height: 1.7; }
   [data-testid="markdown-editor-live-surface"] { height: 100%; }
 
   .cm-editor {
@@ -364,7 +334,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     color: ${({ theme }) => theme.colors.gray12};
   }
   .cm-editor.cm-focused { outline: none; }
-  .cm-scroller { overscroll-behavior: contain; }
+  .cm-scroller { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .cm-content {
     caret-color: ${({ theme }) => theme.colors.gray12};
     padding-left: 64px;
@@ -452,10 +422,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       text-decoration: none;
     }
 
-    &:focus-visible {
-      outline: 2px solid var(--aq-accent-link, #155eef);
-      outline-offset: 1px;
-    }
+    &:focus-visible { outline: 2px solid var(--aq-accent-link, #155eef); outline-offset: 1px; }
+    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
   }
 
   .cm-live-wikilink-icon {
@@ -512,6 +480,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     vertical-align: -0.08em;
     cursor: pointer;
     user-select: none;
+    &:focus-visible { outline: 2px solid ${({ theme }) => theme.colors.blue8}; outline-offset: 1px; }
+    @media (max-width: 768px), (pointer: coarse) { min-width: 24px; min-height: 24px; }
     &.is-checked {
       background: ${({ theme }) => theme.publicDesign.accent};
       border-color: ${({ theme }) => theme.publicDesign.accent};

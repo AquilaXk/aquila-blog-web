@@ -96,7 +96,7 @@ const StyledWrapper = styled.div`
     background: transparent;
     appearance: none;
     -webkit-appearance: none;
-    transition: all 0.125s ease-in;
+    transition: border-color 0.125s ease-in, box-shadow 0.125s ease-in, background-color 0.125s ease-in;
 
     &::placeholder {
       color: var(--aq-subtle);

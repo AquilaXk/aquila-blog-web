@@ -124,6 +124,7 @@ export const StyledWrapper = styled.div`
   .stack-row {
     display: grid;
     grid-template-columns: 140px minmax(0, 1fr);
+    align-items: center;
     gap: 20px;
     padding: 14px 0;
     border-bottom: 1px solid var(--aq-border);

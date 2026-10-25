@@ -143,6 +143,10 @@ export const PreviewEditorGrid = styled.div`
     grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
     align-items: start;
   }
+
+  [data-variant="drawer"] & {
+    grid-template-columns: minmax(0, 1fr);
+  }
 `
 
 export const CompactPublishEditorStack = styled.div`

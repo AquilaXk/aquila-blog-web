@@ -40,9 +40,12 @@ export const useScrollReveal = <T extends HTMLElement = HTMLDivElement>({
     if (!container) return
 
     const headerEl = container.querySelector<HTMLElement>("[data-header]")
+    let lastScrolled: boolean | null = null
     const syncHeaderScroll = () => {
       if (!headerEl) return
       const scrolled = window.scrollY > 12
+      if (scrolled === lastScrolled) return
+      lastScrolled = scrolled
       headerEl.classList.toggle("scrolled", scrolled)
       if (scrolled) {
         headerEl.setAttribute("data-scrolled", "true")

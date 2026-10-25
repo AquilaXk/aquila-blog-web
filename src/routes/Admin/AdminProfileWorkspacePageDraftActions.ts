@@ -85,35 +85,49 @@ export const useAdminProfileWorkspaceDraftActions = ({
           [key]: current[key].filter((_, itemIndex) => itemIndex !== index),
         }
       })
-      setOpenIconPicker((current) => (current === `${section}:${index}` ? null : current))
+      setOpenIconPicker((current) => {
+        if (!current?.startsWith(`${section}:`)) return current
+        const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
+        if (openIdx === index) return null
+        return openIdx > index ? `${section}:${openIdx - 1}` : current
+      })
+    },
+    [setDraft, setOpenIconPicker]
+  )
+
+  const reorderLinkItems = useCallback(
+    (section: LinkTab, fromIndex: number, toIndex: number) => {
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
+      setDraft((current) => {
+        const key = section === "service" ? "serviceLinks" : "contactLinks"
+        const list = current[key]
+        if (fromIndex >= list.length || toIndex >= list.length) return current
+        return {
+          ...current,
+          [key]: reorderListItem(list, fromIndex, toIndex),
+        }
+      })
+      setOpenIconPicker((current) => {
+        if (!current?.startsWith(`${section}:`)) return current
+        const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
+        if (openIdx === fromIndex) return `${section}:${toIndex}`
+        if (fromIndex < toIndex && openIdx > fromIndex && openIdx <= toIndex) {
+          return `${section}:${openIdx - 1}`
+        }
+        if (fromIndex > toIndex && openIdx >= toIndex && openIdx < fromIndex) {
+          return `${section}:${openIdx + 1}`
+        }
+        return current
+      })
     },
     [setDraft, setOpenIconPicker]
   )
 
   const moveLinkItem = useCallback(
     (section: LinkTab, index: number, direction: -1 | 1) => {
-      setDraft((current) => {
-        const key = section === "service" ? "serviceLinks" : "contactLinks"
-        return {
-          ...current,
-          [key]: moveListItem(current[key], index, direction),
-        }
-      })
+      reorderLinkItems(section, index, index + direction)
     },
-    [setDraft]
-  )
-
-  const reorderLinkItems = useCallback(
-    (section: LinkTab, fromIndex: number, toIndex: number) => {
-      setDraft((current) => {
-        const key = section === "service" ? "serviceLinks" : "contactLinks"
-        return {
-          ...current,
-          [key]: reorderListItem(current[key], fromIndex, toIndex),
-        }
-      })
-    },
-    [setDraft]
+    [reorderLinkItems]
   )
 
   const updateAboutSection = useCallback(

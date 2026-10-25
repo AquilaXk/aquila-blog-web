@@ -294,6 +294,17 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
     setListScope(nextStatus === "deleted" ? "deleted" : "active")
   }, [])
 
+  const handleSortChange = useCallback((nextSort: ListSort) => {
+    setListSort(nextSort)
+    setListPage(DEFAULT_PAGE)
+  }, [])
+
+  useEffect(() => {
+    if (listState.rows.length === 0 && listState.total > 0 && (Number.parseInt(listPage, 10) || 1) > 1) {
+      setListPage(String(Math.max(1, Math.ceil(listState.total / (Number.parseInt(listPageSize, 10) || 10)))))
+    }
+  }, [listPage, listPageSize, listState.rows.length, listState.total])
+
   const handleToastAction = useCallback(async () => {
     if (!toast?.action) return
     if (toast.action.kind === "restore") {
@@ -351,7 +362,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
       setListKw={setListKw}
       setListPage={setListPage}
       setListStatus={handleStatusFilterChange}
-      setListSort={setListSort}
+      setListSort={handleSortChange}
       setToast={setToast}
       onHardDeletePost={handleHardDeletePost}
       onRestorePost={handleRestorePost}

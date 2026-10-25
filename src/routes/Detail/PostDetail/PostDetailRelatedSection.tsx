@@ -31,12 +31,15 @@ export const selectUniqueRelatedPosts = (
   relatedByTagPosts: readonly TPost[],
   relatedByAuthorPosts: readonly TPost[],
   limit = 2
-): TPost[] =>
-  limit <= 0
-    ? []
-    : [...relatedByTagPosts, ...relatedByAuthorPosts]
-        .filter((post, index, posts) => posts.findIndex((item) => item.id === post.id) === index)
-        .slice(0, limit)
+): TPost[] => {
+  if (limit <= 0) return []
+  const posts = [...relatedByTagPosts, ...relatedByAuthorPosts].filter(
+    (post): post is TPost => Boolean(post?.id && post?.slug)
+  )
+  return posts
+    .filter((post, index) => posts.findIndex((item) => item.id === post.id) === index)
+    .slice(0, limit)
+}
 
 const RelatedPostsSectionComponent = ({
   showRelatedTagSkeleton,

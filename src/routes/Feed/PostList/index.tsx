@@ -116,25 +116,25 @@ const PostList: React.FC<Props> = ({
   useEffect(() => {
     const nextFirstPostId = posts[0] ? String(posts[0].id) : null
     const previousFirstPostId = previousFirstPostIdRef.current
+    previousFirstPostIdRef.current = posts.length ? nextFirstPostId : null
     const hasListReplaced =
       Boolean(previousFirstPostId) && Boolean(nextFirstPostId) && previousFirstPostId !== nextFirstPostId
     const nextInitialCount = Math.min(posts.length, DEFERRED_MOUNT_INITIAL_COUNT)
 
-    setMountedCardCount((prev) => {
-      if (hasListReplaced) return nextInitialCount
-      if (posts.length < prev) return posts.length
-      if (prev < nextInitialCount) return nextInitialCount
-      return prev
-    })
-
-    previousFirstPostIdRef.current = nextFirstPostId
-    if (!posts.length) {
-      previousFirstPostIdRef.current = null
+    if (hasListReplaced && mountedCardCount !== nextInitialCount) {
+      setMountedCardCount(nextInitialCount)
+      return
     }
-  }, [posts])
-
-  useEffect(() => {
+    if (posts.length < mountedCardCount) {
+      setMountedCardCount(posts.length)
+      return
+    }
+    if (mountedCardCount < nextInitialCount) {
+      setMountedCardCount(nextInitialCount)
+      return
+    }
     if (mountedCardCount >= posts.length) return
+
     const triggerNode = deferredMountTriggerRef.current
     if (!triggerNode || typeof IntersectionObserver === "undefined") {
       setMountedCardCount(posts.length)
@@ -142,27 +142,40 @@ const PostList: React.FC<Props> = ({
     }
 
     let disposed = false
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return
-        if (disposed) return
-        setMountedCardCount((prev) =>
-          Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
-        )
-      },
-      {
-        root: null,
-        rootMargin: DEFERRED_MOUNT_ROOT_MARGIN,
-        threshold: 0.01,
+    let observer: IntersectionObserver | null = null
+    const advanceBatch = () => {
+      if (disposed) return
+      disposed = true
+      observer?.disconnect()
+      setMountedCardCount((prev) =>
+        Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
+      )
+    }
+    const checkTriggerViewport = () => {
+      if (disposed || typeof window === "undefined") return
+      if (triggerNode.getBoundingClientRect().top <= window.innerHeight + 680) {
+        advanceBatch()
       }
+    }
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          advanceBatch()
+          return
+        }
+        checkTriggerViewport()
+      },
+      { root: null, rootMargin: DEFERRED_MOUNT_ROOT_MARGIN, threshold: 0.01 }
     )
 
     observer.observe(triggerNode)
+    checkTriggerViewport()
     return () => {
       disposed = true
-      observer.disconnect()
+      observer?.disconnect()
     }
-  }, [mountedCardCount, posts.length])
+  }, [mountedCardCount, posts])
 
   return (
     <StyledWrapper>
@@ -547,6 +560,10 @@ const StyledWrapper = styled.div`
   .deferredPostCardWrap {
     width: 100%;
     min-width: 0;
+  }
+
+  .deferredPostCardWrap:last-of-type > a {
+    border-bottom: 0;
   }
 
   .deferredPostCardPlaceholder {

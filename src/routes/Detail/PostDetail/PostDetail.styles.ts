@@ -427,6 +427,27 @@ export const StyledWrapper = styled.div `
       transform: translateY(1px) rotate(225deg);
     }
 
+    .mobileTocHead {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0.45rem 0.7rem 0.25rem;
+      border-top: 1px solid var(--aq-border);
+    }
+
+    .mobileTocDepthToggle {
+      border: 1px solid var(--aq-border);
+      border-radius: 6px;
+      background: var(--aq-surface);
+      color: var(--aq-text-secondary);
+      font-size: 0.75rem;
+      font-weight: 700;
+      line-height: 1;
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
+      padding: 0 0.65rem;
+      cursor: pointer;
+    }
+
     .mobileTocList {
       margin: 0;
       padding: 0 0.5rem 0.5rem;

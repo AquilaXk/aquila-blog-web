@@ -23,11 +23,13 @@ export const StyledWrapper = styled.header `
       transition: transform 220ms cubic-bezier(0.215, 0.61, 0.355, 1);
     }
 
-    &:hover {
-      color: var(--aq-text);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--aq-text);
 
-      span:first-of-type {
-        transform: translateX(-3px);
+        span:first-of-type {
+          transform: translateX(-3px);
+        }
       }
     }
 
@@ -140,7 +142,7 @@ export const StyledWrapper = styled.header `
     bottom: 0;
     left: 0;
     height: 45%;
-    border-radius: 999px 999px 2px 2px;
+    border-radius: 50% 50% 2px 2px;
     transform: none;
   }
 

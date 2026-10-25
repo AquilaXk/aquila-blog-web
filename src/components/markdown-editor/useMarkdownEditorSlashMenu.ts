@@ -210,10 +210,19 @@ export const useMarkdownEditorSlashMenu = ({
       }
 
       let coords = { top: 240, left: 340 }
-      const computeSlashMenuTop = (rect: { top: number; bottom: number }) =>
-        rect.bottom + 340 > window.innerHeight && rect.top > 356
-          ? Math.max(12, Math.round(rect.top - 340))
-          : Math.min(rect.bottom + 8, window.innerHeight - 380)
+      const computeSlashMenuTop = (rect: { top: number; bottom: number }) => {
+        const isMobile = window.innerWidth <= 820
+        const menuHeight = isMobile ? Math.min(240, Math.round(window.innerHeight * 0.42)) : 340
+        if (rect.bottom + menuHeight + 12 <= window.innerHeight) {
+          return Math.round(rect.bottom + 8)
+        }
+        if (rect.top > menuHeight + 16) {
+          return Math.max(12, Math.round(rect.top - menuHeight - 6))
+        }
+        return isMobile
+          ? Math.max(12, Math.round(rect.bottom + 6))
+          : Math.min(Math.round(rect.bottom + 8), Math.max(12, window.innerHeight - 380))
+      }
       const viewRect = resolveSlashCoords?.(trigger.slashFrom) ?? null
       if (viewRect && viewRect.bottom > 0 && typeof window !== "undefined") {
         coords = {

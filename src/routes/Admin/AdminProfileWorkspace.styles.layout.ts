@@ -79,7 +79,7 @@ export const WorkspaceShell = styled.section`
     gap: 1.2rem;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `
@@ -103,7 +103,7 @@ export const SectionRail = styled(AdminWorkspaceSectionNav)`
     }
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     flex-wrap: wrap;
     overflow-x: visible;
     padding-bottom: 0;
@@ -131,7 +131,7 @@ export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
     font-weight: 850;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     min-height: ${control.lg}px;
     padding: 0 0.78rem;
     border: 1px solid ${({ theme }) => theme.colors.gray5};
@@ -258,7 +258,7 @@ export const AvatarWorkspaceCard = styled.div`
     font-size: 0.78rem;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     grid-template-columns: minmax(0, 1fr);
     justify-items: start;
   }
@@ -273,7 +273,7 @@ export const FieldSectionCard = styled.div`
   border-bottom: 1px solid ${({ theme }) => theme.colors.gray5};
   background: transparent;
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     padding: 0.9rem;
   }
 `
@@ -297,7 +297,7 @@ export const SectionBlockHeader = styled.div`
     line-height: 1.45;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     flex-direction: column;
   }
 `
@@ -424,7 +424,7 @@ export const AboutSectionCardHeader = styled.div`
     font-size: 0.8rem;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     flex-direction: column;
   }
 `
@@ -445,7 +445,7 @@ export const ItemRow = styled.div`
     font-weight: 900;
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 768px) {
     grid-template-columns: minmax(0, 1fr);
 
     .bullet {

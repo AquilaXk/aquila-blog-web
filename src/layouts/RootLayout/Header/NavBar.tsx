@@ -41,11 +41,16 @@ const NavBar = () => {
   })
 
   useEffect(() => {
-    const syncHash = () => setActiveHash(window.location.hash.replace(/^#/, "").split("?")[0] || "")
-    syncHash()
+    const syncHash = () => {
+      const locationHash = window.location.hash.replace(/^#/, "").split("?")[0] || ""
+      setActiveHash(locationHash)
+    }
+    const locationHash = window.location.hash.replace(/^#/, "").split("?")[0] || ""
+    const routeHash = router.asPath.split("#")[1]?.split("?")[0] || ""
+    setActiveHash(locationHash || routeHash)
     window.addEventListener("hashchange", syncHash)
     return () => window.removeEventListener("hashchange", syncHash)
-  }, [])
+  }, [router.asPath])
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -420,7 +425,7 @@ const StyledWrapper = styled.div`
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    height: 36px;
     padding: 0 8px;
     border: none;
     border-radius: 6px;
@@ -534,7 +539,7 @@ const StyledWrapper = styled.div`
     }
   }
 
-  @media (pointer: coarse) {
+  @media (pointer: coarse), (max-width: ${layoutBreakpoint.navCompact}px) {
     .primaryLinks a,
     .langToggleBtn,
     .searchTrigger {
@@ -544,6 +549,7 @@ const StyledWrapper = styled.div`
     .langToggleBtn,
     .searchTrigger {
       height: 44px;
+      min-width: 44px;
     }
 
     .searchTrigger kbd {

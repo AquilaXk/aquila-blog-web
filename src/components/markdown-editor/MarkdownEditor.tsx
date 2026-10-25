@@ -7,11 +7,8 @@ import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./mar
 import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
 import {
-  createMarkdownEditorTable,
-  getMarkdownEditorTableEditAvailability,
-  packTableEditAvailabilityMask,
-  planMarkdownEditorTableEdit,
-  unpackTableEditAvailabilityMask,
+  createMarkdownEditorTable, getMarkdownEditorTableEditAvailability, packTableEditAvailabilityMask,
+  planMarkdownEditorTableEdit, resolveTableCellSelectionOffset, unpackTableEditAvailabilityMask,
   type MarkdownEditorTableEdit,
 } from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
@@ -51,22 +48,29 @@ type TextareaSelection = MarkdownEditorFocusSelection
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 
+export const resolveActiveTableCellOffset = (root: HTMLElement | null, readMarkdown: () => string): number | null => {
+  const activeEl = typeof document !== "undefined" ? document.activeElement : null
+  const isCellInput = activeEl instanceof HTMLElement && activeEl.classList.contains("cm-live-table-cell-input")
+  if (!isCellInput && activeEl instanceof HTMLElement && activeEl.closest?.(".cm-content") && !activeEl.closest?.(".cm-live-table-wrap")) return null
+  const activeWrap =
+    (isCellInput ? activeEl.closest<HTMLElement>(".cm-live-table-wrap") : null) ??
+    root?.querySelector<HTMLElement>(".cm-live-table-wrap[data-active-mode]") ??
+    null
+  if (isCellInput) activeEl.blur()
+  if (!activeWrap) return null
+  const tableFrom = Number.parseInt(activeWrap.dataset.tableFrom ?? "", 10)
+  const row = Number.parseInt(activeWrap.dataset.activeRow ?? "0", 10)
+  const col = Number.parseInt(activeWrap.dataset.activeCol ?? "0", 10)
+  return resolveTableCellSelectionOffset(readMarkdown(), tableFrom, Number.isFinite(row) ? row : 0, Number.isFinite(col) ? col : 0)
+}
+
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
 
 export const MarkdownEditor = ({
-  value,
-  disabled = false,
-  disableMermaid = false,
-  onRequestFocusTitle,
-  onChange,
-  onSelectionChange,
-  onFlushMarkdownReady,
-  onFocusRequestReady,
-  onRequestSave,
-  onUploadingChange,
-  onUploadImage,
-  onUploadFile,
+  value, disabled = false, disableMermaid = false, onRequestFocusTitle, onChange,
+  onSelectionChange, onFlushMarkdownReady, onFocusRequestReady, onRequestSave,
+  onUploadingChange, onUploadImage, onUploadFile,
 }: MarkdownEditorProps) => {
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
@@ -110,7 +114,10 @@ export const MarkdownEditor = ({
   }, [value])
 
   useEffect(() => {
-    onFlushMarkdownReady?.(() => valueRef.current)
+    onFlushMarkdownReady?.(() => {
+      resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
+      return valueRef.current
+    })
     return () => onFlushMarkdownReady?.(null)
   }, [onFlushMarkdownReady])
 
@@ -190,8 +197,13 @@ export const MarkdownEditor = ({
   }, [invalidateFindReplace, value])
 
   const rememberTextareaSelection = useCallback(() => {
+    const tableCellOffset = resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
     const snapshot = liveSurfaceRef.current?.readSnapshot()
-    if (snapshot) syncSelectionState(snapshot.selection)
+    if (tableCellOffset !== null) {
+      syncSelectionState({ from: tableCellOffset, to: tableCellOffset })
+    } else if (snapshot) {
+      syncSelectionState(snapshot.selection)
+    }
     handleFindReplaceSelectionChange(selectionRef.current)
     updateActiveTableSelection(valueRef.current, selectionRef.current)
     return selectionRef.current
@@ -317,11 +329,11 @@ export const MarkdownEditor = ({
   const commandContext = useMemo(
     () => ({
       disabled,
-      selectionStart: selectionRef.current.from,
-      selectionEnd: selectionRef.current.to,
+      selectionStart: editorSelection.from,
+      selectionEnd: editorSelection.to,
       isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
     }),
-    [disabled, isTableEditDisabled]
+    [disabled, editorSelection, isTableEditDisabled]
   )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
@@ -415,41 +427,22 @@ export const MarkdownEditor = ({
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
-      disabled,
-      valueRef,
-      selectionRef,
-      documentGenerationRef,
-      onUploadImage,
-      onUploadFile,
-      applyPlannedMarkdownMutation,
-      applyRecordedMarkdownMutation: applyMutationPlan,
-      applyBackgroundMarkdownMutation,
-      resolveActiveSelection,
+      disabled, valueRef, selectionRef, documentGenerationRef, onUploadImage, onUploadFile,
+      applyPlannedMarkdownMutation, applyRecordedMarkdownMutation: applyMutationPlan,
+      applyBackgroundMarkdownMutation, resolveActiveSelection,
       resolveDropTargetPosition: (coords) => liveSurfaceRef.current?.posAtCoords(coords) ?? null,
-      setUploadInFlight,
-      setEditorError: setUploadError,
-      insertUploadedMarkdown,
+      setUploadInFlight, setEditorError: setUploadError, insertUploadedMarkdown,
     })
 
-  const resolveSlashCoords = useCallback(
-    (pos: number) => liveSurfaceRef.current?.coordsAtPos?.(pos) ?? null,
-    []
-  )
+  const resolveSlashCoords = useCallback((pos: number) => liveSurfaceRef.current?.coordsAtPos?.(pos) ?? null, [])
 
-  const {
-    slashMenuState,
-    slashMenuOpenRef,
-    slashMenuItems,
-    checkSlashCommand,
-    closeSlashMenu,
-  } = useMarkdownEditorSlashMenu({
-    selectionRef,
-    applyMutationPlan,
-    disableMermaid,
-    onRequestImageUpload: onUploadImage ? () => imageInputRef.current?.click() : undefined,
-    onRequestFileUpload: onUploadFile ? () => fileInputRef.current?.click() : undefined,
-    resolveSlashCoords,
-  })
+  const { slashMenuState, slashMenuOpenRef, slashMenuItems, checkSlashCommand, closeSlashMenu } =
+    useMarkdownEditorSlashMenu({
+      selectionRef, applyMutationPlan, disableMermaid,
+      onRequestImageUpload: onUploadImage ? () => imageInputRef.current?.click() : undefined,
+      onRequestFileUpload: onUploadFile ? () => fileInputRef.current?.click() : undefined,
+      resolveSlashCoords,
+    })
 
   const isCompletionOrSlashMenuActive = useCallback(
     () => slashMenuOpenRef.current || Boolean(liveSurfaceRef.current?.isCompletionActive?.()),
@@ -516,6 +509,7 @@ export const MarkdownEditor = ({
         onApplySnippet={applySnippet}
         onApplyFormatShortcut={applyFormatShortcutOrAppend}
         onApplyListCommand={applyListCommand}
+        onApplyLineCommand={applyLineCommand}
         onApplyBlockSnippet={applyBlockSnippet}
         onInsertTable={insertTable}
         onApplyTableEdit={applyTableEdit}
