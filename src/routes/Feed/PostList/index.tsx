@@ -142,8 +142,11 @@ const PostList: React.FC<Props> = ({
     }
 
     let disposed = false
+    let observer: IntersectionObserver | null = null
     const advanceBatch = () => {
       if (disposed) return
+      disposed = true
+      observer?.disconnect()
       setMountedCardCount((prev) =>
         Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
       )
@@ -155,7 +158,7 @@ const PostList: React.FC<Props> = ({
       }
     }
 
-    const observer = new IntersectionObserver(
+    observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           advanceBatch()
@@ -168,11 +171,9 @@ const PostList: React.FC<Props> = ({
 
     observer.observe(triggerNode)
     checkTriggerViewport()
-    window.addEventListener("scroll", checkTriggerViewport, { passive: true })
     return () => {
       disposed = true
-      observer.disconnect()
-      window.removeEventListener("scroll", checkTriggerViewport)
+      observer?.disconnect()
     }
   }, [mountedCardCount, posts.length])
 

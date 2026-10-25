@@ -30,7 +30,7 @@ type ParsedPostMeta = {
 }
 
 export const parsePostMeta = (content: string): ParsedPostMeta => {
-  let trimmed = content.trimStart()
+  let trimmed = content.replace(/\r\n?/g, "\n").trimStart()
   const tags: string[] = []
   const categories: string[] = []
 
@@ -71,7 +71,7 @@ export const parsePostMeta = (content: string): ParsedPostMeta => {
     }
   }
 
-  const metadataLineRegex = /^\s*(tags?|categories?)\s*:\s*(.+)\s*$/i
+  const metadataLineRegex = /^\s*(tags?|category|categories)\s*:\s*(.+)\s*$/i
   let cursor = 0
   let consumedAny = false
   while (cursor <= trimmed.length) {

@@ -41,15 +41,15 @@ const NavBar = () => {
   })
 
   useEffect(() => {
-    const syncHash = () =>
-      setActiveHash(
-        router.asPath.split("#")[1]?.split("?")[0] ||
-          window.location.hash.replace(/^#/, "").split("?")[0] ||
-          ""
-      )
-    syncHash()
-    window.addEventListener("hashchange", syncHash)
-    return () => window.removeEventListener("hashchange", syncHash)
+    const syncHash = (fromHashChange = false) => {
+      const locationHash = window.location.hash.replace(/^#/, "").split("?")[0] || ""
+      const routeHash = router.asPath.split("#")[1]?.split("?")[0] || ""
+      setActiveHash(fromHashChange ? locationHash : locationHash || routeHash)
+    }
+    syncHash(false)
+    const handleHashChange = () => syncHash(true)
+    window.addEventListener("hashchange", handleHashChange)
+    return () => window.removeEventListener("hashchange", handleHashChange)
   }, [router.asPath])
 
   useEffect(() => {

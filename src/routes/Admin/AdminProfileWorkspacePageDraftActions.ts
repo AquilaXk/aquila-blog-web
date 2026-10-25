@@ -104,12 +104,21 @@ export const useAdminProfileWorkspaceDraftActions = ({
           [key]: moveListItem(current[key], index, direction),
         }
       })
+      setOpenIconPicker((current) => {
+        if (!current || !current.startsWith(`${section}:`)) return current
+        const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
+        const targetIndex = index + direction
+        if (openIdx === index) return `${section}:${targetIndex}`
+        if (openIdx === targetIndex) return `${section}:${index}`
+        return current
+      })
     },
-    [setDraft]
+    [setDraft, setOpenIconPicker]
   )
 
   const reorderLinkItems = useCallback(
     (section: LinkTab, fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
       setDraft((current) => {
         const key = section === "service" ? "serviceLinks" : "contactLinks"
         return {
@@ -117,8 +126,20 @@ export const useAdminProfileWorkspaceDraftActions = ({
           [key]: reorderListItem(current[key], fromIndex, toIndex),
         }
       })
+      setOpenIconPicker((current) => {
+        if (!current || !current.startsWith(`${section}:`)) return current
+        const openIdx = Number.parseInt(current.slice(section.length + 1), 10)
+        if (openIdx === fromIndex) return `${section}:${toIndex}`
+        if (fromIndex < toIndex && openIdx > fromIndex && openIdx <= toIndex) {
+          return `${section}:${openIdx - 1}`
+        }
+        if (fromIndex > toIndex && openIdx >= toIndex && openIdx < fromIndex) {
+          return `${section}:${openIdx + 1}`
+        }
+        return current
+      })
     },
-    [setDraft]
+    [setDraft, setOpenIconPicker]
   )
 
   const updateAboutSection = useCallback(

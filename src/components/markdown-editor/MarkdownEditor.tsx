@@ -266,6 +266,10 @@ export const MarkdownEditor = ({
   const applyTableEdit = useCallback(
     (edit: MarkdownEditorTableEdit) => {
       if (disabled) return
+      const activeEl = typeof document !== "undefined" ? document.activeElement : null
+      if (activeEl instanceof HTMLElement && activeEl.classList.contains("cm-live-table-cell-editor")) {
+        activeEl.blur()
+      }
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
       if (plan) applyPlannedMarkdownMutation(plan)

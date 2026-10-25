@@ -166,6 +166,7 @@ const CompanyHeroParticles: React.FC = () => {
     let targetY = -0.12
     let pointerActive = false
     let isIntersecting = true
+    let rectDirty = false
     let rafId: number | null = null
     const startTime = performance.now()
 
@@ -175,7 +176,11 @@ const CompanyHeroParticles: React.FC = () => {
       rectTop = rect.top
       rectWidth = rect.width
       rectHeight = rect.height
+      rectDirty = false
       return rect
+    }
+    const markRectDirty = () => {
+      rectDirty = true
     }
 
     const syncSize = () => {
@@ -368,6 +373,7 @@ const CompanyHeroParticles: React.FC = () => {
 
     const hostSection = container.parentElement
     const onPointerMove = (event: PointerEvent) => {
+      if (rectDirty) syncRect()
       if (!rectWidth || !rectHeight) return
       const nx = ((event.clientX - rectLeft) / rectWidth) * 2 - 1
       const ny = ((event.clientY - rectTop) / rectHeight) * 2 - 1
@@ -416,9 +422,9 @@ const CompanyHeroParticles: React.FC = () => {
     }
 
     window.addEventListener("resize", onResize, { passive: true })
-    window.addEventListener("scroll", syncRect, { passive: true })
     document.addEventListener("visibilitychange", onVisibilityChange)
     if (finePointer && hostSection) {
+      window.addEventListener("scroll", markRectDirty, { passive: true })
       hostSection.addEventListener("pointermove", onPointerMove, { passive: true })
       hostSection.addEventListener("pointerleave", onPointerLeave, { passive: true })
     }
@@ -429,9 +435,9 @@ const CompanyHeroParticles: React.FC = () => {
       stopLoop()
       observer?.disconnect()
       window.removeEventListener("resize", onResize)
-      window.removeEventListener("scroll", syncRect)
       document.removeEventListener("visibilitychange", onVisibilityChange)
       if (finePointer && hostSection) {
+        window.removeEventListener("scroll", markRectDirty)
         hostSection.removeEventListener("pointermove", onPointerMove)
         hostSection.removeEventListener("pointerleave", onPointerLeave)
       }

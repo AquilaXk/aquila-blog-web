@@ -163,9 +163,15 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
 
   @media (max-width: 768px) {
     .aq-footnote-popover {
-      left: auto;
+      left: 0;
       right: auto;
+      transform: translateY(4px);
       max-width: min(260px, calc(100vw - 32px));
+    }
+
+    .aq-footnote-reference:hover .aq-footnote-popover,
+    .aq-footnote-reference:focus-within .aq-footnote-popover {
+      transform: translateY(0);
     }
   }
 

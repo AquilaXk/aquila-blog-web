@@ -175,6 +175,6 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
 
     const heroParticles = readRepoFile("src/routes/Company/CompanyHeroParticles.tsx")
     expect(heroParticles).toContain("const syncRect = () => {")
-    expect(heroParticles).toContain('window.addEventListener("scroll", syncRect, { passive: true })')
+    expect(heroParticles).toContain('window.addEventListener("scroll", markRectDirty, { passive: true })')
   })
 })

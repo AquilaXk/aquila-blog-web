@@ -156,6 +156,7 @@ const CloudFileTableSection = ({
 
 type CloudFileDetailDrawerProps = {
   detailMode: "drawer" | "inline"
+  isDeleteConfirmOpen?: boolean
   onClose: () => void
   onCopyFileLink: (file: CloudFile) => Promise<void>
   onRequestDeleteFile: (file: CloudFile) => void
@@ -165,6 +166,7 @@ type CloudFileDetailDrawerProps = {
 
 const CloudFileDetailDrawer = ({
   detailMode,
+  isDeleteConfirmOpen = false,
   onClose,
   onCopyFileLink,
   onRequestDeleteFile,
@@ -178,7 +180,12 @@ const CloudFileDetailDrawer = ({
 
   const detailPanelRef = useRef<HTMLElement | null>(null)
   const isDrawerMode = detailMode === "drawer"
-  const { handleKeyDown } = useModalFocusTrap({ open: isDrawerMode, onClose, containerRef: detailPanelRef })
+  const { handleKeyDown } = useModalFocusTrap({
+    open: isDrawerMode,
+    paused: isDeleteConfirmOpen,
+    onClose,
+    containerRef: detailPanelRef,
+  })
   const normalizedFolderPath = normalizeCloudFolderPathSearch(selectedFile.folderPath || "")
   const locationLabel = normalizedFolderPath ? `/${normalizedFolderPath}` : "/"
 
@@ -548,6 +555,7 @@ const AdminCloudWorkspacePage = () => {
         {shouldShowDetailPanel && selectedFile ? (
           <CloudFileDetailDrawer
             detailMode={detailMode}
+            isDeleteConfirmOpen={Boolean(deleteConfirm)}
             onClose={() => setIsDetailPanelOpen(false)}
             onCopyFileLink={handleCopyFileLink}
             onRequestDeleteFile={handleRequestDeleteFile}

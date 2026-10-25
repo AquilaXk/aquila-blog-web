@@ -519,11 +519,8 @@ export class MarkdownTableWidget extends WidgetType {
       visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
 
       if (activeSession && !activeSession.handled) {
-        if (activeSession.input.value !== activeSession.initialValue && activeSession.col < nextGrid.headers.length) {
-          if (activeSession.row === 0) nextGrid.headers[activeSession.col] = activeSession.input.value
-          else if (activeSession.row - 1 < nextGrid.rows.length) nextGrid.rows[activeSession.row - 1]![activeSession.col] = activeSession.input.value
-        }
-        activeSession.handled = true; activeSession = null
+        activeSession.handled = true
+        activeSession = null
       }
 
       const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length

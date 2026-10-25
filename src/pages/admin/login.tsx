@@ -2,7 +2,7 @@ import styled from "@emotion/styled"
 import type { components } from "@shared/contracts"
 import type { GetServerSideProps, NextPage } from "next"
 import { useRouter } from "next/router"
-import { type FormEvent, useEffect, useMemo, useState } from "react"
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { toAuthErrorMessage } from "src/apis/backend/errorMessages"
 import type { AuthMember } from "src/hooks/useAuthSession"
@@ -73,10 +73,14 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
   const saveEmail = (loginPrefMask & LOGIN_PREF_SAVE_EMAIL) !== 0
   const keepSignedIn = (loginPrefMask & LOGIN_PREF_KEEP_SIGNED_IN) !== 0
   const hydrated = (loginPrefMask & LOGIN_PREF_HYDRATED) !== 0
-  const setSaveEmail = (v: boolean) =>
-    setLoginPrefMask((m) => (v ? m | LOGIN_PREF_SAVE_EMAIL : m & ~LOGIN_PREF_SAVE_EMAIL))
-  const setKeepSignedIn = (v: boolean) =>
-    setLoginPrefMask((m) => (v ? m | LOGIN_PREF_KEEP_SIGNED_IN : m & ~LOGIN_PREF_KEEP_SIGNED_IN))
+  const setSaveEmail = useCallback(
+    (v: boolean) => setLoginPrefMask((m) => (v ? m | LOGIN_PREF_SAVE_EMAIL : m & ~LOGIN_PREF_SAVE_EMAIL)),
+    []
+  )
+  const setKeepSignedIn = useCallback(
+    (v: boolean) => setLoginPrefMask((m) => (v ? m | LOGIN_PREF_KEEP_SIGNED_IN : m & ~LOGIN_PREF_KEEP_SIGNED_IN)),
+    []
+  )
   const [step, setStep] = useState<LoginStep>("request")
   const [challengeId, setChallengeId] = useState("")
   const [code, setCode] = useState("")

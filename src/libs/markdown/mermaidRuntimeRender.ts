@@ -422,7 +422,7 @@ export const createMermaidRuntimeController = ({
 
     const markBlockRendered = (renderedSource: string) => {
       block.dataset.mermaidRenderedSource = renderedSource
-      block.dataset.mermaidRenderedWidth = String(Math.round(block.clientWidth || root.clientWidth || 0))
+      block.dataset.mermaidRenderedWidth = String(Math.round(visibleWidth))
       block.dataset.mermaidTheme = preset.themeKey
       block.dataset.mermaidPreset = preset.mode
       block.dataset.mermaidRendered = "true"

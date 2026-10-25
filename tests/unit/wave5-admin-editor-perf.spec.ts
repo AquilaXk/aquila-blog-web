@@ -63,10 +63,17 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
     expect(extractPostIdFromSlug("trailing-dash-0")).toBeNull()
 
     expect(normalizeStringArray([" alpha ", "beta", "alpha", "", "  "])).toEqual(["alpha", "beta"])
-    expect(parsePostMeta("---\ncategory: Backend\ntags: [api, cache]\n---\nHello world")).toEqual({
+    expect(
+      parsePostMeta("---\r\ncategory: Backend\r\ntags: [api, cache]\r\n---\r\nHello world")
+    ).toEqual({
       content: "Hello world",
       category: ["folder::Backend"],
       tags: ["api", "cache"],
+    })
+    expect(parsePostMeta("category: Infra\ntags: [docker, caddy]\n\nLeading meta body")).toEqual({
+      content: "Leading meta body",
+      category: ["folder::Infra"],
+      tags: ["docker", "caddy"],
     })
   })
 

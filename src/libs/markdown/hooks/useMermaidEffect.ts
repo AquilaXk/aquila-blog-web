@@ -40,6 +40,7 @@ const useMermaidEffect = (
     let disposed = false
     let running = false
     let rerunRequested = false
+    let pendingForceResetCache = false
     let mutationObserver: MutationObserver | null = null
     let scheduledRunFrame: number | null = null
     let lastMermaidParseWarning: string | null = null
@@ -92,10 +93,12 @@ const useMermaidEffect = (
       controller.resetLayoutCache(forceResetCache)
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         rerunRequested = true
+        if (forceResetCache) pendingForceResetCache = true
         return
       }
       if (running) {
         rerunRequested = true
+        if (forceResetCache) pendingForceResetCache = true
         return
       }
       if (scheduledRunFrame !== null) return
@@ -123,8 +126,10 @@ const useMermaidEffect = (
       } finally {
         running = false
         if (rerunRequested && !disposed) {
+          const nextForceReset = pendingForceResetCache
           rerunRequested = false
-          scheduleRun()
+          pendingForceResetCache = false
+          scheduleRun(nextForceReset)
         }
       }
     }
