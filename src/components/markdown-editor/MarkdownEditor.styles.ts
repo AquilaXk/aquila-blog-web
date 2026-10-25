@@ -347,7 +347,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     }
   `}
 
-  .cm-line.cm-live-empty-line::after {
+  .cm-editor.cm-focused:not(:has(.cm-live-table-wrap[data-active-mode])) .cm-line.cm-live-empty-line::after {
     content: attr(data-placeholder);
     color: ${({ theme }) => theme.colors.gray9};
     pointer-events: none;
@@ -367,11 +367,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-scroller { overscroll-behavior: contain; }
   .cm-content {
     caret-color: ${({ theme }) => theme.colors.gray12};
-    padding-left: 44px;
-
-    @media (max-width: 720px) {
-      padding-left: 16px;
-    }
+    padding-left: 64px;
+    @media (max-width: 820px) { padding-left: 16px; }
   }
   .cm-placeholder {
     color: ${({ theme }) => theme.colors.gray9};
@@ -521,6 +518,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       color: #fff;
     }
   }
+  .cm-live-task-space { display: inline-block; width: 0; text-decoration: none; }
   .cm-line.cm-live-task-checked-line { color: ${({ theme }) => theme.colors.gray9}; text-decoration: line-through; }
   .cm-live-toggle-block, .cm-live-bookmark-card {
     border-color: ${({ theme }) => theme.publicDesign.border};

@@ -93,14 +93,19 @@ export const extractFirstMarkdownImage = (content: string): string => {
 
 const FNV1A_32_OFFSET_BASIS = 2166136261
 const FNV1A_32_PRIME = 16777619
+let cachedFingerprintInput = ""
+let cachedFingerprintValue = `${0}:${FNV1A_32_OFFSET_BASIS >>> 0}`
 
 export const computeContentFingerprint = (content: string): string => {
+  if (content === cachedFingerprintInput) return cachedFingerprintValue
   let hash = FNV1A_32_OFFSET_BASIS
   for (let index = 0; index < content.length; index += 1) {
     hash ^= content.charCodeAt(index)
     hash = Math.imul(hash, FNV1A_32_PRIME)
   }
-  return `${content.length}:${hash >>> 0}`
+  cachedFingerprintInput = content
+  cachedFingerprintValue = `${content.length}:${hash >>> 0}`
+  return cachedFingerprintValue
 }
 
 export const normalizeSafeImageUrl = (raw: string): string => {
@@ -451,7 +456,11 @@ const detectPlaceholderLineIssue = (trimmed: string): string | null => {
   return null
 }
 
+let cachedPlaceholderInput: string | null = null
+let cachedPlaceholderIssue: string | null = null
+
 export const detectPublishPlaceholderIssue = (content: string): string | null => {
+  if (content === cachedPlaceholderInput) return cachedPlaceholderIssue
   let fenceMarker: FenceMarker | null = null
   let cursor = 0
 
@@ -464,16 +473,21 @@ export const detectPublishPlaceholderIssue = (content: string): string | null =>
       fenceMarker = fenceState.marker
       if (!fenceState.isFenceLine && !fenceMarker && !trimmed.startsWith(">")) {
         const lineIssue = detectPlaceholderLineIssue(trimmed)
-        if (lineIssue) return lineIssue
+        if (lineIssue) {
+          cachedPlaceholderInput = content
+          cachedPlaceholderIssue = lineIssue
+          return lineIssue
+        }
       }
     }
     if (nextBreak === -1) break
     cursor = nextBreak + 1
   }
 
-  if (hasNonCanonicalPostImageSource(content)) {
-    return "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
-  }
-
-  return null
+  const imageIssue = hasNonCanonicalPostImageSource(content)
+    ? "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
+    : null
+  cachedPlaceholderInput = content
+  cachedPlaceholderIssue = imageIssue
+  return imageIssue
 }

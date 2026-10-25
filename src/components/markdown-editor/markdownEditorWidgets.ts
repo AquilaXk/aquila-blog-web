@@ -386,6 +386,13 @@ export class MarkdownCalloutWidget extends WidgetType {
           moveCursorToWidgetOrigin(view, root, this.from)
         })
       }
+    } else if (view) {
+      header.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        moveCursorToWidgetOrigin(view, root, this.to || this.from)
+      })
     }
 
     return root
