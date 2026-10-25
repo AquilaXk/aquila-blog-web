@@ -271,7 +271,7 @@ const getCachedDocBlocks = (state: EditorState) => {
   const images: ImageReplacementSpec[] = []
   const mermaids: MermaidReplacementSpec[] = []
   const hasCalloutMarker = markdownValue.includes("[!")
-  const hasMermaidMarker = markdownValue.includes("mermaid")
+  const hasMermaidMarker = /mermaid/i.test(markdownValue)
 
   tree.iterate({
     enter(node) {

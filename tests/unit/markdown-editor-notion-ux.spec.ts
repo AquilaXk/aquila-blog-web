@@ -994,8 +994,19 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.querySelectorAll("td")[5].classList.contains("is-active-cell")).toBe(true)
       dom.trigger("keydown", { key: "Backspace" })
       expect(lastDispatchedInsert).toContain("| Q1 |  |  |  |")
+      expect(dom.getAttribute("data-active-mode")).toBe("cell")
+      let printableStopped = false
+      dom.trigger("keydown", {
+        key: "x",
+        stopPropagation: () => {
+          printableStopped = true
+        },
+      })
+      expect(printableStopped).toBe(true)
+      dom.querySelector(".cm-live-table-cell-input")?.trigger("keydown", { key: "Escape" })
       dom.trigger("keydown", { key: "Escape" })
       expect(dom.getAttribute("data-active-mode")).toBeNull()
+      expect(widget.ignoreEvent()).toBe(true)
 
       const deleteTableBtn = dom.querySelector('[data-testid="cm-live-table-delete-table"]')
       expect(deleteTableBtn).not.toBeNull()
@@ -1137,6 +1148,10 @@ test.describe("Notion-parity Markdown editor model", () => {
     const hiddenLeadBullet = ranges.find((r) => r.from === line1Start && r.to === line1Start + 2)
     expect(hiddenLeadBullet).toBeDefined()
     expect(hiddenLeadBullet?.widget).toBeNull()
+    const taskSpaceRange = ranges.find(
+      (r) => r.from === line1Start + 5 && r.to === line1Start + 6 && r.className === "cm-live-task-space"
+    )
+    expect(taskSpaceRange).toBeDefined()
 
     const strongRange = ranges.find((r) => r.className === "cm-live-strong")
     expect(strongRange).toBeDefined()

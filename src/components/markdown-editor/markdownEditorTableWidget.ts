@@ -22,7 +22,7 @@ import {
 } from "./markdownEditorTableWidgetDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
-type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean }
+type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean; mode?: "cell" | "row" | "col" }
 type ActiveCellEditorSession = { row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean }
 type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean }
 
@@ -305,7 +305,7 @@ export class MarkdownTableWidget extends WidgetType {
         return
       }
       if (targetCell) {
-        pendingTableCellActivation = { from: range.from, row: targetCell.row, col: targetCell.col, openEditor: targetCell.openEditor }
+        pendingTableCellActivation = { from: range.from, row: targetCell.row, col: targetCell.col, openEditor: targetCell.openEditor, mode: selectedMode }
       }
       const mainSel = view.state.selection.main
       const overlaps = mainSel.from >= range.from && mainSel.from <= range.to
@@ -479,7 +479,10 @@ export class MarkdownTableWidget extends WidgetType {
         if (target.openEditor === false) {
           activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
           activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
+          if (target.mode) selectedMode = target.mode
           syncActiveCellHighlight()
+          focusTableWrap()
+          if (typeof queueMicrotask === "function") queueMicrotask(focusTableWrap)
         } else {
           activateCellEditor(target.row, target.col)
         }
@@ -576,7 +579,11 @@ export class MarkdownTableWidget extends WidgetType {
         if (cleared && cleared !== currentMarkdown) dispatchTableMarkdown(cleared, { row: activeRow, col: activeCol, openEditor: false })
         return
       }
-      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) activateCellEditor(activeRow, activeCol)
+      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        if (event.key === " ") event.preventDefault()
+        event.stopPropagation()
+        activateCellEditor(activeRow, activeCol)
+      }
     })
 
     tableDomControllers.set(wrap, { update })
