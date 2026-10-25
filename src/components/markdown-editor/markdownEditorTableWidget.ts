@@ -418,21 +418,13 @@ export class MarkdownTableWidget extends WidgetType {
 
       const commitAndCloseSession = (focusWrapAfter = false) => {
         if (session.handled) return
-        session.handled = true
-        if (activeSession === session) activeSession = null
-        const nextValue = input.value
-        if (nextValue !== initialValue) {
-          const updated = applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, nextValue)
-          if (updated && updated !== currentMarkdown) {
-            dispatchTableMarkdown(
-              updated,
-              focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined
-            )
-            if (focusWrapAfter) focusTableWrap()
-            return
-          }
+        const committed = flushActiveCellMarkdown()
+        if (committed !== currentMarkdown) {
+          dispatchTableMarkdown(
+            committed,
+            focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined
+          )
         }
-        restoreCellDisplay(cellEl, initialValue)
         if (focusWrapAfter) focusTableWrap()
       }
 

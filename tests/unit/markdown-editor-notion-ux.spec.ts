@@ -582,7 +582,7 @@ test.describe("Notion-parity Markdown editor model", () => {
     expect(isOffsetInsideFencedCodeBlock(doc, doc.indexOf("unclosed fence body"))).toBe(true)
   })
 
-  test("preserves decorationField reference on non-active cursor moves and supports Notion table visual toggles, column resizer, and boundary arrow navigation", () => {
+  test("preserves decorationField reference on non-active cursor moves and supports Notion table visual toggles, column resizer, and boundary arrow navigation", async () => {
     const sampleDoc = "# Heading\n\nPlain paragraph text with **bold** word."
     const state0 = EditorState.create({
       doc: sampleDoc,
@@ -692,7 +692,10 @@ test.describe("Notion-parity Markdown editor model", () => {
           for (const fn of listeners.get(type) ?? []) fn(ev)
           return ev
         },
-        focus: () => {},
+        focusCount: 0,
+        focus: () => {
+          el.focusCount += 1
+        },
         setSelectionRange: (start: number, end: number) => {
           el.selectionStart = start
           el.selectionEnd = end
@@ -1048,16 +1051,29 @@ test.describe("Notion-parity Markdown editor model", () => {
       tdsAfterNav[1].trigger("click")
       const dirtyInputBeforeOutsideFocus = dom.querySelector(".cm-live-table-cell-input")
       dirtyInputBeforeOutsideFocus.value = "SavedOnOutsideFocus"
+      await Promise.resolve()
+      dom.focusCount = 0
       for (const fn of documentListeners.get("focusin") ?? []) {
         fn({
           type: "focusin",
           target: { closest: () => null },
         })
       }
+      await Promise.resolve()
       expect(lastDispatchedInsert).toContain("| P1 | SavedOnOutsideFocus | Z1 |  |")
+      expect(dom.focusCount).toBe(0)
       expect(dom.dataset.activeMode).toBeUndefined()
       expect(dom.dataset.activeRow).toBeUndefined()
       expect(dom.dataset.activeCol).toBeUndefined()
+
+      tdsAfterNav[1].trigger("click")
+      const dirtyInputOnDirectBlur = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputOnDirectBlur.value = "SavedOnDirectBlur"
+      dom.focusCount = 0
+      dirtyInputOnDirectBlur.trigger("blur")
+      await Promise.resolve()
+      expect(lastDispatchedInsert).toContain("| P1 | SavedOnDirectBlur | Z1 |  |")
+      expect(dom.focusCount).toBe(0)
 
       tdsAfterNav[1].trigger("click")
       const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
