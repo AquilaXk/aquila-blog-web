@@ -16,13 +16,17 @@ type UsePostDetailRelatedPostsArgs = {
 export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostDetailRelatedPostsArgs) => {
   const [shouldFetchRelated, setShouldFetchRelated] = useState(false)
   const detailType = data?.type?.[0] ?? "Post"
-  const relatedTag = useMemo(
-    () =>
-      data?.tags
-        ?.map((tag) => tag.trim())
-        .find((tag) => tag && tag.toLowerCase() !== "pinned") || "",
-    [data?.tags]
-  )
+  const relatedTag = useMemo(() => {
+    const tags = data?.tags
+    if (!tags) return ""
+    for (let i = 0; i < tags.length; i += 1) {
+      const primaryTag = tags[i].trim()
+      if (primaryTag && primaryTag.toLowerCase() !== "pinned") {
+        return primaryTag
+      }
+    }
+    return ""
+  }, [data?.tags])
   const authorId = useMemo(
     () => (typeof data?.authorId === "number" ? String(data.authorId) : data?.author?.[0]?.id || ""),
     [data?.authorId, data?.author]
@@ -67,10 +71,18 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
   })
 
   const relatedByTagPosts = useMemo(() => {
+    const posts = relatedByTagQuery.data?.posts
+    if (!posts || posts.length === 0) return []
     const currentPostId = String(data?.id || "")
-    return (relatedByTagQuery.data?.posts || [])
-      .filter((post) => String(post.id) !== currentPostId)
-      .slice(0, RELATED_POSTS_LIMIT)
+    const filtered: typeof posts = []
+    for (let i = 0; i < posts.length; i += 1) {
+      const post = posts[i]
+      if (String(post.id) !== currentPostId) {
+        filtered.push(post)
+        if (filtered.length >= RELATED_POSTS_LIMIT) break
+      }
+    }
+    return filtered
   }, [data?.id, relatedByTagQuery.data?.posts])
 
   const relatedByAuthorPosts = useMemo(() => relatedByAuthorQuery.data || [], [relatedByAuthorQuery.data])

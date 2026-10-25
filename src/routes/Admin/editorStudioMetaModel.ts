@@ -60,7 +60,6 @@ export type LocalDraftPayload = {
   visibility: PostVisibility
   savedAt: string
   source: LocalDraftSource
-  /** Optimistic-lock version for post-slot drafts; create drafts omit/null. */
   postVersion?: number | null
 }
 
@@ -232,6 +231,7 @@ const stripLeadingEditorMetadataLines = (content: string) => {
   if (firstLine.trim() && !LEADING_EDITOR_METADATA_LINE_REGEX.test(firstLine)) {
     return {
       consumed: 0,
+      metadataLines: [] as string[],
       body: normalized,
     }
   }
@@ -249,13 +249,15 @@ const stripLeadingEditorMetadataLines = (content: string) => {
 
   return {
     consumed,
+    metadataLines: consumed > 0 ? lines.slice(0, consumed) : ([] as string[]),
     body: consumed > 0 ? lines.slice(consumed).join("\n").trimStart() : normalized,
   }
 }
 
-const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
+export const resolveEditorBodyFallback = (content: string, parsedBody: string) => {
+  if (parsedBody.trim().length > 0) return parsedBody
   const normalized = content.replace(/\r\n?/g, "\n").trimStart()
-  if (parsedBody.trim().length > 0 || normalized.trim().length === 0) return parsedBody
+  if (normalized.trim().length === 0) return parsedBody
 
   const frontmatterSplit = splitFrontmatterBlock(normalized)
   const inlineMetadataSplit = stripLeadingEditorMetadataLines(frontmatterSplit.body)
@@ -368,21 +370,18 @@ export const parseEditorMeta = (
 
   const leadingMetadataSplit = stripLeadingEditorMetadataLines(trimmed)
   if (leadingMetadataSplit.consumed > 0) {
-    trimmed
-      .split("\n")
-      .slice(0, leadingMetadataSplit.consumed)
-      .forEach((line) => {
-        const match = line.match(LEADING_EDITOR_METADATA_LINE_REGEX)
-        if (!match) return
+    leadingMetadataSplit.metadataLines.forEach((line) => {
+      const match = line.match(LEADING_EDITOR_METADATA_LINE_REGEX)
+      if (!match) return
 
-        const key = match[1].toLowerCase()
-        const value = match[2]
-        if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
-        if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
-        if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
-          thumbnail = normalizeMetaScalar(value)
-        }
-      })
+      const key = match[1].toLowerCase()
+      const value = match[2]
+      if (key === "tag" || key === "tags") pushTags(normalizeMetaItems(value))
+      if (key === "category" || key === "categories") setCategory(normalizeMetaItems(value))
+      if (key === "thumbnail" || key === "thumb" || key === "cover" || key === "coverimage" || key === "cover_image") {
+        thumbnail = normalizeMetaScalar(value)
+      }
+    })
     trimmed = leadingMetadataSplit.body
   }
 

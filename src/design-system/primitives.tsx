@@ -29,6 +29,10 @@ const StyledTextField = styled.input<{ $fieldSize: ControlSize }>`
   &::placeholder {
     color: ${({ theme }) => semanticColors(theme).textMuted};
   }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    min-height: ${control.lg}px;
+  }
 `
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(

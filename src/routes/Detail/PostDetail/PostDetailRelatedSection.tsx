@@ -27,15 +27,39 @@ const getRelatedPostMeta = (post: TPost) => {
   return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "")}`
 }
 
+export const selectUniqueRelatedPosts = (
+  byTag: readonly TPost[],
+  byAuthor: readonly TPost[],
+  limit = 2
+): TPost[] => {
+  if (limit <= 0) return []
+  const selected: TPost[] = []
+  for (let sourceIndex = 0; sourceIndex < 2; sourceIndex += 1) {
+    const source = sourceIndex === 0 ? byTag : byAuthor
+    for (let i = 0; i < source.length; i += 1) {
+      const candidate = source[i]
+      let duplicate = false
+      for (let j = 0; j < selected.length; j += 1) {
+        if (selected[j].id === candidate.id) {
+          duplicate = true
+          break
+        }
+      }
+      if (duplicate) continue
+      selected.push(candidate)
+      if (selected.length >= limit) return selected
+    }
+  }
+  return selected
+}
+
 const RelatedPostsSectionComponent = ({
   showRelatedTagSkeleton,
   relatedByTagPosts,
   showRelatedAuthorSkeleton,
   relatedByAuthorPosts,
 }: RelatedPostsSectionProps) => {
-  const relatedPosts = [...relatedByTagPosts, ...relatedByAuthorPosts]
-    .filter((post, index, posts) => posts.findIndex((item) => item.id === post.id) === index)
-    .slice(0, 2)
+  const relatedPosts = selectUniqueRelatedPosts(relatedByTagPosts, relatedByAuthorPosts, 2)
   const showSkeleton = relatedPosts.length === 0 && (showRelatedTagSkeleton || showRelatedAuthorSkeleton)
 
   if (!showSkeleton && relatedPosts.length === 0) return null

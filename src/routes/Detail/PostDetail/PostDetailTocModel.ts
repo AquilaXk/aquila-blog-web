@@ -16,13 +16,18 @@ export const buildInitialTocFromMarkdown = (
 ): TocItem[] => {
   if (!markdown.trim()) return []
   const headings = precomputedHeadings ?? createMarkdownDocumentInsights(markdown).headings
-  return headings
-    .filter((heading): heading is typeof heading & { level: 2 | 3 | 4 } => heading.level >= 2)
-    .map(({ id, slug, label, level }) => ({
-      id: id || slug,
-      text: label,
-      level,
-    }))
+  const items: TocItem[] = []
+  for (let i = 0; i < headings.length; i += 1) {
+    const heading = headings[i]
+    if (heading.level >= 2 && heading.level <= 4) {
+      items.push({
+        id: heading.id || heading.slug,
+        text: heading.label,
+        level: heading.level as 2 | 3 | 4,
+      })
+    }
+  }
+  return items
 }
 
 const TOC_SELECTOR = ".aq-markdown h2, .aq-markdown h3, .aq-markdown h4"
@@ -51,13 +56,18 @@ const nodeTouchesHeading = (node: Node | null | undefined, checkDescendants: boo
   return false
 }
 
-const nodeCollectionTouchesHeading = (nodes: Iterable<Node> | ArrayLike<Node> | null | undefined): boolean => {
+export const nodeCollectionTouchesHeading = (
+  nodes: Iterable<Node> | ArrayLike<Node> | null | undefined
+): boolean => {
   if (!nodes) return false
-  const list: Iterable<Node> =
-    typeof (nodes as ArrayLike<Node>).length === "number"
-      ? Array.from(nodes as ArrayLike<Node>)
-      : (nodes as Iterable<Node>)
-  for (const node of list) {
+  if (typeof (nodes as ArrayLike<Node>).length === "number") {
+    const arrayLike = nodes as ArrayLike<Node>
+    for (let i = 0; i < arrayLike.length; i += 1) {
+      if (nodeTouchesHeading(arrayLike[i], true)) return true
+    }
+    return false
+  }
+  for (const node of nodes as Iterable<Node>) {
     if (nodeTouchesHeading(node, true)) return true
   }
   return false
@@ -83,24 +93,28 @@ const normalizeHeadingText = (value: string): string =>
     .trim()
 
 export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
-  const headings = Array.from(article.querySelectorAll<HTMLElement>(TOC_SELECTOR))
+  const headings = article.querySelectorAll<HTMLElement>(TOC_SELECTOR)
   if (!headings.length) return []
 
   const slugAllocator = createMarkdownHeadingSlugAllocator()
   const toc: TocItem[] = []
 
-  headings.forEach((heading) => {
+  for (let i = 0; i < headings.length; i += 1) {
+    const heading = headings[i]
     const text = normalizeHeadingText(heading.textContent || "")
-    if (!text) return
+    if (!text) continue
 
-    const level = Number(heading.tagName.replace("H", "")) as TocItem["level"]
-    if (![2, 3, 4].includes(level)) return
+    const tagName = heading.tagName
+    if (tagName.length !== 2 || tagName.charCodeAt(0) !== 72) continue
+    const rawLevel = tagName.charCodeAt(1) - 48
+    if (rawLevel < 2 || rawLevel > 4) continue
+    const level = rawLevel as TocItem["level"]
 
     const id = slugAllocator.allocate(text, heading.id)
     if (heading.id !== id) heading.id = id
 
     toc.push({ id, text, level })
-  })
+  }
 
   return toc
 }

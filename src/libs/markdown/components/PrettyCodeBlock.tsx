@@ -2,6 +2,23 @@ import { FC, ReactNode, useEffect, useMemo, useState } from "react"
 import { toLanguageLabel } from "src/libs/markdown/rendering"
 
 export const COLLAPSIBLE_CODE_LINE_THRESHOLD = 35
+export const CODE_COLLAPSED_BIT = 1 << 0
+export const CODE_COPIED_BIT = 1 << 1
+export const CODE_COPY_FAILED_BIT = 1 << 2
+
+export const packCodeBlockUiState = (
+  isCollapsed: boolean,
+  copyStateOrCopied: "idle" | "copied" | "failed" | boolean = "idle",
+  copyFailed = false
+): number => {
+  const isCopied = copyStateOrCopied === "copied" || copyStateOrCopied === true
+  const isFailed = copyStateOrCopied === "failed" || copyFailed
+  return (
+    (isCollapsed ? CODE_COLLAPSED_BIT : 0) |
+    (isCopied ? CODE_COPIED_BIT : 0) |
+    (isFailed ? CODE_COPY_FAILED_BIT : 0)
+  )
+}
 
 type PrettyCodeBlockProps = {
   language: string
@@ -11,11 +28,11 @@ type PrettyCodeBlockProps = {
   preElement: ReactNode
 }
 
-const countRawCodeLines = (rawCode: string): number => {
+export const countRawCodeLines = (rawCode: string): number => {
   if (!rawCode) return 0
   let count = 1
   for (let i = 0; i < rawCode.length; i += 1) {
-    if (rawCode.codePointAt(i) === 10) {
+    if (rawCode.charCodeAt(i) === 10) {
       count += 1
     }
   }
@@ -34,31 +51,37 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   highlightLines,
   preElement,
 }) => {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
   const lineCount = useMemo(() => countRawCodeLines(rawCode), [rawCode])
   const isCollapsible = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
-  const [isCollapsed, setIsCollapsed] = useState(isCollapsible)
+  const [uiMask, setUiMask] = useState(() => packCodeBlockUiState(isCollapsible, "idle"))
+  const isCollapsed = (uiMask & CODE_COLLAPSED_BIT) !== 0
+  const copied = (uiMask & CODE_COPIED_BIT) !== 0
+  const copyFailed = (uiMask & CODE_COPY_FAILED_BIT) !== 0
   const label = title?.trim() || toLanguageLabel(language)
-  const copied = copyState === "copied"
-  const copyFailed = copyState === "failed"
 
   useEffect(() => {
-    setIsCollapsed(lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD)
+    const shouldCollapse = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
+    setUiMask((prev) =>
+      shouldCollapse ? prev | CODE_COLLAPSED_BIT : prev & ~CODE_COLLAPSED_BIT
+    )
   }, [lineCount])
 
   useEffect(() => {
-    if (copyState === "idle") return
-    const timeout = window.setTimeout(() => setCopyState("idle"), 1400)
+    if ((uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)) === 0) return
+    const timeout = window.setTimeout(
+      () => setUiMask((prev) => prev & ~(CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)),
+      1400
+    )
     return () => window.clearTimeout(timeout)
-  }, [copyState])
+  }, [uiMask])
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(rawCode)
-      setCopyState("copied")
+      setUiMask((prev) => (prev & ~CODE_COPY_FAILED_BIT) | CODE_COPIED_BIT)
     } catch (error) {
       console.warn("[code-block] copy failed", error)
-      setCopyState("failed")
+      setUiMask((prev) => (prev & ~CODE_COPIED_BIT) | CODE_COPY_FAILED_BIT)
     }
   }
 
@@ -88,7 +111,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           type="button"
           className="aq-code-collapse-toggle"
           aria-expanded={!isCollapsed}
-          onClick={() => setIsCollapsed((prev) => !prev)}
+          onClick={() => setUiMask((prev) => prev ^ CODE_COLLAPSED_BIT)}
         >
           {isCollapsed ? `전체 코드 펼치기 (${lineCount}줄)` : "코드 접기"}
         </button>

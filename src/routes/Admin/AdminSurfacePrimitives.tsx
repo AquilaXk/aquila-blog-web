@@ -208,7 +208,8 @@ export const AdminWorkspaceSectionNavButton = styled.button`
     color: ${({ theme }) => theme.colors.statusDangerText};
   }
 
-  @media (max-width: 1180px) {
+  @media (max-width: 1180px), (pointer: coarse) {
+    min-height: 44px;
     scroll-snap-align: start;
   }
 `
@@ -362,6 +363,10 @@ export const AdminTextActionButton = styled.button`
   &[data-tone="danger"] {
     color: ${({ theme }) => theme.colors.red11};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const AdminTextActionLink = styled.a`
@@ -389,6 +394,10 @@ export const AdminTextActionLink = styled.a`
 
   &[data-tone="danger"] {
     color: ${({ theme }) => theme.colors.red11};
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 

@@ -331,6 +331,13 @@ const StyledWrapper = styled.div`
     }
   }
 
+  @media (pointer: coarse) {
+    .desktopList button,
+    .toggleButton {
+      min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
+    }
+  }
+
   .desktopList button .name {
     min-width: 0;
     font-size: 0.8rem;

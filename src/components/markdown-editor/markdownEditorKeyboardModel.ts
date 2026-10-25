@@ -217,39 +217,58 @@ export const planListEnterContinuation = (
   return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
 }
 
+const UNCHECKED_TASK_RE = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/
+const CHECKED_TASK_RE = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/
+const BULLET_OR_ORDERED_RE = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/
+
 export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
-  const uncheckedMatch = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/.exec(lineText)
-  if (uncheckedMatch) {
-    const boxPos = uncheckedMatch[1].length
-    return {
-      replaced: true,
-      lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
+  let i = 0
+  while (i < lineText.length) {
+    const ch = lineText.charCodeAt(i)
+    if (ch !== 32 && ch !== 9) break
+    i += 1
+  }
+  const code = i < lineText.length ? lineText.charCodeAt(i) : -1
+
+  if (code === 45 || code === 42 || code === 43) {
+    const uncheckedMatch = UNCHECKED_TASK_RE.exec(lineText)
+    if (uncheckedMatch) {
+      const boxPos = uncheckedMatch[1].length
+      return {
+        replaced: true,
+        lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
+      }
+    }
+
+    const checkedMatch = CHECKED_TASK_RE.exec(lineText)
+    if (checkedMatch) {
+      const boxPos = checkedMatch[1].length
+      return {
+        replaced: true,
+        lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
+      }
+    }
+
+    const bulletMatch = BULLET_OR_ORDERED_RE.exec(lineText)
+    if (bulletMatch) {
+      return {
+        replaced: true,
+        lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
+      }
+    }
+  } else if (code >= 48 && code <= 57) {
+    const bulletMatch = BULLET_OR_ORDERED_RE.exec(lineText)
+    if (bulletMatch) {
+      return {
+        replaced: true,
+        lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
+      }
     }
   }
 
-  const checkedMatch = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/.exec(lineText)
-  if (checkedMatch) {
-    const boxPos = checkedMatch[1].length
-    return {
-      replaced: true,
-      lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
-    }
-  }
-
-  const bulletMatch = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/.exec(lineText)
-  if (bulletMatch) {
-    return {
-      replaced: true,
-      lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
-    }
-  }
-
-  const plainMatch = /^([ \t]*)(.*)$/.exec(lineText)
-  const indent = plainMatch?.[1] ?? ""
-  const content = plainMatch?.[2] ?? ""
   return {
     replaced: true,
-    lineText: `${indent}- [ ] ${content}`,
+    lineText: `${lineText.slice(0, i)}- [ ] ${lineText.slice(i)}`,
   }
 }
 

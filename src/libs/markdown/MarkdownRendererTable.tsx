@@ -28,6 +28,29 @@ type MarkdownTableRowContextValue = {
   allocateCellIndex: () => number
 }
 
+export const TABLE_SCROLL_LEFT_BIT = 1 << 0
+export const TABLE_SCROLL_HINT_BIT = 1 << 1
+export const TABLE_COL_COUNT_SHIFT = 2
+
+export const packTableUiState = (
+  hasScrollLeft: boolean,
+  showScrollHint: boolean,
+  detectedColumnCount: number
+): number => {
+  const safeCols = detectedColumnCount > 0 ? detectedColumnCount | 0 : 0
+  return (
+    (hasScrollLeft ? TABLE_SCROLL_LEFT_BIT : 0) |
+    (showScrollHint ? TABLE_SCROLL_HINT_BIT : 0) |
+    (safeCols << TABLE_COL_COUNT_SHIFT)
+  )
+}
+
+export const unpackTableUiState = (mask: number) => ({
+  hasScrollLeft: (mask & TABLE_SCROLL_LEFT_BIT) !== 0,
+  showScrollHint: (mask & TABLE_SCROLL_HINT_BIT) !== 0,
+  detectedColumnCount: mask >>> TABLE_COL_COUNT_SHIFT,
+})
+
 const MarkdownTableRenderContext = createContext<MarkdownTableRenderContextValue | null>(null)
 const MarkdownTableRowContext = createContext<MarkdownTableRowContextValue | null>(null)
 
@@ -42,9 +65,8 @@ export const MarkdownTableRenderer = ({
 }) => {
   const rowCursorRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const [hasScrollLeft, setHasScrollLeft] = useState(false)
-  const [showScrollHint, setShowScrollHint] = useState(false)
-  const [detectedColumnCount, setDetectedColumnCount] = useState(0)
+  const [tableUiMask, setTableUiMask] = useState(0)
+  const { hasScrollLeft, showScrollHint, detectedColumnCount } = unpackTableUiState(tableUiMask)
   const isWideOverflowTable = layout?.overflowMode === "wide"
   const columnWidths = layout?.columnWidths
   const layoutColumnCount = Math.max(
@@ -54,23 +76,34 @@ export const MarkdownTableRenderer = ({
   )
   const columnCount = layoutColumnCount > 0 ? layoutColumnCount : detectedColumnCount
   const isNarrowTable = columnCount > 0 && columnCount <= 3
-  const normalizedColumnWidths = useMemo(
-    () =>
-      (columnWidths ?? []).map((width) =>
-        typeof width === "number" && Number.isFinite(width) && width > 0
-          ? Math.max(TABLE_MIN_COLUMN_WIDTH_PX, Math.round(width))
-          : null
-      ),
-    [columnWidths]
-  )
-  const explicitTableWidth = useMemo(
-    () => normalizedColumnWidths.reduce<number>((sum, width) => sum + (width || 0), 0),
-    [normalizedColumnWidths]
-  )
-  const hasExplicitColumnWidths = useMemo(
-    () => normalizedColumnWidths.some((width) => typeof width === "number" && width > 0),
-    [normalizedColumnWidths]
-  )
+  const { normalizedColumnWidths, explicitTableWidth, hasExplicitColumnWidths } = useMemo(() => {
+    if (!columnWidths || columnWidths.length === 0) {
+      return {
+        normalizedColumnWidths: [] as Array<number | null>,
+        explicitTableWidth: 0,
+        hasExplicitColumnWidths: false,
+      }
+    }
+    const widths = new Array<number | null>(columnWidths.length)
+    let totalWidth = 0
+    let hasExplicit = false
+    for (let i = 0; i < columnWidths.length; i += 1) {
+      const width = columnWidths[i]
+      if (typeof width === "number" && Number.isFinite(width) && width > 0) {
+        const normalized = Math.max(TABLE_MIN_COLUMN_WIDTH_PX, Math.round(width))
+        widths[i] = normalized
+        totalWidth += normalized
+        hasExplicit = true
+      } else {
+        widths[i] = null
+      }
+    }
+    return {
+      normalizedColumnWidths: widths,
+      explicitTableWidth: totalWidth,
+      hasExplicitColumnWidths: hasExplicit,
+    }
+  }, [columnWidths])
   const usesExplicitNormalWidth = !isWideOverflowTable && explicitTableWidth > 0
   const tableStyle = useMemo<CSSProperties | undefined>(() => {
     if ((isWideOverflowTable || usesExplicitNormalWidth) && explicitTableWidth > 0) {
@@ -109,23 +142,30 @@ export const MarkdownTableRenderer = ({
     if (!scrollElement) return
     const tableElement = scrollElement.querySelector("table")
 
-    const syncDetectedColumns = () => {
-      const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
-      if (domCols > 0) {
-        setDetectedColumnCount(domCols)
-      }
+    const computeScrollBits = () => {
+      const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
+      const remaining = overflowAmount - scrollElement.scrollLeft
+      const nextScrollLeft = scrollElement.scrollLeft > 2
+      const nextScrollHint = overflowAmount > 1 && remaining > 1
+      return (
+        (nextScrollLeft ? TABLE_SCROLL_LEFT_BIT : 0) |
+        (nextScrollHint ? TABLE_SCROLL_HINT_BIT : 0)
+      )
     }
 
     const syncScrollHint = () => {
-      const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
-      const remaining = overflowAmount - scrollElement.scrollLeft
-      setHasScrollLeft(scrollElement.scrollLeft > 2)
-      setShowScrollHint(overflowAmount > 1 && remaining > 1)
+      const scrollBits = computeScrollBits()
+      setTableUiMask((prev) => (prev & ~3) | scrollBits)
     }
 
     const syncTableMetrics = () => {
-      syncDetectedColumns()
-      syncScrollHint()
+      const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
+      const scrollBits = computeScrollBits()
+      setTableUiMask((prev) => {
+        const prevCols = prev >>> TABLE_COL_COUNT_SHIFT
+        const nextCols = domCols > 0 ? domCols : prevCols
+        return scrollBits | (nextCols << TABLE_COL_COUNT_SHIFT)
+      })
     }
 
     syncTableMetrics()

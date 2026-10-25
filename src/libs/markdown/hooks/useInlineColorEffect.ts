@@ -15,21 +15,17 @@ export const shouldScheduleFromInlineColorMutations = (
       if (nodeContainsInlineColorToken(mutation.target)) return true
       continue
     }
-    for (const addedNode of Array.from(mutation.addedNodes || [])) {
-      if (nodeContainsInlineColorToken(addedNode)) return true
+    const addedNodes = mutation.addedNodes
+    if (!addedNodes) continue
+    for (let i = 0; i < addedNodes.length; i += 1) {
+      if (nodeContainsInlineColorToken(addedNodes[i])) return true
     }
   }
   return false
 }
 
 export const applyInlineColors = (root: HTMLElement) => {
-  const ownTextDesc = Object.getOwnPropertyDescriptor(root, "textContent")
-  if (
-    ownTextDesc &&
-    "value" in ownTextDesc &&
-    typeof ownTextDesc.value === "string" &&
-    !ownTextDesc.value.includes("{{color:")
-  ) {
+  if (!(root.textContent || "").includes("{{color:")) {
     return
   }
   const showTextFilter = typeof NodeFilter !== "undefined" ? NodeFilter.SHOW_TEXT : 4

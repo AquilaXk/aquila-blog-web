@@ -71,6 +71,10 @@ export const PrimaryCta = styled.button`
   font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const ListSection = styled.section`

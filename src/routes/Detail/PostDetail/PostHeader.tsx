@@ -58,9 +58,30 @@ const resolveShareFeedbackMessage = (
   return "복사 완료"
 }
 
+const numberFormatters = new Map<string, Intl.NumberFormat>()
+
+const getNumberFormatter = (locale: string): Intl.NumberFormat => {
+  let formatter = numberFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale)
+    numberFormatters.set(locale, formatter)
+  }
+  return formatter
+}
+
+const findPrimaryTag = (tags?: readonly string[] | null): string => {
+  if (!tags) return ""
+  for (let i = 0; i < tags.length; i += 1) {
+    const trimmed = tags[i].trim()
+    if (trimmed) return trimmed
+  }
+  return ""
+}
+
 const resolveHeroLabels = (data: PostDetail): string[] => {
-  const tags = (data.tags || []).map((tag) => tag.trim()).filter(Boolean)
-  const primaryTaxonomy = (data.category?.[0] || tags[0] || "").trim()
+  const primaryCategory = data.category?.[0]?.trim() || ""
+  const primaryTag = primaryCategory ? "" : findPrimaryTag(data.tags)
+  const primaryTaxonomy = primaryCategory || primaryTag
   const rawTypeLabel = data.type?.[0]?.trim() || "Post"
   const typeLabel = rawTypeLabel === "Post" ? "Production note" : rawTypeLabel
   return primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]
@@ -81,7 +102,7 @@ export const resolvePostHeaderViewModel = (props: Props) => {
   const shareFeedbackMessage = resolveShareFeedbackMessage(shareFeedback)
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const viewCount = hitCount ?? data.hitCount ?? 0
-  const viewText = `${Intl.NumberFormat(CONFIG.lang).format(viewCount)} VIEWS`
+  const viewText = `${getNumberFormatter(CONFIG.lang).format(viewCount)} VIEWS`
   const resolvedLikesCount = likesCount ?? data.likesCount ?? 0
 
   return {

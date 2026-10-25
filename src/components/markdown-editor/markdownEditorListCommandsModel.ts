@@ -6,45 +6,67 @@ export type ListMarkerMatch =
   | { kind: "unordered" | "task" | "quote"; indent: string; marker: string; content: string }
   | { kind: "ordered"; indent: string; marker: string; content: string; number: number }
 
+const TASK_LINE_RE = /^(?<indent>\s*)(?<marker>[-*+] \[[ xX]\] )(?<content>.*)$/
+const UNORDERED_LINE_RE = /^(?<indent>\s*)(?<marker>[-*+] )(?<content>.*)$/
+const ORDERED_LINE_RE = /^(?<indent>\s*)(?<marker>(?<number>\d+)\. )(?<content>.*)$/
+const QUOTE_LINE_RE = /^(?<indent>\s*)(?<marker>> )(?<content>.*)$/
+
 export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
-  const task = /^(?<indent>\s*)(?<marker>[-*+] \[[ xX]\] )(?<content>.*)$/.exec(line)
-  if (task?.groups) {
-    return {
-      kind: "task",
-      indent: task.groups.indent ?? "",
-      marker: "- [ ] ",
-      content: task.groups.content ?? "",
+  let i = 0
+  while (i < line.length) {
+    const ch = line.charCodeAt(i)
+    if (ch !== 32 && ch !== 9) break
+    i += 1
+  }
+  if (i >= line.length) return null
+
+  const code = line.charCodeAt(i)
+  if (code === 45 || code === 42 || code === 43) {
+    const task = TASK_LINE_RE.exec(line)
+    if (task?.groups) {
+      return {
+        kind: "task",
+        indent: task.groups.indent ?? "",
+        marker: "- [ ] ",
+        content: task.groups.content ?? "",
+      }
     }
+
+    const unordered = UNORDERED_LINE_RE.exec(line)
+    if (unordered?.groups) {
+      return {
+        kind: "unordered",
+        indent: unordered.groups.indent ?? "",
+        marker: unordered.groups.marker ?? "- ",
+        content: unordered.groups.content ?? "",
+      }
+    }
+    return null
   }
 
-  const unordered = /^(?<indent>\s*)(?<marker>[-*+] )(?<content>.*)$/.exec(line)
-  if (unordered?.groups) {
-    return {
-      kind: "unordered",
-      indent: unordered.groups.indent ?? "",
-      marker: unordered.groups.marker ?? "- ",
-      content: unordered.groups.content ?? "",
+  if (code >= 48 && code <= 57) {
+    const ordered = ORDERED_LINE_RE.exec(line)
+    if (ordered?.groups) {
+      return {
+        kind: "ordered",
+        indent: ordered.groups.indent ?? "",
+        marker: ordered.groups.marker ?? "1. ",
+        content: ordered.groups.content ?? "",
+        number: Number.parseInt(ordered.groups.number ?? "1", 10) || 1,
+      }
     }
+    return null
   }
 
-  const ordered = /^(?<indent>\s*)(?<marker>(?<number>\d+)\. )(?<content>.*)$/.exec(line)
-  if (ordered?.groups) {
-    return {
-      kind: "ordered",
-      indent: ordered.groups.indent ?? "",
-      marker: ordered.groups.marker ?? "1. ",
-      content: ordered.groups.content ?? "",
-      number: Number.parseInt(ordered.groups.number ?? "1", 10) || 1,
-    }
-  }
-
-  const quote = /^(?<indent>\s*)(?<marker>> )(?<content>.*)$/.exec(line)
-  if (quote?.groups) {
-    return {
-      kind: "quote",
-      indent: quote.groups.indent ?? "",
-      marker: "> ",
-      content: quote.groups.content ?? "",
+  if (code === 62) {
+    const quote = QUOTE_LINE_RE.exec(line)
+    if (quote?.groups) {
+      return {
+        kind: "quote",
+        indent: quote.groups.indent ?? "",
+        marker: "> ",
+        content: quote.groups.content ?? "",
+      }
     }
   }
 
@@ -61,13 +83,16 @@ type LogicalLine = {
 const fenceLine = /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 
 const logicalLines = (value: string): LogicalLine[] => {
-  const lines = value.split("\n")
+  const result: LogicalLine[] = []
   let offset = 0
   let inFence = false
   let openMarker = ""
   let openLength = 0
 
-  return lines.map((text, index) => {
+  while (true) {
+    const nextBreak = value.indexOf("\n", offset)
+    const end = nextBreak === -1 ? value.length : nextBreak
+    const text = value.slice(offset, end)
     const match = fenceLine.exec(text)
     let intersectsFence = inFence
     if (match) {
@@ -85,10 +110,12 @@ const logicalLines = (value: string): LogicalLine[] => {
         openLength = 0
       }
     }
-    const line = { start: offset, end: offset + text.length, text, intersectsFence }
-    offset = line.end + (index < lines.length - 1 ? 1 : 0)
-    return line
-  })
+    result.push({ start: offset, end, text, intersectsFence })
+    if (nextBreak === -1) break
+    offset = end + 1
+  }
+
+  return result
 }
 
 const lineIndexAt = (lines: LogicalLine[], offset: number): number => {

@@ -174,11 +174,20 @@ const parseCardMetadataLine = (
   }
 }
 
-const markdownCardThumbnailSources = (content: string) => {
+export const markdownCardThumbnailSources = (content: string): string[] => {
   if (!content.includes("aq-")) return []
+  const lines = content.split("\n")
+  let lastClosingTripleColonIndex = -1
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].trim() === ":::") {
+      lastClosingTripleColonIndex = index
+      break
+    }
+  }
+  if (lastClosingTripleColonIndex === -1) return []
+
   const sources: string[] = []
   let pendingMetadata: { kind: string; thumbnailUrl: string } | null = null
-  const lines = content.split("\n")
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
@@ -188,12 +197,16 @@ const markdownCardThumbnailSources = (content: string) => {
       continue
     }
 
-    const directiveMatch = CARD_DIRECTIVE_PATTERN.exec(line.trim())
-    const hasClosingMarker = lines.slice(index + 1).some((candidate) => candidate.trim() === ":::")
-    if (pendingMetadata && directiveMatch?.[1].toLowerCase() === pendingMetadata.kind && hasClosingMarker) {
-      sources.push(pendingMetadata.thumbnailUrl)
+    if (pendingMetadata !== null) {
+      const directiveMatch = CARD_DIRECTIVE_PATTERN.exec(line.trim())
+      if (
+        directiveMatch?.[1].toLowerCase() === pendingMetadata.kind &&
+        lastClosingTripleColonIndex > index
+      ) {
+        sources.push(pendingMetadata.thumbnailUrl)
+      }
+      pendingMetadata = null
     }
-    pendingMetadata = null
   }
 
   return sources
@@ -230,13 +243,18 @@ const collectReferenceImageDestinations = (
   return destinations
 }
 
+const INLINE_IMAGE_DESTINATION_PATTERN = /!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g
+
 export const hasNonCanonicalPostImageSource = (content: string): boolean => {
   if (!/!\[|aq-(?:bookmark|embed)/i.test(content)) return false
   const visibleContent = markdownWithoutCode(content)
   const definitions = collectImageReferenceDefinitions(visibleContent)
-  const destinations = [...visibleContent.matchAll(/!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g)]
-    .filter((match) => !isEscapedMarkdownMarker(visibleContent, match.index ?? 0))
-    .map((match) => match[1])
+  const destinations: string[] = []
+  for (const match of visibleContent.matchAll(INLINE_IMAGE_DESTINATION_PATTERN)) {
+    if (!isEscapedMarkdownMarker(visibleContent, match.index ?? 0)) {
+      destinations.push(match[1])
+    }
+  }
   destinations.push(
     ...markdownCardThumbnailSources(visibleContent),
     ...collectReferenceImageDestinations(visibleContent, definitions)

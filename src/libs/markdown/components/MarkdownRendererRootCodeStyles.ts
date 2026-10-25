@@ -82,17 +82,6 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     overflow: hidden;
   }
 
-  .aq-code-block[data-collapsed="true"] .aq-code-body::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 76px;
-    background: linear-gradient(180deg, rgba(15, 23, 40, 0) 0%, #0f1728 92%);
-    pointer-events: none;
-  }
-
   .aq-code-collapse-toggle {
     display: flex;
     align-items: center;

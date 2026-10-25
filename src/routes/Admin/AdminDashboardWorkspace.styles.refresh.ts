@@ -42,4 +42,8 @@ export const RefreshButton = styled.button`
     outline: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, ${adminTeal} 28%, transparent);
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `

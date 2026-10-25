@@ -116,6 +116,10 @@ export const DetailActionLink = styled.a`
     background: ${surfaceMuted};
     color: ${textPrimary};
   }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 export const DetailEditForm = styled.form`
@@ -151,6 +155,10 @@ export const DetailEditInput = styled.input`
   &:focus-visible {
     outline: none;
     border-color: ${borderStrong};
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 
@@ -331,6 +339,10 @@ export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
     font-size: 0.78rem;
     font-weight: 800;
     cursor: pointer;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 `
 

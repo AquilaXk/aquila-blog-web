@@ -76,13 +76,14 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   width: 280px;
+  max-width: calc(100vw - 24px);
   max-height: 380px;
   overflow-y: auto;
   padding: 6px;
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -136,6 +137,7 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
   transition: background-color 0.1s ease;
 
   ${focusVisibleRing}
+  @media (pointer: coarse) { min-height: 44px; }
 
   &:hover {
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};

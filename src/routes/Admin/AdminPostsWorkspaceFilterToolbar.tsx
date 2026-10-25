@@ -143,7 +143,7 @@ const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`
   border-color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray6 : theme.colors.gray5)};
   ${focusVisibleRing}
 
-  @media (max-width: 767px) {
+  @media (max-width: 767px), (pointer: coarse) {
     min-height: 44px;
     padding: 0 0.46rem;
     border-radius: 6px;

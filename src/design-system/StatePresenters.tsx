@@ -17,24 +17,18 @@ export const Skeleton = ({
 
 const skeletonPulse = `
   @keyframes aq-skeleton-pulse {
-    0% {
-      background-position: 200% 0;
+    0%, 100% {
+      opacity: 0.65;
     }
-    100% {
-      background-position: -200% 0;
+    50% {
+      opacity: 1;
     }
   }
 `
 
 const SkeletonBlock = styled.div`
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    ${({ theme }) => theme.colors.gray3} 25%,
-    ${({ theme }) => theme.colors.gray4} 50%,
-    ${({ theme }) => theme.colors.gray3} 75%
-  );
-  background-size: 200% 100%;
+  background: ${({ theme }) => theme.colors.gray3};
   animation: aq-skeleton-pulse ${duration.skeleton}ms ${easing.standard} infinite;
   ${skeletonPulse}
   ${respectReducedMotion}

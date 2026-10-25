@@ -524,6 +524,10 @@ const LoginPreference = styled.label`
   gap: 0.5rem;
   color: ${({ theme }) => theme.colors.gray11};
   font-size: 0.9rem;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `
 
 const LoginSecondaryButton = styled.button`
@@ -543,6 +547,10 @@ const LoginSecondaryButton = styled.button`
   &:disabled {
     cursor: not-allowed;
     opacity: 0.65;
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 
