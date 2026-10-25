@@ -28,6 +28,31 @@ const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean
   return enabled ? mask | bit : mask & ~bit
 }
 const isMobileEditorViewport = () => typeof window !== "undefined" && window.innerWidth <= 820
+const toggleZenBits = (mask: number) =>
+  (mask & EDITOR_SURFACE_ZEN_BITS) === 0 ? mask | EDITOR_SURFACE_ZEN_BITS : mask & ~EDITOR_SURFACE_ZEN_BITS
+const toggleResponsiveSidebarBits = (mask: number, targetBit: number) => {
+  if (!isMobileEditorViewport()) return applyBitFlag(mask, targetBit, (prev) => !prev)
+  const nextOpen = (mask & targetBit) === 0
+  const cleared = mask & ~EDITOR_SURFACE_ZEN_BITS
+  return nextOpen ? cleared | targetBit : cleared
+}
+const buildEditorOutlineItems = (
+  postTitle: string,
+  headings: ReadonlyArray<{ slug: string; offset: number; level: 1 | 2 | 3 | 4; label: string; range: { start: number; end: number } }>
+) => {
+  const title = postTitle.trim()
+  return [
+    ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
+    ...headings.map((heading) => ({
+      id: `${heading.slug}:${heading.offset}`,
+      level: heading.level,
+      label: heading.label,
+      range: heading.range,
+    })),
+  ]
+}
+const computeSelectedCharCount = (range?: { from: number; to: number } | null) =>
+  range ? Math.max(0, range.to - range.from) : 0
 const applyCommaSeparatedTagDraft = (
   nextValue: string,
   onTagDraftChange: (value: string) => void,
@@ -43,6 +68,40 @@ const applyCommaSeparatedTagDraft = (
   const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
   if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
   onTagDraftChange(tailDraft)
+}
+const handleTagInputKeyDown = (
+  event: ReactKeyboardEvent<HTMLInputElement>,
+  onAddTag: (value: string) => void
+) => {
+  if (isComposingKeyboardEvent(event)) return
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault()
+    onAddTag(event.currentTarget.value)
+  }
+}
+const activateEditorOutlineItem = (
+  range: { start: number; end: number } | null,
+  setIsOutlineOpen: (next: boolean) => void,
+  setLastActivatedOutlineOffset: (offset: number | null) => void,
+  onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void,
+  focusTitle: () => void
+) => {
+  if (isMobileEditorViewport()) setIsOutlineOpen(false)
+  if (range) {
+    setLastActivatedOutlineOffset(range.start)
+    onOutlineBodyHeadingActivate({ from: range.start, to: range.end })
+    return
+  }
+  setLastActivatedOutlineOffset(null)
+  focusTitle()
+}
+const dismissMobilePanelsOnCanvasTap = (
+  isZenMode: boolean,
+  setPanelUiMask: (updater: (m: number) => number) => void
+) => {
+  if (isMobileEditorViewport() && !isZenMode) {
+    setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
+  }
 }
 const useResponsiveEditorPanelEffects = (
   setPanelUiMask: (updater: (m: number) => number) => void,
@@ -140,51 +199,24 @@ export const countMarkdownTotalLinks = (markdown: string): number =>
 type NoticeTone = "idle" | "loading" | "success" | "error"
 
 type EditorStudioDedicatedEditorSurfaceProps = {
-  thumbnailImageFileInputRef: Ref<HTMLInputElement>
-  onThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
-  onExit: () => void
-  saveStateText: string
-  saveStateTone: string
-  primaryActionDisabled: boolean
-  primaryActionLabel: string
-  onPrimaryAction: () => void
-  postTags: string[]
-  tagDraft: string
-  onTagDraftChange: (value: string) => void
-  onAddTags: (values: string[]) => void
-  onAddTag: (value: string) => void
-  onRemoveTag: (value: string) => void
-  titleInputRef: (node: HTMLTextAreaElement | null) => void
+  thumbnailImageFileInputRef: Ref<HTMLInputElement>; onThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
+  onExit: () => void; saveStateText: string; saveStateTone: string; primaryActionDisabled: boolean
+  primaryActionLabel: string; onPrimaryAction: () => void; postTags: string[]; tagDraft: string
+  onTagDraftChange: (value: string) => void; onAddTags: (values: string[]) => void; onAddTag: (value: string) => void
+  onRemoveTag: (value: string) => void; titleInputRef: (node: HTMLTextAreaElement | null) => void
   onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
-  activeCursorOffset?: number | null
-  activeSelectionRange?: { from: number; to: number } | null
-  postTitle: string
-  onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
-  onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
-  postContent: string
-  postSummary: string
-  onPostSummaryChange: (value: string) => void
-  postCategory: string
-  onPostCategoryChange: (value: string) => void
-  onCommitPostCategory: () => void
-  categorySuggestions: string[]
-  tagSuggestions?: string[]
-  postVisibility: PostVisibility
-  onPostVisibilityChange: (value: PostVisibility) => void
-  editorCanvas: ReactNode
-  showPublishNotice: boolean
-  publishNoticeTone: NoticeTone
-  publishNoticeText: string
-  isLocalDraftRestoreSuggestionVisible: boolean
-  isLocalDraftRestoreSuggestionActionsDisabled: boolean
-  onRestoreLocalDraft: () => void
-  localDraftCandidates: Array<{ key: string; label: string }>
-  selectedLocalDraftCandidateKey: string
-  onSelectLocalDraftCandidate: (key: string) => void
-  onDiscardLocalDraftCandidate: () => void
-  onDismissLocalDraftRestoreSuggestion: () => void
-  onClearLocalDraft: () => void
-  publishModal: ReactNode
+  activeCursorOffset?: number | null; activeSelectionRange?: { from: number; to: number } | null
+  postTitle: string; onPostTitleChange: ChangeEventHandler<HTMLTextAreaElement>
+  onPostTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>; postContent: string; postSummary: string
+  onPostSummaryChange: (value: string) => void; postCategory: string; onPostCategoryChange: (value: string) => void
+  onCommitPostCategory: () => void; categorySuggestions: string[]; tagSuggestions?: string[]
+  postVisibility: PostVisibility; onPostVisibilityChange: (value: PostVisibility) => void; editorCanvas: ReactNode
+  showPublishNotice: boolean; publishNoticeTone: NoticeTone; publishNoticeText: string
+  isLocalDraftRestoreSuggestionVisible: boolean; isLocalDraftRestoreSuggestionActionsDisabled: boolean
+  onRestoreLocalDraft: () => void; localDraftCandidates: Array<{ key: string; label: string }>
+  selectedLocalDraftCandidateKey: string; onSelectLocalDraftCandidate: (key: string) => void
+  onDiscardLocalDraftCandidate: () => void; onDismissLocalDraftRestoreSuggestion: () => void
+  onClearLocalDraft: () => void; publishModal: ReactNode
 }
 
 const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -260,38 +292,20 @@ export const EditorStudioDedicatedEditorSurface = ({
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
 
-  const handleToggleZenMode = useCallback(() => {
-    setPanelUiMask((m) => ((m & EDITOR_SURFACE_ZEN_BITS) === 0 ? m | EDITOR_SURFACE_ZEN_BITS : m & ~EDITOR_SURFACE_ZEN_BITS))
-  }, [])
-
-  const toggleResponsiveSidebar = useCallback((targetBit: number) => {
-    if (isMobileEditorViewport()) {
-      setPanelUiMask((m) => {
-        const nextOpen = (m & targetBit) === 0
-        const cleared = m & ~EDITOR_SURFACE_ZEN_BITS
-        return nextOpen ? cleared | targetBit : cleared
-      })
-      return
-    }
-    setPanelUiMask((m) => applyBitFlag(m, targetBit, (prev) => !prev))
-  }, [])
+  const handleToggleZenMode = useCallback(() => setPanelUiMask(toggleZenBits), [])
+  const toggleResponsiveSidebar = useCallback(
+    (targetBit: number) => setPanelUiMask((m) => toggleResponsiveSidebarBits(m, targetBit)),
+    []
+  )
 
   useResponsiveEditorPanelEffects(setPanelUiMask, handleToggleZenMode)
 
   const deferredPostContent = useDeferredValue(postContent)
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
-  const outlineItems = useMemo(() => {
-    const title = postTitle.trim()
-    return [
-      ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
-      ...outlineInsights.headings.map((heading) => ({
-        id: `${heading.slug}:${heading.offset}`,
-        level: heading.level,
-        label: heading.label,
-        range: heading.range,
-      })),
-    ]
-  }, [outlineInsights.headings, postTitle])
+  const outlineItems = useMemo(
+    () => buildEditorOutlineItems(postTitle, outlineInsights.headings),
+    [outlineInsights.headings, postTitle]
+  )
   const activeOutlineIndex = useMemo(
     () => resolveActiveOutlineItemIndex(outlineItems, activeCursorOffset ?? lastActivatedOutlineOffset),
     [activeCursorOffset, lastActivatedOutlineOffset, outlineItems]
@@ -302,16 +316,11 @@ export const EditorStudioDedicatedEditorSurface = ({
     () => computeCursorLineAndColumn(deferredPostContent, activeCursorOffset),
     [activeCursorOffset, deferredPostContent]
   )
-  const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
+  const selectedCharCount = computeSelectedCharCount(activeSelectionRange)
   const handleTagDraftChange = (nextValue: string) =>
     applyCommaSeparatedTagDraft(nextValue, onTagDraftChange, onAddTags)
-  const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
-    if (isComposingKeyboardEvent(event)) return
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault()
-      onAddTag(event.currentTarget.value)
-    }
-  }
+  const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) =>
+    handleTagInputKeyDown(event, onAddTag)
   const handleTitleInputRef = useCallback((node: HTMLTextAreaElement | null) => {
     titleNodeRef.current = node
     titleInputRef(node)
@@ -398,17 +407,16 @@ export const EditorStudioDedicatedEditorSurface = ({
                   key={item.id}
                   type="button"
                   data-level={item.level}
-                  data-active={index === activeOutlineIndex ? "true" : "false"}
-                  onClick={() => {
-                    if (isMobileEditorViewport()) setIsOutlineOpen(false)
-                    if (item.range) {
-                      setLastActivatedOutlineOffset(item.range.start)
-                      onOutlineBodyHeadingActivate({ from: item.range.start, to: item.range.end })
-                      return
-                    }
-                    setLastActivatedOutlineOffset(null)
-                    titleNodeRef.current?.focus()
-                  }}
+                  data-active={String(index === activeOutlineIndex)}
+                  onClick={() =>
+                    activateEditorOutlineItem(
+                      item.range,
+                      setIsOutlineOpen,
+                      setLastActivatedOutlineOffset,
+                      onOutlineBodyHeadingActivate,
+                      () => titleNodeRef.current?.focus()
+                    )
+                  }
                 >
                   <span>H{item.level}</span>
                   <strong>{item.label}</strong>
@@ -423,11 +431,7 @@ export const EditorStudioDedicatedEditorSurface = ({
         <EditorStudioWritingColumn
           data-testid="editor-writing-column"
           $zenMode={isZenMode}
-          onPointerDown={() => {
-            if (isMobileEditorViewport() && !isZenMode) {
-              setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
-            }
-          }}
+          onPointerDown={() => dismissMobilePanelsOnCanvasTap(isZenMode, setPanelUiMask)}
         >
           <EditorStudioDedicatedMetaSection>
             {!isInspectorOpen ? localDraftRestoreCardNode : null}
