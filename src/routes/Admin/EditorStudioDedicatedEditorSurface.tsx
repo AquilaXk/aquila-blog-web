@@ -28,6 +28,53 @@ const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean
   return enabled ? mask | bit : mask & ~bit
 }
 const isMobileEditorViewport = () => typeof window !== "undefined" && window.innerWidth <= 820
+const applyCommaSeparatedTagDraft = (
+  nextValue: string,
+  onTagDraftChange: (value: string) => void,
+  onAddTags: (values: string[]) => void
+) => {
+  const commaSeparated = /[,，]/
+  if (!commaSeparated.test(nextValue)) {
+    onTagDraftChange(nextValue)
+    return
+  }
+  const fragments = nextValue.split(commaSeparated)
+  const tailDraft = fragments.pop() ?? ""
+  const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
+  if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
+  onTagDraftChange(tailDraft)
+}
+const useResponsiveEditorPanelEffects = (
+  setPanelUiMask: (updater: (m: number) => number) => void,
+  handleToggleZenMode: () => void
+) => {
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const media = window.matchMedia("(max-width: 820px)")
+    const syncViewportPanels = (matches: boolean) => {
+      setPanelUiMask((m) => (matches ? m & ~EDITOR_SURFACE_ZEN_BITS : m | EDITOR_SURFACE_ZEN_BITS))
+    }
+    if (media.matches) syncViewportPanels(true)
+    const onChange = (event: MediaQueryListEvent) => syncViewportPanels(event.matches)
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [setPanelUiMask])
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault()
+        handleToggleZenMode()
+        return
+      }
+      if (event.key === "Escape" && isMobileEditorViewport()) {
+        setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [handleToggleZenMode, setPanelUiMask])
+}
 
 export const resolveActiveOutlineItemIndex = (
   items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
@@ -155,49 +202,25 @@ const getCategoryInputValue = (category: string) =>
   category.trim() ? splitCategoryDisplay(category).label : ""
 
 type LocalDraftRestoreSuggestionProps = {
-  visible: boolean
-  disabled: boolean
-  onRestore: () => void
-  candidates: Array<{ key: string; label: string }>
-  selectedKey: string
-  onSelect: (key: string) => void
-  onDiscard: () => void
-  onClear: () => void
-  onDismiss: () => void
+  visible: boolean; disabled: boolean; onRestore: () => void; candidates: Array<{ key: string; label: string }>
+  selectedKey: string; onSelect: (key: string) => void; onDiscard: () => void; onClear: () => void; onDismiss: () => void
 }
 
 const LocalDraftRestoreSuggestion = ({
-  visible,
-  disabled,
-  onRestore,
-  candidates,
-  selectedKey,
-  onSelect,
-  onDiscard,
-  onClear,
-  onDismiss,
+  visible, disabled, onRestore, candidates, selectedKey, onSelect, onDiscard, onClear, onDismiss,
 }: LocalDraftRestoreSuggestionProps) => {
   if (!visible) return null
-
   return (
     <LocalDraftRestoreCard role="status" aria-live="polite">
-      <div className="card-header">
-        <span>브라우저 임시글이 있습니다.</span>
-      </div>
+      <div className="card-header"><span>브라우저 임시글이 있습니다.</span></div>
       <select aria-label="복구할 브라우저 초안" disabled={disabled} value={selectedKey} onChange={(event) => onSelect(event.target.value)}>
         <option value="">초안을 선택하세요</option>
         {candidates.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
       </select>
       <div className="card-actions">
-        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>
-          복구
-        </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={selectedKey ? onDiscard : onClear}>
-          삭제
-        </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
-          이번 세션에 표시 안 함
-        </SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={onRestore}>복구</SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled || !selectedKey} onClick={selectedKey ? onDiscard : onClear}>삭제</SecondaryButton>
+        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>이번 세션에 표시 안 함</SecondaryButton>
       </div>
     </LocalDraftRestoreCard>
   )
@@ -253,32 +276,7 @@ export const EditorStudioDedicatedEditorSurface = ({
     setPanelUiMask((m) => applyBitFlag(m, targetBit, (prev) => !prev))
   }, [])
 
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
-    const media = window.matchMedia("(max-width: 820px)")
-    const syncViewportPanels = (matches: boolean) => {
-      setPanelUiMask((m) => (matches ? m & ~EDITOR_SURFACE_ZEN_BITS : m | EDITOR_SURFACE_ZEN_BITS))
-    }
-    if (media.matches) syncViewportPanels(true)
-    const onChange = (event: MediaQueryListEvent) => syncViewportPanels(event.matches)
-    media.addEventListener("change", onChange)
-    return () => media.removeEventListener("change", onChange)
-  }, [])
-
-  useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
-        event.preventDefault()
-        handleToggleZenMode()
-        return
-      }
-      if (event.key === "Escape" && isMobileEditorViewport()) {
-        setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
-      }
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [handleToggleZenMode])
+  useResponsiveEditorPanelEffects(setPanelUiMask, handleToggleZenMode)
 
   const deferredPostContent = useDeferredValue(postContent)
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
@@ -305,19 +303,8 @@ export const EditorStudioDedicatedEditorSurface = ({
     [activeCursorOffset, deferredPostContent]
   )
   const selectedCharCount = activeSelectionRange ? Math.max(0, activeSelectionRange.to - activeSelectionRange.from) : 0
-  const handleTagDraftChange = (nextValue: string) => {
-    const commaSeparated = /[,，]/
-    if (!commaSeparated.test(nextValue)) {
-      onTagDraftChange(nextValue)
-      return
-    }
-
-    const fragments = nextValue.split(commaSeparated)
-    const tailDraft = fragments.pop() ?? ""
-    const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
-    if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
-    onTagDraftChange(tailDraft)
-  }
+  const handleTagDraftChange = (nextValue: string) =>
+    applyCommaSeparatedTagDraft(nextValue, onTagDraftChange, onAddTags)
   const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
     if (isComposingKeyboardEvent(event)) return
     if (event.key === "Enter" || event.key === ",") {

@@ -62,7 +62,7 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
       const block = {
         isConnected: true,
         className: "aq-mermaid",
-        dataset: { aqMermaid: "true", mermaidRendered: "pending" } as DOMStringMap,
+        dataset: { aqMermaid: "true", mermaidRendered: "pending", mermaidSource: initialSource } as DOMStringMap,
         style: {
           minHeight: "",
           overflowX: "",
@@ -74,6 +74,7 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
         getAttribute: (name: string) => (name === "data-mermaid-source" ? currentSource : null),
         setSource: (next: string) => {
           currentSource = next
+          block.dataset.mermaidSource = next
         },
         closest: () => null,
         querySelector: () => code,

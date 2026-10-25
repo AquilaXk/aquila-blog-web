@@ -219,8 +219,7 @@ export const splitFrontmatterBlock = (content: string, allowArbitraryFrontmatter
       if (meaningfulCount === 0 || !allSupported) {
         return { metadataLines: [] as string[], body: normalized }
       }
-      const rawBody = nextBreak === -1 ? "" : normalized.slice(nextCursor)
-      return { metadataLines, body: rawBody.replace(/^\n+/, "") }
+      return { metadataLines, body: normalized.slice(nextCursor).replace(/^\n+/, "") }
     }
     metadataLines.push(line)
     if (line.trim().length > 0) {
