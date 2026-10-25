@@ -19,8 +19,8 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
   const relatedTag = useMemo(() => {
     const tags = data?.tags
     if (!tags) return ""
-    for (let i = 0; i < tags.length; i += 1) {
-      const primaryTag = tags[i].trim()
+    for (const rawTag of tags) {
+      const primaryTag = rawTag.trim()
       if (primaryTag && primaryTag.toLowerCase() !== "pinned") {
         return primaryTag
       }
@@ -75,8 +75,7 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
     if (!posts || posts.length === 0) return []
     const currentPostId = String(data?.id || "")
     const filtered: typeof posts = []
-    for (let i = 0; i < posts.length; i += 1) {
-      const post = posts[i]
+    for (const post of posts) {
       if (String(post.id) !== currentPostId) {
         filtered.push(post)
         if (filtered.length >= RELATED_POSTS_LIMIT) break

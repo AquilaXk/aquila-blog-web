@@ -48,13 +48,15 @@ const MERMAID_EDGE_TOKENS_BY_LENGTH = [...MERMAID_EDGE_TOKENS].sort(
 )
 const mermaidRenderCache = new Map<string, MermaidRenderCacheEntry>()
 
+const FENCED_MERMAID_BLOCK_PATTERN = /^[`~]{3,}\s*mermaid\b[\t ]*\n([\s\S]*?)\n[`~]{3,}\s*$/i
+
 export const isMermaidSource = (rawCode: string) => {
   const normalized = rawCode.trim()
   if (!normalized) return false
 
   const fenced =
     normalized.startsWith("```") || normalized.startsWith("~~~")
-      ? normalized.match(/^[`~]{3,}\s*mermaid\b[\t ]*\n([\s\S]*?)\n[`~]{3,}\s*$/i)
+      ? FENCED_MERMAID_BLOCK_PATTERN.exec(normalized)
       : null
   const body = (fenced?.[1] || normalized).trim()
   if (!body) return false

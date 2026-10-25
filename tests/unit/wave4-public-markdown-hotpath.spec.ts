@@ -82,12 +82,11 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
     expect(packCodeBlockUiState(true, "idle")).toBe(CODE_COLLAPSED_BIT)
     expect(packCodeBlockUiState(true, "copied")).toBe(CODE_COLLAPSED_BIT | CODE_COPIED_BIT)
     expect(packCodeBlockUiState(false, "failed")).toBe(CODE_COPY_FAILED_BIT)
-    expect(packCodeBlockUiState(true, true, false)).toBe(CODE_COLLAPSED_BIT | CODE_COPIED_BIT)
 
     const initialMask = packCodeBlockUiState(true, "copied")
     const toggledMask = initialMask ^ CODE_COLLAPSED_BIT
-    expect((toggledMask & CODE_COLLAPSED_BIT) !== 0).toBe(false)
-    expect((toggledMask & CODE_COPIED_BIT) !== 0).toBe(true)
+    expect(toggledMask & CODE_COLLAPSED_BIT).toBe(0)
+    expect(toggledMask & CODE_COPIED_BIT).toBe(CODE_COPIED_BIT)
 
     expect(countRawCodeLines("")).toBe(0)
     expect(countRawCodeLines("const a = 1")).toBe(1)
@@ -101,8 +100,8 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
       "Card A",
       ":::",
       "",
-      '<!-- aq-embed {"thumbnailUrl":"/assets/b.webp"} -->',
-      ":::embed https://example.com/b",
+      '<!-- AQ-EMBED {"thumbnailUrl":"/assets/b.webp"} -->',
+      ":::EMBED https://example.com/b",
       "Card B",
       ":::",
     ].join("\n")
@@ -135,6 +134,10 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
     expect(normalizeMalformedTrailingSpaceEmphasisSegment(cleanBoldItalic)).toBe(cleanBoldItalic)
     expect(normalizeMalformedTrailingSpaceEmphasisLine(cleanBoldItalic)).toBe(cleanBoldItalic)
     expect(normalizeMalformedTrailingSpaceEmphasis(cleanBoldItalic)).toBe(cleanBoldItalic)
+
+    const multiBoldSameLine =
+      "WebSocket 보안은 **인증 시점(Handshake)**과 **메시지 라우팅 시점(STOMP Frame)**이 분리되어 있습니다."
+    expect(normalizeMalformedTrailingSpaceEmphasis(multiBoldSameLine)).toBe(multiBoldSameLine)
 
     const malformed = "Fix **bold ** and *italic * and __under __ and _em _ now."
     expect(normalizeMalformedTrailingSpaceEmphasis(malformed)).toBe(
@@ -252,10 +255,13 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
       isDefault: false,
     })
 
+    let newestCached: ReturnType<typeof splitCategoryDisplay> | null = null
     for (let i = 0; i < 260; i += 1) {
-      splitCategoryDisplay(`folder::Category-${i}`)
+      newestCached = splitCategoryDisplay(`folder::Category-${i}`)
     }
+    expect(splitCategoryDisplay("folder::Category-259")).toBe(newestCached)
     const recomputed = splitCategoryDisplay("rocket::Performance")
+    expect(recomputed).not.toBe(first)
     expect(recomputed).toEqual(first)
   })
 

@@ -581,7 +581,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-mermaid-fallback": { margin: "0", fontSize: "13px", whiteSpace: "pre-wrap" },
   "@media (pointer: coarse)": {
-    ".cm-live-table-toolbar-btn, .cm-live-table-add-col, .cm-live-table-add-corner, .cm-live-table-add-row": { minHeight: "36px", minWidth: "36px" },
+    ".cm-live-table-toolbar-btn, .cm-live-table-add-col, .cm-live-table-add-corner, .cm-live-table-add-row": { minHeight: "44px", minWidth: "44px" },
   },
   "@media (max-width: 820px)": {
     ".cm-content": { padding: "18px 16px 32px 16px", maxWidth: "100%" },

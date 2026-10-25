@@ -30,7 +30,7 @@ export const matchSlashCommandTrigger = (
   }
 }
 
-export const SLASH_FLAG_MERMAID = 1 << 0
+export const SLASH_FLAG_MERMAID = 1
 export const SLASH_FLAG_IMAGE = 1 << 1
 export const SLASH_FLAG_ATTACHMENT = 1 << 2
 
@@ -43,16 +43,16 @@ export const packSlashDisabledFeaturesMask = (options?: {
   (options?.disableImageUpload ? SLASH_FLAG_IMAGE : 0) |
   (options?.disableFileUpload ? SLASH_FLAG_ATTACHMENT : 0)
 
+const resolveSlashSpecFlagMask = (id: string): number => {
+  if (id === "mermaid") return SLASH_FLAG_MERMAID
+  if (id === "image") return SLASH_FLAG_IMAGE
+  if (id === "attachment") return SLASH_FLAG_ATTACHMENT
+  return 0
+}
+
 const INDEXED_SLASH_SPECS = SLASH_COMMAND_SPECS.map((spec) => ({
   spec,
-  flagMask:
-    spec.id === "mermaid"
-      ? SLASH_FLAG_MERMAID
-      : spec.id === "image"
-        ? SLASH_FLAG_IMAGE
-        : spec.id === "attachment"
-          ? SLASH_FLAG_ATTACHMENT
-          : 0,
+  flagMask: resolveSlashSpecFlagMask(spec.id),
   searchHaystack: `${spec.id}\n${spec.label}\n${spec.description}\n${spec.keywords.join("\n")}`.toLowerCase(),
 }))
 

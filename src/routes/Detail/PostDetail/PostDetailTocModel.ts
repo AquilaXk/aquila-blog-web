@@ -17,8 +17,7 @@ export const buildInitialTocFromMarkdown = (
   if (!markdown.trim()) return []
   const headings = precomputedHeadings ?? createMarkdownDocumentInsights(markdown).headings
   const items: TocItem[] = []
-  for (let i = 0; i < headings.length; i += 1) {
-    const heading = headings[i]
+  for (const heading of headings) {
     if (heading.level >= 2 && heading.level <= 4) {
       items.push({
         id: heading.id || heading.slug,
@@ -62,8 +61,10 @@ export const nodeCollectionTouchesHeading = (
   if (!nodes) return false
   if (typeof (nodes as ArrayLike<Node>).length === "number") {
     const arrayLike = nodes as ArrayLike<Node>
-    for (let i = 0; i < arrayLike.length; i += 1) {
-      if (nodeTouchesHeading(arrayLike[i], true)) return true
+    let index = 0
+    while (index < arrayLike.length) {
+      if (nodeTouchesHeading(arrayLike[index], true)) return true
+      index += 1
     }
     return false
   }
@@ -92,23 +93,29 @@ const normalizeHeadingText = (value: string): string =>
     .replace(/\u200B/g, "")
     .trim()
 
+const resolveTocHeadingLevel = (tagName: string): TocItem["level"] | null => {
+  if (tagName === "H2") return 2
+  if (tagName === "H3") return 3
+  if (tagName === "H4") return 4
+  return null
+}
+
 export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
   const headings = article.querySelectorAll<HTMLElement>(TOC_SELECTOR)
   if (!headings.length) return []
 
   const slugAllocator = createMarkdownHeadingSlugAllocator()
   const toc: TocItem[] = []
+  let index = 0
 
-  for (let i = 0; i < headings.length; i += 1) {
-    const heading = headings[i]
+  while (index < headings.length) {
+    const heading = headings[index]
+    index += 1
     const text = normalizeHeadingText(heading.textContent || "")
     if (!text) continue
 
-    const tagName = heading.tagName
-    if (tagName.length !== 2 || tagName.charCodeAt(0) !== 72) continue
-    const rawLevel = tagName.charCodeAt(1) - 48
-    if (rawLevel < 2 || rawLevel > 4) continue
-    const level = rawLevel as TocItem["level"]
+    const level = resolveTocHeadingLevel(heading.tagName)
+    if (!level) continue
 
     const id = slugAllocator.allocate(text, heading.id)
     if (heading.id !== id) heading.id = id

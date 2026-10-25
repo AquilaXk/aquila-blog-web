@@ -1,9 +1,7 @@
-const isPureAscii = (value: string): boolean => {
-  for (let i = 0; i < value.length; i += 1) {
-    if (value.charCodeAt(i) > 127) return false
-  }
-  return true
-}
+const NON_ASCII_PATTERN = /[^\u0000-\u007f]/
+const COLLAPSIBLE_WHITESPACE_PATTERN = /  |[^\S ]/
+
+const isPureAscii = (value: string): boolean => !NON_ASCII_PATTERN.test(value)
 
 export const normalizeUnicode = (value: string) => {
   if (!value || isPureAscii(value)) return value
@@ -11,23 +9,8 @@ export const normalizeUnicode = (value: string) => {
   return value.normalize("NFKC")
 }
 
-const hasCollapsibleWhitespace = (value: string): boolean => {
-  let prevWasSpace = false
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i)
-    if (code === 32) {
-      if (prevWasSpace) return true
-      prevWasSpace = true
-    } else if (code <= 13 && code >= 9) {
-      return true
-    } else if (code > 127 && /\s/.test(value[i])) {
-      return true
-    } else {
-      prevWasSpace = false
-    }
-  }
-  return false
-}
+const hasCollapsibleWhitespace = (value: string): boolean =>
+  COLLAPSIBLE_WHITESPACE_PATTERN.test(value)
 
 const collapseWhitespace = (value: string) =>
   hasCollapsibleWhitespace(value) ? value.replace(/\s+/g, " ") : value

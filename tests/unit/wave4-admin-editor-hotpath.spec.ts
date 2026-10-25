@@ -333,6 +333,13 @@ test.describe("Wave-4 Track B hot-path and responsive deslop invariants", () => 
     expect(notionChrome).not.toContain("outline: none !important")
     expect(notionChrome).toContain("box-shadow: none;")
     expect(notionChrome).toContain("@media (pointer: coarse)")
+    expect(notionChrome).not.toContain("min-height: 36px;")
+
+    const liveSurfaceCommands = readRepoFile(
+      "src/components/markdown-editor/markdownEditorLiveSurfaceCommands.ts",
+    )
+    expect(liveSurfaceCommands).toContain('minHeight: "44px"')
+    expect(liveSurfaceCommands).toContain('minWidth: "44px"')
 
     const toolsTokens = readRepoFile(
       "src/routes/Admin/AdminToolsWorkspace.styles.tokens.ts",

@@ -2,23 +2,17 @@ import { FC, ReactNode, useEffect, useMemo, useState } from "react"
 import { toLanguageLabel } from "src/libs/markdown/rendering"
 
 export const COLLAPSIBLE_CODE_LINE_THRESHOLD = 35
-export const CODE_COLLAPSED_BIT = 1 << 0
+export const CODE_COLLAPSED_BIT = 1
 export const CODE_COPIED_BIT = 1 << 1
 export const CODE_COPY_FAILED_BIT = 1 << 2
 
 export const packCodeBlockUiState = (
   isCollapsed: boolean,
-  copyStateOrCopied: "idle" | "copied" | "failed" | boolean = "idle",
-  copyFailed = false
-): number => {
-  const isCopied = copyStateOrCopied === "copied" || copyStateOrCopied === true
-  const isFailed = copyStateOrCopied === "failed" || copyFailed
-  return (
-    (isCollapsed ? CODE_COLLAPSED_BIT : 0) |
-    (isCopied ? CODE_COPIED_BIT : 0) |
-    (isFailed ? CODE_COPY_FAILED_BIT : 0)
-  )
-}
+  copyState: "idle" | "copied" | "failed" = "idle"
+): number =>
+  (isCollapsed ? CODE_COLLAPSED_BIT : 0) |
+  (copyState === "copied" ? CODE_COPIED_BIT : 0) |
+  (copyState === "failed" ? CODE_COPY_FAILED_BIT : 0)
 
 type PrettyCodeBlockProps = {
   language: string
@@ -31,10 +25,12 @@ type PrettyCodeBlockProps = {
 export const countRawCodeLines = (rawCode: string): number => {
   if (!rawCode) return 0
   let count = 1
-  for (let i = 0; i < rawCode.length; i += 1) {
-    if (rawCode.charCodeAt(i) === 10) {
-      count += 1
-    }
+  let offset = 0
+  while (true) {
+    const nextBreak = rawCode.indexOf("\n", offset)
+    if (nextBreak === -1) break
+    count += 1
+    offset = nextBreak + 1
   }
   return count
 }
@@ -57,6 +53,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   const isCollapsed = (uiMask & CODE_COLLAPSED_BIT) !== 0
   const copied = (uiMask & CODE_COPIED_BIT) !== 0
   const copyFailed = (uiMask & CODE_COPY_FAILED_BIT) !== 0
+  const copyStatusBits = uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)
   const label = title?.trim() || toLanguageLabel(language)
 
   useEffect(() => {
@@ -67,21 +64,21 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   }, [lineCount])
 
   useEffect(() => {
-    if ((uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)) === 0) return
+    if (copyStatusBits === 0) return
     const timeout = window.setTimeout(
-      () => setUiMask((prev) => prev & ~(CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)),
+      () => setUiMask((prev) => packCodeBlockUiState((prev & CODE_COLLAPSED_BIT) !== 0, "idle")),
       1400
     )
     return () => window.clearTimeout(timeout)
-  }, [uiMask])
+  }, [copyStatusBits])
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(rawCode)
-      setUiMask((prev) => (prev & ~CODE_COPY_FAILED_BIT) | CODE_COPIED_BIT)
+      setUiMask((prev) => packCodeBlockUiState((prev & CODE_COLLAPSED_BIT) !== 0, "copied"))
     } catch (error) {
       console.warn("[code-block] copy failed", error)
-      setUiMask((prev) => (prev & ~CODE_COPIED_BIT) | CODE_COPY_FAILED_BIT)
+      setUiMask((prev) => packCodeBlockUiState((prev & CODE_COLLAPSED_BIT) !== 0, "failed"))
     }
   }
 

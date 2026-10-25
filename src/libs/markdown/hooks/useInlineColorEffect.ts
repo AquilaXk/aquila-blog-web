@@ -17,8 +17,10 @@ export const shouldScheduleFromInlineColorMutations = (
     }
     const addedNodes = mutation.addedNodes
     if (!addedNodes) continue
-    for (let i = 0; i < addedNodes.length; i += 1) {
-      if (nodeContainsInlineColorToken(addedNodes[i])) return true
+    let index = 0
+    while (index < addedNodes.length) {
+      if (nodeContainsInlineColorToken(addedNodes[index])) return true
+      index += 1
     }
   }
   return false

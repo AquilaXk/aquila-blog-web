@@ -101,7 +101,7 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
     background: ${({ theme }) => theme.publicDesign.surfaceElevated};
     color: ${({ theme }) => theme.colors.gray12};
   }
-  @media (pointer: coarse) { min-width: 36px; min-height: 36px; }
+  @media (pointer: coarse) { min-height: 44px; }
   @media (max-width: 720px) { display: none; }
 `
 
@@ -172,7 +172,7 @@ const ColorSwatchMenuButton = styled.button<{ $color: string }>`
   font: 750 11.5px/1 var(--aq-font-sans); display: inline-flex; align-items: center; justify-content: center;
   gap: 4px; cursor: pointer; outline: none;
   ${focusVisibleRing}
-  @media (pointer: coarse) { min-width: 36px; min-height: 36px; }
+  @media (pointer: coarse) { min-height: 44px; }
   &:hover, &:focus {
     border-color: ${({ $color }) => $color};
     background: ${({ theme }) => theme.publicDesign.readableSurface};

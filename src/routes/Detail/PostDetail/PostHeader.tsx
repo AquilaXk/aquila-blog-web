@@ -71,8 +71,8 @@ const getNumberFormatter = (locale: string): Intl.NumberFormat => {
 
 const findPrimaryTag = (tags?: readonly string[] | null): string => {
   if (!tags) return ""
-  for (let i = 0; i < tags.length; i += 1) {
-    const trimmed = tags[i].trim()
+  for (const tag of tags) {
+    const trimmed = tag.trim()
     if (trimmed) return trimmed
   }
   return ""

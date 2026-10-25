@@ -28,7 +28,7 @@ type MarkdownTableRowContextValue = {
   allocateCellIndex: () => number
 }
 
-export const TABLE_SCROLL_LEFT_BIT = 1 << 0
+export const TABLE_SCROLL_LEFT_BIT = 1
 export const TABLE_SCROLL_HINT_BIT = 1 << 1
 export const TABLE_COL_COUNT_SHIFT = 2
 
@@ -37,7 +37,7 @@ export const packTableUiState = (
   showScrollHint: boolean,
   detectedColumnCount: number
 ): number => {
-  const safeCols = detectedColumnCount > 0 ? detectedColumnCount | 0 : 0
+  const safeCols = detectedColumnCount > 0 ? Math.trunc(detectedColumnCount) : 0
   return (
     (hasScrollLeft ? TABLE_SCROLL_LEFT_BIT : 0) |
     (showScrollHint ? TABLE_SCROLL_HINT_BIT : 0) |
@@ -142,29 +142,29 @@ export const MarkdownTableRenderer = ({
     if (!scrollElement) return
     const tableElement = scrollElement.querySelector("table")
 
-    const computeScrollBits = () => {
+    const computeScrollFlags = () => {
       const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
       const remaining = overflowAmount - scrollElement.scrollLeft
-      const nextScrollLeft = scrollElement.scrollLeft > 2
-      const nextScrollHint = overflowAmount > 1 && remaining > 1
-      return (
-        (nextScrollLeft ? TABLE_SCROLL_LEFT_BIT : 0) |
-        (nextScrollHint ? TABLE_SCROLL_HINT_BIT : 0)
-      )
+      return {
+        nextScrollLeft: scrollElement.scrollLeft > 2,
+        nextScrollHint: overflowAmount > 1 && remaining > 1,
+      }
     }
 
     const syncScrollHint = () => {
-      const scrollBits = computeScrollBits()
-      setTableUiMask((prev) => (prev & ~3) | scrollBits)
+      const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
+      setTableUiMask((prev) =>
+        packTableUiState(nextScrollLeft, nextScrollHint, prev >>> TABLE_COL_COUNT_SHIFT)
+      )
     }
 
     const syncTableMetrics = () => {
       const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
-      const scrollBits = computeScrollBits()
+      const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
       setTableUiMask((prev) => {
         const prevCols = prev >>> TABLE_COL_COUNT_SHIFT
         const nextCols = domCols > 0 ? domCols : prevCols
-        return scrollBits | (nextCols << TABLE_COL_COUNT_SHIFT)
+        return packTableUiState(nextScrollLeft, nextScrollHint, nextCols)
       })
     }
 

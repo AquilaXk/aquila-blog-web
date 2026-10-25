@@ -237,7 +237,7 @@ const CompanyHeroParticles: React.FC = () => {
         const p = particles[i]
         const dx = p.refX - ringX
         const dy = p.refY - ringY
-        const dist = Math.sqrt(dx * dx + dy * dy)
+        const dist = Math.hypot(dx, dy)
         const noiseJitter = Math.sin(p.refX * 6.5 + p.refY * 5.2 + time * 1.4) * 0.014
         const distJittered = Math.max(0, dist + noiseJitter)
 
@@ -249,8 +249,8 @@ const CompanyHeroParticles: React.FC = () => {
           smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
         const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
 
-        const clampedOuter = bandOuter > 0 ? bandOuter : 0
-        const clampedInner = bandInner > 0 ? bandInner : 0
+        const clampedOuter = Math.max(0, bandOuter)
+        const clampedInner = Math.max(0, bandInner)
         const tOuter = clampedOuter * clampedOuter
         const tInner = clampedInner * clampedInner * clampedInner
         const ambientWave =

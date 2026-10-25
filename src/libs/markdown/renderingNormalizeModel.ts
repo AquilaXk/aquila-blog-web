@@ -124,46 +124,49 @@ const normalizeSplitInlineColorQuotedEmphasis = (markdown: string) => {
   return normalized
 }
 
+const HAS_SPACE_BEFORE_EMPHASIS_MARKER_PATTERN = /[ \t][*_]/
 const MALFORMED_TRAILING_SPACE_STRONG_ASTERISK_PATTERN =
-  /\*\*(\S(?:(?!\*\*)[^\n])*?\S|\S)([^\S\n]+)\*\*/g
+  /\*\*(\S(?:(?!\*\*)[^\n])*?\S|\S)([^\S\n]*)\*\*/g
 const MALFORMED_TRAILING_SPACE_STRONG_UNDERSCORE_PATTERN =
-  /__(\S(?:(?!__)[^\n])*?\S|\S)([^\S\n]+)__/g
+  /__(\S(?:(?!__)[^\n])*?\S|\S)([^\S\n]*)__/g
 const MALFORMED_TRAILING_SPACE_EMPHASIS_ASTERISK_PATTERN =
-  /(^|[^*])\*([^*\s](?:[^*\n]*?[^*\s])?)([^\S\n]+)\*(?!\*)/g
+  /(^|[^*])\*([^*\s](?:[^*\n]*?[^*\s])?)([^\S\n]*)\*(?!\*)/g
 const MALFORMED_TRAILING_SPACE_EMPHASIS_UNDERSCORE_PATTERN =
-  /(^|[^_])_([^_\s](?:[^_\n]*?[^_\s])?)([^\S\n]+)_(?!_)/g
+  /(^|[^_])_([^_\s](?:[^_\n]*?[^_\s])?)([^\S\n]*)_(?!_)/g
 const INLINE_CODE_SPAN_SPLIT_PATTERN = /(`+[^`\n]*`+)/g
 
 export const normalizeMalformedTrailingSpaceEmphasisSegment = (segment: string) => {
-  if (!segment.includes(" ") && !segment.includes("\t")) return segment
+  if (!HAS_SPACE_BEFORE_EMPHASIS_MARKER_PATTERN.test(segment)) return segment
 
   let normalized = segment
 
   if (normalized.includes("**")) {
     normalized = normalized.replace(
       MALFORMED_TRAILING_SPACE_STRONG_ASTERISK_PATTERN,
-      (_match, inner: string) => `**${inner}**`
+      (match, inner: string, trailingSpace: string) => (trailingSpace ? `**${inner}**` : match)
     )
   }
 
   if (normalized.includes("__")) {
     normalized = normalized.replace(
       MALFORMED_TRAILING_SPACE_STRONG_UNDERSCORE_PATTERN,
-      (_match, inner: string) => `__${inner}__`
+      (match, inner: string, trailingSpace: string) => (trailingSpace ? `__${inner}__` : match)
     )
   }
 
   if (normalized.includes("*")) {
     normalized = normalized.replace(
       MALFORMED_TRAILING_SPACE_EMPHASIS_ASTERISK_PATTERN,
-      (_match, prefix: string, inner: string) => `${prefix}*${inner}*`
+      (match, prefix: string, inner: string, trailingSpace: string) =>
+        trailingSpace ? `${prefix}*${inner}*` : match
     )
   }
 
   if (normalized.includes("_")) {
     normalized = normalized.replace(
       MALFORMED_TRAILING_SPACE_EMPHASIS_UNDERSCORE_PATTERN,
-      (_match, prefix: string, inner: string) => `${prefix}_${inner}_`
+      (match, prefix: string, inner: string, trailingSpace: string) =>
+        trailingSpace ? `${prefix}_${inner}_` : match
     )
   }
 

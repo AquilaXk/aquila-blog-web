@@ -6,68 +6,40 @@ export type ListMarkerMatch =
   | { kind: "unordered" | "task" | "quote"; indent: string; marker: string; content: string }
   | { kind: "ordered"; indent: string; marker: string; content: string; number: number }
 
-const TASK_LINE_RE = /^(?<indent>\s*)(?<marker>[-*+] \[[ xX]\] )(?<content>.*)$/
-const UNORDERED_LINE_RE = /^(?<indent>\s*)(?<marker>[-*+] )(?<content>.*)$/
-const ORDERED_LINE_RE = /^(?<indent>\s*)(?<marker>(?<number>\d+)\. )(?<content>.*)$/
-const QUOTE_LINE_RE = /^(?<indent>\s*)(?<marker>> )(?<content>.*)$/
+const TASK_PREFIX_RE = /^[-*+] \[[ xX]\] (.*)$/
+const UNORDERED_PREFIX_RE = /^([-*+] )(.*)$/
+const ORDERED_PREFIX_RE = /^((\d+)\. )(.*)$/
+const QUOTE_PREFIX_RE = /^> (.*)$/
 
 export const matchListMarkerLine = (line: string): ListMarkerMatch | null => {
-  let i = 0
-  while (i < line.length) {
-    const ch = line.charCodeAt(i)
-    if (ch !== 32 && ch !== 9) break
-    i += 1
-  }
-  if (i >= line.length) return null
+  const trimmed = line.trimStart()
+  if (!trimmed) return null
+  const indent = line.slice(0, line.length - trimmed.length)
+  const first = trimmed[0]
 
-  const code = line.charCodeAt(i)
-  if (code === 45 || code === 42 || code === 43) {
-    const task = TASK_LINE_RE.exec(line)
-    if (task?.groups) {
-      return {
-        kind: "task",
-        indent: task.groups.indent ?? "",
-        marker: "- [ ] ",
-        content: task.groups.content ?? "",
-      }
-    }
-
-    const unordered = UNORDERED_LINE_RE.exec(line)
-    if (unordered?.groups) {
-      return {
-        kind: "unordered",
-        indent: unordered.groups.indent ?? "",
-        marker: unordered.groups.marker ?? "- ",
-        content: unordered.groups.content ?? "",
-      }
-    }
+  if (first === "-" || first === "*" || first === "+") {
+    const task = TASK_PREFIX_RE.exec(trimmed)
+    if (task) return { kind: "task", indent, marker: "- [ ] ", content: task[1] }
+    const unordered = UNORDERED_PREFIX_RE.exec(trimmed)
+    if (unordered) return { kind: "unordered", indent, marker: unordered[1], content: unordered[2] }
     return null
   }
 
-  if (code >= 48 && code <= 57) {
-    const ordered = ORDERED_LINE_RE.exec(line)
-    if (ordered?.groups) {
-      return {
-        kind: "ordered",
-        indent: ordered.groups.indent ?? "",
-        marker: ordered.groups.marker ?? "1. ",
-        content: ordered.groups.content ?? "",
-        number: Number.parseInt(ordered.groups.number ?? "1", 10) || 1,
-      }
+  if (first >= "0" && first <= "9") {
+    const ordered = ORDERED_PREFIX_RE.exec(trimmed)
+    if (!ordered) return null
+    return {
+      kind: "ordered",
+      indent,
+      marker: ordered[1],
+      content: ordered[3],
+      number: Number.parseInt(ordered[2], 10) || 1,
     }
-    return null
   }
 
-  if (code === 62) {
-    const quote = QUOTE_LINE_RE.exec(line)
-    if (quote?.groups) {
-      return {
-        kind: "quote",
-        indent: quote.groups.indent ?? "",
-        marker: "> ",
-        content: quote.groups.content ?? "",
-      }
-    }
+  if (first === ">") {
+    const quote = QUOTE_PREFIX_RE.exec(trimmed)
+    if (quote) return { kind: "quote", indent, marker: "> ", content: quote[1] }
   }
 
   return null

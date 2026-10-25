@@ -217,58 +217,33 @@ export const planListEnterContinuation = (
   return planReplaceSelection(selectionStart, selectionEnd, `\n${nextMarker}`)
 }
 
-const UNCHECKED_TASK_RE = /^([ \t]*[-*+][ \t]+\[) (\][ \t]*.*)$/
-const CHECKED_TASK_RE = /^([ \t]*[-*+][ \t]+\[)[xX](\][ \t]*.*)$/
-const BULLET_OR_ORDERED_RE = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+(.*)$/
+const TASK_BOX_PREFIX_RE = /^[-*+][ \t]+\[([ xX])\][ \t]*/
+const BULLET_OR_ORDERED_PREFIX_RE = /^(?:[-*+]|\d+\.)[ \t]+/
 
 export const cycleTaskCheckboxInLine = (lineText: string): { replaced: boolean; lineText: string } => {
-  let i = 0
-  while (i < lineText.length) {
-    const ch = lineText.charCodeAt(i)
-    if (ch !== 32 && ch !== 9) break
-    i += 1
+  const trimmed = lineText.trimStart()
+  const indent = lineText.slice(0, lineText.length - trimmed.length)
+  const taskMatch = TASK_BOX_PREFIX_RE.exec(trimmed)
+  if (taskMatch) {
+    const boxPos = indent.length + taskMatch[0].indexOf("[") + 1
+    const nextMark = taskMatch[1] === " " ? "x" : " "
+    return {
+      replaced: true,
+      lineText: `${lineText.slice(0, boxPos)}${nextMark}${lineText.slice(boxPos + 1)}`,
+    }
   }
-  const code = i < lineText.length ? lineText.charCodeAt(i) : -1
 
-  if (code === 45 || code === 42 || code === 43) {
-    const uncheckedMatch = UNCHECKED_TASK_RE.exec(lineText)
-    if (uncheckedMatch) {
-      const boxPos = uncheckedMatch[1].length
-      return {
-        replaced: true,
-        lineText: `${lineText.slice(0, boxPos)}x${lineText.slice(boxPos + 1)}`,
-      }
-    }
-
-    const checkedMatch = CHECKED_TASK_RE.exec(lineText)
-    if (checkedMatch) {
-      const boxPos = checkedMatch[1].length
-      return {
-        replaced: true,
-        lineText: `${lineText.slice(0, boxPos)} ${lineText.slice(boxPos + 1)}`,
-      }
-    }
-
-    const bulletMatch = BULLET_OR_ORDERED_RE.exec(lineText)
-    if (bulletMatch) {
-      return {
-        replaced: true,
-        lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
-      }
-    }
-  } else if (code >= 48 && code <= 57) {
-    const bulletMatch = BULLET_OR_ORDERED_RE.exec(lineText)
-    if (bulletMatch) {
-      return {
-        replaced: true,
-        lineText: `${bulletMatch[1]}- [ ] ${bulletMatch[2]}`,
-      }
+  const bulletMatch = BULLET_OR_ORDERED_PREFIX_RE.exec(trimmed)
+  if (bulletMatch) {
+    return {
+      replaced: true,
+      lineText: `${indent}- [ ] ${trimmed.slice(bulletMatch[0].length)}`,
     }
   }
 
   return {
     replaced: true,
-    lineText: `${lineText.slice(0, i)}- [ ] ${lineText.slice(i)}`,
+    lineText: `${indent}- [ ] ${trimmed}`,
   }
 }
 

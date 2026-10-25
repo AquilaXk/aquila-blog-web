@@ -175,7 +175,7 @@ const parseCardMetadataLine = (
 }
 
 export const markdownCardThumbnailSources = (content: string): string[] => {
-  if (!content.includes("aq-")) return []
+  if (!/aq-(?:bookmark|embed)/i.test(content)) return []
   const lines = content.split("\n")
   let lastClosingTripleColonIndex = -1
   for (let index = lines.length - 1; index >= 0; index -= 1) {
@@ -243,16 +243,28 @@ const collectReferenceImageDestinations = (
   return destinations
 }
 
-const INLINE_IMAGE_DESTINATION_PATTERN = /!\[[^\]]*]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g
+const INLINE_IMAGE_CALL_PATTERN = /!\[[^\]]*]\(([^)\n]+)\)/g
+
+const extractInlineImageDestination = (rawInner: string): string => {
+  const trimmed = rawInner.trim()
+  if (!trimmed) return ""
+  const spaceIdx = trimmed.search(/\s/)
+  const token = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx)
+  if (token.startsWith("<") && token.endsWith(">")) {
+    return token.slice(1, -1)
+  }
+  return token
+}
 
 export const hasNonCanonicalPostImageSource = (content: string): boolean => {
   if (!/!\[|aq-(?:bookmark|embed)/i.test(content)) return false
   const visibleContent = markdownWithoutCode(content)
   const definitions = collectImageReferenceDefinitions(visibleContent)
   const destinations: string[] = []
-  for (const match of visibleContent.matchAll(INLINE_IMAGE_DESTINATION_PATTERN)) {
+  for (const match of visibleContent.matchAll(INLINE_IMAGE_CALL_PATTERN)) {
     if (!isEscapedMarkdownMarker(visibleContent, match.index ?? 0)) {
-      destinations.push(match[1])
+      const dest = extractInlineImageDestination(match[1])
+      if (dest) destinations.push(dest)
     }
   }
   destinations.push(
