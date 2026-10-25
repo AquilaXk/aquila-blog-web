@@ -1,7 +1,7 @@
 import { Readable } from "node:stream"
 import type { NextApiRequest, NextApiResponse } from "next"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
-import { resolveServerApiBaseUrl } from "src/libs/server/backend"
+import { resolveServerApiBaseUrl, resolveTrustedClientIp } from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { classifyBackendHttpResult, classifyBackendRoute, getRuntimeMetrics, type BackendFetchResult } from "src/libs/server/runtimeMetrics"
 import { getSetCookieHeaders } from "src/libs/server/ssrBackendCookies"
@@ -28,6 +28,7 @@ const SPOOFABLE_FORWARDING_HEADERS = new Set([
   "cf-connecting-ip",
   "forwarded",
   "true-client-ip",
+  "x-internal-client-ip",
   "x-real-ip",
 ])
 
@@ -199,8 +200,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   Object.entries(req.headers).forEach(([key, value]) => appendIncomingHeader(headers, key, value))
   headers.set("X-Forwarded-Host", req.headers.host || "")
   headers.set("X-Forwarded-Proto", "https")
-  const clientIp = req.socket?.remoteAddress || ""
-  if (clientIp) headers.set("X-Forwarded-For", clientIp)
+  const clientIp = resolveTrustedClientIp(req)
+  if (clientIp) {
+    headers.set("CF-Connecting-IP", clientIp)
+    headers.set("X-Internal-Client-IP", clientIp)
+    headers.set("X-Forwarded-For", clientIp)
+  }
   headers.set("X-Request-Id", requestId)
 
   const controller = new AbortController()

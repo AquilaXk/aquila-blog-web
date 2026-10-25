@@ -8,6 +8,7 @@ import { serverApiFetchJson } from "../../src/libs/server/backend"
 import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
 import { getRuntimeMetrics } from "src/libs/server/runtimeMetrics"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
+import proxyHandler from "../../src/pages/api/backend/[...path]"
 
 const originalFetch = globalThis.fetch
 const originalBackendInternalUrl = process.env.BACKEND_INTERNAL_URL
@@ -321,3 +322,88 @@ test("admin bootstrap network failure throws instead of destination null", async
     readAdminProtectedBootstrap(createReq("apiKey=test"), "/member/api/v1/adm/members/bootstrap", "/admin")
   ).rejects.toBeInstanceOf(ApiNetworkError)
 })
+
+test("serverApiFetchJson and backend proxy forward trusted client IP headers and reject injection", async () => {
+  const observedHeaders: Headers[] = []
+  globalThis.fetch = (async (_input, init) => {
+    observedHeaders.push(new Headers(init?.headers))
+    return jsonResponse(200, { ok: true })
+  }) as typeof fetch
+
+  const cfReq = {
+    headers: {
+      "cf-connecting-ip": "198.51.100.7",
+      "x-forwarded-for": "203.0.113.9, 10.0.0.1",
+      "x-real-ip": "192.0.2.3",
+    },
+    socket: { remoteAddress: "::ffff:127.0.0.1" },
+    url: "/posts",
+  } as unknown as IncomingMessage
+
+  await serverApiFetchJson(cfReq, "/member/api/v1/auth/me")
+  expect(observedHeaders.at(-1)?.get("cf-connecting-ip")).toBe("198.51.100.7")
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("198.51.100.7")
+  expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("198.51.100.7")
+
+  const xffReq = {
+    headers: {
+      "x-forwarded-for": "203.0.113.9, 10.0.0.1",
+      "x-real-ip": "192.0.2.3",
+    },
+    socket: { remoteAddress: "::ffff:127.0.0.1" },
+    url: "/posts",
+  } as unknown as IncomingMessage
+
+  await serverApiFetchJson(xffReq, "/member/api/v1/auth/me")
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("203.0.113.9")
+  expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("203.0.113.9")
+
+  const socketReq = {
+    headers: {
+      "cf-connecting-ip": "203.0.113.1\r\nX-Injected: pwn",
+    },
+    socket: { remoteAddress: "::ffff:192.0.2.44" },
+    url: "/posts",
+  } as unknown as IncomingMessage
+
+  await serverApiFetchJson(socketReq, "/member/api/v1/auth/me")
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("192.0.2.44")
+  expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("192.0.2.44")
+  expect(observedHeaders.at(-1)?.get("x-injected")).toBeNull()
+
+  const proxyReq = {
+    method: "GET",
+    url: "/api/backend/member/api/v1/auth/me",
+    query: { path: ["member", "api", "v1", "auth", "me"] },
+    headers: {
+      host: "blog.aquilaxk.site",
+      "cf-connecting-ip": "198.51.100.42",
+      "x-forwarded-for": "203.0.113.50, 10.0.0.2",
+      "x-internal-client-ip": "1.1.1.1",
+    },
+    socket: { remoteAddress: "::ffff:127.0.0.1" },
+  } as any
+  const proxyRes = {
+    setHeader() {
+      return this
+    },
+    status() {
+      return this
+    },
+    json() {
+      return this
+    },
+    write() {
+      return true
+    },
+    end() {
+      return this
+    },
+  } as any
+
+  await proxyHandler(proxyReq, proxyRes)
+  expect(observedHeaders.at(-1)?.get("cf-connecting-ip")).toBe("198.51.100.42")
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("198.51.100.42")
+  expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("198.51.100.42")
+})
+

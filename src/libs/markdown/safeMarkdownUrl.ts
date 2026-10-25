@@ -5,7 +5,7 @@ export const normalizeSafeMarkdownUrl = (raw: string): string => {
   if (!value) return ""
 
   if (value.startsWith("/")) {
-    return value.startsWith("//") ? "" : value
+    return value.startsWith("//") || value.startsWith("/\\") ? "" : value
   }
 
   if (value.startsWith("./") || value.startsWith("../")) {

@@ -24,7 +24,10 @@ import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean }
 type ActiveCellEditorSession = { row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean }
-type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean }
+type TableDomController = {
+  update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean
+  destroy: () => void
+}
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
@@ -83,6 +86,11 @@ export class MarkdownTableWidget extends WidgetType {
     return controller ? controller.update(this.markdown, this.from, this.to) : false
   }
 
+  destroy(dom: HTMLElement) {
+    tableDomControllers.get(dom)?.destroy()
+    tableDomControllers.delete(dom)
+  }
+
   toDOM(view?: EditorView) {
     const wrap = document.createElement("div")
     wrap.className = "cm-live-table-wrap"
@@ -109,16 +117,28 @@ export class MarkdownTableWidget extends WidgetType {
     let outsideListenerAttached = false
     let activeSession: ActiveCellEditorSession | null = null
 
+    const handleLifecycleFlush = () => flushAndDispatchActiveCell()
+
     const detachOutsideListener = () => {
-      if (!outsideListenerAttached || typeof document === "undefined" || typeof document.removeEventListener !== "function") return
+      if (!outsideListenerAttached) return
       outsideListenerAttached = false
-      document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("mousedown", handleOutsideMouseDown, true)
+      }
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("pagehide", handleLifecycleFlush)
+        window.removeEventListener("beforeunload", handleLifecycleFlush)
+      }
     }
 
     const handleOutsideMouseDown = (event: MouseEvent) => {
-      if (!wrap.isConnected) return detachOutsideListener()
+      if (!wrap.isConnected) {
+        flushAndDispatchActiveCell()
+        return detachOutsideListener()
+      }
       const target = event.target as HTMLElement | null
       if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
+      flushAndDispatchActiveCell()
       isTableActive = false
       detachOutsideListener()
       syncActiveCellHighlight()
@@ -126,9 +146,15 @@ export class MarkdownTableWidget extends WidgetType {
 
     const markTableActive = () => {
       isTableActive = true
-      if (!outsideListenerAttached && typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      if (!outsideListenerAttached) {
         outsideListenerAttached = true
-        document.addEventListener("mousedown", handleOutsideMouseDown, true)
+        if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+          document.addEventListener("mousedown", handleOutsideMouseDown, true)
+        }
+        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+          window.addEventListener("pagehide", handleLifecycleFlush)
+          window.addEventListener("beforeunload", handleLifecycleFlush)
+        }
       }
       if (typeof view.state.doc?.lineAt !== "function") return
       const range = resolveRange()
@@ -181,6 +207,12 @@ export class MarkdownTableWidget extends WidgetType {
       return applyMarkdownTableGridCellEdit(currentMarkdown, session.row, session.col, nextValue) ?? currentMarkdown
     }
 
+    const flushAndDispatchActiveCell = () => {
+      if (!activeSession || activeSession.handled) return
+      const committed = flushActiveCellMarkdown()
+      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
+    }
+
     const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
       if (!view.state.facet(EditorView.editable)) return
       markTableActive()
@@ -195,9 +227,7 @@ export class MarkdownTableWidget extends WidgetType {
       activeCol = outcome.nextCol
       syncActiveCellHighlight()
       dispatchTableMarkdown(outcome.markdown, {
-        row: outcome.nextRow,
-        col: outcome.nextCol,
-        openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
+        row: outcome.nextRow, col: outcome.nextCol, openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
       })
     }
 
@@ -222,15 +252,11 @@ export class MarkdownTableWidget extends WidgetType {
     }
 
     const { toolbar, toolbarButtons, canAddRow, canAddCol } = createTableToolbarElement({
-      grid,
-      wrap,
-      visualOptions,
+      grid, wrap, visualOptions,
       executeGridAction: (action) => executeGridAction(action),
-      onActivateToolbar: () => {
-        markTableActive()
-        syncActiveCellHighlight()
-      },
+      onActivateToolbar: () => { markTableActive(); syncActiveCellHighlight() },
       onEditSource: () => {
+        flushAndDispatchActiveCell()
         const range = resolveRange()
         if (!range) return
         view.focus()
@@ -240,10 +266,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const buildSurface = () =>
       createInteractiveTableSurface({
-        grid,
-        visualOptions,
-        canAddCol,
-        canAddRow,
+        grid, visualOptions, canAddCol, canAddRow,
         onActivateCell: (row, col) => activateCellEditor(row, col),
         onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
         onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
@@ -482,10 +505,7 @@ export class MarkdownTableWidget extends WidgetType {
         }
       })
 
-      input.addEventListener("blur", () => {
-        if (!input.isConnected) return
-        commitAndCloseSession()
-      })
+      input.addEventListener("blur", () => commitAndCloseSession())
 
       const focusInput = () => {
         if (session.handled) return
@@ -534,7 +554,6 @@ export class MarkdownTableWidget extends WidgetType {
       }
 
       const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
-
       if (sameShape) {
         patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
         syncTableColGroupWidths(colElements, visualOptions.columnWidths)
@@ -548,14 +567,9 @@ export class MarkdownTableWidget extends WidgetType {
         while (visualOptions.columnWidths.length < grid.headers.length) visualOptions.columnWidths.push(0)
         if (visualOptions.columnWidths.length > grid.headers.length) visualOptions.columnWidths.length = grid.headers.length
         const nextSurface = buildSurface()
-        gridRow = nextSurface.gridRow
-        addRowBtn = nextSurface.addRowBtn
-        cellElements = nextSurface.cellElements
-        colElements = nextSurface.colElements
+        ;({ gridRow, addRowBtn, cellElements, colElements } = nextSurface)
         wrap.textContent = ""
-        wrap.appendChild(toolbar)
-        wrap.appendChild(gridRow)
-        wrap.appendChild(addRowBtn)
+        for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
       }
 
       activeRow = Math.max(0, Math.min(activeRow, grid.rows.length))
@@ -569,10 +583,11 @@ export class MarkdownTableWidget extends WidgetType {
       return true
     }
 
-    tableDomControllers.set(wrap, { update })
-    wrap.appendChild(toolbar)
-    wrap.appendChild(gridRow)
-    wrap.appendChild(addRowBtn)
+    tableDomControllers.set(wrap, {
+      update,
+      destroy: () => { flushAndDispatchActiveCell(); detachOutsideListener() },
+    })
+    for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
     syncActiveCellHighlight()
     applyPendingCellActivation()
     return wrap

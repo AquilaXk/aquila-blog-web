@@ -3,6 +3,7 @@ import {
   MAX_EDIT_ROWS,
   parseMarkdownTableGrid,
   serializeMarkdownTableGrid,
+  type MarkdownTableGrid,
 } from "./markdownEditorTableModel"
 import {
   applyPlannedTextMutationToValue,
@@ -31,6 +32,60 @@ export type TableCellInlineFormatOutcome = {
   selectionEnd: number
 }
 
+export type TableGridPrefixMeta = {
+  firstLinePrefix: string
+  linePrefix: string
+}
+
+const gridPrefixMeta = new WeakMap<MarkdownTableGrid, TableGridPrefixMeta>()
+
+export const setTableGridPrefixMeta = (grid: MarkdownTableGrid, meta: TableGridPrefixMeta): void => {
+  if (meta.firstLinePrefix || meta.linePrefix) {
+    gridPrefixMeta.set(grid, meta)
+  }
+}
+
+export const getTableGridPrefixMeta = (grid: MarkdownTableGrid): TableGridPrefixMeta =>
+  gridPrefixMeta.get(grid) ?? { firstLinePrefix: "", linePrefix: "" }
+
+export const extractTableLinePrefix = (line: string): { prefix: string; content: string } => {
+  const match = /^([ \t]*(?:>[ \t]*)*)(.*)$/.exec(line)
+  if (!match) return { prefix: "", content: line }
+  return { prefix: match[1] ?? "", content: match[2] ?? "" }
+}
+
+export const isInsideInlineCodeSpan = (value: string, index: number): boolean => {
+  if (!value.includes("`")) return false
+  let inCode = false
+  let fenceLen = 0
+  let i = 0
+  while (i < value.length) {
+    if (value[i] === "\\" && !inCode) {
+      i += 2
+      continue
+    }
+    if (value[i] === "`") {
+      let run = 1
+      while (i + run < value.length && value[i + run] === "`") run += 1
+      if (!inCode) {
+        const closeIdx = value.indexOf("`".repeat(run), i + run)
+        if (closeIdx !== -1) {
+          if (index >= i + run && index < closeIdx) return true
+          inCode = true
+          fenceLen = run
+        }
+      } else if (run === fenceLen) {
+        inCode = false
+        fenceLen = 0
+      }
+      i += run
+      continue
+    }
+    i += 1
+  }
+  return false
+}
+
 const INLINE_FORMAT_DELIMITERS: Record<
   Exclude<TableCellInlineFormatKind, "line-break">,
   string
@@ -41,10 +96,17 @@ const INLINE_FORMAT_DELIMITERS: Record<
   strikethrough: "~~",
 }
 
-const parseCsvRow = (line: string): string[] => {
+type ParsedCsvRow = {
+  cells: string[]
+  valid: boolean
+  hasUnquotedCommaSpace: boolean
+}
+
+const parseCsvRow = (line: string): ParsedCsvRow => {
   const cells: string[] = []
   let current = ""
   let inQuotes = false
+  let hasUnquotedCommaSpace = false
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i]!
     if (inQuotes) {
@@ -59,6 +121,7 @@ const parseCsvRow = (line: string): string[] => {
     } else if (ch === '"') {
       inQuotes = true
     } else if (ch === ",") {
+      if (line[i + 1] === " ") hasUnquotedCommaSpace = true
       cells.push(current)
       current = ""
     } else {
@@ -66,17 +129,65 @@ const parseCsvRow = (line: string): string[] => {
     }
   }
   cells.push(current)
-  return cells
+  return { cells, valid: !inQuotes, hasUnquotedCommaSpace }
+}
+
+const parseTsvRows = (text: string): string[][] => {
+  const rows: string[][] = []
+  let currentRow: string[] = []
+  let currentCell = ""
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]!
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') {
+        currentCell += '"'
+        i += 1
+      } else if (ch === '"') {
+        inQuotes = false
+      } else {
+        currentCell += ch
+      }
+    } else if (ch === '"' && currentCell.length === 0) {
+      inQuotes = true
+    } else if (ch === "\t") {
+      currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+      currentCell = ""
+    } else if (ch === "\n") {
+      currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+      rows.push(currentRow)
+      currentRow = []
+      currentCell = ""
+    } else {
+      currentCell += ch
+    }
+  }
+  currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+  rows.push(currentRow)
+  return rows
 }
 
 const splitPastedTableRows = (trimmedText: string): string[][] => {
-  const lines = trimmedText.split("\n")
   if (trimmedText.includes("\t")) {
-    return lines.map((line) => line.split("\t"))
+    return parseTsvRows(trimmedText)
   }
-  const nonEmptyLines = lines.filter((line) => line.trim().length > 0)
-  if (nonEmptyLines.length > 0 && nonEmptyLines.every((line) => line.includes(","))) {
-    return lines.map(parseCsvRow)
+  const lines = trimmedText.split("\n")
+  if (lines.length >= 2 && lines.every((line) => line.trim().length > 0 && line.includes(","))) {
+    const parsedRows = lines.map(parseCsvRow)
+    const expectedCols = parsedRows[0]?.cells.length ?? 0
+    const isStructuredCsv =
+      expectedCols >= 2 &&
+      parsedRows.every(
+        (row) => row.valid && row.cells.length === expectedCols && !row.hasUnquotedCommaSpace
+      )
+    if (isStructuredCsv) {
+      return parsedRows.map((row) => row.cells)
+    }
+    return [[trimmedText]]
+  }
+  if (lines.some((line) => line.includes(", ") || /[.!?]\s*$/.test(line))) {
+    return [[trimmedText]]
   }
   return lines.map((line) => [line])
 }

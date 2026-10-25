@@ -34,7 +34,7 @@ export { extractImageFileFromClipboard } from "src/components/markdown-editor/ma
 
 export const normalizeEditorReturnRoute = (value: string) => {
   const normalized = value.trim()
-  if (!normalized.startsWith("/") || normalized.startsWith("//")) return ""
+  if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.startsWith("/\\")) return ""
   if (/[\r\n]/.test(normalized)) return ""
   if (/^\/(?:https?:|javascript:)/i.test(normalized)) return ""
   if (normalized.startsWith("/admin/editor")) return ""

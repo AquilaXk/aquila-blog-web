@@ -295,7 +295,7 @@ const collectRegexPlanEntries = (
 
       const raw = match[1]
       const pipeIndex = raw.indexOf("|")
-      const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).trim()
+      const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).replace(/\\$/, "").trim()
       const rawAlias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
       const alias = rawAlias || undefined
       if (!target) continue

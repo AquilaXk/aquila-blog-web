@@ -108,7 +108,7 @@ export const normalizeNextPath = (input: NextPathInput, fallback = "/"): string 
   if (typeof raw !== "string") return fallback
 
   const value = raw.trim()
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback
 
   if (value.startsWith("/_next/data/")) {
     return normalizeNextDataPath(value, fallback)

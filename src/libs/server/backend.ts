@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http"
+import { isIP } from "node:net"
 import {
   ApiError,
   ApiNetworkError,
@@ -17,6 +18,35 @@ type ServerApiFetchInit = RequestInit & {
 }
 
 const FALLBACK_TIMEOUT_MS = 6_000
+
+const readFirstHeaderValue = (value: string | string[] | undefined): string => {
+  if (Array.isArray(value)) return value[0] || ""
+  return typeof value === "string" ? value : ""
+}
+
+const sanitizeClientIpCandidate = (raw: string | undefined): string => {
+  if (!raw) return ""
+  const trimmed = raw.trim().replace(/^::ffff:/i, "")
+  if (!trimmed || trimmed.length > 64 || /[\r\n\0\s,]/.test(trimmed)) return ""
+  return isIP(trimmed) !== 0 ? trimmed : ""
+}
+
+export const resolveTrustedClientIp = (req: IncomingMessage): string => {
+  const headers = req.headers || {}
+  const cfIp = sanitizeClientIpCandidate(readFirstHeaderValue(headers["cf-connecting-ip"]))
+  if (cfIp) return cfIp
+
+  const xffRaw = readFirstHeaderValue(headers["x-forwarded-for"])
+  if (xffRaw) {
+    const firstHop = sanitizeClientIpCandidate(xffRaw.split(",")[0])
+    if (firstHop) return firstHop
+  }
+
+  const realIp = sanitizeClientIpCandidate(readFirstHeaderValue(headers["x-real-ip"]))
+  if (realIp) return realIp
+
+  return sanitizeClientIpCandidate(req.socket?.remoteAddress)
+}
 
 const resolveServerTimeoutMs = (path: string, init: ServerApiFetchInit): number => {
   if (typeof init.timeoutMs === "number" && Number.isFinite(init.timeoutMs) && init.timeoutMs > 0) {
@@ -54,7 +84,6 @@ export const resolveServerApiBaseUrl = (_req: IncomingMessage): string => {
   if (internal) return internal.replace(/\/+$/, "")
 
   if (process.env.NODE_ENV === "production") {
-    // 운영 SSR은 내부 API 경로를 강제한다.
     throw new Error("BACKEND_INTERNAL_URL is required for server-side API calls in production.")
   }
 
@@ -84,6 +113,12 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
 
   if (cookie) {
     headers.set("cookie", cookie)
+  }
+  const clientIp = resolveTrustedClientIp(req)
+  if (clientIp) {
+    headers.set("CF-Connecting-IP", clientIp)
+    headers.set("X-Internal-Client-IP", clientIp)
+    headers.set("X-Forwarded-For", clientIp)
   }
   headers.set("X-Request-Id", getRequestIdForRequest(req))
   const { requestId, observe, observeStatus } = createServerApiFetchMetricsContext(safePath, headers, "ssr")

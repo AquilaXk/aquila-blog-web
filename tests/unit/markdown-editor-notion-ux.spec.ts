@@ -971,6 +971,20 @@ test.describe("Notion-parity Markdown editor model", () => {
           "|  |  |  |  |",
         ].join("\n")
       )
+
+      const tdsAfterCorner = dom.querySelectorAll("td")
+      tdsAfterCorner[0].trigger("click")
+      const dirtyInputBeforeDestroy = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforeDestroy.value = "SavedOnDestroy"
+      ;(widget as any).destroy(dom)
+      expect(lastDispatchedInsert).toContain("| SavedOnDestroy | P2 | Z1 |  |")
+
+      const tdsAfterDestroy = dom.querySelectorAll("td")
+      tdsAfterDestroy[1].trigger("click")
+      const dirtyInputBeforePagehide = dom.querySelector(".cm-live-table-cell-input")
+      dirtyInputBeforePagehide.value = "SavedOnPagehide"
+      for (const fn of windowListeners.get("pagehide") ?? []) fn({ type: "pagehide" })
+      expect(lastDispatchedInsert).toContain("| SavedOnDestroy | SavedOnPagehide | Z1 |  |")
     } finally {
       if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
       else delete (globalThis as Record<string, unknown>).document

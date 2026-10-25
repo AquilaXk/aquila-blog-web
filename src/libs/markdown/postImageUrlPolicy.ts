@@ -47,7 +47,7 @@ export const normalizePostImageUrl = (
   options: PostImageUrlPolicyOptions = {},
 ): string => {
   const value = raw.trim()
-  if (!value || value.startsWith("//")) return ""
+  if (!value || value.startsWith("//") || value.startsWith("/\\")) return ""
 
   if (value.startsWith("/")) {
     return options.allowRelative ? normalizeRelativePostImageUrl(value) : ""
@@ -91,7 +91,7 @@ const stripBlockquotePrefixes = (line: string) => {
 
 const normalizeCardThumbnailSource = (raw: string) => {
   const value = raw.trim()
-  if (!value || value.startsWith("//")) return ""
+  if (!value || value.startsWith("//") || value.startsWith("/\\")) return ""
   if (value.startsWith("/") || value.startsWith("./") || value.startsWith("../")) return value
   try {
     const parsed = new URL(value)

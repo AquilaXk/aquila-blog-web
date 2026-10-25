@@ -1,4 +1,7 @@
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
+import {
+  extractTableLinePrefix, getTableGridPrefixMeta, isInsideInlineCodeSpan, setTableGridPrefixMeta,
+} from "./markdownEditorTableCellModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type MarkdownEditorTableAlignment = "left" | "center" | "right"
@@ -60,8 +63,8 @@ const isEscapedPipe = (value: string, index: number) => {
 }
 
 export const isProtectedPipe = (value: string, index: number): boolean => {
-  if (!value.includes("[[") && !value.includes("{{")) return isEscapedPipe(value, index)
-  if (isEscapedPipe(value, index)) return true
+  if (isEscapedPipe(value, index) || isInsideInlineCodeSpan(value, index)) return true
+  if (!value.includes("[[") && !value.includes("{{")) return false
   const before = value.slice(0, index)
   const after = value.slice(index + 1)
   return (
@@ -243,25 +246,21 @@ const findActiveTable = (value: string, selectionStart: number, selectionEnd: nu
   return table
 }
 
-const serializeRow = (cells: string[]) => `| ${cells.join(" | ")} |`
+const serializeRow = (cells: string[], prefix = "") => `${prefix}| ${cells.join(" | ")} |`
 
 const escapeGridCell = (value: string) => {
   const flat = value.replace(/\r?\n/g, " ").trim()
-  return flat.replace(/\|/g, (m, idx) => (isProtectedPipe(flat, idx) ? m : "\\|"))
+  return flat.replace(/\|/g, (m, idx) => (isEscapedPipe(flat, idx) ? m : "\\|"))
 }
 
 const serializeGridLines = (grid: MarkdownTableGrid, escapePipes: boolean): string[] => {
-  const delimiter = grid.alignments.map((alignment) => {
-    if (alignment === "center") return ":---:"
-    return alignment === "right" ? "---:" : "---"
-  })
+  const { firstLinePrefix, linePrefix } = getTableGridPrefixMeta(grid)
+  const delimiter = grid.alignments.map((a) => (a === "center" ? ":---:" : a === "right" ? "---:" : "---"))
   const formatCell = escapePipes ? escapeGridCell : (cell: string) => cell
   return [
-    serializeRow(grid.headers.map(formatCell)),
-    serializeRow(delimiter),
-    ...grid.rows.map((row) =>
-      serializeRow(grid.headers.map((_, col) => formatCell(row[col] ?? "")))
-    ),
+    serializeRow(grid.headers.map(formatCell), firstLinePrefix),
+    serializeRow(delimiter, linePrefix),
+    ...grid.rows.map((row) => serializeRow(grid.headers.map((_, col) => formatCell(row[col] ?? "")), linePrefix)),
   ]
 }
 
@@ -482,31 +481,14 @@ export const getMarkdownEditorTableEditAvailability = (
   }
 }
 
-export const packTableEditAvailabilityMask = (avail: MarkdownEditorTableEditAvailability | null): number => {
-  if (!avail) return -1
-  return (
-    (avail.addRow ? 1 : 0) |
-    (avail.deleteRow ? 2 : 0) |
-    (avail.addColumn ? 4 : 0) |
-    (avail.deleteColumn ? 8 : 0) |
-    (avail.alignLeft ? 16 : 0) |
-    (avail.alignCenter ? 32 : 0) |
-    (avail.alignRight ? 64 : 0)
-  )
-}
+export const packTableEditAvailabilityMask = (avail: MarkdownEditorTableEditAvailability | null): number =>
+  !avail ? -1 : (avail.addRow ? 1 : 0) | (avail.deleteRow ? 2 : 0) | (avail.addColumn ? 4 : 0) | (avail.deleteColumn ? 8 : 0) | (avail.alignLeft ? 16 : 0) | (avail.alignCenter ? 32 : 0) | (avail.alignRight ? 64 : 0)
 
-export const unpackTableEditAvailabilityMask = (mask: number): MarkdownEditorTableEditAvailability | null => {
-  if (mask < 0) return null
-  return {
-    addRow: (mask & 1) !== 0,
-    deleteRow: (mask & 2) !== 0,
-    addColumn: (mask & 4) !== 0,
-    deleteColumn: (mask & 8) !== 0,
-    alignLeft: (mask & 16) !== 0,
-    alignCenter: (mask & 32) !== 0,
-    alignRight: (mask & 64) !== 0,
+export const unpackTableEditAvailabilityMask = (mask: number): MarkdownEditorTableEditAvailability | null =>
+  mask < 0 ? null : {
+    addRow: (mask & 1) !== 0, deleteRow: (mask & 2) !== 0, addColumn: (mask & 4) !== 0,
+    deleteColumn: (mask & 8) !== 0, alignLeft: (mask & 16) !== 0, alignCenter: (mask & 32) !== 0, alignRight: (mask & 64) !== 0,
   }
-}
 
 export const isMarkdownEditorTableSelection = (value: string, selectionStart: number, selectionEnd: number): boolean =>
   findActiveTable(value, selectionStart, selectionEnd) !== null
@@ -525,19 +507,23 @@ export const planMarkdownEditorTableEnter = (value: string, selectionStart: numb
   planActiveTableAction(value, selectionStart, selectionEnd, { kind: "enter" })
 
 const parseGridLineCells = (line: string): string[] => {
-  const trimmed = line.trim()
+  const trimmed = extractTableLinePrefix(line).content.trim()
   const normalized = `${trimmed.startsWith("|") ? "" : "|"}${trimmed}${trimmed.endsWith("|") && !isEscapedPipe(trimmed, trimmed.length - 1) ? "" : "|"}`
   return (splitTableCells(normalized, 0) ?? []).map((cell) => cell.value.replaceAll("\\|", "|"))
 }
 
 export const parseMarkdownTableGrid = (markdown: string): MarkdownTableGrid | null => {
-  const lines = markdown.trim().split(/\r?\n/).filter((line) => line.trim().length > 0)
+  const lines = markdown.split(/\r?\n/).filter((line) => line.trim().length > 0)
   if (lines.length === 0) return null
+
+  const firstPrefix = extractTableLinePrefix(lines[0]!).prefix
+  const secondParsed = lines[1] ? extractTableLinePrefix(lines[1]) : undefined
+  const linePrefix = secondParsed?.prefix || firstPrefix
 
   const headers = parseGridLineCells(lines[0]!)
   if (headers.length === 0) return null
 
-  const secondLine = lines[1]
+  const secondLine = secondParsed?.content
   const hasDelimiter = Boolean(secondLine && /^[\s|:-]+$/.test(secondLine) && secondLine.includes("-"))
   const rawDelimiterCells = hasDelimiter && secondLine ? parseGridLineCells(secondLine) : []
   const alignments: MarkdownEditorTableAlignment[] = headers.map((_, col) => {
@@ -553,7 +539,9 @@ export const parseMarkdownTableGrid = (markdown: string): MarkdownTableGrid | nu
     rows.push(Array.from({ length: headers.length }, (_, col) => parsed[col] ?? ""))
   }
 
-  return { headers, alignments, rows }
+  const grid: MarkdownTableGrid = { headers, alignments, rows }
+  setTableGridPrefixMeta(grid, { firstLinePrefix: firstPrefix, linePrefix })
+  return grid
 }
 
 export const serializeMarkdownTableGrid = (grid: MarkdownTableGrid): string =>
@@ -571,6 +559,8 @@ export const applyMarkdownTableGridCellEdit = (
   else grid.rows[row - 1]![col] = nextValue
   return serializeMarkdownTableGrid(grid)
 }
+
+export const updateMarkdownTableCell = applyMarkdownTableGridCellEdit
 
 export const applyMarkdownTableGridAction = (
   markdown: string,

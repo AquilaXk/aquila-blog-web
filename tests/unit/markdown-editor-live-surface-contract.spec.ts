@@ -1,9 +1,17 @@
 import { expect, test } from "@playwright/test"
 import { history, undo, undoDepth } from "@codemirror/commands"
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown"
 import { Compartment, EditorState, Transaction } from "@codemirror/state"
+import { GFM } from "@lezer/markdown"
 import { readFileSync } from "fs"
 import path from "path"
 import { computeMinimalDocChange } from "../../src/components/markdown-editor/MarkdownEditorLiveSurface"
+import { decorationField } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
+import {
+  applyMarkdownTableGridCellEdit,
+  parseMarkdownTableGrid,
+} from "../../src/components/markdown-editor/markdownEditorTableModel"
+import { MarkdownTableWidget } from "../../src/components/markdown-editor/markdownEditorTableWidget"
 import { registeredBrowserStorageKeys } from "../../src/libs/privacy/browserStorageRegistry"
 
 const sourcePath = (...parts: string[]) => path.resolve(__dirname, "../../src", ...parts)
@@ -99,4 +107,54 @@ test.describe("markdown editor live surface contract", () => {
     expect(editorSource).toContain("handleFileInput")
     expect(editorSource).toContain("<MarkdownEditorFindReplace")
   })
+
+  test("renders and edits blockquote tables in decorationField without dropping > prefixes or columns", () => {
+    const doc = [
+      "# Title",
+      "",
+      "> | A | B |",
+      "> | --- | --- |",
+      "> | 1 | 2 |",
+    ].join("\n")
+
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [markdown({ base: markdownLanguage, extensions: [GFM] }), decorationField],
+    })
+
+    const tableWidgets: Array<{ from: number; to: number; markdown: string }> = []
+    state.field(decorationField).between(0, doc.length, (from, to, value) => {
+      const spec = (value as unknown as { spec?: { widget?: unknown } }).spec ?? {}
+      if (spec.widget instanceof MarkdownTableWidget) {
+        tableWidgets.push({
+          from,
+          to,
+          markdown: doc.slice(from, to),
+        })
+      }
+    })
+
+    expect(tableWidgets).toHaveLength(1)
+    const tableSlice = tableWidgets[0]!
+    expect(parseMarkdownTableGrid(tableSlice.markdown)).toEqual({
+      headers: ["A", "B"],
+      alignments: ["left", "left"],
+      rows: [["1", "2"]],
+    })
+
+    const replacedSlice = applyMarkdownTableGridCellEdit(tableSlice.markdown, 1, 1, "200")
+    expect(replacedSlice).not.toBeNull()
+    const nextDoc = `${doc.slice(0, tableSlice.from)}${replacedSlice}${doc.slice(tableSlice.to)}`
+    expect(nextDoc).toBe(
+      [
+        "# Title",
+        "",
+        "> | A | B |",
+        "> | --- | --- |",
+        "> | 1 | 200 |",
+      ].join("\n")
+    )
+  })
 })
+

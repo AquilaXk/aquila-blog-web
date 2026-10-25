@@ -191,7 +191,9 @@ export const renderMarkdownSegment = ({
   }
 
   if (segment.type === "embed") {
-    const previewUrl = segment.embedUrl || resolveEmbedPreviewUrl(segment.url)
+    const previewUrl =
+      (segment.embedUrl ? resolveEmbedPreviewUrl(segment.embedUrl) : "") ||
+      resolveEmbedPreviewUrl(segment.url)
     const providerLabel = segment.provider || segment.siteName || inferLinkProvider(segment.url)
     const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
     return (
@@ -211,6 +213,7 @@ export const renderMarkdownSegment = ({
               src={previewUrl}
               title={segment.title || segment.url}
               loading="lazy"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
