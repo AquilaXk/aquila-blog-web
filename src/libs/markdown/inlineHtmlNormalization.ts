@@ -5,37 +5,16 @@ import {
   startsWithAsciiCaseInsensitive,
 } from "./inlineTokenScanners"
 import {
+  collectCommonMarkCodeBlockRanges,
   countCodePointRun,
+  findContainingSortedRangeEnd,
   isEscapedMarkdownAt,
-  parseOpeningCodeFence,
+  mergeSortedSpanRanges,
   scanInlineCodeSpanEnd,
+  scanPandocDisplayMathAt,
+  scanPandocInlineMathAt,
+  type MathSpanRange,
 } from "./pandocMathScanner"
-
-const isTableSeparatorCell = (rawCell: string): boolean => {
-  const cell = rawCell.trim()
-  if (!cell) return false
-  const start = cell.startsWith(":") ? 1 : 0
-  const end = cell.endsWith(":") ? cell.length - 1 : cell.length
-  if (end - start < 3) return false
-  for (let index = start; index < end; index += 1) {
-    if (cell.codePointAt(index) !== 45) return false
-  }
-  return true
-}
-
-const isTableSeparatorLine = (line: string): boolean => {
-  const trimmed = line.trim()
-  if (!trimmed.includes("|") || !trimmed.includes("-")) return false
-  const start = trimmed.startsWith("|") ? 1 : 0
-  const end = trimmed.endsWith("|") ? trimmed.length - 1 : trimmed.length
-  const cells = trimmed.slice(start, end).split("|")
-  return cells.length >= 2 && cells.every(isTableSeparatorCell)
-}
-
-const isLikelyTableRow = (line: string) => {
-  const trimmed = line.trim()
-  return trimmed.length >= 3 && trimmed.slice(1, -1).includes("|")
-}
 
 const findLongestBacktickRun = (value: string): number => {
   let longest = 0
@@ -57,16 +36,6 @@ const wrapDecodedMarkdownMark = (decodedContent: string, marker: string) => {
   return `${marker}${normalized}${marker}`
 }
 
-const wrapWithMarkdownCodeMark = (content: string) => {
-  const normalized = decodeLegacyHtmlEntities(content).trim()
-  if (!normalized) return ""
-  const longestRun = findLongestBacktickRun(normalized)
-  const marker = "`".repeat(longestRun + 1)
-  const paddedContent =
-    normalized.startsWith("`") || normalized.endsWith("`") ? ` ${normalized} ` : normalized
-  return `${marker}${paddedContent}${marker}`
-}
-
 const LEGACY_HTML_ENTITY_CODES: Record<string, number> = {
   amp: 38,
   apos: 39,
@@ -76,24 +45,43 @@ const LEGACY_HTML_ENTITY_CODES: Record<string, number> = {
   quot: 34,
 }
 
+const HTML5_LEGACY_ENTITY_PATTERN =
+  /&(#[xX][\da-fA-F]+|#\d+|amp|AMP|apos|gt|GT|lt|LT|nbsp|NBSP|quot|QUOT);/g
+
 const parseLegacyEntityCodePoint = (normalizedToken: string): number => {
   if (normalizedToken.startsWith("#x")) return Number.parseInt(normalizedToken.slice(2), 16)
   if (normalizedToken.startsWith("#")) return Number.parseInt(normalizedToken.slice(1), 10)
   return LEGACY_HTML_ENTITY_CODES[normalizedToken] ?? -1
 }
 
-const decodeLegacyHtmlEntities = (input: string, preserveMarkupEntities = false) =>
-  String(input || "").replace(
-    /&(#x[\da-f]+|#\d+|amp|apos|gt|lt|nbsp|quot);/gi,
-    (entity, token: string) => {
-      const codePoint = parseLegacyEntityCodePoint(token.toLowerCase())
-      if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return entity
-      if (preserveMarkupEntities && (codePoint === 38 || codePoint === 60 || codePoint === 62)) {
-        return `&#${codePoint};`
-      }
-      return String.fromCodePoint(codePoint)
+const isValidHtmlEntityScalar = (codePoint: number): boolean =>
+  Number.isInteger(codePoint) &&
+  codePoint > 0 &&
+  codePoint <= 0x10ffff &&
+  (codePoint < 0xd800 || codePoint > 0xdfff)
+
+const decodeLegacyHtmlEntities = (
+  input: string,
+  markupTokenReplacer?: (codePoint: number) => string
+) =>
+  String(input || "").replace(HTML5_LEGACY_ENTITY_PATTERN, (entity, token: string) => {
+    const codePoint = parseLegacyEntityCodePoint(token.toLowerCase())
+    if (!isValidHtmlEntityScalar(codePoint)) return entity
+    if (markupTokenReplacer && (codePoint === 38 || codePoint === 60 || codePoint === 62)) {
+      return markupTokenReplacer(codePoint)
     }
-  )
+    return String.fromCodePoint(codePoint)
+  })
+
+const wrapWithMarkdownCodeMark = (content: string) => {
+  const normalized = decodeLegacyHtmlEntities(content).trim()
+  if (!normalized) return ""
+  const longestRun = findLongestBacktickRun(normalized)
+  const marker = "`".repeat(longestRun + 1)
+  const paddedContent =
+    normalized.startsWith("`") || normalized.endsWith("`") ? ` ${normalized} ` : normalized
+  return `${marker}${paddedContent}${marker}`
+}
 
 const isAsciiSpaceCode = (code: number): boolean =>
   code === 32 || (code >= 9 && code <= 13)
@@ -122,9 +110,15 @@ type PairedTagConfig = PairedTagSpec & {
   honorMarkdownEscapes: boolean
 }
 
+const toDelimiterSearchText = (text: string, openDelim: string): string => {
+  if (openDelim !== "&lt;") return text
+  if (!text.includes("&LT;") && !text.includes("&GT;")) return text
+  return text.replaceAll("&LT;", "&lt;").replaceAll("&GT;", "&gt;")
+}
+
 const matchPairedOpenTagAt = (
   text: string,
-  lowerText: string,
+  searchText: string,
   start: number,
   config: PairedTagConfig
 ): { openEnd: number; tagName: string } | null => {
@@ -133,15 +127,15 @@ const matchPairedOpenTagAt = (
   const matchedName = matchTagNameAt(text, afterOpen, config.tagNames)
   if (!matchedName) return null
   const afterName = afterOpen + matchedName.length
-  if (lowerText.startsWith(config.closeDelim, afterName)) {
+  if (searchText.startsWith(config.closeDelim, afterName)) {
     return { openEnd: afterName + config.closeDelim.length, tagName: matchedName }
   }
   const skipped = skipAsciiSpaces(text, afterName)
-  if (lowerText.startsWith(config.closeDelim, skipped)) {
+  if (searchText.startsWith(config.closeDelim, skipped)) {
     return { openEnd: skipped + config.closeDelim.length, tagName: matchedName }
   }
   if (!isAsciiSpaceCode(text.codePointAt(afterName) ?? 0)) return null
-  const closePos = lowerText.indexOf(config.closeDelim, afterName + 1)
+  const closePos = searchText.indexOf(config.closeDelim, afterName + 1)
   if (closePos < 0) return null
   if (config.disallowAmpersandInAttrs && text.slice(afterName + 1, closePos).includes("&")) {
     return null
@@ -151,7 +145,7 @@ const matchPairedOpenTagAt = (
 
 const matchPairedCloseTagAt = (
   text: string,
-  lowerText: string,
+  searchText: string,
   start: number,
   config: PairedTagConfig
 ): number => {
@@ -162,38 +156,38 @@ const matchPairedCloseTagAt = (
   const matchedName = matchTagNameAt(text, cursor, config.tagNames)
   if (!matchedName) return -1
   cursor = skipAsciiSpaces(text, cursor + matchedName.length)
-  return lowerText.startsWith(config.closeDelim, cursor) ? cursor + config.closeDelim.length : -1
+  return searchText.startsWith(config.closeDelim, cursor) ? cursor + config.closeDelim.length : -1
 }
 
 const stepPairedTagDepth = (
   text: string,
-  lowerText: string,
+  searchText: string,
   candidate: number,
   config: PairedTagConfig
 ): { delta: number; tagEnd: number } => {
-  const closeEnd = matchPairedCloseTagAt(text, lowerText, candidate, config)
+  const closeEnd = matchPairedCloseTagAt(text, searchText, candidate, config)
   if (closeEnd > candidate) return { delta: -1, tagEnd: closeEnd }
-  const nestedOpen = matchPairedOpenTagAt(text, lowerText, candidate, config)
+  const nestedOpen = matchPairedOpenTagAt(text, searchText, candidate, config)
   return nestedOpen ? { delta: 1, tagEnd: nestedOpen.openEnd } : { delta: 0, tagEnd: -1 }
 }
 
 const findPairedCloseTag = (
   text: string,
-  lowerText: string,
+  searchText: string,
   searchFrom: number,
   config: PairedTagConfig
 ): { closeStart: number; closeEnd: number } | null => {
   let depth = 1
-  let candidate = lowerText.indexOf(config.openDelim, searchFrom)
+  let candidate = searchText.indexOf(config.openDelim, searchFrom)
   while (candidate >= 0) {
-    const step = stepPairedTagDepth(text, lowerText, candidate, config)
+    const step = stepPairedTagDepth(text, searchText, candidate, config)
     if (step.delta !== 0) {
       depth += step.delta
       if (depth === 0) return { closeStart: candidate, closeEnd: step.tagEnd }
-      candidate = lowerText.indexOf(config.openDelim, step.tagEnd)
+      candidate = searchText.indexOf(config.openDelim, step.tagEnd)
       continue
     }
-    candidate = lowerText.indexOf(config.openDelim, candidate + config.openDelim.length)
+    candidate = searchText.indexOf(config.openDelim, candidate + config.openDelim.length)
   }
   return null
 }
@@ -206,32 +200,32 @@ const replacePairedInlineTags = (
   transformInner: (inner: string) => string,
   decodePlainSlice: (slice: string) => string = IDENTITY_SLICE_DECODER
 ): string => {
-  const lowerText = text.toLowerCase()
-  let openIndex = lowerText.indexOf(spec.openDelim)
+  const searchText = toDelimiterSearchText(text, spec.openDelim)
+  let openIndex = searchText.indexOf(spec.openDelim)
   if (openIndex < 0) return decodePlainSlice(text)
   const outerConfig: PairedTagConfig = { ...spec, honorMarkdownEscapes: true }
   let output = ""
   let cursor = 0
 
   while (openIndex >= 0) {
-    const openTag = matchPairedOpenTagAt(text, lowerText, openIndex, outerConfig)
+    const openTag = matchPairedOpenTagAt(text, searchText, openIndex, outerConfig)
     if (!openTag) {
-      openIndex = lowerText.indexOf(spec.openDelim, openIndex + spec.openDelim.length)
+      openIndex = searchText.indexOf(spec.openDelim, openIndex + spec.openDelim.length)
       continue
     }
-    const closeMatch = findPairedCloseTag(text, lowerText, openTag.openEnd, {
+    const closeMatch = findPairedCloseTag(text, searchText, openTag.openEnd, {
       ...spec,
       tagNames: [openTag.tagName],
       honorMarkdownEscapes: openTag.tagName !== "code",
     })
     if (!closeMatch) {
-      openIndex = lowerText.indexOf(spec.openDelim, openTag.openEnd)
+      openIndex = searchText.indexOf(spec.openDelim, openTag.openEnd)
       continue
     }
     if (openIndex > cursor) output += decodePlainSlice(text.slice(cursor, openIndex))
     output += transformInner(text.slice(openTag.openEnd, closeMatch.closeStart))
     cursor = closeMatch.closeEnd
-    openIndex = lowerText.indexOf(spec.openDelim, cursor)
+    openIndex = searchText.indexOf(spec.openDelim, cursor)
   }
 
   if (cursor === 0) return decodePlainSlice(text)
@@ -247,11 +241,13 @@ const FORMATTING_TAG_SPECS: ReadonlyArray<readonly [readonly string[], string]> 
 const replacePairedFormattingTags = (
   input: string,
   spec: PairedTagSpec,
-  marker: string
+  marker: string,
+  storeSpan: (value: string) => string
 ): string => {
-  const preserveMarkupEntities = spec.openDelim === "<"
+  const markupTokenReplacer =
+    spec.openDelim === "<" ? (codePoint: number) => storeSpan(`&#${codePoint};`) : undefined
   const decodePlainSlice = (slice: string) =>
-    decodeLegacyHtmlEntities(slice, preserveMarkupEntities)
+    decodeLegacyHtmlEntities(slice, markupTokenReplacer)
   const renderNested = (rawInner: string): string =>
     wrapDecodedMarkdownMark(
       replacePairedInlineTags(rawInner, spec, renderNested, decodePlainSlice),
@@ -274,10 +270,11 @@ const restoreStoredCodeSpans = (
   prefix: string,
   codeSpans: readonly string[]
 ): string => {
-  if (codeSpans.length === 0) return text
+  if (codeSpans.length === 0 || !text.includes(prefix)) return text
   let restored = text
   for (let idx = codeSpans.length - 1; idx >= 0; idx -= 1) {
-    restored = restored.replaceAll(`${prefix}${idx}\uE001`, codeSpans[idx] ?? "")
+    const span = codeSpans[idx] ?? ""
+    restored = restored.replaceAll(`${prefix}${idx}\uE001`, () => span)
   }
   return restored
 }
@@ -287,312 +284,202 @@ const normalizeTagGroup = (
   openDelim: string,
   closeDelim: string,
   disallowAmpersandInAttrs: boolean,
-  storeCodeSpan: (codeMark: string) => string
+  storeSpan: (value: string) => string,
+  restoreSpans: (value: string) => string
 ): string => {
   const base = { openDelim, closeDelim, disallowAmpersandInAttrs }
   let normalized = replacePairedInlineTags(
     input,
     { ...base, tagNames: ["code"] },
-    (rawInner) => storeCodeSpan(wrapWithMarkdownCodeMark(rawInner))
+    (rawInner) => storeSpan(wrapWithMarkdownCodeMark(restoreSpans(rawInner)))
   )
   for (const [tagNames, marker] of FORMATTING_TAG_SPECS) {
-    normalized = replacePairedFormattingTags(normalized, { ...base, tagNames }, marker)
+    normalized = replacePairedFormattingTags(normalized, { ...base, tagNames }, marker, storeSpan)
   }
   return normalized
 }
 
-const normalizeInlineHtmlChunk = (
-  chunk: string,
-  hasRawTag: boolean,
-  hasEntityTag: boolean
-): string => {
-  const prefix = createChunkCodeSpanPrefix(chunk)
-  const codeSpans: string[] = []
-  const storeCodeSpan = (codeMark: string): string => {
-    if (!codeMark) return ""
-    const idx = codeSpans.length
-    codeSpans.push(codeMark)
-    return `${prefix}${idx}\uE001`
-  }
+const hasEntityMarkupCandidate = (value: string): boolean =>
+  value.includes("&lt;") || value.includes("&LT;") || value.includes("&#")
 
-  let normalized = chunk
-  if (hasRawTag && normalized.includes("<")) {
-    normalized = normalizeTagGroup(normalized, "<", ">", false, storeCodeSpan)
-    normalized = replaceRawBrTags(normalized, "<br />")
+const INLINE_AUTOLINK_SCHEMES = ["http://", "https://", "mailto:"] as const
+
+const scanAutolinkCloseAngle = (text: string, from: number): number => {
+  for (let cursor = from; cursor < text.length; cursor += 1) {
+    const code = text.codePointAt(cursor) ?? 0
+    if (code === 62) return cursor > from ? cursor + 1 : -1
+    if (code <= 32 || code === 60) return -1
   }
-  if (hasEntityTag && normalized.toLowerCase().includes("&lt;")) {
-    normalized = normalizeTagGroup(normalized, "&lt;", "&gt;", true, storeCodeSpan)
-    normalized = replaceEntityBrTags(normalized, "<br />")
-  }
-  return restoreStoredCodeSpans(normalized, prefix, codeSpans)
+  return -1
 }
 
-const matchUnescapedInlineCodeEndAt = (
+const matchInlineAutolinkEnd = (text: string, index: number): number => {
+  if (text.codePointAt(index) !== 60 || isEscapedMarkdownAt(text, index)) return -1
+  for (const scheme of INLINE_AUTOLINK_SCHEMES) {
+    if (startsWithAsciiCaseInsensitive(text, index + 1, scheme)) {
+      return scanAutolinkCloseAngle(text, index + 1 + scheme.length)
+    }
+  }
+  return -1
+}
+
+const matchSingleLineMathEnd = (
+  text: string,
+  index: number
+): { nextCursor: number; spanEnd: number } => {
+  const run = countCodePointRun(text, index, 36)
+  if (run === 2) {
+    const display = scanPandocDisplayMathAt(text, index, { singleLineOnly: true })
+    return display
+      ? { nextCursor: display.to, spanEnd: display.to }
+      : { nextCursor: index + 2, spanEnd: -1 }
+  }
+  if (run === 1) {
+    const inline = scanPandocInlineMathAt(text, index)
+    return inline
+      ? { nextCursor: inline.to, spanEnd: inline.to }
+      : { nextCursor: index + 1, spanEnd: -1 }
+  }
+  return { nextCursor: index + run, spanEnd: -1 }
+}
+
+const stepSkippedInlineConstructAt = (
   input: string,
   cursor: number
 ): { nextCursor: number; spanEnd: number } => {
-  if (input.codePointAt(cursor) !== 96 || isEscapedMarkdownAt(input, cursor)) {
-    return { nextCursor: cursor + 1, spanEnd: -1 }
+  const code = input.codePointAt(cursor) ?? 0
+  if (code === 96 && !isEscapedMarkdownAt(input, cursor)) {
+    const closeEnd = scanInlineCodeSpanEnd(input, cursor)
+    return closeEnd > cursor
+      ? { nextCursor: closeEnd, spanEnd: closeEnd }
+      : { nextCursor: cursor + countCodePointRun(input, cursor, 96), spanEnd: -1 }
   }
-  const closeEnd = scanInlineCodeSpanEnd(input, cursor)
-  return closeEnd > cursor
-    ? { nextCursor: closeEnd, spanEnd: closeEnd }
-    : { nextCursor: cursor + countCodePointRun(input, cursor, 96), spanEnd: -1 }
+  if (code === 36 && !isEscapedMarkdownAt(input, cursor)) {
+    return matchSingleLineMathEnd(input, cursor)
+  }
+  if (code === 60) {
+    const autolinkEnd = matchInlineAutolinkEnd(input, cursor)
+    if (autolinkEnd > cursor) return { nextCursor: autolinkEnd, spanEnd: autolinkEnd }
+  }
+  return { nextCursor: cursor + 1, spanEnd: -1 }
+}
+
+const shieldSkippedInlineConstructs = (
+  input: string,
+  storeSpan: (value: string) => string
+): string => {
+  if (!input.includes("`") && !input.includes("$") && !input.includes("<")) return input
+  let output = ""
+  let copyFrom = 0
+  let cursor = 0
+  while (cursor < input.length) {
+    const { nextCursor, spanEnd } = stepSkippedInlineConstructAt(input, cursor)
+    if (spanEnd > cursor) {
+      output += input.slice(copyFrom, cursor) + storeSpan(input.slice(cursor, spanEnd))
+      copyFrom = spanEnd
+    }
+    cursor = nextCursor
+  }
+  return copyFrom === 0 ? input : output + input.slice(copyFrom)
 }
 
 export const normalizeLegacyInlineHtmlSpans = (input: string) => {
   if (!input) return input
   const hasRawTag = input.includes("<")
-  const hasEntityTag = input.toLowerCase().includes("&lt;")
+  const hasEntityTag = hasEntityMarkupCandidate(input)
   if (!hasRawTag && !hasEntityTag) return input
-  if (!input.includes("`")) return normalizeInlineHtmlChunk(input, hasRawTag, hasEntityTag)
 
-  let result = ""
-  let copyFrom = 0
+  const prefix = createChunkCodeSpanPrefix(input)
+  const storedSpans: string[] = []
+  const storeSpan = (value: string): string => {
+    if (!value) return ""
+    const idx = storedSpans.length
+    storedSpans.push(value)
+    return `${prefix}${idx}\uE001`
+  }
+  const restoreSpans = (value: string): string =>
+    restoreStoredCodeSpans(value, prefix, storedSpans)
+
+  let normalized = shieldSkippedInlineConstructs(input, storeSpan)
+  if (hasRawTag && normalized.includes("<")) {
+    normalized = normalizeTagGroup(normalized, "<", ">", false, storeSpan, restoreSpans)
+    normalized = replaceRawBrTags(normalized, "<br />")
+  }
+  if (hasEntityTag && (normalized.includes("&lt;") || normalized.includes("&LT;"))) {
+    normalized = normalizeTagGroup(normalized, "&lt;", "&gt;", true, storeSpan, restoreSpans)
+  }
+  if (hasEntityTag && hasEntityMarkupCandidate(normalized)) {
+    normalized = replaceEntityBrTags(normalized, "<br />")
+  }
+  return restoreSpans(normalized)
+}
+
+const stepMultiLineExcludedLiteralAt = (
+  markdown: string,
+  cursor: number,
+  codeBlockRanges: readonly MathSpanRange[],
+  literalRanges: MathSpanRange[]
+): number => {
+  const codeEnd = findContainingSortedRangeEnd(codeBlockRanges, cursor)
+  if (codeEnd > cursor) return codeEnd
+  const code = markdown.codePointAt(cursor) ?? 0
+  if (code === 96 && !isEscapedMarkdownAt(markdown, cursor)) {
+    const spanEnd = scanInlineCodeSpanEnd(markdown, cursor)
+    if (spanEnd > cursor && markdown.slice(cursor, spanEnd).includes("\n")) {
+      literalRanges.push({ from: cursor, to: spanEnd })
+    }
+    return spanEnd > cursor ? spanEnd : cursor + countCodePointRun(markdown, cursor, 96)
+  }
+  if (code !== 36) return cursor + 1
+  const token = scanPandocDisplayMathAt(markdown, cursor, { excludedRanges: codeBlockRanges })
+  if (!token) return cursor + countCodePointRun(markdown, cursor, 36)
+  if (markdown.slice(token.from, token.to).includes("\n")) {
+    literalRanges.push({ from: token.from, to: token.to })
+  }
+  return token.to
+}
+
+const collectMultiLineExcludedLiteralRanges = (
+  markdown: string,
+  codeBlockRanges: readonly MathSpanRange[]
+): MathSpanRange[] => {
+  if (!markdown.includes("$$") && !markdown.includes("`")) return []
+  const literalRanges: MathSpanRange[] = []
   let cursor = 0
-  while (cursor < input.length) {
-    const { nextCursor, spanEnd } = matchUnescapedInlineCodeEndAt(input, cursor)
-    if (spanEnd < 0) {
-      cursor = nextCursor
-      continue
-    }
-    if (cursor > copyFrom) {
-      result += normalizeInlineHtmlChunk(input.slice(copyFrom, cursor), hasRawTag, hasEntityTag)
-    }
-    result += input.slice(cursor, spanEnd)
-    copyFrom = spanEnd
-    cursor = spanEnd
+  while (cursor < markdown.length) {
+    cursor = stepMultiLineExcludedLiteralAt(markdown, cursor, codeBlockRanges, literalRanges)
   }
-  if (copyFrom === 0) return normalizeInlineHtmlChunk(input, hasRawTag, hasEntityTag)
-  return copyFrom < input.length
-    ? result + normalizeInlineHtmlChunk(input.slice(copyFrom), hasRawTag, hasEntityTag)
-    : result
+  return literalRanges
 }
 
-type ActiveCodeFence = {
-  markerCode: number
-  length: number
-  maxCloseIndent: number
-  quoteDepth: number
-}
-
-type BlockScanState = {
-  activeFence: ActiveCodeFence | null
-  inIndentedCode: boolean
-  inParagraph: boolean
-  listContentIndent: number
-  prevQuoteDepth: number
-}
-
-const LIST_MARKER_CONTENT_PATTERN = /^(?:[-+*]|\d{1,9}[.)])([ \t]+)/
-
-const isAtxHeadingStart = (content: string): boolean => {
-  const hashes = countCodePointRun(content, 0, 35)
-  if (hashes < 1 || hashes > 6) return false
-  const next = content.codePointAt(hashes)
-  return next === undefined || next === 32 || next === 9 || next === 13
-}
-
-const advanceIndentColumn = (indent: number, code: number): number =>
-  code === 9 ? indent + 4 - (indent % 4) : indent + 1
-
-const stripBlockquoteMarkers = (line: string): { rest: string; quoteDepth: number } => {
-  let cursor = 0
-  let quoteDepth = 0
-  while (cursor < line.length) {
-    const spaces = Math.min(3, countCodePointRun(line, cursor, 32))
-    if (line.codePointAt(cursor + spaces) !== 62) break
-    quoteDepth += 1
-    cursor += spaces + 1
-    if (line.codePointAt(cursor) === 32) cursor += 1
-  }
-  return { rest: line.slice(cursor), quoteDepth }
-}
-
-const measureLeadingIndent = (
-  line: string
-): { indent: number; contentOffset: number; isBlank: boolean } => {
-  let indent = 0
-  let cursor = 0
-  while (cursor < line.length) {
-    const code = line.codePointAt(cursor) ?? 0
-    if (code === 32 || code === 9) {
-      indent = advanceIndentColumn(indent, code)
-      cursor += 1
-      continue
-    }
-    if (code === 13) {
-      cursor += 1
-      continue
-    }
-    return { indent, contentOffset: cursor, isBlank: false }
-  }
-  return { indent, contentOffset: cursor, isBlank: true }
-}
-
-const matchListMarkerContentIndent = (
-  rest: string,
-  indent: number,
-  contentOffset: number
-): number | null => {
-  const match = LIST_MARKER_CONTENT_PATTERN.exec(rest.slice(contentOffset))
-  if (!match) return null
-  const spacesPart = match[1] ?? ""
-  const markerWidth = match[0].length - spacesPart.length
-  const baseCol = indent + markerWidth
-  let col = baseCol
-  for (let idx = 0; idx < spacesPart.length; idx += 1) {
-    col = advanceIndentColumn(col, spacesPart.codePointAt(idx) ?? 32)
-  }
-  const restIsBlank = rest.slice(contentOffset + match[0].length).trim().length === 0
-  return restIsBlank || col - baseCol > 4 ? baseCol + 1 : col
-}
-
-const isClosingFenceLine = (
-  rest: string,
-  indent: number,
-  contentOffset: number,
-  fence: ActiveCodeFence
-): boolean => {
-  if (indent > fence.maxCloseIndent) return false
-  const content = rest.slice(contentOffset)
-  const runLen = countCodePointRun(content, 0, fence.markerCode)
-  return runLen >= fence.length && content.slice(runLen).trim().length === 0
-}
-
-const stepActiveFenceState = (
-  rest: string,
-  indent: number,
-  contentOffset: number,
-  quoteDepth: number,
-  state: BlockScanState
-): boolean => {
-  if (!state.activeFence) return false
-  if (quoteDepth < state.activeFence.quoteDepth) {
-    state.activeFence = null
-    state.inIndentedCode = false
-    state.inParagraph = false
-    state.listContentIndent = 0
-    return false
-  }
-  if (isClosingFenceLine(rest, indent, contentOffset, state.activeFence)) {
-    state.activeFence = null
-    state.inParagraph = false
-    state.inIndentedCode = false
-  }
-  return true
-}
-
-const syncQuoteDepthTransition = (
-  quoteDepth: number,
-  isBlank: boolean,
-  state: BlockScanState
-): void => {
-  if (quoteDepth > state.prevQuoteDepth) {
-    state.inIndentedCode = false
-    state.inParagraph = false
-    state.listContentIndent = 0
-  } else if (quoteDepth < state.prevQuoteDepth && (isBlank || !state.inParagraph)) {
-    state.inIndentedCode = false
-    state.listContentIndent = 0
-  }
-  state.prevQuoteDepth = quoteDepth
-}
-
-const isIndentedCodeLine = (
-  state: BlockScanState,
-  indent: number,
-  isBlank: boolean
-): boolean => {
-  const minCodeIndent = state.listContentIndent + 4
-  if (state.inIndentedCode) return isBlank || indent >= minCodeIndent
-  return !state.inParagraph && !isBlank && indent >= minCodeIndent
-}
-
-const tryOpenFenceOrUpdateBlockContext = (
-  rest: string,
-  indent: number,
-  contentOffset: number,
-  quoteDepth: number,
-  state: BlockScanState
-): { skipNormalization: boolean; nextInParagraph: boolean } => {
-  const content = rest.slice(contentOffset)
-  if (indent <= state.listContentIndent + 3) {
-    const opened = parseOpeningCodeFence(content)
-    if (opened) {
-      state.activeFence = {
-        ...opened,
-        maxCloseIndent: state.listContentIndent + 3,
-        quoteDepth,
-      }
-      state.inParagraph = false
-      return { skipNormalization: true, nextInParagraph: false }
-    }
-    if (isAtxHeadingStart(content)) {
-      return { skipNormalization: false, nextInParagraph: false }
-    }
-  }
-  const nextListIndent = matchListMarkerContentIndent(rest, indent, contentOffset)
-  if (nextListIndent !== null) state.listContentIndent = nextListIndent
-  return { skipNormalization: false, nextInParagraph: true }
-}
-
-const stepMarkdownCodeBlockState = (line: string, state: BlockScanState): boolean => {
-  const { rest, quoteDepth } = stripBlockquoteMarkers(line)
-  const { indent, contentOffset, isBlank } = measureLeadingIndent(rest)
-  if (stepActiveFenceState(rest, indent, contentOffset, quoteDepth, state)) return true
-  syncQuoteDepthTransition(quoteDepth, isBlank, state)
-  if (!isBlank && indent < state.listContentIndent) {
-    state.listContentIndent = 0
-  }
-  if (isIndentedCodeLine(state, indent, isBlank)) {
-    state.inIndentedCode = true
-    state.inParagraph = false
-    return true
-  }
-  state.inIndentedCode = false
-  if (isBlank) {
-    state.inParagraph = false
-    return true
-  }
-  const blockStep = tryOpenFenceOrUpdateBlockContext(rest, indent, contentOffset, quoteDepth, state)
-  state.inParagraph = blockStep.nextInParagraph
-  return blockStep.skipNormalization
+const normalizeNonExcludedSegment = (segment: string): string => {
+  if (!segment.includes("<") && !hasEntityMarkupCandidate(segment)) return segment
+  return segment.split("\n").map(normalizeLegacyInlineHtmlSpans).join("\n")
 }
 
 export const normalizeLegacyInlineHtmlMarkdown = (markdown: string) => {
   if (!markdown) return markdown
-  const lowerMarkdown = markdown.toLowerCase()
-  if (!markdown.includes("<") && !lowerMarkdown.includes("&lt;")) return markdown
+  if (!markdown.includes("<") && !hasEntityMarkupCandidate(markdown)) return markdown
 
-  const state: BlockScanState = {
-    activeFence: null,
-    inIndentedCode: false,
-    inParagraph: false,
-    listContentIndent: 0,
-    prevQuoteDepth: 0,
+  const codeBlockRanges = collectCommonMarkCodeBlockRanges(markdown)
+  const literalRanges = collectMultiLineExcludedLiteralRanges(markdown, codeBlockRanges)
+  const excludedRanges =
+    literalRanges.length > 0
+      ? mergeSortedSpanRanges([...codeBlockRanges, ...literalRanges])
+      : codeBlockRanges
+  if (excludedRanges.length === 0) return normalizeNonExcludedSegment(markdown)
+
+  let output = ""
+  let cursor = 0
+  for (const range of excludedRanges) {
+    if (range.from > cursor) {
+      output += normalizeNonExcludedSegment(markdown.slice(cursor, range.from))
+    }
+    output += markdown.slice(range.from, range.to)
+    cursor = range.to
   }
-
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (stepMarkdownCodeBlockState(line, state)) return line
-      if (!line.includes("<") && !line.toLowerCase().includes("&lt;")) return line
-      return normalizeLegacyInlineHtmlSpans(line)
-    })
-    .join("\n")
-}
-
-export const normalizeInlineHtmlInMarkdownTables = (markdown: string) => {
-  if (!markdown) return markdown
-  if (!markdown.includes("<") && !markdown.toLowerCase().includes("&lt;")) return markdown
-
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (!line.includes("<") && !line.toLowerCase().includes("&lt;")) return line
-      if (!isLikelyTableRow(line) || isTableSeparatorLine(line)) return line
-      return normalizeLegacyInlineHtmlSpans(line)
-    })
-    .join("\n")
+  if (cursor < markdown.length) {
+    output += normalizeNonExcludedSegment(markdown.slice(cursor))
+  }
+  return output
 }

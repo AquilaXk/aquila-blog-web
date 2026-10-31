@@ -1,19 +1,18 @@
 import {
+  collectCommonMarkCodeBlockRanges,
   countCodePointRun,
+  findContainingSortedRangeEnd,
   findLineEndOffset,
   hasBlankLineBetween,
   isEscapedMarkdownAt,
-  matchFencedCodeBlockEnd,
   scanInlineCodeSpanEnd,
   scanPandocDisplayMathAt,
   scanPandocInlineMathAt,
+  type MathSpanRange,
 } from "./pandocMathScanner"
 
 const AUTOLINK_SCHEMES = ["http://", "https://", "ftp://", "mailto:"] as const
 const ESCAPED_DOLLAR_TOKEN = String.raw`\$`
-
-const isAtLineStart = (text: string, index: number): boolean =>
-  index === 0 || text.codePointAt(index - 1) === 10
 
 const isAsciiAlphaNumericCode = (code: number): boolean => {
   const isDigit = code >= 48 && code <= 57
@@ -128,11 +127,13 @@ const skipAngleConstructAt = (text: string, index: number): number => {
   return commentEnd > index ? commentEnd : matchAutolinkEnd(text, index)
 }
 
-const trySkipLiteralConstructAt = (text: string, index: number): number => {
-  if (isAtLineStart(text, index)) {
-    const fenceEnd = matchFencedCodeBlockEnd(text, index)
-    if (fenceEnd > index) return fenceEnd
-  }
+const trySkipLiteralConstructAt = (
+  text: string,
+  index: number,
+  codeBlockRanges: readonly MathSpanRange[]
+): number => {
+  const codeBlockEnd = findContainingSortedRangeEnd(codeBlockRanges, index)
+  if (codeBlockEnd > index) return codeBlockEnd
   const code = text.codePointAt(index) ?? 0
   if (code === 96) return skipUnescapedBacktickAt(text, index)
   if (code === 60) return skipAngleConstructAt(text, index)
@@ -143,28 +144,37 @@ const trySkipLiteralConstructAt = (text: string, index: number): number => {
 
 const handleDollarSequenceAt = (
   markdown: string,
-  index: number
+  index: number,
+  codeBlockRanges: readonly MathSpanRange[]
 ): { validMathEnd: number; nextIndex: number; escapeCount: number } => {
   const runLen = countCodePointRun(markdown, index, 36)
   if (runLen > 2) {
     return { validMathEnd: -1, nextIndex: index + runLen, escapeCount: runLen }
   }
   if (runLen === 2) {
-    const displayToken = scanPandocDisplayMathAt(markdown, index)
+    const displayToken = scanPandocDisplayMathAt(markdown, index, {
+      excludedRanges: codeBlockRanges,
+    })
     if (displayToken) {
       return { validMathEnd: displayToken.to, nextIndex: displayToken.to, escapeCount: 0 }
     }
     return { validMathEnd: -1, nextIndex: index + 2, escapeCount: 2 }
   }
-  const inlineToken = scanPandocInlineMathAt(markdown, index)
+  const inlineToken = scanPandocInlineMathAt(markdown, index, {
+    excludedRanges: codeBlockRanges,
+  })
   if (inlineToken) {
     return { validMathEnd: inlineToken.to, nextIndex: inlineToken.to, escapeCount: 0 }
   }
   return { validMathEnd: -1, nextIndex: index + 1, escapeCount: 1 }
 }
 
-const advancePastNonDollarAt = (markdown: string, index: number): number => {
-  const skippedEnd = trySkipLiteralConstructAt(markdown, index)
+const advancePastNonDollarAt = (
+  markdown: string,
+  index: number,
+  codeBlockRanges: readonly MathSpanRange[]
+): number => {
+  const skippedEnd = trySkipLiteralConstructAt(markdown, index, codeBlockRanges)
   if (skippedEnd > index) return skippedEnd
   if (markdown.codePointAt(index) !== 36 || isEscapedMarkdownAt(markdown, index)) {
     return index + 1
@@ -174,14 +184,15 @@ const advancePastNonDollarAt = (markdown: string, index: number): number => {
 
 export const hasValidMarkdownMath = (markdown: string): boolean => {
   if (!markdown.includes("$")) return false
+  const codeBlockRanges = collectCommonMarkCodeBlockRanges(markdown)
   let index = 0
   while (index < markdown.length) {
-    const next = advancePastNonDollarAt(markdown, index)
+    const next = advancePastNonDollarAt(markdown, index, codeBlockRanges)
     if (next > index) {
       index = next
       continue
     }
-    const step = handleDollarSequenceAt(markdown, index)
+    const step = handleDollarSequenceAt(markdown, index, codeBlockRanges)
     if (step.validMathEnd > index) return true
     index = step.nextIndex
   }
@@ -210,6 +221,19 @@ export type ProtectedMarkdownState = {
 }
 
 const BACKSLASH_CHAR = String.fromCodePoint(92)
+const NUMERIC_ENTITY_PROBE_PATTERN = /&#(?:[xX]([\da-fA-F]+)|(\d+));/g
+
+const isValidUnicodeScalar = (codePoint: number): boolean =>
+  Number.isInteger(codePoint) &&
+  codePoint > 0 &&
+  codePoint <= 0x10ffff &&
+  (codePoint < 0xd800 || codePoint > 0xdfff)
+
+const decodeNumericEntitiesForSentinelProbe = (source: string): string =>
+  source.replace(NUMERIC_ENTITY_PROBE_PATTERN, (raw, hex?: string, dec?: string) => {
+    const codePoint = hex ? Number.parseInt(hex, 16) : Number.parseInt(dec ?? "", 10)
+    return isValidUnicodeScalar(codePoint) ? String.fromCodePoint(codePoint) : raw
+  })
 
 const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels => {
   const prefix = `\uE000aqp${nonce}_`
@@ -226,14 +250,17 @@ const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels 
 export const DEFAULT_PROTECTED_INLINE_SENTINELS = buildProtectedInlineSentinels(0)
 
 export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
+  const probe = source.includes("&#")
+    ? `${source}\n${decodeNumericEntitiesForSentinelProbe(source)}`
+    : source
   let nonce = 0
-  while (source.includes(`aqp${nonce}_`)) {
+  while (probe.includes(`aqp${nonce}_`)) {
     nonce += 1
   }
   return nonce === 0 ? DEFAULT_PROTECTED_INLINE_SENTINELS : buildProtectedInlineSentinels(nonce)
 }
 
-const LT_ENTITY_PREFIX_PATTERN = /^&(?:lt|#0*60|#x0*3c);/i
+const LT_ENTITY_PREFIX_PATTERN = /^&(?:lt|LT|#0*60|#[xX]0*3[cC]);/
 
 const resolveBackslashProtectedEntry = (
   nextCode: number,
@@ -307,16 +334,17 @@ const matchProtectedInlineTokenAt = (
 
 export const escapeNonPandocSingleDollars = (markdown: string): string => {
   if (!markdown.includes("$")) return markdown
+  const codeBlockRanges = collectCommonMarkCodeBlockRanges(markdown)
   let output = ""
   let copyFrom = 0
   let index = 0
   while (index < markdown.length) {
-    const next = advancePastNonDollarAt(markdown, index)
+    const next = advancePastNonDollarAt(markdown, index, codeBlockRanges)
     if (next > index) {
       index = next
       continue
     }
-    const step = handleDollarSequenceAt(markdown, index)
+    const step = handleDollarSequenceAt(markdown, index, codeBlockRanges)
     if (step.escapeCount > 0) {
       output += `${markdown.slice(copyFrom, index)}${ESCAPED_DOLLAR_TOKEN.repeat(step.escapeCount)}`
       copyFrom = index + step.escapeCount
@@ -326,12 +354,16 @@ export const escapeNonPandocSingleDollars = (markdown: string): string => {
   return copyFrom === 0 ? markdown : `${output}${markdown.slice(copyFrom)}`
 }
 
-const advancePastSkippedConstructAt = (markdown: string, index: number): number => {
-  const skippedEnd = trySkipLiteralConstructAt(markdown, index)
+const advancePastSkippedConstructAt = (
+  markdown: string,
+  index: number,
+  codeBlockRanges: readonly MathSpanRange[]
+): number => {
+  const skippedEnd = trySkipLiteralConstructAt(markdown, index, codeBlockRanges)
   if (skippedEnd > index) return skippedEnd
   const code = markdown.codePointAt(index) ?? 0
   if (code === 36 && !isEscapedMarkdownAt(markdown, index)) {
-    return handleDollarSequenceAt(markdown, index).nextIndex
+    return handleDollarSequenceAt(markdown, index, codeBlockRanges).nextIndex
   }
   if (code === 92 && markdown.codePointAt(index + 1) === 92) {
     return index + 2
@@ -346,12 +378,13 @@ export const protectEscapedInlineSyntax = (
   if (!markdown.includes(BACKSLASH_CHAR) && !markdown.includes("&")) {
     return { markdown, sentinels, tokens: [] }
   }
+  const codeBlockRanges = collectCommonMarkCodeBlockRanges(markdown)
   const registry: TokenRegistry = { seenTokens: new Map(), entityByRaw: new Map() }
   let output = ""
   let copyFrom = 0
   let index = 0
   while (index < markdown.length) {
-    const jumped = advancePastSkippedConstructAt(markdown, index)
+    const jumped = advancePastSkippedConstructAt(markdown, index, codeBlockRanges)
     if (jumped > index) {
       index = jumped
       continue

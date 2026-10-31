@@ -71,15 +71,31 @@ export const matchRawBrTagAt = (text: string, start: number): number => {
   return text.codePointAt(cursor) === 62 ? cursor + 1 : -1
 }
 
+const LT_HTML_ENTITY_STICKY_PATTERN = /&(?:lt|LT|#0*60|#[xX]0*3[cC]);/y
+const GT_HTML_ENTITY_STICKY_PATTERN = /&(?:gt|GT|#0*62|#[xX]0*3[eE]);/y
+
+const matchHtmlLtEntityEndAt = (text: string, start: number): number => {
+  if (text.codePointAt(start) !== 38) return -1
+  LT_HTML_ENTITY_STICKY_PATTERN.lastIndex = start
+  return LT_HTML_ENTITY_STICKY_PATTERN.test(text) ? LT_HTML_ENTITY_STICKY_PATTERN.lastIndex : -1
+}
+
+const matchHtmlGtEntityEndAt = (text: string, start: number): number => {
+  if (text.codePointAt(start) !== 38) return -1
+  GT_HTML_ENTITY_STICKY_PATTERN.lastIndex = start
+  return GT_HTML_ENTITY_STICKY_PATTERN.test(text) ? GT_HTML_ENTITY_STICKY_PATTERN.lastIndex : -1
+}
+
 export const matchEntityBrTagAt = (text: string, start: number): number => {
-  if (!startsWithAsciiCaseInsensitive(text, start, "&lt;")) return -1
-  let cursor = skipAsciiSpaces(text, start + 4)
+  const afterLt = matchHtmlLtEntityEndAt(text, start)
+  if (afterLt < 0) return -1
+  let cursor = skipAsciiSpaces(text, afterLt)
   if (!startsWithAsciiCaseInsensitive(text, cursor, "br")) return -1
   cursor = skipAsciiSpaces(text, cursor + 2)
   if (text.codePointAt(cursor) === 47) {
     cursor = skipAsciiSpaces(text, cursor + 1)
   }
-  return startsWithAsciiCaseInsensitive(text, cursor, "&gt;") ? cursor + 4 : -1
+  return matchHtmlGtEntityEndAt(text, cursor)
 }
 
 export const hasRawBrTag = (text: string): boolean => {
@@ -110,8 +126,26 @@ export const findRawBrTagSpans = (
   return spans
 }
 
-export const replaceRawBrTags = (text: string, replacement: string): string => {
-  const spans = findRawBrTagSpans(text, true)
+const findEntityBrTagSpans = (text: string): TextRangeSpan[] => {
+  const spans: TextRangeSpan[] = []
+  let index = text.indexOf("&")
+  while (index >= 0) {
+    const end = isEscapedMarkdownAt(text, index) ? -1 : matchEntityBrTagAt(text, index)
+    if (end > index) {
+      spans.push({ from: index, to: end })
+      index = text.indexOf("&", end)
+    } else {
+      index = text.indexOf("&", index + 1)
+    }
+  }
+  return spans
+}
+
+const replaceSpansWithLiteral = (
+  text: string,
+  spans: readonly TextRangeSpan[],
+  replacement: string
+): string => {
   if (spans.length === 0) return text
   let result = ""
   let cursor = 0
@@ -120,31 +154,14 @@ export const replaceRawBrTags = (text: string, replacement: string): string => {
     result += replacement
     cursor = span.to
   }
-  if (cursor < text.length) result += text.slice(cursor)
-  return result
+  return cursor < text.length ? result + text.slice(cursor) : result
 }
 
-export const replaceEntityBrTags = (text: string, replacement: string): string => {
-  const lower = text.toLowerCase()
-  let index = lower.indexOf("&lt;")
-  if (index < 0) return text
-  let result = ""
-  let cursor = 0
-  while (index >= 0) {
-    const end = isEscapedMarkdownAt(text, index) ? -1 : matchEntityBrTagAt(text, index)
-    if (end > index) {
-      if (index > cursor) result += text.slice(cursor, index)
-      result += replacement
-      cursor = end
-      index = lower.indexOf("&lt;", end)
-    } else {
-      index = lower.indexOf("&lt;", index + 4)
-    }
-  }
-  if (cursor === 0) return text
-  if (cursor < text.length) result += text.slice(cursor)
-  return result
-}
+export const replaceRawBrTags = (text: string, replacement: string): string =>
+  replaceSpansWithLiteral(text, findRawBrTagSpans(text, true), replacement)
+
+export const replaceEntityBrTags = (text: string, replacement: string): string =>
+  replaceSpansWithLiteral(text, findEntityBrTagSpans(text), replacement)
 
 const buildColorTokenResult = (
   text: string,

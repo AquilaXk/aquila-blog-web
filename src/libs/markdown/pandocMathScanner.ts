@@ -1,3 +1,5 @@
+import { GFM, parser } from "@lezer/markdown"
+
 export type MathSpanRange = {
   from: number
   to: number
@@ -13,7 +15,32 @@ export type ScannedPandocMathToken = {
 export const DEFAULT_MAX_INLINE_MATH_LENGTH = 2048
 export const DEFAULT_MAX_DISPLAY_MATH_LENGTH = 16384
 
+const commonMarkGfmParser = parser.configure([GFM])
+const CONTAINER_DIRECTIVE_LINE_PATTERN = /^([ \t>]*)(:::[^\r\n]*)/gm
 const SINGLE_WHITESPACE_PATTERN = /^\s$/u
+
+const maskContainerDirectives = (markdown: string): string =>
+  markdown.includes(":::")
+    ? markdown.replace(
+        CONTAINER_DIRECTIVE_LINE_PATTERN,
+        (_, lead: string, dir: string) => `${lead}#${" ".repeat(dir.length - 1)}`
+      )
+    : markdown
+
+export const collectCommonMarkCodeBlockRanges = (markdown: string): MathSpanRange[] => {
+  if (!markdown) return []
+  const ranges: MathSpanRange[] = []
+  commonMarkGfmParser.parse(maskContainerDirectives(markdown)).iterate({
+    enter(node) {
+      if (node.name === "FencedCode" || node.name === "CodeBlock") {
+        ranges.push({ from: node.from, to: node.to })
+        return false
+      }
+      return undefined
+    },
+  })
+  return ranges
+}
 
 const ALLOWED_ASCII_PREFIX_CODES = new Set([
   40, 91, 123, 34, 39, 45, 61, 47, 43, 60, 62, 44, 59, 58, 33, 63, 42, 95, 126, 124,
@@ -81,31 +108,6 @@ export const parseOpeningCodeFence = (
   if (runLen < 3) return null
   if (firstCode === 96 && stripped.slice(runLen).includes("`")) return null
   return { markerCode: firstCode, length: runLen }
-}
-
-const isClosingCodeFenceLine = (
-  line: string,
-  fence: { markerCode: number; length: number }
-): boolean => {
-  const stripped = stripLineQuoteAndIndent(line)
-  const runLen = countCodePointRun(stripped, 0, fence.markerCode)
-  return runLen >= fence.length && stripped.slice(runLen).trim().length === 0
-}
-
-export const matchFencedCodeBlockEnd = (text: string, lineStart: number): number => {
-  const firstLineEnd = findLineEndOffset(text, lineStart)
-  const fence = parseOpeningCodeFence(text.slice(lineStart, firstLineEnd))
-  if (!fence) return -1
-
-  let cursor = firstLineEnd < text.length ? firstLineEnd + 1 : text.length
-  while (cursor < text.length) {
-    const lineEnd = findLineEndOffset(text, cursor)
-    if (isClosingCodeFenceLine(text.slice(cursor, lineEnd), fence)) {
-      return lineEnd < text.length ? lineEnd + 1 : text.length
-    }
-    cursor = lineEnd < text.length ? lineEnd + 1 : text.length
-  }
-  return text.length
 }
 
 const isMarkdownBlockBoundaryLine = (line: string): boolean => {
@@ -177,7 +179,7 @@ export const scanInlineCodeSpanEnd = (
   return -1
 }
 
-const normalizeCommonMarkCodeSpanContent = (rawContent: string): string => {
+export const normalizeCommonMarkCodeSpanContent = (rawContent: string): string => {
   const collapsed = rawContent.replaceAll("\r\n", " ").replaceAll("\n", " ")
   if (
     collapsed.length >= 2 &&
@@ -190,49 +192,36 @@ const normalizeCommonMarkCodeSpanContent = (rawContent: string): string => {
   return collapsed
 }
 
-export const replaceCommonMarkInlineCodeSpans = (
-  text: string,
-  onSpan: (normalizedCode: string, from: number, to: number) => string
-): string => {
-  if (!text.includes("`")) return text
-  let output = ""
-  let copyFrom = 0
-  let cursor = 0
-  while (cursor < text.length) {
-    if (text.codePointAt(cursor) !== 96 || isEscapedMarkdownAt(text, cursor)) {
-      cursor += 1
-      continue
-    }
-    const runLen = countCodePointRun(text, cursor, 96)
-    const closeEnd = scanInlineCodeSpanEnd(text, cursor)
-    if (closeEnd < 0) {
-      cursor += runLen
-      continue
-    }
-    const inner = normalizeCommonMarkCodeSpanContent(text.slice(cursor + runLen, closeEnd - runLen))
-    output += text.slice(copyFrom, cursor) + onSpan(inner, cursor, closeEnd)
-    copyFrom = closeEnd
-    cursor = closeEnd
-  }
-  return copyFrom === 0 ? text : output + text.slice(copyFrom)
-}
-
 export const mergeSortedSpanRanges = (ranges: readonly MathSpanRange[]): MathSpanRange[] => {
   const sorted = ranges
     .filter((range) => range.to > range.from)
     .sort((a, b) => (a.from !== b.from ? a.from - b.from : a.to - b.to))
-  if (sorted.length === 0) return []
-  const merged: MathSpanRange[] = [{ ...sorted[0]! }]
-  for (let i = 1; i < sorted.length; i += 1) {
-    const current = sorted[i]!
-    const prev = merged.at(-1)!
-    if (current.from <= prev.to) {
+  const merged: MathSpanRange[] = []
+  for (const current of sorted) {
+    const prev = merged.at(-1)
+    if (prev && current.from <= prev.to) {
       if (current.to > prev.to) prev.to = current.to
     } else {
       merged.push({ ...current })
     }
   }
   return merged
+}
+
+export const findContainingSortedRangeEnd = (
+  ranges: readonly MathSpanRange[],
+  offset: number
+): number => {
+  let low = 0
+  let high = ranges.length - 1
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    const range = ranges[mid]!
+    if (range.to <= offset) low = mid + 1
+    else if (range.from > offset) high = mid - 1
+    else return range.to
+  }
+  return -1
 }
 
 export const overlapsSortedRanges = (
@@ -252,8 +241,10 @@ export const overlapsSortedRanges = (
   return false
 }
 
-const isDedicatedDoubleDollarLine = (line: string): boolean =>
-  stripLineQuoteAndIndent(line).trim() === "$$"
+const isDedicatedDoubleDollarLine = (line: string): boolean => {
+  const stripped = stripLineQuoteAndIndent(line)
+  return stripped.startsWith("$$") && stripped.slice(2).trim() === ""
+}
 
 const tryResolveDedicatedMathAtCloseLine = (
   text: string,
@@ -266,7 +257,13 @@ const tryResolveDedicatedMathAtCloseLine = (
   if (closePos < 0 || closePos > lineEnd) return null
   const to = closePos + 2
   const math = text.slice(openIndex + 2, closePos)
-  if (!math.trim() || overlapsSortedRanges(excludedRanges, openIndex, to)) return null
+  if (
+    !math.trim() ||
+    overlapsSortedRanges(excludedRanges, openIndex, openIndex + 2) ||
+    overlapsSortedRanges(excludedRanges, closePos, to)
+  ) {
+    return null
+  }
   return { kind: "display", from: openIndex, to, math }
 }
 
@@ -447,14 +444,20 @@ const skipDollarLiteralConstructAt = (
   return cursor + run
 }
 
+const skipBackslashEscapeAt = (text: string, cursor: number): number => {
+  const next = text.codePointAt(cursor + 1)
+  if (next === undefined) return Math.min(text.length, cursor + 1)
+  return cursor + 1 + (next > 0xffff ? 2 : 1)
+}
+
 export const skipInlineLiteralConstructAt = (
   text: string,
   cursor: number,
   options?: InlineLiteralSkipOptions
 ): number => {
-  if (options?.honorEscapes === false) return -1
+  if (options?.honorEscapes === false || isEscapedMarkdownAt(text, cursor)) return -1
   const code = text.codePointAt(cursor) ?? 0
-  if (code === 92) return cursor + 2
+  if (code === 92) return skipBackslashEscapeAt(text, cursor)
   if (code === 96) {
     const end = scanInlineCodeSpanEnd(text, cursor, options?.codeScanLimit)
     return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96, options?.codeScanLimit)

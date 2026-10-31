@@ -1,8 +1,6 @@
 import { normalizeHtmlPasteText } from "./markdownEditorHtmlPasteBypass"
 import { escapeMarkdownLinkDestination } from "./markdownEditorUploadModel"
 
-export { escapeMarkdownLinkDestination }
-
 export {
   type HtmlPasteBypassCheckInput,
   hasDocumentStructureHtmlTag,

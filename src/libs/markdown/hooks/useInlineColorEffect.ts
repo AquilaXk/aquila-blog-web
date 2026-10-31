@@ -2,10 +2,13 @@ import { RefObject, useEffect } from "react"
 import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
 import { findDoubleBraceColorSpans } from "src/libs/markdown/inlineTokenScanners"
 
+const hasInlineColorCandidate = (value: string | null | undefined): boolean =>
+  Boolean(value?.includes("{{"))
+
 const nodeContainsInlineColorToken = (node: Node | null): boolean => {
   if (!node) return false
   const text = (node as { nodeValue?: string | null }).nodeValue ?? node.textContent ?? ""
-  return text.includes("{{color:")
+  return hasInlineColorCandidate(text)
 }
 
 const mutationContainsInlineColorToken = (mutation: MutationRecord): boolean => {
@@ -14,8 +17,8 @@ const mutationContainsInlineColorToken = (mutation: MutationRecord): boolean => 
   }
   const addedNodes = mutation.addedNodes
   if (!addedNodes) return false
-  for (let index = 0; index < addedNodes.length; index += 1) {
-    if (nodeContainsInlineColorToken(addedNodes[index] ?? null)) return true
+  for (const addedNode of Array.from(addedNodes)) {
+    if (nodeContainsInlineColorToken(addedNode)) return true
   }
   return false
 }
@@ -32,7 +35,7 @@ const collectInlineColorTextNodes = (root: HTMLElement): Text[] => {
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
     const value = node.nodeValue ?? node.textContent
-    if (!value?.includes("{{color:")) continue
+    if (!hasInlineColorCandidate(value)) continue
     const parent = node.parentElement
     if (
       !parent ||
@@ -108,7 +111,7 @@ const replaceInlineColorTextNode = (textNode: Text): void => {
 }
 
 export const applyInlineColors = (root: HTMLElement) => {
-  if (!(root.textContent || "").includes("{{color:")) {
+  if (!hasInlineColorCandidate(root.textContent)) {
     return
   }
   for (const textNode of collectInlineColorTextNodes(root)) {

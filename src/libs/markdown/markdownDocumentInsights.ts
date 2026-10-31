@@ -5,7 +5,14 @@ import {
   stripDoubleBraceColorTokensOnce,
   stripSingleBraceColorTokensOnce,
 } from "./inlineTokenScanners"
-import { replaceCommonMarkInlineCodeSpans } from "./pandocMathScanner"
+import {
+  countCodePointRun,
+  isEscapedMarkdownAt,
+  normalizeCommonMarkCodeSpanContent,
+  scanInlineCodeSpanEnd,
+  scanPandocDisplayMathAt,
+  scanPandocInlineMathAt,
+} from "./pandocMathScanner"
 
 export type MarkdownSourceRange = {
   start: number
@@ -103,21 +110,13 @@ const countTrimmedCodePointsAndWords = (
   return { characterCount, wordCount }
 }
 
+const HEADING_INLINE_SYNTAX_CODES = new Set([
+  0x21, 0x24, 0x2a, 0x3c, 0x3d, 0x5b, 0x5c, 0x5f, 0x60, 0x7b, 0x7e,
+])
+
 export const hasHeadingInlineSyntax = (text: string): boolean => {
   for (let index = 0; index < text.length; index += 1) {
-    const code = text.codePointAt(index) ?? 0
-    if (
-      code === 0x60 ||
-      code === 0x21 ||
-      code === 0x5b ||
-      code === 0x2a ||
-      code === 0x5f ||
-      code === 0x7e ||
-      code === 0x5c ||
-      code === 0x7b ||
-      code === 0x3d ||
-      code === 0x3c
-    ) {
+    if (HEADING_INLINE_SYNTAX_CODES.has(text.codePointAt(index) ?? 0)) {
       return true
     }
   }
@@ -175,28 +174,95 @@ const createHeadingCodeSpanSentinelPrefix = (text: string): string => {
 const restoreHeadingCodeSpanSentinels = (
   text: string,
   prefix: string,
-  codeSpans: readonly string[]
+  protectedSpans: readonly string[]
 ): string => {
-  if (codeSpans.length === 0) return text
+  if (protectedSpans.length === 0) return text
   let restored = text
-  for (let index = 0; index < codeSpans.length; index += 1) {
-    restored = restored.replaceAll(`${prefix}${index}\uE001`, codeSpans[index] ?? "")
+  for (const [index, span] of protectedSpans.entries()) {
+    restored = restored.replaceAll(`${prefix}${index}\uE001`, () => span)
   }
   return restored
+}
+
+const matchHeadingCodeSpanAt = (
+  text: string,
+  cursor: number
+): { nextCursor: number; replacementValue: string | null } => {
+  const runLen = countCodePointRun(text, cursor, 96)
+  const closeEnd = scanInlineCodeSpanEnd(text, cursor)
+  if (closeEnd < 0) return { nextCursor: cursor + runLen, replacementValue: null }
+  return {
+    nextCursor: closeEnd,
+    replacementValue: normalizeCommonMarkCodeSpanContent(
+      text.slice(cursor + runLen, closeEnd - runLen)
+    ),
+  }
+}
+
+const matchHeadingMathSpanAt = (
+  text: string,
+  cursor: number
+): { nextCursor: number; replacementValue: string | null } => {
+  const runLen = countCodePointRun(text, cursor, 36)
+  if (runLen === 2) {
+    const display = scanPandocDisplayMathAt(text, cursor, { singleLineOnly: true })
+    return display
+      ? { nextCursor: display.to, replacementValue: text.slice(display.from, display.to) }
+      : { nextCursor: cursor + 2, replacementValue: null }
+  }
+  if (runLen === 1) {
+    const inline = scanPandocInlineMathAt(text, cursor)
+    return inline
+      ? { nextCursor: inline.to, replacementValue: text.slice(inline.from, inline.to) }
+      : { nextCursor: cursor + 1, replacementValue: null }
+  }
+  return { nextCursor: cursor + runLen, replacementValue: null }
+}
+
+const matchHeadingProtectedSpanAt = (
+  text: string,
+  cursor: number
+): { nextCursor: number; replacementValue: string | null } => {
+  const code = text.codePointAt(cursor) ?? 0
+  if (code === 96 && !isEscapedMarkdownAt(text, cursor)) {
+    return matchHeadingCodeSpanAt(text, cursor)
+  }
+  if (code === 36 && !isEscapedMarkdownAt(text, cursor)) {
+    return matchHeadingMathSpanAt(text, cursor)
+  }
+  return { nextCursor: cursor + 1, replacementValue: null }
+}
+
+const protectHeadingCodeAndMathSpans = (
+  text: string,
+  sentinelPrefix: string,
+  protectedSpans: string[]
+): string => {
+  if (!text.includes("`") && !text.includes("$")) return text
+  let output = ""
+  let copyFrom = 0
+  let cursor = 0
+  while (cursor < text.length) {
+    const step = matchHeadingProtectedSpanAt(text, cursor)
+    if (step.replacementValue !== null) {
+      const token = `${sentinelPrefix}${protectedSpans.length}\uE001`
+      protectedSpans.push(step.replacementValue)
+      output += text.slice(copyFrom, cursor) + token
+      copyFrom = step.nextCursor
+    }
+    cursor = step.nextCursor
+  }
+  return copyFrom === 0 ? text : output + text.slice(copyFrom)
 }
 
 export const formatMarkdownHeadingLabel = (text: string): string => {
   if (!hasHeadingInlineSyntax(text)) {
     return collapseAsciiWhitespace(text)
   }
-  const codeSpans: string[] = []
+  const protectedSpans: string[] = []
   const sentinelPrefix = createHeadingCodeSpanSentinelPrefix(text)
-  const withCodePlaceholders = replaceCommonMarkInlineCodeSpans(text, (code) => {
-    const token = `${sentinelPrefix}${codeSpans.length}\uE001`
-    codeSpans.push(code)
-    return token
-  })
-  const afterColor = stripInlineColorHeadingTokens(withCodePlaceholders)
+  const withPlaceholders = protectHeadingCodeAndMathSpans(text, sentinelPrefix, protectedSpans)
+  const afterColor = stripInlineColorHeadingTokens(withPlaceholders)
   const afterBr = replaceRawBrTags(afterColor, " ")
   const afterWikilinks = stripWikilinkHeadingTokens(afterBr)
   const afterHighlights = stripMarkdownHighlightDelimiters(afterWikilinks)
@@ -208,7 +274,7 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
     .replace(/(^|[^\p{L}\p{N}_])__([^_\s](?:[^_]*[^_\s])?)__(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/(^|[^\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/~~(.*?)~~/g, "$1")
-  const formatted = restoreHeadingCodeSpanSentinels(stripped, sentinelPrefix, codeSpans)
+  const formatted = restoreHeadingCodeSpanSentinels(stripped, sentinelPrefix, protectedSpans)
   return collapseAsciiWhitespace(formatted)
 }
 
@@ -260,6 +326,9 @@ const updateActiveFenceState = (line: string, activeFence: ActiveFenceState): Ac
   const fence = fenceMatch[1]
   const marker = fence[0] as "`" | "~"
   if (!activeFence) {
+    if (marker === "`" && line.slice(fenceMatch[0].length).includes("`")) {
+      return null
+    }
     return { marker, length: fence.length }
   }
   if (
@@ -340,12 +409,21 @@ const findFirstNonSpaceWithinIndent = (markdown: string, lineStart: number, line
   while (
     firstNonSpace < lineEnd &&
     firstNonSpace - lineStart < 3 &&
-    (markdown.codePointAt(firstNonSpace) === 32 || markdown.codePointAt(firstNonSpace) === 9)
+    markdown.codePointAt(firstNonSpace) === 32
   ) {
     firstNonSpace += 1
   }
   return firstNonSpace
 }
+
+const isDedicatedMathFenceLine = (
+  markdown: string,
+  firstNonSpace: number,
+  lineEnd: number
+): boolean =>
+  markdown.codePointAt(firstNonSpace) === 36 &&
+  markdown.codePointAt(firstNonSpace + 1) === 36 &&
+  markdown.slice(firstNonSpace + 2, lineEnd).trim() === ""
 
 const resolveLineContentEnd = (markdown: string, lineStart: number, nextBreak: number): number => {
   const rawLineEnd = nextBreak === -1 ? markdown.length : nextBreak
@@ -366,6 +444,7 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
   let lineStart = 0
   let offset = 0
   let activeFence: ActiveFenceState = null
+  let mathFenceEnd = -1
 
   while (lineStart <= len) {
     const nextBreak = markdown.indexOf("\n", lineStart)
@@ -373,10 +452,13 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
     const lineLength = lineEnd - lineStart
     const firstNonSpace = findFirstNonSpaceWithinIndent(markdown, lineStart, lineEnd)
     const firstChar = readCodePointWithinBounds(markdown, firstNonSpace, lineEnd)
+    const inMathFence = lineStart < mathFenceEnd
 
-    if (firstChar === 96 || firstChar === 126) {
+    if (!inMathFence && (firstChar === 96 || firstChar === 126)) {
       activeFence = updateActiveFenceState(markdown.slice(lineStart, lineEnd), activeFence)
-    } else if (!activeFence && firstChar === 35 && hasAtxHeadingPrefixAt(markdown, firstNonSpace, lineEnd)) {
+    } else if (!activeFence && !inMathFence && firstChar === 36 && isDedicatedMathFenceLine(markdown, firstNonSpace, lineEnd)) {
+      mathFenceEnd = scanPandocDisplayMathAt(markdown, firstNonSpace)?.to ?? -1
+    } else if (!activeFence && !inMathFence && firstChar === 35 && hasAtxHeadingPrefixAt(markdown, firstNonSpace, lineEnd)) {
       appendMarkdownHeadingInsight(
         markdown.slice(lineStart, lineEnd),
         offset,

@@ -2,7 +2,7 @@ import { syntaxTree } from "@codemirror/language"
 import { EditorState, StateEffect, StateField, type Range, type StateEffectType } from "@codemirror/state"
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
-  buildMarkdownLivePreviewEntries,
+  getMarkdownLivePreviewBundle,
   hasIntervalOverlap,
   isTokenActive,
   resolveMarkdownLivePreviewPlanFromEntries,
@@ -10,11 +10,7 @@ import {
   type MarkdownLivePreviewDecoration,
   type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
-import {
-  MATH_LITERAL_SYNTAX_NODE_NAMES,
-  collectMathReplacementSpecs,
-  type MathReplacementSpec,
-} from "./markdownEditorMathModel"
+import { isNodeShadowedByMath, type MathReplacementSpec } from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
 import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
 import {
@@ -191,32 +187,42 @@ const resolveTaskPrefixRange = (markdownValue: string, from: number, to: number)
   return { from: prefixFrom, to: markerTo, markerTo }
 }
 
+const collectEntryWatchRanges = (
+  markdownValue: string,
+  entry: MarkdownLivePreviewPlanEntry,
+  raw: RangeSpec[]
+): void => {
+  if (entry.hideWhenActiveRange) raw.push({ ...entry.hideWhenActiveRange })
+  if (entry.secondaryHideWhenActiveRange) raw.push({ ...entry.secondaryHideWhenActiveRange })
+  if (entry.kind === "task") {
+    const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
+    raw.push({ from: taskPrefix.from, to: taskPrefix.to })
+  } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
+    raw.push({ from: entry.from, to: entry.to })
+  }
+}
+
+const dedupeSortedRanges = (sorted: readonly RangeSpec[]): RangeSpec[] => {
+  const deduped: RangeSpec[] = []
+  for (const r of sorted) {
+    const prev = deduped.at(-1)
+    if (!prev || prev.from !== r.from || prev.to !== r.to) deduped.push(r)
+  }
+  return deduped
+}
+
 const buildActiveWatchRanges = (
   markdownValue: string,
   previewEntries: readonly MarkdownLivePreviewPlanEntry[],
   blockGroups: readonly (readonly RangeSpec[])[]
 ): RangeSpec[] => {
   const raw: RangeSpec[] = []
-  for (const entry of previewEntries) {
-    if (entry.hideWhenActiveRange) raw.push({ ...entry.hideWhenActiveRange })
-    if (entry.secondaryHideWhenActiveRange) raw.push({ ...entry.secondaryHideWhenActiveRange })
-    if (entry.kind === "task") {
-      const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
-      raw.push({ from: taskPrefix.from, to: taskPrefix.to })
-    } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
-      raw.push({ from: entry.from, to: entry.to })
-    }
-  }
+  for (const entry of previewEntries) collectEntryWatchRanges(markdownValue, entry, raw)
   for (const group of blockGroups) {
     for (const item of group) raw.push({ from: item.from, to: item.to })
   }
   raw.sort((a, b) => a.from - b.from || a.to - b.to)
-  const deduped: RangeSpec[] = []
-  for (const r of raw) {
-    const prev = deduped.at(-1)
-    if (!prev || prev.from !== r.from || prev.to !== r.to) deduped.push(r)
-  }
-  return deduped
+  return dedupeSortedRanges(raw)
 }
 
 export const haveSameActiveWatchHits = (
@@ -259,20 +265,18 @@ type DocBlockCollector = {
   markdownValue: string
   hasCalloutMarker: boolean
   hasMermaidMarker: boolean
+  maths: readonly MathReplacementSpec[]
   tables: TableReplacementSpec[]
   callouts: CalloutReplacementSpec[]
   images: ImageReplacementSpec[]
   mermaids: MermaidReplacementSpec[]
-  literalRanges: RangeSpec[]
 }
 
 const enterSyntaxNodeForDocBlocks = (
   node: { name: string; from: number; to: number },
   collector: DocBlockCollector
 ) => {
-  if (MATH_LITERAL_SYNTAX_NODE_NAMES.has(node.name)) {
-    collector.literalRanges.push({ from: node.from, to: node.to })
-  }
+  if (isNodeShadowedByMath(collector.maths, node.from, node.to)) return
   switch (node.name) {
     case "Table":
       pushIfPresent(collector.tables, collectTableBlockSpec(collector.state, collector.markdownValue, node.from, node.to))
@@ -298,21 +302,20 @@ const getCachedDocBlocks = (state: EditorState) => {
     return cachedDocBlocksEntry
   }
   const markdownValue = getDocString(state.doc)
-  const previewEntries = buildMarkdownLivePreviewEntries(markdownValue, tree.topNode)
+  const { entries: previewEntries, mathSpecs: maths } = getMarkdownLivePreviewBundle(markdownValue, tree.topNode)
   const collector: DocBlockCollector = {
     state,
     markdownValue,
     hasCalloutMarker: markdownValue.includes("[!"),
     hasMermaidMarker: /mermaid/i.test(markdownValue),
+    maths,
     tables: [],
     callouts: [],
     images: [],
     mermaids: [],
-    literalRanges: [],
   }
   tree.iterate({ enter: (node) => enterSyntaxNodeForDocBlocks(node, collector) })
-  const { tables, callouts, images, mermaids, literalRanges } = collector
-  const maths = collectMathReplacementSpecs(markdownValue, -1, -1, false, literalRanges)
+  const { tables, callouts, images, mermaids } = collector
   const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [tables, callouts, images, maths, mermaids])
   cachedDocBlocksEntry = { doc: state.doc, tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, activeWatchRanges }
   return cachedDocBlocksEntry
@@ -327,63 +330,52 @@ type PlanSpecDecorationContext = {
   decorations: Range<Decoration>[]
 }
 
-const appendActiveAwareWidgetSpec = (
-  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
-  ctx: PlanSpecDecorationContext
-): boolean => {
-  if (
-    spec.kind !== "task" &&
-    spec.kind !== "wikilink" &&
-    spec.kind !== "list-marker" &&
-    spec.kind !== "quote-mark"
-  ) {
-    return false
-  }
+type ResolvedPreviewSpec = ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number]
 
+const appendTaskWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): void => {
+  const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
+  if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return
+  const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, taskPrefix.markerTo))
+  ctx.decorations.push(
+    Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo) }).range(spec.from, taskPrefix.markerTo)
+  )
+  if (ctx.markdownValue[taskPrefix.markerTo] === " " || ctx.markdownValue[taskPrefix.markerTo] === "\t") {
+    ctx.decorations.push(TASK_SPACE_DECORATION.range(taskPrefix.markerTo, taskPrefix.markerTo + 1))
+  }
+}
+
+const appendListMarkerWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): void => {
+  const taskGapMatch = /^([ \t]+)\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.to, spec.to + 8))
+  if (taskGapMatch) {
+    if (!isTokenActive(spec.from, spec.to + taskGapMatch[0].length, ctx.selections)) {
+      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + taskGapMatch[1]!.length))
+    }
+    return
+  }
+  if (isTokenActive(spec.from, spec.to, ctx.selections)) return
+  const source = ctx.markdownValue.slice(spec.from, spec.to)
+  const deco = /^\d/.test(source)
+    ? Decoration.replace({ widget: new MarkdownMarkerWidget(source, "cm-live-list-marker") })
+    : BULLET_MARKER_DECORATION
+  ctx.decorations.push(deco.range(spec.from, spec.to))
+}
+
+const appendActiveAwareWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): boolean => {
   if (spec.kind === "task") {
-    const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
-    if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return true
-    const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, taskPrefix.markerTo))
-    ctx.decorations.push(
-      Decoration.replace({
-        widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo),
-      }).range(spec.from, taskPrefix.markerTo)
-    )
-    if (ctx.markdownValue[taskPrefix.markerTo] === " " || ctx.markdownValue[taskPrefix.markerTo] === "\t") {
-      ctx.decorations.push(TASK_SPACE_DECORATION.range(taskPrefix.markerTo, taskPrefix.markerTo + 1))
-    }
+    appendTaskWidgetSpec(spec, ctx)
     return true
   }
-
   if (spec.kind === "list-marker") {
-    const taskGapMatch = /^([ \t]+)\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.to, spec.to + 8))
-    if (taskGapMatch) {
-      if (!isTokenActive(spec.from, spec.to + taskGapMatch[0].length, ctx.selections)) {
-        ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + taskGapMatch[1].length))
-      }
-      return true
-    }
-    if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
-    const source = ctx.markdownValue.slice(spec.from, spec.to)
-    const label = /^\d/.test(source) ? source : "•"
-    const deco =
-      label === "•"
-        ? BULLET_MARKER_DECORATION
-        : Decoration.replace({ widget: new MarkdownMarkerWidget(label, "cm-live-list-marker") })
-    ctx.decorations.push(deco.range(spec.from, spec.to))
+    appendListMarkerWidgetSpec(spec, ctx)
     return true
   }
-
+  if (spec.kind !== "wikilink" && spec.kind !== "quote-mark") return false
   if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
-  if (spec.kind === "wikilink") {
-    ctx.decorations.push(
-      Decoration.replace({
-        widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to),
-      }).range(spec.from, spec.to)
-    )
-  } else {
-    ctx.decorations.push(QUOTE_MARKER_DECORATION.range(spec.from, spec.to))
-  }
+  const deco =
+    spec.kind === "wikilink"
+      ? Decoration.replace({ widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to) })
+      : QUOTE_MARKER_DECORATION
+  ctx.decorations.push(deco.range(spec.from, spec.to))
   return true
 }
 
@@ -397,10 +389,7 @@ const addCodeLineDecorationOnce = (
   ctx.decorations.push(decoration.range(lineFrom))
 }
 
-const appendFencedCodeLineDecorations = (
-  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
-  ctx: PlanSpecDecorationContext
-) => {
+const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext) => {
   const startLine = ctx.state.doc.lineAt(spec.from)
   const endLine = ctx.state.doc.lineAt(spec.to)
   const openDeco = spec.codeLanguage
@@ -418,10 +407,7 @@ const appendFencedCodeLineDecorations = (
   }
 }
 
-const appendStructuralBlockSpec = (
-  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
-  ctx: PlanSpecDecorationContext
-): boolean => {
+const appendStructuralBlockSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): boolean => {
   if (spec.kind === "heading") {
     const levelIdx = Math.max(0, Math.min(5, (spec.level ?? 1) - 1))
     const line = ctx.state.doc.lineAt(spec.from)
@@ -442,10 +428,7 @@ const appendStructuralBlockSpec = (
   return false
 }
 
-const appendSinglePlanSpecDecoration = (
-  spec: ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number],
-  ctx: PlanSpecDecorationContext
-): void => {
+const appendSinglePlanSpecDecoration = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): void => {
   if (spec.kind === "hide-mark") {
     ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
     return
@@ -496,28 +479,46 @@ const appendBlockWidgetDecorations = (
   }
 }
 
+const resolveCompositionRange = (state: EditorState, currentMode: MarkdownEditorSurfaceMode): RangeSpec | null => {
+  if (currentMode === "reading" || !(state.field(compositionField, false) ?? false)) return null
+  const compSel = state.selection.main
+  const compLine = state.doc.lineAt(compSel.head)
+  return { from: Math.min(compSel.from, compLine.from), to: Math.max(compSel.to, compLine.to) }
+}
+
+const overlapsComposition = (compRange: RangeSpec | null, from: number, to: number): boolean =>
+  Boolean(compRange && compRange.from <= to && compRange.to >= from)
+
+const filterEligibleBlockSpecs = <T extends RangeSpec>(
+  items: readonly T[],
+  selections: readonly RangeSpec[],
+  compRange: RangeSpec | null
+): T[] => items.filter((item) => !isTokenActive(item.from, item.to, selections) && !overlapsComposition(compRange, item.from, item.to))
+
+const isPlanSpecSkipped = (
+  spec: ResolvedPreviewSpec,
+  replacedRanges: readonly RangeSpec[],
+  compRange: RangeSpec | null
+): boolean => {
+  const checkTo = spec.kind === "task" ? Math.min(spec.to, spec.from + 3) : spec.to
+  return spec.from === checkTo || hasIntervalOverlap(replacedRanges, spec.from, checkTo) || overlapsComposition(compRange, spec.from, checkTo)
+}
+
 export const buildDecorations = (state: EditorState): DecorationSet => {
   const currentMode = state.field(editorModeField, false) ?? "live"
   if (currentMode === "source") return Decoration.none
 
   const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } = getCachedDocBlocks(state)
   const selections = currentMode === "reading" ? [] : state.selection.ranges.map(({ from, to }) => ({ from, to }))
-  const isComposing = currentMode === "reading" ? false : (state.field(compositionField, false) ?? false)
+  const compRange = resolveCompositionRange(state, currentMode)
   const disableMermaid = state.field(disableMermaidField, false) ?? false
-  const compSel = state.selection.main
-  const compLine = isComposing ? state.doc.lineAt(compSel.head) : null
-  const compFrom = compLine ? Math.min(compSel.from, compLine.from) : compSel.from
-  const compTo = compLine ? Math.max(compSel.to, compLine.to) : compSel.to
-
-  const isEligible = (from: number, to: number) =>
-    !isTokenActive(from, to, selections) && !(isComposing && compFrom <= to && compTo >= from)
 
   const filtered = {
-    tables: tables.filter((item) => isEligible(item.from, item.to)),
-    callouts: callouts.filter((item) => isEligible(item.from, item.to)),
-    images: images.filter((item) => isEligible(item.from, item.to)),
-    maths: maths.filter((item) => isEligible(item.from, item.to)),
-    mermaids: disableMermaid ? [] : mermaids.filter((item) => isEligible(item.from, item.to)),
+    tables: filterEligibleBlockSpecs(tables, selections, compRange),
+    callouts: filterEligibleBlockSpecs(callouts, selections, compRange),
+    images: filterEligibleBlockSpecs(images, selections, compRange),
+    maths: filterEligibleBlockSpecs(maths, selections, compRange),
+    mermaids: disableMermaid ? [] : filterEligibleBlockSpecs(mermaids, selections, compRange),
   }
   const replacedRanges = [
     ...filtered.tables, ...filtered.callouts, ...filtered.images, ...filtered.maths, ...filtered.mermaids,
@@ -532,10 +533,7 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   }
 
   for (const spec of plan) {
-    const checkTo = spec.kind === "task" ? Math.min(spec.to, spec.from + 3) : spec.to
-    if (spec.from === checkTo || hasIntervalOverlap(replacedRanges, spec.from, checkTo)) continue
-    if (isComposing && compFrom <= checkTo && compTo >= spec.from) continue
-    appendSinglePlanSpecDecoration(spec, ctx)
+    if (!isPlanSpecSkipped(spec, replacedRanges, compRange)) appendSinglePlanSpecDecoration(spec, ctx)
   }
 
   appendBlockWidgetDecorations(decorations, filtered)

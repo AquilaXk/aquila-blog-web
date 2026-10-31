@@ -175,7 +175,7 @@ const clampBoundedSpan = (span: number, maxBound: number | undefined): number =>
 
 const expandRowSpanInCellIfCrossing = (
   row: Array<MarkdownTableCellLayout | null>, r: number, c: number,
-  insertTableRow: number, maxBodyRows: number | undefined, coveredCols: Set<number>
+  insertTableRow: number, maxBodyRows: number | undefined, maxCols: number | undefined, coveredCols: Set<number>
 ) => {
   const cell = row[c]
   if (!isVerticalSpanAnchor(cell)) return
@@ -185,34 +185,36 @@ const expandRowSpanInCellIfCrossing = (
     return
   }
   row[c] = compactCellLayoutEntry({ ...cell, rowspan: effective + 1 })
-  const spanWidth = Math.max(1, cell.colspan ?? 1)
+  const spanWidth = clampBoundedSpan(Math.max(1, cell.colspan ?? 1), maxCols === undefined ? undefined : maxCols - c)
   for (let col = c; col < c + spanWidth; col += 1) coveredCols.add(col)
 }
 
 const expandRowSpansCrossingInsertedRow = (
-  cells: Array<Array<MarkdownTableCellLayout | null>>, insertTableRow: number, maxBodyRows?: number
+  cells: Array<Array<MarkdownTableCellLayout | null>>, insertTableRow: number, maxBodyRows?: number, maxCols?: number
 ): Set<number> => {
   const coveredCols = new Set<number>()
   const limit = Math.min(insertTableRow, cells.length)
   for (let r = 0; r < limit; r += 1) {
     const row = cells[r]
     if (!row) continue
-    for (let c = 0; c < row.length; c += 1) {
-      expandRowSpanInCellIfCrossing(row, r, c, insertTableRow, maxBodyRows, coveredCols)
+    const colLimit = maxCols !== undefined ? Math.min(row.length, maxCols) : row.length
+    for (let c = 0; c < colLimit; c += 1) {
+      expandRowSpanInCellIfCrossing(row, r, c, insertTableRow, maxBodyRows, maxCols, coveredCols)
     }
   }
   return coveredCols
 }
 
-const buildCoveredColumnsRow = (coveredCols: ReadonlySet<number>): Array<MarkdownTableCellLayout | null> => {
+const buildCoveredColumnsRow = (coveredCols: ReadonlySet<number>, maxCols?: number): Array<MarkdownTableCellLayout | null> => {
   if (coveredCols.size === 0) return []
-  const maxCol = Math.max(...coveredCols)
-  return Array.from({ length: maxCol + 1 }, (_, col) => (coveredCols.has(col) ? { hidden: true } : null))
+  const rawLen = Math.max(...coveredCols) + 1
+  const rowLen = maxCols !== undefined ? Math.min(rawLen, maxCols) : rawLen
+  return Array.from({ length: rowLen }, (_, col) => (coveredCols.has(col) ? { hidden: true } : null))
 }
 
 const expandColSpanInCellIfCrossing = (
   row: Array<MarkdownTableCellLayout | null>, r: number, c: number,
-  insertCol: number, maxCols: number | undefined, coveredRows: Set<number>
+  insertCol: number, maxCols: number | undefined, maxTotalRows: number | undefined, coveredRows: Set<number>
 ) => {
   const cell = row[c]
   if (!isHorizontalSpanAnchor(cell)) return
@@ -222,23 +224,38 @@ const expandColSpanInCellIfCrossing = (
     return
   }
   row[c] = compactCellLayoutEntry({ ...cell, colspan: effective + 1 })
-  const spanHeight = Math.max(1, cell.rowspan ?? 1)
+  const spanHeight = clampBoundedSpan(Math.max(1, cell.rowspan ?? 1), maxTotalRows === undefined ? undefined : maxTotalRows - r)
   for (let targetRow = r; targetRow < r + spanHeight; targetRow += 1) coveredRows.add(targetRow)
 }
 
 const expandColSpansCrossingInsertedCol = (
-  cells: Array<Array<MarkdownTableCellLayout | null>>, insertCol: number, maxCols?: number
+  cells: Array<Array<MarkdownTableCellLayout | null>>, insertCol: number, maxCols?: number, maxTotalRows?: number
 ): Set<number> => {
   const coveredRows = new Set<number>()
-  for (let r = 0; r < cells.length; r += 1) {
+  const rowLimit = maxTotalRows !== undefined ? Math.min(cells.length, maxTotalRows) : cells.length
+  for (let r = 0; r < rowLimit; r += 1) {
     const row = cells[r]
     if (!row) continue
     const limit = Math.min(insertCol, row.length)
     for (let c = 0; c < limit; c += 1) {
-      expandColSpanInCellIfCrossing(row, r, c, insertCol, maxCols, coveredRows)
+      expandColSpanInCellIfCrossing(row, r, c, insertCol, maxCols, maxTotalRows, coveredRows)
     }
   }
   return coveredRows
+}
+
+const shrinkRowSpanInRowIfCrossing = (
+  row: Array<MarkdownTableCellLayout | null>,
+  r: number,
+  deletedRow: number
+) => {
+  for (let c = 0; c < row.length; c += 1) {
+    const cell = row[c]
+    if (isVerticalSpanAnchor(cell) && r + cell.rowspan > deletedRow) {
+      const nextSpan = cell.rowspan - 1
+      row[c] = compactCellLayoutEntry({ ...cell, rowspan: nextSpan > 1 ? nextSpan : undefined })
+    }
+  }
 }
 
 const shrinkRowSpansCrossingDeletedRow = (
@@ -248,15 +265,20 @@ const shrinkRowSpansCrossingDeletedRow = (
   const limit = Math.min(deletedRow, cells.length)
   for (let r = 0; r < limit; r += 1) {
     const row = cells[r]
-    if (!row) continue
-    for (let c = 0; c < row.length; c += 1) {
-      const cell = row[c]
-      if (isVerticalSpanAnchor(cell) && r + cell.rowspan > deletedRow) {
-        const nextSpan = cell.rowspan - 1
-        row[c] = compactCellLayoutEntry({ ...cell, rowspan: nextSpan > 1 ? nextSpan : undefined })
-      }
-    }
+    if (row) shrinkRowSpanInRowIfCrossing(row, r, deletedRow)
   }
+}
+
+const writeCellAtEnsureBounds = (
+  cells: Array<Array<MarkdownTableCellLayout | null>>,
+  rowIndex: number,
+  colIndex: number,
+  value: MarkdownTableCellLayout | null
+) => {
+  while (cells.length <= rowIndex) cells.push([])
+  const row = cells[rowIndex]!
+  while (row.length <= colIndex) row.push(null)
+  row[colIndex] = value
 }
 
 const promoteDeletedRowAnchors = (
@@ -269,16 +291,8 @@ const promoteDeletedRowAnchors = (
     const anchor = deletedCells[c]
     if (!isVerticalSpanAnchor(anchor)) continue
     const nextSpan = anchor.rowspan - 1
-    const promoted = compactCellLayoutEntry({
-      ...anchor,
-      rowspan: nextSpan > 1 ? nextSpan : undefined,
-      hidden: undefined,
-    })
-    if (!promoted && deletedRow + 1 >= cells.length) continue
-    while (cells.length <= deletedRow + 1) cells.push([])
-    const survivingRow = cells[deletedRow + 1]!
-    while (survivingRow.length <= c) survivingRow.push(null)
-    survivingRow[c] = promoted
+    const promoted = compactCellLayoutEntry({ ...anchor, rowspan: nextSpan > 1 ? nextSpan : undefined, hidden: undefined })
+    if (promoted || deletedRow + 1 < cells.length) writeCellAtEnsureBounds(cells, deletedRow + 1, c, promoted)
   }
 }
 
@@ -367,9 +381,11 @@ const resolveRowInsertTableIndex = (
 }
 
 const buildDuplicatedCellRow = (
-  sourceRow: ReadonlyArray<MarkdownTableCellLayout | null>, coveredCols: ReadonlySet<number>
+  sourceRow: ReadonlyArray<MarkdownTableCellLayout | null>, coveredCols: ReadonlySet<number>, maxCols?: number
 ): Array<MarkdownTableCellLayout | null> => {
-  const rowWidth = Math.max(sourceRow.length, coveredCols.size > 0 ? Math.max(...coveredCols) + 1 : 0)
+  const sourceLen = maxCols !== undefined ? Math.min(sourceRow.length, maxCols) : sourceRow.length
+  const coveredLen = coveredCols.size > 0 ? Math.max(...coveredCols) + 1 : 0
+  const rowWidth = Math.max(sourceLen, maxCols !== undefined ? Math.min(coveredLen, maxCols) : coveredLen)
   return Array.from({ length: rowWidth }, (_, col) =>
     coveredCols.has(col) ? { hidden: true } : stripClonedRowCellSpan(sourceRow[col])
   )
@@ -383,13 +399,13 @@ export const applyRowInsertOrDuplicateLayout = (
   const heightValue = isDuplicate ? (layout.rowHeights?.[activeRow] ?? null) : null
   spliceSparseArray(layout.rowHeights, insertTableRow, 0, heightValue, true)
   if (!layout.cells) return
-  const coveredCols = expandRowSpansCrossingInsertedRow(layout.cells, insertTableRow, maxBodyRows)
+  const coveredCols = expandRowSpansCrossingInsertedRow(layout.cells, insertTableRow, maxBodyRows, maxCols)
   if (isDuplicate) {
     while (layout.cells.length < insertTableRow) layout.cells.push([])
-    layout.cells.splice(insertTableRow, 0, buildDuplicatedCellRow(layout.cells[activeRow] ?? [], coveredCols))
+    layout.cells.splice(insertTableRow, 0, buildDuplicatedCellRow(layout.cells[activeRow] ?? [], coveredCols, maxCols))
     return
   }
-  const insertedRow = buildCoveredColumnsRow(coveredCols)
+  const insertedRow = buildCoveredColumnsRow(coveredCols, maxCols)
   if (insertedRow.length > 0 || insertTableRow <= layout.cells.length) {
     while (layout.cells.length < insertTableRow) layout.cells.push([])
     layout.cells.splice(insertTableRow, 0, insertedRow)
@@ -455,8 +471,9 @@ export const applyColInsertOrDuplicateLayout = (
   spliceSparseArray(layout.columnWidths, insertAt, 0, isDuplicate ? (layout.columnWidths?.[activeCol] ?? null) : null, true)
   spliceSparseArray(layout.columnAlignments, insertAt, 0, isDuplicate ? (layout.columnAlignments?.[activeCol] ?? null) : null, true)
   if (!layout.cells) return
-  const coveredRows = expandColSpansCrossingInsertedCol(layout.cells, insertAt, maxCols)
-  for (let r = 0; r < layout.cells.length; r += 1) {
+  const coveredRows = expandColSpansCrossingInsertedCol(layout.cells, insertAt, maxCols, maxTotalRows)
+  const rowLimit = maxTotalRows !== undefined ? Math.min(layout.cells.length, maxTotalRows) : layout.cells.length
+  for (let r = 0; r < rowLimit; r += 1) {
     const cellRow = layout.cells[r]!
     const insertedCell = resolveInsertedColumnCell(cellRow[activeCol], coveredRows.has(r), isDuplicate)
     spliceSparseArray(cellRow, insertAt, 0, insertedCell, true)
@@ -511,11 +528,7 @@ const isSpanAnchorCoveringTarget = (
 }
 
 const clearHiddenInRectangle = (
-  cells: Array<Array<MarkdownTableCellLayout | null>>,
-  startRow: number,
-  endRow: number,
-  startCol: number,
-  endCol: number
+  cells: Array<Array<MarkdownTableCellLayout | null>>, startRow: number, endRow: number, startCol: number, endCol: number
 ) => {
   const maxRow = Math.min(endRow, cells.length - 1)
   for (let r = startRow; r <= maxRow; r += 1) {
@@ -529,9 +542,7 @@ const clearHiddenInRectangle = (
 }
 
 const unmergeAnchorsCoveringCell = (
-  cells: Array<Array<MarkdownTableCellLayout | null>>,
-  targetRow: number,
-  targetCol: number
+  cells: Array<Array<MarkdownTableCellLayout | null>>, targetRow: number, targetCol: number
 ): boolean => {
   let unmerged = false
   const maxRow = Math.min(targetRow, cells.length - 1)
@@ -561,11 +572,7 @@ const pruneEmptyTableCells = (layout: MarkdownTableLayout) => {
   if (layout.cells.length === 0) layout.cells = undefined
 }
 
-export const unmergeCoveredCellAt = (
-  layout: MarkdownTableLayout,
-  targetRow: number,
-  targetCol: number
-): boolean => {
+export const unmergeCoveredCellAt = (layout: MarkdownTableLayout, targetRow: number, targetCol: number): boolean => {
   const cells = layout.cells
   if (!cells || targetRow < 0 || targetCol < 0) return false
   const wasHidden = cells[targetRow]?.[targetCol]?.hidden === true
@@ -573,10 +580,7 @@ export const unmergeCoveredCellAt = (
   if (!wasHidden && !unmergedAnchor) return false
   if (cells[targetRow]?.[targetCol]?.hidden) {
     cells[targetRow]![targetCol] = compactCellLayoutEntry({
-      ...cells[targetRow]![targetCol],
-      rowspan: undefined,
-      colspan: undefined,
-      hidden: undefined,
+      ...cells[targetRow]![targetCol], rowspan: undefined, colspan: undefined, hidden: undefined,
     })
   }
   pruneEmptyTableCells(layout)

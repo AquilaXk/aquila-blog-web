@@ -8,6 +8,11 @@ import {
   parseCustomDirectiveHeader,
   type PendingDirectiveMetadata,
 } from "src/libs/markdown/renderingDirectiveModel"
+import {
+  collectCommonMarkCodeBlockRanges,
+  overlapsSortedRanges,
+} from "src/libs/markdown/pandocMathScanner"
+import { trimMarkdownPreservingCodeIndent } from "src/libs/markdown/renderingNormalizeModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 
 type ParsedCalloutHeader = {
@@ -18,7 +23,6 @@ type ParsedCalloutHeader = {
   defaultCollapsed?: boolean
 }
 
-const FENCE_LINE_PATTERN = /^([`~]{3,})/
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 
 const isAsciiCalloutToken = (token: string): boolean => {
@@ -189,7 +193,7 @@ const buildCalloutSegment = (
     kind: header.kind,
     title: resolvedTitle,
     emoji: header.emoji,
-    content: promoted.bodyLines.join("\n").trim(),
+    content: trimMarkdownPreservingCodeIndent(promoted.bodyLines.join("\n")),
     ...(header.foldable
       ? {
           foldable: true,
@@ -197,18 +201,6 @@ const buildCalloutSegment = (
         }
       : {}),
   }
-}
-
-type CodeFenceMarkerChar = "`" | "~"
-type ActiveFenceMarker = CodeFenceMarkerChar | null
-
-const parseFenceMarker = (line: string): ActiveFenceMarker => {
-  const match = FENCE_LINE_PATTERN.exec(line.trim())
-  if (!match) return null
-
-  const fence = match[1]!
-  const marker = fence[0] as CodeFenceMarkerChar
-  return hasUniformFenceMarker(fence, marker) ? marker : null
 }
 
 const resolveDirectiveCalloutHeader = (rawHeader: string): ParsedCalloutHeader => {
@@ -302,13 +294,16 @@ const tryParseAsideBlock = (
   return { nextIndex: collected.closedIndex + 1, segment, fallbackLines: [] }
 }
 
+const isDedicatedFormulaFenceLine = (line: string): boolean =>
+  !/^(?: {4,}|\t)/.test(line) && line.trim() === "$$"
+
 const tryParseFormulaBlock = (
   lines: readonly string[],
   startIndex: number
 ): { closedIndex: number; formula: string } => {
   const bodyLines: string[] = []
   for (let index = startIndex + 1; index < lines.length; index += 1) {
-    if (lines[index]!.trim() === "$$") {
+    if (isDedicatedFormulaFenceLine(lines[index]!)) {
       return { closedIndex: index, formula: bodyLines.join("\n").trim() }
     }
     bodyLines.push(lines[index]!)
@@ -415,7 +410,11 @@ const tryConsumeColonBlockAt = (
     const title = line.slice(":::toggle".length).trim() || "토글"
     const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
     if (closedIndex >= 0) {
-      ctx.flushAndPush({ type: "toggle", title, content: bodyLines.join("\n").trim() })
+      ctx.flushAndPush({
+        type: "toggle",
+        title,
+        content: trimMarkdownPreservingCodeIndent(bodyLines.join("\n")),
+      })
       return { nextIndex: closedIndex + 1 }
     }
     ctx.markdownBuffer.push(line)
@@ -465,35 +464,27 @@ const tryConsumeStructuredBlockAt = (
   const firstCode = trimmed.codePointAt(0)
   if (firstCode === 33) return tryConsumeImageLine(trimmed, index, ctx)
   if (firstCode === 58) return tryConsumeColonBlockAt(line, trimmed, index, ctx)
-  if (trimmed === "$$") return tryConsumeFormulaBlockAt(line, index, ctx)
+  if (isDedicatedFormulaFenceLine(line)) return tryConsumeFormulaBlockAt(line, index, ctx)
   if (firstCode === 62) return tryConsumeBlockquoteAt(index, ctx)
   if (firstCode === 60) return tryConsumeAsideAt(index, ctx)
   return null
 }
 
-const stepSegmentFenceState = (
-  trimmed: string,
-  firstCode: number | undefined,
-  activeFenceMarker: ActiveFenceMarker
-): { handled: boolean; nextFence: ActiveFenceMarker } => {
-  const fenceMarker =
-    firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
-  if (activeFenceMarker) {
-    return { handled: true, nextFence: fenceMarker === activeFenceMarker ? null : activeFenceMarker }
-  }
-  if (fenceMarker) return { handled: true, nextFence: fenceMarker }
-  return { handled: false, nextFence: null }
-}
-
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
+  const codeBlockRanges = collectCommonMarkCodeBlockRanges(content)
+  let nextLineStart = 0
+  const lineStarts = lines.map((entry) => {
+    const start = nextLineStart
+    nextLineStart += entry.length + 1
+    return start
+  })
   const segments: MarkdownSegment[] = []
   const markdownBuffer: string[] = []
-  let activeFenceMarker: ActiveFenceMarker = null
   let pendingDirectiveMetadata: PendingDirectiveMetadata | null = null
 
   const flushMarkdown = () => {
-    const text = markdownBuffer.join("\n").trim()
+    const text = trimMarkdownPreservingCodeIndent(markdownBuffer.join("\n"))
     if (text) segments.push({ type: "markdown", content: text })
     markdownBuffer.length = 0
   }
@@ -506,16 +497,14 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   let index = 0
   while (index < lines.length) {
     const line = lines[index]!
-    const trimmed = line.trim()
-    const firstCode = trimmed.codePointAt(0)
-
-    const fenceStep = stepSegmentFenceState(trimmed, firstCode, activeFenceMarker)
-    if (fenceStep.handled) {
+    const lineStart = lineStarts[index]!
+    if (overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))) {
       markdownBuffer.push(line)
-      activeFenceMarker = fenceStep.nextFence
       index += 1
       continue
     }
+    const trimmed = line.trim()
+    const firstCode = trimmed.codePointAt(0)
 
     const metadataComment = firstCode === 60 ? parseCardMetadataComment(trimmed) : null
     if (metadataComment) {

@@ -29,11 +29,12 @@ const hasLineBreakBetween = (text: string, from: number, to: number): boolean =>
 const skipEscapedHighlightConstructAt = (
   text: string,
   cursor: number,
-  honorEscapes: boolean
+  honorEscapes: boolean,
+  singleLineDisplayMath: boolean
 ): { nextCursor: number; abortLine: boolean } => {
   const nextCursor = skipInlineLiteralConstructAt(text, cursor, {
     honorEscapes,
-    singleLineDisplayMath: true,
+    singleLineDisplayMath,
   })
   if (nextCursor <= cursor) return { nextCursor: cursor, abortLine: false }
   const code = text.codePointAt(cursor) ?? 0
@@ -86,7 +87,7 @@ const scanClosingHighlightOnLine = (
     if (isLineBreakCode(text.codePointAt(cursor) ?? 0)) {
       return { closeIndex: -1, abortedAtIndex: cursor + 1 }
     }
-    const skipped = skipEscapedHighlightConstructAt(text, cursor, honorEscapes)
+    const skipped = skipEscapedHighlightConstructAt(text, cursor, honorEscapes, true)
     if (skipped.abortLine) return { closeIndex: -1, abortedAtIndex: skipped.nextCursor }
     if (skipped.nextCursor > cursor) {
       cursor = skipped.nextCursor
@@ -110,7 +111,7 @@ export const findMarkdownHighlightSpans = (
   let index = 0
 
   while (index + 3 < text.length) {
-    const skipped = skipEscapedHighlightConstructAt(text, index, honorEscapes)
+    const skipped = skipEscapedHighlightConstructAt(text, index, honorEscapes, false)
     if (skipped.nextCursor > index) {
       index = skipped.nextCursor
       continue

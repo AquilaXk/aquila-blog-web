@@ -6,12 +6,18 @@ import { renderToStaticMarkup } from "react-dom/server"
 import MarkdownRenderer from "../../src/libs/markdown/MarkdownRenderer"
 import { createTheme } from "../../src/styles/theme"
 import { isTableEditActionDisabled } from "../../src/components/markdown-editor/MarkdownEditor"
-import {
-  convertSafeHtmlPasteToMarkdown,
-  escapeMarkdownLinkDestination,
-} from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
+import { convertSafeHtmlPasteToMarkdown } from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
+import { GFM, parser } from "@lezer/markdown"
 import { appendInlineMarkdownNodes } from "../../src/components/markdown-editor/markdownEditorInlineDom"
-import { buildMarkdownLivePreviewDecorationSpecs } from "../../src/components/markdown-editor/markdownEditorLivePreview"
+import {
+  buildMarkdownLivePreviewDecorationSpecs,
+  buildMarkdownLivePreviewEntries,
+  getMarkdownLivePreviewBundle,
+} from "../../src/components/markdown-editor/markdownEditorLivePreview"
+import { markdown } from "@codemirror/lang-markdown"
+import { EditorState } from "@codemirror/state"
+import { buildDecorations, decorationField } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
+import { isNodeShadowedByMath } from "../../src/components/markdown-editor/markdownEditorMathModel"
 import { planLinkifySelectionWithUrl } from "../../src/components/markdown-editor/markdownEditorPasteDropModel"
 import {
   applyMarkdownTableGridAction,
@@ -31,6 +37,7 @@ import {
 } from "../../src/components/markdown-editor/markdownEditorTableSpanModel"
 import { MarkdownTableWidget } from "../../src/components/markdown-editor/markdownEditorTableWidget"
 import {
+  escapeMarkdownLinkDestination,
   resolveMarkdownAttachmentLink,
   resolveMarkdownImageEmbed,
 } from "../../src/components/markdown-editor/markdownEditorUploadModel"
@@ -174,10 +181,14 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
       expect(renderInline("~~strike $x~~y$ end~~")).toBe(
         '<div><del class="cm-live-strikethrough">strike <span class="cm-live-math cm-live-math-inline">x~~y</span> end</del></div>'
       )
-      expect(renderInline("**escaped \\** inner**")).toBe("<div><strong>escaped \\** inner</strong></div>")
-      expect(renderInline("**foo \\***")).toBe("<div><strong>foo \\*</strong></div>")
-      expect(renderInline("keep \\<br> literal")).toBe("<div>keep \\<br> literal</div>")
-      expect(renderInline("**bold** keep \\<br> literal")).toBe("<div><strong>bold</strong> keep \\<br> literal</div>")
+      expect(renderInline(String.raw`**escaped \** inner**`)).toBe(
+        String.raw`<div><strong>escaped \** inner</strong></div>`
+      )
+      expect(renderInline(String.raw`**foo \***`)).toBe(String.raw`<div><strong>foo \*</strong></div>`)
+      expect(renderInline(String.raw`keep \<br> literal`)).toBe(String.raw`<div>keep \<br> literal</div>`)
+      expect(renderInline(String.raw`**bold** keep \<br> literal`)).toBe(
+        String.raw`<div><strong>bold</strong> keep \<br> literal</div>`
+      )
       expect(renderInline("line1<br>line2")).toBe("<div>line1<br/>line2</div>")
     })
   })
@@ -402,10 +413,10 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(isTableEditActionDisabled({ kind: "add-row" }, availability)).toBe(false)
     expect(isTableEditActionDisabled({ kind: "delete-column" }, availability)).toBe(true)
     expect(isTableEditActionDisabled({ kind: "clear-row" }, availability)).toBe(false)
-    expect(escapeMarkdownLinkDestination("https://example.com/a(1)\\b")).toBe("https://example.com/a%281%29%5Cb")
+    expect(escapeMarkdownLinkDestination(String.raw`https://example.com/a(1)\b`)).toBe("https://example.com/a%281%29%5Cb")
   })
 
-  test("percent-encodes linkified and uploaded URLs with parentheses so live inline DOM renders clickable links", () => {
+  test("percent-encodes linkified and uploaded URLs with parentheses, spaces, and angle brackets so live inline DOM renders clickable links", () => {
     withMockDom(() => {
       const linkified = planLinkifySelectionWithUrl(0, 3, "Foo", "https://en.wikipedia.org/wiki/Foo_(bar)")
       expect(linkified.replacement).toBe("[Foo](https://en.wikipedia.org/wiki/Foo_%28bar%29)")
@@ -426,6 +437,15 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     })
 
     expect(
+      resolveMarkdownAttachmentLink(
+        { url: "https://cdn.example.test/files/my file <1>.pdf", name: "my file <1>.pdf" },
+        "file.pdf"
+      )
+    ).toEqual({
+      markdown: "\n\n[my file <1>.pdf](https://cdn.example.test/files/my%20file%20%3C1%3E.pdf)\n",
+    })
+
+    expect(
       resolveMarkdownImageEmbed(
         { url: "https://blog.aquilaxk.site/post/api/v1/images/posts/diagram_(1).png", width: 800, height: 600 },
         "diagram.png",
@@ -434,9 +454,23 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     ).toEqual({
       markdown: "\n\n![diagram.png](https://blog.aquilaxk.site/post/api/v1/images/posts/diagram_%281%29.png?w=800&h=600)\n",
     })
+
+    const spacedImageEmbed = resolveMarkdownImageEmbed(
+      { url: "https://blog.aquilaxk.site/post/api/v1/images/posts/my photo <1>.png", width: 800, height: 600 },
+      "photo.png",
+      { publicApiOrigin: "https://blog.aquilaxk.site" }
+    )
+    expect(spacedImageEmbed).toEqual({
+      markdown: "\n\n![photo.png](https://blog.aquilaxk.site/post/api/v1/images/posts/my%20photo%20%3C1%3E.png?w=800&h=600)\n",
+    })
+    if ("markdown" in spacedImageEmbed) {
+      expect(parseStandaloneMarkdownImageLine(spacedImageEmbed.markdown.trim())?.src).toBe(
+        "https://blog.aquilaxk.site/post/api/v1/images/posts/my%20photo%20%3C1%3E.png?w=800&h=600"
+      )
+    }
   })
 
-  test("excludes Pandoc inline and display math ranges from live preview inline-color, highlight, and wikilink decorations", () => {
+  test("excludes Pandoc inline and display math ranges from live preview Lezer syntax and custom token decorations", () => {
     const displayMath = [
       "$$",
       "f(x) = {{color:red|x}}",
@@ -459,6 +493,74 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(inlineSpecs.filter((spec) => spec.kind === "inline-color")).toHaveLength(1)
     expect(inlineSpecs.filter((spec) => spec.kind === "highlight")).toHaveLength(1)
     expect(inlineSpecs.filter((spec) => spec.kind === "wikilink").map((spec) => spec.target)).toEqual(["RealPage"])
+
+    const crossMathAsterisk = "$x*y$ and a*b"
+    const readingCrossMathSpecs = buildMarkdownLivePreviewDecorationSpecs(crossMathAsterisk, [], false, "reading")
+    const inactiveLiveCrossMathSpecs = buildMarkdownLivePreviewDecorationSpecs(
+      crossMathAsterisk,
+      [{ from: crossMathAsterisk.length, to: crossMathAsterisk.length }],
+      false,
+      "live"
+    )
+    expect(readingCrossMathSpecs.filter((spec) => spec.kind === "hide-mark" || spec.kind === "emphasis")).toEqual([])
+    expect(inactiveLiveCrossMathSpecs.filter((spec) => spec.kind === "hide-mark" || spec.kind === "emphasis")).toEqual([])
+
+    const unfoldedDisplayBlock = "$$\n2*a*b + g[i](j)\n- term\n> quote\n---\n$$"
+    const unfoldedSpecs = buildMarkdownLivePreviewDecorationSpecs(unfoldedDisplayBlock, [{ from: 0, to: 0 }])
+    expect(
+      unfoldedSpecs.filter((spec) =>
+        ["hide-mark", "emphasis", "link", "list-marker", "quote-mark", "horizontal-rule"].includes(spec.kind)
+      )
+    ).toEqual([])
+
+    const displayWithCommentHeading = "$$\n# comment\n$$"
+    expect(buildMarkdownLivePreviewDecorationSpecs(displayWithCommentHeading, [{ from: 0, to: 0 }])).toEqual([])
+
+    const headingWithMathAndBold = "# Heading $a*b$ **bold**"
+    const headingSpecs = buildMarkdownLivePreviewDecorationSpecs(headingWithMathAndBold, [], false, "reading")
+    expect(headingSpecs.some((spec) => spec.kind === "heading" && spec.level === 1)).toBe(true)
+    expect(headingSpecs.some((spec) => spec.kind === "strong")).toBe(true)
+    const mathStarOffset = headingWithMathAndBold.indexOf("*")
+    expect(headingSpecs.some((spec) => spec.from <= mathStarOffset && spec.to > mathStarOffset && spec.kind !== "heading")).toBe(false)
+
+    const topNode = parser.configure(GFM).parse(headingWithMathAndBold).topNode
+    const cachedEntries = buildMarkdownLivePreviewEntries(headingWithMathAndBold, topNode)
+    const bundle = getMarkdownLivePreviewBundle(headingWithMathAndBold, topNode)
+    expect(bundle.entries).toBe(cachedEntries)
+    expect(bundle.mathSpecs).toEqual([{ from: 10, to: 15, math: "a*b", displayMode: false }])
+
+    const angleMathDoc = 'Type $T<U>$ and <span data-a="$1" data-b="$2">raw</span> and $5 <span data-x="$10">'
+    const angleBundle = getMarkdownLivePreviewBundle(angleMathDoc)
+    expect(angleBundle.mathSpecs).toEqual([{ from: 5, to: 11, math: "T<U>", displayMode: false }])
+
+    const unfoldedMathWithImageAndCallout = [
+      "$$",
+      "![diagram](/post/api/v1/images/x.png)",
+      "$$",
+      "",
+      "$$",
+      "> [!NOTE]",
+      "$$",
+      "> outside",
+    ].join("\n")
+    const mathEditorState = EditorState.create({
+      doc: unfoldedMathWithImageAndCallout,
+      selection: { anchor: 0 },
+      extensions: [markdown(), decorationField],
+    })
+    const activeDecos = buildDecorations(mathEditorState)
+    const widgetNames: string[] = []
+    const iter = activeDecos.iter()
+    while (iter.value) {
+      const widget = (iter.value.spec as { widget?: { constructor?: { name?: string } } }).widget
+      if (widget?.constructor?.name) widgetNames.push(widget.constructor.name)
+      iter.next()
+    }
+    expect(widgetNames).not.toContain("MarkdownImageWidget")
+    expect(widgetNames).not.toContain("MarkdownCalloutWidget")
+
+    expect(isNodeShadowedByMath([{ from: 0, to: 3 }], 0, 23)).toBe(false)
+    expect(isNodeShadowedByMath([{ from: 0, to: 15 }], 3, 28)).toBe(true)
   })
 
   test("trims stale out-of-bounds aq-table layout arrays and honors cross-axis bounds during span duplication", () => {
@@ -496,6 +598,12 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     }
     applyRowInsertOrDuplicateLayout(crossColRowLayout, 1, true, false, 2, 2)
     expect(crossColRowLayout.rowHeights).toEqual([40, 50, 50, 60])
+    expect(crossColRowLayout.cells).toEqual([
+      [null, null],
+      [null, null, { rowspan: 2 }],
+      [null, null],
+      [null, null, { hidden: true }],
+    ])
 
     const crossRowColLayout: MarkdownTableLayout = {
       columnWidths: [120, 180],
@@ -507,6 +615,11 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     }
     applyColInsertOrDuplicateLayout(crossRowColLayout, 0, true, false, 2, 1)
     expect(crossRowColLayout.columnWidths).toEqual([120, 120, 180])
+    expect(crossRowColLayout.cells).toEqual([
+      [null, null, null],
+      [null, null, null],
+      [{ colspan: 2 }, { hidden: true }],
+    ])
   })
 })
 

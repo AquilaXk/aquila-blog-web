@@ -6,9 +6,16 @@ import { expect, test } from "@playwright/test"
 import { appendInlineMarkdownNodes } from "../../src/components/markdown-editor/markdownEditorInlineDom"
 import MarkdownRenderer from "../../src/libs/markdown/MarkdownRenderer"
 import * as inlineColorModule from "../../src/libs/markdown/inlineColor"
-import { applyInlineColors } from "../../src/libs/markdown/hooks/useInlineColorEffect"
+import {
+  applyInlineColors,
+  shouldScheduleFromInlineColorMutations,
+} from "../../src/libs/markdown/hooks/useInlineColorEffect"
 import { findMarkdownHighlightSpans } from "../../src/libs/markdown/inlineHighlightModel"
-import { normalizeLegacyInlineHtmlMarkdown } from "../../src/libs/markdown/inlineHtmlNormalization"
+import * as inlineHtmlNormModule from "../../src/libs/markdown/inlineHtmlNormalization"
+import {
+  normalizeLegacyInlineHtmlMarkdown,
+  normalizeLegacyInlineHtmlSpans,
+} from "../../src/libs/markdown/inlineHtmlNormalization"
 import * as inlineMathGuardModule from "../../src/libs/markdown/inlineMathGuardModel"
 import {
   protectEscapedInlineSyntax,
@@ -100,8 +107,8 @@ test.describe("wave6 round4 public markdown regressions", () => {
         },
       }
       const textNode = {
-        nodeValue: "{{color:green|C:\\}} and {{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
-        textContent: "{{color:green|C:\\}} and {{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
+        nodeValue: "{{color:green|C:\\}} and {{ COLOR: green | obj { a: { b: 1 } } }} and {{color:red|line1\nline2}}",
+        textContent: "{{color:green|C:\\}} and {{ COLOR: green | obj { a: { b: 1 } } }} and {{color:red|line1\nline2}}",
         parentElement: parentNode,
         parentNode,
       }
@@ -524,5 +531,159 @@ test.describe("wave6 round4 public markdown regressions", () => {
         "mark",
       ])
     })
+  })
+
+  test("CommonMark code block unification preserves $HOME and raw HTML inside indented and nested-list code blocks", () => {
+    const indentedMathAndCode = renderMarkdownHtml("Inline $x + 1$\n\n    echo $HOME\n")
+    expect(indentedMathAndCode).toContain("echo $HOME")
+    expect(indentedMathAndCode).not.toContain(String.raw`\$HOME`)
+
+    const nestedListFence = renderMarkdownHtml(
+      ["-   outer", "    -   inner", "        ```sh", "        echo $a$ $HOME", "        ```"].join(
+        "\n"
+      )
+    )
+    expect(nestedListFence).toContain("echo $a$ $HOME")
+    expect(nestedListFence).not.toContain(String.raw`\$HOME`)
+
+    const calloutFence = renderMarkdownHtml(
+      ["Inline $x + 1$", "", ":::callout info", "```sh", "echo $HOME", "```", ":::"].join("\n")
+    )
+    expect(calloutFence).toContain("echo $HOME")
+    expect(calloutFence).not.toContain(String.raw`\$HOME`)
+
+    const calloutImmediateIndented = renderMarkdownHtml(
+      ["Inline $x + 1$", "", ":::callout info", "    echo $HOME && <b>raw</b>", ":::"].join("\n")
+    )
+    expect(calloutImmediateIndented).toContain("echo $HOME")
+    expect(calloutImmediateIndented).not.toContain(String.raw`\$HOME`)
+    expect(calloutImmediateIndented).not.toContain("<strong>raw</strong>")
+
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("<b>before</b> `line1\n<b>in code</b>` <i>after</i>")
+    ).toBe("**before** `line1\n<b>in code</b>` *after*")
+    expect(normalizeLegacyInlineHtmlMarkdown("<b>&#0; and &#xD800;</b>")).toBe(
+      "**&#0; and &#xD800;**"
+    )
+
+    expect("normalizeInlineHtmlInMarkdownTables" in inlineHtmlNormModule).toBe(false)
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("- ```\n  <b>x</b>\n  ```\n\n<b>after</b>")
+    ).toBe("- ```\n  <b>x</b>\n  ```\n\n**after**")
+    expect(normalizeLegacyInlineHtmlMarkdown("---\n    if (a <b> c)")).toBe(
+      "---\n    if (a <b> c)"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown(
+        "- outer\n  - inner\n\n  still outer\n\n    <b>para in outer</b>"
+      )
+    ).toBe("- outer\n  - inner\n\n  still outer\n\n    **para in outer**")
+    expect(normalizeLegacyInlineHtmlMarkdown(">\t<b>bold</b>")).toBe(">\t**bold**")
+    expect(normalizeLegacyInlineHtmlMarkdown("-     <b>code</b>\n      <i>more</i>")).toBe(
+      "-     <b>code</b>\n      <i>more</i>"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("- \n      <b>code</b>")).toBe(
+      "- \n      <b>code</b>"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("$x <i> y </i> z$")).toBe("$x <i> y </i> z$")
+    expect(normalizeLegacyInlineHtmlSpans("$a<br>b$ and $$x <i> y </i>$$")).toBe(
+      "$a<br>b$ and $$x <i> y </i>$$"
+    )
+    expect(
+      normalizeLegacyInlineHtmlSpans("Visit <https://example.com/?a=1&lt;b&gt;> and <mailto:a@b.co>")
+    ).toBe("Visit <https://example.com/?a=1&lt;b&gt;> and <mailto:a@b.co>")
+    expect(normalizeLegacyInlineHtmlMarkdown("$$\nx <i> y </i>\n$$")).toBe(
+      "$$\nx <i> y </i>\n$$"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("<b>intro</b> $$\nx <i> y </i>\n$$ <i>outro</i>")
+    ).toBe("**intro** $$\nx <i> y </i>\n$$ *outro*")
+  })
+
+  test("HTML5 case-sensitive entities, numeric sentinel probing, heading math placeholders, multi-line math highlights, and literal construct skipping", () => {
+    const entityHtml = renderMarkdownHtml("Assume x &Lt; y and y &Gt; z and &lT;tag>")
+    expect(entityHtml).toContain("\u226a")
+    expect(entityHtml).toContain("\u226b")
+    expect(entityHtml).toContain("&amp;lT;tag&gt;")
+    expect(entityHtml).not.toContain("<tag>")
+    expect(entityHtml).not.toContain("Assume x &lt;")
+
+    expect(normalizeLegacyInlineHtmlMarkdown("&Lt;b&gt;text&Lt;/b&gt;")).toBe(
+      "&Lt;b&gt;text&Lt;/b&gt;"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("&lT;b&gt;text&lT;/b&gt;")).toBe(
+      "&lT;b&gt;text&lT;/b&gt;"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("&lt;b&Gt;text&lt;/b&Gt;")).toBe(
+      "&lt;b&Gt;text&lt;/b&Gt;"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("&Lt;br&gt; and &lt;br&Gt;")).toBe(
+      "&Lt;br&gt; and &lt;br&Gt;"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("&lt;b&gt;text&lt;/b&gt; and &LT;B&GT;upper&LT;/B&GT;")
+    ).toBe("**text** and **upper**")
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("<b>&Lt; &Gt; &APOS; &lT; &AMP; &QUOT;</b>")
+    ).toBe("**&Lt; &Gt; &APOS; &lT; &#38; \"**")
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("&LT;BR/&GT; and &#60;br&#62; and &#x3c;br&#x3e;")
+    ).toBe("<br /> and <br /> and <br />")
+
+    const numericCollisionHtml = renderMarkdownHtml(
+      String.raw`&#xE000;&#97;qp0_eq&#xE001; and \==plain==`
+    )
+    expect(numericCollisionHtml).toContain("\uE000aqp0_eq\uE001 and ==plain==")
+    expect(numericCollisionHtml).not.toContain("<mark")
+
+    expect(formatMarkdownHeadingLabel("Product $a *b* c$")).toBe("Product $a *b* c$")
+    expect(formatMarkdownHeadingLabel("Formula ${color:red}x{/color}$")).toBe(
+      "Formula ${color:red}x{/color}$"
+    )
+    expect(findMarkdownHighlightSpans("$$\na ==b== c\n$$")).toEqual([])
+
+    expect(skipInlineLiteralConstructAt(String.raw`\`a` + "`", 1)).toBe(-1)
+    expect(skipInlineLiteralConstructAt(String.raw`\$$a$`, 1)).toBe(-1)
+    expect(skipInlineLiteralConstructAt(String.raw`\𝕏`, 0)).toBe(String.raw`\𝕏`.length)
+    expect(skipInlineLiteralConstructAt("abc" + String.fromCodePoint(92), 3)).toBe(4)
+
+    const mockMutation = {
+      type: "childList",
+      target: { nodeValue: null, textContent: "" },
+      addedNodes: [{ nodeValue: null, textContent: "hello {{ COLOR: red | world }}" }],
+    } as unknown as MutationRecord
+    expect(shouldScheduleFromInlineColorMutations([mockMutation])).toBe(true)
+
+    const multiParaIndentedMathHtml = renderMarkdownHtml("$$\n\n    a = b\n$$")
+    expect(multiParaIndentedMathHtml).toContain("aq-formula-card")
+    expect(multiParaIndentedMathHtml).toContain("a = b")
+    const indentedCodeDollarHtml = renderMarkdownHtml("Intro\n\n    $$\n\n        a = b\n    $$")
+    expect(indentedCodeDollarHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(indentedCodeDollarHtml).not.toContain("aq-formula-card")
+
+    const calloutIndentedCodeHtml = renderMarkdownHtml(":::callout info\n    echo $HOME $PATH\n:::")
+    expect(calloutIndentedCodeHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(calloutIndentedCodeHtml).toContain("echo $HOME $PATH")
+    expect(calloutIndentedCodeHtml).not.toContain(String.raw`\$HOME`)
+
+    expect(normalizeLegacyInlineHtmlMarkdown("`line1\n<b>in code</b>` and <b>out</b>")).toBe(
+      "`line1\n<b>in code</b>` and **out**"
+    )
+
+    const insightsDoc = [
+      "```inline```",
+      "## After Triple Backtick Inline",
+      "\t## Tab Indented Code",
+      "$$",
+      "## Inside Math Fence",
+      "$$",
+      "$$",
+      "",
+      "## After Unclosed Math",
+    ].join("\n")
+    expect(createMarkdownDocumentInsights(insightsDoc).headings.map((h) => h.label)).toEqual([
+      "After Triple Backtick Inline",
+      "After Unclosed Math",
+    ])
   })
 })
