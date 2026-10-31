@@ -122,31 +122,33 @@ export const normalizeSafeMarkdownUrl = (raw: string): string => {
   return ""
 }
 
+const normalizeSafeHashHref = (value: string): string => {
+  try {
+    const parsed = new URL(value, SAFE_RELATIVE_PROBE_ORIGIN)
+    if (parsed.origin !== SAFE_RELATIVE_PROBE_ORIGIN) return ""
+    return value === "#" ? "#" : `#${value.slice(1)}`
+  } catch {
+    return ""
+  }
+}
+
+const normalizeSafeMailtoHref = (value: string): string => {
+  if (value.length <= 7) return ""
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "mailto:" && parsed.pathname.trim().length > 0
+      ? parsed.toString()
+      : ""
+  } catch {
+    return ""
+  }
+}
+
 export const normalizeSafeMarkdownLinkHref = (raw: string): string => {
   const value = raw.trim()
   if (!value || hasAsciiControlCharacters(value) || value.includes("\\")) return ""
-
-  if (value.startsWith("#")) {
-    try {
-      const parsed = new URL(value, SAFE_RELATIVE_PROBE_ORIGIN)
-      if (parsed.origin !== SAFE_RELATIVE_PROBE_ORIGIN) return ""
-      return value === "#" ? "#" : `#${value.slice(1)}`
-    } catch {
-      return ""
-    }
-  }
-
-  if (value.toLowerCase().startsWith("mailto:") && value.length > 7) {
-    try {
-      const parsed = new URL(value)
-      return parsed.protocol === "mailto:" && parsed.pathname.trim().length > 0
-        ? parsed.toString()
-        : ""
-    } catch {
-      return ""
-    }
-  }
-
+  if (value.startsWith("#")) return normalizeSafeHashHref(value)
+  if (value.toLowerCase().startsWith("mailto:")) return normalizeSafeMailtoHref(value)
   return normalizeSafeMarkdownUrl(value)
 }
 
@@ -155,7 +157,7 @@ export const setSafeAnchorHref = (anchor: HTMLAnchorElement, rawHref: string): s
   if (!normalizedHref) return ""
   const safeHref = normalizedHref.replace(
     /[<>"']/g,
-    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`
+    (ch) => `%${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase()}`
   )
   anchor.setAttribute("href", safeHref)
   return safeHref

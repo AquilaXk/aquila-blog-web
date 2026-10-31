@@ -34,7 +34,15 @@ export const validateMarkdownAttachmentSize = (file: File): string | null => {
   return null
 }
 
-export const escapeMarkdownLinkLabel = (value: string) => value.replace(/[\\[\]]/g, "\\$&")
+export const escapeMarkdownLinkLabel = (value: string) => value.replace(/[\\[\]]/g, String.raw`\$&`)
+
+const encodeLinkDestinationChar = (ch: string): string => {
+  if (ch === "(") return "%28"
+  return ch === ")" ? "%29" : "%5C"
+}
+
+export const escapeMarkdownLinkDestination = (url: string): string =>
+  url.replace(/[()\\]/g, encodeLinkDestinationChar)
 
 export const resolveMarkdownAttachmentLink = (
   uploaded: MarkdownFileUploadResult,
@@ -47,7 +55,7 @@ export const resolveMarkdownAttachmentLink = (
 
   const name = String(uploaded.name || fallbackName).trim() || fallbackName
   return {
-    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${url})\n`,
+    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${escapeMarkdownLinkDestination(url)})\n`,
   }
 }
 
@@ -76,6 +84,6 @@ export const resolveMarkdownImageEmbed = (
   }
 
   return {
-    markdown: `\n\n![${escapeMarkdownLinkLabel(alt)}](${src})\n`,
+    markdown: `\n\n![${escapeMarkdownLinkLabel(alt)}](${escapeMarkdownLinkDestination(src)})\n`,
   }
 }

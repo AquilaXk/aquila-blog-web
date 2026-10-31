@@ -1,9 +1,6 @@
 import {
-  countCodePointRun,
   isEscapedMarkdownAt,
-  scanInlineCodeSpanEnd,
-  scanPandocDisplayMathAt,
-  scanPandocInlineMathAt,
+  skipInlineLiteralConstructAt,
 } from "./pandocMathScanner"
 
 export type TextRangeSpan = {
@@ -162,6 +159,18 @@ const buildColorTokenResult = (
 const isDisallowedColorHeaderCode = (code: number): boolean =>
   code === 123 || code === 125 || code === 10 || code === 13
 
+const matchBackslashHeaderAt = (
+  text: string,
+  tokenStart: number,
+  cursor: number,
+  allowBackslashInToken: boolean
+): { done: boolean; result: { colorToken: string; contentStart: number } | null } => {
+  if (text.codePointAt(cursor + 1) === 124) {
+    return { done: true, result: buildColorTokenResult(text, tokenStart, cursor, cursor + 2) }
+  }
+  return { done: !allowBackslashInToken, result: null }
+}
+
 const scanColorTokenBeforePipe = (
   text: string,
   tokenStart: number,
@@ -170,14 +179,10 @@ const scanColorTokenBeforePipe = (
   for (let cursor = tokenStart; cursor < text.length; cursor += 1) {
     const code = text.codePointAt(cursor) ?? 0
     if (isDisallowedColorHeaderCode(code)) return null
-    if (code === 124) {
-      return buildColorTokenResult(text, tokenStart, cursor, cursor + 1)
-    }
+    if (code === 124) return buildColorTokenResult(text, tokenStart, cursor, cursor + 1)
     if (code === 92) {
-      if (text.codePointAt(cursor + 1) === 124) {
-        return buildColorTokenResult(text, tokenStart, cursor, cursor + 2)
-      }
-      if (!allowBackslashInToken) return null
+      const step = matchBackslashHeaderAt(text, tokenStart, cursor, allowBackslashInToken)
+      if (step.done) return step.result
     }
   }
   return null
@@ -205,24 +210,6 @@ const findLineBreakIndex = (text: string, start: number): number => {
   return text.length
 }
 
-const skipDollarConstructAt = (text: string, cursor: number, singleLine: boolean): number => {
-  const run = countCodePointRun(text, cursor, 36)
-  if (run === 2) {
-    const m = scanPandocDisplayMathAt(text, cursor, { singleLineOnly: singleLine })
-    return m ? m.to : cursor + 2
-  }
-  if (run === 1) {
-    const m = scanPandocInlineMathAt(text, cursor)
-    return m ? m.to : cursor + 1
-  }
-  return cursor + run
-}
-
-const skipBacktickRunBounded = (text: string, cursor: number, limit: number): number => {
-  const end = scanInlineCodeSpanEnd(text, cursor, limit)
-  return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96, limit)
-}
-
 const isNestedColorHeaderAt = (text: string, cursor: number): boolean =>
   text.codePointAt(cursor + 1) === 123 && matchDoubleBraceColorHeader(text, cursor, true) !== null
 
@@ -230,21 +217,6 @@ type BraceScanStep = {
   nextCursor: number
   nextDepth: number
   matchedClose: number
-}
-
-const skipRawColorConstructAt = (
-  text: string,
-  cursor: number,
-  scanLimit: number,
-  singleLine: boolean,
-  honorEscapes: boolean
-): number => {
-  if (!honorEscapes) return -1
-  const code = text.codePointAt(cursor) ?? 0
-  if (code === 92) return cursor + 2
-  if (code === 96) return skipBacktickRunBounded(text, cursor, scanLimit)
-  if (code === 36) return skipDollarConstructAt(text, cursor, singleLine)
-  return -1
 }
 
 const stepCloseBraceScanAt = (
@@ -255,7 +227,11 @@ const stepCloseBraceScanAt = (
   singleLine: boolean,
   honorEscapes: boolean
 ): BraceScanStep => {
-  const skipped = skipRawColorConstructAt(text, cursor, scanLimit, singleLine, honorEscapes)
+  const skipped = skipInlineLiteralConstructAt(text, cursor, {
+    honorEscapes,
+    codeScanLimit: scanLimit,
+    singleLineDisplayMath: singleLine,
+  })
   if (skipped > cursor) {
     return { nextCursor: skipped, nextDepth: braceDepth, matchedClose: -1 }
   }
@@ -335,17 +311,19 @@ const resolveColorCloseBraceIndex = (
     ? findBacktickAwareDoubleCloseBrace(text, contentStart, singleLine, honorEscapes)
     : text.indexOf("}}", contentStart)
 
-const advancePastUnescapedInlineCodeAt = (
+const skipOuterColorLiteralAt = (
   text: string,
   cursor: number,
-  honorEscapes: boolean
-): number => {
-  if (!honorEscapes || text.codePointAt(cursor) !== 96 || isEscapedMarkdownAt(text, cursor)) {
-    return -1
-  }
-  const end = scanInlineCodeSpanEnd(text, cursor)
-  return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96)
-}
+  skipCode: boolean,
+  honorEscapes: boolean,
+  singleLine: boolean
+): number =>
+  skipCode && honorEscapes
+    ? skipInlineLiteralConstructAt(text, cursor, {
+        honorEscapes: true,
+        singleLineDisplayMath: singleLine,
+      })
+    : -1
 
 const isDoubleBraceCandidateAt = (
   text: string,
@@ -408,11 +386,12 @@ export const findDoubleBraceColorSpans = (
   const spans: InlineColorMatchSpan[] = []
   const skipCode = options.skipInlineCodeSpans !== false
   const honorEscapes = options.honorMarkdownEscapes !== false
+  const singleLine = options.singleLine === true
   let cursor = 0
   while (cursor + 4 <= text.length) {
-    const codeEnd = skipCode ? advancePastUnescapedInlineCodeAt(text, cursor, honorEscapes) : -1
-    if (codeEnd > cursor) {
-      cursor = codeEnd
+    const skipped = skipOuterColorLiteralAt(text, cursor, skipCode, honorEscapes, singleLine)
+    if (skipped > cursor) {
+      cursor = skipped
       continue
     }
     if (!isDoubleBraceCandidateAt(text, cursor, honorEscapes)) {

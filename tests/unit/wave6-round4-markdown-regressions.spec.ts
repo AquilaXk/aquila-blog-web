@@ -3,22 +3,32 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ThemeProvider } from "@emotion/react"
 import { expect, test } from "@playwright/test"
+import { appendInlineMarkdownNodes } from "../../src/components/markdown-editor/markdownEditorInlineDom"
 import MarkdownRenderer from "../../src/libs/markdown/MarkdownRenderer"
 import * as inlineColorModule from "../../src/libs/markdown/inlineColor"
 import { applyInlineColors } from "../../src/libs/markdown/hooks/useInlineColorEffect"
 import { findMarkdownHighlightSpans } from "../../src/libs/markdown/inlineHighlightModel"
 import { normalizeLegacyInlineHtmlMarkdown } from "../../src/libs/markdown/inlineHtmlNormalization"
+import * as inlineMathGuardModule from "../../src/libs/markdown/inlineMathGuardModel"
+import {
+  protectEscapedInlineSyntax,
+  remarkRestoreProtectedInlineTokens,
+} from "../../src/libs/markdown/inlineMathGuardModel"
 import {
   findDoubleBraceColorSpans,
   stripDoubleBraceColorTokensOnce,
 } from "../../src/libs/markdown/inlineTokenScanners"
+import { skipInlineLiteralConstructAt } from "../../src/libs/markdown/pandocMathScanner"
 import { mountMermaidErrorStateDom } from "../../src/libs/markdown/mermaidRuntimeSanitize"
 import {
   normalizeSafeMarkdownLinkHref,
   normalizeSafeMarkdownUrl,
   setSafeAnchorHref,
 } from "../../src/libs/markdown/safeMarkdownUrl"
-import { formatMarkdownHeadingLabel } from "../../src/libs/markdown/markdownDocumentInsights"
+import {
+  createMarkdownDocumentInsights,
+  formatMarkdownHeadingLabel,
+} from "../../src/libs/markdown/markdownDocumentInsights"
 import { createTheme } from "../../src/styles/theme"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 import { SimpleDomElement, withMockDom } from "./helpers/simpleMockDom"
@@ -90,8 +100,8 @@ test.describe("wave6 round4 public markdown regressions", () => {
         },
       }
       const textNode = {
-        nodeValue: "{{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
-        textContent: "{{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
+        nodeValue: "{{color:green|C:\\}} and {{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
+        textContent: "{{color:green|C:\\}} and {{color:green|obj { a: { b: 1 } }}} and {{color:red|line1\nline2}}",
         parentElement: parentNode,
         parentNode,
       }
@@ -132,11 +142,14 @@ test.describe("wave6 round4 public markdown regressions", () => {
       doc.createTextNode = (val: string): MockOutNode => ({ className: "", textContent: val })
 
       applyInlineColors({ textContent: textNode.nodeValue } as unknown as HTMLElement)
-      expect(replacedNodes).toHaveLength(2)
+      expect(replacedNodes).toHaveLength(4)
       expect(replacedNodes[0]?.className).toBe("aq-inline-color")
       expect(replacedNodes[0]?.cssVar).toBe("#34d399")
-      expect(replacedNodes[0]?.textContent).toBe("obj { a: { b: 1 } }")
-      expect(replacedNodes[1]?.textContent).toBe(" and {{color:red|line1\nline2}}")
+      expect(replacedNodes[0]?.textContent).toBe("C:\\")
+      expect(replacedNodes[2]?.className).toBe("aq-inline-color")
+      expect(replacedNodes[2]?.cssVar).toBe("#34d399")
+      expect(replacedNodes[2]?.textContent).toBe("obj { a: { b: 1 } }")
+      expect(replacedNodes[3]?.textContent).toBe(" and {{color:red|line1\nline2}}")
     })
   })
 
@@ -363,5 +376,153 @@ test.describe("wave6 round4 public markdown regressions", () => {
       "#한글-제목"
     )
     expect(koreanAnchor.getAttribute("href")).toBe("#한글-제목")
+  })
+
+  test("round 6: trailing backslashes in <code>, numeric entity PUA collisions, indented code blocks, and inline triple-backtick spans", () => {
+    expect(normalizeLegacyInlineHtmlMarkdown("<code>C:\\</code>")).toBe("`C:\\`")
+    expect(normalizeLegacyInlineHtmlMarkdown("<code>\\</code>")).toBe("`\\`")
+    expect(normalizeLegacyInlineHtmlMarkdown("<code>C:\\</code> and <code>D:\\</code>")).toBe(
+      "`C:\\` and `D:\\`"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("&lt;code&gt;C:\\&lt;/code&gt; and &lt;code&gt;\\&lt;/code&gt;")
+    ).toBe("`C:\\` and `\\`")
+    expect(normalizeLegacyInlineHtmlMarkdown("\\<code>C:\\</code>")).toBe("\\<code>C:\\</code>")
+
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("<b>&#xE000;AQCODE0_0&#xE001;</b> <code>real</code>")
+    ).toBe("**\uE000AQCODE0_0\uE001** `real`")
+    const codeCollisionHtml = renderMarkdownHtml("<b>&#xE000;AQCODE0_0&#xE001;</b> <code>real</code>")
+    expect(codeCollisionHtml).toContain("<strong>\uE000AQCODE0_0\uE001</strong>")
+    expect(codeCollisionHtml).toContain("<code class=\"aq-inline-code\">real</code>")
+
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("```inline``` and <b>bold</b>\n<b>next</b>")
+    ).toBe("```inline``` and **bold**\n**next**")
+
+    const indentedBlock = "intro\n\n    if (a <br> b || &lt;br&gt; || <b>x</b>)"
+    expect(normalizeLegacyInlineHtmlMarkdown(indentedBlock)).toBe(indentedBlock)
+    const indentedHtml = renderMarkdownHtml(indentedBlock)
+    expect(indentedHtml).toContain(
+      "data-raw-code=\"if (a &lt;br&gt; b || &amp;lt;br&amp;gt; || &lt;b&gt;x&lt;/b&gt;)\""
+    )
+    expect(indentedHtml).not.toContain("<strong>x</strong>")
+
+    expect(normalizeLegacyInlineHtmlMarkdown("\tif (a <br> b || <b>x</b>)")).toBe(
+      "\tif (a <br> b || <b>x</b>)"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("> intro\n>\n>     if (a <br> b || <b>x</b>)")).toBe(
+      "> intro\n>\n>     if (a <br> b || <b>x</b>)"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("intro\n    <b>bold</b>")).toBe("intro\n    **bold**")
+    expect(normalizeLegacyInlineHtmlMarkdown("- item\n\n    <b>bold</b>")).toBe(
+      "- item\n\n    **bold**"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown(">   - item\n\n    if (a <b> b)")).toBe(
+      ">   - item\n\n    if (a <b> b)"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("# Heading <b>title</b>\n    if (a <b> b)")).toBe(
+      "# Heading **title**\n    if (a <b> b)"
+    )
+  })
+
+  test("round 6: Pandoc math inside color scanner/headings, unified < entities, sentinel collisions, fence meta, and imageReferences", () => {
+    expect("protectEscapedHighlightDelimiters" in inlineMathGuardModule).toBe(false)
+    expect(skipInlineLiteralConstructAt("\\x", 0, { honorEscapes: false })).toBe(-1)
+    expect(skipInlineLiteralConstructAt("```unclosed", 0, { codeScanLimit: 5 })).toBe(3)
+    expect(skipInlineLiteralConstructAt("$$a\nb$$", 0, { singleLineDisplayMath: true })).toBe(2)
+    expect(skipInlineLiteralConstructAt("$$$x$$$", 0)).toBe(3)
+    expect(skipInlineLiteralConstructAt("plain", 0)).toBe(-1)
+
+    expect(formatMarkdownHeadingLabel("## Formula ${{color:red|x}}$")).toBe(
+      "## Formula ${{color:red|x}}$"
+    )
+    expect(formatMarkdownHeadingLabel("# Formula $\\text{{color:red|x}}$")).toBe(
+      "# Formula $\\text{{color:red|x}}$"
+    )
+    expect(
+      createMarkdownDocumentInsights("# Formula $\\text{{color:red|x}}$\n## Formula ${{color:red|x}}$")
+        .headings.map((h) => h.label)
+    ).toEqual(["Formula $\\text{{color:red|x}}$", "Formula ${{color:red|x}}$"])
+    expect(
+      stripDoubleBraceColorTokensOnce("Formula $\\text{{color:red|x}}$ and $$y + {{color:blue|z}}$$")
+    ).toBe("Formula $\\text{{color:red|x}}$ and $$y + {{color:blue|z}}$$")
+
+    const aqpEntityCollisionHtml = renderMarkdownHtml("&#xE000;aqp0_eq&#xE001; and \\==plain==")
+    expect(aqpEntityCollisionHtml).toContain("\uE000aqp0_eq\uE001 and ==plain==")
+    expect(aqpEntityCollisionHtml).not.toContain("<mark")
+
+    const ltEntitiesHtml = renderMarkdownHtml("&lt;br&#47;> and &lt;&#32;br> and &lt;b&#114;>")
+    expect(ltEntitiesHtml).not.toContain("<br")
+    expect(ltEntitiesHtml).toContain("&lt;br/&gt; and &lt; br&gt; and &lt;br&gt;")
+
+    const nestedFenceHtml = renderMarkdownHtml(
+      ["- outer", "  - inner", "    ```ts title=\"a\\=b\"", "    const x = 1", "    ```"].join("\n")
+    )
+    expect(nestedFenceHtml).not.toContain("\uE000")
+    expect(nestedFenceHtml).toContain("a=b")
+
+    const unresolvedImgRefHtml = renderMarkdownHtml("![a \\==b==][missing]")
+    expect(unresolvedImgRefHtml).not.toContain("\uE000")
+    expect(unresolvedImgRefHtml).not.toContain("<mark")
+    expect(unresolvedImgRefHtml).toContain("![a ==b==][missing]")
+
+    const definedImgRefHtml = renderMarkdownHtml(
+      "![a \\==b==][def]\n\n[def]: /post/api/v1/images/x.png"
+    )
+    expect(definedImgRefHtml).not.toContain("\uE000")
+    expect(definedImgRefHtml).not.toContain("<mark")
+    expect(definedImgRefHtml).toContain("alt=\"a ==b==\"")
+
+    const protectedSample = protectEscapedInlineSyntax("a \\==b==")
+    const astSample = {
+      type: "root",
+      children: [
+        { type: "definition", identifier: "def", url: "/post/api/v1/images/x.png" },
+        {
+          type: "code",
+          lang: `ts${protectedSample.sentinels.eq}`,
+          meta: `title="a${protectedSample.sentinels.eq}b"`,
+          value: protectedSample.markdown,
+        },
+        {
+          type: "paragraph",
+          children: [
+            { type: "imageReference", identifier: "DEF", alt: protectedSample.markdown },
+            { type: "imageReference", identifier: "missing", alt: protectedSample.markdown },
+          ],
+        },
+      ],
+    }
+    remarkRestoreProtectedInlineTokens(protectedSample)(astSample)
+    const codeNode = astSample.children[1] as { lang: string; meta: string; value: string }
+    const paraChildren = (astSample.children[2] as { children: Array<{ alt: string }> }).children
+    expect(codeNode.lang).toBe("ts=")
+    expect(codeNode.meta).toBe("title=\"a=b\"")
+    expect(codeNode.value).toBe("a \\==b==")
+    expect(paraChildren[0]?.alt).toBe("a ==b==")
+    expect(paraChildren[1]?.alt).toBe(protectedSample.markdown)
+
+    withMockDom(() => {
+      const container = new SimpleDomElement("div")
+      appendInlineMarkdownNodes(
+        container as unknown as HTMLElement,
+        "**keep `a**b` and $x**y$** *em `c*d`* [lbl `e]f`](/posts/1) `code` $x+1$ <br> [[Note|Alias]] {{color:red|hi}} ==mark=="
+      )
+      const elementTags = container.children
+        .map((c) => c.tagName.toLowerCase())
+        .filter((tag) => tag !== "#text")
+      expect(elementTags).toEqual([
+        "strong",
+        "em",
+        "a",
+        "code",
+        "span",
+        "br",
+        "span",
+        "span",
+        "mark",
+      ])
+    })
   })
 })

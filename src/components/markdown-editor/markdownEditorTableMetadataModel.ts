@@ -166,13 +166,32 @@ export const serializeMarkdownTableLayoutCommentIfNonDefault = (
 
 const gridLayoutMeta = new WeakMap<MarkdownTableGrid, ExtendedMarkdownTableLayout>()
 
+const clampLayoutToGridBounds = (
+  cloned: ExtendedMarkdownTableLayout,
+  totalRows: number,
+  colCount: number
+): void => {
+  if (cloned.cells) {
+    cloned.cells = reconcileCellSpans(cloned.cells, totalRows, colCount)
+  }
+  if (cloned.columnWidths && cloned.columnWidths.length > colCount) {
+    cloned.columnWidths = cloned.columnWidths.slice(0, colCount)
+  }
+  if (cloned.columnAlignments && cloned.columnAlignments.length > colCount) {
+    cloned.columnAlignments = cloned.columnAlignments.slice(0, colCount)
+  }
+  if (cloned.rowHeights && cloned.rowHeights.length > totalRows) {
+    cloned.rowHeights = cloned.rowHeights.slice(0, totalRows)
+  }
+}
+
 export const setTableGridLayoutMeta = (
   grid: MarkdownTableGrid,
   layout: ExtendedMarkdownTableLayout | null | undefined
 ): void => {
   const cloned = cloneTableLayout(layout)
-  if (cloned?.cells && grid.headers.length > 0) {
-    cloned.cells = reconcileCellSpans(cloned.cells, grid.rows.length + 1, grid.headers.length)
+  if (cloned && grid.headers.length > 0) {
+    clampLayoutToGridBounds(cloned, grid.rows.length + 1, grid.headers.length)
   }
   const compacted = compactTableLayoutDefaults(cloned)
   if (compacted) {
@@ -208,7 +227,8 @@ const applyGridActionToTableLayout = (
         activeRow,
         action.kind === "duplicate-row",
         action.kind === "insert-row-above",
-        bodyRowCountBefore
+        bodyRowCountBefore,
+        colCountBefore
       )
       return
     case "move-row-up":
@@ -232,7 +252,8 @@ const applyGridActionToTableLayout = (
         activeCol,
         action.kind === "duplicate-column",
         action.kind === "insert-column-left",
-        colCountBefore
+        colCountBefore,
+        bodyRowCountBefore
       )
       return
     case "move-column-left":

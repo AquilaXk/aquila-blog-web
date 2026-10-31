@@ -2,6 +2,7 @@ import { GFM, parser } from "@lezer/markdown"
 import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
 import { findMarkdownHighlightSpans } from "../../libs/markdown/inlineHighlightModel"
 import { findDoubleBraceColorSpans } from "../../libs/markdown/inlineTokenScanners"
+import { augmentLivePreviewLiteralRangesWithMath } from "./markdownEditorMathModel"
 
 export type MarkdownEditorSurfaceMode = "live" | "source" | "reading"
 
@@ -254,9 +255,7 @@ const LITERAL_NODE_NAMES = new Set([
   "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag", "URL", "Autolink",
 ])
 
-const collectLiteralRanges = (
-  rootNode: MarkdownSyntaxNode
-): { literalRanges: MarkdownLiveSourceRange[]; blockLiteralRanges: MarkdownLiveSourceRange[] } => {
+const collectLiteralRanges = (rootNode: MarkdownSyntaxNode) => {
   const literalRanges: MarkdownLiveSourceRange[] = []
   const blockLiteralRanges: MarkdownLiveSourceRange[] = []
   const walk = (node: MarkdownSyntaxNode) => {
@@ -270,9 +269,7 @@ const collectLiteralRanges = (
       literalRanges.push({ from: node.from, to: node.to })
       return
     }
-    for (let child = node.firstChild; child; child = child.nextSibling) {
-      walk(child)
-    }
+    for (let child = node.firstChild; child; child = child.nextSibling) walk(child)
   }
   walk(rootNode)
   return { literalRanges, blockLiteralRanges }
@@ -421,7 +418,10 @@ export const buildMarkdownLivePreviewEntries = (
   }
 
   const entries: MarkdownLivePreviewPlanEntry[] = []
-  const { literalRanges, blockLiteralRanges } = collectLiteralRanges(documentNode)
+  const rawLiterals = collectLiteralRanges(documentNode)
+  const { literalRanges, blockLiteralRanges } = augmentLivePreviewLiteralRangesWithMath(
+    markdown, rawLiterals.literalRanges, rawLiterals.blockLiteralRanges
+  )
   const wikilinkRanges = collectRegexPlanEntries(markdown, blockLiteralRanges, literalRanges, entries)
   const taskRanges: MarkdownLiveSourceRange[] = []
 

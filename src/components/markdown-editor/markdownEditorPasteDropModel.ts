@@ -1,9 +1,12 @@
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
+  escapeMarkdownLinkDestination,
   escapeMarkdownLinkLabel,
   validateMarkdownAttachmentSize,
 } from "./markdownEditorUploadModel"
+
+export { escapeMarkdownLinkDestination }
 
 export const createUploadPlaceholderId = (): string => createSecureRandomUuid()
 
@@ -153,9 +156,6 @@ export const parseSingleHttpUrl = (text: string): string | null => {
     return null
   }
 }
-
-export const escapeMarkdownLinkDestination = (url: string): string =>
-  url.replace(/[\\()]/g, "\\$&")
 
 const EXISTING_MARKDOWN_LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/
 

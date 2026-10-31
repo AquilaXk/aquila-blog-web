@@ -145,3 +145,26 @@ export const collectMathReplacementSpecs = (
 }
 
 export const collectMarkdownMathSpans = collectMathReplacementSpecs
+
+export const augmentLivePreviewLiteralRangesWithMath = (
+  markdown: string,
+  literalRanges: readonly MathLiteralRange[],
+  blockLiteralRanges: readonly MathLiteralRange[]
+): { literalRanges: MathLiteralRange[]; blockLiteralRanges: MathLiteralRange[] } => {
+  if (!markdown.includes("$")) {
+    return { literalRanges: [...literalRanges], blockLiteralRanges: [...blockLiteralRanges] }
+  }
+  const specs = collectMathReplacementSpecs(markdown, -1, -1, false, literalRanges)
+  if (specs.length === 0) {
+    return { literalRanges: [...literalRanges], blockLiteralRanges: [...blockLiteralRanges] }
+  }
+  const mathRanges = specs.map(({ from, to }) => ({ from, to }))
+  const displayRanges = specs.filter((spec) => spec.displayMode).map(({ from, to }) => ({ from, to }))
+  return {
+    literalRanges: mergeSortedSpanRanges([...literalRanges, ...mathRanges]),
+    blockLiteralRanges:
+      displayRanges.length > 0
+        ? mergeSortedSpanRanges([...blockLiteralRanges, ...displayRanges])
+        : [...blockLiteralRanges],
+  }
+}

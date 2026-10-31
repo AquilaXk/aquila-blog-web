@@ -358,37 +358,35 @@ export const resolveTargetMovedCol = (action: MarkdownTableGridAction, activeCol
 }
 
 const resolveRowInsertTableIndex = (
-  layout: MarkdownTableLayout,
-  activeRow: number,
-  isDuplicate: boolean,
-  insertAbove: boolean,
-  maxBodyRows?: number
+  layout: MarkdownTableLayout, activeRow: number, isDuplicate: boolean,
+  insertAbove: boolean, maxBodyRows?: number, maxCols?: number
 ): number => {
-  if (isDuplicate) return resolveDuplicateRowInsertTableIndex(layout, activeRow, maxBodyRows)
+  if (isDuplicate) return resolveDuplicateRowInsertTableIndex(layout, activeRow, maxBodyRows, maxCols)
   const baseRow = insertAbove ? activeRow - 1 : activeRow
   return Math.max(0, baseRow) + 1
 }
 
+const buildDuplicatedCellRow = (
+  sourceRow: ReadonlyArray<MarkdownTableCellLayout | null>, coveredCols: ReadonlySet<number>
+): Array<MarkdownTableCellLayout | null> => {
+  const rowWidth = Math.max(sourceRow.length, coveredCols.size > 0 ? Math.max(...coveredCols) + 1 : 0)
+  return Array.from({ length: rowWidth }, (_, col) =>
+    coveredCols.has(col) ? { hidden: true } : stripClonedRowCellSpan(sourceRow[col])
+  )
+}
+
 export const applyRowInsertOrDuplicateLayout = (
-  layout: MarkdownTableLayout,
-  activeRow: number,
-  isDuplicate: boolean,
-  insertAbove: boolean,
-  maxBodyRows?: number
+  layout: MarkdownTableLayout, activeRow: number, isDuplicate: boolean,
+  insertAbove: boolean, maxBodyRows?: number, maxCols?: number
 ) => {
-  const insertTableRow = resolveRowInsertTableIndex(layout, activeRow, isDuplicate, insertAbove, maxBodyRows)
+  const insertTableRow = resolveRowInsertTableIndex(layout, activeRow, isDuplicate, insertAbove, maxBodyRows, maxCols)
   const heightValue = isDuplicate ? (layout.rowHeights?.[activeRow] ?? null) : null
   spliceSparseArray(layout.rowHeights, insertTableRow, 0, heightValue, true)
   if (!layout.cells) return
   const coveredCols = expandRowSpansCrossingInsertedRow(layout.cells, insertTableRow, maxBodyRows)
   if (isDuplicate) {
     while (layout.cells.length < insertTableRow) layout.cells.push([])
-    const sourceRow = layout.cells[activeRow] ?? []
-    const rowWidth = Math.max(sourceRow.length, coveredCols.size > 0 ? Math.max(...coveredCols) + 1 : 0)
-    const clonedRow = Array.from({ length: rowWidth }, (_, col) =>
-      coveredCols.has(col) ? { hidden: true } : stripClonedRowCellSpan(sourceRow[col])
-    )
-    layout.cells.splice(insertTableRow, 0, clonedRow)
+    layout.cells.splice(insertTableRow, 0, buildDuplicatedCellRow(layout.cells[activeRow] ?? [], coveredCols))
     return
   }
   const insertedRow = buildCoveredColumnsRow(coveredCols)
@@ -432,13 +430,10 @@ export const applyRowDeleteLayout = (layout: MarkdownTableLayout, activeRow: num
 }
 
 const resolveColInsertIndex = (
-  layout: MarkdownTableLayout,
-  activeCol: number,
-  isDuplicate: boolean,
-  insertLeft: boolean,
-  maxCols?: number
+  layout: MarkdownTableLayout, activeCol: number, isDuplicate: boolean,
+  insertLeft: boolean, maxCols?: number, maxTotalRows?: number
 ): number => {
-  if (isDuplicate) return resolveDuplicateColInsertIndex(layout, activeCol, maxCols)
+  if (isDuplicate) return resolveDuplicateColInsertIndex(layout, activeCol, maxCols, maxTotalRows)
   return insertLeft ? activeCol : activeCol + 1
 }
 
@@ -452,13 +447,11 @@ const resolveInsertedColumnCell = (
 }
 
 export const applyColInsertOrDuplicateLayout = (
-  layout: MarkdownTableLayout,
-  activeCol: number,
-  isDuplicate: boolean,
-  insertLeft: boolean,
-  maxCols?: number
+  layout: MarkdownTableLayout, activeCol: number, isDuplicate: boolean,
+  insertLeft: boolean, maxCols?: number, maxBodyRows?: number
 ) => {
-  const insertAt = resolveColInsertIndex(layout, activeCol, isDuplicate, insertLeft, maxCols)
+  const maxTotalRows = maxBodyRows === undefined ? undefined : maxBodyRows + 1
+  const insertAt = resolveColInsertIndex(layout, activeCol, isDuplicate, insertLeft, maxCols, maxTotalRows)
   spliceSparseArray(layout.columnWidths, insertAt, 0, isDuplicate ? (layout.columnWidths?.[activeCol] ?? null) : null, true)
   spliceSparseArray(layout.columnAlignments, insertAt, 0, isDuplicate ? (layout.columnAlignments?.[activeCol] ?? null) : null, true)
   if (!layout.cells) return

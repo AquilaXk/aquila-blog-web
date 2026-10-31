@@ -1,9 +1,6 @@
 import {
-  countCodePointRun,
   isEscapedMarkdownAt,
-  scanInlineCodeSpanEnd,
-  scanPandocDisplayMathAt,
-  scanPandocInlineMathAt,
+  skipInlineLiteralConstructAt,
 } from "./pandocMathScanner"
 
 export type MarkdownHighlightSpan = {
@@ -29,45 +26,21 @@ const hasLineBreakBetween = (text: string, from: number, to: number): boolean =>
   return false
 }
 
-const skipInlineCodeRunAt = (text: string, cursor: number): number => {
-  const end = scanInlineCodeSpanEnd(text, cursor)
-  return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96)
-}
-
-const skipSingleLinePandocMathAt = (text: string, cursor: number): number => {
-  const run = countCodePointRun(text, cursor, 36)
-  if (run === 2) {
-    const match = scanPandocDisplayMathAt(text, cursor, { singleLineOnly: true })
-    return match ? match.to : cursor + 2
-  }
-  if (run === 1) {
-    const match = scanPandocInlineMathAt(text, cursor)
-    return match ? match.to : cursor + 1
-  }
-  return cursor + run
-}
-
 const skipEscapedHighlightConstructAt = (
   text: string,
   cursor: number,
   honorEscapes: boolean
 ): { nextCursor: number; abortLine: boolean } => {
-  if (!honorEscapes) return { nextCursor: cursor, abortLine: false }
+  const nextCursor = skipInlineLiteralConstructAt(text, cursor, {
+    honorEscapes,
+    singleLineDisplayMath: true,
+  })
+  if (nextCursor <= cursor) return { nextCursor: cursor, abortLine: false }
   const code = text.codePointAt(cursor) ?? 0
-  if (code === 92) {
-    return {
-      nextCursor: cursor + 2,
-      abortLine: isLineBreakCode(text.codePointAt(cursor + 1) ?? 0),
-    }
-  }
-  if (code === 96) {
-    const nextCursor = skipInlineCodeRunAt(text, cursor)
-    return { nextCursor, abortLine: hasLineBreakBetween(text, cursor, nextCursor) }
-  }
-  if (code === 36) {
-    return { nextCursor: skipSingleLinePandocMathAt(text, cursor), abortLine: false }
-  }
-  return { nextCursor: cursor, abortLine: false }
+  const abortLine =
+    (code === 92 && isLineBreakCode(text.codePointAt(cursor + 1) ?? 0)) ||
+    (code === 96 && hasLineBreakBetween(text, cursor, nextCursor))
+  return { nextCursor, abortLine }
 }
 
 const isOpeningHighlightAt = (

@@ -422,3 +422,45 @@ export const scanPandocInlineMathAt = (
     math: text.slice(openIndex + 1, closePos),
   }
 }
+
+export type InlineLiteralSkipOptions = {
+  honorEscapes?: boolean
+  codeScanLimit?: number
+  singleLineDisplayMath?: boolean
+}
+
+const skipDollarLiteralConstructAt = (
+  text: string,
+  cursor: number,
+  singleLineDisplayMath?: boolean
+): number => {
+  const run = countCodePointRun(text, cursor, 36)
+  if (run === 2) {
+    return (
+      scanPandocDisplayMathAt(text, cursor, { singleLineOnly: singleLineDisplayMath })?.to ??
+      cursor + 2
+    )
+  }
+  if (run === 1) {
+    return scanPandocInlineMathAt(text, cursor)?.to ?? cursor + 1
+  }
+  return cursor + run
+}
+
+export const skipInlineLiteralConstructAt = (
+  text: string,
+  cursor: number,
+  options?: InlineLiteralSkipOptions
+): number => {
+  if (options?.honorEscapes === false) return -1
+  const code = text.codePointAt(cursor) ?? 0
+  if (code === 92) return cursor + 2
+  if (code === 96) {
+    const end = scanInlineCodeSpanEnd(text, cursor, options?.codeScanLimit)
+    return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96, options?.codeScanLimit)
+  }
+  if (code === 36) {
+    return skipDollarLiteralConstructAt(text, cursor, options?.singleLineDisplayMath)
+  }
+  return -1
+}

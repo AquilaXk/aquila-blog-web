@@ -11,6 +11,8 @@ import {
   escapeMarkdownLinkDestination,
 } from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
 import { appendInlineMarkdownNodes } from "../../src/components/markdown-editor/markdownEditorInlineDom"
+import { buildMarkdownLivePreviewDecorationSpecs } from "../../src/components/markdown-editor/markdownEditorLivePreview"
+import { planLinkifySelectionWithUrl } from "../../src/components/markdown-editor/markdownEditorPasteDropModel"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
@@ -23,9 +25,18 @@ import {
   applyTableColumnWidthsAction,
   getOrCreateTableVisualOptions,
 } from "../../src/components/markdown-editor/markdownEditorTableResizeDom"
+import {
+  applyColInsertOrDuplicateLayout,
+  applyRowInsertOrDuplicateLayout,
+} from "../../src/components/markdown-editor/markdownEditorTableSpanModel"
 import { MarkdownTableWidget } from "../../src/components/markdown-editor/markdownEditorTableWidget"
+import {
+  resolveMarkdownAttachmentLink,
+  resolveMarkdownImageEmbed,
+} from "../../src/components/markdown-editor/markdownEditorUploadModel"
 import { normalizePostImageUrl } from "../../src/libs/markdown/postImageUrlPolicy"
 import { parseStandaloneMarkdownImageLine } from "../../src/libs/markdown/rendering"
+import type { MarkdownTableLayout } from "../../src/libs/markdown/tableMetadata"
 import { SimpleDomElement, withMockDom } from "./helpers/simpleMockDom"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
@@ -392,6 +403,110 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(isTableEditActionDisabled({ kind: "delete-column" }, availability)).toBe(true)
     expect(isTableEditActionDisabled({ kind: "clear-row" }, availability)).toBe(false)
     expect(escapeMarkdownLinkDestination("https://example.com/a(1)\\b")).toBe("https://example.com/a%281%29%5Cb")
+  })
+
+  test("percent-encodes linkified and uploaded URLs with parentheses so live inline DOM renders clickable links", () => {
+    withMockDom(() => {
+      const linkified = planLinkifySelectionWithUrl(0, 3, "Foo", "https://en.wikipedia.org/wiki/Foo_(bar)")
+      expect(linkified.replacement).toBe("[Foo](https://en.wikipedia.org/wiki/Foo_%28bar%29)")
+      const host = document.createElement("div")
+      appendInlineMarkdownNodes(host, linkified.replacement)
+      expect(serializeSimpleDom(host as unknown as SimpleDomElement)).toBe(
+        '<div><a class="cm-live-link" href="https://en.wikipedia.org/wiki/Foo_%28bar%29">Foo</a></div>'
+      )
+    })
+
+    expect(
+      resolveMarkdownAttachmentLink(
+        { url: "https://cdn.example.test/files/spec_(v2).pdf", name: "spec (v2).pdf" },
+        "spec.pdf"
+      )
+    ).toEqual({
+      markdown: "\n\n[spec (v2).pdf](https://cdn.example.test/files/spec_%28v2%29.pdf)\n",
+    })
+
+    expect(
+      resolveMarkdownImageEmbed(
+        { url: "https://blog.aquilaxk.site/post/api/v1/images/posts/diagram_(1).png", width: 800, height: 600 },
+        "diagram.png",
+        { publicApiOrigin: "https://blog.aquilaxk.site" }
+      )
+    ).toEqual({
+      markdown: "\n\n![diagram.png](https://blog.aquilaxk.site/post/api/v1/images/posts/diagram_%281%29.png?w=800&h=600)\n",
+    })
+  })
+
+  test("excludes Pandoc inline and display math ranges from live preview inline-color, highlight, and wikilink decorations", () => {
+    const displayMath = [
+      "$$",
+      "f(x) = {{color:red|x}}",
+      "g(x) = a == b == c",
+      "k(x) = a ==b== c",
+      "h(x) = [[Note]]",
+      "$$",
+    ].join("\n")
+
+    const activeFirstLineSpecs = buildMarkdownLivePreviewDecorationSpecs(displayMath, [{ from: 0, to: 0 }])
+    expect(
+      activeFirstLineSpecs.filter(
+        (spec) => spec.kind === "inline-color" || spec.kind === "highlight" || spec.kind === "wikilink"
+      )
+    ).toEqual([])
+
+    const inlineMathAndProse =
+      "Intro $f(x) = {{color:red|x}}$ mid $a == b == c$ plus $a ==b== c$ tail $[[MathWiki]]$ and {{color:blue|live}} ==mark== [[RealPage]]"
+    const inlineSpecs = buildMarkdownLivePreviewDecorationSpecs(inlineMathAndProse, [{ from: 6, to: 6 }])
+    expect(inlineSpecs.filter((spec) => spec.kind === "inline-color")).toHaveLength(1)
+    expect(inlineSpecs.filter((spec) => spec.kind === "highlight")).toHaveLength(1)
+    expect(inlineSpecs.filter((spec) => spec.kind === "wikilink").map((spec) => spec.target)).toEqual(["RealPage"])
+  })
+
+  test("trims stale out-of-bounds aq-table layout arrays and honors cross-axis bounds during span duplication", () => {
+    const staleTwoCol = [
+      '<!-- aq-table {"columnWidths":[140,220,310],"columnAlignments":["left","center","right"],"rowHeights":[44,52,68]} -->',
+      "| H1 | H2 |",
+      "| --- | --- |",
+      "| A | B |",
+    ].join("\n")
+
+    const initialGrid = parseMarkdownTableGrid(staleTwoCol)!
+    expect(getTableGridLayoutMeta(initialGrid)).toEqual({
+      columnWidths: [140, 220],
+      columnAlignments: ["left", "center"],
+      rowHeights: [44, 52],
+    })
+
+    const addedCol = applyMarkdownTableGridAction(staleTwoCol, 0, 1, { kind: "add-column" })
+    expect(addedCol).not.toBeNull()
+    const expandedGrid = parseMarkdownTableGrid(addedCol!.markdown)!
+    expect(expandedGrid.headers).toEqual(["H1", "H2", ""])
+    expect(getTableGridLayoutMeta(expandedGrid)).toEqual({
+      columnWidths: [140, 220],
+      columnAlignments: ["left", "center"],
+      rowHeights: [44, 52],
+    })
+
+    const crossColRowLayout: MarkdownTableLayout = {
+      rowHeights: [40, 50, 60],
+      cells: [
+        [null, null],
+        [null, null, { rowspan: 2 }],
+        [null, null, { hidden: true }],
+      ],
+    }
+    applyRowInsertOrDuplicateLayout(crossColRowLayout, 1, true, false, 2, 2)
+    expect(crossColRowLayout.rowHeights).toEqual([40, 50, 50, 60])
+
+    const crossRowColLayout: MarkdownTableLayout = {
+      columnWidths: [120, 180],
+      cells: [
+        [null, null],
+        [null, null],
+        [{ colspan: 2 }, { hidden: true }],
+      ],
+    }
+    applyColInsertOrDuplicateLayout(crossRowColLayout, 0, true, false, 2, 1)
+    expect(crossRowColLayout.columnWidths).toEqual([120, 120, 180])
   })
 })
 

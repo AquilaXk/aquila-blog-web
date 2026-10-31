@@ -192,12 +192,12 @@ test.describe("markdown editor paste/drop model", () => {
   })
 
   test("escapes markdown link destinations that contain parentheses", () => {
-    expect(escapeMarkdownLinkDestination("https://example.com/a)")).toBe("https://example.com/a\\)")
+    expect(escapeMarkdownLinkDestination("https://example.com/a)")).toBe("https://example.com/a%29")
     expect(escapeMarkdownLinkDestination("https://example.com/a(b)")).toBe(
-      "https://example.com/a\\(b\\)"
+      "https://example.com/a%28b%29"
     )
     const plan = planLinkifySelectionWithUrl(0, 4, "docs", "https://example.com/a)")
-    expect(plan.replacement).toBe("[docs](https://example.com/a\\))")
+    expect(plan.replacement).toBe("[docs](https://example.com/a%29)")
   })
 
   test("routes multi-file paste through transfer-files and keeps items-only fallback", () => {

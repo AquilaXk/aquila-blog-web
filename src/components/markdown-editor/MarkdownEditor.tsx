@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import { planMarkdownEditorLineCommand, type MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import { planToggleListCommand, type MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
@@ -6,11 +6,6 @@ import { EditorRoot, ToolbarError, LiveEditorBody } from "./MarkdownEditor.style
 import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
-import {
-  createMarkdownEditorTable, getMarkdownEditorTableEditAvailability, packTableEditAvailabilityMask,
-  planMarkdownEditorTableEdit, resolveTableCellSelectionOffset, unpackTableEditAvailabilityMask,
-  type MarkdownEditorTableEdit,
-} from "./markdownEditorTableModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
 import { type MarkdownFileUploadResult, type MarkdownImageUploadResult } from "./markdownEditorUploadModel"
@@ -24,6 +19,13 @@ import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
 import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
 import { useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
+import {
+  TABLE_ADD_ROW_EDIT,
+  isTableEditActionDisabled,
+  resolveActiveTableCellOffset,
+  useMarkdownEditorTableControls,
+} from "./useMarkdownEditorTableControls"
+export { isTableEditActionDisabled, resolveActiveTableCellOffset }
 export { matchSlashCommandTrigger, resolveSlashCommandMutation, SLASH_COMMAND_SPECS } from "./useMarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = { editorFocused: boolean }
@@ -46,102 +48,14 @@ type MarkdownEditorProps = {
 }
 
 type TextareaSelection = MarkdownEditorFocusSelection
-type TableEditAvailability = NonNullable<ReturnType<typeof getMarkdownEditorTableEditAvailability>>
-type TableAlignment = Extract<MarkdownEditorTableEdit, { kind: "set-alignment" }>["alignment"]
 
-const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
 const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode => {
   if (prev === "live") return "source"
   return prev === "source" ? "reading" : "live"
 }
-const isAlignmentDisabled = (alignment: TableAlignment, availability: TableEditAvailability): boolean => {
-  if (alignment === "left") return !availability.alignLeft
-  return alignment === "center" ? !availability.alignCenter : !availability.alignRight
-}
-
-export const isTableEditActionDisabled = (
-  edit: MarkdownEditorTableEdit,
-  availability: TableEditAvailability | null
-): boolean => {
-  if (!availability) return true
-  switch (edit.kind) {
-    case "add-row":
-    case "insert-row-above":
-    case "duplicate-row":
-      return !availability.addRow
-    case "move-row-up":
-    case "move-row-down":
-    case "move-row-to":
-    case "delete-row":
-      return !availability.deleteRow
-    case "add-column":
-    case "insert-column-left":
-    case "duplicate-column":
-      return !availability.addColumn
-    case "add-row-and-column":
-      return !availability.addRow && !availability.addColumn
-    case "move-column-left":
-    case "move-column-right":
-    case "move-column-to":
-    case "delete-column":
-      return !availability.deleteColumn
-    case "clear-row":
-    case "clear-column":
-      return false
-    case "set-alignment":
-      return isAlignmentDisabled(edit.alignment, availability)
-  }
-}
-
-type FocusableTableElement = {
-  classList?: { contains?: (token: string) => boolean }
-  closest?: <T extends Element = Element>(selector: string) => T | null
-  blur?: () => void
-}
-
-const asFocusableTableElement = (el: unknown): FocusableTableElement | null =>
-  el && typeof el === "object" ? (el as FocusableTableElement) : null
-
-const isTableCellOrImeProxyElement = (el: FocusableTableElement | null): boolean =>
-  Boolean(
-    el?.classList?.contains?.("cm-live-table-cell-input") ||
-      el?.classList?.contains?.("cm-live-table-ime-proxy")
-  )
-
-const isEditorContentOutsideTable = (el: FocusableTableElement | null): boolean =>
-  Boolean(el?.closest?.(".cm-content") && !el.closest?.(".cm-live-table-wrap"))
-
-const parseDatasetCoordinate = (value: string | undefined): number => {
-  const parsed = Number.parseInt(value ?? "0", 10)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-export const resolveActiveTableCellOffset = (root: HTMLElement | null, readMarkdown: () => string): number | null => {
-  const activeEl = asFocusableTableElement(typeof document !== "undefined" ? document.activeElement : null)
-  const isTableInput = isTableCellOrImeProxyElement(activeEl)
-  if (!isTableInput && isEditorContentOutsideTable(activeEl)) return null
-  const activeWrap =
-    (isTableInput ? activeEl?.closest?.<HTMLElement>(".cm-live-table-wrap") : null) ??
-    root?.querySelector<HTMLElement>(".cm-live-table-wrap[data-active-mode]") ??
-    null
-  if (isTableInput) activeEl?.blur?.()
-  if (!activeWrap) return null
-  const tableFrom = Number.parseInt(activeWrap.dataset?.tableFrom ?? "", 10)
-  const row = parseDatasetCoordinate(activeWrap.dataset?.activeRow)
-  const col = parseDatasetCoordinate(activeWrap.dataset?.activeCol)
-  return resolveTableCellSelectionOffset(readMarkdown(), tableFrom, row, col)
-}
 
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
-
-const createUploadClickTrigger = (
-  enabled: boolean,
-  inputRef: RefObject<HTMLInputElement | null>
-): (() => void) | undefined => (enabled ? () => inputRef.current?.click() : undefined)
-
-const resolveFindReplaceScopeLabel = (scope: unknown): "선택 영역" | "전체 문서" =>
-  scope ? "선택 영역" : "전체 문서"
 
 export const MarkdownEditor = ({
   value, disabled = false, disableMermaid = false, onRequestFocusTitle, onChange,
@@ -150,9 +64,7 @@ export const MarkdownEditor = ({
 }: MarkdownEditorProps) => {
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
-  const [tableRows, setTableRows] = useState(2)
-  const [tableColumns, setTableColumns] = useState(2)
-  const [tableEditAvailabilityMask, setTableEditAvailabilityMask] = useState(-1)
+  const [viewMode, setViewMode] = useState<MarkdownEditorSurfaceMode>("live")
   const [editorSelection, setEditorSelectionState] = useState<TextareaSelection>({ from: 0, to: 0 })
   const liveEditorBodyRef = useRef<HTMLDivElement | null>(null)
   const liveSurfaceRef = useRef<MarkdownEditorLiveSurfaceHandle | null>(null)
@@ -164,6 +76,8 @@ export const MarkdownEditor = ({
   const uploadInFlightCountRef = useRef(0)
   const allowNativeTabAfterEscapeRef = useRef(false)
   const pendingFindReplaceInvalidationRef = useRef(false)
+  const isAuthoringDisabled = disabled || viewMode === "reading"
+  const cycleViewMode = useCallback(() => setViewMode(nextEditorViewMode), [])
 
   const syncSelectionState = useCallback((next: TextareaSelection) => {
     selectionRef.current = next
@@ -180,23 +94,6 @@ export const MarkdownEditor = ({
     [onUploadingChange]
   )
 
-  useEffect(() => {
-    if (value === valueRef.current) return
-    valueRef.current = value
-    setDraftValue(value)
-    setTableEditAvailabilityMask(-1)
-    pendingFindReplaceInvalidationRef.current = true
-    documentGenerationRef.current += 1
-  }, [value])
-
-  useEffect(() => {
-    onFlushMarkdownReady?.(() => {
-      resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
-      return valueRef.current
-    })
-    return () => onFlushMarkdownReady?.(null)
-  }, [onFlushMarkdownReady])
-
   const commitMarkdown = useCallback(
     (nextMarkdown: string, editorFocused = false, options?: { clearUploadError?: boolean }) => {
       valueRef.current = nextMarkdown
@@ -209,37 +106,6 @@ export const MarkdownEditor = ({
     [onChange]
   )
 
-  const updateActiveTableSelection = useCallback((nextValue = valueRef.current, selection = selectionRef.current) => {
-    setTableEditAvailabilityMask(
-      packTableEditAvailabilityMask(
-        getMarkdownEditorTableEditAvailability(nextValue, selection.from, selection.to)
-      )
-    )
-  }, [])
-
-  const setEditorSelection = useCallback((from: number, to = from) => {
-    const length = valueRef.current.length
-    const nextSelection = {
-      from: Math.max(0, Math.min(from, length)),
-      to: Math.max(0, Math.min(to, length)),
-    }
-    syncSelectionState(nextSelection)
-    updateActiveTableSelection(valueRef.current, nextSelection)
-    onSelectionChange?.(nextSelection)
-    liveSurfaceRef.current?.focus(nextSelection)
-  }, [onSelectionChange, syncSelectionState, updateActiveTableSelection])
-
-  const [viewMode, setViewMode] = useState<MarkdownEditorSurfaceMode>("live")
-  const isAuthoringDisabled = disabled || viewMode === "reading"
-  const cycleViewMode = useCallback(() => setViewMode(nextEditorViewMode), [])
-
-  useEffect(() => {
-    onFocusRequestReady?.((selection) => {
-      if (!disabled) liveSurfaceRef.current?.focus(selection)
-    })
-    return () => onFocusRequestReady?.(null)
-  }, [disabled, onFocusRequestReady])
-
   const applyRawMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
       const surface = liveSurfaceRef.current
@@ -250,9 +116,91 @@ export const MarkdownEditor = ({
     },
     [isAuthoringDisabled, syncSelectionState]
   )
+  const applyMutationPlan = applyRawMutationPlan
+
+  const applyFallbackValueMutation = useCallback(
+    (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
+      const next = applyPlannedTextMutationToValue(valueRef.current, plan)
+      const selection = { from: next.selectionStart, to: next.selectionEnd }
+      syncSelectionState(selection)
+      commitMarkdown(next.value, true, options)
+      return { value: next.value, selection }
+    },
+    [commitMarkdown, syncSelectionState]
+  )
+
+  const syncSelectionFromLiveDom = useCallback(() => {
+    const tableCellOffset = resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
+    const snapshot = liveSurfaceRef.current?.readSnapshot()
+    if (tableCellOffset !== null) {
+      syncSelectionState({ from: tableCellOffset, to: tableCellOffset })
+    } else if (snapshot) {
+      syncSelectionState(snapshot.selection)
+    }
+    return selectionRef.current
+  }, [syncSelectionState])
+
+  const readTableSelection = useCallback(
+    () => (liveSurfaceRef.current ? syncSelectionFromLiveDom() : selectionRef.current),
+    [syncSelectionFromLiveDom]
+  )
+
+  const {
+    tableRows,
+    setTableRows,
+    tableColumns,
+    setTableColumns,
+    resetTableAvailability,
+    syncSelectionTableAvailability,
+    insertTable,
+    tableEditAction,
+    isTableEditDisabled,
+    isTableSelection,
+  } = useMarkdownEditorTableControls({
+    disabled: isAuthoringDisabled,
+    valueRef,
+    readSelection: readTableSelection,
+    applyMutationPlan,
+    applyFallbackMutation: applyFallbackValueMutation,
+  })
+
+  useEffect(() => {
+    if (value === valueRef.current) return
+    valueRef.current = value
+    setDraftValue(value)
+    resetTableAvailability()
+    pendingFindReplaceInvalidationRef.current = true
+    documentGenerationRef.current += 1
+  }, [resetTableAvailability, value])
+
+  useEffect(() => {
+    onFlushMarkdownReady?.(() => {
+      resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
+      return valueRef.current
+    })
+    return () => onFlushMarkdownReady?.(null)
+  }, [onFlushMarkdownReady])
+
+  const setEditorSelection = useCallback((from: number, to = from) => {
+    const length = valueRef.current.length
+    const nextSelection = {
+      from: Math.max(0, Math.min(from, length)),
+      to: Math.max(0, Math.min(to, length)),
+    }
+    syncSelectionState(nextSelection)
+    syncSelectionTableAvailability(valueRef.current, nextSelection)
+    onSelectionChange?.(nextSelection)
+    liveSurfaceRef.current?.focus(nextSelection)
+  }, [onSelectionChange, syncSelectionState, syncSelectionTableAvailability])
+
+  useEffect(() => {
+    onFocusRequestReady?.((selection) => {
+      if (!disabled) liveSurfaceRef.current?.focus(selection)
+    })
+    return () => onFocusRequestReady?.(null)
+  }, [disabled, onFocusRequestReady])
 
   const readEditorSnapshot = useCallback(() => liveSurfaceRef.current?.readSnapshot() ?? null, [])
-  const applyMutationPlan = applyRawMutationPlan
   const selectFindReplaceRange = useCallback((from: number, to?: number) => setEditorSelection(from, to), [setEditorSelection])
 
   const findReplace = useMarkdownEditorFindReplace({
@@ -268,17 +216,11 @@ export const MarkdownEditor = ({
   }, [invalidateFindReplace, value])
 
   const rememberTextareaSelection = useCallback(() => {
-    const tableCellOffset = resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
-    const snapshot = liveSurfaceRef.current?.readSnapshot()
-    if (tableCellOffset !== null) {
-      syncSelectionState({ from: tableCellOffset, to: tableCellOffset })
-    } else if (snapshot) {
-      syncSelectionState(snapshot.selection)
-    }
-    handleFindReplaceSelectionChange(selectionRef.current)
-    updateActiveTableSelection(valueRef.current, selectionRef.current)
-    return selectionRef.current
-  }, [handleFindReplaceSelectionChange, syncSelectionState, updateActiveTableSelection])
+    const selection = syncSelectionFromLiveDom()
+    handleFindReplaceSelectionChange(selection)
+    syncSelectionTableAvailability(valueRef.current, selection)
+    return selection
+  }, [handleFindReplaceSelectionChange, syncSelectionFromLiveDom, syncSelectionTableAvailability])
 
   const resolveActiveSelection = useCallback(
     () => (liveSurfaceRef.current ? rememberTextareaSelection() : selectionRef.current),
@@ -289,13 +231,11 @@ export const MarkdownEditor = ({
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
       if (isAuthoringDisabled) return false
       if (applyMutationPlan(plan, options)) return true
-      const next = applyPlannedTextMutationToValue(valueRef.current, plan)
-      syncSelectionState({ from: next.selectionStart, to: next.selectionEnd })
-      updateActiveTableSelection(next.value, selectionRef.current)
-      commitMarkdown(next.value, true, options)
+      const next = applyFallbackValueMutation(plan, options)
+      syncSelectionTableAvailability(next.value, next.selection)
       return true
     },
-    [applyMutationPlan, commitMarkdown, isAuthoringDisabled, syncSelectionState, updateActiveTableSelection]
+    [applyFallbackValueMutation, applyMutationPlan, isAuthoringDisabled, syncSelectionTableAvailability]
   )
 
   const applyBackgroundMarkdownMutation = useCallback(
@@ -334,40 +274,14 @@ export const MarkdownEditor = ({
     [applyPlannedMarkdownMutation, isAuthoringDisabled, resolveActiveSelection]
   )
 
-  const insertTable = useCallback(() => {
-    if (isAuthoringDisabled) return
-    const table = createMarkdownEditorTable(tableRows, tableColumns)
-    if (table) applyBlockSnippet(table)
-  }, [applyBlockSnippet, isAuthoringDisabled, tableColumns, tableRows])
-
-  const applyTableEdit = useCallback(
-    (edit: MarkdownEditorTableEdit) => {
-      if (isAuthoringDisabled) return
-      const { from, to } = resolveActiveSelection()
-      const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
-      if (plan) applyPlannedMarkdownMutation(plan)
-    },
-    [applyPlannedMarkdownMutation, isAuthoringDisabled, resolveActiveSelection]
-  )
-
-  const tableEditAvailability = useMemo(
-    () => (isAuthoringDisabled ? null : unpackTableEditAvailabilityMask(tableEditAvailabilityMask)),
-    [isAuthoringDisabled, tableEditAvailabilityMask]
-  )
-
-  const isTableEditDisabled = useCallback(
-    (edit: MarkdownEditorTableEdit) => isTableEditActionDisabled(edit, tableEditAvailability),
-    [tableEditAvailability]
-  )
-
   const commandContext = useMemo(
     () => ({
       disabled: isAuthoringDisabled,
       selectionStart: editorSelection.from,
       selectionEnd: editorSelection.to,
-      isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
+      isTableSelection,
     }),
-    [editorSelection, isAuthoringDisabled, isTableEditDisabled]
+    [editorSelection, isAuthoringDisabled, isTableSelection]
   )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
@@ -386,14 +300,14 @@ export const MarkdownEditor = ({
         disabled: isAuthoringDisabled,
         selectionStart: selectionRef.current.from,
         selectionEnd: selectionRef.current.to,
-        isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
+        isTableSelection,
       })
       if (!action) return
       if (action.kind === "format") return applyFormatShortcutOrAppend(action.shortcut)
       if (action.kind === "block") return applyBlockSnippet(codeBlockSnippet)
-      applyTableEdit(TABLE_ADD_ROW_EDIT)
+      tableEditAction(TABLE_ADD_ROW_EDIT)
     },
-    [applyBlockSnippet, applyFormatShortcutOrAppend, applyTableEdit, isAuthoringDisabled, isTableEditDisabled]
+    [applyBlockSnippet, applyFormatShortcutOrAppend, isAuthoringDisabled, isTableSelection, tableEditAction]
   )
 
   const applySnippet = useCallback(
@@ -462,8 +376,8 @@ export const MarkdownEditor = ({
   const { slashMenuState, slashMenuOpenRef, slashMenuItems, checkSlashCommand, closeSlashMenu } =
     useMarkdownEditorSlashMenu({
       selectionRef, applyMutationPlan, disableMermaid,
-      onRequestImageUpload: createUploadClickTrigger(Boolean(onUploadImage), imageInputRef),
-      onRequestFileUpload: createUploadClickTrigger(Boolean(onUploadFile), fileInputRef),
+      onRequestImageUpload: onUploadImage ? () => imageInputRef.current?.click() : undefined,
+      onRequestFileUpload: onUploadFile ? () => fileInputRef.current?.click() : undefined,
       resolveSlashCoords,
     })
 
@@ -494,13 +408,13 @@ export const MarkdownEditor = ({
     (selection: TextareaSelection) => {
       syncSelectionState(selection)
       handleFindReplaceSelectionChange(selection)
-      updateActiveTableSelection(valueRef.current, selection)
+      syncSelectionTableAvailability(valueRef.current, selection)
       onSelectionChange?.(selection)
       if (viewMode === "live" && !disabled) {
         checkSlashCommand(valueRef.current, selection)
       }
     },
-    [checkSlashCommand, disabled, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, updateActiveTableSelection, viewMode]
+    [checkSlashCommand, disabled, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, syncSelectionTableAvailability, viewMode]
   )
 
   const handleLiveChange = useCallback(
@@ -530,7 +444,7 @@ export const MarkdownEditor = ({
         onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
         onApplyListCommand={applyListCommand} onApplyLineCommand={applyLineCommand}
         onApplyBlockSnippet={applyBlockSnippet} onInsertTable={insertTable}
-        onApplyTableEdit={applyTableEdit} isTableEditDisabled={isTableEditDisabled}
+        onApplyTableEdit={tableEditAction} isTableEditDisabled={isTableEditDisabled}
         onOpenFindReplace={findReplace.open} onImageFileSelect={handleImageFileSelect}
         onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={setViewMode}
       />
@@ -544,7 +458,7 @@ export const MarkdownEditor = ({
           onReplaceAll={findReplace.replaceAll} onReplaceCurrent={findReplace.replaceCurrent}
           onReplacementChange={findReplace.updateReplacement} replacement={findReplace.replacement}
           replaceCurrentDisabled={findReplace.replaceCurrentDisabled}
-          scopeLabel={resolveFindReplaceScopeLabel(findReplace.panel.scope)}
+          scopeLabel={findReplace.panel.scope ? "선택 영역" : "전체 문서"}
           totalMatches={findReplace.totalMatches} query={findReplace.query}
         />
       ) : null}
