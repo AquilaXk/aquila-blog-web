@@ -7,7 +7,7 @@ export const PublishModalBackdrop = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 120;
+  z-index: 190;
   padding: 1rem;
 
   &[data-variant="drawer"] {
@@ -32,6 +32,8 @@ export const PublishDialog = styled.div`
     width: min(560px, 100vw);
     max-height: 100vh;
     height: 100vh;
+    max-height: 100dvh;
+    height: 100dvh;
     border-radius: 0;
     border-left: 1px solid ${({ theme }) => theme.colors.gray6};
     border-right: 0;
@@ -81,7 +83,7 @@ export const PublishModalFooter = styled.div`
   display: flex;
   justify-content: flex-end;
   gap: 0.52rem;
-  padding: 0.78rem 0;
+  padding: 0.78rem 0 max(0.78rem, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
 

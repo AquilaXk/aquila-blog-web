@@ -10,16 +10,17 @@ import {
   removeLocalDraftCandidate, resolveLocalDraftSource,
 } from "./editorStudioStorageModel"
 import {
-  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition,
-  removeLocalDraftCandidateForSource, resolveLocalDraftShouldAdoptBaseline,
-  shouldReleasePostIdTransitionGate,
+  buildLocalDraftPayloadForSource, clearLocalDraftSuppressionForSource, computeStoredDraftFingerprint,
+  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition, removeLocalDraftCandidateForSource,
+  resolveLocalDraftShouldAdoptBaseline, resolveRestoredPostVersion, shouldReleasePostIdTransitionGate,
   type LocalDraftBaselineReadySignal, type LocalDraftFingerprintSnapshot,
 } from "./editorStudioDraftAutosaveDecisionModel"
 export {
-  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition,
-  isLocalDraftBaselineSettleLoadingKey, isLocalDraftRestoreSuggestionEligible,
-  LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS, removeLocalDraftCandidateForSource,
-  resolveCreateWritePostId, resolveLocalDraftShouldAdoptBaseline, shouldReleasePostIdTransitionGate,
+  buildLocalDraftPayloadForSource, clearLocalDraftSuppressionForSource, computeStoredDraftFingerprint,
+  decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition, isLocalDraftBaselineSettleLoadingKey,
+  isLocalDraftRestoreSuggestionEligible, LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS,
+  removeLocalDraftCandidateForSource, resolveCreateWritePostId, resolveLocalDraftShouldAdoptBaseline,
+  resolveRestoredPostVersion, shouldReleasePostIdTransitionGate,
   type CreateWritePostIdResolution, type LocalDraftAutosaveDecision,
   type LocalDraftAutosaveDecisionInput, type LocalDraftBaselineReadySignal,
   type LocalDraftFingerprintSnapshot,
@@ -32,44 +33,23 @@ type PublishTarget = "page" | "modal"
 type EditorMode = "create" | "edit"
 
 type UseEditorStudioLocalDraftLifecycleParams = {
-  editorMode: EditorMode
-  postId: string
-  postVersion: number | null
-  loadingKey: string
-  postTitle: string
-  postContent: string
-  getCurrentPostContent: () => string
-  postSummary: string
-  postSummarySource: CanonicalSummaryState["summarySource"]
-  summaryIntent: SummaryIntent
-  postThumbnailUrl: string
-  postThumbnailFocusX: number
-  postThumbnailFocusY: number
-  postThumbnailZoom: number
-  postTags: string[]
-  postCategory: string
-  postVisibility: PostVisibility
-  setEditorMode: StudioSetState<EditorMode>
-  setIsTempDraftMode: StudioSetState<boolean>
-  setPostId: StudioSetState<string>
-  setPostVersion: StudioSetState<number | null>
-  setPreviewThumbnailSourceUrl: StudioSetState<string>
-  setPostTitle: StudioSetState<string>
-  setPostContent: StudioSetState<string>
-  setPostSummary: StudioSetState<string>
+  editorMode: EditorMode; postId: string; postVersion: number | null; loadingKey: string
+  postTitle: string; postContent: string; getCurrentPostContent: () => string
+  postSummary: string; postSummarySource: CanonicalSummaryState["summarySource"]; summaryIntent: SummaryIntent
+  postThumbnailUrl: string; postThumbnailFocusX: number; postThumbnailFocusY: number; postThumbnailZoom: number
+  postTags: string[]; postCategory: string; postVisibility: PostVisibility
+  setEditorMode: StudioSetState<EditorMode>; setIsTempDraftMode: StudioSetState<boolean>
+  setPostId: StudioSetState<string>; setPostVersion: StudioSetState<number | null>
+  setPreviewThumbnailSourceUrl: StudioSetState<string>; setPostTitle: StudioSetState<string>
+  setPostContent: StudioSetState<string>; setPostSummary: StudioSetState<string>
   setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
-  setSummaryIntent: StudioSetState<SummaryIntent>
-  setPostThumbnailUrl: StudioSetState<string>
-  setPostThumbnailFocusX: StudioSetState<number>
-  setPostThumbnailFocusY: StudioSetState<number>
-  setPostThumbnailZoom: StudioSetState<number>
-  setPostTags: StudioSetState<string[]>
-  setPostCategory: StudioSetState<string>
-  setPostVisibility: StudioSetState<PostVisibility>
+  setSummaryIntent: StudioSetState<SummaryIntent>; setPostThumbnailUrl: StudioSetState<string>
+  setPostThumbnailFocusX: StudioSetState<number>; setPostThumbnailFocusY: StudioSetState<number>
+  setPostThumbnailZoom: StudioSetState<number>; setPostTags: StudioSetState<string[]>
+  setPostCategory: StudioSetState<string>; setPostVisibility: StudioSetState<PostVisibility>
   setLocalDraftSavedAt: StudioSetState<string>
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
-  dedupeStrings: (items: string[]) => string[]
-  normalizeCategoryValue: (value: string) => string
+  dedupeStrings: (items: string[]) => string[]; normalizeCategoryValue: (value: string) => string
   buildLocalDraftFingerprint: (payload: Omit<LocalDraftPayload, "savedAt" | "source" | "postVersion">) => string
   persistLocalDraft: (payload: LocalDraftPayload) => void
   readLocalDraft: (source: LocalDraftSource) => LocalDraftPayload | null
@@ -163,7 +143,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       thumbnailFocusY: postThumbnailFocusY,
       thumbnailZoom: postThumbnailZoom,
       tags: dedupeStrings(postTags),
-      category: postCategory ? normalizeCategoryValue(postCategory) : "",
+      category: postCategory.trim() ? normalizeCategoryValue(postCategory) : "",
       visibility: postVisibility,
     }),
     [
@@ -222,27 +202,14 @@ export const useEditorStudioLocalDraftLifecycle = ({
       return
     }
 
-    const currentLocalDraftCore = {
-      ...localDraftCore,
-      content: getCurrentPostContent(),
-    }
-    const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
-
-    if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) {
-      return
-    }
-
-    const resolvedPostVersion =
-      source.kind === "post" && typeof postVersionRef.current === "number"
-        ? postVersionRef.current
-        : null
-
-    const payload: LocalDraftPayload = {
-      ...currentLocalDraftCore,
-      savedAt: new Date().toISOString(),
+    const { core: currentLocalDraftCore, payload } = buildLocalDraftPayloadForSource(
+      localDraftCore,
+      getCurrentPostContent(),
       source,
-      postVersion: resolvedPostVersion,
-    }
+      postVersionRef.current
+    )
+    const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
+    if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) return
 
     try {
       persistLocalDraft(payload)
@@ -263,18 +230,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setLocalDraftSavedAt(payload.savedAt)
 
     if (!options?.silent) {
-      setPublishStatus(
-        {
-          tone: "success",
-          text: `브라우저 임시저장 완료 (${describeLocalDraftSlot(payload)})`,
-        },
-        "page"
-      )
+      setPublishStatus({ tone: "success", text: `브라우저 임시저장 완료 (${describeLocalDraftSlot(payload)})` }, "page")
     }
   }, [
     buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
-    localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt,
-    setPublishStatus,
+    localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt, setPublishStatus,
   ])
 
   const restoreLocalDraft = useCallback((candidateKey?: string) => {
@@ -299,14 +259,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
     }
 
     if (draft.source.kind === "post") {
+      const isSamePost = draft.source.postId === postId.trim()
+      const currentVersionForPost = isSamePost ? postVersionRef.current : null
       setEditorMode("edit")
       setPostId(draft.source.postId)
-      if (typeof draft.postVersion === "number") {
-        setPostVersion(draft.postVersion)
-      } else if (postId !== draft.source.postId) {
-        setPostVersion(null)
-      }
-      if (draft.source.postId !== postId) {
+      setPostVersion(resolveRestoredPostVersion(currentVersionForPost, draft.postVersion))
+      if (!isSamePost) {
         setIsTempDraftMode(false)
       }
     } else {
@@ -317,20 +275,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
     }
     lastWriteFingerprintRef.current = ""
     lastWriteIdempotencyKeyRef.current = ""
-    lastLocalDraftFingerprintRef.current = buildLocalDraftFingerprint({
-      title: draft.title,
-      content: draft.content,
-      summary: draft.summary,
-      summarySource: draft.summarySource,
-      summaryIntent: draft.summaryIntent,
-      thumbnailUrl: draft.thumbnailUrl,
-      thumbnailFocusX: draft.thumbnailFocusX,
-      thumbnailFocusY: draft.thumbnailFocusY,
-      thumbnailZoom: draft.thumbnailZoom,
-      tags: dedupeStrings(draft.tags),
-      category: draft.category ? normalizeCategoryValue(draft.category) : "",
-      visibility: draft.visibility,
-    })
+    lastLocalDraftFingerprintRef.current = computeStoredDraftFingerprint(
+      draft,
+      buildLocalDraftFingerprint,
+      dedupeStrings,
+      normalizeCategoryValue
+    )
     const restoredDraft = { key: selectedKey, source: draft.source, fingerprint: lastLocalDraftFingerprintRef.current }
     setLocalDraftCandidate(restoredDraft)
     setRestoredLocalDraft((current) =>
@@ -404,16 +354,78 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPublishStatus,
   ])
 
-  const refreshLocalDraftCandidates = useCallback(() => {
-    const candidates = listLocalDraftCandidates(draftSource).map(({ key, draft }) => ({
+  const refreshLocalDraftCandidatesForSource = useCallback((source: LocalDraftSource) => {
+    const candidates = listLocalDraftCandidates(source).map(({ key, draft }) => ({
       key,
       label: describeLocalDraftSlot(draft),
       source: draft.source,
-      fingerprint: buildLocalDraftFingerprint({ title: draft.title, content: draft.content, summary: draft.summary, summarySource: draft.summarySource, summaryIntent: draft.summaryIntent, thumbnailUrl: draft.thumbnailUrl, thumbnailFocusX: draft.thumbnailFocusX, thumbnailFocusY: draft.thumbnailFocusY, thumbnailZoom: draft.thumbnailZoom, tags: dedupeStrings(draft.tags), category: draft.category ? normalizeCategoryValue(draft.category) : "", visibility: draft.visibility }),
+      fingerprint: computeStoredDraftFingerprint(
+        draft,
+        buildLocalDraftFingerprint,
+        dedupeStrings,
+        normalizeCategoryValue
+      ),
     }))
     setLocalDraftCandidates(candidates)
     return candidates
-  }, [buildLocalDraftFingerprint, dedupeStrings, draftSource, normalizeCategoryValue])
+  }, [buildLocalDraftFingerprint, dedupeStrings, normalizeCategoryValue])
+
+  const refreshLocalDraftCandidates = useCallback(
+    () => refreshLocalDraftCandidatesForSource(draftSource),
+    [draftSource, refreshLocalDraftCandidatesForSource]
+  )
+
+  const preserveLocalDraftForConflictReload = useCallback((targetPostId?: string): boolean => {
+    const normalizedTargetPostId = (targetPostId ?? postId).trim()
+    const source: LocalDraftSource = normalizedTargetPostId
+      ? { kind: "post", postId: normalizedTargetPostId }
+      : draftSourceRef.current
+    const { core: currentLocalDraftCore, payload } = buildLocalDraftPayloadForSource(
+      localDraftCore,
+      getCurrentPostContent(),
+      source,
+      postVersionRef.current
+    )
+    const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
+
+    try {
+      persistLocalDraft(payload)
+    } catch {
+      const errorNotice: PublishNotice = {
+        tone: "error",
+        text: "브라우저 임시저장에 실패해 서버 최신본을 불러오지 않았습니다. 현재 원고를 복사한 뒤 다시 시도해주세요.",
+      }
+      setPublishStatus(errorNotice)
+      setPublishStatus(errorNotice, "page")
+      return false
+    }
+
+    lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
+    setLocalDraftSavedAt(payload.savedAt)
+    setRestoredLocalDraft((current) => clearLocalDraftSuppressionForSource(current, source))
+    setDismissedLocalDraft((current) => clearLocalDraftSuppressionForSource(current, source))
+
+    try {
+      const candidates = refreshLocalDraftCandidatesForSource(source)
+      const matched =
+        candidates.find((candidate) => candidate.fingerprint === currentLocalDraftFingerprint) ||
+        candidates[0] ||
+        null
+      setLocalDraftCandidate(matched)
+      cachedRestorableDraftRef.current = {
+        source,
+        candidates,
+        fingerprint: currentLocalDraftFingerprint,
+      }
+    } catch {
+      cachedRestorableDraftRef.current = null
+    }
+    return true
+  }, [
+    buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
+    localDraftCore, persistLocalDraft, postId, refreshLocalDraftCandidatesForSource,
+    setLocalDraftSavedAt, setPublishStatus,
+  ])
 
   useEffect(() => {
     const refresh = () => {
@@ -468,22 +480,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
       const pendingDraft = readLocalDraft(draftSource)
       pendingRestorableDraftFingerprint =
         pendingDraft?.savedAt
-          ? buildLocalDraftFingerprint({
-              title: pendingDraft.title,
-              content: pendingDraft.content,
-              summary: pendingDraft.summary,
-              summarySource: pendingDraft.summarySource,
-              summaryIntent: pendingDraft.summaryIntent,
-              thumbnailUrl: pendingDraft.thumbnailUrl,
-              thumbnailFocusX: pendingDraft.thumbnailFocusX,
-              thumbnailFocusY: pendingDraft.thumbnailFocusY,
-              thumbnailZoom: pendingDraft.thumbnailZoom,
-              tags: dedupeStrings(pendingDraft.tags),
-              category: pendingDraft.category
-                ? normalizeCategoryValue(pendingDraft.category)
-                : "",
-              visibility: pendingDraft.visibility,
-            })
+          ? computeStoredDraftFingerprint(
+              pendingDraft,
+              buildLocalDraftFingerprint,
+              dedupeStrings,
+              normalizeCategoryValue
+            )
           : null
       cachedRestorableDraftRef.current = {
         source: draftSource,
@@ -574,6 +576,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     discardLocalDraftCandidate,
     signalLocalDraftRemoved,
     saveLocalDraft,
+    preserveLocalDraftForConflictReload,
     restoreLocalDraft,
     clearLocalDraft,
     signalLocalDraftBaselineReady,

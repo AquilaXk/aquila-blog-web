@@ -205,6 +205,11 @@ export const CompactPublishEditorToggle = styled.button`
 `
 
 export const PublishModalNotice = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
   margin: 0;
   padding: 0.55rem 0.7rem;
   border-radius: 6px;

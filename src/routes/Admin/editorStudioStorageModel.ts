@@ -186,7 +186,7 @@ const parseLocalDraftPayload = (
       tags: Array.isArray(parsed.tags)
         ? dedupeStrings(parsed.tags.filter((item): item is string => typeof item === "string"))
         : [],
-      category: typeof parsed.category === "string" ? normalizeCategoryValue(parsed.category) : "",
+      category: typeof parsed.category === "string" && parsed.category.trim() ? normalizeCategoryValue(parsed.category) : "",
       visibility: isValidVisibility ? visibility : "PUBLIC_LISTED",
       savedAt,
       source,

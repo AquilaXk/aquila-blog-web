@@ -1,6 +1,7 @@
 import {
   useCallback,
   useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -9,13 +10,15 @@ import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiPostWriteResult } from "src/apis/backend/posts/PostApiDtos"
 import { normalizeCategoryValue } from "src/libs/utils"
-import { resolveEditorFailureRecovery } from "./editorFailureRecoveryModel"
+import { resolveEditorFailureRecovery, type EditorFailureRecovery } from "./editorFailureRecoveryModel"
 import { buildLocalDraftFingerprint } from "./editorStudioMetaModel"
-import { isTempDraftTitlePlaceholder } from "./editorTempDraft"
+import { isTempDraftCandidate } from "./editorTempDraft"
 import {
   resolveCreateWritePostId,
   type LocalDraftBaselineReadySignal,
 } from "./useEditorStudioDraftLifecycleModel"
+import { resolveCanonicalCategoryFromCatalog } from "./useEditorStudioMetaCatalog"
+import { extractPendingTagDraftValues } from "./useEditorStudioPublishModalFlow"
 import {
   resolveSummaryWriteCompletion,
   toCreateSummaryWriteFields,
@@ -34,7 +37,9 @@ type PublishNotice = { tone: NoticeTone; text: string }
 type PublishTarget = "page" | "modal"
 type EditorMode = "create" | "edit"
 
-type PostWriteResult = ApiPostWriteResult
+type PostWriteResult = ApiPostWriteResult & {
+  tempDraft?: boolean | null
+}
 
 type EditorFingerprintPayload = {
   title: string
@@ -69,7 +74,7 @@ const armLocalDraftFingerprintBaseline = (
     thumbnailFocusY: payload.thumbnailFocusY,
     thumbnailZoom: payload.thumbnailZoom,
     tags: dedupeStrings(payload.tags),
-    category: payload.category ? normalizeCategoryValue(payload.category) : "",
+    category: payload.category.trim() ? normalizeCategoryValue(payload.category) : "",
     visibility: payload.visibility,
   })
   lastLocalDraftFingerprintRef.current = fingerprint
@@ -82,7 +87,9 @@ type UseEditorStudioPersistenceParams = {
   postVersion: number | null
   postTitle: string
   postTags: string[]
+  tagDraft?: string
   postCategory: string
+  customCategoryCatalog?: ReadonlyArray<string>
   postSummary: string
   postSummarySource: CanonicalSummaryState["summarySource"]
   summaryIntent: SummaryIntent
@@ -101,6 +108,9 @@ type UseEditorStudioPersistenceParams = {
   defaultThumbnailFocusX: number
   defaultThumbnailFocusY: number
   defaultThumbnailZoom: number
+  addTagsToPost?: (values: string[]) => string[]
+  setTagDraft?: StudioSetState<string>
+  setPostCategory?: StudioSetState<string>
   setEditorMode: StudioSetState<EditorMode>
   setIsTempDraftMode: StudioSetState<boolean>
   setPostId: StudioSetState<string>
@@ -138,20 +148,20 @@ type UseEditorStudioPersistenceParams = {
 }
 
 export const useEditorStudioPersistence = ({
-  buildEditorStateFingerprint, composeEditorContent, dedupeStrings, defaultThumbnailFocusX,
-  defaultThumbnailFocusY, defaultThumbnailZoom, detectPublishPlaceholderIssue, editorMode,
-  effectiveThumbnailUrl, extractImageFileFromClipboard, generateIdempotencyKey,
-  lastLocalDraftFingerprintRef, lastWriteFingerprintRef, lastWriteIdempotencyKeyRef,
-  loadingKey, normalizeSafeImageUrl, postCategory, getCurrentPostContent, postId,
-  postSummary, postSummarySource, summaryIntent, postTags, postThumbnailFocusX,
-  postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion,
-  postVisibility, pretty, refreshPublicPostReadViews, serverBaselineEditorFingerprintRef,
-  signalLocalDraftBaselineReady, setEditorMode, setIsPreviewThumbnailError,
-  setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
-  setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
+  addTagsToPost, buildEditorStateFingerprint, composeEditorContent, customCategoryCatalog,
+  dedupeStrings, defaultThumbnailFocusX, defaultThumbnailFocusY, defaultThumbnailZoom,
+  detectPublishPlaceholderIssue, editorMode, effectiveThumbnailUrl, extractImageFileFromClipboard,
+  generateIdempotencyKey, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
+  lastWriteIdempotencyKeyRef, loadingKey, normalizeSafeImageUrl, postCategory,
+  getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
+  postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
+  postVersion, postVisibility, pretty, refreshPublicPostReadViews,
+  serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, setEditorMode,
+  setIsPreviewThumbnailError, setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
+  setPostCategory, setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
   setPostThumbnailUrl, setPostThumbnailZoom, setPostVersion, setPostSummary,
   setPostSummarySource, setSummaryIntent, setPreviewThumbnailSourceUrl, setPublishStatus,
-  setResult, setThumbnailImageFileName, toFlags, uploadWithConflictRetry,
+  setResult, setTagDraft, setThumbnailImageFileName, tagDraft, toFlags, uploadWithConflictRetry,
 }: UseEditorStudioPersistenceParams) => {
   const {
     handleMarkdownEditorImageUpload,
@@ -235,8 +245,48 @@ export const useEditorStudioPersistence = ({
     ]
   )
 
+  const [lastSaveError, setLastSaveError] = useState<EditorFailureRecovery["result"] | null>(null)
+  const clearLastSaveError = useCallback(() => {
+    setLastSaveError(null)
+  }, [])
+
+  const resolveAuthoringMetadataForWrite = useCallback(() => {
+    const pendingTags = extractPendingTagDraftValues(tagDraft ?? "")
+    if (pendingTags.length > 0) {
+      addTagsToPost?.(pendingTags)
+      setTagDraft?.("")
+    } else if ((tagDraft ?? "").length > 0) {
+      setTagDraft?.("")
+    }
+    const effectiveTags = dedupeStrings(pendingTags.length > 0 ? [...postTags, ...pendingTags] : postTags)
+    const effectiveCategory = resolveCanonicalCategoryFromCatalog(postCategory, customCategoryCatalog ?? [])
+    if (effectiveCategory !== postCategory) {
+      setPostCategory?.(effectiveCategory)
+    }
+    return { tags: effectiveTags, category: effectiveCategory }
+  }, [addTagsToPost, customCategoryCatalog, dedupeStrings, postCategory, postTags, setPostCategory, setTagDraft, tagDraft])
+
+  const reportSaveFailure = useCallback(
+    (error: unknown, action: "write" | "modify" | "publish-temp"): false => {
+      const recovery = resolveEditorFailureRecovery(error, { action, isOnline: isBrowserOnline() })
+      setLastSaveError(recovery.result)
+      setPublishStatus({ tone: "error", text: recovery.statusText })
+      if (recovery.result.errorType === "version-conflict") {
+        setPublishStatus({ tone: "error", text: recovery.statusText }, "page")
+      }
+      setResult(pretty(recovery.result))
+      return false
+    },
+    [pretty, setPublishStatus, setResult]
+  )
+
   const buildSuccessfulWriteFingerprintPayload = useCallback(
-    (content: string, canonicalSummary: CanonicalSummaryState): EditorFingerprintPayload => ({
+    (
+      content: string,
+      canonicalSummary: CanonicalSummaryState,
+      tags: string[],
+      category: string
+    ): EditorFingerprintPayload => ({
       title: postTitle,
       content,
       summary: canonicalSummary.summary,
@@ -246,31 +296,25 @@ export const useEditorStudioPersistence = ({
       thumbnailFocusX: postThumbnailFocusX,
       thumbnailFocusY: postThumbnailFocusY,
       thumbnailZoom: postThumbnailZoom,
-      tags: postTags,
-      category: postCategory,
+      tags,
+      category,
       visibility: postVisibility,
     }),
-    [
-      postCategory, postTags, postThumbnailFocusX, postThumbnailFocusY,
-      postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
-    ]
+    [postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility]
   )
 
   const buildModifyPostRequestBody = useCallback(
-    (content: string) => ({
+    (content: string, tags: string[], category: string) => ({
       title: postTitle,
-      content: composeEditorContent(content, postTags, {
-        category: postCategory,
+      content: composeEditorContent(content, tags, {
+        category,
         thumbnail: effectiveThumbnailUrl,
       }),
       ...toModifySummaryWriteFields(summaryIntent),
       ...toFlags(postVisibility),
       version: postVersion,
     }),
-    [
-      composeEditorContent, effectiveThumbnailUrl, postCategory, postTags,
-      postTitle, postVersion, postVisibility, summaryIntent, toFlags,
-    ]
+    [composeEditorContent, effectiveThumbnailUrl, postTitle, postVersion, postVisibility, summaryIntent, toFlags]
   )
 
   const handleWritePost = useCallback(async (): Promise<boolean> => {
@@ -283,11 +327,13 @@ export const useEditorStudioPersistence = ({
     if (!validateContentPreflight(currentPostContent)) return false
 
     try {
+      const { tags: effectiveTags, category: effectiveCategory } = resolveAuthoringMetadataForWrite()
       const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "create" })
+      setLastSaveError(null)
       setLoadingKey("writePost")
       setPublishStatus({ tone: "loading", text: "글 작성 중입니다..." })
-      const contentWithMetadata = composeEditorContent(currentPostContent, postTags, {
-        category: postCategory,
+      const contentWithMetadata = composeEditorContent(currentPostContent, effectiveTags, {
+        category: effectiveCategory,
         thumbnail: effectiveThumbnailUrl,
       })
 
@@ -327,7 +373,12 @@ export const useEditorStudioPersistence = ({
 
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
-      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(
+        currentPostContent,
+        canonicalSummary,
+        effectiveTags,
+        effectiveCategory
+      )
 
       setPostId(createWritePostId.postId)
       setPostVersion(typeof response.data?.version === "number" ? response.data.version : null)
@@ -365,13 +416,7 @@ export const useEditorStudioPersistence = ({
       )
       return true
     } catch (error) {
-      const recovery = resolveEditorFailureRecovery(error, {
-        action: "write",
-        isOnline: isBrowserOnline(),
-      })
-      setResult(pretty(recovery.result))
-      setPublishStatus({ tone: "error", text: recovery.statusText })
-      return false
+      return reportSaveFailure(error, "write")
     } finally {
       setLoadingKey("")
     }
@@ -379,8 +424,8 @@ export const useEditorStudioPersistence = ({
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
     composeEditorContent, dedupeStrings, editorMode, effectiveThumbnailUrl, generateIdempotencyKey,
     getCurrentPostContent, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
-    lastWriteIdempotencyKeyRef, postCategory, postId, summaryIntent, postTags, postTitle,
-    postVisibility, pretty, refreshPublicPostReadViews, reportValidationError,
+    lastWriteIdempotencyKeyRef, postId, summaryIntent, postTitle, postVisibility, pretty,
+    refreshPublicPostReadViews, reportSaveFailure, reportValidationError, resolveAuthoringMetadataForWrite,
     serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, setEditorMode,
     setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
     setPostId, setPostVersion, setPublishStatus, setResult, toFlags, validateContentPreflight,
@@ -397,21 +442,36 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const { tags: effectiveTags, category: effectiveCategory } = resolveAuthoringMetadataForWrite()
       const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
+      setLastSaveError(null)
       setLoadingKey("modifyPost")
       setPublishStatus({ tone: "loading", text: "글 수정 중입니다..." })
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent, effectiveTags, effectiveCategory)),
       })
 
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
-      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(
+        currentPostContent,
+        canonicalSummary,
+        effectiveTags,
+        effectiveCategory
+      )
+      const modifiedFlags = toFlags(postVisibility)
 
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
-      setIsTempDraftMode(isTempDraftTitlePlaceholder(postTitle) && postVisibility === "PRIVATE")
+      setIsTempDraftMode(
+        isTempDraftCandidate({
+          title: response?.data?.title ?? postTitle,
+          published: response?.data?.published ?? modifiedFlags.published,
+          listed: response?.data?.listed ?? modifiedFlags.listed,
+          tempDraft: typeof response?.data?.tempDraft === "boolean" ? response.data.tempDraft : false,
+        })
+      )
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
       const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({
@@ -434,13 +494,7 @@ export const useEditorStudioPersistence = ({
       setResult(pretty(response))
       return true
     } catch (error) {
-      const recovery = resolveEditorFailureRecovery(error, {
-        action: "modify",
-        isOnline: isBrowserOnline(),
-      })
-      setPublishStatus({ tone: "error", text: recovery.statusText })
-      setResult(pretty(recovery.result))
-      return false
+      return reportSaveFailure(error, "modify")
     } finally {
       setLoadingKey("")
     }
@@ -448,9 +502,10 @@ export const useEditorStudioPersistence = ({
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
     lastLocalDraftFingerprintRef, postId, postTitle, postVersion, postVisibility,
-    pretty, refreshPublicPostReadViews, reportValidationError, serverBaselineEditorFingerprintRef,
+    pretty, refreshPublicPostReadViews, reportSaveFailure, reportValidationError,
+    resolveAuthoringMetadataForWrite, serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady, setIsTempDraftMode, setLoadingKey,
-    setLocalDraftSavedAt, setPostVersion, setPublishStatus, setResult,
+    setLocalDraftSavedAt, setPostVersion, setPublishStatus, setResult, toFlags,
     validateContentPreflight,
   ])
 
@@ -465,17 +520,24 @@ export const useEditorStudioPersistence = ({
     }
 
     try {
+      const { tags: effectiveTags, category: effectiveCategory } = resolveAuthoringMetadataForWrite()
       const cleanupSubmittedDraft = captureLocalDraftCleanup({ kind: "post", postId: postId.trim() })
+      setLastSaveError(null)
       setLoadingKey("publishTempPost")
       setPublishStatus({ tone: "loading", text: "새 글을 작성하는 중입니다..." })
 
       const response = await apiFetch<RsData<PostWriteResult>>(`/post/api/v1/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent)),
+        body: JSON.stringify(buildModifyPostRequestBody(currentPostContent, effectiveTags, effectiveCategory)),
       })
       const canonicalSummary = applyCanonicalWriteResponse(response)
       if (!canonicalSummary) return false
-      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(currentPostContent, canonicalSummary)
+      const fingerprintPayload = buildSuccessfulWriteFingerprintPayload(
+        currentPostContent,
+        canonicalSummary,
+        effectiveTags,
+        effectiveCategory
+      )
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(false)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(fingerprintPayload)
@@ -500,13 +562,7 @@ export const useEditorStudioPersistence = ({
       setResult(pretty(response))
       return true
     } catch (error) {
-      const recovery = resolveEditorFailureRecovery(error, {
-        action: "publish-temp",
-        isOnline: isBrowserOnline(),
-      })
-      setPublishStatus({ tone: "error", text: recovery.statusText })
-      setResult(pretty(recovery.result))
-      return false
+      return reportSaveFailure(error, "publish-temp")
     } finally {
       setLoadingKey("")
     }
@@ -514,12 +570,15 @@ export const useEditorStudioPersistence = ({
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
     lastLocalDraftFingerprintRef, postId, postVersion, pretty, refreshPublicPostReadViews,
-    reportValidationError, serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady,
+    reportSaveFailure, reportValidationError, resolveAuthoringMetadataForWrite,
+    serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady,
     setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
     setPostVersion, setPublishStatus, setResult, validateContentPreflight,
   ])
 
   return {
+    lastSaveError,
+    clearLastSaveError,
     handleMarkdownEditorImageUpload,
     handleMarkdownEditorFileUpload,
     handleUploadThumbnailImage,

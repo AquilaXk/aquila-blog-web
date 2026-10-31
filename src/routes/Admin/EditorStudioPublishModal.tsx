@@ -44,6 +44,7 @@ type EditorStudioPublishModalProps = {
   visibilityOptions: EditorStudioPublishVisibilityOption[]
   onClose: () => void
   onConfirmPublish: () => void
+  onReloadLatestServerPost?: (() => void) | null
   onPostVisibilityChange: (nextVisibility: PostVisibility) => void
   onToggleMobileMetaEditor: () => void
   onToggleMobileThumbnailEditor: () => void
@@ -68,6 +69,7 @@ export const EditorStudioPublishModal = ({
   visibilityOptions,
   onClose,
   onConfirmPublish,
+  onReloadLatestServerPost = null,
   onPostVisibilityChange,
   onToggleMobileMetaEditor,
   onToggleMobileThumbnailEditor,
@@ -110,7 +112,18 @@ export const EditorStudioPublishModal = ({
         </PublishModalHeader>
         <PublishModalBody>
           {shouldShowNotice ? (
-            <PublishModalNotice data-tone={modalNotice.tone}>{modalNotice.text}</PublishModalNotice>
+            <PublishModalNotice data-tone={modalNotice.tone}>
+              <span>{modalNotice.text}</span>
+              {onReloadLatestServerPost ? (
+                <PublishButton
+                  type="button"
+                  disabled={isCloseDisabled}
+                  onClick={onReloadLatestServerPost}
+                >
+                  서버 최신본 다시 불러오기
+                </PublishButton>
+              ) : null}
+            </PublishModalNotice>
           ) : null}
           <PublishOverviewGrid>
             <EditorStudioPublishVisibilitySection

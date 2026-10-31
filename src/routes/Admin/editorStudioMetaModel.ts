@@ -329,7 +329,7 @@ export const buildEditorStateFingerprint = ({
     thumbnailFocusY,
     thumbnailZoom,
     tags: dedupeStrings(tags),
-    category: category ? normalizeCategoryValue(category) : "",
+    category: category.trim() ? normalizeCategoryValue(category) : "",
     visibility,
   })
 
@@ -412,7 +412,7 @@ export const composeEditorContent = (
 ) => {
   const normalizedBody = body.trim()
   const normalizedTags = dedupeStrings(tags)
-  const normalizedCategory = options?.category ? normalizeCategoryValue(options.category) : ""
+  const normalizedCategory = options?.category?.trim() ? normalizeCategoryValue(options.category) : ""
   const normalizedThumbnail = options?.thumbnail?.trim() || ""
   const metadataLines: string[] = []
 

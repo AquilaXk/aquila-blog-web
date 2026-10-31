@@ -526,6 +526,11 @@ export const PublishNotice = styled.div`
   right: 32px;
   bottom: 18px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
   margin: 0;
   padding: 0.55rem 0.7rem;
   border-radius: 6px;

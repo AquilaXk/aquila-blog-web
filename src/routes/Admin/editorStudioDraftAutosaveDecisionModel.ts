@@ -1,9 +1,29 @@
 import {
   localDraftSourcesEqual,
+  type LocalDraftFingerprintPayload,
+  type LocalDraftPayload,
   type LocalDraftSource,
 } from "./editorStudioMetaModel"
 
 type EditorMode = "create" | "edit"
+
+export const resolveRestoredPostVersion = (
+  currentPostVersion: number | null,
+  draftPostVersion: number | null | undefined
+): number | null => {
+  const hasCurrent = typeof currentPostVersion === "number" && Number.isFinite(currentPostVersion)
+  const hasDraft = typeof draftPostVersion === "number" && Number.isFinite(draftPostVersion)
+  if (hasCurrent && hasDraft) {
+    return Math.max(currentPostVersion, draftPostVersion)
+  }
+  if (hasCurrent) {
+    return currentPostVersion
+  }
+  if (hasDraft) {
+    return draftPostVersion
+  }
+  return null
+}
 
 /** loadingKey values whose settle should adopt editor fingerprint as autosave baseline. */
 export const LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS = new Set([
@@ -70,6 +90,67 @@ export const removeLocalDraftCandidateForSource = (
   source: LocalDraftSource
 ): LocalDraftFingerprintSnapshot | null =>
   candidate != null && localDraftSourcesEqual(candidate.source, source) ? null : candidate
+
+export const clearLocalDraftSuppressionForSource = (
+  snapshots: LocalDraftFingerprintSnapshot[],
+  source: LocalDraftSource
+): LocalDraftFingerprintSnapshot[] =>
+  snapshots.filter((snapshot) => !localDraftSourcesEqual(snapshot.source, source))
+
+export const computeStoredDraftFingerprint = (
+  draft: Pick<
+    LocalDraftPayload,
+    | "title"
+    | "content"
+    | "summary"
+    | "summarySource"
+    | "summaryIntent"
+    | "thumbnailUrl"
+    | "thumbnailFocusX"
+    | "thumbnailFocusY"
+    | "thumbnailZoom"
+    | "tags"
+    | "category"
+    | "visibility"
+  >,
+  buildLocalDraftFingerprint: (payload: LocalDraftFingerprintPayload) => string,
+  dedupeStrings: (items: string[]) => string[],
+  normalizeCategoryValue: (value: string) => string
+): string =>
+  buildLocalDraftFingerprint({
+    title: draft.title,
+    content: draft.content,
+    summary: draft.summary,
+    summarySource: draft.summarySource,
+    summaryIntent: draft.summaryIntent,
+    thumbnailUrl: draft.thumbnailUrl,
+    thumbnailFocusX: draft.thumbnailFocusX,
+    thumbnailFocusY: draft.thumbnailFocusY,
+    thumbnailZoom: draft.thumbnailZoom,
+    tags: dedupeStrings(draft.tags),
+    category: draft.category.trim() ? normalizeCategoryValue(draft.category) : "",
+    visibility: draft.visibility,
+  })
+
+export const buildLocalDraftPayloadForSource = (
+  core: LocalDraftFingerprintPayload,
+  content: string,
+  source: LocalDraftSource,
+  currentPostVersion: number | null
+): { core: LocalDraftFingerprintPayload; payload: LocalDraftPayload } => {
+  const nextCore: LocalDraftFingerprintPayload = { ...core, content }
+  const resolvedPostVersion =
+    source.kind === "post" && typeof currentPostVersion === "number" ? currentPostVersion : null
+  return {
+    core: nextCore,
+    payload: {
+      ...nextCore,
+      savedAt: new Date().toISOString(),
+      source,
+      postVersion: resolvedPostVersion,
+    },
+  }
+}
 
 export type LocalDraftBaselineReadySignal = {
   /**

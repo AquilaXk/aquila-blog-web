@@ -104,7 +104,7 @@ export const EditorStudioPublishCardSettings = ({
           >
             <div>
               <strong>카드 메타 편집</strong>
-              <span>썸네일 URL과 요약만 따로 정리합니다.</span>
+              <span>썸네일 URL과 업로드 방식을 설정합니다.</span>
             </div>
             <span>{isMobileMetaEditorOpen ? closeToggleLabel : "열기"}</span>
           </CompactPublishEditorToggle>

@@ -8,11 +8,12 @@ export const revalidateSavedPost = async (postId: string | number): Promise<void
   // 저장 이후의 조회 갱신 때문에 편집 화면이 무기한 잠기지 않도록 요청을 취소한다.
   const timeout = setTimeout(() => controller.abort(), POST_SAVE_REFRESH_TIMEOUT_MS)
   try {
+    const canonicalPostPath = toCanonicalPostPath(String(postId).trim())
     const response = await fetch("/api/revalidate", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths: [toCanonicalPostPath(postId)] }),
+      body: JSON.stringify({ paths: ["/", canonicalPostPath] }),
       signal: controller.signal,
     })
     if (!response.ok) throw new Error("공개 화면 갱신 요청에 실패했습니다.")

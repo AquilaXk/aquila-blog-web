@@ -11,7 +11,7 @@ import { apiFetch } from "src/apis/backend/client"
 import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { replaceRoute } from "src/libs/router"
 import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
-import { isServerTempDraftPost } from "./editorTempDraft"
+import { isServerTempDraftPost, isTempDraftCandidate } from "./editorTempDraft"
 import { useEditorStudioLocalDraftLifecycle } from "./useEditorStudioDraftLifecycleModel"
 import {
   resolvePersistedSummaryResult,
@@ -182,7 +182,7 @@ export const useEditorStudioDraftLifecycle = ({
     localDraftFingerprint, localDraftSource, localDraftCandidate, localDraftCandidates,
     selectLocalDraftCandidate, discardLocalDraftCandidate, restoredLocalDraft,
     dismissedLocalDraft, dismissLocalDraftRestoreSuggestion, signalLocalDraftRemoved,
-    saveLocalDraft, restoreLocalDraft: restoreStoredLocalDraft, clearLocalDraft,
+    saveLocalDraft, preserveLocalDraftForConflictReload, restoreLocalDraft: restoreStoredLocalDraft, clearLocalDraft,
     signalLocalDraftBaselineReady, beginLocalDraftPostLoad, endLocalDraftPostLoad,
   } = useEditorStudioLocalDraftLifecycle({
     buildLocalDraftFingerprint, dedupeStrings, editorMode, lastLocalDraftFingerprintRef,
@@ -252,7 +252,7 @@ export const useEditorStudioDraftLifecycle = ({
     setPostId(String(post.id))
     setPostVersion(typeof post.version === "number" ? post.version : null)
     setEditorMode("edit")
-    setIsTempDraftMode(isServerTempDraftPost(post))
+    setIsTempDraftMode(isTempDraftCandidate(post))
     lastWriteFingerprintRef.current = ""
     lastWriteIdempotencyKeyRef.current = ""
   }, [
@@ -264,7 +264,7 @@ export const useEditorStudioDraftLifecycle = ({
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
       const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
-      const shouldMaskTempTitle = isServerTempDraftPost(post)
+      const shouldMaskTempTitle = isTempDraftCandidate(post)
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
       const title = shouldMaskTempTitle ? "" : post.title ?? ""
       const visibility = toVisibility(!!post.published, !!post.listed)
@@ -354,6 +354,62 @@ export const useEditorStudioDraftLifecycle = ({
     setPostVisibility,
     setResult,
     signalLocalDraftBaselineReady,
+  ])
+
+  const reloadLatestServerPost = useCallback(async (targetPostId: string = postId): Promise<boolean> => {
+    const normalizedTargetPostId = targetPostId.trim()
+    if (!normalizedTargetPostId) return false
+    if (!preserveLocalDraftForConflictReload(normalizedTargetPostId)) return false
+
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
+    beginLocalDraftPostLoad()
+    try {
+      setLoadingKey("postOne")
+      setPublishStatus(
+        { tone: "loading", text: "현재 작성 내용을 임시글로 보관하고 서버 최신본을 불러오는 중입니다..." },
+        "page"
+      )
+      const resolvedPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
+      if (!isCurrentLoad()) return false
+
+      const loadedPostState = resolveLoadedPostState(resolvedPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload
+      )
+      applyLoadedPostContext(resolvedPost)
+      signalLocalDraftBaselineReady()
+      setResult(pretty(resolvedPost))
+      setPublishStatus(
+        {
+          tone: "success",
+          text: "현재 작성 내용을 브라우저 임시글로 보관하고 서버 최신본을 불러왔습니다. 임시글 복구 카드에서 비교하거나 복구해 다시 저장할 수 있습니다.",
+        },
+        "page"
+      )
+      return true
+    } catch (error) {
+      if (!isCurrentLoad()) return false
+      const message = error instanceof Error ? error.message : String(error)
+      const errorNotice: PublishNotice = {
+        tone: "error",
+        text: `서버 최신본 다시 불러오기 실패: ${message} 현재 작성 내용과 브라우저 임시저장은 유지됩니다.`,
+      }
+      setPublishStatus(errorNotice)
+      setPublishStatus(errorNotice, "page")
+      setResult(pretty({ error: message }))
+      return false
+    } finally {
+      endLocalDraftPostLoad()
+      if (isCurrentLoad()) setLoadingKey("")
+    }
+  }, [
+    applyLoadedPostContext, beginLocalDraftPostLoad, buildEditorStateFingerprint,
+    endLocalDraftPostLoad, postId, preserveLocalDraftForConflictReload, pretty,
+    resolveLoadedPostState, serverBaselineEditorFingerprintRef, setLoadingKey,
+    setPostTitle, setPostVisibility, setPublishStatus, setResult, signalLocalDraftBaselineReady,
   ])
 
   const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
@@ -463,11 +519,13 @@ export const useEditorStudioDraftLifecycle = ({
     dismissLocalDraftRestoreSuggestion,
     signalLocalDraftRemoved,
     saveLocalDraft,
+    preserveLocalDraftForConflictReload,
     restoreLocalDraft,
     clearLocalDraft,
     signalLocalDraftBaselineReady,
     switchToCreateMode,
     loadPostForEditor,
+    reloadLatestServerPost,
     handleLoadOrCreateTempPost,
   }
 }

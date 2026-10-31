@@ -75,7 +75,7 @@ export const ConfirmDialog = ({
 const ConfirmBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 220;
   display: grid;
   place-items: center;
   ${modalSafeAreaPadding}
