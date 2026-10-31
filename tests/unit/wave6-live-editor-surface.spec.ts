@@ -55,12 +55,21 @@ import {
   resolveMarkdownAttachmentLink,
   resolveMarkdownImageEmbed,
 } from "../../src/components/markdown-editor/markdownEditorUploadModel"
-import * as htmlPasteModel from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
-import * as profileImageUpload from "../../src/libs/profileImageUpload"
+import {
+  shouldBypassHtmlPasteConversion,
+  shouldReportEmptyHtmlPasteError,
+} from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
+import { resolveMarkdownEditorUploadErrorMessage } from "../../src/components/markdown-editor/useMarkdownEditorMediaTransfers"
+import {
+  hasAlphaTransparency,
+  resolveTransferOutputMimeTypes,
+} from "../../src/libs/profileImageUpload"
 
 const lightTheme = createTheme({ scheme: "light" })
 const srcFile = (...parts: string[]) =>
   readFileSync(path.resolve(__dirname, "../../src", ...parts), "utf8")
+
+type MockDomEvent = Record<string, unknown>
 
 class SimpleDomElement {
   tagName: string
@@ -85,7 +94,7 @@ class SimpleDomElement {
   attributes = new Map<string, string>()
   children: SimpleDomElement[] = []
   parentElement: SimpleDomElement | null = null
-  listeners = new Map<string, Array<(event: any) => void>>()
+  listeners = new Map<string, Array<(event: MockDomEvent) => void>>()
   private innerHtmlValue = ""
   classList = {
     add: (...tokens: string[]) => {
@@ -216,13 +225,13 @@ class SimpleDomElement {
     return out
   }
 
-  addEventListener(type: string, fn: (event: any) => void) {
+  addEventListener(type: string, fn: (event: MockDomEvent) => void) {
     const list = this.listeners.get(type) ?? []
     list.push(fn)
     this.listeners.set(type, list)
   }
 
-  removeEventListener(type: string, fn: (event: any) => void) {
+  removeEventListener(type: string, fn: (event: MockDomEvent) => void) {
     const list = this.listeners.get(type)
     if (!list) return
     this.listeners.set(
@@ -231,10 +240,10 @@ class SimpleDomElement {
     )
   }
 
-  dispatch(type: string, init: Record<string, any> = {}) {
+  dispatch(type: string, init: Record<string, unknown> = {}) {
     let defaultPrevented = false
     let propagationStopped = false
-    const event = {
+    const event: MockDomEvent = {
       type,
       target: init.target ?? this,
       currentTarget: this,
@@ -269,11 +278,12 @@ class SimpleDomElement {
   }
 }
 
-const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: any) => void>>) => T): T => {
-  const prevDoc = (globalThis as any).document
-  const prevWin = (globalThis as any).window
-  const winListeners = new Map<string, Array<(e: any) => void>>()
-  ;(globalThis as any).document = {
+const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: MockDomEvent) => void>>) => T): T => {
+  const globalRecord = globalThis as Record<string, unknown>
+  const prevDoc = globalRecord.document
+  const prevWin = globalRecord.window
+  const winListeners = new Map<string, Array<(e: MockDomEvent) => void>>()
+  globalRecord.document = {
     createElement: (tag: string) => new SimpleDomElement(tag),
     createTextNode: (text: string) => {
       const node = new SimpleDomElement("#text")
@@ -284,15 +294,15 @@ const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: any) => void>>)
     removeEventListener: () => {},
     activeElement: null,
   }
-  ;(globalThis as any).window = {
+  globalRecord.window = {
     innerWidth: 1280,
     innerHeight: 840,
-    addEventListener: (type: string, cb: (e: any) => void) => {
+    addEventListener: (type: string, cb: (e: MockDomEvent) => void) => {
       const list = winListeners.get(type) ?? []
       list.push(cb)
       winListeners.set(type, list)
     },
-    removeEventListener: (type: string, cb: (e: any) => void) => {
+    removeEventListener: (type: string, cb: (e: MockDomEvent) => void) => {
       const list = winListeners.get(type)
       if (!list) return
       winListeners.set(
@@ -304,8 +314,8 @@ const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: any) => void>>)
   try {
     return fn(winListeners)
   } finally {
-    ;(globalThis as any).document = prevDoc
-    ;(globalThis as any).window = prevWin
+    globalRecord.document = prevDoc
+    globalRecord.window = prevWin
   }
 }
 
@@ -475,16 +485,16 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       doc,
       [{ from: 2, to: 2 }],
       false,
-      "live" as never
+      "live"
     )
-    const readingSpecsAtHeading = (buildMarkdownLivePreviewDecorationSpecs as any)(
+    const readingSpecsAtHeading = buildMarkdownLivePreviewDecorationSpecs(
       doc,
       [{ from: 2, to: 2 }],
       false,
       "reading"
     )
-    expect(liveSpecsAtHeading.some((d: any) => d.kind === "hide-mark" && d.from === 0)).toBe(false)
-    expect(readingSpecsAtHeading.some((d: any) => d.kind === "hide-mark" && d.from === 0)).toBe(true)
+    expect(liveSpecsAtHeading.some((d) => d.kind === "hide-mark" && d.from === 0)).toBe(false)
+    expect(readingSpecsAtHeading.some((d) => d.kind === "hide-mark" && d.from === 0)).toBe(true)
 
     const tableCursor = doc.indexOf("| 1 |") + 2
     const readingState = createDecorationEditorState(doc, tableCursor, "reading")
@@ -655,13 +665,8 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
   })
 
   test("bypasses HTML-to-Markdown conversion for IDE/fence/source pastes and falls back to plain text on benign empty HTML", () => {
-    const shouldBypass = (htmlPasteModel as Record<string, any>).shouldBypassHtmlPasteConversion
-    const shouldBlockEmpty = (htmlPasteModel as Record<string, any>).shouldReportEmptyHtmlPasteError
-    expect(typeof shouldBypass).toBe("function")
-    expect(typeof shouldBlockEmpty).toBe("function")
-
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "source",
         markdown: "hello",
         selectionFrom: 0,
@@ -673,7 +678,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
 
     const fencedDoc = "```ts\nconst a = 1\n```"
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "live",
         markdown: fencedDoc,
         selectionFrom: fencedDoc.indexOf("const"),
@@ -685,7 +690,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
 
     const inlineCodeDoc = "Use `const x = 1` here"
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "live",
         markdown: inlineCodeDoc,
         selectionFrom: inlineCodeDoc.indexOf("const"),
@@ -696,7 +701,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     ).toBe(true)
 
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "live",
         markdown: "",
         selectionFrom: 0,
@@ -707,7 +712,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     ).toBe(true)
 
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "live",
         markdown: "",
         selectionFrom: 0,
@@ -718,7 +723,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     ).toBe(true)
 
     expect(
-      shouldBypass({
+      shouldBypassHtmlPasteConversion({
         viewMode: "live",
         markdown: "",
         selectionFrom: 0,
@@ -728,9 +733,9 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       })
     ).toBe(false)
 
-    expect(shouldBlockEmpty("<div><span>   </span></div>", "plain fallback text")).toBe(false)
-    expect(shouldBlockEmpty("<script>window.__xss = 1</script>", "ignored")).toBe(true)
-    expect(shouldBlockEmpty("<div><span>   </span></div>", "")).toBe(true)
+    expect(shouldReportEmptyHtmlPasteError("<div><span>   </span></div>", "plain fallback text")).toBe(false)
+    expect(shouldReportEmptyHtmlPasteError("<script>window.__xss = 1</script>", "ignored")).toBe(true)
+    expect(shouldReportEmptyHtmlPasteError("<div><span>   </span></div>", "")).toBe(true)
   })
 
   test("enforces Pandoc tex_math_dollars rules and literalRanges exclusion in collectMathReplacementSpecs", () => {
@@ -881,60 +886,50 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       markdown: "\n\n[Spec \\[Draft\\].pdf](https://cdn.example.test/files/spec.pdf)\n",
     })
 
-    const mediaTransfersModule = await import(
-      "../../src/components/markdown-editor/useMarkdownEditorMediaTransfers"
-    )
-    const resolveUploadError = (mediaTransfersModule as Record<string, any>)
-      .resolveMarkdownEditorUploadErrorMessage
-    expect(typeof resolveUploadError).toBe("function")
     expect(
-      resolveUploadError(
+      resolveMarkdownEditorUploadErrorMessage(
         new ApiError(413, "/post/api/v1/posts/images", JSON.stringify({ msg: "이미지 용량이 8MB를 초과했습니다." })),
         { kind: "image", fileName: "big.png", fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE }
       )
     ).toContain("용량")
     expect(
-      resolveUploadError(new ApiTimeoutError("/post/api/v1/posts/files", 12000), {
+      resolveMarkdownEditorUploadErrorMessage(new ApiTimeoutError("/post/api/v1/posts/files", 12000), {
         kind: "file",
         fileName: "doc.pdf",
         fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
       })
     ).toContain("지연")
     expect(
-      resolveUploadError(new Error("지원하지 않는 이미지 형식입니다."), {
+      resolveMarkdownEditorUploadErrorMessage(new Error("지원하지 않는 이미지 형식입니다."), {
         kind: "image",
         fileName: "bad.bmp",
         fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
       })
     ).toContain("지원하지 않는 이미지 형식입니다.")
     expect(
-      resolveUploadError(new ApiError(500, "/post/api/v1/posts/files", "failed"), {
+      resolveMarkdownEditorUploadErrorMessage(new ApiError(500, "/post/api/v1/posts/files", "failed"), {
         kind: "file",
         fileName: "failed.txt",
         fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
       })
     ).toBe(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
 
-    const hasAlpha = (profileImageUpload as Record<string, any>).hasAlphaTransparency
-    const resolveMimeTypes = (profileImageUpload as Record<string, any>).resolveTransferOutputMimeTypes
-    expect(typeof hasAlpha).toBe("function")
-    expect(typeof resolveMimeTypes).toBe("function")
-    expect(hasAlpha(new Uint8ClampedArray([255, 255, 255, 255, 10, 20, 30, 255]))).toBe(false)
-    expect(hasAlpha(new Uint8ClampedArray([255, 255, 255, 255, 10, 20, 30, 128]))).toBe(true)
+    expect(hasAlphaTransparency(new Uint8ClampedArray([255, 255, 255, 255, 10, 20, 30, 255]))).toBe(false)
+    expect(hasAlphaTransparency(new Uint8ClampedArray([255, 255, 255, 255, 10, 20, 30, 128]))).toBe(true)
     expect(
-      resolveMimeTypes(["image/webp", "image/jpeg", "image/png"], {
+      resolveTransferOutputMimeTypes(["image/webp", "image/jpeg", "image/png"], {
         sourceMimeType: "image/png",
         hasTransparency: true,
       })
     ).toEqual(["image/webp", "image/png"])
     expect(
-      resolveMimeTypes(["image/webp", "image/jpeg"], {
+      resolveTransferOutputMimeTypes(["image/webp", "image/jpeg"], {
         sourceMimeType: "image/png",
         hasTransparency: true,
       })
     ).toEqual(["image/webp", "image/png"])
     expect(
-      resolveMimeTypes(["image/webp", "image/jpeg", "image/png"], {
+      resolveTransferOutputMimeTypes(["image/webp", "image/jpeg", "image/png"], {
         sourceMimeType: "image/png",
         hasTransparency: false,
       })

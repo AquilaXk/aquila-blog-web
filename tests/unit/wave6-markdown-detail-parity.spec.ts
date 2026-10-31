@@ -18,9 +18,15 @@ import {
   createMarkdownDocumentInsights,
   formatMarkdownHeadingLabel,
 } from "../../src/libs/markdown/markdownDocumentInsights"
-import * as mermaidRuntimeConfig from "../../src/libs/markdown/mermaidRuntimeConfig"
+import {
+  loadSharedMermaidRuntime,
+  resetSharedMermaidRuntimeForTests,
+} from "../../src/libs/markdown/mermaidRuntimeConfig"
 import { createMermaidRuntimeController } from "../../src/libs/markdown/mermaidRuntimeRender"
-import * as postDetailTocModel from "../../src/routes/Detail/PostDetail/PostDetailTocModel"
+import {
+  collectTocFromArticle,
+  expandClosedAncestorDetails,
+} from "../../src/routes/Detail/PostDetail/PostDetailTocModel"
 import { buildPostDetailMetadata } from "../../src/routes/Detail/PostDetail/postDetailMetadataModel"
 import MetaConfig, { type MetaConfigProps } from "../../src/components/MetaConfig"
 import {
@@ -387,27 +393,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
   })
 
   test("5. shares Mermaid singleton loader across theme switches and preserves unwrapped source for copy", async () => {
-    const loadShared = (
-      mermaidRuntimeConfig as unknown as {
-        loadSharedMermaidRuntime?: (
-          scheme: "dark" | "light",
-          onParseWarning?: (error: unknown) => void,
-          runtimeLoader?: () => Promise<unknown>
-        ) => Promise<{
-          mermaidRuntime: {
-            initialize: (config: Record<string, unknown>) => void
-            parseError?: (err: unknown) => void
-          }
-          preset: { themeKey: string }
-        }>
-        resetSharedMermaidRuntimeForTests?: () => void
-      }
-    ).loadSharedMermaidRuntime
-
-    expect(typeof loadShared).toBe("function")
-    ;(
-      mermaidRuntimeConfig as unknown as { resetSharedMermaidRuntimeForTests?: () => void }
-    ).resetSharedMermaidRuntimeForTests?.()
+    resetSharedMermaidRuntimeForTests()
 
     const initCalls: Array<Record<string, unknown>> = []
     let loaderInvocations = 0
@@ -428,11 +414,11 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     const warningsA: unknown[] = []
     const warningsB: unknown[] = []
 
-    const first = await loadShared!("light", (err) => warningsA.push(err), loader)
+    const first = await loadSharedMermaidRuntime("light", (err) => warningsA.push(err), loader)
     fakeMermaid.parseError?.("warn-a")
-    const second = await loadShared!("light", (err) => warningsB.push(err), loader)
+    const second = await loadSharedMermaidRuntime("light", (err) => warningsB.push(err), loader)
     fakeMermaid.parseError?.("warn-b")
-    const third = await loadShared!("dark", undefined, loader)
+    const third = await loadSharedMermaidRuntime("dark", undefined, loader)
 
     expect(loaderInvocations).toBe(1)
     expect(first.mermaidRuntime).toBe(second.mermaidRuntime)
@@ -498,15 +484,8 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       querySelectorAll: () => [realHeading, footnoteHeading],
     } as unknown as HTMLElement
 
-    const collected = postDetailTocModel.collectTocFromArticle(fakeArticle)
+    const collected = collectTocFromArticle(fakeArticle)
     expect(collected).toEqual([{ id: "실제-섹션", text: "실제 섹션", level: 2 }])
-
-    const expandClosedAncestorDetails = (
-      postDetailTocModel as unknown as {
-        expandClosedAncestorDetails?: (element: Element | null) => boolean
-      }
-    ).expandClosedAncestorDetails
-    expect(typeof expandClosedAncestorDetails).toBe("function")
 
     const outerDetails = {
       tagName: "DETAILS",
@@ -529,7 +508,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       parentElement: innerDetails as unknown as Element,
     } as unknown as Element
 
-    expect(expandClosedAncestorDetails!(nestedHeading)).toBe(true)
+    expect(expandClosedAncestorDetails(nestedHeading)).toBe(true)
     expect(innerDetails.open).toBe(true)
     expect(outerDetails.open).toBe(true)
 
