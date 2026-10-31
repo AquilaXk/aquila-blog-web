@@ -1,64 +1,417 @@
-import { EditorSelection, Transaction } from "@codemirror/state"
-import { WidgetType, EditorView } from "@codemirror/view"
+import { EditorView, WidgetType } from "@codemirror/view"
 import {
-  applyMarkdownTableGridAction, applyMarkdownTableGridCellEdit, applyMarkdownTableGridPaste,
-  applyTableCellInlineFormat, parseMarkdownTableGrid, serializeMarkdownTableGrid,
-  type MarkdownTableGrid, type MarkdownTableGridAction, type TableCellInlineFormatKind,
+  applyMarkdownTableGridAction, applyMarkdownTableGridCellEdit, parseMarkdownTableGrid,
+  type MarkdownTableGrid, type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
+import { getTableGridLayoutMeta, hasLeadingAqTableComment, hydrateVisualOptionsIntoTarget } from "./markdownEditorTableMetadataModel"
 import {
-  getTableGridLayoutMeta, hasLeadingAqTableComment, hydrateVisualOptionsIntoTarget,
-  mergeVisualOptionsIntoTableLayout, setTableGridLayoutMeta,
-} from "./markdownEditorTableMetadataModel"
+  appendTableWrapChildren, applyVisualOptionsToTableMarkdown, createOutsideTableListenerGuard,
+  dispatchDeleteTableRange, dispatchEditSourceSelection, dispatchTableMarkdownChange,
+  getPreservedCellControls, isEventInsideTableWrap, parkSelectionOutsideActiveTable,
+  patchTableCellsInPlace, replaceGridContentsInPlace, resolveTableWidgetRange, restoreCellDisplay,
+  syncCellHighlightClasses, syncColumnWidthsToGrid, syncHydratedOptionsOnMarkdownUpdate,
+  syncTableActiveDataset, syncTableFromDataset, syncToolbarButtonStates,
+} from "./markdownEditorTablePatchDom"
+import {
+  attachImeProxyListeners, attachWrapSurfaceListeners, createTableImeProxyElement,
+  focusElementPreventScroll, openTableCellEditorSession,
+  type ActiveCellEditorSession, type TableCellTarget, type TableSelectionMode, type TableSurfaceInteractionParams,
+} from "./markdownEditorTableSessionDom"
 import {
   applyTableColumnWidthsAction, createInteractiveTableSurface, createTableToolbarElement,
   getOrCreateTableVisualOptions, migrateTableVisualOptionsOffset, renderStaticTableElement,
   syncTableColGroupWidths, syncTableVisualWrapAttributes, type TableVisualOptions,
 } from "./markdownEditorTableWidgetDom"
-import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
-type PendingTableCellActivation = { from: number; row: number; col: number; openEditor?: boolean; mode?: "cell" | "row" | "col" }
-type ActiveCellEditorSession = { row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean }
-type TableDomController = { update: (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined) => boolean; destroy: () => void }
+type PendingTableCellActivation = {
+  from: number; row: number; col: number; openEditor?: boolean; mode?: TableSelectionMode
+}
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
-const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
+const tableDomControllers = new WeakMap<HTMLElement, TableWidgetController>()
 
-const applyVisualOptionsToTableMarkdown = (markdown: string, visualOptions: TableVisualOptions): string => {
-  const parsed = parseMarkdownTableGrid(markdown)
-  if (!parsed) return markdown
-  setTableGridLayoutMeta(parsed, mergeVisualOptionsIntoTableLayout(getTableGridLayoutMeta(parsed), visualOptions, parsed.headers.length))
-  return serializeMarkdownTableGrid(parsed)
-}
+class TableWidgetController implements TableSurfaceInteractionParams {
+  visualOptions: TableVisualOptions
+  private currentMarkdown: string
+  private currentFrom: number | undefined
+  private currentTo: number | undefined
+  private activeRow = 0
+  private activeCol = 0
+  private selectedMode: TableSelectionMode = "cell"
+  private tableActive = false
+  private activeSession: ActiveCellEditorSession | null = null
+  private imeProxy: HTMLTextAreaElement | null = null
+  private readonly tb: ReturnType<typeof createTableToolbarElement>
+  private surface: ReturnType<typeof createInteractiveTableSurface>
+  private readonly outsideGuard = createOutsideTableListenerGuard(
+    (event) => this.handleOutsideInteraction(event),
+    () => this.flushAndDispatchActiveCell()
+  )
 
-const syncTableFromDataset = (wrap: HTMLElement, from: number | undefined) => {
-  if (!wrap.dataset) return
-  if (from !== undefined) wrap.dataset.tableFrom = String(from)
-  else delete wrap.dataset.tableFrom
-}
-const readGridCellText = (grid: MarkdownTableGrid, r: number, c: number): string => (r === 0 ? (grid.headers[c] ?? "") : (grid.rows[r - 1]?.[c] ?? ""))
+  constructor(
+    readonly wrap: HTMLElement,
+    private readonly view: EditorView,
+    readonly grid: MarkdownTableGrid,
+    markdown: string,
+    from: number | undefined,
+    to: number | undefined
+  ) {
+    this.currentMarkdown = markdown
+    this.currentFrom = from
+    this.currentTo = to
+    wrap.tabIndex = -1
+    wrap.setAttribute("tabindex", "-1")
+    if (wrap.dataset) wrap.dataset.testid = "cm-live-table-widget"
+    syncTableFromDataset(wrap, from)
 
-const patchSingleTableCell = (
-  cellEl: HTMLElement, prevAlign: string, nextAlign: string, prevText: string, nextText: string,
-  restoreCellDisplay: (el: HTMLElement, text: string) => void
-) => {
-  if (prevAlign !== nextAlign) {
-    if (cellEl.style) cellEl.style.textAlign = nextAlign
-    if (cellEl.dataset) cellEl.dataset.align = nextAlign
-  }
-  const hasInput = typeof cellEl.querySelector === "function" && cellEl.querySelector(".cm-live-table-cell-input") !== null
-  if (prevText !== nextText || hasInput) restoreCellDisplay(cellEl, nextText)
-}
-
-const patchTableCellsInPlace = (
-  cellElements: HTMLElement[][], grid: MarkdownTableGrid, nextGrid: MarkdownTableGrid,
-  restoreCellDisplay: (el: HTMLElement, text: string) => void
-) => {
-  for (let r = 0; r <= nextGrid.rows.length; r += 1) {
-    for (let c = 0; c < nextGrid.headers.length; c += 1) {
-      const cellEl = cellElements[r]?.[c]
-      if (!cellEl) continue
-      patchSingleTableCell(cellEl, grid.alignments[c] ?? "left", nextGrid.alignments[c] ?? "left", readGridCellText(grid, r, c), readGridCellText(nextGrid, r, c), restoreCellDisplay)
+    this.visualOptions = getOrCreateTableVisualOptions(from ?? 0, grid.headers.length, view)
+    if (hasLeadingAqTableComment(markdown)) {
+      hydrateVisualOptionsIntoTarget(this.visualOptions, getTableGridLayoutMeta(grid), grid.headers.length)
     }
+    syncTableVisualWrapAttributes(wrap, this.visualOptions)
+
+    this.tb = this.initToolbar()
+    this.surface = this.buildSurface()
+    if (this.isEditable()) {
+      this.imeProxy = createTableImeProxyElement()
+      attachImeProxyListeners(this.imeProxy, this)
+    }
+    appendTableWrapChildren(wrap, this.tb.toolbar, this.surface.gridRow, this.surface.addRowBtn, this.imeProxy)
+    attachWrapSurfaceListeners(this)
+    wrap.addEventListener("focus", (event: FocusEvent) => {
+      if (event.target === this.wrap && this.tableActive && !this.hasOpenEditorSession() && this.isEditable()) {
+        this.focusSelectedTableTarget()
+      }
+    })
+    this.syncActiveCellHighlight()
+    this.applyPendingCellActivation()
+  }
+
+  readonly getImeProxy = () => this.imeProxy
+  readonly getActiveSession = () => this.activeSession
+  readonly isEditable = () => Boolean(this.view.state.facet(EditorView.editable))
+  readonly isTableActive = () => this.tableActive
+  readonly hasOpenEditorSession = () => Boolean(this.activeSession && !this.activeSession.handled)
+  readonly getCurrentMarkdown = () => this.currentMarkdown
+  readonly getSelectionState = () => ({ row: this.activeRow, col: this.activeCol, mode: this.selectedMode })
+
+  readonly setSelectionState = (next: { row?: number; col?: number; mode?: TableSelectionMode }) => {
+    if (next.row !== undefined) this.activeRow = next.row
+    if (next.col !== undefined) this.activeCol = next.col
+    if (next.mode !== undefined) this.selectedMode = next.mode
+  }
+
+  private ensureImeProxy(): HTMLTextAreaElement {
+    if (!this.imeProxy) {
+      this.imeProxy = createTableImeProxyElement()
+      attachImeProxyListeners(this.imeProxy, this)
+      this.wrap.appendChild(this.imeProxy)
+    }
+    return this.imeProxy
+  }
+
+  readonly focusSelectedTableTarget = () => {
+    if (this.isEditable() && this.tableActive && this.activeRow >= 0 && this.activeCol >= 0 && !this.hasOpenEditorSession()) {
+      focusElementPreventScroll(this.ensureImeProxy())
+      return
+    }
+    focusElementPreventScroll(this.wrap)
+  }
+
+  private resolveRange() {
+    return resolveTableWidgetRange(this.view, this.wrap, this.currentFrom, this.currentTo, this.currentMarkdown.length)
+  }
+
+  private readonly flushActiveCellMarkdown = (): string => {
+    if (!this.activeSession || this.activeSession.handled) return this.currentMarkdown
+    const session = this.activeSession
+    session.handled = true
+    this.activeSession = null
+    const nextValue = session.input.value
+    restoreCellDisplay(session.cellEl, nextValue)
+    if (nextValue === session.initialValue) return this.currentMarkdown
+    return applyMarkdownTableGridCellEdit(this.currentMarkdown, session.row, session.col, nextValue) ?? this.currentMarkdown
+  }
+
+  private flushAndDispatchActiveCell() {
+    if (!this.activeSession || this.activeSession.handled) return
+    const committed = this.flushActiveCellMarkdown()
+    if (committed !== this.currentMarkdown) this.dispatchTableMarkdown(committed)
+  }
+
+  readonly deactivateTable = () => {
+    this.tableActive = false
+    this.outsideGuard.detach()
+    this.syncActiveCellHighlight()
+  }
+
+  private handleOutsideInteraction(event: Event) {
+    if (!this.wrap.isConnected) {
+      this.flushAndDispatchActiveCell()
+      this.outsideGuard.detach()
+      return
+    }
+    const target = event.target as HTMLElement | null
+    if (isEventInsideTableWrap(this.wrap, target)) return
+    this.flushAndDispatchActiveCell()
+    if (target?.closest?.("[data-table-popover]")) return
+    this.deactivateTable()
+  }
+
+  private markTableActive() {
+    this.tableActive = true
+    this.outsideGuard.attach()
+    parkSelectionOutsideActiveTable(this.view, this.resolveRange())
+  }
+
+  readonly executeGridAction = (
+    action: MarkdownTableGridAction,
+    rowOverride = this.activeRow,
+    colOverride = this.activeCol,
+    openEditor?: boolean
+  ) => {
+    if (!this.isEditable()) return
+    this.markTableActive()
+    const baseMarkdown = this.flushActiveCellMarkdown()
+    const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
+    if (!outcome) {
+      if (baseMarkdown !== this.currentMarkdown) {
+        this.dispatchTableMarkdown(baseMarkdown, { row: rowOverride, col: colOverride, openEditor: false })
+      }
+      return
+    }
+    applyTableColumnWidthsAction(this.visualOptions.columnWidths, this.grid.headers.length, colOverride, action)
+    this.activeRow = outcome.nextRow
+    this.activeCol = outcome.nextCol
+    this.syncActiveCellHighlight()
+    const resolvedOpenEditor = openEditor ?? (this.selectedMode === "cell" ? undefined : false)
+    this.dispatchTableMarkdown(outcome.markdown, {
+      row: outcome.nextRow, col: outcome.nextCol, openEditor: resolvedOpenEditor,
+    })
+  }
+
+  private selectAxis(mode: "row" | "col", index: number) {
+    if (!this.isEditable()) return
+    this.markTableActive()
+    const committed = this.flushActiveCellMarkdown()
+    if (mode === "col") this.activeCol = Math.max(0, Math.min(index, this.grid.headers.length - 1))
+    else this.activeRow = Math.max(0, Math.min(index, this.grid.rows.length))
+    this.selectedMode = mode
+    this.syncActiveCellHighlight()
+    this.focusSelectedTableTarget()
+    if (committed !== this.currentMarkdown) {
+      this.dispatchTableMarkdown(committed, { row: this.activeRow, col: this.activeCol, openEditor: false })
+    }
+  }
+
+  private readonly persistVisualOptions = () => {
+    if (!this.isEditable()) return
+    this.markTableActive()
+    this.dispatchTableMarkdown(applyVisualOptionsToTableMarkdown(this.flushActiveCellMarkdown(), this.visualOptions))
+  }
+
+  private initToolbar() {
+    return createTableToolbarElement({
+      grid: this.grid,
+      wrap: this.wrap,
+      visualOptions: this.visualOptions,
+      isEditable: this.isEditable,
+      executeGridAction: (action) => this.executeGridAction(action),
+      onActivateToolbar: () => {
+        if (!this.isEditable()) return
+        this.markTableActive()
+        this.syncActiveCellHighlight()
+        if (!this.hasOpenEditorSession()) this.focusSelectedTableTarget()
+      },
+      onVisualOptionsChange: this.persistVisualOptions,
+      onEditSource: () => {
+        if (!this.isEditable()) return
+        this.flushAndDispatchActiveCell()
+        const range = this.resolveRange()
+        if (range) dispatchEditSourceSelection(this.view, range)
+      },
+      onDeleteTable: () => {
+        const range = this.isEditable() ? this.resolveRange() : null
+        if (range) dispatchDeleteTableRange(this.view, range)
+      },
+    })
+  }
+
+  private buildSurface() {
+    return createInteractiveTableSurface({
+      grid: this.grid,
+      visualOptions: this.visualOptions,
+      canAddCol: this.tb.canAddCol,
+      canAddRow: this.tb.canAddRow,
+      isEditable: this.isEditable,
+      onActivateCell: (row, col) => this.activateCellEditor(row, col),
+      onAddColumn: () => this.executeGridAction({ kind: "add-column" }, this.activeRow, this.grid.headers.length - 1),
+      onAddRow: () => this.executeGridAction({ kind: "add-row" }, this.grid.rows.length, 0),
+      onAddRowAndColumn: () => this.executeGridAction({ kind: "add-row-and-column" }, this.grid.rows.length, this.grid.headers.length - 1),
+      onSelectColumn: (col) => this.selectAxis("col", col),
+      onSelectRow: (row) => this.selectAxis("row", row),
+      onMoveColumnTo: (fromCol, toCol) => {
+        this.selectedMode = "col"
+        this.executeGridAction({ kind: "move-column-to", targetCol: toCol }, this.activeRow, fromCol, false)
+      },
+      onMoveRowTo: (fromRow, toRow) => {
+        this.selectedMode = "row"
+        this.executeGridAction({ kind: "move-row-to", targetRow: toRow }, fromRow, this.activeCol, false)
+      },
+      onVisualOptionsChange: this.persistVisualOptions,
+    })
+  }
+
+  readonly syncActiveCellHighlight = () => {
+    syncTableActiveDataset(this.wrap, this.tableActive, this.selectedMode, this.activeRow, this.activeCol)
+    syncCellHighlightClasses(this.surface.cellElements, this.tableActive, this.selectedMode, this.activeRow, this.activeCol)
+    syncToolbarButtonStates(this.tb.toolbarButtons, this.grid.alignments[this.activeCol] ?? "left", this.activeRow, this.activeCol)
+  }
+
+  private applyTargetCellWithoutMutation(targetCell: TableCellTarget) {
+    if (targetCell.openEditor === false) {
+      this.activeRow = Math.max(0, Math.min(targetCell.row, this.grid.rows.length))
+      this.activeCol = Math.max(0, Math.min(targetCell.col, this.grid.headers.length - 1))
+      this.syncActiveCellHighlight()
+      this.focusSelectedTableTarget()
+      return
+    }
+    this.activateCellEditor(targetCell.row, targetCell.col)
+  }
+
+  readonly dispatchTableMarkdown = (nextMarkdown: string, targetCell?: TableCellTarget) => {
+    const range = this.resolveRange()
+    if (!range) return
+    if (nextMarkdown === this.currentMarkdown) {
+      if (targetCell) this.applyTargetCellWithoutMutation(targetCell)
+      return
+    }
+    if (targetCell) {
+      pendingTableCellActivation = {
+        from: range.from, row: targetCell.row, col: targetCell.col, openEditor: targetCell.openEditor, mode: this.selectedMode,
+      }
+    }
+    dispatchTableMarkdownChange(this.view, range, nextMarkdown)
+    if (this.currentMarkdown !== nextMarkdown) {
+      this.update(nextMarkdown, range.from, range.from + nextMarkdown.length)
+    }
+  }
+
+  readonly activateCellEditor = (row: number, col: number, initialText?: string, deferFocus = false) => {
+    if (!this.isEditable()) return
+    this.markTableActive()
+    const r = Math.max(0, Math.min(row, this.grid.rows.length))
+    const c = Math.max(0, Math.min(col, this.grid.headers.length - 1))
+    this.activeRow = r
+    this.activeCol = c
+    this.selectedMode = "cell"
+    this.syncActiveCellHighlight()
+    if (this.focusMatchingOpenSession(r, c, deferFocus) || this.flushNonMatchingOpenSession(r, c)) return
+    const cellEl = this.surface.cellElements[r]?.[c]
+    if (!cellEl) return
+    this.activeSession = openTableCellEditorSession({
+      cellEl,
+      preservedControls: getPreservedCellControls(cellEl),
+      grid: this.grid,
+      visualOptions: this.visualOptions,
+      row: r,
+      col: c,
+      initialText,
+      deferFocus,
+      getCurrentMarkdown: this.getCurrentMarkdown,
+      clearActiveSessionIfMatch: (s) => {
+        if (this.activeSession === s) this.activeSession = null
+      },
+      setActiveCoordinates: (nr, nc) => {
+        this.activeRow = nr
+        this.activeCol = nc
+      },
+      flushActiveCellMarkdown: this.flushActiveCellMarkdown,
+      dispatchTableMarkdown: this.dispatchTableMarkdown,
+      executeGridAction: this.executeGridAction,
+      focusSelectedTableTarget: this.focusSelectedTableTarget,
+    })
+  }
+
+  private focusMatchingOpenSession(row: number, col: number, deferFocus = false): boolean {
+    if (!this.activeSession || this.activeSession.handled || this.activeSession.row !== row || this.activeSession.col !== col) return false
+    if (!deferFocus) focusElementPreventScroll(this.activeSession.input)
+    return true
+  }
+
+  private flushNonMatchingOpenSession(nextRow: number, nextCol: number): boolean {
+    if (!this.activeSession || this.activeSession.handled) return false
+    const committed = this.flushActiveCellMarkdown()
+    if (committed === this.currentMarkdown) return false
+    this.dispatchTableMarkdown(committed, { row: nextRow, col: nextCol })
+    return true
+  }
+
+  private applyPendingCellActivation() {
+    if (!pendingTableCellActivation || (this.currentFrom !== undefined && pendingTableCellActivation.from !== this.currentFrom)) return
+    const target = pendingTableCellActivation
+    pendingTableCellActivation = null
+    this.markTableActive()
+    if (target.openEditor === false) {
+      this.activeRow = Math.max(0, Math.min(target.row, this.grid.rows.length))
+      this.activeCol = Math.max(0, Math.min(target.col, this.grid.headers.length - 1))
+      if (target.mode) this.selectedMode = target.mode
+      this.syncActiveCellHighlight()
+      this.focusSelectedTableTarget()
+      if (typeof queueMicrotask === "function") queueMicrotask(this.focusSelectedTableTarget)
+      return
+    }
+    this.activateCellEditor(target.row, target.col)
+  }
+
+  update(nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean {
+    if (nextMarkdown === this.currentMarkdown) {
+      this.visualOptions = migrateTableVisualOptionsOffset(this.currentFrom, nextFrom, this.grid.headers.length, this.visualOptions, this.view)
+      this.currentFrom = nextFrom
+      this.currentTo = nextTo
+      syncTableFromDataset(this.wrap, this.currentFrom)
+      this.applyPendingCellActivation()
+      return true
+    }
+    const nextGrid = parseMarkdownTableGrid(nextMarkdown)
+    if (!nextGrid) return false
+
+    this.visualOptions = migrateTableVisualOptionsOffset(this.currentFrom, nextFrom, nextGrid.headers.length, this.visualOptions, this.view)
+    syncHydratedOptionsOnMarkdownUpdate(this.wrap, this.visualOptions, this.currentMarkdown, nextMarkdown, nextGrid, this.tb.syncOptionButtons)
+    if (this.activeSession && !this.activeSession.handled) {
+      this.activeSession.handled = true
+      this.activeSession = null
+    }
+
+    const sameShape = nextGrid.headers.length === this.grid.headers.length && nextGrid.rows.length === this.grid.rows.length
+    if (sameShape) {
+      patchTableCellsInPlace(this.surface.cellElements, this.grid, nextGrid)
+      syncTableColGroupWidths(this.surface.colElements, this.visualOptions.columnWidths)
+    }
+    replaceGridContentsInPlace(this.grid, nextGrid)
+    if (!sameShape) {
+      syncColumnWidthsToGrid(this.visualOptions.columnWidths, this.grid.headers.length)
+      this.surface = this.buildSurface()
+      appendTableWrapChildren(
+        this.wrap, this.tb.toolbar, this.surface.gridRow, this.surface.addRowBtn,
+        this.isEditable() ? this.imeProxy : null
+      )
+    }
+
+    this.activeRow = Math.max(0, Math.min(this.activeRow, this.grid.rows.length))
+    this.activeCol = Math.max(0, Math.min(this.activeCol, this.grid.headers.length - 1))
+    this.currentMarkdown = nextMarkdown
+    this.currentFrom = nextFrom
+    this.currentTo = nextTo
+    syncTableFromDataset(this.wrap, this.currentFrom)
+    this.syncActiveCellHighlight()
+    this.applyPendingCellActivation()
+    return true
+  }
+
+  destroy() {
+    this.flushAndDispatchActiveCell()
+    this.outsideGuard.detach()
   }
 }
 
@@ -66,25 +419,17 @@ export class MarkdownTableWidget extends WidgetType {
   constructor(private readonly markdown: string, private readonly from?: number, private readonly to?: number) {
     super()
   }
-
   eq(other: MarkdownTableWidget) {
     return other instanceof MarkdownTableWidget && other.markdown === this.markdown && other.from === this.from && other.to === this.to
   }
-
-  ignoreEvent() {
-    return true
-  }
-
+  ignoreEvent() { return true }
   updateDOM(dom: HTMLElement, _view: EditorView) {
-    const controller = tableDomControllers.get(dom)
-    return controller ? controller.update(this.markdown, this.from, this.to) : false
+    return tableDomControllers.get(dom)?.update(this.markdown, this.from, this.to) ?? false
   }
-
   destroy(dom: HTMLElement) {
     tableDomControllers.get(dom)?.destroy()
     tableDomControllers.delete(dom)
   }
-
   toDOM(view?: EditorView) {
     const wrap = document.createElement("div")
     wrap.className = "cm-live-table-wrap"
@@ -94,504 +439,7 @@ export class MarkdownTableWidget extends WidgetType {
       wrap.appendChild(renderStaticTableElement(grid))
       return wrap
     }
-
-    let currentMarkdown = this.markdown
-    let currentFrom = this.from
-    let currentTo = this.to
-    wrap.tabIndex = -1
-    wrap.setAttribute("tabindex", "-1")
-    if (wrap.dataset) wrap.dataset.testid = "cm-live-table-widget"
-    syncTableFromDataset(wrap, currentFrom)
-    const focusTableWrap = () => {
-      try { wrap.focus({ preventScroll: true }) } catch {}
-    }
-
-    const isViewEditable = () => Boolean(view.state.facet(EditorView.editable))
-    let visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length, view)
-    if (hasLeadingAqTableComment(this.markdown)) {
-      hydrateVisualOptionsIntoTarget(visualOptions, getTableGridLayoutMeta(grid), grid.headers.length)
-    }
-    syncTableVisualWrapAttributes(wrap, visualOptions)
-
-    let activeRow = 0
-    let activeCol = 0
-    let selectedMode: "cell" | "row" | "col" = "cell"
-    let isTableActive = false
-    let outsideListenerAttached = false
-    let activeSession: ActiveCellEditorSession | null = null
-
-    const handleLifecycleFlush = () => flushAndDispatchActiveCell()
-
-    const detachOutsideListener = () => {
-      if (!outsideListenerAttached) return
-      outsideListenerAttached = false
-      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
-        document.removeEventListener("mousedown", handleOutsideInteraction, true)
-        document.removeEventListener("focusin", handleOutsideInteraction, true)
-      }
-      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
-        window.removeEventListener("pagehide", handleLifecycleFlush)
-        window.removeEventListener("beforeunload", handleLifecycleFlush)
-      }
-    }
-
-    const handleOutsideInteraction = (event: Event) => {
-      if (!wrap.isConnected) { flushAndDispatchActiveCell(); return detachOutsideListener() }
-      const target = event.target as HTMLElement | null
-      if (target && (target === wrap || (typeof wrap.contains === "function" && wrap.contains(target)) || target.closest?.(".cm-live-table-wrap") === wrap)) return
-      flushAndDispatchActiveCell()
-      if (target?.closest?.("[data-table-popover]")) return
-      isTableActive = false
-      detachOutsideListener()
-      syncActiveCellHighlight()
-    }
-
-    const markTableActive = () => {
-      isTableActive = true
-      if (!outsideListenerAttached) {
-        outsideListenerAttached = true
-        if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-          document.addEventListener("mousedown", handleOutsideInteraction, true)
-          document.addEventListener("focusin", handleOutsideInteraction, true)
-        }
-        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-          window.addEventListener("pagehide", handleLifecycleFlush)
-          window.addEventListener("beforeunload", handleLifecycleFlush)
-        }
-      }
-      if (typeof view.state.doc?.lineAt !== "function") return
-      const range = resolveRange()
-      const mainSel = view.state.selection.main
-      if (!range || mainSel.from !== mainSel.to || view.state.doc.lineAt(mainSel.from).length === 0) return
-      if (range.from > 0 && view.state.doc.lineAt(range.from - 1).length === 0) {
-        view.dispatch({ selection: EditorSelection.cursor(range.from - 1) })
-      } else if (range.to < view.state.doc.length && view.state.doc.lineAt(range.to + 1).length === 0) {
-        view.dispatch({ selection: EditorSelection.cursor(range.to + 1) })
-      }
-    }
-
-    const resolveRange = (): { from: number; to: number } | null => {
-      let resolvedFrom = currentFrom
-      try {
-        const domPos = view.posAtDOM(wrap)
-        if (typeof domPos === "number" && domPos >= 0) resolvedFrom = domPos
-      } catch {}
-      if (resolvedFrom === undefined) return null
-      const docLen = view.state.doc.length
-      const from = Math.max(0, Math.min(resolvedFrom, docLen))
-      const span = currentFrom !== undefined && currentTo !== undefined ? Math.max(0, currentTo - currentFrom) : currentMarkdown.length
-      return { from, to: Math.max(from, Math.min(from + span, docLen)) }
-    }
-
-    const getPreservedCellControls = (cellEl: HTMLElement): HTMLElement[] =>
-      typeof cellEl.querySelector !== "function"
-        ? []
-        : [".cm-live-table-col-handle", ".cm-live-table-row-handle", ".cm-live-table-col-resizer"]
-            .map((sel) => cellEl.querySelector<HTMLElement>(sel))
-            .filter((el): el is HTMLElement => el !== null)
-
-    const restoreCellDisplay = (cellEl: HTMLElement, rawText: string) => {
-      const controls = getPreservedCellControls(cellEl)
-      cellEl.textContent = ""
-      appendInlineMarkdownNodes(cellEl, rawText)
-      for (const control of controls) cellEl.appendChild(control)
-    }
-
-    const flushActiveCellMarkdown = (): string => {
-      if (!activeSession || activeSession.handled) return currentMarkdown
-      const session = activeSession
-      session.handled = true
-      activeSession = null
-      const nextValue = session.input.value
-      restoreCellDisplay(session.cellEl, nextValue)
-      if (nextValue === session.initialValue) return currentMarkdown
-      return applyMarkdownTableGridCellEdit(currentMarkdown, session.row, session.col, nextValue) ?? currentMarkdown
-    }
-
-    const flushAndDispatchActiveCell = () => {
-      if (!activeSession || activeSession.handled) return
-      const committed = flushActiveCellMarkdown()
-      if (committed !== currentMarkdown) dispatchTableMarkdown(committed)
-    }
-
-    const executeGridAction = (action: MarkdownTableGridAction, rowOverride = activeRow, colOverride = activeCol, openEditor?: boolean) => {
-      if (!view.state.facet(EditorView.editable)) return
-      markTableActive()
-      const baseMarkdown = flushActiveCellMarkdown()
-      const outcome = applyMarkdownTableGridAction(baseMarkdown, rowOverride, colOverride, action)
-      if (!outcome) {
-        if (baseMarkdown !== currentMarkdown) dispatchTableMarkdown(baseMarkdown, { row: rowOverride, col: colOverride, openEditor: false })
-        return
-      }
-      applyTableColumnWidthsAction(visualOptions.columnWidths, grid.headers.length, colOverride, action)
-      activeRow = outcome.nextRow
-      activeCol = outcome.nextCol
-      syncActiveCellHighlight()
-      dispatchTableMarkdown(outcome.markdown, {
-        row: outcome.nextRow, col: outcome.nextCol, openEditor: openEditor ?? (selectedMode === "cell" ? undefined : false),
-      })
-    }
-
-    const selectColumn = (col: number) => {
-      if (!view.state.facet(EditorView.editable)) return
-      markTableActive()
-      const committed = flushActiveCellMarkdown()
-      activeCol = Math.max(0, Math.min(col, grid.headers.length - 1))
-      selectedMode = "col"
-      syncActiveCellHighlight()
-      focusTableWrap()
-      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
-    }
-
-    const selectRow = (row: number) => {
-      if (!view.state.facet(EditorView.editable)) return
-      markTableActive()
-      const committed = flushActiveCellMarkdown()
-      activeRow = Math.max(0, Math.min(row, grid.rows.length))
-      selectedMode = "row"
-      syncActiveCellHighlight()
-      focusTableWrap()
-      if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
-    }
-
-    const persistVisualOptions = () => {
-      if (!view.state.facet(EditorView.editable)) return
-      markTableActive()
-      dispatchTableMarkdown(applyVisualOptionsToTableMarkdown(flushActiveCellMarkdown(), visualOptions))
-    }
-
-    const { toolbar, toolbarButtons, canAddRow, canAddCol, syncOptionButtons } = createTableToolbarElement({
-      grid, wrap, visualOptions, isEditable: isViewEditable,
-      executeGridAction: (action) => executeGridAction(action),
-      onActivateToolbar: () => { if (!isViewEditable()) return; markTableActive(); syncActiveCellHighlight() },
-      onVisualOptionsChange: persistVisualOptions,
-      onEditSource: () => {
-        if (!isViewEditable()) return
-        flushAndDispatchActiveCell()
-        const range = resolveRange()
-        if (!range) return
-        view.focus()
-        view.dispatch({ selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)), scrollIntoView: true })
-      },
-      onDeleteTable: () => {
-        const range = isViewEditable() ? resolveRange() : null
-        if (!range) return
-        view.dispatch({ changes: { from: range.from, to: range.to, insert: "" }, selection: EditorSelection.cursor(range.from), annotations: [Transaction.userEvent.of("delete")] })
-      },
-    })
-
-    const buildSurface = () =>
-      createInteractiveTableSurface({
-        grid, visualOptions, canAddCol, canAddRow, isEditable: isViewEditable,
-        onActivateCell: (row, col) => activateCellEditor(row, col),
-        onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
-        onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
-        onAddRowAndColumn: () => executeGridAction({ kind: "add-row-and-column" }, grid.rows.length, grid.headers.length - 1),
-        onSelectColumn: (col) => selectColumn(col),
-        onSelectRow: (row) => selectRow(row),
-        onMoveColumnTo: (fromCol, toCol) => { selectedMode = "col"; executeGridAction({ kind: "move-column-to", targetCol: toCol }, activeRow, fromCol, false) },
-        onMoveRowTo: (fromRow, toRow) => { selectedMode = "row"; executeGridAction({ kind: "move-row-to", targetRow: toRow }, fromRow, activeCol, false) },
-        onVisualOptionsChange: persistVisualOptions,
-      })
-
-    let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
-
-    const syncActiveCellHighlight = () => {
-      if (isTableActive) {
-        wrap.dataset.activeMode = selectedMode; wrap.dataset.activeRow = String(activeRow); wrap.dataset.activeCol = String(activeCol)
-      } else {
-        delete wrap.dataset.activeMode; delete wrap.dataset.activeRow; delete wrap.dataset.activeCol
-      }
-      for (let r = 0; r < cellElements.length; r += 1) {
-        const rowEls = cellElements[r]!
-        for (let c = 0; c < rowEls.length; c += 1) {
-          const el = rowEls[c]!
-          if (isTableActive && r === activeRow && c === activeCol) el.classList.add("is-active-cell")
-          else el.classList.remove("is-active-cell")
-          if (isTableActive && selectedMode === "col" && c === activeCol) el.classList.add("is-selected-col")
-          else el.classList.remove("is-selected-col")
-          if (isTableActive && selectedMode === "row" && r === activeRow) el.classList.add("is-selected-row")
-          else el.classList.remove("is-selected-row")
-        }
-      }
-      const currentAlign = grid.alignments[activeCol] ?? "left"
-      for (const entry of toolbarButtons) {
-        if (entry.isDisabled) entry.button.disabled = entry.isDisabled(activeRow, activeCol)
-        if (entry.align) entry.button.setAttribute("aria-pressed", String(entry.align === currentAlign))
-      }
-    }
-
-    const dispatchTableMarkdown = (nextMarkdown: string, targetCell?: { row: number; col: number; openEditor?: boolean }) => {
-      const range = resolveRange()
-      if (!range) return
-      if (nextMarkdown === currentMarkdown) {
-        if (!targetCell) return
-        if (targetCell.openEditor === false) {
-          activeRow = Math.max(0, Math.min(targetCell.row, grid.rows.length))
-          activeCol = Math.max(0, Math.min(targetCell.col, grid.headers.length - 1))
-          syncActiveCellHighlight()
-        } else {
-          activateCellEditor(targetCell.row, targetCell.col)
-        }
-        return
-      }
-      if (targetCell) {
-        pendingTableCellActivation = { from: range.from, row: targetCell.row, col: targetCell.col, openEditor: targetCell.openEditor, mode: selectedMode }
-      }
-      const mainSel = view.state.selection.main
-      const overlaps = mainSel.from >= range.from && mainSel.from <= range.to
-      const canParkBefore = range.from > 0 && view.state.doc.lineAt?.(range.from - 1).length === 0
-      const canParkAfter = range.to < view.state.doc.length && view.state.doc.lineAt?.(range.to + 1).length === 0
-      let safeAnchor: number | undefined
-      if (canParkBefore) safeAnchor = range.from - 1
-      else if (canParkAfter) safeAnchor = range.from + nextMarkdown.length + 1
-      else if (range.from > 0) safeAnchor = range.from - 1
-      else if (range.to < view.state.doc.length) safeAnchor = range.from + nextMarkdown.length + 1
-
-      view.dispatch({
-        changes: { from: range.from, to: range.to, insert: nextMarkdown },
-        ...(overlaps && safeAnchor !== undefined ? { selection: EditorSelection.cursor(safeAnchor) } : {}),
-        annotations: [Transaction.userEvent.of("input")],
-      })
-      if (currentMarkdown !== nextMarkdown) update(nextMarkdown, range.from, range.from + nextMarkdown.length)
-    }
-
-    const activateCellEditor = (row: number, col: number) => {
-      if (!view.state.facet(EditorView.editable)) return
-      markTableActive()
-      const clampedRow = Math.max(0, Math.min(row, grid.rows.length))
-      const clampedCol = Math.max(0, Math.min(col, grid.headers.length - 1))
-      activeRow = clampedRow
-      activeCol = clampedCol
-      selectedMode = "cell"
-      syncActiveCellHighlight()
-
-      if (activeSession && !activeSession.handled && activeSession.row === clampedRow && activeSession.col === clampedCol) {
-        activeSession.input.focus()
-        return
-      }
-      if (activeSession && !activeSession.handled) {
-        const committed = flushActiveCellMarkdown()
-        if (committed !== currentMarkdown) return dispatchTableMarkdown(committed, { row: clampedRow, col: clampedCol })
-      }
-
-      const cellEl = cellElements[clampedRow]?.[clampedCol]
-      if (!cellEl) return
-      const initialValue = clampedRow === 0 ? (grid.headers[clampedCol] ?? "") : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
-      const controls = getPreservedCellControls(cellEl)
-      cellEl.textContent = ""
-      const input = document.createElement("input")
-      input.type = "text"
-      input.className = "cm-live-table-cell-input"
-      input.setAttribute("data-testid", "cm-live-table-cell-input")
-      input.setAttribute("aria-label", "표 셀 편집")
-      input.value = initialValue
-      cellEl.appendChild(input)
-      for (const control of controls) cellEl.appendChild(control)
-
-      const session: ActiveCellEditorSession = { row: clampedRow, col: clampedCol, cellEl, input, initialValue, handled: false }
-      activeSession = session
-
-      const stopBubble = (event: Event) => event.stopPropagation()
-      for (const eventName of ["mousedown", "mouseup", "click", "dblclick", "input", "beforeinput", "compositionstart", "compositionend"]) {
-        input.addEventListener(eventName, stopBubble)
-      }
-
-      input.addEventListener("paste", (event: ClipboardEvent) => {
-        event.stopPropagation()
-        const pastedText = event.clipboardData?.getData("text/plain") ?? ""
-        if (!pastedText.includes("\t") && !pastedText.includes("\n") && !pastedText.includes("\r")) return
-        const baseMarkdown = input.value !== initialValue ? (applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, input.value) ?? currentMarkdown) : currentMarkdown
-        const outcome = applyMarkdownTableGridPaste(baseMarkdown, clampedRow, clampedCol, pastedText)
-        if (!outcome) return
-        event.preventDefault()
-        session.handled = true
-        if (activeSession === session) activeSession = null
-        const nextGrid = parseMarkdownTableGrid(outcome.markdown)
-        if (nextGrid) {
-          while (visualOptions.columnWidths.length < nextGrid.headers.length) visualOptions.columnWidths.push(0)
-        }
-        activeRow = outcome.nextRow
-        activeCol = outcome.nextCol
-        dispatchTableMarkdown(outcome.markdown, { row: outcome.nextRow, col: outcome.nextCol, openEditor: false })
-      })
-
-      const commitAndCloseSession = (focusWrapAfter = false) => {
-        if (session.handled) return
-        const committed = flushActiveCellMarkdown()
-        if (committed !== currentMarkdown) {
-          dispatchTableMarkdown(committed, focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined)
-        }
-        if (focusWrapAfter) focusTableWrap()
-      }
-
-      input.addEventListener("keydown", (event: KeyboardEvent) => {
-        event.stopPropagation()
-        if (event.isComposing || event.keyCode === 229) return
-
-        const applyInlineShortcut = (kind: TableCellInlineFormatKind) => {
-          event.preventDefault()
-          const res = applyTableCellInlineFormat(input.value, input.selectionStart ?? input.value.length, input.selectionEnd ?? input.value.length, kind)
-          input.value = res.value
-          try { input.setSelectionRange(res.selectionStart, res.selectionEnd) } catch {}
-        }
-
-        if (event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) return applyInlineShortcut("line-break")
-        if ((event.metaKey || event.ctrlKey) && !event.altKey) {
-          const lowerKey = event.key.toLowerCase()
-          if (!event.shiftKey && lowerKey === "b") return applyInlineShortcut("bold")
-          if (!event.shiftKey && lowerKey === "i") return applyInlineShortcut("italic")
-          if (!event.shiftKey && lowerKey === "e") return applyInlineShortcut("code")
-          if (event.shiftKey && (lowerKey === "x" || lowerKey === "s")) return applyInlineShortcut("strikethrough")
-        }
-        if (event.key === "Tab") {
-          event.preventDefault()
-          return executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, clampedRow, clampedCol)
-        }
-        const hasNoModifiers = !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
-        if (event.key === "Enter" && hasNoModifiers) { event.preventDefault(); return executeGridAction({ kind: "enter" }, clampedRow, clampedCol) }
-        if (event.key === "ArrowLeft" && hasNoModifiers && input.selectionStart === 0 && input.selectionEnd === 0 && (clampedRow > 0 || clampedCol > 0)) {
-          event.preventDefault()
-          return executeGridAction({ kind: "tab", direction: "previous" }, clampedRow, clampedCol)
-        }
-        if (event.key === "ArrowRight" && hasNoModifiers && input.selectionStart === input.value.length && input.selectionEnd === input.value.length && (clampedRow < grid.rows.length || clampedCol < grid.headers.length - 1)) {
-          event.preventDefault()
-          return executeGridAction({ kind: "tab", direction: "next" }, clampedRow, clampedCol)
-        }
-        if ((event.key === "ArrowUp" || event.key === "ArrowDown") && hasNoModifiers) {
-          event.preventDefault()
-          const targetRow = Math.max(0, Math.min(grid.rows.length, clampedRow + (event.key === "ArrowUp" ? -1 : 1)))
-          return dispatchTableMarkdown(flushActiveCellMarkdown(), { row: targetRow, col: clampedCol })
-        }
-        if (event.key === "Escape") { event.preventDefault(); commitAndCloseSession(true) }
-      })
-
-      input.addEventListener("blur", () => commitAndCloseSession())
-
-      const focusInput = () => {
-        if (session.handled) return
-        try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); input.scrollLeft = 0 } catch {}
-      }
-      focusInput()
-      if (typeof queueMicrotask === "function") queueMicrotask(focusInput)
-    }
-
-    const applyPendingCellActivation = () => {
-      if (!pendingTableCellActivation || (currentFrom !== undefined && pendingTableCellActivation.from !== currentFrom)) return
-      const target = pendingTableCellActivation
-      pendingTableCellActivation = null
-      markTableActive()
-      if (target.openEditor === false) {
-        activeRow = Math.max(0, Math.min(target.row, grid.rows.length))
-        activeCol = Math.max(0, Math.min(target.col, grid.headers.length - 1))
-        if (target.mode) selectedMode = target.mode
-        syncActiveCellHighlight()
-        focusTableWrap()
-        if (typeof queueMicrotask === "function") queueMicrotask(focusTableWrap)
-      } else {
-        activateCellEditor(target.row, target.col)
-      }
-    }
-
-    const update = (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean => {
-      if (nextMarkdown === currentMarkdown) {
-        visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length, visualOptions, view)
-        currentFrom = nextFrom
-        currentTo = nextTo
-        syncTableFromDataset(wrap, currentFrom)
-        applyPendingCellActivation()
-        return true
-      }
-
-      const nextGrid = parseMarkdownTableGrid(nextMarkdown)
-      if (!nextGrid) return false
-      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions, view)
-      if (hasLeadingAqTableComment(nextMarkdown)) {
-        hydrateVisualOptionsIntoTarget(visualOptions, getTableGridLayoutMeta(nextGrid), nextGrid.headers.length)
-        syncTableVisualWrapAttributes(wrap, visualOptions)
-        syncOptionButtons()
-      } else if (hasLeadingAqTableComment(currentMarkdown)) {
-        hydrateVisualOptionsIntoTarget(visualOptions, null, nextGrid.headers.length)
-        syncTableVisualWrapAttributes(wrap, visualOptions)
-        syncOptionButtons()
-      }
-
-      if (activeSession && !activeSession.handled) {
-        activeSession.handled = true
-        activeSession = null
-      }
-
-      const sameShape = nextGrid.headers.length === grid.headers.length && nextGrid.rows.length === grid.rows.length
-      if (sameShape) {
-        patchTableCellsInPlace(cellElements, grid, nextGrid, restoreCellDisplay)
-        syncTableColGroupWidths(colElements, visualOptions.columnWidths)
-      }
-
-      grid.headers.splice(0, grid.headers.length, ...nextGrid.headers)
-      grid.alignments.splice(0, grid.alignments.length, ...nextGrid.alignments)
-      grid.rows.splice(0, grid.rows.length, ...nextGrid.rows.map((row) => [...row]))
-
-      if (!sameShape) {
-        while (visualOptions.columnWidths.length < grid.headers.length) visualOptions.columnWidths.push(0)
-        if (visualOptions.columnWidths.length > grid.headers.length) visualOptions.columnWidths.length = grid.headers.length
-        ;({ gridRow, addRowBtn, cellElements, colElements } = buildSurface())
-        wrap.textContent = ""
-        for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
-      }
-
-      activeRow = Math.max(0, Math.min(activeRow, grid.rows.length))
-      activeCol = Math.max(0, Math.min(activeCol, grid.headers.length - 1))
-      currentMarkdown = nextMarkdown
-      currentFrom = nextFrom
-      currentTo = nextTo
-      syncTableFromDataset(wrap, currentFrom)
-      syncActiveCellHighlight()
-      applyPendingCellActivation()
-      return true
-    }
-
-    wrap.addEventListener("compositionstart", () => {
-      if (!isViewEditable() || !isTableActive || (activeSession && !activeSession.handled)) return
-      activateCellEditor(activeRow, activeCol)
-    })
-
-    wrap.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (!isViewEditable() || !isTableActive || (activeSession && !activeSession.handled)) return
-      const stop = () => { event.preventDefault(); event.stopPropagation() }
-      if (event.key === "Escape") { stop(); isTableActive = false; detachOutsideListener(); return syncActiveCellHighlight() }
-      if (event.key === "Enter" || event.key === "F2") { stop(); return activateCellEditor(activeRow, activeCol) }
-      if (event.key === "Tab") { stop(); selectedMode = "cell"; return executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, activeRow, activeCol, false) }
-      if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "ArrowLeft" || event.key === "ArrowRight") {
-        stop()
-        if (event.key === "ArrowUp") activeRow = Math.max(0, activeRow - 1)
-        else if (event.key === "ArrowDown") activeRow = Math.min(grid.rows.length, activeRow + 1)
-        else if (event.key === "ArrowLeft") activeCol = Math.max(0, activeCol - 1)
-        else activeCol = Math.min(grid.headers.length - 1, activeCol + 1)
-        selectedMode = "cell"
-        return syncActiveCellHighlight()
-      }
-      if (event.key === "Backspace" || event.key === "Delete") {
-        stop()
-        if (selectedMode === "row") return executeGridAction({ kind: "clear-row" }, activeRow, activeCol, false)
-        if (selectedMode === "col") return executeGridAction({ kind: "clear-column" }, activeRow, activeCol, false)
-        const cleared = applyMarkdownTableGridCellEdit(currentMarkdown, activeRow, activeCol, "")
-        if (cleared && cleared !== currentMarkdown) dispatchTableMarkdown(cleared, { row: activeRow, col: activeCol, openEditor: false })
-        return
-      }
-      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        if (event.key === " ") event.preventDefault()
-        event.stopPropagation()
-        activateCellEditor(activeRow, activeCol)
-      }
-    })
-
-    tableDomControllers.set(wrap, {
-      update,
-      destroy: () => { flushAndDispatchActiveCell(); detachOutsideListener() },
-    })
-    for (const el of [toolbar, gridRow, addRowBtn]) wrap.appendChild(el)
-    syncActiveCellHighlight()
-    applyPendingCellActivation()
+    tableDomControllers.set(wrap, new TableWidgetController(wrap, view, grid, this.markdown, this.from, this.to))
     return wrap
   }
 }

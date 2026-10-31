@@ -56,14 +56,24 @@ import {
   resolveMarkdownImageEmbed,
 } from "../../src/components/markdown-editor/markdownEditorUploadModel"
 import {
+  isOffsetInsideInlineCodeSpan,
   shouldBypassHtmlPasteConversion,
   shouldReportEmptyHtmlPasteError,
 } from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
-import { resolveMarkdownEditorUploadErrorMessage } from "../../src/components/markdown-editor/useMarkdownEditorMediaTransfers"
+import {
+  appendInlineMarkdownNodes,
+  isSafeInlineHref,
+} from "../../src/components/markdown-editor/markdownEditorInlineDom"
+import {
+  resolveMarkdownEditorUploadErrorMessage,
+  shouldLinkifySelectionOnUrlPaste,
+} from "../../src/components/markdown-editor/markdownEditorMediaTransferModel"
+import { reconcileCellSpans } from "../../src/components/markdown-editor/markdownEditorTableSpanModel"
 import {
   hasAlphaTransparency,
   resolveTransferOutputMimeTypes,
 } from "../../src/libs/profileImageUpload"
+import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
 const lightTheme = createTheme({ scheme: "light" })
 const srcFile = (...parts: string[]) =>
@@ -266,7 +276,10 @@ class SimpleDomElement {
     return event
   }
 
-  focus() {}
+  focus() {
+    const doc = (globalThis as { document?: { activeElement?: unknown } }).document
+    if (doc) doc.activeElement = this
+  }
 
   setSelectionRange(start: number, end: number) {
     this.selectionStart = start
@@ -319,82 +332,9 @@ const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: MockDomEvent) =
   }
 }
 
-const pwComponentCache = new WeakMap<object, unknown>()
-
-function wrapPwComponent(type: unknown): unknown {
-  if (!type || (typeof type !== "function" && typeof type !== "object")) return type
-  if (typeof type === "function") {
-    if (
-      "__emotion_real" in type ||
-      Boolean((type as { prototype?: { isReactComponent?: unknown } }).prototype?.isReactComponent)
-    ) {
-      return type
-    }
-    const cached = pwComponentCache.get(type)
-    if (cached) return cached
-    const fn = type as (props: Record<string, unknown>) => unknown
-    const Wrapped = (props: Record<string, unknown>) => toReactElement(fn(props))
-    pwComponentCache.set(type, Wrapped)
-    return Wrapped
-  }
-  const cachedObj = pwComponentCache.get(type)
-  if (cachedObj) return cachedObj
-  const obj = type as { $$typeof?: symbol; type?: unknown; compare?: unknown }
-  if (obj.$$typeof === Symbol.for("react.memo") && obj.type) {
-    const WrappedMemo = React.memo(wrapPwComponent(obj.type) as never, obj.compare as never)
-    pwComponentCache.set(type, WrappedMemo)
-    return WrappedMemo
-  }
-  return type
-}
-
-function toReactElement(node: unknown, index?: number): unknown {
-  if (!node || typeof node !== "object") return node
-  if (Array.isArray(node)) return node.map((child, idx) => toReactElement(child, idx))
-  const record = node as {
-    __pw_type?: string
-    type?: unknown
-    props?: Record<string, unknown>
-    key?: string | number | null
-  }
-  if (record.__pw_type === "jsx") {
-    const nextProps: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(record.props ?? {})) {
-      nextProps[k] = toReactElement(v)
-    }
-    const resolvedKey =
-      record.key !== undefined && record.key !== null
-        ? record.key
-        : index !== undefined
-          ? `pw-${index}`
-          : undefined
-    if (resolvedKey !== undefined) nextProps.key = resolvedKey
-    const resolvedType =
-      record.type === undefined ||
-      (typeof record.type === "object" && record.type !== null && !("$$typeof" in record.type))
-        ? React.Fragment
-        : wrapPwComponent(record.type)
-    return React.createElement(resolvedType as never, nextProps)
-  }
-  if (React.isValidElement(node) && record.props) {
-    const nextType = wrapPwComponent(record.type)
-    let changed = nextType !== record.type
-    const nextProps: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(record.props)) {
-      const converted = toReactElement(v)
-      if (converted !== v) changed = true
-      nextProps[k] = converted
-    }
-    if (!changed) return node
-    if (record.key !== undefined && record.key !== null) nextProps.key = record.key
-    return React.createElement(nextType as never, nextProps)
-  }
-  return node
-}
-
 const renderToolbarHtml = (viewMode: "live" | "source" | "reading", disabled = false) =>
   renderToStaticMarkup(
-    toReactElement(
+    materializePlaywrightJsx(
       React.createElement(ThemeProvider, {
         theme: lightTheme,
         children: React.createElement(MarkdownEditorToolbar, {
@@ -649,7 +589,8 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       expect(isolatedDom.getAttribute("data-header-col")).toBeNull()
 
       fullWidthBtn.dispatch("click")
-      expect(currentDoc).toContain('"overflowMode":"wide"')
+      expect(currentDoc).toContain('"fitWidth":true')
+      expect(currentDoc).not.toContain('"overflowMode":"wide"')
 
       resizers[1]!.dispatch("pointerdown", { button: 0, clientX: 100 })
       for (const move of winListeners.get("pointermove") ?? []) move({ clientX: 180 })
@@ -661,6 +602,39 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       fullWidthBtn.dispatch("click")
       expect(currentDoc).not.toContain("<!-- aq-table")
       expect(currentDoc).toBe(plainTable)
+
+      const wideTable = [
+        '<!-- aq-table {"overflowMode":"wide"} -->',
+        "| Col A | Col B |",
+        "| --- | --- |",
+        "| 1 | 2 |",
+      ].join("\n")
+      let wideDoc = wideTable
+      const wideView = {
+        state: {
+          get doc() {
+            return { length: wideDoc.length, lineAt: () => ({ length: 1 }) }
+          },
+          selection: { main: { from: 0, to: 0 } },
+          facet: () => true,
+        },
+        posAtDOM: () => 0,
+        focus: () => {},
+        dispatch: (spec: { changes?: { from: number; to: number; insert: string } }) => {
+          if (spec.changes) {
+            wideDoc =
+              wideDoc.slice(0, spec.changes.from) +
+              spec.changes.insert +
+              wideDoc.slice(spec.changes.to)
+          }
+        },
+      } as unknown as EditorView
+      const wideDom = new MarkdownTableWidget(wideTable, 0, wideTable.length).toDOM(
+        wideView
+      ) as unknown as SimpleDomElement
+      wideDom.querySelector('[data-testid="cm-live-table-toggle-full-width"]')!.dispatch("click")
+      expect(wideDoc).toContain('"overflowMode":"wide"')
+      expect(wideDoc).toContain('"fitWidth":true')
     })
   })
 
@@ -977,5 +951,163 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       notionChromeSource
     expect(stylesCombined).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*?overflow-x:\s*auto/)
     expect(notionChromeSource).toMatch(/@media\s*\(pointer:\s*coarse\)\s*\{\s*display:\s*none;\s*\}/)
+  })
+
+  test("aligns R2 inline DOM tokens, table span reconciliation, deferred Korean 2-Beolsik IME proxy, and code/URL paste guards", () => {
+    expect(isSafeInlineHref("/\t/evil.example/phish")).toBe(false)
+    expect(isSafeInlineHref("/\x7f/evil.example/phish")).toBe(false)
+    expect(isSafeInlineHref("//evil.example/phish")).toBe(false)
+    expect(isSafeInlineHref("https://example.com/docs")).toBe(true)
+    expect(isSafeInlineHref("#section-1")).toBe(true)
+
+    const serializeSimpleDom = (el: SimpleDomElement): string => {
+      if (el.tagName === "#TEXT") return el.textContent
+      if (el.tagName === "BR") return "<br/>"
+      const tag = el.tagName.toLowerCase()
+      const cls = el.className ? ` class="${el.className}"` : ""
+      const inner =
+        el.children.length > 0 ? el.children.map(serializeSimpleDom).join("") : el.textContent
+      return `<${tag}${cls}>${inner}</${tag}>`
+    }
+
+    withMockDom(() => {
+      const renderInlineSnippet = (source: string) => {
+        const host = new SimpleDomElement("div")
+        appendInlineMarkdownNodes(host as unknown as HTMLElement, source)
+        return serializeSimpleDom(host)
+      }
+
+      expect(renderInlineSnippet("Check ==x = 1== and =={{color:blue|note}}==.")).toContain(
+        '<mark class="cm-live-highlight">x = 1</mark>'
+      )
+      expect(renderInlineSnippet("Check ==x = 1== and =={{color:blue|note}}==.")).toContain(
+        '<mark class="cm-live-highlight"><span class="cm-live-color">note</span></mark>'
+      )
+      expect(renderInlineSnippet("Keep === and a == 1 || b == 2 literal.")).toBe(
+        "<div>Keep === and a == 1 || b == 2 literal.</div>"
+      )
+      expect(renderInlineSnippet("Prices are $10 and $25 today.")).toBe(
+        "<div>Prices are $10 and $25 today.</div>"
+      )
+    })
+
+    const reconciled = reconcileCellSpans(
+      [
+        [{ rowspan: 3, colspan: 2 }, { hidden: true }],
+        [{ hidden: true }, { hidden: true }],
+      ],
+      2,
+      2
+    )
+    expect(reconciled).toEqual([
+      [{ rowspan: 2, colspan: 2 }, { hidden: true }],
+      [{ hidden: true }, { hidden: true }],
+    ])
+
+    const mergedTable = [
+      '<!-- aq-table {"cells":[[{"colspan":2},{"hidden":true}],[{"rowspan":2},null],[{"hidden":true},null]]} -->',
+      "| H1 | H2 |",
+      "| --- | --- |",
+      "| SpanTop | R1C2 |",
+      "| Covered | R2C2 |",
+    ].join("\n")
+    const duplicatedMergedRow = applyMarkdownTableGridAction(mergedTable, 1, 0, {
+      kind: "duplicate-row",
+    })
+    expect(duplicatedMergedRow).not.toBeNull()
+    const deletedMergedRow = applyMarkdownTableGridAction(mergedTable, 1, 0, {
+      kind: "delete-row",
+    })
+    expect(deletedMergedRow).not.toBeNull()
+    expect(deletedMergedRow!.markdown).not.toContain('"rowspan":2')
+
+    withMockDom(() => {
+      const tableDoc = "| A | B |\n| --- | --- |\n| 작성자<br> | 2 |"
+      let dispatchedInsert = ""
+      const mockView = {
+        state: {
+          doc: { length: tableDoc.length, lineAt: () => ({ length: 1 }) },
+          selection: { main: { from: 0, to: 0 } },
+          facet: () => true,
+        },
+        posAtDOM: () => 0,
+        focus: () => {},
+        dispatch: (spec: { changes?: { insert?: string } }) => {
+          if (spec.changes?.insert) dispatchedInsert = spec.changes.insert
+        },
+      } as unknown as EditorView
+
+      const dom = new MarkdownTableWidget(tableDoc, 0, tableDoc.length).toDOM(
+        mockView
+      ) as unknown as SimpleDomElement
+      const rowHandle = dom.querySelectorAll('[data-testid="cm-live-table-row-handle"]')[1]!
+      rowHandle.dispatch("click")
+      const imeProxy = dom.querySelector('[data-testid="cm-live-table-ime-proxy"]')!
+      imeProxy.focus()
+      expect((globalThis.document as unknown as { activeElement: unknown }).activeElement).toBe(
+        imeProxy
+      )
+
+      imeProxy.dispatch("compositionstart", { data: "ㅎ" })
+      const cellInput = dom.querySelector('[data-testid="cm-live-table-cell-input"]')!
+      expect(cellInput).not.toBeNull()
+      expect((globalThis.document as unknown as { activeElement: unknown }).activeElement).toBe(
+        imeProxy
+      )
+
+      imeProxy.value = "한"
+      imeProxy.dispatch("compositionupdate", { data: "한" })
+      imeProxy.dispatch("input", { isComposing: true })
+      expect(cellInput.value).toBe("작성자<br>한")
+
+      imeProxy.value = "한글"
+      imeProxy.dispatch("compositionupdate", { data: "한글" })
+      imeProxy.dispatch("compositionend", { data: "한글" })
+      expect(cellInput.value).toBe("작성자<br>한글")
+
+      cellInput.dispatch("blur")
+      expect(dispatchedInsert).toContain("| 작성자<br>한글 | 2 |")
+    })
+
+    expect(shouldLinkifySelectionOnUrlPaste("live", "Select word here", { from: 7, to: 11 })).toBe(
+      true
+    )
+    expect(shouldLinkifySelectionOnUrlPaste("source", "Select word here", { from: 7, to: 11 })).toBe(
+      false
+    )
+    expect(
+      shouldLinkifySelectionOnUrlPaste("reading", "Select word here", { from: 7, to: 11 })
+    ).toBe(false)
+    expect(
+      shouldLinkifySelectionOnUrlPaste("live", "```ts\nconst url = 1\n```", { from: 12, to: 15 })
+    ).toBe(false)
+    expect(
+      shouldLinkifySelectionOnUrlPaste("live", "Inline `codeTarget` span", { from: 8, to: 18 })
+    ).toBe(false)
+
+    const unmatchedBacktickDoc = "Unmatched ` backtick before target here"
+    expect(
+      isOffsetInsideInlineCodeSpan(unmatchedBacktickDoc, unmatchedBacktickDoc.indexOf("target"))
+    ).toBe(false)
+    const matchedBacktickDoc = "Matched `insideCode` span"
+    expect(
+      isOffsetInsideInlineCodeSpan(matchedBacktickDoc, matchedBacktickDoc.indexOf("insideCode"))
+    ).toBe(true)
+
+    expect(
+      shouldBypassHtmlPasteConversion({
+        viewMode: "live",
+        markdown: "",
+        selectionFrom: 0,
+        clipboardTypes: ["text/html", "text/plain"],
+        html: '<pre style="font: 12px \'JetBrains Mono\', monospace; white-space: pre;"><b>fun</b> <a href="https://kotlinlang.org">main</a>() {}</pre>',
+        plainText: "fun main() {}",
+      })
+    ).toBe(true)
+
+    expect(
+      collectMathReplacementSpecs("Wait $$ here\n\nAnd $$ there", -1, -1, false, [])
+    ).toEqual([])
+    expect(collectMathReplacementSpecs("Triple $$$x$$$ dollars", -1, -1, false, [])).toEqual([])
   })
 })

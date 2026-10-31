@@ -110,19 +110,19 @@ export const useEditorStudioPublishModalFlow = ({
   ])
 
   const handleConfirmPublish = useCallback(async () => {
-    flushPendingAuthoringMetadata()
-    const success =
-      publishActionType === "create"
-        ? await handleWritePost()
-        : publishActionType === "modify"
-          ? await handleModifyPost()
-          : await handlePublishTempDraft()
+    let success = false
+    if (publishActionType === "create") {
+      success = await handleWritePost()
+    } else if (publishActionType === "modify") {
+      success = await handleModifyPost()
+    } else {
+      success = await handlePublishTempDraft()
+    }
 
     if (success) {
       setIsPublishModalOpen(false)
     }
   }, [
-    flushPendingAuthoringMetadata,
     handleModifyPost,
     handlePublishTempDraft,
     handleWritePost,

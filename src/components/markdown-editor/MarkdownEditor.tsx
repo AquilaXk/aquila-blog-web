@@ -17,6 +17,7 @@ import { type MarkdownFileUploadResult, type MarkdownImageUploadResult } from ".
 import { modShortcutLabel } from "./markdownEditorToolbarModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
+import { type MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import { MarkdownEditorLiveSurface, type MarkdownEditorLiveSurfaceHandle } from "./MarkdownEditorLiveSurface"
 import { planMarkdownSnippetMutation, planStripBlockLinePrefix } from "./markdownEditorNotionModel"
 import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
@@ -45,8 +46,18 @@ type MarkdownEditorProps = {
 }
 
 type TextareaSelection = MarkdownEditorFocusSelection
+type TableEditAvailability = NonNullable<ReturnType<typeof getMarkdownEditorTableEditAvailability>>
+type TableAlignment = Extract<MarkdownEditorTableEdit, { kind: "set-alignment" }>["alignment"]
 
 const TABLE_ADD_ROW_EDIT: MarkdownEditorTableEdit = { kind: "add-row" }
+const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode => {
+  if (prev === "live") return "source"
+  return prev === "source" ? "reading" : "live"
+}
+const isAlignmentDisabled = (alignment: TableAlignment, availability: TableEditAvailability): boolean => {
+  if (alignment === "left") return !availability.alignLeft
+  return alignment === "center" ? !availability.alignCenter : !availability.alignRight
+}
 
 export const resolveActiveTableCellOffset = (root: HTMLElement | null, readMarkdown: () => string): number | null => {
   const activeEl = typeof document !== "undefined" ? document.activeElement : null
@@ -153,16 +164,13 @@ export const MarkdownEditor = ({
     liveSurfaceRef.current?.focus(nextSelection)
   }, [onSelectionChange, syncSelectionState, updateActiveTableSelection])
 
-  const [viewMode, setViewMode] = useState<"live" | "source" | "reading">("live")
+  const [viewMode, setViewMode] = useState<MarkdownEditorSurfaceMode>("live")
   const isAuthoringDisabled = disabled || viewMode === "reading"
-  const cycleViewMode = useCallback(() => {
-    setViewMode((prev) => (prev === "live" ? "source" : prev === "source" ? "reading" : "live"))
-  }, [])
+  const cycleViewMode = useCallback(() => setViewMode(nextEditorViewMode), [])
 
   useEffect(() => {
     onFocusRequestReady?.((selection) => {
-      if (disabled) return
-      liveSurfaceRef.current?.focus(selection)
+      if (!disabled) liveSurfaceRef.current?.focus(selection)
     })
     return () => onFocusRequestReady?.(null)
   }, [disabled, onFocusRequestReady])
@@ -180,21 +188,13 @@ export const MarkdownEditor = ({
 
   const readEditorSnapshot = useCallback(() => liveSurfaceRef.current?.readSnapshot() ?? null, [])
   const applyMutationPlan = applyRawMutationPlan
-  const selectFindReplaceRange = useCallback((from: number, to?: number) => {
-    setEditorSelection(from, to)
-  }, [setEditorSelection])
+  const selectFindReplaceRange = useCallback((from: number, to?: number) => setEditorSelection(from, to), [setEditorSelection])
 
   const findReplace = useMarkdownEditorFindReplace({
-    disabled: isAuthoringDisabled,
-    draftValue,
-    readSnapshot: readEditorSnapshot,
-    selectRange: selectFindReplaceRange,
-    applyRecordedMutation: applyMutationPlan,
+    disabled: isAuthoringDisabled, draftValue, readSnapshot: readEditorSnapshot,
+    selectRange: selectFindReplaceRange, applyRecordedMutation: applyMutationPlan,
   })
-  const {
-    invalidate: invalidateFindReplace,
-    onSelectionChange: handleFindReplaceSelectionChange,
-  } = findReplace
+  const { invalidate: invalidateFindReplace, onSelectionChange: handleFindReplaceSelectionChange } = findReplace
 
   useEffect(() => {
     if (!pendingFindReplaceInvalidationRef.current) return
@@ -239,11 +239,7 @@ export const MarkdownEditor = ({
       if (surface) {
         syncSelectionState({ from: plan.selectionStart, to: plan.selectionEnd })
         return surface.applyMutation(plan, {
-          focus: false,
-          scrollIntoView: false,
-          addToHistory: false,
-          clearUploadError: false,
-          replaceTransientContent: true,
+          focus: false, scrollIntoView: false, addToHistory: false, clearUploadError: false, replaceTransientContent: true,
         })
       }
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
@@ -322,11 +318,7 @@ export const MarkdownEditor = ({
         case "clear-column":
           return false
         case "set-alignment":
-          return edit.alignment === "left"
-            ? !tableEditAvailability.alignLeft
-            : edit.alignment === "center"
-              ? !tableEditAvailability.alignCenter
-              : !tableEditAvailability.alignRight
+          return isAlignmentDisabled(edit.alignment, tableEditAvailability)
       }
     },
     [tableEditAvailability]

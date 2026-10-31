@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import { createElement, Fragment, isValidElement, memo, StrictMode, type ReactElement } from "react"
+import { createElement, Fragment, StrictMode, type ReactElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ThemeProvider } from "@emotion/react"
@@ -8,6 +8,11 @@ import { expect, test } from "@playwright/test"
 import MarkdownRenderer from "../../src/libs/markdown/MarkdownRenderer"
 import { normalizeMarkdownInlineChildren } from "../../src/libs/markdown/MarkdownRendererInline"
 import { normalizeLegacyInlineHtmlMarkdown } from "../../src/libs/markdown/inlineHtmlNormalization"
+import {
+  hasAsciiControlCharacters,
+  normalizeSafeMarkdownUrl,
+  normalizeSafeRelativeMarkdownPath,
+} from "../../src/libs/markdown/safeMarkdownUrl"
 import {
   extractMarkdownTableLayouts,
   normalizeMarkdownTableLayout,
@@ -21,6 +26,7 @@ import {
 import {
   loadSharedMermaidRuntime,
   resetSharedMermaidRuntimeForTests,
+  runSerializedMermaidTask,
 } from "../../src/libs/markdown/mermaidRuntimeConfig"
 import { createMermaidRuntimeController } from "../../src/libs/markdown/mermaidRuntimeRender"
 import {
@@ -35,110 +41,10 @@ import {
 } from "../../src/routes/Detail/PostDetail/PostDetailActionSections"
 import { createTheme } from "../../src/styles/theme"
 import type { TPost } from "../../src/types"
+import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
 const REPO_ROOT = path.resolve(__dirname, "../..")
 const lightTheme = createTheme({ scheme: "light" })
-
-const pwComponentCache = new WeakMap<object, unknown>()
-
-function wrapPwComponent(type: unknown): unknown {
-  if (!type || (typeof type !== "function" && typeof type !== "object")) {
-    return type
-  }
-  if (typeof type === "function") {
-    if (
-      "__emotion_real" in type ||
-      Boolean((type as { prototype?: { isReactComponent?: unknown } }).prototype?.isReactComponent)
-    ) {
-      return type
-    }
-    const cached = pwComponentCache.get(type)
-    if (cached) return cached
-    const fn = type as (props: Record<string, unknown>) => unknown
-    const Wrapped = (props: Record<string, unknown>) => toReactElement(fn(props))
-    Wrapped.displayName =
-      (type as { displayName?: string; name?: string }).displayName || fn.name || "PwWrapped"
-    pwComponentCache.set(type, Wrapped)
-    return Wrapped
-  }
-
-  const cachedObj = pwComponentCache.get(type)
-  if (cachedObj) return cachedObj
-  const obj = type as { $$typeof?: symbol; type?: unknown; compare?: unknown }
-  if (obj.$$typeof === Symbol.for("react.memo") && obj.type) {
-    const WrappedMemo = memo(wrapPwComponent(obj.type) as never, obj.compare as never)
-    pwComponentCache.set(type, WrappedMemo)
-    return WrappedMemo
-  }
-  return type
-}
-
-function toReactElement(node: unknown, index?: number): unknown {
-  if (!node || typeof node !== "object") return node
-  if (Array.isArray(node)) return node.map((child, idx) => toReactElement(child, idx))
-
-  const record = node as {
-    __pw_type?: string
-    $$typeof?: symbol
-    type?: unknown
-    props?: Record<string, unknown>
-    key?: string | number | null
-  }
-
-  if (record.__pw_type === "jsx") {
-    const rawProps = record.props ?? {}
-    const nextProps: Record<string, unknown> = {}
-    for (const [propKey, propValue] of Object.entries(rawProps)) {
-      if (
-        propKey === "components" &&
-        propValue &&
-        typeof propValue === "object" &&
-        !Array.isArray(propValue)
-      ) {
-        const mappedComponents: Record<string, unknown> = {}
-        for (const [tag, comp] of Object.entries(propValue as Record<string, unknown>)) {
-          mappedComponents[tag] = wrapPwComponent(comp)
-        }
-        nextProps[propKey] = mappedComponents
-      } else {
-        nextProps[propKey] = toReactElement(propValue)
-      }
-    }
-    const resolvedKey =
-      record.key !== undefined && record.key !== null
-        ? record.key
-        : index !== undefined
-          ? `pw-${index}`
-          : undefined
-    if (resolvedKey !== undefined) {
-      nextProps.key = resolvedKey
-    }
-    const resolvedType =
-      record.type === undefined ||
-      (typeof record.type === "object" && record.type !== null && !("$$typeof" in record.type))
-        ? Fragment
-        : wrapPwComponent(record.type)
-    return createElement(resolvedType as never, nextProps)
-  }
-
-  if (isValidElement(node) && record.props) {
-    const nextType = wrapPwComponent(record.type)
-    let changed = nextType !== record.type
-    const nextProps: Record<string, unknown> = {}
-    for (const [propKey, propValue] of Object.entries(record.props)) {
-      const converted = toReactElement(propValue)
-      if (converted !== propValue) changed = true
-      nextProps[propKey] = converted
-    }
-    if (!changed) return node
-    if (record.key !== undefined && record.key !== null) {
-      nextProps.key = record.key
-    }
-    return createElement(nextType as never, nextProps)
-  }
-
-  return node
-}
 
 const renderMarkdownHtml = (
   content: string,
@@ -161,7 +67,7 @@ const renderMarkdownHtml = (
       children: options.strictMode ? createElement(StrictMode, null, renderer) : renderer,
     })
   )
-  return renderToStaticMarkup(toReactElement(tree) as ReactElement)
+  return renderToStaticMarkup(materializePlaywrightJsx(tree) as ReactElement)
 }
 
 const renderMetaHeadHtml = (props: MetaConfigProps): string => {
@@ -169,7 +75,7 @@ const renderMetaHeadHtml = (props: MetaConfigProps): string => {
     props
   )
   return renderToStaticMarkup(
-    toReactElement(createElement(Fragment, null, headElement.props.children as never)) as ReactElement
+    materializePlaywrightJsx(createElement(Fragment, null, headElement.props.children as never)) as ReactElement
   )
 }
 
@@ -183,7 +89,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     const directChildren = normalizeMarkdownInlineChildren("first<br>second")
     expect(Array.isArray(directChildren)).toBe(true)
     const directBrHtml = renderToStaticMarkup(
-      toReactElement(createElement("td", null, directChildren)) as ReactElement
+      materializePlaywrightJsx(createElement("td", null, directChildren)) as ReactElement
     )
     expect(directBrHtml).toBe("<td>first<br/>second</td>")
 
@@ -576,7 +482,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
 
     const renderActions = (shareFeedback: "copied" | "shared" | "failed" | null) =>
       renderToStaticMarkup(
-        toReactElement(
+        materializePlaywrightJsx(
           createElement(ThemeProvider, {
             theme: lightTheme,
             children: createElement(
@@ -610,5 +516,178 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(copiedHtml).not.toContain("floatingActionButton floatingLikeButton")
     expect(sharedHtml).toContain("공유 완료")
     expect(sharedHtml).not.toContain("복사 완료")
+  })
+
+  test("9. rejects ASCII control protocol-relative bypasses, aligns ==x = 1== / recursive color / heading code slugs, and guards Pandoc math", () => {
+    expect(hasAsciiControlCharacters("/\t/evil.example/phish")).toBe(true)
+    expect(hasAsciiControlCharacters("/\x7f/evil.example/phish")).toBe(true)
+    expect(normalizeSafeRelativeMarkdownPath("/\t/evil.example/phish")).toBe("")
+    expect(normalizeSafeRelativeMarkdownPath("/\n/evil.example/phish")).toBe("")
+    expect(normalizeSafeMarkdownUrl("/\t/evil.example/phish")).toBe("")
+    expect(normalizeSafeRelativeMarkdownPath("/easysubway/og-image.png")).toBe(
+      "/easysubway/og-image.png"
+    )
+
+    const tabPhishMetaHtml = renderMetaHeadHtml({
+      title: "Tab Bypass Check",
+      description: "Desc",
+      type: "Post",
+      url: "https://blog.aquilaxk.site/posts/tab-check",
+      image: "/\t/evil.example/phish",
+    })
+    expect(tabPhishMetaHtml).not.toContain("evil.example")
+    expect(tabPhishMetaHtml).not.toContain("/\t/")
+
+    const parityHtml = renderMarkdownHtml(
+      [
+        "## API`v2`",
+        "",
+        "Highlight ==x = 1== and =={{color:blue|note}}== while keeping === and a == 1 || b == 2 literal.",
+        "",
+        "Wikilink tab bypass [[/\\t/evil.example/phish]]".replace("\\t", "\t"),
+        "",
+        "Prices are $10 and $25 today.",
+        "",
+        "Valid math $O(1)$, ($x^2$), and 한글 $a+b$이다.",
+        "",
+        "Wait $$ here",
+        "",
+        "And $$ there",
+      ].join("\n")
+    )
+
+    expect(parityHtml).toContain('id="apiv2"')
+    expect(parityHtml).toContain('<mark class="aq-highlight">x = 1</mark>')
+    expect(parityHtml).toMatch(
+      /<mark class="aq-highlight"><span[^>]*class="aq-inline-color"[^>]*>note<\/span><\/mark>/
+    )
+    expect(parityHtml).toContain("keeping === and a == 1 || b == 2 literal.")
+    expect(parityHtml).toContain(
+      `<a class="aq-wikilink" href="/?q=${encodeURIComponent("/\t/evil.example/phish")}">`
+    )
+    expect(parityHtml).toContain("Prices are $10 and $25 today.")
+    expect(parityHtml).toContain('class="katex"')
+    expect(parityHtml).not.toContain('class="katex-display"')
+  })
+
+  test("10. separates fitWidth from overflowMode wide, preserves unmeasured partial columnWidths, scopes data-header-col-cell, and serializes Mermaid parseError", async () => {
+    const stripStyleTags = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, "")
+
+    const fitWidthHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"fitWidth":true} -->',
+          "| Col A | Col B |",
+          "| --- | --- |",
+          "| 1 | 2 |",
+        ].join("\n")
+      )
+    )
+    expect(fitWidthHtml).toContain("width:100%")
+    expect(fitWidthHtml).toContain("table-layout:fixed")
+    expect(fitWidthHtml).not.toContain('data-overflow-mode="wide"')
+
+    const wideOverflowHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"overflowMode":"wide"} -->',
+          "| Col A | Col B |",
+          "| --- | --- |",
+          "| 1 | 2 |",
+        ].join("\n")
+      )
+    )
+    expect(wideOverflowHtml).toContain('data-overflow-mode="wide"')
+    expect(wideOverflowHtml).not.toContain("table-layout:fixed")
+
+    const partialWidthsHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"columnWidths":[null,200]} -->',
+          "| Auto Col | Fixed Col |",
+          "| --- | --- |",
+          "| Long prose | 200 |",
+        ].join("\n")
+      )
+    )
+    expect(partialWidthsHtml).toContain('<col/><col style="width:200px;min-width:200px"/>')
+    expect(partialWidthsHtml).not.toContain('<table style="width:200px')
+
+    const plainTableHtml = stripStyleTags(
+      renderMarkdownHtml(["| Col A | Col B |", "| --- | --- |", "| Left | Right |"].join("\n"))
+    )
+    expect(plainTableHtml).not.toContain("data-header-col-cell")
+
+    const hiddenFirstColHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"headerColumn":true,"cells":[[null,null],[{"hidden":true},null]]} -->',
+          "| Col A | Col B |",
+          "| --- | --- |",
+          "| Covered | Visible Second Col |",
+        ].join("\n")
+      )
+    )
+    expect(hiddenFirstColHtml).toContain("Visible Second Col")
+    expect(hiddenFirstColHtml).not.toContain("data-header-col-cell")
+
+    const visibleHeaderColHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"headerColumn":true} -->',
+          "| Col A | Col B |",
+          "| --- | --- |",
+          "| Row Label | Cell Value |",
+        ].join("\n")
+      )
+    )
+    expect(visibleHeaderColHtml).toMatch(/<td[^>]*data-header-col-cell="true"[^>]*>Row Label<\/td>/)
+    expect(visibleHeaderColHtml).not.toMatch(
+      /<td[^>]*data-header-col-cell="true"[^>]*>Cell Value<\/td>/
+    )
+
+    resetSharedMermaidRuntimeForTests()
+    const fakeMermaid = {
+      initialize() {},
+      render: async (id: string) => ({ svg: `<svg id="${id}"></svg>` }),
+      parseError: undefined as ((error: unknown) => void) | undefined,
+    }
+    const loader = async () => ({ default: fakeMermaid })
+    const warningsTask1: unknown[] = []
+    const warningsTask2: unknown[] = []
+    const task1GateControl = { release: () => {} }
+    const task1Gate = new Promise<void>((resolve) => {
+      task1GateControl.release = resolve
+    })
+
+    const run1 = runSerializedMermaidTask(
+      "light",
+      (err) => warningsTask1.push(err),
+      async ({ mermaidRuntime, preset }) => {
+        fakeMermaid.parseError?.("task-1-before-await")
+        await task1Gate
+        fakeMermaid.parseError?.("task-1-after-await")
+        return `${preset.themeKey}:${typeof mermaidRuntime.render}`
+      },
+      loader
+    )
+    const run2 = runSerializedMermaidTask(
+      "dark",
+      (err) => warningsTask2.push(err),
+      async ({ preset }) => {
+        fakeMermaid.parseError?.("task-2-only")
+        return preset.themeKey
+      },
+      loader
+    )
+
+    await Promise.resolve()
+    await Promise.resolve()
+    task1GateControl.release()
+    const [res1, res2] = await Promise.all([run1, run2])
+    expect(res1).toBe("github-light:function")
+    expect(res2).toBe("github-dark")
+    expect(warningsTask1).toEqual(["task-1-before-await", "task-1-after-await"])
+    expect(warningsTask2).toEqual(["task-2-only"])
   })
 })

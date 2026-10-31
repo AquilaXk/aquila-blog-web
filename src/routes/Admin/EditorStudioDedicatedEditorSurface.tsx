@@ -20,7 +20,6 @@ import {
   EDITOR_SURFACE_MOBILE_PROPS_OPEN,
   EDITOR_SURFACE_OUTLINE_OPEN,
   EDITOR_SURFACE_ZEN_BITS,
-  analyzeMarkdownLinks,
   applyBitFlag,
   applyCommaSeparatedTagDraft,
   buildEditorOutlineItems,
@@ -50,7 +49,7 @@ export {
   resolveActiveOutlineItemIndex,
   resolveViewportPanelUiMask,
   toCategorySuggestionLabels,
-}
+} from "./editorStudioDedicatedSurfaceModel"
 
 const activateEditorOutlineItem = (
   range: { start: number; end: number } | null,
@@ -79,12 +78,11 @@ const dismissMobilePanelsOnCanvasTap = (
 }
 
 const subscribeMediaQueryChange = (media: MediaQueryList, listener: () => void) => {
-  if (typeof media.addEventListener === "function") {
-    media.addEventListener("change", listener)
-    return () => media.removeEventListener("change", listener)
+  if (typeof media.addEventListener !== "function") {
+    return () => undefined
   }
-  media.addListener(listener)
-  return () => media.removeListener(listener)
+  media.addEventListener("change", listener)
+  return () => media.removeEventListener("change", listener)
 }
 
 const useResponsiveEditorPanelEffects = (
@@ -186,6 +184,84 @@ export const EditorStudioDedicatedEditorLoadingState = () => (
   </EditorStudioRoot>
 )
 
+const renderEditorOutlinePanel = ({
+  isOutlineOpen,
+  outlineItems,
+  activeOutlineIndex,
+  setIsOutlineOpen,
+  setLastActivatedOutlineOffset,
+  onOutlineBodyHeadingActivate,
+  focusTitle,
+}: {
+  isOutlineOpen: boolean
+  outlineItems: ReturnType<typeof buildEditorOutlineItems>
+  activeOutlineIndex: number
+  setIsOutlineOpen: (next: boolean) => void
+  setLastActivatedOutlineOffset: (offset: number | null) => void
+  onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
+  focusTitle: () => void
+}) => {
+  if (!isOutlineOpen) return null
+  return (
+    <EditorOutline aria-label="문서 목차">
+      <EditorPanelHeader>
+        <h3>문서 목차</h3>
+        <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>×</button>
+      </EditorPanelHeader>
+      {outlineItems.length > 0 ? (
+        outlineItems.map((item, index) => (
+          <EditorOutlineItem
+            key={item.id}
+            type="button"
+            data-level={item.level}
+            data-active={String(index === activeOutlineIndex)}
+            onClick={() =>
+              activateEditorOutlineItem(
+                item.range,
+                setIsOutlineOpen,
+                setLastActivatedOutlineOffset,
+                onOutlineBodyHeadingActivate,
+                focusTitle
+              )
+            }
+          >
+            <span>H{item.level}</span>
+            <strong>{item.label}</strong>
+          </EditorOutlineItem>
+        ))
+      ) : (
+        <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
+      )}
+    </EditorOutline>
+  )
+}
+
+const renderPublishNoticeBanner = ({
+  showPublishNotice,
+  publishNoticeTone,
+  publishNoticeText,
+  onReloadLatestServerPost,
+  actionsDisabled,
+}: {
+  showPublishNotice: boolean
+  publishNoticeTone: NoticeTone
+  publishNoticeText: string
+  onReloadLatestServerPost: (() => void) | null
+  actionsDisabled: boolean
+}) => {
+  if (!showPublishNotice) return null
+  return (
+    <PublishNotice data-tone={publishNoticeTone}>
+      <span>{publishNoticeText}</span>
+      {onReloadLatestServerPost ? (
+        <SecondaryButton type="button" disabled={actionsDisabled} onClick={onReloadLatestServerPost}>
+          서버 최신본 다시 불러오기
+        </SecondaryButton>
+      ) : null}
+    </PublishNotice>
+  )
+}
+
 export const EditorStudioDedicatedEditorSurface = ({
   thumbnailImageFileInputRef, onThumbnailImageFileChange, onExit, saveStateText, saveStateTone,
   primaryActionDisabled, primaryActionLabel, onPrimaryAction, postTags, tagDraft, onTagDraftChange,
@@ -221,9 +297,12 @@ export const EditorStudioDedicatedEditorSurface = ({
   useResponsiveEditorPanelEffects(setPanelUiMask, handleToggleZenMode)
 
   useEffect(() => {
-    if (isPublishModalVisible && isMobileEditorViewport()) {
-      setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
-    }
+    if (!isPublishModalVisible) return
+    setPanelUiMask((m) =>
+      isMobileEditorViewport()
+        ? m & ~(EDITOR_SURFACE_ZEN_BITS | EDITOR_SURFACE_GUIDE_OPEN)
+        : m & ~EDITOR_SURFACE_GUIDE_OPEN
+    )
   }, [isPublishModalVisible])
 
   const deferredPostContent = useDeferredValue(postContent)
@@ -325,38 +404,15 @@ export const EditorStudioDedicatedEditorSurface = ({
       </EditorStudioDedicatedTopBar>
 
       <EditorStudioFrame data-testid="editor-studio-frame" $showOutline={isOutlineOpen} $showInspector={isInspectorOpen}>
-        {isOutlineOpen ? (
-          <EditorOutline aria-label="문서 목차">
-            <EditorPanelHeader>
-              <h3>문서 목차</h3>
-              <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>×</button>
-            </EditorPanelHeader>
-            {outlineItems.length > 0 ? (
-              outlineItems.map((item, index) => (
-                <EditorOutlineItem
-                  key={item.id}
-                  type="button"
-                  data-level={item.level}
-                  data-active={String(index === activeOutlineIndex)}
-                  onClick={() =>
-                    activateEditorOutlineItem(
-                      item.range,
-                      setIsOutlineOpen,
-                      setLastActivatedOutlineOffset,
-                      onOutlineBodyHeadingActivate,
-                      () => titleNodeRef.current?.focus()
-                    )
-                  }
-                >
-                  <span>H{item.level}</span>
-                  <strong>{item.label}</strong>
-                </EditorOutlineItem>
-              ))
-            ) : (
-              <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
-            )}
-          </EditorOutline>
-        ) : null}
+        {renderEditorOutlinePanel({
+          isOutlineOpen,
+          outlineItems,
+          activeOutlineIndex,
+          setIsOutlineOpen,
+          setLastActivatedOutlineOffset,
+          onOutlineBodyHeadingActivate,
+          focusTitle: () => titleNodeRef.current?.focus(),
+        })}
 
         <EditorStudioWritingColumn
           data-testid="editor-writing-column"
@@ -419,20 +475,13 @@ export const EditorStudioDedicatedEditorSurface = ({
             <span>링크 {totalLinkCount}</span>
           </EditorStudioStatusBar>
 
-          {showPublishNotice ? (
-            <PublishNotice data-tone={publishNoticeTone}>
-              <span>{publishNoticeText}</span>
-              {onReloadLatestServerPost ? (
-                <SecondaryButton
-                  type="button"
-                  disabled={isLocalDraftRestoreSuggestionActionsDisabled}
-                  onClick={onReloadLatestServerPost}
-                >
-                  서버 최신본 다시 불러오기
-                </SecondaryButton>
-              ) : null}
-            </PublishNotice>
-          ) : null}
+          {renderPublishNoticeBanner({
+            showPublishNotice,
+            publishNoticeTone,
+            publishNoticeText,
+            onReloadLatestServerPost,
+            actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
+          })}
         </EditorStudioWritingColumn>
 
         {isInspectorOpen ? (

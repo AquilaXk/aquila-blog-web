@@ -45,15 +45,17 @@ export const resolveViewportPanelUiMask = (
   return mask | EDITOR_SURFACE_ZEN_BITS
 }
 
+const STORED_CATEGORY_PREFIX_PATTERN = /^[a-z0-9-]+::(.*)$/i
+
 export const formatCategoryDraftInputValue = (category: string): string => {
   if (!category) return ""
   const trimmed = category.trim()
   if (category === "📂 All" || trimmed.toLowerCase() === "all::all") {
     return "All"
   }
-  const storedMatch = category.match(/^[a-z0-9-]+::(.*)$/i)
+  const storedMatch = STORED_CATEGORY_PREFIX_PATTERN.exec(category)
   if (storedMatch) {
-    return storedMatch[1]
+    return storedMatch[1] ?? ""
   }
   return category
 }

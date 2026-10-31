@@ -471,6 +471,7 @@ export const EditorStudioWorkspaceController = ({
     setIsPreviewThumbnailError,
     setThumbnailImageFileName,
     addTagsToPost,
+    commitPostCategory,
     setTagDraft,
     setPostCategory,
     composeEditorContent,

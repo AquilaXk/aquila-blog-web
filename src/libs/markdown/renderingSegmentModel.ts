@@ -1,6 +1,13 @@
 import type { CalloutKind, MarkdownSegment } from "src/libs/markdown/renderingTypes"
 import { getCallout, resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "src/libs/markdown/calloutRegistry"
 import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
+import {
+  buildCustomDirectiveSegment,
+  collectTripleColonBody,
+  parseCardMetadataComment,
+  parseCustomDirectiveHeader,
+  type PendingDirectiveMetadata,
+} from "src/libs/markdown/renderingDirectiveModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 
 type ParsedCalloutHeader = {
@@ -10,6 +17,12 @@ type ParsedCalloutHeader = {
   foldable?: boolean
   defaultCollapsed?: boolean
 }
+
+const HEADING_TITLE_PATTERN = /^#{1,6}\s+(.+)$/
+const PROMOTED_BOLD_PATTERN = /^(?:[-*+]\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$/
+const FENCE_LINE_PATTERN = /^([`~]{3,})/
+const ASIDE_OPEN_LINE_PATTERN = /^\s*<aside(?:\s[^>]*)?>(.*)$/i
+const ASIDE_CLOSE_SUFFIX_PATTERN = /<\/aside>\s*$/i
 
 const isAsciiCalloutToken = (token: string): boolean => {
   if (token.length === 0) return false
@@ -94,6 +107,8 @@ const parseCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   }
 }
 
+const infoCalloutMarker = getCallout("info").marker
+
 const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   const header = parseCalloutHeader(raw)
   if (header) return header
@@ -119,9 +134,8 @@ const extractPromotedCalloutTitle = (bodyLines: string[]) => {
     return { title: "", bodyLines }
   }
 
-  const originalLine = bodyLines[firstBodyLineIndex]
-  const trimmedLine = originalLine.trim()
-  const headingMatch = trimmedLine.match(/^#{1,6}\s+(.+)$/)
+  const trimmedLine = bodyLines[firstBodyLineIndex].trim()
+  const headingMatch = HEADING_TITLE_PATTERN.exec(trimmedLine)
   if (headingMatch) {
     return {
       title: headingMatch[1]?.trim() || "",
@@ -129,24 +143,16 @@ const extractPromotedCalloutTitle = (bodyLines: string[]) => {
     }
   }
 
-  const boldMatch = trimmedLine.match(/^(?:[-*+]\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$/)
+  const boldMatch = PROMOTED_BOLD_PATTERN.exec(trimmedLine)
   const promotedTitle = (boldMatch?.[1] || boldMatch?.[2] || "").trim()
-  if (!promotedTitle) {
-    return { title: "", bodyLines }
-  }
-
   const remainingLine = (boldMatch?.[3] || "").trim()
-  if (remainingLine.length > 0) {
+  if (!promotedTitle || remainingLine.length > 0) {
     return { title: "", bodyLines }
   }
-
-  const resolvedBodyLines = remainingLine
-    ? bodyLines.map((line, index) => (index === firstBodyLineIndex ? remainingLine : line))
-    : bodyLines.filter((_, index) => index !== firstBodyLineIndex)
 
   return {
     title: promotedTitle,
-    bodyLines: resolvedBodyLines,
+    bodyLines: bodyLines.filter((_, index) => index !== firstBodyLineIndex),
   }
 }
 
@@ -173,64 +179,238 @@ const buildCalloutSegment = (
 }
 
 const parseFenceMarker = (line: string): "`" | "~" | null => {
-  const match = line.trim().match(/^([`~]{3,})(.*)$/)
+  const match = FENCE_LINE_PATTERN.exec(line.trim())
   if (!match) return null
 
   const fence = match[1]
   const marker = fence[0] as "`" | "~"
-  if (!hasUniformFenceMarker(fence, marker)) return null
-  return marker
+  return hasUniformFenceMarker(fence, marker) ? marker : null
 }
 
-const CUSTOM_DIRECTIVE_PATTERN =
-  /^:::(bookmark|embed|file)(?:\s+(\S+)(?:\s+(.*))?)?\s*$/i
-const CARD_METADATA_COMMENT_PATTERN =
-  /^\s*<!--\s*aq-(bookmark|embed|file)\s+(\{[\s\S]*\})\s*-->\s*$/
-
-const FORMULA_BLOCK_START_PATTERN = /^\s*\$\$\s*$/
-const infoCalloutMarker = getCallout("info").marker
-
-const normalizeOptionalCardUrl = (value: unknown): string | undefined => {
-  if (typeof value !== "string" || !value.trim()) return undefined
-  const normalized = normalizeSafeMarkdownUrl(value)
-  return normalized || undefined
-}
-
-const parseCardMetadataComment = (line: string) => {
-  const match = line.match(CARD_METADATA_COMMENT_PATTERN)
-  if (!match) return null
-
-  try {
-    const kind = match[1].toLowerCase() as "bookmark" | "embed" | "file"
-    const payload = JSON.parse(match[2]) as Record<string, unknown>
-    const thumbnailUrl = normalizeOptionalCardUrl(payload.thumbnailUrl)
-    const embedUrl = normalizeOptionalCardUrl(payload.embedUrl)
+const resolveDirectiveCalloutHeader = (rawHeader: string): ParsedCalloutHeader => {
+  const parsed = parseCalloutHeader(rawHeader)
+  if (parsed) return parsed
+  const firstSpace = rawHeader.search(/\s/)
+  const firstToken = firstSpace === -1 ? rawHeader : rawHeader.slice(0, firstSpace)
+  const restTitle = firstSpace === -1 ? "" : rawHeader.slice(firstSpace).trim()
+  const tokenCallout = firstToken ? resolveCalloutBlockquote(firstToken) : null
+  if (tokenCallout) {
     return {
-      kind,
-      attrs:
-        kind === "file"
-          ? {
-              ...(typeof payload.mimeType === "string" && payload.mimeType.trim()
-                ? { mimeType: payload.mimeType.trim() }
-                : {}),
-              ...(typeof payload.sizeBytes === "number" && Number.isFinite(payload.sizeBytes)
-                ? { sizeBytes: Math.max(0, Math.round(payload.sizeBytes)) }
-                : {}),
-            }
-          : {
-              ...(typeof payload.siteName === "string" && payload.siteName.trim()
-                ? { siteName: payload.siteName.trim() }
-                : {}),
-              ...(typeof payload.provider === "string" && payload.provider.trim()
-                ? { provider: payload.provider.trim() }
-                : {}),
-              ...(thumbnailUrl ? { thumbnailUrl } : {}),
-              ...(kind === "embed" && embedUrl ? { embedUrl } : {}),
-            },
+      kind: tokenCallout.kind,
+      title: restTitle,
+      emoji: tokenCallout.callout.marker,
     }
-  } catch {
-    return null
   }
+  return {
+    kind: "info",
+    title: rawHeader,
+    emoji: infoCalloutMarker,
+  }
+}
+
+const tryParseAsideBlock = (
+  lines: readonly string[],
+  startIndex: number
+): { nextIndex: number; segment: MarkdownSegment | null; fallbackLines: string[] } | null => {
+  const line = lines[startIndex]
+  const openingMatch = ASIDE_OPEN_LINE_PATTERN.exec(line)
+  if (!openingMatch) return null
+
+  const originalLines = [line]
+  const bodyLines: string[] = []
+  let closed = false
+  let nextIndex = startIndex
+
+  const appendContent = (value: string) => {
+    if (value.length > 0) bodyLines.push(value)
+  }
+
+  const openingTail = openingMatch[1] ?? ""
+  if (ASIDE_CLOSE_SUFFIX_PATTERN.test(openingTail)) {
+    appendContent(openingTail.replace(ASIDE_CLOSE_SUFFIX_PATTERN, "").trimEnd())
+    closed = true
+  } else {
+    appendContent(openingTail)
+  }
+
+  let cursor = startIndex + 1
+  while (!closed && cursor < lines.length) {
+    const currentLine = lines[cursor]
+    originalLines.push(currentLine)
+    if (ASIDE_CLOSE_SUFFIX_PATTERN.test(currentLine)) {
+      appendContent(currentLine.replace(ASIDE_CLOSE_SUFFIX_PATTERN, "").trimEnd())
+      closed = true
+      nextIndex = cursor
+      break
+    }
+    bodyLines.push(currentLine)
+    cursor += 1
+  }
+
+  if (!closed) {
+    return { nextIndex: startIndex + 1, segment: null, fallbackLines: originalLines }
+  }
+
+  const normalizedBodyLines = bodyLines.map((row) => row.trim())
+  const firstContentIndex = normalizedBodyLines.findIndex((row) => row.length > 0)
+  const header =
+    firstContentIndex >= 0 ? parseAsideCalloutHeader(normalizedBodyLines[firstContentIndex]) : null
+  const segment: MarkdownSegment = header
+    ? buildCalloutSegment(header, normalizedBodyLines.slice(firstContentIndex + 1))
+    : {
+        type: "callout",
+        kind: "info",
+        title: "",
+        emoji: infoCalloutMarker,
+        content: normalizedBodyLines.join("\n").trim(),
+      }
+  return { nextIndex: nextIndex + 1, segment, fallbackLines: [] }
+}
+
+const tryParseFormulaBlock = (
+  lines: readonly string[],
+  startIndex: number
+): { closedIndex: number; formula: string; bodyLines: string[] } => {
+  const bodyLines: string[] = []
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === "$$") {
+      return { closedIndex: index, formula: bodyLines.join("\n").trim(), bodyLines }
+    }
+    bodyLines.push(lines[index])
+  }
+  return { closedIndex: -1, formula: "", bodyLines }
+}
+
+const consumeBlockquoteCalloutOrLines = (
+  lines: readonly string[],
+  startIndex: number
+): { nextIndex: number; calloutSegment: MarkdownSegment | null; rawBlock: string } => {
+  const quoteLines: string[] = []
+  let cursor = startIndex
+  while (cursor < lines.length && lines[cursor].trimStart().startsWith(">")) {
+    quoteLines.push(lines[cursor].replace(/^\s*>\s?/, ""))
+    cursor += 1
+  }
+  const firstContentIndex = quoteLines.findIndex((row) => row.trim().length > 0)
+  if (firstContentIndex >= 0) {
+    const header = parseCalloutHeader(quoteLines[firstContentIndex].trim())
+    if (header) {
+      return {
+        nextIndex: cursor,
+        calloutSegment: buildCalloutSegment(header, quoteLines.slice(firstContentIndex + 1)),
+        rawBlock: "",
+      }
+    }
+  }
+  return {
+    nextIndex: cursor,
+    calloutSegment: null,
+    rawBlock: lines.slice(startIndex, cursor).join("\n"),
+  }
+}
+
+type SegmentLineStepResult = {
+  nextIndex: number
+  nextPendingMeta: PendingDirectiveMetadata | null
+}
+
+const tryConsumeStructuredBlockAt = (
+  lines: readonly string[],
+  index: number,
+  pendingDirectiveMetadata: PendingDirectiveMetadata | null,
+  flushAndPush: (segment: MarkdownSegment) => void,
+  markdownBuffer: string[]
+): SegmentLineStepResult | null => {
+  const line = lines[index]
+  const trimmed = line.trim()
+  const firstCode = trimmed.codePointAt(0)
+
+  if (firstCode === 33) {
+    const standaloneImage = parseStandaloneMarkdownImageLine(trimmed)
+    if (standaloneImage) {
+      flushAndPush({ type: "image", ...standaloneImage })
+      return { nextIndex: index + 1, nextPendingMeta: null }
+    }
+  }
+
+  const customDirective = firstCode === 58 ? parseCustomDirectiveHeader(trimmed) : null
+  if (customDirective) {
+    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
+    if (closedIndex >= 0) {
+      const metadata =
+        pendingDirectiveMetadata?.kind === customDirective.directive
+          ? pendingDirectiveMetadata.attrs
+          : {}
+      flushAndPush(
+        buildCustomDirectiveSegment(
+          customDirective.directive,
+          normalizeSafeMarkdownUrl(customDirective.rawUrl),
+          customDirective.inlineTitle,
+          bodyLines,
+          metadata
+        )
+      )
+      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
+    }
+    markdownBuffer.push(line, ...bodyLines)
+    return { nextIndex: index + 1, nextPendingMeta: null }
+  }
+
+  if (trimmed === "$$") {
+    const formulaResult = tryParseFormulaBlock(lines, index)
+    if (formulaResult.closedIndex >= 0) {
+      flushAndPush({ type: "formula", formula: formulaResult.formula })
+      return { nextIndex: formulaResult.closedIndex + 1, nextPendingMeta: null }
+    }
+    markdownBuffer.push(line, ...formulaResult.bodyLines)
+    return { nextIndex: index + 1, nextPendingMeta: null }
+  }
+
+  if (line.startsWith(":::callout")) {
+    const rawHeader = line.slice(":::callout".length).trim()
+    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
+    if (closedIndex >= 0) {
+      flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
+      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
+    }
+    markdownBuffer.push(line, ...bodyLines)
+    return { nextIndex: index + 1, nextPendingMeta: null }
+  }
+
+  if (line.startsWith(":::toggle")) {
+    const title = line.slice(":::toggle".length).trim() || "토글"
+    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
+    if (closedIndex >= 0) {
+      flushAndPush({ type: "toggle", title, content: bodyLines.join("\n").trim() })
+      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
+    }
+    markdownBuffer.push(line, ...bodyLines)
+    return { nextIndex: index + 1, nextPendingMeta: null }
+  }
+
+  if (firstCode === 62) {
+    const quoteStep = consumeBlockquoteCalloutOrLines(lines, index)
+    if (quoteStep.calloutSegment) {
+      flushAndPush(quoteStep.calloutSegment)
+    } else {
+      markdownBuffer.push(quoteStep.rawBlock)
+    }
+    return { nextIndex: quoteStep.nextIndex, nextPendingMeta: null }
+  }
+
+  if (firstCode === 60) {
+    const asideStep = tryParseAsideBlock(lines, index)
+    if (asideStep) {
+      if (asideStep.segment) {
+        flushAndPush(asideStep.segment)
+      } else {
+        markdownBuffer.push(asideStep.fallbackLines.join("\n"))
+      }
+      return { nextIndex: asideStep.nextIndex, nextPendingMeta: null }
+    }
+  }
+
+  return null
 }
 
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
@@ -238,12 +418,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const segments: MarkdownSegment[] = []
   let markdownBuffer: string[] = []
   let activeFenceMarker: "`" | "~" | null = null
-  let pendingDirectiveMetadata:
-    | {
-        kind: "bookmark" | "embed" | "file"
-        attrs: Record<string, unknown>
-      }
-    | null = null
+  let pendingDirectiveMetadata: PendingDirectiveMetadata | null = null
 
   const flushMarkdown = () => {
     const text = markdownBuffer.join("\n").trim()
@@ -251,312 +426,55 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
     markdownBuffer = []
   }
 
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]
+  const flushAndPush = (segment: MarkdownSegment) => {
+    flushMarkdown()
+    segments.push(segment)
+  }
+
+  let index = 0
+  while (index < lines.length) {
+    const line = lines[index]
     const trimmed = line.trim()
     const firstCode = trimmed.codePointAt(0)
     const fenceMarker =
       firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
-    const directiveMetadataComment =
-      !activeFenceMarker && firstCode === 60 ? parseCardMetadataComment(trimmed) : null
 
     if (activeFenceMarker) {
       markdownBuffer.push(line)
-      if (fenceMarker === activeFenceMarker) {
-        activeFenceMarker = null
-      }
-      i += 1
-      continue
-    }
-
-    if (directiveMetadataComment) {
-      pendingDirectiveMetadata = directiveMetadataComment
-      i += 1
+      if (fenceMarker === activeFenceMarker) activeFenceMarker = null
+      index += 1
       continue
     }
 
     if (fenceMarker) {
       markdownBuffer.push(line)
       activeFenceMarker = fenceMarker
-      i += 1
+      index += 1
       continue
     }
 
-    const standaloneImage =
-      firstCode === 33 ? parseStandaloneMarkdownImageLine(trimmed) : null
-    if (standaloneImage) {
-      flushMarkdown()
-      segments.push({
-        type: "image",
-        alt: standaloneImage.alt,
-        src: standaloneImage.src,
-        title: standaloneImage.title,
-        widthPx: standaloneImage.widthPx,
-        heightPx: standaloneImage.heightPx,
-        aspectRatio: standaloneImage.aspectRatio,
-        align: standaloneImage.align,
-      })
-      i += 1
+    const metadataComment = firstCode === 60 ? parseCardMetadataComment(trimmed) : null
+    if (metadataComment) {
+      pendingDirectiveMetadata = metadataComment
+      index += 1
       continue
     }
 
-    const customDirectiveMatch =
-      firstCode === 58 || firstCode === 91
-        ? CUSTOM_DIRECTIVE_PATTERN.exec(trimmed)
-        : null
-    if (customDirectiveMatch) {
-      const directive = customDirectiveMatch[1]?.toLowerCase()
-      const url = normalizeSafeMarkdownUrl(customDirectiveMatch[2] || "")
-      const inlineTitle = (customDirectiveMatch[3] || "").trim()
-      const bodyLines: string[] = []
-      let closed = false
-
-      for (let j = i + 1; j < lines.length; j += 1) {
-        if (lines[j].trim() === ":::") {
-          const [firstLine = "", ...restLines] = bodyLines
-          const secondaryText = restLines.join("\n").trim()
-          flushMarkdown()
-          const directiveMetadata =
-            pendingDirectiveMetadata?.kind === directive
-              ? pendingDirectiveMetadata.attrs
-              : {}
-          pendingDirectiveMetadata = null
-
-          if (directive === "bookmark") {
-            segments.push({
-              type: "bookmark",
-              url,
-              title: inlineTitle || firstLine.trim() || "북마크",
-              description: inlineTitle ? bodyLines.join("\n").trim() : secondaryText,
-              ...directiveMetadata,
-            })
-          } else if (directive === "embed") {
-            segments.push({
-              type: "embed",
-              url,
-              title: firstLine.trim() || "임베드",
-              caption: secondaryText,
-              ...directiveMetadata,
-            })
-          } else if (directive === "file") {
-            segments.push({
-              type: "file",
-              url,
-              name: firstLine.trim() || "파일",
-              description: secondaryText,
-              ...directiveMetadata,
-            })
-          }
-
-          i = j
-          closed = true
-          break
-        }
-        bodyLines.push(lines[j])
-      }
-
-      if (!closed) {
-        markdownBuffer.push(line)
-        markdownBuffer.push(...bodyLines)
-      }
-
-      i += 1
-      continue
-    }
-
+    const structuredStep = tryConsumeStructuredBlockAt(
+      lines,
+      index,
+      pendingDirectiveMetadata,
+      flushAndPush,
+      markdownBuffer
+    )
     pendingDirectiveMetadata = null
-
-    if (
-      (firstCode === 36 || firstCode === 92) &&
-      FORMULA_BLOCK_START_PATTERN.test(trimmed)
-    ) {
-      const bodyLines: string[] = []
-      let closed = false
-
-      for (let j = i + 1; j < lines.length; j += 1) {
-        if (FORMULA_BLOCK_START_PATTERN.test(lines[j].trim())) {
-          flushMarkdown()
-          segments.push({
-            type: "formula",
-            formula: bodyLines.join("\n").trim(),
-          })
-          i = j
-          closed = true
-          break
-        }
-        bodyLines.push(lines[j])
-      }
-
-      if (!closed) {
-        markdownBuffer.push(line)
-        markdownBuffer.push(...bodyLines)
-      }
-
-      i += 1
-      continue
-    }
-
-    if (line.startsWith(":::callout")) {
-      const rawHeader = line.replace(/^:::callout\s*/, "").trim()
-      const bodyLines: string[] = []
-      let closed = false
-
-      for (let j = i + 1; j < lines.length; j += 1) {
-        if (lines[j].trim() === ":::") {
-          flushMarkdown()
-          const firstSpace = rawHeader.search(/\s/)
-          const firstToken = firstSpace === -1 ? rawHeader : rawHeader.slice(0, firstSpace)
-          const restTitle = firstSpace === -1 ? "" : rawHeader.slice(firstSpace).trim()
-          const tokenCallout = firstToken ? resolveCalloutBlockquote(firstToken) : null
-          const resolvedHeader: ParsedCalloutHeader =
-            parseCalloutHeader(rawHeader) ??
-            (tokenCallout
-              ? {
-                  kind: tokenCallout.kind,
-                  title: restTitle,
-                  emoji: tokenCallout.callout.marker,
-                }
-              : {
-                  kind: "info",
-                  title: rawHeader,
-                  emoji: infoCalloutMarker,
-                })
-          segments.push(buildCalloutSegment(resolvedHeader, bodyLines))
-          i = j
-          closed = true
-          break
-        }
-        bodyLines.push(lines[j])
-      }
-
-      if (!closed) {
-        markdownBuffer.push(line)
-        markdownBuffer.push(...bodyLines)
-      }
-
-      i += 1
-      continue
-    }
-
-    if (line.startsWith(":::toggle")) {
-      const title = line.replace(/^:::toggle\s*/, "").trim() || "토글"
-      const bodyLines: string[] = []
-      let closed = false
-
-      for (let j = i + 1; j < lines.length; j += 1) {
-        if (lines[j].trim() === ":::") {
-          flushMarkdown()
-          segments.push({
-            type: "toggle",
-            title,
-            content: bodyLines.join("\n").trim(),
-          })
-          i = j
-          closed = true
-          break
-        }
-        bodyLines.push(lines[j])
-      }
-
-      if (!closed) {
-        markdownBuffer.push(line)
-        markdownBuffer.push(...bodyLines)
-      }
-
-      i += 1
-      continue
-    }
-
-    if (firstCode === 62 && line.trimStart().startsWith(">")) {
-      const blockStart = i
-      const quoteLines: string[] = []
-
-      while (i < lines.length && lines[i].trimStart().startsWith(">")) {
-        quoteLines.push(lines[i].replace(/^\s*>\s?/, ""))
-        i += 1
-      }
-
-      const firstContentIndex = quoteLines.findIndex((row) => row.trim().length > 0)
-      if (firstContentIndex >= 0) {
-        const firstLine = quoteLines[firstContentIndex].trim()
-        const header = parseCalloutHeader(firstLine)
-        if (header) {
-          flushMarkdown()
-          segments.push(buildCalloutSegment(header, quoteLines.slice(firstContentIndex + 1)))
-          continue
-        }
-      }
-
-      markdownBuffer.push(lines.slice(blockStart, i).join("\n"))
-      continue
-    }
-
-    if (firstCode === 60 && /^\s*<aside(?:\s+[^>]*)?>/i.test(line)) {
-      const originalLines = [line]
-      const openingMatch = line.match(/^\s*<aside(?:\s+[^>]*)?>(.*)$/i)
-      const bodyLines: string[] = []
-      let closed = false
-
-      const appendAsideContent = (value: string) => {
-        if (value.length === 0) return
-        bodyLines.push(value)
-      }
-
-      const openingTail = openingMatch?.[1] ?? ""
-      if (openingTail.includes("</aside>")) {
-        appendAsideContent(openingTail.replace(/<\/aside>\s*$/i, "").trimEnd())
-        closed = true
-      } else {
-        appendAsideContent(openingTail)
-      }
-
-      let j = i + 1
-      while (!closed && j < lines.length) {
-        const currentLine = lines[j]
-        originalLines.push(currentLine)
-
-        if (/<\/aside>\s*$/i.test(currentLine)) {
-          appendAsideContent(currentLine.replace(/<\/aside>\s*$/i, "").trimEnd())
-          closed = true
-          i = j
-          break
-        }
-
-        bodyLines.push(currentLine)
-        j += 1
-      }
-
-      if (closed) {
-        const normalizedBodyLines = bodyLines
-          .map((row) => row.replace(/^\s+|\s+$/g, ""))
-        const firstContentIndex = normalizedBodyLines.findIndex((row) => row.length > 0)
-        const header = firstContentIndex >= 0 ? parseAsideCalloutHeader(normalizedBodyLines[firstContentIndex]) : null
-
-        flushMarkdown()
-        if (header) {
-          segments.push(buildCalloutSegment(header, normalizedBodyLines.slice(firstContentIndex + 1)))
-        } else {
-          segments.push({
-            type: "callout",
-            kind: "info",
-            title: "",
-            emoji: infoCalloutMarker,
-            content: normalizedBodyLines.join("\n").trim(),
-          })
-        }
-
-        i += 1
-        continue
-      }
-
-      markdownBuffer.push(originalLines.join("\n"))
-      i += 1
+    if (structuredStep) {
+      index = structuredStep.nextIndex
       continue
     }
 
     markdownBuffer.push(line)
-    i += 1
+    index += 1
   }
 
   flushMarkdown()

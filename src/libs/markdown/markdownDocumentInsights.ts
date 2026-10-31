@@ -1,3 +1,11 @@
+import { stripMarkdownHighlightDelimiters } from "./inlineHighlightModel"
+import {
+  findWikilinkSpans,
+  replaceRawBrTags,
+  stripDoubleBraceColorTokensOnce,
+  stripSingleBraceColorTokensOnce,
+} from "./inlineTokenScanners"
+
 export type MarkdownSourceRange = {
   start: number
   end: number
@@ -134,11 +142,24 @@ const stripInlineColorHeadingTokens = (value: string): string => {
   let previous = ""
   while (current !== previous) {
     previous = current
-    current = current
-      .replace(/\{\{\s*color\s*:\s*[^|{}]+\\?\|([\s\S]*?)\}\}/gi, "$1")
-      .replace(/\{\s*color\s*:\s*[^}]+\}([\s\S]*?)\{\s*\/\s*color\s*\}/gi, "$1")
+    current = stripSingleBraceColorTokensOnce(stripDoubleBraceColorTokensOnce(current))
   }
   return current
+}
+
+const stripWikilinkHeadingTokens = (value: string): string => {
+  const spans = findWikilinkSpans(value)
+  if (spans.length === 0) return value
+  let output = ""
+  let cursor = 0
+  for (const span of spans) {
+    if (span.from > cursor) output += value.slice(cursor, span.from)
+    const fallback = span.rawTarget.startsWith("#") ? span.rawTarget.slice(1) : span.rawTarget
+    output += (span.rawAlias || fallback).trim()
+    cursor = span.to
+  }
+  if (cursor < value.length) output += value.slice(cursor)
+  return output
 }
 
 export const formatMarkdownHeadingLabel = (text: string): string => {
@@ -151,13 +172,11 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
     codeSpans.push(code)
     return token
   })
-  const formatted = stripInlineColorHeadingTokens(withCodePlaceholders)
-    .replace(/<\s*br\s*\/?\s*>/gi, " ")
-    .replace(
-      /\[\[([^\][\r\n|\\]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/g,
-      (_, target: string, alias?: string) => (alias || target.replace(/^#/, "")).trim()
-    )
-    .replace(/==([^\r\n=]+?)==/g, "$1")
+  const afterColor = stripInlineColorHeadingTokens(withCodePlaceholders)
+  const afterBr = replaceRawBrTags(afterColor, " ")
+  const afterWikilinks = stripWikilinkHeadingTokens(afterBr)
+  const afterHighlights = stripMarkdownHighlightDelimiters(afterWikilinks)
+  const formatted = afterHighlights
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\*\*(.*?)\*\*/g, "$1")

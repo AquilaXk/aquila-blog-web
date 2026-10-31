@@ -152,7 +152,9 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
     )
     expect(engagementActions).toContain("if (promptResult !== null)")
 
-    const mermaidRender = readRepoFile("src/libs/markdown/mermaidRuntimeRender.ts")
+    const mermaidRender =
+      readRepoFile("src/libs/markdown/mermaidRuntimeRender.ts") +
+      readRepoFile("src/libs/markdown/mermaidRuntimeGeometry.ts")
     expect(mermaidRender).toContain("mermaidRenderedWidth")
     expect(mermaidRender).toContain("clearBlockCache")
 

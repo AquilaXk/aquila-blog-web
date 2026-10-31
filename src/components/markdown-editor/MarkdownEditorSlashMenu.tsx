@@ -322,7 +322,7 @@ export const MarkdownEditorSlashMenu = ({
     if (!isOpen) return
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.isComposing || event.keyCode === 229) return
+      if (event.isComposing || Reflect.get(event, "keyCode") === 229) return
 
       if (event.key === "Escape") {
         event.preventDefault()

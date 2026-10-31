@@ -1,7 +1,3 @@
 [[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"
-reason = "no patched braces 3.x release available; stack exhaustion on deeply nested patterns"
-
-[[IgnoredVulns]]
-id = "CVE-2026-93687"
-reason = "no patched braces 3.x release available; stack exhaustion on deeply nested patterns"
+id = "GHSA-g3hv-75wg-m249"
+reason = "minimatch 11.0.1 is ESM-only and incompatible with CommonJS eslint 8.x and @redocly/openapi-core dev tooling"

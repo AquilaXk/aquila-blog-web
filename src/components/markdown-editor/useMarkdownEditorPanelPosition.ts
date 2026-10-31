@@ -5,14 +5,51 @@ export type MarkdownEditorPanelFixedPosition = {
   left: number
 }
 
+type PanelHorizontalAlign = "start" | "end"
+
 type MarkdownEditorPanelPositionParams = {
   open: boolean
-  align?: "start" | "end"
+  align?: PanelHorizontalAlign
   rootRef: RefObject<HTMLElement | null>
   panelRef: RefObject<HTMLElement | null>
 }
 
 const COMPACT_TOOLBAR_BREAKPOINT = 720
+
+const computeCompactFixedPosition = (
+  root: HTMLElement,
+  panel: HTMLElement,
+  editor: HTMLElement | null,
+  align: PanelHorizontalAlign
+): MarkdownEditorPanelFixedPosition => {
+  const rootBounds = root.getBoundingClientRect()
+  const panelWidth = panel.getBoundingClientRect().width
+  const editorBounds = editor?.getBoundingClientRect()
+  const minLeft = editorBounds ? editorBounds.left + 4 : 12
+  const maxRight = editorBounds ? editorBounds.right - 4 : window.innerWidth - 12
+  const rawLeft = align === "end" ? rootBounds.right - panelWidth : rootBounds.left
+  const clampedLeft = Math.max(minLeft, Math.min(rawLeft, maxRight - panelWidth))
+  return {
+    top: Math.round(rootBounds.bottom + 6),
+    left: Math.round(clampedLeft),
+  }
+}
+
+const computeDesktopHorizontalOffset = (
+  panel: HTMLElement,
+  editor: HTMLElement,
+  previousOffset: number
+): number => {
+  const editorBounds = editor.getBoundingClientRect()
+  const panelBounds = panel.getBoundingClientRect()
+  const baseLeft = panelBounds.left - previousOffset
+  const baseRight = panelBounds.right - previousOffset
+  let nextOffset = baseLeft < editorBounds.left ? editorBounds.left - baseLeft : 0
+  if (baseRight + nextOffset > editorBounds.right) {
+    nextOffset += editorBounds.right - (baseRight + nextOffset)
+  }
+  return nextOffset
+}
 
 export const useMarkdownEditorPanelPosition = ({
   open,
@@ -39,36 +76,15 @@ export const useMarkdownEditorPanelPosition = ({
     const editor = root.closest<HTMLElement>("[data-testid='markdown-editor']")
 
     if (typeof window !== "undefined" && window.innerWidth <= COMPACT_TOOLBAR_BREAKPOINT) {
-      const rootBounds = root.getBoundingClientRect()
-      const panelWidth = panel.getBoundingClientRect().width
-      const editorBounds = editor?.getBoundingClientRect()
-      const minLeft = editorBounds ? editorBounds.left + 4 : 12
-      const maxRight = editorBounds ? editorBounds.right - 4 : window.innerWidth - 12
-      let left = align === "end" ? rootBounds.right - panelWidth : rootBounds.left
-      if (left + panelWidth > maxRight) left = maxRight - panelWidth
-      if (left < minLeft) left = minLeft
       horizontalOffsetRef.current = 0
       setHorizontalOffset(0)
-      setFixedPosition({
-        top: Math.round(rootBounds.bottom + 6),
-        left: Math.round(left),
-      })
+      setFixedPosition(computeCompactFixedPosition(root, panel, editor, align))
       return
     }
 
     setFixedPosition(null)
     if (!editor) return
-    const editorBounds = editor.getBoundingClientRect()
-    const panelBounds = panel.getBoundingClientRect()
-    const baseLeft = panelBounds.left - horizontalOffsetRef.current
-    const baseRight = panelBounds.right - horizontalOffsetRef.current
-    let nextOffset = 0
-
-    if (baseLeft < editorBounds.left) nextOffset = editorBounds.left - baseLeft
-    if (baseRight + nextOffset > editorBounds.right) {
-      nextOffset += editorBounds.right - (baseRight + nextOffset)
-    }
-
+    const nextOffset = computeDesktopHorizontalOffset(panel, editor, horizontalOffsetRef.current)
     horizontalOffsetRef.current = nextOffset
     setHorizontalOffset(nextOffset)
   }, [align, panelRef, rootRef])

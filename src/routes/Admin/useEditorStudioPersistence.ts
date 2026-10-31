@@ -58,6 +58,12 @@ type EditorFingerprintPayload = {
 
 const isBrowserOnline = () => (typeof navigator === "undefined" ? undefined : navigator.onLine)
 
+const formatPostVisibilityLabel = (visibility: PostVisibility): string => {
+  if (visibility === "PUBLIC_LISTED") return "전체 공개(목록 노출)"
+  if (visibility === "PUBLIC_UNLISTED") return "링크 공개(목록 미노출)"
+  return "비공개"
+}
+
 const armLocalDraftFingerprintBaseline = (
   lastLocalDraftFingerprintRef: MutableRefObject<string>,
   payload: EditorFingerprintPayload,
@@ -109,6 +115,7 @@ type UseEditorStudioPersistenceParams = {
   defaultThumbnailFocusY: number
   defaultThumbnailZoom: number
   addTagsToPost?: (values: string[]) => string[]
+  commitPostCategory?: () => string
   setTagDraft?: StudioSetState<string>
   setPostCategory?: StudioSetState<string>
   setEditorMode: StudioSetState<EditorMode>
@@ -148,7 +155,7 @@ type UseEditorStudioPersistenceParams = {
 }
 
 export const useEditorStudioPersistence = ({
-  addTagsToPost, buildEditorStateFingerprint, composeEditorContent, customCategoryCatalog,
+  addTagsToPost, buildEditorStateFingerprint, commitPostCategory, composeEditorContent, customCategoryCatalog,
   dedupeStrings, defaultThumbnailFocusX, defaultThumbnailFocusY, defaultThumbnailZoom,
   detectPublishPlaceholderIssue, editorMode, effectiveThumbnailUrl, extractImageFileFromClipboard,
   generateIdempotencyKey, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
@@ -259,12 +266,14 @@ export const useEditorStudioPersistence = ({
       setTagDraft?.("")
     }
     const effectiveTags = dedupeStrings(pendingTags.length > 0 ? [...postTags, ...pendingTags] : postTags)
-    const effectiveCategory = resolveCanonicalCategoryFromCatalog(postCategory, customCategoryCatalog ?? [])
-    if (effectiveCategory !== postCategory) {
-      setPostCategory?.(effectiveCategory)
+    const committedCategory = commitPostCategory
+      ? commitPostCategory()
+      : resolveCanonicalCategoryFromCatalog(postCategory, customCategoryCatalog ?? [])
+    if (!commitPostCategory && committedCategory !== postCategory) {
+      setPostCategory?.(committedCategory)
     }
-    return { tags: effectiveTags, category: effectiveCategory }
-  }, [addTagsToPost, customCategoryCatalog, dedupeStrings, postCategory, postTags, setPostCategory, setTagDraft, tagDraft])
+    return { tags: effectiveTags, category: committedCategory }
+  }, [addTagsToPost, commitPostCategory, customCategoryCatalog, dedupeStrings, postCategory, postTags, setPostCategory, setTagDraft, tagDraft])
 
   const reportSaveFailure = useCallback(
     (error: unknown, action: "write" | "modify" | "publish-temp"): false => {
@@ -388,12 +397,7 @@ export const useEditorStudioPersistence = ({
       lastWriteFingerprintRef.current = ""
       lastWriteIdempotencyKeyRef.current = ""
 
-      const visibilityText =
-        postVisibility === "PUBLIC_LISTED"
-          ? "전체 공개(목록 노출)"
-          : postVisibility === "PUBLIC_UNLISTED"
-            ? "링크 공개(목록 미노출)"
-            : "비공개"
+      const visibilityText = formatPostVisibilityLabel(postVisibility)
 
       const removedSubmittedDraft = cleanupSubmittedDraft()
       signalLocalDraftBaselineReady({

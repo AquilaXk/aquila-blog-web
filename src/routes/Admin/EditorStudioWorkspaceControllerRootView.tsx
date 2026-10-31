@@ -132,6 +132,33 @@ type EditorStudioWorkspaceControllerRootViewProps = {
   props: EditorStudioWorkspaceControllerRootViewBag
 }
 
+const resolveEditorPrimaryActionType = (
+  editorMode: "create" | "edit",
+  isTempDraftMode: boolean
+): PublishActionType => {
+  if (editorMode === "create") return "create"
+  return isTempDraftMode ? "temp" : "modify"
+}
+
+const resolveSelectedLocalDraftKey = (
+  eligibleCandidates: LocalDraftFingerprintSnapshot[],
+  currentCandidate: LocalDraftFingerprintSnapshot | null
+): string => {
+  const key = currentCandidate?.key ?? ""
+  if (!key) return ""
+  return eligibleCandidates.some((candidate) => candidate.key === key) ? key : ""
+}
+
+const shouldDisplayNewEditorBootstrapState = (
+  isDedicatedNewEditorRoute: boolean,
+  postId: string,
+  isNewEditorBootstrapPending: boolean,
+  loadingKey: string
+): boolean =>
+  isDedicatedNewEditorRoute &&
+  !postId.trim() &&
+  (isNewEditorBootstrapPending || loadingKey === "postTemp")
+
 export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioWorkspaceControllerRootViewProps) => {
   const {
     addTagsToPost, addTagToPost, applyFirstBodyImageToThumbnail, clearLocalDraft, discardLocalDraftCandidate,
@@ -249,12 +276,12 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     dismissed: dismissedLocalDraft,
   }))
   const isLocalDraftRestoreSuggestionVisible = eligibleLocalDraftCandidates.length > 0
-  const selectedLocalDraftCandidateKey = eligibleLocalDraftCandidates.some(
-    (candidate) => candidate.key === localDraftCandidate?.key
-  ) ? (localDraftCandidate?.key ?? "") : ""
+  const selectedLocalDraftCandidateKey = resolveSelectedLocalDraftKey(
+    eligibleLocalDraftCandidates,
+    localDraftCandidate
+  )
   const getIsEditorUnsavedDirty = useCallback(() => {
-    const liveContent =
-      typeof getCurrentPostContent === "function" ? getCurrentPostContent() : postContent
+    const liveContent = getCurrentPostContent()
     return isEditorUnsavedDirtyByFingerprint({
       isSaving: isEditorSaving,
       editorMode,
@@ -286,7 +313,6 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     lastLocalDraftFingerprintRef,
     localDraftSavedAt,
     postCategory,
-    postContent,
     postSummary,
     postSummarySource,
     summaryIntent,
@@ -373,8 +399,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       onThumbnailUrlChange={handleThumbnailUrlModalChange}
     />
   )
-  const editorPrimaryActionType: PublishActionType =
-    editorMode === "create" ? "create" : isTempDraftMode ? "temp" : "modify"
+  const editorPrimaryActionType = resolveEditorPrimaryActionType(editorMode, isTempDraftMode)
   const isMarkdownEditorDisabled = loadingKey.length > 0
   const handleEditorCommitDuration = useCallback((actualDuration: number) => {
     recordEditorCommitDurationForRuntimeGuard(actualDuration)
@@ -416,10 +441,12 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       postContent,
     ]
   )
-  const shouldShowEditorLoadingState =
-    isDedicatedNewEditorRoute &&
-    !postId.trim() &&
-    (isNewEditorBootstrapPending || loadingKey === "postTemp")
+  const shouldShowEditorLoadingState = shouldDisplayNewEditorBootstrapState(
+    isDedicatedNewEditorRoute,
+    postId,
+    isNewEditorBootstrapPending,
+    loadingKey
+  )
 
   if (!sessionMember) {
     return null

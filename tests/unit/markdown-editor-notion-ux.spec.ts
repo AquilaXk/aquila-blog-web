@@ -856,7 +856,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.querySelectorAll("th")[1].classList.contains("is-drop-target-col")).toBe(true)
       dom.querySelectorAll("th")[1].trigger("drop")
       expect(lastDispatchedInsert).toBe(
-        '<!-- aq-table {"headerColumn":true,"overflowMode":"wide","columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |'
+        '<!-- aq-table {"headerColumn":true,"fitWidth":true,"columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |'
       )
       expect(
         new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
@@ -916,7 +916,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       expect(dom.querySelectorAll("tr")[2].classList.contains("is-drop-target-row")).toBe(true)
       dom.querySelectorAll("tr")[2].trigger("drop")
       expect(lastDispatchedInsert).toBe(
-        '<!-- aq-table {"headerColumn":true,"overflowMode":"wide","columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B2 | A2 |\n| B1 | A1 |'
+        '<!-- aq-table {"headerColumn":true,"fitWidth":true,"columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B2 | A2 |\n| B1 | A1 |'
       )
 
       const sameShapeWidget = new MarkdownTableWidget(

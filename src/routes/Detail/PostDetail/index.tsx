@@ -35,7 +35,7 @@ import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
 const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"), {
   loading: () => (
-    <div className="markdownLoadingSkeleton" role="status" aria-busy="true" aria-label="본문 불러오는 중">
+    <div className="markdownLoadingSkeleton" aria-busy="true" aria-label="본문 불러오는 중">
       <span className="skeletonLine skeletonLineWide" />
       <span className="skeletonLine skeletonLineFull" />
       <span className="skeletonLine skeletonLineMid" />

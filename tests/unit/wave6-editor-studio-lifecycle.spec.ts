@@ -2,7 +2,7 @@ import createCache from "@emotion/cache"
 import { CacheProvider, ThemeProvider } from "@emotion/react"
 import createEmotionServer from "@emotion/server/create-instance"
 import { expect, test } from "@playwright/test"
-import { Fragment, act, createElement, type ComponentType, type Dispatch, type SetStateAction } from "react"
+import { act, createElement, type ComponentType, type Dispatch, type SetStateAction } from "react"
 import { createRoot } from "react-dom/client"
 import { renderToString } from "react-dom/server"
 import { ConfirmDialog } from "../../src/design-system/ConfirmDialog"
@@ -13,7 +13,9 @@ import {
   resolveViewportPanelUiMask,
   toCategorySuggestionLabels,
 } from "../../src/routes/Admin/EditorStudioDedicatedEditorSurface"
+import { EditorStudioGuideModal } from "../../src/routes/Admin/EditorStudioDedicatedPanelParts"
 import {
+  EDITOR_SURFACE_GUIDE_OPEN,
   EDITOR_SURFACE_INSPECTOR_OPEN,
   EDITOR_SURFACE_OUTLINE_OPEN,
   EDITOR_SURFACE_ZEN_BITS,
@@ -49,50 +51,12 @@ import { useEditorStudioMetaCatalog } from "../../src/routes/Admin/useEditorStud
 import { useEditorStudioPersistence } from "../../src/routes/Admin/useEditorStudioPersistence"
 import { useEditorStudioPublishModalFlow } from "../../src/routes/Admin/useEditorStudioPublishModalFlow"
 import { createTheme } from "../../src/styles/theme"
+import { zIndexes } from "../../src/styles/zIndexes"
+import { wrapPlaywrightJsxComponent } from "./helpers/materializePlaywrightJsx"
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 
 const lightTheme = createTheme({ scheme: "light" })
-
-const wrappedComponentCache = new WeakMap<(props: unknown) => unknown, (props: unknown) => unknown>()
-
-const wrapPlaywrightComponent = (fn: (props: unknown) => unknown) => {
-  const existing = wrappedComponentCache.get(fn)
-  if (existing) return existing
-  const wrapped = (props: unknown) => materializePlaywrightJsx(fn(props))
-  Object.defineProperty(wrapped, "name", { value: fn.name || "WrappedComponent" })
-  wrappedComponentCache.set(fn, wrapped)
-  return wrapped
-}
-
-const materializePlaywrightJsx = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(materializePlaywrightJsx)
-  if (
-    value &&
-    typeof value === "object" &&
-    "__pw_type" in value &&
-    (value as { __pw_type?: unknown }).__pw_type === "jsx"
-  ) {
-    const pw = value as { type?: unknown; props?: Record<string, unknown>; key?: string | null }
-    const resolvedType =
-      typeof pw.type === "function"
-        ? wrapPlaywrightComponent(pw.type as (props: unknown) => unknown)
-        : (pw.type ?? Fragment)
-    const { children: rawChildren, ...restProps } = pw.props ?? {}
-    const nextProps: Record<string, unknown> = {
-      ...restProps,
-      ...(pw.key != null ? { key: pw.key } : {}),
-    }
-    if (Array.isArray(rawChildren)) {
-      return createElement(resolvedType as never, nextProps, ...(rawChildren.map(materializePlaywrightJsx) as never[]))
-    }
-    if (rawChildren !== undefined) {
-      return createElement(resolvedType as never, nextProps, materializePlaywrightJsx(rawChildren) as never)
-    }
-    return createElement(resolvedType as never, nextProps)
-  }
-  return value
-}
 
 const renderWithEmotionCss = <P extends Record<string, unknown>>(
   Component: ComponentType<P>,
@@ -100,7 +64,7 @@ const renderWithEmotionCss = <P extends Record<string, unknown>>(
 ) => {
   const cache = createCache({ key: "css" })
   const { extractCriticalToChunks } = createEmotionServer(cache)
-  const Wrapped = wrapPlaywrightComponent(Component as unknown as (p: unknown) => unknown) as ComponentType<P>
+  const Wrapped = wrapPlaywrightJsxComponent(Component) as ComponentType<P>
   const node = createElement(Wrapped, props)
   const html = renderToString(
     createElement(
@@ -884,6 +848,25 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
             { status: 200, headers: { "content-type": "application/json" } }
           )
         }
+        if (url.endsWith("/post/api/v1/posts/501") && init?.method === "PUT") {
+          capturedBodies.push(JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>)
+          return new Response(
+            JSON.stringify({
+              resultCode: "200-1",
+              msg: "modified",
+              data: {
+                id: 501,
+                version: 2,
+                title: "새 포스트 2",
+                summary: "",
+                summarySource: "NONE",
+                published: true,
+                listed: true,
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+        }
         if (url === "/api/revalidate") {
           return new Response(JSON.stringify({ revalidated: true }), { status: 200 })
         }
@@ -904,6 +887,19 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
         expect(writeHarness.state.postCategory).toBe("rocket::Backend")
         expect(String(capturedBodies[0]?.content ?? "")).toContain('tags: ["react", "typescript", "nextjs"]')
         expect(String(capturedBodies[0]?.content ?? "")).toContain('category: ["rocket::Backend"]')
+
+        await act(async () => {
+          writeHarness.state.postTitle = "새 포스트 2"
+          writeRoot.render(createElement(writeHarness.Probe))
+        })
+        await act(async () => {
+          await writeHarness.persistence.handleModifyPost()
+          writeRoot.render(createElement(writeHarness.Probe))
+        })
+        expect(writeHarness.state.postTags).toEqual(["react", "typescript", "nextjs"])
+        expect(writeHarness.state.postCategory).toBe("rocket::Backend")
+        expect(String(capturedBodies[1]?.content ?? "")).toContain('tags: ["react", "typescript", "nextjs"]')
+        expect(String(capturedBodies[1]?.content ?? "")).toContain('category: ["rocket::Backend"]')
       } finally {
         await act(async () => {
           writeRoot.unmount()
@@ -914,6 +910,18 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
   })
 
   test("responsive z-index hierarchy, tablet inspector default, 100dvh drawer + safe-area footer, conflict CTA, and card meta copy match contract", () => {
+    expect(zIndexes.mobileSheet).toBe(160)
+    expect(zIndexes.editorGuide).toBe(190)
+    expect(zIndexes.publishModal).toBe(210)
+    expect(zIndexes.confirmDialog).toBe(2300)
+    expect(zIndexes.mobileSheet).toBeLessThan(zIndexes.editorGuide)
+    expect(zIndexes.editorGuide).toBeLessThan(zIndexes.publishModal)
+    expect(zIndexes.publishModal).toBeLessThan(zIndexes.confirmDialog)
+    expect(zIndexes.confirmDialog).toBeGreaterThan(2200)
+    expect((EDITOR_SURFACE_ZEN_BITS | EDITOR_SURFACE_GUIDE_OPEN) & ~EDITOR_SURFACE_GUIDE_OPEN).toBe(
+      EDITOR_SURFACE_ZEN_BITS
+    )
+
     const mobileMask = resolveViewportPanelUiMask(EDITOR_SURFACE_ZEN_BITS, {
       isMobileViewport: true,
       isTabletViewport: false,
@@ -933,6 +941,13 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
       isTabletViewport: false,
     })
     expect(desktopMask & EDITOR_SURFACE_ZEN_BITS).toBe(EDITOR_SURFACE_ZEN_BITS)
+
+    const guideRendered = renderWithEmotionCss(EditorStudioGuideModal, {
+      onClose: () => undefined,
+    })
+    expect(guideRendered.css).toContain("z-index:190;")
+    expect(guideRendered.css).toContain("height:100dvh;")
+    expect(guideRendered.css).toContain("calc(50px + env(safe-area-inset-bottom, 0px))")
 
     const modalRendered = renderWithEmotionCss(EditorStudioPublishModal, {
       closeToggleLabel: "닫기",
@@ -960,7 +975,7 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
     expect(modalRendered.html).toContain("썸네일 URL과 업로드 방식을 설정합니다.")
     expect(modalRendered.html).not.toContain("썸네일 URL과 요약만")
     expect(modalRendered.html).toContain("서버 최신본 다시 불러오기")
-    expect(modalRendered.css).toContain("z-index:190;")
+    expect(modalRendered.css).toContain("z-index:210;")
     expect(modalRendered.css).toContain("max-height:100dvh;height:100dvh;")
     expect(modalRendered.css).toContain("padding:0.78rem 0 max(0.78rem, env(safe-area-inset-bottom, 0px));")
 
@@ -974,7 +989,7 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
       onConfirm: () => undefined,
       onCancel: () => undefined,
     })
-    expect(confirmRendered.css).toContain("z-index:220;")
+    expect(confirmRendered.css).toContain("z-index:2300;")
 
     const surfaceRendered = renderWithEmotionCss(EditorStudioDedicatedEditorSurface, {
       thumbnailImageFileInputRef: () => undefined,

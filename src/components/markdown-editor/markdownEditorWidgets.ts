@@ -1,24 +1,16 @@
 import { EditorView, WidgetType } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
 import "katex/dist/katex.min.css"
-import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
-import { loadSharedMermaidRuntime } from "../../libs/markdown/mermaidRuntimeConfig"
+import { runSerializedMermaidTask } from "../../libs/markdown/mermaidRuntimeConfig"
 import { sanitizeRenderableMermaidSource } from "../../libs/markdown/mermaidRuntimeSanitize"
 import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownUrl"
+import {
+  appendInlineMarkdownNodes,
+  isSafeInlineHref,
+  renderKatexIntoElement,
+} from "./markdownEditorInlineDom"
 
-type KatexRuntime = { renderToString: (math: string, options: { displayMode: boolean; throwOnError: boolean }) => string }
-let cachedKatex: KatexRuntime | null = null
-let katexLoadPromise: Promise<KatexRuntime | null> | null = null
-
-const getKatex = (): KatexRuntime | null => {
-  if (cachedKatex) return cachedKatex
-  if (!katexLoadPromise && typeof window !== "undefined") {
-    katexLoadPromise = import("katex")
-      .then((mod) => (cachedKatex = mod.default || mod))
-      .catch(() => null)
-  }
-  return null
-}
+export { appendInlineMarkdownNodes, isSafeInlineHref }
 
 export class MarkdownMarkerWidget extends WidgetType {
   constructor(private readonly label: string, private readonly className: string) {
@@ -43,111 +35,6 @@ export class MarkdownRuleWidget extends WidgetType {
     rule.setAttribute("role", "separator")
     rule.className = "cm-live-horizontal-rule"
     return rule
-  }
-}
-
-const INLINE_MARKDOWN_TOKEN_REGEX =
-  /`([^`\r\n]+)`|\*\*([^*\r\n]+)\*\*|\*([^*\r\n]+)\*|~~([^~\r\n]+)~~|==([^=\r\n]+)==|\$\$((?:[^$\r\n]|\$(?!\$))+)\$\$|(?<!\$)\$(?!\$)([^\s$][^$\r\n]*?[^\s$]|[^\s$])\$(?![$0-9])|\[([^\]\r\n]+)\]\(([^)\s\r\n]+)\)|\{\{\s*color\s*:\s*([^|{}\\]+?)\s*\\?\|\s*([^{}]+?)\s*\}\}|(<br\s*\/?>)|\[\[([^\][\r\n|\\]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/gi
-
-export const isSafeInlineHref = (href: string): boolean =>
-  /^(?:\/(?![/\\])|#|(?:\.\.?\/)|https?:\/\/|mailto:)/i.test(href.trim())
-
-const createInlineMathSpan = (math: string): HTMLElement => {
-  const span = document.createElement("span")
-  span.className = "cm-live-math cm-live-math-inline"
-  const katex = getKatex()
-  if (katex) {
-    try {
-      span.innerHTML = katex.renderToString(math, { displayMode: false, throwOnError: false })
-      return span
-    } catch {}
-  } else if (katexLoadPromise) {
-    void katexLoadPromise.then(() => {
-      try {
-        if (cachedKatex) {
-          span.innerHTML = cachedKatex.renderToString(math, { displayMode: false, throwOnError: false })
-        }
-      } catch {}
-    })
-  }
-  span.textContent = math
-  return span
-}
-
-export const appendInlineMarkdownNodes = (container: HTMLElement, text: string): void => {
-  if (!/[`*~=$[{<]/.test(text)) {
-    container.textContent = text
-    return
-  }
-  let lastIndex = 0
-  INLINE_MARKDOWN_TOKEN_REGEX.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = INLINE_MARKDOWN_TOKEN_REGEX.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
-    }
-    if (match[1] !== undefined) {
-      const code = document.createElement("code")
-      code.className = "cm-live-inline-code"
-      code.textContent = match[1]
-      container.appendChild(code)
-    } else if (match[2] !== undefined) {
-      const strong = document.createElement("strong")
-      strong.textContent = match[2]
-      container.appendChild(strong)
-    } else if (match[3] !== undefined) {
-      const em = document.createElement("em")
-      em.textContent = match[3]
-      container.appendChild(em)
-    } else if (match[4] !== undefined) {
-      const del = document.createElement("del")
-      del.className = "cm-live-strikethrough"
-      del.textContent = match[4]
-      container.appendChild(del)
-    } else if (match[5] !== undefined) {
-      const mark = document.createElement("mark")
-      mark.className = "cm-live-highlight"
-      mark.textContent = match[5]
-      container.appendChild(mark)
-    } else if (match[6] !== undefined || match[7] !== undefined) {
-      container.appendChild(createInlineMathSpan((match[6] ?? match[7])!))
-    } else if (match[8] !== undefined && match[9] !== undefined) {
-      const label = match[8]
-      const href = match[9]
-      if (isSafeInlineHref(href)) {
-        const link = document.createElement("a")
-        link.className = "cm-live-link"
-        link.href = href.trim()
-        link.textContent = label
-        link.target = "_blank"
-        link.rel = "noopener noreferrer"
-        container.appendChild(link)
-      } else {
-        container.appendChild(document.createTextNode(match[0]))
-      }
-    } else if (match[10] !== undefined && match[11] !== undefined) {
-      const color = resolveInlineColorValue(match[10])
-      if (color) {
-        const span = document.createElement("span")
-        span.className = "cm-live-color"
-        if (span.style) span.style.color = color
-        span.textContent = match[11]
-        container.appendChild(span)
-      } else {
-        container.appendChild(document.createTextNode(match[0]))
-      }
-    } else if (match[12] !== undefined) {
-      container.appendChild(document.createElement("br"))
-    } else if (match[13] !== undefined) {
-      const span = document.createElement("span")
-      span.className = "cm-live-wikilink"
-      span.textContent = (match[14] ?? match[13]).trim()
-      container.appendChild(span)
-    }
-    lastIndex = match.index + match[0].length
-  }
-  if (lastIndex < text.length) {
-    container.appendChild(document.createTextNode(text.slice(lastIndex)))
   }
 }
 
@@ -224,22 +111,8 @@ export class MarkdownMathWidget extends WidgetType {
   toDOM(_view: EditorView) {
     const span = document.createElement("span")
     span.className = `cm-live-math ${this.displayMode ? "cm-live-math-display" : "cm-live-math-inline"}`
-    const katex = getKatex()
-    if (katex) {
-      try {
-        span.innerHTML = katex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
-        return span
-      } catch {}
-    } else if (katexLoadPromise) {
-      void katexLoadPromise.then(() => {
-        try {
-          if (cachedKatex) {
-            span.innerHTML = cachedKatex.renderToString(this.math, { displayMode: this.displayMode, throwOnError: false })
-          }
-        } catch {}
-      })
-    }
-    span.textContent = this.displayMode ? `$$ ${this.math} $$` : `$${this.math}$`
+    const fallback = this.displayMode ? `$$ ${this.math} $$` : `$${this.math}$`
+    renderKatexIntoElement(span, this.math, this.displayMode, fallback)
     return span
   }
 }
@@ -300,6 +173,66 @@ export const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: s
   return { kind: "info", icon: "ℹ️" }
 }
 
+const attachCollapsibleCalloutBody = (
+  root: HTMLElement,
+  header: HTMLElement,
+  foldIcon: HTMLElement,
+  strippedContent: string,
+  initialCollapsed: boolean,
+  from: number,
+  view?: EditorView
+): void => {
+  let isCollapsed = initialCollapsed
+  const body = document.createElement("div")
+  body.className = "cm-live-callout-body"
+  appendInlineMarkdownNodes(body, strippedContent)
+  root.appendChild(body)
+
+  header.tabIndex = 0
+  header.setAttribute("tabindex", "0")
+  header.setAttribute("role", "button")
+  header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
+
+  const toggleCallout = (e: Event) => {
+    e.preventDefault()
+    e.stopPropagation()
+    isCollapsed = root.classList.toggle("is-collapsed")
+    header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
+    foldIcon.textContent = isCollapsed ? "▶" : "▼"
+  }
+
+  header.addEventListener("mousedown", toggleCallout)
+  header.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      toggleCallout(e)
+    }
+  })
+
+  if (!view) return
+  body.addEventListener("mousedown", (e) => {
+    const target = e.target as HTMLElement | null
+    if (target?.closest("a")) return
+    e.preventDefault()
+    e.stopPropagation()
+    moveCursorToWidgetOrigin(view, root, from)
+  })
+}
+
+const attachEmptyCalloutHeader = (
+  root: HTMLElement,
+  header: HTMLElement,
+  originPos: number,
+  view?: EditorView
+): void => {
+  if (!view) return
+  header.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    moveCursorToWidgetOrigin(view, root, originPos)
+  })
+}
+
 export class MarkdownCalloutWidget extends WidgetType {
   constructor(
     readonly calloutType: string,
@@ -324,7 +257,7 @@ export class MarkdownCalloutWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const rawKind = this.calloutType.toLowerCase()
     const tone = resolveLiveCalloutTone(rawKind)
-    let isCollapsed = this.foldState === "-"
+    const isCollapsed = this.foldState === "-"
     const root = document.createElement("div")
     root.className = `cm-live-callout cm-live-callout-${rawKind} cm-live-callout-tone-${tone.kind}${
       isCollapsed ? " is-collapsed" : ""
@@ -356,49 +289,10 @@ export class MarkdownCalloutWidget extends WidgetType {
     root.appendChild(header)
 
     const strippedContent = this.content.replace(/^[ \t]*>[ \t]?/gm, "").trim()
-
     if (strippedContent) {
-      const body = document.createElement("div")
-      body.className = "cm-live-callout-body"
-      appendInlineMarkdownNodes(body, strippedContent)
-      root.appendChild(body)
-
-      header.tabIndex = 0
-      header.setAttribute("tabindex", "0")
-      header.setAttribute("role", "button")
-      header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
-
-      const toggleCallout = (e: Event) => {
-        e.preventDefault()
-        e.stopPropagation()
-        isCollapsed = root.classList.toggle("is-collapsed")
-        header.setAttribute("aria-expanded", isCollapsed ? "false" : "true")
-        foldIcon.textContent = isCollapsed ? "▶" : "▼"
-      }
-
-      header.addEventListener("mousedown", toggleCallout)
-      header.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          toggleCallout(e)
-        }
-      })
-
-      if (view) {
-        body.addEventListener("mousedown", (e) => {
-          const target = e.target as HTMLElement | null
-          if (target?.closest("a")) return
-          e.preventDefault()
-          e.stopPropagation()
-          moveCursorToWidgetOrigin(view, root, this.from)
-        })
-      }
-    } else if (view) {
-      header.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return
-        e.preventDefault()
-        e.stopPropagation()
-        moveCursorToWidgetOrigin(view, root, this.to || this.from)
-      })
+      attachCollapsibleCalloutBody(root, header, foldIcon, strippedContent, isCollapsed, this.from, view)
+    } else {
+      attachEmptyCalloutHeader(root, header, this.to || this.from, view)
     }
 
     return root
@@ -471,7 +365,7 @@ const LIVE_MERMAID_SVG_CACHE_LIMIT = 64
 const liveMermaidSvgCache = new Map<string, string>()
 
 const resolveLiveMermaidScheme = (): "dark" | "light" =>
-  typeof document !== "undefined" && document.documentElement?.getAttribute?.("data-theme") === "dark"
+  typeof document !== "undefined" && document.documentElement?.dataset?.aquilaScheme === "dark"
     ? "dark"
     : "light"
 
@@ -482,6 +376,25 @@ const cacheLiveMermaidSvg = (source: string, svg: string) => {
     const oldest = liveMermaidSvgCache.keys().next().value
     if (oldest !== undefined) liveMermaidSvgCache.delete(oldest)
   }
+}
+
+const renderMermaidFallbackCode = (container: HTMLElement, text: string) => {
+  const pre = document.createElement("pre")
+  pre.className = "cm-live-mermaid-fallback"
+  const code = document.createElement("code")
+  code.textContent = text
+  pre.appendChild(code)
+  container.appendChild(pre)
+}
+
+const renderMermaidErrorFallback = (container: HTMLElement, text: string) => {
+  container.innerHTML = ""
+  container.dataset.mermaidState = "error"
+  const banner = document.createElement("div")
+  banner.className = "cm-live-mermaid-error"
+  banner.textContent = "Mermaid 다이어그램 문법 오류"
+  container.appendChild(banner)
+  renderMermaidFallbackCode(container, text)
 }
 
 export class MarkdownMermaidWidget extends WidgetType {
@@ -502,25 +415,6 @@ export class MarkdownMermaidWidget extends WidgetType {
     root.className = "cm-live-mermaid"
     if (this.from !== undefined) root.dataset.from = String(this.from)
 
-    const renderFallbackCode = (container: HTMLElement, text: string) => {
-      const pre = document.createElement("pre")
-      pre.className = "cm-live-mermaid-fallback"
-      const code = document.createElement("code")
-      code.textContent = text
-      pre.appendChild(code)
-      container.appendChild(pre)
-    }
-
-    const renderErrorFallback = (container: HTMLElement, text: string) => {
-      container.innerHTML = ""
-      container.dataset.mermaidState = "error"
-      const banner = document.createElement("div")
-      banner.className = "cm-live-mermaid-error"
-      banner.textContent = "Mermaid 다이어그램 문법 오류"
-      container.appendChild(banner)
-      renderFallbackCode(container, text)
-    }
-
     if (view) {
       root.addEventListener("mousedown", (e) => {
         if (e.button !== 0) return
@@ -533,42 +427,40 @@ export class MarkdownMermaidWidget extends WidgetType {
     const normalized = sanitizeRenderableMermaidSource(this.source.trim())
     if (!normalized) {
       root.dataset.mermaidState = "empty"
-      renderFallbackCode(root, this.source)
+      renderMermaidFallbackCode(root, this.source)
       return root
     }
 
     const scheme = resolveLiveMermaidScheme()
     const cacheKey = `${scheme}:${normalized}`
-    if (!this.customRenderer) {
-      const cachedSvg = liveMermaidSvgCache.get(cacheKey)
-      if (cachedSvg) {
-        root.dataset.mermaidState = "rendered"
-        root.innerHTML = cachedSvg
-        return root
-      }
+    const cachedSvg = this.customRenderer ? undefined : liveMermaidSvgCache.get(cacheKey)
+    if (cachedSvg) {
+      root.dataset.mermaidState = "rendered"
+      root.innerHTML = cachedSvg
+      return root
     }
 
     root.dataset.mermaidState = "loading"
-    renderFallbackCode(root, normalized)
+    renderMermaidFallbackCode(root, normalized)
 
     const renderId = `cm-live-mermaid-${(mermaidRenderCounter += 1)}`
     const executeRender = this.customRenderer
       ? this.customRenderer(renderId, normalized)
-      : loadSharedMermaidRuntime(scheme).then(({ mermaidRuntime }) =>
+      : runSerializedMermaidTask(scheme, undefined, async ({ mermaidRuntime }) =>
           mermaidRuntime.render(renderId, normalized)
         )
 
     void executeRender
       .then((res) => {
         if (!res?.svg) {
-          renderErrorFallback(root, normalized)
+          renderMermaidErrorFallback(root, normalized)
           return
         }
         if (!this.customRenderer) cacheLiveMermaidSvg(cacheKey, res.svg)
         root.dataset.mermaidState = "rendered"
         root.innerHTML = res.svg
       })
-      .catch(() => renderErrorFallback(root, normalized))
+      .catch(() => renderMermaidErrorFallback(root, normalized))
 
     return root
   }

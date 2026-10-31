@@ -1,5 +1,9 @@
 import { CONFIG } from "site.config"
 import Head from "next/head"
+import {
+  hasAsciiControlCharacters,
+  normalizeSafeRelativeMarkdownPath,
+} from "src/libs/markdown/safeMarkdownUrl"
 
 export type MetaConfigProps = {
   title: string
@@ -12,15 +16,18 @@ export type MetaConfigProps = {
   robots?: string
   canonicalUrl?: string | null
   jsonLd?: Array<Record<string, unknown>>
-  /**
-   * 이 페이지가 속한 사이트 이름. 기본값은 블로그 제목이다.
-   * 같은 이미지가 서빙하는 회사·제품 표면은 각자 자기 이름으로 브랜딩돼야 하므로, 블로그 제목이
-   * 탭 제목 접미사와 og:site_name에 강제로 붙지 않게 표면이 이 값을 넘긴다.
-   */
   siteName?: string
 }
 
 const SITE_TITLE = CONFIG.blog.title || "AquilaLog"
+
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
+    end -= 1
+  }
+  return value.slice(0, end)
+}
 
 const resolveBrowserTabTitle = (title: string, siteName: string) => {
   const pageTitle = title.trim()
@@ -45,19 +52,14 @@ export const resolveOpenGraphType = (type: string | undefined): "article" | "web
 }
 
 export const sanitizeMetadataImageUrl = (rawImage: string | undefined): string => {
-  const withoutFragment = (rawImage || "").split("#")[0]?.trim() || ""
-  if (!withoutFragment || withoutFragment.startsWith("//") || withoutFragment.startsWith("/\\")) {
+  const rawWithoutFragment = (rawImage ?? "").split("#")[0] ?? ""
+  const withoutFragment = rawWithoutFragment.trim()
+  if (!withoutFragment || hasAsciiControlCharacters(withoutFragment)) {
     return ""
   }
 
   if (withoutFragment.startsWith("/")) {
-    try {
-      const probe = new URL(withoutFragment, "https://metadata.local/")
-      if (probe.origin !== "https://metadata.local") return ""
-      return `${probe.pathname}${probe.search}`
-    } catch {
-      return ""
-    }
+    return normalizeSafeRelativeMarkdownPath(withoutFragment)
   }
 
   try {
@@ -84,7 +86,7 @@ export const resolveMetadataImageUrl = (
   if (!sanitized) return ""
 
   if (sanitized.startsWith("/")) {
-    const baseOrigin = siteUrl.trim().replace(/\/+$/, "")
+    const baseOrigin = trimTrailingSlashes(siteUrl.trim())
     if (!baseOrigin) return ""
     try {
       const resolved = new URL(sanitized, `${baseOrigin}/`)

@@ -131,9 +131,14 @@ export const countMermaidEdgeTokens = (source: string) => {
   return count
 }
 
+const MERMAID_NODE_SHAPE_PATTERN = /\[[^\]\n]+\]|\{[^}\n]+\}|\(\([^)\n]+\)\)|\([^)\n]+\)/g
+
 export const estimateMermaidComplexity = (source: string): MermaidComplexitySummary => {
   const edgeCount = countMermaidEdgeTokens(source)
-  const nodeCount = (source.match(/(?:\[[^\]\n]+\]|\{[^}\n]+\}|\(\([^\)\n]+\)\)|\([^\)\n]+\))/g) || []).length
+  let nodeCount = 0
+  for (const _match of source.matchAll(MERMAID_NODE_SHAPE_PATTERN)) {
+    nodeCount += 1
+  }
   const level: MermaidComplexityLevel =
     source.length >= MERMAID_COMPLEX_SOURCE_THRESHOLD ||
     edgeCount >= MERMAID_COMPLEX_EDGE_THRESHOLD ||
@@ -251,19 +256,18 @@ export const resolveMermaidPreset = (scheme: "dark" | "light"): MermaidRuntimePr
 let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
 let lastInitializedThemeKey: string | null = null
 let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
+let mermaidExecutionQueue: Promise<unknown> = Promise.resolve()
 
 export const resetSharedMermaidRuntimeForTests = () => {
   sharedMermaidPromise = null
   lastInitializedThemeKey = null
   activeMermaidParseWarningHandler = null
+  mermaidExecutionQueue = Promise.resolve()
 }
 
-export const loadSharedMermaidRuntime = async (
-  scheme: "dark" | "light",
-  onParseWarning?: (error: unknown) => void,
+const ensureSharedMermaidInstance = (
   runtimeLoader?: () => Promise<unknown>
-): Promise<{ mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }> => {
-  const preset = resolveMermaidPreset(scheme)
+): Promise<MermaidRuntimeInstance> => {
   if (!sharedMermaidPromise) {
     const loadModule = runtimeLoader ?? (() => import("mermaid"))
     sharedMermaidPromise = loadModule()
@@ -283,16 +287,53 @@ export const loadSharedMermaidRuntime = async (
         throw error
       })
   }
+  return sharedMermaidPromise
+}
 
-  const mermaidRuntime = await sharedMermaidPromise
+const applyMermaidThemePreset = (
+  mermaidRuntime: MermaidRuntimeInstance,
+  preset: MermaidRuntimePreset
+) => {
+  if (lastInitializedThemeKey === preset.themeKey) return
+  mermaidRuntime.initialize({
+    startOnLoad: false,
+    ...preset.config,
+  })
+  lastInitializedThemeKey = preset.themeKey
+}
+
+export const loadSharedMermaidRuntime = async (
+  scheme: "dark" | "light",
+  onParseWarning?: (error: unknown) => void,
+  runtimeLoader?: () => Promise<unknown>
+): Promise<{ mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }> => {
+  const preset = resolveMermaidPreset(scheme)
+  const mermaidRuntime = await ensureSharedMermaidInstance(runtimeLoader)
   activeMermaidParseWarningHandler = onParseWarning ?? null
-  if (lastInitializedThemeKey !== preset.themeKey) {
-    mermaidRuntime.initialize({
-      startOnLoad: false,
-      ...preset.config,
-    })
-    lastInitializedThemeKey = preset.themeKey
-  }
-
+  applyMermaidThemePreset(mermaidRuntime, preset)
   return { mermaidRuntime, preset }
+}
+
+export const runSerializedMermaidTask = <T>(
+  scheme: "dark" | "light",
+  onParseWarning: ((error: unknown) => void) | undefined,
+  task: (ctx: { mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }) => Promise<T>,
+  runtimeLoader?: () => Promise<unknown>
+): Promise<T> => {
+  const scheduled = mermaidExecutionQueue.then(async () => {
+    const preset = resolveMermaidPreset(scheme)
+    const mermaidRuntime = await ensureSharedMermaidInstance(runtimeLoader)
+    activeMermaidParseWarningHandler = onParseWarning ?? null
+    try {
+      applyMermaidThemePreset(mermaidRuntime, preset)
+      return await task({ mermaidRuntime, preset })
+    } finally {
+      activeMermaidParseWarningHandler = null
+    }
+  })
+  mermaidExecutionQueue = scheduled.then(
+    () => undefined,
+    () => undefined
+  )
+  return scheduled
 }

@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { zIndexes } from "src/styles/zIndexes"
 
 export const PublishModalBackdrop = styled.div`
   position: fixed;
@@ -7,7 +8,7 @@ export const PublishModalBackdrop = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 190;
+  z-index: ${zIndexes.publishModal};
   padding: 1rem;
 
   &[data-variant="drawer"] {

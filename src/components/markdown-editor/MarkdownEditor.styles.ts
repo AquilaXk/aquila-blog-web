@@ -163,16 +163,25 @@ export const ToolbarMenuChevron = styled.span`
   svg { width: 12px; height: 12px; display: block; }
 `
 
+type ToolbarMenuHorizontalAlign = "start" | "end"
+
+const resolveToolbarMenuHorizontalPlacement = (
+  $align: ToolbarMenuHorizontalAlign,
+  $fixedPosition?: { top: number; left: number } | null
+): string => {
+  if ($fixedPosition) return `left: ${$fixedPosition.left}px; right: auto;`
+  return $align === "end" ? "right: 0;" : "left: 0;"
+}
+
 export const ToolbarMenuPanel = styled.div<{
-  $align: "start" | "end"
+  $align: ToolbarMenuHorizontalAlign
   $horizontalOffset: number
   $fixedPosition?: { top: number; left: number } | null
 }>`
   position: ${({ $fixedPosition }) => ($fixedPosition ? "fixed" : "absolute")};
   z-index: ${zIndexes.dropdownMenu};
   top: ${({ $fixedPosition }) => ($fixedPosition ? `${$fixedPosition.top}px` : "calc(100% + 6px)")};
-  ${({ $align, $fixedPosition }) =>
-    $fixedPosition ? `left: ${$fixedPosition.left}px; right: auto;` : $align === "end" ? "right: 0;" : "left: 0;"}
+  ${({ $align, $fixedPosition }) => resolveToolbarMenuHorizontalPlacement($align, $fixedPosition)}
   transform: ${({ $fixedPosition, $horizontalOffset }) =>
     $fixedPosition ? "none" : `translateX(${$horizontalOffset}px)`};
   display: grid;

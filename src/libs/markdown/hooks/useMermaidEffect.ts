@@ -1,9 +1,6 @@
 import { RefObject, useEffect } from "react"
 import useScheme from "src/hooks/useScheme"
-import {
-  loadSharedMermaidRuntime,
-  resolveMermaidPreset,
-} from "src/libs/markdown/mermaidRuntimeConfig"
+import { resolveMermaidPreset } from "src/libs/markdown/mermaidRuntimeConfig"
 import { shouldScheduleFromMermaidMutations } from "src/libs/markdown/mermaidRuntimeMutations"
 import { createMermaidRuntimeController } from "src/libs/markdown/mermaidRuntimeRender"
 
@@ -41,30 +38,18 @@ const useMermaidEffect = (
     let pendingForceResetCache = false
     let mutationObserver: MutationObserver | null = null
     let scheduledRunFrame: number | null = null
-    let lastMermaidParseWarning: string | null = null
     const retryTimers = new Set<number>()
     const preset = resolveMermaidPreset(effectiveScheme)
-
-    const getMermaid = async () => {
-      const { mermaidRuntime } = await loadSharedMermaidRuntime(effectiveScheme, (error) => {
-        lastMermaidParseWarning = String(error || "Mermaid parse error")
-      })
-      return mermaidRuntime
-    }
 
     const controller = createMermaidRuntimeController({
       root,
       preset,
+      scheme: effectiveScheme,
       allowDesktopWideLane,
       lazyViewport,
       shouldLogMermaidWarnings,
-      getMermaid,
       isDisposed: () => disposed,
       retryTimers,
-      readParseWarning: () => lastMermaidParseWarning,
-      clearParseWarning: () => {
-        lastMermaidParseWarning = null
-      },
     })
 
     const scheduleRun = (forceResetCache = false) => {

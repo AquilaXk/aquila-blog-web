@@ -70,8 +70,10 @@ const CALLOUT_EMOJI_TONE_MAP: Record<string, NotionCalloutTone> = {
   "🧾": "purple",
 }
 
-const normalizeEmojiIcon = (raw: string): string =>
-  raw === "ℹ" ? "ℹ️" : raw === "⚠" ? "⚠️" : raw
+const normalizeEmojiIcon = (raw: string): string => {
+  if (raw === "ℹ") return "ℹ️"
+  return raw === "⚠" ? "⚠️" : raw
+}
 
 const parseCalloutContainerPayload = (
   rawHeader: string,
@@ -268,7 +270,7 @@ const focusContainerBlockOrigin = (
   fallbackTo: number,
   innerOffset: number
 ) => {
-  if (!view || !view.state.facet(EditorView.editable)) return
+  if (!view?.state.facet(EditorView.editable)) return
   let resolvedFrom = fallbackFrom
   const datasetFrom = Number(root.dataset?.from)
   if (Number.isFinite(datasetFrom) && datasetFrom >= 0) resolvedFrom = datasetFrom
@@ -518,6 +520,16 @@ const haveSameActiveContainerBlocks = (
   return true
 }
 
+const createNotionContainerBlockWidget = (block: NotionContainerBlock): WidgetType => {
+  if (block.kind === "callout") {
+    return new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
+  }
+  if (block.kind === "toggle") {
+    return new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
+  }
+  return new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
+}
+
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
   if (mode === "source" || state.doc.length === 0) return Decoration.none
@@ -546,13 +558,7 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
       continue
     }
 
-    const widget =
-      block.kind === "callout"
-        ? new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
-        : block.kind === "toggle"
-          ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
-          : new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
-
+    const widget = createNotionContainerBlockWidget(block)
     decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to))
   }
 

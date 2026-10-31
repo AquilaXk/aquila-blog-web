@@ -91,10 +91,10 @@ export const useEditorStudioMetaCatalog = ({
     setPostCategory(value)
   }, [setPostCategory])
 
-  const commitPostCategory = useCallback(() => {
+  const commitPostCategory = useCallback((): string => {
     if (!postCategory.trim()) {
       setPostCategory("")
-      return
+      return ""
     }
     const storedBase = hasHydratedCatalog
       ? customCategoryCatalog
@@ -106,7 +106,7 @@ export const useEditorStudioMetaCatalog = ({
         ])
     const category = resolveCanonicalCategoryFromCatalog(postCategory, storedBase)
     setPostCategory(category)
-    if (!category) return
+    if (!category) return ""
     setCustomCategoryCatalog((current) => {
       const base = hasHydratedCatalog ? current : storedBase
       if (base.includes(category)) return base
@@ -114,6 +114,7 @@ export const useEditorStudioMetaCatalog = ({
       persistCatalog(CATEGORY_CATALOG_STORAGE_KEY, next)
       return next
     })
+    return category
   }, [customCategoryCatalog, hasHydratedCatalog, postCategory, setPostCategory])
 
   return {

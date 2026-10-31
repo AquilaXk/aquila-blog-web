@@ -4,12 +4,15 @@ import {
   parseMarkdownTableGrid,
   serializeMarkdownTableGrid,
   type MarkdownTableGrid,
+  type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
 import {
   applyPlannedTextMutationToValue,
   planReplaceSelection,
   planToggleWrapSelection,
 } from "./markdownEditorTextMutation"
+
+const MIN_TABLE_ROWS = 2
 
 export type MarkdownTablePasteOutcome = {
   markdown: string
@@ -49,41 +52,70 @@ export const getTableGridPrefixMeta = (grid: MarkdownTableGrid): TableGridPrefix
   gridPrefixMeta.get(grid) ?? { firstLinePrefix: "", linePrefix: "" }
 
 export const extractTableLinePrefix = (line: string): { prefix: string; content: string } => {
-  const match = /^([ \t]*(?:>[ \t]*)*)(.*)$/.exec(line)
-  if (!match) return { prefix: "", content: line }
-  return { prefix: match[1] ?? "", content: match[2] ?? "" }
+  let index = 0
+  while (index < line.length) {
+    const code = line.codePointAt(index)
+    if (code === 32 || code === 9 || code === 62) {
+      index += 1
+      continue
+    }
+    break
+  }
+  return { prefix: line.slice(0, index), content: line.slice(index) }
+}
+
+const countBacktickRun = (value: string, start: number): number => {
+  let run = 1
+  while (start + run < value.length && value.codePointAt(start + run) === 96) {
+    run += 1
+  }
+  return run
 }
 
 export const isInsideInlineCodeSpan = (value: string, index: number): boolean => {
-  if (!value.includes("`")) return false
-  let inCode = false
-  let fenceLen = 0
+  if (!value.includes("`")) {
+    return false
+  }
   let i = 0
-  while (i < value.length) {
-    if (value[i] === "\\" && !inCode) {
+  while (i < value.length && i <= index) {
+    const code = value.codePointAt(i)
+    if (code === 92) {
       i += 2
       continue
     }
-    if (value[i] === "`") {
-      let run = 1
-      while (i + run < value.length && value[i + run] === "`") run += 1
-      if (!inCode) {
-        const closeIdx = value.indexOf("`".repeat(run), i + run)
-        if (closeIdx !== -1) {
-          if (index >= i + run && index < closeIdx) return true
-          inCode = true
-          fenceLen = run
-        }
-      } else if (run === fenceLen) {
-        inCode = false
-        fenceLen = 0
-      }
-      i += run
+    if (code !== 96) {
+      i += 1
       continue
     }
-    i += 1
+    const run = countBacktickRun(value, i)
+    const openEnd = i + run
+    const closeIdx = findMatchingBacktickRun(value, openEnd, run)
+    if (closeIdx === -1) {
+      i = openEnd
+      continue
+    }
+    if (index >= openEnd && index < closeIdx) {
+      return true
+    }
+    i = closeIdx + run
   }
   return false
+}
+
+const findMatchingBacktickRun = (value: string, searchFrom: number, targetRun: number): number => {
+  let cursor = searchFrom
+  while (cursor < value.length) {
+    if (value.codePointAt(cursor) !== 96) {
+      cursor += 1
+      continue
+    }
+    const run = countBacktickRun(value, cursor)
+    if (run === targetRun) {
+      return cursor
+    }
+    cursor += run
+  }
+  return -1
 }
 
 const INLINE_FORMAT_DELIMITERS: Record<
@@ -102,6 +134,19 @@ type ParsedCsvRow = {
   hasUnquotedCommaSpace: boolean
 }
 
+const consumeQuotedStep = (
+  source: string,
+  index: number
+): { char: string; nextIndex: number; stillQuoted: boolean } => {
+  if (source[index] === '"' && source[index + 1] === '"') {
+    return { char: '"', nextIndex: index + 1, stillQuoted: true }
+  }
+  if (source[index] === '"') {
+    return { char: "", nextIndex: index, stillQuoted: false }
+  }
+  return { char: source[index]!, nextIndex: index, stillQuoted: true }
+}
+
 const parseCsvRow = (line: string): ParsedCsvRow => {
   const cells: string[] = []
   let current = ""
@@ -110,18 +155,18 @@ const parseCsvRow = (line: string): ParsedCsvRow => {
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i]!
     if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"'
-        i += 1
-      } else if (ch === '"') {
-        inQuotes = false
-      } else {
-        current += ch
-      }
-    } else if (ch === '"') {
+      const step = consumeQuotedStep(line, i)
+      current += step.char
+      i = step.nextIndex
+      inQuotes = step.stillQuoted
+      continue
+    }
+    if (ch === '"') {
       inQuotes = true
     } else if (ch === ",") {
-      if (line[i + 1] === " ") hasUnquotedCommaSpace = true
+      if (line[i + 1] === " ") {
+        hasUnquotedCommaSpace = true
+      }
       cells.push(current)
       current = ""
     } else {
@@ -132,30 +177,29 @@ const parseCsvRow = (line: string): ParsedCsvRow => {
   return { cells, valid: !inQuotes, hasUnquotedCommaSpace }
 }
 
+const normalizeTsvCell = (cell: string): string => cell.replace(/\s*\n\s*/g, " ")
+
 const parseTsvRows = (text: string): string[][] => {
   const rows: string[][] = []
   let currentRow: string[] = []
   let currentCell = ""
   let inQuotes = false
-
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i]!
     if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') {
-        currentCell += '"'
-        i += 1
-      } else if (ch === '"') {
-        inQuotes = false
-      } else {
-        currentCell += ch
-      }
-    } else if (ch === '"' && currentCell.length === 0) {
+      const step = consumeQuotedStep(text, i)
+      currentCell += step.char
+      i = step.nextIndex
+      inQuotes = step.stillQuoted
+      continue
+    }
+    if (ch === '"' && currentCell.length === 0) {
       inQuotes = true
     } else if (ch === "\t") {
-      currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+      currentRow.push(normalizeTsvCell(currentCell))
       currentCell = ""
     } else if (ch === "\n") {
-      currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+      currentRow.push(normalizeTsvCell(currentCell))
       rows.push(currentRow)
       currentRow = []
       currentCell = ""
@@ -163,9 +207,17 @@ const parseTsvRows = (text: string): string[][] => {
       currentCell += ch
     }
   }
-  currentRow.push(currentCell.replace(/\s*\n\s*/g, " "))
+  currentRow.push(normalizeTsvCell(currentCell))
   rows.push(currentRow)
   return rows
+}
+
+const isProseSentenceLine = (line: string): boolean => {
+  if (line.includes(", ")) {
+    return true
+  }
+  const lastChar = line.trimEnd().at(-1)
+  return lastChar === "." || lastChar === "!" || lastChar === "?"
 }
 
 const splitPastedTableRows = (trimmedText: string): string[][] => {
@@ -181,15 +233,82 @@ const splitPastedTableRows = (trimmedText: string): string[][] => {
       parsedRows.every(
         (row) => row.valid && row.cells.length === expectedCols && !row.hasUnquotedCommaSpace
       )
-    if (isStructuredCsv) {
-      return parsedRows.map((row) => row.cells)
-    }
-    return [[trimmedText]]
+    return isStructuredCsv ? parsedRows.map((row) => row.cells) : [[trimmedText]]
   }
-  if (lines.some((line) => line.includes(", ") || /[.!?]\s*$/.test(line))) {
+  if (lines.some(isProseSentenceLine)) {
     return [[trimmedText]]
   }
   return lines.map((line) => [line])
+}
+
+const expandGridToFitPaste = (
+  grid: MarkdownTableGrid,
+  clampedStartRow: number,
+  clampedStartCol: number,
+  rowCount: number,
+  maxCols: number
+) => {
+  while (
+    grid.headers.length < clampedStartCol + maxCols &&
+    grid.headers.length < MAX_EDIT_COLUMNS
+  ) {
+    grid.headers.push("")
+    grid.alignments.push("left")
+    for (const row of grid.rows) {
+      row.push("")
+    }
+  }
+  while (
+    grid.rows.length < clampedStartRow + rowCount - 1 &&
+    grid.rows.length + 1 < MAX_EDIT_ROWS
+  ) {
+    grid.rows.push(Array.from({ length: grid.headers.length }, () => ""))
+  }
+}
+
+const writeMatrixIntoGrid = (
+  grid: MarkdownTableGrid,
+  matrix: string[][],
+  clampedStartRow: number,
+  clampedStartCol: number
+): { pastedRows: number; pastedCols: number; lastRow: number; lastCol: number } => {
+  let pastedRows = 0
+  let pastedCols = 0
+  let lastRow = clampedStartRow
+  let lastCol = clampedStartCol
+  for (let r = 0; r < matrix.length; r += 1) {
+    const targetRow = clampedStartRow + r
+    if (targetRow > grid.rows.length) break
+    pastedRows += 1
+    lastRow = targetRow
+    const sourceRow = matrix[r]!
+    const writtenCols = writeMatrixRowIntoGrid(grid, sourceRow, targetRow, clampedStartCol)
+    if (writtenCols > pastedCols) pastedCols = writtenCols
+    const endCol = clampedStartCol + Math.max(0, writtenCols - 1)
+    if (writtenCols > 0 && endCol > lastCol) lastCol = endCol
+  }
+  return { pastedRows, pastedCols, lastRow, lastCol }
+}
+
+const writeMatrixRowIntoGrid = (
+  grid: MarkdownTableGrid,
+  sourceRow: string[],
+  targetRow: number,
+  clampedStartCol: number
+): number => {
+  let writtenCols = 0
+  for (let c = 0; c < sourceRow.length; c += 1) {
+    const targetCol = clampedStartCol + c
+    if (targetCol >= grid.headers.length) break
+    writtenCols = c + 1
+    const cellVal = (sourceRow[c] ?? "").trim()
+    if (targetRow === 0) {
+      grid.headers[targetCol] = cellVal
+    } else {
+      grid.rows[targetRow - 1]![targetCol] = cellVal
+    }
+  }
+  return writtenCols
 }
 
 export const applyMarkdownTableGridPaste = (
@@ -199,62 +318,35 @@ export const applyMarkdownTableGridPaste = (
   rawText: string
 ): MarkdownTablePasteOutcome | null => {
   const normalized = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-  if (!normalized.includes("\t") && !normalized.includes("\n")) return null
+  if (!normalized.includes("\t") && !normalized.includes("\n")) {
+    return null
+  }
   const trimmedTrailing = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized
   const matrix = splitPastedTableRows(trimmedTrailing)
   const maxCols = Math.max(0, ...matrix.map((row) => row.length))
-  if (matrix.length <= 1 && maxCols <= 1) return null
-
+  if (matrix.length <= 1 && maxCols <= 1) {
+    return null
+  }
   const grid = parseMarkdownTableGrid(markdown)
-  if (!grid || grid.headers.length === 0) return null
-
+  if (!grid || grid.headers.length === 0) {
+    return null
+  }
   const clampedStartRow = Math.max(0, Math.min(startRow, grid.rows.length))
   const clampedStartCol = Math.max(0, Math.min(startCol, grid.headers.length - 1))
-
-  while (
-    grid.headers.length < clampedStartCol + maxCols &&
-    grid.headers.length < MAX_EDIT_COLUMNS
-  ) {
-    grid.headers.push("")
-    grid.alignments.push("left")
-    for (const row of grid.rows) row.push("")
+  expandGridToFitPaste(grid, clampedStartRow, clampedStartCol, matrix.length, maxCols)
+  const { pastedRows, pastedCols, lastRow, lastCol } = writeMatrixIntoGrid(
+    grid,
+    matrix,
+    clampedStartRow,
+    clampedStartCol
+  )
+  if (pastedRows === 0 || pastedCols === 0) {
+    return null
   }
-
-  while (
-    grid.rows.length < clampedStartRow + matrix.length - 1 &&
-    grid.rows.length + 1 < MAX_EDIT_ROWS
-  ) {
-    grid.rows.push(Array.from({ length: grid.headers.length }, () => ""))
-  }
-
-  let pastedRows = 0
-  let pastedCols = 0
-  let lastTargetRow = clampedStartRow
-  let lastTargetCol = clampedStartCol
-
-  for (let r = 0; r < matrix.length; r += 1) {
-    const targetRow = clampedStartRow + r
-    if (targetRow > grid.rows.length) break
-    pastedRows += 1
-    lastTargetRow = targetRow
-    const sourceRow = matrix[r]!
-    for (let c = 0; c < sourceRow.length; c += 1) {
-      const targetCol = clampedStartCol + c
-      if (targetCol >= grid.headers.length) break
-      if (c + 1 > pastedCols) pastedCols = c + 1
-      if (targetCol > lastTargetCol) lastTargetCol = targetCol
-      const cellVal = (sourceRow[c] ?? "").trim()
-      if (targetRow === 0) grid.headers[targetCol] = cellVal
-      else grid.rows[targetRow - 1]![targetCol] = cellVal
-    }
-  }
-
-  if (pastedRows === 0 || pastedCols === 0) return null
-
   return {
     markdown: serializeMarkdownTableGrid(grid),
-    nextRow: lastTargetRow,
-    nextCol: lastTargetCol,
+    nextRow: lastRow,
+    nextCol: lastCol,
     pastedRows,
     pastedCols,
   }
@@ -268,14 +360,228 @@ export const applyTableCellInlineFormat = (
 ): TableCellInlineFormatOutcome => {
   const start = Math.max(0, Math.min(selectionStart, value.length))
   const end = Math.max(start, Math.min(selectionEnd, value.length))
-
   if (kind === "line-break") {
     return applyPlannedTextMutationToValue(value, planReplaceSelection(start, end, "<br>"))
   }
-
   const delim = INLINE_FORMAT_DELIMITERS[kind]
   return applyPlannedTextMutationToValue(
     value,
     planToggleWrapSelection(value, start, end, delim, delim)
   )
+}
+
+const mutateGridNavigation = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  action: Extract<MarkdownTableGridAction, { kind: "tab" | "enter" }>
+): { nextRow: number; nextCol: number } | null => {
+  const colCount = grid.headers.length
+  if (action.kind === "tab") {
+    const totalRows = grid.rows.length + 1
+    const step = action.direction === "next" ? 1 : -1
+    const target = activeRow * colCount + activeCol + step
+    if (target >= 0 && target < totalRows * colCount) {
+      return { nextRow: Math.floor(target / colCount), nextCol: target % colCount }
+    }
+    if (action.direction === "previous" || totalRows >= MAX_EDIT_ROWS) return null
+    grid.rows.push(Array.from({ length: colCount }, () => ""))
+    return { nextRow: grid.rows.length, nextCol: 0 }
+  }
+  if (activeRow < grid.rows.length) return { nextRow: activeRow + 1, nextCol: activeCol }
+  if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
+  grid.rows.push(Array.from({ length: colCount }, () => ""))
+  return { nextRow: grid.rows.length, nextCol: activeCol }
+}
+
+const resolveMoveRowTarget = (action: MarkdownTableGridAction, activeRow: number): number => {
+  if (action.kind === "move-row-to") return action.targetRow
+  return action.kind === "move-row-up" ? activeRow - 1 : activeRow + 1
+}
+
+const resolveMoveColumnTarget = (action: MarkdownTableGridAction, activeCol: number): number => {
+  if (action.kind === "move-column-to") return action.targetCol
+  return action.kind === "move-column-left" ? activeCol - 1 : activeCol + 1
+}
+
+const mutateGridRowMove = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  targetRow: number
+): { nextRow: number; nextCol: number } | null => {
+  if (
+    activeRow < 1 ||
+    activeRow > grid.rows.length ||
+    targetRow < 1 ||
+    targetRow > grid.rows.length ||
+    targetRow === activeRow
+  ) {
+    return null
+  }
+  const [moved] = grid.rows.splice(activeRow - 1, 1)
+  if (!moved) return null
+  grid.rows.splice(targetRow - 1, 0, moved)
+  return { nextRow: targetRow, nextCol: activeCol }
+}
+
+const mutateGridRowAction = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  action: MarkdownTableGridAction
+): { nextRow: number; nextCol: number } | null => {
+  if (action.kind === "add-row" || action.kind === "insert-row-above") {
+    if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
+    const insertAt = Math.max(0, action.kind === "add-row" ? activeRow : activeRow - 1)
+    grid.rows.splice(insertAt, 0, Array.from({ length: grid.headers.length }, () => ""))
+    return { nextRow: insertAt + 1, nextCol: activeCol }
+  }
+  if (
+    action.kind === "move-row-up" ||
+    action.kind === "move-row-down" ||
+    action.kind === "move-row-to"
+  ) {
+    return mutateGridRowMove(grid, activeRow, activeCol, resolveMoveRowTarget(action, activeRow))
+  }
+  if (action.kind === "duplicate-row") {
+    if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
+    const sourceCells = activeRow === 0 ? grid.headers : (grid.rows[activeRow - 1] ?? grid.headers)
+    const insertAt = Math.max(0, activeRow)
+    grid.rows.splice(insertAt, 0, [...sourceCells])
+    return { nextRow: insertAt + 1, nextCol: activeCol }
+  }
+  if (action.kind === "clear-row") {
+    const target = activeRow === 0 ? grid.headers : grid.rows[activeRow - 1]
+    if (!target) return null
+    target.fill("")
+    return { nextRow: activeRow, nextCol: activeCol }
+  }
+  if (activeRow === 0 || grid.rows.length + 1 <= MIN_TABLE_ROWS) return null
+  grid.rows.splice(activeRow - 1, 1)
+  return { nextRow: Math.min(activeRow, grid.rows.length), nextCol: activeCol }
+}
+
+const mutateGridColumnInsertOrDuplicate = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  isDuplicate: boolean,
+  insertLeft: boolean
+): { nextRow: number; nextCol: number } | null => {
+  if (grid.headers.length >= MAX_EDIT_COLUMNS) return null
+  const insertAt = insertLeft ? activeCol : activeCol + 1
+  grid.headers.splice(insertAt, 0, isDuplicate ? (grid.headers[activeCol] ?? "") : "")
+  grid.alignments.splice(insertAt, 0, isDuplicate ? (grid.alignments[activeCol] ?? "left") : "left")
+  for (const row of grid.rows) {
+    row.splice(insertAt, 0, isDuplicate ? (row[activeCol] ?? "") : "")
+  }
+  return { nextRow: activeRow, nextCol: insertAt }
+}
+
+const mutateGridColumnMove = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  targetCol: number
+): { nextRow: number; nextCol: number } | null => {
+  const colCount = grid.headers.length
+  if (
+    activeCol < 0 ||
+    activeCol >= colCount ||
+    targetCol < 0 ||
+    targetCol >= colCount ||
+    targetCol === activeCol
+  ) {
+    return null
+  }
+  const move = <T>(items: T[]) => {
+    const [item] = items.splice(activeCol, 1)
+    if (item !== undefined) items.splice(targetCol, 0, item)
+  }
+  move(grid.headers)
+  move(grid.alignments)
+  for (const row of grid.rows) move(row)
+  return { nextRow: activeRow, nextCol: targetCol }
+}
+
+const mutateGridColumnAction = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  action: MarkdownTableGridAction
+): { nextRow: number; nextCol: number } | null => {
+  const colCount = grid.headers.length
+  if (
+    action.kind === "add-column" ||
+    action.kind === "insert-column-left" ||
+    action.kind === "duplicate-column"
+  ) {
+    return mutateGridColumnInsertOrDuplicate(
+      grid,
+      activeRow,
+      activeCol,
+      action.kind === "duplicate-column",
+      action.kind === "insert-column-left"
+    )
+  }
+  if (
+    action.kind === "move-column-left" ||
+    action.kind === "move-column-right" ||
+    action.kind === "move-column-to"
+  ) {
+    return mutateGridColumnMove(grid, activeRow, activeCol, resolveMoveColumnTarget(action, activeCol))
+  }
+  if (action.kind === "clear-column") {
+    if (activeCol < 0 || activeCol >= colCount) return null
+    grid.headers[activeCol] = ""
+    for (const row of grid.rows) row[activeCol] = ""
+    return { nextRow: activeRow, nextCol: activeCol }
+  }
+  if (action.kind === "delete-column") {
+    if (colCount <= 1) return null
+    grid.headers.splice(activeCol, 1)
+    grid.alignments.splice(activeCol, 1)
+    for (const row of grid.rows) row.splice(activeCol, 1)
+    return { nextRow: activeRow, nextCol: Math.min(activeCol, grid.headers.length - 1) }
+  }
+  if (action.kind === "set-alignment") {
+    grid.alignments[activeCol] = action.alignment
+    return { nextRow: activeRow, nextCol: activeCol }
+  }
+  if (colCount >= MAX_EDIT_COLUMNS && grid.rows.length + 2 > MAX_EDIT_ROWS) return null
+  if (colCount < MAX_EDIT_COLUMNS) {
+    grid.headers.push("")
+    grid.alignments.push("left")
+    for (const row of grid.rows) row.push("")
+  }
+  if (grid.rows.length + 2 <= MAX_EDIT_ROWS) {
+    grid.rows.push(Array.from({ length: grid.headers.length }, () => ""))
+  }
+  return { nextRow: grid.rows.length, nextCol: grid.headers.length - 1 }
+}
+
+export const mutateMarkdownTableGridCells = (
+  grid: MarkdownTableGrid,
+  activeRow: number,
+  activeCol: number,
+  action: MarkdownTableGridAction
+): { nextRow: number; nextCol: number } | null => {
+  if (grid.headers.length === 0) return null
+  if (action.kind === "tab" || action.kind === "enter") {
+    return mutateGridNavigation(grid, activeRow, activeCol, action)
+  }
+  if (
+    action.kind === "add-row" ||
+    action.kind === "insert-row-above" ||
+    action.kind === "move-row-up" ||
+    action.kind === "move-row-down" ||
+    action.kind === "move-row-to" ||
+    action.kind === "duplicate-row" ||
+    action.kind === "clear-row" ||
+    action.kind === "delete-row"
+  ) {
+    return mutateGridRowAction(grid, activeRow, activeCol, action)
+  }
+  return mutateGridColumnAction(grid, activeRow, activeCol, action)
 }

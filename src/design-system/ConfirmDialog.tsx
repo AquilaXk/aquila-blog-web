@@ -1,6 +1,7 @@
 import type { Theme } from "@emotion/react"
 import styled from "@emotion/styled"
 import { useRef, type ReactNode } from "react"
+import { zIndexes } from "src/styles/zIndexes"
 import { focusVisibleRing } from "./focusRing"
 import { modalSafeAreaPadding } from "./safeArea"
 import { useModalFocusTrap } from "./useModalFocusTrap"
@@ -75,7 +76,7 @@ export const ConfirmDialog = ({
 const ConfirmBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 220;
+  z-index: ${zIndexes.confirmDialog};
   display: grid;
   place-items: center;
   ${modalSafeAreaPadding}

@@ -50,9 +50,18 @@ import {
 } from "src/libs/markdown/MarkdownRendererFootnotes"
 import { createMarkdownHeadingSlugAllocator } from "src/libs/markdown/markdownDocumentInsights"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
+import {
+  escapeNonPandocSingleDollars,
+  hasValidMarkdownMath,
+} from "src/libs/markdown/inlineMathGuardModel"
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
 export { markdownGuide } from "src/libs/markdown/rendering"
+export {
+  escapeNonPandocSingleDollars,
+  hasValidMarkdownMath,
+  hasValidMarkdownMath as hasLikelyMarkdownMath,
+} from "src/libs/markdown/inlineMathGuardModel"
 
 type MarkdownRenderPassState = {
   nextTableIndex: number
@@ -140,32 +149,6 @@ export const resolvePreBlockMermaidSource = (language: string, rawCode: string):
     return ""
   }
   return extractNormalizedMermaidSource(rawCode) || rawCode
-}
-
-export const hasLikelyMarkdownMath = (markdown: string): boolean => {
-  const firstDollar = markdown.indexOf("$")
-  if (firstDollar === -1) return false
-  if (markdown.includes("$$")) return true
-  let index = firstDollar
-  const length = markdown.length
-  while (index < length) {
-    const lineEnd = markdown.indexOf("\n", index)
-    const currentLineEnd = lineEnd === -1 ? length : lineEnd
-    let dollarCountOnLine = 0
-    let cursor = index
-    while (cursor < currentLineEnd) {
-      const nextDollar = markdown.indexOf("$", cursor)
-      if (nextDollar === -1 || nextDollar >= currentLineEnd) break
-      if (nextDollar === 0 || markdown.codePointAt(nextDollar - 1) !== 92) {
-        dollarCountOnLine += 1
-        if (dollarCountOnLine >= 2) return true
-      }
-      cursor = nextDollar + 1
-    }
-    if (lineEnd === -1) break
-    index = lineEnd + 1
-  }
-  return false
 }
 
 type MarkdownElementProps = {
@@ -506,7 +489,8 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   renderPassStateRef.current = createMarkdownRenderPassState()
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
-    const hasMath = hasLikelyMarkdownMath(markdown)
+    const hasMath = hasValidMarkdownMath(markdown)
+    const preparedMarkdown = hasMath ? escapeNonPandocSingleDollars(markdown) : markdown
     return (
       <ReactMarkdown
         key={key}
@@ -514,7 +498,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         rehypePlugins={hasMath ? REHYPE_PLUGINS_MATH : REHYPE_PLUGINS_DEFAULT}
         components={componentVariants.getComponents(inCallout, inlineOnly)}
       >
-        {markdown}
+        {preparedMarkdown}
       </ReactMarkdown>
     )
   }

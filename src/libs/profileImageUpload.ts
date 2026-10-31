@@ -351,12 +351,75 @@ const toPreparedFile = (
   }
 }
 
+const DIRECT_PASSTHROUGH_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+])
+
+const isSourceImageAlreadyWithinPolicy = (
+  sourceFile: File,
+  sourceMimeType: string,
+  originalWidth: number,
+  originalHeight: number,
+  constrained: { width: number; height: number },
+  policy: ImageUploadPolicy
+): boolean =>
+  sourceFile.size <= policy.maxBytes &&
+  constrained.width === originalWidth &&
+  constrained.height === originalHeight &&
+  DIRECT_PASSTHROUGH_MIME_TYPES.has(sourceMimeType)
+
+const pickSmallerCandidate = (
+  currentBest: EncodedCandidate | null,
+  candidate: EncodedCandidate | null
+): EncodedCandidate | null => {
+  if (!candidate) return currentBest
+  if (!currentBest || candidate.blob.size < currentBest.blob.size) return candidate
+  return currentBest
+}
+
+const findBestEncodedImageCandidate = async (
+  image: HTMLImageElement,
+  initialSize: { width: number; height: number },
+  sourceMimeType: string,
+  policy: ImageUploadPolicy
+): Promise<EncodedCandidate | null> => {
+  let bestCandidate: EncodedCandidate | null = null
+  let currentWidth = initialSize.width
+  let currentHeight = initialSize.height
+  let outputMimeTypes: readonly string[] | null = null
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const canvas = drawToCanvas(image, currentWidth, currentHeight)
+    outputMimeTypes ??= resolveTransferOutputMimeTypes(policy.outputMimeTypes, {
+      sourceMimeType,
+      hasTransparency: detectCanvasAlphaTransparency(canvas, currentWidth, currentHeight, sourceMimeType),
+    })
+    const candidates = await encodeCandidates(canvas, currentWidth, currentHeight, policy, outputMimeTypes)
+    const smallestCandidate = candidates[0] ?? null
+    bestCandidate = pickSmallerCandidate(bestCandidate, smallestCandidate)
+
+    if (smallestCandidate && smallestCandidate.blob.size <= policy.maxBytes) {
+      return smallestCandidate
+    }
+    if (Math.max(currentWidth, currentHeight) <= MIN_RETRY_LONG_EDGE) break
+
+    currentWidth = Math.max(1, Math.round(currentWidth * RETRY_SCALE_FACTOR))
+    currentHeight = Math.max(1, Math.round(currentHeight * RETRY_SCALE_FACTOR))
+  }
+
+  return bestCandidate && bestCandidate.blob.size <= policy.maxBytes ? bestCandidate : null
+}
+
 const optimizeImageByPolicy = async (
   sourceFile: File,
   policy: ImageUploadPolicy
 ): Promise<PreparedImageUpload> => {
   const sourceMimeType = normalizeMimeType(sourceFile.type || "")
-  const looksLikeGif = sourceMimeType === "image/gif" || sourceFile.name.trim().toLowerCase().endsWith(".gif")
+  const looksLikeGif =
+    sourceMimeType === "image/gif" || sourceFile.name.trim().toLowerCase().endsWith(".gif")
   const image = await loadImageFromFile(sourceFile)
   const originalWidth = image.naturalWidth || image.width
   const originalHeight = image.naturalHeight || image.height
@@ -366,16 +429,16 @@ const optimizeImageByPolicy = async (
   }
 
   const constrained = constrainByLongEdge(originalWidth, originalHeight, policy.maxLongEdge)
-  const sourceAlreadyValid =
-    sourceFile.size <= policy.maxBytes &&
-    constrained.width === originalWidth &&
-    constrained.height === originalHeight &&
-    (sourceMimeType === "image/jpeg" ||
-      sourceMimeType === "image/png" ||
-      sourceMimeType === "image/webp" ||
-      sourceMimeType === "image/gif")
-
-  if (sourceAlreadyValid) {
+  if (
+    isSourceImageAlreadyWithinPolicy(
+      sourceFile,
+      sourceMimeType,
+      originalWidth,
+      originalHeight,
+      constrained,
+      policy
+    )
+  ) {
     return {
       file: sourceFile,
       optimized: false,
@@ -394,42 +457,14 @@ const optimizeImageByPolicy = async (
     )
   }
 
-  let bestCandidate: EncodedCandidate | null = null
-  let currentWidth = constrained.width
-  let currentHeight = constrained.height
-  let resolvedOutputMimeTypes: readonly string[] | null = null
-
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const canvas = drawToCanvas(image, currentWidth, currentHeight)
-    if (!resolvedOutputMimeTypes) {
-      const hasTransparency = detectCanvasAlphaTransparency(canvas, currentWidth, currentHeight, sourceMimeType)
-      resolvedOutputMimeTypes = resolveTransferOutputMimeTypes(policy.outputMimeTypes, {
-        sourceMimeType,
-        hasTransparency,
-      })
-    }
-    const candidates = await encodeCandidates(canvas, currentWidth, currentHeight, policy, resolvedOutputMimeTypes)
-    const smallestCandidate = candidates[0] || null
-
-    if (smallestCandidate && (!bestCandidate || smallestCandidate.blob.size < bestCandidate.blob.size)) {
-      bestCandidate = smallestCandidate
-    }
-
-    if (smallestCandidate && smallestCandidate.blob.size <= policy.maxBytes) {
-      return toPreparedFile(smallestCandidate, sourceFile, originalWidth, originalHeight)
-    }
-
-    const longEdge = Math.max(currentWidth, currentHeight)
-    if (longEdge <= MIN_RETRY_LONG_EDGE) {
-      break
-    }
-
-    currentWidth = Math.max(1, Math.round(currentWidth * RETRY_SCALE_FACTOR))
-    currentHeight = Math.max(1, Math.round(currentHeight * RETRY_SCALE_FACTOR))
-  }
-
-  if (bestCandidate && bestCandidate.blob.size <= policy.maxBytes) {
-    return toPreparedFile(bestCandidate, sourceFile, originalWidth, originalHeight)
+  const acceptedCandidate = await findBestEncodedImageCandidate(
+    image,
+    constrained,
+    sourceMimeType,
+    policy
+  )
+  if (acceptedCandidate) {
+    return toPreparedFile(acceptedCandidate, sourceFile, originalWidth, originalHeight)
   }
 
   throw new Error(
