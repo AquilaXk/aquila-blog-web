@@ -5,8 +5,13 @@ import {
   useCallback,
   useRef,
 } from "react"
+import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
-import { convertSafeHtmlPasteToMarkdown } from "./markdownEditorHtmlPasteModel"
+import {
+  convertSafeHtmlPasteToMarkdown,
+  shouldBypassHtmlPasteConversion,
+  shouldReportEmptyHtmlPasteError,
+} from "./markdownEditorHtmlPasteModel"
 import {
   buildUploadingImagePlaceholder,
   createUploadPlaceholderId,
@@ -42,8 +47,52 @@ type MarkdownMutationOptions = {
   clearUploadError?: boolean
 }
 
+export type ResolveMarkdownEditorUploadErrorOptions = {
+  kind: "image" | "file"
+  fileName: string
+  fallbackMessage: string
+}
+
+const GENERIC_CLIENT_STATUS_MESSAGES = new Set([
+  "요청 값이 올바르지 않습니다.",
+  "요청 처리 중 오류가 발생했습니다.",
+])
+
+export const resolveMarkdownEditorUploadErrorMessage = (
+  error: unknown,
+  { fallbackMessage }: ResolveMarkdownEditorUploadErrorOptions
+): string => {
+  if (error instanceof ApiTimeoutError) {
+    return "업로드 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+  }
+  if (error instanceof ApiNetworkError) {
+    return "네트워크 연결에 실패했습니다. 잠시 후 다시 시도해주세요."
+  }
+  if (error instanceof ApiError) {
+    if (error.status >= 500) return fallbackMessage
+    if (error.status === 413) {
+      return error.userMessage || "업로드 파일 용량이 너무 큽니다. 용량을 줄여 다시 시도해주세요."
+    }
+    if (error.status === 401 || error.status === 403 || error.status === 429) {
+      return error.userMessage || fallbackMessage
+    }
+    if (error.userMessage && !GENERIC_CLIENT_STATUS_MESSAGES.has(error.userMessage)) {
+      return error.userMessage
+    }
+    return fallbackMessage
+  }
+  if (error instanceof Error) {
+    const trimmed = error.message.trim()
+    if (trimmed && /[가-힣]/.test(trimmed) && !/Exception|endpoint|bucket|provider|stack/i.test(trimmed)) {
+      return trimmed
+    }
+  }
+  return fallbackMessage
+}
+
 type UseMarkdownEditorMediaTransfersArgs = {
   disabled: boolean
+  viewMode?: "live" | "source" | "reading"
   valueRef: MutableRefObject<string>
   selectionRef: MutableRefObject<TextareaSelection>
   documentGenerationRef: MutableRefObject<number>
@@ -61,6 +110,7 @@ type UseMarkdownEditorMediaTransfersArgs = {
 
 export const useMarkdownEditorMediaTransfers = ({
   disabled,
+  viewMode = "live",
   valueRef,
   selectionRef,
   documentGenerationRef,
@@ -92,8 +142,11 @@ export const useMarkdownEditorMediaTransfers = ({
   )
 
   const insertAtActiveSelection = useCallback(
-    (text: string, options?: MarkdownMutationOptions) => {
-      const { from, to } = resolveActiveSelection()
+    (text: string, options?: MarkdownMutationOptions, explicitPos?: number) => {
+      const { from, to } =
+        typeof explicitPos === "number"
+          ? { from: explicitPos, to: explicitPos }
+          : resolveActiveSelection()
       applyPlannedMarkdownMutation(planReplaceSelection(from, to, text), options)
     },
     [applyPlannedMarkdownMutation, resolveActiveSelection]
@@ -156,9 +209,15 @@ export const useMarkdownEditorMediaTransfers = ({
       let uploaded: MarkdownImageUploadResult
       try {
         uploaded = await onUploadImage(file)
-      } catch {
+      } catch (error) {
         removeExactPlaceholder(placeholder)
-        reportUploadError(MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE)
+        reportUploadError(
+          resolveMarkdownEditorUploadErrorMessage(error, {
+            kind: "image",
+            fileName: file.name,
+            fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+          })
+        )
         return
       } finally {
         if (manageInFlight) setUploadInFlight(-1)
@@ -201,9 +260,15 @@ export const useMarkdownEditorMediaTransfers = ({
       let uploaded: MarkdownFileUploadResult
       try {
         uploaded = await onUploadFile(file)
-      } catch {
+      } catch (error) {
         removeExactPlaceholder(placeholder)
-        reportUploadError(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
+        reportUploadError(
+          resolveMarkdownEditorUploadErrorMessage(error, {
+            kind: "file",
+            fileName: file.name,
+            fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+          })
+        )
         return
       } finally {
         if (manageInFlight) setUploadInFlight(-1)
@@ -273,8 +338,14 @@ export const useMarkdownEditorMediaTransfers = ({
       let uploaded: MarkdownImageUploadResult
       try {
         uploaded = await onUploadImage(file)
-      } catch {
-        setEditorError(MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE)
+      } catch (error) {
+        setEditorError(
+          resolveMarkdownEditorUploadErrorMessage(error, {
+            kind: "image",
+            fileName: file.name,
+            fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+          })
+        )
         return
       } finally {
         setUploadInFlight(-1)
@@ -303,8 +374,14 @@ export const useMarkdownEditorMediaTransfers = ({
       let uploaded: MarkdownFileUploadResult
       try {
         uploaded = await onUploadFile(file)
-      } catch {
-        setEditorError(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
+      } catch (error) {
+        setEditorError(
+          resolveMarkdownEditorUploadErrorMessage(error, {
+            kind: "file",
+            fileName: file.name,
+            fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+          })
+        )
         return
       } finally {
         setUploadInFlight(-1)
@@ -321,7 +398,7 @@ export const useMarkdownEditorMediaTransfers = ({
   )
 
   const processTransferFiles = useCallback(
-    async (files: readonly File[]) => {
+    async (files: readonly File[], explicitInsertPos?: number) => {
       clearUploadError()
       const startedGeneration = documentGenerationRef.current
 
@@ -333,7 +410,8 @@ export const useMarkdownEditorMediaTransfers = ({
       if (jobs.length > 0) {
         insertAtActiveSelection(
           jobs.map((job) => job.placeholder).join(""),
-          { clearUploadError: false }
+          { clearUploadError: false },
+          explicitInsertPos
         )
       }
 
@@ -387,8 +465,8 @@ export const useMarkdownEditorMediaTransfers = ({
       }
 
       const { from, to } = resolveActiveSelection()
+      const plainText = readClipboardPlainText(event.clipboardData)
       if (from < to) {
-        const plainText = readClipboardPlainText(event.clipboardData)
         const url = parseSingleHttpUrl(plainText)
         if (url) {
           event.preventDefault()
@@ -400,10 +478,27 @@ export const useMarkdownEditorMediaTransfers = ({
 
       const html = readClipboardHtml(event.clipboardData)
       if (html !== null) {
+        const clipboardTypes = Array.from(event.clipboardData?.types ?? [])
+        if (
+          shouldBypassHtmlPasteConversion({
+            viewMode,
+            markdown: valueRef.current,
+            selectionFrom: from,
+            clipboardTypes,
+            html,
+            plainText,
+          })
+        ) {
+          return
+        }
         const imported = convertSafeHtmlPasteToMarkdown(html)
         event.preventDefault()
         if (imported.kind === "error") {
-          setEditorError(imported.message)
+          if (shouldReportEmptyHtmlPasteError(html, plainText)) {
+            setEditorError(imported.message)
+            return
+          }
+          applyRecordedMarkdownMutation(planReplaceSelection(from, to, plainText.replace(/\r\n?/g, "\n")))
           return
         }
         if (imported.kind === "markdown") {
@@ -423,6 +518,7 @@ export const useMarkdownEditorMediaTransfers = ({
       setEditorError,
       uploadImageWithPlaceholder,
       valueRef,
+      viewMode,
     ]
   )
 
@@ -443,10 +539,11 @@ export const useMarkdownEditorMediaTransfers = ({
       if (files.length === 0) return
       event.preventDefault()
       const dropPos = resolveDropTargetPosition?.({ x: event.clientX, y: event.clientY })
-      if (typeof dropPos === "number") {
-        selectionRef.current = { from: dropPos, to: dropPos }
+      const resolvedDropPos = typeof dropPos === "number" ? dropPos : undefined
+      if (resolvedDropPos !== undefined) {
+        selectionRef.current = { from: resolvedDropPos, to: resolvedDropPos }
       }
-      void processTransferFiles(files)
+      void processTransferFiles(files, resolvedDropPos)
     },
     [disabled, onUploadFile, onUploadImage, processTransferFiles, resolveDropTargetPosition, selectionRef]
   )

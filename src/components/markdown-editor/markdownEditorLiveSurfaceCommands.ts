@@ -1,25 +1,11 @@
-import {
-  LanguageDescription,
-  LanguageSupport,
-} from "@codemirror/language"
-import {
-  javascriptLanguage,
-  typescriptLanguage,
-  jsxLanguage,
-  tsxLanguage,
-} from "@codemirror/lang-javascript"
+import { LanguageDescription, LanguageSupport, syntaxTree } from "@codemirror/language"
+import { javascriptLanguage, typescriptLanguage, jsxLanguage, tsxLanguage } from "@codemirror/lang-javascript"
 import { htmlLanguage } from "@codemirror/lang-html"
 import { cssLanguage } from "@codemirror/lang-css"
-import {
-  EditorSelection,
-  Transaction,
-} from "@codemirror/state"
-import {
-  EditorView,
-  type KeyBinding,
-} from "@codemirror/view"
+import { EditorSelection, Transaction } from "@codemirror/state"
+import { EditorView, type KeyBinding } from "@codemirror/view"
 import { cycleTaskCheckboxInLine } from "./markdownEditorKeyboardModel"
-import { getDocString } from "./markdownEditorLiveSurfaceDecorations"
+import { compositionField, getDocString } from "./markdownEditorLiveSurfaceDecorations"
 
 export const selectNextOccurrenceCommand = (view: EditorView): boolean => {
   const { state } = view
@@ -97,6 +83,9 @@ export const cycleTaskCommand = (view: EditorView): boolean => {
 export const handleFenceEnter: KeyBinding = {
   key: "Enter",
   run: (view) => {
+    if (view.composing || (view.state.field(compositionField, false) ?? false)) {
+      return false
+    }
     const { state } = view
     const { selection, doc } = state
     const { from, to } = selection.main
@@ -124,6 +113,39 @@ export const handleFenceEnter: KeyBinding = {
     view.dispatch({
       changes: { from, to: from, insert: insertion },
       selection: EditorSelection.cursor(from + 1 + indent.length),
+      scrollIntoView: true,
+      annotations: [Transaction.userEvent.of("input")],
+    })
+    return true
+  },
+}
+
+export const handleFenceShiftEnter: KeyBinding = {
+  key: "Shift-Enter",
+  run: (view) => {
+    if (view.composing || (view.state.field(compositionField, false) ?? false)) {
+      return false
+    }
+    const { state } = view
+    const { from, to } = state.selection.main
+    let insideFence = false
+    syntaxTree(state).iterate({
+      from,
+      to: from,
+      enter: (node) => {
+        if (node.name === "FencedCode") {
+          const openLine = state.doc.lineAt(node.from)
+          if (from > openLine.to && from <= node.to) {
+            insideFence = true
+          }
+          return false
+        }
+      },
+    })
+    if (!insideFence) return false
+    view.dispatch({
+      changes: { from, to, insert: "\n" },
+      selection: EditorSelection.cursor(from + 1),
       scrollIntoView: true,
       annotations: [Transaction.userEvent.of("input")],
     })
@@ -558,6 +580,12 @@ export const liveSurfaceTheme = EditorView.theme({
   "@media (max-width: 768px), (pointer: coarse)": {
     ".cm-live-callout-header": { minHeight: "44px" },
     ".cm-live-toggle-caret, .cm-live-bookmark-open, .cm-live-table-toolbar-btn, .cm-live-table-col-handle, .cm-live-table-row-handle, .cm-live-table-add-col, .cm-live-table-add-corner, .cm-live-table-add-row": { minHeight: "44px", minWidth: "44px" },
+  },
+  "@media (pointer: coarse) and (min-width: 821px)": {
+    ".cm-content": { paddingLeft: "32px" },
+  },
+  '.cm-content[contenteditable="false"] .cm-live-table-toolbar, .cm-content[contenteditable="false"] .cm-live-table-footer-row, .cm-content[contenteditable="false"] .cm-live-table-add-col, .cm-content[contenteditable="false"] .cm-live-table-col-handle, .cm-content[contenteditable="false"] .cm-live-table-row-handle, .cm-content[contenteditable="false"] .cm-live-table-col-resizer': {
+    display: "none",
   },
   "@media (max-width: 820px)": {
     ".cm-content": { padding: "18px 16px 32px 16px", maxWidth: "100%" },

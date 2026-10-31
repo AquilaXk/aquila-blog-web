@@ -1,9 +1,103 @@
+import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
+
 export const HTML_PASTE_EMPTY_CONTENT_MESSAGE = "붙여넣을 수 있는 안전한 HTML 내용이 없습니다."
 
 export type HtmlPasteImportResult =
   | { kind: "none" }
   | { kind: "markdown"; markdown: string }
   | { kind: "error"; message: typeof HTML_PASTE_EMPTY_CONTENT_MESSAGE }
+
+export type HtmlPasteBypassCheckInput = {
+  viewMode?: "live" | "source" | "reading"
+  markdown: string
+  selectionFrom: number
+  clipboardTypes: readonly string[]
+  html: string
+  plainText: string
+}
+
+const IDE_CLIPBOARD_TYPE_RE = /(?:vscode|jetbrains|code\.copy-metadata)/i
+const MONOSPACE_PRE_STYLE_RE = /white-space\s*:\s*pre(?:-wrap)?\b/i
+const MONOSPACE_FONT_STYLE_RE =
+  /font-family\s*:[^;"']*\b(?:monospace|menlo|monaco|consolas|courier|fira\s*code|jetbrains\s*mono|sf\s*mono|source\s*code\s*pro|cascadia|inconsolata|d2coding)\b/i
+const SEMANTIC_RICH_HTML_TAG_RE =
+  /<(?:p|h[1-6]|ul|ol|li|table|thead|tbody|tfoot|tr|td|th|blockquote|a|img|strong|b|em|i|del|s|strike|code)\b/i
+const UNSAFE_ACTIVE_HTML_PAYLOAD_RE =
+  /<(?:script|iframe|object|embed|applet|svg|math|form|base|link|button|input|select|textarea|template)\b|<meta\b[^>]*http-equiv|\bon[a-z]+\s*=|\b(?:href|src|action|formaction|xlink:href)\s*=\s*["']?\s*(?:javascript|vbscript|data):/i
+
+const isOffsetInsideInlineCodeSpan = (markdown: string, offset: number): boolean => {
+  if (!markdown || offset <= 0 || offset >= markdown.length) return false
+  const windowRadius = 4096
+  const scanStart = Math.max(0, offset - windowRadius)
+  const scanEnd = Math.min(markdown.length, offset + windowRadius)
+  const beforeBlank = markdown.lastIndexOf("\n\n", offset - 1)
+  const afterBlank = markdown.indexOf("\n\n", offset)
+  const start = beforeBlank >= scanStart ? beforeBlank + 2 : scanStart
+  const end = afterBlank !== -1 && afterBlank <= scanEnd ? afterBlank : scanEnd
+  let i = start
+  while (i < end) {
+    if (markdown.charCodeAt(i) !== 96) {
+      i += 1
+      continue
+    }
+    let backslashes = 0
+    for (let b = i - 1; b >= start && markdown.charCodeAt(b) === 92; b -= 1) backslashes += 1
+    let runLen = 1
+    while (i + runLen < end && markdown.charCodeAt(i + runLen) === 96) runLen += 1
+    if (backslashes % 2 === 1) {
+      i += runLen
+      continue
+    }
+    const openEnd = i + runLen
+    let j = openEnd
+    let closeStart = -1
+    while (j < end) {
+      if (markdown.charCodeAt(j) !== 96) {
+        j += 1
+        continue
+      }
+      let nextRun = 1
+      while (j + nextRun < end && markdown.charCodeAt(j + nextRun) === 96) nextRun += 1
+      if (nextRun === runLen) {
+        closeStart = j
+        break
+      }
+      j += nextRun
+    }
+    if (closeStart === -1) return false
+    if (offset >= openEnd && offset <= closeStart) return true
+    i = closeStart + runLen
+  }
+  return false
+}
+
+export const shouldBypassHtmlPasteConversion = ({
+  viewMode,
+  markdown,
+  selectionFrom,
+  clipboardTypes,
+  html,
+  plainText,
+}: HtmlPasteBypassCheckInput): boolean => {
+  if (viewMode === "source" || viewMode === "reading") return true
+  if (isOffsetInsideFencedCodeBlock(markdown, selectionFrom)) return true
+  if (isOffsetInsideInlineCodeSpan(markdown, selectionFrom)) return true
+  if (!plainText) return false
+  if (clipboardTypes.some((type) => IDE_CLIPBOARD_TYPE_RE.test(type))) return true
+  if (
+    MONOSPACE_PRE_STYLE_RE.test(html) &&
+    MONOSPACE_FONT_STYLE_RE.test(html) &&
+    !SEMANTIC_RICH_HTML_TAG_RE.test(html)
+  ) {
+    return true
+  }
+  return false
+}
+
+export const shouldReportEmptyHtmlPasteError = (html: string, plainText: string): boolean => {
+  if (UNSAFE_ACTIVE_HTML_PAYLOAD_RE.test(html)) return true
+  return !normalizeHtmlPasteText(plainText)
+}
 
 const ACTIVE_TAGS = new Set([
   "base",

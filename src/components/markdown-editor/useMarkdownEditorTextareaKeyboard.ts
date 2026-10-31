@@ -1,6 +1,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type MutableRefObject, useCallback } from "react"
 import {
   isComposingEditorKeyboardEvent,
+  isOffsetInsideFencedCodeBlock,
   isSaveShortcut,
   planFormatShortcutMutation,
   planHardBreak,
@@ -20,7 +21,7 @@ import {
   planNotionBlockPrefixBackspace,
   planNotionSpaceInputRule,
 } from "./markdownEditorNotionModel"
-import type { PlannedTextMutation } from "./markdownEditorTextMutation"
+import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
   from: number
@@ -29,6 +30,7 @@ type TextareaSelection = {
 
 type UseMarkdownEditorTextareaKeyboardArgs = {
   disabled: boolean
+  authoringDisabled?: boolean
   valueRef: MutableRefObject<string>
   allowNativeTabAfterEscapeRef: MutableRefObject<boolean>
   rememberTextareaSelection: () => TextareaSelection
@@ -42,6 +44,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
 
 export const useMarkdownEditorTextareaKeyboard = ({
   disabled,
+  authoringDisabled = disabled,
   valueRef,
   allowNativeTabAfterEscapeRef,
   rememberTextareaSelection,
@@ -83,7 +86,11 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (event.shiftKey) {
         event.preventDefault()
         const { from, to } = rememberTextareaSelection()
-        applyMutationPlan(planHardBreak(from, to))
+        if (isOffsetInsideFencedCodeBlock(valueRef.current, from)) {
+          applyMutationPlan(planReplaceSelection(from, to, "\n"))
+        } else {
+          applyMutationPlan(planHardBreak(from, to))
+        }
         return true
       }
 
@@ -117,23 +124,8 @@ export const useMarkdownEditorTextareaKeyboard = ({
     [onRequestSave]
   )
 
-  const handleFormatShortcutKeyDown = useCallback(
+  const handleViewModeShortcutKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
-      const command = resolveMarkdownEditorCommandShortcut(event)
-      if (command) {
-        event.preventDefault()
-        const { from, to } = rememberTextareaSelection()
-        const action = command.execute({
-          disabled,
-          selectionStart: from,
-          selectionEnd: to,
-          isTableSelection: false,
-        })
-        if (action?.kind === "format") {
-          applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, action.shortcut))
-        }
-        return true
-      }
       if (
         (event.metaKey || event.ctrlKey) &&
         (event.key === "e" || event.key === "E") &&
@@ -145,6 +137,29 @@ export const useMarkdownEditorTextareaKeyboard = ({
         onToggleViewMode()
         return true
       }
+      return false
+    },
+    [onToggleViewMode]
+  )
+
+  const handleFormatShortcutKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
+      const command = resolveMarkdownEditorCommandShortcut(event)
+      if (command) {
+        event.preventDefault()
+        const { from, to } = rememberTextareaSelection()
+        const action = command.execute({
+          disabled: authoringDisabled,
+          selectionStart: from,
+          selectionEnd: to,
+          isTableSelection: false,
+        })
+        if (action?.kind === "format") {
+          applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, action.shortcut))
+        }
+        return true
+      }
+      if (handleViewModeShortcutKeyDown(event)) return true
       const formatShortcut = resolveFormatShortcut(event)
       if (!formatShortcut) return false
       event.preventDefault()
@@ -152,7 +167,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, formatShortcut))
       return true
     },
-    [applyMutationPlan, disabled, onToggleViewMode, rememberTextareaSelection, valueRef]
+    [applyMutationPlan, authoringDisabled, handleViewModeShortcutKeyDown, rememberTextareaSelection, valueRef]
   )
 
   const handleLineCommandKeyDown = useCallback(
@@ -226,6 +241,13 @@ export const useMarkdownEditorTextareaKeyboard = ({
     (event: ReactKeyboardEvent<HTMLElement>) => {
       if (disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)) return
 
+      if (authoringDisabled) {
+        if (handleSaveShortcutKeyDown(event)) return
+        if (handleViewModeShortcutKeyDown(event)) return
+        handleHomeEndKeyDown(event)
+        return
+      }
+
       const targetElement = event.target as HTMLElement | null
       const targetTagName = targetElement?.tagName
       const isInsideTableWidget =
@@ -268,6 +290,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
     },
     [
       allowNativeTabAfterEscapeRef,
+      authoringDisabled,
       disabled,
       handleEnterKeyDown,
       handleFormatShortcutKeyDown,
@@ -276,6 +299,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       handleAutoPairKeyDown,
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
+      handleViewModeShortcutKeyDown,
       isCompletionActive,
     ]
   )

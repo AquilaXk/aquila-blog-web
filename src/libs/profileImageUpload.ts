@@ -235,6 +235,50 @@ const constrainByLongEdge = (
   }
 }
 
+export const hasAlphaTransparency = (rgbaData: Uint8ClampedArray): boolean => {
+  for (let index = 3; index < rgbaData.length; index += 4) {
+    if ((rgbaData[index] ?? 255) < 255) return true
+  }
+  return false
+}
+
+export const resolveTransferOutputMimeTypes = (
+  outputMimeTypes: readonly string[],
+  options: { sourceMimeType: string; hasTransparency: boolean }
+): string[] => {
+  const normalizedSource = normalizeMimeType(options.sourceMimeType || "")
+  if (!options.hasTransparency || normalizedSource === "image/jpeg") {
+    return [...outputMimeTypes]
+  }
+  const alphaSafe = outputMimeTypes
+    .map(normalizeMimeType)
+    .filter((mime) => mime !== "image/jpeg")
+  if (!alphaSafe.includes("image/png")) {
+    alphaSafe.push("image/png")
+  }
+  return alphaSafe
+}
+
+const detectCanvasAlphaTransparency = (
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  sourceMimeType: string
+): boolean => {
+  const normalizedSource = normalizeMimeType(sourceMimeType || "")
+  if (normalizedSource === "image/jpeg") return false
+  const context = canvas.getContext("2d", { alpha: true })
+  if (!context || typeof context.getImageData !== "function") {
+    return normalizedSource === "image/png" || normalizedSource === "image/webp" || normalizedSource === "image/gif"
+  }
+  try {
+    const imageData = context.getImageData(0, 0, Math.max(1, width), Math.max(1, height))
+    return hasAlphaTransparency(imageData.data)
+  } catch {
+    return normalizedSource === "image/png" || normalizedSource === "image/webp" || normalizedSource === "image/gif"
+  }
+}
+
 const drawToCanvas = (
   image: HTMLImageElement,
   width: number,
@@ -257,11 +301,12 @@ const encodeCandidates = async (
   canvas: HTMLCanvasElement,
   width: number,
   height: number,
-  policy: ImageUploadPolicy
+  policy: ImageUploadPolicy,
+  outputMimeTypes: readonly string[] = policy.outputMimeTypes
 ): Promise<EncodedCandidate[]> => {
   const candidates: EncodedCandidate[] = []
 
-  for (const mimeType of policy.outputMimeTypes) {
+  for (const mimeType of outputMimeTypes) {
     if (!isCanvasEncodeSupported(mimeType)) continue
 
     if (mimeType === "image/png") {
@@ -352,10 +397,18 @@ const optimizeImageByPolicy = async (
   let bestCandidate: EncodedCandidate | null = null
   let currentWidth = constrained.width
   let currentHeight = constrained.height
+  let resolvedOutputMimeTypes: readonly string[] | null = null
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const canvas = drawToCanvas(image, currentWidth, currentHeight)
-    const candidates = await encodeCandidates(canvas, currentWidth, currentHeight, policy)
+    if (!resolvedOutputMimeTypes) {
+      const hasTransparency = detectCanvasAlphaTransparency(canvas, currentWidth, currentHeight, sourceMimeType)
+      resolvedOutputMimeTypes = resolveTransferOutputMimeTypes(policy.outputMimeTypes, {
+        sourceMimeType,
+        hasTransparency,
+      })
+    }
+    const candidates = await encodeCandidates(canvas, currentWidth, currentHeight, policy, resolvedOutputMimeTypes)
     const smallestCandidate = candidates[0] || null
 
     if (smallestCandidate && (!bestCandidate || smallestCandidate.blob.size < bestCandidate.blob.size)) {
@@ -435,14 +488,19 @@ export const buildProfileImageEditedFile = async (
   context.clearRect(0, 0, outputSize, outputSize)
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
 
+  const sourceMimeType = normalizeMimeType(sourceFile.type || "")
+  const hasTransparency = detectCanvasAlphaTransparency(canvas, outputSize, outputSize, sourceMimeType)
   const webpBlob = isCanvasEncodeSupported("image/webp") ? await canvasToBlob(canvas, "image/webp", 0.92) : null
-  const fallbackBlob = webpBlob || (await canvasToBlob(canvas, "image/jpeg", 0.92))
+  const fallbackMimeType = hasTransparency ? "image/png" : "image/jpeg"
+  const fallbackBlob =
+    webpBlob ||
+    (await canvasToBlob(canvas, fallbackMimeType, fallbackMimeType === "image/jpeg" ? 0.92 : undefined))
   if (!fallbackBlob) {
     throw new Error("프로필 편집 이미지를 생성하지 못했습니다.")
   }
 
-  const mimeType = webpBlob ? "image/webp" : "image/jpeg"
-  const extension = webpBlob ? "webp" : "jpg"
+  const mimeType = webpBlob ? "image/webp" : fallbackMimeType
+  const extension = extensionFromMimeType(mimeType)
   const baseName = sanitizeFileBaseName(sourceFile.name)
   const fileName = `${baseName}-profile-edit.${extension}`
   return new File([fallbackBlob], fileName, { type: mimeType })

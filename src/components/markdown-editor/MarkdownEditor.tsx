@@ -153,6 +153,12 @@ export const MarkdownEditor = ({
     liveSurfaceRef.current?.focus(nextSelection)
   }, [onSelectionChange, syncSelectionState, updateActiveTableSelection])
 
+  const [viewMode, setViewMode] = useState<"live" | "source" | "reading">("live")
+  const isAuthoringDisabled = disabled || viewMode === "reading"
+  const cycleViewMode = useCallback(() => {
+    setViewMode((prev) => (prev === "live" ? "source" : prev === "source" ? "reading" : "live"))
+  }, [])
+
   useEffect(() => {
     onFocusRequestReady?.((selection) => {
       if (disabled) return
@@ -164,12 +170,12 @@ export const MarkdownEditor = ({
   const applyRawMutationPlan = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
       const surface = liveSurfaceRef.current
-      if (!surface || disabled) return false
+      if (!surface || isAuthoringDisabled) return false
       syncSelectionState({ from: plan.selectionStart, to: plan.selectionEnd })
       if (options?.clearUploadError !== false) setUploadError("")
       return surface.applyMutation(plan)
     },
-    [disabled, syncSelectionState]
+    [isAuthoringDisabled, syncSelectionState]
   )
 
   const readEditorSnapshot = useCallback(() => liveSurfaceRef.current?.readSnapshot() ?? null, [])
@@ -179,7 +185,7 @@ export const MarkdownEditor = ({
   }, [setEditorSelection])
 
   const findReplace = useMarkdownEditorFindReplace({
-    disabled,
+    disabled: isAuthoringDisabled,
     draftValue,
     readSnapshot: readEditorSnapshot,
     selectRange: selectFindReplaceRange,
@@ -216,20 +222,19 @@ export const MarkdownEditor = ({
 
   const applyPlannedMarkdownMutation = useCallback(
     (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => {
+      if (isAuthoringDisabled) return false
       if (applyMutationPlan(plan, options)) return true
-
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
       syncSelectionState({ from: next.selectionStart, to: next.selectionEnd })
       updateActiveTableSelection(next.value, selectionRef.current)
       commitMarkdown(next.value, true, options)
       return true
     },
-    [applyMutationPlan, commitMarkdown, syncSelectionState, updateActiveTableSelection]
+    [applyMutationPlan, commitMarkdown, isAuthoringDisabled, syncSelectionState, updateActiveTableSelection]
   )
 
   const applyBackgroundMarkdownMutation = useCallback(
     (plan: PlannedTextMutation) => {
-      const commitOptions = { clearUploadError: false as const }
       const surface = liveSurfaceRef.current
       if (surface) {
         syncSelectionState({ from: plan.selectionStart, to: plan.selectionEnd })
@@ -241,10 +246,9 @@ export const MarkdownEditor = ({
           replaceTransientContent: true,
         })
       }
-
       const next = applyPlannedTextMutationToValue(valueRef.current, plan)
       syncSelectionState({ from: next.selectionStart, to: next.selectionEnd })
-      commitMarkdown(next.value, false, commitOptions)
+      commitMarkdown(next.value, false, { clearUploadError: false })
       return true
     },
     [commitMarkdown, syncSelectionState]
@@ -252,42 +256,42 @@ export const MarkdownEditor = ({
 
   const insertMarkdownAtEditorSelection = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
-      if (!liveSurfaceRef.current || disabled) return false
+      if (!liveSurfaceRef.current || isAuthoringDisabled) return false
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownSnippetMutation(valueRef.current, from, to, before, after, options)
       return plan ? applyMutationPlan(plan) : false
     },
-    [applyMutationPlan, disabled, resolveActiveSelection]
+    [applyMutationPlan, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const applyBlockSnippet = useCallback(
     (spec: BlockSnippetSpec) => {
-      if (disabled) return
+      if (isAuthoringDisabled) return
       const { from, to } = resolveActiveSelection()
       applyPlannedMarkdownMutation(planInsertBlockSnippet(from, to, spec))
     },
-    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
+    [applyPlannedMarkdownMutation, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const insertTable = useCallback(() => {
-    if (disabled) return
+    if (isAuthoringDisabled) return
     const table = createMarkdownEditorTable(tableRows, tableColumns)
     if (table) applyBlockSnippet(table)
-  }, [applyBlockSnippet, disabled, tableColumns, tableRows])
+  }, [applyBlockSnippet, isAuthoringDisabled, tableColumns, tableRows])
 
   const applyTableEdit = useCallback(
     (edit: MarkdownEditorTableEdit) => {
-      if (disabled) return
+      if (isAuthoringDisabled) return
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownEditorTableEdit(valueRef.current, from, to, edit)
       if (plan) applyPlannedMarkdownMutation(plan)
     },
-    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
+    [applyPlannedMarkdownMutation, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const tableEditAvailability = useMemo(
-    () => (disabled ? null : unpackTableEditAvailabilityMask(tableEditAvailabilityMask)),
-    [disabled, tableEditAvailabilityMask]
+    () => (isAuthoringDisabled ? null : unpackTableEditAvailabilityMask(tableEditAvailabilityMask)),
+    [isAuthoringDisabled, tableEditAvailabilityMask]
   )
 
   const isTableEditDisabled = useCallback(
@@ -318,9 +322,11 @@ export const MarkdownEditor = ({
         case "clear-column":
           return false
         case "set-alignment":
-          if (edit.alignment === "left") return !tableEditAvailability.alignLeft
-          if (edit.alignment === "center") return !tableEditAvailability.alignCenter
-          return !tableEditAvailability.alignRight
+          return edit.alignment === "left"
+            ? !tableEditAvailability.alignLeft
+            : edit.alignment === "center"
+              ? !tableEditAvailability.alignCenter
+              : !tableEditAvailability.alignRight
       }
     },
     [tableEditAvailability]
@@ -328,28 +334,28 @@ export const MarkdownEditor = ({
 
   const commandContext = useMemo(
     () => ({
-      disabled,
+      disabled: isAuthoringDisabled,
       selectionStart: editorSelection.from,
       selectionEnd: editorSelection.to,
       isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
     }),
-    [disabled, editorSelection, isTableEditDisabled]
+    [editorSelection, isAuthoringDisabled, isTableEditDisabled]
   )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
   const applyFormatShortcutOrAppend = useCallback(
     (shortcut: Parameters<typeof planFormatShortcutMutation>[3]) => {
-      if (disabled) return
+      if (isAuthoringDisabled) return
       const { from, to } = resolveActiveSelection()
       applyPlannedMarkdownMutation(planFormatShortcutMutation(valueRef.current, from, to, shortcut))
     },
-    [applyPlannedMarkdownMutation, disabled, resolveActiveSelection]
+    [applyPlannedMarkdownMutation, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const applyMarkdownEditorCommand = useCallback(
     (command: MarkdownEditorCommandDescriptor) => {
       const action = command.execute({
-        disabled,
+        disabled: isAuthoringDisabled,
         selectionStart: selectionRef.current.from,
         selectionEnd: selectionRef.current.to,
         isTableSelection: !isTableEditDisabled(TABLE_ADD_ROW_EDIT),
@@ -359,49 +365,44 @@ export const MarkdownEditor = ({
       if (action.kind === "block") return applyBlockSnippet(codeBlockSnippet)
       applyTableEdit(TABLE_ADD_ROW_EDIT)
     },
-    [applyBlockSnippet, applyFormatShortcutOrAppend, applyTableEdit, disabled, isTableEditDisabled]
+    [applyBlockSnippet, applyFormatShortcutOrAppend, applyTableEdit, isAuthoringDisabled, isTableEditDisabled]
   )
 
   const applySnippet = useCallback(
     (before: string, after = "", options?: { toggle?: boolean }) => {
-      if (disabled || insertMarkdownAtEditorSelection(before, after, options)) return
+      if (isAuthoringDisabled || insertMarkdownAtEditorSelection(before, after, options)) return
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownSnippetMutation(valueRef.current, from, to, before, after, options)
       if (plan) applyPlannedMarkdownMutation(plan)
     },
-    [
-      applyPlannedMarkdownMutation,
-      disabled,
-      insertMarkdownAtEditorSelection,
-      resolveActiveSelection,
-    ]
+    [applyPlannedMarkdownMutation, insertMarkdownAtEditorSelection, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const applyListCommand = useCallback(
     (command: MarkdownEditorListCommand) => {
-      if (disabled) return
+      if (isAuthoringDisabled) return
       const { from, to } = resolveActiveSelection()
       const plan = planToggleListCommand(valueRef.current, from, to, command)
       if (plan) applyMutationPlan(plan)
     },
-    [applyMutationPlan, disabled, resolveActiveSelection]
+    [applyMutationPlan, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const applyStripBlockPrefix = useCallback(() => {
-    if (disabled) return
+    if (isAuthoringDisabled) return
     const { from, to } = resolveActiveSelection()
     const plan = planStripBlockLinePrefix(valueRef.current, from, to)
     if (plan) applyMutationPlan(plan)
-  }, [applyMutationPlan, disabled, resolveActiveSelection])
+  }, [applyMutationPlan, isAuthoringDisabled, resolveActiveSelection])
 
   const applyLineCommand = useCallback(
     (command: MarkdownEditorLineCommand) => {
-      if (disabled) return
+      if (isAuthoringDisabled) return
       const { from, to } = resolveActiveSelection()
       const plan = planMarkdownEditorLineCommand(valueRef.current, from, to, command)
       if (plan) applyMutationPlan(plan)
     },
-    [applyMutationPlan, disabled, resolveActiveSelection]
+    [applyMutationPlan, isAuthoringDisabled, resolveActiveSelection]
   )
 
   const insertUploadedMarkdown = useCallback(
@@ -412,14 +413,6 @@ export const MarkdownEditor = ({
     [commitMarkdown, insertMarkdownAtEditorSelection]
   )
 
-  const [viewMode, setViewMode] = useState<"live" | "source" | "reading">("live")
-  const cycleViewMode = useCallback(() => {
-    setViewMode((prev) => {
-      if (prev === "live") return "source"
-      if (prev === "source") return "reading"
-      return "live"
-    })
-  }, [])
   const handleCloseFindReplace = useCallback(() => {
     findReplace.closePanel()
     liveSurfaceRef.current?.focus(selectionRef.current)
@@ -427,7 +420,9 @@ export const MarkdownEditor = ({
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
-      disabled, valueRef, selectionRef, documentGenerationRef, onUploadImage, onUploadFile,
+      disabled: isAuthoringDisabled,
+      viewMode,
+      valueRef, selectionRef, documentGenerationRef, onUploadImage, onUploadFile,
       applyPlannedMarkdownMutation, applyRecordedMarkdownMutation: applyMutationPlan,
       applyBackgroundMarkdownMutation, resolveActiveSelection,
       resolveDropTargetPosition: (coords) => liveSurfaceRef.current?.posAtCoords(coords) ?? null,
@@ -444,6 +439,10 @@ export const MarkdownEditor = ({
       resolveSlashCoords,
     })
 
+  useEffect(() => {
+    if (viewMode !== "live" || disabled) closeSlashMenu()
+  }, [closeSlashMenu, disabled, viewMode])
+
   const isCompletionOrSlashMenuActive = useCallback(
     () => slashMenuOpenRef.current || Boolean(liveSurfaceRef.current?.isCompletionActive?.()),
     [slashMenuOpenRef]
@@ -451,6 +450,7 @@ export const MarkdownEditor = ({
 
   const { handleTextareaKeyDown } = useMarkdownEditorTextareaKeyboard({
     disabled,
+    authoringDisabled: isAuthoringDisabled,
     valueRef,
     allowNativeTabAfterEscapeRef,
     rememberTextareaSelection,
@@ -468,9 +468,11 @@ export const MarkdownEditor = ({
       handleFindReplaceSelectionChange(selection)
       updateActiveTableSelection(valueRef.current, selection)
       onSelectionChange?.(selection)
-      checkSlashCommand(valueRef.current, selection)
+      if (viewMode === "live" && !disabled) {
+        checkSlashCommand(valueRef.current, selection)
+      }
     },
-    [checkSlashCommand, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, updateActiveTableSelection]
+    [checkSlashCommand, disabled, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, updateActiveTableSelection, viewMode]
   )
 
   const handleLiveChange = useCallback(
@@ -544,7 +546,7 @@ export const MarkdownEditor = ({
         <MarkdownEditorNotionChrome
           containerRef={liveEditorBodyRef}
           mode={viewMode}
-          disabled={disabled}
+          disabled={isAuthoringDisabled}
           value={draftValue}
           selection={editorSelection}
           isSlashMenuOpen={slashMenuState.isOpen}

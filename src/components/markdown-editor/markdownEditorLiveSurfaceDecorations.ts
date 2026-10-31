@@ -10,6 +10,13 @@ import {
   type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
 import {
+  MATH_LITERAL_SYNTAX_NODE_NAMES,
+  collectMathReplacementSpecs,
+  type MathReplacementSpec,
+} from "./markdownEditorMathModel"
+export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
+import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
+import {
   MarkdownCalloutWidget,
   MarkdownImageWidget,
   MarkdownMarkerWidget,
@@ -89,7 +96,6 @@ type CalloutReplacementSpec = RangeSpec & {
   foldState: "+" | "-" | null
 }
 type ImageReplacementSpec = RangeSpec & { alt: string; src: string }
-type MathReplacementSpec = RangeSpec & { math: string; displayMode: boolean }
 type MermaidReplacementSpec = RangeSpec & { source: string }
 
 let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
@@ -179,23 +185,6 @@ const parseMermaidReplacementSpec = (raw: string, from: number, to: number): Mer
   return { from, to, source }
 }
 
-const collectMathReplacementSpecs = (markdownValue: string): MathReplacementSpec[] => {
-  const maths: MathReplacementSpec[] = []
-  if (!markdownValue.includes("$")) return maths
-  const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
-  let mathMatch: RegExpExecArray | null
-  while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
-    const from = mathMatch.index
-    maths.push({
-      from,
-      to: from + mathMatch[0].length,
-      math: mathMatch[1] ?? mathMatch[2] ?? "",
-      displayMode: Boolean(mathMatch[1]),
-    })
-  }
-  return maths
-}
-
 const ACTIVE_WIDGET_KINDS = new Set<MarkdownLivePreviewDecoration["kind"]>([
   "task",
   "wikilink",
@@ -274,13 +263,29 @@ const getCachedDocBlocks = (state: EditorState) => {
   const callouts: CalloutReplacementSpec[] = []
   const images: ImageReplacementSpec[] = []
   const mermaids: MermaidReplacementSpec[] = []
+  const literalRanges: RangeSpec[] = []
   const hasCalloutMarker = markdownValue.includes("[!")
   const hasMermaidMarker = /mermaid/i.test(markdownValue)
 
   tree.iterate({
     enter(node) {
+      if (MATH_LITERAL_SYNTAX_NODE_NAMES.has(node.name)) {
+        literalRanges.push({ from: node.from, to: node.to })
+      }
       if (node.name === "Table") {
-        tables.push({ from: node.from, to: node.to, markdown: markdownValue.slice(node.from, node.to) })
+        let tableFrom = node.from
+        const headerLine = state.doc.lineAt(node.from)
+        if (headerLine.number > 1) {
+          const prevLine = state.doc.line(headerLine.number - 1)
+          const parsedComment = parseLeadingTableLayoutLine(prevLine.text)
+          if (parsedComment.kind === "malformed") return
+          if (parsedComment.kind === "valid") tableFrom = prevLine.from
+        }
+        tables.push({
+          from: tableFrom,
+          to: node.to,
+          markdown: markdownValue.slice(tableFrom, node.to),
+        })
       } else if (node.name === "Blockquote" && hasCalloutMarker) {
         const callout = parseCalloutBlockquoteSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
         if (callout) callouts.push(callout)
@@ -294,7 +299,7 @@ const getCachedDocBlocks = (state: EditorState) => {
     },
   })
 
-  const maths = collectMathReplacementSpecs(markdownValue)
+  const maths = collectMathReplacementSpecs(markdownValue, -1, -1, false, literalRanges)
   const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [tables, callouts, images, maths, mermaids])
 
   cachedDocBlocksEntry = { doc: state.doc, tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, activeWatchRanges }
@@ -458,8 +463,12 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
 
   const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } =
     getCachedDocBlocks(state)
-  const selections = state.selection.ranges.map(({ from, to }) => ({ from, to }))
-  const isComposing = state.field(compositionField, false) ?? false
+  const selections =
+    currentMode === "reading"
+      ? []
+      : state.selection.ranges.map(({ from, to }) => ({ from, to }))
+  const isComposing =
+    currentMode === "reading" ? false : (state.field(compositionField, false) ?? false)
   const disableMermaid = state.field(disableMermaidField, false) ?? false
   const compSel = state.selection.main
   const compLine = isComposing ? state.doc.lineAt(compSel.head) : null
@@ -485,7 +494,12 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
     ...mermaidReplacements,
   ].sort((a, b) => (a.from !== b.from ? a.from - b.from : a.to - b.to))
 
-  const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections)
+  const plan = resolveMarkdownLivePreviewPlanFromEntries(
+    previewEntries,
+    selections,
+    false,
+    currentMode
+  )
   const decorations: Range<Decoration>[] = []
   const ctx: PlanSpecDecorationContext = {
     state,
@@ -550,6 +564,9 @@ export const decorationField = StateField.define<DecorationSet>({
     const treeChanged = syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
     if (!transaction.docChanged && !treeChanged && !hasRelevantEffect) {
       if (!transaction.selection) return decorations
+      if ((transaction.state.field(editorModeField, false) ?? "live") === "reading") {
+        return decorations
+      }
       const isComposing =
         (transaction.state.field(compositionField, false) ?? false) ||
         (transaction.startState.field(compositionField, false) ?? false)

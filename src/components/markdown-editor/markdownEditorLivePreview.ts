@@ -500,21 +500,31 @@ export const buildMarkdownLivePreviewEntries = (
 export const resolveMarkdownLivePreviewPlanFromEntries = (
   entries: readonly MarkdownLivePreviewPlanEntry[],
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: "live" | "source" | "reading" = "live"
 ): MarkdownLivePreviewDecoration[] => {
-  if (composing) return []
+  if (mode === "source" || (composing && mode !== "reading")) return []
+  const effectiveSelections = mode === "reading" ? [] : selections
   const decorations: MarkdownLivePreviewDecoration[] = []
-  const hasSelections = selections.length > 0
+  const hasSelections = effectiveSelections.length > 0
   const primaryBit = ENTRY_FLAG_HAS_PRIMARY_HIDE << 5
   const secondaryBit = ENTRY_FLAG_HAS_SECONDARY_HIDE << 5
   for (const entry of entries) {
     if (hasSelections) {
       const primaryRange = entry.hideWhenActiveRange
-      if ((entry.packedMeta & primaryBit) !== 0 && primaryRange && isTokenActive(primaryRange.from, primaryRange.to, selections)) {
+      if (
+        (entry.packedMeta & primaryBit) !== 0 &&
+        primaryRange &&
+        isTokenActive(primaryRange.from, primaryRange.to, effectiveSelections)
+      ) {
         continue
       }
       const secondaryRange = entry.secondaryHideWhenActiveRange
-      if ((entry.packedMeta & secondaryBit) !== 0 && secondaryRange && isTokenActive(secondaryRange.from, secondaryRange.to, selections)) {
+      if (
+        (entry.packedMeta & secondaryBit) !== 0 &&
+        secondaryRange &&
+        isTokenActive(secondaryRange.from, secondaryRange.to, effectiveSelections)
+      ) {
         continue
       }
     }
@@ -527,69 +537,31 @@ export const buildMarkdownLivePreviewPlan = (
   markdown: string,
   documentNode: MarkdownSyntaxNode,
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: "live" | "source" | "reading" = "live"
 ): MarkdownLivePreviewDecoration[] =>
-  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown, documentNode), selections, composing)
+  mode === "source" || (composing && mode !== "reading")
+    ? []
+    : resolveMarkdownLivePreviewPlanFromEntries(
+        buildMarkdownLivePreviewEntries(markdown, documentNode),
+        selections,
+        composing,
+        mode
+      )
 
 export const buildMarkdownLivePreviewDecorationSpecs = (
   markdown: string,
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: "live" | "source" | "reading" = "live"
 ): MarkdownLivePreviewDecoration[] =>
-  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown), selections, composing)
+  mode === "source" || (composing && mode !== "reading")
+    ? []
+    : resolveMarkdownLivePreviewPlanFromEntries(
+        buildMarkdownLivePreviewEntries(markdown),
+        selections,
+        composing,
+        mode
+      )
 
-const stepFoldFence = (fence: string, text: string): { fence: string; isFenceLine: boolean } => {
-  let cursor = 0
-  while (cursor < 3 && (text[cursor] === " " || text[cursor] === "\t")) cursor += 1
-  const marker = text[cursor]
-  if (marker !== "`" && marker !== "~") return { fence, isFenceLine: false }
-  const runStart = cursor
-  while (text[cursor] === marker) cursor += 1
-  const fenceRun = text.slice(runStart, cursor)
-  if (fenceRun.length < 3) return { fence, isFenceLine: false }
-  if (!fence) return { fence: fenceRun, isFenceLine: true }
-  const closes = fenceRun.startsWith(fence[0]!) && fenceRun.length >= fence.length && !text.slice(cursor).trim()
-  return { fence: closes ? "" : fence, isFenceLine: true }
-}
-
-type FoldDocLine = { number: number; from: number; to: number; text: string }
-
-export const computeMarkdownFoldRange = (
-  state: { doc: { lines: number; lineAt: (pos: number) => FoldDocLine; line: (lineNo: number) => FoldDocLine } },
-  lineStart: number,
-  _lineEnd?: number
-): { from: number; to: number } | null => {
-  const line = state.doc.lineAt(lineStart)
-  const headingMatch = /^\s{0,3}(#{1,6})\s+/.exec(line.text)
-  if (headingMatch) {
-    const level = headingMatch[1].length
-    let endPos = line.to
-    let activeFence = ""
-    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
-      const nextLine = state.doc.line(lineNo)
-      const fenceStep = stepFoldFence(activeFence, nextLine.text)
-      activeFence = fenceStep.fence
-      if (!fenceStep.isFenceLine && !activeFence) {
-        const nextHeading = /^\s{0,3}(#{1,6})\s+/.exec(nextLine.text)
-        if (nextHeading && nextHeading[1].length <= level) break
-      }
-      endPos = nextLine.to
-    }
-    return endPos > line.to ? { from: line.to, to: endPos } : null
-  }
-
-  const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line.text)
-  if (fenceMatch) {
-    const fence = fenceMatch[1]
-    const marker = fence[0]
-    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
-      const nextLine = state.doc.line(lineNo)
-      const closeMatch = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(nextLine.text)
-      if (closeMatch && closeMatch[1][0] === marker && closeMatch[1].length >= fence.length) {
-        return nextLine.to > line.to ? { from: line.to, to: nextLine.to } : null
-      }
-    }
-  }
-
-  return null
-}
+export { computeMarkdownFoldRange } from "./markdownEditorFoldModel"

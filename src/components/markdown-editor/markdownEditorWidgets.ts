@@ -1,7 +1,10 @@
-import { WidgetType, type EditorView } from "@codemirror/view"
+import { EditorView, WidgetType } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
 import "katex/dist/katex.min.css"
 import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
+import { loadSharedMermaidRuntime } from "../../libs/markdown/mermaidRuntimeConfig"
+import { sanitizeRenderableMermaidSource } from "../../libs/markdown/mermaidRuntimeSanitize"
+import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownUrl"
 
 type KatexRuntime = { renderToString: (math: string, options: { displayMode: boolean; throwOnError: boolean }) => string }
 let cachedKatex: KatexRuntime | null = null
@@ -174,6 +177,7 @@ export class MarkdownTaskWidget extends WidgetType {
     const toggleTask = (e: Event) => {
       e.preventDefault()
       e.stopPropagation()
+      if (!view.state.facet(EditorView.editable)) return
       let targetFrom = this.from
       let targetTo = this.to
       try {
@@ -254,7 +258,8 @@ export class MarkdownImageWidget extends WidgetType {
     wrap.className = "cm-live-image-wrap"
     const img = document.createElement("img")
     img.className = "cm-live-image"
-    img.src = this.src
+    const safeSrc = normalizeSafeMarkdownImageSrc(this.src)
+    if (safeSrc) img.src = safeSrc
     img.alt = this.alt
     img.loading = "lazy"
     wrap.appendChild(img)
@@ -268,6 +273,7 @@ const moveCursorToWidgetOrigin = (
   fallbackFrom: number | undefined,
   offset = 0
 ) => {
+  if (!view.state.facet(EditorView.editable)) return
   let resolvedFrom = fallbackFrom
   try {
     const domPos = view.posAtDOM(el)
@@ -460,39 +466,14 @@ export class MarkdownWikilinkWidget extends WidgetType {
   }
 }
 
-type LiveMermaidRenderer = {
-  initialize?: (config: Record<string, unknown>) => void
-  render: (id: string, text: string) => Promise<{ svg: string }>
-}
-
-let cachedMermaid: LiveMermaidRenderer | null = null
-let mermaidLoadPromise: Promise<LiveMermaidRenderer | null> | null = null
-let mermaidInitialized = false
 let mermaidRenderCounter = 0
 const LIVE_MERMAID_SVG_CACHE_LIMIT = 64
 const liveMermaidSvgCache = new Map<string, string>()
 
-const loadLiveMermaid = (): Promise<LiveMermaidRenderer | null> => {
-  if (cachedMermaid) return Promise.resolve(cachedMermaid)
-  if (!mermaidLoadPromise && typeof window !== "undefined") {
-    mermaidLoadPromise = import("mermaid")
-      .then((mod) => {
-        const api = (mod.default || mod) as LiveMermaidRenderer
-        if (!mermaidInitialized && typeof api.initialize === "function") {
-          api.initialize({
-            startOnLoad: false,
-            securityLevel: "strict",
-            suppressErrorRendering: true,
-          })
-          mermaidInitialized = true
-        }
-        cachedMermaid = api
-        return cachedMermaid
-      })
-      .catch(() => null)
-  }
-  return mermaidLoadPromise ?? Promise.resolve(null)
-}
+const resolveLiveMermaidScheme = (): "dark" | "light" =>
+  typeof document !== "undefined" && document.documentElement?.getAttribute?.("data-theme") === "dark"
+    ? "dark"
+    : "light"
 
 const cacheLiveMermaidSvg = (source: string, svg: string) => {
   if (liveMermaidSvgCache.has(source)) liveMermaidSvgCache.delete(source)
@@ -549,15 +530,17 @@ export class MarkdownMermaidWidget extends WidgetType {
       })
     }
 
-    const normalized = this.source.trim()
+    const normalized = sanitizeRenderableMermaidSource(this.source.trim())
     if (!normalized) {
       root.dataset.mermaidState = "empty"
       renderFallbackCode(root, this.source)
       return root
     }
 
+    const scheme = resolveLiveMermaidScheme()
+    const cacheKey = `${scheme}:${normalized}`
     if (!this.customRenderer) {
-      const cachedSvg = liveMermaidSvgCache.get(normalized)
+      const cachedSvg = liveMermaidSvgCache.get(cacheKey)
       if (cachedSvg) {
         root.dataset.mermaidState = "rendered"
         root.innerHTML = cachedSvg
@@ -571,10 +554,9 @@ export class MarkdownMermaidWidget extends WidgetType {
     const renderId = `cm-live-mermaid-${(mermaidRenderCounter += 1)}`
     const executeRender = this.customRenderer
       ? this.customRenderer(renderId, normalized)
-      : loadLiveMermaid().then((mermaid) => {
-          if (!mermaid) throw new Error("Mermaid unavailable")
-          return mermaid.render(renderId, normalized)
-        })
+      : loadSharedMermaidRuntime(scheme).then(({ mermaidRuntime }) =>
+          mermaidRuntime.render(renderId, normalized)
+        )
 
     void executeRender
       .then((res) => {
@@ -582,7 +564,7 @@ export class MarkdownMermaidWidget extends WidgetType {
           renderErrorFallback(root, normalized)
           return
         }
-        if (!this.customRenderer) cacheLiveMermaidSvg(normalized, res.svg)
+        if (!this.customRenderer) cacheLiveMermaidSvg(cacheKey, res.svg)
         root.dataset.mermaidState = "rendered"
         root.innerHTML = res.svg
       })

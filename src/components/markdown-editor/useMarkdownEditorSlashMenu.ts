@@ -10,7 +10,8 @@ type SlashSelection = {
   to: number
 }
 
-const SLASH_TRIGGER_PATTERN = /(?:^|\s)\/([^\s/]*)$/
+const SLASH_TRIGGER_PATTERN =
+  /^\s*(?:>\s*)*(?:(?:[-+*]|\d+\.)\s+(?:\[[ xX]\]\s+)?)?\/([^\s/]*)$/
 
 export const matchSlashCommandTrigger = (
   markdown: string,
@@ -210,24 +211,38 @@ export const useMarkdownEditorSlashMenu = ({
       }
 
       let coords = { top: 240, left: 340 }
+      const readViewportMetrics = () => {
+        const vv = typeof window !== "undefined" ? window.visualViewport : null
+        const top = vv?.offsetTop ?? 0
+        const left = vv?.offsetLeft ?? 0
+        const width = vv?.width ?? (typeof window !== "undefined" ? window.innerWidth : 1280)
+        const height = vv?.height ?? (typeof window !== "undefined" ? window.innerHeight : 800)
+        return { top, left, width, height, bottom: top + height, right: left + width }
+      }
       const computeSlashMenuTop = (rect: { top: number; bottom: number }) => {
-        const isMobile = window.innerWidth <= 820
-        const menuHeight = isMobile ? Math.min(240, Math.round(window.innerHeight * 0.42)) : 340
-        if (rect.bottom + menuHeight + 12 <= window.innerHeight) {
-          return Math.round(rect.bottom + 8)
+        const vp = readViewportMetrics()
+        const isMobile = vp.width <= 820
+        const menuHeight = isMobile ? Math.min(240, Math.round(vp.height * 0.42)) : 340
+        const minTop = Math.round(vp.top + 12)
+        if (rect.bottom + menuHeight + 12 <= vp.bottom) {
+          return Math.max(minTop, Math.round(rect.bottom + 8))
         }
-        if (rect.top > menuHeight + 16) {
-          return Math.max(12, Math.round(rect.top - menuHeight - 6))
+        if (rect.top - vp.top > menuHeight + 16) {
+          return Math.max(minTop, Math.round(rect.top - menuHeight - 6))
         }
         return isMobile
-          ? Math.max(12, Math.round(rect.bottom + 6))
-          : Math.min(Math.round(rect.bottom + 8), Math.max(12, window.innerHeight - 380))
+          ? Math.max(minTop, Math.min(Math.round(rect.bottom + 6), Math.max(minTop, Math.round(vp.bottom - 140))))
+          : Math.min(Math.round(rect.bottom + 8), Math.max(minTop, Math.round(vp.bottom - 380)))
+      }
+      const clampSlashMenuLeft = (rawLeft: number) => {
+        const vp = readViewportMetrics()
+        return Math.max(Math.round(vp.left + 12), Math.min(Math.round(rawLeft), Math.round(vp.right - 292)))
       }
       const viewRect = resolveSlashCoords?.(trigger.slashFrom) ?? null
       if (viewRect && viewRect.bottom > 0 && typeof window !== "undefined") {
         coords = {
           top: computeSlashMenuTop(viewRect),
-          left: Math.max(12, Math.min(viewRect.left, window.innerWidth - 300)),
+          left: clampSlashMenuLeft(viewRect.left),
         }
       } else {
         const selectionObj = typeof window !== "undefined" ? window.getSelection() : null
@@ -237,7 +252,7 @@ export const useMarkdownEditorSlashMenu = ({
           if (rect.bottom > 0) {
             coords = {
               top: computeSlashMenuTop(rect),
-              left: Math.max(12, Math.min(rect.left, window.innerWidth - 300)),
+              left: clampSlashMenuLeft(rect.left),
             }
           }
         }

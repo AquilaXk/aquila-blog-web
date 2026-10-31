@@ -70,14 +70,14 @@ type MarkdownEditorSlashMenuProps = {
   onClose: () => void
 }
 
-const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
+const SlashMenuContainer = styled.div<{ $top: number; $left: number; $maxHeight?: number | null }>`
   position: fixed;
   z-index: ${zIndexes.dropdownMenu + 10};
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   width: 280px;
   max-width: calc(100vw - 24px);
-  max-height: 380px;
+  max-height: ${({ $maxHeight }) => ($maxHeight ? `${$maxHeight}px` : "380px")};
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 6px;
@@ -90,7 +90,7 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number }>`
   gap: 2px;
 
   @media (max-width: 820px) {
-    max-height: min(240px, 42dvh);
+    max-height: ${({ $maxHeight }) => ($maxHeight ? `${$maxHeight}px` : "min(240px, 42dvh)")};
   }
 `
 
@@ -244,8 +244,8 @@ const SLASH_SHORTCUT_BY_ID: Readonly<Record<string, string>> = {
   "bullet-list": "-",
   "ordered-list": "1.",
   "task-list": "[]",
-  quote: ">",
-  divider: "---",
+  "quote": ">",
+  "divider": "---",
   toggle: ":::",
   "code-block": "```",
   math: "$$",
@@ -280,12 +280,38 @@ export const MarkdownEditorSlashMenu = ({
   onClose,
 }: MarkdownEditorSlashMenuProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [maxHeightPx, setMaxHeightPx] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   useEffect(() => {
     setSelectedIndex(0)
   }, [isOpen, items])
+
+  useEffect(() => {
+    if (!isOpen || !position || typeof window === "undefined") {
+      setMaxHeightPx(null)
+      return
+    }
+    const updateMaxHeight = () => {
+      const vv = window.visualViewport
+      const viewportBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight)
+      const isMobile = (vv?.width ?? window.innerWidth) <= 820
+      const cap = isMobile ? Math.min(240, Math.round((vv?.height ?? window.innerHeight) * 0.42)) : 380
+      const available = Math.floor(viewportBottom - position.top - 12)
+      setMaxHeightPx(available > 0 ? Math.max(120, Math.min(cap, available)) : cap)
+    }
+    updateMaxHeight()
+    const vv = window.visualViewport
+    vv?.addEventListener("resize", updateMaxHeight)
+    vv?.addEventListener("scroll", updateMaxHeight)
+    window.addEventListener("resize", updateMaxHeight)
+    return () => {
+      vv?.removeEventListener("resize", updateMaxHeight)
+      vv?.removeEventListener("scroll", updateMaxHeight)
+      window.removeEventListener("resize", updateMaxHeight)
+    }
+  }, [isOpen, position])
 
   useEffect(() => {
     if (!isOpen) return
@@ -296,6 +322,8 @@ export const MarkdownEditorSlashMenu = ({
     if (!isOpen) return
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return
+
       if (event.key === "Escape") {
         event.preventDefault()
         event.stopPropagation()
@@ -342,6 +370,7 @@ export const MarkdownEditorSlashMenu = ({
       ref={menuRef}
       $top={position.top}
       $left={position.left}
+      $maxHeight={maxHeightPx}
       role="menu"
       aria-label="빠른 삽입 메뉴"
       aria-activedescendant={items[selectedIndex] ? `aq-slash-item-${items[selectedIndex].id}` : undefined}

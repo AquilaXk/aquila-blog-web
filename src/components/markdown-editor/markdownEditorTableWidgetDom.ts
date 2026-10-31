@@ -20,7 +20,18 @@ export type TableToolbarButtonEntry = {
 }
 
 const MAX_TABLE_VISUAL_OPTIONS = 128
-const tableVisualOptionsByOffset = new Map<number, TableVisualOptions>()
+const fallbackTableVisualOptionsByOffset = new Map<number, TableVisualOptions>()
+const scopedTableVisualOptionsByView = new WeakMap<object, Map<number, TableVisualOptions>>()
+
+const resolveVisualOptionsStore = (scopeKey?: object | null): Map<number, TableVisualOptions> => {
+  if (!scopeKey) return fallbackTableVisualOptionsByOffset
+  let store = scopedTableVisualOptionsByView.get(scopeKey)
+  if (!store) {
+    store = new Map<number, TableVisualOptions>()
+    scopedTableVisualOptionsByView.set(scopeKey, store)
+  }
+  return store
+}
 
 const syncVisualOptionWidths = (options: TableVisualOptions, columnCount: number) => {
   while (options.columnWidths.length < columnCount) options.columnWidths.push(0)
@@ -29,18 +40,20 @@ const syncVisualOptionWidths = (options: TableVisualOptions, columnCount: number
 
 export const getOrCreateTableVisualOptions = (
   tableFrom: number,
-  columnCount: number
+  columnCount: number,
+  scopeKey?: object | null
 ): TableVisualOptions => {
-  const existing = tableVisualOptionsByOffset.get(tableFrom)
+  const store = resolveVisualOptionsStore(scopeKey)
+  const existing = store.get(tableFrom)
   if (existing) {
-    tableVisualOptionsByOffset.delete(tableFrom)
+    store.delete(tableFrom)
     syncVisualOptionWidths(existing, columnCount)
-    tableVisualOptionsByOffset.set(tableFrom, existing)
+    store.set(tableFrom, existing)
     return existing
   }
-  if (tableVisualOptionsByOffset.size >= MAX_TABLE_VISUAL_OPTIONS) {
-    const oldestKey = tableVisualOptionsByOffset.keys().next().value
-    if (oldestKey !== undefined) tableVisualOptionsByOffset.delete(oldestKey)
+  if (store.size >= MAX_TABLE_VISUAL_OPTIONS) {
+    const oldestKey = store.keys().next().value
+    if (oldestKey !== undefined) store.delete(oldestKey)
   }
   const created: TableVisualOptions = {
     headerRow: true,
@@ -48,7 +61,7 @@ export const getOrCreateTableVisualOptions = (
     fitPageWidth: false,
     columnWidths: Array.from({ length: columnCount }, () => 0),
   }
-  tableVisualOptionsByOffset.set(tableFrom, created)
+  store.set(tableFrom, created)
   return created
 }
 
@@ -56,20 +69,22 @@ export const migrateTableVisualOptionsOffset = (
   prevFrom: number | undefined,
   nextFrom: number | undefined,
   columnCount: number,
-  currentOptions?: TableVisualOptions
+  currentOptions?: TableVisualOptions,
+  scopeKey?: object | null
 ): TableVisualOptions => {
+  const store = resolveVisualOptionsStore(scopeKey)
   const prevKey = prevFrom ?? 0
   const nextKey = nextFrom ?? 0
-  const existing = currentOptions ?? tableVisualOptionsByOffset.get(prevKey)
+  const existing = currentOptions ?? store.get(prevKey)
   if (existing) {
-    if (prevKey !== nextKey && tableVisualOptionsByOffset.get(prevKey) === existing) {
-      tableVisualOptionsByOffset.delete(prevKey)
+    if (prevKey !== nextKey && store.get(prevKey) === existing) {
+      store.delete(prevKey)
     }
     syncVisualOptionWidths(existing, columnCount)
-    tableVisualOptionsByOffset.set(nextKey, existing)
+    store.set(nextKey, existing)
     return existing
   }
-  return getOrCreateTableVisualOptions(nextKey, columnCount)
+  return getOrCreateTableVisualOptions(nextKey, columnCount, scopeKey)
 }
 
 export const setBooleanDataAttribute = (el: HTMLElement, attr: string, enabled: boolean) => {
@@ -188,7 +203,9 @@ export const attachColumnResizeHandle = (
   th: HTMLElement,
   colIndex: number,
   colEl: HTMLElement,
-  visualOptions: TableVisualOptions
+  visualOptions: TableVisualOptions,
+  onVisualOptionsChange?: () => void,
+  isEditable?: () => boolean
 ): HTMLElement => {
   const resizer = document.createElement("span")
   resizer.className = "cm-live-table-col-resizer"
@@ -206,9 +223,11 @@ export const attachColumnResizeHandle = (
   resizer.addEventListener("dblclick", (event: MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
+    if (isEditable && !isEditable()) return
     visualOptions.columnWidths[colIndex] = 0
     if (colEl.style) colEl.style.width = ""
     if (typeof colEl.removeAttribute === "function") colEl.removeAttribute("data-col-width")
+    onVisualOptionsChange?.()
   })
 
   let isResizing = false
@@ -218,6 +237,7 @@ export const attachColumnResizeHandle = (
     moveEventName: "mousemove" | "pointermove",
     upEventNames: readonly ("mouseup" | "pointerup" | "pointercancel")[]
   ) => {
+    if (isEditable && !isEditable()) return
     if (typeof event.button === "number" && event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
@@ -226,10 +246,8 @@ export const attachColumnResizeHandle = (
 
     const startX = event.clientX
     const configuredWidth = visualOptions.columnWidths[colIndex] ?? 0
-    const measuredWidth =
-      typeof th.getBoundingClientRect === "function" ? th.getBoundingClientRect().width : 0
-    const startWidth =
-      configuredWidth > 0 ? configuredWidth : measuredWidth > 0 ? measuredWidth : 120
+    const measuredWidth = typeof th.getBoundingClientRect === "function" ? th.getBoundingClientRect().width : 0
+    const startWidth = configuredWidth > 0 ? configuredWidth : measuredWidth > 0 ? measuredWidth : 120
 
     let latestClientX = startX
     let hasMoved = false
@@ -262,10 +280,13 @@ export const attachColumnResizeHandle = (
         cancelAnimationFrame(rafId)
         rafId = null
       }
-      if (hasMoved) applyWidth(latestClientX)
       if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
         window.removeEventListener(moveEventName, handleMove)
         for (const upName of upEventNames) window.removeEventListener(upName, handleUp)
+      }
+      if (hasMoved) {
+        applyWidth(latestClientX)
+        onVisualOptionsChange?.()
       }
     }
 
@@ -282,20 +303,15 @@ export const attachColumnResizeHandle = (
 }
 
 export const createTableToolbarElement = (params: {
-  grid: MarkdownTableGrid
-  wrap: HTMLElement
-  visualOptions: TableVisualOptions
+  grid: MarkdownTableGrid; wrap: HTMLElement; visualOptions: TableVisualOptions
   executeGridAction: (action: MarkdownTableGridAction) => void
-  onEditSource: () => void
-  onDeleteTable?: () => void
-  onActivateToolbar?: () => void
+  onEditSource: () => void; onDeleteTable?: () => void; onActivateToolbar?: () => void
+  onVisualOptionsChange?: () => void; isEditable?: () => boolean
 }): {
-  toolbar: HTMLDivElement
-  toolbarButtons: TableToolbarButtonEntry[]
-  canAddRow: () => boolean
-  canAddCol: () => boolean
+  toolbar: HTMLDivElement; toolbarButtons: TableToolbarButtonEntry[]
+  syncOptionButtons: () => void; canAddRow: () => boolean; canAddCol: () => boolean
 } => {
-  const { grid, wrap, visualOptions, executeGridAction, onEditSource, onDeleteTable, onActivateToolbar } = params
+  const { grid, wrap, visualOptions, executeGridAction, onEditSource, onDeleteTable, onActivateToolbar, onVisualOptionsChange, isEditable } = params
   const toolbar = document.createElement("div")
   toolbar.className = "cm-live-table-toolbar"
   toolbar.setAttribute("role", "toolbar")
@@ -303,33 +319,27 @@ export const createTableToolbarElement = (params: {
   toolbar.setAttribute("data-testid", "cm-live-table-toolbar")
 
   const toolbarButtons: TableToolbarButtonEntry[] = []
+  const optionButtons: Array<{ button: HTMLButtonElement; key: "headerRow" | "headerColumn" | "fitPageWidth" }> = []
   const canAddRow = () => grid.rows.length + 2 <= MAX_EDIT_ROWS
   const canAddCol = () => grid.headers.length < MAX_EDIT_COLUMNS
 
   const toggleOptionSpec = (label: string, ariaLabel: string, testId: string, key: "headerRow" | "headerColumn" | "fitPageWidth") => ({
-    group: "options" as const,
-    label,
-    ariaLabel,
-    testId,
-    ariaPressed: visualOptions[key],
+    group: "options" as const, label, ariaLabel, testId, optionKey: key, ariaPressed: visualOptions[key],
     onSelect: (btn: HTMLButtonElement) => {
+      if (isEditable && !isEditable()) return
       visualOptions[key] = !visualOptions[key]
       syncTableVisualWrapAttributes(wrap, visualOptions)
       btn.setAttribute("aria-pressed", String(visualOptions[key]))
+      onVisualOptionsChange?.()
     },
   })
 
   const actionSpecs: Array<{
     group: "options" | "align" | "row" | "col" | "source"
-    groupStart?: boolean
-    label: string
-    ariaLabel: string
-    testId?: string
-    ariaPressed?: boolean
-    align?: "left" | "center" | "right"
-    action?: MarkdownTableGridAction
-    isDisabled?: (row: number, col: number) => boolean
-    onSelect?: (button: HTMLButtonElement) => void
+    groupStart?: boolean; label: string; ariaLabel: string; testId?: string
+    optionKey?: "headerRow" | "headerColumn" | "fitPageWidth"; ariaPressed?: boolean
+    align?: "left" | "center" | "right"; action?: MarkdownTableGridAction
+    isDisabled?: (row: number, col: number) => boolean; onSelect?: (button: HTMLButtonElement) => void
   }> = [
     toggleOptionSpec("▤ 제목행", "표 제목 행 강조 전환", "cm-live-table-toggle-header-row", "headerRow"),
     toggleOptionSpec("▤ 제목열", "표 제목 열 강조 전환", "cm-live-table-toggle-header-col", "headerColumn"),
@@ -365,6 +375,7 @@ export const createTableToolbarElement = (params: {
     if (spec.groupStart) btn.setAttribute("data-group-start", "true")
     if (spec.testId) btn.setAttribute("data-testid", spec.testId)
     if (spec.ariaPressed !== undefined) btn.setAttribute("aria-pressed", String(spec.ariaPressed))
+    if (spec.optionKey) optionButtons.push({ button: btn, key: spec.optionKey })
     btn.textContent = spec.label
     btn.addEventListener("mousedown", (event) => {
       event.preventDefault()
@@ -381,29 +392,26 @@ export const createTableToolbarElement = (params: {
     toolbar.appendChild(btn)
   }
 
-  return { toolbar, toolbarButtons, canAddRow, canAddCol }
+  const syncOptionButtons = () => {
+    for (const entry of optionButtons) entry.button.setAttribute("aria-pressed", String(visualOptions[entry.key]))
+  }
+
+  return { toolbar, toolbarButtons, syncOptionButtons, canAddRow, canAddCol }
 }
 
 export const createInteractiveTableSurface = (params: {
-  grid: MarkdownTableGrid
-  visualOptions: TableVisualOptions
-  canAddCol: () => boolean
-  canAddRow: () => boolean
+  grid: MarkdownTableGrid; visualOptions: TableVisualOptions
+  canAddCol: () => boolean; canAddRow: () => boolean
   onActivateCell: (row: number, col: number) => void
-  onAddColumn: () => void
-  onAddRow: () => void
-  onAddRowAndColumn?: () => void
-  onSelectColumn?: (col: number) => void
-  onSelectRow?: (row: number) => void
+  onAddColumn: () => void; onAddRow: () => void; onAddRowAndColumn?: () => void
+  onSelectColumn?: (col: number) => void; onSelectRow?: (row: number) => void
   onMoveColumnTo?: (fromCol: number, toCol: number) => void
   onMoveRowTo?: (fromRow: number, toRow: number) => void
+  onVisualOptionsChange?: () => void; isEditable?: () => boolean
 }): {
-  gridRow: HTMLDivElement
-  addRowBtn: HTMLElement
-  cellElements: HTMLElement[][]
-  colElements: HTMLElement[]
+  gridRow: HTMLDivElement; addRowBtn: HTMLElement; cellElements: HTMLElement[][]; colElements: HTMLElement[]
 } => {
-  const { grid, visualOptions, canAddCol, canAddRow, onActivateCell, onAddColumn, onAddRow, onAddRowAndColumn, onSelectColumn, onSelectRow, onMoveColumnTo, onMoveRowTo } = params
+  const { grid, visualOptions, canAddCol, canAddRow, onActivateCell, onAddColumn, onAddRow, onAddRowAndColumn, onSelectColumn, onSelectRow, onMoveColumnTo, onMoveRowTo, onVisualOptionsChange, isEditable } = params
   const cellElements: HTMLElement[][] = []
   const gridRow = document.createElement("div")
   gridRow.className = "cm-live-table-grid-row"
@@ -455,31 +463,20 @@ export const createInteractiveTableSurface = (params: {
     colHandle.textContent = "⋯"
     colHandle.addEventListener("mousedown", (event: MouseEvent) => event.stopPropagation())
     colHandle.addEventListener("click", (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      onSelectColumn?.(col)
+      event.preventDefault(); event.stopPropagation(); onSelectColumn?.(col)
     })
     colHandle.addEventListener("dragstart", (event: DragEvent) => {
-      event.stopPropagation()
-      draggedCol = col
-      draggedRow = null
+      event.stopPropagation(); draggedCol = col; draggedRow = null
     })
-    colHandle.addEventListener("dragend", () => {
-      draggedCol = null
-    })
+    colHandle.addEventListener("dragend", () => { draggedCol = null })
     th.addEventListener("dragover", (event: DragEvent) => {
       if (draggedCol === null) return
-      event.preventDefault()
-      event.stopPropagation()
-      th.classList.add("is-drop-target-col")
+      event.preventDefault(); event.stopPropagation(); th.classList.add("is-drop-target-col")
     })
     th.addEventListener("dragleave", () => th.classList.remove("is-drop-target-col"))
     th.addEventListener("drop", (event: DragEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      th.classList.remove("is-drop-target-col")
-      const fromCol = draggedCol
-      draggedCol = null
+      event.preventDefault(); event.stopPropagation(); th.classList.remove("is-drop-target-col")
+      const fromCol = draggedCol; draggedCol = null
       if (fromCol !== null && fromCol !== col) onMoveColumnTo?.(fromCol, col)
     })
     th.appendChild(colHandle)
@@ -496,32 +493,21 @@ export const createInteractiveTableSurface = (params: {
     rowHandle.textContent = "⋮⋮"
     rowHandle.addEventListener("mousedown", (event: MouseEvent) => event.stopPropagation())
     rowHandle.addEventListener("click", (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      onSelectRow?.(row)
+      event.preventDefault(); event.stopPropagation(); onSelectRow?.(row)
     })
     if (row > 0) {
       rowHandle.addEventListener("dragstart", (event: DragEvent) => {
-        event.stopPropagation()
-        draggedRow = row
-        draggedCol = null
+        event.stopPropagation(); draggedRow = row; draggedCol = null
       })
-      rowHandle.addEventListener("dragend", () => {
-        draggedRow = null
-      })
+      rowHandle.addEventListener("dragend", () => { draggedRow = null })
       tr.addEventListener("dragover", (event: DragEvent) => {
         if (draggedRow === null) return
-        event.preventDefault()
-        event.stopPropagation()
-        tr.classList.add("is-drop-target-row")
+        event.preventDefault(); event.stopPropagation(); tr.classList.add("is-drop-target-row")
       })
       tr.addEventListener("dragleave", () => tr.classList.remove("is-drop-target-row"))
       tr.addEventListener("drop", (event: DragEvent) => {
-        event.preventDefault()
-        event.stopPropagation()
-        tr.classList.remove("is-drop-target-row")
-        const fromRow = draggedRow
-        draggedRow = null
+        event.preventDefault(); event.stopPropagation(); tr.classList.remove("is-drop-target-row")
+        const fromRow = draggedRow; draggedRow = null
         if (fromRow !== null && fromRow !== row) onMoveRowTo?.(fromRow, row)
       })
     }
@@ -536,7 +522,7 @@ export const createInteractiveTableSurface = (params: {
     bindInteractiveCell(th, 0, col, grid.headers[col] ?? "")
     attachColumnGripHandle(th, col)
     if (col === 0) attachRowGripHandle(th, headTr, 0)
-    attachColumnResizeHandle(th, col, cols[col]!, visualOptions)
+    attachColumnResizeHandle(th, col, cols[col]!, visualOptions, onVisualOptionsChange, isEditable)
     headCellEls.push(th)
     headTr.appendChild(th)
   }

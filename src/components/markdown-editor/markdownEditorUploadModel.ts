@@ -76,6 +76,6 @@ export const resolveMarkdownImageEmbed = (
   }
 
   return {
-    markdown: `\n\n![${alt}](${src})\n`,
+    markdown: `\n\n![${escapeMarkdownLinkLabel(alt)}](${src})\n`,
   }
 }

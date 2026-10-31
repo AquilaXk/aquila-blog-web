@@ -268,7 +268,7 @@ const focusContainerBlockOrigin = (
   fallbackTo: number,
   innerOffset: number
 ) => {
-  if (!view) return
+  if (!view || !view.state.facet(EditorView.editable)) return
   let resolvedFrom = fallbackFrom
   const datasetFrom = Number(root.dataset?.from)
   if (Number.isFinite(datasetFrom) && datasetFrom >= 0) resolvedFrom = datasetFrom

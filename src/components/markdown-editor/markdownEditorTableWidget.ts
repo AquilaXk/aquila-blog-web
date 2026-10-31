@@ -1,24 +1,18 @@
 import { EditorSelection, Transaction } from "@codemirror/state"
 import { WidgetType, EditorView } from "@codemirror/view"
 import {
-  applyMarkdownTableGridAction,
-  applyMarkdownTableGridCellEdit,
-  applyMarkdownTableGridPaste,
-  applyTableCellInlineFormat,
-  parseMarkdownTableGrid,
-  type MarkdownTableGrid,
-  type MarkdownTableGridAction,
-  type TableCellInlineFormatKind,
+  applyMarkdownTableGridAction, applyMarkdownTableGridCellEdit, applyMarkdownTableGridPaste,
+  applyTableCellInlineFormat, parseMarkdownTableGrid, serializeMarkdownTableGrid,
+  type MarkdownTableGrid, type MarkdownTableGridAction, type TableCellInlineFormatKind,
 } from "./markdownEditorTableModel"
 import {
-  applyTableColumnWidthsAction,
-  createInteractiveTableSurface,
-  createTableToolbarElement,
-  getOrCreateTableVisualOptions,
-  migrateTableVisualOptionsOffset,
-  renderStaticTableElement,
-  syncTableColGroupWidths,
-  syncTableVisualWrapAttributes,
+  getTableGridLayoutMeta, hasLeadingAqTableComment, hydrateVisualOptionsIntoTarget,
+  mergeVisualOptionsIntoTableLayout, setTableGridLayoutMeta,
+} from "./markdownEditorTableMetadataModel"
+import {
+  applyTableColumnWidthsAction, createInteractiveTableSurface, createTableToolbarElement,
+  getOrCreateTableVisualOptions, migrateTableVisualOptionsOffset, renderStaticTableElement,
+  syncTableColGroupWidths, syncTableVisualWrapAttributes, type TableVisualOptions,
 } from "./markdownEditorTableWidgetDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
@@ -28,6 +22,13 @@ type TableDomController = { update: (nextMarkdown: string, nextFrom: number | un
 
 let pendingTableCellActivation: PendingTableCellActivation | null = null
 const tableDomControllers = new WeakMap<HTMLElement, TableDomController>()
+
+const applyVisualOptionsToTableMarkdown = (markdown: string, visualOptions: TableVisualOptions): string => {
+  const parsed = parseMarkdownTableGrid(markdown)
+  if (!parsed) return markdown
+  setTableGridLayoutMeta(parsed, mergeVisualOptionsIntoTableLayout(getTableGridLayoutMeta(parsed), visualOptions, parsed.headers.length))
+  return serializeMarkdownTableGrid(parsed)
+}
 
 const syncTableFromDataset = (wrap: HTMLElement, from: number | undefined) => {
   if (!wrap.dataset) return
@@ -105,7 +106,11 @@ export class MarkdownTableWidget extends WidgetType {
       try { wrap.focus({ preventScroll: true }) } catch {}
     }
 
-    let visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length)
+    const isViewEditable = () => Boolean(view.state.facet(EditorView.editable))
+    let visualOptions = getOrCreateTableVisualOptions(currentFrom ?? 0, grid.headers.length, view)
+    if (hasLeadingAqTableComment(this.markdown)) {
+      hydrateVisualOptionsIntoTarget(visualOptions, getTableGridLayoutMeta(grid), grid.headers.length)
+    }
     syncTableVisualWrapAttributes(wrap, visualOptions)
 
     let activeRow = 0
@@ -181,11 +186,9 @@ export class MarkdownTableWidget extends WidgetType {
     const getPreservedCellControls = (cellEl: HTMLElement): HTMLElement[] =>
       typeof cellEl.querySelector !== "function"
         ? []
-        : [
-            cellEl.querySelector<HTMLElement>(".cm-live-table-col-handle"),
-            cellEl.querySelector<HTMLElement>(".cm-live-table-row-handle"),
-            cellEl.querySelector<HTMLElement>(".cm-live-table-col-resizer"),
-          ].filter((el): el is HTMLElement => el !== null)
+        : [".cm-live-table-col-handle", ".cm-live-table-row-handle", ".cm-live-table-col-resizer"]
+            .map((sel) => cellEl.querySelector<HTMLElement>(sel))
+            .filter((el): el is HTMLElement => el !== null)
 
     const restoreCellDisplay = (cellEl: HTMLElement, rawText: string) => {
       const controls = getPreservedCellControls(cellEl)
@@ -251,11 +254,19 @@ export class MarkdownTableWidget extends WidgetType {
       if (committed !== currentMarkdown) dispatchTableMarkdown(committed, { row: activeRow, col: activeCol, openEditor: false })
     }
 
-    const { toolbar, toolbarButtons, canAddRow, canAddCol } = createTableToolbarElement({
-      grid, wrap, visualOptions,
+    const persistVisualOptions = () => {
+      if (!view.state.facet(EditorView.editable)) return
+      markTableActive()
+      dispatchTableMarkdown(applyVisualOptionsToTableMarkdown(flushActiveCellMarkdown(), visualOptions))
+    }
+
+    const { toolbar, toolbarButtons, canAddRow, canAddCol, syncOptionButtons } = createTableToolbarElement({
+      grid, wrap, visualOptions, isEditable: isViewEditable,
       executeGridAction: (action) => executeGridAction(action),
-      onActivateToolbar: () => { markTableActive(); syncActiveCellHighlight() },
+      onActivateToolbar: () => { if (!isViewEditable()) return; markTableActive(); syncActiveCellHighlight() },
+      onVisualOptionsChange: persistVisualOptions,
       onEditSource: () => {
+        if (!isViewEditable()) return
         flushAndDispatchActiveCell()
         const range = resolveRange()
         if (!range) return
@@ -263,7 +274,7 @@ export class MarkdownTableWidget extends WidgetType {
         view.dispatch({ selection: EditorSelection.cursor(Math.min(range.to, range.from + 2)), scrollIntoView: true })
       },
       onDeleteTable: () => {
-        const range = view.state.facet(EditorView.editable) ? resolveRange() : null
+        const range = isViewEditable() ? resolveRange() : null
         if (!range) return
         view.dispatch({ changes: { from: range.from, to: range.to, insert: "" }, selection: EditorSelection.cursor(range.from), annotations: [Transaction.userEvent.of("delete")] })
       },
@@ -271,7 +282,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const buildSurface = () =>
       createInteractiveTableSurface({
-        grid, visualOptions, canAddCol, canAddRow,
+        grid, visualOptions, canAddCol, canAddRow, isEditable: isViewEditable,
         onActivateCell: (row, col) => activateCellEditor(row, col),
         onAddColumn: () => executeGridAction({ kind: "add-column" }, activeRow, grid.headers.length - 1),
         onAddRow: () => executeGridAction({ kind: "add-row" }, grid.rows.length, 0),
@@ -280,6 +291,7 @@ export class MarkdownTableWidget extends WidgetType {
         onSelectRow: (row) => selectRow(row),
         onMoveColumnTo: (fromCol, toCol) => { selectedMode = "col"; executeGridAction({ kind: "move-column-to", targetCol: toCol }, activeRow, fromCol, false) },
         onMoveRowTo: (fromRow, toRow) => { selectedMode = "row"; executeGridAction({ kind: "move-row-to", targetRow: toRow }, fromRow, activeCol, false) },
+        onVisualOptionsChange: persistVisualOptions,
       })
 
     let { gridRow, addRowBtn, cellElements, colElements } = buildSurface()
@@ -309,21 +321,17 @@ export class MarkdownTableWidget extends WidgetType {
       }
     }
 
-    const dispatchTableMarkdown = (
-      nextMarkdown: string,
-      targetCell?: { row: number; col: number; openEditor?: boolean }
-    ) => {
+    const dispatchTableMarkdown = (nextMarkdown: string, targetCell?: { row: number; col: number; openEditor?: boolean }) => {
       const range = resolveRange()
       if (!range) return
       if (nextMarkdown === currentMarkdown) {
-        if (targetCell) {
-          if (targetCell.openEditor === false) {
-            activeRow = Math.max(0, Math.min(targetCell.row, grid.rows.length))
-            activeCol = Math.max(0, Math.min(targetCell.col, grid.headers.length - 1))
-            syncActiveCellHighlight()
-          } else {
-            activateCellEditor(targetCell.row, targetCell.col)
-          }
+        if (!targetCell) return
+        if (targetCell.openEditor === false) {
+          activeRow = Math.max(0, Math.min(targetCell.row, grid.rows.length))
+          activeCol = Math.max(0, Math.min(targetCell.col, grid.headers.length - 1))
+          syncActiveCellHighlight()
+        } else {
+          activateCellEditor(targetCell.row, targetCell.col)
         }
         return
       }
@@ -362,19 +370,14 @@ export class MarkdownTableWidget extends WidgetType {
         activeSession.input.focus()
         return
       }
-
       if (activeSession && !activeSession.handled) {
         const committed = flushActiveCellMarkdown()
-        if (committed !== currentMarkdown) {
-          dispatchTableMarkdown(committed, { row: clampedRow, col: clampedCol })
-          return
-        }
+        if (committed !== currentMarkdown) return dispatchTableMarkdown(committed, { row: clampedRow, col: clampedCol })
       }
 
       const cellEl = cellElements[clampedRow]?.[clampedCol]
       if (!cellEl) return
       const initialValue = clampedRow === 0 ? (grid.headers[clampedCol] ?? "") : (grid.rows[clampedRow - 1]?.[clampedCol] ?? "")
-
       const controls = getPreservedCellControls(cellEl)
       cellEl.textContent = ""
       const input = document.createElement("input")
@@ -398,10 +401,7 @@ export class MarkdownTableWidget extends WidgetType {
         event.stopPropagation()
         const pastedText = event.clipboardData?.getData("text/plain") ?? ""
         if (!pastedText.includes("\t") && !pastedText.includes("\n") && !pastedText.includes("\r")) return
-        const baseMarkdown =
-          input.value !== initialValue
-            ? (applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, input.value) ?? currentMarkdown)
-            : currentMarkdown
+        const baseMarkdown = input.value !== initialValue ? (applyMarkdownTableGridCellEdit(currentMarkdown, clampedRow, clampedCol, input.value) ?? currentMarkdown) : currentMarkdown
         const outcome = applyMarkdownTableGridPaste(baseMarkdown, clampedRow, clampedCol, pastedText)
         if (!outcome) return
         event.preventDefault()
@@ -420,10 +420,7 @@ export class MarkdownTableWidget extends WidgetType {
         if (session.handled) return
         const committed = flushActiveCellMarkdown()
         if (committed !== currentMarkdown) {
-          dispatchTableMarkdown(
-            committed,
-            focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined
-          )
+          dispatchTableMarkdown(committed, focusWrapAfter ? { row: clampedRow, col: clampedCol, openEditor: false } : undefined)
         }
         if (focusWrapAfter) focusTableWrap()
       }
@@ -452,10 +449,7 @@ export class MarkdownTableWidget extends WidgetType {
           return executeGridAction({ kind: "tab", direction: event.shiftKey ? "previous" : "next" }, clampedRow, clampedCol)
         }
         const hasNoModifiers = !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
-        if (event.key === "Enter" && hasNoModifiers) {
-          event.preventDefault()
-          return executeGridAction({ kind: "enter" }, clampedRow, clampedCol)
-        }
+        if (event.key === "Enter" && hasNoModifiers) { event.preventDefault(); return executeGridAction({ kind: "enter" }, clampedRow, clampedCol) }
         if (event.key === "ArrowLeft" && hasNoModifiers && input.selectionStart === 0 && input.selectionEnd === 0 && (clampedRow > 0 || clampedCol > 0)) {
           event.preventDefault()
           return executeGridAction({ kind: "tab", direction: "previous" }, clampedRow, clampedCol)
@@ -469,10 +463,7 @@ export class MarkdownTableWidget extends WidgetType {
           const targetRow = Math.max(0, Math.min(grid.rows.length, clampedRow + (event.key === "ArrowUp" ? -1 : 1)))
           return dispatchTableMarkdown(flushActiveCellMarkdown(), { row: targetRow, col: clampedCol })
         }
-        if (event.key === "Escape") {
-          event.preventDefault()
-          commitAndCloseSession(true)
-        }
+        if (event.key === "Escape") { event.preventDefault(); commitAndCloseSession(true) }
       })
 
       input.addEventListener("blur", () => commitAndCloseSession())
@@ -504,7 +495,7 @@ export class MarkdownTableWidget extends WidgetType {
 
     const update = (nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean => {
       if (nextMarkdown === currentMarkdown) {
-        visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length, visualOptions)
+        visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, grid.headers.length, visualOptions, view)
         currentFrom = nextFrom
         currentTo = nextTo
         syncTableFromDataset(wrap, currentFrom)
@@ -514,7 +505,16 @@ export class MarkdownTableWidget extends WidgetType {
 
       const nextGrid = parseMarkdownTableGrid(nextMarkdown)
       if (!nextGrid) return false
-      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions)
+      visualOptions = migrateTableVisualOptionsOffset(currentFrom, nextFrom, nextGrid.headers.length, visualOptions, view)
+      if (hasLeadingAqTableComment(nextMarkdown)) {
+        hydrateVisualOptionsIntoTarget(visualOptions, getTableGridLayoutMeta(nextGrid), nextGrid.headers.length)
+        syncTableVisualWrapAttributes(wrap, visualOptions)
+        syncOptionButtons()
+      } else if (hasLeadingAqTableComment(currentMarkdown)) {
+        hydrateVisualOptionsIntoTarget(visualOptions, null, nextGrid.headers.length)
+        syncTableVisualWrapAttributes(wrap, visualOptions)
+        syncOptionButtons()
+      }
 
       if (activeSession && !activeSession.handled) {
         activeSession.handled = true
@@ -550,8 +550,13 @@ export class MarkdownTableWidget extends WidgetType {
       return true
     }
 
+    wrap.addEventListener("compositionstart", () => {
+      if (!isViewEditable() || !isTableActive || (activeSession && !activeSession.handled)) return
+      activateCellEditor(activeRow, activeCol)
+    })
+
     wrap.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (!isTableActive || (activeSession && !activeSession.handled)) return
+      if (!isViewEditable() || !isTableActive || (activeSession && !activeSession.handled)) return
       const stop = () => { event.preventDefault(); event.stopPropagation() }
       if (event.key === "Escape") { stop(); isTableActive = false; detachOutsideListener(); return syncActiveCellHighlight() }
       if (event.key === "Enter" || event.key === "F2") { stop(); return activateCellEditor(activeRow, activeCol) }
