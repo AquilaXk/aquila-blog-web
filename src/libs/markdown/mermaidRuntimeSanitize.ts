@@ -1,7 +1,6 @@
 import {
   MERMAID_FLOWCHART_HEADER_PATTERN,
   MERMAID_INIT_DIRECTIVE_PATTERN,
-  MERMAID_RENDER_TIMEOUT_MS,
   MERMAID_RISKY_INIT_KEY_PATTERN,
   MERMAID_RISKY_STYLE_DIRECTIVE_PATTERN,
   formatMermaidErrorReason,
@@ -143,14 +142,6 @@ export const sanitizeRenderableMermaidSource = (source: string) => {
 
 export const stabilizeMermaidSvgLabels = (_svgElement: SVGSVGElement) => {}
 
-const escapeMermaidHtml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
-
 export const isMermaidRenderTimeoutError = (error: unknown) =>
   formatMermaidErrorReason(error, "").includes("MERMAID_RENDER_TIMEOUT")
 
@@ -171,34 +162,13 @@ const toMermaidErrorMessage = (error: unknown) => {
   return "문법 또는 블록 구조를 확인해 주세요."
 }
 
-export const renderMermaidErrorState = ({ source, error }: { source: string; error: unknown }) => {
-  const escapedSource = escapeMermaidHtml(source)
-  const escapedError = escapeMermaidHtml(formatMermaidErrorReason(error, "알 수 없는 오류"))
-  const guidance = escapeMermaidHtml(toMermaidErrorMessage(error))
-  return `
-    <div class="aq-mermaid-error-state" role="status" aria-live="polite">
-      <div class="aq-mermaid-error-title">Mermaid를 렌더하지 못했습니다.</div>
-      <p class="aq-mermaid-error-description">${guidance}</p>
-      <p class="aq-mermaid-error-guidance">${MERMAID_ERROR_GUIDANCE_TEXT}</p>
-      <details class="aq-mermaid-error-details">
-        <summary>Mermaid 코드 보기</summary>
-        <code class="aq-mermaid-error-code">${escapedSource}</code>
-      </details>
-      <details class="aq-mermaid-error-details">
-        <summary>상세 오류 보기</summary>
-        <code class="aq-mermaid-error-code">${escapedError}</code>
-      </details>
-    </div>
-  `
-}
-
 const clearElementChildrenSafely = (element: HTMLElement) => {
   if (typeof element.replaceChildren === "function") {
     element.replaceChildren()
     return
   }
-  while (element.firstChild && typeof element.removeChild === "function") {
-    element.removeChild(element.firstChild)
+  while (element.firstChild && typeof element.firstChild.remove === "function") {
+    element.firstChild.remove()
   }
   const descriptor = Object.getOwnPropertyDescriptor(element, "textContent")
   if (!descriptor || descriptor.writable || typeof descriptor.set === "function") {
@@ -281,6 +251,3 @@ export const isMermaidSyntaxError = (error: unknown) => {
     normalized.includes("unknown diagram")
   )
 }
-
-export const createMermaidRenderTimeoutError = () =>
-  new Error(`MERMAID_RENDER_TIMEOUT:${MERMAID_RENDER_TIMEOUT_MS}`)

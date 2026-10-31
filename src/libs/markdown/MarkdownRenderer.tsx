@@ -58,6 +58,7 @@ import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl
 import {
   escapeNonPandocSingleDollars,
   hasValidMarkdownMath,
+  protectEscapedHighlightDelimiters,
 } from "src/libs/markdown/inlineMathGuardModel"
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
@@ -169,8 +170,10 @@ const normalizeAnchorInlineChildren = (children: ReactNode): ReactNode => {
     return normalizeMarkdownInlineChildren(children)
   }
   let sentinel = "\uE000aqwl0\uE001"
-  for (let idx = 1; hasAnchorTextMatching(children, (text) => text.includes(sentinel)); idx += 1) {
+  let idx = 1
+  while (hasAnchorTextMatching(children, (text) => text.includes(sentinel))) {
     sentinel = `\uE000aqwl${idx}\uE001`
+    idx += 1
   }
   const masked = replaceAnchorText(children, "[[", sentinel)
   return replaceAnchorText(normalizeMarkdownInlineChildren(masked), sentinel, "[[")
@@ -510,7 +513,9 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
     const hasMath = hasValidMarkdownMath(markdown)
-    const preparedMarkdown = hasMath ? escapeNonPandocSingleDollars(markdown) : markdown
+    const preparedMarkdown = protectEscapedHighlightDelimiters(
+      hasMath ? escapeNonPandocSingleDollars(markdown) : markdown
+    )
     return (
       <ReactMarkdown
         key={key}

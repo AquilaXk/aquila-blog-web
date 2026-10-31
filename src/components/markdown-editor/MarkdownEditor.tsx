@@ -59,6 +59,40 @@ const isAlignmentDisabled = (alignment: TableAlignment, availability: TableEditA
   return alignment === "center" ? !availability.alignCenter : !availability.alignRight
 }
 
+export const isTableEditActionDisabled = (
+  edit: MarkdownEditorTableEdit,
+  availability: TableEditAvailability | null
+): boolean => {
+  if (!availability) return true
+  switch (edit.kind) {
+    case "add-row":
+    case "insert-row-above":
+    case "duplicate-row":
+      return !availability.addRow
+    case "move-row-up":
+    case "move-row-down":
+    case "move-row-to":
+    case "delete-row":
+      return !availability.deleteRow
+    case "add-column":
+    case "insert-column-left":
+    case "duplicate-column":
+      return !availability.addColumn
+    case "add-row-and-column":
+      return !availability.addRow && !availability.addColumn
+    case "move-column-left":
+    case "move-column-right":
+    case "move-column-to":
+    case "delete-column":
+      return !availability.deleteColumn
+    case "clear-row":
+    case "clear-column":
+      return false
+    case "set-alignment":
+      return isAlignmentDisabled(edit.alignment, availability)
+  }
+}
+
 type FocusableTableElement = {
   classList?: { contains?: (token: string) => boolean }
   closest?: <T extends Element = Element>(selector: string) => T | null
@@ -314,36 +348,7 @@ export const MarkdownEditor = ({
   )
 
   const isTableEditDisabled = useCallback(
-    (edit: MarkdownEditorTableEdit) => {
-      if (!tableEditAvailability) return true
-      switch (edit.kind) {
-        case "add-row":
-        case "insert-row-above":
-        case "duplicate-row":
-          return !tableEditAvailability.addRow
-        case "move-row-up":
-        case "move-row-down":
-        case "move-row-to":
-        case "delete-row":
-          return !tableEditAvailability.deleteRow
-        case "add-column":
-        case "insert-column-left":
-        case "duplicate-column":
-          return !tableEditAvailability.addColumn
-        case "add-row-and-column":
-          return !tableEditAvailability.addRow && !tableEditAvailability.addColumn
-        case "move-column-left":
-        case "move-column-right":
-        case "move-column-to":
-        case "delete-column":
-          return !tableEditAvailability.deleteColumn
-        case "clear-row":
-        case "clear-column":
-          return false
-        case "set-alignment":
-          return isAlignmentDisabled(edit.alignment, tableEditAvailability)
-      }
-    },
+    (edit: MarkdownEditorTableEdit) => isTableEditActionDisabled(edit, tableEditAvailability),
     [tableEditAvailability]
   )
 

@@ -1,4 +1,10 @@
-import { isEscapedMarkdownAt, scanInlineCodeSpanEnd } from "./pandocMathScanner"
+import {
+  countCodePointRun,
+  isEscapedMarkdownAt,
+  scanInlineCodeSpanEnd,
+  scanPandocDisplayMathAt,
+  scanPandocInlineMathAt,
+} from "./pandocMathScanner"
 
 export type TextRangeSpan = {
   from: number
@@ -184,24 +190,65 @@ export const matchDoubleBraceColorHeader = (
   return scanColorTokenBeforePipe(text, cursor, allowBackslashInToken)
 }
 
+const skipDollarConstructAt = (text: string, cursor: number): number => {
+  const run = countCodePointRun(text, cursor, 36)
+  if (run === 2) {
+    const m = scanPandocDisplayMathAt(text, cursor)
+    return m ? m.to : cursor + 2
+  }
+  if (run === 1) {
+    const m = scanPandocInlineMathAt(text, cursor)
+    return m ? m.to : cursor + 1
+  }
+  return cursor + run
+}
+
 export const findBacktickAwareDoubleCloseBrace = (
   text: string,
   contentStart: number,
   singleLine = false
 ): number => {
   let cursor = contentStart
+  let braceDepth = 0
   while (cursor + 1 < text.length) {
     const code = text.codePointAt(cursor) ?? 0
-    if (singleLine && (code === 10 || code === 13)) return -1
-    if (code === 96 && !isEscapedMarkdownAt(text, cursor)) {
-      const codeEnd = scanInlineCodeSpanEnd(text, cursor)
-      if (codeEnd > cursor) {
-        cursor = codeEnd
-        continue
-      }
+    if (code === 10 || code === 13) {
+      if (singleLine) return -1
+      cursor += 1
+      continue
     }
-    if (code === 125 && text.codePointAt(cursor + 1) === 125) {
-      return cursor
+    if (code === 92) {
+      const nextCode = text.codePointAt(cursor + 1) ?? 0
+      if (singleLine && (nextCode === 10 || nextCode === 13)) return -1
+      cursor += 2
+      continue
+    }
+    if (code === 96) {
+      const end = scanInlineCodeSpanEnd(text, cursor)
+      cursor = end > cursor ? end : cursor + countCodePointRun(text, cursor, 96)
+      continue
+    }
+    if (code === 36) {
+      cursor = skipDollarConstructAt(text, cursor)
+      continue
+    }
+    if (
+      code === 123 &&
+      text.codePointAt(cursor + 1) === 123 &&
+      matchDoubleBraceColorHeader(text, cursor, true)
+    ) {
+      return -1
+    }
+    if (code === 123) {
+      braceDepth += 1
+      cursor += 1
+      continue
+    }
+    if (code === 125) {
+      if (braceDepth === 0 && text.codePointAt(cursor + 1) === 125) return cursor
+      if (braceDepth > 0) braceDepth -= 1
+      cursor += 1
+      continue
     }
     cursor += 1
   }
@@ -265,7 +312,7 @@ const stepDoubleBraceColorAt = (
     options.singleLine === true
   )
   if (closeIndex < 0) {
-    return { span: null, nextCursor: cursor + 2, stop: options.singleLine !== true }
+    return { span: null, nextCursor: cursor + 2, stop: !skipCode }
   }
   if (!options.allowEmptyContent && closeIndex === header.contentStart) {
     return { span: null, nextCursor: cursor + 2, stop: false }
@@ -321,6 +368,7 @@ export const stripDoubleBraceColorTokensOnce = (text: string): string => {
     trimTrailingContentWhitespace: false,
     allowEmptyContent: true,
     allowBackslashInToken: true,
+    singleLine: true,
   })
   if (spans.length === 0) return text
   let output = ""

@@ -4,6 +4,7 @@ import {
   type MarkdownTableGrid, type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
 import { getTableGridLayoutMeta, hasLeadingAqTableComment, hydrateVisualOptionsIntoTarget } from "./markdownEditorTableMetadataModel"
+import { resolveDuplicateColInsertIndex } from "./markdownEditorTableSpanModel"
 import {
   appendTableWrapChildren, applyVisualOptionsToTableMarkdown, createOutsideTableListenerGuard,
   dispatchDeleteTableRange, dispatchEditSourceSelection, dispatchTableMarkdownChange,
@@ -183,7 +184,14 @@ class TableWidgetController implements TableSurfaceInteractionParams {
       }
       return
     }
-    applyTableColumnWidthsAction(this.visualOptions.columnWidths, this.grid.headers.length, colOverride, action)
+    const sourceGrid = baseMarkdown === this.currentMarkdown ? this.grid : (parseMarkdownTableGrid(baseMarkdown) ?? this.grid)
+    const clampedCol = Math.max(0, Math.min(colOverride, sourceGrid.headers.length - 1))
+    const duplicateInsertCol = action.kind === "duplicate-column"
+      ? resolveDuplicateColInsertIndex(getTableGridLayoutMeta(sourceGrid), clampedCol, sourceGrid.headers.length)
+      : undefined
+    applyTableColumnWidthsAction(
+      this.visualOptions.columnWidths, sourceGrid.headers.length, colOverride, action, duplicateInsertCol
+    )
     this.activeRow = outcome.nextRow
     this.activeCol = outcome.nextCol
     this.syncActiveCellHighlight()

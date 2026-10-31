@@ -199,12 +199,15 @@ const buildCalloutSegment = (
   }
 }
 
-const parseFenceMarker = (line: string): "`" | "~" | null => {
+type CodeFenceMarkerChar = "`" | "~"
+type ActiveFenceMarker = CodeFenceMarkerChar | null
+
+const parseFenceMarker = (line: string): ActiveFenceMarker => {
   const match = FENCE_LINE_PATTERN.exec(line.trim())
   if (!match) return null
 
   const fence = match[1]!
-  const marker = fence[0] as "`" | "~"
+  const marker = fence[0] as CodeFenceMarkerChar
   return hasUniformFenceMarker(fence, marker) ? marker : null
 }
 
@@ -471,8 +474,8 @@ const tryConsumeStructuredBlockAt = (
 const stepSegmentFenceState = (
   trimmed: string,
   firstCode: number | undefined,
-  activeFenceMarker: "`" | "~" | null
-): { handled: boolean; nextFence: "`" | "~" | null } => {
+  activeFenceMarker: ActiveFenceMarker
+): { handled: boolean; nextFence: ActiveFenceMarker } => {
   const fenceMarker =
     firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
   if (activeFenceMarker) {
@@ -486,7 +489,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
   const segments: MarkdownSegment[] = []
   const markdownBuffer: string[] = []
-  let activeFenceMarker: "`" | "~" | null = null
+  let activeFenceMarker: ActiveFenceMarker = null
   let pendingDirectiveMetadata: PendingDirectiveMetadata | null = null
 
   const flushMarkdown = () => {

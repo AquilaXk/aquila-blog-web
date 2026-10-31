@@ -422,7 +422,7 @@ export const loadSharedMermaidRuntime = (
   runSerializedMermaidTask(
     scheme,
     onParseWarning,
-    async (ctx) => ctx,
+    (ctx) => Promise.resolve(ctx),
     runtimeLoader
   )
 

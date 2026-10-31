@@ -11,6 +11,7 @@ import {
   getTableGridLayoutMeta,
   isAqTableCommentCandidateLine,
   parseLeadingTableLayoutLine,
+  reconcileOverwrittenTableCells,
   serializeMarkdownTableLayoutCommentIfNonDefault,
   setTableGridLayoutMeta,
   syncTableLayoutOnGridAction,
@@ -462,6 +463,9 @@ export const applyMarkdownTableGridCellEdit = (
   if (!grid || col < 0 || col >= grid.headers.length || row < 0 || row > grid.rows.length) return null
   if (row === 0) grid.headers[col] = nextValue
   else grid.rows[row - 1]![col] = nextValue
+  if (nextValue.trim().length > 0) {
+    reconcileOverwrittenTableCells(grid, [{ row, col }])
+  }
   return serializeMarkdownTableGrid(grid)
 }
 

@@ -188,6 +188,35 @@ export const hasValidMarkdownMath = (markdown: string): boolean => {
   return false
 }
 
+export const ESCAPED_HIGHLIGHT_SENTINEL = "\uE000aqhl\uE001"
+export const ESCAPED_LT_SENTINEL = "\uE000aqlt\uE001"
+
+const PROTECTED_INLINE_TOKEN_HINT = /\\(?:==|<)|&#(?:0*60|x0*3c);|&lt;/i
+const ESCAPED_BR_ENTITY_PREFIX = /^&(?:lt|#0*60|#x0*3c);(?=\s*br(?:[\s/>]|&(?:gt|#0*62|#x0*3e);))/i
+
+const matchProtectedInlineTokenAt = (
+  markdown: string,
+  index: number
+): { length: number; sentinel: string } | null => {
+  const code = markdown.codePointAt(index) ?? 0
+  if (code === 92 && !isEscapedMarkdownAt(markdown, index)) {
+    const nextCode = markdown.codePointAt(index + 1) ?? 0
+    if (nextCode === 61 && markdown.codePointAt(index + 2) === 61) {
+      return { length: 3, sentinel: ESCAPED_HIGHLIGHT_SENTINEL }
+    }
+    if (nextCode === 60) {
+      return { length: 2, sentinel: ESCAPED_LT_SENTINEL }
+    }
+  }
+  if (code === 38) {
+    const entityMatch = ESCAPED_BR_ENTITY_PREFIX.exec(markdown.slice(index, index + 24))
+    if (entityMatch) {
+      return { length: entityMatch[0].length, sentinel: ESCAPED_LT_SENTINEL }
+    }
+  }
+  return null
+}
+
 export const escapeNonPandocSingleDollars = (markdown: string): string => {
   if (!markdown.includes("$")) return markdown
   let output = ""
@@ -205,6 +234,38 @@ export const escapeNonPandocSingleDollars = (markdown: string): string => {
       copyFrom = index + step.escapeCount
     }
     index = step.nextIndex
+  }
+  return copyFrom === 0 ? markdown : `${output}${markdown.slice(copyFrom)}`
+}
+
+export const protectEscapedHighlightDelimiters = (markdown: string): string => {
+  if (!PROTECTED_INLINE_TOKEN_HINT.test(markdown)) return markdown
+  let output = ""
+  let copyFrom = 0
+  let index = 0
+  while (index < markdown.length) {
+    const skippedEnd = trySkipLiteralConstructAt(markdown, index)
+    if (skippedEnd > index) {
+      index = skippedEnd
+      continue
+    }
+    const code = markdown.codePointAt(index) ?? 0
+    if (code === 36 && !isEscapedMarkdownAt(markdown, index)) {
+      index = handleDollarSequenceAt(markdown, index).nextIndex
+      continue
+    }
+    if (code === 92 && markdown.codePointAt(index + 1) === 92) {
+      index += 2
+      continue
+    }
+    const matched = matchProtectedInlineTokenAt(markdown, index)
+    if (matched) {
+      output += `${markdown.slice(copyFrom, index)}${matched.sentinel}`
+      copyFrom = index + matched.length
+      index += matched.length
+      continue
+    }
+    index += 1
   }
   return copyFrom === 0 ? markdown : `${output}${markdown.slice(copyFrom)}`
 }

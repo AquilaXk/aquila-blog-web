@@ -14,8 +14,11 @@ export const hasAsciiControlCharacters = (value: string): boolean => {
 
 const hasPathTraversalSegment = (value: string): boolean => {
   const pathPart = value.split(/[?#]/, 1)[0] ?? ""
-  return pathPart.split("/").some((segment) => segment === "..")
+  return pathPart.split("/").includes("..")
 }
+
+const hasDotSegment = (segments: readonly string[]): boolean =>
+  segments.includes(".") || segments.includes("..")
 
 const isSafeDecodedRelativePathPart = (value: string, allowDotSegments: boolean): boolean => {
   const pathPart = value.split(/[?#]/, 1)[0] ?? ""
@@ -58,16 +61,34 @@ export const normalizeSafeRelativeMarkdownPath = (rawPath: string): string => {
   }
 }
 
+const isAllowedDotRelativeRest = (rest: string, requireNonEmpty: boolean): boolean => {
+  if (requireNonEmpty && rest.length === 0) return false
+  if (hasDotSegment(rest.split("/"))) return false
+  return !hasDotSegment(decodeURIComponent(rest).split("/"))
+}
+
 const normalizeSafeDotRelativePath = (value: string): string => {
-  if (value.includes("//") || value.includes("\\") || !isSafeDecodedRelativePathPart(value, true)) {
+  const pathPart = value.split(/[?#]/, 1)[0] ?? ""
+  if (
+    value.includes("//") ||
+    value.includes("\\") ||
+    /%2e/i.test(pathPart) ||
+    !isSafeDecodedRelativePathPart(value, true)
+  ) {
     return ""
   }
+  const isCurrentDir = value.startsWith("./")
+  const isParentDir = !isCurrentDir && value.startsWith("../")
+  if (!isCurrentDir && !isParentDir) return ""
+  const rest = isCurrentDir ? pathPart.slice(2) : pathPart.slice(3)
+  if (!isAllowedDotRelativeRest(rest, isParentDir)) return ""
+
   try {
-    const probe = new URL(value, `${SAFE_RELATIVE_PROBE_ORIGIN}/dir/sub/`)
+    const probe = new URL(value, `${SAFE_RELATIVE_PROBE_ORIGIN}/posts/`)
     if (probe.origin !== SAFE_RELATIVE_PROBE_ORIGIN || probe.pathname.startsWith("//")) {
       return ""
     }
-    return value
+    return isCurrentDir ? `./${value.slice(2)}` : `../${value.slice(3)}`
   } catch {
     return ""
   }
@@ -108,7 +129,8 @@ export const normalizeSafeMarkdownLinkHref = (raw: string): string => {
   if (value.startsWith("#")) {
     try {
       const parsed = new URL(value, SAFE_RELATIVE_PROBE_ORIGIN)
-      return parsed.origin === SAFE_RELATIVE_PROBE_ORIGIN ? parsed.hash : ""
+      if (parsed.origin !== SAFE_RELATIVE_PROBE_ORIGIN) return ""
+      return value === "#" ? "#" : `#${value.slice(1)}`
     } catch {
       return ""
     }
@@ -128,25 +150,25 @@ export const normalizeSafeMarkdownLinkHref = (raw: string): string => {
   return normalizeSafeMarkdownUrl(value)
 }
 
+const lockSafeAnchorHrefPrefix = (safeHref: string): string => {
+  if (!safeHref || safeHref.startsWith("//")) return ""
+  if (safeHref === "#") return "#"
+  if (safeHref === "/") return "/"
+  if (safeHref.startsWith("https://")) return "https://" + safeHref.slice(8)
+  if (safeHref.startsWith("http://")) return "http://" + safeHref.slice(7)
+  if (safeHref.startsWith("mailto:")) return "mailto:" + safeHref.slice(7)
+  if (safeHref.startsWith("#")) return "#" + safeHref.slice(1)
+  if (safeHref.startsWith("./")) return "./" + safeHref.slice(2)
+  if (safeHref.startsWith("../")) return "../" + safeHref.slice(3)
+  if (safeHref.startsWith("/") && !safeHref.startsWith("//")) return "/" + safeHref.slice(1)
+  return ""
+}
+
 export const setSafeAnchorHref = (anchor: HTMLAnchorElement, rawHref: string): string => {
-  const safeHref = normalizeSafeMarkdownLinkHref(rawHref)
-  if (
-    !safeHref ||
-    !(
-      safeHref.startsWith("https://") ||
-      safeHref.startsWith("http://") ||
-      safeHref.startsWith("mailto:") ||
-      safeHref.startsWith("/") ||
-      safeHref.startsWith("#") ||
-      safeHref.startsWith("./") ||
-      safeHref.startsWith("../")
-    ) ||
-    safeHref.startsWith("//")
-  ) {
-    return ""
-  }
-  anchor.setAttribute("href", safeHref)
-  return safeHref
+  const lockedHref = lockSafeAnchorHrefPrefix(normalizeSafeMarkdownLinkHref(rawHref))
+  if (!lockedHref) return ""
+  anchor.setAttribute("href", lockedHref)
+  return lockedHref
 }
 
 export const normalizeSafeMarkdownImageSrc = (raw: string): string => normalizePublicPostImageUrl(raw)

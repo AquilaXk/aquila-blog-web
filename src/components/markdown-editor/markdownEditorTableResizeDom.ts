@@ -140,20 +140,24 @@ const spliceColumnWidthsByAction = (
   columnWidths: number[],
   columnCount: number,
   clampedCol: number,
-  kind: MarkdownTableGridAction["kind"]
+  kind: MarkdownTableGridAction["kind"],
+  duplicateInsertCol?: number
 ) => {
   if (kind === "insert-column-left") columnWidths.splice(clampedCol, 0, 0)
   else if (kind === "add-column") columnWidths.splice(clampedCol + 1, 0, 0)
   else if (kind === "add-row-and-column" && columnCount < MAX_EDIT_COLUMNS) columnWidths.push(0)
-  else if (kind === "duplicate-column") columnWidths.splice(clampedCol + 1, 0, columnWidths[clampedCol] ?? 0)
-  else if (kind === "delete-column" && columnCount > 1) columnWidths.splice(clampedCol, 1)
+  else if (kind === "duplicate-column") {
+    const insertIndex = Math.max(0, Math.min(columnWidths.length, duplicateInsertCol ?? clampedCol + 1))
+    columnWidths.splice(insertIndex, 0, columnWidths[clampedCol] ?? 0)
+  } else if (kind === "delete-column" && columnCount > 1) columnWidths.splice(clampedCol, 1)
 }
 
 export const applyTableColumnWidthsAction = (
   columnWidths: number[],
   columnCount: number,
   colIndex: number,
-  action: MarkdownTableGridAction
+  action: MarkdownTableGridAction,
+  duplicateInsertCol?: number
 ) => {
   while (columnWidths.length < columnCount) columnWidths.push(0)
   if (columnWidths.length > columnCount) columnWidths.length = columnCount
@@ -169,7 +173,7 @@ export const applyTableColumnWidthsAction = (
       columnWidths.splice(targetCol, 0, moved ?? 0)
     }
   } else {
-    spliceColumnWidthsByAction(columnWidths, columnCount, clampedCol, action.kind)
+    spliceColumnWidthsByAction(columnWidths, columnCount, clampedCol, action.kind, duplicateInsertCol)
   }
 }
 

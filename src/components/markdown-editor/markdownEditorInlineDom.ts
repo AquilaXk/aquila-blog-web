@@ -127,6 +127,32 @@ const matchInlineCodeAt = (text: string, from: number): InlineDomToken | null =>
   return null
 }
 
+const trySkipDollarMathAt = (text: string, index: number): number => {
+  const run = countCodePointRun(text, index, 36)
+  if (run === 2) {
+    return scanPandocDisplayMathAt(text, index, { singleLineOnly: true })?.to ?? index + 2
+  }
+  if (run === 1) {
+    return scanPandocInlineMathAt(text, index)?.to ?? -1
+  }
+  return index + run
+}
+
+const trySkipInlineCodeOrMathAt = (text: string, index: number, lineEnd: number): number => {
+  const code = text.codePointAt(index) ?? 0
+  if (code === 96 && !isEscapedMarkdownAt(text, index)) {
+    const end = scanInlineCodeSpanEnd(text, index, lineEnd)
+    return end > index ? end : index + countCodePointRun(text, index, 96)
+  }
+  if (code === 36 && !isEscapedMarkdownAt(text, index)) {
+    return trySkipDollarMathAt(text, index)
+  }
+  return -1
+}
+
+const tryAdvanceInlineSkippedSpan = (text: string, pos: number, lineEnd: number): number =>
+  text.codePointAt(pos) === 92 ? pos + 2 : trySkipInlineCodeOrMathAt(text, pos, lineEnd)
+
 const isClosingDoubleDelimiterAt = (
   text: string,
   pos: number,
@@ -134,6 +160,7 @@ const isClosingDoubleDelimiterAt = (
 ): boolean =>
   text.codePointAt(pos) === markerCode &&
   text.codePointAt(pos + 1) === markerCode &&
+  (text.codePointAt(pos - 1) !== markerCode || isEscapedMarkdownAt(text, pos - 1)) &&
   text.codePointAt(pos + 2) !== markerCode &&
   !isEscapedMarkdownAt(text, pos) &&
   !isWhitespaceAt(text, pos - 1)
@@ -143,10 +170,16 @@ const findClosingDoubleDelimiter = (
   innerStart: number,
   markerCode: number
 ): number => {
-  for (let pos = innerStart; pos < text.length; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) return -1
+  const lineEnd = findInlineLineEnd(text, innerStart)
+  let pos = innerStart
+  while (pos < lineEnd) {
+    const skipped = tryAdvanceInlineSkippedSpan(text, pos, lineEnd)
+    if (skipped > pos) {
+      pos = skipped
+      continue
+    }
     if (isClosingDoubleDelimiterAt(text, pos, markerCode)) return pos
+    pos += 1
   }
   return -1
 }
@@ -155,7 +188,7 @@ const matchPairedDoubleDelimiterAt = (
   text: string,
   from: number,
   markerCode: number,
-  kind: "strong" | "del"
+  kind: "strong" | "del" | "mark"
 ): InlineDomToken | null => {
   const runLen = countCodePointRun(text, from, markerCode)
   if (runLen !== 2) {
@@ -170,7 +203,10 @@ const matchPairedDoubleDelimiterAt = (
   }
   const closePos = findClosingDoubleDelimiter(text, innerStart, markerCode)
   if (closePos >= innerStart) {
-    return { kind, from, end: closePos + 2, content: text.slice(innerStart, closePos) }
+    const content = text.slice(innerStart, closePos)
+    if (kind !== "mark" || content.trim().length > 0) {
+      return { kind, from, end: closePos + 2, content }
+    }
   }
   return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
 }
@@ -179,11 +215,15 @@ const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
   const innerStart = from + 1
   const firstCode = text.codePointAt(innerStart) ?? 0
   if (!firstCode || isNewlineCode(firstCode) || isWhitespaceAt(text, innerStart)) return null
+  const lineEnd = findInlineLineEnd(text, innerStart)
   let pos = innerStart
-  while (pos < text.length) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) return null
-    if (code === 42 && !isEscapedMarkdownAt(text, pos)) {
+  while (pos < lineEnd) {
+    const skipped = tryAdvanceInlineSkippedSpan(text, pos, lineEnd)
+    if (skipped > pos) {
+      pos = skipped
+      continue
+    }
+    if (text.codePointAt(pos) === 42 && !isEscapedMarkdownAt(text, pos)) {
       const closeRun = countCodePointRun(text, pos, 42)
       if (closeRun === 1 && !isWhitespaceAt(text, pos - 1)) {
         return { kind: "em", from, end: pos + 1, content: text.slice(innerStart, pos) }
@@ -200,52 +240,6 @@ const matchStarDelimiterAt = (text: string, from: number): InlineDomToken | null
   text.codePointAt(from + 1) === 42
     ? matchPairedDoubleDelimiterAt(text, from, 42, "strong")
     : matchEmphasisAt(text, from)
-
-const isClosingHighlightAt = (text: string, index: number): boolean =>
-  text.codePointAt(index) === 61 &&
-  text.codePointAt(index + 1) === 61 &&
-  text.codePointAt(index - 1) !== 61 &&
-  !isWhitespaceAt(text, index - 1) &&
-  text.codePointAt(index + 2) !== 61 &&
-  !isEscapedMarkdownAt(text, index)
-
-const findClosingInlineHighlight = (text: string, innerStart: number): number => {
-  const lineEnd = findInlineLineEnd(text, innerStart)
-  let pos = innerStart + 1
-  while (pos + 1 < lineEnd) {
-    const code = text.codePointAt(pos) ?? 0
-    if (code === 96 && !isEscapedMarkdownAt(text, pos)) {
-      const codeEnd = scanInlineCodeSpanEnd(text, pos, lineEnd)
-      pos = codeEnd > pos ? codeEnd : pos + countCodePointRun(text, pos, 96)
-      continue
-    }
-    if (code === 61 && isClosingHighlightAt(text, pos)) return pos
-    pos += 1
-  }
-  return -1
-}
-
-const matchHighlightAt = (text: string, from: number): InlineDomToken | null => {
-  const runLen = countCodePointRun(text, from, 61)
-  if (runLen !== 2) {
-    return runLen > 2
-      ? { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
-      : null
-  }
-  const innerStart = from + 2
-  const firstCode = text.codePointAt(innerStart) ?? 0
-  if (from + 3 >= text.length || !firstCode || isNewlineCode(firstCode) || isWhitespaceAt(text, innerStart)) {
-    return { kind: "literal", from, end: innerStart, raw: "==" }
-  }
-  const closePos = findClosingInlineHighlight(text, innerStart)
-  if (closePos > innerStart) {
-    const content = text.slice(innerStart, closePos)
-    if (content.trim().length > 0) {
-      return { kind: "mark", from, end: closePos + 2, content }
-    }
-  }
-  return { kind: "literal", from, end: innerStart, raw: "==" }
-}
 
 const matchMathAt = (text: string, from: number): InlineDomToken | null => {
   const runLen = countCodePointRun(text, from, 36)
@@ -285,11 +279,18 @@ const matchWikilinkAt = (text: string, from: number): InlineDomToken | null => {
 }
 
 const findClosingLinkBracket = (text: string, start: number): number => {
-  for (let pos = start; pos < text.length; pos += 1) {
+  const lineEnd = findInlineLineEnd(text, start)
+  let pos = start
+  while (pos < lineEnd) {
+    const skipped = tryAdvanceInlineSkippedSpan(text, pos, lineEnd)
+    if (skipped > pos) {
+      pos = skipped
+      continue
+    }
     const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) return -1
-    if (code === 91 && !isEscapedMarkdownAt(text, pos)) return -1
-    if (code === 93 && !isEscapedMarkdownAt(text, pos)) return pos
+    if (code === 91) return -1
+    if (code === 93) return pos
+    pos += 1
   }
   return -1
 }
@@ -364,7 +365,7 @@ const matchInlineTokenAt = (text: string, cursor: number): InlineDomToken | null
   if (code === 96) return matchInlineCodeAt(text, cursor)
   if (code === 42) return matchStarDelimiterAt(text, cursor)
   if (code === 126) return matchPairedDoubleDelimiterAt(text, cursor, 126, "del")
-  if (code === 61) return matchHighlightAt(text, cursor)
+  if (code === 61) return matchPairedDoubleDelimiterAt(text, cursor, 61, "mark")
   if (code === 36) return matchMathAt(text, cursor)
   if (code === 91) return matchBracketConstructAt(text, cursor)
   if (code === 123) return matchInlineColorAt(text, cursor)

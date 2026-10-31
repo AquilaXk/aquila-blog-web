@@ -11,6 +11,10 @@ import {
 import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
 import { findMarkdownHighlightSpans } from "src/libs/markdown/inlineHighlightModel"
 import {
+  ESCAPED_HIGHLIGHT_SENTINEL,
+  ESCAPED_LT_SENTINEL,
+} from "src/libs/markdown/inlineMathGuardModel"
+import {
   findDoubleBraceColorSpans,
   findRawBrTagSpans,
   findWikilinkSpans,
@@ -224,34 +228,26 @@ const hasWikilinkSyntax = (text: string): boolean => text.includes("[[")
 const hasInlineBrSyntax = (text: string): boolean => hasRawBrTag(text)
 const hasSoftBreakSyntax = (text: string): boolean => text.includes("\n")
 
+const restoreEscapedInlineText = (value: string): string =>
+  value.replaceAll(ESCAPED_HIGHLIGHT_SENTINEL, "==").replaceAll(ESCAPED_LT_SENTINEL, "<")
+
 export const resolveMarkdownWikilinkTarget = (
   rawTarget: string,
   rawAlias?: string
 ): { href: string; label: string } | null => {
-  const target = rawTarget.trim()
+  const target = restoreEscapedInlineText(rawTarget).trim()
   if (!target) return null
-  const alias = (rawAlias ?? "").trim()
+  const alias = restoreEscapedInlineText(rawAlias ?? "").trim()
   const fallbackLabel = target.startsWith("#") ? target.slice(1) : target
   const label = (alias || fallbackLabel).trim()
   if (!label) return null
 
   if (target.startsWith("#")) {
-    return {
-      href: `#${slugifyMarkdownHeading(target.slice(1))}`,
-      label,
-    }
+    return { href: `#${slugifyMarkdownHeading(target.slice(1))}`, label }
   }
   const safePath = target.startsWith("/") ? normalizeSafeRelativeMarkdownPath(target) : ""
-  if (safePath) {
-    return {
-      href: safePath,
-      label,
-    }
-  }
-  return {
-    href: `/?q=${encodeURIComponent(target)}`,
-    label,
-  }
+  if (safePath) return { href: safePath, label }
+  return { href: `/?q=${encodeURIComponent(target)}`, label }
 }
 
 const restoreDelimitedText = (
@@ -272,9 +268,7 @@ const restoreDelimitedText = (
       index += 1
       continue
     }
-    if (textCursor < index) {
-      nodes.push(value.slice(textCursor, index))
-    }
+    if (textCursor < index) nodes.push(value.slice(textCursor, index))
     nodes.push(renderWrap(match.quotedText, matchCount))
     matchCount += 1
     index = match.end
@@ -282,9 +276,7 @@ const restoreDelimitedText = (
   }
 
   if (matchCount === 0) return [value]
-  if (textCursor < value.length) {
-    nodes.push(value.slice(textCursor))
-  }
+  if (textCursor < value.length) nodes.push(value.slice(textCursor))
   return nodes
 }
 
@@ -336,10 +328,7 @@ const restoreSerializedMarkdownChildren = (serialized: string, sourceChildren: R
     match = placeholderRegex.exec(serialized)
   }
 
-  if (cursor < serialized.length) {
-    nodes.push(serialized.slice(cursor))
-  }
-
+  if (cursor < serialized.length) nodes.push(serialized.slice(cursor))
   return nodes
 }
 
@@ -410,7 +399,7 @@ const normalizeHighlightFlat = (children: ReactNode): ReactNode => {
   const serialized = serializeMixedInlineChildren(sourceChildren)
   if (!serialized.includes("==")) return children
 
-  const spans = findMarkdownHighlightSpans(serialized)
+  const spans = findMarkdownHighlightSpans(serialized, { honorMarkdownEscapes: false })
   if (spans.length === 0) return children
 
   const nodes: ReactNode[] = []
@@ -422,9 +411,7 @@ const normalizeHighlightFlat = (children: ReactNode): ReactNode => {
     const contentSerialized = serialized.slice(span.contentFrom, span.contentTo)
     if (!contentSerialized.trim()) continue
     if (span.from > cursor) {
-      nodes.push(
-        ...restoreSerializedMarkdownChildren(serialized.slice(cursor, span.from), sourceChildren)
-      )
+      nodes.push(...restoreSerializedMarkdownChildren(serialized.slice(cursor, span.from), sourceChildren))
     }
     nodes.push(
       createElement(
@@ -448,6 +435,22 @@ const normalizeHighlightFlat = (children: ReactNode): ReactNode => {
 const normalizeHighlightChildren = (children: ReactNode): ReactNode =>
   runRecursiveInlinePass(children, hasHighlightSyntax, normalizeHighlightFlat)
 
+const hasEscapedHighlightSentinel = (text: string): boolean =>
+  text.includes(ESCAPED_HIGHLIGHT_SENTINEL) || text.includes(ESCAPED_LT_SENTINEL)
+
+const restoreEscapedHighlightFlat = (children: ReactNode): ReactNode => {
+  if (typeof children === "string") return restoreEscapedInlineText(children)
+  if (!Array.isArray(children)) return children
+  return children.map((child) =>
+    typeof child === "string" && hasEscapedHighlightSentinel(child)
+      ? restoreEscapedInlineText(child)
+      : child
+  )
+}
+
+const restoreEscapedHighlightChildren = (children: ReactNode): ReactNode =>
+  runRecursiveInlinePass(children, hasEscapedHighlightSentinel, restoreEscapedHighlightFlat)
+
 const normalizeInlineColorFlat = (children: ReactNode): ReactNode => {
   const sourceChildren = mergeAdjacentStringChildren(children)
   if (sourceChildren.length === 0) return children
@@ -457,6 +460,7 @@ const normalizeInlineColorFlat = (children: ReactNode): ReactNode => {
   const spans = findDoubleBraceColorSpans(serialized, {
     trimTrailingContentWhitespace: true,
     allowEmptyContent: false,
+    singleLine: true,
   })
   if (spans.length === 0) return children
 
@@ -468,14 +472,10 @@ const normalizeInlineColorFlat = (children: ReactNode): ReactNode => {
   for (const span of spans) {
     const cssColor = resolveInlineColorValue(span.colorToken)
     if (span.from > cursor) {
-      nodes.push(
-        ...restoreSerializedMarkdownChildren(serialized.slice(cursor, span.from), sourceChildren)
-      )
+      nodes.push(...restoreSerializedMarkdownChildren(serialized.slice(cursor, span.from), sourceChildren))
     }
     if (!cssColor) {
-      nodes.push(
-        ...restoreSerializedMarkdownChildren(serialized.slice(span.from, span.to), sourceChildren)
-      )
+      nodes.push(...restoreSerializedMarkdownChildren(serialized.slice(span.from, span.to), sourceChildren))
     } else {
       nodes.push(
         createElement(
@@ -548,16 +548,13 @@ export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode =>
 const MarkdownBlockquoteContext = createContext(false)
 
 export const normalizeMarkdownInlineChildren = (children: ReactNode) => {
-  if (typeof children === "string" && !/[{*_~`<\n\\=[\]]/.test(children)) {
+  if (typeof children === "string" && !/[{*_~`<\n\\=[\]\uE000]/.test(children)) {
     return children
   }
-  let normalizedChildren = normalizeWikilinkChildren(children)
-  normalizedChildren = normalizeInlineBrChildren(normalizedChildren)
-  normalizedChildren = normalizeHighlightChildren(normalizedChildren)
-  normalizedChildren = normalizeInlineColorChildren(normalizedChildren)
-  normalizedChildren = normalizeQuotedStrongChildren(normalizedChildren)
-  normalizedChildren = normalizeQuotedEmphasisChildren(normalizedChildren)
-  return normalizedChildren
+  const withBr = normalizeInlineBrChildren(normalizeWikilinkChildren(children))
+  const withColor = normalizeInlineColorChildren(withBr)
+  const withHighlight = restoreEscapedHighlightChildren(normalizeHighlightChildren(withColor))
+  return normalizeQuotedEmphasisChildren(normalizeQuotedStrongChildren(withHighlight))
 }
 
 export const MarkdownParagraph = ({

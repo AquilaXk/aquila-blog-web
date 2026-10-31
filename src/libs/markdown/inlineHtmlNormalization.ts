@@ -4,6 +4,11 @@ import {
   skipAsciiSpaces,
   startsWithAsciiCaseInsensitive,
 } from "./inlineTokenScanners"
+import {
+  countCodePointRun,
+  isEscapedMarkdownAt,
+  scanInlineCodeSpanEnd,
+} from "./pandocMathScanner"
 
 const FENCE_MARKER_PATTERN = /^(`{3,}|~{3,})/
 
@@ -72,25 +77,42 @@ const LEGACY_HTML_ENTITY_MAP: Record<string, string> = {
   quot: '"',
 }
 
-const decodeLegacyHtmlCodePoint = (codePoint: number, fallback: string) => {
+const RAW_HTML_SAFE_ENTITY_MAP: Record<string, string> = {
+  amp: "&#38;",
+  apos: "'",
+  gt: "&#62;",
+  lt: "&#60;",
+  nbsp: " ",
+  quot: '"',
+}
+
+const decodeLegacyHtmlCodePoint = (
+  codePoint: number,
+  fallback: string,
+  preserveMarkupEntities: boolean
+) => {
   if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return fallback
+  if (preserveMarkupEntities && (codePoint === 38 || codePoint === 60 || codePoint === 62)) {
+    return `&#${codePoint};`
+  }
   return String.fromCodePoint(codePoint)
 }
 
-const decodeLegacyHtmlEntities = (input: string) =>
+const decodeLegacyHtmlEntities = (input: string, preserveMarkupEntities = false) =>
   String(input || "").replace(
     /&(#x[\da-f]+|#\d+|amp|apos|gt|lt|nbsp|quot);/gi,
     (entity, token: string) => {
       const normalizedToken = token.toLowerCase()
       if (normalizedToken.startsWith("#x")) {
         const codePoint = Number.parseInt(normalizedToken.slice(2), 16)
-        return decodeLegacyHtmlCodePoint(codePoint, entity)
+        return decodeLegacyHtmlCodePoint(codePoint, entity, preserveMarkupEntities)
       }
       if (normalizedToken.startsWith("#")) {
         const codePoint = Number.parseInt(normalizedToken.slice(1), 10)
-        return decodeLegacyHtmlCodePoint(codePoint, entity)
+        return decodeLegacyHtmlCodePoint(codePoint, entity, preserveMarkupEntities)
       }
-      return LEGACY_HTML_ENTITY_MAP[normalizedToken] || entity
+      const entityMap = preserveMarkupEntities ? RAW_HTML_SAFE_ENTITY_MAP : LEGACY_HTML_ENTITY_MAP
+      return entityMap[normalizedToken] || entity
     }
   )
 
@@ -218,8 +240,7 @@ const findPairedCloseTag = (
   return null
 }
 
-const decodeTextSlice = (slice: string, shouldDecode: boolean): string =>
-  shouldDecode ? decodeLegacyHtmlEntities(slice) : slice
+const IDENTITY_SLICE_DECODER = (slice: string): string => slice
 
 const replacePairedInlineTags = (
   text: string,
@@ -228,11 +249,11 @@ const replacePairedInlineTags = (
   tagNames: readonly string[],
   disallowAmpersandInAttrs: boolean,
   transformInner: (inner: string) => string,
-  decodePlainSlices = false
+  decodePlainSlice: (slice: string) => string = IDENTITY_SLICE_DECODER
 ): string => {
   const lowerText = text.toLowerCase()
   let openIndex = lowerText.indexOf(openDelim)
-  if (openIndex < 0) return decodeTextSlice(text, decodePlainSlices)
+  if (openIndex < 0) return decodePlainSlice(text)
   let output = ""
   let cursor = 0
 
@@ -259,18 +280,21 @@ const replacePairedInlineTags = (
       [openTag.tagName],
       disallowAmpersandInAttrs
     )
-    if (!closeMatch) break
+    if (!closeMatch) {
+      openIndex = lowerText.indexOf(openDelim, openTag.openEnd)
+      continue
+    }
     if (openIndex > cursor) {
-      output += decodeTextSlice(text.slice(cursor, openIndex), decodePlainSlices)
+      output += decodePlainSlice(text.slice(cursor, openIndex))
     }
     output += transformInner(text.slice(openTag.openEnd, closeMatch.closeStart))
     cursor = closeMatch.closeEnd
     openIndex = lowerText.indexOf(openDelim, cursor)
   }
 
-  if (cursor === 0) return decodeTextSlice(text, decodePlainSlices)
+  if (cursor === 0) return decodePlainSlice(text)
   if (cursor < text.length) {
-    output += decodeTextSlice(text.slice(cursor), decodePlainSlices)
+    output += decodePlainSlice(text.slice(cursor))
   }
   return output
 }
@@ -283,6 +307,9 @@ const replacePairedFormattingTags = (
   disallowAmpersandInAttrs: boolean,
   marker: string
 ): string => {
+  const preserveMarkupEntities = openDelim === "<"
+  const decodePlainSlice = (slice: string) =>
+    decodeLegacyHtmlEntities(slice, preserveMarkupEntities)
   const renderNested = (rawInner: string): string => {
     const normalizedInner = replacePairedInlineTags(
       rawInner,
@@ -291,7 +318,7 @@ const replacePairedFormattingTags = (
       tagNames,
       disallowAmpersandInAttrs,
       renderNested,
-      true
+      decodePlainSlice
     )
     return wrapDecodedMarkdownMark(normalizedInner, marker)
   }
@@ -373,20 +400,31 @@ export const normalizeLegacyInlineHtmlSpans = (input: string) => {
   }
 
   let result = ""
+  let copyFrom = 0
   let cursor = 0
-  const codeSpanRegex = /(`+)([\s\S]*?)\1/g
-  let match = codeSpanRegex.exec(input)
-  while (match !== null) {
-    const start = match.index
-    if (start > cursor) {
-      result += normalizeInlineHtmlChunk(input.slice(cursor, start), hasRawTag, hasEntityTag)
+  while (cursor < input.length) {
+    if (input.codePointAt(cursor) !== 96 || isEscapedMarkdownAt(input, cursor)) {
+      cursor += 1
+      continue
     }
-    result += match[0]
-    cursor = start + match[0].length
-    match = codeSpanRegex.exec(input)
+    const runLen = countCodePointRun(input, cursor, 96)
+    const closeEnd = scanInlineCodeSpanEnd(input, cursor)
+    if (closeEnd <= cursor) {
+      cursor += runLen
+      continue
+    }
+    if (cursor > copyFrom) {
+      result += normalizeInlineHtmlChunk(input.slice(copyFrom, cursor), hasRawTag, hasEntityTag)
+    }
+    result += input.slice(cursor, closeEnd)
+    copyFrom = closeEnd
+    cursor = closeEnd
   }
-  if (cursor < input.length) {
-    result += normalizeInlineHtmlChunk(input.slice(cursor), hasRawTag, hasEntityTag)
+  if (copyFrom === 0) {
+    return normalizeInlineHtmlChunk(input, hasRawTag, hasEntityTag)
+  }
+  if (copyFrom < input.length) {
+    result += normalizeInlineHtmlChunk(input.slice(copyFrom), hasRawTag, hasEntityTag)
   }
   return result
 }

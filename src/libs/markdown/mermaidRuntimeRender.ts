@@ -1,15 +1,15 @@
 import {
   DESKTOP_MERMAID_MIN_VIEWPORT_PX,
-  MERMAID_RENDER_TIMEOUT_MS,
   MERMAID_VIEWPORT_ROOT_MARGIN,
   buildMermaidCacheKey,
   estimateMermaidComplexity,
   formatMermaidErrorReason,
   isMermaidSource,
   readMermaidCache,
-  runSerializedMermaidTask,
+  renderMermaidInstanceWithTimeout,
+  renderSerializedMermaidSvg,
   writeMermaidCache,
-} from "src/libs/markdown/mermaidRuntimeConfig"
+} from "./mermaidRuntimeConfig"
 import {
   applyRenderedMermaidDom,
   collectMermaidBlocksInRoot,
@@ -23,7 +23,6 @@ import {
 } from "src/libs/markdown/mermaidRuntimeGeometry"
 import { openMermaidOverlay } from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
-  createMermaidRenderTimeoutError,
   isMermaidRenderTimeoutError,
   isMermaidSyntaxError,
   isNegativeRectWidthError,
@@ -80,28 +79,6 @@ type ControllerInternalState = {
 const MAX_RETRY_COUNT = 6
 const RETRY_BASE_DELAY_MS = 150
 
-const renderMermaidWithTimeout = async (
-  mermaidInstance: MermaidRuntimeInstance,
-  renderId: string,
-  sourceToRender: string
-) => {
-  let timeoutId: number | null = null
-  try {
-    const timed = new Promise<never>((_, reject) => {
-      timeoutId = window.setTimeout(
-        () => reject(createMermaidRenderTimeoutError()),
-        MERMAID_RENDER_TIMEOUT_MS
-      )
-    })
-    return await Promise.race([
-      Promise.resolve(mermaidInstance.render(renderId, sourceToRender)),
-      timed,
-    ])
-  } finally {
-    if (timeoutId !== null) window.clearTimeout(timeoutId)
-  }
-}
-
 const executeUncachedMermaidRender = async ({
   customMermaid,
   options,
@@ -115,28 +92,20 @@ const executeUncachedMermaidRender = async ({
 }): Promise<string> => {
   if (customMermaid) {
     options.clearParseWarning?.()
-    const rendered = await renderMermaidWithTimeout(customMermaid, renderId, sourceToRender)
+    const rendered = await renderMermaidInstanceWithTimeout(customMermaid, renderId, sourceToRender)
     const parseWarning = options.readParseWarning?.()
     if (parseWarning) throw new Error(parseWarning)
     return rendered.svg
   }
 
-  const resolvedScheme =
+  const scheme =
     options.scheme ?? (options.preset.themeKey.endsWith("-dark") ? "dark" : "light")
-  let taskParseWarning: string | null = null
-  const rendered = await runSerializedMermaidTask(
-    resolvedScheme,
-    (error) => {
-      taskParseWarning = formatMermaidErrorReason(error)
-    },
-    async ({ mermaidRuntime }) => {
-      taskParseWarning = null
-      const result = await renderMermaidWithTimeout(mermaidRuntime, renderId, sourceToRender)
-      if (taskParseWarning) throw new Error(taskParseWarning)
-      return result
-    },
-    options.runtimeLoader
-  )
+  const rendered = await renderSerializedMermaidSvg({
+    scheme,
+    renderId,
+    source: sourceToRender,
+    runtimeLoader: options.runtimeLoader,
+  })
   return rendered.svg
 }
 

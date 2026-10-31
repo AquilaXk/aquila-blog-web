@@ -1,5 +1,6 @@
 import { RefObject, useEffect } from "react"
-import { INLINE_COLOR_TOKEN_REGEX, resolveInlineColorValue } from "src/libs/markdown/inlineColor"
+import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
+import { findDoubleBraceColorSpans } from "src/libs/markdown/inlineTokenScanners"
 
 const nodeContainsInlineColorToken = (node: Node | null): boolean => {
   if (!node) return false
@@ -46,24 +47,27 @@ export const applyInlineColors = (root: HTMLElement) => {
 
   textNodes.forEach((textNode) => {
     const original = textNode.nodeValue || ""
-    INLINE_COLOR_TOKEN_REGEX.lastIndex = 0
+    const spans = findDoubleBraceColorSpans(original, {
+      trimTrailingContentWhitespace: true,
+      allowEmptyContent: false,
+      singleLine: true,
+    })
+    if (spans.length === 0) return
+
     let matched = false
     let cursor = 0
     const fragment = document.createDocumentFragment()
 
-    for (const match of original.matchAll(INLINE_COLOR_TOKEN_REGEX)) {
-      const full = match[0]
-      const colorToken = match[1]
-      const content = match[2].trim()
-      const start = match.index ?? 0
-      const cssColor = resolveInlineColorValue(colorToken)
+    for (const match of spans) {
+      const content = match.content.trim()
+      const cssColor = resolveInlineColorValue(match.colorToken)
 
-      if (start > cursor) {
-        fragment.appendChild(document.createTextNode(original.slice(cursor, start)))
+      if (match.from > cursor) {
+        fragment.appendChild(document.createTextNode(original.slice(cursor, match.from)))
       }
 
       if (!cssColor || !content) {
-        fragment.appendChild(document.createTextNode(full))
+        fragment.appendChild(document.createTextNode(original.slice(match.from, match.to)))
       } else {
         const span = document.createElement("span")
         span.className = "aq-inline-color"
@@ -73,7 +77,7 @@ export const applyInlineColors = (root: HTMLElement) => {
         matched = true
       }
 
-      cursor = start + full.length
+      cursor = match.to
     }
 
     if (!matched) return

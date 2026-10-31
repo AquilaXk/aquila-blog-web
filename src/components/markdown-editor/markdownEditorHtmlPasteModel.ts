@@ -123,14 +123,16 @@ const INLINE_WRAP_DELIMITERS: Record<string, string> = {
   strike: "~~",
 }
 
+export const escapeMarkdownLinkDestination = (url: string) => url.replace(/[\\()]/g, "\\$&")
+
 const serializeInlineLinkOrImage = (element: HTMLElement, tag: string, inner: string): string => {
   if (tag === "a") {
     const href = resolveSafeHtmlPasteHref(element.getAttribute("href") || "")
-    return href && inner ? `[${inner}](${href.replace(/[\\()]/g, String.raw`\$&`)})` : inner
+    return href && inner ? `[${inner}](${escapeMarkdownLinkDestination(href)})` : inner
   }
   const src = resolveSafeHtmlPasteHref(element.getAttribute("src") || "")
   const alt = inlineText(element.getAttribute("alt") || "")
-  return src ? `![${alt}](${src.replace(/[\\()]/g, String.raw`\$&`)})` : alt
+  return src ? `![${alt}](${escapeMarkdownLinkDestination(src)})` : alt
 }
 
 const serializeInline = (node: Node): string => {

@@ -20,6 +20,7 @@ import {
   reconcileCellSpans,
   resolveTargetMovedCol,
   resolveTargetMovedRow,
+  unmergeCoveredCellAt,
 } from "./markdownEditorTableSpanModel"
 
 export { reconcileCellSpans }
@@ -197,7 +198,8 @@ const applyGridActionToTableLayout = (
         layout,
         activeRow,
         action.kind === "duplicate-row",
-        action.kind === "insert-row-above"
+        action.kind === "insert-row-above",
+        bodyRowCountBefore
       )
       return
     case "move-row-up":
@@ -220,7 +222,8 @@ const applyGridActionToTableLayout = (
         layout,
         activeCol,
         action.kind === "duplicate-column",
-        action.kind === "insert-column-left"
+        action.kind === "insert-column-left",
+        colCountBefore
       )
       return
     case "move-column-left":
@@ -253,6 +256,9 @@ export const syncTableLayoutOnGridAction = (
   if (!layout) {
     return
   }
+  if (layout.cells) {
+    layout.cells = reconcileCellSpans(layout.cells, bodyRowCountBefore + 1, colCountBefore)
+  }
   applyGridActionToTableLayout(
     layout,
     colCountBefore,
@@ -265,6 +271,24 @@ export const syncTableLayoutOnGridAction = (
     layout.cells = reconcileCellSpans(layout.cells, grid.rows.length + 1, grid.headers.length)
   }
   setTableGridLayoutMeta(grid, layout)
+}
+
+export const reconcileOverwrittenTableCells = (
+  grid: MarkdownTableGrid,
+  coords: ReadonlyArray<{ row: number; col: number }>
+): void => {
+  if (coords.length === 0) return
+  const next = getTableGridLayoutMeta(grid)
+  if (!next) return
+  let changed = false
+  for (const { row, col } of coords) {
+    if (unmergeCoveredCellAt(next, row, col)) changed = true
+  }
+  if (!changed) return
+  if (next.cells) {
+    next.cells = reconcileCellSpans(next.cells, grid.rows.length + 1, grid.headers.length)
+  }
+  setTableGridLayoutMeta(grid, next)
 }
 
 export type HydratedTableVisualState = {

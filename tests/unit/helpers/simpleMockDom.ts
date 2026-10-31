@@ -98,6 +98,17 @@ export class SimpleDomElement {
     if (name.startsWith("data-")) delete this.dataset[toDatasetCamel(name)]
   }
 
+  get firstChild(): SimpleDomElement | null {
+    return this.children[0] ?? null
+  }
+
+  remove() {
+    if (!this.parentElement) return
+    const idx = this.parentElement.children.indexOf(this)
+    if (idx >= 0) this.parentElement.children.splice(idx, 1)
+    this.parentElement = null
+  }
+
   appendChild<T extends SimpleDomElement>(child: T): T {
     child.parentElement = this
     this.children.push(child)

@@ -1,27 +1,12 @@
-import {
-  countCodePointRun,
-  isEscapedMarkdownAt,
-  scanInlineCodeSpanEnd,
-} from "../../libs/markdown/pandocMathScanner"
+import { countCodePointRun, isEscapedMarkdownAt, scanInlineCodeSpanEnd } from "../../libs/markdown/pandocMathScanner"
 import type { MarkdownTableCellLayout } from "../../libs/markdown/tableMetadata"
-import { getTableGridLayoutMeta } from "./markdownEditorTableMetadataModel"
+import { getTableGridLayoutMeta, reconcileOverwrittenTableCells } from "./markdownEditorTableMetadataModel"
 import {
-  MAX_EDIT_COLUMNS,
-  MAX_EDIT_ROWS,
-  parseMarkdownTableGrid,
-  serializeMarkdownTableGrid,
-  type MarkdownTableGrid,
-  type MarkdownTableGridAction,
+  MAX_EDIT_COLUMNS, MAX_EDIT_ROWS, parseMarkdownTableGrid, serializeMarkdownTableGrid,
+  type MarkdownTableGrid, type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
-import {
-  resolveDuplicateColInsertIndex,
-  resolveDuplicateRowInsertTableIndex,
-} from "./markdownEditorTableSpanModel"
-import {
-  applyPlannedTextMutationToValue,
-  planReplaceSelection,
-  planToggleWrapSelection,
-} from "./markdownEditorTextMutation"
+import { resolveDuplicateColInsertIndex, resolveDuplicateRowInsertTableIndex } from "./markdownEditorTableSpanModel"
+import { applyPlannedTextMutationToValue, planReplaceSelection, planToggleWrapSelection } from "./markdownEditorTextMutation"
 
 const MIN_TABLE_ROWS = 2
 
@@ -240,10 +225,8 @@ const expandGridToFitPaste = (
 }
 
 const writeMatrixRowIntoGrid = (
-  grid: MarkdownTableGrid,
-  sourceRow: string[],
-  targetRow: number,
-  clampedStartCol: number
+  grid: MarkdownTableGrid, sourceRow: string[], targetRow: number,
+  clampedStartCol: number, writtenCoords: Array<{ row: number; col: number }>
 ): number => {
   let writtenCols = 0
   for (let c = 0; c < sourceRow.length; c += 1) {
@@ -253,38 +236,37 @@ const writeMatrixRowIntoGrid = (
     const cellVal = (sourceRow[c] ?? "").trim()
     if (targetRow === 0) grid.headers[targetCol] = cellVal
     else grid.rows[targetRow - 1]![targetCol] = cellVal
+    if (cellVal.length > 0) writtenCoords.push({ row: targetRow, col: targetCol })
   }
   return writtenCols
 }
 
 const writeMatrixIntoGrid = (
-  grid: MarkdownTableGrid,
-  matrix: string[][],
-  clampedStartRow: number,
-  clampedStartCol: number
-): { pastedRows: number; pastedCols: number; lastRow: number; lastCol: number } => {
+  grid: MarkdownTableGrid, matrix: string[][], clampedStartRow: number, clampedStartCol: number
+): {
+  pastedRows: number; pastedCols: number; lastRow: number; lastCol: number
+  writtenCoords: Array<{ row: number; col: number }>
+} => {
   let pastedRows = 0
   let pastedCols = 0
   let lastRow = clampedStartRow
   let lastCol = clampedStartCol
+  const writtenCoords: Array<{ row: number; col: number }> = []
   for (let r = 0; r < matrix.length; r += 1) {
     const targetRow = clampedStartRow + r
     if (targetRow > grid.rows.length) break
     pastedRows += 1
     lastRow = targetRow
-    const writtenCols = writeMatrixRowIntoGrid(grid, matrix[r]!, targetRow, clampedStartCol)
+    const writtenCols = writeMatrixRowIntoGrid(grid, matrix[r]!, targetRow, clampedStartCol, writtenCoords)
     if (writtenCols > pastedCols) pastedCols = writtenCols
     const endCol = clampedStartCol + Math.max(0, writtenCols - 1)
     if (writtenCols > 0 && endCol > lastCol) lastCol = endCol
   }
-  return { pastedRows, pastedCols, lastRow, lastCol }
+  return { pastedRows, pastedCols, lastRow, lastCol, writtenCoords }
 }
 
 export const applyMarkdownTableGridPaste = (
-  markdown: string,
-  startRow: number,
-  startCol: number,
-  rawText: string
+  markdown: string, startRow: number, startCol: number, rawText: string
 ): MarkdownTablePasteOutcome | null => {
   const normalized = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
   if (!normalized.includes("\t") && !normalized.includes("\n")) return null
@@ -297,13 +279,11 @@ export const applyMarkdownTableGridPaste = (
   const clampedStartRow = Math.max(0, Math.min(startRow, grid.rows.length))
   const clampedStartCol = Math.max(0, Math.min(startCol, grid.headers.length - 1))
   expandGridToFitPaste(grid, clampedStartRow, clampedStartCol, matrix.length, maxCols)
-  const { pastedRows, pastedCols, lastRow, lastCol } = writeMatrixIntoGrid(
-    grid,
-    matrix,
-    clampedStartRow,
-    clampedStartCol
+  const { pastedRows, pastedCols, lastRow, lastCol, writtenCoords } = writeMatrixIntoGrid(
+    grid, matrix, clampedStartRow, clampedStartCol
   )
   if (pastedRows === 0 || pastedCols === 0) return null
+  if (writtenCoords.length > 0) reconcileOverwrittenTableCells(grid, writtenCoords)
   return {
     markdown: serializeMarkdownTableGrid(grid),
     nextRow: lastRow,
@@ -451,6 +431,13 @@ const mutateGridRowAction = (
   return mutateGridRowMove(grid, activeRow, activeCol, resolveMoveRowTarget(action, activeRow))
 }
 
+const resolveColumnInsertIndex = (
+  grid: MarkdownTableGrid, activeCol: number, isDuplicate: boolean, insertLeft: boolean
+): number => {
+  if (isDuplicate) return resolveDuplicateColInsertIndex(getTableGridLayoutMeta(grid), activeCol, grid.headers.length)
+  return insertLeft ? activeCol : activeCol + 1
+}
+
 const mutateGridColumnInsertOrDuplicate = (
   grid: MarkdownTableGrid,
   activeRow: number,
@@ -459,11 +446,7 @@ const mutateGridColumnInsertOrDuplicate = (
   insertLeft: boolean
 ): { nextRow: number; nextCol: number } | null => {
   if (grid.headers.length >= MAX_EDIT_COLUMNS) return null
-  const insertAt = isDuplicate
-    ? resolveDuplicateColInsertIndex(getTableGridLayoutMeta(grid), activeCol, grid.headers.length)
-    : insertLeft
-      ? activeCol
-      : activeCol + 1
+  const insertAt = resolveColumnInsertIndex(grid, activeCol, isDuplicate, insertLeft)
   grid.headers.splice(insertAt, 0, isDuplicate ? (grid.headers[activeCol] ?? "") : "")
   grid.alignments.splice(insertAt, 0, isDuplicate ? (grid.alignments[activeCol] ?? "left") : "left")
   for (const row of grid.rows) row.splice(insertAt, 0, isDuplicate ? (row[activeCol] ?? "") : "")
