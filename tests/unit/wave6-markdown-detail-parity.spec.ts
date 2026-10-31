@@ -24,11 +24,16 @@ import {
   formatMarkdownHeadingLabel,
 } from "../../src/libs/markdown/markdownDocumentInsights"
 import {
+  escapeNonPandocSingleDollars,
+  hasValidMarkdownMath,
+} from "../../src/libs/markdown/inlineMathGuardModel"
+import {
   loadSharedMermaidRuntime,
   resetSharedMermaidRuntimeForTests,
   runSerializedMermaidTask,
 } from "../../src/libs/markdown/mermaidRuntimeConfig"
 import { createMermaidRuntimeController } from "../../src/libs/markdown/mermaidRuntimeRender"
+import { mountMermaidErrorStateDom } from "../../src/libs/markdown/mermaidRuntimeSanitize"
 import {
   collectTocFromArticle,
   expandClosedAncestorDetails,
@@ -117,8 +122,9 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       `<a class="aq-wikilink" href="/?q=${encodeURIComponent("Distributed Consensus")}">Distributed Consensus</a>`
     )
     expect(html).toContain('<code class="aq-inline-code">==code== [[CodeLink]] &lt;br&gt;</code>')
-    expect(html).toContain('href="https://example.com"')
-    expect(html).toContain(">==link== [[LinkTarget]]</a>")
+    expect(html).toContain('href="https://example.com/"')
+    expect(html).toContain('rel="noopener noreferrer"')
+    expect(html).toContain('><mark class="aq-highlight">link</mark> [[LinkTarget]]</a>')
     expect(html).toContain("<td>first<br/>second</td>")
     expect(html).toContain('<mark class="aq-highlight">cell mark</mark>')
     expect(html).toContain('<a class="aq-wikilink" href="/posts/42">Post 42</a>')
@@ -320,11 +326,26 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     const warningsA: unknown[] = []
     const warningsB: unknown[] = []
 
-    const first = await loadSharedMermaidRuntime("light", (err) => warningsA.push(err), loader)
-    fakeMermaid.parseError?.("warn-a")
+    const first = await runSerializedMermaidTask(
+      "light",
+      (err) => warningsA.push(err),
+      async (ctx) => {
+        fakeMermaid.parseError?.("warn-a")
+        return ctx
+      },
+      loader
+    )
     const second = await loadSharedMermaidRuntime("light", (err) => warningsB.push(err), loader)
-    fakeMermaid.parseError?.("warn-b")
-    const third = await loadSharedMermaidRuntime("dark", undefined, loader)
+    fakeMermaid.parseError?.("post-return-ignored")
+    const third = await runSerializedMermaidTask(
+      "dark",
+      (err) => warningsB.push(err),
+      async (ctx) => {
+        fakeMermaid.parseError?.("warn-b")
+        return ctx
+      },
+      loader
+    )
 
     expect(loaderInvocations).toBe(1)
     expect(first.mermaidRuntime).toBe(second.mermaidRuntime)
@@ -689,5 +710,159 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(res2).toBe("github-dark")
     expect(warningsTask1).toEqual(["task-1-before-await", "task-1-after-await"])
     expect(warningsTask2).toEqual(["task-2-only"])
+  })
+
+  test("11. preserves unclosed block lines once, pairs nested inline HTML tags, strips multi-backtick heading links, and guards Pandoc math", () => {
+    const unclosedSamples = [
+      ":::callout info Title\nUniqueCalloutLine\nTailAfterCallout",
+      ":::toggle Summary\nUniqueToggleLine\nTailAfterToggle",
+      ":::bookmark https://example.com\nUniqueDirectiveLine\nTailAfterDirective",
+      "$$\nUniqueMathLine\nTailAfterMath",
+      "<aside>\nUniqueAsideLine\nTailAfterAside",
+    ]
+    for (const sample of unclosedSamples) {
+      const joined = parseMarkdownSegments(sample)
+        .map((segment) => ("content" in segment ? segment.content : ""))
+        .join("\n")
+      const lines = sample.split("\n")
+      for (const token of lines.slice(1)) {
+        expect(joined.split(token).length - 1).toBe(1)
+      }
+    }
+
+    const nestedHtml = normalizeLegacyInlineHtmlMarkdown(
+      "<strong>outer <b>inner</b> outer</strong> and <em>left <i>mid</i> right</em>"
+    )
+    expect(nestedHtml).toBe("**outer **inner** outer** and *left *mid* right*")
+    const renderedNested = renderMarkdownHtml(
+      "<strong>outer <b>inner</b> outer</strong> and <em>left <i>mid</i> right</em>"
+    )
+    expect(renderedNested).toContain("<strong>outer <strong>inner</strong> outer</strong>")
+    expect(renderedNested).toContain("<em>left <em>mid</em> right</em>")
+
+    expect(formatMarkdownHeadingLabel("``a`` [docs](https://example.com) ``b``")).toBe("a docs b")
+    expect(formatMarkdownHeadingLabel("`` `tag` `` [guide](https://example.com)")).toBe("`tag` guide")
+
+    expect(hasValidMarkdownMath(String.raw`$a \\$`)).toBe(true)
+    expect(escapeNonPandocSingleDollars(String.raw`$a \\$`)).toBe(String.raw`$a \\$`)
+    expect(hasValidMarkdownMath("{{color:blue|$x^{2}$}}")).toBe(true)
+    expect(escapeNonPandocSingleDollars("{{color:blue|$x^{2}$}}")).toBe("{{color:blue|$x^{2}$}}")
+    expect(hasValidMarkdownMath("==$x^{2}$==")).toBe(true)
+    expect(escapeNonPandocSingleDollars("[label $5](https://example.com?q=$10) and $x$")).toBe(
+      String.raw`[label \$5](https://example.com?q=$10) and $x$`
+    )
+  })
+
+  test("12. sanitizes MarkdownRenderer anchors, scales fitWidth explicit columns, mounts Mermaid errors via textContent, and falls back past empty post timestamps", () => {
+    const stripStyleTags = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, "")
+
+    const anchorHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          "[proto](//evil.example) [slash](/\\evil.example) [dot](/..//evil.example) [irc](irc://example)",
+          "",
+          "[=={{color:blue|note}}==](https://example.com)",
+        ].join("\n")
+      )
+    )
+    expect(anchorHtml).toContain("<span>proto</span>")
+    expect(anchorHtml).toContain("<span>slash</span>")
+    expect(anchorHtml).toContain("<span>dot</span>")
+    expect(anchorHtml).toContain("<span>irc</span>")
+    expect(anchorHtml).not.toContain("evil.example")
+    expect(anchorHtml).not.toContain("irc://")
+    expect(anchorHtml).toContain('href="https://example.com/"')
+    expect(anchorHtml).toContain('target="_blank"')
+    expect(anchorHtml).toContain('rel="noopener noreferrer"')
+    expect(anchorHtml).toMatch(
+      /><mark class="aq-highlight"><span class="aq-inline-color"[^>]*>note<\/span><\/mark><\/a>/
+    )
+
+    const fitColsHtml = stripStyleTags(
+      renderMarkdownHtml(
+        [
+          '<!-- aq-table {"fitWidth":true,"columnWidths":[200,400]} -->',
+          "| Left | Right |",
+          "| --- | --- |",
+          "| A | B |",
+        ].join("\n")
+      )
+    )
+    expect(fitColsHtml).toContain("width:100%")
+    expect(fitColsHtml).toContain("table-layout:fixed")
+    expect(fitColsHtml).not.toContain("width:600px")
+    expect(fitColsHtml).not.toContain('data-table-width-mode="explicit-normal"')
+    expect(fitColsHtml).toContain('<col style="width:33.3333%"/><col style="width:66.6667%"/>')
+
+    type MockDomNode = {
+      tagName: string
+      className: string
+      textContent: string
+      attrs: Record<string, string>
+      children: MockDomNode[]
+      setAttribute: (name: string, value: string) => void
+      appendChild: (child: MockDomNode) => MockDomNode
+      replaceChildren: () => void
+    }
+    const createdNodes: MockDomNode[] = []
+    const makeMockNode = (tagName: string, ownerDoc?: unknown): MockDomNode => {
+      const node: MockDomNode & { ownerDocument?: unknown } = {
+        tagName: tagName.toLowerCase(),
+        className: "",
+        textContent: "",
+        attrs: {},
+        children: [],
+        ownerDocument: ownerDoc,
+        setAttribute(name: string, value: string) {
+          this.attrs[name] = value
+        },
+        appendChild(child: MockDomNode) {
+          this.children.push(child)
+          return child
+        },
+        replaceChildren() {
+          this.children = []
+        },
+      }
+      Object.defineProperty(node, "innerHTML", {
+        set() {
+          throw new Error("innerHTML assignment forbidden in mountMermaidErrorStateDom")
+        },
+      })
+      createdNodes.push(node)
+      return node
+    }
+    const mockDoc = {
+      createElement: (tag: string) => makeMockNode(tag, mockDoc),
+    }
+    const hostBlock = makeMockNode("pre", mockDoc)
+    hostBlock.appendChild(makeMockNode("code", mockDoc))
+    createdNodes.length = 0
+
+    mountMermaidErrorStateDom(hostBlock as unknown as HTMLElement, {
+      source: "flowchart TD\nA-->B",
+      error: new Error("<img src=x onerror=alert(1)>"),
+    })
+    expect(hostBlock.children).toHaveLength(1)
+    expect(createdNodes.some((node) => node.tagName === "img")).toBe(false)
+    const codeTexts = createdNodes
+      .filter((node) => node.className === "aq-mermaid-error-code")
+      .map((node) => node.textContent)
+    expect(codeTexts).toEqual(["flowchart TD\nA-->B", "<img src=x onerror=alert(1)>"])
+
+    const metadata = buildPostDetailMetadata({
+      id: "42",
+      slug: "date-fallback",
+      title: "Date Fallback",
+      createdAt: "",
+      createdTime: "",
+      modifiedAt: "",
+      modifiedTime: "",
+      date: { start_date: "2026-03-15" },
+      type: ["Post"],
+      status: ["Public"],
+    } as TPost)
+    expect(metadata.date).toBe("2026-03-15T00:00:00.000Z")
+    expect(metadata.modifiedDate).toBe("2026-03-15T00:00:00.000Z")
   })
 })

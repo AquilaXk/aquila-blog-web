@@ -1,16 +1,14 @@
 import { EditorView, WidgetType } from "@codemirror/view"
 import { Transaction } from "@codemirror/state"
 import "katex/dist/katex.min.css"
-import { runSerializedMermaidTask } from "../../libs/markdown/mermaidRuntimeConfig"
+import { renderSerializedMermaidSvg } from "../../libs/markdown/mermaidRuntimeConfig"
 import { sanitizeRenderableMermaidSource } from "../../libs/markdown/mermaidRuntimeSanitize"
 import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownUrl"
-import {
-  appendInlineMarkdownNodes,
-  isSafeInlineHref,
-  renderKatexIntoElement,
-} from "./markdownEditorInlineDom"
+import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
 
-export { appendInlineMarkdownNodes, isSafeInlineHref }
+export type MermaidColorScheme = "dark" | "light"
+
+export { appendInlineMarkdownNodes, isSafeInlineHref } from "./markdownEditorInlineDom"
 
 export class MarkdownMarkerWidget extends WidgetType {
   constructor(private readonly label: string, private readonly className: string) {
@@ -364,10 +362,11 @@ let mermaidRenderCounter = 0
 const LIVE_MERMAID_SVG_CACHE_LIMIT = 64
 const liveMermaidSvgCache = new Map<string, string>()
 
-const resolveLiveMermaidScheme = (): "dark" | "light" =>
-  typeof document !== "undefined" && document.documentElement?.dataset?.aquilaScheme === "dark"
-    ? "dark"
-    : "light"
+const resolveLiveMermaidScheme = (): MermaidColorScheme => {
+  if (typeof document === "undefined") return "light"
+  const dataset = document.documentElement?.dataset
+  return dataset?.theme === "dark" || dataset?.aquilaScheme === "dark" ? "dark" : "light"
+}
 
 const cacheLiveMermaidSvg = (source: string, svg: string) => {
   if (liveMermaidSvgCache.has(source)) liveMermaidSvgCache.delete(source)
@@ -397,17 +396,51 @@ const renderMermaidErrorFallback = (container: HTMLElement, text: string) => {
   renderMermaidFallbackCode(container, text)
 }
 
+export type MarkdownMermaidWidgetOptions = {
+  scheme?: MermaidColorScheme
+  runtimeLoader?: () => Promise<unknown>
+  timeoutMs?: number
+}
+
 export class MarkdownMermaidWidget extends WidgetType {
+  private readonly scheme: MermaidColorScheme
+
   constructor(
     private readonly source: string,
     private readonly from?: number,
-    private readonly customRenderer?: (id: string, text: string) => Promise<{ svg: string }>
+    private readonly customRenderer?: (id: string, text: string) => Promise<{ svg: string }>,
+    private readonly options?: MarkdownMermaidWidgetOptions
   ) {
     super()
+    this.scheme = options?.scheme ?? resolveLiveMermaidScheme()
   }
 
   eq(other: MarkdownMermaidWidget) {
-    return other instanceof MarkdownMermaidWidget && other.source === this.source && other.customRenderer === this.customRenderer
+    return (
+      other instanceof MarkdownMermaidWidget &&
+      other.source === this.source &&
+      other.scheme === this.scheme &&
+      other.customRenderer === this.customRenderer &&
+      other.options?.runtimeLoader === this.options?.runtimeLoader &&
+      other.options?.timeoutMs === this.options?.timeoutMs
+    )
+  }
+
+  private runMermaidRender(renderId: string, normalized: string): Promise<{ svg: string }> {
+    if (this.customRenderer) {
+      return this.customRenderer(renderId, normalized)
+    }
+    return renderSerializedMermaidSvg({
+      scheme: this.scheme,
+      renderId,
+      source: normalized,
+      runtimeLoader: this.options?.runtimeLoader,
+      timeoutMs: this.options?.timeoutMs,
+    })
+  }
+
+  private usesSharedSvgCache(): boolean {
+    return !this.customRenderer
   }
 
   toDOM(view?: EditorView) {
@@ -431,9 +464,8 @@ export class MarkdownMermaidWidget extends WidgetType {
       return root
     }
 
-    const scheme = resolveLiveMermaidScheme()
-    const cacheKey = `${scheme}:${normalized}`
-    const cachedSvg = this.customRenderer ? undefined : liveMermaidSvgCache.get(cacheKey)
+    const cacheKey = `${this.scheme}:${normalized}`
+    const cachedSvg = this.usesSharedSvgCache() ? liveMermaidSvgCache.get(cacheKey) : undefined
     if (cachedSvg) {
       root.dataset.mermaidState = "rendered"
       root.innerHTML = cachedSvg
@@ -444,19 +476,13 @@ export class MarkdownMermaidWidget extends WidgetType {
     renderMermaidFallbackCode(root, normalized)
 
     const renderId = `cm-live-mermaid-${(mermaidRenderCounter += 1)}`
-    const executeRender = this.customRenderer
-      ? this.customRenderer(renderId, normalized)
-      : runSerializedMermaidTask(scheme, undefined, async ({ mermaidRuntime }) =>
-          mermaidRuntime.render(renderId, normalized)
-        )
-
-    void executeRender
+    void this.runMermaidRender(renderId, normalized)
       .then((res) => {
         if (!res?.svg) {
           renderMermaidErrorFallback(root, normalized)
           return
         }
-        if (!this.customRenderer) cacheLiveMermaidSvg(cacheKey, res.svg)
+        if (this.usesSharedSvgCache()) cacheLiveMermaidSvg(cacheKey, res.svg)
         root.dataset.mermaidState = "rendered"
         root.innerHTML = res.svg
       })

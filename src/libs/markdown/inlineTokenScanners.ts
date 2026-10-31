@@ -1,3 +1,5 @@
+import { isEscapedMarkdownAt, scanInlineCodeSpanEnd } from "./pandocMathScanner"
+
 export type TextRangeSpan = {
   from: number
   to: number
@@ -6,6 +8,8 @@ export type TextRangeSpan = {
 export type InlineColorMatchSpan = {
   from: number
   to: number
+  contentFrom: number
+  contentTo: number
   colorToken: string
   content: string
 }
@@ -114,9 +118,9 @@ export const replaceRawBrTags = (text: string, replacement: string): string => {
 }
 
 export const replaceEntityBrTags = (text: string, replacement: string): string => {
-  let index = text.toLowerCase().indexOf("&lt;")
-  if (index < 0) return text
   const lower = text.toLowerCase()
+  let index = lower.indexOf("&lt;")
+  if (index < 0) return text
   let result = ""
   let cursor = 0
   while (index >= 0) {
@@ -135,6 +139,16 @@ export const replaceEntityBrTags = (text: string, replacement: string): string =
   return result
 }
 
+const buildColorTokenResult = (
+  text: string,
+  tokenStart: number,
+  tokenEnd: number,
+  contentStart: number
+): { colorToken: string; contentStart: number } | null => {
+  const colorToken = text.slice(tokenStart, tokenEnd).trim()
+  return colorToken ? { colorToken, contentStart } : null
+}
+
 const scanColorTokenBeforePipe = (
   text: string,
   tokenStart: number,
@@ -142,27 +156,26 @@ const scanColorTokenBeforePipe = (
 ): { colorToken: string; contentStart: number } | null => {
   for (let cursor = tokenStart; cursor < text.length; cursor += 1) {
     const code = text.codePointAt(cursor) ?? 0
-    if (code === 123 || code === 125) return null
+    if (code === 123 || code === 125 || code === 10 || code === 13) return null
+    if (code === 124) {
+      return buildColorTokenResult(text, tokenStart, cursor, cursor + 1)
+    }
     if (code === 92) {
       if (text.codePointAt(cursor + 1) === 124) {
-        const colorToken = text.slice(tokenStart, cursor).trim()
-        return colorToken ? { colorToken, contentStart: cursor + 2 } : null
+        return buildColorTokenResult(text, tokenStart, cursor, cursor + 2)
       }
       if (!allowBackslashInToken) return null
-    }
-    if (code === 124) {
-      const colorToken = text.slice(tokenStart, cursor).trim()
-      return colorToken ? { colorToken, contentStart: cursor + 1 } : null
     }
   }
   return null
 }
 
-const matchDoubleBraceColorHeader = (
+export const matchDoubleBraceColorHeader = (
   text: string,
   openIndex: number,
-  allowBackslashInToken: boolean
+  allowBackslashInToken = false
 ): { colorToken: string; contentStart: number } | null => {
+  if (!text.startsWith("{{", openIndex)) return null
   let cursor = skipAsciiSpaces(text, openIndex + 2)
   if (!startsWithAsciiCaseInsensitive(text, cursor, "color")) return null
   cursor = skipAsciiSpaces(text, cursor + 5)
@@ -171,41 +184,134 @@ const matchDoubleBraceColorHeader = (
   return scanColorTokenBeforePipe(text, cursor, allowBackslashInToken)
 }
 
-export const findDoubleBraceColorSpans = (
+export const findBacktickAwareDoubleCloseBrace = (
   text: string,
-  options: { trimTrailingContentWhitespace: boolean; allowEmptyContent: boolean }
-): InlineColorMatchSpan[] => {
-  const spans: InlineColorMatchSpan[] = []
-  let openIndex = text.indexOf("{{")
-  while (openIndex >= 0) {
-    const header = matchDoubleBraceColorHeader(
-      text,
-      openIndex,
-      options.allowEmptyContent
-    )
-    if (!header) {
-      openIndex = text.indexOf("{{", openIndex + 2)
-      continue
-    }
-    const closeIndex = text.indexOf("}}", header.contentStart)
-    if (closeIndex < 0) break
-    if (!options.allowEmptyContent && closeIndex === header.contentStart) {
-      openIndex = text.indexOf("{{", openIndex + 2)
-      continue
-    }
-    let contentEnd = closeIndex
-    if (options.trimTrailingContentWhitespace) {
-      while (contentEnd > header.contentStart + 1 && isUnicodeSpaceAt(text, contentEnd - 1)) {
-        contentEnd -= 1
+  contentStart: number,
+  singleLine = false
+): number => {
+  let cursor = contentStart
+  while (cursor + 1 < text.length) {
+    const code = text.codePointAt(cursor) ?? 0
+    if (singleLine && (code === 10 || code === 13)) return -1
+    if (code === 96 && !isEscapedMarkdownAt(text, cursor)) {
+      const codeEnd = scanInlineCodeSpanEnd(text, cursor)
+      if (codeEnd > cursor) {
+        cursor = codeEnd
+        continue
       }
     }
-    spans.push({
-      from: openIndex,
+    if (code === 125 && text.codePointAt(cursor + 1) === 125) {
+      return cursor
+    }
+    cursor += 1
+  }
+  return -1
+}
+
+const trimColorContentEnd = (
+  text: string,
+  contentStart: number,
+  closeIndex: number,
+  trimTrailing: boolean
+): number => {
+  if (!trimTrailing) return closeIndex
+  let contentEnd = closeIndex
+  while (contentEnd > contentStart + 1 && isUnicodeSpaceAt(text, contentEnd - 1)) {
+    contentEnd -= 1
+  }
+  return contentEnd
+}
+
+export type FindDoubleBraceColorSpanOptions = {
+  trimTrailingContentWhitespace: boolean
+  allowEmptyContent: boolean
+  allowBackslashInToken?: boolean
+  skipInlineCodeSpans?: boolean
+  singleLine?: boolean
+}
+
+const resolveColorCloseBraceIndex = (
+  text: string,
+  contentStart: number,
+  skipCode: boolean,
+  singleLine: boolean
+): number =>
+  skipCode
+    ? findBacktickAwareDoubleCloseBrace(text, contentStart, singleLine)
+    : text.indexOf("}}", contentStart)
+
+const trySkipUnescapedInlineCodeAt = (text: string, cursor: number): number => {
+  if (text.codePointAt(cursor) !== 96 || isEscapedMarkdownAt(text, cursor)) return -1
+  return scanInlineCodeSpanEnd(text, cursor)
+}
+
+const stepDoubleBraceColorAt = (
+  text: string,
+  cursor: number,
+  options: FindDoubleBraceColorSpanOptions,
+  skipCode: boolean
+): { span: InlineColorMatchSpan | null; nextCursor: number; stop: boolean } => {
+  const header = matchDoubleBraceColorHeader(
+    text,
+    cursor,
+    options.allowBackslashInToken === true
+  )
+  if (!header) return { span: null, nextCursor: cursor + 2, stop: false }
+
+  const closeIndex = resolveColorCloseBraceIndex(
+    text,
+    header.contentStart,
+    skipCode,
+    options.singleLine === true
+  )
+  if (closeIndex < 0) {
+    return { span: null, nextCursor: cursor + 2, stop: options.singleLine !== true }
+  }
+  if (!options.allowEmptyContent && closeIndex === header.contentStart) {
+    return { span: null, nextCursor: cursor + 2, stop: false }
+  }
+  const contentEnd = trimColorContentEnd(
+    text,
+    header.contentStart,
+    closeIndex,
+    options.trimTrailingContentWhitespace
+  )
+  return {
+    span: {
+      from: cursor,
       to: closeIndex + 2,
+      contentFrom: header.contentStart,
+      contentTo: contentEnd,
       colorToken: header.colorToken,
       content: text.slice(header.contentStart, contentEnd),
-    })
-    openIndex = text.indexOf("{{", closeIndex + 2)
+    },
+    nextCursor: closeIndex + 2,
+    stop: false,
+  }
+}
+
+export const findDoubleBraceColorSpans = (
+  text: string,
+  options: FindDoubleBraceColorSpanOptions
+): InlineColorMatchSpan[] => {
+  if (!text.includes("{{")) return []
+  const spans: InlineColorMatchSpan[] = []
+  const skipCode = options.skipInlineCodeSpans !== false
+  let cursor = 0
+  while (cursor + 4 <= text.length) {
+    const codeEnd = skipCode ? trySkipUnescapedInlineCodeAt(text, cursor) : -1
+    if (codeEnd > cursor) {
+      cursor = codeEnd
+      continue
+    }
+    if (!text.startsWith("{{", cursor)) {
+      cursor += 1
+      continue
+    }
+    const step = stepDoubleBraceColorAt(text, cursor, options, skipCode)
+    if (step.stop) break
+    if (step.span) spans.push(step.span)
+    cursor = step.nextCursor
   }
   return spans
 }
@@ -214,6 +320,7 @@ export const stripDoubleBraceColorTokensOnce = (text: string): string => {
   const spans = findDoubleBraceColorSpans(text, {
     trimTrailingContentWhitespace: false,
     allowEmptyContent: true,
+    allowBackslashInToken: true,
   })
   if (spans.length === 0) return text
   let output = ""

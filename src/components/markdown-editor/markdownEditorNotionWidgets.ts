@@ -1,11 +1,8 @@
 import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view"
+import { normalizeSafeMarkdownUrl, setSafeAnchorHref } from "../../libs/markdown/safeMarkdownUrl"
 import { hasIntervalOverlap, isTokenActive } from "./markdownEditorLivePreview"
-import {
-  editorModeField,
-  getDocString,
-  setEditorMode,
-} from "./markdownEditorLiveSurfaceDecorations"
+import { editorModeField, getDocString, setEditorMode } from "./markdownEditorLiveSurfaceDecorations"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 const FENCE_DELIMITER_LINE_RE =
@@ -14,7 +11,6 @@ const CALLOUT_OPEN_LINE_RE = /^:::callout(?:[ \t]+(.*))?$/
 const TOGGLE_OPEN_LINE_RE = /^:::toggle(?:[ \t]+(.*))?$/
 const BOOKMARK_OPEN_LINE_RE = /^:::bookmark(?:[ \t]+(\S+)(?:[ \t]+(.*))?)?$/
 const CONTAINER_CLOSE_LINE_RE = /^:::[ \t]*$/
-const HTTP_URL_PREFIX_RE = /^https?:\/\//i
 const LEADING_EMOJI_RE =
   /^\[?(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)\]?(?:[ \t]+|$)/u
 
@@ -245,7 +241,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
     const bookmarkMatch = BOOKMARK_OPEN_LINE_RE.exec(lineText)
     if (bookmarkMatch) {
       const url = (bookmarkMatch[1] ?? "").trim()
-      candidate = HTTP_URL_PREFIX_RE.test(url)
+      candidate = normalizeSafeMarkdownUrl(url)
         ? {
             kind: "bookmark",
             from: lineStart,
@@ -332,7 +328,7 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = `cm-live-callout cm-live-callout-tone-${this.tone}`
-    root.setAttribute("data-testid", "cm-live-callout-widget")
+    root.dataset.testid = "cm-live-callout-widget"
     root.dataset.from = String(this.from)
     root.dataset.callout = this.tone
     root.dataset.sig = `${this.tone}\0${this.icon}\0${this.title}\0${this.body}\0${this.bodyOffset}`
@@ -387,7 +383,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     let isCollapsed = false
     const root = document.createElement("div")
     root.className = "cm-live-toggle-block"
-    root.setAttribute("data-testid", "cm-live-toggle-widget")
+    root.dataset.testid = "cm-live-toggle-widget"
     root.dataset.from = String(this.from)
     root.dataset.sig = `${this.title}\0${this.body}\0${this.bodyOffset}`
 
@@ -459,7 +455,7 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = "cm-live-bookmark-card"
-    root.setAttribute("data-testid", "cm-live-bookmark-widget")
+    root.dataset.testid = "cm-live-bookmark-widget"
     root.dataset.from = String(this.from)
     root.dataset.sig = `${this.url}\0${this.title}\0${this.description}`
 
@@ -485,12 +481,18 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     content.appendChild(urlEl)
     const openLink = document.createElement("a")
     openLink.className = "cm-live-bookmark-open"
-    openLink.href = this.url
-    openLink.target = "_blank"
-    openLink.rel = "noopener noreferrer"
-    openLink.setAttribute("aria-label", "북마크 링크 열기")
-    openLink.textContent = "↗"
-    root.append(icon, content, openLink)
+    const safeUrl = normalizeSafeMarkdownUrl(this.url)
+    if (safeUrl && setSafeAnchorHref(openLink, safeUrl)) {
+      if (safeUrl.startsWith("http://") || safeUrl.startsWith("https://")) {
+        openLink.target = "_blank"
+        openLink.rel = "noopener noreferrer"
+      }
+      openLink.setAttribute("aria-label", "북마크 링크 열기")
+      openLink.textContent = "↗"
+      root.append(icon, content, openLink)
+    } else {
+      root.append(icon, content)
+    }
     bindContainerActivateTarget(root, view, root, this.from, this.to, 12, true)
     return root
   }

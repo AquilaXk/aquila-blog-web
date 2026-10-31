@@ -160,18 +160,18 @@ const resolveTableInlineStyle = ({
   isFitWidthTable: boolean
   isWideOverflowTable: boolean
 }): CSSProperties | undefined => {
+  if (isFitWidthTable) {
+    return {
+      width: "100%",
+      minWidth: "100%",
+      maxWidth: "100%",
+      tableLayout: "fixed",
+    }
+  }
   if (hasAllExplicitColumnWidths && explicitTableWidth > 0) {
     return {
       width: `${explicitTableWidth}px`,
       minWidth: `${explicitTableWidth}px`,
-    }
-  }
-  if (isFitWidthTable) {
-    return {
-      width: "100%",
-      maxWidth: "100%",
-      minWidth: 0,
-      tableLayout: "fixed",
     }
   }
   if (!isWideOverflowTable) {
@@ -182,6 +182,94 @@ const resolveTableInlineStyle = ({
   }
   return undefined
 }
+
+const resolveTableColInlineStyle = (
+  width: number | null,
+  isFitWidthTable: boolean,
+  hasAllExplicitColumnWidths: boolean,
+  explicitTableWidth: number
+): CSSProperties | undefined => {
+  if (!width) return undefined
+  if (isFitWidthTable && hasAllExplicitColumnWidths && explicitTableWidth > 0) {
+    return { width: `${((width / explicitTableWidth) * 100).toFixed(4)}%` }
+  }
+  if (isFitWidthTable) {
+    return { width: `${width}px` }
+  }
+  return { width: `${width}px`, minWidth: `${width}px` }
+}
+
+const bindTableScrollMetricsObserver = (
+  scrollElement: HTMLDivElement,
+  setTableUiMask: (updater: (prev: number) => number) => void
+) => {
+  const tableElement = scrollElement.querySelector("table")
+
+  const computeScrollFlags = () => {
+    const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
+    const remaining = overflowAmount - scrollElement.scrollLeft
+    return {
+      nextScrollLeft: scrollElement.scrollLeft > 2,
+      nextScrollHint: overflowAmount > 1 && remaining > 1,
+    }
+  }
+
+  const syncScrollHint = () => {
+    const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
+    setTableUiMask((prev) =>
+      packTableUiState(nextScrollLeft, nextScrollHint, prev >>> TABLE_COL_COUNT_SHIFT)
+    )
+  }
+
+  const syncTableMetrics = () => {
+    const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
+    const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
+    setTableUiMask((prev) => {
+      const prevCols = prev >>> TABLE_COL_COUNT_SHIFT
+      return packTableUiState(nextScrollLeft, nextScrollHint, domCols > 0 ? domCols : prevCols)
+    })
+  }
+
+  syncTableMetrics()
+  scrollElement.addEventListener("scroll", syncScrollHint, { passive: true })
+  window.addEventListener("resize", syncTableMetrics)
+
+  const resizeObserver =
+    typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => syncTableMetrics()) : null
+  resizeObserver?.observe(scrollElement)
+  if (resizeObserver && tableElement) resizeObserver.observe(tableElement)
+
+  return () => {
+    scrollElement.removeEventListener("scroll", syncScrollHint)
+    window.removeEventListener("resize", syncTableMetrics)
+    resizeObserver?.disconnect()
+  }
+}
+
+const toOptionalTrueAttr = (flag: boolean): "true" | undefined => (flag ? "true" : undefined)
+
+const buildTableElementAttributes = ({
+  className,
+  isWideOverflowTable,
+  isFitWidthTable,
+  isNarrowTable,
+  layout,
+}: {
+  className?: string
+  isWideOverflowTable: boolean
+  isFitWidthTable: boolean
+  isNarrowTable: boolean
+  layout?: MarkdownTableLayout | null
+}) => ({
+  className: ["aq-table", isWideOverflowTable ? "aq-table-wide" : "aq-table-normal", className]
+    .filter(Boolean)
+    .join(" "),
+  "data-fit-width": toOptionalTrueAttr(isFitWidthTable),
+  "data-overflow-mode": isWideOverflowTable ? "wide" : undefined,
+  "data-narrow-table": toOptionalTrueAttr(isNarrowTable),
+  "data-header-row": layout?.headerRow === false ? "false" : undefined,
+  "data-header-column": toOptionalTrueAttr(layout?.headerColumn === true),
+})
 
 export const MarkdownTableRenderer = ({
   children,
@@ -217,7 +305,10 @@ export const MarkdownTableRenderer = ({
       .slice(0, columnCount)
       .every((width): width is number => typeof width === "number" && width > 0)
   const usesExplicitNormalWidth =
-    !isWideOverflowTable && hasAllExplicitColumnWidths && explicitTableWidth > 0
+    !isWideOverflowTable &&
+    !isFitWidthTable &&
+    hasAllExplicitColumnWidths &&
+    explicitTableWidth > 0
   const tableStyle = useMemo<CSSProperties | undefined>(
     () =>
       resolveTableInlineStyle({
@@ -242,94 +333,43 @@ export const MarkdownTableRenderer = ({
 
   useEffect(() => {
     const scrollElement = scrollRef.current
-    if (!scrollElement) return
-    const tableElement = scrollElement.querySelector("table")
-
-    const computeScrollFlags = () => {
-      const overflowAmount = scrollElement.scrollWidth - scrollElement.clientWidth
-      const remaining = overflowAmount - scrollElement.scrollLeft
-      return {
-        nextScrollLeft: scrollElement.scrollLeft > 2,
-        nextScrollHint: overflowAmount > 1 && remaining > 1,
-      }
-    }
-
-    const syncScrollHint = () => {
-      const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
-      setTableUiMask((prev) =>
-        packTableUiState(nextScrollLeft, nextScrollHint, prev >>> TABLE_COL_COUNT_SHIFT)
-      )
-    }
-
-    const syncTableMetrics = () => {
-      const domCols = tableElement?.querySelector("tr")?.children.length ?? 0
-      const { nextScrollLeft, nextScrollHint } = computeScrollFlags()
-      setTableUiMask((prev) => {
-        const prevCols = prev >>> TABLE_COL_COUNT_SHIFT
-        const nextCols = domCols > 0 ? domCols : prevCols
-        return packTableUiState(nextScrollLeft, nextScrollHint, nextCols)
-      })
-    }
-
-    syncTableMetrics()
-    scrollElement.addEventListener("scroll", syncScrollHint, { passive: true })
-    window.addEventListener("resize", syncTableMetrics)
-
-    let resizeObserver: ResizeObserver | null = null
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => syncTableMetrics())
-      resizeObserver.observe(scrollElement)
-      if (tableElement) resizeObserver.observe(tableElement)
-    }
-
-    return () => {
-      scrollElement.removeEventListener("scroll", syncScrollHint)
-      window.removeEventListener("resize", syncTableMetrics)
-      resizeObserver?.disconnect()
-    }
+    if (!scrollElement) return undefined
+    return bindTableScrollMetricsObserver(scrollElement, setTableUiMask)
   }, [explicitTableWidth, isFitWidthTable, isWideOverflowTable, usesExplicitNormalWidth])
+
+  const widthModeAttr = usesExplicitNormalWidth ? "explicit-normal" : undefined
+  const tableAttrs = buildTableElementAttributes({
+    className,
+    isWideOverflowTable,
+    isFitWidthTable,
+    isNarrowTable,
+    layout,
+  })
 
   return (
     <MarkdownTableRenderContext.Provider value={contextValue}>
       <div
         className="aq-table-shell"
-        data-fit-width={isFitWidthTable ? "true" : undefined}
-        data-table-width-mode={usesExplicitNormalWidth ? "explicit-normal" : undefined}
-        data-scroll-left={hasScrollLeft ? "true" : "false"}
-        data-scroll-hint={showScrollHint ? "true" : "false"}
+        data-fit-width={toOptionalTrueAttr(isFitWidthTable)}
+        data-table-width-mode={widthModeAttr}
+        data-scroll-left={String(hasScrollLeft)}
+        data-scroll-hint={String(showScrollHint)}
       >
-        <div
-          ref={scrollRef}
-          className="aq-table-scroll"
-          data-table-width-mode={usesExplicitNormalWidth ? "explicit-normal" : undefined}
-        >
-          <table
-            className={[
-              "aq-table",
-              isWideOverflowTable ? "aq-table-wide" : "aq-table-normal",
-              className,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            data-fit-width={isFitWidthTable ? "true" : undefined}
-            data-overflow-mode={isWideOverflowTable ? "wide" : undefined}
-            data-narrow-table={isNarrowTable ? "true" : undefined}
-            data-header-row={layout?.headerRow === false ? "false" : undefined}
-            data-header-column={layout?.headerColumn === true ? "true" : undefined}
-            style={tableStyle}
-          >
+        <div ref={scrollRef} className="aq-table-scroll" data-table-width-mode={widthModeAttr}>
+          <table {...tableAttrs} style={tableStyle}>
             {hasExplicitColumnWidths ? (
               <colgroup>
-                {Array.from({ length: colgroupSlotCount }, (_, index) => {
-                  const width = normalizedColumnWidths[index] ?? null
-                  if (!width) return <col key={`table-col-${index}`} />
-                  return (
-                    <col
-                      key={`table-col-${index}`}
-                      style={{ width: `${width}px`, minWidth: `${width}px` }}
-                    />
-                  )
-                })}
+                {Array.from({ length: colgroupSlotCount }, (_, index) => (
+                  <col
+                    key={`table-col-${index}`}
+                    style={resolveTableColInlineStyle(
+                      normalizedColumnWidths[index] ?? null,
+                      isFitWidthTable,
+                      hasAllExplicitColumnWidths,
+                      explicitTableWidth
+                    )}
+                  />
+                ))}
               </colgroup>
             ) : null}
             {indexedChildren}
@@ -350,32 +390,39 @@ export const MarkdownTableRowRenderer = ({
   const context = useContext(MarkdownTableRenderContext)
   const rowIndex = useContext(MarkdownTableRowIndexContext)
   const rowHeight = context?.rowHeights[rowIndex] || null
-  const rowStyle = rowHeight
-    ? ({
-        height: `${Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight)}px`,
-      } satisfies CSSProperties)
-    : undefined
+  const clampedHeight = rowHeight ? Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight) : undefined
+  const rowStyle = clampedHeight ? ({ height: `${clampedHeight}px` } satisfies CSSProperties) : undefined
 
   let nextColumnIndex = 0
   const indexedCells = Children.map(children, (cellChild) => {
     if (!isValidElement(cellChild)) return cellChild
-    const position: MarkdownTableCellPosition = {
-      rowIndex,
-      columnIndex: nextColumnIndex,
-    }
+    const position: MarkdownTableCellPosition = { rowIndex, columnIndex: nextColumnIndex }
     nextColumnIndex += 1
     return createElement(MarkdownTableCellPositionContext.Provider, { value: position }, cellChild)
   })
 
   return (
-    <tr
-      className={className}
-      data-row-height={rowHeight ? Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight) : undefined}
-      style={rowStyle}
-    >
+    <tr className={className} data-row-height={clampedHeight} style={rowStyle}>
       {indexedCells}
     </tr>
   )
+}
+
+const toMarkdownAlignment = (alignment?: string): MarkdownTableCellAlignment | null =>
+  alignment === "left" || alignment === "center" || alignment === "right" ? alignment : null
+
+const toSpanAttr = (span?: number | null): number | undefined =>
+  span && span > 1 ? span : undefined
+
+const buildCellStyle = (
+  textAlign?: MarkdownTableCellAlignment,
+  backgroundColor?: string
+): CSSProperties | undefined => {
+  if (!textAlign && !backgroundColor) return undefined
+  const style: CSSProperties = {}
+  if (textAlign) style.textAlign = textAlign
+  if (backgroundColor) style.backgroundColor = backgroundColor
+  return style
 }
 
 export const MarkdownTableCellRenderer = ({
@@ -394,33 +441,19 @@ export const MarkdownTableCellRenderer = ({
   const rowIndex = position?.rowIndex ?? 0
   const columnIndex = position?.columnIndex ?? 0
   const cellLayout = tableContext?.cellLayouts[rowIndex]?.[columnIndex] || null
+  if (cellLayout?.hidden) return null
+
   const columnAlignment = tableContext?.columnAlignments[columnIndex] || null
-  const markdownAlignment: MarkdownTableCellAlignment | null =
-    alignment === "left" || alignment === "center" || alignment === "right" ? alignment : null
-
-  if (cellLayout?.hidden) {
-    return null
-  }
-
-  const rowSpan = cellLayout?.rowspan && cellLayout.rowspan > 1 ? cellLayout.rowspan : undefined
-  const colSpan = cellLayout?.colspan && cellLayout.colspan > 1 ? cellLayout.colspan : undefined
-  const textAlign = cellLayout?.align || columnAlignment || markdownAlignment || undefined
-  const backgroundColor = cellLayout?.backgroundColor || undefined
-  const style = textAlign || backgroundColor
-    ? ({
-        ...(textAlign ? { textAlign } : {}),
-        ...(backgroundColor ? { backgroundColor } : {}),
-      } satisfies CSSProperties)
-    : undefined
+  const textAlign = cellLayout?.align || columnAlignment || toMarkdownAlignment(alignment) || undefined
+  const style = buildCellStyle(textAlign, cellLayout?.backgroundColor || undefined)
+  const isHeaderColCell = Component === "td" && columnIndex === 0 && Boolean(tableContext?.headerColumn)
 
   return (
     <Component
       className={className}
-      data-header-col-cell={
-        Component === "td" && columnIndex === 0 && tableContext?.headerColumn ? "true" : undefined
-      }
-      rowSpan={rowSpan}
-      colSpan={colSpan}
+      data-header-col-cell={toOptionalTrueAttr(isHeaderColCell)}
+      rowSpan={toSpanAttr(cellLayout?.rowspan)}
+      colSpan={toSpanAttr(cellLayout?.colspan)}
       style={style}
     >
       {children}

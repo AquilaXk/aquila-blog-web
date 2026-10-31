@@ -87,27 +87,25 @@ export const migrateTableVisualOptionsOffset = (
   return getOrCreateTableVisualOptions(nextKey, columnCount, scopeKey)
 }
 
-export const setBooleanDataAttribute = (el: HTMLElement, attr: string, enabled: boolean) => {
-  if (enabled) el.setAttribute(attr, "true")
-  else if (typeof el.removeAttribute === "function") el.removeAttribute(attr)
-  else if (typeof el.toggleAttribute === "function") el.toggleAttribute(attr, false)
-}
-
 export const syncTableVisualWrapAttributes = (wrap: HTMLElement, visualOptions: TableVisualOptions) => {
-  setBooleanDataAttribute(wrap, "data-header-row", visualOptions.headerRow)
-  setBooleanDataAttribute(wrap, "data-header-col", visualOptions.headerColumn)
-  setBooleanDataAttribute(wrap, "data-full-width", visualOptions.fitPageWidth)
+  if (!wrap.dataset) return
+  if (visualOptions.headerRow) wrap.dataset.headerRow = "true"
+  else delete wrap.dataset.headerRow
+  if (visualOptions.headerColumn) wrap.dataset.headerCol = "true"
+  else delete wrap.dataset.headerCol
+  if (visualOptions.fitPageWidth) wrap.dataset.fullWidth = "true"
+  else delete wrap.dataset.fullWidth
 }
 
 const applyColElementWidth = (colEl: HTMLElement, width: number) => {
   if (width > 0) {
     const rounded = Math.round(width)
     if (colEl.style) colEl.style.width = `${rounded}px`
-    colEl.setAttribute("data-col-width", String(rounded))
+    if (colEl.dataset) colEl.dataset.colWidth = String(rounded)
     return
   }
   if (colEl.style) colEl.style.width = ""
-  if (typeof colEl.removeAttribute === "function") colEl.removeAttribute("data-col-width")
+  if (colEl.dataset) delete colEl.dataset.colWidth
 }
 
 export const syncTableColGroupWidths = (cols: readonly HTMLElement[], columnWidths: readonly number[]) => {
@@ -261,8 +259,10 @@ export const attachColumnResizeHandle = (
 ): HTMLElement => {
   const resizer = document.createElement("span")
   resizer.className = "cm-live-table-col-resizer"
-  resizer.setAttribute("data-testid", "cm-live-table-col-resizer")
-  resizer.setAttribute("data-col-index", String(colIndex))
+  if (resizer.dataset) {
+    resizer.dataset.testid = "cm-live-table-col-resizer"
+    resizer.dataset.colIndex = String(colIndex)
+  }
   resizer.setAttribute("role", "separator")
   resizer.setAttribute("aria-orientation", "vertical")
   resizer.setAttribute("aria-label", `${colIndex + 1}열 너비 조절`)

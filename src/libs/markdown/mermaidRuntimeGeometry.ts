@@ -10,7 +10,7 @@ import {
   shouldIgnoreStageClickForZoom,
 } from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
-  renderMermaidErrorState,
+  mountMermaidErrorStateDom,
   sanitizeRenderableMermaidSource,
   stripRiskyFlowchartDirectives,
 } from "src/libs/markdown/mermaidRuntimeSanitize"
@@ -99,10 +99,10 @@ export const isBlockAlreadyRendered = (
 
 export const hasMermaidBlockHint = (block: HTMLElement): boolean => {
   const codeBlock = queryMermaidCodeElement(block)
-  const codeClassName = codeBlock?.className?.toLowerCase() || ""
-  const codeDataLanguage = (codeBlock?.getAttribute("data-language") || "").toLowerCase()
-  const blockClassName = block.className?.toLowerCase() || ""
-  const blockDataLanguage = (block.getAttribute("data-language") || "").toLowerCase()
+  const codeClassName = (codeBlock?.className ?? "").toLowerCase()
+  const codeDataLanguage = (codeBlock?.dataset?.language ?? "").toLowerCase()
+  const blockClassName = (block.className ?? "").toLowerCase()
+  const blockDataLanguage = (block.dataset?.language ?? "").toLowerCase()
   return (
     blockClassName.includes("aq-mermaid") ||
     blockDataLanguage === "mermaid" ||
@@ -157,25 +157,28 @@ export const markMermaidBlockError = (
   block.dataset.mermaidRendered = "error"
   block.classList.add("aq-mermaid-error")
   block.style.minHeight = ""
-  block.innerHTML = renderMermaidErrorState({ source: displaySource, error })
+  mountMermaidErrorStateDom(block, { source: displaySource, error })
 }
 
 export const measureDesktopWideLaneBounds = (block: HTMLElement): DesktopWideLaneBounds | null => {
   const detailLayout = block.closest<HTMLElement>(".detailLayout")
   const rightRail = detailLayout?.querySelector<HTMLElement>(".rightRail")
-  if (!detailLayout || !rightRail || rightRail.offsetParent === null) {
+  if (!detailLayout || rightRail?.offsetParent == null) {
     return null
   }
   const leftRail = detailLayout.querySelector<HTMLElement>(".leftRail")
-  const hasVisibleLeftRail = Boolean(leftRail && leftRail.offsetParent !== null)
+  const hasVisibleLeftRail = leftRail?.offsetParent != null
   const leftBound = hasVisibleLeftRail
-    ? (leftRail as HTMLElement).getBoundingClientRect().right + MERMAID_DESKTOP_SAFE_MARGIN_PX
+    ? leftRail.getBoundingClientRect().right + MERMAID_DESKTOP_SAFE_MARGIN_PX
     : MERMAID_DESKTOP_SAFE_MARGIN_PX
   return {
     leftBound,
     rightBound: rightRail.getBoundingClientRect().left - MERMAID_DESKTOP_SAFE_MARGIN_PX,
   }
 }
+
+const pickPositiveFinite = (candidate: number, fallback: number): number =>
+  Number.isFinite(candidate) && candidate > 0 ? candidate : fallback
 
 const readSvgIntrinsicDimensions = (
   svgElement: SVGSVGElement,
@@ -184,20 +187,15 @@ const readSvgIntrinsicDimensions = (
   const viewBoxValues = parseSvgViewBoxNumbers(svgElement.getAttribute("viewBox") || "")
   const viewBoxWidth = viewBoxValues ? viewBoxValues[2] : Number.NaN
   const viewBoxHeight = viewBoxValues ? viewBoxValues[3] : Number.NaN
-  const attrWidth = Number(svgElement.getAttribute("width"))
-  const attrHeight = Number(svgElement.getAttribute("height"))
-  const fallbackWidth = Number.isFinite(attrWidth) && attrWidth > 0 ? attrWidth : containerWidth
-  const fallbackHeight =
-    Number.isFinite(attrHeight) && attrHeight > 0
-      ? attrHeight
-      : Math.max(120, Math.round(fallbackWidth * 0.6))
-  const intrinsicWidth =
-    Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : Math.max(1, fallbackWidth)
-  const intrinsicHeight =
-    Number.isFinite(viewBoxHeight) && viewBoxHeight > 0
-      ? viewBoxHeight
-      : Math.max(1, fallbackHeight)
-  return { intrinsicWidth, intrinsicHeight }
+  const fallbackWidth = pickPositiveFinite(Number(svgElement.getAttribute("width")), containerWidth)
+  const fallbackHeight = pickPositiveFinite(
+    Number(svgElement.getAttribute("height")),
+    Math.max(120, Math.round(fallbackWidth * 0.6))
+  )
+  return {
+    intrinsicWidth: pickPositiveFinite(viewBoxWidth, Math.max(1, fallbackWidth)),
+    intrinsicHeight: pickPositiveFinite(viewBoxHeight, Math.max(1, fallbackHeight)),
+  }
 }
 
 const computeWideLaneAllocation = ({

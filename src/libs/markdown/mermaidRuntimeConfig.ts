@@ -131,14 +131,62 @@ export const countMermaidEdgeTokens = (source: string) => {
   return count
 }
 
-const MERMAID_NODE_SHAPE_PATTERN = /\[[^\]\n]+\]|\{[^}\n]+\}|\(\([^)\n]+\)\)|\([^)\n]+\)/g
+const resolveMatchedShapeEnd = (
+  source: string,
+  start: number,
+  cursor: number,
+  closeCode: number,
+  doubleClose: boolean
+): number => {
+  if (cursor <= start) return -1
+  if (!doubleClose) return cursor + 1
+  return source.codePointAt(cursor + 1) === closeCode ? cursor + 2 : -1
+}
+
+const findMatchingMermaidShapeEnd = (
+  source: string,
+  openIndex: number,
+  closeCode: number,
+  doubleClose: boolean
+): number => {
+  const start = openIndex + (doubleClose ? 2 : 1)
+  for (let cursor = start; cursor < source.length; cursor += 1) {
+    const code = source.codePointAt(cursor) ?? 0
+    if (code === 10 || code === 13) return -1
+    if (code === closeCode) {
+      return resolveMatchedShapeEnd(source, start, cursor, closeCode, doubleClose)
+    }
+  }
+  return -1
+}
+
+const countMermaidNodeShapes = (source: string): number => {
+  let count = 0
+  let index = 0
+  while (index < source.length) {
+    const code = source.codePointAt(index) ?? 0
+    let shapeEnd = -1
+    if (code === 91) {
+      shapeEnd = findMatchingMermaidShapeEnd(source, index, 93, false)
+    } else if (code === 123) {
+      shapeEnd = findMatchingMermaidShapeEnd(source, index, 125, false)
+    } else if (code === 40) {
+      const isDoubleParen = source.codePointAt(index + 1) === 40
+      shapeEnd = findMatchingMermaidShapeEnd(source, index, 41, isDoubleParen)
+    }
+    if (shapeEnd > index) {
+      count += 1
+      index = shapeEnd
+    } else {
+      index += 1
+    }
+  }
+  return count
+}
 
 export const estimateMermaidComplexity = (source: string): MermaidComplexitySummary => {
   const edgeCount = countMermaidEdgeTokens(source)
-  let nodeCount = 0
-  for (const _match of source.matchAll(MERMAID_NODE_SHAPE_PATTERN)) {
-    nodeCount += 1
-  }
+  const nodeCount = countMermaidNodeShapes(source)
   const level: MermaidComplexityLevel =
     source.length >= MERMAID_COMPLEX_SOURCE_THRESHOLD ||
     edgeCount >= MERMAID_COMPLEX_EDGE_THRESHOLD ||
@@ -253,6 +301,46 @@ export const resolveMermaidPreset = (scheme: "dark" | "light"): MermaidRuntimePr
   }
 }
 
+export const formatMermaidErrorReason = (
+  error: unknown,
+  fallback = "Mermaid parse error"
+): string => {
+  if (typeof error === "string") {
+    const trimmed = error.trim()
+    return trimmed || fallback
+  }
+  if (error instanceof Error) {
+    return error.message.trim() || error.name || fallback
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return String(error)
+  }
+  return fallback
+}
+
+export const renderMermaidInstanceWithTimeout = async (
+  mermaidInstance: MermaidRuntimeInstance,
+  renderId: string,
+  sourceToRender: string,
+  timeoutMs = MERMAID_RENDER_TIMEOUT_MS
+): Promise<{ svg: string }> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  try {
+    const timed = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`MERMAID_RENDER_TIMEOUT:${timeoutMs}`)),
+        timeoutMs
+      )
+    })
+    return await Promise.race([
+      Promise.resolve(mermaidInstance.render(renderId, sourceToRender)),
+      timed,
+    ])
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId)
+  }
+}
+
 let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
 let lastInitializedThemeKey: string | null = null
 let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
@@ -302,18 +390,6 @@ const applyMermaidThemePreset = (
   lastInitializedThemeKey = preset.themeKey
 }
 
-export const loadSharedMermaidRuntime = async (
-  scheme: "dark" | "light",
-  onParseWarning?: (error: unknown) => void,
-  runtimeLoader?: () => Promise<unknown>
-): Promise<{ mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }> => {
-  const preset = resolveMermaidPreset(scheme)
-  const mermaidRuntime = await ensureSharedMermaidInstance(runtimeLoader)
-  activeMermaidParseWarningHandler = onParseWarning ?? null
-  applyMermaidThemePreset(mermaidRuntime, preset)
-  return { mermaidRuntime, preset }
-}
-
 export const runSerializedMermaidTask = <T>(
   scheme: "dark" | "light",
   onParseWarning: ((error: unknown) => void) | undefined,
@@ -336,4 +412,52 @@ export const runSerializedMermaidTask = <T>(
     () => undefined
   )
   return scheduled
+}
+
+export const loadSharedMermaidRuntime = (
+  scheme: "dark" | "light",
+  onParseWarning?: (error: unknown) => void,
+  runtimeLoader?: () => Promise<unknown>
+): Promise<{ mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }> =>
+  runSerializedMermaidTask(
+    scheme,
+    onParseWarning,
+    async (ctx) => ctx,
+    runtimeLoader
+  )
+
+export const renderSerializedMermaidSvg = async ({
+  scheme,
+  renderId,
+  source,
+  runtimeLoader,
+  timeoutMs = MERMAID_RENDER_TIMEOUT_MS,
+}: {
+  scheme: "dark" | "light"
+  renderId: string
+  source: string
+  runtimeLoader?: () => Promise<unknown>
+  timeoutMs?: number
+}): Promise<{ svg: string; preset: MermaidRuntimePreset }> => {
+  let taskParseWarning: string | null = null
+  return runSerializedMermaidTask(
+    scheme,
+    (error) => {
+      taskParseWarning = formatMermaidErrorReason(error)
+    },
+    async ({ mermaidRuntime, preset }) => {
+      taskParseWarning = null
+      const rendered = await renderMermaidInstanceWithTimeout(
+        mermaidRuntime,
+        renderId,
+        source,
+        timeoutMs
+      )
+      if (taskParseWarning) {
+        throw new Error(taskParseWarning)
+      }
+      return { svg: rendered.svg, preset }
+    },
+    runtimeLoader
+  )
 }

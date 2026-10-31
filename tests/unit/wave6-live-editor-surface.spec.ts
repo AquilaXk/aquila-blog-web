@@ -13,9 +13,7 @@ import { ApiError, ApiTimeoutError } from "../../src/apis/backend/client"
 import { resetSharedMermaidRuntimeForTests } from "../../src/libs/markdown/mermaidRuntimeConfig"
 import { MarkdownEditorToolbar } from "../../src/components/markdown-editor/MarkdownEditorToolbar"
 import { projectMarkdownEditorToolbarCommands } from "../../src/components/markdown-editor/markdownEditorCommandRegistryModel"
-import {
-  buildMarkdownLivePreviewDecorationSpecs,
-} from "../../src/components/markdown-editor/markdownEditorLivePreview"
+import { buildMarkdownLivePreviewDecorationSpecs } from "../../src/components/markdown-editor/markdownEditorLivePreview"
 import {
   buildDecorations,
   collectMathReplacementSpecs,
@@ -25,23 +23,17 @@ import {
   editorModeField,
   pointerSelectingField,
   setComposition,
-  setEditorMode,
-  setPointerSelecting,
 } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
 import { activeEmptyLineField } from "../../src/components/markdown-editor/markdownEditorNotionModel"
-import { notionContainerBlockField } from "../../src/components/markdown-editor/markdownEditorNotionWidgets"
+import {
+  MarkdownBookmarkBlockWidget,
+  notionContainerBlockField,
+  parseNotionContainerBlocks,
+} from "../../src/components/markdown-editor/markdownEditorNotionWidgets"
 import {
   handleFenceEnter,
   handleFenceShiftEnter,
 } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceCommands"
-import {
-  applyMarkdownTableGridAction,
-  applyMarkdownTableGridCellEdit,
-  applyMarkdownTableGridPaste,
-  parseMarkdownTableGrid,
-  planMarkdownEditorTableEdit,
-  resolveTableCellSelectionOffset,
-} from "../../src/components/markdown-editor/markdownEditorTableModel"
 import { MarkdownTableWidget } from "../../src/components/markdown-editor/markdownEditorTableWidget"
 import {
   MarkdownImageWidget,
@@ -56,281 +48,19 @@ import {
   resolveMarkdownImageEmbed,
 } from "../../src/components/markdown-editor/markdownEditorUploadModel"
 import {
-  isOffsetInsideInlineCodeSpan,
-  shouldBypassHtmlPasteConversion,
-  shouldReportEmptyHtmlPasteError,
-} from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
-import {
   appendInlineMarkdownNodes,
   isSafeInlineHref,
 } from "../../src/components/markdown-editor/markdownEditorInlineDom"
-import {
-  resolveMarkdownEditorUploadErrorMessage,
-  shouldLinkifySelectionOnUrlPaste,
-} from "../../src/components/markdown-editor/markdownEditorMediaTransferModel"
-import { reconcileCellSpans } from "../../src/components/markdown-editor/markdownEditorTableSpanModel"
+import { resolveMarkdownEditorUploadErrorMessage } from "../../src/components/markdown-editor/markdownEditorMediaTransferModel"
 import {
   hasAlphaTransparency,
   resolveTransferOutputMimeTypes,
 } from "../../src/libs/profileImageUpload"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
+import { SimpleDomElement, withMockDom } from "./helpers/simpleMockDom"
 
 const lightTheme = createTheme({ scheme: "light" })
-const srcFile = (...parts: string[]) =>
-  readFileSync(path.resolve(__dirname, "../../src", ...parts), "utf8")
-
-type MockDomEvent = Record<string, unknown>
-
-class SimpleDomElement {
-  tagName: string
-  className = ""
-  textContent = ""
-  value = ""
-  type = ""
-  src = ""
-  alt = ""
-  href = ""
-  target = ""
-  rel = ""
-  loading = ""
-  tabIndex = 0
-  disabled = false
-  scrollLeft = 0
-  selectionStart: number | null = 0
-  selectionEnd: number | null = 0
-  isConnected = true
-  dataset: Record<string, string> = {}
-  style: Record<string, string> = {}
-  attributes = new Map<string, string>()
-  children: SimpleDomElement[] = []
-  parentElement: SimpleDomElement | null = null
-  listeners = new Map<string, Array<(event: MockDomEvent) => void>>()
-  private innerHtmlValue = ""
-  classList = {
-    add: (...tokens: string[]) => {
-      const set = new Set(this.className.split(/\s+/).filter(Boolean))
-      for (const token of tokens) set.add(token)
-      this.className = [...set].join(" ")
-    },
-    remove: (...tokens: string[]) => {
-      const removeSet = new Set(tokens)
-      this.className = this.className
-        .split(/\s+/)
-        .filter((token) => Boolean(token) && !removeSet.has(token))
-        .join(" ")
-    },
-    contains: (token: string) => this.className.split(/\s+/).includes(token),
-    toggle: (token: string, force?: boolean) => {
-      const has = this.className.split(/\s+/).includes(token)
-      const next = force ?? !has
-      if (next) this.classList.add(token)
-      else this.classList.remove(token)
-      return next
-    },
-  }
-
-  constructor(tagName: string) {
-    this.tagName = tagName.toUpperCase()
-  }
-
-  get innerHTML() {
-    return this.innerHtmlValue
-  }
-
-  set innerHTML(val: string) {
-    this.innerHtmlValue = val
-    if (val === "") {
-      this.children = []
-      this.textContent = ""
-    }
-  }
-
-  setAttribute(name: string, val: string) {
-    this.attributes.set(name, val)
-    if (name.startsWith("data-")) {
-      const camel = name
-        .slice(5)
-        .replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase())
-      this.dataset[camel] = val
-    }
-  }
-
-  getAttribute(name: string) {
-    if (name.startsWith("data-")) {
-      const camel = name
-        .slice(5)
-        .replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase())
-      if (camel in this.dataset) return this.dataset[camel] ?? null
-    }
-    return this.attributes.get(name) ?? null
-  }
-
-  removeAttribute(name: string) {
-    this.attributes.delete(name)
-    if (name.startsWith("data-")) {
-      const camel = name
-        .slice(5)
-        .replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase())
-      delete this.dataset[camel]
-    }
-  }
-
-  appendChild<T extends SimpleDomElement>(child: T): T {
-    child.parentElement = this
-    this.children.push(child)
-    return child
-  }
-
-  append(...nodes: SimpleDomElement[]) {
-    for (const node of nodes) this.appendChild(node)
-  }
-
-  contains(other: unknown): boolean {
-    let cur = other as SimpleDomElement | null
-    while (cur) {
-      if (cur === this) return true
-      cur = cur.parentElement
-    }
-    return false
-  }
-
-  closest(selector: string): SimpleDomElement | null {
-    let cur: SimpleDomElement | null = this
-    while (cur) {
-      if (cur.matchesSelector(selector)) return cur
-      cur = cur.parentElement
-    }
-    return null
-  }
-
-  private matchesSelector(selector: string): boolean {
-    if (selector.startsWith(".")) {
-      return this.classList.contains(selector.slice(1))
-    }
-    if (selector.startsWith("[data-testid=\"") && selector.endsWith("\"]")) {
-      const expected = selector.slice(14, -2)
-      return this.getAttribute("data-testid") === expected
-    }
-    if (selector === "[data-table-popover]") {
-      return this.attributes.has("data-table-popover")
-    }
-    return this.tagName.toLowerCase() === selector.toLowerCase()
-  }
-
-  querySelector(selector: string): SimpleDomElement | null {
-    for (const child of this.children) {
-      if (child.matchesSelector(selector)) return child
-      const nested = child.querySelector(selector)
-      if (nested) return nested
-    }
-    return null
-  }
-
-  querySelectorAll(selector: string): SimpleDomElement[] {
-    const out: SimpleDomElement[] = []
-    for (const child of this.children) {
-      if (child.matchesSelector(selector)) out.push(child)
-      out.push(...child.querySelectorAll(selector))
-    }
-    return out
-  }
-
-  addEventListener(type: string, fn: (event: MockDomEvent) => void) {
-    const list = this.listeners.get(type) ?? []
-    list.push(fn)
-    this.listeners.set(type, list)
-  }
-
-  removeEventListener(type: string, fn: (event: MockDomEvent) => void) {
-    const list = this.listeners.get(type)
-    if (!list) return
-    this.listeners.set(
-      type,
-      list.filter((entry) => entry !== fn)
-    )
-  }
-
-  dispatch(type: string, init: Record<string, unknown> = {}) {
-    let defaultPrevented = false
-    let propagationStopped = false
-    const event: MockDomEvent = {
-      type,
-      target: init.target ?? this,
-      currentTarget: this,
-      button: 0,
-      preventDefault() {
-        defaultPrevented = true
-      },
-      stopPropagation() {
-        propagationStopped = true
-      },
-      get defaultPrevented() {
-        return defaultPrevented
-      },
-      ...init,
-    }
-    for (const listener of [...(this.listeners.get(type) ?? [])]) {
-      listener(event)
-      if (propagationStopped) break
-    }
-    return event
-  }
-
-  focus() {
-    const doc = (globalThis as { document?: { activeElement?: unknown } }).document
-    if (doc) doc.activeElement = this
-  }
-
-  setSelectionRange(start: number, end: number) {
-    this.selectionStart = start
-    this.selectionEnd = end
-  }
-
-  getBoundingClientRect() {
-    return { width: 120, height: 32, top: 0, left: 0, right: 120, bottom: 32 }
-  }
-}
-
-const withMockDom = <T>(fn: (winListeners: Map<string, Array<(e: MockDomEvent) => void>>) => T): T => {
-  const globalRecord = globalThis as Record<string, unknown>
-  const prevDoc = globalRecord.document
-  const prevWin = globalRecord.window
-  const winListeners = new Map<string, Array<(e: MockDomEvent) => void>>()
-  globalRecord.document = {
-    createElement: (tag: string) => new SimpleDomElement(tag),
-    createTextNode: (text: string) => {
-      const node = new SimpleDomElement("#text")
-      node.textContent = text
-      return node
-    },
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    activeElement: null,
-  }
-  globalRecord.window = {
-    innerWidth: 1280,
-    innerHeight: 840,
-    addEventListener: (type: string, cb: (e: MockDomEvent) => void) => {
-      const list = winListeners.get(type) ?? []
-      list.push(cb)
-      winListeners.set(type, list)
-    },
-    removeEventListener: (type: string, cb: (e: MockDomEvent) => void) => {
-      const list = winListeners.get(type)
-      if (!list) return
-      winListeners.set(
-        type,
-        list.filter((entry) => entry !== cb)
-      )
-    },
-  }
-  try {
-    return fn(winListeners)
-  } finally {
-    globalRecord.document = prevDoc
-    globalRecord.window = prevWin
-  }
-}
+const srcFile = (...parts: string[]) => readFileSync(path.resolve(__dirname, "../../src", ...parts), "utf8")
 
 const renderToolbarHtml = (viewMode: "live" | "source" | "reading", disabled = false) =>
   renderToStaticMarkup(
@@ -338,62 +68,37 @@ const renderToolbarHtml = (viewMode: "live" | "source" | "reading", disabled = f
       React.createElement(ThemeProvider, {
         theme: lightTheme,
         children: React.createElement(MarkdownEditorToolbar, {
-          disabled,
-          disableMermaid: false,
-          viewMode,
-          tableRows: 2,
-          tableColumns: 2,
+          disabled, disableMermaid: false, viewMode, tableRows: 2, tableColumns: 2,
           commandContext: {
             disabled: disabled || viewMode === "reading",
-            selectionStart: 0,
-            selectionEnd: 0,
-            isTableSelection: false,
+            selectionStart: 0, selectionEnd: 0, isTableSelection: false,
           },
           toolbarCommands: projectMarkdownEditorToolbarCommands(),
           imageInputRef: createRef<HTMLInputElement>(),
           fileInputRef: createRef<HTMLInputElement>(),
-          hasUploadImage: true,
-          hasUploadFile: true,
-          onTableRowsChange: () => {},
-          onTableColumnsChange: () => {},
-          onRememberSelection: () => {},
-          onApplyCommand: () => {},
-          onApplySnippet: () => {},
-          onApplyFormatShortcut: () => {},
-          onApplyListCommand: () => {},
-          onApplyLineCommand: () => {},
-          onApplyBlockSnippet: () => {},
-          onInsertTable: () => {},
-          onApplyTableEdit: () => {},
-          isTableEditDisabled: () => true,
-          onOpenFindReplace: () => {},
-          onImageFileSelect: () => {},
-          onAttachmentFileSelect: () => {},
-          onViewModeChange: () => {},
+          hasUploadImage: true, hasUploadFile: true,
+          onTableRowsChange: () => {}, onTableColumnsChange: () => {},
+          onRememberSelection: () => {}, onApplyCommand: () => {},
+          onApplySnippet: () => {}, onApplyFormatShortcut: () => {},
+          onApplyListCommand: () => {}, onApplyLineCommand: () => {},
+          onApplyBlockSnippet: () => {}, onInsertTable: () => {},
+          onApplyTableEdit: () => {}, isTableEditDisabled: () => true,
+          onOpenFindReplace: () => {}, onImageFileSelect: () => {},
+          onAttachmentFileSelect: () => {}, onViewModeChange: () => {},
         }),
       })
     ) as React.ReactElement
   )
 
-const createDecorationEditorState = (
-  doc: string,
-  cursorPos: number,
-  mode: "live" | "source" | "reading"
-) =>
+const createDecorationEditorState = (doc: string, cursorPos: number, mode: "live" | "source" | "reading") =>
   EditorState.create({
     doc,
     selection: EditorSelection.cursor(Math.min(cursorPos, doc.length)),
     extensions: [
-      markdown({ extensions: GFM }),
-      compositionField,
-      pointerSelectingField,
-      editorModeField.init(() => mode),
-      disableMermaidField.init(() => false),
-      decorationField,
-      notionContainerBlockField,
-      activeEmptyLineField,
-      EditorState.readOnly.of(mode === "reading"),
-      EditorView.editable.of(mode !== "reading"),
+      markdown({ extensions: GFM }), compositionField, pointerSelectingField,
+      editorModeField.init(() => mode), disableMermaidField.init(() => false),
+      decorationField, notionContainerBlockField, activeEmptyLineField,
+      EditorState.readOnly.of(mode === "reading"), EditorView.editable.of(mode !== "reading"),
     ],
   })
 
@@ -410,29 +115,12 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     expect(readingToolbar).not.toMatch(/aria-label="읽기 뷰"[^>]*disabled=""/)
 
     const doc = [
-      "# Heading Title",
-      "",
-      "**Bold** and [Link](https://example.com) and $O(1)$ and [[Note|Alias]]",
-      "",
-      "- [x] Done item",
-      "",
-      "| A | B |",
-      "| --- | --- |",
-      "| 1 | 2 |",
+      "# Heading Title", "", "**Bold** and [Link](https://example.com) and $O(1)$ and [[Note|Alias]]",
+      "", "- [x] Done item", "", "| A | B |", "| --- | --- |", "| 1 | 2 |",
     ].join("\n")
 
-    const liveSpecsAtHeading = buildMarkdownLivePreviewDecorationSpecs(
-      doc,
-      [{ from: 2, to: 2 }],
-      false,
-      "live"
-    )
-    const readingSpecsAtHeading = buildMarkdownLivePreviewDecorationSpecs(
-      doc,
-      [{ from: 2, to: 2 }],
-      false,
-      "reading"
-    )
+    const liveSpecsAtHeading = buildMarkdownLivePreviewDecorationSpecs(doc, [{ from: 2, to: 2 }], false, "live")
+    const readingSpecsAtHeading = buildMarkdownLivePreviewDecorationSpecs(doc, [{ from: 2, to: 2 }], false, "reading")
     expect(liveSpecsAtHeading.some((d) => d.kind === "hide-mark" && d.from === 0)).toBe(false)
     expect(readingSpecsAtHeading.some((d) => d.kind === "hide-mark" && d.from === 0)).toBe(true)
 
@@ -441,9 +129,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     const readingDecos = buildDecorations(readingState)
     let hasTableWidgetAtCursorInReading = false
     readingDecos.between(0, doc.length, (_from, _to, value) => {
-      if (value.spec.widget instanceof MarkdownTableWidget) {
-        hasTableWidgetAtCursorInReading = true
-      }
+      if (value.spec.widget instanceof MarkdownTableWidget) hasTableWidgetAtCursorInReading = true
     })
     expect(hasTableWidgetAtCursorInReading).toBe(true)
 
@@ -464,9 +150,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       let dispatched = false
       const mockView = {
         state: readingState,
-        dispatch: () => {
-          dispatched = true
-        },
+        dispatch: () => { dispatched = true },
         posAtDOM: () => doc.indexOf("[x]"),
       } as unknown as EditorView
       const checkbox = new MarkdownTaskWidget(true, 0, 3).toDOM(mockView) as unknown as SimpleDomElement
@@ -474,258 +158,28 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       expect(dispatched).toBe(false)
 
       const readingTableDom = new MarkdownTableWidget(
-        "| A | B |\n| --- | --- |\n| 1 | 2 |",
-        0,
-        29
+        "| A | B |\n| --- | --- |\n| 1 | 2 |", 0, 29
       ).toDOM(mockView) as unknown as SimpleDomElement
-      const readingHeaderColBtn = readingTableDom.querySelector(
-        '[data-testid="cm-live-table-toggle-header-col"]'
-      )!
-      readingHeaderColBtn.dispatch("click")
+      readingTableDom.querySelector('[data-testid="cm-live-table-toggle-header-col"]')!.dispatch("click")
       expect(readingTableDom.getAttribute("data-header-col")).toBeNull()
       expect(dispatched).toBe(false)
     })
   })
 
-  test("round-trips <!-- aq-table {...} --> layout metadata across edits and omits default comments", () => {
-    const malformed = ["<!-- aq-table malformed", "| one |", "| --- |", "| two |"].join("\n")
-    expect(parseMarkdownTableGrid(malformed)).toBeNull()
-    expect(planMarkdownEditorTableEdit(malformed, malformed.indexOf("one"), malformed.indexOf("one"), { kind: "add-row" })).toBeNull()
-
-    const withMeta = [
-      '<!-- aq-table {"headerRow":false,"headerColumn":true,"overflowMode":"wide","columnWidths":[null,220],"rowHeights":[52,60]} -->',
-      "| Col A | Col B |",
-      "| --- | --- |",
-      "| 1 | 2 |",
-    ].join("\n")
-
-    const cellEdited = applyMarkdownTableGridCellEdit(withMeta, 1, 0, "updated")
-    expect(cellEdited).not.toBeNull()
-    expect(cellEdited).toContain("<!-- aq-table ")
-    expect(cellEdited).toContain('"headerRow":false')
-    expect(cellEdited).toContain('"headerColumn":true')
-    expect(cellEdited).toContain('"overflowMode":"wide"')
-    expect(cellEdited).toContain('"columnWidths":[null,220]')
-    expect(cellEdited).toContain("| updated | 2 |")
-
-    const colInserted = applyMarkdownTableGridAction(withMeta, 1, 0, { kind: "add-column" })
-    expect(colInserted).not.toBeNull()
-    expect(colInserted!.markdown).toContain('"columnWidths":[null,null,220]')
-
-    const pasted = applyMarkdownTableGridPaste(withMeta, 1, 0, "alpha\tbeta")
-    expect(pasted).not.toBeNull()
-    expect(pasted!.markdown).toContain('"headerColumn":true')
-    expect(pasted!.markdown).toContain("| alpha | beta |")
-
-    const offset = resolveTableCellSelectionOffset(withMeta, 0, 1, 1)
-    expect(offset).not.toBeNull()
-    const plannedEdit = planMarkdownEditorTableEdit(withMeta, offset!, offset!, {
-      kind: "set-alignment",
-      alignment: "right",
-    })
-    expect(plannedEdit).not.toBeNull()
-    expect(plannedEdit!.rangeStart).toBe(0)
-    expect(plannedEdit!.replacement).toContain('"headerColumn":true')
-    expect(plannedEdit!.replacement).toContain("| --- | ---: |")
-
-    const stateWithMeta = createDecorationEditorState(withMeta, withMeta.length, "reading")
-    const decos = buildDecorations(stateWithMeta)
-    const tableRanges: Array<{ from: number; to: number }> = []
-    decos.between(0, withMeta.length, (from, to, value) => {
-      if (value.spec.widget instanceof MarkdownTableWidget) {
-        tableRanges.push({ from, to })
-      }
-    })
-    expect(tableRanges).toEqual([{ from: 0, to: withMeta.length }])
-
-    const plainTable = ["| Col A | Col B |", "| --- | --- |", "| 1 | 2 |"].join("\n")
-    withMockDom((winListeners) => {
-      let currentDoc = plainTable
-      const mockView = {
-        state: {
-          get doc() {
-            return {
-              length: currentDoc.length,
-              lineAt: () => ({ length: 1 }),
-            }
-          },
-          selection: { main: { from: 0, to: 0 } },
-          facet: () => true,
-        },
-        posAtDOM: () => 0,
-        focus: () => {},
-        dispatch: (spec: { changes?: { from: number; to: number; insert: string } }) => {
-          if (spec.changes) {
-            currentDoc =
-              currentDoc.slice(0, spec.changes.from) +
-              spec.changes.insert +
-              currentDoc.slice(spec.changes.to)
-          }
-        },
-      } as unknown as EditorView
-
-      const widget = new MarkdownTableWidget(plainTable, 0, plainTable.length)
-      const dom = widget.toDOM(mockView) as unknown as SimpleDomElement
-      const headerColBtn = dom.querySelector('[data-testid="cm-live-table-toggle-header-col"]')!
-      const fullWidthBtn = dom.querySelector('[data-testid="cm-live-table-toggle-full-width"]')!
-      const resizers = dom.querySelectorAll('[data-testid="cm-live-table-col-resizer"]')
-
-      headerColBtn.dispatch("click")
-      expect(currentDoc).toContain('<!-- aq-table {"headerColumn":true} -->')
-
-      const separatePostView = {
-        state: {
-          doc: { length: plainTable.length, lineAt: () => ({ length: 1 }) },
-          selection: { main: { from: 0, to: 0 } },
-          facet: () => true,
-        },
-        posAtDOM: () => 0,
-        focus: () => {},
-        dispatch: () => {},
-      } as unknown as EditorView
-      const isolatedDom = new MarkdownTableWidget(plainTable, 0, plainTable.length).toDOM(
-        separatePostView
-      ) as unknown as SimpleDomElement
-      expect(isolatedDom.getAttribute("data-header-col")).toBeNull()
-
-      fullWidthBtn.dispatch("click")
-      expect(currentDoc).toContain('"fitWidth":true')
-      expect(currentDoc).not.toContain('"overflowMode":"wide"')
-
-      resizers[1]!.dispatch("pointerdown", { button: 0, clientX: 100 })
-      for (const move of winListeners.get("pointermove") ?? []) move({ clientX: 180 })
-      for (const up of winListeners.get("pointerup") ?? []) up({})
-      expect(currentDoc).toContain('"columnWidths":[null,200]')
-
-      resizers[1]!.dispatch("dblclick")
-      headerColBtn.dispatch("click")
-      fullWidthBtn.dispatch("click")
-      expect(currentDoc).not.toContain("<!-- aq-table")
-      expect(currentDoc).toBe(plainTable)
-
-      const wideTable = [
-        '<!-- aq-table {"overflowMode":"wide"} -->',
-        "| Col A | Col B |",
-        "| --- | --- |",
-        "| 1 | 2 |",
-      ].join("\n")
-      let wideDoc = wideTable
-      const wideView = {
-        state: {
-          get doc() {
-            return { length: wideDoc.length, lineAt: () => ({ length: 1 }) }
-          },
-          selection: { main: { from: 0, to: 0 } },
-          facet: () => true,
-        },
-        posAtDOM: () => 0,
-        focus: () => {},
-        dispatch: (spec: { changes?: { from: number; to: number; insert: string } }) => {
-          if (spec.changes) {
-            wideDoc =
-              wideDoc.slice(0, spec.changes.from) +
-              spec.changes.insert +
-              wideDoc.slice(spec.changes.to)
-          }
-        },
-      } as unknown as EditorView
-      const wideDom = new MarkdownTableWidget(wideTable, 0, wideTable.length).toDOM(
-        wideView
-      ) as unknown as SimpleDomElement
-      wideDom.querySelector('[data-testid="cm-live-table-toggle-full-width"]')!.dispatch("click")
-      expect(wideDoc).toContain('"overflowMode":"wide"')
-      expect(wideDoc).toContain('"fitWidth":true')
-    })
-  })
-
-  test("bypasses HTML-to-Markdown conversion for IDE/fence/source pastes and falls back to plain text on benign empty HTML", () => {
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "source",
-        markdown: "hello",
-        selectionFrom: 0,
-        clipboardTypes: ["text/html", "text/plain"],
-        html: "<p><strong>bold</strong></p>",
-        plainText: "bold",
-      })
-    ).toBe(true)
-
-    const fencedDoc = "```ts\nconst a = 1\n```"
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: fencedDoc,
-        selectionFrom: fencedDoc.indexOf("const"),
-        clipboardTypes: ["text/html", "text/plain"],
-        html: "<p><strong>bold</strong></p>",
-        plainText: "bold",
-      })
-    ).toBe(true)
-
-    const inlineCodeDoc = "Use `const x = 1` here"
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: inlineCodeDoc,
-        selectionFrom: inlineCodeDoc.indexOf("const"),
-        clipboardTypes: ["text/html", "text/plain"],
-        html: "<p><strong>bold</strong></p>",
-        plainText: "bold",
-      })
-    ).toBe(true)
-
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: "",
-        selectionFrom: 0,
-        clipboardTypes: ["vscode-editor-data", "text/html", "text/plain"],
-        html: '<div style="font-family: Menlo; white-space: pre;"><span>const x = 1;</span></div>',
-        plainText: "const x = 1;",
-      })
-    ).toBe(true)
-
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: "",
-        selectionFrom: 0,
-        clipboardTypes: ["text/html", "text/plain"],
-        html: '<div style="font-family: monospace; white-space: pre;"><span>fn main() {}</span></div>',
-        plainText: "fn main() {}",
-      })
-    ).toBe(true)
-
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: "",
-        selectionFrom: 0,
-        clipboardTypes: ["text/html", "text/plain"],
-        html: "<p>Hello <strong>world</strong> and <a href=\"https://example.com\">docs</a></p>",
-        plainText: "Hello world and docs",
-      })
-    ).toBe(false)
-
-    expect(shouldReportEmptyHtmlPasteError("<div><span>   </span></div>", "plain fallback text")).toBe(false)
-    expect(shouldReportEmptyHtmlPasteError("<script>window.__xss = 1</script>", "ignored")).toBe(true)
-    expect(shouldReportEmptyHtmlPasteError("<div><span>   </span></div>", "")).toBe(true)
-  })
-
-  test("enforces Pandoc tex_math_dollars rules and literalRanges exclusion in collectMathReplacementSpecs", () => {
+  test("enforces Pandoc tex_math_dollars rules, nested inline wrappers, and literalRanges exclusion in collectMathReplacementSpecs", () => {
     const proseCurrency = "Prices are $10 and $20 or $10~20 and ($10) to ($20)."
     expect(collectMathReplacementSpecs(proseCurrency, -1, -1, false, [])).toEqual([])
 
     const shellAndUrl = 'Run echo "$HOME $PATH" and visit https://a.com/$x/$y now.'
-    const codeLiteralStart = shellAndUrl.indexOf("echo")
-    const codeLiteralEnd = shellAndUrl.indexOf(" and")
     expect(
       collectMathReplacementSpecs(shellAndUrl, -1, -1, false, [
-        { from: codeLiteralStart, to: codeLiteralEnd },
+        { from: shellAndUrl.indexOf("echo"), to: shellAndUrl.indexOf(" and") },
       ])
     ).toEqual([])
 
     expect(collectMathReplacementSpecs("Escaped \\$x + y\\$ stays literal", -1, -1, false, [])).toEqual([])
+    expect(collectMathReplacementSpecs("Wait $$ here\n\nAnd $$ there", -1, -1, false, [])).toEqual([])
+    expect(collectMathReplacementSpecs("Triple $$$x$$$ dollars", -1, -1, false, [])).toEqual([])
 
     const validMath =
       "Inline time=$O(1)$, ($x^2$), the $n$th item, 한글 $a + b$이다, and\n$$\n\\sum_{i=1}^n i\n$$"
@@ -737,41 +191,38 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       { math: "a + b", displayMode: false },
       { math: "\\sum_{i=1}^n i", displayMode: true },
     ])
+
+    expect(collectMathReplacementSpecs("$a \\\\$", -1, -1, false, []).map((m) => m.math)).toEqual(["a \\\\"])
+    expect(collectMathReplacementSpecs("{{color:blue|$x^{2}$}}", -1, -1, false, []).map((m) => m.math)).toEqual(["x^{2}"])
+    expect(collectMathReplacementSpecs("==$x^{2}$==", -1, -1, false, []).map((m) => m.math)).toEqual(["x^{2}"])
+    const linkCurrency = "[label $5](https://example.com?q=$10)"
+    expect(
+      collectMathReplacementSpecs(linkCurrency, -1, -1, false, [
+        { from: linkCurrency.indexOf("https://"), to: linkCurrency.length - 1 },
+      ])
+    ).toEqual([])
   })
 
   test("guards Korean IME 229, restricts slash trigger to line/block prefix, clamps visualViewport, and keeps Shift+Enter literal inside FencedCode", () => {
-    expect(matchSlashCommandTrigger("/head", { from: 5, to: 5 })).toEqual({
-      query: "head",
-      slashFrom: 0,
-    })
-    expect(matchSlashCommandTrigger("  > - [ ] /todo", { from: 15, to: 15 })).toEqual({
-      query: "todo",
-      slashFrom: 10,
-    })
+    expect(matchSlashCommandTrigger("/head", { from: 5, to: 5 })).toEqual({ query: "head", slashFrom: 0 })
+    expect(matchSlashCommandTrigger("  > - [ ] /todo", { from: 15, to: 15 })).toEqual({ query: "todo", slashFrom: 10 })
     expect(matchSlashCommandTrigger("요청 / 응답", { from: 4, to: 4 })).toBeNull()
     expect(matchSlashCommandTrigger("https://example.com/docs", { from: 24, to: 24 })).toBeNull()
 
     const slashMenuSource = srcFile("components", "markdown-editor", "MarkdownEditorSlashMenu.tsx")
     expect(slashMenuSource).toMatch(/isComposing[\s\S]*229/)
-    expect(
-      slashMenuSource + srcFile("components", "markdown-editor", "useMarkdownEditorSlashMenu.ts")
-    ).toContain("visualViewport")
+    expect(slashMenuSource + srcFile("components", "markdown-editor", "useMarkdownEditorSlashMenu.ts")).toContain("visualViewport")
 
     const fencedDoc = "```ts\nconst a = 1\n```"
-    const insideFencePos = fencedDoc.indexOf("1") + 1
     const fenceState = EditorState.create({
       doc: fencedDoc,
-      selection: EditorSelection.cursor(insideFencePos),
+      selection: EditorSelection.cursor(fencedDoc.indexOf("1") + 1),
       extensions: [markdown({ extensions: GFM }), compositionField],
     })
     const composingState = fenceState.update({ effects: setComposition.of(true) }).state
     let fenceDispatched = false
     const mockFenceView = {
-      state: composingState,
-      composing: true,
-      dispatch: () => {
-        fenceDispatched = true
-      },
+      state: composingState, composing: true, dispatch: () => { fenceDispatched = true },
     } as unknown as EditorView
     expect(handleFenceEnter.run?.(mockFenceView)).toBe(false)
     expect(fenceDispatched).toBe(false)
@@ -779,69 +230,46 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     const multiLineComposeDoc = ["# Heading", "", "Paragraph", "", "- [x] Done"].join("\n")
     const paragraphPos = multiLineComposeDoc.indexOf("Paragraph")
     const composeSurfaceState = createDecorationEditorState(
-      multiLineComposeDoc,
-      paragraphPos,
-      "live"
+      multiLineComposeDoc, paragraphPos, "live"
     ).update({ effects: setComposition.of(true) }).state
     const composeSurfaceDecos = buildDecorations(composeSurfaceState)
     let hidesInactiveHeadingMark = false
     let decoratesComposingLine = false
     composeSurfaceDecos.between(0, multiLineComposeDoc.length, (from, to) => {
       if (from === 0 && to === 2) hidesInactiveHeadingMark = true
-      if (from >= paragraphPos && to <= paragraphPos + "Paragraph".length) {
-        decoratesComposingLine = true
-      }
+      if (from >= paragraphPos && to <= paragraphPos + "Paragraph".length) decoratesComposingLine = true
     })
     expect(hidesInactiveHeadingMark).toBe(true)
     expect(decoratesComposingLine).toBe(false)
 
     let shiftEnterInsert = ""
     const mockShiftEnterView = {
-      state: fenceState,
-      composing: false,
-      dispatch: (spec: { changes?: { insert?: string } }) => {
-        shiftEnterInsert = spec.changes?.insert ?? ""
-      },
+      state: fenceState, composing: false,
+      dispatch: (spec: { changes?: { insert?: string } }) => { shiftEnterInsert = spec.changes?.insert ?? "" },
     } as unknown as EditorView
     expect(handleFenceShiftEnter.run?.(mockShiftEnterView)).toBe(true)
     expect(shiftEnterInsert).toBe("\n")
 
-    const textareaKeyboardSource = srcFile(
-      "components",
-      "markdown-editor",
-      "useMarkdownEditorTextareaKeyboard.ts"
-    )
-    expect(textareaKeyboardSource).toContain("isOffsetInsideFencedCodeBlock")
+    expect(srcFile("components", "markdown-editor", "useMarkdownEditorTextareaKeyboard.ts")).toContain("isOffsetInsideFencedCodeBlock")
 
     withMockDom(() => {
       const tableDoc = "| A | B |\n| --- | --- |\n| 1 | 2 |"
       const mockView = {
-        state: {
-          doc: { length: tableDoc.length, lineAt: () => ({ length: 1 }) },
-          selection: { main: { from: 0, to: 0 } },
-          facet: () => true,
-        },
-        posAtDOM: () => 0,
-        focus: () => {},
-        dispatch: () => {},
+        state: { doc: { length: tableDoc.length, lineAt: () => ({ length: 1 }) }, selection: { main: { from: 0, to: 0 } }, facet: () => true },
+        posAtDOM: () => 0, focus: () => {}, dispatch: () => {},
       } as unknown as EditorView
-      const widget = new MarkdownTableWidget(tableDoc, 0, tableDoc.length)
-      const dom = widget.toDOM(mockView) as unknown as SimpleDomElement
-      const colHandle = dom.querySelector('[data-testid="cm-live-table-col-handle"]')!
-      colHandle.dispatch("click")
+      const dom = new MarkdownTableWidget(tableDoc, 0, tableDoc.length).toDOM(mockView) as unknown as SimpleDomElement
+      dom.querySelector('[data-testid="cm-live-table-col-handle"]')!.dispatch("click")
       expect(dom.querySelector('[data-testid="cm-live-table-cell-input"]')).toBeNull()
       dom.dispatch("compositionstart")
       expect(dom.querySelector('[data-testid="cm-live-table-cell-input"]')).not.toBeNull()
     })
   })
 
-  test("hardens media transfers, widget sanitization, alpha transparency preservation, Notion chrome effects, and compact/coarse styles", async () => {
+  test("hardens media transfers, widget sanitization, scheme-aware serialized Mermaid runtime, and Notion bookmark URLs", async () => {
     expect(
       resolveMarkdownImageEmbed(
-        {
-          url: "https://blog.aquilaxk.site/post/api/v1/images/posts/chart.png",
-          alt: "Diagram [v1]",
-        },
+        { url: "https://blog.aquilaxk.site/post/api/v1/images/posts/chart.png", alt: "Diagram [v1]" },
         "chart[1].png",
         { publicApiOrigin: "https://blog.aquilaxk.site" }
       )
@@ -850,10 +278,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     })
     expect(
       resolveMarkdownAttachmentLink(
-        {
-          url: "https://cdn.example.test/files/spec.pdf",
-          name: "Spec [Draft].pdf",
-        },
+        { url: "https://cdn.example.test/files/spec.pdf", name: "Spec [Draft].pdf" },
         "spec.pdf"
       )
     ).toEqual({
@@ -868,23 +293,17 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     ).toContain("용량")
     expect(
       resolveMarkdownEditorUploadErrorMessage(new ApiTimeoutError("/post/api/v1/posts/files", 12000), {
-        kind: "file",
-        fileName: "doc.pdf",
-        fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+        kind: "file", fileName: "doc.pdf", fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
       })
     ).toContain("지연")
     expect(
       resolveMarkdownEditorUploadErrorMessage(new Error("지원하지 않는 이미지 형식입니다."), {
-        kind: "image",
-        fileName: "bad.bmp",
-        fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+        kind: "image", fileName: "bad.bmp", fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
       })
     ).toContain("지원하지 않는 이미지 형식입니다.")
     expect(
       resolveMarkdownEditorUploadErrorMessage(new ApiError(500, "/post/api/v1/posts/files", "failed"), {
-        kind: "file",
-        fileName: "failed.txt",
-        fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+        kind: "file", fileName: "failed.txt", fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
       })
     ).toBe(MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE)
 
@@ -892,35 +311,38 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     expect(hasAlphaTransparency(new Uint8ClampedArray([255, 255, 255, 255, 10, 20, 30, 128]))).toBe(true)
     expect(
       resolveTransferOutputMimeTypes(["image/webp", "image/jpeg", "image/png"], {
-        sourceMimeType: "image/png",
-        hasTransparency: true,
+        sourceMimeType: "image/png", hasTransparency: true,
       })
     ).toEqual(["image/webp", "image/png"])
     expect(
       resolveTransferOutputMimeTypes(["image/webp", "image/jpeg"], {
-        sourceMimeType: "image/png",
-        hasTransparency: true,
+        sourceMimeType: "image/png", hasTransparency: true,
       })
     ).toEqual(["image/webp", "image/png"])
     expect(
       resolveTransferOutputMimeTypes(["image/webp", "image/jpeg", "image/png"], {
-        sourceMimeType: "image/png",
-        hasTransparency: false,
+        sourceMimeType: "image/png", hasTransparency: false,
       })
     ).toEqual(["image/webp", "image/jpeg", "image/png"])
 
+    expect(parseNotionContainerBlocks(":::bookmark https://user:pass@example.com\n:::")).toEqual([])
+    expect(parseNotionContainerBlocks(":::bookmark https://exa\u0007mple.com\n:::")).toEqual([])
+    const validBookmarkBlocks = parseNotionContainerBlocks(":::bookmark https://example.com/docs Docs\nGuide\n:::")
+    expect(validBookmarkBlocks).toHaveLength(1)
+    expect(validBookmarkBlocks[0]).toMatchObject({ kind: "bookmark", url: "https://example.com/docs", title: "Docs" })
+
     resetSharedMermaidRuntimeForTests()
-    await withMockDom(async () => {
+    await withMockDom(async (_winListeners, docElement) => {
       const unsafeImgDom = new MarkdownImageWidget("javascript:alert(1)", "bad").toDOM() as unknown as SimpleDomElement
       expect(unsafeImgDom.querySelector("img")?.src ?? "").toBe("")
 
-      const safeImgDom = new MarkdownImageWidget(
-        "/post/api/v1/images/posts/ok.png",
-        "ok"
-      ).toDOM() as unknown as SimpleDomElement
-      expect(safeImgDom.querySelector("img")?.src).toBe(
-        "/post/api/v1/images/posts/ok.png"
-      )
+      const safeImgDom = new MarkdownImageWidget("/post/api/v1/images/posts/ok.png", "ok").toDOM() as unknown as SimpleDomElement
+      expect(safeImgDom.querySelector("img")?.src).toBe("/post/api/v1/images/posts/ok.png")
+
+      const safeBookmarkDom = new MarkdownBookmarkBlockWidget("https://example.com/docs", "Docs", "Desc", 0, 24).toDOM() as unknown as SimpleDomElement
+      expect(safeBookmarkDom.querySelector("a")?.getAttribute("href")).toBe("https://example.com/docs")
+      const unsafeBookmarkDom = new MarkdownBookmarkBlockWidget("https://user:pass@example.com/docs", "Bad", "", 0, 24).toDOM() as unknown as SimpleDomElement
+      expect(unsafeBookmarkDom.querySelector("a")).toBeNull()
 
       let renderedMermaidText = ""
       const mermaidWidget = new MarkdownMermaidWidget(
@@ -936,6 +358,45 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       expect(renderedMermaidText).not.toContain("themeCSS")
       expect(renderedMermaidText).not.toContain("classDef")
       expect(renderedMermaidText).toContain("flowchart TD")
+
+      const initializedDarkFlags: boolean[] = []
+      let parseErrHandler: ((err: unknown) => void) | undefined
+      const runtimeLoader = async () => ({
+        get default() {
+          return {
+            initialize(cfg: Record<string, unknown>) { initializedDarkFlags.push(Boolean(cfg.darkMode)) },
+            set parseError(fn: ((err: unknown) => void) | undefined) { parseErrHandler = fn },
+            get parseError() { return parseErrHandler },
+            async render(_id: string, text: string) {
+              if (text.includes("TriggerParseWarn")) {
+                parseErrHandler?.("Lexical error on line 2")
+                return { svg: "<svg><text>corrupt</text></svg>" }
+              }
+              if (text.includes("TriggerHang")) return await new Promise<{ svg: string }>(() => {})
+              return { svg: `<svg data-dark="${initializedDarkFlags.at(-1)}"></svg>` }
+            },
+          }
+        },
+      })
+
+      docElement.dataset.theme = "light"
+      const lightWidget = new MarkdownMermaidWidget("flowchart TD\n  SchemeCheck --> B", 0, undefined, { runtimeLoader })
+      const lightDom = lightWidget.toDOM() as unknown as SimpleDomElement
+      docElement.dataset.theme = "dark"
+      const darkWidget = new MarkdownMermaidWidget("flowchart TD\n  SchemeCheck --> B", 0, undefined, { runtimeLoader })
+      expect(lightWidget.eq(darkWidget)).toBe(false)
+      const darkDom = darkWidget.toDOM() as unknown as SimpleDomElement
+
+      const warnDom = new MarkdownMermaidWidget("flowchart TD\n  TriggerParseWarn --> B", 0, undefined, { runtimeLoader }).toDOM() as unknown as SimpleDomElement
+      const timeoutDom = new MarkdownMermaidWidget("flowchart TD\n  TriggerHang --> B", 0, undefined, { runtimeLoader, timeoutMs: 15 }).toDOM() as unknown as SimpleDomElement
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(lightDom.dataset.mermaidState).toBe("rendered")
+      expect(lightDom.innerHTML).toContain('data-dark="false"')
+      expect(darkDom.dataset.mermaidState).toBe("rendered")
+      expect(darkDom.innerHTML).toContain('data-dark="true"')
+      expect(warnDom.dataset.mermaidState).toBe("error")
+      expect(timeoutDom.dataset.mermaidState).toBe("error")
     })
 
     const liveSurfaceSource = srcFile("components", "markdown-editor", "MarkdownEditorLiveSurface.tsx")
@@ -946,14 +407,12 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     expect(notionChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeBubbleToolbarPosition/)
     expect(notionChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeGutterTopPosition/)
 
-    const stylesCombined =
-      srcFile("components", "markdown-editor", "MarkdownEditor.styles.ts") +
-      notionChromeSource
+    const stylesCombined = srcFile("components", "markdown-editor", "MarkdownEditor.styles.ts") + notionChromeSource
     expect(stylesCombined).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*?overflow-x:\s*auto/)
     expect(notionChromeSource).toMatch(/@media\s*\(pointer:\s*coarse\)\s*\{\s*display:\s*none;\s*\}/)
   })
 
-  test("aligns R2 inline DOM tokens, table span reconciliation, deferred Korean 2-Beolsik IME proxy, and code/URL paste guards", () => {
+  test("aligns inline DOM scanners, safe anchor href assignment, and nested live-preview highlight/color decorations", () => {
     expect(isSafeInlineHref("/\t/evil.example/phish")).toBe(false)
     expect(isSafeInlineHref("/\x7f/evil.example/phish")).toBe(false)
     expect(isSafeInlineHref("//evil.example/phish")).toBe(false)
@@ -965,17 +424,17 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       if (el.tagName === "BR") return "<br/>"
       const tag = el.tagName.toLowerCase()
       const cls = el.className ? ` class="${el.className}"` : ""
-      const inner =
-        el.children.length > 0 ? el.children.map(serializeSimpleDom).join("") : el.textContent
+      const inner = el.children.length > 0 ? el.children.map(serializeSimpleDom).join("") : el.textContent
       return `<${tag}${cls}>${inner}</${tag}>`
     }
 
     withMockDom(() => {
-      const renderInlineSnippet = (source: string) => {
+      const renderInlineHost = (source: string) => {
         const host = new SimpleDomElement("div")
         appendInlineMarkdownNodes(host as unknown as HTMLElement, source)
-        return serializeSimpleDom(host)
+        return host
       }
+      const renderInlineSnippet = (source: string) => serializeSimpleDom(renderInlineHost(source))
 
       expect(renderInlineSnippet("Check ==x = 1== and =={{color:blue|note}}==.")).toContain(
         '<mark class="cm-live-highlight">x = 1</mark>'
@@ -989,125 +448,50 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       expect(renderInlineSnippet("Prices are $10 and $25 today.")).toBe(
         "<div>Prices are $10 and $25 today.</div>"
       )
-    })
+      expect(renderInlineSnippet("Multi ``code`` span")).toBe(
+        '<div>Multi <code class="cm-live-inline-code">code</code> span</div>'
+      )
+      expect(renderInlineSnippet("Escaped $a \\\\$ math")).toContain('class="cm-live-math cm-live-math-inline"')
 
-    const reconciled = reconcileCellSpans(
-      [
-        [{ rowspan: 3, colspan: 2 }, { hidden: true }],
-        [{ hidden: true }, { hidden: true }],
-      ],
-      2,
-      2
-    )
-    expect(reconciled).toEqual([
-      [{ rowspan: 2, colspan: 2 }, { hidden: true }],
-      [{ hidden: true }, { hidden: true }],
-    ])
+      const linkHost = renderInlineHost("[link $1](https://example.com?x=$2)")
+      const anchor = linkHost.querySelector("a")
+      expect(anchor).not.toBeNull()
+      expect(anchor?.getAttribute("href")).toBe("https://example.com/?x=$2")
+      expect(anchor?.textContent).toBe("link $1")
+      expect(linkHost.querySelector(".cm-live-math-inline")).toBeNull()
 
-    const mergedTable = [
-      '<!-- aq-table {"cells":[[{"colspan":2},{"hidden":true}],[{"rowspan":2},null],[{"hidden":true},null]]} -->',
-      "| H1 | H2 |",
-      "| --- | --- |",
-      "| SpanTop | R1C2 |",
-      "| Covered | R2C2 |",
-    ].join("\n")
-    const duplicatedMergedRow = applyMarkdownTableGridAction(mergedTable, 1, 0, {
-      kind: "duplicate-row",
-    })
-    expect(duplicatedMergedRow).not.toBeNull()
-    const deletedMergedRow = applyMarkdownTableGridAction(mergedTable, 1, 0, {
-      kind: "delete-row",
-    })
-    expect(deletedMergedRow).not.toBeNull()
-    expect(deletedMergedRow!.markdown).not.toContain('"rowspan":2')
-
-    withMockDom(() => {
-      const tableDoc = "| A | B |\n| --- | --- |\n| 작성자<br> | 2 |"
-      let dispatchedInsert = ""
-      const mockView = {
-        state: {
-          doc: { length: tableDoc.length, lineAt: () => ({ length: 1 }) },
-          selection: { main: { from: 0, to: 0 } },
-          facet: () => true,
-        },
-        posAtDOM: () => 0,
-        focus: () => {},
-        dispatch: (spec: { changes?: { insert?: string } }) => {
-          if (spec.changes?.insert) dispatchedInsert = spec.changes.insert
-        },
-      } as unknown as EditorView
-
-      const dom = new MarkdownTableWidget(tableDoc, 0, tableDoc.length).toDOM(
-        mockView
-      ) as unknown as SimpleDomElement
-      const rowHandle = dom.querySelectorAll('[data-testid="cm-live-table-row-handle"]')[1]!
-      rowHandle.dispatch("click")
-      const imeProxy = dom.querySelector('[data-testid="cm-live-table-ime-proxy"]')!
-      imeProxy.focus()
-      expect((globalThis.document as unknown as { activeElement: unknown }).activeElement).toBe(
-        imeProxy
+      expect(renderInlineSnippet("{{color:blue|$x^{2}$}}")).toContain('class="cm-live-math cm-live-math-inline"')
+      expect(renderInlineSnippet("{{color:blue|`{a}`}}")).toBe(
+        '<div><span class="cm-live-color"><code class="cm-live-inline-code">{a}</code></span></div>'
       )
 
-      imeProxy.dispatch("compositionstart", { data: "ㅎ" })
-      const cellInput = dom.querySelector('[data-testid="cm-live-table-cell-input"]')!
-      expect(cellInput).not.toBeNull()
-      expect((globalThis.document as unknown as { activeElement: unknown }).activeElement).toBe(
-        imeProxy
+      const unsafeHost = renderInlineHost("[evil](javascript:alert(1)) and [phish](//evil.example)")
+      expect(unsafeHost.querySelector("a")).toBeNull()
+      expect(serializeSimpleDom(unsafeHost)).toBe(
+        "<div><span>evil</span> and <span>phish</span></div>"
       )
-
-      imeProxy.value = "한"
-      imeProxy.dispatch("compositionupdate", { data: "한" })
-      imeProxy.dispatch("input", { isComposing: true })
-      expect(cellInput.value).toBe("작성자<br>한")
-
-      imeProxy.value = "한글"
-      imeProxy.dispatch("compositionupdate", { data: "한글" })
-      imeProxy.dispatch("compositionend", { data: "한글" })
-      expect(cellInput.value).toBe("작성자<br>한글")
-
-      cellInput.dispatch("blur")
-      expect(dispatchedInsert).toContain("| 작성자<br>한글 | 2 |")
     })
 
-    expect(shouldLinkifySelectionOnUrlPaste("live", "Select word here", { from: 7, to: 11 })).toBe(
-      true
+    const nestedPreviewDoc = [
+      "==run `yarn test`==",
+      "==see [docs](https://example.com)==",
+      "==[[Note]]==",
+      "{{color:blue|a `b}}c` d}}",
+      "{{color:blue|`code` and [link](https://example.com)}}",
+    ].join("\n\n")
+    const specs = buildMarkdownLivePreviewDecorationSpecs(
+      nestedPreviewDoc,
+      [{ from: nestedPreviewDoc.length, to: nestedPreviewDoc.length }],
+      false,
+      "reading"
     )
-    expect(shouldLinkifySelectionOnUrlPaste("source", "Select word here", { from: 7, to: 11 })).toBe(
-      false
+    const highlightMarks = specs.filter((s) => s.kind === "highlight")
+    expect(highlightMarks).toHaveLength(3)
+    const colorMarks = specs.filter((s) => s.kind === "inline-color")
+    expect(colorMarks).toHaveLength(2)
+    expect(nestedPreviewDoc.slice(colorMarks[0]!.from, colorMarks[0]!.to)).toBe("a `b}}c` d")
+    expect(nestedPreviewDoc.slice(colorMarks[1]!.from, colorMarks[1]!.to)).toBe(
+      "`code` and [link](https://example.com)"
     )
-    expect(
-      shouldLinkifySelectionOnUrlPaste("reading", "Select word here", { from: 7, to: 11 })
-    ).toBe(false)
-    expect(
-      shouldLinkifySelectionOnUrlPaste("live", "```ts\nconst url = 1\n```", { from: 12, to: 15 })
-    ).toBe(false)
-    expect(
-      shouldLinkifySelectionOnUrlPaste("live", "Inline `codeTarget` span", { from: 8, to: 18 })
-    ).toBe(false)
-
-    const unmatchedBacktickDoc = "Unmatched ` backtick before target here"
-    expect(
-      isOffsetInsideInlineCodeSpan(unmatchedBacktickDoc, unmatchedBacktickDoc.indexOf("target"))
-    ).toBe(false)
-    const matchedBacktickDoc = "Matched `insideCode` span"
-    expect(
-      isOffsetInsideInlineCodeSpan(matchedBacktickDoc, matchedBacktickDoc.indexOf("insideCode"))
-    ).toBe(true)
-
-    expect(
-      shouldBypassHtmlPasteConversion({
-        viewMode: "live",
-        markdown: "",
-        selectionFrom: 0,
-        clipboardTypes: ["text/html", "text/plain"],
-        html: '<pre style="font: 12px \'JetBrains Mono\', monospace; white-space: pre;"><b>fun</b> <a href="https://kotlinlang.org">main</a>() {}</pre>',
-        plainText: "fun main() {}",
-      })
-    ).toBe(true)
-
-    expect(
-      collectMathReplacementSpecs("Wait $$ here\n\nAnd $$ there", -1, -1, false, [])
-    ).toEqual([])
-    expect(collectMathReplacementSpecs("Triple $$$x$$$ dollars", -1, -1, false, [])).toEqual([])
   })
 })

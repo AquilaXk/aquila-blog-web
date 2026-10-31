@@ -8,13 +8,8 @@ import {
 import {
   type TableVisualOptionKey,
   type TableVisualOptions,
-  applyTableColumnWidthsAction,
   attachColumnResizeHandle,
   createTableColGroup,
-  getOrCreateTableVisualOptions,
-  migrateTableVisualOptionsOffset,
-  setBooleanDataAttribute,
-  syncTableColGroupWidths,
   syncTableVisualWrapAttributes,
 } from "./markdownEditorTableResizeDom"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
@@ -27,10 +22,9 @@ export {
   createTableColGroup,
   getOrCreateTableVisualOptions,
   migrateTableVisualOptionsOffset,
-  setBooleanDataAttribute,
   syncTableColGroupWidths,
   syncTableVisualWrapAttributes,
-}
+} from "./markdownEditorTableResizeDom"
 
 export type TableToolbarButtonEntry = {
   button: HTMLButtonElement
@@ -50,7 +44,7 @@ const stopAndPrevent = (event: Event) => {
 const createAlignedTableCell = (tag: TableCellTagName, align: string, text: string) => {
   const cell = document.createElement(tag)
   if (cell.style) cell.style.textAlign = align
-  cell.setAttribute("data-align", align)
+  if (cell.dataset) cell.dataset.align = align
   appendInlineMarkdownNodes(cell, text)
   return cell
 }
@@ -93,6 +87,13 @@ type TableToolbarActionSpec = {
   onSelect?: (button: HTMLButtonElement) => void
 }
 
+const applyToolbarButtonDataset = (btn: HTMLButtonElement, spec: TableToolbarActionSpec) => {
+  if (!btn.dataset) return
+  btn.dataset.group = spec.group
+  if (spec.groupStart) btn.dataset.groupStart = "true"
+  if (spec.testId) btn.dataset.testid = spec.testId
+}
+
 const buildToolbarButtonElement = (
   spec: TableToolbarActionSpec,
   executeGridAction: (action: MarkdownTableGridAction) => void,
@@ -103,9 +104,7 @@ const buildToolbarButtonElement = (
   btn.className = "cm-live-table-toolbar-btn"
   btn.setAttribute("aria-label", spec.ariaLabel)
   btn.setAttribute("title", spec.ariaLabel)
-  btn.setAttribute("data-group", spec.group)
-  if (spec.groupStart) btn.setAttribute("data-group-start", "true")
-  if (spec.testId) btn.setAttribute("data-testid", spec.testId)
+  applyToolbarButtonDataset(btn, spec)
   if (spec.ariaPressed !== undefined) btn.setAttribute("aria-pressed", String(spec.ariaPressed))
   btn.textContent = spec.label
   btn.addEventListener("mousedown", stopAndPrevent)
@@ -150,7 +149,7 @@ export const createTableToolbarElement = (params: {
   toolbar.className = "cm-live-table-toolbar"
   toolbar.setAttribute("role", "toolbar")
   toolbar.setAttribute("aria-label", "표 빠른 편집 도구")
-  toolbar.setAttribute("data-testid", "cm-live-table-toolbar")
+  if (toolbar.dataset) toolbar.dataset.testid = "cm-live-table-toolbar"
 
   const toolbarButtons: TableToolbarButtonEntry[] = []
   const optionButtons: Array<{ button: HTMLButtonElement; key: TableVisualOptionKey }> = []
@@ -241,9 +240,11 @@ const bindInteractiveCellElement = (
   onActivateCell: (row: number, col: number) => void
 ) => {
   if (cellEl.style) cellEl.style.textAlign = align
-  cellEl.setAttribute("data-align", align)
-  cellEl.setAttribute("data-cell-row", String(row))
-  cellEl.setAttribute("data-cell-col", String(col))
+  if (cellEl.dataset) {
+    cellEl.dataset.align = align
+    cellEl.dataset.cellRow = String(row)
+    cellEl.dataset.cellCol = String(col)
+  }
   appendInlineMarkdownNodes(cellEl, text)
 
   const handleActivate = (event: MouseEvent) => {
@@ -288,6 +289,13 @@ const bindGripDragAndDrop = (params: {
   })
 }
 
+const applyGripHandleDataset = (handle: HTMLButtonElement, axis: TableGripAxis, index: number) => {
+  if (!handle.dataset) return
+  handle.dataset.testid = handle.className
+  if (axis === "col") handle.dataset.colIndex = String(index)
+  else handle.dataset.rowIndex = String(index)
+}
+
 const attachAxisGripHandle = (params: {
   hostEl: HTMLElement
   dropTarget: HTMLElement
@@ -303,8 +311,7 @@ const attachAxisGripHandle = (params: {
   const handle = document.createElement("button")
   handle.type = "button"
   handle.className = axis === "col" ? "cm-live-table-col-handle" : "cm-live-table-row-handle"
-  handle.setAttribute("data-testid", handle.className)
-  handle.setAttribute(axis === "col" ? "data-col-index" : "data-row-index", String(index))
+  applyGripHandleDataset(handle, axis, index)
   handle.setAttribute("aria-label", ariaLabel)
   handle.setAttribute("draggable", draggable ? "true" : "false")
   handle.textContent = axis === "col" ? "⋯" : "⋮⋮"
@@ -339,7 +346,7 @@ const createAddBarButton = (
   btn.type = "button"
   btn.className = className
   btn.setAttribute("aria-label", ariaLabel)
-  btn.setAttribute("data-testid", testId)
+  if (btn.dataset) btn.dataset.testid = testId
   btn.textContent = label
   btn.disabled = disabled
   btn.addEventListener("mousedown", stopAndPrevent)

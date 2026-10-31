@@ -1413,6 +1413,9 @@ test.describe("Notion-parity Markdown editor model", () => {
           this.children.push(child)
           return child
         },
+        setAttribute(key: string, val: string) {
+          if (key === "href") this.href = val
+        },
       }
       return node
     }

@@ -8,11 +8,9 @@ import {
 import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import {
   type MarkdownMutationOptions,
-  type ResolveMarkdownEditorUploadErrorOptions,
   type TextareaSelection,
   applyHtmlPasteIfEligible,
   resolveMarkdownEditorUploadErrorMessage,
-  shouldLinkifySelectionOnUrlPaste,
   tryApplyUrlSelectionLinkify,
 } from "./markdownEditorMediaTransferModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
@@ -20,9 +18,7 @@ import {
   buildUploadingImagePlaceholder,
   createUploadPlaceholderId,
   listFilesFromDataTransfer,
-  parseSingleHttpUrl,
   planAppendAtEnd,
-  planLinkifySelectionWithUrl,
   planReplaceExactSubstring,
   planTransferFileReservations,
   readClipboardHtml,
@@ -44,11 +40,13 @@ import {
 
 export {
   type ResolveMarkdownEditorUploadErrorOptions,
-  parseSingleHttpUrl,
-  planLinkifySelectionWithUrl,
   resolveMarkdownEditorUploadErrorMessage,
   shouldLinkifySelectionOnUrlPaste,
-}
+} from "./markdownEditorMediaTransferModel"
+export {
+  parseSingleHttpUrl,
+  planLinkifySelectionWithUrl,
+} from "./markdownEditorPasteDropModel"
 
 type UseMarkdownEditorMediaTransfersArgs = {
   disabled: boolean

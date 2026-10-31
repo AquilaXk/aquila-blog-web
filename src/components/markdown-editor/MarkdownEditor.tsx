@@ -59,20 +59,43 @@ const isAlignmentDisabled = (alignment: TableAlignment, availability: TableEditA
   return alignment === "center" ? !availability.alignCenter : !availability.alignRight
 }
 
+type FocusableTableElement = {
+  classList?: { contains?: (token: string) => boolean }
+  closest?: <T extends Element = Element>(selector: string) => T | null
+  blur?: () => void
+}
+
+const asFocusableTableElement = (el: unknown): FocusableTableElement | null =>
+  el && typeof el === "object" ? (el as FocusableTableElement) : null
+
+const isTableCellOrImeProxyElement = (el: FocusableTableElement | null): boolean =>
+  Boolean(
+    el?.classList?.contains?.("cm-live-table-cell-input") ||
+      el?.classList?.contains?.("cm-live-table-ime-proxy")
+  )
+
+const isEditorContentOutsideTable = (el: FocusableTableElement | null): boolean =>
+  Boolean(el?.closest?.(".cm-content") && !el.closest?.(".cm-live-table-wrap"))
+
+const parseDatasetCoordinate = (value: string | undefined): number => {
+  const parsed = Number.parseInt(value ?? "0", 10)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export const resolveActiveTableCellOffset = (root: HTMLElement | null, readMarkdown: () => string): number | null => {
-  const activeEl = typeof document !== "undefined" ? document.activeElement : null
-  const isCellInput = activeEl instanceof HTMLElement && activeEl.classList.contains("cm-live-table-cell-input")
-  if (!isCellInput && activeEl instanceof HTMLElement && activeEl.closest?.(".cm-content") && !activeEl.closest?.(".cm-live-table-wrap")) return null
+  const activeEl = asFocusableTableElement(typeof document !== "undefined" ? document.activeElement : null)
+  const isTableInput = isTableCellOrImeProxyElement(activeEl)
+  if (!isTableInput && isEditorContentOutsideTable(activeEl)) return null
   const activeWrap =
-    (isCellInput ? activeEl.closest<HTMLElement>(".cm-live-table-wrap") : null) ??
+    (isTableInput ? activeEl?.closest?.<HTMLElement>(".cm-live-table-wrap") : null) ??
     root?.querySelector<HTMLElement>(".cm-live-table-wrap[data-active-mode]") ??
     null
-  if (isCellInput) activeEl.blur()
+  if (isTableInput) activeEl?.blur?.()
   if (!activeWrap) return null
-  const tableFrom = Number.parseInt(activeWrap.dataset.tableFrom ?? "", 10)
-  const row = Number.parseInt(activeWrap.dataset.activeRow ?? "0", 10)
-  const col = Number.parseInt(activeWrap.dataset.activeCol ?? "0", 10)
-  return resolveTableCellSelectionOffset(readMarkdown(), tableFrom, Number.isFinite(row) ? row : 0, Number.isFinite(col) ? col : 0)
+  const tableFrom = Number.parseInt(activeWrap.dataset?.tableFrom ?? "", 10)
+  const row = parseDatasetCoordinate(activeWrap.dataset?.activeRow)
+  const col = parseDatasetCoordinate(activeWrap.dataset?.activeCol)
+  return resolveTableCellSelectionOffset(readMarkdown(), tableFrom, row, col)
 }
 
 const TEXTAREA_KEYBOARD_HELP =
@@ -440,18 +463,18 @@ export const MarkdownEditor = ({
     [slashMenuOpenRef]
   )
 
+  const handleRequestSave = useCallback(() => {
+    if (!onRequestSave) return
+    resolveActiveTableCellOffset(liveEditorBodyRef.current, () => valueRef.current)
+    onRequestSave()
+  }, [onRequestSave])
+
   const { handleTextareaKeyDown } = useMarkdownEditorTextareaKeyboard({
-    disabled,
-    authoringDisabled: isAuthoringDisabled,
-    valueRef,
-    allowNativeTabAfterEscapeRef,
-    rememberTextareaSelection,
-    applyMutationPlan,
-    applyRecordedMutation: applyMutationPlan,
+    disabled, authoringDisabled: isAuthoringDisabled, valueRef, allowNativeTabAfterEscapeRef,
+    rememberTextareaSelection, applyMutationPlan, applyRecordedMutation: applyMutationPlan,
     setTextareaSelection: setEditorSelection,
-    onRequestSave,
-    onToggleViewMode: cycleViewMode,
-    isCompletionActive: isCompletionOrSlashMenuActive,
+    onRequestSave: onRequestSave ? handleRequestSave : undefined,
+    onToggleViewMode: cycleViewMode, isCompletionActive: isCompletionOrSlashMenuActive,
   })
 
   const handleLiveSelectionChange = useCallback(
@@ -485,69 +508,40 @@ export const MarkdownEditor = ({
   return (
     <EditorRoot data-testid="markdown-editor">
       <MarkdownEditorToolbar
-        disabled={disabled}
-        disableMermaid={disableMermaid}
-        viewMode={viewMode}
-        tableRows={tableRows}
-        tableColumns={tableColumns}
-        commandContext={commandContext}
-        toolbarCommands={toolbarCommands}
-        imageInputRef={imageInputRef}
-        fileInputRef={fileInputRef}
-        hasUploadImage={Boolean(onUploadImage)}
-        hasUploadFile={Boolean(onUploadFile)}
-        onTableRowsChange={setTableRows}
-        onTableColumnsChange={setTableColumns}
-        onRememberSelection={rememberTextareaSelection}
-        onApplyCommand={applyMarkdownEditorCommand}
-        onApplySnippet={applySnippet}
-        onApplyFormatShortcut={applyFormatShortcutOrAppend}
-        onApplyListCommand={applyListCommand}
-        onApplyLineCommand={applyLineCommand}
-        onApplyBlockSnippet={applyBlockSnippet}
-        onInsertTable={insertTable}
-        onApplyTableEdit={applyTableEdit}
-        isTableEditDisabled={isTableEditDisabled}
-        onOpenFindReplace={findReplace.open}
-        onImageFileSelect={handleImageFileSelect}
-        onAttachmentFileSelect={handleAttachmentFileSelect}
-        onViewModeChange={setViewMode}
+        disabled={disabled} disableMermaid={disableMermaid} viewMode={viewMode}
+        tableRows={tableRows} tableColumns={tableColumns} commandContext={commandContext}
+        toolbarCommands={toolbarCommands} imageInputRef={imageInputRef} fileInputRef={fileInputRef}
+        hasUploadImage={Boolean(onUploadImage)} hasUploadFile={Boolean(onUploadFile)}
+        onTableRowsChange={setTableRows} onTableColumnsChange={setTableColumns}
+        onRememberSelection={rememberTextareaSelection} onApplyCommand={applyMarkdownEditorCommand}
+        onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
+        onApplyListCommand={applyListCommand} onApplyLineCommand={applyLineCommand}
+        onApplyBlockSnippet={applyBlockSnippet} onInsertTable={insertTable}
+        onApplyTableEdit={applyTableEdit} isTableEditDisabled={isTableEditDisabled}
+        onOpenFindReplace={findReplace.open} onImageFileSelect={handleImageFileSelect}
+        onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={setViewMode}
       />
       {uploadError ? <ToolbarError role="alert">{uploadError}</ToolbarError> : null}
       {findReplace.panel ? (
         <MarkdownEditorFindReplace
-          caseSensitive={findReplace.caseSensitive}
-          currentMatch={findReplace.currentMatch}
-          disabled={findReplace.panelDisabled}
-          onCaseSensitiveChange={findReplace.updateCaseSensitive}
-          onClose={handleCloseFindReplace}
-          onNext={() => findReplace.move("next")}
-          onPrevious={() => findReplace.move("previous")}
-          onQueryChange={findReplace.updateQuery}
-          onReplaceAll={findReplace.replaceAll}
-          onReplaceCurrent={findReplace.replaceCurrent}
-          onReplacementChange={findReplace.updateReplacement}
-          replacement={findReplace.replacement}
+          caseSensitive={findReplace.caseSensitive} currentMatch={findReplace.currentMatch}
+          disabled={findReplace.panelDisabled} onCaseSensitiveChange={findReplace.updateCaseSensitive}
+          onClose={handleCloseFindReplace} onNext={() => findReplace.move("next")}
+          onPrevious={() => findReplace.move("previous")} onQueryChange={findReplace.updateQuery}
+          onReplaceAll={findReplace.replaceAll} onReplaceCurrent={findReplace.replaceCurrent}
+          onReplacementChange={findReplace.updateReplacement} replacement={findReplace.replacement}
           replaceCurrentDisabled={findReplace.replaceCurrentDisabled}
           scopeLabel={findReplace.panel.scope ? "선택 영역" : "전체 문서"}
-          totalMatches={findReplace.totalMatches}
-          query={findReplace.query}
+          totalMatches={findReplace.totalMatches} query={findReplace.query}
         />
       ) : null}
       <LiveEditorBody ref={liveEditorBodyRef} aria-disabled={disabled} $isEmpty={!draftValue}>
         <MarkdownEditorNotionChrome
-          containerRef={liveEditorBodyRef}
-          mode={viewMode}
-          disabled={isAuthoringDisabled}
-          value={draftValue}
-          selection={editorSelection}
-          isSlashMenuOpen={slashMenuState.isOpen}
-          isFindReplaceOpen={Boolean(findReplace.panel)}
-          resolveCoords={resolveSlashCoords}
-          onApplySnippet={applySnippet}
-          onApplyFormatShortcut={applyFormatShortcutOrAppend}
-          onApplyListCommand={applyListCommand}
-          onStripBlockPrefix={applyStripBlockPrefix}
+          containerRef={liveEditorBodyRef} mode={viewMode} disabled={isAuthoringDisabled}
+          value={draftValue} selection={editorSelection} isSlashMenuOpen={slashMenuState.isOpen}
+          isFindReplaceOpen={Boolean(findReplace.panel)} resolveCoords={resolveSlashCoords}
+          onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
+          onApplyListCommand={applyListCommand} onStripBlockPrefix={applyStripBlockPrefix}
           onApplyLineCommand={applyLineCommand}
           onTriggerSlashCommand={(plan) => {
             applyPlannedMarkdownMutation(plan)
@@ -555,27 +549,16 @@ export const MarkdownEditor = ({
           }}
         />
         <MarkdownEditorLiveSurface
-          ref={liveSurfaceRef}
-          value={draftValue}
-          disabled={disabled}
-          disableMermaid={disableMermaid}
-          mode={viewMode}
-          onToggleViewMode={cycleViewMode}
-          ariaDescription={TEXTAREA_KEYBOARD_HELP}
-          onChange={handleLiveChange}
-          onSelectionChange={handleLiveSelectionChange}
-          onRequestFocusTitle={onRequestFocusTitle}
-          onKeyDownCapture={handleTextareaKeyDown}
-          onPasteCapture={handlePaste}
-          onDragOver={handleDragOver}
-          onDropCapture={handleDrop}
+          ref={liveSurfaceRef} value={draftValue} disabled={disabled} disableMermaid={disableMermaid}
+          mode={viewMode} onToggleViewMode={cycleViewMode} ariaDescription={TEXTAREA_KEYBOARD_HELP}
+          onChange={handleLiveChange} onSelectionChange={handleLiveSelectionChange}
+          onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
+          onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}
         />
       </LiveEditorBody>
       <MarkdownEditorSlashMenu
-        isOpen={slashMenuState.isOpen}
-        position={slashMenuState.position}
-        items={slashMenuItems}
-        onClose={closeSlashMenu}
+        isOpen={slashMenuState.isOpen} position={slashMenuState.position}
+        items={slashMenuItems} onClose={closeSlashMenu}
       />
     </EditorRoot>
   )

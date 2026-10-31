@@ -18,11 +18,8 @@ type ParsedCalloutHeader = {
   defaultCollapsed?: boolean
 }
 
-const HEADING_TITLE_PATTERN = /^#{1,6}\s+(.+)$/
-const PROMOTED_BOLD_PATTERN = /^(?:[-*+]\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$/
 const FENCE_LINE_PATTERN = /^([`~]{3,})/
-const ASIDE_OPEN_LINE_PATTERN = /^\s*<aside(?:\s[^>]*)?>(.*)$/i
-const ASIDE_CLOSE_SUFFIX_PATTERN = /<\/aside>\s*$/i
+const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 
 const isAsciiCalloutToken = (token: string): boolean => {
   if (token.length === 0) return false
@@ -128,30 +125,54 @@ const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
   }
 }
 
+const extractPromotedHeadingTitle = (trimmedLine: string): string | null => {
+  let hashCount = 0
+  while (hashCount < trimmedLine.length && trimmedLine.codePointAt(hashCount) === 35) {
+    hashCount += 1
+  }
+  if (hashCount < 1 || hashCount > 6) return null
+  const afterHash = trimmedLine[hashCount]
+  if (!afterHash || !SINGLE_SPACE_CHAR_PATTERN.test(afterHash)) return null
+  const title = trimmedLine.slice(hashCount).trim()
+  return title.length > 0 ? title : null
+}
+
+const stripOptionalListBulletPrefix = (trimmedLine: string): string => {
+  const first = trimmedLine[0]
+  if (first !== "-" && first !== "*" && first !== "+") return trimmedLine
+  const second = trimmedLine[1]
+  if (!second || !SINGLE_SPACE_CHAR_PATTERN.test(second)) return trimmedLine
+  return trimmedLine.slice(2).trimStart()
+}
+
+const extractPromotedBoldTitle = (trimmedLine: string): string | null => {
+  const candidate = stripOptionalListBulletPrefix(trimmedLine)
+  let marker = ""
+  if (candidate.startsWith("**")) marker = "**"
+  else if (candidate.startsWith("__")) marker = "__"
+  if (!marker) return null
+
+  const closeIndex = candidate.indexOf(marker, 3)
+  if (closeIndex < 0 || candidate.slice(closeIndex + 2).trim().length > 0) return null
+  const promotedTitle = candidate.slice(2, closeIndex).trim()
+  return promotedTitle.length > 0 ? promotedTitle : null
+}
+
 const extractPromotedCalloutTitle = (bodyLines: string[]) => {
   const firstBodyLineIndex = bodyLines.findIndex((row) => row.trim().length > 0)
   if (firstBodyLineIndex < 0) {
     return { title: "", bodyLines }
   }
 
-  const trimmedLine = bodyLines[firstBodyLineIndex].trim()
-  const headingMatch = HEADING_TITLE_PATTERN.exec(trimmedLine)
-  if (headingMatch) {
-    return {
-      title: headingMatch[1]?.trim() || "",
-      bodyLines: bodyLines.filter((_, index) => index !== firstBodyLineIndex),
-    }
-  }
-
-  const boldMatch = PROMOTED_BOLD_PATTERN.exec(trimmedLine)
-  const promotedTitle = (boldMatch?.[1] || boldMatch?.[2] || "").trim()
-  const remainingLine = (boldMatch?.[3] || "").trim()
-  if (!promotedTitle || remainingLine.length > 0) {
+  const trimmedLine = bodyLines[firstBodyLineIndex]!.trim()
+  const promoted =
+    extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)
+  if (!promoted) {
     return { title: "", bodyLines }
   }
 
   return {
-    title: promotedTitle,
+    title: promoted,
     bodyLines: bodyLines.filter((_, index) => index !== firstBodyLineIndex),
   }
 }
@@ -182,7 +203,7 @@ const parseFenceMarker = (line: string): "`" | "~" | null => {
   const match = FENCE_LINE_PATTERN.exec(line.trim())
   if (!match) return null
 
-  const fence = match[1]
+  const fence = match[1]!
   const marker = fence[0] as "`" | "~"
   return hasUniformFenceMarker(fence, marker) ? marker : null
 }
@@ -208,53 +229,64 @@ const resolveDirectiveCalloutHeader = (rawHeader: string): ParsedCalloutHeader =
   }
 }
 
+const extractAsideOpenTail = (line: string): string | null => {
+  const trimmedStart = line.trimStart()
+  if (!trimmedStart.toLowerCase().startsWith("<aside")) return null
+  const nextChar = trimmedStart[6]
+  if (nextChar === ">") return trimmedStart.slice(7)
+  if (!nextChar || !SINGLE_SPACE_CHAR_PATTERN.test(nextChar)) return null
+  const closeAngle = trimmedStart.indexOf(">", 7)
+  return closeAngle < 0 ? null : trimmedStart.slice(closeAngle + 1)
+}
+
+const stripClosingAsideTag = (value: string): string | null => {
+  const trimmedEnd = value.trimEnd()
+  if (!trimmedEnd.toLowerCase().endsWith("</aside>")) return null
+  return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
+}
+
+const collectAsideBodyLines = (
+  lines: readonly string[],
+  startIndex: number,
+  openingTail: string
+): { closedIndex: number; bodyLines: string[] } | null => {
+  const bodyLines: string[] = []
+  const inlineClosed = stripClosingAsideTag(openingTail)
+  if (inlineClosed !== null) {
+    if (inlineClosed.length > 0) bodyLines.push(inlineClosed)
+    return { closedIndex: startIndex, bodyLines }
+  }
+  if (openingTail.length > 0) bodyLines.push(openingTail)
+
+  for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
+    const currentLine = lines[cursor]!
+    const closedLine = stripClosingAsideTag(currentLine)
+    if (closedLine !== null) {
+      if (closedLine.length > 0) bodyLines.push(closedLine)
+      return { closedIndex: cursor, bodyLines }
+    }
+    bodyLines.push(currentLine)
+  }
+  return null
+}
+
 const tryParseAsideBlock = (
   lines: readonly string[],
   startIndex: number
 ): { nextIndex: number; segment: MarkdownSegment | null; fallbackLines: string[] } | null => {
-  const line = lines[startIndex]
-  const openingMatch = ASIDE_OPEN_LINE_PATTERN.exec(line)
-  if (!openingMatch) return null
+  const line = lines[startIndex]!
+  const openingTail = extractAsideOpenTail(line)
+  if (openingTail === null) return null
 
-  const originalLines = [line]
-  const bodyLines: string[] = []
-  let closed = false
-  let nextIndex = startIndex
-
-  const appendContent = (value: string) => {
-    if (value.length > 0) bodyLines.push(value)
+  const collected = collectAsideBodyLines(lines, startIndex, openingTail)
+  if (!collected) {
+    return { nextIndex: startIndex + 1, segment: null, fallbackLines: [line] }
   }
 
-  const openingTail = openingMatch[1] ?? ""
-  if (ASIDE_CLOSE_SUFFIX_PATTERN.test(openingTail)) {
-    appendContent(openingTail.replace(ASIDE_CLOSE_SUFFIX_PATTERN, "").trimEnd())
-    closed = true
-  } else {
-    appendContent(openingTail)
-  }
-
-  let cursor = startIndex + 1
-  while (!closed && cursor < lines.length) {
-    const currentLine = lines[cursor]
-    originalLines.push(currentLine)
-    if (ASIDE_CLOSE_SUFFIX_PATTERN.test(currentLine)) {
-      appendContent(currentLine.replace(ASIDE_CLOSE_SUFFIX_PATTERN, "").trimEnd())
-      closed = true
-      nextIndex = cursor
-      break
-    }
-    bodyLines.push(currentLine)
-    cursor += 1
-  }
-
-  if (!closed) {
-    return { nextIndex: startIndex + 1, segment: null, fallbackLines: originalLines }
-  }
-
-  const normalizedBodyLines = bodyLines.map((row) => row.trim())
+  const normalizedBodyLines = collected.bodyLines.map((row) => row.trim())
   const firstContentIndex = normalizedBodyLines.findIndex((row) => row.length > 0)
   const header =
-    firstContentIndex >= 0 ? parseAsideCalloutHeader(normalizedBodyLines[firstContentIndex]) : null
+    firstContentIndex >= 0 ? parseAsideCalloutHeader(normalizedBodyLines[firstContentIndex]!) : null
   const segment: MarkdownSegment = header
     ? buildCalloutSegment(header, normalizedBodyLines.slice(firstContentIndex + 1))
     : {
@@ -264,21 +296,21 @@ const tryParseAsideBlock = (
         emoji: infoCalloutMarker,
         content: normalizedBodyLines.join("\n").trim(),
       }
-  return { nextIndex: nextIndex + 1, segment, fallbackLines: [] }
+  return { nextIndex: collected.closedIndex + 1, segment, fallbackLines: [] }
 }
 
 const tryParseFormulaBlock = (
   lines: readonly string[],
   startIndex: number
-): { closedIndex: number; formula: string; bodyLines: string[] } => {
+): { closedIndex: number; formula: string } => {
   const bodyLines: string[] = []
   for (let index = startIndex + 1; index < lines.length; index += 1) {
-    if (lines[index].trim() === "$$") {
-      return { closedIndex: index, formula: bodyLines.join("\n").trim(), bodyLines }
+    if (lines[index]!.trim() === "$$") {
+      return { closedIndex: index, formula: bodyLines.join("\n").trim() }
     }
-    bodyLines.push(lines[index])
+    bodyLines.push(lines[index]!)
   }
-  return { closedIndex: -1, formula: "", bodyLines }
+  return { closedIndex: -1, formula: "" }
 }
 
 const consumeBlockquoteCalloutOrLines = (
@@ -287,13 +319,13 @@ const consumeBlockquoteCalloutOrLines = (
 ): { nextIndex: number; calloutSegment: MarkdownSegment | null; rawBlock: string } => {
   const quoteLines: string[] = []
   let cursor = startIndex
-  while (cursor < lines.length && lines[cursor].trimStart().startsWith(">")) {
-    quoteLines.push(lines[cursor].replace(/^\s*>\s?/, ""))
+  while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
+    quoteLines.push(lines[cursor]!.replace(/^\s*>\s?/, ""))
     cursor += 1
   }
   const firstContentIndex = quoteLines.findIndex((row) => row.trim().length > 0)
   if (firstContentIndex >= 0) {
-    const header = parseCalloutHeader(quoteLines[firstContentIndex].trim())
+    const header = parseCalloutHeader(quoteLines[firstContentIndex]!.trim())
     if (header) {
       return {
         nextIndex: cursor,
@@ -309,121 +341,158 @@ const consumeBlockquoteCalloutOrLines = (
   }
 }
 
-type SegmentLineStepResult = {
-  nextIndex: number
-  nextPendingMeta: PendingDirectiveMetadata | null
+type SegmentLineStepResult = { nextIndex: number }
+
+type SegmentConsumerContext = {
+  lines: readonly string[]
+  pendingDirectiveMetadata: PendingDirectiveMetadata | null
+  flushAndPush: (segment: MarkdownSegment) => void
+  markdownBuffer: string[]
+}
+
+const tryConsumeImageLine = (
+  trimmed: string,
+  index: number,
+  ctx: SegmentConsumerContext
+): SegmentLineStepResult | null => {
+  const standaloneImage = parseStandaloneMarkdownImageLine(trimmed)
+  if (!standaloneImage) return null
+  ctx.flushAndPush({ type: "image", ...standaloneImage })
+  return { nextIndex: index + 1 }
+}
+
+const tryConsumeCustomDirectiveAt = (
+  line: string,
+  trimmed: string,
+  index: number,
+  ctx: SegmentConsumerContext
+): SegmentLineStepResult | null => {
+  const customDirective = parseCustomDirectiveHeader(trimmed)
+  if (!customDirective) return null
+  const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+  if (closedIndex >= 0) {
+    const metadata =
+      ctx.pendingDirectiveMetadata?.kind === customDirective.directive
+        ? ctx.pendingDirectiveMetadata.attrs
+        : {}
+    ctx.flushAndPush(
+      buildCustomDirectiveSegment(
+        customDirective.directive,
+        normalizeSafeMarkdownUrl(customDirective.rawUrl),
+        customDirective.inlineTitle,
+        bodyLines,
+        metadata
+      )
+    )
+    return { nextIndex: closedIndex + 1 }
+  }
+  ctx.markdownBuffer.push(line)
+  return { nextIndex: index + 1 }
+}
+
+const tryConsumeColonBlockAt = (
+  line: string,
+  trimmed: string,
+  index: number,
+  ctx: SegmentConsumerContext
+): SegmentLineStepResult | null => {
+  const customStep = tryConsumeCustomDirectiveAt(line, trimmed, index, ctx)
+  if (customStep) return customStep
+  if (line.startsWith(":::callout")) {
+    const rawHeader = line.slice(":::callout".length).trim()
+    const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+    if (closedIndex >= 0) {
+      ctx.flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
+      return { nextIndex: closedIndex + 1 }
+    }
+    ctx.markdownBuffer.push(line)
+    return { nextIndex: index + 1 }
+  }
+  if (line.startsWith(":::toggle")) {
+    const title = line.slice(":::toggle".length).trim() || "토글"
+    const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+    if (closedIndex >= 0) {
+      ctx.flushAndPush({ type: "toggle", title, content: bodyLines.join("\n").trim() })
+      return { nextIndex: closedIndex + 1 }
+    }
+    ctx.markdownBuffer.push(line)
+    return { nextIndex: index + 1 }
+  }
+  return null
+}
+
+const tryConsumeFormulaBlockAt = (
+  line: string,
+  index: number,
+  ctx: SegmentConsumerContext
+): SegmentLineStepResult => {
+  const formulaResult = tryParseFormulaBlock(ctx.lines, index)
+  if (formulaResult.closedIndex >= 0) {
+    ctx.flushAndPush({ type: "formula", formula: formulaResult.formula })
+    return { nextIndex: formulaResult.closedIndex + 1 }
+  }
+  ctx.markdownBuffer.push(line)
+  return { nextIndex: index + 1 }
+}
+
+const tryConsumeBlockquoteAt = (index: number, ctx: SegmentConsumerContext): SegmentLineStepResult => {
+  const quoteStep = consumeBlockquoteCalloutOrLines(ctx.lines, index)
+  if (quoteStep.calloutSegment) ctx.flushAndPush(quoteStep.calloutSegment)
+  else ctx.markdownBuffer.push(quoteStep.rawBlock)
+  return { nextIndex: quoteStep.nextIndex }
+}
+
+const tryConsumeAsideAt = (
+  index: number,
+  ctx: SegmentConsumerContext
+): SegmentLineStepResult | null => {
+  const asideStep = tryParseAsideBlock(ctx.lines, index)
+  if (!asideStep) return null
+  if (asideStep.segment) ctx.flushAndPush(asideStep.segment)
+  else ctx.markdownBuffer.push(asideStep.fallbackLines.join("\n"))
+  return { nextIndex: asideStep.nextIndex }
 }
 
 const tryConsumeStructuredBlockAt = (
-  lines: readonly string[],
   index: number,
-  pendingDirectiveMetadata: PendingDirectiveMetadata | null,
-  flushAndPush: (segment: MarkdownSegment) => void,
-  markdownBuffer: string[]
+  ctx: SegmentConsumerContext
 ): SegmentLineStepResult | null => {
-  const line = lines[index]
+  const line = ctx.lines[index]!
   const trimmed = line.trim()
   const firstCode = trimmed.codePointAt(0)
-
-  if (firstCode === 33) {
-    const standaloneImage = parseStandaloneMarkdownImageLine(trimmed)
-    if (standaloneImage) {
-      flushAndPush({ type: "image", ...standaloneImage })
-      return { nextIndex: index + 1, nextPendingMeta: null }
-    }
-  }
-
-  const customDirective = firstCode === 58 ? parseCustomDirectiveHeader(trimmed) : null
-  if (customDirective) {
-    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
-    if (closedIndex >= 0) {
-      const metadata =
-        pendingDirectiveMetadata?.kind === customDirective.directive
-          ? pendingDirectiveMetadata.attrs
-          : {}
-      flushAndPush(
-        buildCustomDirectiveSegment(
-          customDirective.directive,
-          normalizeSafeMarkdownUrl(customDirective.rawUrl),
-          customDirective.inlineTitle,
-          bodyLines,
-          metadata
-        )
-      )
-      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
-    }
-    markdownBuffer.push(line, ...bodyLines)
-    return { nextIndex: index + 1, nextPendingMeta: null }
-  }
-
-  if (trimmed === "$$") {
-    const formulaResult = tryParseFormulaBlock(lines, index)
-    if (formulaResult.closedIndex >= 0) {
-      flushAndPush({ type: "formula", formula: formulaResult.formula })
-      return { nextIndex: formulaResult.closedIndex + 1, nextPendingMeta: null }
-    }
-    markdownBuffer.push(line, ...formulaResult.bodyLines)
-    return { nextIndex: index + 1, nextPendingMeta: null }
-  }
-
-  if (line.startsWith(":::callout")) {
-    const rawHeader = line.slice(":::callout".length).trim()
-    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
-    if (closedIndex >= 0) {
-      flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
-      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
-    }
-    markdownBuffer.push(line, ...bodyLines)
-    return { nextIndex: index + 1, nextPendingMeta: null }
-  }
-
-  if (line.startsWith(":::toggle")) {
-    const title = line.slice(":::toggle".length).trim() || "토글"
-    const { closedIndex, bodyLines } = collectTripleColonBody(lines, index + 1)
-    if (closedIndex >= 0) {
-      flushAndPush({ type: "toggle", title, content: bodyLines.join("\n").trim() })
-      return { nextIndex: closedIndex + 1, nextPendingMeta: null }
-    }
-    markdownBuffer.push(line, ...bodyLines)
-    return { nextIndex: index + 1, nextPendingMeta: null }
-  }
-
-  if (firstCode === 62) {
-    const quoteStep = consumeBlockquoteCalloutOrLines(lines, index)
-    if (quoteStep.calloutSegment) {
-      flushAndPush(quoteStep.calloutSegment)
-    } else {
-      markdownBuffer.push(quoteStep.rawBlock)
-    }
-    return { nextIndex: quoteStep.nextIndex, nextPendingMeta: null }
-  }
-
-  if (firstCode === 60) {
-    const asideStep = tryParseAsideBlock(lines, index)
-    if (asideStep) {
-      if (asideStep.segment) {
-        flushAndPush(asideStep.segment)
-      } else {
-        markdownBuffer.push(asideStep.fallbackLines.join("\n"))
-      }
-      return { nextIndex: asideStep.nextIndex, nextPendingMeta: null }
-    }
-  }
-
+  if (firstCode === 33) return tryConsumeImageLine(trimmed, index, ctx)
+  if (firstCode === 58) return tryConsumeColonBlockAt(line, trimmed, index, ctx)
+  if (trimmed === "$$") return tryConsumeFormulaBlockAt(line, index, ctx)
+  if (firstCode === 62) return tryConsumeBlockquoteAt(index, ctx)
+  if (firstCode === 60) return tryConsumeAsideAt(index, ctx)
   return null
+}
+
+const stepSegmentFenceState = (
+  trimmed: string,
+  firstCode: number | undefined,
+  activeFenceMarker: "`" | "~" | null
+): { handled: boolean; nextFence: "`" | "~" | null } => {
+  const fenceMarker =
+    firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
+  if (activeFenceMarker) {
+    return { handled: true, nextFence: fenceMarker === activeFenceMarker ? null : activeFenceMarker }
+  }
+  if (fenceMarker) return { handled: true, nextFence: fenceMarker }
+  return { handled: false, nextFence: null }
 }
 
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
   const segments: MarkdownSegment[] = []
-  let markdownBuffer: string[] = []
+  const markdownBuffer: string[] = []
   let activeFenceMarker: "`" | "~" | null = null
   let pendingDirectiveMetadata: PendingDirectiveMetadata | null = null
 
   const flushMarkdown = () => {
     const text = markdownBuffer.join("\n").trim()
     if (text) segments.push({ type: "markdown", content: text })
-    markdownBuffer = []
+    markdownBuffer.length = 0
   }
 
   const flushAndPush = (segment: MarkdownSegment) => {
@@ -433,22 +502,14 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
 
   let index = 0
   while (index < lines.length) {
-    const line = lines[index]
+    const line = lines[index]!
     const trimmed = line.trim()
     const firstCode = trimmed.codePointAt(0)
-    const fenceMarker =
-      firstCode === 96 || firstCode === 126 ? parseFenceMarker(trimmed) : null
 
-    if (activeFenceMarker) {
+    const fenceStep = stepSegmentFenceState(trimmed, firstCode, activeFenceMarker)
+    if (fenceStep.handled) {
       markdownBuffer.push(line)
-      if (fenceMarker === activeFenceMarker) activeFenceMarker = null
-      index += 1
-      continue
-    }
-
-    if (fenceMarker) {
-      markdownBuffer.push(line)
-      activeFenceMarker = fenceMarker
+      activeFenceMarker = fenceStep.nextFence
       index += 1
       continue
     }
@@ -460,13 +521,12 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       continue
     }
 
-    const structuredStep = tryConsumeStructuredBlockAt(
+    const structuredStep = tryConsumeStructuredBlockAt(index, {
       lines,
-      index,
       pendingDirectiveMetadata,
       flushAndPush,
-      markdownBuffer
-    )
+      markdownBuffer,
+    })
     pendingDirectiveMetadata = null
     if (structuredStep) {
       index = structuredStep.nextIndex

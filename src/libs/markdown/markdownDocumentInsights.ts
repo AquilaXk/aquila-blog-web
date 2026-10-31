@@ -5,6 +5,7 @@ import {
   stripDoubleBraceColorTokensOnce,
   stripSingleBraceColorTokensOnce,
 } from "./inlineTokenScanners"
+import { replaceCommonMarkInlineCodeSpans } from "./pandocMathScanner"
 
 export type MarkdownSourceRange = {
   start: number
@@ -28,7 +29,6 @@ export type MarkdownDocumentInsights = {
 }
 
 const FENCE_OPEN_PATTERN = /^\s{0,3}(`{3,}|~{3,})/
-const ATX_HEADING_PATTERN = /^\s{0,3}(#{1,4})\s+(.+?)(?:\s+#+)?\s*$/
 
 const isUnicodeWhitespace = (code: number): boolean => {
   if (code <= 0x7f) {
@@ -162,13 +162,37 @@ const stripWikilinkHeadingTokens = (value: string): string => {
   return output
 }
 
+const createHeadingCodeSpanSentinelPrefix = (text: string): string => {
+  let candidate = "\uE000AQHCODE"
+  let attempt = 0
+  while (text.includes(candidate)) {
+    attempt += 1
+    candidate = `\uE000AQHCODE${attempt}X`
+  }
+  return candidate
+}
+
+const restoreHeadingCodeSpanSentinels = (
+  text: string,
+  prefix: string,
+  codeSpans: readonly string[]
+): string => {
+  if (codeSpans.length === 0) return text
+  let restored = text
+  for (let index = 0; index < codeSpans.length; index += 1) {
+    restored = restored.replaceAll(`${prefix}${index}\uE001`, codeSpans[index] ?? "")
+  }
+  return restored
+}
+
 export const formatMarkdownHeadingLabel = (text: string): string => {
   if (!hasHeadingInlineSyntax(text)) {
     return collapseAsciiWhitespace(text)
   }
   const codeSpans: string[] = []
-  const withCodePlaceholders = text.replace(/`([^`]+)`/g, (_, code: string) => {
-    const token = `@@CODE_SPAN_${codeSpans.length}@@`
+  const sentinelPrefix = createHeadingCodeSpanSentinelPrefix(text)
+  const withCodePlaceholders = replaceCommonMarkInlineCodeSpans(text, (code) => {
+    const token = `${sentinelPrefix}${codeSpans.length}\uE001`
     codeSpans.push(code)
     return token
   })
@@ -176,7 +200,7 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
   const afterBr = replaceRawBrTags(afterColor, " ")
   const afterWikilinks = stripWikilinkHeadingTokens(afterBr)
   const afterHighlights = stripMarkdownHighlightDelimiters(afterWikilinks)
-  const formatted = afterHighlights
+  const stripped = afterHighlights
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -184,14 +208,22 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
     .replace(/(^|[^\p{L}\p{N}_])__([^_\s](?:[^_]*[^_\s])?)__(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/(^|[^\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_(?=$|[^\p{L}\p{N}_])/gu, "$1$2")
     .replace(/~~(.*?)~~/g, "$1")
-    .replace(/@@CODE_SPAN_(\d+)@@/g, (_, index: string) => codeSpans[Number(index)] ?? "")
+  const formatted = restoreHeadingCodeSpanSentinels(stripped, sentinelPrefix, codeSpans)
   return collapseAsciiWhitespace(formatted)
+}
+
+const trimEdgeHyphens = (value: string): string => {
+  let start = 0
+  let end = value.length
+  while (start < end && value.codePointAt(start) === 45) start += 1
+  while (end > start && value.codePointAt(end - 1) === 45) end -= 1
+  return value.slice(start, end)
 }
 
 export const toMarkdownHeadingSlug = (value: string) => {
   const normalized = value.trim().toLowerCase()
   const stripped = normalized.replace(/[^\p{L}\p{N}\s-]/gu, "")
-  const dashed = stripped.replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "")
+  const dashed = trimEdgeHyphens(stripped.replace(/\s+/g, "-").replace(/-+/g, "-"))
   return dashed || "section"
 }
 
@@ -251,6 +283,32 @@ const hasAtxHeadingPrefixAt = (markdown: string, firstNonSpace: number, lineEnd:
   return nextCode === 0x20 || nextCode === 0x09
 }
 
+const stripOptionalAtxClosingHashes = (trimmedBody: string): string => {
+  let hashStart = trimmedBody.length
+  while (hashStart > 0 && trimmedBody.codePointAt(hashStart - 1) === 0x23) {
+    hashStart -= 1
+  }
+  if (hashStart === trimmedBody.length) return trimmedBody
+  if (hashStart === 0) return ""
+  const beforeCode = trimmedBody.codePointAt(hashStart - 1) ?? 0
+  if (beforeCode !== 0x20 && beforeCode !== 0x09) return trimmedBody
+  return trimmedBody.slice(0, hashStart).trimEnd()
+}
+
+const parseAtxHeadingLine = (
+  line: string
+): { level: MarkdownDocumentHeading["level"]; rawContent: string } | null => {
+  const firstNonSpace = findFirstNonSpaceWithinIndent(line, 0, line.length)
+  if (!hasAtxHeadingPrefixAt(line, firstNonSpace, line.length)) return null
+  let cursor = firstNonSpace
+  while (cursor < line.length && line.codePointAt(cursor) === 0x23) {
+    cursor += 1
+  }
+  const level = (cursor - firstNonSpace) as MarkdownDocumentHeading["level"]
+  const rawContent = stripOptionalAtxClosingHashes(line.slice(cursor).trim())
+  return rawContent ? { level, rawContent } : null
+}
+
 const appendMarkdownHeadingInsight = (
   line: string,
   offset: number,
@@ -258,14 +316,13 @@ const appendMarkdownHeadingInsight = (
   slugAllocator: ReturnType<typeof createMarkdownHeadingSlugAllocator>,
   headings: MarkdownDocumentHeading[]
 ): void => {
-  const headingMatch = ATX_HEADING_PATTERN.exec(line)
-  if (!headingMatch) return
-  const label = formatMarkdownHeadingLabel(headingMatch[2])
+  const parsed = parseAtxHeadingLine(line)
+  if (!parsed) return
+  const label = formatMarkdownHeadingLabel(parsed.rawContent)
   if (!label) return
-  const level = headingMatch[1].length as MarkdownDocumentHeading["level"]
   const slug = slugAllocator.allocate(label)
   const headingItem = {
-    level,
+    level: parsed.level,
     label,
     offset,
     range: { start: offset, end: offset + lineLength },
@@ -290,6 +347,17 @@ const findFirstNonSpaceWithinIndent = (markdown: string, lineStart: number, line
   return firstNonSpace
 }
 
+const resolveLineContentEnd = (markdown: string, lineStart: number, nextBreak: number): number => {
+  const rawLineEnd = nextBreak === -1 ? markdown.length : nextBreak
+  if (rawLineEnd > lineStart && markdown.codePointAt(rawLineEnd - 1) === 13) {
+    return rawLineEnd - 1
+  }
+  return rawLineEnd
+}
+
+const readCodePointWithinBounds = (markdown: string, index: number, end: number): number =>
+  index < end ? (markdown.codePointAt(index) ?? 0) : 0
+
 export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocumentInsights => {
   const { characterCount, wordCount } = countTrimmedCodePointsAndWords(markdown)
   const headings: MarkdownDocumentHeading[] = []
@@ -301,14 +369,10 @@ export const createMarkdownDocumentInsights = (markdown: string): MarkdownDocume
 
   while (lineStart <= len) {
     const nextBreak = markdown.indexOf("\n", lineStart)
-    const rawLineEnd = nextBreak === -1 ? len : nextBreak
-    const lineEnd =
-      rawLineEnd > lineStart && markdown.codePointAt(rawLineEnd - 1) === 13
-        ? rawLineEnd - 1
-        : rawLineEnd
+    const lineEnd = resolveLineContentEnd(markdown, lineStart, nextBreak)
     const lineLength = lineEnd - lineStart
     const firstNonSpace = findFirstNonSpaceWithinIndent(markdown, lineStart, lineEnd)
-    const firstChar = firstNonSpace < lineEnd ? (markdown.codePointAt(firstNonSpace) ?? 0) : 0
+    const firstChar = readCodePointWithinBounds(markdown, firstNonSpace, lineEnd)
 
     if (firstChar === 96 || firstChar === 126) {
       activeFence = updateActiveFenceState(markdown.slice(lineStart, lineEnd), activeFence)

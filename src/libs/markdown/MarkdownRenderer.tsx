@@ -1,7 +1,10 @@
 import {
+  cloneElement,
+  isValidElement,
   type FC,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactElement,
   type ReactNode,
   memo,
   useCallback,
@@ -47,6 +50,8 @@ import { renderMarkdownSegment } from "src/libs/markdown/MarkdownRendererSegment
 import {
   MarkdownFootnoteAppendix,
   MarkdownFootnoteReferenceLink,
+  isExternalHttpHref,
+  resolveSafeRenderedAnchorHref,
 } from "src/libs/markdown/MarkdownRendererFootnotes"
 import { createMarkdownHeadingSlugAllocator } from "src/libs/markdown/markdownDocumentInsights"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
@@ -136,18 +141,45 @@ const REMARK_PLUGINS_DEFAULT = [remarkGfm]
 const REMARK_PLUGINS_MATH = [remarkGfm, remarkMath]
 const REHYPE_PLUGINS_DEFAULT: never[] = []
 const REHYPE_PLUGINS_MATH = [rehypeKatex]
+const ANCHOR_INLINE_TRAVERSABLE_TAGS = new Set(["mark", "strong", "em", "del", "span"])
+
+const isTraversableAnchorElement = (node: ReactNode): node is ReactElement<{ children?: ReactNode }> =>
+  isValidElement<{ children?: ReactNode }>(node) &&
+  typeof node.type === "string" &&
+  ANCHOR_INLINE_TRAVERSABLE_TAGS.has(node.type)
+
+const hasAnchorTextMatching = (node: ReactNode, predicate: (value: string) => boolean): boolean => {
+  if (typeof node === "string") return predicate(node)
+  if (Array.isArray(node)) return node.some((item) => hasAnchorTextMatching(item, predicate))
+  return isTraversableAnchorElement(node) ? hasAnchorTextMatching(node.props.children, predicate) : false
+}
+
+const replaceAnchorText = (node: ReactNode, fromToken: string, toToken: string): ReactNode => {
+  if (typeof node === "string") {
+    return node.includes(fromToken) ? node.replaceAll(fromToken, toToken) : node
+  }
+  if (Array.isArray(node)) return node.map((item) => replaceAnchorText(item, fromToken, toToken))
+  if (!isTraversableAnchorElement(node)) return node
+  const nextChildren = replaceAnchorText(node.props.children, fromToken, toToken)
+  return nextChildren === node.props.children ? node : cloneElement(node, undefined, nextChildren)
+}
+
+const normalizeAnchorInlineChildren = (children: ReactNode): ReactNode => {
+  if (!hasAnchorTextMatching(children, (text) => text.includes("[["))) {
+    return normalizeMarkdownInlineChildren(children)
+  }
+  let sentinel = "\uE000aqwl0\uE001"
+  for (let idx = 1; hasAnchorTextMatching(children, (text) => text.includes(sentinel)); idx += 1) {
+    sentinel = `\uE000aqwl${idx}\uE001`
+  }
+  const masked = replaceAnchorText(children, "[[", sentinel)
+  return replaceAnchorText(normalizeMarkdownInlineChildren(masked), sentinel, "[[")
+}
 
 export const resolvePreBlockMermaidSource = (language: string, rawCode: string): string => {
   const normalizedLanguage = (language || "").trim().toLowerCase()
-  if (normalizedLanguage && normalizedLanguage !== "mermaid") {
-    return ""
-  }
-  if (normalizedLanguage === "mermaid") {
-    return extractNormalizedMermaidSource(rawCode) || rawCode
-  }
-  if (!isMermaidSource(rawCode)) {
-    return ""
-  }
+  if (normalizedLanguage && normalizedLanguage !== "mermaid") return ""
+  if (normalizedLanguage !== "mermaid" && !isMermaidSource(rawCode)) return ""
   return extractNormalizedMermaidSource(rawCode) || rawCode
 }
 
@@ -168,6 +200,110 @@ type MarkdownTableCellProps = {
   align?: unknown
   style?: unknown
   className?: string
+}
+
+const resolveHeadingNodeId = (
+  state: MarkdownRenderPassState,
+  node: unknown,
+  explicitId: unknown,
+  normalizedChildren: ReactNode
+): string => {
+  if (typeof explicitId === "string" && explicitId.trim()) return explicitId.trim()
+  if (typeof node === "object" && node !== null) {
+    const cached = state.headingIds.get(node)
+    if (cached) return cached
+    const allocated = state.headingSlugAllocator.allocate(extractTextFromMarkdownNode(normalizedChildren))
+    state.headingIds.set(node, allocated)
+    return allocated
+  }
+  return state.headingSlugAllocator.allocate(extractTextFromMarkdownNode(normalizedChildren))
+}
+
+const extractRawCodeFromChildren = (children: ReactNode): string => {
+  if (typeof children === "string") return children
+  if (!Array.isArray(children)) return extractTextFromMarkdownNode(children)
+  return children
+    .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+    .join("\n")
+}
+
+const renderMarkdownCodeElement = ({ node, className, children, ...props }: MarkdownElementProps) => {
+  const raw = extractRawCodeFromChildren(children) || extractTextFromCodeAst(node)
+  if (!className && !raw.includes("\n")) {
+    return <code className="aq-inline-code" {...props}>{children}</code>
+  }
+  return <code className={className} data-raw-code={raw} {...props}>{children}</code>
+}
+
+const renderMarkdownPreElement = ({ node, children, className: _className, ...props }: MarkdownElementProps) => {
+  const { language, title, rawCode, highlightLines } = extractCodeMetaFromPreChildren(children, node)
+  const mermaidSource = resolvePreBlockMermaidSource(language, rawCode)
+  if (mermaidSource) {
+    return (
+      <pre
+        className="aq-mermaid"
+        data-aq-mermaid="true"
+        data-mermaid-rendered="pending"
+        data-mermaid-source={mermaidSource}
+      >
+        <code className="language-mermaid">{mermaidSource}</code>
+      </pre>
+    )
+  }
+  const highlightedLines = highlightLines ? parseHighlightedLineNumbers(highlightLines) : undefined
+  const initialCode = renderImmediateCodeToHtml({ source: rawCode, language, highlightedLines })
+  return (
+    <PrettyCodeBlock
+      language={initialCode.language}
+      title={title}
+      rawCode={rawCode}
+      highlightLines={highlightLines}
+      preElement={
+        <pre {...props} className="aq-code aq-pretty-pre">
+          <code
+            className={`language-${initialCode.language}`}
+            data-language={initialCode.language}
+            data-prism-language={initialCode.language}
+            data-prism-source={rawCode}
+            data-raw-code={rawCode}
+            data-highlight-lines={highlightLines || undefined}
+            dangerouslySetInnerHTML={{ __html: initialCode.html }}
+          />
+        </pre>
+      }
+    />
+  )
+}
+
+const renderMarkdownImageElement = (
+  { src, alt, node }: MarkdownElementProps,
+  state: MarkdownRenderPassState,
+  imageRenderOrderRef?: { current: number }
+) => {
+  const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
+  if (!imageSrc) {
+    const blockedLabel = alt || "차단된 이미지"
+    return (
+      <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>
+        {blockedLabel}
+      </span>
+    )
+  }
+  const imageIndex = allocateNodeOrderIndex(node, state.imageIndices, () =>
+    imageRenderOrderRef ? imageRenderOrderRef.current++ : state.nextImageIndex++
+  )
+  const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
+  return (
+    <MarkdownImageFigure
+      src={imageSrc}
+      alt={alt || ""}
+      widthPx={widthPx}
+      heightPx={heightPx}
+      aspectRatio={aspectRatio}
+      eager={imageIndex === 0}
+      imageIndex={imageIndex}
+    />
+  )
 }
 
 export const createMarkdownComponentVariants = ({
@@ -193,30 +329,8 @@ export const createMarkdownComponentVariants = ({
     { children, node, id, ...props }: MarkdownElementProps
   ) => {
     const normalizedChildren = normalizeMarkdownInlineChildren(children)
-    const state = getPassState()
-    let resolvedId = typeof id === "string" && id.trim() ? id.trim() : ""
-    if (!resolvedId) {
-      if (typeof node === "object" && node !== null) {
-        const cached = state.headingIds.get(node)
-        if (cached) {
-          resolvedId = cached
-        } else {
-          resolvedId = state.headingSlugAllocator.allocate(
-            extractTextFromMarkdownNode(normalizedChildren)
-          )
-          state.headingIds.set(node, resolvedId)
-        }
-      } else {
-        resolvedId = state.headingSlugAllocator.allocate(
-          extractTextFromMarkdownNode(normalizedChildren)
-        )
-      }
-    }
-    return (
-      <Tag id={resolvedId} {...props}>
-        {normalizedChildren}
-      </Tag>
-    )
+    const resolvedId = resolveHeadingNodeId(getPassState(), node, id, normalizedChildren)
+    return <Tag id={resolvedId} {...props}>{normalizedChildren}</Tag>
   }
 
   const renderTableCell = (
@@ -237,175 +351,72 @@ export const createMarkdownComponentVariants = ({
     h2: (props: MarkdownElementProps) => renderHeading("h2", props),
     h3: (props: MarkdownElementProps) => renderHeading("h3", props),
     h4: (props: MarkdownElementProps) => renderHeading("h4", props),
-    strong({ children, node: _node, ...props }: MarkdownElementProps) {
-      return <strong {...props}>{normalizeMarkdownInlineChildren(children)}</strong>
-    },
-    em({ children, node: _node, ...props }: MarkdownElementProps) {
-      return <em {...props}>{normalizeMarkdownInlineChildren(children)}</em>
-    },
-    del({ children, node: _node, ...props }: MarkdownElementProps) {
-      return <del {...props}>{normalizeMarkdownInlineChildren(children)}</del>
-    },
-    blockquote({ children }: MarkdownElementProps) {
-      return <MarkdownBlockquote>{children}</MarkdownBlockquote>
-    },
-    li({ children, node: _node, ...props }: MarkdownElementProps) {
-      return <li {...props}>{normalizeMarkdownInlineChildren(children)}</li>
-    },
+    strong: ({ children, node: _node, ...props }: MarkdownElementProps) => (
+      <strong {...props}>{normalizeMarkdownInlineChildren(children)}</strong>
+    ),
+    em: ({ children, node: _node, ...props }: MarkdownElementProps) => (
+      <em {...props}>{normalizeMarkdownInlineChildren(children)}</em>
+    ),
+    del: ({ children, node: _node, ...props }: MarkdownElementProps) => (
+      <del {...props}>{normalizeMarkdownInlineChildren(children)}</del>
+    ),
+    blockquote: ({ children }: MarkdownElementProps) => <MarkdownBlockquote>{children}</MarkdownBlockquote>,
+    li: ({ children, node: _node, ...props }: MarkdownElementProps) => (
+      <li {...props}>{normalizeMarkdownInlineChildren(children)}</li>
+    ),
     table({ children, node, ...props }: MarkdownElementProps) {
       const state = getPassState()
       const tableIndex = allocateNodeOrderIndex(node, state.tableIndices, () =>
         tableRenderIndexRef ? tableRenderIndexRef.current++ : state.nextTableIndex++
       )
-      const layout = tableLayouts[tableIndex] || null
       return (
-        <MarkdownTableRenderer layout={layout} {...props}>
+        <MarkdownTableRenderer layout={tableLayouts[tableIndex] || null} {...props}>
           {children}
         </MarkdownTableRenderer>
       )
     },
-    tr({ children, ...props }: MarkdownElementProps) {
-      return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
-    },
+    tr: ({ children, ...props }: MarkdownElementProps) => (
+      <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
+    ),
     th: (props: MarkdownTableCellProps) => renderTableCell("th", props),
     td: (props: MarkdownTableCellProps) => renderTableCell("td", props),
-    img({ src, alt, node }: MarkdownElementProps) {
-      const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
-      if (!imageSrc) {
-        const blockedLabel = alt || "차단된 이미지"
-        return (
-          <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>
-            {blockedLabel}
-          </span>
-        )
-      }
-      const state = getPassState()
-      const imageIndex = allocateNodeOrderIndex(node, state.imageIndices, () =>
-        imageRenderOrderRef ? imageRenderOrderRef.current++ : state.nextImageIndex++
-      )
-      const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
-
-      return (
-        <MarkdownImageFigure
-          src={imageSrc}
-          alt={alt || ""}
-          widthPx={widthPx}
-          heightPx={heightPx}
-          aspectRatio={aspectRatio}
-          eager={imageIndex === 0}
-          imageIndex={imageIndex}
-        />
-      )
-    },
+    img: (props: MarkdownElementProps) =>
+      renderMarkdownImageElement(props, getPassState(), imageRenderOrderRef),
     a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
+      const normalizedChildren = normalizeAnchorInlineChildren(children)
+      const safeHref = resolveSafeRenderedAnchorHref(href)
+      if (!safeHref) return <span>{normalizedChildren}</span>
+      const externalProps = isExternalHttpHref(safeHref)
+        ? { target: "_blank", rel: "noopener noreferrer" }
+        : undefined
       return (
         <MarkdownFootnoteReferenceLink
           footnotes={footnotes}
           marker={footnoteMarker}
-          href={href}
+          href={safeHref}
           title={title}
           {...props}
+          {...externalProps}
         >
-          {children}
+          {normalizedChildren}
         </MarkdownFootnoteReferenceLink>
       )
     },
-    code({ node, className, children, ...props }: MarkdownElementProps) {
-      let rawFromChildren = ""
-      if (typeof children === "string") {
-        rawFromChildren = children
-      } else if (Array.isArray(children)) {
-        rawFromChildren = children
-          .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
-          .join("\n")
-      } else {
-        rawFromChildren = extractTextFromMarkdownNode(children)
-      }
-      const raw = rawFromChildren || extractTextFromCodeAst(node)
-      const isInlineCode = !className && !raw.includes("\n")
-
-      if (isInlineCode) {
-        return (
-          <code className="aq-inline-code" {...props}>
-            {children}
-          </code>
-        )
-      }
-
-      return (
-        <code className={className} data-raw-code={raw} {...props}>
-          {children}
-        </code>
-      )
-    },
-    pre({ node, children, className: _className, ...props }: MarkdownElementProps) {
-      const { language, title, rawCode, highlightLines } = extractCodeMetaFromPreChildren(children, node)
-      const mermaidSource = resolvePreBlockMermaidSource(language, rawCode)
-
-      if (mermaidSource) {
-        return (
-          <pre
-            className="aq-mermaid"
-            data-aq-mermaid="true"
-            data-mermaid-rendered="pending"
-            data-mermaid-source={mermaidSource}
-          >
-            <code className="language-mermaid">{mermaidSource}</code>
-          </pre>
-        )
-      }
-
-      const mergedClassName = "aq-code aq-pretty-pre"
-      const highlightedLines = highlightLines
-        ? parseHighlightedLineNumbers(highlightLines)
-        : undefined
-      const initialCodePresentation = renderImmediateCodeToHtml({
-        source: rawCode,
-        language,
-        highlightedLines,
-      })
-
-      return (
-        <PrettyCodeBlock
-          language={initialCodePresentation.language}
-          title={title}
-          rawCode={rawCode}
-          highlightLines={highlightLines}
-          preElement={
-            <pre {...props} className={mergedClassName}>
-              <code
-                className={`language-${initialCodePresentation.language}`}
-                data-language={initialCodePresentation.language}
-                data-prism-language={initialCodePresentation.language}
-                data-prism-source={rawCode}
-                data-raw-code={rawCode}
-                data-highlight-lines={highlightLines || undefined}
-                dangerouslySetInnerHTML={{ __html: initialCodePresentation.html }}
-              />
-            </pre>
-          }
-        />
-      )
-    },
+    code: renderMarkdownCodeElement,
+    pre: renderMarkdownPreElement,
   }
 
   const defaultComponents = {
     ...sharedComponents,
-    p({ children }: { children?: ReactNode }) {
-      return <MarkdownParagraph inCallout={false}>{children}</MarkdownParagraph>
-    },
+    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={false}>{children}</MarkdownParagraph>,
   }
   const calloutComponents = {
     ...sharedComponents,
-    p({ children }: { children?: ReactNode }) {
-      return <MarkdownParagraph inCallout={true}>{children}</MarkdownParagraph>
-    },
+    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={true}>{children}</MarkdownParagraph>,
   }
   const inlineComponents = {
     ...sharedComponents,
-    p({ children }: { children?: ReactNode }) {
-      return <>{normalizeMarkdownInlineChildren(children)}</>
-    },
+    p: ({ children }: { children?: ReactNode }) => <>{normalizeMarkdownInlineChildren(children)}</>,
   }
 
   return {
@@ -414,6 +425,25 @@ export const createMarkdownComponentVariants = ({
       return inCallout ? calloutComponents : defaultComponents
     },
   }
+}
+
+const syncFocusableMarkdownImages = (root: HTMLElement | null, editableImages: boolean) => {
+  if (!root || editableImages) return
+  for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+    if (!image.closest("a, button") && !image.hasAttribute("tabindex")) {
+      image.tabIndex = 0
+    }
+  }
+}
+
+const shouldOpenLightboxFromKeyDown = (
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  editableImages: boolean
+): boolean => {
+  if (editableImages || (event.key !== "Enter" && event.key !== " ")) return false
+  if (!(event.target instanceof HTMLImageElement)) return false
+  if (!event.target.closest(".aq-markdown") || event.target.closest("a, button")) return false
+  return handleImageLightboxClick(event.target)
 }
 
 const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
@@ -444,31 +474,21 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   })
 
   useEffect(() => {
-    const root = rootRef.current
-    if (!root || editableImages) return
-    for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
-      if (!image.closest("a, button") && !image.hasAttribute("tabindex")) {
-        image.tabIndex = 0
-      }
-    }
+    syncFocusableMarkdownImages(rootRef.current, editableImages)
   }, [editableImages, renderKey])
 
   const handleRootClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (editableImages) return
-      if (!(event.target instanceof Element)) return
-      handleImageLightboxClick(event.target)
+      if (!editableImages && event.target instanceof Element) {
+        handleImageLightboxClick(event.target)
+      }
     },
     [editableImages]
   )
 
   const handleRootKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (editableImages) return
-      if (event.key !== "Enter" && event.key !== " ") return
-      if (!(event.target instanceof HTMLImageElement)) return
-      if (!event.target.closest(".aq-markdown") || event.target.closest("a, button")) return
-      if (handleImageLightboxClick(event.target)) {
+      if (shouldOpenLightboxFromKeyDown(event, editableImages)) {
         event.preventDefault()
       }
     },
@@ -503,12 +523,14 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     )
   }
 
+  const editableDataValue = editableImages ? "true" : undefined
+
   if (resolvedContentHtml) {
     return (
       <MarkdownRendererRoot
         ref={rootRef}
         className="aq-markdown"
-        data-editable={editableImages ? "true" : undefined}
+        data-editable={editableDataValue}
         data-force-scheme={forceScheme}
         onClick={handleRootClick}
         onKeyDown={handleRootKeyDown}
@@ -527,7 +549,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     <MarkdownRendererRoot
       ref={rootRef}
       className="aq-markdown"
-      data-editable={editableImages ? "true" : undefined}
+      data-editable={editableDataValue}
       data-force-scheme={forceScheme}
       onClick={handleRootClick}
       onKeyDown={handleRootKeyDown}

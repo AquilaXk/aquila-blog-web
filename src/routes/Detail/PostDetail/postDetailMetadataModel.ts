@@ -96,10 +96,10 @@ const buildBreadcrumbJsonLd = (
 export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
   const canonicalPath = toCanonicalPostPath(post.id)
   const canonicalUrl = `${SITE_URL}${canonicalPath}`
-  const publishedDate = toIsoDate(post.createdAt ?? post.createdTime ?? post.date?.start_date)
-  const modifiedDate = toIsoDate(
-    post.modifiedAt ?? post.modifiedTime ?? post.createdAt ?? post.createdTime ?? post.date?.start_date
-  )
+  const publishedDate =
+    toIsoDate(post.createdAt) ?? toIsoDate(post.createdTime) ?? toIsoDate(post.date?.start_date)
+  const modifiedDate =
+    toIsoDate(post.modifiedAt) ?? toIsoDate(post.modifiedTime) ?? publishedDate
   const image = normalizePostImage(post)
   const rawType = resolvePrimaryPostType(post.type)
 

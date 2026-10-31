@@ -1,5 +1,19 @@
 import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
-import { hasAsciiControlCharacters, normalizeSafeMarkdownUrl } from "../../libs/markdown/safeMarkdownUrl"
+import {
+  findBacktickAwareDoubleCloseBrace,
+  matchDoubleBraceColorHeader,
+} from "../../libs/markdown/inlineTokenScanners"
+import {
+  countCodePointRun,
+  isEscapedMarkdownAt,
+  scanInlineCodeSpanEnd,
+  scanPandocDisplayMathAt,
+  scanPandocInlineMathAt,
+} from "../../libs/markdown/pandocMathScanner"
+import {
+  normalizeSafeMarkdownLinkHref,
+  setSafeAnchorHref,
+} from "../../libs/markdown/safeMarkdownUrl"
 
 type KatexRuntime = {
   renderToString: (math: string, options: { displayMode: boolean; throwOnError: boolean }) => string
@@ -19,13 +33,8 @@ type InlineDomToken =
   | { kind: "wikilink"; from: number; end: number; display: string }
 
 const MAX_INLINE_NESTING_DEPTH = 4
-const MAX_INLINE_MATH_SCAN_LENGTH = 2048
 const INLINE_TRIGGER_PATTERN = /[`*~=$[{<]/
 const SINGLE_WHITESPACE_PATTERN = /^\s$/u
-
-const ALLOWED_ASCII_MATH_PREFIX_CODES = new Set([
-  40, 91, 123, 34, 39, 45, 61, 47, 43, 60, 62, 44, 59, 58, 33, 63, 42, 95, 126, 124,
-])
 
 let cachedKatex: KatexRuntime | null = null
 let katexLoadPromise: Promise<KatexRuntime | null> | null = null
@@ -40,6 +49,20 @@ const getKatex = (): KatexRuntime | null => {
   return null
 }
 
+const applyKatexRender = (
+  runtime: KatexRuntime,
+  element: HTMLElement,
+  math: string,
+  displayMode: boolean
+): boolean => {
+  try {
+    element.innerHTML = runtime.renderToString(math, { displayMode, throwOnError: false })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const renderKatexIntoElement = (
   element: HTMLElement,
   math: string,
@@ -47,30 +70,19 @@ export const renderKatexIntoElement = (
   fallbackText: string
 ): void => {
   const katex = getKatex()
-  if (katex) {
-    try {
-      element.innerHTML = katex.renderToString(math, { displayMode, throwOnError: false })
-      return
-    } catch {}
-  } else if (katexLoadPromise) {
-    void katexLoadPromise.then(() => {
-      try {
-        if (cachedKatex) {
-          element.innerHTML = cachedKatex.renderToString(math, { displayMode, throwOnError: false })
-        }
-      } catch {}
+  if (katex && applyKatexRender(katex, element, math, displayMode)) {
+    return
+  }
+  if (!katex && katexLoadPromise) {
+    void katexLoadPromise.then((loaded) => {
+      if (loaded) applyKatexRender(loaded, element, math, displayMode)
     })
   }
   element.textContent = fallbackText
 }
 
-export const isSafeInlineHref = (href: string): boolean => {
-  const trimmed = href.trim()
-  if (!trimmed || hasAsciiControlCharacters(trimmed)) return false
-  if (trimmed.startsWith("#")) return true
-  if (trimmed.toLowerCase().startsWith("mailto:") && trimmed.length > 7) return true
-  return normalizeSafeMarkdownUrl(trimmed).length > 0
-}
+export const isSafeInlineHref = (href: string): boolean =>
+  normalizeSafeMarkdownLinkHref(href).length > 0
 
 const isNewlineCode = (code: number): boolean => code === 10 || code === 13
 
@@ -79,20 +91,13 @@ const isWhitespaceAt = (text: string, index: number): boolean => {
   return ch !== undefined && SINGLE_WHITESPACE_PATTERN.test(ch)
 }
 
-const isEscapedAt = (text: string, index: number): boolean => {
-  let slashCount = 0
-  for (let pos = index - 1; pos >= 0 && text.codePointAt(pos) === 92; pos -= 1) {
-    slashCount += 1
-  }
-  return (slashCount & 1) === 1
-}
-
-const countCodeRun = (text: string, start: number, targetCode: number): number => {
-  let end = start
-  while (end < text.length && text.codePointAt(end) === targetCode) {
-    end += 1
-  }
-  return end - start
+const findInlineLineEnd = (text: string, from: number): number => {
+  let end = text.length
+  const nlIndex = text.indexOf("\n", from)
+  if (nlIndex >= 0 && nlIndex < end) end = nlIndex
+  const crIndex = text.indexOf("\r", from)
+  if (crIndex >= 0 && crIndex < end) end = crIndex
+  return end
 }
 
 const normalizeCodeSpanContent = (rawContent: string, runLen: number): string => {
@@ -109,30 +114,41 @@ const normalizeCodeSpanContent = (rawContent: string, runLen: number): string =>
 }
 
 const matchInlineCodeAt = (text: string, from: number): InlineDomToken | null => {
-  const runLen = countCodeRun(text, from, 96)
-  let pos = from + runLen
-  while (pos < text.length) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) break
-    if (code === 96) {
-      const closeLen = countCodeRun(text, pos, 96)
-      if (closeLen === runLen) {
-        const end = pos + closeLen
-        if (pos === from + runLen) {
-          return { kind: "literal", from, end, raw: text.slice(from, end) }
-        }
-        const content = normalizeCodeSpanContent(text.slice(from + runLen, pos), runLen)
-        return { kind: "code", from, end, content }
-      }
-      pos += closeLen
-      continue
-    }
-    pos += 1
+  const runLen = countCodePointRun(text, from, 96)
+  const lineEnd = findInlineLineEnd(text, from)
+  const closeEnd = scanInlineCodeSpanEnd(text, from, lineEnd)
+  if (closeEnd > 0) {
+    const rawContent = text.slice(from + runLen, closeEnd - runLen)
+    return { kind: "code", from, end: closeEnd, content: normalizeCodeSpanContent(rawContent, runLen) }
   }
   if (runLen > 1) {
     return { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
   }
   return null
+}
+
+const isClosingDoubleDelimiterAt = (
+  text: string,
+  pos: number,
+  markerCode: number
+): boolean =>
+  text.codePointAt(pos) === markerCode &&
+  text.codePointAt(pos + 1) === markerCode &&
+  text.codePointAt(pos + 2) !== markerCode &&
+  !isEscapedMarkdownAt(text, pos) &&
+  !isWhitespaceAt(text, pos - 1)
+
+const findClosingDoubleDelimiter = (
+  text: string,
+  innerStart: number,
+  markerCode: number
+): number => {
+  for (let pos = innerStart; pos < text.length; pos += 1) {
+    const code = text.codePointAt(pos) ?? 0
+    if (isNewlineCode(code)) return -1
+    if (isClosingDoubleDelimiterAt(text, pos, markerCode)) return pos
+  }
+  return -1
 }
 
 const matchPairedDoubleDelimiterAt = (
@@ -141,30 +157,20 @@ const matchPairedDoubleDelimiterAt = (
   markerCode: number,
   kind: "strong" | "del"
 ): InlineDomToken | null => {
-  const runLen = countCodeRun(text, from, markerCode)
+  const runLen = countCodePointRun(text, from, markerCode)
   if (runLen !== 2) {
-    if (runLen > 2) {
-      return { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
-    }
-    return null
+    return runLen > 2
+      ? { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
+      : null
   }
   const innerStart = from + 2
   const firstCode = text.codePointAt(innerStart) ?? 0
   if (!firstCode || isNewlineCode(firstCode) || isWhitespaceAt(text, innerStart)) {
     return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
   }
-  for (let pos = innerStart; pos < text.length; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) break
-    if (
-      code === markerCode &&
-      text.codePointAt(pos + 1) === markerCode &&
-      text.codePointAt(pos + 2) !== markerCode &&
-      !isEscapedAt(text, pos) &&
-      !isWhitespaceAt(text, pos - 1)
-    ) {
-      return { kind, from, end: pos + 2, content: text.slice(innerStart, pos) }
-    }
+  const closePos = findClosingDoubleDelimiter(text, innerStart, markerCode)
+  if (closePos >= innerStart) {
+    return { kind, from, end: closePos + 2, content: text.slice(innerStart, closePos) }
   }
   return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
 }
@@ -177,8 +183,8 @@ const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
   while (pos < text.length) {
     const code = text.codePointAt(pos) ?? 0
     if (isNewlineCode(code)) return null
-    if (code === 42 && !isEscapedAt(text, pos)) {
-      const closeRun = countCodeRun(text, pos, 42)
+    if (code === 42 && !isEscapedMarkdownAt(text, pos)) {
+      const closeRun = countCodePointRun(text, pos, 42)
       if (closeRun === 1 && !isWhitespaceAt(text, pos - 1)) {
         return { kind: "em", from, end: pos + 1, content: text.slice(innerStart, pos) }
       }
@@ -190,108 +196,70 @@ const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
   return null
 }
 
-const matchStarDelimiterAt = (text: string, from: number): InlineDomToken | null => {
-  if (text.codePointAt(from + 1) === 42) {
-    return matchPairedDoubleDelimiterAt(text, from, 42, "strong")
-  }
-  return matchEmphasisAt(text, from)
-}
+const matchStarDelimiterAt = (text: string, from: number): InlineDomToken | null =>
+  text.codePointAt(from + 1) === 42
+    ? matchPairedDoubleDelimiterAt(text, from, 42, "strong")
+    : matchEmphasisAt(text, from)
 
 const isClosingHighlightAt = (text: string, index: number): boolean =>
   text.codePointAt(index) === 61 &&
   text.codePointAt(index + 1) === 61 &&
   text.codePointAt(index - 1) !== 61 &&
   !isWhitespaceAt(text, index - 1) &&
-  text.codePointAt(index + 2) !== 61
+  text.codePointAt(index + 2) !== 61 &&
+  !isEscapedMarkdownAt(text, index)
+
+const findClosingInlineHighlight = (text: string, innerStart: number): number => {
+  const lineEnd = findInlineLineEnd(text, innerStart)
+  let pos = innerStart + 1
+  while (pos + 1 < lineEnd) {
+    const code = text.codePointAt(pos) ?? 0
+    if (code === 96 && !isEscapedMarkdownAt(text, pos)) {
+      const codeEnd = scanInlineCodeSpanEnd(text, pos, lineEnd)
+      pos = codeEnd > pos ? codeEnd : pos + countCodePointRun(text, pos, 96)
+      continue
+    }
+    if (code === 61 && isClosingHighlightAt(text, pos)) return pos
+    pos += 1
+  }
+  return -1
+}
 
 const matchHighlightAt = (text: string, from: number): InlineDomToken | null => {
-  const runLen = countCodeRun(text, from, 61)
+  const runLen = countCodePointRun(text, from, 61)
   if (runLen !== 2) {
-    if (runLen > 2) {
-      return { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
-    }
-    return null
+    return runLen > 2
+      ? { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
+      : null
   }
   const innerStart = from + 2
   const firstCode = text.codePointAt(innerStart) ?? 0
   if (from + 3 >= text.length || !firstCode || isNewlineCode(firstCode) || isWhitespaceAt(text, innerStart)) {
     return { kind: "literal", from, end: innerStart, raw: "==" }
   }
-  for (let pos = from + 3; pos + 1 < text.length; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) break
-    if (code === 61 && isClosingHighlightAt(text, pos)) {
-      const content = text.slice(innerStart, pos)
-      if (content.trim().length > 0) {
-        return { kind: "mark", from, end: pos + 2, content }
-      }
-      break
+  const closePos = findClosingInlineHighlight(text, innerStart)
+  if (closePos > innerStart) {
+    const content = text.slice(innerStart, closePos)
+    if (content.trim().length > 0) {
+      return { kind: "mark", from, end: closePos + 2, content }
     }
   }
   return { kind: "literal", from, end: innerStart, raw: "==" }
 }
 
-const isAllowedMathPrefix = (text: string, index: number): boolean => {
-  if (index === 0 || isWhitespaceAt(text, index - 1)) return true
-  const prevCode = text.codePointAt(index - 1) ?? 0
-  return prevCode > 0x7f || ALLOWED_ASCII_MATH_PREFIX_CODES.has(prevCode)
-}
-
-const matchSingleLineDoubleDollarAt = (text: string, from: number): InlineDomToken => {
-  const limit = Math.min(text.length - 1, from + 2 + MAX_INLINE_MATH_SCAN_LENGTH)
-  for (let pos = from + 2; pos < limit; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) break
-    if (
-      code === 36 &&
-      text.codePointAt(pos + 1) === 36 &&
-      text.codePointAt(pos + 2) !== 36 &&
-      !isEscapedAt(text, pos)
-    ) {
-      const math = text.slice(from + 2, pos)
-      if (math.trim().length > 0) {
-        return { kind: "math", from, end: pos + 2, math }
-      }
-      break
-    }
-  }
-  return { kind: "literal", from, end: from + 2, raw: "$$" }
-}
-
-const isValidPandocMathClose = (text: string, from: number, closePos: number): boolean => {
-  if (closePos < from + 2) return false
-  if (isWhitespaceAt(text, closePos - 1) || text.codePointAt(closePos - 1) === 92) return false
-  const afterCode = text.codePointAt(closePos + 1) ?? -1
-  return !((afterCode >= 48 && afterCode <= 57) || afterCode === 36)
-}
-
-const matchPandocSingleDollarAt = (text: string, from: number): InlineDomToken | null => {
-  if (!isAllowedMathPrefix(text, from)) return null
-  const firstCode = text.codePointAt(from + 1) ?? 0
-  if (!firstCode || isNewlineCode(firstCode) || isWhitespaceAt(text, from + 1)) return null
-  const limit = Math.min(text.length, from + 1 + MAX_INLINE_MATH_SCAN_LENGTH)
-  for (let pos = from + 1; pos < limit; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (isNewlineCode(code)) return null
-    if (code === 96 && !isEscapedAt(text, pos)) return null
-    if (code === 36 && !isEscapedAt(text, pos)) {
-      if (text.codePointAt(pos + 1) === 36) return null
-      if (!isValidPandocMathClose(text, from, pos)) return null
-      return { kind: "math", from, end: pos + 1, math: text.slice(from + 1, pos) }
-    }
-  }
-  return null
-}
-
 const matchMathAt = (text: string, from: number): InlineDomToken | null => {
-  const runLen = countCodeRun(text, from, 36)
+  const runLen = countCodePointRun(text, from, 36)
   if (runLen > 2) {
     return { kind: "literal", from, end: from + runLen, raw: text.slice(from, from + runLen) }
   }
   if (runLen === 2) {
-    return matchSingleLineDoubleDollarAt(text, from)
+    const display = scanPandocDisplayMathAt(text, from, { singleLineOnly: true })
+    return display
+      ? { kind: "math", from, end: display.to, math: display.math }
+      : { kind: "literal", from, end: from + 2, raw: "$$" }
   }
-  return matchPandocSingleDollarAt(text, from)
+  const inline = scanPandocInlineMathAt(text, from)
+  return inline ? { kind: "math", from, end: inline.to, math: inline.math } : null
 }
 
 const parseWikilinkInner = (raw: string): string | null => {
@@ -320,8 +288,8 @@ const findClosingLinkBracket = (text: string, start: number): number => {
   for (let pos = start; pos < text.length; pos += 1) {
     const code = text.codePointAt(pos) ?? 0
     if (isNewlineCode(code)) return -1
-    if (code === 91 && !isEscapedAt(text, pos)) return -1
-    if (code === 93 && !isEscapedAt(text, pos)) return pos
+    if (code === 91 && !isEscapedMarkdownAt(text, pos)) return -1
+    if (code === 93 && !isEscapedMarkdownAt(text, pos)) return pos
   }
   return -1
 }
@@ -331,7 +299,7 @@ const findClosingLinkParen = (text: string, start: number): number => {
   for (let pos = start; pos < text.length; pos += 1) {
     const code = text.codePointAt(pos) ?? 0
     if (code <= 32) return -1
-    if (isEscapedAt(text, pos)) continue
+    if (isEscapedMarkdownAt(text, pos)) continue
     if (code === 40) depth += 1
     else if (code === 41) {
       depth -= 1
@@ -348,58 +316,24 @@ const matchMarkdownLinkAt = (text: string, from: number): InlineDomToken | null 
   if (closeParen <= closeBracket + 2) return null
   const label = text.slice(from + 1, closeBracket)
   const href = text.slice(closeBracket + 2, closeParen)
-  const end = closeParen + 1
-  if (isSafeInlineHref(href)) {
-    return { kind: "link", from, end, label, href: href.trim() }
-  }
-  return { kind: "literal", from, end, raw: text.slice(from, end) }
+  return { kind: "link", from, end: closeParen + 1, label, href }
 }
 
-const matchBracketConstructAt = (text: string, from: number): InlineDomToken | null => {
-  if (text.codePointAt(from + 1) === 91) {
-    return matchWikilinkAt(text, from)
-  }
-  return matchMarkdownLinkAt(text, from)
-}
-
-const findDoubleCloseBrace = (text: string, start: number): number => {
-  for (let pos = start; pos + 1 < text.length; pos += 1) {
-    const code = text.codePointAt(pos) ?? 0
-    if (code === 123) return -1
-    if (code === 125) {
-      return text.codePointAt(pos + 1) === 125 ? pos : -1
-    }
-  }
-  return -1
-}
-
-const parseInlineColorDirective = (
-  inner: string
-): { rawColor: string; content: string } | null => {
-  const trimmedStart = inner.trimStart()
-  if (!trimmedStart.toLowerCase().startsWith("color")) return null
-  const afterKeyword = trimmedStart.slice(5).trimStart()
-  if (!afterKeyword.startsWith(":")) return null
-  const payload = afterKeyword.slice(1)
-  const pipeIdx = payload.indexOf("|")
-  if (pipeIdx < 0) return null
-  const rawLeft = payload.slice(0, pipeIdx)
-  const rawColor = (rawLeft.endsWith("\\") ? rawLeft.slice(0, -1) : rawLeft).trim()
-  const content = payload.slice(pipeIdx + 1).trim()
-  if (!rawColor || rawColor.includes("\\") || !content) return null
-  return { rawColor, content }
-}
+const matchBracketConstructAt = (text: string, from: number): InlineDomToken | null =>
+  text.codePointAt(from + 1) === 91 ? matchWikilinkAt(text, from) : matchMarkdownLinkAt(text, from)
 
 const matchInlineColorAt = (text: string, from: number): InlineDomToken | null => {
   if (text.codePointAt(from + 1) !== 123) return null
-  const closeBrace = findDoubleCloseBrace(text, from + 2)
+  const header = matchDoubleBraceColorHeader(text, from)
+  if (!header) return null
+  const closeBrace = findBacktickAwareDoubleCloseBrace(text, header.contentStart, true)
   if (closeBrace < 0) return null
-  const parsed = parseInlineColorDirective(text.slice(from + 2, closeBrace))
-  if (!parsed) return null
+  const content = text.slice(header.contentStart, closeBrace).trim()
+  if (!content) return null
   const end = closeBrace + 2
-  const color = resolveInlineColorValue(parsed.rawColor)
+  const color = resolveInlineColorValue(header.colorToken)
   if (color) {
-    return { kind: "color", from, end, color, content: parsed.content }
+    return { kind: "color", from, end, color, content }
   }
   return { kind: "literal", from, end, raw: text.slice(from, end) }
 }
@@ -426,7 +360,7 @@ const matchLineBreakTagAt = (text: string, from: number): InlineDomToken | null 
 const matchInlineTokenAt = (text: string, cursor: number): InlineDomToken | null => {
   const code = text.codePointAt(cursor) ?? 0
   if (code === 60) return matchLineBreakTagAt(text, cursor)
-  if (isEscapedAt(text, cursor)) return null
+  if (isEscapedMarkdownAt(text, cursor)) return null
   if (code === 96) return matchInlineCodeAt(text, cursor)
   if (code === 42) return matchStarDelimiterAt(text, cursor)
   if (code === 126) return matchPairedDoubleDelimiterAt(text, cursor, 126, "del")
@@ -450,6 +384,26 @@ const scanInlineMarkdownTokens = (text: string): InlineDomToken[] => {
     }
   }
   return tokens
+}
+
+const createInlineLinkElement = (
+  token: Extract<InlineDomToken, { kind: "link" }>,
+  depth: number
+): HTMLElement => {
+  const link = document.createElement("a")
+  const safeHref = setSafeAnchorHref(link, token.href)
+  if (!safeHref) {
+    const fallback = document.createElement("span")
+    appendInlineMarkdownNodes(fallback, token.label, depth + 1)
+    return fallback
+  }
+  link.className = "cm-live-link"
+  if (safeHref.startsWith("http://") || safeHref.startsWith("https://")) {
+    link.target = "_blank"
+    link.rel = "noopener noreferrer"
+  }
+  appendInlineMarkdownNodes(link, token.label, depth + 1)
+  return link
 }
 
 const createInlineElementForToken = (
@@ -491,15 +445,8 @@ const createInlineElementForToken = (
       renderKatexIntoElement(span, token.math, false, token.math)
       return span
     }
-    case "link": {
-      const link = document.createElement("a")
-      link.className = "cm-live-link"
-      link.href = token.href
-      link.target = "_blank"
-      link.rel = "noopener noreferrer"
-      appendInlineMarkdownNodes(link, token.label, depth + 1)
-      return link
-    }
+    case "link":
+      return createInlineLinkElement(token, depth)
     case "color": {
       const span = document.createElement("span")
       span.className = "cm-live-color"

@@ -47,8 +47,8 @@ const findLongestBacktickRun = (value: string): number => {
   return longest
 }
 
-const wrapWithMarkdownMark = (content: string, marker: string) => {
-  const normalized = decodeLegacyHtmlEntities(content).trim()
+const wrapDecodedMarkdownMark = (decodedContent: string, marker: string) => {
+  const normalized = decodedContent.trim()
   if (!normalized) return ""
   return `${marker}${normalized}${marker}`
 }
@@ -118,25 +118,25 @@ const matchPairedOpenTagAt = (
   closeDelim: string,
   tagNames: readonly string[],
   disallowAmpersandInAttrs: boolean
-): number => {
+): { openEnd: number; tagName: string } | null => {
   const afterOpen = skipAsciiSpaces(text, start + openDelim.length)
   const matchedName = matchTagNameAt(text, afterOpen, tagNames)
-  if (!matchedName) return -1
+  if (!matchedName) return null
   const afterName = afterOpen + matchedName.length
   if (lowerText.startsWith(closeDelim, afterName)) {
-    return afterName + closeDelim.length
+    return { openEnd: afterName + closeDelim.length, tagName: matchedName }
   }
   const skipped = skipAsciiSpaces(text, afterName)
   if (lowerText.startsWith(closeDelim, skipped)) {
-    return skipped + closeDelim.length
+    return { openEnd: skipped + closeDelim.length, tagName: matchedName }
   }
-  if (!isAsciiSpaceCode(text.codePointAt(afterName) ?? 0)) return -1
+  if (!isAsciiSpaceCode(text.codePointAt(afterName) ?? 0)) return null
   const closePos = lowerText.indexOf(closeDelim, afterName + 1)
-  if (closePos < 0) return -1
+  if (closePos < 0) return null
   if (disallowAmpersandInAttrs && text.slice(afterName + 1, closePos).includes("&")) {
-    return -1
+    return null
   }
-  return closePos + closeDelim.length
+  return { openEnd: closePos + closeDelim.length, tagName: matchedName }
 }
 
 const matchPairedCloseTagAt = (
@@ -156,31 +156,70 @@ const matchPairedCloseTagAt = (
   return lowerText.startsWith(closeDelim, cursor) ? cursor + closeDelim.length : -1
 }
 
+const stepPairedTagDepth = (
+  text: string,
+  lowerText: string,
+  candidate: number,
+  openDelim: string,
+  closeDelim: string,
+  singleTag: readonly string[],
+  disallowAmpersandInAttrs: boolean
+): { delta: number; tagEnd: number } => {
+  const closeEnd = matchPairedCloseTagAt(
+    text,
+    lowerText,
+    candidate,
+    openDelim,
+    closeDelim,
+    singleTag
+  )
+  if (closeEnd > candidate) return { delta: -1, tagEnd: closeEnd }
+  const nestedOpen = matchPairedOpenTagAt(
+    text,
+    lowerText,
+    candidate,
+    openDelim,
+    closeDelim,
+    singleTag,
+    disallowAmpersandInAttrs
+  )
+  return nestedOpen ? { delta: 1, tagEnd: nestedOpen.openEnd } : { delta: 0, tagEnd: -1 }
+}
+
 const findPairedCloseTag = (
   text: string,
   lowerText: string,
   searchFrom: number,
   openDelim: string,
   closeDelim: string,
-  tagNames: readonly string[]
+  tagNames: readonly string[],
+  disallowAmpersandInAttrs: boolean
 ): { closeStart: number; closeEnd: number } | null => {
+  let depth = 1
   let candidate = lowerText.indexOf(openDelim, searchFrom)
   while (candidate >= 0) {
-    const closeEnd = matchPairedCloseTagAt(
+    const step = stepPairedTagDepth(
       text,
       lowerText,
       candidate,
       openDelim,
       closeDelim,
-      tagNames
+      tagNames,
+      disallowAmpersandInAttrs
     )
-    if (closeEnd > candidate) {
-      return { closeStart: candidate, closeEnd }
+    if (step.delta !== 0) {
+      depth += step.delta
+      if (depth === 0) return { closeStart: candidate, closeEnd: step.tagEnd }
+      candidate = lowerText.indexOf(openDelim, step.tagEnd)
+      continue
     }
     candidate = lowerText.indexOf(openDelim, candidate + openDelim.length)
   }
   return null
 }
+
+const decodeTextSlice = (slice: string, shouldDecode: boolean): string =>
+  shouldDecode ? decodeLegacyHtmlEntities(slice) : slice
 
 const replacePairedInlineTags = (
   text: string,
@@ -188,16 +227,17 @@ const replacePairedInlineTags = (
   closeDelim: string,
   tagNames: readonly string[],
   disallowAmpersandInAttrs: boolean,
-  transformInner: (inner: string) => string
+  transformInner: (inner: string) => string,
+  decodePlainSlices = false
 ): string => {
   const lowerText = text.toLowerCase()
   let openIndex = lowerText.indexOf(openDelim)
-  if (openIndex < 0) return text
+  if (openIndex < 0) return decodeTextSlice(text, decodePlainSlices)
   let output = ""
   let cursor = 0
 
   while (openIndex >= 0) {
-    const openEnd = matchPairedOpenTagAt(
+    const openTag = matchPairedOpenTagAt(
       text,
       lowerText,
       openIndex,
@@ -206,28 +246,63 @@ const replacePairedInlineTags = (
       tagNames,
       disallowAmpersandInAttrs
     )
-    if (openEnd < 0) {
+    if (!openTag) {
       openIndex = lowerText.indexOf(openDelim, openIndex + openDelim.length)
       continue
     }
     const closeMatch = findPairedCloseTag(
       text,
       lowerText,
-      openEnd,
+      openTag.openEnd,
       openDelim,
       closeDelim,
-      tagNames
+      [openTag.tagName],
+      disallowAmpersandInAttrs
     )
     if (!closeMatch) break
-    if (openIndex > cursor) output += text.slice(cursor, openIndex)
-    output += transformInner(text.slice(openEnd, closeMatch.closeStart))
+    if (openIndex > cursor) {
+      output += decodeTextSlice(text.slice(cursor, openIndex), decodePlainSlices)
+    }
+    output += transformInner(text.slice(openTag.openEnd, closeMatch.closeStart))
     cursor = closeMatch.closeEnd
     openIndex = lowerText.indexOf(openDelim, cursor)
   }
 
-  if (cursor === 0) return text
-  if (cursor < text.length) output += text.slice(cursor)
+  if (cursor === 0) return decodeTextSlice(text, decodePlainSlices)
+  if (cursor < text.length) {
+    output += decodeTextSlice(text.slice(cursor), decodePlainSlices)
+  }
   return output
+}
+
+const replacePairedFormattingTags = (
+  input: string,
+  openDelim: string,
+  closeDelim: string,
+  tagNames: readonly string[],
+  disallowAmpersandInAttrs: boolean,
+  marker: string
+): string => {
+  const renderNested = (rawInner: string): string => {
+    const normalizedInner = replacePairedInlineTags(
+      rawInner,
+      openDelim,
+      closeDelim,
+      tagNames,
+      disallowAmpersandInAttrs,
+      renderNested,
+      true
+    )
+    return wrapDecodedMarkdownMark(normalizedInner, marker)
+  }
+  return replacePairedInlineTags(
+    input,
+    openDelim,
+    closeDelim,
+    tagNames,
+    disallowAmpersandInAttrs,
+    renderNested
+  )
 }
 
 const normalizeTagGroup = (
@@ -244,29 +319,29 @@ const normalizeTagGroup = (
     disallowAmpersandInAttrs,
     (rawInner) => wrapWithMarkdownCodeMark(rawInner)
   )
-  normalized = replacePairedInlineTags(
+  normalized = replacePairedFormattingTags(
     normalized,
     openDelim,
     closeDelim,
     ["strong", "b"],
     disallowAmpersandInAttrs,
-    (rawInner) => wrapWithMarkdownMark(rawInner, "**")
+    "**"
   )
-  normalized = replacePairedInlineTags(
+  normalized = replacePairedFormattingTags(
     normalized,
     openDelim,
     closeDelim,
     ["em", "i"],
     disallowAmpersandInAttrs,
-    (rawInner) => wrapWithMarkdownMark(rawInner, "*")
+    "*"
   )
-  return replacePairedInlineTags(
+  return replacePairedFormattingTags(
     normalized,
     openDelim,
     closeDelim,
     ["del", "s"],
     disallowAmpersandInAttrs,
-    (rawInner) => wrapWithMarkdownMark(rawInner, "~~")
+    "~~"
   )
 }
 
@@ -325,7 +400,7 @@ const stepFenceMarker = (line: string, activeFenceMarker: string): { nextMarker:
   if (!activeFenceMarker) {
     return { nextMarker: marker, isFenceLine: true }
   }
-  if (marker[0] === activeFenceMarker[0] && marker.length >= activeFenceMarker.length) {
+  if (marker.startsWith(activeFenceMarker[0]!) && marker.length >= activeFenceMarker.length) {
     return { nextMarker: "", isFenceLine: true }
   }
   return { nextMarker: activeFenceMarker, isFenceLine: true }

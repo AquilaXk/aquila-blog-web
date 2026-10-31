@@ -8,7 +8,12 @@ export type TableSelectionMode = "cell" | "row" | "col"
 export type TableCellTarget = { row: number; col: number; openEditor?: boolean }
 
 export type ActiveCellEditorSession = {
-  row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement; initialValue: string; handled: boolean
+  row: number; col: number; cellEl: HTMLElement; input: HTMLInputElement
+  initialValue: string; handled: boolean; handleKeydown: (event: KeyboardEvent) => void
+}
+
+export type ImeProxyController = {
+  cancelPendingProxyHandoff: (syncToBoundSession?: boolean) => void
 }
 
 export type TableSessionCallbacks = {
@@ -37,7 +42,7 @@ export const createTableImeProxyElement = (): HTMLTextAreaElement => {
   proxy.className = "cm-live-table-ime-proxy"
   proxy.tabIndex = -1
   proxy.setAttribute("tabindex", "-1")
-  proxy.setAttribute("data-testid", "cm-live-table-ime-proxy")
+  if (proxy.dataset) proxy.dataset.testid = "cm-live-table-ime-proxy"
   proxy.setAttribute("aria-label", "표 셀 입력 대리자")
   proxy.setAttribute("autocapitalize", "off")
   proxy.setAttribute("autocomplete", "off")
@@ -93,12 +98,8 @@ const canNavigateHorizontallyFromInput = (
 }
 
 export type OpenTableCellEditorParams = TableSessionCallbacks & {
-  cellEl: HTMLElement
-  preservedControls: HTMLElement[]
-  row: number
-  col: number
-  initialText?: string
-  deferFocus?: boolean
+  cellEl: HTMLElement; preservedControls: HTMLElement[]; row: number; col: number
+  initialText?: string; deferFocus?: boolean
   clearActiveSessionIfMatch: (session: ActiveCellEditorSession) => void
   setActiveCoordinates: (row: number, col: number) => void
   flushActiveCellMarkdown: () => string
@@ -197,13 +198,27 @@ export const openTableCellEditorSession = (params: OpenTableCellEditorParams): A
   const input = document.createElement("input")
   input.type = "text"
   input.className = "cm-live-table-cell-input"
-  input.setAttribute("data-testid", "cm-live-table-cell-input")
+  if (input.dataset) input.dataset.testid = "cm-live-table-cell-input"
   input.setAttribute("aria-label", "표 셀 편집")
   input.value = initialText ? `${initialValue}${initialText}` : initialValue
   cellEl.appendChild(input)
   for (const control of preservedControls) cellEl.appendChild(control)
 
-  const session: ActiveCellEditorSession = { row, col, cellEl, input, initialValue, handled: false }
+  const commitAndCloseSession = (focusProxyAfter = false) => {
+    if (session.handled) return
+    const currentMd = params.getCurrentMarkdown()
+    const committed = params.flushActiveCellMarkdown()
+    if (committed !== currentMd) {
+      params.dispatchTableMarkdown(committed, focusProxyAfter ? { row, col, openEditor: false } : undefined)
+    }
+    if (focusProxyAfter) params.focusSelectedTableTarget()
+  }
+
+  const onInputKeydown = (event: KeyboardEvent) =>
+    handleCellEditorKeydown(event, input, params, commitAndCloseSession)
+  const session: ActiveCellEditorSession = {
+    row, col, cellEl, input, initialValue, handled: false, handleKeydown: onInputKeydown,
+  }
   let inputComposing = false
   const stopBubble = (event: Event) => event.stopPropagation()
   for (const name of ["mousedown", "mouseup", "click", "dblclick", "input", "beforeinput"]) {
@@ -218,20 +233,7 @@ export const openTableCellEditorSession = (params: OpenTableCellEditorParams): A
     inputComposing = false
   })
   input.addEventListener("paste", (event: ClipboardEvent) => handleCellEditorPaste(event, session, params))
-
-  const commitAndCloseSession = (focusProxyAfter = false) => {
-    if (session.handled) return
-    const currentMd = params.getCurrentMarkdown()
-    const committed = params.flushActiveCellMarkdown()
-    if (committed !== currentMd) {
-      params.dispatchTableMarkdown(committed, focusProxyAfter ? { row, col, openEditor: false } : undefined)
-    }
-    if (focusProxyAfter) params.focusSelectedTableTarget()
-  }
-
-  input.addEventListener("keydown", (event: KeyboardEvent) =>
-    handleCellEditorKeydown(event, input, params, commitAndCloseSession)
-  )
+  input.addEventListener("keydown", onInputKeydown)
   input.addEventListener("blur", () => commitAndCloseSession(false))
 
   const placeCaretAtEnd = (allowSelectionReset: boolean) => {
@@ -261,6 +263,7 @@ export type TableSurfaceInteractionParams = TableSessionCallbacks & {
   wrap: HTMLElement
   getImeProxy: () => HTMLTextAreaElement | null
   getActiveSession: () => ActiveCellEditorSession | null
+  flushActiveSession: () => void
   isEditable: () => boolean
   isTableActive: () => boolean
   hasOpenEditorSession: () => boolean
@@ -392,35 +395,22 @@ const handleSurfacePaste = (event: ClipboardEvent, params: TableSurfaceInteracti
   }
 }
 
-const syncDeferredProxyTextIntoSession = (
+const syncProxyDraftIntoSession = (
   proxy: HTMLTextAreaElement,
-  params: TableSurfaceInteractionParams,
+  session: ActiveCellEditorSession,
   fallbackText = ""
 ) => {
-  const session = params.getActiveSession()
-  if (!session || session.handled) return
+  if (session.handled) return
   const draft = proxy.value || fallbackText
   session.input.value = `${session.initialValue}${draft}`
 }
 
-const handoffProxySessionToCellInput = (
-  proxy: HTMLTextAreaElement,
-  params: TableSurfaceInteractionParams
-) => {
-  const session = params.getActiveSession()
-  if (!session || session.handled) {
-    proxy.value = ""
-    return
-  }
-  if (proxy.value) {
-    session.input.value = `${session.initialValue}${proxy.value}`
-  }
-  proxy.value = ""
-  focusElementPreventScroll(session.input)
+const focusSessionInputAtEnd = (input: HTMLInputElement) => {
+  focusElementPreventScroll(input)
   try {
-    const end = session.input.value.length
-    session.input.setSelectionRange(end, end)
-    session.input.scrollLeft = 0
+    const end = input.value.length
+    input.setSelectionRange(end, end)
+    input.scrollLeft = 0
   } catch {
     return
   }
@@ -429,54 +419,110 @@ const handoffProxySessionToCellInput = (
 export const attachImeProxyListeners = (
   proxy: HTMLTextAreaElement,
   params: TableSurfaceInteractionParams
-) => {
+): ImeProxyController => {
   let proxyComposing = false
-  let proxyDrivingSession = false
+  let proxyBoundSession: ActiveCellEditorSession | null = null
+  let pendingHandoffTimer: ReturnType<typeof setTimeout> | null = null
+  let handoffInProgress = false
+
+  const clearPendingTimer = () => {
+    if (pendingHandoffTimer !== null) {
+      clearTimeout(pendingHandoffTimer)
+      pendingHandoffTimer = null
+    }
+  }
+
+  const getValidBoundSession = (): ActiveCellEditorSession | null =>
+    proxyBoundSession && params.getActiveSession() === proxyBoundSession && !proxyBoundSession.handled
+      ? proxyBoundSession
+      : null
+
+  const cancelPendingProxyHandoff = (syncToBoundSession = false) => {
+    clearPendingTimer()
+    proxyComposing = false
+    const bound = getValidBoundSession()
+    if (syncToBoundSession && bound && proxy.value) {
+      bound.input.value = `${bound.initialValue}${proxy.value}`
+    }
+    proxyBoundSession = null
+    proxy.value = ""
+  }
+
+  const handoffToBoundSessionInput = (): ActiveCellEditorSession | null => {
+    clearPendingTimer()
+    const bound = getValidBoundSession()
+    proxyBoundSession = null
+    if (!bound) {
+      proxy.value = ""
+      return null
+    }
+    if (proxy.value) {
+      bound.input.value = `${bound.initialValue}${proxy.value}`
+    }
+    proxy.value = ""
+    handoffInProgress = true
+    try {
+      focusSessionInputAtEnd(bound.input)
+    } finally {
+      handoffInProgress = false
+    }
+    return bound
+  }
+
   proxy.addEventListener("compositionstart", (event: CompositionEvent) => {
     event.stopPropagation()
+    clearPendingTimer()
     proxyComposing = true
     if (!params.isEditable() || !params.isTableActive()) {
+      proxyBoundSession = null
       proxy.value = ""
       return
     }
     if (!params.hasOpenEditorSession()) {
       const seed = proxy.value || (typeof event.data === "string" ? event.data : "")
       const { row, col } = params.getSelectionState()
-      proxyDrivingSession = true
       params.activateCellEditor(row, col, seed || undefined, true)
+      proxyBoundSession = params.getActiveSession()
       return
     }
-    if (proxyDrivingSession) {
-      syncDeferredProxyTextIntoSession(proxy, params)
-    }
+    const bound = getValidBoundSession()
+    if (bound) syncProxyDraftIntoSession(proxy, bound)
   })
+
   proxy.addEventListener("compositionupdate", (event: CompositionEvent) => {
     event.stopPropagation()
-    if (!proxyDrivingSession) return
+    const bound = getValidBoundSession()
+    if (!bound) return
     const liveData = typeof event.data === "string" ? event.data : ""
-    syncDeferredProxyTextIntoSession(proxy, params, liveData)
+    syncProxyDraftIntoSession(proxy, bound, liveData)
   })
+
   proxy.addEventListener("compositionend", (event: CompositionEvent) => {
     event.stopPropagation()
     proxyComposing = false
-    if (!proxyDrivingSession) {
-      proxy.value = ""
+    const bound = getValidBoundSession()
+    if (!bound) {
+      cancelPendingProxyHandoff(false)
       return
     }
     const committedData = typeof event.data === "string" ? event.data : ""
-    syncDeferredProxyTextIntoSession(proxy, params, committedData)
-    setTimeout(() => {
-      if (proxyComposing || !proxyDrivingSession) return
-      proxyDrivingSession = false
-      handoffProxySessionToCellInput(proxy, params)
+    syncProxyDraftIntoSession(proxy, bound, committedData)
+    clearPendingTimer()
+    pendingHandoffTimer = setTimeout(() => {
+      pendingHandoffTimer = null
+      if (proxyComposing || proxyBoundSession !== bound) return
+      handoffToBoundSessionInput()
     }, 0)
   })
+
   proxy.addEventListener("input", (event: Event) => {
     event.stopPropagation()
-    if (proxyDrivingSession) {
-      syncDeferredProxyTextIntoSession(proxy, params)
+    const bound = getValidBoundSession()
+    if (bound) {
+      syncProxyDraftIntoSession(proxy, bound)
       return
     }
+    if (proxyBoundSession) cancelPendingProxyHandoff(false)
     if (proxyComposing || Reflect.get(event, "isComposing") === true) return
     if (!params.isEditable() || !params.isTableActive() || params.hasOpenEditorSession()) {
       proxy.value = ""
@@ -489,23 +535,45 @@ export const attachImeProxyListeners = (
       params.activateCellEditor(row, col, typed)
     }
   })
+
   proxy.addEventListener("keydown", (event: KeyboardEvent) => {
-    const active = params.getActiveSession()
-    if (proxyDrivingSession && (!active || active.handled)) {
-      proxyDrivingSession = false
-      proxy.value = ""
-    }
-    if (proxyDrivingSession) {
-      event.stopPropagation()
-      if (proxyComposing || isImeComposingKeyEvent(event)) return
-      proxyDrivingSession = false
-      handoffProxySessionToCellInput(proxy, params)
-      return
+    if (proxyBoundSession) {
+      const bound = getValidBoundSession()
+      if (!bound) {
+        cancelPendingProxyHandoff(false)
+      } else {
+        event.stopPropagation()
+        if (proxyComposing || isImeComposingKeyEvent(event)) return
+        const handedOff = handoffToBoundSessionInput()
+        handedOff?.handleKeydown(event)
+        return
+      }
     }
     handleSurfaceKeydown(event, params)
   })
+
+  proxy.addEventListener("blur", () => {
+    clearPendingTimer()
+    proxyComposing = false
+    const bound = proxyBoundSession
+    if (!bound) {
+      proxy.value = ""
+      return
+    }
+    const isCurrentBound = params.getActiveSession() === bound && !bound.handled
+    if (isCurrentBound && proxy.value) {
+      bound.input.value = `${bound.initialValue}${proxy.value}`
+    }
+    proxyBoundSession = null
+    proxy.value = ""
+    if (!isCurrentBound || handoffInProgress) return
+    if (typeof document !== "undefined" && document.activeElement === bound.input) return
+    params.flushActiveSession()
+  })
+
   proxy.addEventListener("copy", (event: ClipboardEvent) => handleSurfaceCopy(event, params))
   proxy.addEventListener("paste", (event: ClipboardEvent) => handleSurfacePaste(event, params))
+  return { cancelPendingProxyHandoff }
 }
 
 export const attachWrapSurfaceListeners = (params: TableSurfaceInteractionParams) => {

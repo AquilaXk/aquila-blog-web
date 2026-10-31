@@ -4,6 +4,7 @@ import {
   MERMAID_VIEWPORT_ROOT_MARGIN,
   buildMermaidCacheKey,
   estimateMermaidComplexity,
+  formatMermaidErrorReason,
   isMermaidSource,
   readMermaidCache,
   runSerializedMermaidTask,
@@ -26,7 +27,7 @@ import {
   isMermaidRenderTimeoutError,
   isMermaidSyntaxError,
   isNegativeRectWidthError,
-  renderMermaidErrorState,
+  mountMermaidErrorStateDom,
   stripRiskyFlowchartDirectives,
 } from "src/libs/markdown/mermaidRuntimeSanitize"
 import type {
@@ -126,7 +127,7 @@ const executeUncachedMermaidRender = async ({
   const rendered = await runSerializedMermaidTask(
     resolvedScheme,
     (error) => {
-      taskParseWarning = String(error || "Mermaid parse error")
+      taskParseWarning = formatMermaidErrorReason(error)
     },
     async ({ mermaidRuntime }) => {
       taskParseWarning = null
@@ -266,6 +267,46 @@ const renderSourceIntoStageBlock = async ({
   })
 }
 
+const isRetriableMermaidError = (error: unknown): boolean =>
+  !isMermaidSyntaxError(error) && !isMermaidRenderTimeoutError(error)
+
+const tryRenderFallbackMermaidSource = async ({
+  state,
+  block,
+  index,
+  customMermaid,
+  prepared,
+  fallbackSource,
+}: {
+  state: ControllerInternalState
+  block: HTMLElement
+  index: number
+  customMermaid: MermaidRuntimeInstance | null
+  prepared: PreparedBlockRender
+  fallbackSource: string
+}): Promise<boolean> => {
+  try {
+    await renderSourceIntoStageBlock({
+      state,
+      block,
+      index,
+      customMermaid,
+      sourceToRender: fallbackSource,
+      prepared,
+    })
+    markMermaidBlockRendered(block, state.options.preset, fallbackSource, prepared.visibleWidth)
+    return true
+  } catch (fallbackError) {
+    logMermaidWarningOnce(
+      state,
+      `fallback:${fallbackSource}:${formatMermaidErrorReason(fallbackError)}`,
+      "[mermaid] fallback render failed",
+      fallbackError
+    )
+    return isRetriableMermaidError(fallbackError) && scheduleBlockRetry(state, block)
+  }
+}
+
 const handleBlockRenderFailure = async ({
   state,
   block,
@@ -289,32 +330,18 @@ const handleBlockRenderFailure = async ({
     fallbackSource !== prepared.desiredSource &&
     fallbackSource !== prepared.renderableSource
   if (canTryFallback) {
-    try {
-      await renderSourceIntoStageBlock({
-        state,
-        block,
-        index,
-        customMermaid,
-        sourceToRender: fallbackSource,
-        prepared,
-      })
-      markMermaidBlockRendered(block, state.options.preset, fallbackSource, prepared.visibleWidth)
-      return
-    } catch (fallbackError) {
-      logMermaidWarningOnce(
-        state,
-        `fallback:${fallbackSource}:${String(fallbackError)}`,
-        "[mermaid] fallback render failed",
-        fallbackError
-      )
-      const retriableFallback =
-        !isMermaidSyntaxError(fallbackError) && !isMermaidRenderTimeoutError(fallbackError)
-      if (retriableFallback && scheduleBlockRetry(state, block)) return
-    }
+    const handledByFallback = await tryRenderFallbackMermaidSource({
+      state,
+      block,
+      index,
+      customMermaid,
+      prepared,
+      fallbackSource,
+    })
+    if (handledByFallback) return
   }
 
-  const retriable = !isMermaidSyntaxError(error) && !isMermaidRenderTimeoutError(error)
-  if (retriable && scheduleBlockRetry(state, block)) return
+  if (isRetriableMermaidError(error) && scheduleBlockRetry(state, block)) return
 
   markMermaidBlockError(
     block,
@@ -325,10 +352,24 @@ const handleBlockRenderFailure = async ({
   )
   logMermaidWarningOnce(
     state,
-    `${prepared.desiredSource}:${String(error)}`,
+    `${prepared.desiredSource}:${formatMermaidErrorReason(error)}`,
     "[mermaid] render failed",
     error
   )
+}
+
+const handleZeroVisibleWidthBlock = (
+  state: ControllerInternalState,
+  block: HTMLElement,
+  fallbackRaw: string
+) => {
+  if (scheduleBlockRetry(state, block)) return
+  block.dataset.mermaidRendered = "error"
+  block.classList.add("aq-mermaid-error")
+  mountMermaidErrorStateDom(block, {
+    source: fallbackRaw,
+    error: "다이어그램 영역 너비를 계산할 수 없습니다. 레이아웃이 안정되면 다시 렌더링됩니다.",
+  })
 }
 
 const prepareBlockSourcesAndVisibility = (
@@ -359,14 +400,7 @@ const prepareBlockSourcesAndVisibility = (
 
   const visibleWidth = block.clientWidth || Math.floor(blockRect.width)
   if (visibleWidth <= 0) {
-    if (!scheduleBlockRetry(state, block)) {
-      block.dataset.mermaidRendered = "error"
-      block.classList.add("aq-mermaid-error")
-      block.innerHTML = renderMermaidErrorState({
-        source: fallbackRaw,
-        error: "다이어그램 영역 너비를 계산할 수 없습니다. 레이아웃이 안정되면 다시 렌더링됩니다.",
-      })
-    }
+    handleZeroVisibleWidthBlock(state, block, fallbackRaw)
     return null
   }
 
@@ -441,6 +475,59 @@ const ensureLazyIntersectionObserver = (state: ControllerInternalState): Interse
   return state.intersectionObserver
 }
 
+const enqueueBlockIntoRenderQueue = (state: ControllerInternalState, block: HTMLElement) => {
+  if (!block || state.renderingBlocks.has(block)) return
+  state.renderingBlocks.add(block)
+  state.activeQueueCount += 1
+  state.renderQueue = state.renderQueue
+    .then(() => renderSingleMermaidBlock(state, block))
+    .catch((error) => {
+      if (state.options.shouldLogMermaidWarnings) console.warn("[mermaid] queued render failed", error)
+    })
+    .finally(() => {
+      state.renderingBlocks.delete(block)
+      state.activeQueueCount = Math.max(0, state.activeQueueCount - 1)
+    })
+}
+
+const resetControllerLayoutCache = (
+  state: ControllerInternalState,
+  isRendering: () => boolean,
+  clearBlockCache: boolean
+) => {
+  if (!clearBlockCache && isRendering()) return
+  state.cachedDesktopWideLaneBounds = undefined
+  state.premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
+  if (!clearBlockCache) return
+  state.options.root
+    .querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']")
+    .forEach((block) => {
+      delete block.dataset.mermaidRendered
+    })
+}
+
+const runControllerMermaidBlocks = async (state: ControllerInternalState) => {
+  const { options } = state
+  const blocks = collectMermaidBlocksInRoot(options.root)
+  if (!blocks.length) return
+  const candidateBlocks = blocks.filter(
+    (block) =>
+      !isBlockAlreadyRendered(block, options.preset.themeKey) && !state.renderingBlocks.has(block)
+  )
+  if (!options.lazyViewport || typeof IntersectionObserver === "undefined") {
+    batchMeasureCandidateBlocks(state, candidateBlocks)
+    candidateBlocks.forEach(state.enqueueRender)
+    await state.renderQueue
+    return
+  }
+  const observer = ensureLazyIntersectionObserver(state)
+  for (const block of candidateBlocks) {
+    if (state.observedBlocks.has(block)) continue
+    state.observedBlocks.add(block)
+    observer.observe(block)
+  }
+}
+
 export const createMermaidRuntimeController = (options: MermaidRuntimeControllerOptions) => {
   const state: ControllerInternalState = {
     options,
@@ -457,57 +544,14 @@ export const createMermaidRuntimeController = (options: MermaidRuntimeController
     enqueueRender: () => {},
   }
 
-  state.enqueueRender = (block: HTMLElement) => {
-    if (!block || state.renderingBlocks.has(block)) return
-    state.renderingBlocks.add(block)
-    state.activeQueueCount += 1
-    state.renderQueue = state.renderQueue
-      .then(() => renderSingleMermaidBlock(state, block))
-      .catch((error) => {
-        if (options.shouldLogMermaidWarnings) console.warn("[mermaid] queued render failed", error)
-      })
-      .finally(() => {
-        state.renderingBlocks.delete(block)
-        state.activeQueueCount = Math.max(0, state.activeQueueCount - 1)
-      })
-  }
-
+  state.enqueueRender = (block: HTMLElement) => enqueueBlockIntoRenderQueue(state, block)
   const isRendering = () => state.activeQueueCount > 0 || state.renderingBlocks.size > 0
 
   return {
     isRendering,
-    resetLayoutCache: (clearBlockCache = false) => {
-      if (!clearBlockCache && isRendering()) return
-      state.cachedDesktopWideLaneBounds = undefined
-      state.premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
-      if (!clearBlockCache) return
-      options.root
-        .querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']")
-        .forEach((block) => {
-          delete block.dataset.mermaidRendered
-        })
-    },
-    renderMermaidBlocks: async () => {
-      const blocks = collectMermaidBlocksInRoot(options.root)
-      if (!blocks.length) return
-      const candidateBlocks = blocks.filter(
-        (block) =>
-          !isBlockAlreadyRendered(block, options.preset.themeKey) &&
-          !state.renderingBlocks.has(block)
-      )
-      if (!options.lazyViewport || typeof IntersectionObserver === "undefined") {
-        batchMeasureCandidateBlocks(state, candidateBlocks)
-        candidateBlocks.forEach(state.enqueueRender)
-        await state.renderQueue
-        return
-      }
-      const observer = ensureLazyIntersectionObserver(state)
-      for (const block of candidateBlocks) {
-        if (state.observedBlocks.has(block)) continue
-        state.observedBlocks.add(block)
-        observer.observe(block)
-      }
-    },
+    resetLayoutCache: (clearBlockCache = false) =>
+      resetControllerLayoutCache(state, isRendering, clearBlockCache),
+    renderMermaidBlocks: () => runControllerMermaidBlocks(state),
     dispose: () => {
       state.mermaidOverlayCleanup?.()
       state.mermaidOverlayCleanup = null

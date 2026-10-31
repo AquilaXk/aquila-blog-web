@@ -173,19 +173,40 @@ export const normalizeTableBackgroundColor = (value: unknown): string | null => 
 
 const normalizeBackgroundColor = normalizeTableBackgroundColor
 
+const toTrimmedPrimitiveText = (value: unknown): string => {
+  if (typeof value === "string") return value.trim()
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return ""
+}
+
 const normalizePositiveInteger = (value: unknown): number | null => {
   const numericValue =
-    typeof value === "number" ? value : Number.parseInt(String(value || ""), 10)
+    typeof value === "number" ? value : Number.parseInt(toTrimmedPrimitiveText(value), 10)
   if (!Number.isFinite(numericValue) || numericValue < 1) return null
   return Math.max(1, Math.round(numericValue))
 }
 
 const normalizeOptionalBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value
-  const text = String(value ?? "").trim()
+  const text = toTrimmedPrimitiveText(value)
   if (text === "true") return true
   if (text === "false") return false
   return undefined
+}
+
+const toSpanAboveOne = (rawSpan: number | null): number | undefined =>
+  rawSpan && rawSpan > 1 ? rawSpan : undefined
+
+const compactObject = <T extends Record<string, unknown>>(entries: T): Partial<T> | null => {
+  const result: Partial<T> = {}
+  let hasEntry = false
+  for (const [key, entryValue] of Object.entries(entries)) {
+    if (entryValue !== undefined && entryValue !== null) {
+      ;(result as Record<string, unknown>)[key] = entryValue
+      hasEntry = true
+    }
+  }
+  return hasEntry ? result : null
 }
 
 const normalizeTableCellLayout = (
@@ -194,27 +215,14 @@ const normalizeTableCellLayout = (
   if (!value || typeof value !== "object") return null
 
   const candidate = value as MarkdownTableCellLayout
-  const align = normalizeTableCellAlignment(candidate.align)
-  const backgroundColor = normalizeBackgroundColor(candidate.backgroundColor)
-  const header = normalizeOptionalBoolean((candidate as { header?: unknown }).header)
-  const rawColspan = normalizePositiveInteger(candidate.colspan)
-  const rawRowspan = normalizePositiveInteger(candidate.rowspan)
-  const colspan = rawColspan && rawColspan > 1 ? rawColspan : undefined
-  const rowspan = rawRowspan && rawRowspan > 1 ? rawRowspan : undefined
-  const hidden = candidate.hidden === true ? true : undefined
-
-  if (!align && !backgroundColor && header === undefined && !colspan && !rowspan && !hidden) {
-    return null
-  }
-
-  return {
-    ...(align ? { align } : {}),
-    ...(backgroundColor ? { backgroundColor } : {}),
-    ...(header !== undefined ? { header } : {}),
-    ...(colspan ? { colspan } : {}),
-    ...(rowspan ? { rowspan } : {}),
-    ...(hidden ? { hidden: true } : {}),
-  }
+  return compactObject({
+    align: normalizeTableCellAlignment(candidate.align),
+    backgroundColor: normalizeBackgroundColor(candidate.backgroundColor),
+    header: normalizeOptionalBoolean((candidate as { header?: unknown }).header),
+    colspan: toSpanAboveOne(normalizePositiveInteger(candidate.colspan)),
+    rowspan: toSpanAboveOne(normalizePositiveInteger(candidate.rowspan)),
+    hidden: candidate.hidden === true ? true : undefined,
+  })
 }
 
 const normalizeTableCellRow = (row: unknown): Array<MarkdownTableCellLayout | null> => {
@@ -241,39 +249,24 @@ const normalizeTableCellMatrix = (
 const normalizeOverflowMode = (value: unknown): MarkdownTableOverflowMode | undefined =>
   value === "wide" || value === "normal" ? value : undefined
 
+const normalizeStrictBoolean = (value: unknown): boolean | undefined =>
+  typeof value === "boolean" ? value : undefined
+
 export const normalizeMarkdownTableLayout = (
   layout?: MarkdownTableLayout | null
 ): MarkdownTableLayout | null => {
   if (!layout) return null
 
-  const headerRow = typeof layout.headerRow === "boolean" ? layout.headerRow : undefined
-  const headerColumn = typeof layout.headerColumn === "boolean" ? layout.headerColumn : undefined
-  const rawFitWidth = typeof layout.fitWidth === "boolean" ? layout.fitWidth : undefined
-  const fitWidth = rawFitWidth === true ? true : undefined
-  const overflowMode = normalizeOverflowMode(layout.overflowMode)
-  const columnWidths = normalizeTableMetricList(layout.columnWidths, TABLE_MIN_COLUMN_WIDTH_PX)
-  const rowHeights = normalizeTableMetricList(layout.rowHeights, TABLE_MIN_ROW_HEIGHT_PX)
-  const columnAlignments = normalizeTableAlignmentList(layout.columnAlignments)
-  const cells = normalizeTableCellMatrix(layout.cells)
-
-  const hasAnyProperty =
-    headerRow !== undefined ||
-    headerColumn !== undefined ||
-    fitWidth !== undefined ||
-    overflowMode !== undefined ||
-    Boolean(columnWidths || rowHeights || columnAlignments || cells)
-  if (!hasAnyProperty) return null
-
-  return {
-    ...(headerRow !== undefined ? { headerRow } : {}),
-    ...(headerColumn !== undefined ? { headerColumn } : {}),
-    ...(fitWidth ? { fitWidth: true } : {}),
-    ...(overflowMode !== undefined ? { overflowMode } : {}),
-    ...(columnWidths ? { columnWidths } : {}),
-    ...(rowHeights ? { rowHeights } : {}),
-    ...(columnAlignments ? { columnAlignments } : {}),
-    ...(cells ? { cells } : {}),
-  }
+  return compactObject({
+    headerRow: normalizeStrictBoolean(layout.headerRow),
+    headerColumn: normalizeStrictBoolean(layout.headerColumn),
+    fitWidth: layout.fitWidth === true ? true : undefined,
+    overflowMode: normalizeOverflowMode(layout.overflowMode),
+    columnWidths: normalizeTableMetricList(layout.columnWidths, TABLE_MIN_COLUMN_WIDTH_PX),
+    rowHeights: normalizeTableMetricList(layout.rowHeights, TABLE_MIN_ROW_HEIGHT_PX),
+    columnAlignments: normalizeTableAlignmentList(layout.columnAlignments),
+    cells: normalizeTableCellMatrix(layout.cells),
+  })
 }
 
 const extractAqTableCommentJson = (line: string): string | null => {
@@ -282,7 +275,7 @@ const extractAqTableCommentJson = (line: string): string | null => {
   const inner = trimmed.slice(4, -3).trim()
   if (!inner.startsWith("aq-table")) return null
   const afterKeyword = inner.slice("aq-table".length)
-  if (!afterKeyword || (afterKeyword[0] !== " " && afterKeyword[0] !== "\t")) return null
+  if (!afterKeyword.startsWith(" ") && !afterKeyword.startsWith("\t")) return null
   const jsonPayload = afterKeyword.trim()
   return jsonPayload.startsWith("{") && jsonPayload.endsWith("}") ? jsonPayload : null
 }
@@ -450,56 +443,44 @@ const collectPlainTableLayouts = (lines: string[]): Array<MarkdownTableLayout | 
   return layouts
 }
 
-export const extractMarkdownTableLayouts = (
-  markdown: string
-): ExtractedTableLayouts => {
-  const normalizedMarkdown = normalizeTableSourceLineEndings(markdown)
-  const hasAqTableComment = normalizedMarkdown.includes("aq-table")
-  if (!normalizedMarkdown.includes("|") && !hasAqTableComment) {
-    return {
-      cleanedMarkdown: normalizedMarkdown,
-      layouts: [],
-    }
-  }
-
-  const lines = normalizedMarkdown.split("\n")
-  if (!hasAqTableComment) {
-    return {
-      cleanedMarkdown: normalizedMarkdown,
-      layouts: collectPlainTableLayouts(lines),
-    }
-  }
-
+const extractCommentedTableLayouts = (lines: string[]): ExtractedTableLayouts => {
   const cleanedLines: string[] = []
   const layouts: Array<MarkdownTableLayout | null> = []
-  const tableHeaderLinesWithExplicitLayout = new Set<number>()
-  let fencedCodeBlockMarker: FencedCodeBlockMarker | null = null
+  const explicitTableHeaderLines = new Set<number>()
+  let fencedMarker: FencedCodeBlockMarker | null = null
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? ""
-    const wasInFencedCode = fencedCodeBlockMarker !== null
-    fencedCodeBlockMarker = stepFencedCodeState(line, fencedCodeBlockMarker)
-    if (wasInFencedCode || fencedCodeBlockMarker !== null) {
+    const wasInFence = fencedMarker !== null
+    fencedMarker = stepFencedCodeState(line, fencedMarker)
+    if (wasInFence || fencedMarker !== null) {
       cleanedLines.push(line)
       continue
     }
-
     const layout = parseMarkdownTableLayoutComment(line)
     if (layout && isGfmTableAt(lines, index + 1)) {
       layouts.push(layout)
-      tableHeaderLinesWithExplicitLayout.add(index + 1)
+      explicitTableHeaderLines.add(index + 1)
       continue
     }
-
-    if (!tableHeaderLinesWithExplicitLayout.has(index) && isGfmTableAt(lines, index)) {
+    if (!explicitTableHeaderLines.has(index) && isGfmTableAt(lines, index)) {
       layouts.push(null)
     }
-
     cleanedLines.push(line)
   }
 
-  return {
-    cleanedMarkdown: cleanedLines.join("\n"),
-    layouts,
+  return { cleanedMarkdown: cleanedLines.join("\n"), layouts }
+}
+
+export const extractMarkdownTableLayouts = (markdown: string): ExtractedTableLayouts => {
+  const normalizedMarkdown = normalizeTableSourceLineEndings(markdown)
+  const hasAqTableComment = normalizedMarkdown.includes("aq-table")
+  if (!normalizedMarkdown.includes("|") && !hasAqTableComment) {
+    return { cleanedMarkdown: normalizedMarkdown, layouts: [] }
   }
+  const lines = normalizedMarkdown.split("\n")
+  if (!hasAqTableComment) {
+    return { cleanedMarkdown: normalizedMarkdown, layouts: collectPlainTableLayouts(lines) }
+  }
+  return extractCommentedTableLayouts(lines)
 }

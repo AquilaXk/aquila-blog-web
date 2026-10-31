@@ -1,3 +1,8 @@
+import {
+  countCodePointRun,
+  isEscapedMarkdownAt,
+  scanInlineCodeSpanEnd,
+} from "../../libs/markdown/pandocMathScanner"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 
@@ -81,7 +86,7 @@ const URI_ATTRIBUTE_NAMES = new Set(["href", "src", "action", "formaction", "xli
 export const normalizeHtmlPasteText = (value: string): string => {
   const normalized = String(value)
     .replace(/\r\n?/g, "\n")
-    .replace(/\u00a0/g, " ")
+    .replaceAll("\u00a0", " ")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .replace(/[ \t]+/g, " ")
   return /\S/.test(normalized) ? normalized : ""
@@ -99,54 +104,34 @@ const resolveInlineCodeScanBounds = (markdown: string, offset: number): { start:
   }
 }
 
-const measureBacktickRun = (markdown: string, pos: number, end: number): number => {
-  let len = 0
-  while (pos + len < end && markdown.codePointAt(pos + len) === 96) {
-    len += 1
+const advanceInlineCodeScan = (
+  markdown: string,
+  pos: number,
+  end: number,
+  offset: number
+): { hit: boolean; nextPos: number } => {
+  const runLen = countCodePointRun(markdown, pos, 96, end)
+  if (runLen === 0 || isEscapedMarkdownAt(markdown, pos)) {
+    return { hit: false, nextPos: pos + Math.max(1, runLen) }
   }
-  return len
-}
-
-const hasOddPrecedingBackslashes = (markdown: string, pos: number, start: number): boolean => {
-  let count = 0
-  for (let b = pos - 1; b >= start && markdown.codePointAt(b) === 92; b -= 1) {
-    count += 1
+  const closeEnd = scanInlineCodeSpanEnd(markdown, pos, end)
+  if (closeEnd === -1) {
+    return { hit: false, nextPos: pos + runLen }
   }
-  return count % 2 === 1
-}
-
-const findMatchingBacktickRun = (markdown: string, from: number, end: number, targetLen: number): number => {
-  let j = from
-  while (j < end) {
-    const run = measureBacktickRun(markdown, j, end)
-    if (run === 0) {
-      j += 1
-      continue
-    }
-    if (run === targetLen) return j
-    j += run
+  return {
+    hit: offset >= pos + runLen && offset <= closeEnd - runLen,
+    nextPos: closeEnd,
   }
-  return -1
 }
 
 export const isOffsetInsideInlineCodeSpan = (markdown: string, offset: number): boolean => {
-  if (!markdown || offset <= 0 || offset >= markdown.length) return false
+  if (offset <= 0 || offset >= markdown.length) return false
   const { start, end } = resolveInlineCodeScanBounds(markdown, offset)
   let i = start
   while (i < end) {
-    const runLen = measureBacktickRun(markdown, i, end)
-    if (runLen === 0 || hasOddPrecedingBackslashes(markdown, i, start)) {
-      i += Math.max(1, runLen)
-      continue
-    }
-    const openEnd = i + runLen
-    const closeStart = findMatchingBacktickRun(markdown, openEnd, end, runLen)
-    if (closeStart === -1) {
-      i = openEnd
-      continue
-    }
-    if (offset >= openEnd && offset <= closeStart) return true
-    i = closeStart + runLen
+    const step = advanceInlineCodeScan(markdown, i, end, offset)
+    if (step.hit) return true
+    i = step.nextPos
   }
   return false
 }

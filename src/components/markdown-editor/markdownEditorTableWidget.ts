@@ -15,7 +15,7 @@ import {
 import {
   attachImeProxyListeners, attachWrapSurfaceListeners, createTableImeProxyElement,
   focusElementPreventScroll, openTableCellEditorSession,
-  type ActiveCellEditorSession, type TableCellTarget, type TableSelectionMode, type TableSurfaceInteractionParams,
+  type ActiveCellEditorSession, type ImeProxyController, type TableCellTarget, type TableSelectionMode, type TableSurfaceInteractionParams,
 } from "./markdownEditorTableSessionDom"
 import {
   applyTableColumnWidthsAction, createInteractiveTableSurface, createTableToolbarElement,
@@ -41,6 +41,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
   private tableActive = false
   private activeSession: ActiveCellEditorSession | null = null
   private imeProxy: HTMLTextAreaElement | null = null
+  private imeProxyController: ImeProxyController | null = null
   private readonly tb: ReturnType<typeof createTableToolbarElement>
   private surface: ReturnType<typeof createInteractiveTableSurface>
   private readonly outsideGuard = createOutsideTableListenerGuard(
@@ -74,7 +75,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
     this.surface = this.buildSurface()
     if (this.isEditable()) {
       this.imeProxy = createTableImeProxyElement()
-      attachImeProxyListeners(this.imeProxy, this)
+      this.imeProxyController = attachImeProxyListeners(this.imeProxy, this)
     }
     appendTableWrapChildren(wrap, this.tb.toolbar, this.surface.gridRow, this.surface.addRowBtn, this.imeProxy)
     attachWrapSurfaceListeners(this)
@@ -89,6 +90,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 
   readonly getImeProxy = () => this.imeProxy
   readonly getActiveSession = () => this.activeSession
+  readonly flushActiveSession = () => this.flushAndDispatchActiveCell()
   readonly isEditable = () => Boolean(this.view.state.facet(EditorView.editable))
   readonly isTableActive = () => this.tableActive
   readonly hasOpenEditorSession = () => Boolean(this.activeSession && !this.activeSession.handled)
@@ -104,7 +106,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
   private ensureImeProxy(): HTMLTextAreaElement {
     if (!this.imeProxy) {
       this.imeProxy = createTableImeProxyElement()
-      attachImeProxyListeners(this.imeProxy, this)
+      this.imeProxyController = attachImeProxyListeners(this.imeProxy, this)
       this.wrap.appendChild(this.imeProxy)
     }
     return this.imeProxy
@@ -123,6 +125,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
   }
 
   private readonly flushActiveCellMarkdown = (): string => {
+    this.imeProxyController?.cancelPendingProxyHandoff(true)
     if (!this.activeSession || this.activeSession.handled) return this.currentMarkdown
     const session = this.activeSession
     session.handled = true
@@ -335,7 +338,10 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 
   private focusMatchingOpenSession(row: number, col: number, deferFocus = false): boolean {
     if (!this.activeSession || this.activeSession.handled || this.activeSession.row !== row || this.activeSession.col !== col) return false
-    if (!deferFocus) focusElementPreventScroll(this.activeSession.input)
+    if (!deferFocus) {
+      this.imeProxyController?.cancelPendingProxyHandoff(true)
+      focusElementPreventScroll(this.activeSession.input)
+    }
     return true
   }
 
@@ -378,6 +384,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 
     this.visualOptions = migrateTableVisualOptionsOffset(this.currentFrom, nextFrom, nextGrid.headers.length, this.visualOptions, this.view)
     syncHydratedOptionsOnMarkdownUpdate(this.wrap, this.visualOptions, this.currentMarkdown, nextMarkdown, nextGrid, this.tb.syncOptionButtons)
+    this.imeProxyController?.cancelPendingProxyHandoff(false)
     if (this.activeSession && !this.activeSession.handled) {
       this.activeSession.handled = true
       this.activeSession = null
@@ -411,6 +418,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 
   destroy() {
     this.flushAndDispatchActiveCell()
+    this.imeProxyController?.cancelPendingProxyHandoff(false)
     this.outsideGuard.detach()
   }
 }

@@ -1,14 +1,4 @@
-import {
-  type HtmlPasteBypassCheckInput,
-  hasDocumentStructureHtmlTag,
-  hasMonospaceFontStyle,
-  hasMonospacePreStyle,
-  hasUnsafeActiveHtmlPayload,
-  isOffsetInsideInlineCodeSpan,
-  normalizeHtmlPasteText,
-  shouldBypassHtmlPasteConversion,
-  shouldReportEmptyHtmlPasteError,
-} from "./markdownEditorHtmlPasteBypass"
+import { normalizeHtmlPasteText } from "./markdownEditorHtmlPasteBypass"
 
 export {
   type HtmlPasteBypassCheckInput,
@@ -20,7 +10,7 @@ export {
   normalizeHtmlPasteText,
   shouldBypassHtmlPasteConversion,
   shouldReportEmptyHtmlPasteError,
-}
+} from "./markdownEditorHtmlPasteBypass"
 
 export const HTML_PASTE_EMPTY_CONTENT_MESSAGE = "붙여넣을 수 있는 안전한 HTML 내용이 없습니다."
 
@@ -42,7 +32,7 @@ const BLOCK_TAGS = new Set([
 
 const TABLE_CELL_TAGS = new Set(["td", "th"])
 
-const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}[\]|<>~]/g, "\\$&")
+const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}[\]|<>~]/g, String.raw`\$&`)
 
 const collapseExcessNewlines = (value: string): string => {
   const result: string[] = []
@@ -89,7 +79,7 @@ export const resolveSafeHtmlPasteHref = (rawHref: string): string | null => {
 const normalizeInlineHtmlPasteText = (value: string): string =>
   String(value)
     .replace(/\r\n?/g, "\n")
-    .replace(/\u00a0/g, " ")
+    .replaceAll("\u00a0", " ")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .replace(/[ \t\n]+/g, " ")
 
@@ -136,11 +126,11 @@ const INLINE_WRAP_DELIMITERS: Record<string, string> = {
 const serializeInlineLinkOrImage = (element: HTMLElement, tag: string, inner: string): string => {
   if (tag === "a") {
     const href = resolveSafeHtmlPasteHref(element.getAttribute("href") || "")
-    return href && inner ? `[${inner}](${href.replace(/[\\()]/g, "\\$&")})` : inner
+    return href && inner ? `[${inner}](${href.replace(/[\\()]/g, String.raw`\$&`)})` : inner
   }
   const src = resolveSafeHtmlPasteHref(element.getAttribute("src") || "")
   const alt = inlineText(element.getAttribute("alt") || "")
-  return src ? `![${alt}](${src.replace(/[\\()]/g, "\\$&")})` : alt
+  return src ? `![${alt}](${src.replace(/[\\()]/g, String.raw`\$&`)})` : alt
 }
 
 const serializeInline = (node: Node): string => {
@@ -231,7 +221,7 @@ const normalizeTableCellMultilineText = (raw: string): string =>
     .filter((line, idx, arr) => line.length > 0 || (idx > 0 && idx < arr.length - 1))
     .join("<br>")
     .replace(/(?:<br>)+/g, "<br>")
-    .replace(/(?<!\\)\|/g, "\\|")
+    .replace(/(?<!\\)\|/g, String.raw`\|`)
 
 const serializeTableElement = (element: HTMLElement): string => {
   const rows = Array.from(element.querySelectorAll("tr"))

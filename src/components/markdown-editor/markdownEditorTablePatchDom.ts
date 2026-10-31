@@ -151,11 +151,16 @@ export const syncColumnWidthsToGrid = (columnWidths: number[], headerCount: numb
   }
 }
 
-const setElementClassFlag = (el: HTMLElement, className: string, active: boolean) => {
-  if (active) {
-    el.classList.add(className)
-  } else {
-    el.classList.remove(className)
+const syncElementClassList = (
+  el: HTMLElement,
+  entries: ReadonlyArray<readonly [string, boolean]>
+) => {
+  for (const [className, active] of entries) {
+    if (active) {
+      el.classList.add(className)
+    } else {
+      el.classList.remove(className)
+    }
   }
 }
 
@@ -169,10 +174,11 @@ export const syncCellHighlightClasses = (
   for (let r = 0; r < cellElements.length; r += 1) {
     const rowEls = cellElements[r]!
     for (let c = 0; c < rowEls.length; c += 1) {
-      const el = rowEls[c]!
-      setElementClassFlag(el, "is-active-cell", isTableActive && r === activeRow && c === activeCol)
-      setElementClassFlag(el, "is-selected-col", isTableActive && selectedMode === "col" && c === activeCol)
-      setElementClassFlag(el, "is-selected-row", isTableActive && selectedMode === "row" && r === activeRow)
+      syncElementClassList(rowEls[c]!, [
+        ["is-active-cell", isTableActive && r === activeRow && c === activeCol],
+        ["is-selected-col", isTableActive && selectedMode === "col" && c === activeCol],
+        ["is-selected-row", isTableActive && selectedMode === "row" && r === activeRow],
+      ])
     }
   }
 }

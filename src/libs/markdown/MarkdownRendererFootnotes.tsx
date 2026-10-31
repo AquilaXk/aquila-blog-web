@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react"
 import type { MarkdownFootnote } from "src/libs/markdown/renderingFootnoteModel"
+import { normalizeSafeMarkdownLinkHref } from "src/libs/markdown/safeMarkdownUrl"
 
 type RenderMarkdown = (markdown: string, key: string, inCallout?: boolean, inlineOnly?: boolean) => ReactNode
 
@@ -7,6 +8,12 @@ type MarkdownFootnoteReferenceLinkProps = ComponentPropsWithoutRef<"a"> & {
   footnotes: readonly MarkdownFootnote[]
   marker: string
 }
+
+export const isExternalHttpHref = (href: string): boolean =>
+  href.startsWith("http://") || href.startsWith("https://")
+
+export const resolveSafeRenderedAnchorHref = (rawHref: unknown): string =>
+  typeof rawHref === "string" ? normalizeSafeMarkdownLinkHref(rawHref) : ""
 
 const extractFootnotePlainTextPreview = (content: string): string => {
   const cleaned = content
@@ -27,12 +34,24 @@ export const MarkdownFootnoteReferenceLink = ({
   marker,
   ...props
 }: MarkdownFootnoteReferenceLinkProps) => {
+  const safeHref = resolveSafeRenderedAnchorHref(href)
+  if (!safeHref) {
+    return <span>{children}</span>
+  }
   const referenceId = title?.startsWith(`${marker}:`) ? title.slice(marker.length + 1) : ""
   const footnote = footnotes.find(
-    (candidate) => href === `#${candidate.targetId}` && candidate.referenceIds.includes(referenceId)
+    (candidate) =>
+      safeHref === `#${candidate.targetId}` && candidate.referenceIds.includes(referenceId)
   )
   if (!footnote) {
-    return <a href={href} title={title} {...props}>{children}</a>
+    const externalProps = isExternalHttpHref(safeHref)
+      ? { target: "_blank", rel: "noopener noreferrer" }
+      : undefined
+    return (
+      <a {...props} {...externalProps} href={safeHref} title={title}>
+        {children}
+      </a>
+    )
   }
   const occurrence = footnote.referenceIds.indexOf(referenceId) + 1
   const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
@@ -43,7 +62,7 @@ export const MarkdownFootnoteReferenceLink = ({
     <sup className="aq-footnote-reference">
       <a
         {...props}
-        href={href}
+        href={safeHref}
         id={referenceId}
         data-footnote-ref
         aria-describedby={plainTextPreview ? tooltipId : "aq-footnote-heading"}
@@ -57,6 +76,28 @@ export const MarkdownFootnoteReferenceLink = ({
         </span>
       ) : null}
     </sup>
+  )
+}
+
+const renderFootnoteBackref = (footnoteNumber: number, referenceId: string, index: number) => {
+  const safeBackrefHref = normalizeSafeMarkdownLinkHref(`#${referenceId}`)
+  const ariaLabel = `본문의 각주 ${footnoteNumber}번 참조 ${index + 1}로 돌아가기`
+  if (!safeBackrefHref) {
+    return (
+      <span key={referenceId} aria-label={ariaLabel}>
+        ↩
+      </span>
+    )
+  }
+  return (
+    <a
+      key={referenceId}
+      href={safeBackrefHref}
+      data-footnote-backref
+      aria-label={ariaLabel}
+    >
+      ↩
+    </a>
   )
 }
 
@@ -76,16 +117,9 @@ export const MarkdownFootnoteAppendix = ({
         {footnotes.map((footnote) => (
           <li key={footnote.identifier} id={footnote.targetId}>
             {renderMarkdown(footnote.content, `footnote-definition-${footnote.identifier}`)}
-            {footnote.referenceIds.map((referenceId, index) => (
-              <a
-                key={referenceId}
-                href={`#${referenceId}`}
-                data-footnote-backref
-                aria-label={`본문의 각주 ${footnote.number}번 참조 ${index + 1}로 돌아가기`}
-              >
-                ↩
-              </a>
-            ))}
+            {footnote.referenceIds.map((referenceId, index) =>
+              renderFootnoteBackref(footnote.number, referenceId, index)
+            )}
           </li>
         ))}
       </ol>
