@@ -18,6 +18,7 @@ import {
   normalizeSafeMarkdownUrl,
   setSafeAnchorHref,
 } from "../../src/libs/markdown/safeMarkdownUrl"
+import { formatMarkdownHeadingLabel } from "../../src/libs/markdown/markdownDocumentInsights"
 import { createTheme } from "../../src/styles/theme"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 import { SimpleDomElement, withMockDom } from "./helpers/simpleMockDom"
@@ -211,5 +212,156 @@ test.describe("wave6 round4 public markdown regressions", () => {
       mountMermaidErrorStateDom(host as unknown as HTMLElement, { source: "graph TD", error: new Error("parse error") })
       expect(host.children).toHaveLength(1)
     })
+  })
+
+  test("legacy inline HTML normalizer shields emitted code spans from formatting and br passes", () => {
+    expect(normalizeLegacyInlineHtmlMarkdown("<code>&lt;b&gt;x&lt;/b&gt;</code>")).toBe("`<b>x</b>`")
+    expect(normalizeLegacyInlineHtmlMarkdown("<code>&lt;br&gt;</code>")).toBe("`<br>`")
+    expect(normalizeLegacyInlineHtmlMarkdown("<b><code>&lt;/b&gt;</code> bold</b>")).toBe(
+      "**`</b>` bold**"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("<b><code>&lt;b&gt;</code></b>")).toBe("**`<b>`**")
+    expect(normalizeLegacyInlineHtmlMarkdown("<b><code>a &amp;lt; b</code></b>")).toBe(
+      "**`a &lt; b`**"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("&lt;code&gt;&amp;lt;b&amp;gt;x&amp;lt;/b&amp;gt;&lt;/code&gt;")
+    ).toBe("`&lt;b&gt;x&lt;/b&gt;`")
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("\uE000AQCODE0_0\uE001 <code>&lt;b&gt;x&lt;/b&gt;</code>")
+    ).toBe("\uE000AQCODE0_0\uE001 `<b>x</b>`")
+  })
+
+  test("protected inline sentinels restore cleanly across h5/h6, indented code, images, definitions, collisions, single-char escapes, and colors", () => {
+    const h5Html = renderMarkdownHtml("##### Check \\== 1")
+    expect(h5Html).toContain("<h5>Check == 1</h5>")
+    expect(h5Html).not.toContain("<mark")
+    expect(h5Html).not.toContain("\uE000")
+
+    const h6Html = renderMarkdownHtml("###### \\<br>")
+    expect(h6Html).toContain("<h6>&lt;br&gt;</h6>")
+    expect(h6Html).not.toContain("<br")
+    expect(h6Html).not.toContain("\uE000")
+
+    const indentedCodeHtml = renderMarkdownHtml(
+      "intro\n\n    if (a \\== b || x \\< y || &lt;br>)"
+    )
+    expect(indentedCodeHtml).not.toContain("\uE000")
+    expect(indentedCodeHtml).toContain(
+      "data-raw-code=\"if (a \\== b || x \\&lt; y || &amp;lt;br&gt;)\""
+    )
+    expect(indentedCodeHtml).toContain("\\==")
+    expect(indentedCodeHtml).toContain("\\&lt;")
+    expect(indentedCodeHtml).toContain("&amp;lt;br&gt;")
+
+    const inlineImgHtml = renderMarkdownHtml("See ![a \\== b](/post/api/v1/images/x.png)")
+    expect(inlineImgHtml).not.toContain("\uE000")
+    expect(inlineImgHtml).toContain("alt=\"a == b\"")
+
+    const blockedImgHtml = renderMarkdownHtml("See ![a \\== b](https://evil.invalid/x.png)")
+    expect(blockedImgHtml).not.toContain("\uE000")
+    expect(blockedImgHtml).toContain("aria-label=\"a == b\"")
+    expect(blockedImgHtml).toContain(">a == b</span>")
+
+    const refLinkHtml = renderMarkdownHtml("[x][id]\n\n[id]: /posts/1 \"Title \\==\"")
+    expect(refLinkHtml).not.toContain("\uE000")
+    expect(refLinkHtml).toContain("href=\"/posts/1\"")
+    expect(refLinkHtml).toContain("title=\"Title ==\"")
+
+    const collisionHtml = renderMarkdownHtml("\uE000aqp0_eq\uE001 and \\==plain==")
+    expect(collisionHtml).toContain("\uE000aqp0_eq\uE001 and ==plain==")
+    expect(collisionHtml).not.toContain("<mark")
+
+    const singleCharEscapesHtml = renderMarkdownHtml(
+      "=\\=plain== and \\=\\=plain== and ==highlight\\==="
+    )
+    expect(singleCharEscapesHtml).toContain(
+      "<p>==plain== and ==plain== and <mark class=\"aq-highlight\">highlight=</mark></p>"
+    )
+    expect(singleCharEscapesHtml).not.toContain("\uE000")
+
+    const colorRenderedHtml = renderMarkdownHtml("{{color:green|keep \\}\\} and `x}}y`}}")
+    expect(colorRenderedHtml).toContain(
+      "<span class=\"aq-inline-color\" style=\"--aq-inline-color:#34d399\">keep }} and <code class=\"aq-inline-code\">x}}y</code></span>"
+    )
+    expect(colorRenderedHtml).not.toContain("\uE000")
+
+    const escapedColorHtml = renderMarkdownHtml("\\{{color:red|x}}")
+    expect(escapedColorHtml).toContain("<p>{{color:red|x}}</p>")
+    expect(escapedColorHtml).not.toContain("aq-inline-color")
+    expect(escapedColorHtml).not.toContain("\uE000")
+
+    const postCommonMarkColorHtml = renderMarkdownHtml(
+      "\\\\{{color:red|path C:\\\\}} and {{color:blue|\\`a}} and \\`b}} and \\&lt;br&gt;"
+    )
+    expect(postCommonMarkColorHtml).toContain(
+      "\\<span class=\"aq-inline-color\" style=\"--aq-inline-color:#eb5757\">path C:\\</span> and <span class=\"aq-inline-color\" style=\"--aq-inline-color:#2383e2\">`a</span> and `b}} and &amp;lt;br&gt;"
+    )
+    expect(postCommonMarkColorHtml).not.toContain("<br")
+  })
+
+  test("double-brace color scanner enforces singleLine across code and display math, skips unclosed multi-backtick runs, and skips escaped openers", () => {
+    expect(
+      findDoubleBraceColorSpans("{{color:red|`a\nb`}}", {
+        trimTrailingContentWhitespace: true,
+        allowEmptyContent: false,
+        singleLine: true,
+      })
+    ).toEqual([])
+    expect(
+      findDoubleBraceColorSpans("{{color:red|$$a\nb$$}}", {
+        trimTrailingContentWhitespace: true,
+        allowEmptyContent: false,
+        singleLine: true,
+      })
+    ).toEqual([])
+    expect(stripDoubleBraceColorTokensOnce("{{color:red|`a\nb`}} and {{color:red|$$a\nb$$}}")).toBe(
+      "{{color:red|`a\nb`}} and {{color:red|$$a\nb$$}}"
+    )
+    expect(
+      findDoubleBraceColorSpans("`` a `{{color:red|x}}` b", {
+        trimTrailingContentWhitespace: true,
+        allowEmptyContent: false,
+        singleLine: true,
+      })
+    ).toEqual([])
+    expect(
+      findDoubleBraceColorSpans("\\{{color:red|x}}", {
+        trimTrailingContentWhitespace: true,
+        allowEmptyContent: false,
+        singleLine: true,
+      })
+    ).toEqual([])
+    expect(stripDoubleBraceColorTokensOnce("\\{{color:red|x}}")).toBe("\\{{color:red|x}}")
+  })
+
+  test("highlight scanner and heading label formatter skip single-line Pandoc math spans", () => {
+    expect(findMarkdownHighlightSpans("==$a==b$==")).toEqual([
+      { from: 0, to: 10, contentFrom: 2, contentTo: 8 },
+    ])
+    expect(findMarkdownHighlightSpans("==$$a==b$$==")).toEqual([
+      { from: 0, to: 12, contentFrom: 2, contentTo: 10 },
+    ])
+    expect(findMarkdownHighlightSpans("$a==b$ and $c==d$")).toEqual([])
+    expect(formatMarkdownHeadingLabel("==$a==b$==")).toBe("$a==b$")
+    expect(formatMarkdownHeadingLabel("==$$a==b$$==")).toBe("$$a==b$$")
+    expect(formatMarkdownHeadingLabel("$a==b$ and $c==d$")).toBe("$a==b$ and $c==d$")
+  })
+
+  test("safeMarkdownUrl allows // in dot-relative query strings and percent-encodes HTML metacharacters in setSafeAnchorHref", () => {
+    expect(normalizeSafeMarkdownUrl("./post?ref=https://example.com")).toBe(
+      "./post?ref=https://example.com"
+    )
+    const metaAnchor = new SimpleDomElement("a")
+    expect(setSafeAnchorHref(metaAnchor as unknown as HTMLAnchorElement, "#a\"b<c>'d")).toBe(
+      "#a%22b%3Cc%3E%27d"
+    )
+    expect(metaAnchor.getAttribute("href")).toBe("#a%22b%3Cc%3E%27d")
+
+    const koreanAnchor = new SimpleDomElement("a")
+    expect(setSafeAnchorHref(koreanAnchor as unknown as HTMLAnchorElement, "#한글-제목")).toBe(
+      "#한글-제목"
+    )
+    expect(koreanAnchor.getAttribute("href")).toBe("#한글-제목")
   })
 })

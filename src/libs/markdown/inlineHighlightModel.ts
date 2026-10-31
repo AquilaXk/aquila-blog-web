@@ -2,6 +2,8 @@ import {
   countCodePointRun,
   isEscapedMarkdownAt,
   scanInlineCodeSpanEnd,
+  scanPandocDisplayMathAt,
+  scanPandocInlineMathAt,
 } from "./pandocMathScanner"
 
 export type MarkdownHighlightSpan = {
@@ -18,10 +20,11 @@ const isWhitespaceAt = (text: string, index: number): boolean => {
   return ch !== undefined && SINGLE_CHAR_WHITESPACE_PATTERN.test(ch)
 }
 
+const isLineBreakCode = (code: number): boolean => code === 10 || code === 13
+
 const hasLineBreakBetween = (text: string, from: number, to: number): boolean => {
   for (let idx = from; idx < to; idx += 1) {
-    const code = text.codePointAt(idx) ?? 0
-    if (code === 10 || code === 13) return true
+    if (isLineBreakCode(text.codePointAt(idx) ?? 0)) return true
   }
   return false
 }
@@ -29,6 +32,42 @@ const hasLineBreakBetween = (text: string, from: number, to: number): boolean =>
 const skipInlineCodeRunAt = (text: string, cursor: number): number => {
   const end = scanInlineCodeSpanEnd(text, cursor)
   return end > cursor ? end : cursor + countCodePointRun(text, cursor, 96)
+}
+
+const skipSingleLinePandocMathAt = (text: string, cursor: number): number => {
+  const run = countCodePointRun(text, cursor, 36)
+  if (run === 2) {
+    const match = scanPandocDisplayMathAt(text, cursor, { singleLineOnly: true })
+    return match ? match.to : cursor + 2
+  }
+  if (run === 1) {
+    const match = scanPandocInlineMathAt(text, cursor)
+    return match ? match.to : cursor + 1
+  }
+  return cursor + run
+}
+
+const skipEscapedHighlightConstructAt = (
+  text: string,
+  cursor: number,
+  honorEscapes: boolean
+): { nextCursor: number; abortLine: boolean } => {
+  if (!honorEscapes) return { nextCursor: cursor, abortLine: false }
+  const code = text.codePointAt(cursor) ?? 0
+  if (code === 92) {
+    return {
+      nextCursor: cursor + 2,
+      abortLine: isLineBreakCode(text.codePointAt(cursor + 1) ?? 0),
+    }
+  }
+  if (code === 96) {
+    const nextCursor = skipInlineCodeRunAt(text, cursor)
+    return { nextCursor, abortLine: hasLineBreakBetween(text, cursor, nextCursor) }
+  }
+  if (code === 36) {
+    return { nextCursor: skipSingleLinePandocMathAt(text, cursor), abortLine: false }
+  }
+  return { nextCursor: cursor, abortLine: false }
 }
 
 const isOpeningHighlightAt = (
@@ -71,27 +110,16 @@ const scanClosingHighlightOnLine = (
 ): { closeIndex: number; abortedAtIndex: number } => {
   let cursor = searchFrom
   while (cursor < text.length) {
-    const code = text.codePointAt(cursor) ?? 0
-    if (code === 10 || code === 13) {
+    if (isLineBreakCode(text.codePointAt(cursor) ?? 0)) {
       return { closeIndex: -1, abortedAtIndex: cursor + 1 }
     }
-    if (honorEscapes && code === 92) {
-      const nextCode = text.codePointAt(cursor + 1) ?? 0
-      if (nextCode === 10 || nextCode === 13) {
-        return { closeIndex: -1, abortedAtIndex: cursor + 2 }
-      }
-      cursor += 2
+    const skipped = skipEscapedHighlightConstructAt(text, cursor, honorEscapes)
+    if (skipped.abortLine) return { closeIndex: -1, abortedAtIndex: skipped.nextCursor }
+    if (skipped.nextCursor > cursor) {
+      cursor = skipped.nextCursor
       continue
     }
-    if (honorEscapes && code === 96) {
-      const nextCursor = skipInlineCodeRunAt(text, cursor)
-      if (hasLineBreakBetween(text, cursor, nextCursor)) {
-        return { closeIndex: -1, abortedAtIndex: nextCursor }
-      }
-      cursor = nextCursor
-      continue
-    }
-    if (code === 61 && isClosingHighlightAt(text, cursor, honorEscapes)) {
+    if (isClosingHighlightAt(text, cursor, honorEscapes)) {
       return { closeIndex: cursor, abortedAtIndex: cursor }
     }
     cursor += 1
@@ -109,13 +137,9 @@ export const findMarkdownHighlightSpans = (
   let index = 0
 
   while (index + 3 < text.length) {
-    const code = text.codePointAt(index) ?? 0
-    if (honorEscapes && code === 92) {
-      index += 2
-      continue
-    }
-    if (honorEscapes && code === 96) {
-      index = skipInlineCodeRunAt(text, index)
+    const skipped = skipEscapedHighlightConstructAt(text, index, honorEscapes)
+    if (skipped.nextCursor > index) {
+      index = skipped.nextCursor
       continue
     }
     if (!isOpeningHighlightAt(text, index, honorEscapes)) {

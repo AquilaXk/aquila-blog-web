@@ -359,9 +359,9 @@ const matchLineBreakTagAt = (text: string, from: number): InlineDomToken | null 
 }
 
 const matchInlineTokenAt = (text: string, cursor: number): InlineDomToken | null => {
+  if (isEscapedMarkdownAt(text, cursor)) return null
   const code = text.codePointAt(cursor) ?? 0
   if (code === 60) return matchLineBreakTagAt(text, cursor)
-  if (isEscapedMarkdownAt(text, cursor)) return null
   if (code === 96) return matchInlineCodeAt(text, cursor)
   if (code === 42) return matchStarDelimiterAt(text, cursor)
   if (code === 126) return matchPairedDoubleDelimiterAt(text, cursor, 126, "del")

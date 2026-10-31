@@ -1,6 +1,7 @@
 import {
   cloneElement,
   isValidElement,
+  type ComponentProps,
   type FC,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -56,9 +57,12 @@ import {
 import { createMarkdownHeadingSlugAllocator } from "src/libs/markdown/markdownDocumentInsights"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 import {
+  createProtectedInlineSentinels,
   escapeNonPandocSingleDollars,
   hasValidMarkdownMath,
-  protectEscapedHighlightDelimiters,
+  protectEscapedInlineSyntax,
+  remarkRestoreProtectedInlineTokens,
+  type ProtectedInlineSentinels,
 } from "src/libs/markdown/inlineMathGuardModel"
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
@@ -138,8 +142,9 @@ const resolveMarkdownTableCellAlignment = (node: unknown, propAlignment: unknown
   return typeof alignment === "string" ? alignment : undefined
 }
 
-const REMARK_PLUGINS_DEFAULT = [remarkGfm]
-const REMARK_PLUGINS_MATH = [remarkGfm, remarkMath]
+type RemarkPluginList = NonNullable<ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>
+const REMARK_PLUGINS_DEFAULT: RemarkPluginList = [remarkGfm]
+const REMARK_PLUGINS_MATH: RemarkPluginList = [remarkGfm, remarkMath]
 const REHYPE_PLUGINS_DEFAULT: never[] = []
 const REHYPE_PLUGINS_MATH = [rehypeKatex]
 const ANCHOR_INLINE_TRAVERSABLE_TAGS = new Set(["mark", "strong", "em", "del", "span"])
@@ -165,9 +170,9 @@ const replaceAnchorText = (node: ReactNode, fromToken: string, toToken: string):
   return nextChildren === node.props.children ? node : cloneElement(node, undefined, nextChildren)
 }
 
-const normalizeAnchorInlineChildren = (children: ReactNode): ReactNode => {
+const normalizeAnchorInlineChildren = (children: ReactNode, sentinels?: ProtectedInlineSentinels): ReactNode => {
   if (!hasAnchorTextMatching(children, (text) => text.includes("[["))) {
-    return normalizeMarkdownInlineChildren(children)
+    return normalizeMarkdownInlineChildren(children, sentinels)
   }
   let sentinel = "\uE000aqwl0\uE001"
   let idx = 1
@@ -176,7 +181,7 @@ const normalizeAnchorInlineChildren = (children: ReactNode): ReactNode => {
     idx += 1
   }
   const masked = replaceAnchorText(children, "[[", sentinel)
-  return replaceAnchorText(normalizeMarkdownInlineChildren(masked), sentinel, "[[")
+  return replaceAnchorText(normalizeMarkdownInlineChildren(masked, sentinels), sentinel, "[[")
 }
 
 export const resolvePreBlockMermaidSource = (language: string, rawCode: string): string => {
@@ -316,6 +321,7 @@ export const createMarkdownComponentVariants = ({
   renderPassStateRef,
   tableRenderIndexRef,
   imageRenderOrderRef,
+  sentinels,
 }: {
   footnotes: ReturnType<typeof resolveMarkdownRenderModel>["footnotes"]
   footnoteMarker: string
@@ -323,15 +329,17 @@ export const createMarkdownComponentVariants = ({
   renderPassStateRef?: { current: MarkdownRenderPassState }
   tableRenderIndexRef?: { current: number }
   imageRenderOrderRef?: { current: number }
+  sentinels?: ProtectedInlineSentinels
 }) => {
   const fallbackPassStateRef = { current: createMarkdownRenderPassState() }
   const getPassState = () => (renderPassStateRef ?? fallbackPassStateRef).current
+  const normalizeInline = (children: ReactNode) => normalizeMarkdownInlineChildren(children, sentinels)
 
   const renderHeading = (
     Tag: "h1" | "h2" | "h3" | "h4",
     { children, node, id, ...props }: MarkdownElementProps
   ) => {
-    const normalizedChildren = normalizeMarkdownInlineChildren(children)
+    const normalizedChildren = normalizeInline(children)
     const resolvedId = resolveHeadingNodeId(getPassState(), node, id, normalizedChildren)
     return <Tag id={resolvedId} {...props}>{normalizedChildren}</Tag>
   }
@@ -345,7 +353,7 @@ export const createMarkdownComponentVariants = ({
       alignment={resolveMarkdownTableCellAlignment(node, align, style)}
       className={className}
     >
-      {normalizeMarkdownInlineChildren(children)}
+      {normalizeInline(children)}
     </MarkdownTableCellRenderer>
   )
 
@@ -354,19 +362,13 @@ export const createMarkdownComponentVariants = ({
     h2: (props: MarkdownElementProps) => renderHeading("h2", props),
     h3: (props: MarkdownElementProps) => renderHeading("h3", props),
     h4: (props: MarkdownElementProps) => renderHeading("h4", props),
-    strong: ({ children, node: _node, ...props }: MarkdownElementProps) => (
-      <strong {...props}>{normalizeMarkdownInlineChildren(children)}</strong>
-    ),
-    em: ({ children, node: _node, ...props }: MarkdownElementProps) => (
-      <em {...props}>{normalizeMarkdownInlineChildren(children)}</em>
-    ),
-    del: ({ children, node: _node, ...props }: MarkdownElementProps) => (
-      <del {...props}>{normalizeMarkdownInlineChildren(children)}</del>
-    ),
+    h5: ({ children, node: _node, ...props }: MarkdownElementProps) => <h5 {...props}>{normalizeInline(children)}</h5>,
+    h6: ({ children, node: _node, ...props }: MarkdownElementProps) => <h6 {...props}>{normalizeInline(children)}</h6>,
+    strong: ({ children, node: _node, ...props }: MarkdownElementProps) => <strong {...props}>{normalizeInline(children)}</strong>,
+    em: ({ children, node: _node, ...props }: MarkdownElementProps) => <em {...props}>{normalizeInline(children)}</em>,
+    del: ({ children, node: _node, ...props }: MarkdownElementProps) => <del {...props}>{normalizeInline(children)}</del>,
     blockquote: ({ children }: MarkdownElementProps) => <MarkdownBlockquote>{children}</MarkdownBlockquote>,
-    li: ({ children, node: _node, ...props }: MarkdownElementProps) => (
-      <li {...props}>{normalizeMarkdownInlineChildren(children)}</li>
-    ),
+    li: ({ children, node: _node, ...props }: MarkdownElementProps) => <li {...props}>{normalizeInline(children)}</li>,
     table({ children, node, ...props }: MarkdownElementProps) {
       const state = getPassState()
       const tableIndex = allocateNodeOrderIndex(node, state.tableIndices, () =>
@@ -386,7 +388,7 @@ export const createMarkdownComponentVariants = ({
     img: (props: MarkdownElementProps) =>
       renderMarkdownImageElement(props, getPassState(), imageRenderOrderRef),
     a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
-      const normalizedChildren = normalizeAnchorInlineChildren(children)
+      const normalizedChildren = normalizeAnchorInlineChildren(children, sentinels)
       const safeHref = resolveSafeRenderedAnchorHref(href)
       if (!safeHref) return <span>{normalizedChildren}</span>
       const externalProps = isExternalHttpHref(safeHref)
@@ -411,15 +413,15 @@ export const createMarkdownComponentVariants = ({
 
   const defaultComponents = {
     ...sharedComponents,
-    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={false}>{children}</MarkdownParagraph>,
+    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={false} sentinels={sentinels}>{children}</MarkdownParagraph>,
   }
   const calloutComponents = {
     ...sharedComponents,
-    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={true}>{children}</MarkdownParagraph>,
+    p: ({ children }: { children?: ReactNode }) => <MarkdownParagraph inCallout={true} sentinels={sentinels}>{children}</MarkdownParagraph>,
   }
   const inlineComponents = {
     ...sharedComponents,
-    p: ({ children }: { children?: ReactNode }) => <>{normalizeMarkdownInlineChildren(children)}</>,
+    p: ({ children }: { children?: ReactNode }) => <>{normalizeInline(children)}</>,
   }
 
   return {
@@ -465,13 +467,17 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   )
   const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker } = renderModel
   const { tableLayouts } = renderModel
+  const sentinels = useMemo(
+    () => createProtectedInlineSentinels(`${content ?? ""}\n${normalizedContent}`),
+    [content, normalizedContent]
+  )
 
   useMermaidEffect(rootRef, renderKey, !disableMermaid, {
     observeMutations: false,
     forceScheme,
   })
   useResponsiveTableEffect(rootRef, renderKey)
-  useInlineColorEffect(rootRef, renderKey)
+  useInlineColorEffect(rootRef, renderKey, Boolean(resolvedContentHtml))
   usePrismEffect(rootRef, renderKey, true, {
     mutationDebounceMs: 96,
   })
@@ -505,25 +511,32 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         footnoteMarker,
         tableLayouts,
         renderPassStateRef,
+        sentinels,
       }),
-    [footnoteMarker, footnotes, tableLayouts]
+    [footnoteMarker, footnotes, sentinels, tableLayouts]
   )
 
   renderPassStateRef.current = createMarkdownRenderPassState()
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
     const hasMath = hasValidMarkdownMath(markdown)
-    const preparedMarkdown = protectEscapedHighlightDelimiters(
-      hasMath ? escapeNonPandocSingleDollars(markdown) : markdown
+    const protectedState = protectEscapedInlineSyntax(
+      hasMath ? escapeNonPandocSingleDollars(markdown) : markdown,
+      sentinels
     )
+    const baseRemarkPlugins = hasMath ? REMARK_PLUGINS_MATH : REMARK_PLUGINS_DEFAULT
+    const remarkPlugins: RemarkPluginList =
+      protectedState.tokens.length > 0
+        ? [...baseRemarkPlugins, [remarkRestoreProtectedInlineTokens, protectedState]]
+        : baseRemarkPlugins
     return (
       <ReactMarkdown
         key={key}
-        remarkPlugins={hasMath ? REMARK_PLUGINS_MATH : REMARK_PLUGINS_DEFAULT}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={hasMath ? REHYPE_PLUGINS_MATH : REHYPE_PLUGINS_DEFAULT}
         components={componentVariants.getComponents(inCallout, inlineOnly)}
       >
-        {preparedMarkdown}
+        {protectedState.markdown}
       </ReactMarkdown>
     )
   }

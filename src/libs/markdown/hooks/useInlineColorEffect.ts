@@ -90,8 +90,13 @@ export const applyInlineColors = (root: HTMLElement) => {
   })
 }
 
-const useInlineColorEffect = (rootRef: RefObject<HTMLElement | null>, contentKey: string) => {
+const useInlineColorEffect = (
+  rootRef: RefObject<HTMLElement | null>,
+  contentKey: string,
+  enabled = true
+) => {
   useEffect(() => {
+    if (!enabled) return
     const root = rootRef.current
     if (!root) return
 

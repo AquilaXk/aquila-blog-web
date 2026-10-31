@@ -70,7 +70,7 @@ const isAllowedDotRelativeRest = (rest: string, requireNonEmpty: boolean): boole
 const normalizeSafeDotRelativePath = (value: string): string => {
   const pathPart = value.split(/[?#]/, 1)[0] ?? ""
   if (
-    value.includes("//") ||
+    pathPart.includes("//") ||
     value.includes("\\") ||
     /%2e/i.test(pathPart) ||
     !isSafeDecodedRelativePathPart(value, true)
@@ -150,25 +150,15 @@ export const normalizeSafeMarkdownLinkHref = (raw: string): string => {
   return normalizeSafeMarkdownUrl(value)
 }
 
-const lockSafeAnchorHrefPrefix = (safeHref: string): string => {
-  if (!safeHref || safeHref.startsWith("//")) return ""
-  if (safeHref === "#") return "#"
-  if (safeHref === "/") return "/"
-  if (safeHref.startsWith("https://")) return "https://" + safeHref.slice(8)
-  if (safeHref.startsWith("http://")) return "http://" + safeHref.slice(7)
-  if (safeHref.startsWith("mailto:")) return "mailto:" + safeHref.slice(7)
-  if (safeHref.startsWith("#")) return "#" + safeHref.slice(1)
-  if (safeHref.startsWith("./")) return "./" + safeHref.slice(2)
-  if (safeHref.startsWith("../")) return "../" + safeHref.slice(3)
-  if (safeHref.startsWith("/") && !safeHref.startsWith("//")) return "/" + safeHref.slice(1)
-  return ""
-}
-
 export const setSafeAnchorHref = (anchor: HTMLAnchorElement, rawHref: string): string => {
-  const lockedHref = lockSafeAnchorHrefPrefix(normalizeSafeMarkdownLinkHref(rawHref))
-  if (!lockedHref) return ""
-  anchor.setAttribute("href", lockedHref)
-  return lockedHref
+  const normalizedHref = normalizeSafeMarkdownLinkHref(rawHref)
+  if (!normalizedHref) return ""
+  const safeHref = normalizedHref.replace(
+    /[<>"']/g,
+    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+  anchor.setAttribute("href", safeHref)
+  return safeHref
 }
 
 export const normalizeSafeMarkdownImageSrc = (raw: string): string => normalizePublicPostImageUrl(raw)

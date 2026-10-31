@@ -140,6 +140,7 @@ export const replaceGridContentsInPlace = (target: MarkdownTableGrid, source: Ma
   target.headers.splice(0, target.headers.length, ...source.headers)
   target.alignments.splice(0, target.alignments.length, ...source.alignments)
   target.rows.splice(0, target.rows.length, ...source.rows.map((row) => [...row]))
+  setTableGridLayoutMeta(target, getTableGridLayoutMeta(source))
 }
 
 export const syncColumnWidthsToGrid = (columnWidths: number[], headerCount: number) => {

@@ -11,8 +11,10 @@ import {
 import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
 import { findMarkdownHighlightSpans } from "src/libs/markdown/inlineHighlightModel"
 import {
-  ESCAPED_HIGHLIGHT_SENTINEL,
-  ESCAPED_LT_SENTINEL,
+  DEFAULT_PROTECTED_INLINE_SENTINELS,
+  hasProtectedInlineSentinel,
+  restoreProtectedInlineText,
+  type ProtectedInlineSentinels,
 } from "src/libs/markdown/inlineMathGuardModel"
 import {
   findDoubleBraceColorSpans,
@@ -228,16 +230,14 @@ const hasWikilinkSyntax = (text: string): boolean => text.includes("[[")
 const hasInlineBrSyntax = (text: string): boolean => hasRawBrTag(text)
 const hasSoftBreakSyntax = (text: string): boolean => text.includes("\n")
 
-const restoreEscapedInlineText = (value: string): string =>
-  value.replaceAll(ESCAPED_HIGHLIGHT_SENTINEL, "==").replaceAll(ESCAPED_LT_SENTINEL, "<")
-
 export const resolveMarkdownWikilinkTarget = (
   rawTarget: string,
-  rawAlias?: string
+  rawAlias?: string,
+  sentinels: ProtectedInlineSentinels = DEFAULT_PROTECTED_INLINE_SENTINELS
 ): { href: string; label: string } | null => {
-  const target = restoreEscapedInlineText(rawTarget).trim()
+  const target = restoreProtectedInlineText(rawTarget, sentinels).trim()
   if (!target) return null
-  const alias = restoreEscapedInlineText(rawAlias ?? "").trim()
+  const alias = restoreProtectedInlineText(rawAlias ?? "", sentinels).trim()
   const fallbackLabel = target.startsWith("#") ? target.slice(1) : target
   const label = (alias || fallbackLabel).trim()
   if (!label) return null
@@ -332,7 +332,7 @@ const restoreSerializedMarkdownChildren = (serialized: string, sourceChildren: R
   return nodes
 }
 
-const normalizeWikilinkFlat = (children: ReactNode): ReactNode => {
+const normalizeWikilinkFlat = (children: ReactNode, sentinels: ProtectedInlineSentinels): ReactNode => {
   const sourceChildren = mergeAdjacentStringChildren(children)
   let linkIndex = 0
   let matchedAny = false
@@ -344,7 +344,7 @@ const normalizeWikilinkFlat = (children: ReactNode): ReactNode => {
     const nodes: ReactNode[] = []
     let cursor = 0
     for (const span of spans) {
-      const resolved = resolveMarkdownWikilinkTarget(span.rawTarget, span.rawAlias)
+      const resolved = resolveMarkdownWikilinkTarget(span.rawTarget, span.rawAlias, sentinels)
       if (!resolved) continue
       if (span.from > cursor) nodes.push(child.slice(cursor, span.from))
       nodes.push(
@@ -362,8 +362,8 @@ const normalizeWikilinkFlat = (children: ReactNode): ReactNode => {
   return matchedAny ? nextNodes : children
 }
 
-const normalizeWikilinkChildren = (children: ReactNode): ReactNode =>
-  runRecursiveInlinePass(children, hasWikilinkSyntax, normalizeWikilinkFlat)
+const normalizeWikilinkChildren = (children: ReactNode, sentinels: ProtectedInlineSentinels): ReactNode =>
+  runRecursiveInlinePass(children, hasWikilinkSyntax, (flat) => normalizeWikilinkFlat(flat, sentinels))
 
 const normalizeInlineBrFlat = (children: ReactNode): ReactNode => {
   const sourceChildren = mergeAdjacentStringChildren(children)
@@ -435,21 +435,21 @@ const normalizeHighlightFlat = (children: ReactNode): ReactNode => {
 const normalizeHighlightChildren = (children: ReactNode): ReactNode =>
   runRecursiveInlinePass(children, hasHighlightSyntax, normalizeHighlightFlat)
 
-const hasEscapedHighlightSentinel = (text: string): boolean =>
-  text.includes(ESCAPED_HIGHLIGHT_SENTINEL) || text.includes(ESCAPED_LT_SENTINEL)
-
-const restoreEscapedHighlightFlat = (children: ReactNode): ReactNode => {
-  if (typeof children === "string") return restoreEscapedInlineText(children)
+const restoreProtectedInlineFlat = (
+  children: ReactNode,
+  sentinels: ProtectedInlineSentinels
+): ReactNode => {
+  if (typeof children === "string") return restoreProtectedInlineText(children, sentinels)
   if (!Array.isArray(children)) return children
   return children.map((child) =>
-    typeof child === "string" && hasEscapedHighlightSentinel(child)
-      ? restoreEscapedInlineText(child)
+    typeof child === "string" && hasProtectedInlineSentinel(child, sentinels)
+      ? restoreProtectedInlineText(child, sentinels)
       : child
   )
 }
 
-const restoreEscapedHighlightChildren = (children: ReactNode): ReactNode =>
-  runRecursiveInlinePass(children, hasEscapedHighlightSentinel, restoreEscapedHighlightFlat)
+const restoreProtectedInlineChildren = (children: ReactNode, sentinels: ProtectedInlineSentinels): ReactNode =>
+  runRecursiveInlinePass(children, (t) => hasProtectedInlineSentinel(t, sentinels), (c) => restoreProtectedInlineFlat(c, sentinels))
 
 const normalizeInlineColorFlat = (children: ReactNode): ReactNode => {
   const sourceChildren = mergeAdjacentStringChildren(children)
@@ -461,6 +461,7 @@ const normalizeInlineColorFlat = (children: ReactNode): ReactNode => {
     trimTrailingContentWhitespace: true,
     allowEmptyContent: false,
     singleLine: true,
+    honorMarkdownEscapes: false,
   })
   if (spans.length === 0) return children
 
@@ -547,25 +548,30 @@ export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode =>
 
 const MarkdownBlockquoteContext = createContext(false)
 
-export const normalizeMarkdownInlineChildren = (children: ReactNode) => {
+export const normalizeMarkdownInlineChildren = (
+  children: ReactNode,
+  sentinels: ProtectedInlineSentinels = DEFAULT_PROTECTED_INLINE_SENTINELS
+) => {
   if (typeof children === "string" && !/[{*_~`<\n\\=[\]\uE000]/.test(children)) {
     return children
   }
-  const withBr = normalizeInlineBrChildren(normalizeWikilinkChildren(children))
+  const withBr = normalizeInlineBrChildren(normalizeWikilinkChildren(children, sentinels))
   const withColor = normalizeInlineColorChildren(withBr)
-  const withHighlight = restoreEscapedHighlightChildren(normalizeHighlightChildren(withColor))
+  const withHighlight = restoreProtectedInlineChildren(normalizeHighlightChildren(withColor), sentinels)
   return normalizeQuotedEmphasisChildren(normalizeQuotedStrongChildren(withHighlight))
 }
 
 export const MarkdownParagraph = ({
   children,
   inCallout = false,
+  sentinels = DEFAULT_PROTECTED_INLINE_SENTINELS,
 }: {
   children: ReactNode
   inCallout?: boolean
+  sentinels?: ProtectedInlineSentinels
 }) => {
   const inBlockquote = useContext(MarkdownBlockquoteContext)
-  let normalizedChildren = normalizeMarkdownInlineChildren(children)
+  let normalizedChildren = normalizeMarkdownInlineChildren(children, sentinels)
   if (inBlockquote) {
     normalizedChildren = normalizeSoftBreakChildren(normalizedChildren)
   }

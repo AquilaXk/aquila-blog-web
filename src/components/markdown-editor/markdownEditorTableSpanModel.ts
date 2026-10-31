@@ -100,10 +100,15 @@ const isHorizontalSpanAnchor = (
   Boolean(cell && !cell.hidden && cell.colspan && cell.colspan > 1)
 
 const findRowMaxVerticalSpanEnd = (
-  rowCells: ReadonlyArray<MarkdownTableCellLayout | null>, rowIndex: number, activeRow: number
+  rowCells: ReadonlyArray<MarkdownTableCellLayout | null>,
+  rowIndex: number,
+  activeRow: number,
+  maxCols?: number
 ): number => {
   let endRow = activeRow
-  for (const cell of rowCells) {
+  const colLimit = maxCols !== undefined ? Math.min(rowCells.length, maxCols) : rowCells.length
+  for (let c = 0; c < colLimit; c += 1) {
+    const cell = rowCells[c]
     if (isVerticalSpanAnchor(cell) && rowIndex + cell.rowspan - 1 >= activeRow) {
       endRow = Math.max(endRow, rowIndex + cell.rowspan - 1)
     }
@@ -112,7 +117,10 @@ const findRowMaxVerticalSpanEnd = (
 }
 
 export const resolveDuplicateRowInsertTableIndex = (
-  layout: MarkdownTableLayout | null | undefined, activeRow: number, maxBodyRows?: number
+  layout: MarkdownTableLayout | null | undefined,
+  activeRow: number,
+  maxBodyRows?: number,
+  maxCols?: number
 ): number => {
   let spanEndRow = Math.max(0, activeRow)
   const cells = layout?.cells
@@ -120,7 +128,7 @@ export const resolveDuplicateRowInsertTableIndex = (
     const maxScanRow = Math.min(activeRow, cells.length - 1)
     for (let r = 0; r <= maxScanRow; r += 1) {
       const rowCells = cells[r]
-      if (rowCells) spanEndRow = Math.max(spanEndRow, findRowMaxVerticalSpanEnd(rowCells, r, activeRow))
+      if (rowCells) spanEndRow = Math.max(spanEndRow, findRowMaxVerticalSpanEnd(rowCells, r, activeRow, maxCols))
     }
   }
   if (maxBodyRows !== undefined) spanEndRow = Math.min(spanEndRow, maxBodyRows)
@@ -131,22 +139,31 @@ const findRowSpanEndColCoveringActive = (
   rowCells: ReadonlyArray<MarkdownTableCellLayout | null>, activeCol: number, maxCols?: number
 ): number => {
   let endCol = activeCol
+  let coveredUntil = -1
   const maxScanCol = Math.min(activeCol, rowCells.length - 1)
   for (let c = 0; c <= maxScanCol; c += 1) {
+    if (c <= coveredUntil) continue
     const cell = rowCells[c]
     if (!isHorizontalSpanAnchor(cell)) continue
     const rawEnd = c + cell.colspan - 1
     const clampedEnd = maxCols !== undefined && maxCols > 0 ? Math.min(rawEnd, maxCols - 1) : rawEnd
+    coveredUntil = clampedEnd
     if (clampedEnd >= activeCol) endCol = Math.max(endCol, clampedEnd)
   }
   return endCol
 }
 
 export const resolveDuplicateColInsertIndex = (
-  layout: MarkdownTableLayout | null | undefined, activeCol: number, maxCols?: number
+  layout: MarkdownTableLayout | null | undefined,
+  activeCol: number,
+  maxCols?: number,
+  maxTotalRows?: number
 ): number => {
   let spanEndCol = activeCol
-  for (const rowCells of layout?.cells ?? []) {
+  const cells = layout?.cells ?? []
+  const rowLimit = maxTotalRows !== undefined ? Math.min(cells.length, maxTotalRows) : cells.length
+  for (let r = 0; r < rowLimit; r += 1) {
+    const rowCells = cells[r]
     if (rowCells) spanEndCol = Math.max(spanEndCol, findRowSpanEndColCoveringActive(rowCells, activeCol, maxCols))
   }
   if (maxCols !== undefined && maxCols > 0) spanEndCol = Math.min(spanEndCol, maxCols - 1)

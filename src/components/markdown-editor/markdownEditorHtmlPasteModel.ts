@@ -123,7 +123,13 @@ const INLINE_WRAP_DELIMITERS: Record<string, string> = {
   strike: "~~",
 }
 
-export const escapeMarkdownLinkDestination = (url: string) => url.replace(/[\\()]/g, "\\$&")
+const encodeLinkDestinationChar = (ch: string): string => {
+  if (ch === "(") return "%28"
+  return ch === ")" ? "%29" : "%5C"
+}
+
+export const escapeMarkdownLinkDestination = (url: string): string =>
+  url.replace(/[()\\]/g, encodeLinkDestinationChar)
 
 const serializeInlineLinkOrImage = (element: HTMLElement, tag: string, inner: string): string => {
   if (tag === "a") {

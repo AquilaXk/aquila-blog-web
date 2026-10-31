@@ -6,7 +6,10 @@ import { renderToStaticMarkup } from "react-dom/server"
 import MarkdownRenderer from "../../src/libs/markdown/MarkdownRenderer"
 import { createTheme } from "../../src/styles/theme"
 import { isTableEditActionDisabled } from "../../src/components/markdown-editor/MarkdownEditor"
-import { escapeMarkdownLinkDestination } from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
+import {
+  convertSafeHtmlPasteToMarkdown,
+  escapeMarkdownLinkDestination,
+} from "../../src/components/markdown-editor/markdownEditorHtmlPasteModel"
 import { appendInlineMarkdownNodes } from "../../src/components/markdown-editor/markdownEditorInlineDom"
 import {
   applyMarkdownTableGridAction,
@@ -21,6 +24,8 @@ import {
   getOrCreateTableVisualOptions,
 } from "../../src/components/markdown-editor/markdownEditorTableResizeDom"
 import { MarkdownTableWidget } from "../../src/components/markdown-editor/markdownEditorTableWidget"
+import { normalizePostImageUrl } from "../../src/libs/markdown/postImageUrlPolicy"
+import { parseStandaloneMarkdownImageLine } from "../../src/libs/markdown/rendering"
 import { SimpleDomElement, withMockDom } from "./helpers/simpleMockDom"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
@@ -48,6 +53,92 @@ const serializeSimpleDom = (el: SimpleDomElement): string => {
   return `<${tag}${cls}${href}>${inner}</${tag}>`
 }
 
+type MockPasteDomNode = {
+  nodeType: number
+  tagName: string
+  textContent: string
+  childNodes: MockPasteDomNode[]
+  children: MockPasteDomNode[]
+  getAttribute: (name: string) => string | null
+}
+
+const createMockElementNode = (
+  tagName: string,
+  attrs: Record<string, string>,
+  children: MockPasteDomNode[]
+): MockPasteDomNode => ({
+  nodeType: 1,
+  tagName: tagName.toUpperCase(),
+  textContent: children.map((child) => child.textContent).join(""),
+  childNodes: children,
+  children: children.filter((child) => child.nodeType === 1),
+  getAttribute: (name: string) => attrs[name] ?? null,
+})
+
+const createMockTextNode = (textContent: string): MockPasteDomNode => ({
+  nodeType: 3,
+  tagName: "#TEXT",
+  textContent,
+  childNodes: [],
+  children: [],
+  getAttribute: () => null,
+})
+
+const parseMockHtmlFragment = (html: string): MockPasteDomNode => {
+  const linkMatch = /<a\s+href="([^"]+)">([^<]*)<\/a>/i.exec(html)
+  if (linkMatch) {
+    const anchor = createMockElementNode("a", { href: linkMatch[1] ?? "" }, [createMockTextNode(linkMatch[2] ?? "")])
+    return createMockElementNode("body", {}, [anchor])
+  }
+  const imgMatch = /<img\s+src="([^"]+)"\s+alt="([^"]*)"\s*\/?>/i.exec(html)
+  if (imgMatch) {
+    const img = createMockElementNode("img", { src: imgMatch[1] ?? "", alt: imgMatch[2] ?? "" }, [])
+    return createMockElementNode("body", {}, [img])
+  }
+  return createMockElementNode("body", {}, [])
+}
+
+const withMockHtmlParser = <T>(fn: () => T): T => {
+  const globalRecord = globalThis as Record<string, unknown>
+  const prevParser = globalRecord.DOMParser
+  const prevNode = globalRecord.Node
+  globalRecord.Node = { ELEMENT_NODE: 1, TEXT_NODE: 3 }
+  globalRecord.DOMParser = class {
+    parseFromString(html: string) {
+      return { body: parseMockHtmlFragment(html) }
+    }
+  }
+  try {
+    return fn()
+  } finally {
+    globalRecord.DOMParser = prevParser
+    globalRecord.Node = prevNode
+  }
+}
+
+const createMockTableEditorView = (getDoc: () => string, setDoc: (next: string) => void) => ({
+  state: {
+    get doc() {
+      const doc = getDoc()
+      return {
+        length: doc.length,
+        sliceString: (from: number, to?: number) => doc.slice(from, to),
+      }
+    },
+    get selection() {
+      const len = getDoc().length
+      return { main: { from: len, to: len } }
+    },
+    facet: () => true,
+  },
+  dispatch: (tr: { changes?: { from: number; to: number; insert: string } }) => {
+    if (tr.changes) {
+      const doc = getDoc()
+      setDoc(doc.slice(0, tr.changes.from) + tr.changes.insert + doc.slice(tr.changes.to))
+    }
+  },
+})
+
 test.describe("Wave-6 Round 4 live editor regressions", () => {
   test("skips inline code, math, and backslash escapes inside inactive-line inline DOM delimiters", () => {
     withMockDom(() => {
@@ -74,7 +165,45 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
       )
       expect(renderInline("**escaped \\** inner**")).toBe("<div><strong>escaped \\** inner</strong></div>")
       expect(renderInline("**foo \\***")).toBe("<div><strong>foo \\*</strong></div>")
+      expect(renderInline("keep \\<br> literal")).toBe("<div>keep \\<br> literal</div>")
+      expect(renderInline("**bold** keep \\<br> literal")).toBe("<div><strong>bold</strong> keep \\<br> literal</div>")
+      expect(renderInline("line1<br>line2")).toBe("<div>line1<br/>line2</div>")
     })
+  })
+
+  test("percent-encodes parenthesized HTML paste URLs so live links and standalone images survive round-trip", () => {
+    withMockDom(() =>
+      withMockHtmlParser(() => {
+        const pastedLink = convertSafeHtmlPasteToMarkdown('<a href="https://en.wikipedia.org/wiki/Foo_(bar)">Foo</a>')
+        expect(pastedLink).toEqual({
+          kind: "markdown",
+          markdown: "[Foo](https://en.wikipedia.org/wiki/Foo_%28bar%29)",
+        })
+        if (pastedLink.kind === "markdown") {
+          expect(pastedLink.markdown).not.toContain("\\")
+          const host = document.createElement("div")
+          appendInlineMarkdownNodes(host, pastedLink.markdown)
+          expect(serializeSimpleDom(host as unknown as SimpleDomElement)).toBe(
+            '<div><a class="cm-live-link" href="https://en.wikipedia.org/wiki/Foo_%28bar%29">Foo</a></div>'
+          )
+        }
+
+        const pastedImg = convertSafeHtmlPasteToMarkdown(
+          '<img src="https://api.example.com/post/api/v1/images/diagram_(1).png" alt="pic">'
+        )
+        expect(pastedImg).toEqual({
+          kind: "markdown",
+          markdown: "![pic](https://api.example.com/post/api/v1/images/diagram_%281%29.png)",
+        })
+        if (pastedImg.kind === "markdown") {
+          const standalone = parseStandaloneMarkdownImageLine(pastedImg.markdown)
+          expect(standalone?.src).toBe("https://api.example.com/post/api/v1/images/diagram_%281%29.png")
+          const normalizedImgUrl = normalizePostImageUrl(standalone!.src, { publicApiOrigin: "https://api.example.com" })
+          expect(normalizedImgUrl).toContain("diagram_%281%29.png")
+          expect(normalizedImgUrl).not.toContain("diagram_/(1/)")
+        }
+      })
+    )
   })
 
   test("unmerges hidden aq-table cells on non-empty paste and cell edit so MarkdownRenderer renders new text", () => {
@@ -113,7 +242,7 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(renderMarkdownHtml(clearedHidden!)).toContain('colSpan="2"')
   })
 
-  test("clamps oversized rowspan and colspan metadata on duplicate-row and duplicate-column", () => {
+  test("clamps oversized spans and reconciles covered duplicate anchors, out-of-bounds rows, and paste expansion", () => {
     const oversizedRowSpan = [
       '<!-- aq-table {"cells":[[null,null],[{"rowspan":99,"align":"center"},null],[{"hidden":true},null]]} -->',
       "| H1 | H2 |",
@@ -128,8 +257,7 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(dupRowGrid.rows).toHaveLength(3)
     expect(getTableGridLayoutMeta(dupRowGrid)?.cells?.[1]?.[0]).toEqual({ rowspan: 2, align: "center" })
     expect(getTableGridLayoutMeta(dupRowGrid)?.cells?.[3]).toEqual([{ align: "center" }])
-    const dupRowHtml = renderMarkdownHtml(dupRow!.markdown)
-    expect(dupRowHtml).toContain('rowSpan="2"')
+    expect(renderMarkdownHtml(dupRow!.markdown)).toContain('rowSpan="2"')
 
     const oversizedColSpan = [
       '<!-- aq-table {"cells":[[{"colspan":99,"align":"right"},{"hidden":true}],[null,null]]} -->',
@@ -145,9 +273,48 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(getTableGridLayoutMeta(dupColGrid)?.cells?.[0]?.[0]).toEqual({ colspan: 2, align: "right" })
     expect(getTableGridLayoutMeta(dupColGrid)?.cells?.[0]?.[2]).toEqual({ align: "right" })
     expect(renderMarkdownHtml(dupCol!.markdown)).toContain('colSpan="2"')
+
+    const pastedExpanded = applyMarkdownTableGridPaste(oversizedColSpan, 1, 1, "B1\tC1")
+    expect(pastedExpanded).not.toBeNull()
+    const expandedGrid = parseMarkdownTableGrid(pastedExpanded!.markdown)!
+    expect(expandedGrid.headers).toEqual(["SpanHead", "", ""])
+    expect(expandedGrid.rows[0]).toEqual(["A", "B1", "C1"])
+    expect(getTableGridLayoutMeta(expandedGrid)?.cells?.[0]).toEqual([
+      { colspan: 2, align: "right" },
+      { hidden: true },
+    ])
+    const expandedHtml = renderMarkdownHtml(pastedExpanded!.markdown)
+    expect(expandedHtml).toContain('colSpan="2"')
+    expect(expandedHtml).not.toContain('colSpan="3"')
+
+    const coveredDupAnchor = [
+      '<!-- aq-table {"columnWidths":[120,160,200],"cells":[[{"colspan":2},{"colspan":2},null]]} -->',
+      "| H1 |  | H3 |",
+      "| --- | --- | --- |",
+      "| A | B | C |",
+    ].join("\n")
+    const coveredDupOutcome = applyMarkdownTableGridAction(coveredDupAnchor, 0, 1, { kind: "duplicate-column" })
+    expect(coveredDupOutcome).not.toBeNull()
+    expect(coveredDupOutcome!.nextCol).toBe(2)
+    const coveredDupGrid = parseMarkdownTableGrid(coveredDupOutcome!.markdown)!
+    expect(coveredDupGrid.headers).toEqual(["H1", "", "", "H3"])
+    expect(getTableGridLayoutMeta(coveredDupGrid)?.columnWidths).toEqual([120, 160, 160, 200])
+
+    const outOfBoundsRowSpan = [
+      '<!-- aq-table {"columnWidths":[120,180],"cells":[[null,null],[null,null],[{"colspan":2},{"hidden":true}]]} -->',
+      "| H1 | H2 |",
+      "| --- | --- |",
+      "| A | B |",
+    ].join("\n")
+    const oobDupOutcome = applyMarkdownTableGridAction(outOfBoundsRowSpan, 0, 0, { kind: "duplicate-column" })
+    expect(oobDupOutcome).not.toBeNull()
+    expect(oobDupOutcome!.nextCol).toBe(1)
+    const oobDupGrid = parseMarkdownTableGrid(oobDupOutcome!.markdown)!
+    expect(oobDupGrid.headers).toEqual(["H1", "H1", "H2"])
+    expect(getTableGridLayoutMeta(oobDupGrid)?.columnWidths).toEqual([120, 120, 180])
   })
 
-  test("aligns columnWidths splice index on duplicate-column across colspan: 2 in helper and widget", () => {
+  test("aligns columnWidths splice index on duplicate-column across colspan: 2 and clears stale spans on widget update", () => {
     const widths = [140, 220, 180]
     applyTableColumnWidthsAction(widths, 3, 0, { kind: "duplicate-column" }, 2)
     expect(widths).toEqual([140, 220, 140, 180])
@@ -161,23 +328,12 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
 
     withMockDom(() => {
       let currentDoc = spannedMarkdown
-      const mockView = {
-        state: {
-          get doc() {
-            return {
-              length: currentDoc.length,
-              sliceString: (from: number, to?: number) => currentDoc.slice(from, to),
-            }
-          },
-          selection: { main: { from: currentDoc.length, to: currentDoc.length } },
-          facet: () => true,
-        },
-        dispatch: (tr: { changes?: { from: number; to: number; insert: string } }) => {
-          if (tr.changes) {
-            currentDoc = currentDoc.slice(0, tr.changes.from) + tr.changes.insert + currentDoc.slice(tr.changes.to)
-          }
-        },
-      }
+      const mockView = createMockTableEditorView(
+        () => currentDoc,
+        (next) => {
+          currentDoc = next
+        }
+      )
       const typedView = mockView as unknown as NonNullable<Parameters<MarkdownTableWidget["toDOM"]>[0]>
       const widget = new MarkdownTableWidget(spannedMarkdown, 0, spannedMarkdown.length)
       const domEl = widget.toDOM(typedView)
@@ -190,6 +346,41 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
       const cols = dom.querySelectorAll("col")
       expect(cols.map((col) => col.dataset.colWidth ?? "")).toEqual(["140", "220", "140", "180"])
     })
+
+    const mergedWithoutWidths = [
+      '<!-- aq-table {"cells":[[{"colspan":2},{"hidden":true},null]]} -->',
+      "| SpanHead |  | Tail |",
+      "| --- | --- | --- |",
+      "| A | B | C |",
+    ].join("\n")
+
+    withMockDom(() => {
+      let currentDoc = mergedWithoutWidths
+      const mockView = createMockTableEditorView(
+        () => currentDoc,
+        (next) => {
+          currentDoc = next
+        }
+      )
+      const typedView = mockView as unknown as NonNullable<Parameters<MarkdownTableWidget["toDOM"]>[0]>
+      const mountedWidget = new MarkdownTableWidget(mergedWithoutWidths, 0, mergedWithoutWidths.length)
+      const domEl = mountedWidget.toDOM(typedView)
+      const visualOpts = getOrCreateTableVisualOptions(0, 3, mockView)
+      visualOpts.columnWidths = [140, 220, 180]
+
+      const unmergedDoc = applyMarkdownTableGridCellEdit(mergedWithoutWidths, 0, 1, "Unmerged")!
+      expect(unmergedDoc).not.toContain("aq-table")
+      currentDoc = unmergedDoc
+      const updatedInPlace = new MarkdownTableWidget(unmergedDoc, 0, unmergedDoc.length).updateDOM(domEl, typedView)
+      expect(updatedInPlace).toBe(true)
+      visualOpts.columnWidths = [140, 220, 180]
+
+      const dom = domEl as unknown as SimpleDomElement
+      const dupColBtn = dom.querySelectorAll("button").find((btn) => btn.getAttribute("aria-label") === "표 열 복제")
+      expect(dupColBtn).toBeDefined()
+      dupColBtn!.dispatch("click")
+      expect(visualOpts.columnWidths).toEqual([140, 140, 220, 180])
+    })
   })
 
   test("evaluates table edit action availability and escapes markdown link destinations", () => {
@@ -200,6 +391,7 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(isTableEditActionDisabled({ kind: "add-row" }, availability)).toBe(false)
     expect(isTableEditActionDisabled({ kind: "delete-column" }, availability)).toBe(true)
     expect(isTableEditActionDisabled({ kind: "clear-row" }, availability)).toBe(false)
-    expect(escapeMarkdownLinkDestination("https://example.com/a(1)\\b")).toBe("https://example.com/a\\(1\\)\\\\b")
+    expect(escapeMarkdownLinkDestination("https://example.com/a(1)\\b")).toBe("https://example.com/a%281%29%5Cb")
   })
 })
+

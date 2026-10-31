@@ -170,7 +170,11 @@ export const setTableGridLayoutMeta = (
   grid: MarkdownTableGrid,
   layout: ExtendedMarkdownTableLayout | null | undefined
 ): void => {
-  const compacted = compactTableLayoutDefaults(cloneTableLayout(layout))
+  const cloned = cloneTableLayout(layout)
+  if (cloned?.cells && grid.headers.length > 0) {
+    cloned.cells = reconcileCellSpans(cloned.cells, grid.rows.length + 1, grid.headers.length)
+  }
+  const compacted = compactTableLayoutDefaults(cloned)
   if (compacted) {
     gridLayoutMeta.set(grid, compacted)
   } else {
@@ -181,6 +185,11 @@ export const setTableGridLayoutMeta = (
 export const getTableGridLayoutMeta = (
   grid: MarkdownTableGrid
 ): ExtendedMarkdownTableLayout | null => cloneTableLayout(gridLayoutMeta.get(grid) ?? null)
+
+export const reconcileGridTableLayout = (grid: MarkdownTableGrid): void => {
+  const current = getTableGridLayoutMeta(grid)
+  if (current) setTableGridLayoutMeta(grid, current)
+}
 
 const applyGridActionToTableLayout = (
   layout: ExtendedMarkdownTableLayout,
@@ -267,9 +276,6 @@ export const syncTableLayoutOnGridAction = (
     activeCol,
     action
   )
-  if (layout.cells) {
-    layout.cells = reconcileCellSpans(layout.cells, grid.rows.length + 1, grid.headers.length)
-  }
   setTableGridLayoutMeta(grid, layout)
 }
 
@@ -284,10 +290,7 @@ export const reconcileOverwrittenTableCells = (
   for (const { row, col } of coords) {
     if (unmergeCoveredCellAt(next, row, col)) changed = true
   }
-  if (!changed) return
-  if (next.cells) {
-    next.cells = reconcileCellSpans(next.cells, grid.rows.length + 1, grid.headers.length)
-  }
+  if (!changed && !next.cells) return
   setTableGridLayoutMeta(grid, next)
 }
 

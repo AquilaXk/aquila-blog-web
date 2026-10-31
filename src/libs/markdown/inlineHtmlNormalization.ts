@@ -141,6 +141,7 @@ const matchPairedOpenTagAt = (
   tagNames: readonly string[],
   disallowAmpersandInAttrs: boolean
 ): { openEnd: number; tagName: string } | null => {
+  if (isEscapedMarkdownAt(text, start)) return null
   const afterOpen = skipAsciiSpaces(text, start + openDelim.length)
   const matchedName = matchTagNameAt(text, afterOpen, tagNames)
   if (!matchedName) return null
@@ -169,6 +170,7 @@ const matchPairedCloseTagAt = (
   closeDelim: string,
   tagNames: readonly string[]
 ): number => {
+  if (isEscapedMarkdownAt(text, start)) return -1
   let cursor = skipAsciiSpaces(text, start + openDelim.length)
   if (text.codePointAt(cursor) !== 47) return -1
   cursor = skipAsciiSpaces(text, cursor + 1)
@@ -332,11 +334,35 @@ const replacePairedFormattingTags = (
   )
 }
 
+const createChunkCodeSpanPrefix = (chunk: string): string => {
+  let nonce = 0
+  let prefix = `\uE000AQCODE${nonce}_`
+  while (chunk.includes(prefix)) {
+    nonce += 1
+    prefix = `\uE000AQCODE${nonce}_`
+  }
+  return prefix
+}
+
+const restoreStoredCodeSpans = (
+  text: string,
+  prefix: string,
+  codeSpans: readonly string[]
+): string => {
+  if (codeSpans.length === 0) return text
+  let restored = text
+  for (let idx = codeSpans.length - 1; idx >= 0; idx -= 1) {
+    restored = restored.replaceAll(`${prefix}${idx}\uE001`, codeSpans[idx] ?? "")
+  }
+  return restored
+}
+
 const normalizeTagGroup = (
   input: string,
   openDelim: string,
   closeDelim: string,
-  disallowAmpersandInAttrs: boolean
+  disallowAmpersandInAttrs: boolean,
+  storeCodeSpan: (codeMark: string) => string
 ): string => {
   let normalized = replacePairedInlineTags(
     input,
@@ -344,7 +370,7 @@ const normalizeTagGroup = (
     closeDelim,
     ["code"],
     disallowAmpersandInAttrs,
-    (rawInner) => wrapWithMarkdownCodeMark(rawInner)
+    (rawInner) => storeCodeSpan(wrapWithMarkdownCodeMark(rawInner))
   )
   normalized = replacePairedFormattingTags(
     normalized,
@@ -377,16 +403,25 @@ const normalizeInlineHtmlChunk = (
   hasRawTag: boolean,
   hasEntityTag: boolean
 ): string => {
+  const prefix = createChunkCodeSpanPrefix(chunk)
+  const codeSpans: string[] = []
+  const storeCodeSpan = (codeMark: string): string => {
+    if (!codeMark) return ""
+    const idx = codeSpans.length
+    codeSpans.push(codeMark)
+    return `${prefix}${idx}\uE001`
+  }
+
   let normalized = chunk
   if (hasRawTag && normalized.includes("<")) {
-    normalized = normalizeTagGroup(normalized, "<", ">", false)
+    normalized = normalizeTagGroup(normalized, "<", ">", false, storeCodeSpan)
     normalized = replaceRawBrTags(normalized, "<br />")
   }
   if (hasEntityTag && normalized.toLowerCase().includes("&lt;")) {
-    normalized = normalizeTagGroup(normalized, "&lt;", "&gt;", true)
+    normalized = normalizeTagGroup(normalized, "&lt;", "&gt;", true, storeCodeSpan)
     normalized = replaceEntityBrTags(normalized, "<br />")
   }
-  return normalized
+  return restoreStoredCodeSpans(normalized, prefix, codeSpans)
 }
 
 export const normalizeLegacyInlineHtmlSpans = (input: string) => {

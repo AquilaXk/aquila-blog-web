@@ -1,6 +1,8 @@
 import { countCodePointRun, isEscapedMarkdownAt, scanInlineCodeSpanEnd } from "../../libs/markdown/pandocMathScanner"
 import type { MarkdownTableCellLayout } from "../../libs/markdown/tableMetadata"
-import { getTableGridLayoutMeta, reconcileOverwrittenTableCells } from "./markdownEditorTableMetadataModel"
+import {
+  getTableGridLayoutMeta, reconcileGridTableLayout, reconcileOverwrittenTableCells,
+} from "./markdownEditorTableMetadataModel"
 import {
   MAX_EDIT_COLUMNS, MAX_EDIT_ROWS, parseMarkdownTableGrid, serializeMarkdownTableGrid,
   type MarkdownTableGrid, type MarkdownTableGridAction,
@@ -276,6 +278,7 @@ export const applyMarkdownTableGridPaste = (
   if (matrix.length <= 1 && maxCols <= 1) return null
   const grid = parseMarkdownTableGrid(markdown)
   if (!grid || grid.headers.length === 0) return null
+  reconcileGridTableLayout(grid)
   const clampedStartRow = Math.max(0, Math.min(startRow, grid.rows.length))
   const clampedStartCol = Math.max(0, Math.min(startCol, grid.headers.length - 1))
   expandGridToFitPaste(grid, clampedStartRow, clampedStartCol, matrix.length, maxCols)
@@ -284,6 +287,7 @@ export const applyMarkdownTableGridPaste = (
   )
   if (pastedRows === 0 || pastedCols === 0) return null
   if (writtenCoords.length > 0) reconcileOverwrittenTableCells(grid, writtenCoords)
+  else reconcileGridTableLayout(grid)
   return {
     markdown: serializeMarkdownTableGrid(grid),
     nextRow: lastRow,
@@ -379,7 +383,8 @@ const mutateGridRowDuplicate = (
   const insertTableRow = resolveDuplicateRowInsertTableIndex(
     getTableGridLayoutMeta(grid),
     activeRow,
-    grid.rows.length
+    grid.rows.length,
+    grid.headers.length
   )
   const insertAt = Math.max(0, Math.min(grid.rows.length, insertTableRow - 1))
   grid.rows.splice(insertAt, 0, [...sourceCells])
@@ -434,7 +439,14 @@ const mutateGridRowAction = (
 const resolveColumnInsertIndex = (
   grid: MarkdownTableGrid, activeCol: number, isDuplicate: boolean, insertLeft: boolean
 ): number => {
-  if (isDuplicate) return resolveDuplicateColInsertIndex(getTableGridLayoutMeta(grid), activeCol, grid.headers.length)
+  if (isDuplicate) {
+    return resolveDuplicateColInsertIndex(
+      getTableGridLayoutMeta(grid),
+      activeCol,
+      grid.headers.length,
+      grid.rows.length + 1
+    )
+  }
   return insertLeft ? activeCol : activeCol + 1
 }
 

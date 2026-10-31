@@ -11,6 +11,7 @@ import {
   getTableGridLayoutMeta,
   isAqTableCommentCandidateLine,
   parseLeadingTableLayoutLine,
+  reconcileGridTableLayout,
   reconcileOverwrittenTableCells,
   serializeMarkdownTableLayoutCommentIfNonDefault,
   setTableGridLayoutMeta,
@@ -296,6 +297,7 @@ const mutateTableGrid = (
   activeCol: number,
   action: MarkdownTableGridAction
 ): { nextRow: number; nextCol: number } | null => {
+  reconcileGridTableLayout(grid)
   const colCountBefore = grid.headers.length
   const bodyRowCountBefore = grid.rows.length
   const outcome = mutateMarkdownTableGridCells(grid, activeRow, activeCol, action)

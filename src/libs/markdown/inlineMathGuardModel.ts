@@ -188,30 +188,144 @@ export const hasValidMarkdownMath = (markdown: string): boolean => {
   return false
 }
 
-export const ESCAPED_HIGHLIGHT_SENTINEL = "\uE000aqhl\uE001"
-export const ESCAPED_LT_SENTINEL = "\uE000aqlt\uE001"
+export type ProtectedInlineSentinels = {
+  prefix: string
+  eq: string
+  lt: string
+  lb: string
+  rb: string
+  entityPattern: RegExp
+}
 
-const PROTECTED_INLINE_TOKEN_HINT = /\\(?:==|<)|&#(?:0*60|x0*3c);|&lt;/i
-const ESCAPED_BR_ENTITY_PREFIX = /^&(?:lt|#0*60|#x0*3c);(?=\s*br(?:[\s/>]|&(?:gt|#0*62|#x0*3e);))/i
+export type ProtectedInlineTokenEntry = {
+  token: string
+  raw: string
+  unescaped: string
+}
+
+export type ProtectedMarkdownState = {
+  markdown: string
+  sentinels: ProtectedInlineSentinels
+  tokens: readonly ProtectedInlineTokenEntry[]
+}
+
+const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels => {
+  const prefix = `\uE000aqp${nonce}_`
+  return {
+    prefix,
+    eq: `${prefix}eq\uE001`,
+    lt: `${prefix}lt\uE001`,
+    lb: `${prefix}lb\uE001`,
+    rb: `${prefix}rb\uE001`,
+    entityPattern: new RegExp(`${prefix}ent\\d+\uE001`, "g"),
+  }
+}
+
+export const DEFAULT_PROTECTED_INLINE_SENTINELS = buildProtectedInlineSentinels(0)
+
+export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
+  let nonce = 0
+  while (source.includes(`\uE000aqp${nonce}_`)) {
+    nonce += 1
+  }
+  return nonce === 0 ? DEFAULT_PROTECTED_INLINE_SENTINELS : buildProtectedInlineSentinels(nonce)
+}
+
+const LT_ENTITY_PREFIX_PATTERN = /^&(?:lt|#0*60|#x0*3c);/i
+const GT_ENTITY_PREFIX_PATTERN = /^&(?:gt|#0*62|#x0*3e);/i
+
+const isAsciiWhitespaceCode = (code: number): boolean =>
+  code === 32 || (code >= 9 && code <= 13)
+
+const skipAsciiWhitespace = (text: string, start: number): number => {
+  let cursor = start
+  while (cursor < text.length && isAsciiWhitespaceCode(text.codePointAt(cursor) ?? 0)) {
+    cursor += 1
+  }
+  return cursor
+}
+
+const isBrTerminatorAt = (markdown: string, pos: number): boolean => {
+  if (pos >= markdown.length) return false
+  const code = markdown.codePointAt(pos) ?? 0
+  if (isAsciiWhitespaceCode(code) || code === 47 || code === 62) return true
+  return code === 38 && GT_ENTITY_PREFIX_PATTERN.test(markdown.slice(pos, pos + 32))
+}
+
+const isFollowedByBrTagRest = (markdown: string, afterEntity: number): boolean => {
+  const brStart = skipAsciiWhitespace(markdown, afterEntity)
+  if (markdown.slice(brStart, brStart + 2).toLowerCase() !== "br") return false
+  return isBrTerminatorAt(markdown, brStart + 2)
+}
+
+const resolveBackslashProtectedEntry = (
+  nextCode: number,
+  sentinels: ProtectedInlineSentinels
+): ProtectedInlineTokenEntry | null => {
+  if (nextCode === 61) return { token: sentinels.eq, raw: "\\=", unescaped: "=" }
+  if (nextCode === 60) return { token: sentinels.lt, raw: "\\<", unescaped: "<" }
+  if (nextCode === 123) return { token: sentinels.lb, raw: "\\{", unescaped: "{" }
+  if (nextCode === 125) return { token: sentinels.rb, raw: "\\}", unescaped: "}" }
+  return null
+}
+
+const matchBrEntityAt = (markdown: string, index: number): string | null => {
+  if (markdown.codePointAt(index) !== 38 || isEscapedMarkdownAt(markdown, index)) return null
+  const entityMatch = LT_ENTITY_PREFIX_PATTERN.exec(markdown.slice(index, index + 32))
+  if (!entityMatch) return null
+  const raw = entityMatch[0]
+  return isFollowedByBrTagRest(markdown, index + raw.length) ? raw : null
+}
+
+type TokenRegistry = {
+  seenTokens: Map<string, ProtectedInlineTokenEntry>
+  entityByRaw: Map<string, ProtectedInlineTokenEntry>
+}
+
+const registerProtectedEntry = (
+  registry: TokenRegistry,
+  entry: ProtectedInlineTokenEntry
+): ProtectedInlineTokenEntry => {
+  if (!registry.seenTokens.has(entry.token)) {
+    registry.seenTokens.set(entry.token, entry)
+  }
+  return entry
+}
+
+const registerEntityToken = (
+  registry: TokenRegistry,
+  sentinels: ProtectedInlineSentinels,
+  raw: string
+): ProtectedInlineTokenEntry => {
+  const existing = registry.entityByRaw.get(raw)
+  if (existing) return existing
+  const entry: ProtectedInlineTokenEntry = {
+    token: `${sentinels.prefix}ent${registry.entityByRaw.size}\uE001`,
+    raw,
+    unescaped: "<",
+  }
+  registry.entityByRaw.set(raw, entry)
+  return registerProtectedEntry(registry, entry)
+}
 
 const matchProtectedInlineTokenAt = (
   markdown: string,
-  index: number
-): { length: number; sentinel: string } | null => {
+  index: number,
+  sentinels: ProtectedInlineSentinels,
+  registry: TokenRegistry
+): { length: number; token: string } | null => {
   const code = markdown.codePointAt(index) ?? 0
   if (code === 92 && !isEscapedMarkdownAt(markdown, index)) {
-    const nextCode = markdown.codePointAt(index + 1) ?? 0
-    if (nextCode === 61 && markdown.codePointAt(index + 2) === 61) {
-      return { length: 3, sentinel: ESCAPED_HIGHLIGHT_SENTINEL }
-    }
-    if (nextCode === 60) {
-      return { length: 2, sentinel: ESCAPED_LT_SENTINEL }
+    const entry = resolveBackslashProtectedEntry(markdown.codePointAt(index + 1) ?? 0, sentinels)
+    if (entry) {
+      return { length: 2, token: registerProtectedEntry(registry, entry).token }
     }
   }
-  if (code === 38) {
-    const entityMatch = ESCAPED_BR_ENTITY_PREFIX.exec(markdown.slice(index, index + 24))
-    if (entityMatch) {
-      return { length: entityMatch[0].length, sentinel: ESCAPED_LT_SENTINEL }
+  const rawEntity = matchBrEntityAt(markdown, index)
+  if (rawEntity) {
+    return {
+      length: rawEntity.length,
+      token: registerEntityToken(registry, sentinels, rawEntity).token,
     }
   }
   return null
@@ -238,34 +352,145 @@ export const escapeNonPandocSingleDollars = (markdown: string): string => {
   return copyFrom === 0 ? markdown : `${output}${markdown.slice(copyFrom)}`
 }
 
-export const protectEscapedHighlightDelimiters = (markdown: string): string => {
-  if (!PROTECTED_INLINE_TOKEN_HINT.test(markdown)) return markdown
+const advancePastSkippedConstructAt = (markdown: string, index: number): number => {
+  const skippedEnd = trySkipLiteralConstructAt(markdown, index)
+  if (skippedEnd > index) return skippedEnd
+  const code = markdown.codePointAt(index) ?? 0
+  if (code === 36 && !isEscapedMarkdownAt(markdown, index)) {
+    return handleDollarSequenceAt(markdown, index).nextIndex
+  }
+  if (code === 92 && markdown.codePointAt(index + 1) === 92) {
+    return index + 2
+  }
+  return -1
+}
+
+export const protectEscapedInlineSyntax = (
+  markdown: string,
+  sentinels: ProtectedInlineSentinels = createProtectedInlineSentinels(markdown)
+): ProtectedMarkdownState => {
+  if (!markdown.includes("\\") && !markdown.includes("&")) {
+    return { markdown, sentinels, tokens: [] }
+  }
+  const registry: TokenRegistry = { seenTokens: new Map(), entityByRaw: new Map() }
   let output = ""
   let copyFrom = 0
   let index = 0
   while (index < markdown.length) {
-    const skippedEnd = trySkipLiteralConstructAt(markdown, index)
-    if (skippedEnd > index) {
-      index = skippedEnd
+    const jumped = advancePastSkippedConstructAt(markdown, index)
+    if (jumped > index) {
+      index = jumped
       continue
     }
-    const code = markdown.codePointAt(index) ?? 0
-    if (code === 36 && !isEscapedMarkdownAt(markdown, index)) {
-      index = handleDollarSequenceAt(markdown, index).nextIndex
-      continue
-    }
-    if (code === 92 && markdown.codePointAt(index + 1) === 92) {
-      index += 2
-      continue
-    }
-    const matched = matchProtectedInlineTokenAt(markdown, index)
+    const matched = matchProtectedInlineTokenAt(markdown, index, sentinels, registry)
     if (matched) {
-      output += `${markdown.slice(copyFrom, index)}${matched.sentinel}`
+      output += `${markdown.slice(copyFrom, index)}${matched.token}`
       copyFrom = index + matched.length
       index += matched.length
       continue
     }
     index += 1
   }
-  return copyFrom === 0 ? markdown : `${output}${markdown.slice(copyFrom)}`
+  if (copyFrom === 0) return { markdown, sentinels, tokens: [] }
+  return {
+    markdown: `${output}${markdown.slice(copyFrom)}`,
+    sentinels,
+    tokens: [...registry.seenTokens.values()],
+  }
 }
+
+export const protectEscapedHighlightDelimiters = (markdown: string): string =>
+  protectEscapedInlineSyntax(markdown).markdown
+
+export const hasProtectedInlineSentinel = (
+  text: string,
+  sentinels: ProtectedInlineSentinels = DEFAULT_PROTECTED_INLINE_SENTINELS
+): boolean => text.includes(sentinels.prefix)
+
+export const restoreProtectedInlineText = (
+  text: string,
+  sentinels: ProtectedInlineSentinels = DEFAULT_PROTECTED_INLINE_SENTINELS
+): string => {
+  if (!text.includes(sentinels.prefix)) return text
+  let restored = text
+    .replaceAll(sentinels.eq, "=")
+    .replaceAll(sentinels.lt, "<")
+    .replaceAll(sentinels.lb, "{")
+    .replaceAll(sentinels.rb, "}")
+  if (restored.includes(`${sentinels.prefix}ent`)) {
+    restored = restored.replace(sentinels.entityPattern, "<")
+  }
+  return restored
+}
+
+const restoreRawTokensInString = (value: string, state: ProtectedMarkdownState): string => {
+  if (!value.includes(state.sentinels.prefix)) return value
+  let restored = value
+  for (const entry of state.tokens) {
+    restored = restored.replaceAll(entry.token, entry.raw)
+  }
+  return restored
+}
+
+const RAW_RESTORE_MDAST_TYPES = new Set(["code", "inlineCode", "html", "math", "inlineMath"])
+const ATTR_RESTORE_MDAST_TYPES = new Set(["image", "imageReference", "link", "definition"])
+const ATTR_RESTORE_KEYS = ["alt", "title", "url"] as const
+
+type MutableAstNode = {
+  type?: unknown
+  value?: unknown
+  alt?: unknown
+  title?: unknown
+  url?: unknown
+  data?: { hChildren?: unknown }
+  children?: unknown
+}
+
+const restoreRawInHastSubtree = (nodes: unknown, state: ProtectedMarkdownState): void => {
+  if (!Array.isArray(nodes)) return
+  for (const child of nodes) {
+    if (!child || typeof child !== "object") continue
+    const record = child as MutableAstNode
+    if (typeof record.value === "string") {
+      record.value = restoreRawTokensInString(record.value, state)
+    }
+    restoreRawInHastSubtree(record.children, state)
+  }
+}
+
+const restoreUnescapedAttributesOnNode = (
+  node: MutableAstNode,
+  sentinels: ProtectedInlineSentinels
+): void => {
+  for (const key of ATTR_RESTORE_KEYS) {
+    const current = node[key]
+    if (typeof current === "string") {
+      node[key] = restoreProtectedInlineText(current, sentinels)
+    }
+  }
+}
+
+const walkMdastRestoreProtectedTokens = (node: unknown, state: ProtectedMarkdownState): void => {
+  if (!node || typeof node !== "object") return
+  const current = node as MutableAstNode
+  const nodeType = typeof current.type === "string" ? current.type : ""
+  if (RAW_RESTORE_MDAST_TYPES.has(nodeType)) {
+    if (typeof current.value === "string") {
+      current.value = restoreRawTokensInString(current.value, state)
+    }
+    restoreRawInHastSubtree(current.data?.hChildren, state)
+  } else if (ATTR_RESTORE_MDAST_TYPES.has(nodeType)) {
+    restoreUnescapedAttributesOnNode(current, state.sentinels)
+  }
+  if (!Array.isArray(current.children)) return
+  for (const child of current.children) {
+    walkMdastRestoreProtectedTokens(child, state)
+  }
+}
+
+export const remarkRestoreProtectedInlineTokens =
+  (state: ProtectedMarkdownState) =>
+  (tree: unknown): void => {
+    if (state.tokens.length === 0) return
+    walkMdastRestoreProtectedTokens(tree, state)
+  }
