@@ -443,12 +443,13 @@ let cachedActiveEmptyLineState: {
 
 const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
-  if (mode !== "live" || state.doc.length === 0) {
+  if (mode === "source" || state.doc.length === 0) {
     return Decoration.none
   }
 
   const meta = getCachedNotionLineMeta(state.doc)
-  const activeEmptyLineFrom = resolveActiveEmptyLineFrom(state, meta.fencedRanges)
+  const activeEmptyLineFrom =
+    mode === "reading" ? -1 : resolveActiveEmptyLineFrom(state, meta.fencedRanges)
   if (
     cachedActiveEmptyLineState &&
     cachedActiveEmptyLineState.doc === state.doc &&
@@ -504,10 +505,12 @@ const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
 export const activeEmptyLineField = StateField.define<DecorationSet>({
   create: buildActiveEmptyLineDecorations,
   update: (decorations, transaction) => {
+    const hasModeEffect = transaction.effects.some((effect) => effect.is(setEditorMode))
+    const mode = transaction.state.field(editorModeField, false) ?? "live"
     if (
       transaction.docChanged ||
-      transaction.selection ||
-      transaction.effects.some((effect) => effect.is(setEditorMode))
+      hasModeEffect ||
+      (transaction.selection && mode === "live")
     ) {
       return buildActiveEmptyLineDecorations(transaction.state)
     }

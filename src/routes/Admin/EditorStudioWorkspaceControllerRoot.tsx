@@ -234,6 +234,7 @@ export const EditorStudioWorkspaceController = ({
     localDraftCandidates,
     localDraftSource,
     loadPostForEditor,
+    reloadLatestServerPost,
     restoredLocalDraft,
     restoreLocalDraft,
     selectLocalDraftCandidate,
@@ -415,6 +416,7 @@ export const EditorStudioWorkspaceController = ({
   })
 
   const {
+    clearLastSaveError,
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
     handleModifyPost,
@@ -422,13 +424,16 @@ export const EditorStudioWorkspaceController = ({
     handleThumbnailImageFileChange,
     handleThumbnailPaste,
     handleWritePost,
+    lastSaveError,
   } = useEditorStudioPersistence({
     editorMode,
     postId,
     postVersion,
     postTitle,
     postTags,
+    tagDraft,
     postCategory,
+    customCategoryCatalog,
     postSummary,
     postSummarySource,
     summaryIntent,
@@ -465,6 +470,10 @@ export const EditorStudioWorkspaceController = ({
     setPreviewThumbnailSourceUrl,
     setIsPreviewThumbnailError,
     setThumbnailImageFileName,
+    addTagsToPost,
+    commitPostCategory,
+    setTagDraft,
+    setPostCategory,
     composeEditorContent,
     toFlags,
     buildEditorStateFingerprint,
@@ -478,6 +487,18 @@ export const EditorStudioWorkspaceController = ({
     normalizeSafeImageUrl,
     extractImageFileFromClipboard,
   })
+
+  useEffect(() => {
+    clearLastSaveError()
+  }, [clearLastSaveError, postId])
+
+  const handleReloadLatestServerPost = useCallback(async () => {
+    const reloaded = await reloadLatestServerPost()
+    if (reloaded) {
+      clearLastSaveError()
+      setIsPublishModalOpen(false)
+    }
+  }, [clearLastSaveError, reloadLatestServerPost, setIsPublishModalOpen])
 
   const { handleExitDedicatedEditor } = useEditorStudioRouting({
     router,
@@ -508,6 +529,8 @@ export const EditorStudioWorkspaceController = ({
     openPublishModal,
   } = useEditorStudioPublishModalFlow({
     activateComposeSurface,
+    addTagsToPost,
+    commitPostCategory,
     handleModifyPost,
     handlePublishTempDraft,
     handleWritePost,
@@ -521,6 +544,8 @@ export const EditorStudioWorkspaceController = ({
     setIsPublishModalOpen,
     setPublishActionType,
     setPublishModalNotice,
+    setTagDraft,
+    tagDraft,
   })
 
   return (
@@ -532,11 +557,11 @@ export const EditorStudioWorkspaceController = ({
         getCurrentPostContent, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
         handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
         commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
-        handlePreviewThumbPointerMove, handleThumbnailImageFileChange, handleThumbnailPaste,
+        handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleThumbnailImageFileChange, handleThumbnailPaste,
         handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
         isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
-        isPublishModalOpen, isTempDraftMode, lastLocalDraftFingerprintRef, loadingKey, localDraftCandidate,
+        isPublishModalOpen, isTempDraftMode, lastLocalDraftFingerprintRef, lastSaveError, loadingKey, localDraftCandidate,
         localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal, openThumbnailFileInput,
         postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
         postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,

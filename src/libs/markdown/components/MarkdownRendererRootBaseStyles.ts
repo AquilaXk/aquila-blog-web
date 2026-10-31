@@ -218,19 +218,45 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     text-decoration: none;
   }
 
+  .aq-highlight {
+    background-color: color-mix(in srgb, ${theme.colors.orange4} 72%, transparent);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0.04em 0.22em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  a.aq-wikilink {
+    color: ${theme.publicDesign.accent};
+    background-color: ${theme.colors.accentSurfaceSubtle};
+    border-bottom: 1px solid ${theme.colors.accentBorder};
+    border-radius: 3px;
+    padding: 0.04em 0.28em;
+    text-decoration: none;
+    font-weight: 550;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+      background-color: ${theme.colors.accentSurfaceStrong};
+    }
+  }
+
   @media (max-width: 768px), (pointer: coarse) {
     a[data-footnote-ref] {
       position: relative;
-      min-width: 44px;
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      display: inline-block;
+      line-height: 1;
 
       &::after {
         content: "";
         position: absolute;
-        inset: -10px;
+        left: 50%;
+        top: 50%;
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%);
       }
     }
 

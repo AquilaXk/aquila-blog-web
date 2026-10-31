@@ -164,6 +164,14 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     max-width: none;
   }
 
+  table[data-fit-width="true"],
+  .aq-table[data-fit-width="true"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    table-layout: fixed;
+  }
+
   thead th,
   .aq-table thead th {
     ${(() => {
@@ -194,6 +202,34 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
       padding-top: 13px;
       padding-bottom: 13px;
     }
+  }
+
+  table[data-header-row="false"] thead th,
+  .aq-table[data-header-row="false"] thead th {
+    position: static;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 400;
+    line-height: inherit;
+    text-transform: none;
+    border-bottom: 1px solid ${theme.colors.gray6};
+  }
+
+  table[data-header-column="true"] tbody tr > td[data-header-col-cell="true"],
+  table[data-header-column="true"] tbody tr > th:first-of-type,
+  .aq-table[data-header-column="true"] tbody tr > td[data-header-col-cell="true"],
+  .aq-table[data-header-column="true"] tbody tr > th:first-of-type,
+  .aq-table[data-header-row="false"][data-header-column="true"] thead tr > th:first-of-type {
+    ${(() => {
+      const tableChrome = getTableChromePalette(theme)
+      return `
+    background: ${tableChrome.headerBackground};
+    color: ${theme.colors.gray12};
+    font-weight: 700;
+      `
+    })()}
   }
 
   th,

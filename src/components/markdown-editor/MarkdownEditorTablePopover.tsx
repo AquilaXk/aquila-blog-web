@@ -59,7 +59,7 @@ export const MarkdownEditorTablePopover = ({
   const rowsSelectRef = useRef<HTMLSelectElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const dialogId = useId()
-  const { horizontalOffset, resetHorizontalOffset } = useMarkdownEditorPanelPosition({
+  const { horizontalOffset, fixedPosition, resetHorizontalOffset } = useMarkdownEditorPanelPosition({
     open,
     rootRef,
     panelRef,
@@ -136,6 +136,7 @@ export const MarkdownEditorTablePopover = ({
           aria-label="표"
           $align="start"
           $horizontalOffset={horizontalOffset}
+          $fixedPosition={fixedPosition}
           onBlur={(event) => {
             if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
             closePopover(false)

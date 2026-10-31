@@ -1,5 +1,5 @@
 import type {
-  ChangeEventHandler, KeyboardEvent as ReactKeyboardEvent, KeyboardEventHandler, ReactNode, Ref,
+  ChangeEventHandler, KeyboardEventHandler, ReactNode, Ref,
 } from "react"
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
@@ -14,71 +14,43 @@ import {
   EditorStudioWritingColumn, EditorTagRow, InlineMetaInput, LocalDraftRestoreCard,
   MobilePropertiesToggle, PrimaryButton, PublishNotice, SelectedTagChip, SecondaryButton, TitleInput,
 } from "./EditorStudioDedicatedEditorSurfaceParts"
+import {
+  EDITOR_SURFACE_GUIDE_OPEN,
+  EDITOR_SURFACE_INSPECTOR_OPEN,
+  EDITOR_SURFACE_MOBILE_PROPS_OPEN,
+  EDITOR_SURFACE_OUTLINE_OPEN,
+  EDITOR_SURFACE_ZEN_BITS,
+  applyBitFlag,
+  applyCommaSeparatedTagDraft,
+  buildEditorOutlineItems,
+  computeCursorLineAndColumn,
+  computeSelectedCharCount,
+  countMarkdownLinkWarnings,
+  countMarkdownTotalLinks,
+  formatCategoryDraftInputValue,
+  handleTagInputKeyDown,
+  isMobileEditorViewport,
+  resolveActiveOutlineItemIndex,
+  resolveViewportPanelUiMask,
+  toCategorySuggestionLabels,
+  toggleResponsiveSidebarBits,
+  toggleZenBits,
+} from "./editorStudioDedicatedSurfaceModel"
 import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
 
-const EDITOR_SURFACE_GUIDE_OPEN = 1
-const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
-const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
-const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
-const EDITOR_SURFACE_ZEN_BITS = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
-const applyBitFlag = (mask: number, bit: number, next: boolean | ((prev: boolean) => boolean)) => {
-  const enabled = typeof next === "function" ? next((mask & bit) !== 0) : next
-  return enabled ? mask | bit : mask & ~bit
-}
-const isMobileEditorViewport = () => typeof window !== "undefined" && window.innerWidth <= 820
-const toggleZenBits = (mask: number) =>
-  (mask & EDITOR_SURFACE_ZEN_BITS) === 0 ? mask | EDITOR_SURFACE_ZEN_BITS : mask & ~EDITOR_SURFACE_ZEN_BITS
-const toggleResponsiveSidebarBits = (mask: number, targetBit: number) => {
-  if (!isMobileEditorViewport()) return applyBitFlag(mask, targetBit, (prev) => !prev)
-  const nextOpen = (mask & targetBit) === 0
-  const cleared = mask & ~EDITOR_SURFACE_ZEN_BITS
-  return nextOpen ? cleared | targetBit : cleared
-}
-const buildEditorOutlineItems = (
-  postTitle: string,
-  headings: ReadonlyArray<{ slug: string; offset: number; level: 1 | 2 | 3 | 4; label: string; range: { start: number; end: number } }>
-) => {
-  const title = postTitle.trim()
-  return [
-    ...(title ? [{ id: "title", level: 1 as const, label: title, range: null }] : []),
-    ...headings.map((heading) => ({
-      id: `${heading.slug}:${heading.offset}`,
-      level: heading.level,
-      label: heading.label,
-      range: heading.range,
-    })),
-  ]
-}
-const computeSelectedCharCount = (range?: { from: number; to: number } | null) =>
-  range ? Math.max(0, range.to - range.from) : 0
-const applyCommaSeparatedTagDraft = (
-  nextValue: string,
-  onTagDraftChange: (value: string) => void,
-  onAddTags: (values: string[]) => void
-) => {
-  const commaSeparated = /[,，]/
-  if (!commaSeparated.test(nextValue)) {
-    onTagDraftChange(nextValue)
-    return
-  }
-  const fragments = nextValue.split(commaSeparated)
-  const tailDraft = fragments.pop() ?? ""
-  const tagsToAdd = fragments.map((fragment) => fragment.trim()).filter(Boolean)
-  if (tagsToAdd.length > 0) onAddTags(tagsToAdd)
-  onTagDraftChange(tailDraft)
-}
-const handleTagInputKeyDown = (
-  event: ReactKeyboardEvent<HTMLInputElement>,
-  onAddTag: (value: string) => void
-) => {
-  if (isComposingKeyboardEvent(event)) return
-  if (event.key === "Enter" || event.key === ",") {
-    event.preventDefault()
-    onAddTag(event.currentTarget.value)
-  }
-}
+export {
+  analyzeMarkdownLinks,
+  computeCursorLineAndColumn,
+  countMarkdownLinkWarnings,
+  countMarkdownTotalLinks,
+  formatCategoryDraftInputValue,
+  resolveActiveOutlineItemIndex,
+  resolveViewportPanelUiMask,
+  toCategorySuggestionLabels,
+} from "./editorStudioDedicatedSurfaceModel"
+
 const activateEditorOutlineItem = (
   range: { start: number; end: number } | null,
   setIsOutlineOpen: (next: boolean) => void,
@@ -95,6 +67,7 @@ const activateEditorOutlineItem = (
   setLastActivatedOutlineOffset(null)
   focusTitle()
 }
+
 const dismissMobilePanelsOnCanvasTap = (
   isZenMode: boolean,
   setPanelUiMask: (updater: (m: number) => number) => void
@@ -103,20 +76,38 @@ const dismissMobilePanelsOnCanvasTap = (
     setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
   }
 }
+
+const subscribeMediaQueryChange = (media: MediaQueryList, listener: () => void) => {
+  if (typeof media.addEventListener !== "function") {
+    return () => undefined
+  }
+  media.addEventListener("change", listener)
+  return () => media.removeEventListener("change", listener)
+}
+
 const useResponsiveEditorPanelEffects = (
   setPanelUiMask: (updater: (m: number) => number) => void,
   handleToggleZenMode: () => void
 ) => {
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
-    const media = window.matchMedia("(max-width: 820px)")
-    const syncViewportPanels = (matches: boolean) => {
-      setPanelUiMask((m) => (matches ? m & ~EDITOR_SURFACE_ZEN_BITS : m | EDITOR_SURFACE_ZEN_BITS))
+    const mobileMedia = window.matchMedia("(max-width: 820px)")
+    const tabletMedia = window.matchMedia("(max-width: 1100px)")
+    const syncViewportPanels = () => {
+      setPanelUiMask((m) =>
+        resolveViewportPanelUiMask(m, {
+          isMobileViewport: mobileMedia.matches,
+          isTabletViewport: !mobileMedia.matches && tabletMedia.matches,
+        })
+      )
     }
-    if (media.matches) syncViewportPanels(true)
-    const onChange = (event: MediaQueryListEvent) => syncViewportPanels(event.matches)
-    media.addEventListener("change", onChange)
-    return () => media.removeEventListener("change", onChange)
+    syncViewportPanels()
+    const unsubscribeMobile = subscribeMediaQueryChange(mobileMedia, syncViewportPanels)
+    const unsubscribeTablet = subscribeMediaQueryChange(tabletMedia, syncViewportPanels)
+    return () => {
+      unsubscribeMobile()
+      unsubscribeTablet()
+    }
   }, [setPanelUiMask])
 
   useEffect(() => {
@@ -135,67 +126,6 @@ const useResponsiveEditorPanelEffects = (
   }, [handleToggleZenMode, setPanelUiMask])
 }
 
-export const resolveActiveOutlineItemIndex = (
-  items: ReadonlyArray<{ range: { start: number; end: number } | null }>,
-  cursorOffset?: number | null
-): number => {
-  if (items.length === 0) return -1
-  if (cursorOffset == null || cursorOffset < 0) return 0
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const range = items[index]?.range
-    if (range && cursorOffset >= range.start) {
-      return index
-    }
-  }
-  return 0
-}
-
-export const computeCursorLineAndColumn = (
-  markdown: string,
-  cursorOffset?: number | null
-): { line: number; column: number } => {
-  const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
-  let line = 1
-  let lastNewlineIndex = -1
-  let searchPos = 0
-  while (searchPos < clamped) {
-    const nextBreak = markdown.indexOf("\n", searchPos)
-    if (nextBreak === -1 || nextBreak >= clamped) break
-    line += 1
-    lastNewlineIndex = nextBreak
-    searchPos = nextBreak + 1
-  }
-  return { line, column: clamped - lastNewlineIndex }
-}
-
-let cachedLinkAnalysis: { markdown: string; result: { totalLinks: number; linkWarnings: number } } | null = null
-
-export const analyzeMarkdownLinks = (
-  markdown: string
-): { totalLinks: number; linkWarnings: number } => {
-  if (cachedLinkAnalysis?.markdown === markdown) return cachedLinkAnalysis.result
-  if (!markdown.includes("](") && !markdown.includes("[[")) {
-    return { totalLinks: 0, linkWarnings: 0 }
-  }
-  let totalLinks = 0
-  let linkWarnings = 0
-  for (const match of markdown.matchAll(/!?\[[^\][\r\n]*\]\(([^()\s]*)(\))?|(\[\[[^\][\r\n]+\]\])/g)) {
-    if (match[3]) {
-      totalLinks += 1
-      continue
-    }
-    const href = match[1]?.trim() ?? ""
-    if (match[2]) totalLinks += 1
-    if (!href || /^https?:\/\/$/.test(href)) linkWarnings += 1
-  }
-  const result = { totalLinks, linkWarnings }
-  cachedLinkAnalysis = { markdown, result }
-  return result
-}
-
-export const countMarkdownTotalLinks = (markdown: string): number =>
-  analyzeMarkdownLinks(markdown).totalLinks
-
 type NoticeTone = "idle" | "loading" | "success" | "error"
 
 type EditorStudioDedicatedEditorSurfaceProps = {
@@ -212,26 +142,13 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onCommitPostCategory: () => void; categorySuggestions: string[]; tagSuggestions?: string[]
   postVisibility: PostVisibility; onPostVisibilityChange: (value: PostVisibility) => void; editorCanvas: ReactNode
   showPublishNotice: boolean; publishNoticeTone: NoticeTone; publishNoticeText: string
+  onReloadLatestServerPost?: (() => void) | null
   isLocalDraftRestoreSuggestionVisible: boolean; isLocalDraftRestoreSuggestionActionsDisabled: boolean
   onRestoreLocalDraft: () => void; localDraftCandidates: Array<{ key: string; label: string }>
   selectedLocalDraftCandidateKey: string; onSelectLocalDraftCandidate: (key: string) => void
   onDiscardLocalDraftCandidate: () => void; onDismissLocalDraftRestoreSuggestion: () => void
   onClearLocalDraft: () => void; publishModal: ReactNode
 }
-
-const isComposingKeyboardEvent = (event: ReactKeyboardEvent<HTMLElement>) => {
-  const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent & {
-    isComposing?: boolean
-    keyCode?: number
-  }
-  return nativeEvent.isComposing === true || nativeEvent.keyCode === 229
-}
-
-export const countMarkdownLinkWarnings = (markdown: string) =>
-  analyzeMarkdownLinks(markdown).linkWarnings
-
-const getCategoryInputValue = (category: string) =>
-  category.trim() ? splitCategoryDisplay(category).label : ""
 
 type LocalDraftRestoreSuggestionProps = {
   visible: boolean; disabled: boolean; onRestore: () => void; candidates: Array<{ key: string; label: string }>
@@ -267,6 +184,84 @@ export const EditorStudioDedicatedEditorLoadingState = () => (
   </EditorStudioRoot>
 )
 
+const renderEditorOutlinePanel = ({
+  isOutlineOpen,
+  outlineItems,
+  activeOutlineIndex,
+  setIsOutlineOpen,
+  setLastActivatedOutlineOffset,
+  onOutlineBodyHeadingActivate,
+  focusTitle,
+}: {
+  isOutlineOpen: boolean
+  outlineItems: ReturnType<typeof buildEditorOutlineItems>
+  activeOutlineIndex: number
+  setIsOutlineOpen: (next: boolean) => void
+  setLastActivatedOutlineOffset: (offset: number | null) => void
+  onOutlineBodyHeadingActivate: (selection: { from: number; to: number }) => void
+  focusTitle: () => void
+}) => {
+  if (!isOutlineOpen) return null
+  return (
+    <EditorOutline aria-label="문서 목차">
+      <EditorPanelHeader>
+        <h3>문서 목차</h3>
+        <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>×</button>
+      </EditorPanelHeader>
+      {outlineItems.length > 0 ? (
+        outlineItems.map((item, index) => (
+          <EditorOutlineItem
+            key={item.id}
+            type="button"
+            data-level={item.level}
+            data-active={String(index === activeOutlineIndex)}
+            onClick={() =>
+              activateEditorOutlineItem(
+                item.range,
+                setIsOutlineOpen,
+                setLastActivatedOutlineOffset,
+                onOutlineBodyHeadingActivate,
+                focusTitle
+              )
+            }
+          >
+            <span>H{item.level}</span>
+            <strong>{item.label}</strong>
+          </EditorOutlineItem>
+        ))
+      ) : (
+        <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
+      )}
+    </EditorOutline>
+  )
+}
+
+const renderPublishNoticeBanner = ({
+  showPublishNotice,
+  publishNoticeTone,
+  publishNoticeText,
+  onReloadLatestServerPost,
+  actionsDisabled,
+}: {
+  showPublishNotice: boolean
+  publishNoticeTone: NoticeTone
+  publishNoticeText: string
+  onReloadLatestServerPost: (() => void) | null
+  actionsDisabled: boolean
+}) => {
+  if (!showPublishNotice) return null
+  return (
+    <PublishNotice data-tone={publishNoticeTone}>
+      <span>{publishNoticeText}</span>
+      {onReloadLatestServerPost ? (
+        <SecondaryButton type="button" disabled={actionsDisabled} onClick={onReloadLatestServerPost}>
+          서버 최신본 다시 불러오기
+        </SecondaryButton>
+      ) : null}
+    </PublishNotice>
+  )
+}
+
 export const EditorStudioDedicatedEditorSurface = ({
   thumbnailImageFileInputRef, onThumbnailImageFileChange, onExit, saveStateText, saveStateTone,
   primaryActionDisabled, primaryActionLabel, onPrimaryAction, postTags, tagDraft, onTagDraftChange,
@@ -274,7 +269,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   activeSelectionRange, postTitle, onPostTitleChange, onPostTitleKeyDown, postContent, postSummary,
   onPostSummaryChange, postCategory, onPostCategoryChange, onCommitPostCategory, categorySuggestions,
   tagSuggestions = [], postVisibility, onPostVisibilityChange, editorCanvas, showPublishNotice,
-  publishNoticeTone, publishNoticeText, isLocalDraftRestoreSuggestionVisible,
+  publishNoticeTone, publishNoticeText, onReloadLatestServerPost = null, isLocalDraftRestoreSuggestionVisible,
   isLocalDraftRestoreSuggestionActionsDisabled, onRestoreLocalDraft, localDraftCandidates,
   selectedLocalDraftCandidateKey, onSelectLocalDraftCandidate, onDiscardLocalDraftCandidate,
   onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal,
@@ -291,6 +286,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const [lastActivatedOutlineOffset, setLastActivatedOutlineOffset] = useState<number | null>(null)
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const isZenMode = !isOutlineOpen && !isInspectorOpen
+  const isPublishModalVisible = Boolean(publishModal)
 
   const handleToggleZenMode = useCallback(() => setPanelUiMask(toggleZenBits), [])
   const toggleResponsiveSidebar = useCallback(
@@ -299,6 +295,15 @@ export const EditorStudioDedicatedEditorSurface = ({
   )
 
   useResponsiveEditorPanelEffects(setPanelUiMask, handleToggleZenMode)
+
+  useEffect(() => {
+    if (!isPublishModalVisible) return
+    setPanelUiMask((m) =>
+      isMobileEditorViewport()
+        ? m & ~(EDITOR_SURFACE_ZEN_BITS | EDITOR_SURFACE_GUIDE_OPEN)
+        : m & ~EDITOR_SURFACE_GUIDE_OPEN
+    )
+  }, [isPublishModalVisible])
 
   const deferredPostContent = useDeferredValue(postContent)
   const outlineInsights = useMemo(() => createMarkdownDocumentInsights(deferredPostContent), [deferredPostContent])
@@ -329,6 +334,10 @@ export const EditorStudioDedicatedEditorSurface = ({
     const selected = new Set(postTags)
     return tagSuggestions.filter((tag) => !selected.has(tag))
   }, [postTags, tagSuggestions])
+  const decodedCategorySuggestions = useMemo(
+    () => toCategorySuggestionLabels(categorySuggestions),
+    [categorySuggestions]
+  )
   const localDraftRestoreCardNode = (
     <LocalDraftRestoreSuggestion
       visible={isLocalDraftRestoreSuggestionVisible}
@@ -395,38 +404,15 @@ export const EditorStudioDedicatedEditorSurface = ({
       </EditorStudioDedicatedTopBar>
 
       <EditorStudioFrame data-testid="editor-studio-frame" $showOutline={isOutlineOpen} $showInspector={isInspectorOpen}>
-        {isOutlineOpen ? (
-          <EditorOutline aria-label="문서 목차">
-            <EditorPanelHeader>
-              <h3>문서 목차</h3>
-              <button type="button" aria-label="목차 닫기" onClick={() => setIsOutlineOpen(false)}>×</button>
-            </EditorPanelHeader>
-            {outlineItems.length > 0 ? (
-              outlineItems.map((item, index) => (
-                <EditorOutlineItem
-                  key={item.id}
-                  type="button"
-                  data-level={item.level}
-                  data-active={String(index === activeOutlineIndex)}
-                  onClick={() =>
-                    activateEditorOutlineItem(
-                      item.range,
-                      setIsOutlineOpen,
-                      setLastActivatedOutlineOffset,
-                      onOutlineBodyHeadingActivate,
-                      () => titleNodeRef.current?.focus()
-                    )
-                  }
-                >
-                  <span>H{item.level}</span>
-                  <strong>{item.label}</strong>
-                </EditorOutlineItem>
-              ))
-            ) : (
-              <p>제목과 본문 heading을 입력하면 목차가 표시됩니다.</p>
-            )}
-          </EditorOutline>
-        ) : null}
+        {renderEditorOutlinePanel({
+          isOutlineOpen,
+          outlineItems,
+          activeOutlineIndex,
+          setIsOutlineOpen,
+          setLastActivatedOutlineOffset,
+          onOutlineBodyHeadingActivate,
+          focusTitle: () => titleNodeRef.current?.focus(),
+        })}
 
         <EditorStudioWritingColumn
           data-testid="editor-writing-column"
@@ -474,7 +460,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   onKeyDown={handleTagDraftKeyDown}
                 />
               </EditorTagRow>
-              {postCategory.trim() ? <EditorHeaderMetaPill data-testid="editor-category-meta-pill">분류 · {getCategoryInputValue(postCategory)}</EditorHeaderMetaPill> : null}
+              {postCategory.trim() ? <EditorHeaderMetaPill data-testid="editor-category-meta-pill">분류 · {splitCategoryDisplay(postCategory).label}</EditorHeaderMetaPill> : null}
               <EditorHeaderMetaPill>본문 형식 · Markdown</EditorHeaderMetaPill>
             </EditorHeaderMetaRow>
           </EditorStudioDedicatedMetaSection>
@@ -489,7 +475,13 @@ export const EditorStudioDedicatedEditorSurface = ({
             <span>링크 {totalLinkCount}</span>
           </EditorStudioStatusBar>
 
-          {showPublishNotice ? <PublishNotice data-tone={publishNoticeTone}>{publishNoticeText}</PublishNotice> : null}
+          {renderPublishNoticeBanner({
+            showPublishNotice,
+            publishNoticeTone,
+            publishNoticeText,
+            onReloadLatestServerPost,
+            actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
+          })}
         </EditorStudioWritingColumn>
 
         {isInspectorOpen ? (
@@ -527,7 +519,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                 <input
                   list="editor-category-suggestions"
                   placeholder="분류 입력 또는 선택"
-                  value={getCategoryInputValue(postCategory)}
+                  value={formatCategoryDraftInputValue(postCategory)}
                   onChange={(event) => onPostCategoryChange(event.target.value)}
                   onBlur={onCommitPostCategory}
                 />
@@ -541,7 +533,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                 </SecondaryButton>
               </EditorInspectorTagInputRow>
               <datalist id="editor-category-suggestions">
-                {categorySuggestions.map((category) => (
+                {decodedCategorySuggestions.map((category) => (
                   <option key={category} value={category} />
                 ))}
               </datalist>

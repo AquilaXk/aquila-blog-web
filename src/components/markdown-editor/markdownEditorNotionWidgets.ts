@@ -1,11 +1,8 @@
 import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view"
+import { normalizeSafeMarkdownUrl, setSafeAnchorHref } from "../../libs/markdown/safeMarkdownUrl"
 import { hasIntervalOverlap, isTokenActive } from "./markdownEditorLivePreview"
-import {
-  editorModeField,
-  getDocString,
-  setEditorMode,
-} from "./markdownEditorLiveSurfaceDecorations"
+import { editorModeField, getDocString, setEditorMode } from "./markdownEditorLiveSurfaceDecorations"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
 const FENCE_DELIMITER_LINE_RE =
@@ -14,7 +11,6 @@ const CALLOUT_OPEN_LINE_RE = /^:::callout(?:[ \t]+(.*))?$/
 const TOGGLE_OPEN_LINE_RE = /^:::toggle(?:[ \t]+(.*))?$/
 const BOOKMARK_OPEN_LINE_RE = /^:::bookmark(?:[ \t]+(\S+)(?:[ \t]+(.*))?)?$/
 const CONTAINER_CLOSE_LINE_RE = /^:::[ \t]*$/
-const HTTP_URL_PREFIX_RE = /^https?:\/\//i
 const LEADING_EMOJI_RE =
   /^\[?(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)\]?(?:[ \t]+|$)/u
 
@@ -70,8 +66,10 @@ const CALLOUT_EMOJI_TONE_MAP: Record<string, NotionCalloutTone> = {
   "🧾": "purple",
 }
 
-const normalizeEmojiIcon = (raw: string): string =>
-  raw === "ℹ" ? "ℹ️" : raw === "⚠" ? "⚠️" : raw
+const normalizeEmojiIcon = (raw: string): string => {
+  if (raw === "ℹ") return "ℹ️"
+  return raw === "⚠" ? "⚠️" : raw
+}
 
 const parseCalloutContainerPayload = (
   rawHeader: string,
@@ -243,7 +241,7 @@ export const parseNotionContainerBlocks = (docText: string): NotionContainerBloc
     const bookmarkMatch = BOOKMARK_OPEN_LINE_RE.exec(lineText)
     if (bookmarkMatch) {
       const url = (bookmarkMatch[1] ?? "").trim()
-      candidate = HTTP_URL_PREFIX_RE.test(url)
+      candidate = normalizeSafeMarkdownUrl(url)
         ? {
             kind: "bookmark",
             from: lineStart,
@@ -268,7 +266,7 @@ const focusContainerBlockOrigin = (
   fallbackTo: number,
   innerOffset: number
 ) => {
-  if (!view) return
+  if (!view?.state.facet(EditorView.editable)) return
   let resolvedFrom = fallbackFrom
   const datasetFrom = Number(root.dataset?.from)
   if (Number.isFinite(datasetFrom) && datasetFrom >= 0) resolvedFrom = datasetFrom
@@ -330,7 +328,7 @@ export class MarkdownNotionCalloutBlockWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = `cm-live-callout cm-live-callout-tone-${this.tone}`
-    root.setAttribute("data-testid", "cm-live-callout-widget")
+    root.dataset.testid = "cm-live-callout-widget"
     root.dataset.from = String(this.from)
     root.dataset.callout = this.tone
     root.dataset.sig = `${this.tone}\0${this.icon}\0${this.title}\0${this.body}\0${this.bodyOffset}`
@@ -385,7 +383,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     let isCollapsed = false
     const root = document.createElement("div")
     root.className = "cm-live-toggle-block"
-    root.setAttribute("data-testid", "cm-live-toggle-widget")
+    root.dataset.testid = "cm-live-toggle-widget"
     root.dataset.from = String(this.from)
     root.dataset.sig = `${this.title}\0${this.body}\0${this.bodyOffset}`
 
@@ -457,7 +455,7 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const root = document.createElement("div")
     root.className = "cm-live-bookmark-card"
-    root.setAttribute("data-testid", "cm-live-bookmark-widget")
+    root.dataset.testid = "cm-live-bookmark-widget"
     root.dataset.from = String(this.from)
     root.dataset.sig = `${this.url}\0${this.title}\0${this.description}`
 
@@ -483,12 +481,18 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     content.appendChild(urlEl)
     const openLink = document.createElement("a")
     openLink.className = "cm-live-bookmark-open"
-    openLink.href = this.url
-    openLink.target = "_blank"
-    openLink.rel = "noopener noreferrer"
-    openLink.setAttribute("aria-label", "북마크 링크 열기")
-    openLink.textContent = "↗"
-    root.append(icon, content, openLink)
+    const safeUrl = normalizeSafeMarkdownUrl(this.url)
+    if (safeUrl && setSafeAnchorHref(openLink, safeUrl)) {
+      if (safeUrl.startsWith("http://") || safeUrl.startsWith("https://")) {
+        openLink.target = "_blank"
+        openLink.rel = "noopener noreferrer"
+      }
+      openLink.setAttribute("aria-label", "북마크 링크 열기")
+      openLink.textContent = "↗"
+      root.append(icon, content, openLink)
+    } else {
+      root.append(icon, content)
+    }
     bindContainerActivateTarget(root, view, root, this.from, this.to, 12, true)
     return root
   }
@@ -516,6 +520,16 @@ const haveSameActiveContainerBlocks = (
     if (isContainerBlockActive(block, prevRanges) !== isContainerBlockActive(block, nextRanges)) return false
   }
   return true
+}
+
+const createNotionContainerBlockWidget = (block: NotionContainerBlock): WidgetType => {
+  if (block.kind === "callout") {
+    return new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
+  }
+  if (block.kind === "toggle") {
+    return new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
+  }
+  return new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
 }
 
 const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet => {
@@ -546,13 +560,7 @@ const buildNotionContainerBlockDecorations = (state: EditorState): DecorationSet
       continue
     }
 
-    const widget =
-      block.kind === "callout"
-        ? new MarkdownNotionCalloutBlockWidget(block.tone, block.icon, block.title, block.body, block.from, block.to, block.bodyOffset)
-        : block.kind === "toggle"
-          ? new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
-          : new MarkdownBookmarkBlockWidget(block.url, block.title, block.description, block.from, block.to)
-
+    const widget = createNotionContainerBlockWidget(block)
     decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to))
   }
 

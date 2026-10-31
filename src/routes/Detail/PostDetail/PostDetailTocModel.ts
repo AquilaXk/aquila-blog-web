@@ -31,7 +31,7 @@ export const buildInitialTocFromMarkdown = (
 
 const TOC_SELECTOR = ".aq-markdown h2, .aq-markdown h3, .aq-markdown h4"
 const TOC_MUTATION_HEADING_SELECTOR = "h1, h2, h3, h4"
-const TOC_MUTATION_IGNORED_SELECTOR = ".aq-mermaid, .aq-code-block, svg"
+const TOC_MUTATION_IGNORED_SELECTOR = ".aq-mermaid, .aq-code-block, .aq-footnotes, svg"
 
 const resolveMutationElement = (node: Node | null | undefined): Element | null => {
   if (!node) return null
@@ -100,6 +100,23 @@ const resolveTocHeadingLevel = (tagName: string): TocItem["level"] | null => {
   return null
 }
 
+export const expandClosedAncestorDetails = (target: Element | null): boolean => {
+  let expanded = false
+  let current: Element | null = target?.parentElement ?? null
+  while (current) {
+    if (current.tagName === "DETAILS") {
+      const detailsElement = current as HTMLDetailsElement
+      if (!detailsElement.open) {
+        detailsElement.open = true
+        detailsElement.setAttribute?.("open", "")
+        expanded = true
+      }
+    }
+    current = current.parentElement ?? null
+  }
+  return expanded
+}
+
 export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
   const headings = article.querySelectorAll<HTMLElement>(TOC_SELECTOR)
   if (!headings.length) return []
@@ -111,6 +128,8 @@ export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
   while (index < headings.length) {
     const heading = headings[index]
     index += 1
+    if (heading.id === "aq-footnote-heading" || heading.closest?.(".aq-footnotes")) continue
+
     const text = normalizeHeadingText(heading.textContent || "")
     if (!text) continue
 

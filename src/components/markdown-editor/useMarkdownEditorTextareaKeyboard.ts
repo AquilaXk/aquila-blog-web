@@ -1,6 +1,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type MutableRefObject, useCallback } from "react"
 import {
   isComposingEditorKeyboardEvent,
+  isOffsetInsideFencedCodeBlock,
   isSaveShortcut,
   planFormatShortcutMutation,
   planHardBreak,
@@ -20,7 +21,7 @@ import {
   planNotionBlockPrefixBackspace,
   planNotionSpaceInputRule,
 } from "./markdownEditorNotionModel"
-import type { PlannedTextMutation } from "./markdownEditorTextMutation"
+import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
   from: number
@@ -29,6 +30,7 @@ type TextareaSelection = {
 
 type UseMarkdownEditorTextareaKeyboardArgs = {
   disabled: boolean
+  authoringDisabled?: boolean
   valueRef: MutableRefObject<string>
   allowNativeTabAfterEscapeRef: MutableRefObject<boolean>
   rememberTextareaSelection: () => TextareaSelection
@@ -40,8 +42,25 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   isCompletionActive?: () => boolean
 }
 
+const COMPLETION_HANDLED_KEYS = new Set(["Enter", "ArrowUp", "ArrowDown", "Tab", "Escape"])
+
+const isCompletionHandledKey = (key: string): boolean => COMPLETION_HANDLED_KEYS.has(key)
+
+const isInsideTableOrFormInput = (target: EventTarget | null): boolean => {
+  const element = target as HTMLElement | null
+  const tagName = element?.tagName
+  if (tagName === "INPUT" || tagName === "TEXTAREA") return true
+  return typeof element?.closest === "function" && element.closest(".cm-live-table-wrap") !== null
+}
+
+const isIgnoredEditorKeyEvent = (
+  disabled: boolean,
+  event: ReactKeyboardEvent<HTMLElement>
+): boolean => disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)
+
 export const useMarkdownEditorTextareaKeyboard = ({
   disabled,
+  authoringDisabled = disabled,
   valueRef,
   allowNativeTabAfterEscapeRef,
   rememberTextareaSelection,
@@ -66,8 +85,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
         return
       }
       if (!tableTabPlan.mutation) {
-        if (event.shiftKey) return
-        event.preventDefault()
+        if (!event.shiftKey) event.preventDefault()
         return
       }
       event.preventDefault()
@@ -79,14 +97,15 @@ export const useMarkdownEditorTextareaKeyboard = ({
   const handleEnterKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.key !== "Enter") return false
-
       if (event.shiftKey) {
         event.preventDefault()
         const { from, to } = rememberTextareaSelection()
-        applyMutationPlan(planHardBreak(from, to))
+        const plan = isOffsetInsideFencedCodeBlock(valueRef.current, from)
+          ? planReplaceSelection(from, to, "\n")
+          : planHardBreak(from, to)
+        applyMutationPlan(plan)
         return true
       }
-
       if (event.metaKey || event.ctrlKey || event.altKey) return false
 
       const { from, to } = rememberTextareaSelection()
@@ -96,11 +115,11 @@ export const useMarkdownEditorTextareaKeyboard = ({
         applyMutationPlan(tableEnterPlan)
         return true
       }
-
       const listPlan = planListEnterContinuation(valueRef.current, from, to)
-      if (!listPlan) return true
-      event.preventDefault()
-      applyMutationPlan(listPlan)
+      if (listPlan) {
+        event.preventDefault()
+        applyMutationPlan(listPlan)
+      }
       return true
     },
     [applyMutationPlan, rememberTextareaSelection, valueRef]
@@ -109,12 +128,28 @@ export const useMarkdownEditorTextareaKeyboard = ({
   const handleSaveShortcutKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (!isSaveShortcut(event)) return false
-      if (!onRequestSave) return true
-      event.preventDefault()
-      onRequestSave()
+      if (onRequestSave) {
+        event.preventDefault()
+        onRequestSave()
+      }
       return true
     },
     [onRequestSave]
+  )
+
+  const handleViewModeShortcutKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
+      const isModToggle =
+        (event.metaKey || event.ctrlKey) &&
+        (event.key === "e" || event.key === "E") &&
+        !event.shiftKey &&
+        !event.altKey
+      if (!isModToggle || !onToggleViewMode) return false
+      event.preventDefault()
+      onToggleViewMode()
+      return true
+    },
+    [onToggleViewMode]
   )
 
   const handleFormatShortcutKeyDown = useCallback(
@@ -124,7 +159,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
         event.preventDefault()
         const { from, to } = rememberTextareaSelection()
         const action = command.execute({
-          disabled,
+          disabled: authoringDisabled,
           selectionStart: from,
           selectionEnd: to,
           isTableSelection: false,
@@ -134,17 +169,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
         }
         return true
       }
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        (event.key === "e" || event.key === "E") &&
-        !event.shiftKey &&
-        !event.altKey &&
-        onToggleViewMode
-      ) {
-        event.preventDefault()
-        onToggleViewMode()
-        return true
-      }
+      if (handleViewModeShortcutKeyDown(event)) return true
       const formatShortcut = resolveFormatShortcut(event)
       if (!formatShortcut) return false
       event.preventDefault()
@@ -152,14 +177,13 @@ export const useMarkdownEditorTextareaKeyboard = ({
       applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, formatShortcut))
       return true
     },
-    [applyMutationPlan, disabled, onToggleViewMode, rememberTextareaSelection, valueRef]
+    [applyMutationPlan, authoringDisabled, handleViewModeShortcutKeyDown, rememberTextareaSelection, valueRef]
   )
 
   const handleLineCommandKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       const command = resolveMarkdownEditorLineCommand(event)
       if (!command) return false
-
       event.preventDefault()
       const { from, to } = rememberTextareaSelection()
       const plan = planMarkdownEditorLineCommand(valueRef.current, from, to, command)
@@ -172,30 +196,20 @@ export const useMarkdownEditorTextareaKeyboard = ({
   const handleAutoPairKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.metaKey || event.ctrlKey || event.altKey) return false
-
       const { from, to } = rememberTextareaSelection()
-      if (event.key === "Backspace") {
-        const prefixPlan = planNotionBlockPrefixBackspace(valueRef.current, from, to)
-        if (prefixPlan) {
-          event.preventDefault()
-          applyRecordedMutation(prefixPlan)
-          return true
-        }
+      let rulePlan: PlannedTextMutation | null = null
+      if (event.key === "Backspace") rulePlan = planNotionBlockPrefixBackspace(valueRef.current, from, to)
+      else if (event.key === " ") rulePlan = planNotionSpaceInputRule(valueRef.current, from, to)
+      if (rulePlan) {
+        event.preventDefault()
+        applyRecordedMutation(rulePlan)
+        return true
       }
-      if (event.key === " ") {
-        const spacePlan = planNotionSpaceInputRule(valueRef.current, from, to)
-        if (spacePlan) {
-          event.preventDefault()
-          applyRecordedMutation(spacePlan)
-          return true
-        }
-      }
-
-      const action = event.key === "Backspace"
-        ? planMarkdownEditorAutoPairBackspace(valueRef.current, from, to)
-        : planMarkdownEditorAutoPairInsert(valueRef.current, from, to, event.key)
+      const action =
+        event.key === "Backspace"
+          ? planMarkdownEditorAutoPairBackspace(valueRef.current, from, to)
+          : planMarkdownEditorAutoPairInsert(valueRef.current, from, to, event.key)
       if (!action) return false
-
       event.preventDefault()
       if (action.kind === "mutation") applyRecordedMutation(action.mutation)
       else setTextareaSelection(action.selectionStart, action.selectionEnd)
@@ -207,76 +221,79 @@ export const useMarkdownEditorTextareaKeyboard = ({
   const handleHomeEndKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): boolean => {
       if (event.shiftKey || (!event.metaKey && !event.ctrlKey)) return false
-      if (event.key === "Home") {
-        event.preventDefault()
-        setTextareaSelection(0)
-        return true
-      }
-      if (event.key === "End") {
-        event.preventDefault()
-        setTextareaSelection(valueRef.current.length)
-        return true
-      }
-      return false
+      if (event.key !== "Home" && event.key !== "End") return false
+      event.preventDefault()
+      setTextareaSelection(event.key === "Home" ? 0 : valueRef.current.length)
+      return true
     },
     [setTextareaSelection, valueRef]
   )
 
-  const handleTextareaKeyDown = useCallback(
+  const runReadOnlyKeyHandlers = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      if (disabled || event.defaultPrevented || isComposingEditorKeyboardEvent(event)) return
-
-      const targetElement = event.target as HTMLElement | null
-      const targetTagName = targetElement?.tagName
-      const isInsideTableWidget =
-        typeof targetElement?.closest === "function" &&
-        targetElement.closest(".cm-live-table-wrap") !== null
-      if (targetTagName === "INPUT" || targetTagName === "TEXTAREA" || isInsideTableWidget) {
-        handleSaveShortcutKeyDown(event)
-        return
+      for (const handler of [handleSaveShortcutKeyDown, handleViewModeShortcutKeyDown, handleHomeEndKeyDown]) {
+        if (handler(event)) return
       }
+    },
+    [handleHomeEndKeyDown, handleSaveShortcutKeyDown, handleViewModeShortcutKeyDown]
+  )
 
-      if (
-        isCompletionActive?.() &&
-        (event.key === "Enter" ||
-          event.key === "ArrowUp" ||
-          event.key === "ArrowDown" ||
-          event.key === "Tab" ||
-          event.key === "Escape")
-      ) {
-        return
+  const runAuthoringKeyHandlers = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      const handlers = [
+        handleEnterKeyDown,
+        handleSaveShortcutKeyDown,
+        handleFormatShortcutKeyDown,
+        handleLineCommandKeyDown,
+        handleAutoPairKeyDown,
+        handleHomeEndKeyDown,
+      ]
+      for (const handler of handlers) {
+        if (handler(event)) return
       }
-
-      if (event.key === "Escape") {
-        allowNativeTabAfterEscapeRef.current = true
-        return
-      }
-
-      if (event.key === "Tab") {
-        handleTabKeyDown(event)
-        return
-      }
-
-      allowNativeTabAfterEscapeRef.current = false
-
-      if (handleEnterKeyDown(event)) return
-      if (handleSaveShortcutKeyDown(event)) return
-      if (handleFormatShortcutKeyDown(event)) return
-      if (handleLineCommandKeyDown(event)) return
-      if (handleAutoPairKeyDown(event)) return
-      handleHomeEndKeyDown(event)
     },
     [
-      allowNativeTabAfterEscapeRef,
-      disabled,
+      handleAutoPairKeyDown,
       handleEnterKeyDown,
       handleFormatShortcutKeyDown,
       handleHomeEndKeyDown,
       handleLineCommandKeyDown,
-      handleAutoPairKeyDown,
+      handleSaveShortcutKeyDown,
+    ]
+  )
+
+  const handleTextareaKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (isIgnoredEditorKeyEvent(disabled, event)) return
+      if (authoringDisabled) {
+        runReadOnlyKeyHandlers(event)
+        return
+      }
+      if (isInsideTableOrFormInput(event.target)) {
+        handleSaveShortcutKeyDown(event)
+        return
+      }
+      if (isCompletionActive?.() && isCompletionHandledKey(event.key)) return
+      if (event.key === "Escape") {
+        allowNativeTabAfterEscapeRef.current = true
+        return
+      }
+      if (event.key === "Tab") {
+        handleTabKeyDown(event)
+        return
+      }
+      allowNativeTabAfterEscapeRef.current = false
+      runAuthoringKeyHandlers(event)
+    },
+    [
+      allowNativeTabAfterEscapeRef,
+      authoringDisabled,
+      disabled,
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
       isCompletionActive,
+      runAuthoringKeyHandlers,
+      runReadOnlyKeyHandlers,
     ]
   )
 

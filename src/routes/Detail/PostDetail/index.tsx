@@ -9,6 +9,7 @@ import {
   collectTocFromArticle,
   createObserverRegistry,
   createRafScheduler,
+  expandClosedAncestorDetails,
   isSameToc,
   measureHeadingOffsets,
   resolveActiveTocIdFromOffsets,
@@ -32,7 +33,15 @@ import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
-const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"))
+const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"), {
+  loading: () => (
+    <div className="markdownLoadingSkeleton" aria-busy="true" aria-label="본문 불러오는 중">
+      <span className="skeletonLine skeletonLineWide" />
+      <span className="skeletonLine skeletonLineFull" />
+      <span className="skeletonLine skeletonLineMid" />
+    </div>
+  ),
+})
 
 export const RAIL_UI_DETAILED_TOC = 1
 export const RAIL_UI_LEFT_ACTIVE = 1 << 1
@@ -393,6 +402,9 @@ const PostDetail: React.FC = () => {
   const handleTocNavigate = useCallback((id: string) => {
     const heading = document.getElementById(id)
     if (!heading) return
+    if (expandClosedAncestorDetails(heading)) {
+      headingOffsetsRef.current = measureHeadingOffsets(visibleTocItemsRef.current, window.scrollY)
+    }
     const targetTop = heading.getBoundingClientRect().top + window.scrollY - (railTopOffsetRef.current + 24)
     tocScrollLockRef.current = { id, until: Date.now() + 700 }
     setActiveTocId(id)

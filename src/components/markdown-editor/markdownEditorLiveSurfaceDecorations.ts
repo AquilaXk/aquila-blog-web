@@ -6,24 +6,25 @@ import {
   hasIntervalOverlap,
   isTokenActive,
   resolveMarkdownLivePreviewPlanFromEntries,
+  type MarkdownEditorSurfaceMode,
   type MarkdownLivePreviewDecoration,
   type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
 import {
-  MarkdownCalloutWidget,
-  MarkdownImageWidget,
-  MarkdownMarkerWidget,
-  MarkdownMathWidget,
-  MarkdownMermaidWidget,
-  MarkdownRuleWidget,
-  MarkdownTableWidget,
-  MarkdownTaskWidget,
-  MarkdownWikilinkWidget,
+  MATH_LITERAL_SYNTAX_NODE_NAMES,
+  collectMathReplacementSpecs,
+  type MathReplacementSpec,
+} from "./markdownEditorMathModel"
+export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
+import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
+import {
+  MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
+  MarkdownMermaidWidget, MarkdownRuleWidget, MarkdownTableWidget, MarkdownTaskWidget, MarkdownWikilinkWidget,
 } from "./markdownEditorWidgets"
 
 export const setComposition = StateEffect.define<boolean>()
 export const setPointerSelecting = StateEffect.define<boolean>()
-export const setEditorMode = StateEffect.define<"live" | "source" | "reading">()
+export const setEditorMode = StateEffect.define<MarkdownEditorSurfaceMode>()
 export const setDisableMermaid = StateEffect.define<boolean>()
 
 const defineEffectStateField = <T>(initial: T, effectType: StateEffectType<T>) =>
@@ -39,7 +40,7 @@ const defineEffectStateField = <T>(initial: T, effectType: StateEffectType<T>) =
 
 export const compositionField = defineEffectStateField(false, setComposition)
 export const pointerSelectingField = defineEffectStateField(false, setPointerSelecting)
-export const editorModeField = defineEffectStateField<"live" | "source" | "reading">("live", setEditorMode)
+export const editorModeField = defineEffectStateField<MarkdownEditorSurfaceMode>("live", setEditorMode)
 export const disableMermaidField = defineEffectStateField(false, setDisableMermaid)
 
 const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], string>> = {
@@ -83,13 +84,9 @@ const MARK_DECORATION_BY_KIND: Partial<Record<MarkdownLivePreviewDecoration["kin
 type RangeSpec = { from: number; to: number }
 type TableReplacementSpec = RangeSpec & { markdown: string }
 type CalloutReplacementSpec = RangeSpec & {
-  type: string
-  title: string
-  content: string
-  foldState: "+" | "-" | null
+  type: string; title: string; content: string; foldState: "+" | "-" | null
 }
 type ImageReplacementSpec = RangeSpec & { alt: string; src: string }
-type MathReplacementSpec = RangeSpec & { math: string; displayMode: boolean }
 type MermaidReplacementSpec = RangeSpec & { source: string }
 
 let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
@@ -100,30 +97,32 @@ export const getDocString = (doc: EditorState["doc"]): string => {
   return text
 }
 
+const isHighSurrogateUnit = (text: string, index: number): boolean => {
+  const cp = text.codePointAt(index) ?? 0
+  return cp > 0xffff || (cp >= 0xd800 && cp <= 0xdbff)
+}
+
+const isLowSurrogateUnit = (text: string, index: number): boolean => {
+  const cp = text.codePointAt(index) ?? 0
+  return cp >= 0xdc00 && cp <= 0xdfff
+}
+
 export const computeMinimalDocChange = (current: string, next: string) => {
   let from = 0
   const minLen = Math.min(current.length, next.length)
-  while (from < minLen && current.charCodeAt(from) === next.charCodeAt(from)) from += 1
-  if (
-    from > 0 &&
-    ((current.charCodeAt(from - 1) & 0xfc00) === 0xd800 ||
-      (next.charCodeAt(from - 1) & 0xfc00) === 0xd800)
-  ) {
+  while (from < minLen && current[from] === next[from]) from += 1
+  if (from > 0 && (isHighSurrogateUnit(current, from - 1) || isHighSurrogateUnit(next, from - 1))) {
     from -= 1
   }
   let currentEnd = current.length
   let nextEnd = next.length
-  while (
-    currentEnd > from &&
-    nextEnd > from &&
-    current.charCodeAt(currentEnd - 1) === next.charCodeAt(nextEnd - 1)
-  ) {
+  while (currentEnd > from && nextEnd > from && current[currentEnd - 1] === next[nextEnd - 1]) {
     currentEnd -= 1
     nextEnd -= 1
   }
   if (
-    (currentEnd < current.length && (current.charCodeAt(currentEnd) & 0xfc00) === 0xdc00) ||
-    (nextEnd < next.length && (next.charCodeAt(nextEnd) & 0xfc00) === 0xdc00)
+    (currentEnd < current.length && isLowSurrogateUnit(current, currentEnd)) ||
+    (nextEnd < next.length && isLowSurrogateUnit(next, nextEnd))
   ) {
     currentEnd += 1
     nextEnd += 1
@@ -179,29 +178,8 @@ const parseMermaidReplacementSpec = (raw: string, from: number, to: number): Mer
   return { from, to, source }
 }
 
-const collectMathReplacementSpecs = (markdownValue: string): MathReplacementSpec[] => {
-  const maths: MathReplacementSpec[] = []
-  if (!markdownValue.includes("$")) return maths
-  const mathRegex = /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$/g
-  let mathMatch: RegExpExecArray | null
-  while ((mathMatch = mathRegex.exec(markdownValue)) !== null) {
-    const from = mathMatch.index
-    maths.push({
-      from,
-      to: from + mathMatch[0].length,
-      math: mathMatch[1] ?? mathMatch[2] ?? "",
-      displayMode: Boolean(mathMatch[1]),
-    })
-  }
-  return maths
-}
-
 const ACTIVE_WIDGET_KINDS = new Set<MarkdownLivePreviewDecoration["kind"]>([
-  "task",
-  "wikilink",
-  "list-marker",
-  "quote-mark",
-  "fenced-code",
+  "task", "wikilink", "list-marker", "quote-mark", "fenced-code",
 ])
 
 const resolveTaskPrefixRange = (markdownValue: string, from: number, to: number) => {
@@ -248,55 +226,94 @@ export const haveSameActiveWatchHits = (
 ): boolean => {
   for (let i = 0; i < activeWatchRanges.length; i += 1) {
     const range = activeWatchRanges[i]!
-    if (
-      isTokenActive(range.from, range.to, prevSelections) !==
-      isTokenActive(range.from, range.to, nextSelections)
-    ) {
+    if (isTokenActive(range.from, range.to, prevSelections) !== isTokenActive(range.from, range.to, nextSelections)) {
       return false
     }
   }
   return true
 }
 
+const pushIfPresent = <T>(list: T[], item: T | null) => {
+  if (item) list.push(item)
+}
+
+const collectTableBlockSpec = (
+  state: EditorState,
+  markdownValue: string,
+  nodeFrom: number,
+  nodeTo: number
+): TableReplacementSpec | null => {
+  let tableFrom = nodeFrom
+  const headerLine = state.doc.lineAt(nodeFrom)
+  if (headerLine.number > 1) {
+    const prevLine = state.doc.line(headerLine.number - 1)
+    const parsedComment = parseLeadingTableLayoutLine(prevLine.text)
+    if (parsedComment.kind === "malformed") return null
+    if (parsedComment.kind === "valid") tableFrom = prevLine.from
+  }
+  return { from: tableFrom, to: nodeTo, markdown: markdownValue.slice(tableFrom, nodeTo) }
+}
+
+type DocBlockCollector = {
+  state: EditorState
+  markdownValue: string
+  hasCalloutMarker: boolean
+  hasMermaidMarker: boolean
+  tables: TableReplacementSpec[]
+  callouts: CalloutReplacementSpec[]
+  images: ImageReplacementSpec[]
+  mermaids: MermaidReplacementSpec[]
+  literalRanges: RangeSpec[]
+}
+
+const enterSyntaxNodeForDocBlocks = (
+  node: { name: string; from: number; to: number },
+  collector: DocBlockCollector
+) => {
+  if (MATH_LITERAL_SYNTAX_NODE_NAMES.has(node.name)) {
+    collector.literalRanges.push({ from: node.from, to: node.to })
+  }
+  switch (node.name) {
+    case "Table":
+      pushIfPresent(collector.tables, collectTableBlockSpec(collector.state, collector.markdownValue, node.from, node.to))
+      return
+    case "Blockquote":
+      if (collector.hasCalloutMarker) {
+        pushIfPresent(collector.callouts, parseCalloutBlockquoteSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
+      }
+      return
+    case "Image":
+      pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
+      return
+    case "FencedCode":
+      if (collector.hasMermaidMarker) {
+        pushIfPresent(collector.mermaids, parseMermaidReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
+      }
+  }
+}
+
 const getCachedDocBlocks = (state: EditorState) => {
   const tree = syntaxTree(state)
-  if (
-    cachedDocBlocksEntry &&
-    cachedDocBlocksEntry.doc === state.doc &&
-    cachedDocBlocksEntry.tree === tree
-  ) {
+  if (cachedDocBlocksEntry && cachedDocBlocksEntry.doc === state.doc && cachedDocBlocksEntry.tree === tree) {
     return cachedDocBlocksEntry
   }
-
   const markdownValue = getDocString(state.doc)
   const previewEntries = buildMarkdownLivePreviewEntries(markdownValue, tree.topNode)
-  const tables: TableReplacementSpec[] = []
-  const callouts: CalloutReplacementSpec[] = []
-  const images: ImageReplacementSpec[] = []
-  const mermaids: MermaidReplacementSpec[] = []
-  const hasCalloutMarker = markdownValue.includes("[!")
-  const hasMermaidMarker = /mermaid/i.test(markdownValue)
-
-  tree.iterate({
-    enter(node) {
-      if (node.name === "Table") {
-        tables.push({ from: node.from, to: node.to, markdown: markdownValue.slice(node.from, node.to) })
-      } else if (node.name === "Blockquote" && hasCalloutMarker) {
-        const callout = parseCalloutBlockquoteSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
-        if (callout) callouts.push(callout)
-      } else if (node.name === "Image") {
-        const img = parseImageReplacementSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
-        if (img) images.push(img)
-      } else if (node.name === "FencedCode" && hasMermaidMarker) {
-        const mermaid = parseMermaidReplacementSpec(markdownValue.slice(node.from, node.to), node.from, node.to)
-        if (mermaid) mermaids.push(mermaid)
-      }
-    },
-  })
-
-  const maths = collectMathReplacementSpecs(markdownValue)
+  const collector: DocBlockCollector = {
+    state,
+    markdownValue,
+    hasCalloutMarker: markdownValue.includes("[!"),
+    hasMermaidMarker: /mermaid/i.test(markdownValue),
+    tables: [],
+    callouts: [],
+    images: [],
+    mermaids: [],
+    literalRanges: [],
+  }
+  tree.iterate({ enter: (node) => enterSyntaxNodeForDocBlocks(node, collector) })
+  const { tables, callouts, images, mermaids, literalRanges } = collector
+  const maths = collectMathReplacementSpecs(markdownValue, -1, -1, false, literalRanges)
   const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [tables, callouts, images, maths, mermaids])
-
   cachedDocBlocksEntry = { doc: state.doc, tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, activeWatchRanges }
   return cachedDocBlocksEntry
 }
@@ -452,48 +469,66 @@ const appendSinglePlanSpecDecoration = (
   if (markDeco) ctx.decorations.push(markDeco.range(spec.from, spec.to))
 }
 
+const appendBlockWidgetDecorations = (
+  decorations: Range<Decoration>[],
+  groups: {
+    tables: readonly TableReplacementSpec[]
+    callouts: readonly CalloutReplacementSpec[]
+    images: readonly ImageReplacementSpec[]
+    maths: readonly MathReplacementSpec[]
+    mermaids: readonly MermaidReplacementSpec[]
+  }
+) => {
+  for (const t of groups.tables) {
+    decorations.push(Decoration.replace({ widget: new MarkdownTableWidget(t.markdown, t.from, t.to) }).range(t.from, t.to))
+  }
+  for (const c of groups.callouts) {
+    decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
+  }
+  for (const img of groups.images) {
+    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt) }).range(img.from, img.to))
+  }
+  for (const m of groups.maths) {
+    decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))
+  }
+  for (const m of groups.mermaids) {
+    decorations.push(Decoration.replace({ widget: new MarkdownMermaidWidget(m.source, m.from) }).range(m.from, m.to))
+  }
+}
+
 export const buildDecorations = (state: EditorState): DecorationSet => {
   const currentMode = state.field(editorModeField, false) ?? "live"
   if (currentMode === "source") return Decoration.none
 
-  const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } =
-    getCachedDocBlocks(state)
-  const selections = state.selection.ranges.map(({ from, to }) => ({ from, to }))
-  const isComposing = state.field(compositionField, false) ?? false
+  const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } = getCachedDocBlocks(state)
+  const selections = currentMode === "reading" ? [] : state.selection.ranges.map(({ from, to }) => ({ from, to }))
+  const isComposing = currentMode === "reading" ? false : (state.field(compositionField, false) ?? false)
   const disableMermaid = state.field(disableMermaidField, false) ?? false
   const compSel = state.selection.main
   const compLine = isComposing ? state.doc.lineAt(compSel.head) : null
   const compFrom = compLine ? Math.min(compSel.from, compLine.from) : compSel.from
   const compTo = compLine ? Math.max(compSel.to, compLine.to) : compSel.to
 
-  const isEligibleReplacement = (from: number, to: number) =>
+  const isEligible = (from: number, to: number) =>
     !isTokenActive(from, to, selections) && !(isComposing && compFrom <= to && compTo >= from)
 
-  const tableReplacements = tables.filter((item) => isEligibleReplacement(item.from, item.to))
-  const calloutReplacements = callouts.filter((item) => isEligibleReplacement(item.from, item.to))
-  const imageReplacements = images.filter((item) => isEligibleReplacement(item.from, item.to))
-  const mathReplacements = maths.filter((item) => isEligibleReplacement(item.from, item.to))
-  const mermaidReplacements = disableMermaid
-    ? []
-    : mermaids.filter((item) => isEligibleReplacement(item.from, item.to))
-
+  const filtered = {
+    tables: tables.filter((item) => isEligible(item.from, item.to)),
+    callouts: callouts.filter((item) => isEligible(item.from, item.to)),
+    images: images.filter((item) => isEligible(item.from, item.to)),
+    maths: maths.filter((item) => isEligible(item.from, item.to)),
+    mermaids: disableMermaid ? [] : mermaids.filter((item) => isEligible(item.from, item.to)),
+  }
   const replacedRanges = [
-    ...tableReplacements,
-    ...calloutReplacements,
-    ...imageReplacements,
-    ...mathReplacements,
-    ...mermaidReplacements,
-  ].sort((a, b) => (a.from !== b.from ? a.from - b.from : a.to - b.to))
+    ...filtered.tables, ...filtered.callouts, ...filtered.images, ...filtered.maths, ...filtered.mermaids,
+  ].sort((a, b) => a.from - b.from || a.to - b.to)
 
-  const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections)
+  const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections, false, currentMode)
   const decorations: Range<Decoration>[] = []
   const ctx: PlanSpecDecorationContext = {
-    state,
-    markdownValue,
-    selections,
+    state, markdownValue, selections, decorations,
     styledHeadingLineStarts: new Set<number>(),
     styledCodeFenceLineStarts: new Set<number>(),
-    decorations,
   }
 
   for (const spec of plan) {
@@ -503,35 +538,29 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
     appendSinglePlanSpecDecoration(spec, ctx)
   }
 
-  for (const t of tableReplacements) {
-    decorations.push(
-      Decoration.replace({ widget: new MarkdownTableWidget(t.markdown, t.from, t.to) }).range(t.from, t.to)
-    )
-  }
-  for (const c of calloutReplacements) {
-    decorations.push(
-      Decoration.replace({
-        widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState),
-      }).range(c.from, c.to)
-    )
-  }
-  for (const img of imageReplacements) {
-    decorations.push(
-      Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt) }).range(img.from, img.to)
-    )
-  }
-  for (const m of mathReplacements) {
-    decorations.push(
-      Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to)
-    )
-  }
-  for (const m of mermaidReplacements) {
-    decorations.push(
-      Decoration.replace({ widget: new MarkdownMermaidWidget(m.source, m.from) }).range(m.from, m.to)
-    )
-  }
-
+  appendBlockWidgetDecorations(decorations, filtered)
   return Decoration.set(decorations, true)
+}
+
+const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): boolean =>
+  effects.some(
+    (effect) =>
+      effect.is(setComposition) ||
+      (effect.is(setPointerSelecting) && !effect.value) ||
+      effect.is(setEditorMode) ||
+      effect.is(setDisableMermaid)
+  )
+
+const canReuseSelectionDecorations = (startState: EditorState, nextState: EditorState): boolean => {
+  if ((nextState.field(editorModeField, false) ?? "live") === "reading") return true
+  const isComposing =
+    (nextState.field(compositionField, false) ?? false) || (startState.field(compositionField, false) ?? false)
+  if (isComposing) return false
+  return haveSameActiveWatchHits(
+    getCachedDocBlocks(nextState).activeWatchRanges,
+    startState.selection.ranges,
+    nextState.selection.ranges
+  )
 }
 
 export const decorationField = StateField.define<DecorationSet>({
@@ -540,34 +569,14 @@ export const decorationField = StateField.define<DecorationSet>({
     if ((transaction.state.field(pointerSelectingField, false) ?? false) && !transaction.docChanged) {
       return decorations.map(transaction.changes)
     }
-    const hasRelevantEffect = transaction.effects.some(
-      (effect) =>
-        effect.is(setComposition) ||
-        (effect.is(setPointerSelecting) && !effect.value) ||
-        effect.is(setEditorMode) ||
-        effect.is(setDisableMermaid)
-    )
+    const hasRelevantEffect = hasRelevantDecorationEffect(transaction.effects)
     const treeChanged = syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
     if (!transaction.docChanged && !treeChanged && !hasRelevantEffect) {
-      if (!transaction.selection) return decorations
-      const isComposing =
-        (transaction.state.field(compositionField, false) ?? false) ||
-        (transaction.startState.field(compositionField, false) ?? false)
-      if (
-        !isComposing &&
-        haveSameActiveWatchHits(
-          getCachedDocBlocks(transaction.state).activeWatchRanges,
-          transaction.startState.selection.ranges,
-          transaction.state.selection.ranges
-        )
-      ) {
+      if (!transaction.selection || canReuseSelectionDecorations(transaction.startState, transaction.state)) {
         return decorations
       }
     }
-    return transaction.docChanged ||
-      transaction.selection ||
-      treeChanged ||
-      hasRelevantEffect
+    return transaction.docChanged || transaction.selection || treeChanged || hasRelevantEffect
       ? buildDecorations(transaction.state)
       : decorations.map(transaction.changes)
   },

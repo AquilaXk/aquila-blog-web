@@ -3,6 +3,7 @@ import type { CalloutKind, MarkdownSegment } from "src/libs/markdown/rendering"
 import FormulaRender from "src/libs/markdown/FormulaRender"
 import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
+import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 import type { MarkdownImageWidthCommitPayload } from "src/libs/markdown/MarkdownRenderer.types"
 import { formatReadableFileSize, inferLinkProvider, resolveEmbedPreviewUrl } from "src/libs/unfurl/extractMeta"
 
@@ -111,7 +112,9 @@ export const renderMarkdownSegment = ({
           <span className="aq-toggle__caret" aria-hidden="true" />
           <span className="aq-toggle__title">{segment.title}</span>
         </summary>
-        <div className="aq-toggle__body">{renderMarkdown(segment.content, `toggle-body-${index}`)}</div>
+        {segment.content ? (
+          <div className="aq-toggle__body">{renderMarkdown(segment.content, `toggle-body-${index}`)}</div>
+        ) : null}
       </details>
     )
   }
@@ -137,9 +140,11 @@ export const renderMarkdownSegment = ({
             <strong className="aq-callout-title">{resolvedTitle}</strong>
             <span className="aq-callout-fold-chevron" aria-hidden="true" />
           </summary>
-          <div className="aq-callout-box-text aq-callout-body aq-callout-content">
-            {renderMarkdown(segment.content, `callout-body-${index}`, true)}
-          </div>
+          {segment.content ? (
+            <div className="aq-callout-box-text aq-callout-body aq-callout-content">
+              {renderMarkdown(segment.content, `callout-body-${index}`, true)}
+            </div>
+          ) : null}
         </details>
       )
     }
@@ -161,30 +166,46 @@ export const renderMarkdownSegment = ({
               <strong className="aq-callout-title">{segment.title}</strong>
             </div>
           ) : null}
-          {renderMarkdown(segment.content, `callout-body-${index}`, true)}
+          {segment.content ? renderMarkdown(segment.content, `callout-body-${index}`, true) : null}
         </div>
       </div>
     )
   }
 
   if (segment.type === "bookmark") {
-    const providerLabel = segment.provider || segment.siteName || inferLinkProvider(segment.url)
+    const safeUrl = normalizeSafeMarkdownUrl(segment.url || "")
+    const providerLabel =
+      segment.provider || segment.siteName || (safeUrl ? inferLinkProvider(safeUrl) : "")
     const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
+    const cardInner = (
+      <>
+        {thumbnailSrc ? (
+          <div className="aq-link-card-thumb" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
+          </div>
+        ) : null}
+        <div className="aq-link-card-copy">
+          {providerLabel ? <small>{providerLabel}</small> : null}
+          <strong>{segment.title || safeUrl || "북마크"}</strong>
+          {safeUrl ? <span>{safeUrl}</span> : null}
+          {segment.description ? <p>{segment.description}</p> : null}
+        </div>
+      </>
+    )
+
+    if (!safeUrl) {
+      return (
+        <div key={`bookmark-${index}`} className="aq-bookmark-card" data-disabled="true">
+          <div className="aq-bookmark-card__body">{cardInner}</div>
+        </div>
+      )
+    }
+
     return (
       <div key={`bookmark-${index}`} className="aq-bookmark-card">
-        <a href={segment.url} target="_blank" rel="noreferrer">
-          {thumbnailSrc ? (
-            <div className="aq-link-card-thumb" aria-hidden="true">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
-            </div>
-          ) : null}
-          <div className="aq-link-card-copy">
-            {providerLabel ? <small>{providerLabel}</small> : null}
-            <strong>{segment.title || segment.url}</strong>
-            <span>{segment.url}</span>
-            {segment.description ? <p>{segment.description}</p> : null}
-          </div>
+        <a href={safeUrl} target="_blank" rel="noreferrer">
+          {cardInner}
         </a>
       </div>
     )

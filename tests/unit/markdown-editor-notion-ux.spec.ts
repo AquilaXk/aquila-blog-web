@@ -772,7 +772,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       const fakeView = {
         posAtDOM: () => 40,
         state: {
-          doc: { length: tableMd.length + 120 },
+          doc: { length: tableMd.length + 260 },
           selection: { main: { from: 0, to: 0 } },
           facet: () => true,
         },
@@ -855,7 +855,9 @@ test.describe("Notion-parity Markdown editor model", () => {
       dom.querySelectorAll("th")[1].trigger("dragover")
       expect(dom.querySelectorAll("th")[1].classList.contains("is-drop-target-col")).toBe(true)
       dom.querySelectorAll("th")[1].trigger("drop")
-      expect(lastDispatchedInsert).toBe("| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |")
+      expect(lastDispatchedInsert).toBe(
+        '<!-- aq-table {"headerColumn":true,"fitWidth":true,"columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B1 | A1 |\n| B2 | A2 |'
+      )
       expect(
         new MarkdownTableWidget(lastDispatchedInsert, 40, 40 + lastDispatchedInsert.length).updateDOM(
           dom,
@@ -913,7 +915,9 @@ test.describe("Notion-parity Markdown editor model", () => {
       dom.querySelectorAll("tr")[2].trigger("dragover")
       expect(dom.querySelectorAll("tr")[2].classList.contains("is-drop-target-row")).toBe(true)
       dom.querySelectorAll("tr")[2].trigger("drop")
-      expect(lastDispatchedInsert).toBe("| ColB | ColA |\n| --- | --- |\n| B2 | A2 |\n| B1 | A1 |")
+      expect(lastDispatchedInsert).toBe(
+        '<!-- aq-table {"headerColumn":true,"fitWidth":true,"columnWidths":[null,200]} -->\n| ColB | ColA |\n| --- | --- |\n| B2 | A2 |\n| B1 | A1 |'
+      )
 
       const sameShapeWidget = new MarkdownTableWidget(
         "| ColX | ColY |\n| --- | --- |\n| X1 | Y1 |\n| X2 | Y2 |",
@@ -1408,6 +1412,9 @@ test.describe("Notion-parity Markdown editor model", () => {
         appendChild(child: any) {
           this.children.push(child)
           return child
+        },
+        setAttribute(key: string, val: string) {
+          if (key === "href") this.href = val
         },
       }
       return node

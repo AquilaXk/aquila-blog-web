@@ -1,7 +1,23 @@
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import {
-  extractTableLinePrefix, getTableGridPrefixMeta, isInsideInlineCodeSpan, setTableGridPrefixMeta,
+  extractTableLinePrefix,
+  getTableGridPrefixMeta,
+  isInsideInlineCodeSpan,
+  mutateMarkdownTableGridCells,
+  setTableGridPrefixMeta,
 } from "./markdownEditorTableCellModel"
+import {
+  collectLocalTableLineWindow,
+  getTableGridLayoutMeta,
+  isAqTableCommentCandidateLine,
+  parseLeadingTableLayoutLine,
+  reconcileOverwrittenTableCells,
+  serializeMarkdownTableLayoutCommentIfNonDefault,
+  setTableGridLayoutMeta,
+  syncTableLayoutOnGridAction,
+  type ExtendedMarkdownTableLayout,
+  type LocalTableLineSlice,
+} from "./markdownEditorTableMetadataModel"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type MarkdownEditorTableAlignment = "left" | "center" | "right"
@@ -40,6 +56,7 @@ type TableRow = { cells: TableCell[]; start: number; end: number }
 type ActiveTable = {
   header: TableRow; alignments: MarkdownEditorTableAlignment[]; body: TableRow[]
   rangeStart: number; rangeEnd: number; activeRow: number; activeColumn: number
+  layout: ExtendedMarkdownTableLayout | null
 }
 
 const MIN_ROWS = 2
@@ -56,9 +73,7 @@ export type MarkdownEditorTableEditAvailability = {
 
 const isEscapedPipe = (value: string, index: number) => {
   let backslashes = 0
-  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
-    backslashes += 1
-  }
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) backslashes += 1
   return backslashes % 2 === 1
 }
 
@@ -75,7 +90,6 @@ export const isProtectedPipe = (value: string, index: number): boolean => {
 
 const splitTableCells = (line: string, lineStart: number): TableCell[] | null => {
   if (!line.startsWith("|") || !line.endsWith("|")) return null
-
   const segments: Array<{ value: string; start: number }> = []
   let segmentStart = 0
   for (let index = 0; index < line.length; index += 1) {
@@ -84,11 +98,8 @@ const splitTableCells = (line: string, lineStart: number): TableCell[] | null =>
       segmentStart = index + 1
     }
   }
-
-  if (segmentStart !== line.length) return null
-  const inner = segments.slice(1)
-  if (inner.length === 0) return null
-  return inner.map(({ value, start }) => {
+  if (segmentStart !== line.length || segments.length <= 1) return null
+  return segments.slice(1).map(({ value, start }) => {
     const leading = value.length - value.trimStart().length
     const trimmed = value.trim()
     const contentStart = trimmed === "" ? Math.min(1, value.length) : leading
@@ -108,70 +119,14 @@ const parseDelimiterAlignment = (value: string): MarkdownEditorTableAlignment | 
   return value.endsWith(":") ? "right" : "left"
 }
 
-const collectBackwardLines = (value: string, cursorLineStart: number, maxLinesEachWay: number) => {
-  const before: Array<{ text: string; start: number; end: number }> = []
-  let scanStart = cursorLineStart
-  for (let count = 0; count < maxLinesEachWay && scanStart > 0; count += 1) {
-    const lineEnd = scanStart - 1
-    const lineStart = lineEnd === 0 ? 0 : value.lastIndexOf("\n", lineEnd - 1) + 1
-    const text = value.slice(lineStart, lineEnd)
-    before.push({ text, start: lineStart, end: lineEnd })
-    scanStart = lineStart
-    if (!text.startsWith("|") && !isMetadataLine(text)) break
-  }
-  return before.reverse()
-}
-
-const collectForwardLines = (value: string, cursorLineEnd: number, maxLinesEachWay: number) => {
-  const after: Array<{ text: string; start: number; end: number }> = []
-  let scanEnd = cursorLineEnd
-  for (let count = 0; count < maxLinesEachWay && scanEnd < value.length; count += 1) {
-    const lineStart = scanEnd + 1
-    const nextBreak = value.indexOf("\n", lineStart)
-    const lineEnd = nextBreak === -1 ? value.length : nextBreak
-    const text = value.slice(lineStart, lineEnd)
-    after.push({ text, start: lineStart, end: lineEnd })
-    scanEnd = lineEnd
-    if (!text.startsWith("|")) break
-  }
-  return after
-}
-
-const collectLocalLineWindow = (value: string, offset: number, maxLinesEachWay: number) => {
-  const clamped = Math.max(0, Math.min(offset, value.length))
-  const cursorLineStart = clamped === 0 ? 0 : value.lastIndexOf("\n", clamped - 1) + 1
-  const cursorNextBreak = value.indexOf("\n", clamped)
-  const cursorLineEnd = cursorNextBreak === -1 ? value.length : cursorNextBreak
-  const cursorLineText = value.slice(cursorLineStart, cursorLineEnd)
-  if (!cursorLineText.startsWith("|") || !cursorLineText.endsWith("|")) return []
-
-  const before = collectBackwardLines(value, cursorLineStart, maxLinesEachWay)
-  const after = collectForwardLines(value, cursorLineEnd, maxLinesEachWay)
-  return [...before, { text: cursorLineText, start: cursorLineStart, end: cursorLineEnd }, ...after]
-}
-
-const isOffsetInsideFencedCode = (value: string, offset: number) =>
-  isOffsetInsideFencedCodeBlock(value, offset)
-
-const isMetadataLine = (line: string) => /^\s*<!--\s*aq-table(?:\s|$)/i.test(line)
-
 const findCellAtOffset = (row: TableRow, offset: number) =>
   row.cells.findIndex((cell) => offset >= cell.contextStart && offset <= cell.contextEnd)
 
 let lastActiveTableCache: {
-  value: string
-  selectionStart: number
-  selectionEnd: number
-  table: ActiveTable | null
+  value: string; selectionStart: number; selectionEnd: number; table: ActiveTable | null
 } | null = null
 
-type LocalLineSlice = { text: string; start: number; end: number }
-
-const collectTableBodyRows = (
-  lines: LocalLineSlice[],
-  startIndex: number,
-  expectedColumnCount: number
-): TableRow[] => {
+const collectTableBodyRows = (lines: LocalTableLineSlice[], startIndex: number, expectedColumnCount: number): TableRow[] => {
   const body: TableRow[] = []
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index]!
@@ -182,8 +137,27 @@ const collectTableBodyRows = (
   return body
 }
 
+const resolveTableHeaderLeadingLayout = (
+  lines: LocalTableLineSlice[],
+  headerIndex: number,
+  headerStart: number
+): { rangeStart: number; layout: ExtendedMarkdownTableLayout | null } | null => {
+  if (headerIndex <= 0) {
+    return { rangeStart: headerStart, layout: null }
+  }
+  const prevLine = lines[headerIndex - 1]!
+  const parsedComment = parseLeadingTableLayoutLine(prevLine.text)
+  if (parsedComment.kind === "malformed") {
+    return null
+  }
+  if (parsedComment.kind === "valid") {
+    return { rangeStart: prevLine.start, layout: parsedComment.layout }
+  }
+  return { rangeStart: headerStart, layout: null }
+}
+
 const parseActiveTableAtHeader = (
-  lines: LocalLineSlice[],
+  lines: LocalTableLineSlice[],
   headerIndex: number,
   selectionStart: number
 ): ActiveTable | null => {
@@ -192,7 +166,9 @@ const parseActiveTableAtHeader = (
   const headerCells = splitTableCells(headerLine.text, headerLine.start)
   const delimiterCells = splitTableCells(delimiterLine.text, delimiterLine.start)
   if (!headerCells || !delimiterCells || headerCells.length !== delimiterCells.length) return null
-  if (headerIndex > 0 && isMetadataLine(lines[headerIndex - 1]!.text)) return null
+
+  const leading = resolveTableHeaderLeadingLayout(lines, headerIndex, headerLine.start)
+  if (!leading) return null
 
   const alignments = delimiterCells.map((cell) => parseDelimiterAlignment(cell.value))
   if (alignments.includes(null)) return null
@@ -211,10 +187,11 @@ const parseActiveTableAtHeader = (
     header,
     alignments: alignments as MarkdownEditorTableAlignment[],
     body,
-    rangeStart: header.start,
+    rangeStart: leading.rangeStart,
     rangeEnd: body.at(-1)!.end,
     activeRow,
     activeColumn,
+    layout: leading.layout,
   }
 }
 
@@ -223,8 +200,8 @@ const findActiveTableUncached = (value: string, selectionStart: number, selectio
   const lineStart = selectionStart > 0 ? value.lastIndexOf("\n", selectionStart - 1) + 1 : 0
   const nextBreak = value.indexOf("\n", selectionStart)
   if (!value.slice(lineStart, nextBreak === -1 ? value.length : nextBreak).includes("|")) return null
-  const lines = collectLocalLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
-  if (lines.length < 3 || isOffsetInsideFencedCode(value, selectionStart)) return null
+  const lines = collectLocalTableLineWindow(value, selectionStart, MAX_EDIT_ROWS + 3)
+  if (lines.length < 3 || isOffsetInsideFencedCodeBlock(value, selectionStart)) return null
 
   for (let headerIndex = 0; headerIndex + 2 < lines.length; headerIndex += 1) {
     const candidate = parseActiveTableAtHeader(lines, headerIndex, selectionStart)
@@ -253,12 +230,22 @@ const escapeGridCell = (value: string) => {
   return flat.replace(/\|/g, (m, idx) => (isEscapedPipe(flat, idx) ? m : "\\|"))
 }
 
+const formatDelimiterAlignment = (alignment: MarkdownEditorTableAlignment): string => {
+  if (alignment === "center") return ":---:"
+  return alignment === "right" ? "---:" : "---"
+}
+
 const serializeGridLines = (grid: MarkdownTableGrid, escapePipes: boolean): string[] => {
   const { firstLinePrefix, linePrefix } = getTableGridPrefixMeta(grid)
-  const delimiter = grid.alignments.map((a) => (a === "center" ? ":---:" : a === "right" ? "---:" : "---"))
+  const commentLine = serializeMarkdownTableLayoutCommentIfNonDefault(
+    getTableGridLayoutMeta(grid),
+    firstLinePrefix || linePrefix
+  )
+  const delimiter = grid.alignments.map(formatDelimiterAlignment)
   const formatCell = escapePipes ? escapeGridCell : (cell: string) => cell
   return [
-    serializeRow(grid.headers.map(formatCell), firstLinePrefix),
+    ...(commentLine ? [commentLine] : []),
+    serializeRow(grid.headers.map(formatCell), commentLine ? linePrefix : firstLinePrefix),
     serializeRow(delimiter, linePrefix),
     ...grid.rows.map((row) => serializeRow(grid.headers.map((_, col) => formatCell(row[col] ?? "")), linePrefix)),
   ]
@@ -273,11 +260,15 @@ const selectionOffset = (lines: string[], row: number, column: number) => {
   return offset + cell.sourceStart
 }
 
-const toActiveGrid = (table: ActiveTable): MarkdownTableGrid => ({
-  headers: table.header.cells.map((cell) => cell.value),
-  alignments: [...table.alignments],
-  rows: table.body.map((row) => row.cells.map((cell) => cell.value)),
-})
+const toActiveGrid = (table: ActiveTable): MarkdownTableGrid => {
+  const grid: MarkdownTableGrid = {
+    headers: table.header.cells.map((cell) => cell.value),
+    alignments: [...table.alignments],
+    rows: table.body.map((row) => row.cells.map((cell) => cell.value)),
+  }
+  if (table.layout) setTableGridLayoutMeta(grid, table.layout)
+  return grid
+}
 
 const planForGrid = (
   rangeStart: number,
@@ -287,8 +278,9 @@ const planForGrid = (
   column: number
 ): PlannedTextMutation => {
   const lines = serializeGridLines(grid, false)
+  const commentOffset = lines[0] && isAqTableCommentCandidateLine(lines[0]) ? 1 : 0
   const replacement = lines.join("\n")
-  const cursorOffset = selectionOffset(lines, row === 0 ? 0 : row + 1, column)
+  const cursorOffset = selectionOffset(lines, (row === 0 ? 0 : row + 1) + commentOffset, column)
   return {
     rangeStart,
     rangeEnd,
@@ -304,133 +296,12 @@ const mutateTableGrid = (
   activeCol: number,
   action: MarkdownTableGridAction
 ): { nextRow: number; nextCol: number } | null => {
-  const colCount = grid.headers.length
-  if (colCount === 0) return null
-
-  switch (action.kind) {
-    case "tab": {
-      const totalRows = grid.rows.length + 1
-      const cellIndex = activeRow * colCount + activeCol
-      const target = action.direction === "next" ? cellIndex + 1 : cellIndex - 1
-      if (target >= 0 && target < totalRows * colCount) {
-        return { nextRow: Math.floor(target / colCount), nextCol: target % colCount }
-      }
-      if (action.direction === "previous" || totalRows >= MAX_EDIT_ROWS) return null
-      grid.rows.push(Array.from({ length: colCount }, () => ""))
-      return { nextRow: grid.rows.length, nextCol: 0 }
-    }
-    case "enter": {
-      if (activeRow < grid.rows.length) {
-        return { nextRow: activeRow + 1, nextCol: activeCol }
-      }
-      if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
-      grid.rows.push(Array.from({ length: colCount }, () => ""))
-      return { nextRow: grid.rows.length, nextCol: activeCol }
-    }
-    case "add-row":
-    case "insert-row-above": {
-      if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
-      const insertAt = Math.max(0, action.kind === "add-row" ? activeRow : activeRow - 1)
-      grid.rows.splice(insertAt, 0, Array.from({ length: colCount }, () => ""))
-      return { nextRow: insertAt + 1, nextCol: activeCol }
-    }
-    case "move-row-up":
-    case "move-row-down":
-    case "move-row-to": {
-      const targetRow =
-        action.kind === "move-row-to"
-          ? action.targetRow
-          : action.kind === "move-row-up"
-            ? activeRow - 1
-            : activeRow + 1
-      if (activeRow < 1 || activeRow > grid.rows.length || targetRow < 1 || targetRow > grid.rows.length || targetRow === activeRow) {
-        return null
-      }
-      const [moved] = grid.rows.splice(activeRow - 1, 1)
-      if (!moved) return null
-      grid.rows.splice(targetRow - 1, 0, moved)
-      return { nextRow: targetRow, nextCol: activeCol }
-    }
-    case "duplicate-row": {
-      if (grid.rows.length + 2 > MAX_EDIT_ROWS) return null
-      const sourceCells = activeRow === 0 ? grid.headers : (grid.rows[activeRow - 1] ?? grid.headers)
-      const insertAt = Math.max(0, activeRow)
-      grid.rows.splice(insertAt, 0, [...sourceCells])
-      return { nextRow: insertAt + 1, nextCol: activeCol }
-    }
-    case "clear-row": {
-      const target = activeRow === 0 ? grid.headers : grid.rows[activeRow - 1]
-      if (!target) return null
-      target.fill("")
-      return { nextRow: activeRow, nextCol: activeCol }
-    }
-    case "delete-row": {
-      if (activeRow === 0 || grid.rows.length + 1 <= MIN_ROWS) return null
-      grid.rows.splice(activeRow - 1, 1)
-      return { nextRow: Math.min(activeRow, grid.rows.length), nextCol: activeCol }
-    }
-    case "add-column":
-    case "insert-column-left":
-    case "duplicate-column": {
-      if (colCount >= MAX_EDIT_COLUMNS) return null
-      const insertAt = action.kind === "insert-column-left" ? activeCol : activeCol + 1
-      const isDup = action.kind === "duplicate-column"
-      grid.headers.splice(insertAt, 0, isDup ? (grid.headers[activeCol] ?? "") : "")
-      grid.alignments.splice(insertAt, 0, isDup ? (grid.alignments[activeCol] ?? "left") : "left")
-      for (const row of grid.rows) row.splice(insertAt, 0, isDup ? (row[activeCol] ?? "") : "")
-      return { nextRow: activeRow, nextCol: insertAt }
-    }
-    case "move-column-left":
-    case "move-column-right":
-    case "move-column-to": {
-      const targetCol =
-        action.kind === "move-column-to"
-          ? action.targetCol
-          : action.kind === "move-column-left"
-            ? activeCol - 1
-            : activeCol + 1
-      if (activeCol < 0 || activeCol >= colCount || targetCol < 0 || targetCol >= colCount || targetCol === activeCol) {
-        return null
-      }
-      const move = <T>(items: T[]) => {
-        const [item] = items.splice(activeCol, 1)
-        if (item !== undefined) items.splice(targetCol, 0, item)
-      }
-      move(grid.headers)
-      move(grid.alignments)
-      for (const row of grid.rows) move(row)
-      return { nextRow: activeRow, nextCol: targetCol }
-    }
-    case "clear-column": {
-      if (activeCol < 0 || activeCol >= colCount) return null
-      grid.headers[activeCol] = ""
-      for (const row of grid.rows) row[activeCol] = ""
-      return { nextRow: activeRow, nextCol: activeCol }
-    }
-    case "delete-column": {
-      if (colCount <= 1) return null
-      grid.headers.splice(activeCol, 1)
-      grid.alignments.splice(activeCol, 1)
-      for (const row of grid.rows) row.splice(activeCol, 1)
-      return { nextRow: activeRow, nextCol: Math.min(activeCol, grid.headers.length - 1) }
-    }
-    case "set-alignment": {
-      grid.alignments[activeCol] = action.alignment
-      return { nextRow: activeRow, nextCol: activeCol }
-    }
-    case "add-row-and-column": {
-      if (colCount >= MAX_EDIT_COLUMNS && grid.rows.length + 2 > MAX_EDIT_ROWS) return null
-      if (colCount < MAX_EDIT_COLUMNS) {
-        grid.headers.push("")
-        grid.alignments.push("left")
-        for (const row of grid.rows) row.push("")
-      }
-      if (grid.rows.length + 2 <= MAX_EDIT_ROWS) {
-        grid.rows.push(Array.from({ length: grid.headers.length }, () => ""))
-      }
-      return { nextRow: grid.rows.length, nextCol: grid.headers.length - 1 }
-    }
-  }
+  const colCountBefore = grid.headers.length
+  const bodyRowCountBefore = grid.rows.length
+  const outcome = mutateMarkdownTableGridCells(grid, activeRow, activeCol, action)
+  if (!outcome) return null
+  syncTableLayoutOnGridAction(grid, colCountBefore, bodyRowCountBefore, activeRow, activeCol, action)
+  return outcome
 }
 
 export const createMarkdownEditorTable = (rows: number, columns: number): MarkdownEditorTableSnippet | null => {
@@ -444,10 +315,7 @@ export const createMarkdownEditorTable = (rows: number, columns: number): Markdo
 }
 
 const planActiveTableAction = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number,
-  action: MarkdownTableGridAction
+  value: string, selectionStart: number, selectionEnd: number, action: MarkdownTableGridAction
 ): PlannedTextMutation | null => {
   const table = findActiveTable(value, selectionStart, selectionEnd)
   if (!table) return null
@@ -457,16 +325,11 @@ const planActiveTableAction = (
 }
 
 export const planMarkdownEditorTableEdit = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number,
-  edit: MarkdownEditorTableEdit
+  value: string, selectionStart: number, selectionEnd: number, edit: MarkdownEditorTableEdit
 ): PlannedTextMutation | null => planActiveTableAction(value, selectionStart, selectionEnd, edit)
 
 export const getMarkdownEditorTableEditAvailability = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number
+  value: string, selectionStart: number, selectionEnd: number
 ): MarkdownEditorTableEditAvailability | null => {
   const table = findActiveTable(value, selectionStart, selectionEnd)
   if (!table) return null
@@ -481,8 +344,18 @@ export const getMarkdownEditorTableEditAvailability = (
   }
 }
 
-export const packTableEditAvailabilityMask = (avail: MarkdownEditorTableEditAvailability | null): number =>
-  !avail ? -1 : (avail.addRow ? 1 : 0) | (avail.deleteRow ? 2 : 0) | (avail.addColumn ? 4 : 0) | (avail.deleteColumn ? 8 : 0) | (avail.alignLeft ? 16 : 0) | (avail.alignCenter ? 32 : 0) | (avail.alignRight ? 64 : 0)
+export const packTableEditAvailabilityMask = (avail: MarkdownEditorTableEditAvailability | null): number => {
+  if (!avail) return -1
+  let mask = 0
+  if (avail.addRow) mask |= 1
+  if (avail.deleteRow) mask |= 2
+  if (avail.addColumn) mask |= 4
+  if (avail.deleteColumn) mask |= 8
+  if (avail.alignLeft) mask |= 16
+  if (avail.alignCenter) mask |= 32
+  if (avail.alignRight) mask |= 64
+  return mask
+}
 
 export const unpackTableEditAvailabilityMask = (mask: number): MarkdownEditorTableEditAvailability | null =>
   mask < 0 ? null : {
@@ -495,8 +368,15 @@ export const isMarkdownEditorTableSelection = (value: string, selectionStart: nu
 
 export const resolveTableCellSelectionOffset = (value: string, tableFrom: number, row = 0, col = 0): number | null => {
   if (!Number.isFinite(tableFrom) || tableFrom < 0 || tableFrom >= value.length) return null
-  const firstPipe = value.indexOf("|", tableFrom)
-  const lineEnd = value.indexOf("\n", tableFrom)
+  let scanFrom = tableFrom
+  const initialLineEnd = value.indexOf("\n", scanFrom)
+  const firstLine = value.slice(scanFrom, initialLineEnd === -1 ? value.length : initialLineEnd)
+  if (!firstLine.includes("|")) {
+    if (initialLineEnd === -1 || parseLeadingTableLayoutLine(firstLine).kind !== "valid") return null
+    scanFrom = initialLineEnd + 1
+  }
+  const firstPipe = value.indexOf("|", scanFrom)
+  const lineEnd = value.indexOf("\n", scanFrom)
   if (firstPipe === -1 || (lineEnd !== -1 && firstPipe > lineEnd)) return null
   const table = findActiveTable(value, firstPipe + 1, firstPipe + 1)
   if (!table) return null
@@ -506,10 +386,7 @@ export const resolveTableCellSelectionOffset = (value: string, tableFrom: number
 }
 
 export const planMarkdownEditorTableTab = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number,
-  direction: MarkdownEditorTableTabDirection
+  value: string, selectionStart: number, selectionEnd: number, direction: MarkdownEditorTableTabDirection
 ): PlannedTextMutation | null =>
   planActiveTableAction(value, selectionStart, selectionEnd, { kind: "tab", direction: direction === "next" ? "next" : "previous" })
 
@@ -520,39 +397,59 @@ export const planMarkdownEditorTableEnter = (value: string, selectionStart: numb
 
 const parseGridLineCells = (line: string): string[] => {
   const trimmed = extractTableLinePrefix(line).content.trim()
-  const normalized = `${trimmed.startsWith("|") ? "" : "|"}${trimmed}${trimmed.endsWith("|") && !isEscapedPipe(trimmed, trimmed.length - 1) ? "" : "|"}`
+  const lead = trimmed.startsWith("|") ? "" : "|"
+  const hasTrailingPipe = trimmed.endsWith("|") && !isEscapedPipe(trimmed, trimmed.length - 1)
+  const normalized = `${lead}${trimmed}${hasTrailingPipe ? "" : "|"}`
   return (splitTableCells(normalized, 0) ?? []).map((cell) => cell.value.replaceAll("\\|", "|"))
 }
 
+const parseGridAlignments = (columnCount: number, secondLine: string | undefined): {
+  hasDelimiter: boolean
+  alignments: MarkdownEditorTableAlignment[]
+} => {
+  const hasDelimiter = Boolean(secondLine && /^[\s|:-]+$/.test(secondLine) && secondLine.includes("-"))
+  const rawCells = hasDelimiter && secondLine ? parseGridLineCells(secondLine) : []
+  const alignments: MarkdownEditorTableAlignment[] = Array.from({ length: columnCount }, (_, col) => {
+    const token = (rawCells[col] ?? "").trim()
+    if (token.startsWith(":") && token.endsWith(":")) return "center"
+    return token.endsWith(":") ? "right" : "left"
+  })
+  return { hasDelimiter, alignments }
+}
+
 export const parseMarkdownTableGrid = (markdown: string): MarkdownTableGrid | null => {
-  const lines = markdown.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  const nonEmptyLines = markdown.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  if (nonEmptyLines.length === 0) return null
+
+  let layout: ExtendedMarkdownTableLayout | null = null
+  let lines = nonEmptyLines
+  let commentPrefix = ""
+  const parsedComment = parseLeadingTableLayoutLine(nonEmptyLines[0]!)
+  if (parsedComment.kind === "malformed") return null
+  if (parsedComment.kind === "valid") {
+    layout = parsedComment.layout
+    commentPrefix = extractTableLinePrefix(nonEmptyLines[0]!).prefix
+    lines = nonEmptyLines.slice(1)
+  }
   if (lines.length === 0) return null
 
-  const firstPrefix = extractTableLinePrefix(lines[0]!).prefix
+  const firstPrefix = commentPrefix || extractTableLinePrefix(lines[0]!).prefix
   const secondParsed = lines[1] ? extractTableLinePrefix(lines[1]) : undefined
-  const linePrefix = secondParsed?.prefix || firstPrefix
+  const linePrefix = secondParsed?.prefix || extractTableLinePrefix(lines[0]!).prefix || firstPrefix
 
   const headers = parseGridLineCells(lines[0]!)
   if (headers.length === 0) return null
 
-  const secondLine = secondParsed?.content
-  const hasDelimiter = Boolean(secondLine && /^[\s|:-]+$/.test(secondLine) && secondLine.includes("-"))
-  const rawDelimiterCells = hasDelimiter && secondLine ? parseGridLineCells(secondLine) : []
-  const alignments: MarkdownEditorTableAlignment[] = headers.map((_, col) => {
-    const token = (rawDelimiterCells[col] ?? "").trim()
-    if (token.startsWith(":") && token.endsWith(":")) return "center"
-    return token.endsWith(":") ? "right" : "left"
-  })
-
-  const bodyStartIndex = hasDelimiter ? 2 : 1
+  const { hasDelimiter, alignments } = parseGridAlignments(headers.length, secondParsed?.content)
   const rows: string[][] = []
-  for (let index = bodyStartIndex; index < lines.length; index += 1) {
+  for (let index = hasDelimiter ? 2 : 1; index < lines.length; index += 1) {
     const parsed = parseGridLineCells(lines[index]!)
     rows.push(Array.from({ length: headers.length }, (_, col) => parsed[col] ?? ""))
   }
 
   const grid: MarkdownTableGrid = { headers, alignments, rows }
   setTableGridPrefixMeta(grid, { firstLinePrefix: firstPrefix, linePrefix })
+  if (layout) setTableGridLayoutMeta(grid, layout)
   return grid
 }
 
@@ -560,25 +457,22 @@ export const serializeMarkdownTableGrid = (grid: MarkdownTableGrid): string =>
   serializeGridLines(grid, true).join("\n")
 
 export const applyMarkdownTableGridCellEdit = (
-  markdown: string,
-  row: number,
-  col: number,
-  nextValue: string
+  markdown: string, row: number, col: number, nextValue: string
 ): string | null => {
   const grid = parseMarkdownTableGrid(markdown)
   if (!grid || col < 0 || col >= grid.headers.length || row < 0 || row > grid.rows.length) return null
   if (row === 0) grid.headers[col] = nextValue
   else grid.rows[row - 1]![col] = nextValue
+  if (nextValue.trim().length > 0) {
+    reconcileOverwrittenTableCells(grid, [{ row, col }])
+  }
   return serializeMarkdownTableGrid(grid)
 }
 
 export const updateMarkdownTableCell = applyMarkdownTableGridCellEdit
 
 export const applyMarkdownTableGridAction = (
-  markdown: string,
-  row: number,
-  col: number,
-  action: MarkdownTableGridAction
+  markdown: string, row: number, col: number, action: MarkdownTableGridAction
 ): { markdown: string; nextRow: number; nextCol: number } | null => {
   const grid = parseMarkdownTableGrid(markdown)
   if (!grid || grid.headers.length === 0) return null

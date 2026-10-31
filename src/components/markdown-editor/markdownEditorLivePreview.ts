@@ -1,5 +1,9 @@
 import { GFM, parser } from "@lezer/markdown"
-import { INLINE_COLOR_TOKEN_REGEX, resolveInlineColorValue } from "../../libs/markdown/inlineColor"
+import { resolveInlineColorValue } from "../../libs/markdown/inlineColor"
+import { findMarkdownHighlightSpans } from "../../libs/markdown/inlineHighlightModel"
+import { findDoubleBraceColorSpans } from "../../libs/markdown/inlineTokenScanners"
+
+export type MarkdownEditorSurfaceMode = "live" | "source" | "reading"
 
 const fallbackMarkdownParser = parser.configure(GFM)
 
@@ -27,10 +31,7 @@ export const unpackLivePreviewEntryMeta = (packed: number) => ({
   level: (packed >>> 13) & 0x7,
 })
 
-export type MarkdownLiveSelection = {
-  from: number
-  to: number
-}
+export type MarkdownLiveSelection = { from: number; to: number }
 
 type MarkdownSyntaxNode = {
   name: string
@@ -46,23 +47,10 @@ export type MarkdownLivePreviewDecoration = {
   from: number
   to: number
   kind:
-    | "hide-mark"
-    | "heading"
-    | "strong"
-    | "emphasis"
-    | "strikethrough"
-    | "inline-code"
-    | "link"
-    | "task"
-    | "quote"
-    | "quote-mark"
-    | "list"
-    | "list-marker"
-    | "fenced-code"
-    | "horizontal-rule"
-    | "inline-color"
-    | "highlight"
-    | "wikilink"
+    | "hide-mark" | "heading" | "strong" | "emphasis" | "strikethrough"
+    | "inline-code" | "link" | "task" | "quote" | "quote-mark"
+    | "list" | "list-marker" | "fenced-code" | "horizontal-rule"
+    | "inline-color" | "highlight" | "wikilink"
   level?: number
   color?: string
   target?: string
@@ -74,7 +62,6 @@ export type MarkdownLivePreviewDecoration = {
 export type MarkdownLivePreviewDecorationSpec = MarkdownLivePreviewDecoration
 
 const WIKILINK_TOKEN_REGEX = /\[\[([^\]\r\n]+)\]\]/g
-const HIGHLIGHT_TOKEN_REGEX = /(?<!=)==((?:[^\r\n=]|=(?!=))+?)==(?!=)/g
 
 const clampOffset = (offset: number, length: number) => Math.max(0, Math.min(offset, length))
 
@@ -262,13 +249,23 @@ const cachedPreviewEntriesByNode = new WeakMap<
   { markdown: string; entries: readonly MarkdownLivePreviewPlanEntry[] }
 >()
 
+const BLOCK_LITERAL_NODE_NAMES = new Set(["FencedCode", "CodeBlock", "HTMLBlock"])
 const LITERAL_NODE_NAMES = new Set([
-  "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag", "URL",
+  "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag", "URL", "Autolink",
 ])
 
-const collectLiteralRanges = (rootNode: MarkdownSyntaxNode): MarkdownLiveSourceRange[] => {
+const collectLiteralRanges = (
+  rootNode: MarkdownSyntaxNode
+): { literalRanges: MarkdownLiveSourceRange[]; blockLiteralRanges: MarkdownLiveSourceRange[] } => {
   const literalRanges: MarkdownLiveSourceRange[] = []
+  const blockLiteralRanges: MarkdownLiveSourceRange[] = []
   const walk = (node: MarkdownSyntaxNode) => {
+    if (BLOCK_LITERAL_NODE_NAMES.has(node.name)) {
+      const range = { from: node.from, to: node.to }
+      blockLiteralRanges.push(range)
+      literalRanges.push(range)
+      return
+    }
     if (LITERAL_NODE_NAMES.has(node.name)) {
       literalRanges.push({ from: node.from, to: node.to })
       return
@@ -278,71 +275,103 @@ const collectLiteralRanges = (rootNode: MarkdownSyntaxNode): MarkdownLiveSourceR
     }
   }
   walk(rootNode)
-  return literalRanges
+  return { literalRanges, blockLiteralRanges }
 }
 
-const collectRegexPlanEntries = (
+const isWrappedSpanBlockedByLiterals = (
+  span: { from: number; to: number; contentFrom: number; contentTo: number },
+  blockLiteralRanges: readonly MarkdownLiveSourceRange[],
+  literalRanges: readonly MarkdownLiveSourceRange[],
+  wikilinkRanges: readonly MarkdownLiveSourceRange[]
+): boolean =>
+  hasEnclosingInterval(blockLiteralRanges, span.from, span.to) ||
+  hasIntervalOverlap(literalRanges, span.from, span.contentFrom) ||
+  hasIntervalOverlap(literalRanges, span.contentTo, span.to) ||
+  hasIntervalOverlap(wikilinkRanges, span.from, span.contentFrom) ||
+  hasIntervalOverlap(wikilinkRanges, span.contentTo, span.to)
+
+const collectWikilinkEntries = (
   markdown: string,
   literalRanges: readonly MarkdownLiveSourceRange[],
   entries: MarkdownLivePreviewPlanEntry[]
 ): MarkdownLiveSourceRange[] => {
   const wikilinkRanges: MarkdownLiveSourceRange[] = []
-  if (markdown.includes("[[")) {
-    for (const match of markdown.matchAll(WIKILINK_TOKEN_REGEX)) {
-      const from = match.index
-      const to = from + match[0].length
-      if (hasIntervalOverlap(literalRanges, from, to)) continue
+  if (!markdown.includes("[[")) return wikilinkRanges
+  for (const match of markdown.matchAll(WIKILINK_TOKEN_REGEX)) {
+    const from = match.index
+    const to = from + match[0].length
+    if (hasIntervalOverlap(literalRanges, from, to)) continue
 
-      const raw = match[1]
-      const pipeIndex = raw.indexOf("|")
-      const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).replace(/\\$/, "").trim()
-      const rawAlias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
-      const alias = rawAlias || undefined
-      if (!target) continue
+    const raw = match[1]
+    const pipeIndex = raw.indexOf("|")
+    const target = pipeIndex === -1 ? raw.trim() : raw.slice(0, pipeIndex).replace(/\\$/, "").trim()
+    const rawAlias = pipeIndex === -1 ? undefined : raw.slice(pipeIndex + 1).trim()
+    const alias = rawAlias || undefined
+    if (!target) continue
 
-      const activeRange = { from, to }
-      wikilinkRanges.push(activeRange)
-      entries.push(createPlanEntry({ from, to, kind: "wikilink", target, alias }, activeRange))
-    }
+    const activeRange = { from, to }
+    wikilinkRanges.push(activeRange)
+    entries.push(createPlanEntry({ from, to, kind: "wikilink", target, alias }, activeRange))
   }
+  return wikilinkRanges
+}
 
-  if (markdown.includes("{{color:")) {
-    INLINE_COLOR_TOKEN_REGEX.lastIndex = 0
-    for (const match of markdown.matchAll(INLINE_COLOR_TOKEN_REGEX)) {
-      const from = match.index
-      const to = from + match[0].length
-      if (hasEnclosingInterval(literalRanges, from, to) || hasEnclosingInterval(wikilinkRanges, from, to)) continue
-      const color = resolveInlineColorValue(match[1])
-      if (!color) continue
-      const bodyFrom = from + match[0].indexOf("|") + 1
-      const bodyTo = to - 2
-      const activeRange = { from, to }
-      entries.push(
-        createPlanEntry({ from, to: bodyFrom, kind: "hide-mark" }, activeRange),
-        createPlanEntry({ from: bodyFrom, to: bodyTo, kind: "inline-color", color }, activeRange),
-        createPlanEntry({ from: bodyTo, to, kind: "hide-mark" }, activeRange)
-      )
-    }
+const collectInlineColorEntries = (
+  markdown: string,
+  blockLiteralRanges: readonly MarkdownLiveSourceRange[],
+  literalRanges: readonly MarkdownLiveSourceRange[],
+  wikilinkRanges: readonly MarkdownLiveSourceRange[],
+  entries: MarkdownLivePreviewPlanEntry[]
+): void => {
+  const spans = findDoubleBraceColorSpans(markdown, {
+    trimTrailingContentWhitespace: false,
+    allowEmptyContent: false,
+    skipInlineCodeSpans: true,
+    singleLine: true,
+  })
+  for (const span of spans) {
+    if (isWrappedSpanBlockedByLiterals(span, blockLiteralRanges, literalRanges, wikilinkRanges)) continue
+    const color = resolveInlineColorValue(span.colorToken)
+    if (!color) continue
+    const activeRange = { from: span.from, to: span.to }
+    entries.push(
+      createPlanEntry({ from: span.from, to: span.contentFrom, kind: "hide-mark" }, activeRange),
+      createPlanEntry({ from: span.contentFrom, to: span.contentTo, kind: "inline-color", color }, activeRange),
+      createPlanEntry({ from: span.contentTo, to: span.to, kind: "hide-mark" }, activeRange)
+    )
   }
+}
 
-  if (markdown.includes("==")) {
-    for (const match of markdown.matchAll(HIGHLIGHT_TOKEN_REGEX)) {
-      const from = match.index
-      const to = from + match[0].length
-      if (hasIntervalOverlap(literalRanges, from, to) || hasIntervalOverlap(wikilinkRanges, from, to)) continue
-      if (!match[1]?.trim()) continue
-
-      const bodyFrom = from + 2
-      const bodyTo = to - 2
-      const activeRange = { from, to }
-      entries.push(
-        createPlanEntry({ from: bodyFrom, to: bodyTo, kind: "highlight" }),
-        createPlanEntry({ from, to: bodyFrom, kind: "hide-mark" }, activeRange),
-        createPlanEntry({ from: bodyTo, to, kind: "hide-mark" }, activeRange)
-      )
+const collectHighlightEntries = (
+  markdown: string,
+  blockLiteralRanges: readonly MarkdownLiveSourceRange[],
+  literalRanges: readonly MarkdownLiveSourceRange[],
+  wikilinkRanges: readonly MarkdownLiveSourceRange[],
+  entries: MarkdownLivePreviewPlanEntry[]
+): void => {
+  for (const span of findMarkdownHighlightSpans(markdown)) {
+    if (isWrappedSpanBlockedByLiterals(span, blockLiteralRanges, literalRanges, wikilinkRanges)) {
+      continue
     }
+    if (!markdown.slice(span.contentFrom, span.contentTo).trim()) continue
+    const activeRange = { from: span.from, to: span.to }
+    entries.push(
+      createPlanEntry({ from: span.contentFrom, to: span.contentTo, kind: "highlight" }),
+      createPlanEntry({ from: span.from, to: span.contentFrom, kind: "hide-mark" }, activeRange),
+      createPlanEntry({ from: span.contentTo, to: span.to, kind: "hide-mark" }, activeRange)
+    )
   }
+}
 
+const collectRegexPlanEntries = (
+  markdown: string,
+  blockLiteralRanges: readonly MarkdownLiveSourceRange[],
+  literalRanges: readonly MarkdownLiveSourceRange[],
+  entries: MarkdownLivePreviewPlanEntry[]
+): MarkdownLiveSourceRange[] => {
+  const wikilinkRanges = collectWikilinkEntries(markdown, literalRanges, entries)
+  collectInlineColorEntries(markdown, blockLiteralRanges, literalRanges, wikilinkRanges, entries)
+  collectHighlightEntries(markdown, blockLiteralRanges, literalRanges, wikilinkRanges, entries)
   return wikilinkRanges
 }
 
@@ -392,8 +421,8 @@ export const buildMarkdownLivePreviewEntries = (
   }
 
   const entries: MarkdownLivePreviewPlanEntry[] = []
-  const literalRanges = collectLiteralRanges(documentNode)
-  const wikilinkRanges = collectRegexPlanEntries(markdown, literalRanges, entries)
+  const { literalRanges, blockLiteralRanges } = collectLiteralRanges(documentNode)
+  const wikilinkRanges = collectRegexPlanEntries(markdown, blockLiteralRanges, literalRanges, entries)
   const taskRanges: MarkdownLiveSourceRange[] = []
 
   const visit = (
@@ -500,21 +529,31 @@ export const buildMarkdownLivePreviewEntries = (
 export const resolveMarkdownLivePreviewPlanFromEntries = (
   entries: readonly MarkdownLivePreviewPlanEntry[],
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: MarkdownEditorSurfaceMode = "live"
 ): MarkdownLivePreviewDecoration[] => {
-  if (composing) return []
+  if (mode === "source" || (composing && mode !== "reading")) return []
+  const effectiveSelections = mode === "reading" ? [] : selections
   const decorations: MarkdownLivePreviewDecoration[] = []
-  const hasSelections = selections.length > 0
+  const hasSelections = effectiveSelections.length > 0
   const primaryBit = ENTRY_FLAG_HAS_PRIMARY_HIDE << 5
   const secondaryBit = ENTRY_FLAG_HAS_SECONDARY_HIDE << 5
   for (const entry of entries) {
     if (hasSelections) {
       const primaryRange = entry.hideWhenActiveRange
-      if ((entry.packedMeta & primaryBit) !== 0 && primaryRange && isTokenActive(primaryRange.from, primaryRange.to, selections)) {
+      if (
+        (entry.packedMeta & primaryBit) !== 0 &&
+        primaryRange &&
+        isTokenActive(primaryRange.from, primaryRange.to, effectiveSelections)
+      ) {
         continue
       }
       const secondaryRange = entry.secondaryHideWhenActiveRange
-      if ((entry.packedMeta & secondaryBit) !== 0 && secondaryRange && isTokenActive(secondaryRange.from, secondaryRange.to, selections)) {
+      if (
+        (entry.packedMeta & secondaryBit) !== 0 &&
+        secondaryRange &&
+        isTokenActive(secondaryRange.from, secondaryRange.to, effectiveSelections)
+      ) {
         continue
       }
     }
@@ -527,69 +566,31 @@ export const buildMarkdownLivePreviewPlan = (
   markdown: string,
   documentNode: MarkdownSyntaxNode,
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: MarkdownEditorSurfaceMode = "live"
 ): MarkdownLivePreviewDecoration[] =>
-  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown, documentNode), selections, composing)
+  mode === "source" || (composing && mode !== "reading")
+    ? []
+    : resolveMarkdownLivePreviewPlanFromEntries(
+        buildMarkdownLivePreviewEntries(markdown, documentNode),
+        selections,
+        composing,
+        mode
+      )
 
 export const buildMarkdownLivePreviewDecorationSpecs = (
   markdown: string,
   selections: readonly MarkdownLiveSelection[],
-  composing = false
+  composing = false,
+  mode: MarkdownEditorSurfaceMode = "live"
 ): MarkdownLivePreviewDecoration[] =>
-  composing ? [] : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown), selections, composing)
+  mode === "source" || (composing && mode !== "reading")
+    ? []
+    : resolveMarkdownLivePreviewPlanFromEntries(
+        buildMarkdownLivePreviewEntries(markdown),
+        selections,
+        composing,
+        mode
+      )
 
-const stepFoldFence = (fence: string, text: string): { fence: string; isFenceLine: boolean } => {
-  let cursor = 0
-  while (cursor < 3 && (text[cursor] === " " || text[cursor] === "\t")) cursor += 1
-  const marker = text[cursor]
-  if (marker !== "`" && marker !== "~") return { fence, isFenceLine: false }
-  const runStart = cursor
-  while (text[cursor] === marker) cursor += 1
-  const fenceRun = text.slice(runStart, cursor)
-  if (fenceRun.length < 3) return { fence, isFenceLine: false }
-  if (!fence) return { fence: fenceRun, isFenceLine: true }
-  const closes = fenceRun.startsWith(fence[0]!) && fenceRun.length >= fence.length && !text.slice(cursor).trim()
-  return { fence: closes ? "" : fence, isFenceLine: true }
-}
-
-type FoldDocLine = { number: number; from: number; to: number; text: string }
-
-export const computeMarkdownFoldRange = (
-  state: { doc: { lines: number; lineAt: (pos: number) => FoldDocLine; line: (lineNo: number) => FoldDocLine } },
-  lineStart: number,
-  _lineEnd?: number
-): { from: number; to: number } | null => {
-  const line = state.doc.lineAt(lineStart)
-  const headingMatch = /^\s{0,3}(#{1,6})\s+/.exec(line.text)
-  if (headingMatch) {
-    const level = headingMatch[1].length
-    let endPos = line.to
-    let activeFence = ""
-    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
-      const nextLine = state.doc.line(lineNo)
-      const fenceStep = stepFoldFence(activeFence, nextLine.text)
-      activeFence = fenceStep.fence
-      if (!fenceStep.isFenceLine && !activeFence) {
-        const nextHeading = /^\s{0,3}(#{1,6})\s+/.exec(nextLine.text)
-        if (nextHeading && nextHeading[1].length <= level) break
-      }
-      endPos = nextLine.to
-    }
-    return endPos > line.to ? { from: line.to, to: endPos } : null
-  }
-
-  const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line.text)
-  if (fenceMatch) {
-    const fence = fenceMatch[1]
-    const marker = fence[0]
-    for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo += 1) {
-      const nextLine = state.doc.line(lineNo)
-      const closeMatch = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(nextLine.text)
-      if (closeMatch && closeMatch[1][0] === marker && closeMatch[1].length >= fence.length) {
-        return nextLine.to > line.to ? { from: line.to, to: nextLine.to } : null
-      }
-    }
-  }
-
-  return null
-}
+export { computeMarkdownFoldRange } from "./markdownEditorFoldModel"
