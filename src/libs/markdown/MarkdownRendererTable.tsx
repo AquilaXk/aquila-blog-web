@@ -1,6 +1,11 @@
 import {
+  Children,
+  cloneElement,
   createContext,
+  createElement,
+  isValidElement,
   type CSSProperties,
+  type ReactElement,
   type ReactNode,
   useContext,
   useEffect,
@@ -20,12 +25,11 @@ type MarkdownTableRenderContextValue = {
   rowHeights: Array<number | null>
   columnAlignments: Array<MarkdownTableCellAlignment | null>
   cellLayouts: Array<Array<MarkdownTableCellLayout | null>>
-  allocateRowIndex: () => number
 }
 
-type MarkdownTableRowContextValue = {
+type MarkdownTableCellPosition = {
   rowIndex: number
-  allocateCellIndex: () => number
+  columnIndex: number
 }
 
 export const TABLE_SCROLL_LEFT_BIT = 1
@@ -52,7 +56,40 @@ export const unpackTableUiState = (mask: number) => ({
 })
 
 const MarkdownTableRenderContext = createContext<MarkdownTableRenderContextValue | null>(null)
-const MarkdownTableRowContext = createContext<MarkdownTableRowContextValue | null>(null)
+const MarkdownTableRowIndexContext = createContext<number>(0)
+const MarkdownTableCellPositionContext = createContext<MarkdownTableCellPosition | null>(null)
+
+const isTableSectionElement = (
+  element: ReactElement
+): element is ReactElement<{ children?: ReactNode }> =>
+  element.type === "thead" || element.type === "tbody" || element.type === "tfoot"
+
+const provideIndexedTableRows = (children: ReactNode): ReactNode => {
+  let nextRowIndex = 0
+  return Children.map(children, (sectionOrRowChild) => {
+    if (!isValidElement(sectionOrRowChild)) return sectionOrRowChild
+    if (isTableSectionElement(sectionOrRowChild)) {
+      const wrappedRows = Children.map(sectionOrRowChild.props.children, (rowChild) => {
+        if (!isValidElement(rowChild)) return rowChild
+        const assignedRowIndex = nextRowIndex
+        nextRowIndex += 1
+        return createElement(
+          MarkdownTableRowIndexContext.Provider,
+          { value: assignedRowIndex },
+          rowChild
+        )
+      })
+      return cloneElement(sectionOrRowChild, undefined, wrappedRows)
+    }
+    const assignedRowIndex = nextRowIndex
+    nextRowIndex += 1
+    return createElement(
+      MarkdownTableRowIndexContext.Provider,
+      { value: assignedRowIndex },
+      sectionOrRowChild
+    )
+  })
+}
 
 export const MarkdownTableRenderer = ({
   children,
@@ -63,7 +100,6 @@ export const MarkdownTableRenderer = ({
   className?: string
   layout?: MarkdownTableLayout | null
 }) => {
-  const rowCursorRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [tableUiMask, setTableUiMask] = useState(0)
   const { hasScrollLeft, showScrollHint, detectedColumnCount } = unpackTableUiState(tableUiMask)
@@ -122,20 +158,15 @@ export const MarkdownTableRenderer = ({
 
     return undefined
   }, [explicitTableWidth, isWideOverflowTable, usesExplicitNormalWidth])
-  rowCursorRef.current = 0
   const contextValue = useMemo<MarkdownTableRenderContextValue>(
     () => ({
       rowHeights: layout?.rowHeights || [],
       columnAlignments: layout?.columnAlignments || [],
       cellLayouts: layout?.cells || [],
-      allocateRowIndex: () => {
-        const currentIndex = rowCursorRef.current
-        rowCursorRef.current += 1
-        return currentIndex
-      },
     }),
     [layout?.cells, layout?.columnAlignments, layout?.rowHeights]
   )
+  const indexedChildren = provideIndexedTableRows(children)
 
   useEffect(() => {
     const scrollElement = scrollRef.current
@@ -209,6 +240,8 @@ export const MarkdownTableRenderer = ({
               .join(" ")}
             data-overflow-mode={isWideOverflowTable ? "wide" : undefined}
             data-narrow-table={isNarrowTable ? "true" : undefined}
+            data-header-row={layout?.headerRow === false ? "false" : undefined}
+            data-header-column={layout?.headerColumn === true ? "true" : undefined}
             style={tableStyle}
           >
             {hasExplicitColumnWidths ? (
@@ -228,7 +261,7 @@ export const MarkdownTableRenderer = ({
                 })}
               </colgroup>
             ) : null}
-            {children}
+            {indexedChildren}
           </table>
         </div>
       </div>
@@ -244,40 +277,33 @@ export const MarkdownTableRowRenderer = ({
   className?: string
 }) => {
   const context = useContext(MarkdownTableRenderContext)
-  const rowIndexRef = useRef<number | null>(null)
-
-  if (context && rowIndexRef.current === null) {
-    rowIndexRef.current = context.allocateRowIndex()
-  }
-
-  const rowHeight =
-    rowIndexRef.current !== null ? context?.rowHeights[rowIndexRef.current] || null : null
+  const rowIndex = useContext(MarkdownTableRowIndexContext)
+  const rowHeight = context?.rowHeights[rowIndex] || null
   const rowStyle = rowHeight
     ? ({
         height: `${Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight)}px`,
       } satisfies CSSProperties)
     : undefined
 
-  let cellCursor = 0
-  const rowContextValue: MarkdownTableRowContextValue = {
-    rowIndex: rowIndexRef.current ?? 0,
-    allocateCellIndex: () => {
-      const currentIndex = cellCursor
-      cellCursor += 1
-      return currentIndex
-    },
-  }
+  let nextColumnIndex = 0
+  const indexedCells = Children.map(children, (cellChild) => {
+    if (!isValidElement(cellChild)) return cellChild
+    const position: MarkdownTableCellPosition = {
+      rowIndex,
+      columnIndex: nextColumnIndex,
+    }
+    nextColumnIndex += 1
+    return createElement(MarkdownTableCellPositionContext.Provider, { value: position }, cellChild)
+  })
 
   return (
-    <MarkdownTableRowContext.Provider value={rowContextValue}>
-      <tr
-        className={className}
-        data-row-height={rowHeight ? Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight) : undefined}
-        style={rowStyle}
-      >
-        {children}
-      </tr>
-    </MarkdownTableRowContext.Provider>
+    <tr
+      className={className}
+      data-row-height={rowHeight ? Math.max(TABLE_MIN_ROW_HEIGHT_PX, rowHeight) : undefined}
+      style={rowStyle}
+    >
+      {indexedCells}
+    </tr>
   )
 }
 
@@ -293,15 +319,9 @@ export const MarkdownTableCellRenderer = ({
   className?: string
 }) => {
   const tableContext = useContext(MarkdownTableRenderContext)
-  const rowContext = useContext(MarkdownTableRowContext)
-  const cellIndexRef = useRef<number | null>(null)
-
-  if (rowContext && cellIndexRef.current === null) {
-    cellIndexRef.current = rowContext.allocateCellIndex()
-  }
-
-  const rowIndex = rowContext?.rowIndex ?? 0
-  const columnIndex = cellIndexRef.current ?? 0
+  const position = useContext(MarkdownTableCellPositionContext)
+  const rowIndex = position?.rowIndex ?? 0
+  const columnIndex = position?.columnIndex ?? 0
   const cellLayout = tableContext?.cellLayouts[rowIndex]?.[columnIndex] || null
   const columnAlignment = tableContext?.columnAlignments[columnIndex] || null
   const markdownAlignment: MarkdownTableCellAlignment | null =

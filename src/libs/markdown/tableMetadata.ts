@@ -79,12 +79,48 @@ const normalizeTableAlignmentList = (
   return normalized.slice(0, lastMeaningfulIndex + 1)
 }
 
-const normalizeBackgroundColor = (value: unknown): string | null => {
+const SAFE_HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+const SAFE_CSS_VAR_COLOR_PATTERN = /^var\(\s*--[a-zA-Z0-9_-]{1,64}\s*\)$/
+const SAFE_NAMED_COLOR_PATTERN = /^[a-zA-Z]{3,24}$/
+const SAFE_RGB_COLOR_PATTERN =
+  /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0|1|0?\.\d+|1\.0+))?\s*\)$/i
+const SAFE_HSL_COLOR_PATTERN =
+  /^hsla?\(\s*(-?\d{1,3}(?:\.\d+)?)(?:deg)?\s*,\s*(\d{1,3}(?:\.\d+)?)%\s*,\s*(\d{1,3}(?:\.\d+)?)%(?:\s*,\s*(0|1|0?\.\d+|1\.0+))?\s*\)$/i
+const UNSAFE_CSS_VALUE_CHARS_PATTERN = /[;:{}<>\\"'`]/
+
+export const normalizeTableBackgroundColor = (value: unknown): string | null => {
   if (typeof value !== "string") return null
   const normalized = value.trim()
-  if (!normalized) return null
-  return normalized
+  if (!normalized || normalized.length > 64) return null
+  if (UNSAFE_CSS_VALUE_CHARS_PATTERN.test(normalized)) return null
+  const lower = normalized.toLowerCase()
+  if (lower.includes("url(") || lower.includes("expression(") || lower.includes("javascript")) {
+    return null
+  }
+  if (
+    SAFE_HEX_COLOR_PATTERN.test(normalized) ||
+    SAFE_CSS_VAR_COLOR_PATTERN.test(normalized) ||
+    SAFE_NAMED_COLOR_PATTERN.test(normalized)
+  ) {
+    return normalized
+  }
+  const rgbMatch = SAFE_RGB_COLOR_PATTERN.exec(normalized)
+  if (rgbMatch) {
+    const r = Number(rgbMatch[1])
+    const g = Number(rgbMatch[2])
+    const b = Number(rgbMatch[3])
+    return r <= 255 && g <= 255 && b <= 255 ? normalized : null
+  }
+  const hslMatch = SAFE_HSL_COLOR_PATTERN.exec(normalized)
+  if (hslMatch) {
+    const saturation = Number(hslMatch[2])
+    const lightness = Number(hslMatch[3])
+    return saturation <= 100 && lightness <= 100 ? normalized : null
+  }
+  return null
 }
+
+const normalizeBackgroundColor = normalizeTableBackgroundColor
 
 const normalizePositiveInteger = (value: unknown): number | null => {
   const numericValue =

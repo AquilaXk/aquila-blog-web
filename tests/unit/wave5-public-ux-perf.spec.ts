@@ -143,7 +143,9 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
       "src/routes/Detail/PostDetail/PostDetailMobileToc.tsx"
     )
     expect(postDetailMobileToc).toContain("mobileTocDepthToggle")
-    expect(postDetailMobileToc).toContain('querySelector<HTMLElement>("summary")?.focus()')
+    expect(postDetailMobileToc).toContain(
+      'querySelector<HTMLElement>("summary")?.focus({ preventScroll: true })'
+    )
 
     const engagementActions = readRepoFile(
       "src/routes/Detail/PostDetail/usePostDetailEngagementActions.ts"

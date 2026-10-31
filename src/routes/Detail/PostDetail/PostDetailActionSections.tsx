@@ -30,9 +30,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
         <div ref={innerRef as Ref<HTMLDivElement>} className="leftRailInner">
           <div className="floatingLikeCluster">
             <div className="floatingLikeStat">
-              <span
-                className="floatingActionButton floatingLikeButton"
-              >
+              <span className="floatingLikeBadge" aria-hidden="true">
                 <AppIcon name="heart" />
               </span>
               <span className="floatingLikeCount">좋아요 {likesCount}</span>
@@ -51,7 +49,11 @@ export const FloatingActionRail = memo(function FloatingActionRail({
             </div>
             {shareFeedback ? (
               <span className="floatingShareFeedback" role="status" aria-live="polite">
-                {shareFeedback === "failed" ? "공유 실패" : "복사 완료"}
+                {shareFeedback === "failed"
+                  ? "공유 실패"
+                  : shareFeedback === "shared"
+                    ? "공유 완료"
+                    : "복사 완료"}
               </span>
             ) : null}
           </div>
@@ -74,7 +76,7 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
 }: MobileSummaryActionsProps) {
   return (
     <MobileSummaryBar aria-label="빠른 이동 및 반응">
-      <span data-tone="accent" aria-label={`좋아요 ${likesCount}`}>
+      <span className="mobileLikeStat" aria-label={`좋아요 ${likesCount}`}>
         <AppIcon name="heart" />
         <span>{`좋아요 ${likesCount}`}</span>
       </span>
@@ -88,7 +90,7 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
           shareFeedback === "failed"
             ? "공유 실패, 다시 시도"
             : shareFeedback === "shared"
-              ? "링크 복사 완료"
+              ? "공유 완료"
               : shareFeedback === "copied"
                 ? "공유 링크 복사 완료"
                 : "공유"
@@ -96,7 +98,15 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         onClick={onSharePost}
       >
         <AppIcon name="share" />
-        <span>{shareFeedback === "copied" ? "복사" : shareFeedback === "shared" ? "복사" : shareFeedback === "failed" ? "실패" : "공유"}</span>
+        <span>
+          {shareFeedback === "copied"
+            ? "복사 완료"
+            : shareFeedback === "shared"
+              ? "공유 완료"
+              : shareFeedback === "failed"
+                ? "공유 실패"
+                : "공유"}
+        </span>
       </button>
     </MobileSummaryBar>
   )

@@ -48,10 +48,44 @@ import {
   MarkdownFootnoteAppendix,
   MarkdownFootnoteReferenceLink,
 } from "src/libs/markdown/MarkdownRendererFootnotes"
+import { createMarkdownHeadingSlugAllocator } from "src/libs/markdown/markdownDocumentInsights"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 import type { MarkdownRendererProps } from "src/libs/markdown/MarkdownRenderer.types"
 
 export { markdownGuide } from "src/libs/markdown/rendering"
+
+type MarkdownRenderPassState = {
+  nextTableIndex: number
+  tableIndices: WeakMap<object, number>
+  nextImageIndex: number
+  imageIndices: WeakMap<object, number>
+  headingIds: WeakMap<object, string>
+  headingSlugAllocator: ReturnType<typeof createMarkdownHeadingSlugAllocator>
+}
+
+const createMarkdownRenderPassState = (): MarkdownRenderPassState => ({
+  nextTableIndex: 0,
+  tableIndices: new WeakMap(),
+  nextImageIndex: 0,
+  imageIndices: new WeakMap(),
+  headingIds: new WeakMap(),
+  headingSlugAllocator: createMarkdownHeadingSlugAllocator(),
+})
+
+const allocateNodeOrderIndex = (
+  node: unknown,
+  nodeMap: WeakMap<object, number>,
+  allocateNext: () => number
+): number => {
+  if (typeof node === "object" && node !== null) {
+    const existing = nodeMap.get(node)
+    if (existing !== undefined) return existing
+    const next = allocateNext()
+    nodeMap.set(node, next)
+    return next
+  }
+  return allocateNext()
+}
 
 const handleImageLightboxClick = (target: Element): boolean => {
   if (target.closest("a, button, .aq-image-resize-handle")) return false
@@ -134,81 +168,125 @@ export const hasLikelyMarkdownMath = (markdown: string): boolean => {
   return false
 }
 
+type MarkdownElementProps = {
+  children?: ReactNode
+  node?: unknown
+  id?: string
+  className?: string
+  href?: string
+  title?: string
+  src?: string
+  alt?: string
+} & Record<string, unknown>
+
+type MarkdownTableCellProps = {
+  children?: ReactNode
+  node?: unknown
+  align?: unknown
+  style?: unknown
+  className?: string
+}
+
 export const createMarkdownComponentVariants = ({
   footnotes,
   footnoteMarker,
   tableLayouts,
+  renderPassStateRef,
   tableRenderIndexRef,
   imageRenderOrderRef,
 }: {
   footnotes: ReturnType<typeof resolveMarkdownRenderModel>["footnotes"]
   footnoteMarker: string
   tableLayouts: ReturnType<typeof resolveMarkdownRenderModel>["tableLayouts"]
-  tableRenderIndexRef: { current: number }
-  imageRenderOrderRef: { current: number }
+  renderPassStateRef?: { current: MarkdownRenderPassState }
+  tableRenderIndexRef?: { current: number }
+  imageRenderOrderRef?: { current: number }
 }) => {
+  const fallbackPassStateRef = { current: createMarkdownRenderPassState() }
+  const getPassState = () => (renderPassStateRef ?? fallbackPassStateRef).current
+
+  const renderHeading = (
+    Tag: "h1" | "h2" | "h3" | "h4",
+    { children, node, id, ...props }: MarkdownElementProps
+  ) => {
+    const normalizedChildren = normalizeMarkdownInlineChildren(children)
+    const state = getPassState()
+    let resolvedId = typeof id === "string" && id.trim() ? id.trim() : ""
+    if (!resolvedId) {
+      if (typeof node === "object" && node !== null) {
+        const cached = state.headingIds.get(node)
+        if (cached) {
+          resolvedId = cached
+        } else {
+          resolvedId = state.headingSlugAllocator.allocate(
+            extractTextFromMarkdownNode(normalizedChildren)
+          )
+          state.headingIds.set(node, resolvedId)
+        }
+      } else {
+        resolvedId = state.headingSlugAllocator.allocate(
+          extractTextFromMarkdownNode(normalizedChildren)
+        )
+      }
+    }
+    return (
+      <Tag id={resolvedId} {...props}>
+        {normalizedChildren}
+      </Tag>
+    )
+  }
+
+  const renderTableCell = (
+    as: "th" | "td",
+    { children, node, align, style, className }: MarkdownTableCellProps
+  ) => (
+    <MarkdownTableCellRenderer
+      as={as}
+      alignment={resolveMarkdownTableCellAlignment(node, align, style)}
+      className={className}
+    >
+      {normalizeMarkdownInlineChildren(children)}
+    </MarkdownTableCellRenderer>
+  )
+
   const sharedComponents: Record<string, unknown> = {
-    blockquote({ children }: { children?: ReactNode }) {
+    h1: (props: MarkdownElementProps) => renderHeading("h1", props),
+    h2: (props: MarkdownElementProps) => renderHeading("h2", props),
+    h3: (props: MarkdownElementProps) => renderHeading("h3", props),
+    h4: (props: MarkdownElementProps) => renderHeading("h4", props),
+    strong({ children, node: _node, ...props }: MarkdownElementProps) {
+      return <strong {...props}>{normalizeMarkdownInlineChildren(children)}</strong>
+    },
+    em({ children, node: _node, ...props }: MarkdownElementProps) {
+      return <em {...props}>{normalizeMarkdownInlineChildren(children)}</em>
+    },
+    del({ children, node: _node, ...props }: MarkdownElementProps) {
+      return <del {...props}>{normalizeMarkdownInlineChildren(children)}</del>
+    },
+    blockquote({ children }: MarkdownElementProps) {
       return <MarkdownBlockquote>{children}</MarkdownBlockquote>
     },
-    li({ children, node: _node, ...props }: { children?: ReactNode; node?: unknown } & Record<string, unknown>) {
+    li({ children, node: _node, ...props }: MarkdownElementProps) {
       return <li {...props}>{normalizeMarkdownInlineChildren(children)}</li>
     },
-    table({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) {
-      const layout = tableLayouts[tableRenderIndexRef.current] || null
-      tableRenderIndexRef.current += 1
+    table({ children, node, ...props }: MarkdownElementProps) {
+      const state = getPassState()
+      const tableIndex = allocateNodeOrderIndex(node, state.tableIndices, () =>
+        tableRenderIndexRef ? tableRenderIndexRef.current++ : state.nextTableIndex++
+      )
+      const layout = tableLayouts[tableIndex] || null
       return (
         <MarkdownTableRenderer layout={layout} {...props}>
           {children}
         </MarkdownTableRenderer>
       )
     },
-    tr({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) {
+    tr({ children, ...props }: MarkdownElementProps) {
       return <MarkdownTableRowRenderer {...props}>{children}</MarkdownTableRowRenderer>
     },
-    th({
-      children,
-      node,
-      ...props
-    }: {
-      children?: ReactNode
-      node?: unknown
-      align?: unknown
-      style?: unknown
-      className?: string
-    }) {
-      return (
-        <MarkdownTableCellRenderer
-          as="th"
-          alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-          className={props.className}
-        >
-          {normalizeMarkdownInlineChildren(children)}
-        </MarkdownTableCellRenderer>
-      )
-    },
-    td({
-      children,
-      node,
-      ...props
-    }: {
-      children?: ReactNode
-      node?: unknown
-      align?: unknown
-      style?: unknown
-      className?: string
-    }) {
-      return (
-        <MarkdownTableCellRenderer
-          as="td"
-          alignment={resolveMarkdownTableCellAlignment(node, props.align, props.style)}
-          className={props.className}
-        >
-          {normalizeMarkdownInlineChildren(children)}
-        </MarkdownTableCellRenderer>
-      )
-    },
-    img({ src, alt }: { src?: string; alt?: string }) {
+    th: (props: MarkdownTableCellProps) => renderTableCell("th", props),
+    td: (props: MarkdownTableCellProps) => renderTableCell("td", props),
+    img({ src, alt, node }: MarkdownElementProps) {
       const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
       if (!imageSrc) {
         const blockedLabel = alt || "차단된 이미지"
@@ -218,8 +296,10 @@ export const createMarkdownComponentVariants = ({
           </span>
         )
       }
-      const imageIndex = imageRenderOrderRef.current
-      imageRenderOrderRef.current += 1
+      const state = getPassState()
+      const imageIndex = allocateNodeOrderIndex(node, state.imageIndices, () =>
+        imageRenderOrderRef ? imageRenderOrderRef.current++ : state.nextImageIndex++
+      )
       const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
 
       return (
@@ -234,18 +314,7 @@ export const createMarkdownComponentVariants = ({
         />
       )
     },
-    a({
-      children,
-      href,
-      title,
-      node: _node,
-      ...props
-    }: {
-      children?: ReactNode
-      href?: string
-      title?: string
-      node?: unknown
-    } & Record<string, unknown>) {
+    a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
       return (
         <MarkdownFootnoteReferenceLink
           footnotes={footnotes}
@@ -258,16 +327,7 @@ export const createMarkdownComponentVariants = ({
         </MarkdownFootnoteReferenceLink>
       )
     },
-    code({
-      node,
-      className,
-      children,
-      ...props
-    }: {
-      node?: unknown
-      className?: string
-      children?: ReactNode
-    } & Record<string, unknown>) {
+    code({ node, className, children, ...props }: MarkdownElementProps) {
       let rawFromChildren = ""
       if (typeof children === "string") {
         rawFromChildren = children
@@ -295,16 +355,7 @@ export const createMarkdownComponentVariants = ({
         </code>
       )
     },
-    pre({
-      node,
-      children,
-      className: _className,
-      ...props
-    }: {
-      node?: unknown
-      children?: ReactNode
-      className?: string
-    } & Record<string, unknown>) {
+    pre({ node, children, className: _className, ...props }: MarkdownElementProps) {
       const { language, title, rawCode, highlightLines } = extractCodeMetaFromPreChildren(children, node)
       const mermaidSource = resolvePreBlockMermaidSource(language, rawCode)
 
@@ -391,8 +442,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   onImageWidthCommit,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null)
-  const imageRenderOrderRef = useRef(0)
-  const tableRenderIndexRef = useRef(0)
+  const renderPassStateRef = useRef<MarkdownRenderPassState>(createMarkdownRenderPassState())
   const renderModel = useMemo(
     () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
     [content, trustedContentHtml]
@@ -411,7 +461,6 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   })
 
   useEffect(() => {
-    imageRenderOrderRef.current = 0
     const root = rootRef.current
     if (!root || editableImages) return
     for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
@@ -449,14 +498,12 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         footnotes,
         footnoteMarker,
         tableLayouts,
-        tableRenderIndexRef,
-        imageRenderOrderRef,
+        renderPassStateRef,
       }),
     [footnoteMarker, footnotes, tableLayouts]
   )
 
-  tableRenderIndexRef.current = 0
-  imageRenderOrderRef.current = 0
+  renderPassStateRef.current = createMarkdownRenderPassState()
 
   const renderMarkdown = (markdown: string, key: string, inCallout = false, inlineOnly = false) => {
     const hasMath = hasLikelyMarkdownMath(markdown)
@@ -478,6 +525,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         ref={rootRef}
         className="aq-markdown"
         data-editable={editableImages ? "true" : undefined}
+        data-force-scheme={forceScheme}
         onClick={handleRootClick}
         onKeyDown={handleRootKeyDown}
         dangerouslySetInnerHTML={{ __html: resolvedContentHtml }}
@@ -485,7 +533,9 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     )
   }
 
-  if (!normalizedContent) return <MarkdownRendererRoot>본문이 없습니다.</MarkdownRendererRoot>
+  if (!normalizedContent) {
+    return <MarkdownRendererRoot data-force-scheme={forceScheme}>본문이 없습니다.</MarkdownRendererRoot>
+  }
 
   let standaloneImageIndex = -1
 
@@ -494,6 +544,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
       ref={rootRef}
       className="aq-markdown"
       data-editable={editableImages ? "true" : undefined}
+      data-force-scheme={forceScheme}
       onClick={handleRootClick}
       onKeyDown={handleRootKeyDown}
     >

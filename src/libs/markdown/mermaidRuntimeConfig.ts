@@ -2,6 +2,7 @@ import type {
   MermaidComplexityLevel,
   MermaidComplexitySummary,
   MermaidRenderCacheEntry,
+  MermaidRuntimeInstance,
   MermaidRuntimePreset,
   MermaidVisualPreset,
 } from "src/libs/markdown/mermaidRuntimeTypes"
@@ -245,4 +246,53 @@ export const resolveMermaidPreset = (scheme: "dark" | "light"): MermaidRuntimePr
     themeKey: `service-${scheme}`,
     config: createServiceMermaidConfig(scheme),
   }
+}
+
+let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
+let lastInitializedThemeKey: string | null = null
+let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
+
+export const resetSharedMermaidRuntimeForTests = () => {
+  sharedMermaidPromise = null
+  lastInitializedThemeKey = null
+  activeMermaidParseWarningHandler = null
+}
+
+export const loadSharedMermaidRuntime = async (
+  scheme: "dark" | "light",
+  onParseWarning?: (error: unknown) => void,
+  runtimeLoader?: () => Promise<unknown>
+): Promise<{ mermaidRuntime: MermaidRuntimeInstance; preset: MermaidRuntimePreset }> => {
+  const preset = resolveMermaidPreset(scheme)
+  if (!sharedMermaidPromise) {
+    const loadModule = runtimeLoader ?? (() => import("mermaid"))
+    sharedMermaidPromise = loadModule()
+      .then((loaded) => {
+        const rawRuntime =
+          loaded && typeof loaded === "object" && "default" in loaded
+            ? (loaded as { default: unknown }).default
+            : loaded
+        const mermaidRuntime = rawRuntime as MermaidRuntimeInstance
+        mermaidRuntime.parseError = (error) => {
+          activeMermaidParseWarningHandler?.(error)
+        }
+        return mermaidRuntime
+      })
+      .catch((error) => {
+        sharedMermaidPromise = null
+        throw error
+      })
+  }
+
+  const mermaidRuntime = await sharedMermaidPromise
+  activeMermaidParseWarningHandler = onParseWarning ?? null
+  if (lastInitializedThemeKey !== preset.themeKey) {
+    mermaidRuntime.initialize({
+      startOnLoad: false,
+      ...preset.config,
+    })
+    lastInitializedThemeKey = preset.themeKey
+  }
+
+  return { mermaidRuntime, preset }
 }

@@ -58,14 +58,13 @@ const normalizeCodeTagMatch = (rawInner: string) => {
   return wrapWithMarkdownCodeMark(String(rawInner || ""))
 }
 
-export const normalizeLegacyInlineHtmlSpans = (input: string) => {
-  if (!input) return input
-  const hasRawTag = input.includes("<")
-  const hasEntityTag = input.includes("&lt;")
-  if (!hasRawTag && !hasEntityTag) return input
-
-  let normalized = input
-  if (hasRawTag) {
+const normalizeInlineHtmlChunk = (
+  chunk: string,
+  hasRawTag: boolean,
+  hasEntityTag: boolean
+): string => {
+  let normalized = chunk
+  if (hasRawTag && normalized.includes("<")) {
     normalized = normalized.replace(
       /<\s*code(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*code\s*>/gi,
       (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
@@ -82,8 +81,9 @@ export const normalizeLegacyInlineHtmlSpans = (input: string) => {
       /<\s*(?:del|s)(?:\s+[^>]*)?\s*>([\s\S]*?)<\s*\/\s*(?:del|s)\s*>/gi,
       (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
     )
+    normalized = normalized.replace(/<\s*br\s*\/?\s*>/gi, "<br />")
   }
-  if (hasEntityTag) {
+  if (hasEntityTag && normalized.includes("&lt;")) {
     normalized = normalized.replace(
       /&lt;\s*code(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*code\s*&gt;/gi,
       (_match, rawInner: string) => normalizeCodeTagMatch(rawInner)
@@ -100,9 +100,35 @@ export const normalizeLegacyInlineHtmlSpans = (input: string) => {
       /&lt;\s*(?:del|s)(?:\s+[^&]*)?&gt;([\s\S]*?)&lt;\s*\/\s*(?:del|s)\s*&gt;/gi,
       (_match, rawInner: string) => wrapWithMarkdownMark(String(rawInner || ""), "~~")
     )
+    normalized = normalized.replace(/&lt;\s*br\s*\/?\s*&gt;/gi, "<br />")
+  }
+  return normalized
+}
+
+export const normalizeLegacyInlineHtmlSpans = (input: string) => {
+  if (!input) return input
+  const hasRawTag = input.includes("<")
+  const hasEntityTag = input.includes("&lt;")
+  if (!hasRawTag && !hasEntityTag) return input
+
+  if (!input.includes("`")) {
+    return normalizeInlineHtmlChunk(input, hasRawTag, hasEntityTag)
   }
 
-  return normalized
+  let result = ""
+  let cursor = 0
+  for (const match of input.matchAll(/(`+)([\s\S]*?)\1/g)) {
+    const start = match.index ?? 0
+    if (start > cursor) {
+      result += normalizeInlineHtmlChunk(input.slice(cursor, start), hasRawTag, hasEntityTag)
+    }
+    result += match[0]
+    cursor = start + match[0].length
+  }
+  if (cursor < input.length) {
+    result += normalizeInlineHtmlChunk(input.slice(cursor), hasRawTag, hasEntityTag)
+  }
+  return result
 }
 
 export const normalizeLegacyInlineHtmlMarkdown = (markdown: string) => {
@@ -149,7 +175,7 @@ export const normalizeInlineHtmlInMarkdownTables = (markdown: string) => {
   return markdown
     .split("\n")
     .map((line) => {
-      if (!line.includes("<")) return line
+      if (!line.includes("<") && !line.includes("&lt;")) return line
       if (!isLikelyTableRow(line) || isTableSeparatorLine(line)) return line
       return normalizeLegacyInlineHtmlSpans(line)
     })

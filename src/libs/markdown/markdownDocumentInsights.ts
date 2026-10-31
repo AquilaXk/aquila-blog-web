@@ -105,7 +105,10 @@ export const hasHeadingInlineSyntax = (text: string): boolean => {
       code === 0x2a ||
       code === 0x5f ||
       code === 0x7e ||
-      code === 0x5c
+      code === 0x5c ||
+      code === 0x7b ||
+      code === 0x3d ||
+      code === 0x3c
     ) {
       return true
     }
@@ -126,17 +129,35 @@ const collapseAsciiWhitespace = (text: string): string => {
   return needsCollapse ? text.replace(/[ \t]+/g, " ").trim() : text.trim()
 }
 
+const stripInlineColorHeadingTokens = (value: string): string => {
+  let current = value
+  let previous = ""
+  while (current !== previous) {
+    previous = current
+    current = current
+      .replace(/\{\{\s*color\s*:\s*[^|{}]+\\?\|([\s\S]*?)\}\}/gi, "$1")
+      .replace(/\{\s*color\s*:\s*[^}]+\}([\s\S]*?)\{\s*\/\s*color\s*\}/gi, "$1")
+  }
+  return current
+}
+
 export const formatMarkdownHeadingLabel = (text: string): string => {
   if (!hasHeadingInlineSyntax(text)) {
     return collapseAsciiWhitespace(text)
   }
   const codeSpans: string[] = []
-  const formatted = text
-    .replace(/`([^`]+)`/g, (_, code: string) => {
-      const token = `@@CODE_SPAN_${codeSpans.length}@@`
-      codeSpans.push(code)
-      return token
-    })
+  const withCodePlaceholders = text.replace(/`([^`]+)`/g, (_, code: string) => {
+    const token = `@@CODE_SPAN_${codeSpans.length}@@`
+    codeSpans.push(code)
+    return token
+  })
+  const formatted = stripInlineColorHeadingTokens(withCodePlaceholders)
+    .replace(/<\s*br\s*\/?\s*>/gi, " ")
+    .replace(
+      /\[\[([^\][\r\n|\\]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/g,
+      (_, target: string, alias?: string) => (alias || target.replace(/^#/, "")).trim()
+    )
+    .replace(/==([^\r\n=]+?)==/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -148,12 +169,14 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
   return collapseAsciiWhitespace(formatted)
 }
 
-const toMarkdownHeadingSlug = (value: string) => {
+export const toMarkdownHeadingSlug = (value: string) => {
   const normalized = value.trim().toLowerCase()
   const stripped = normalized.replace(/[^\p{L}\p{N}\s-]/gu, "")
   const dashed = stripped.replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "")
   return dashed || "section"
 }
+
+export const slugifyMarkdownHeading = toMarkdownHeadingSlug
 
 export const createMarkdownHeadingSlugAllocator = () => {
   const usedIds = new Set<string>()

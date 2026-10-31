@@ -15,6 +15,15 @@ const MarkdownRendererRoot = styled.div`
   overflow-x: visible;
   overflow-wrap: anywhere;
   word-break: break-word;
+
+  &[data-force-scheme="light"] {
+    color-scheme: light;
+  }
+
+  &[data-force-scheme="dark"] {
+    color-scheme: dark;
+  }
+
   ${({ theme }) => markdownContentTypography("&", theme)}
   ${({ theme }) => markdownRendererRootBaseStyles(theme)}
   ${({ theme }) => markdownRendererRootCardStyles(theme)}

@@ -1,9 +1,11 @@
 import { RefObject, useEffect } from "react"
 import useScheme from "src/hooks/useScheme"
-import { resolveMermaidPreset } from "src/libs/markdown/mermaidRuntimeConfig"
+import {
+  loadSharedMermaidRuntime,
+  resolveMermaidPreset,
+} from "src/libs/markdown/mermaidRuntimeConfig"
 import { shouldScheduleFromMermaidMutations } from "src/libs/markdown/mermaidRuntimeMutations"
 import { createMermaidRuntimeController } from "src/libs/markdown/mermaidRuntimeRender"
-import type { MermaidRuntimeInstance } from "src/libs/markdown/mermaidRuntimeTypes"
 
 interface MermaidEffectOptions {
   observeMutations?: boolean
@@ -14,10 +16,6 @@ interface MermaidEffectOptions {
 
 export const shouldScheduleMermaidResize = (lastWidth: number, nextWidth: number) =>
   Math.abs(Math.floor(nextWidth) - Math.floor(lastWidth)) >= 2
-
-let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
-let lastInitializedThemeKey: string | null = null
-let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
 
 const useMermaidEffect = (
   rootRef?: RefObject<HTMLElement | null>,
@@ -48,28 +46,9 @@ const useMermaidEffect = (
     const preset = resolveMermaidPreset(effectiveScheme)
 
     const getMermaid = async () => {
-      if (!sharedMermaidPromise) {
-        sharedMermaidPromise = import("mermaid").then(({ default: mermaid }) => {
-          const mermaidRuntime = mermaid as MermaidRuntimeInstance
-          mermaidRuntime.parseError = (error) => {
-            activeMermaidParseWarningHandler?.(error)
-          }
-          return mermaidRuntime
-        })
-      }
-
-      const mermaidRuntime = await sharedMermaidPromise
-      activeMermaidParseWarningHandler = (error) => {
+      const { mermaidRuntime } = await loadSharedMermaidRuntime(effectiveScheme, (error) => {
         lastMermaidParseWarning = String(error || "Mermaid parse error")
-      }
-      if (lastInitializedThemeKey !== preset.themeKey) {
-        mermaidRuntime.initialize({
-          startOnLoad: false,
-          ...preset.config,
-        })
-        lastInitializedThemeKey = preset.themeKey
-      }
-
+      })
       return mermaidRuntime
     }
 

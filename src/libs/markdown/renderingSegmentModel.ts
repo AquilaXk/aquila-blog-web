@@ -162,7 +162,7 @@ const buildCalloutSegment = (
     kind: header.kind,
     title: resolvedTitle,
     emoji: header.emoji,
-    content: promoted.bodyLines.join("\n").trim() || "내용을 입력하세요.",
+    content: promoted.bodyLines.join("\n").trim(),
     ...(header.foldable
       ? {
           foldable: true,
@@ -183,7 +183,7 @@ const parseFenceMarker = (line: string): "`" | "~" | null => {
 }
 
 const CUSTOM_DIRECTIVE_PATTERN =
-  /^:::(bookmark|embed|file)(?:\s+(\S+))?\s*$/i
+  /^:::(bookmark|embed|file)(?:\s+(\S+)(?:\s+(.*))?)?\s*$/i
 const CARD_METADATA_COMMENT_PATTERN =
   /^\s*<!--\s*aq-(bookmark|embed|file)\s+(\{[\s\S]*\})\s*-->\s*$/
 
@@ -308,6 +308,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
     if (customDirectiveMatch) {
       const directive = customDirectiveMatch[1]?.toLowerCase()
       const url = normalizeSafeMarkdownUrl(customDirectiveMatch[2] || "")
+      const inlineTitle = (customDirectiveMatch[3] || "").trim()
       const bodyLines: string[] = []
       let closed = false
 
@@ -326,8 +327,8 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
             segments.push({
               type: "bookmark",
               url,
-              title: firstLine.trim() || "북마크",
-              description: secondaryText,
+              title: inlineTitle || firstLine.trim() || "북마크",
+              description: inlineTitle ? bodyLines.join("\n").trim() : secondaryText,
               ...directiveMetadata,
             })
           } else if (directive === "embed") {
@@ -449,7 +450,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
           segments.push({
             type: "toggle",
             title,
-            content: bodyLines.join("\n").trim() || "내용을 입력하세요.",
+            content: bodyLines.join("\n").trim(),
           })
           i = j
           closed = true
@@ -541,7 +542,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
             kind: "info",
             title: "",
             emoji: infoCalloutMarker,
-            content: normalizedBodyLines.join("\n").trim() || "내용을 입력하세요.",
+            content: normalizedBodyLines.join("\n").trim(),
           })
         }
 

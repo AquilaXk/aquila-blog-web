@@ -81,7 +81,7 @@ export const isCanonicalPostImageUploadUrl = (
 
 const normalizeReferenceLabel = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase()
 const CARD_METADATA_PATTERN = /^\s*<!--\s*aq-(bookmark|embed)\s+(\{[\s\S]*\})\s*-->\s*$/i
-const CARD_DIRECTIVE_PATTERN = /^:::(bookmark|embed)(?:\s+\S+)?\s*$/i
+const CARD_DIRECTIVE_PATTERN = /^:::(bookmark|embed)(?:\s+\S+(?:\s+.*)?)?\s*$/i
 
 const stripBlockquotePrefixes = (line: string) => {
   let value = line

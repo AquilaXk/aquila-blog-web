@@ -1,18 +1,21 @@
 import {
-  Children,
   createContext,
   type CSSProperties,
   type ReactNode,
   useContext,
 } from "react"
 import { resolveInlineColorValue } from "src/libs/markdown/inlineColor"
+import { slugifyMarkdownHeading } from "src/libs/markdown/markdownDocumentInsights"
 
 const QUOTED_STRONG_MARKERS = ["**", "__"] as const
 const QUOTED_EMPHASIS_MARKERS = ["*", "_"] as const
 const INLINE_COLOR_CHILD_PLACEHOLDER_PREFIX = "__AQ_INLINE_COLOR_CHILD_"
 const INLINE_COLOR_CHILD_PLACEHOLDER_SUFFIX = "__"
 const INLINE_COLOR_CHILD_PLACEHOLDER_REGEX = /__AQ_INLINE_COLOR_CHILD_(\d+)__/g
-const INLINE_COLOR_RENDER_REGEX = /\{\{\s*color\s*:\s*([^|{}]+?)\s*\|([\s\S]+?)\s*\}\}/gi
+const INLINE_COLOR_RENDER_REGEX = /\{\{\s*color\s*:\s*([^|{}\\]+?)\s*\\?\|([\s\S]+?)\s*\}\}/gi
+const INLINE_HIGHLIGHT_REGEX = /==([^\r\n=]+?)==/g
+const INLINE_WIKILINK_REGEX = /\[\[([^\][\r\n|\\]+?)(?:\\?\|([^\][\r\n]+?))?\]\]/g
+const INLINE_HTML_BR_REGEX = /<\s*br\s*\/?\s*>/gi
 const isLetterOrNumber = (value: string) => /[\p{L}\p{N}]/u.test(value)
 const isPunctuationOrSymbol = (value: string) => /[\p{P}\p{S}]/u.test(value)
 
@@ -119,10 +122,70 @@ const hasStringChildMatching = (
   return true
 }
 
+const flattenChildNodes = (children: ReactNode, target: ReactNode[] = []): ReactNode[] => {
+  if (children === null || children === undefined || typeof children === "boolean") {
+    return target
+  }
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      flattenChildNodes(child, target)
+    }
+    return target
+  }
+  target.push(children)
+  return target
+}
+
+const mergeAdjacentStringChildren = (children: ReactNode): ReactNode[] => {
+  const rawList = flattenChildNodes(children)
+  if (rawList.length <= 1) return rawList
+  const merged: ReactNode[] = []
+  for (const child of rawList) {
+    const lastIndex = merged.length - 1
+    if (typeof child === "string" && lastIndex >= 0 && typeof merged[lastIndex] === "string") {
+      merged[lastIndex] = `${merged[lastIndex] as string}${child}`
+    } else {
+      merged.push(child)
+    }
+  }
+  return merged
+}
+
 const hasStrongSyntax = (text: string): boolean => text.includes("**") || text.includes("__")
 const hasEmphasisSyntax = (text: string): boolean => text.includes("*") || text.includes("_")
 const hasInlineColorSyntax = (text: string): boolean => text.includes("{{")
+const hasHighlightSyntax = (text: string): boolean => text.includes("==")
+const hasWikilinkSyntax = (text: string): boolean => text.includes("[[")
+const hasInlineBrSyntax = (text: string): boolean => /<\s*br\s*\/?\s*>/i.test(text)
 const hasSoftBreakSyntax = (text: string): boolean => text.includes("\n")
+
+export const resolveMarkdownWikilinkTarget = (
+  rawTarget: string,
+  rawAlias?: string
+): { href: string; label: string } | null => {
+  const target = rawTarget.trim()
+  if (!target) return null
+  const alias = (rawAlias ?? "").trim()
+  const label = (alias || target.replace(/^#/, "")).trim()
+  if (!label) return null
+
+  if (target.startsWith("#")) {
+    return {
+      href: `#${slugifyMarkdownHeading(target.slice(1))}`,
+      label,
+    }
+  }
+  if (target.startsWith("/") && !target.startsWith("//") && !target.startsWith("/\\")) {
+    return {
+      href: target,
+      label,
+    }
+  }
+  return {
+    href: `/?q=${encodeURIComponent(target)}`,
+    label,
+  }
+}
 
 const restoreQuotedStrongText = (value: string): ReactNode[] => {
   if (!hasStrongSyntax(value)) {
@@ -161,7 +224,7 @@ const restoreQuotedStrongText = (value: string): ReactNode[] => {
 
 const normalizeQuotedStrongChildren = (children: ReactNode): ReactNode => {
   if (!hasStringChildMatching(children, hasStrongSyntax)) return children
-  return Children.toArray(children).flatMap((child) => {
+  return mergeAdjacentStringChildren(children).flatMap((child) => {
     if (typeof child !== "string") return [child]
     return restoreQuotedStrongText(child)
   })
@@ -204,7 +267,7 @@ const restoreQuotedEmphasisText = (value: string): ReactNode[] => {
 
 const normalizeQuotedEmphasisChildren = (children: ReactNode): ReactNode => {
   if (!hasStringChildMatching(children, hasEmphasisSyntax)) return children
-  return Children.toArray(children).flatMap((child) => {
+  return mergeAdjacentStringChildren(children).flatMap((child) => {
     if (typeof child !== "string") return [child]
     return restoreQuotedEmphasisText(child)
   })
@@ -233,9 +296,124 @@ const restoreSerializedMarkdownChildren = (serialized: string, sourceChildren: R
   return nodes
 }
 
+const normalizeWikilinkChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasWikilinkSyntax)) return children
+  const sourceChildren = mergeAdjacentStringChildren(children)
+  let linkIndex = 0
+  let matchedAny = false
+
+  const nextNodes = sourceChildren.flatMap((child) => {
+    if (typeof child !== "string" || !child.includes("[[")) return [child]
+    const nodes: ReactNode[] = []
+    let cursor = 0
+    for (const match of child.matchAll(INLINE_WIKILINK_REGEX)) {
+      const start = match.index ?? 0
+      const resolved = resolveMarkdownWikilinkTarget(match[1] || "", match[2])
+      if (!resolved) continue
+      if (start > cursor) {
+        nodes.push(child.slice(cursor, start))
+      }
+      nodes.push(
+        <a key={`inline-wikilink-${linkIndex}`} className="aq-wikilink" href={resolved.href}>
+          {resolved.label}
+        </a>
+      )
+      linkIndex += 1
+      matchedAny = true
+      cursor = start + match[0].length
+    }
+    if (cursor === 0) return [child]
+    if (cursor < child.length) {
+      nodes.push(child.slice(cursor))
+    }
+    return nodes
+  })
+
+  return matchedAny ? nextNodes : children
+}
+
+const normalizeInlineBrChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasInlineBrSyntax)) return children
+  const sourceChildren = mergeAdjacentStringChildren(children)
+  let brIndex = 0
+  let matchedAny = false
+
+  const nextNodes = sourceChildren.flatMap((child) => {
+    if (typeof child !== "string" || !hasInlineBrSyntax(child)) return [child]
+    const nodes: ReactNode[] = []
+    let cursor = 0
+    for (const match of child.matchAll(INLINE_HTML_BR_REGEX)) {
+      const start = match.index ?? 0
+      if (start > cursor) {
+        nodes.push(child.slice(cursor, start))
+      }
+      nodes.push(<br key={`inline-br-${brIndex}`} />)
+      brIndex += 1
+      matchedAny = true
+      cursor = start + match[0].length
+    }
+    if (cursor < child.length) {
+      nodes.push(child.slice(cursor))
+    }
+    return nodes
+  })
+
+  return matchedAny ? nextNodes : children
+}
+
+const normalizeHighlightChildren = (children: ReactNode): ReactNode => {
+  if (!hasStringChildMatching(children, hasHighlightSyntax)) return children
+  const sourceChildren = mergeAdjacentStringChildren(children)
+  if (sourceChildren.length === 0) return sourceChildren
+
+  const serialized = sourceChildren
+    .map((child, index) =>
+      typeof child === "string" || typeof child === "number"
+        ? String(child)
+        : `${INLINE_COLOR_CHILD_PLACEHOLDER_PREFIX}${index}${INLINE_COLOR_CHILD_PLACEHOLDER_SUFFIX}`
+    )
+    .join("")
+
+  if (!serialized.includes("==")) return sourceChildren
+
+  const nodes: ReactNode[] = []
+  let cursor = 0
+  let highlightIndex = 0
+  let matched = false
+
+  for (const match of serialized.matchAll(INLINE_HIGHLIGHT_REGEX)) {
+    const full = match[0]
+    const contentSerialized = match[1] || ""
+    const start = match.index ?? 0
+    if (!contentSerialized.trim()) continue
+
+    if (start > cursor) {
+      nodes.push(...restoreSerializedMarkdownChildren(serialized.slice(cursor, start), sourceChildren))
+    }
+
+    const contentNodes = restoreSerializedMarkdownChildren(contentSerialized, sourceChildren)
+    nodes.push(
+      <mark key={`inline-highlight-${highlightIndex}`} className="aq-highlight">
+        {contentNodes}
+      </mark>
+    )
+    highlightIndex += 1
+    matched = true
+    cursor = start + full.length
+  }
+
+  if (!matched) return children
+
+  if (cursor < serialized.length) {
+    nodes.push(...restoreSerializedMarkdownChildren(serialized.slice(cursor), sourceChildren))
+  }
+
+  return nodes
+}
+
 const normalizeInlineColorChildren = (children: ReactNode): ReactNode => {
   if (!hasStringChildMatching(children, hasInlineColorSyntax)) return children
-  const sourceChildren = Children.toArray(children)
+  const sourceChildren = mergeAdjacentStringChildren(children)
   if (sourceChildren.length === 0) return sourceChildren
 
   const serialized = sourceChildren
@@ -319,7 +497,7 @@ export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
   const nodes: ReactNode[] = []
   let breakIndex = 0
 
-  for (const child of Children.toArray(children)) {
+  for (const child of flattenChildNodes(children)) {
     if (typeof child !== "string" || !child.includes("\n")) {
       nodes.push(child)
       continue
@@ -333,10 +511,13 @@ export const normalizeSoftBreakChildren = (children: ReactNode): ReactNode => {
 const MarkdownBlockquoteContext = createContext(false)
 
 export const normalizeMarkdownInlineChildren = (children: ReactNode) => {
-  if (typeof children === "string" && !/[{*_~`<\n\\]/.test(children)) {
+  if (typeof children === "string" && !/[{*_~`<\n\\=[\]]/.test(children)) {
     return children
   }
-  let normalizedChildren = normalizeInlineColorChildren(children)
+  let normalizedChildren = normalizeWikilinkChildren(children)
+  normalizedChildren = normalizeInlineBrChildren(normalizedChildren)
+  normalizedChildren = normalizeHighlightChildren(normalizedChildren)
+  normalizedChildren = normalizeInlineColorChildren(normalizedChildren)
   normalizedChildren = normalizeQuotedStrongChildren(normalizedChildren)
   normalizedChildren = normalizeQuotedEmphasisChildren(normalizedChildren)
   return normalizedChildren

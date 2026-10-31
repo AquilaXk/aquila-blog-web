@@ -37,6 +37,51 @@ const resolveBrowserTabTitle = (title: string, siteName: string) => {
   return `${pageTitle} | ${siteName}`
 }
 
+export const resolveOpenGraphType = (type: string | undefined): "article" | "website" => {
+  const normalized = (type || "").trim().toLowerCase()
+  return normalized === "post" || normalized === "paper" || normalized === "article"
+    ? "article"
+    : "website"
+}
+
+export const resolveMetadataImageUrl = (
+  rawImage: string | undefined,
+  siteUrl: string = CONFIG.link
+): string => {
+  const withoutFragment = (rawImage || "").split("#")[0]?.trim() || ""
+  if (!withoutFragment || withoutFragment.startsWith("//") || withoutFragment.startsWith("/\\")) {
+    return ""
+  }
+
+  if (withoutFragment.startsWith("/")) {
+    const baseOrigin = siteUrl.trim().replace(/\/+$/, "")
+    if (!baseOrigin) return ""
+    try {
+      const resolved = new URL(withoutFragment, `${baseOrigin}/`)
+      if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return ""
+      resolved.hash = ""
+      return resolved.toString()
+    } catch {
+      return ""
+    }
+  }
+
+  try {
+    const parsed = new URL(withoutFragment)
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return ""
+    }
+    parsed.hash = ""
+    return parsed.toString()
+  } catch {
+    return ""
+  }
+}
+
 const serializeJsonLd = (value: Record<string, unknown>) =>
   JSON.stringify(value).replace(/</g, "\\u003c")
 
@@ -46,6 +91,8 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
   const robots = props.robots || "follow, index"
   const canonicalUrl =
     props.canonicalUrl === undefined ? props.url : props.canonicalUrl
+  const ogType = resolveOpenGraphType(props.type)
+  const resolvedImage = resolveMetadataImageUrl(props.image)
 
   return (
     <Head>
@@ -54,18 +101,18 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
       <meta charSet="UTF-8" />
       <meta name="description" content={props.description} />
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-      <meta property="og:type" content={props.type} />
+      <meta property="og:type" content={ogType} />
       <meta property="og:title" content={props.title} />
       <meta property="og:description" content={props.description} />
       <meta property="og:url" content={props.url} />
       <meta property="og:site_name" content={siteName} />
       {CONFIG.lang && <meta property="og:locale" content={CONFIG.lang} />}
-      {props.image && <meta property="og:image" content={props.image} />}
+      {resolvedImage && <meta property="og:image" content={resolvedImage} />}
       <meta name="twitter:title" content={props.title} />
       <meta name="twitter:description" content={props.description} />
       <meta name="twitter:card" content="summary_large_image" />
-      {props.image && <meta name="twitter:image" content={props.image} />}
-      {props.type === "Post" && (
+      {resolvedImage && <meta name="twitter:image" content={resolvedImage} />}
+      {ogType === "article" && (
         <>
           {props.date && (
             <meta property="article:published_time" content={props.date} />

@@ -1,5 +1,9 @@
 import { CONFIG } from "site.config"
-import type { MetaConfigProps } from "src/components/MetaConfig"
+import {
+  resolveMetadataImageUrl,
+  resolveOpenGraphType,
+  type MetaConfigProps,
+} from "src/components/MetaConfig"
 import type { TPost } from "src/types"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 
@@ -14,7 +18,7 @@ const toIsoDate = (value: string | undefined) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const normalizePostImage = (post: TPost) => post.thumbnail?.trim() || ""
+const normalizePostImage = (post: TPost) => resolveMetadataImageUrl(post.thumbnail, SITE_URL)
 
 const normalizeAuthorName = (post: TPost) =>
   post.authorName?.trim() ||
@@ -83,6 +87,7 @@ export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
     post.modifiedAt || post.modifiedTime || post.createdAt || post.createdTime || post.date?.start_date
   )
   const image = normalizePostImage(post)
+  const rawType = Array.isArray(post.type) ? post.type[0] || "Post" : post.type || "Post"
 
   return {
     title: post.title,
@@ -90,7 +95,7 @@ export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
     modifiedDate,
     image,
     description: post.summary || "",
-    type: Array.isArray(post.type) ? post.type[0] || "Post" : post.type || "Post",
+    type: resolveOpenGraphType(rawType),
     url: canonicalUrl,
     jsonLd: [
       buildBlogPostingJsonLd({
