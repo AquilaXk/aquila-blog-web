@@ -1,5 +1,5 @@
+import { collectCommonMarkCodeBlockRanges } from "./commonMarkCodeBlockRanges"
 import {
-  collectCommonMarkCodeBlockRanges,
   countCodePointRun,
   findContainingSortedRangeEnd,
   findLineEndOffset,
@@ -250,8 +250,9 @@ const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels 
 export const DEFAULT_PROTECTED_INLINE_SENTINELS = buildProtectedInlineSentinels(0)
 
 export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
-  const probe = source.includes("&#")
-    ? `${source}\n${decodeNumericEntitiesForSentinelProbe(source)}`
+  const needsDecodedProbe = source.includes("&#") || source.includes("\\_")
+  const probe = needsDecodedProbe
+    ? `${source}\n${decodeNumericEntitiesForSentinelProbe(source).replaceAll("\\_", "_")}`
     : source
   let nonce = 0
   while (probe.includes(`aqp${nonce}_`)) {

@@ -7,7 +7,7 @@ import {
   augmentLivePreviewLiteralRangesWithMath,
   classifySyntaxNodeAgainstMath,
   collectSyntaxLiteralRanges,
-  type MarkdownMathReplacementSpec,
+  type MathReplacementSpec,
 } from "./markdownEditorMathModel"
 
 export type MarkdownEditorSurfaceMode = "live" | "source" | "reading"
@@ -238,12 +238,12 @@ const createPlanEntry = (
 
 export type MarkdownLivePreviewBundle = {
   entries: MarkdownLivePreviewPlanEntry[]
-  mathSpecs: MarkdownMathReplacementSpec[]
+  mathSpecs: MathReplacementSpec[]
 }
 
 const cachedPreviewEntriesByNode = new WeakMap<
   MarkdownSyntaxNode,
-  { markdown: string; entries: MarkdownLivePreviewPlanEntry[]; mathSpecs: MarkdownMathReplacementSpec[] }
+  { markdown: string; entries: MarkdownLivePreviewPlanEntry[]; mathSpecs: MathReplacementSpec[] }
 >()
 
 const isWrappedSpanBlockedByLiterals = (
@@ -381,7 +381,6 @@ type LivePreviewAstWalkContext = {
   markdown: string; documentNode: MarkdownSyntaxNode
   wikilinkRanges: readonly MarkdownLiveSourceRange[]
   mathRanges: readonly MarkdownLiveSourceRange[]
-  displayMathRanges: readonly MarkdownLiveSourceRange[]
   entries: MarkdownLivePreviewPlanEntry[]; taskRanges: MarkdownLiveSourceRange[]
 }
 
@@ -457,7 +456,7 @@ const visitLivePreviewSyntaxNode = (
     return
   }
   if (hasEnclosingInterval(ctx.wikilinkRanges, node.from, node.to)) return
-  const mathDisposition = classifySyntaxNodeAgainstMath(node, ctx.mathRanges, ctx.displayMathRanges)
+  const mathDisposition = classifySyntaxNodeAgainstMath(node, ctx.mathRanges)
   if (mathDisposition === "skip") return
 
   const activeHeading = /^ATXHeading[1-6]$/.test(node.name) ? node : currentHeading
@@ -485,17 +484,18 @@ export const getMarkdownLivePreviewBundle = (
 
   const entries: MarkdownLivePreviewPlanEntry[] = []
   const rawLiterals = collectSyntaxLiteralRanges(documentNode)
-  const { literalRanges, blockLiteralRanges, mathRanges, displayMathRanges, mathSpecs } =
+  const { literalRanges, blockLiteralRanges, mathRanges, mathSpecs } =
     augmentLivePreviewLiteralRangesWithMath(
       markdown,
       rawLiterals.literalRanges,
       rawLiterals.blockLiteralRanges,
-      rawLiterals.interiorLiteralRanges
+      rawLiterals.interiorLiteralRanges,
+      rawLiterals.codeBlockRanges
     )
   const wikilinkRanges = collectRegexPlanEntries(markdown, blockLiteralRanges, literalRanges, entries)
   const taskRanges: MarkdownLiveSourceRange[] = []
   visitLivePreviewSyntaxNode(documentNode, null, null, {
-    markdown, documentNode, wikilinkRanges, mathRanges, displayMathRanges, entries, taskRanges,
+    markdown, documentNode, wikilinkRanges, mathRanges, entries, taskRanges,
   })
 
   entries.sort((a, b) => a.from - b.from || a.to - b.to)

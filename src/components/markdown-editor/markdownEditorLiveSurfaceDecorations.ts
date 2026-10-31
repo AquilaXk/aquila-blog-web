@@ -3,14 +3,16 @@ import { EditorState, StateEffect, StateField, type Range, type StateEffectType 
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
   getMarkdownLivePreviewBundle,
-  hasIntervalOverlap,
   isTokenActive,
   resolveMarkdownLivePreviewPlanFromEntries,
   type MarkdownEditorSurfaceMode,
   type MarkdownLivePreviewDecoration,
   type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
-import { isNodeShadowedByMath, type MathReplacementSpec } from "./markdownEditorMathModel"
+import {
+  filterDisjointPreorderItems, filterItemsOutsideSortedRanges, isLivePlanSpecBlockedByReplacedRanges,
+  isNodeShadowedByMath, resolveBlockNodeEndWithMath, type MathReplacementSpec,
+} from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
 import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
 import {
@@ -276,23 +278,21 @@ const enterSyntaxNodeForDocBlocks = (
   node: { name: string; from: number; to: number },
   collector: DocBlockCollector
 ) => {
+  if (node.name === "Table" || node.name === "Blockquote") {
+    const end = resolveBlockNodeEndWithMath(collector.markdownValue, node.name, node.from, node.to, collector.maths)
+    if (end === null || isNodeShadowedByMath(collector.maths, node.from, end)) return
+    if (node.name === "Table") {
+      pushIfPresent(collector.tables, collectTableBlockSpec(collector.state, collector.markdownValue, node.from, end))
+    } else if (collector.hasCalloutMarker) {
+      pushIfPresent(collector.callouts, parseCalloutBlockquoteSpec(collector.markdownValue.slice(node.from, end), node.from, end))
+    }
+    return
+  }
   if (isNodeShadowedByMath(collector.maths, node.from, node.to)) return
-  switch (node.name) {
-    case "Table":
-      pushIfPresent(collector.tables, collectTableBlockSpec(collector.state, collector.markdownValue, node.from, node.to))
-      return
-    case "Blockquote":
-      if (collector.hasCalloutMarker) {
-        pushIfPresent(collector.callouts, parseCalloutBlockquoteSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
-      }
-      return
-    case "Image":
-      pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
-      return
-    case "FencedCode":
-      if (collector.hasMermaidMarker) {
-        pushIfPresent(collector.mermaids, parseMermaidReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
-      }
+  if (node.name === "Image") {
+    pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
+  } else if (node.name === "FencedCode" && collector.hasMermaidMarker) {
+    pushIfPresent(collector.mermaids, parseMermaidReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
   }
 }
 
@@ -495,13 +495,16 @@ const filterEligibleBlockSpecs = <T extends RangeSpec>(
   compRange: RangeSpec | null
 ): T[] => items.filter((item) => !isTokenActive(item.from, item.to, selections) && !overlapsComposition(compRange, item.from, item.to))
 
+const sortRanges = (ranges: RangeSpec[]): RangeSpec[] => ranges.sort((a, b) => a.from - b.from || a.to - b.to)
+
 const isPlanSpecSkipped = (
+  markdownValue: string,
   spec: ResolvedPreviewSpec,
   replacedRanges: readonly RangeSpec[],
   compRange: RangeSpec | null
 ): boolean => {
   const checkTo = spec.kind === "task" ? Math.min(spec.to, spec.from + 3) : spec.to
-  return spec.from === checkTo || hasIntervalOverlap(replacedRanges, spec.from, checkTo) || overlapsComposition(compRange, spec.from, checkTo)
+  return spec.from === checkTo || isLivePlanSpecBlockedByReplacedRanges(markdownValue, spec.kind, spec.from, checkTo, replacedRanges) || overlapsComposition(compRange, spec.from, checkTo)
 }
 
 export const buildDecorations = (state: EditorState): DecorationSet => {
@@ -515,14 +518,18 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
 
   const filtered = {
     tables: filterEligibleBlockSpecs(tables, selections, compRange),
-    callouts: filterEligibleBlockSpecs(callouts, selections, compRange),
+    callouts: filterDisjointPreorderItems(filterEligibleBlockSpecs(callouts, selections, compRange)),
     images: filterEligibleBlockSpecs(images, selections, compRange),
     maths: filterEligibleBlockSpecs(maths, selections, compRange),
     mermaids: disableMermaid ? [] : filterEligibleBlockSpecs(mermaids, selections, compRange),
   }
-  const replacedRanges = [
-    ...filtered.tables, ...filtered.callouts, ...filtered.images, ...filtered.maths, ...filtered.mermaids,
-  ].sort((a, b) => a.from - b.from || a.to - b.to)
+  filtered.tables = filterItemsOutsideSortedRanges(filtered.tables, filtered.callouts)
+  filtered.mermaids = filterItemsOutsideSortedRanges(filtered.mermaids, filtered.callouts)
+  const outerBlockRanges = sortRanges([...filtered.tables, ...filtered.callouts, ...filtered.mermaids])
+  filtered.images = filterDisjointPreorderItems(filterItemsOutsideSortedRanges(filtered.images, outerBlockRanges))
+  const nonMathRanges = sortRanges([...outerBlockRanges, ...filtered.images])
+  filtered.maths = filterItemsOutsideSortedRanges(filtered.maths, nonMathRanges)
+  const replacedRanges = sortRanges([...nonMathRanges, ...filtered.maths])
 
   const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections, false, currentMode)
   const decorations: Range<Decoration>[] = []
@@ -533,7 +540,7 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   }
 
   for (const spec of plan) {
-    if (!isPlanSpecSkipped(spec, replacedRanges, compRange)) appendSinglePlanSpecDecoration(spec, ctx)
+    if (!isPlanSpecSkipped(markdownValue, spec, replacedRanges, compRange)) appendSinglePlanSpecDecoration(spec, ctx)
   }
 
   appendBlockWidgetDecorations(decorations, filtered)

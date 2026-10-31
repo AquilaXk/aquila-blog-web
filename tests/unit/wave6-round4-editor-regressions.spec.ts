@@ -621,5 +621,117 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
       [{ colspan: 2 }, { hidden: true }],
     ])
   })
+
+  test("truncates absorbed trailing math from tables and callouts, guards right-edge overlaps, preserves heading marks, and aligns TeX delimiter scanning", () => {
+    const collectDecoSnapshot = (doc: string, anchor = doc.length) => {
+      const state = EditorState.create({
+        doc,
+        selection: { anchor },
+        extensions: [markdown({ extensions: GFM }), decorationField],
+      })
+      const decos = buildDecorations(state)
+      const classes: Array<{ cls: string; from: number; to: number }> = []
+      const widgets: Array<{ name: string; from: number; to: number; widget: unknown }> = []
+      const iter = decos.iter()
+      while (iter.value) {
+        const spec = iter.value.spec as { class?: string; widget?: { constructor?: { name?: string } } }
+        if (spec.class) classes.push({ cls: spec.class, from: iter.from, to: iter.to })
+        if (spec.widget?.constructor?.name) {
+          widgets.push({ name: spec.widget.constructor.name, from: iter.from, to: iter.to, widget: spec.widget })
+        }
+        iter.next()
+      }
+      return { classes, widgets }
+    }
+
+    const tableLines = ["| H1 | H2 |", "| --- | --- |", "| A | B |"].join("\n")
+    const tableThenMath = `${tableLines}\n$$\nx + y = z\n$$\n\ncursor`
+    const tableSnap = collectDecoSnapshot(tableThenMath)
+    expect(tableSnap.widgets.map(({ name, from, to }) => ({ name, from, to }))).toEqual([
+      { name: "MarkdownTableWidget", from: 0, to: tableLines.length },
+      { name: "MarkdownMathWidget", from: tableLines.length + 1, to: tableLines.length + 16 },
+    ])
+    withMockDom(() => {
+      let currentDoc = tableThenMath
+      const mockView = createMockTableEditorView(
+        () => currentDoc,
+        (next) => {
+          currentDoc = next
+        }
+      )
+      const typedView = mockView as unknown as NonNullable<Parameters<MarkdownTableWidget["toDOM"]>[0]>
+      const tableWidget = tableSnap.widgets[0]!.widget as MarkdownTableWidget
+      const dom = tableWidget.toDOM(typedView) as unknown as SimpleDomElement
+      const dupColBtn = dom.querySelectorAll("button").find((btn) => btn.getAttribute("aria-label") === "표 열 복제")
+      expect(dupColBtn).toBeDefined()
+      dupColBtn!.dispatch("click")
+      expect(currentDoc).toContain("| H1 | H1 | H2 |")
+      expect(currentDoc).toContain("$$\nx + y = z\n$$")
+    })
+
+    const midCellMultiLineMath = "| a | $$\nx = 1\n$$\n\ncursor"
+    expect(collectDecoSnapshot(midCellMultiLineMath).widgets.map((w) => w.name)).not.toContain("MarkdownTableWidget")
+
+    const tableWithInlineMath = "| $a$ | $b$ |\n| --- | --- |\n| 1 | 2 |\n\ncursor"
+    expect(collectDecoSnapshot(tableWithInlineMath).widgets.map((w) => w.name)).toEqual(["MarkdownTableWidget"])
+
+    const calloutLines = "> [!NOTE]\n> body"
+    const calloutThenMath = `${calloutLines}\n$$\nx = 1\n$$\n\ncursor`
+    const calloutSnap = collectDecoSnapshot(calloutThenMath)
+    expect(calloutSnap.widgets.map(({ name, from, to }) => ({ name, from, to }))).toEqual([
+      { name: "MarkdownCalloutWidget", from: 0, to: calloutLines.length },
+      { name: "MarkdownMathWidget", from: calloutLines.length + 1, to: calloutLines.length + 12 },
+    ])
+
+    const rightEdgeOverlapImage = "![alt $$](/post/api/v1/images/test.png) x$$\n\ncursor"
+    const imageSnap = collectDecoSnapshot(rightEdgeOverlapImage)
+    expect(imageSnap.widgets.map((w) => w.name)).toEqual(["MarkdownMathWidget"])
+
+    const htmlAttrBackticks = '<span data-x="`"> $a$</span> and <span data-y="`">end</span>'
+    expect(getMarkdownLivePreviewBundle(htmlAttrBackticks).mathSpecs).toEqual([
+      { from: 18, to: 21, math: "a", displayMode: false },
+    ])
+
+    const crossFenceBacktickDoc = "$$\n`a'\n$$\nText `code`"
+    const crossFenceBundle = getMarkdownLivePreviewBundle(crossFenceBacktickDoc)
+    expect(crossFenceBundle.mathSpecs).toEqual([{ from: 0, to: 9, math: "\n`a'\n", displayMode: true }])
+    const crossFenceSpecs = buildMarkdownLivePreviewDecorationSpecs(crossFenceBacktickDoc, [], false, "reading")
+    expect(crossFenceSpecs.filter((s) => s.kind === "inline-code" || s.kind === "hide-mark")).toEqual([])
+    const separatedParagraphSpecs = buildMarkdownLivePreviewDecorationSpecs("$$\n`a'\n$$\n\nText `code`", [], false, "reading")
+    expect(separatedParagraphSpecs.filter((s) => s.kind === "inline-code").map(({ from, to }) => ({ from, to }))).toEqual([
+      { from: 16, to: 22 },
+    ])
+
+    const commentInsideDisplay = "$$\n<!--\n$$\n-->\nx = 1\n$$"
+    expect(getMarkdownLivePreviewBundle(commentInsideDisplay).mathSpecs).toEqual([
+      { from: 0, to: 10, math: "\n<!--\n", displayMode: true },
+    ])
+    expect(renderMarkdownHtml(commentInsideDisplay)).toContain("katex-display")
+
+    const backticksInsideSingleLineDisplay = "$$a `b` $$ and $$c = 1$$"
+    expect(getMarkdownLivePreviewBundle(backticksInsideSingleLineDisplay).mathSpecs).toEqual([
+      { from: 0, to: 10, math: "a `b` ", displayMode: true },
+      { from: 15, to: 24, math: "c = 1", displayMode: true },
+    ])
+    const unclosedBacktickDisplay = "$$a `$$` b$$ and $$c = 1$$"
+    expect(getMarkdownLivePreviewBundle(unclosedBacktickDisplay).mathSpecs).toEqual([
+      { from: 0, to: 7, math: "a `", displayMode: true },
+      { from: 10, to: 19, math: " and ", displayMode: true },
+    ])
+    expect(getMarkdownLivePreviewBundle("```tex\n$$\nx = 1\n$$\n```").mathSpecs).toEqual([])
+    expect(getMarkdownLivePreviewBundle("$$\n\n    a = b\n$$").mathSpecs).toEqual([
+      { from: 0, to: 16, math: "\n\n    a = b\n", displayMode: true },
+    ])
+
+    const headingWithDisplayMath = "# Theorem **1** $$E = mc^2$$\n\ncursor"
+    const headingSnap = collectDecoSnapshot(headingWithDisplayMath)
+    expect(headingSnap.classes.some((c) => c.cls.includes("cm-live-heading-line-1"))).toBe(true)
+    expect(headingSnap.classes.some((c) => c.cls.includes("cm-live-heading-1") && c.from === 0 && c.to === 28)).toBe(true)
+    expect(headingSnap.classes.some((c) => c.cls === "cm-live-strong" && c.from === 10 && c.to === 15)).toBe(true)
+    expect(headingSnap.widgets.map(({ name, from, to }) => ({ name, from, to }))).toEqual([
+      { name: "MarkdownMathWidget", from: 16, to: 28 },
+    ])
+  })
 })
+
 

@@ -654,9 +654,15 @@ test.describe("wave6 round4 public markdown regressions", () => {
     } as unknown as MutationRecord
     expect(shouldScheduleFromInlineColorMutations([mockMutation])).toBe(true)
 
-    const multiParaIndentedMathHtml = renderMarkdownHtml("$$\n\n    a = b\n$$")
+    const multiParaIndentedMathHtml = renderMarkdownHtml("$$\n\n    a = b\n$$\n\n$$\n\n   c = d\n$$")
     expect(multiParaIndentedMathHtml).toContain("aq-formula-card")
     expect(multiParaIndentedMathHtml).toContain("a = b")
+    expect(multiParaIndentedMathHtml).toContain("c = d")
+    const unclosedMathBeforeCodeBlockHtml = renderMarkdownHtml("$$\n\n    echo $HOME")
+    expect(unclosedMathBeforeCodeBlockHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(unclosedMathBeforeCodeBlockHtml).toContain("echo $HOME")
+    expect(unclosedMathBeforeCodeBlockHtml).not.toContain(String.raw`\$HOME`)
+    expect(unclosedMathBeforeCodeBlockHtml).not.toContain("aq-formula-card")
     const indentedCodeDollarHtml = renderMarkdownHtml("Intro\n\n    $$\n\n        a = b\n    $$")
     expect(indentedCodeDollarHtml).toContain('class="aq-code aq-pretty-pre"')
     expect(indentedCodeDollarHtml).not.toContain("aq-formula-card")
@@ -685,5 +691,105 @@ test.describe("wave6 round4 public markdown regressions", () => {
       "After Triple Backtick Inline",
       "After Unclosed Math",
     ])
+  })
+
+  test("round 8: directive/aside/formula code-block boundaries, lazy continuations, list continuations, tab-stop code, and &NBSP;/empty-tag probes", () => {
+    const calloutIndentedCloseHtml = renderMarkdownHtml(
+      ["Inline $x + 1$", "", ":::callout info", "    :::", "    echo $HOME", ":::"].join("\n")
+    )
+    expect(calloutIndentedCloseHtml).toContain('data-callout="info"')
+    expect(calloutIndentedCloseHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(calloutIndentedCloseHtml).toContain('data-raw-code=":::\necho $HOME"')
+    expect(calloutIndentedCloseHtml).not.toContain("<p>:::</p>")
+    expect(calloutIndentedCloseHtml).not.toContain(String.raw`\$HOME`)
+
+    const calloutFencedInnerHtml = renderMarkdownHtml(
+      [":::callout info", "```markdown", ":::callout warning", "inner", ":::", "```", ":::"].join("\n")
+    )
+    expect(calloutFencedInnerHtml).toContain('data-callout="info"')
+    expect(calloutFencedInnerHtml).not.toContain('data-callout="warning"')
+    expect(calloutFencedInnerHtml).toContain(":::callout warning")
+
+    const unclosedMathBeforeFenceHtml = renderMarkdownHtml(
+      ["Inline $y + 1$", "", "$$", "", "```markdown", "$$", "x = 1", "$$", "```", "", "$$", "z = 2", "$$"].join(
+        "\n"
+      )
+    )
+    expect(unclosedMathBeforeFenceHtml).toContain("<p>$$</p>")
+    expect(unclosedMathBeforeFenceHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(unclosedMathBeforeFenceHtml).toContain("aq-formula-card")
+    expect(unclosedMathBeforeFenceHtml).toContain("z = 2")
+
+    const unclosedMathBeforeTabStopCodeHtml = renderMarkdownHtml("$$\n\n \t$$")
+    expect(unclosedMathBeforeTabStopCodeHtml).not.toContain("aq-formula-card")
+    expect(unclosedMathBeforeTabStopCodeHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(unclosedMathBeforeTabStopCodeHtml).toContain('data-raw-code="$$"')
+
+    const tabStopStandaloneFenceHtml = renderMarkdownHtml(" \t$$")
+    expect(tabStopStandaloneFenceHtml).not.toContain("aq-formula-card")
+    expect(tabStopStandaloneFenceHtml).toContain('data-raw-code="$$"')
+
+    const asideWithFenceHtml = renderMarkdownHtml(
+      ["<aside>", "[!INFO] Aside Note", "```html", "</aside>", "```", "Tail inside aside", "</aside>"].join("\n")
+    )
+    expect(asideWithFenceHtml).toContain("Aside Note")
+    expect(asideWithFenceHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(asideWithFenceHtml).toContain("Tail inside aside")
+
+    const unknownDirectiveLazyHtml = renderMarkdownHtml(
+      "Math $k + 1$\n\n:::note\n    Cost is $100 and $200 and <b>bold</b> and \\==plain=="
+    )
+    expect(unknownDirectiveLazyHtml).not.toContain('class="aq-code aq-pretty-pre"')
+    expect(unknownDirectiveLazyHtml).toContain("Cost is $100 and $200 and <strong>bold</strong> and ==plain==")
+    expect(unknownDirectiveLazyHtml).not.toContain("<mark")
+    expect(unknownDirectiveLazyHtml).not.toContain("\uE000")
+
+    const indentedListContHtml = renderMarkdownHtml("   - list item\n\n      continuation paragraph")
+    expect(indentedListContHtml).toContain("<li>")
+    expect(indentedListContHtml).toContain("<p>continuation paragraph</p>")
+    expect(indentedListContHtml).not.toContain("<pre")
+
+    const listWithImageAndContHtml = renderMarkdownHtml(
+      "- list item\n\n    ![alt](/post/api/v1/images/a.png)\n\n    continuation paragraph"
+    )
+    expect(listWithImageAndContHtml).toContain("<li>")
+    expect(listWithImageAndContHtml).toContain("/post/api/v1/images/a.png")
+    expect(listWithImageAndContHtml).toContain("<p>continuation paragraph</p>")
+    expect(listWithImageAndContHtml).not.toContain("<pre")
+
+    const spaceTabCodeHtml = renderMarkdownHtml("  \techo $HOME")
+    expect(spaceTabCodeHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(spaceTabCodeHtml).toContain("echo $HOME")
+
+    expect(normalizeLegacyInlineHtmlMarkdown("<b>&NBSP;</b>")).toBe("**&NBSP;**")
+    expect(normalizeLegacyInlineHtmlMarkdown("<b>a&NBSP;b</b>")).toBe("**a&NBSP;b**")
+    expect(renderMarkdownHtml("<b>&NBSP;</b> and <b>a&NBSP;b</b>")).toContain(
+      "<strong>&amp;NBSP;</strong> and <strong>a&amp;NBSP;b</strong>"
+    )
+    expect(normalizeLegacyInlineHtmlMarkdown("<b>&#xE000;AQ<i></i>CODE0_0&#xE001;</b>")).toBe(
+      "**\uE000AQCODE0_0\uE001**"
+    )
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("<code>saved</code> and <b>&#xE000;AQ<i></i>CODE0_0&#xE001;</b>")
+    ).toBe("`saved` and **\uE000AQCODE0_0\uE001**")
+    const emptyTagCollisionHtml = renderMarkdownHtml(
+      "<code>saved</code> and <b>&#xE000;AQ<i></i>CODE0_0&#xE001;</b> and <b>&#xE000;AQ<b> </b>CODE1_0&#xE001;</b>"
+    )
+    expect(emptyTagCollisionHtml).toContain('<code class="aq-inline-code">saved</code>')
+    expect(emptyTagCollisionHtml).toContain("<strong>\uE000AQCODE0_0\uE001</strong>")
+    expect(emptyTagCollisionHtml).toContain("<strong>\uE000AQCODE1_0\uE001</strong>")
+
+    const escapedUnderscoreSentinelHtml = renderMarkdownHtml(
+      String.raw`\==plain== and &#xE000;aqp0\_eq&#xE001;`
+    )
+    expect(escapedUnderscoreSentinelHtml).toContain("==plain== and \uE000aqp0_eq\uE001")
+    expect(escapedUnderscoreSentinelHtml).not.toContain("<mark")
+
+    const nestedDirectiveOuterCodeHtml = renderMarkdownHtml(
+      [":::toggle Outer", ":::callout info", "inner", ":::", "    echo $HOME", ":::"].join("\n")
+    )
+    expect(nestedDirectiveOuterCodeHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(nestedDirectiveOuterCodeHtml).toContain("echo $HOME")
+    expect(nestedDirectiveOuterCodeHtml).not.toContain(String.raw`\$HOME`)
   })
 })

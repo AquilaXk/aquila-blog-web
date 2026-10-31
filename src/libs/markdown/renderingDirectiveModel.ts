@@ -1,3 +1,10 @@
+import {
+  countCodePointRun,
+  hasCommonMarkCodeIndent,
+  overlapsSortedRanges,
+  parseOpeningCodeFence,
+  type MathSpanRange,
+} from "src/libs/markdown/pandocMathScanner"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 
@@ -6,6 +13,44 @@ export type CustomDirectiveKind = "bookmark" | "embed" | "file"
 export type PendingDirectiveMetadata = {
   kind: CustomDirectiveKind
   attrs: Record<string, unknown>
+}
+
+export type ActiveCodeFence = {
+  markerCode: number
+  length: number
+}
+
+const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
+const WHITESPACE_ONLY_PATTERN = /^[ \t]*$/
+
+const stripCarriageReturn = (line: string): string =>
+  line.endsWith("\r") ? line.slice(0, -1) : line
+
+export const stepTopLevelCodeFence = (
+  rawLine: string,
+  activeFence: ActiveCodeFence | null
+): { activeFence: ActiveCodeFence | null; inFence: boolean } => {
+  const line = stripCarriageReturn(rawLine)
+  if (hasCommonMarkCodeIndent(line)) {
+    return { activeFence, inFence: activeFence !== null }
+  }
+  const leadingSpaces = countCodePointRun(line, 0, 32)
+  const trimmedStart = line.slice(leadingSpaces)
+  if (!activeFence) {
+    if (trimmedStart.startsWith(">")) {
+      return { activeFence: null, inFence: false }
+    }
+    const opened = parseOpeningCodeFence(line)
+    return { activeFence: opened, inFence: opened !== null }
+  }
+  const runLen = countCodePointRun(trimmedStart, 0, activeFence.markerCode)
+  if (
+    runLen >= activeFence.length &&
+    WHITESPACE_ONLY_PATTERN.test(trimmedStart.slice(runLen))
+  ) {
+    return { activeFence: null, inFence: true }
+  }
+  return { activeFence, inFence: true }
 }
 
 export const parseCustomDirectiveHeader = (
@@ -102,18 +147,42 @@ export const parseCardMetadataComment = (trimmedLine: string): PendingDirectiveM
   }
 }
 
+export const findDirectiveCloseLineIndex = (
+  lines: readonly string[],
+  startIndex: number,
+  lineStarts?: readonly number[],
+  codeBlockRanges?: readonly MathSpanRange[]
+): number => {
+  let activeFence: ActiveCodeFence | null = null
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index]!
+    const fenceStep = stepTopLevelCodeFence(line, activeFence)
+    activeFence = fenceStep.activeFence
+    if (fenceStep.inFence) continue
+    if (lineStarts && codeBlockRanges && codeBlockRanges.length > 0) {
+      const lineStart = lineStarts[index]!
+      if (overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))) {
+        continue
+      }
+    }
+    if (DIRECTIVE_CLOSE_LINE_PATTERN.test(line)) {
+      return activeFence === null ? index : -1
+    }
+  }
+  return -1
+}
+
 export const collectTripleColonBody = (
   lines: readonly string[],
-  startIndex: number
+  startIndex: number,
+  lineStarts?: readonly number[],
+  codeBlockRanges?: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } => {
-  const bodyLines: string[] = []
-  for (let index = startIndex; index < lines.length; index += 1) {
-    if (lines[index].trim() === ":::") {
-      return { closedIndex: index, bodyLines }
-    }
-    bodyLines.push(lines[index])
+  const closedIndex = findDirectiveCloseLineIndex(lines, startIndex, lineStarts, codeBlockRanges)
+  if (closedIndex < 0) {
+    return { closedIndex: -1, bodyLines: lines.slice(startIndex) }
   }
-  return { closedIndex: -1, bodyLines }
+  return { closedIndex, bodyLines: lines.slice(startIndex, closedIndex) }
 }
 
 export const buildCustomDirectiveSegment = (

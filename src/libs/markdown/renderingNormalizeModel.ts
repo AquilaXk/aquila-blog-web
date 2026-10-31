@@ -220,10 +220,7 @@ export const normalizeMalformedTrailingSpaceEmphasis = (markdown: string) => {
 
 export const trimMarkdownPreservingCodeIndent = (value: string): string => {
   if (!value.trim()) return ""
-  const withoutBlankLead = value.replace(/^(?:[ \t]*\r?\n)+/, "")
-  return /^(?: {4,}|\t)/.test(withoutBlankLead)
-    ? withoutBlankLead.trimEnd()
-    : withoutBlankLead.trim()
+  return value.replace(/^(?:[ \t]*\r?\n)+/, "").trimEnd()
 }
 
 export const normalizeMarkdownForRender = (rawMarkdown: string) =>

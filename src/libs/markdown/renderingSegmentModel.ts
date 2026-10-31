@@ -1,16 +1,21 @@
 import type { CalloutKind, MarkdownSegment } from "src/libs/markdown/renderingTypes"
 import { getCallout, resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "src/libs/markdown/calloutRegistry"
+import { parseCommonMarkBlockRanges } from "src/libs/markdown/commonMarkCodeBlockRanges"
 import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
 import {
   buildCustomDirectiveSegment,
   collectTripleColonBody,
   parseCardMetadataComment,
   parseCustomDirectiveHeader,
+  stepTopLevelCodeFence,
+  type ActiveCodeFence,
   type PendingDirectiveMetadata,
 } from "src/libs/markdown/renderingDirectiveModel"
 import {
-  collectCommonMarkCodeBlockRanges,
+  hasCommonMarkCodeIndent,
   overlapsSortedRanges,
+  parseOpeningCodeFence,
+  type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
 import { trimMarkdownPreservingCodeIndent } from "src/libs/markdown/renderingNormalizeModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
@@ -24,6 +29,9 @@ type ParsedCalloutHeader = {
 }
 
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
+const CALLOUT_DIRECTIVE_OPEN_PATTERN = /^:::callout(?:[ \t\r]|$)/
+const TOGGLE_DIRECTIVE_OPEN_PATTERN = /^:::toggle(?:[ \t\r]|$)/
+const LEADING_SPACE_OR_TAB_PATTERN = /^[ \t]/
 
 const isAsciiCalloutToken = (token: string): boolean => {
   if (token.length === 0) return false
@@ -243,7 +251,9 @@ const stripClosingAsideTag = (value: string): string | null => {
 const collectAsideBodyLines = (
   lines: readonly string[],
   startIndex: number,
-  openingTail: string
+  openingTail: string,
+  lineStarts: readonly number[],
+  codeBlockRanges: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } | null => {
   const bodyLines: string[] = []
   const inlineClosed = stripClosingAsideTag(openingTail)
@@ -253,12 +263,22 @@ const collectAsideBodyLines = (
   }
   if (openingTail.length > 0) bodyLines.push(openingTail)
 
+  let activeFence: ActiveCodeFence | null = null
   for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
     const currentLine = lines[cursor]!
-    const closedLine = stripClosingAsideTag(currentLine)
-    if (closedLine !== null) {
-      if (closedLine.length > 0) bodyLines.push(closedLine)
-      return { closedIndex: cursor, bodyLines }
+    const fenceStep = stepTopLevelCodeFence(currentLine, activeFence)
+    activeFence = fenceStep.activeFence
+    const lineStart = lineStarts[cursor]!
+    const inCode =
+      fenceStep.inFence ||
+      overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, currentLine.length))
+    if (!inCode) {
+      const closedLine = stripClosingAsideTag(currentLine)
+      if (closedLine !== null) {
+        if (activeFence !== null) return null
+        if (closedLine.length > 0) bodyLines.push(closedLine)
+        return { closedIndex: cursor, bodyLines }
+      }
     }
     bodyLines.push(currentLine)
   }
@@ -267,13 +287,15 @@ const collectAsideBodyLines = (
 
 const tryParseAsideBlock = (
   lines: readonly string[],
-  startIndex: number
+  startIndex: number,
+  lineStarts: readonly number[],
+  codeBlockRanges: readonly MathSpanRange[]
 ): { nextIndex: number; segment: MarkdownSegment | null; fallbackLines: string[] } | null => {
   const line = lines[startIndex]!
   const openingTail = extractAsideOpenTail(line)
   if (openingTail === null) return null
 
-  const collected = collectAsideBodyLines(lines, startIndex, openingTail)
+  const collected = collectAsideBodyLines(lines, startIndex, openingTail, lineStarts, codeBlockRanges)
   if (!collected) {
     return { nextIndex: startIndex + 1, segment: null, fallbackLines: [line] }
   }
@@ -295,18 +317,26 @@ const tryParseAsideBlock = (
 }
 
 const isDedicatedFormulaFenceLine = (line: string): boolean =>
-  !/^(?: {4,}|\t)/.test(line) && line.trim() === "$$"
+  !hasCommonMarkCodeIndent(line) && line.trim() === "$$"
 
 const tryParseFormulaBlock = (
   lines: readonly string[],
-  startIndex: number
+  startIndex: number,
+  lineStarts: readonly number[],
+  codeBlockRanges: readonly MathSpanRange[]
 ): { closedIndex: number; formula: string } => {
   const bodyLines: string[] = []
   for (let index = startIndex + 1; index < lines.length; index += 1) {
-    if (isDedicatedFormulaFenceLine(lines[index]!)) {
+    const line = lines[index]!
+    if (parseOpeningCodeFence(line) !== null) return { closedIndex: -1, formula: "" }
+    const lineStart = lineStarts[index]!
+    if (
+      isDedicatedFormulaFenceLine(line) &&
+      !overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))
+    ) {
       return { closedIndex: index, formula: bodyLines.join("\n").trim() }
     }
-    bodyLines.push(lines[index]!)
+    bodyLines.push(line)
   }
   return { closedIndex: -1, formula: "" }
 }
@@ -343,6 +373,8 @@ type SegmentLineStepResult = { nextIndex: number }
 
 type SegmentConsumerContext = {
   lines: readonly string[]
+  lineStarts: readonly number[]
+  codeBlockRanges: readonly MathSpanRange[]
   pendingDirectiveMetadata: PendingDirectiveMetadata | null
   flushAndPush: (segment: MarkdownSegment) => void
   markdownBuffer: string[]
@@ -365,9 +397,15 @@ const tryConsumeCustomDirectiveAt = (
   index: number,
   ctx: SegmentConsumerContext
 ): SegmentLineStepResult | null => {
+  if (!line.startsWith(":::")) return null
   const customDirective = parseCustomDirectiveHeader(trimmed)
   if (!customDirective) return null
-  const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+  const { closedIndex, bodyLines } = collectTripleColonBody(
+    ctx.lines,
+    index + 1,
+    ctx.lineStarts,
+    ctx.codeBlockRanges
+  )
   if (closedIndex >= 0) {
     const metadata =
       ctx.pendingDirectiveMetadata?.kind === customDirective.directive
@@ -396,9 +434,14 @@ const tryConsumeColonBlockAt = (
 ): SegmentLineStepResult | null => {
   const customStep = tryConsumeCustomDirectiveAt(line, trimmed, index, ctx)
   if (customStep) return customStep
-  if (line.startsWith(":::callout")) {
+  if (CALLOUT_DIRECTIVE_OPEN_PATTERN.test(line)) {
     const rawHeader = line.slice(":::callout".length).trim()
-    const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+    const { closedIndex, bodyLines } = collectTripleColonBody(
+      ctx.lines,
+      index + 1,
+      ctx.lineStarts,
+      ctx.codeBlockRanges
+    )
     if (closedIndex >= 0) {
       ctx.flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
       return { nextIndex: closedIndex + 1 }
@@ -406,9 +449,14 @@ const tryConsumeColonBlockAt = (
     ctx.markdownBuffer.push(line)
     return { nextIndex: index + 1 }
   }
-  if (line.startsWith(":::toggle")) {
+  if (TOGGLE_DIRECTIVE_OPEN_PATTERN.test(line)) {
     const title = line.slice(":::toggle".length).trim() || "토글"
-    const { closedIndex, bodyLines } = collectTripleColonBody(ctx.lines, index + 1)
+    const { closedIndex, bodyLines } = collectTripleColonBody(
+      ctx.lines,
+      index + 1,
+      ctx.lineStarts,
+      ctx.codeBlockRanges
+    )
     if (closedIndex >= 0) {
       ctx.flushAndPush({
         type: "toggle",
@@ -428,7 +476,7 @@ const tryConsumeFormulaBlockAt = (
   index: number,
   ctx: SegmentConsumerContext
 ): SegmentLineStepResult => {
-  const formulaResult = tryParseFormulaBlock(ctx.lines, index)
+  const formulaResult = tryParseFormulaBlock(ctx.lines, index, ctx.lineStarts, ctx.codeBlockRanges)
   if (formulaResult.closedIndex >= 0) {
     ctx.flushAndPush({ type: "formula", formula: formulaResult.formula })
     return { nextIndex: formulaResult.closedIndex + 1 }
@@ -448,7 +496,7 @@ const tryConsumeAsideAt = (
   index: number,
   ctx: SegmentConsumerContext
 ): SegmentLineStepResult | null => {
-  const asideStep = tryParseAsideBlock(ctx.lines, index)
+  const asideStep = tryParseAsideBlock(ctx.lines, index, ctx.lineStarts, ctx.codeBlockRanges)
   if (!asideStep) return null
   if (asideStep.segment) ctx.flushAndPush(asideStep.segment)
   else ctx.markdownBuffer.push(asideStep.fallbackLines.join("\n"))
@@ -472,7 +520,7 @@ const tryConsumeStructuredBlockAt = (
 
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
-  const codeBlockRanges = collectCommonMarkCodeBlockRanges(content)
+  const { codeBlockRanges, listRanges } = parseCommonMarkBlockRanges(content)
   let nextLineStart = 0
   const lineStarts = lines.map((entry) => {
     const start = nextLineStart
@@ -498,7 +546,14 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   while (index < lines.length) {
     const line = lines[index]!
     const lineStart = lineStarts[index]!
-    if (overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))) {
+    const lineEnd = lineStart + Math.max(1, line.length)
+    if (
+      overlapsSortedRanges(codeBlockRanges, lineStart, lineEnd) ||
+      hasCommonMarkCodeIndent(line) ||
+      (LEADING_SPACE_OR_TAB_PATTERN.test(line) &&
+        overlapsSortedRanges(listRanges, lineStart, lineEnd))
+    ) {
+      pendingDirectiveMetadata = null
       markdownBuffer.push(line)
       index += 1
       continue
@@ -515,6 +570,8 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
 
     const structuredStep = tryConsumeStructuredBlockAt(index, {
       lines,
+      lineStarts,
+      codeBlockRanges,
       pendingDirectiveMetadata,
       flushAndPush,
       markdownBuffer,

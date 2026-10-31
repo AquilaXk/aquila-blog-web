@@ -1,5 +1,3 @@
-import { GFM, parser } from "@lezer/markdown"
-
 export type MathSpanRange = {
   from: number
   to: number
@@ -15,32 +13,11 @@ export type ScannedPandocMathToken = {
 export const DEFAULT_MAX_INLINE_MATH_LENGTH = 2048
 export const DEFAULT_MAX_DISPLAY_MATH_LENGTH = 16384
 
-const commonMarkGfmParser = parser.configure([GFM])
-const CONTAINER_DIRECTIVE_LINE_PATTERN = /^([ \t>]*)(:::[^\r\n]*)/gm
+const COMMONMARK_CODE_INDENT_PATTERN = /^(?: {4}|\t| {1,3}\t)/
 const SINGLE_WHITESPACE_PATTERN = /^\s$/u
 
-const maskContainerDirectives = (markdown: string): string =>
-  markdown.includes(":::")
-    ? markdown.replace(
-        CONTAINER_DIRECTIVE_LINE_PATTERN,
-        (_, lead: string, dir: string) => `${lead}#${" ".repeat(dir.length - 1)}`
-      )
-    : markdown
-
-export const collectCommonMarkCodeBlockRanges = (markdown: string): MathSpanRange[] => {
-  if (!markdown) return []
-  const ranges: MathSpanRange[] = []
-  commonMarkGfmParser.parse(maskContainerDirectives(markdown)).iterate({
-    enter(node) {
-      if (node.name === "FencedCode" || node.name === "CodeBlock") {
-        ranges.push({ from: node.from, to: node.to })
-        return false
-      }
-      return undefined
-    },
-  })
-  return ranges
-}
+export const hasCommonMarkCodeIndent = (line: string): boolean =>
+  COMMONMARK_CODE_INDENT_PATTERN.test(line)
 
 const ALLOWED_ASCII_PREFIX_CODES = new Set([
   40, 91, 123, 34, 39, 45, 61, 47, 43, 60, 62, 44, 59, 58, 33, 63, 42, 95, 126, 124,

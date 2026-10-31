@@ -1,3 +1,4 @@
+import { collectCommonMarkCodeBlockRanges } from "./commonMarkCodeBlockRanges"
 import {
   replaceEntityBrTags,
   replaceRawBrTags,
@@ -5,7 +6,6 @@ import {
   startsWithAsciiCaseInsensitive,
 } from "./inlineTokenScanners"
 import {
-  collectCommonMarkCodeBlockRanges,
   countCodePointRun,
   findContainingSortedRangeEnd,
   isEscapedMarkdownAt,
@@ -46,7 +46,7 @@ const LEGACY_HTML_ENTITY_CODES: Record<string, number> = {
 }
 
 const HTML5_LEGACY_ENTITY_PATTERN =
-  /&(#[xX][\da-fA-F]+|#\d+|amp|AMP|apos|gt|GT|lt|LT|nbsp|NBSP|quot|QUOT);/g
+  /&(#[xX][\da-fA-F]+|#\d+|amp|AMP|apos|gt|GT|lt|LT|nbsp|quot|QUOT);/g
 
 const parseLegacyEntityCodePoint = (normalizedToken: string): number => {
   if (normalizedToken.startsWith("#x")) return Number.parseInt(normalizedToken.slice(2), 16)
@@ -257,7 +257,8 @@ const replacePairedFormattingTags = (
 }
 
 const createChunkCodeSpanPrefix = (chunk: string): string => {
-  const probe = chunk.includes("&") ? `${chunk}\n${decodeLegacyHtmlEntities(chunk)}` : chunk
+  const decoded = chunk.includes("&") ? decodeLegacyHtmlEntities(chunk) : chunk
+  const probe = `${chunk}\n${decoded}\n${decoded.replace(/(?:<[^>]*>|\s)+/g, "")}`
   let nonce = 0
   while (probe.includes(`AQCODE${nonce}_`)) {
     nonce += 1
