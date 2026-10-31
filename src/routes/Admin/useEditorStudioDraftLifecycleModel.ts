@@ -7,19 +7,21 @@ import type { PostVisibility } from "./editorStudioState"
 import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   describeLocalDraftSlot, listLocalDraftCandidates, readLocalDraftCandidate,
-  removeLocalDraftCandidate, resolveLocalDraftSource,
+  removeLocalDraftCandidate, resolveCurrentDocumentDraftStorageKey, resolveLocalDraftSource,
 } from "./editorStudioStorageModel"
 import {
   buildLocalDraftPayloadForSource, clearLocalDraftSuppressionForSource, computeStoredDraftFingerprint,
   decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition, removeLocalDraftCandidateForSource,
-  resolveLocalDraftShouldAdoptBaseline, resolveRestoredPostVersion, shouldReleasePostIdTransitionGate,
+  resolveEffectivePendingRestorableDraftFingerprint, resolveLocalDraftShouldAdoptBaseline,
+  resolveRestoredPostVersion, selectPreferredLocalDraftCandidate, shouldReleasePostIdTransitionGate,
   type LocalDraftBaselineReadySignal, type LocalDraftFingerprintSnapshot,
 } from "./editorStudioDraftAutosaveDecisionModel"
 export {
   buildLocalDraftPayloadForSource, clearLocalDraftSuppressionForSource, computeStoredDraftFingerprint,
   decideLocalDraftAutosave, isLocalDraftAutosaveGatedForPostIdTransition, isLocalDraftBaselineSettleLoadingKey,
   isLocalDraftRestoreSuggestionEligible, LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS,
-  removeLocalDraftCandidateForSource, resolveCreateWritePostId, resolveLocalDraftShouldAdoptBaseline,
+  removeLocalDraftCandidateForSource, resolveCreateWritePostId,
+  resolveEffectivePendingRestorableDraftFingerprint, resolveLocalDraftShouldAdoptBaseline,
   resolveRestoredPostVersion, shouldReleasePostIdTransitionGate,
   type CreateWritePostIdResolution, type LocalDraftAutosaveDecision,
   type LocalDraftAutosaveDecisionInput, type LocalDraftBaselineReadySignal,
@@ -97,6 +99,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     candidates: LocalDraftFingerprintSnapshot[]
     fingerprint: string | null
   } | null>(null)
+  const ownSessionAutosaveRef = useRef<{ key: string | null; fingerprint: string } | null>(null)
   const prevEditorModeRef = useRef(editorMode)
   const prevPostIdRef = useRef(postId)
   const isPostIdTransitionGated = isLocalDraftAutosaveGatedForPostIdTransition(
@@ -111,6 +114,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
   isPostLoadInFlightRef.current = isPostLoadInFlight
 
   const signalLocalDraftBaselineReady = useCallback((signal?: LocalDraftBaselineReadySignal) => {
+    ownSessionAutosaveRef.current = null
     pendingSuccessfulBaselineSettleRef.current = true
     pendingBaselineFingerprintRef.current =
       typeof signal?.baselineFingerprint === "string" ? signal.baselineFingerprint : null
@@ -211,9 +215,15 @@ export const useEditorStudioLocalDraftLifecycle = ({
     const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
     if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) return
 
+    const previousOwnAutosave = ownSessionAutosaveRef.current
+    ownSessionAutosaveRef.current = {
+      key: resolveCurrentDocumentDraftStorageKey(source),
+      fingerprint: currentLocalDraftFingerprint,
+    }
     try {
       persistLocalDraft(payload)
     } catch {
+      ownSessionAutosaveRef.current = previousOwnAutosave
       setLocalDraftSavedAt("")
       setPublishStatus({
         tone: "error",
@@ -333,38 +343,25 @@ export const useEditorStudioLocalDraftLifecycle = ({
       setPublishStatus({ tone: "error", text: "브라우저 임시저장을 삭제하지 못했습니다. 현재 원고는 유지됩니다." }, "page")
       return
     }
+    ownSessionAutosaveRef.current = null
     lastLocalDraftFingerprintRef.current = localDraftFingerprint
-    cachedRestorableDraftRef.current = {
-      source: draftSource,
-      candidates: localDraftCandidates,
-      fingerprint: null,
-    }
+    cachedRestorableDraftRef.current = { source: draftSource, candidates: localDraftCandidates, fingerprint: null }
     signalLocalDraftRemoved(draftSource)
     setLocalDraftSavedAt("")
-    setPublishStatus(
-      {
-        tone: "success",
-        text: "브라우저 임시저장을 삭제했습니다.",
-      },
-      "page"
-    )
+    setPublishStatus({ tone: "success", text: "브라우저 임시저장을 삭제했습니다." }, "page")
   }, [
     draftSource, lastLocalDraftFingerprintRef, localDraftCandidates, localDraftFingerprint,
-    removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt,
-    setPublishStatus,
+    removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt, setPublishStatus,
   ])
 
   const refreshLocalDraftCandidatesForSource = useCallback((source: LocalDraftSource) => {
+    const activeOwnKey = ownSessionAutosaveRef.current?.key ?? null
     const candidates = listLocalDraftCandidates(source).map(({ key, draft }) => ({
       key,
       label: describeLocalDraftSlot(draft),
       source: draft.source,
-      fingerprint: computeStoredDraftFingerprint(
-        draft,
-        buildLocalDraftFingerprint,
-        dedupeStrings,
-        normalizeCategoryValue
-      ),
+      fingerprint: computeStoredDraftFingerprint(draft, buildLocalDraftFingerprint, dedupeStrings, normalizeCategoryValue),
+      isActiveSessionAutosave: activeOwnKey != null && key === activeOwnKey,
     }))
     setLocalDraftCandidates(candidates)
     return candidates
@@ -381,12 +378,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
       ? { kind: "post", postId: normalizedTargetPostId }
       : draftSourceRef.current
     const { core: currentLocalDraftCore, payload } = buildLocalDraftPayloadForSource(
-      localDraftCore,
-      getCurrentPostContent(),
-      source,
-      postVersionRef.current
+      localDraftCore, getCurrentPostContent(), source, postVersionRef.current
     )
     const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
+    ownSessionAutosaveRef.current = null
 
     try {
       persistLocalDraft(payload)
@@ -407,16 +402,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
     try {
       const candidates = refreshLocalDraftCandidatesForSource(source)
-      const matched =
-        candidates.find((candidate) => candidate.fingerprint === currentLocalDraftFingerprint) ||
-        candidates[0] ||
-        null
+      const matched = candidates.find((candidate) => candidate.fingerprint === currentLocalDraftFingerprint) || candidates[0] || null
       setLocalDraftCandidate(matched)
-      cachedRestorableDraftRef.current = {
-        source,
-        candidates,
-        fingerprint: currentLocalDraftFingerprint,
-      }
+      cachedRestorableDraftRef.current = { source, candidates, fingerprint: currentLocalDraftFingerprint }
     } catch {
       cachedRestorableDraftRef.current = null
     }
@@ -436,7 +424,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
         setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 선택과 원고는 유지됩니다." }, "page")
         return
       }
-      setLocalDraftCandidate((selected) => candidates.find((candidate) => candidate.key === selected?.key) || candidates[0] || null)
+      setLocalDraftCandidate((selected) => selectPreferredLocalDraftCandidate(candidates, selected?.key))
     }
     refresh()
     window.addEventListener("storage", refresh)
@@ -452,46 +440,26 @@ export const useEditorStudioLocalDraftLifecycle = ({
       loadingKey,
       pendingSuccessfulBaseline: pendingSuccessfulBaselineSettleRef.current,
     })
-    const baselineFingerprint = shouldAdoptBaseline
-      ? pendingBaselineFingerprintRef.current
-      : null
+    const baselineFingerprint = shouldAdoptBaseline ? pendingBaselineFingerprintRef.current : null
     if (shouldAdoptBaseline) {
       pendingSuccessfulBaselineSettleRef.current = false
       pendingBaselineFingerprintRef.current = null
     }
 
     const hasDraftContent =
-      postTitle.trim().length > 0 ||
-      postContent.trim().length > 0 ||
-      postSummary.trim().length > 0 ||
-      postThumbnailUrl.trim().length > 0 ||
-      postTags.length > 0 ||
-      postCategory.trim().length > 0
+      postTitle.trim().length > 0 || postContent.trim().length > 0 || postSummary.trim().length > 0 ||
+      postThumbnailUrl.trim().length > 0 || postTags.length > 0 || postCategory.trim().length > 0
 
     let pendingRestorableDraftFingerprint: string | null = null
     const cached = cachedRestorableDraftRef.current
-    if (
-      cached &&
-      localDraftSourcesEqual(cached.source, draftSource) &&
-      cached.candidates === localDraftCandidates
-    ) {
+    if (cached && localDraftSourcesEqual(cached.source, draftSource) && cached.candidates === localDraftCandidates) {
       pendingRestorableDraftFingerprint = cached.fingerprint
     } else {
       const pendingDraft = readLocalDraft(draftSource)
-      pendingRestorableDraftFingerprint =
-        pendingDraft?.savedAt
-          ? computeStoredDraftFingerprint(
-              pendingDraft,
-              buildLocalDraftFingerprint,
-              dedupeStrings,
-              normalizeCategoryValue
-            )
-          : null
-      cachedRestorableDraftRef.current = {
-        source: draftSource,
-        candidates: localDraftCandidates,
-        fingerprint: pendingRestorableDraftFingerprint,
-      }
+      pendingRestorableDraftFingerprint = pendingDraft?.savedAt
+        ? computeStoredDraftFingerprint(pendingDraft, buildLocalDraftFingerprint, dedupeStrings, normalizeCategoryValue)
+        : null
+      cachedRestorableDraftRef.current = { source: draftSource, candidates: localDraftCandidates, fingerprint: pendingRestorableDraftFingerprint }
     }
 
     const decision = decideLocalDraftAutosave({
@@ -503,7 +471,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
       hasDraftContent,
       editorFingerprint: localDraftFingerprint,
       lastArmedFingerprint: lastLocalDraftFingerprintRef.current,
-      pendingRestorableDraftFingerprint,
+      pendingRestorableDraftFingerprint: resolveEffectivePendingRestorableDraftFingerprint(
+        pendingRestorableDraftFingerprint,
+        ownSessionAutosaveRef.current?.fingerprint ?? null
+      ),
     })
 
     if (decision.action === "skip") {

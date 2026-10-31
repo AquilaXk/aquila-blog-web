@@ -40,7 +40,9 @@ import {
 import { isServerTempDraftPost, isTempDraftCandidate } from "../../src/routes/Admin/editorTempDraft"
 import { useEditorStudioDraftLifecycle } from "../../src/routes/Admin/useEditorStudioDraftLifecycle"
 import {
+  decideLocalDraftAutosave,
   isLocalDraftRestoreSuggestionEligible,
+  resolveEffectivePendingRestorableDraftFingerprint,
   resolveRestoredPostVersion,
 } from "../../src/routes/Admin/useEditorStudioDraftLifecycleModel"
 import { useEditorStudioMetaCatalog } from "../../src/routes/Admin/useEditorStudioMetaCatalog"
@@ -1027,5 +1029,48 @@ test.describe("Wave 6 Unit 3: EditorStudio lifecycle, revalidation, metadata & r
     expect(surfaceRendered.html).not.toContain("folder::Spring Boot")
     expect(surfaceRendered.html).not.toContain("rocket::Backend")
     expect(surfaceRendered.css).toContain("z-index:160;")
+  })
+
+  test("consecutive session autosaves reschedule when own checkpoint updates and suppress self-restore thrashing", () => {
+    const firstCheckpoint = '{"title":"draft","summary":"수동 요약"}'
+    const clearedSummaryCheckpoint = '{"title":"draft","summary":""}'
+
+    expect(
+      resolveEffectivePendingRestorableDraftFingerprint(firstCheckpoint, firstCheckpoint)
+    ).toBeNull()
+    expect(
+      resolveEffectivePendingRestorableDraftFingerprint(firstCheckpoint, null)
+    ).toBe(firstCheckpoint)
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: clearedSummaryCheckpoint,
+        lastArmedFingerprint: firstCheckpoint,
+        pendingRestorableDraftFingerprint: resolveEffectivePendingRestorableDraftFingerprint(
+          firstCheckpoint,
+          firstCheckpoint
+        ),
+      })
+    ).toEqual({ action: "schedule" })
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: {
+          key: "admin.editor.localDraft.create.self.v3",
+          source: { kind: "create" },
+          fingerprint: firstCheckpoint,
+          isActiveSessionAutosave: true,
+        },
+        currentSource: { kind: "create" },
+        editorFingerprint: clearedSummaryCheckpoint,
+        serverBaselineFingerprint: "",
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
   })
 })

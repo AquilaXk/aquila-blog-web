@@ -44,23 +44,17 @@ export const resolveOpenGraphType = (type: string | undefined): "article" | "web
     : "website"
 }
 
-export const resolveMetadataImageUrl = (
-  rawImage: string | undefined,
-  siteUrl: string = CONFIG.link
-): string => {
+export const sanitizeMetadataImageUrl = (rawImage: string | undefined): string => {
   const withoutFragment = (rawImage || "").split("#")[0]?.trim() || ""
   if (!withoutFragment || withoutFragment.startsWith("//") || withoutFragment.startsWith("/\\")) {
     return ""
   }
 
   if (withoutFragment.startsWith("/")) {
-    const baseOrigin = siteUrl.trim().replace(/\/+$/, "")
-    if (!baseOrigin) return ""
     try {
-      const resolved = new URL(withoutFragment, `${baseOrigin}/`)
-      if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return ""
-      resolved.hash = ""
-      return resolved.toString()
+      const probe = new URL(withoutFragment, "https://metadata.local/")
+      if (probe.origin !== "https://metadata.local") return ""
+      return `${probe.pathname}${probe.search}`
     } catch {
       return ""
     }
@@ -82,6 +76,29 @@ export const resolveMetadataImageUrl = (
   }
 }
 
+export const resolveMetadataImageUrl = (
+  rawImage: string | undefined,
+  siteUrl: string = CONFIG.link
+): string => {
+  const sanitized = sanitizeMetadataImageUrl(rawImage)
+  if (!sanitized) return ""
+
+  if (sanitized.startsWith("/")) {
+    const baseOrigin = siteUrl.trim().replace(/\/+$/, "")
+    if (!baseOrigin) return ""
+    try {
+      const resolved = new URL(sanitized, `${baseOrigin}/`)
+      if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return ""
+      resolved.hash = ""
+      return resolved.toString()
+    } catch {
+      return ""
+    }
+  }
+
+  return sanitized
+}
+
 const serializeJsonLd = (value: Record<string, unknown>) =>
   JSON.stringify(value).replace(/</g, "\\u003c")
 
@@ -92,7 +109,7 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
   const canonicalUrl =
     props.canonicalUrl === undefined ? props.url : props.canonicalUrl
   const ogType = resolveOpenGraphType(props.type)
-  const resolvedImage = resolveMetadataImageUrl(props.image)
+  const resolvedImage = sanitizeMetadataImageUrl(props.image)
 
   return (
     <Head>

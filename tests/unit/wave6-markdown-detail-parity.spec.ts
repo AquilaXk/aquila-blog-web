@@ -573,17 +573,26 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     const pageMeta = buildPostDetailMetadata({ ...basePost, type: ["Page"] })
     expect(pageMeta.type).toBe("website")
 
-    const metaHeadHtml = renderMetaHeadHtml({
-      ...postMeta,
-      type: "Post",
-      image: "/images/hero.png#focusX=50&focusY=50",
-    })
+    const metaHeadHtml = renderMetaHeadHtml(postMeta)
     expect(metaHeadHtml).toContain('<meta property="og:type" content="article"/>')
     expect(metaHeadHtml).toMatch(
-      /<meta property="og:image" content="https?:\/\/[^"#]+\/images\/hero\.png"\/>/
+      /<meta property="og:image" content="https?:\/\/[^"#]+\/post\/api\/v1\/images\/cover\.webp"\/>/
     )
     expect(metaHeadHtml).toMatch(
-      /<meta name="twitter:image" content="https?:\/\/[^"#]+\/images\/hero\.png"\/>/
+      /<meta name="twitter:image" content="https?:\/\/[^"#]+\/post\/api\/v1\/images\/cover\.webp"\/>/
+    )
+
+    const multiHostSurfaceHeadHtml = renderMetaHeadHtml({
+      ...pageMeta,
+      type: "Post",
+      image: "/easysubway/og-image.png#focusX=50&focusY=50",
+    })
+    expect(multiHostSurfaceHeadHtml).toContain('<meta property="og:type" content="article"/>')
+    expect(multiHostSurfaceHeadHtml).toContain(
+      '<meta property="og:image" content="/easysubway/og-image.png"/>'
+    )
+    expect(multiHostSurfaceHeadHtml).toContain(
+      '<meta name="twitter:image" content="/easysubway/og-image.png"/>'
     )
 
     const renderActions = (shareFeedback: "copied" | "shared" | "failed" | null) =>

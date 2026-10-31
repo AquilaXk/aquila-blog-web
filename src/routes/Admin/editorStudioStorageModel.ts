@@ -66,6 +66,14 @@ export const localDraftStorageKeyForDocument = (source: LocalDraftSource, docume
   return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.${owner}.v3`
 }
 
+export const resolveCurrentDocumentDraftStorageKey = (source: LocalDraftSource): string | null => {
+  try {
+    return localDraftStorageKeyForDocument(source, getLocalDraftDocumentId())
+  } catch {
+    return null
+  }
+}
+
 export const describeLocalDraftSlot = (
   draft: Pick<LocalDraftPayload, "title" | "savedAt" | "source">
 ): string => {

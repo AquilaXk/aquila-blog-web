@@ -53,7 +53,19 @@ export type LocalDraftFingerprintSnapshot = {
   key: string
   source: LocalDraftSource
   fingerprint: string
+  isActiveSessionAutosave?: boolean
 }
+
+export const resolveEffectivePendingRestorableDraftFingerprint = (
+  pendingRestorableDraftFingerprint: string | null,
+  activeSessionAutosaveFingerprint: string | null
+): string | null =>
+  pendingRestorableDraftFingerprint != null &&
+  activeSessionAutosaveFingerprint != null &&
+  activeSessionAutosaveFingerprint.length > 0 &&
+  pendingRestorableDraftFingerprint === activeSessionAutosaveFingerprint
+    ? null
+    : pendingRestorableDraftFingerprint
 
 export const isLocalDraftRestoreSuggestionEligible = (input: {
   candidate: LocalDraftFingerprintSnapshot | null
@@ -64,7 +76,7 @@ export const isLocalDraftRestoreSuggestionEligible = (input: {
   dismissed: LocalDraftFingerprintSnapshot[]
 }): boolean => {
   const candidate = input.candidate
-  if (candidate == null) return false
+  if (candidate == null || candidate.isActiveSessionAutosave) return false
 
   return (
     localDraftSourcesEqual(candidate.source, input.currentSource) &&
@@ -131,6 +143,16 @@ export const computeStoredDraftFingerprint = (
     category: draft.category.trim() ? normalizeCategoryValue(draft.category) : "",
     visibility: draft.visibility,
   })
+
+export const selectPreferredLocalDraftCandidate = (
+  candidates: readonly LocalDraftFingerprintSnapshot[],
+  selectedKey?: string | null
+): LocalDraftFingerprintSnapshot | null =>
+  candidates.find((c) => c.key === selectedKey && !c.isActiveSessionAutosave) ||
+  candidates.find((c) => !c.isActiveSessionAutosave) ||
+  candidates.find((c) => c.key === selectedKey) ||
+  candidates[0] ||
+  null
 
 export const buildLocalDraftPayloadForSource = (
   core: LocalDraftFingerprintPayload,
