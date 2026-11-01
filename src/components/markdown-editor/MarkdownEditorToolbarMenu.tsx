@@ -54,8 +54,9 @@ export const MarkdownEditorToolbarMenu = ({
     () => actions.map((action) => Boolean(action.disabled)),
     [actions]
   )
-  const { horizontalOffset, resetHorizontalOffset } = useMarkdownEditorPanelPosition({
+  const { horizontalOffset, fixedPosition, resetHorizontalOffset } = useMarkdownEditorPanelPosition({
     open,
+    align,
     rootRef,
     panelRef,
   })
@@ -156,6 +157,7 @@ export const MarkdownEditorToolbarMenu = ({
           aria-label={label}
           $align={align}
           $horizontalOffset={horizontalOffset}
+          $fixedPosition={fixedPosition}
           onBlur={(event) => {
             if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
             closeMenu(false)

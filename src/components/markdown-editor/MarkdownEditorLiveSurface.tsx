@@ -76,6 +76,7 @@ import {
   codeLanguages,
   cycleTaskCommand,
   handleFenceEnter,
+  handleFenceShiftEnter,
   liveSurfaceTheme,
   selectNextOccurrenceCommand,
 } from "./markdownEditorLiveSurfaceCommands"
@@ -161,7 +162,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onToggleViewModeRef = useRef(onToggleViewMode)
   const editableCompartmentRef = useRef(new Compartment())
   const historyCompartmentRef = useRef(new Compartment())
-  const initialStateRef = useRef({ value, disabled, disableMermaid, ariaDescription })
+  const initialStateRef = useRef({ value, disabled, disableMermaid, mode, ariaDescription })
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
   onRequestFocusTitleRef.current = onRequestFocusTitle
@@ -174,9 +175,11 @@ export const MarkdownEditorLiveSurface = forwardRef<
     const editableCompartment = editableCompartmentRef.current
     const historyCompartment = historyCompartmentRef.current
     const initialState = initialStateRef.current
+    const initialReadOnly = initialState.disabled || initialState.mode === "reading"
 
     const customKeymaps: KeyBinding[] = [
       handleFenceEnter,
+      handleFenceShiftEnter,
       {
         key: "Mod-e",
         run: () => {
@@ -237,7 +240,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         EditorView.lineWrapping,
         compositionField,
         pointerSelectingField,
-        editorModeField,
+        editorModeField.init(() => initialState.mode),
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         decorationField,
         notionContainerBlockField,
@@ -251,8 +254,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
           spellcheck: "false",
         }),
         editableCompartment.of([
-          EditorState.readOnly.of(initialState.disabled),
-          EditorView.editable.of(!initialState.disabled),
+          EditorState.readOnly.of(initialReadOnly),
+          EditorView.editable.of(!initialReadOnly),
         ]),
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
@@ -273,6 +276,18 @@ export const MarkdownEditorLiveSurface = forwardRef<
             view.dom.ownerDocument.addEventListener("mouseup", finishPointerSelection, {
               once: true,
             })
+            return false
+          },
+          dragend: (_event, view) => {
+            if (view.state.field(pointerSelectingField)) {
+              view.dispatch({ effects: setPointerSelecting.of(false) })
+            }
+            return false
+          },
+          blur: (_event, view) => {
+            if (view.state.field(pointerSelectingField)) {
+              view.dispatch({ effects: setPointerSelecting.of(false) })
+            }
             return false
           },
           compositionstart: (_event, view) => {

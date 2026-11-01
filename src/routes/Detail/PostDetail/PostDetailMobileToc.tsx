@@ -47,7 +47,7 @@ const PostDetailMobileToc = ({
                 aria-label={item.text}
                 onClick={(event) => {
                   const details = event.currentTarget.closest("details")
-                  details?.querySelector<HTMLElement>("summary")?.focus()
+                  details?.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true })
                   details?.removeAttribute("open")
                   onNavigate(item.id)
                 }}

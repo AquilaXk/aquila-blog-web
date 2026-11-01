@@ -11,7 +11,7 @@ test("저장 후 갱신은 같은 출처에 취소 가능한 단일 POST를 보�
     expect(url).toBe("/api/revalidate")
     expect(init?.method).toBe("POST")
     expect(init?.credentials).toBe("include")
-    expect(JSON.parse(String(init?.body))).toEqual({ paths: ["/posts/771"] })
+    expect(JSON.parse(String(init?.body))).toEqual({ paths: ["/", "/posts/771"] })
     expect(init?.signal).toBeInstanceOf(AbortSignal)
     return new Response(null, { status: 204 })
   }

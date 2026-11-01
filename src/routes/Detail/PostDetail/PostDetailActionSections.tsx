@@ -5,6 +5,28 @@ import type { TocItem } from "./PostDetailTocModel"
 
 type ShareFeedback = "copied" | "shared" | "failed" | null
 
+export const resolveFloatingShareFeedbackLabel = (
+  shareFeedback: Exclude<ShareFeedback, null>
+): string => {
+  if (shareFeedback === "failed") return "공유 실패"
+  if (shareFeedback === "shared") return "공유 완료"
+  return "복사 완료"
+}
+
+export const resolveMobileShareAriaLabel = (shareFeedback: ShareFeedback): string => {
+  if (shareFeedback === "failed") return "공유 실패, 다시 시도"
+  if (shareFeedback === "shared") return "공유 완료"
+  if (shareFeedback === "copied") return "공유 링크 복사 완료"
+  return "공유"
+}
+
+export const resolveMobileShareButtonLabel = (shareFeedback: ShareFeedback): string => {
+  if (shareFeedback === "copied") return "복사 완료"
+  if (shareFeedback === "shared") return "공유 완료"
+  if (shareFeedback === "failed") return "공유 실패"
+  return "공유"
+}
+
 type FloatingActionRailProps = {
   railRef: RefObject<HTMLElement | null>
   innerRef: RefObject<HTMLDivElement | null>
@@ -30,9 +52,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
         <div ref={innerRef as Ref<HTMLDivElement>} className="leftRailInner">
           <div className="floatingLikeCluster">
             <div className="floatingLikeStat">
-              <span
-                className="floatingActionButton floatingLikeButton"
-              >
+              <span className="floatingLikeBadge" aria-hidden="true">
                 <AppIcon name="heart" />
               </span>
               <span className="floatingLikeCount">좋아요 {likesCount}</span>
@@ -51,7 +71,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
             </div>
             {shareFeedback ? (
               <span className="floatingShareFeedback" role="status" aria-live="polite">
-                {shareFeedback === "failed" ? "공유 실패" : "복사 완료"}
+                {resolveFloatingShareFeedbackLabel(shareFeedback)}
               </span>
             ) : null}
           </div>
@@ -74,7 +94,7 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
 }: MobileSummaryActionsProps) {
   return (
     <MobileSummaryBar aria-label="빠른 이동 및 반응">
-      <span data-tone="accent" aria-label={`좋아요 ${likesCount}`}>
+      <span className="mobileLikeStat" aria-label={`좋아요 ${likesCount}`}>
         <AppIcon name="heart" />
         <span>{`좋아요 ${likesCount}`}</span>
       </span>
@@ -84,19 +104,11 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         data-feedback={Boolean(shareFeedback)}
         data-tone="accent"
         aria-live="polite"
-        aria-label={
-          shareFeedback === "failed"
-            ? "공유 실패, 다시 시도"
-            : shareFeedback === "shared"
-              ? "링크 복사 완료"
-              : shareFeedback === "copied"
-                ? "공유 링크 복사 완료"
-                : "공유"
-        }
+        aria-label={resolveMobileShareAriaLabel(shareFeedback)}
         onClick={onSharePost}
       >
         <AppIcon name="share" />
-        <span>{shareFeedback === "copied" ? "복사" : shareFeedback === "shared" ? "복사" : shareFeedback === "failed" ? "실패" : "공유"}</span>
+        <span>{resolveMobileShareButtonLabel(shareFeedback)}</span>
       </button>
     </MobileSummaryBar>
   )

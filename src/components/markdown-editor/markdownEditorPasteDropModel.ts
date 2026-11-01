@@ -1,6 +1,7 @@
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
+  escapeMarkdownLinkDestination,
   escapeMarkdownLinkLabel,
   validateMarkdownAttachmentSize,
 } from "./markdownEditorUploadModel"
@@ -67,6 +68,35 @@ export type ReservedTransferJob =
   | { kind: "image"; file: File; placeholder: string }
   | { kind: "attachment"; file: File; placeholder: string }
 
+const reserveSingleTransferFile = (
+  file: File,
+  options: { canUploadImage: boolean; canUploadFile: boolean },
+  createId: () => string,
+  jobs: ReservedTransferJob[],
+  errors: string[]
+): void => {
+  if (isImageFile(file)) {
+    if (!options.canUploadImage) return
+    jobs.push({
+      kind: "image",
+      file,
+      placeholder: buildUploadingImagePlaceholder(file.name || "image", createId()),
+    })
+    return
+  }
+  if (!options.canUploadFile) return
+  const sizeError = validateMarkdownAttachmentSize(file)
+  if (sizeError) {
+    errors.push(sizeError)
+    return
+  }
+  jobs.push({
+    kind: "attachment",
+    file,
+    placeholder: buildUploadingAttachmentPlaceholder(file.name || "file", createId()),
+  })
+}
+
 export const planTransferFileReservations = (
   files: readonly File[],
   options: {
@@ -78,31 +108,7 @@ export const planTransferFileReservations = (
   const createId = options.createId ?? createUploadPlaceholderId
   const jobs: ReservedTransferJob[] = []
   const errors: string[] = []
-
-  for (const file of files) {
-    if (isImageFile(file)) {
-      if (!options.canUploadImage) continue
-      jobs.push({
-        kind: "image",
-        file,
-        placeholder: buildUploadingImagePlaceholder(file.name || "image", createId()),
-      })
-      continue
-    }
-
-    if (!options.canUploadFile) continue
-    const sizeError = validateMarkdownAttachmentSize(file)
-    if (sizeError) {
-      errors.push(sizeError)
-      continue
-    }
-    jobs.push({
-      kind: "attachment",
-      file,
-      placeholder: buildUploadingAttachmentPlaceholder(file.name || "file", createId()),
-    })
-  }
-
+  for (const file of files) reserveSingleTransferFile(file, options, createId, jobs, errors)
   return { jobs, errors }
 }
 
@@ -153,9 +159,6 @@ export const parseSingleHttpUrl = (text: string): string | null => {
     return null
   }
 }
-
-export const escapeMarkdownLinkDestination = (url: string): string =>
-  url.replace(/[\\()]/g, "\\$&")
 
 const EXISTING_MARKDOWN_LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/
 

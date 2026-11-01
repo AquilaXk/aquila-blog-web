@@ -55,6 +55,7 @@ const resolveShareFeedbackMessage = (
   shareFeedback: Props["shareFeedback"]
 ): string => {
   if (shareFeedback === "failed") return "공유에 실패했습니다."
+  if (shareFeedback === "shared") return "공유 완료"
   return "복사 완료"
 }
 

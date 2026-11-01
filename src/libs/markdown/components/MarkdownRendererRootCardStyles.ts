@@ -15,6 +15,7 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
   }
 
   .aq-bookmark-card a,
+  .aq-bookmark-card__body,
   .aq-file-card a {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -22,6 +23,10 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
     gap: 20px;
     padding: 17px;
     text-decoration: none;
+  }
+
+  .aq-bookmark-card[data-disabled="true"] {
+    opacity: 0.78;
   }
 
   .aq-link-card-thumb,
@@ -189,6 +194,7 @@ export const markdownRendererRootCardStyles = (theme: Theme) => css`
 
   @media (max-width: 820px) {
     .aq-bookmark-card a,
+    .aq-bookmark-card__body,
     .aq-file-card a {
       grid-template-columns: 1fr;
     }

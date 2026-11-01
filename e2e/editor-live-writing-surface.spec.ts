@@ -1533,6 +1533,27 @@ test.describe("live Markdown writing surface", () => {
     await expect(
       tableWidget.locator('td[data-cell-row="1"][data-cell-col="1"] br')
     ).toHaveCount(1)
+
+    const imeProxy = tableWidget.getByTestId("cm-live-table-ime-proxy")
+    await expect(imeProxy).toBeFocused()
+    await imeProxy.evaluate((proxyEl) => {
+      const proxy = proxyEl as HTMLTextAreaElement
+      proxy.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "ㅎ" }))
+      proxy.value = "한"
+      proxy.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "한" }))
+      proxy.dispatchEvent(
+        new InputEvent("input", { bubbles: true, data: "한", isComposing: true })
+      )
+      proxy.value = "한글"
+      proxy.dispatchEvent(
+        new CompositionEvent("compositionupdate", { bubbles: true, data: "한글" })
+      )
+      proxy.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "한글" }))
+    })
+    await expect(cellInput).toBeVisible()
+    await expect(cellInput).toHaveValue("작성자<br>한글")
+    await cellInput.press("Escape")
+
     await tableWidget.getByTestId("cm-live-table-add-row").click()
     await expect(tableWidget.locator("tbody tr")).toHaveCount(2)
 
@@ -1545,7 +1566,7 @@ test.describe("live Markdown writing surface", () => {
     await page.keyboard.press("Escape")
 
     await expect.poll(() => readMarkdown(page)).toContain("| 이름 | 역할 |  |  |")
-    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자<br> |  |  |")
+    await expect.poll(() => readMarkdown(page)).toContain("| 밥 | 작성자<br>한글 |  |  |")
   })
 })
 

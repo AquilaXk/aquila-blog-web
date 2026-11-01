@@ -1,5 +1,3 @@
-export const INLINE_COLOR_TOKEN_REGEX = /\{\{\s*color\s*:\s*([^|{}\\]+?)\s*\\?\|\s*([^{}]+?)\s*\}\}/gi
-
 export const INLINE_TEXT_COLOR_OPTIONS = [
   { label: "하늘", token: "sky", value: "#60a5fa" },
   { label: "바이올렛", token: "violet", value: "#a78bfa" },

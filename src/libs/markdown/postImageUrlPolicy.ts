@@ -47,7 +47,7 @@ export const normalizePostImageUrl = (
   options: PostImageUrlPolicyOptions = {},
 ): string => {
   const value = raw.trim()
-  if (!value || value.startsWith("//") || value.startsWith("/\\")) return ""
+  if (!value || hasControlChars(value) || value.startsWith("//") || value.startsWith("/\\")) return ""
 
   if (value.startsWith("/")) {
     return options.allowRelative ? normalizeRelativePostImageUrl(value) : ""
@@ -80,8 +80,6 @@ export const isCanonicalPostImageUploadUrl = (
   Boolean(normalizePostImageUrl(raw, options))
 
 const normalizeReferenceLabel = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase()
-const CARD_METADATA_PATTERN = /^\s*<!--\s*aq-(bookmark|embed)\s+(\{[\s\S]*\})\s*-->\s*$/i
-const CARD_DIRECTIVE_PATTERN = /^:::(bookmark|embed)(?:\s+\S+)?\s*$/i
 
 const stripBlockquotePrefixes = (line: string) => {
   let value = line
@@ -89,9 +87,17 @@ const stripBlockquotePrefixes = (line: string) => {
   return value
 }
 
+function hasControlChars(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.codePointAt(index) ?? 0
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
+
 const normalizeCardThumbnailSource = (raw: string) => {
   const value = raw.trim()
-  if (!value || value.startsWith("//") || value.startsWith("/\\")) return ""
+  if (!value || hasControlChars(value) || value.startsWith("//") || value.startsWith("/\\")) return ""
   if (value.startsWith("/") || value.startsWith("./") || value.startsWith("../")) return value
   try {
     const parsed = new URL(value)
@@ -159,18 +165,53 @@ const isEscapedMarkdownMarker = (content: string, index: number) => {
   return slashCount % 2 === 1
 }
 
+const resolveCardCommentKind = (prefix: string): "bookmark" | "embed" | null => {
+  if (prefix === "aq-bookmark") return "bookmark"
+  if (prefix === "aq-embed") return "embed"
+  return null
+}
+
+const extractCardMetadataParts = (
+  rawLine: string
+): { kind: "bookmark" | "embed"; jsonText: string } | null => {
+  const trimmed = rawLine.trim()
+  if (!trimmed.startsWith("<!--") || !trimmed.endsWith("-->")) return null
+  const inner = trimmed.slice(4, -3).trim()
+  const spaceIdx = inner.search(/\s/)
+  if (spaceIdx < 0) return null
+  const kind = resolveCardCommentKind(inner.slice(0, spaceIdx).toLowerCase())
+  if (!kind) return null
+  const jsonText = inner.slice(spaceIdx).trim()
+  return jsonText.startsWith("{") && jsonText.endsWith("}") ? { kind, jsonText } : null
+}
+
+const parseCardDirectiveKind = (rawLine: string): "bookmark" | "embed" | null => {
+  const trimmed = rawLine.trim()
+  if (!trimmed.startsWith(":::")) return null
+  const rest = trimmed.slice(3)
+  const spaceIdx = rest.search(/\s/)
+  const keyword = (spaceIdx < 0 ? rest : rest.slice(0, spaceIdx)).toLowerCase()
+  if (keyword === "bookmark" || keyword === "embed") return keyword
+  return null
+}
+
 const parseCardMetadataLine = (
-  metadataMatch: RegExpMatchArray
-): { kind: string; thumbnailUrl: string } | null => {
+  rawLine: string
+): { match: boolean; metadata: { kind: "bookmark" | "embed"; thumbnailUrl: string } | null } => {
+  const parts = extractCardMetadataParts(rawLine)
+  if (!parts) return { match: false, metadata: null }
   try {
-    const payload = JSON.parse(metadataMatch[2]) as Record<string, unknown>
+    const payload = JSON.parse(parts.jsonText) as Record<string, unknown>
     const thumbnailUrl =
       typeof payload.thumbnailUrl === "string"
         ? normalizeCardThumbnailSource(payload.thumbnailUrl)
         : ""
-    return thumbnailUrl ? { kind: metadataMatch[1].toLowerCase(), thumbnailUrl } : null
+    return {
+      match: true,
+      metadata: thumbnailUrl ? { kind: parts.kind, thumbnailUrl } : null,
+    }
   } catch {
-    return null
+    return { match: true, metadata: null }
   }
 }
 
@@ -187,22 +228,19 @@ export const markdownCardThumbnailSources = (content: string): string[] => {
   if (lastClosingTripleColonIndex === -1) return []
 
   const sources: string[] = []
-  let pendingMetadata: { kind: string; thumbnailUrl: string } | null = null
+  let pendingMetadata: { kind: "bookmark" | "embed"; thumbnailUrl: string } | null = null
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    const metadataMatch = CARD_METADATA_PATTERN.exec(line)
-    if (metadataMatch) {
-      pendingMetadata = parseCardMetadataLine(metadataMatch)
+    const parsedMeta = parseCardMetadataLine(line)
+    if (parsedMeta.match) {
+      pendingMetadata = parsedMeta.metadata
       continue
     }
 
     if (pendingMetadata !== null) {
-      const directiveMatch = CARD_DIRECTIVE_PATTERN.exec(line.trim())
-      if (
-        directiveMatch?.[1].toLowerCase() === pendingMetadata.kind &&
-        lastClosingTripleColonIndex > index
-      ) {
+      const directiveKind = parseCardDirectiveKind(line)
+      if (directiveKind === pendingMetadata.kind && lastClosingTripleColonIndex > index) {
         sources.push(pendingMetadata.thumbnailUrl)
       }
       pendingMetadata = null

@@ -53,6 +53,16 @@ export const ToolbarGroup = styled.div`
   &[data-align="end"] {
     margin-left: auto;
   }
+
+  @media (max-width: 720px) {
+    &:not([data-align="end"]) {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      &::-webkit-scrollbar { display: none; }
+    }
+  }
 `
 
 export const ToolbarQuoteGlyph = styled.span`
@@ -153,15 +163,27 @@ export const ToolbarMenuChevron = styled.span`
   svg { width: 12px; height: 12px; display: block; }
 `
 
+type ToolbarMenuHorizontalAlign = "start" | "end"
+
+const resolveToolbarMenuHorizontalPlacement = (
+  $align: ToolbarMenuHorizontalAlign,
+  $fixedPosition?: { top: number; left: number } | null
+): string => {
+  if ($fixedPosition) return `left: ${$fixedPosition.left}px; right: auto;`
+  return $align === "end" ? "right: 0;" : "left: 0;"
+}
+
 export const ToolbarMenuPanel = styled.div<{
-  $align: "start" | "end"
+  $align: ToolbarMenuHorizontalAlign
   $horizontalOffset: number
+  $fixedPosition?: { top: number; left: number } | null
 }>`
-  position: absolute;
+  position: ${({ $fixedPosition }) => ($fixedPosition ? "fixed" : "absolute")};
   z-index: ${zIndexes.dropdownMenu};
-  top: calc(100% + 6px);
-  ${({ $align }) => ($align === "end" ? "right: 0;" : "left: 0;")}
-  transform: translateX(${({ $horizontalOffset }) => $horizontalOffset}px);
+  top: ${({ $fixedPosition }) => ($fixedPosition ? `${$fixedPosition.top}px` : "calc(100% + 6px)")};
+  ${({ $align, $fixedPosition }) => resolveToolbarMenuHorizontalPlacement($align, $fixedPosition)}
+  transform: ${({ $fixedPosition, $horizontalOffset }) =>
+    $fixedPosition ? "none" : `translateX(${$horizontalOffset}px)`};
   display: grid;
   min-width: 172px;
   max-width: min(280px, calc(100vw - 24px));

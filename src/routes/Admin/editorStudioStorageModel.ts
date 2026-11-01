@@ -66,6 +66,14 @@ export const localDraftStorageKeyForDocument = (source: LocalDraftSource, docume
   return `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${source.postId.trim()}.${owner}.v3`
 }
 
+export const resolveCurrentDocumentDraftStorageKey = (source: LocalDraftSource): string | null => {
+  try {
+    return localDraftStorageKeyForDocument(source, getLocalDraftDocumentId())
+  } catch {
+    return null
+  }
+}
+
 export const describeLocalDraftSlot = (
   draft: Pick<LocalDraftPayload, "title" | "savedAt" | "source">
 ): string => {
@@ -186,7 +194,7 @@ const parseLocalDraftPayload = (
       tags: Array.isArray(parsed.tags)
         ? dedupeStrings(parsed.tags.filter((item): item is string => typeof item === "string"))
         : [],
-      category: typeof parsed.category === "string" ? normalizeCategoryValue(parsed.category) : "",
+      category: typeof parsed.category === "string" && parsed.category.trim() ? normalizeCategoryValue(parsed.category) : "",
       visibility: isValidVisibility ? visibility : "PUBLIC_LISTED",
       savedAt,
       source,

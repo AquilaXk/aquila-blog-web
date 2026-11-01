@@ -1,12 +1,30 @@
 import { CONFIG } from "site.config"
-import type { MetaConfigProps } from "src/components/MetaConfig"
+import {
+  resolveMetadataImageUrl,
+  resolveOpenGraphType,
+  type MetaConfigProps,
+} from "src/components/MetaConfig"
 import type { TPost } from "src/types"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 
 type JsonLdObject = Record<string, unknown>
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
+    end -= 1
+  }
+  return value.slice(0, end)
+}
+
 const SITE_TITLE = CONFIG.blog.title || "AquilaLog"
-const SITE_URL = CONFIG.link.replace(/\/+$/, "")
+const SITE_URL = trimTrailingSlashes(CONFIG.link)
+
+const resolvePrimaryPostType = (type: TPost["type"]): string => {
+  const candidate = Array.isArray(type) ? (type[0] ?? "") : (type ?? "")
+  const trimmed = candidate.trim()
+  return trimmed.length > 0 ? trimmed : "Post"
+}
 
 const toIsoDate = (value: string | undefined) => {
   if (!value) return undefined
@@ -14,7 +32,7 @@ const toIsoDate = (value: string | undefined) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const normalizePostImage = (post: TPost) => post.thumbnail?.trim() || ""
+const normalizePostImage = (post: TPost) => resolveMetadataImageUrl(post.thumbnail, SITE_URL)
 
 const normalizeAuthorName = (post: TPost) =>
   post.authorName?.trim() ||
@@ -78,11 +96,12 @@ const buildBreadcrumbJsonLd = (
 export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
   const canonicalPath = toCanonicalPostPath(post.id)
   const canonicalUrl = `${SITE_URL}${canonicalPath}`
-  const publishedDate = toIsoDate(post.createdAt || post.createdTime || post.date?.start_date)
-  const modifiedDate = toIsoDate(
-    post.modifiedAt || post.modifiedTime || post.createdAt || post.createdTime || post.date?.start_date
-  )
+  const publishedDate =
+    toIsoDate(post.createdAt) ?? toIsoDate(post.createdTime) ?? toIsoDate(post.date?.start_date)
+  const modifiedDate =
+    toIsoDate(post.modifiedAt) ?? toIsoDate(post.modifiedTime) ?? publishedDate
   const image = normalizePostImage(post)
+  const rawType = resolvePrimaryPostType(post.type)
 
   return {
     title: post.title,
@@ -90,7 +109,7 @@ export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
     modifiedDate,
     image,
     description: post.summary || "",
-    type: Array.isArray(post.type) ? post.type[0] || "Post" : post.type || "Post",
+    type: resolveOpenGraphType(rawType),
     url: canonicalUrl,
     jsonLd: [
       buildBlogPostingJsonLd({

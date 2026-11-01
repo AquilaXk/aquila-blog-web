@@ -1,4 +1,4 @@
-import { isCanonicalPostImageUploadUrl } from "src/libs/markdown/postImageUrlPolicy"
+import { normalizePostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 
 export const MARKDOWN_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
@@ -34,7 +34,23 @@ export const validateMarkdownAttachmentSize = (file: File): string | null => {
   return null
 }
 
-export const escapeMarkdownLinkLabel = (value: string) => value.replace(/[\\[\]]/g, "\\$&")
+export const escapeMarkdownLinkLabel = (value: string) => value.replace(/[\\[\]]/g, String.raw`\$&`)
+
+const LINK_DEST_ENCODED_CODES = new Set([0x28, 0x29, 0x3c, 0x3e, 0x5c, 0x7f])
+
+const shouldEncodeLinkDestinationCode = (code: number): boolean =>
+  code <= 0x20 || LINK_DEST_ENCODED_CODES.has(code)
+
+export const escapeMarkdownLinkDestination = (url: string): string => {
+  let encoded = ""
+  for (const ch of url) {
+    const code = ch.codePointAt(0) ?? 0
+    encoded += shouldEncodeLinkDestinationCode(code)
+      ? `%${code.toString(16).toUpperCase().padStart(2, "0")}`
+      : ch
+  }
+  return encoded
+}
 
 export const resolveMarkdownAttachmentLink = (
   uploaded: MarkdownFileUploadResult,
@@ -47,8 +63,20 @@ export const resolveMarkdownAttachmentLink = (
 
   const name = String(uploaded.name || fallbackName).trim() || fallbackName
   return {
-    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${url})\n`,
+    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${escapeMarkdownLinkDestination(url)})\n`,
   }
+}
+
+const appendImageDimensionsIfMissing = (
+  src: string,
+  width: number | undefined,
+  height: number | undefined
+): string => {
+  if (width == null || height == null || width <= 0 || height <= 0 || /[?&](?:w|width)=/i.test(src)) {
+    return src
+  }
+  const separator = src.includes("?") ? "&" : "?"
+  return `${src}${separator}w=${Math.round(width)}&h=${Math.round(height)}`
 }
 
 export const resolveMarkdownImageEmbed = (
@@ -57,25 +85,17 @@ export const resolveMarkdownImageEmbed = (
   options?: { publicApiOrigin?: string },
 ): { markdown: string } | { error: string } => {
   const rawSrc = String(uploaded.url || uploaded.src || "").trim()
-  if (!rawSrc || !isCanonicalPostImageUploadUrl(rawSrc, options)) {
+  const normalizedSrc = rawSrc ? normalizePostImageUrl(rawSrc, options) : ""
+  if (!normalizedSrc) {
     return { error: MARKDOWN_IMAGE_URL_MISSING_MESSAGE }
   }
 
   const alt = String(uploaded.alt || uploaded.title || fallbackName).trim() || fallbackName
   const width = uploaded.width ?? uploaded.widthPx
   const height = uploaded.height ?? uploaded.heightPx
-
-  let src = rawSrc
-  if (width != null && height != null && width > 0 && height > 0) {
-    const roundedWidth = Math.round(width)
-    const roundedHeight = Math.round(height)
-    if (!/[?&](?:w|width)=/i.test(src)) {
-      const separator = src.includes("?") ? "&" : "?"
-      src = `${src}${separator}w=${roundedWidth}&h=${roundedHeight}`
-    }
-  }
+  const src = appendImageDimensionsIfMissing(normalizedSrc, width, height)
 
   return {
-    markdown: `\n\n![${alt}](${src})\n`,
+    markdown: `\n\n![${escapeMarkdownLinkLabel(alt)}](${escapeMarkdownLinkDestination(src)})\n`,
   }
 }

@@ -218,11 +218,18 @@ export const normalizeMalformedTrailingSpaceEmphasis = (markdown: string) => {
     .join("\n")
 }
 
+export const trimMarkdownPreservingCodeIndent = (value: string): string => {
+  if (!value.trim()) return ""
+  return value.replace(/^(?:[ \t]*\r?\n)+/, "").trimEnd()
+}
+
 export const normalizeMarkdownForRender = (rawMarkdown: string) =>
   normalizeLegacyInlineHtmlMarkdown(
     normalizeLegacyCollapsedBlockquoteStrongLines(
       normalizeMalformedTrailingSpaceEmphasis(
-        normalizeSplitInlineColorQuotedEmphasis(normalizeEscapedMarkdownFences(rawMarkdown.trim()))
+        normalizeSplitInlineColorQuotedEmphasis(
+          normalizeEscapedMarkdownFences(trimMarkdownPreservingCodeIndent(rawMarkdown))
+        )
       )
     )
   )

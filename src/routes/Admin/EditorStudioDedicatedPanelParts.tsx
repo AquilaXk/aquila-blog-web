@@ -3,6 +3,7 @@ import styled from "@emotion/styled"
 import { CONFIG } from "site.config"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
+import { zIndexes } from "src/styles/zIndexes"
 
 export const EditorStudioStatusBar = styled.footer`
   display: flex;
@@ -126,7 +127,7 @@ export const EditorOutline = styled.aside`
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 160;
+    z-index: ${zIndexes.mobileSheet};
     max-height: min(72dvh, 520px);
     border-right: 0;
     border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
@@ -344,7 +345,7 @@ export const EditorInspector = styled.aside`
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 160;
+    z-index: ${zIndexes.mobileSheet};
     max-height: min(78dvh, 580px);
     border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
     border-radius: 16px 16px 0 0;
@@ -361,7 +362,7 @@ export const EditorInspector = styled.aside`
 export const EditorGuideBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: ${zIndexes.editorGuide};
   display: flex;
   justify-content: flex-end;
   background: rgba(10, 12, 16, 0.42);
@@ -369,7 +370,8 @@ export const EditorGuideBackdrop = styled.div`
 
 export const EditorGuidePanel = styled.aside`
   width: min(100%, 590px);
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr;
   border-left: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
@@ -407,7 +409,7 @@ export const EditorGuidePanel = styled.aside`
 
 export const EditorGuideBody = styled.div`
   overflow: auto;
-  padding: 24px 22px 50px;
+  padding: 24px 22px calc(50px + env(safe-area-inset-bottom, 0px));
 
   > p {
     margin: 0 0 22px;

@@ -1,30 +1,32 @@
-import { applyMermaidSoftWrapHints, extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
 import {
   DESKTOP_MERMAID_MIN_VIEWPORT_PX,
-  MERMAID_COMPLEX_SCALE_CAP,
-  MERMAID_DESKTOP_SAFE_MARGIN_PX,
-  MERMAID_DESKTOP_WIDE_MAX_PX,
-  MERMAID_EXPAND_THRESHOLD_PX,
-  MERMAID_RENDER_TIMEOUT_MS,
   MERMAID_VIEWPORT_ROOT_MARGIN,
   buildMermaidCacheKey,
   estimateMermaidComplexity,
+  formatMermaidErrorReason,
   isMermaidSource,
   readMermaidCache,
+  renderMermaidInstanceWithTimeout,
+  renderSerializedMermaidSvg,
   writeMermaidCache,
-} from "src/libs/markdown/mermaidRuntimeConfig"
+} from "./mermaidRuntimeConfig"
 import {
-  openMermaidOverlay,
-  parseSvgViewBoxNumbers,
-  shouldIgnoreStageClickForZoom,
-} from "src/libs/markdown/mermaidRuntimeOverlay"
+  applyRenderedMermaidDom,
+  collectMermaidBlocksInRoot,
+  computeMermaidDisplayGeometry,
+  hasMermaidBlockHint,
+  isBlockAlreadyRendered,
+  markMermaidBlockError,
+  markMermaidBlockRendered,
+  measureDesktopWideLaneBounds,
+  resolveBlockSources,
+} from "src/libs/markdown/mermaidRuntimeGeometry"
+import { openMermaidOverlay } from "src/libs/markdown/mermaidRuntimeOverlay"
 import {
-  createMermaidRenderTimeoutError,
   isMermaidRenderTimeoutError,
   isMermaidSyntaxError,
   isNegativeRectWidthError,
-  renderMermaidErrorState,
-  sanitizeRenderableMermaidSource,
+  mountMermaidErrorStateDom,
   stripRiskyFlowchartDirectives,
 } from "src/libs/markdown/mermaidRuntimeSanitize"
 import type {
@@ -37,560 +39,495 @@ import type {
 type MermaidRuntimeControllerOptions = {
   root: HTMLElement
   preset: MermaidRuntimePreset
+  scheme?: "dark" | "light"
+  runtimeLoader?: () => Promise<unknown>
   allowDesktopWideLane: boolean
   lazyViewport: boolean
   shouldLogMermaidWarnings: boolean
-  getMermaid: () => Promise<MermaidRuntimeInstance>
+  getMermaid?: () => Promise<MermaidRuntimeInstance>
   isDisposed: () => boolean
   retryTimers: Set<number>
-  readParseWarning: () => string | null
-  clearParseWarning: () => void
+  readParseWarning?: () => string | null
+  clearParseWarning?: () => void
 }
 
-const blockSourceCache = new WeakMap<HTMLElement, { raw: string; desired: string; renderable: string }>()
+type PreparedBlockRender = {
+  originalSource: string
+  desiredSource: string
+  renderableSource: string
+  complexityLevel: MermaidComplexityLevel
+  visibleWidth: number
+  blockRect: DOMRect
+  desktopWideLaneBounds: DesktopWideLaneBounds | null
+}
 
-export const createMermaidRuntimeController = ({
-  root,
-  preset,
-  allowDesktopWideLane,
-  lazyViewport,
-  shouldLogMermaidWarnings,
-  getMermaid,
-  isDisposed,
-  retryTimers,
-  readParseWarning,
-  clearParseWarning,
-}: MermaidRuntimeControllerOptions) => {
-  let intersectionObserver: IntersectionObserver | null = null
-  let cachedDesktopWideLaneBounds: DesktopWideLaneBounds | null | undefined
-  let mermaidOverlayCleanup: (() => void) | null = null
-  let renderQueue: Promise<void> = Promise.resolve()
-  let activeQueueCount = 0
-  const renderingBlocks = new Set<HTMLElement>()
-  const observedBlocks = new WeakSet<HTMLElement>()
-  let premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
-  let renderSequence = 0
-  const loggedErrorSignatures = new Set<string>()
-  const maxRetryCount = 6
-  const retryBaseDelayMs = 150
+type ControllerInternalState = {
+  options: MermaidRuntimeControllerOptions
+  cachedDesktopWideLaneBounds: DesktopWideLaneBounds | null | undefined
+  mermaidOverlayCleanup: (() => void) | null
+  renderQueue: Promise<void>
+  activeQueueCount: number
+  renderingBlocks: Set<HTMLElement>
+  observedBlocks: WeakSet<HTMLElement>
+  premeasuredRects: WeakMap<HTMLElement, DOMRect>
+  renderSequence: number
+  loggedErrorSignatures: Set<string>
+  intersectionObserver: IntersectionObserver | null
+  enqueueRender: (block: HTMLElement) => void
+}
 
-  const resolveBlockSources = (block: HTMLElement) => {
-    const codeBlock =
-      block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
-    const raw =
-      block.dataset.mermaidSource ||
-      block.dataset.mermaidRenderedSource ||
-      codeBlock?.textContent ||
-      block.textContent ||
-      ""
-    const cached = blockSourceCache.get(block)
-    if (cached?.raw === raw) return cached
-    const desired = applyMermaidSoftWrapHints(extractNormalizedMermaidSource(raw))
-    const next = { raw, desired, renderable: desired ? sanitizeRenderableMermaidSource(desired) : "" }
-    blockSourceCache.set(block, next)
-    return next
+const MAX_RETRY_COUNT = 6
+const RETRY_BASE_DELAY_MS = 150
+
+const executeUncachedMermaidRender = async ({
+  customMermaid,
+  options,
+  renderId,
+  sourceToRender,
+}: {
+  customMermaid: MermaidRuntimeInstance | null
+  options: MermaidRuntimeControllerOptions
+  renderId: string
+  sourceToRender: string
+}): Promise<string> => {
+  if (customMermaid) {
+    options.clearParseWarning?.()
+    const rendered = await renderMermaidInstanceWithTimeout(customMermaid, renderId, sourceToRender)
+    const parseWarning = options.readParseWarning?.()
+    if (parseWarning) throw new Error(parseWarning)
+    return rendered.svg
   }
 
-  const resolveBlockDesiredSource = (block: HTMLElement) => resolveBlockSources(block).desired
+  const scheme =
+    options.scheme ?? (options.preset.themeKey.endsWith("-dark") ? "dark" : "light")
+  const rendered = await renderSerializedMermaidSvg({
+    scheme,
+    renderId,
+    source: sourceToRender,
+    runtimeLoader: options.runtimeLoader,
+  })
+  return rendered.svg
+}
 
-  const isBlockAlreadyRendered = (block: HTMLElement, desiredSource?: string) => {
-    if (
-      (block.dataset.mermaidRendered !== "true" && block.dataset.mermaidRendered !== "error") ||
-      block.dataset.mermaidTheme !== preset.themeKey
-    ) {
-      return false
-    }
-    const targetSource = desiredSource ?? resolveBlockDesiredSource(block)
-    if (!targetSource) return true
-    const renderedSource = block.dataset.mermaidRenderedSource
-    return (
-      renderedSource === targetSource ||
-      renderedSource === stripRiskyFlowchartDirectives(targetSource).trim()
-    )
+const resolveCachedWideLaneBounds = (
+  state: ControllerInternalState,
+  block: HTMLElement
+): DesktopWideLaneBounds | null => {
+  if (!state.options.allowDesktopWideLane) return null
+  if (state.cachedDesktopWideLaneBounds !== undefined) return state.cachedDesktopWideLaneBounds
+  state.cachedDesktopWideLaneBounds = measureDesktopWideLaneBounds(block)
+  return state.cachedDesktopWideLaneBounds
+}
+
+const batchMeasureCandidateBlocks = (
+  state: ControllerInternalState,
+  targetBlocks: HTMLElement[]
+) => {
+  if (!targetBlocks.length) return
+  resolveCachedWideLaneBounds(state, targetBlocks[0]!)
+  for (const block of targetBlocks) {
+    if (!block.isConnected || isBlockAlreadyRendered(block, state.options.preset.themeKey)) continue
+    state.premeasuredRects.set(block, block.getBoundingClientRect())
   }
+}
 
-  const resolveDesktopWideLaneBounds = (block: HTMLElement) => {
-    if (!allowDesktopWideLane) return null
-    if (cachedDesktopWideLaneBounds !== undefined) return cachedDesktopWideLaneBounds
+const scheduleBlockRetry = (state: ControllerInternalState, block: HTMLElement): boolean => {
+  const retryCount = Number.parseInt(block.dataset.mermaidRetryCount || "0", 10)
+  if (retryCount >= MAX_RETRY_COUNT) return false
+  block.dataset.mermaidRetryCount = String(retryCount + 1)
+  state.premeasuredRects.delete(block)
+  const timerId = window.setTimeout(() => {
+    state.options.retryTimers.delete(timerId)
+    state.enqueueRender(block)
+  }, RETRY_BASE_DELAY_MS * (retryCount + 1))
+  state.options.retryTimers.add(timerId)
+  return true
+}
 
-    const detailLayout = block.closest<HTMLElement>(".detailLayout")
-    const rightRail = detailLayout?.querySelector<HTMLElement>(".rightRail")
-    if (!detailLayout || !rightRail || rightRail.offsetParent === null) {
-      cachedDesktopWideLaneBounds = null
-      return cachedDesktopWideLaneBounds
-    }
+const logMermaidWarningOnce = (
+  state: ControllerInternalState,
+  signature: string,
+  label: string,
+  err: unknown
+) => {
+  if (state.loggedErrorSignatures.has(signature)) return
+  state.loggedErrorSignatures.add(signature)
+  if (state.options.shouldLogMermaidWarnings) console.warn(label, err)
+}
 
-    const leftRail = detailLayout.querySelector<HTMLElement>(".leftRail")
-    cachedDesktopWideLaneBounds = {
-      leftBound:
-        leftRail && leftRail.offsetParent !== null
-          ? leftRail.getBoundingClientRect().right + MERMAID_DESKTOP_SAFE_MARGIN_PX
-          : MERMAID_DESKTOP_SAFE_MARGIN_PX,
-      rightBound: rightRail.getBoundingClientRect().left - MERMAID_DESKTOP_SAFE_MARGIN_PX,
-    }
-    return cachedDesktopWideLaneBounds
-  }
+const renderSourceIntoStageBlock = async ({
+  state,
+  block,
+  index,
+  customMermaid,
+  sourceToRender,
+  prepared,
+}: {
+  state: ControllerInternalState
+  block: HTMLElement
+  index: number
+  customMermaid: MermaidRuntimeInstance | null
+  sourceToRender: string
+  prepared: PreparedBlockRender
+}) => {
+  const { options } = state
+  if (options.isDisposed() || !block.isConnected) return
+  const isMobileViewport = window.matchMedia("(max-width: 768px)").matches
+  const isDesktopViewport = window.matchMedia(
+    `(min-width: ${DESKTOP_MERMAID_MIN_VIEWPORT_PX}px)`
+  ).matches
+  const containerWidth = Math.max(280, prepared.visibleWidth)
+  const reserveHeight = Math.max(120, Math.ceil(prepared.blockRect.height))
 
-  const batchMeasureBlocks = (targetBlocks: HTMLElement[]) => {
-    if (!targetBlocks.length) return
-    resolveDesktopWideLaneBounds(targetBlocks[0])
-    targetBlocks.forEach((block) => {
-      if (!block.isConnected || isBlockAlreadyRendered(block)) return
-      premeasuredRects.set(block, block.getBoundingClientRect())
-    })
-  }
+  const stage = document.createElement("div")
+  stage.className = "aq-mermaid-stage mermaid"
+  stage.style.minWidth = `${containerWidth}px`
+  stage.style.width = `${containerWidth}px`
+  stage.style.minHeight = `${reserveHeight}px`
+  block.style.minHeight = `${reserveHeight}px`
+  block.innerHTML = ""
+  block.appendChild(stage)
 
-  const renderMermaidWithTimeout = async (
-    mermaidInstance: MermaidRuntimeInstance,
-    renderId: string,
-    sourceToRender: string
-  ) => {
-    let timeoutId: number | null = null
-    try {
-      const timed = new Promise<never>((_, reject) => {
-        timeoutId = window.setTimeout(() => {
-          reject(createMermaidRenderTimeoutError())
-        }, MERMAID_RENDER_TIMEOUT_MS)
-      })
-      return await Promise.race([
-        Promise.resolve(mermaidInstance.render(renderId, sourceToRender)),
-        timed,
-      ])
-    } finally {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }
-
-  const renderSourceIntoBlock = async ({
-    block,
-    index,
-    mermaid,
+  const cacheKey = buildMermaidCacheKey(
     sourceToRender,
-    complexityLevel,
+    options.preset.themeKey,
+    options.allowDesktopWideLane
+  )
+  const cached = readMermaidCache(cacheKey)
+  let renderedSvg = cached?.svg || ""
+  if (!renderedSvg) {
+    const renderId = `aq-mermaid-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    renderedSvg = await executeUncachedMermaidRender({
+      customMermaid,
+      options,
+      renderId,
+      sourceToRender,
+    })
+    writeMermaidCache(cacheKey, { svg: renderedSvg, complexity: prepared.complexityLevel })
+  }
+  if (options.isDisposed() || !block.isConnected) return
+
+  stage.innerHTML = renderedSvg
+  const svgElement = stage.querySelector("svg")
+  if (!svgElement) throw new Error("Mermaid SVG 생성 실패")
+
+  const geometry = computeMermaidDisplayGeometry({
+    svgElement,
+    containerWidth,
+    blockRect: prepared.blockRect,
+    desktopWideLaneBounds: prepared.desktopWideLaneBounds,
+    complexityLevel: prepared.complexityLevel,
+    isMobileViewport,
+    isDesktopViewport,
+  })
+  const copySource = prepared.originalSource || sourceToRender
+  applyRenderedMermaidDom({
+    block,
+    stage,
+    svgElement,
+    geometry,
+    onTriggerOverlay: () => {
+      state.mermaidOverlayCleanup = openMermaidOverlay(
+        renderedSvg,
+        state.mermaidOverlayCleanup,
+        copySource
+      )
+    },
+  })
+}
+
+const isRetriableMermaidError = (error: unknown): boolean =>
+  !isMermaidSyntaxError(error) && !isMermaidRenderTimeoutError(error)
+
+const tryRenderFallbackMermaidSource = async ({
+  state,
+  block,
+  index,
+  customMermaid,
+  prepared,
+  fallbackSource,
+}: {
+  state: ControllerInternalState
+  block: HTMLElement
+  index: number
+  customMermaid: MermaidRuntimeInstance | null
+  prepared: PreparedBlockRender
+  fallbackSource: string
+}): Promise<boolean> => {
+  try {
+    await renderSourceIntoStageBlock({
+      state,
+      block,
+      index,
+      customMermaid,
+      sourceToRender: fallbackSource,
+      prepared,
+    })
+    markMermaidBlockRendered(block, state.options.preset, fallbackSource, prepared.visibleWidth)
+    return true
+  } catch (fallbackError) {
+    logMermaidWarningOnce(
+      state,
+      `fallback:${fallbackSource}:${formatMermaidErrorReason(fallbackError)}`,
+      "[mermaid] fallback render failed",
+      fallbackError
+    )
+    return isRetriableMermaidError(fallbackError) && scheduleBlockRetry(state, block)
+  }
+}
+
+const handleBlockRenderFailure = async ({
+  state,
+  block,
+  index,
+  customMermaid,
+  error,
+  prepared,
+}: {
+  state: ControllerInternalState
+  block: HTMLElement
+  index: number
+  customMermaid: MermaidRuntimeInstance | null
+  error: unknown
+  prepared: PreparedBlockRender
+}) => {
+  if (isNegativeRectWidthError(error) && scheduleBlockRetry(state, block)) return
+
+  const fallbackSource = stripRiskyFlowchartDirectives(prepared.desiredSource).trim()
+  const canTryFallback =
+    Boolean(fallbackSource) &&
+    fallbackSource !== prepared.desiredSource &&
+    fallbackSource !== prepared.renderableSource
+  if (canTryFallback) {
+    const handledByFallback = await tryRenderFallbackMermaidSource({
+      state,
+      block,
+      index,
+      customMermaid,
+      prepared,
+      fallbackSource,
+    })
+    if (handledByFallback) return
+  }
+
+  if (isRetriableMermaidError(error) && scheduleBlockRetry(state, block)) return
+
+  markMermaidBlockError(
+    block,
+    state.options.preset,
+    prepared.desiredSource,
+    prepared.originalSource || prepared.desiredSource,
+    error
+  )
+  logMermaidWarningOnce(
+    state,
+    `${prepared.desiredSource}:${formatMermaidErrorReason(error)}`,
+    "[mermaid] render failed",
+    error
+  )
+}
+
+const handleZeroVisibleWidthBlock = (
+  state: ControllerInternalState,
+  block: HTMLElement,
+  fallbackRaw: string
+) => {
+  if (scheduleBlockRetry(state, block)) return
+  block.dataset.mermaidRendered = "error"
+  block.classList.add("aq-mermaid-error")
+  mountMermaidErrorStateDom(block, {
+    source: fallbackRaw,
+    error: "다이어그램 영역 너비를 계산할 수 없습니다. 레이아웃이 안정되면 다시 렌더링됩니다.",
+  })
+}
+
+const prepareBlockSourcesAndVisibility = (
+  state: ControllerInternalState,
+  block: HTMLElement
+): PreparedBlockRender | null => {
+  const { original, desired, renderable } = resolveBlockSources(block)
+  if (!desired) return null
+  if (!hasMermaidBlockHint(block) && !isMermaidSource(desired)) return null
+  if (isBlockAlreadyRendered(block, state.options.preset.themeKey, desired)) return null
+
+  const fallbackRaw = original || desired
+  block.dataset.mermaidOriginalSource ??= fallbackRaw
+  block.dataset.mermaidSource ??= fallbackRaw
+  block.dataset.aqMermaid = "true"
+
+  const premeasured = state.premeasuredRects.get(block)
+  state.premeasuredRects.delete(block)
+  const blockRect =
+    premeasured && premeasured.width > 0 ? premeasured : block.getBoundingClientRect()
+  const desktopWideLaneBounds = resolveCachedWideLaneBounds(state, block)
+  const complexity = estimateMermaidComplexity(renderable)
+  block.dataset.mermaidComplexity = complexity.level
+  if (!block.dataset.mermaidRendered) {
+    block.dataset.mermaidRendered = "pending"
+    block.dataset.mermaidPreset = state.options.preset.mode
+  }
+
+  const visibleWidth = block.clientWidth || Math.floor(blockRect.width)
+  if (visibleWidth <= 0) {
+    handleZeroVisibleWidthBlock(state, block, fallbackRaw)
+    return null
+  }
+
+  return {
+    originalSource: original,
+    desiredSource: desired,
+    renderableSource: renderable,
+    complexityLevel: complexity.level,
     visibleWidth,
     blockRect,
     desktopWideLaneBounds,
-  }: {
-    block: HTMLElement
-    index: number
-    mermaid: MermaidRuntimeInstance
-    sourceToRender: string
-    complexityLevel: MermaidComplexityLevel
-    visibleWidth: number
-    blockRect: DOMRect
-    desktopWideLaneBounds: DesktopWideLaneBounds | null
-  }) => {
-    if (isDisposed() || !block.isConnected) return
-    const isMobileViewport = window.matchMedia("(max-width: 768px)").matches
-    const isDesktopViewport = window.matchMedia(
-      `(min-width: ${DESKTOP_MERMAID_MIN_VIEWPORT_PX}px)`
-    ).matches
-    const containerWidth = Math.max(280, visibleWidth)
-    const reserveHeight = Math.max(120, Math.ceil(blockRect.height))
+  }
+}
 
-    const stage = document.createElement("div")
-    stage.className = "aq-mermaid-stage mermaid"
-    stage.style.minWidth = `${containerWidth}px`
-    stage.style.width = `${containerWidth}px`
-    stage.style.minHeight = `${reserveHeight}px`
-    block.style.minHeight = `${reserveHeight}px`
-    block.innerHTML = ""
-    block.appendChild(stage)
+const renderSingleMermaidBlock = async (state: ControllerInternalState, block: HTMLElement) => {
+  if (state.options.isDisposed() || !block?.isConnected) return
+  const customMermaid = state.options.getMermaid ? await state.options.getMermaid() : null
+  if (state.options.isDisposed() || !block.isConnected) return
 
-    const cacheKey = buildMermaidCacheKey(sourceToRender, preset.themeKey, allowDesktopWideLane)
-    const cached = readMermaidCache(cacheKey)
-    let renderedSvg = cached?.svg || ""
+  const prepared = prepareBlockSourcesAndVisibility(state, block)
+  if (!prepared) return
 
-    if (!renderedSvg) {
-      const renderId = `aq-mermaid-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      clearParseWarning()
-      const rendered = await renderMermaidWithTimeout(mermaid, renderId, sourceToRender)
-      const parseWarning = readParseWarning()
-      if (parseWarning) {
-        throw new Error(parseWarning)
-      }
-      renderedSvg = rendered.svg
-      writeMermaidCache(cacheKey, {
-        svg: renderedSvg,
-        complexity: complexityLevel,
-      })
-    }
-    if (isDisposed() || !block.isConnected) return
+  const index = state.renderSequence
+  state.renderSequence += 1
 
-    stage.innerHTML = renderedSvg
-
-    const svgElement = stage.querySelector("svg")
-    if (!svgElement) throw new Error("Mermaid SVG 생성 실패")
-
-    const viewBoxValues = parseSvgViewBoxNumbers(svgElement.getAttribute("viewBox") || "")
-    const viewBoxWidth = viewBoxValues ? viewBoxValues[2] : Number.NaN
-    const viewBoxHeight = viewBoxValues ? viewBoxValues[3] : Number.NaN
-    const attrWidth = Number(svgElement.getAttribute("width"))
-    const attrHeight = Number(svgElement.getAttribute("height"))
-    const fallbackWidth = Number.isFinite(attrWidth) && attrWidth > 0 ? attrWidth : containerWidth
-    const fallbackHeight =
-      Number.isFinite(attrHeight) && attrHeight > 0
-        ? attrHeight
-        : Math.max(120, Math.round(fallbackWidth * 0.6))
-    const intrinsicWidth =
-      Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : Math.max(1, fallbackWidth)
-    const intrinsicHeight =
-      Number.isFinite(viewBoxHeight) && viewBoxHeight > 0
-        ? viewBoxHeight
-        : Math.max(1, fallbackHeight)
-    const exceedsArticleWidth = intrinsicWidth > containerWidth + MERMAID_EXPAND_THRESHOLD_PX
-    let maxDisplayWidth = containerWidth
-    let wideBleedLeft = 0
-    let wideBleedRight = 0
-
-    if (isDesktopViewport && desktopWideLaneBounds && exceedsArticleWidth) {
-      const safeLaneWidth = Math.max(
-        containerWidth,
-        Math.round(desktopWideLaneBounds.rightBound - desktopWideLaneBounds.leftBound)
-      )
-      const desiredWideWidth = Math.max(
-        containerWidth,
-        Math.min(intrinsicWidth, MERMAID_DESKTOP_WIDE_MAX_PX, safeLaneWidth)
-      )
-      const desiredExtra = Math.max(0, desiredWideWidth - containerWidth)
-
-      if (desiredExtra > 24) {
-        const leftAllowance = Math.max(0, Math.round(blockRect.left - desktopWideLaneBounds.leftBound))
-        const rightAllowance = Math.max(0, Math.round(desktopWideLaneBounds.rightBound - blockRect.right))
-        let nextLeftBleed = Math.min(leftAllowance, Math.round(desiredExtra / 2))
-        let nextRightBleed = desiredExtra - nextLeftBleed
-
-        if (nextRightBleed > rightAllowance) {
-          nextRightBleed = rightAllowance
-          nextLeftBleed = Math.min(leftAllowance, desiredExtra - nextRightBleed)
-        }
-
-        if (nextLeftBleed > leftAllowance) {
-          nextLeftBleed = leftAllowance
-          nextRightBleed = Math.min(rightAllowance, desiredExtra - nextLeftBleed)
-        }
-
-        const actualWideWidth = containerWidth + nextLeftBleed + nextRightBleed
-        if (actualWideWidth > containerWidth + 24) {
-          maxDisplayWidth = actualWideWidth
-          wideBleedLeft = nextLeftBleed
-          wideBleedRight = nextRightBleed
-        }
-      }
-    }
-    if (complexityLevel === "high") {
-      maxDisplayWidth = Math.min(maxDisplayWidth, Math.max(containerWidth, 860))
-    }
-
-    const maxReadableHeight = isMobileViewport
-      ? Number.POSITIVE_INFINITY
-      : Math.min(760, Math.floor(window.innerHeight * 0.74))
-    const usesDesktopWideLane = complexityLevel !== "high" && maxDisplayWidth > containerWidth + 24
-    const effectiveMaxDisplayWidth = Math.max(240, maxDisplayWidth - (isMobileViewport ? 20 : 40))
-
-    let scale = 1
-    if (intrinsicWidth > effectiveMaxDisplayWidth) {
-      scale = Math.min(scale, effectiveMaxDisplayWidth / intrinsicWidth)
-    }
-    if (intrinsicHeight * scale > maxReadableHeight) {
-      scale = Math.min(scale, maxReadableHeight / intrinsicHeight)
-    }
-    if (complexityLevel === "high" && !isMobileViewport) {
-      scale = Math.min(scale, MERMAID_COMPLEX_SCALE_CAP)
-    }
-
-    const roundedWidth = Math.max(1, Math.round(intrinsicWidth * scale))
-    const roundedHeight = Math.max(1, Math.round(intrinsicHeight * scale))
-    const stageWidth = usesDesktopWideLane ? maxDisplayWidth : containerWidth
-    const needsExpandAction = intrinsicWidth > 0
-    stage.style.width = usesDesktopWideLane ? `${stageWidth}px` : "100%"
-    stage.style.minHeight = `${roundedHeight}px`
-    stage.style.display = "flex"
-    stage.style.justifyContent = "center"
-    stage.style.overflowX = usesDesktopWideLane ? "visible" : "auto"
-    block.style.overflowX = usesDesktopWideLane ? "visible" : "auto"
-    stage.style.setProperty("-webkit-overflow-scrolling", "touch")
-    block.style.setProperty("-webkit-overflow-scrolling", "touch")
-    block.dataset.mermaidWide = usesDesktopWideLane ? "true" : "false"
-    block.dataset.mermaidExpandable = needsExpandAction ? "true" : "false"
-    block.style.setProperty("--aq-mermaid-wide-width", `${stageWidth}px`)
-    block.style.setProperty("--aq-mermaid-bleed-left", `${wideBleedLeft}px`)
-    block.style.setProperty("--aq-mermaid-bleed-right", `${wideBleedRight}px`)
-
-    svgElement.setAttribute("preserveAspectRatio", "xMidYMin meet")
-    svgElement.style.width = `${roundedWidth}px`
-    svgElement.style.height = `${roundedHeight}px`
-    svgElement.style.maxWidth = "100%"
-    svgElement.style.maxHeight = "none"
-    svgElement.style.minHeight = "0"
-    svgElement.style.objectFit = "contain"
-    svgElement.style.margin = "0 auto"
-    svgElement.removeAttribute("width")
-    svgElement.removeAttribute("height")
-
-    stage.title = "클릭하여 크게 보기"
-    stage.addEventListener("click", (event) => {
-      if (!shouldIgnoreStageClickForZoom(event)) {
-        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
-      }
+  try {
+    await renderSourceIntoStageBlock({
+      state,
+      block,
+      index,
+      customMermaid,
+      sourceToRender: prepared.renderableSource,
+      prepared,
     })
-    block.querySelectorAll(".aq-mermaid-expand-btn").forEach((button) => button.remove())
-    if (needsExpandAction) {
-      const expandButton = document.createElement("button")
-      expandButton.type = "button"
-      expandButton.className = "aq-mermaid-expand-btn"
-      expandButton.textContent = "확대 보기"
-      expandButton.addEventListener("click", () => {
-        mermaidOverlayCleanup = openMermaidOverlay(renderedSvg, mermaidOverlayCleanup, sourceToRender)
-      })
-      block.appendChild(expandButton)
-    }
-
-    block.style.minHeight = ""
-    stage.style.minHeight = ""
-    stage.style.minWidth = "0"
-  }
-
-  let enqueueRender: (block: HTMLElement) => void = () => {}
-
-  const scheduleRetry = (block: HTMLElement) => {
-    const retryCount = Number.parseInt(block.dataset.mermaidRetryCount || "0", 10)
-    if (retryCount >= maxRetryCount) return false
-    block.dataset.mermaidRetryCount = String(retryCount + 1)
-    premeasuredRects.delete(block)
-    const timerId = window.setTimeout(() => {
-      retryTimers.delete(timerId)
-      enqueueRender(block)
-    }, retryBaseDelayMs * (retryCount + 1))
-    retryTimers.add(timerId)
-    return true
-  }
-
-  const renderSingleBlock = async (block: HTMLElement) => {
-    if (isDisposed() || !block?.isConnected) return
-    const mermaid = await getMermaid()
-    if (isDisposed() || !block.isConnected) return
-    const codeBlock =
-      block.querySelector<HTMLElement>("code.language-mermaid, code[data-language='mermaid'], code") || null
-    const codeClassName = codeBlock?.className?.toLowerCase() || ""
-    const codeDataLanguage = (codeBlock?.getAttribute("data-language") || "").toLowerCase()
-    const blockClassName = block.className?.toLowerCase() || ""
-    const blockDataLanguage = (block.getAttribute("data-language") || "").toLowerCase()
-    const hasMermaidHint =
-      blockClassName.includes("aq-mermaid") ||
-      blockDataLanguage === "mermaid" ||
-      codeClassName.includes("language-mermaid") ||
-      codeDataLanguage === "mermaid"
-    const { desired: desiredSource, renderable: renderableSource } = resolveBlockSources(block)
-    if (!desiredSource) return
-    const looksLikeMermaid = isMermaidSource(desiredSource)
-    if (!hasMermaidHint && !looksLikeMermaid) return
-    if (isBlockAlreadyRendered(block, desiredSource)) return
-
-    if (!block.dataset.mermaidSource) {
-      block.dataset.mermaidSource = desiredSource
-    }
-    block.dataset.aqMermaid = "true"
-
-    const premeasured = premeasuredRects.get(block)
-    premeasuredRects.delete(block)
-    const blockRect = premeasured && premeasured.width > 0 ? premeasured : block.getBoundingClientRect()
-    const desktopWideLaneBounds = resolveDesktopWideLaneBounds(block)
-
-    const complexity = estimateMermaidComplexity(renderableSource)
-    block.dataset.mermaidComplexity = complexity.level
-    if (!block.dataset.mermaidRendered) {
-      block.dataset.mermaidRendered = "pending"
-      block.dataset.mermaidPreset = preset.mode
-    }
-    const visibleWidth = block.clientWidth || Math.floor(blockRect.width)
-    if (visibleWidth <= 0) {
-      if (scheduleRetry(block)) return
-      block.dataset.mermaidRendered = "error"
-      block.classList.add("aq-mermaid-error")
-      block.innerHTML = renderMermaidErrorState({
-        source: desiredSource,
-        error: "다이어그램 영역 너비를 계산할 수 없습니다. 레이아웃이 안정되면 다시 렌더링됩니다.",
-      })
-      return
-    }
-
-    const index = renderSequence
-    renderSequence += 1
-
-    const markBlockRendered = (renderedSource: string) => {
-      block.dataset.mermaidRenderedSource = renderedSource
-      block.dataset.mermaidRenderedWidth = String(Math.round(visibleWidth))
-      block.dataset.mermaidTheme = preset.themeKey
-      block.dataset.mermaidPreset = preset.mode
-      block.dataset.mermaidRendered = "true"
-      block.dataset.mermaidRetryCount = "0"
-      block.classList.remove("aq-mermaid-error")
-    }
-
-    const logOnce = (signature: string, label: string, err: unknown) => {
-      if (loggedErrorSignatures.has(signature)) return
-      loggedErrorSignatures.add(signature)
-      if (shouldLogMermaidWarnings) console.warn(label, err)
-    }
-
-    try {
-      await renderSourceIntoBlock({
-        block,
-        index,
-        mermaid,
-        sourceToRender: renderableSource,
-        complexityLevel: complexity.level,
-        visibleWidth,
-        blockRect,
-        desktopWideLaneBounds,
-      })
-      markBlockRendered(desiredSource)
-    } catch (error) {
-      const isSyntaxError = isMermaidSyntaxError(error)
-      const isTimeoutError = isMermaidRenderTimeoutError(error)
-      if (isNegativeRectWidthError(error) && scheduleRetry(block)) return
-
-      const fallbackSource = stripRiskyFlowchartDirectives(desiredSource).trim()
-      if (fallbackSource && fallbackSource !== desiredSource && fallbackSource !== renderableSource) {
-        try {
-          await renderSourceIntoBlock({
-            block,
-            index,
-            mermaid,
-            sourceToRender: fallbackSource,
-            complexityLevel: complexity.level,
-            visibleWidth,
-            blockRect,
-            desktopWideLaneBounds,
-          })
-          markBlockRendered(fallbackSource)
-          return
-        } catch (fallbackError) {
-          logOnce(`fallback:${fallbackSource}:${String(fallbackError)}`, "[mermaid] fallback render failed", fallbackError)
-          if (!isMermaidSyntaxError(fallbackError) && !isMermaidRenderTimeoutError(fallbackError) && scheduleRetry(block)) return
-        }
-      }
-
-      if (!isSyntaxError && !isTimeoutError && scheduleRetry(block)) return
-
-      block.dataset.mermaidRenderedSource = desiredSource
-      block.dataset.mermaidTheme = preset.themeKey
-      block.dataset.mermaidPreset = preset.mode
-      block.dataset.mermaidRendered = "error"
-      block.classList.add("aq-mermaid-error")
-      block.style.minHeight = ""
-      block.innerHTML = renderMermaidErrorState({ source: desiredSource, error })
-      logOnce(`${desiredSource}:${String(error)}`, "[mermaid] render failed", error)
-    }
-  }
-
-  enqueueRender = (block: HTMLElement) => {
-    if (!block || renderingBlocks.has(block)) return
-    renderingBlocks.add(block)
-    activeQueueCount += 1
-    renderQueue = renderQueue
-      .then(async () => {
-        await renderSingleBlock(block)
-      })
-      .catch((error) => {
-        if (shouldLogMermaidWarnings) {
-          console.warn("[mermaid] queued render failed", error)
-        }
-      })
-      .finally(() => {
-        renderingBlocks.delete(block)
-        activeQueueCount = Math.max(0, activeQueueCount - 1)
-      })
-  }
-
-  const renderMermaidBlocks = async () => {
-    const codeBlocks = Array.from(
-      root.querySelectorAll<HTMLElement>(
-        "pre > code.language-mermaid, pre.aq-mermaid > code.language-mermaid, pre > code[data-language='mermaid'], pre[data-language='mermaid'] > code"
-      )
+    markMermaidBlockRendered(
+      block,
+      state.options.preset,
+      prepared.desiredSource,
+      prepared.visibleWidth
     )
-    const preBlocks = Array.from(
-      root.querySelectorAll<HTMLElement>(
-        "pre.aq-mermaid, pre[data-aq-mermaid='true'], pre[data-language='mermaid']"
-      )
-    )
-    const mergedBlocks = new Map<HTMLElement, HTMLElement>()
-    codeBlocks.forEach((codeBlock) => {
-      const block = codeBlock.closest<HTMLElement>("pre")
-      if (block) mergedBlocks.set(block, block)
-    })
-    preBlocks.forEach((block) => {
-      mergedBlocks.set(block, block)
-    })
-
-    const blocks = Array.from(mergedBlocks.values())
-    if (!blocks.length) return
-
-    const candidateBlocks = blocks.filter(
-      (block) => !isBlockAlreadyRendered(block) && !renderingBlocks.has(block)
-    )
-
-    if (!lazyViewport || typeof IntersectionObserver === "undefined") {
-      batchMeasureBlocks(candidateBlocks)
-      candidateBlocks.forEach((block) => {
-        enqueueRender(block)
-      })
-      await renderQueue
-      return
-    }
-
-    if (!intersectionObserver) {
-      intersectionObserver = new IntersectionObserver(
-        (entries) => {
-          const intersectingBlocks: HTMLElement[] = []
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting && entry.intersectionRatio <= 0) return
-            const target = entry.target as HTMLElement
-            intersectionObserver?.unobserve(target)
-            observedBlocks.delete(target)
-            intersectingBlocks.push(target)
-          })
-          if (intersectingBlocks.length > 0) {
-            batchMeasureBlocks(intersectingBlocks)
-            intersectingBlocks.forEach((target) => enqueueRender(target))
-          }
-        },
-        { root: null, rootMargin: MERMAID_VIEWPORT_ROOT_MARGIN, threshold: 0.01 }
-      )
-    }
-
-    candidateBlocks.forEach((block) => {
-      if (observedBlocks.has(block)) return
-      observedBlocks.add(block)
-      intersectionObserver?.observe(block)
+  } catch (error) {
+    await handleBlockRenderFailure({
+      state,
+      block,
+      index,
+      customMermaid,
+      error,
+      prepared,
     })
   }
+}
 
-  const isRendering = () => activeQueueCount > 0 || renderingBlocks.size > 0
+const ensureLazyIntersectionObserver = (state: ControllerInternalState): IntersectionObserver => {
+  if (state.intersectionObserver) return state.intersectionObserver
+  state.intersectionObserver = new IntersectionObserver(
+    (entries) => {
+      const intersectingBlocks: HTMLElement[] = []
+      for (const entry of entries) {
+        if (!entry.isIntersecting && entry.intersectionRatio <= 0) continue
+        const target = entry.target as HTMLElement
+        state.intersectionObserver?.unobserve(target)
+        state.observedBlocks.delete(target)
+        intersectingBlocks.push(target)
+      }
+      if (intersectingBlocks.length > 0) {
+        batchMeasureCandidateBlocks(state, intersectingBlocks)
+        intersectingBlocks.forEach((target) => state.enqueueRender(target))
+      }
+    },
+    { root: null, rootMargin: MERMAID_VIEWPORT_ROOT_MARGIN, threshold: 0.01 }
+  )
+  return state.intersectionObserver
+}
+
+const enqueueBlockIntoRenderQueue = (state: ControllerInternalState, block: HTMLElement) => {
+  if (!block || state.renderingBlocks.has(block)) return
+  state.renderingBlocks.add(block)
+  state.activeQueueCount += 1
+  state.renderQueue = state.renderQueue
+    .then(() => renderSingleMermaidBlock(state, block))
+    .catch((error) => {
+      if (state.options.shouldLogMermaidWarnings) console.warn("[mermaid] queued render failed", error)
+    })
+    .finally(() => {
+      state.renderingBlocks.delete(block)
+      state.activeQueueCount = Math.max(0, state.activeQueueCount - 1)
+    })
+}
+
+const resetControllerLayoutCache = (
+  state: ControllerInternalState,
+  isRendering: () => boolean,
+  clearBlockCache: boolean
+) => {
+  if (!clearBlockCache && isRendering()) return
+  state.cachedDesktopWideLaneBounds = undefined
+  state.premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
+  if (!clearBlockCache) return
+  state.options.root
+    .querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']")
+    .forEach((block) => {
+      delete block.dataset.mermaidRendered
+    })
+}
+
+const runControllerMermaidBlocks = async (state: ControllerInternalState) => {
+  const { options } = state
+  const blocks = collectMermaidBlocksInRoot(options.root)
+  if (!blocks.length) return
+  const candidateBlocks = blocks.filter(
+    (block) =>
+      !isBlockAlreadyRendered(block, options.preset.themeKey) && !state.renderingBlocks.has(block)
+  )
+  if (!options.lazyViewport || typeof IntersectionObserver === "undefined") {
+    batchMeasureCandidateBlocks(state, candidateBlocks)
+    candidateBlocks.forEach(state.enqueueRender)
+    await state.renderQueue
+    return
+  }
+  const observer = ensureLazyIntersectionObserver(state)
+  for (const block of candidateBlocks) {
+    if (state.observedBlocks.has(block)) continue
+    state.observedBlocks.add(block)
+    observer.observe(block)
+  }
+}
+
+export const createMermaidRuntimeController = (options: MermaidRuntimeControllerOptions) => {
+  const state: ControllerInternalState = {
+    options,
+    cachedDesktopWideLaneBounds: undefined,
+    mermaidOverlayCleanup: null,
+    renderQueue: Promise.resolve(),
+    activeQueueCount: 0,
+    renderingBlocks: new Set<HTMLElement>(),
+    observedBlocks: new WeakSet<HTMLElement>(),
+    premeasuredRects: new WeakMap<HTMLElement, DOMRect>(),
+    renderSequence: 0,
+    loggedErrorSignatures: new Set<string>(),
+    intersectionObserver: null,
+    enqueueRender: () => {},
+  }
+
+  state.enqueueRender = (block: HTMLElement) => enqueueBlockIntoRenderQueue(state, block)
+  const isRendering = () => state.activeQueueCount > 0 || state.renderingBlocks.size > 0
 
   return {
     isRendering,
-    resetLayoutCache: (clearBlockCache = false) => {
-      if (!clearBlockCache && isRendering()) return
-      cachedDesktopWideLaneBounds = undefined
-      premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
-      if (clearBlockCache) {
-        root.querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']").forEach((block) => {
-          delete block.dataset.mermaidRendered
-        })
-      }
-    },
-    renderMermaidBlocks,
+    resetLayoutCache: (clearBlockCache = false) =>
+      resetControllerLayoutCache(state, isRendering, clearBlockCache),
+    renderMermaidBlocks: () => runControllerMermaidBlocks(state),
     dispose: () => {
-      mermaidOverlayCleanup?.()
-      mermaidOverlayCleanup = null
-      intersectionObserver?.disconnect()
-      intersectionObserver = null
-      renderingBlocks.clear()
-      activeQueueCount = 0
+      state.mermaidOverlayCleanup?.()
+      state.mermaidOverlayCleanup = null
+      state.intersectionObserver?.disconnect()
+      state.intersectionObserver = null
+      state.renderingBlocks.clear()
+      state.activeQueueCount = 0
     },
   }
 }

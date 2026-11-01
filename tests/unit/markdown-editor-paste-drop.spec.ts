@@ -12,7 +12,6 @@ import {
   listFilesFromDataTransfer,
   parseSingleHttpUrl,
   partitionUploadFiles,
-  escapeMarkdownLinkDestination,
   planAppendAtEnd,
   planLinkifySelectionWithUrl,
   planReplaceExactSubstring,
@@ -31,6 +30,7 @@ import {
 import {
   MARKDOWN_ATTACHMENT_MAX_BYTES,
   MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE,
+  escapeMarkdownLinkDestination,
   resolveMarkdownAttachmentLink,
   resolveMarkdownImageEmbed,
 } from "../../src/components/markdown-editor/markdownEditorUploadModel"
@@ -55,13 +55,13 @@ test.describe("markdown editor paste/drop model", () => {
       "[업로드 중: notes.pdf · upload-a…]()"
     )
     expect(sanitizeUploadPlaceholderFileName("evil](https://x)\n.png")).toBe(
-      "evil\\](https://x) .png"
+      String.raw`evil\](https://x) .png`
     )
     expect(buildUploadingImagePlaceholder("a]b.png", "id-1")).toBe(
-      "![업로드 중: a\\]b.png · id-1…]()"
+      String.raw`![업로드 중: a\]b.png · id-1…]()`
     )
     expect(buildUploadingAttachmentPlaceholder("a]b.pdf", "id-2")).toBe(
-      "[업로드 중: a\\]b.pdf · id-2…]()"
+      String.raw`[업로드 중: a\]b.pdf · id-2…]()`
     )
     expect(shouldAppendMissingPlaceholder(3, 3)).toBe(true)
     expect(shouldAppendMissingPlaceholder(3, 4)).toBe(false)
@@ -182,22 +182,25 @@ test.describe("markdown editor paste/drop model", () => {
   test("escapes markdown label metacharacters when linkifying a selection", () => {
     const value = "see foo]bar here"
     const plan = planLinkifySelectionWithUrl(4, 11, "foo]bar", "https://example.com")
-    expect(plan.replacement).toBe("[foo\\]bar](https://example.com)")
+    expect(plan.replacement).toBe(String.raw`[foo\]bar](https://example.com)`)
     expect(applyPlannedTextMutationToValue(value, plan).value).toBe(
-      "see [foo\\]bar](https://example.com) here"
+      String.raw`see [foo\]bar](https://example.com) here`
     )
 
     const bracketPlan = planLinkifySelectionWithUrl(0, 5, "a[b]c", "https://example.com/x")
-    expect(bracketPlan.replacement).toBe("[a\\[b\\]c](https://example.com/x)")
+    expect(bracketPlan.replacement).toBe(String.raw`[a\[b\]c](https://example.com/x)`)
   })
 
-  test("escapes markdown link destinations that contain parentheses", () => {
-    expect(escapeMarkdownLinkDestination("https://example.com/a)")).toBe("https://example.com/a\\)")
+  test("escapes markdown link destinations that contain parentheses, spaces, or angle brackets", () => {
+    expect(escapeMarkdownLinkDestination("https://example.com/a)")).toBe("https://example.com/a%29")
     expect(escapeMarkdownLinkDestination("https://example.com/a(b)")).toBe(
-      "https://example.com/a\\(b\\)"
+      "https://example.com/a%28b%29"
     )
-    const plan = planLinkifySelectionWithUrl(0, 4, "docs", "https://example.com/a)")
-    expect(plan.replacement).toBe("[docs](https://example.com/a\\))")
+    expect(escapeMarkdownLinkDestination("https://example.com/my file <1>.pdf")).toBe(
+      "https://example.com/my%20file%20%3C1%3E.pdf"
+    )
+    const plan = planLinkifySelectionWithUrl(0, 4, "docs", "https://example.com/my file <1>.pdf")
+    expect(plan.replacement).toBe("[docs](https://example.com/my%20file%20%3C1%3E.pdf)")
   })
 
   test("routes multi-file paste through transfer-files and keeps items-only fallback", () => {

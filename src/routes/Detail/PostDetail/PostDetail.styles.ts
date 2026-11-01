@@ -204,6 +204,24 @@ export const StyledWrapper = styled.div `
     row-gap: 0.36rem;
   }
 
+  .floatingLikeBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border: 0;
+    background: transparent;
+    color: var(--aq-muted);
+    cursor: default;
+    user-select: none;
+
+    svg {
+      width: 1em;
+      height: 1em;
+      font-size: 1.125rem;
+    }
+  }
+
   .floatingShareStat {
     display: grid;
     justify-items: center;
@@ -502,5 +520,32 @@ export const BodySection = styled.div `
   border-top: 0;
   width: 100%;
   min-width: 0;
+
+  .markdownLoadingSkeleton {
+    margin-top: 1.65rem;
+    min-height: clamp(18rem, 42vh, 28rem);
+    display: grid;
+    align-content: start;
+    gap: 0.9rem;
+  }
+
+  .markdownLoadingSkeleton .skeletonLine {
+    display: block;
+    height: 1rem;
+    border-radius: 4px;
+    background: var(--aq-border);
+  }
+
+  .markdownLoadingSkeleton .skeletonLineWide {
+    width: 82%;
+  }
+
+  .markdownLoadingSkeleton .skeletonLineFull {
+    width: 96%;
+  }
+
+  .markdownLoadingSkeleton .skeletonLineMid {
+    width: 68%;
+  }
 `;
 export { MobileSummaryBar, RelatedSection, RelatedSkeletonItem } from "./PostDetailSection.styles";

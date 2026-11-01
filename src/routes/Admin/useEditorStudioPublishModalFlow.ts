@@ -7,8 +7,16 @@ type NoticeState = {
 
 type PublishActionType = "create" | "modify" | "temp"
 
+export const extractPendingTagDraftValues = (tagDraft: string): string[] =>
+  tagDraft
+    .split(/[,，]/)
+    .map((fragment) => fragment.trim())
+    .filter(Boolean)
+
 type UseEditorStudioPublishModalFlowParams = {
   activateComposeSurface: () => void
+  addTagsToPost?: (values: string[]) => string[]
+  commitPostCategory?: () => void
   handleModifyPost: () => Promise<boolean>
   handlePublishTempDraft: () => Promise<boolean>
   handleWritePost: () => Promise<boolean>
@@ -22,10 +30,14 @@ type UseEditorStudioPublishModalFlowParams = {
   setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>
   setPublishActionType: Dispatch<SetStateAction<PublishActionType>>
   setPublishModalNotice: Dispatch<SetStateAction<NoticeState>>
+  setTagDraft?: Dispatch<SetStateAction<string>>
+  tagDraft?: string
 }
 
 export const useEditorStudioPublishModalFlow = ({
   activateComposeSurface,
+  addTagsToPost,
+  commitPostCategory,
   handleModifyPost,
   handlePublishTempDraft,
   handleWritePost,
@@ -39,8 +51,22 @@ export const useEditorStudioPublishModalFlow = ({
   setIsPublishModalOpen,
   setPublishActionType,
   setPublishModalNotice,
+  setTagDraft,
+  tagDraft = "",
 }: UseEditorStudioPublishModalFlowParams) => {
+  const flushPendingAuthoringMetadata = useCallback(() => {
+    const pendingTags = extractPendingTagDraftValues(tagDraft)
+    if (pendingTags.length > 0) {
+      addTagsToPost?.(pendingTags)
+      setTagDraft?.("")
+    } else if (tagDraft.length > 0) {
+      setTagDraft?.("")
+    }
+    commitPostCategory?.()
+  }, [addTagsToPost, commitPostCategory, setTagDraft, tagDraft])
+
   const openPublishModal = useCallback((actionType: PublishActionType) => {
+    flushPendingAuthoringMetadata()
     activateComposeSurface()
     setPublishActionType(actionType)
     setPublishModalNotice({
@@ -53,6 +79,7 @@ export const useEditorStudioPublishModalFlow = ({
     setIsPublishModalOpen(true)
   }, [
     activateComposeSurface,
+    flushPendingAuthoringMetadata,
     isPreviewThumbnailError,
     publishModalHintByAction,
     safePreviewThumbnail,
@@ -83,17 +110,25 @@ export const useEditorStudioPublishModalFlow = ({
   ])
 
   const handleConfirmPublish = useCallback(async () => {
-    const success =
-      publishActionType === "create"
-        ? await handleWritePost()
-        : publishActionType === "modify"
-          ? await handleModifyPost()
-          : await handlePublishTempDraft()
+    let success = false
+    if (publishActionType === "create") {
+      success = await handleWritePost()
+    } else if (publishActionType === "modify") {
+      success = await handleModifyPost()
+    } else {
+      success = await handlePublishTempDraft()
+    }
 
     if (success) {
       setIsPublishModalOpen(false)
     }
-  }, [handleModifyPost, handlePublishTempDraft, handleWritePost, publishActionType, setIsPublishModalOpen])
+  }, [
+    handleModifyPost,
+    handlePublishTempDraft,
+    handleWritePost,
+    publishActionType,
+    setIsPublishModalOpen,
+  ])
 
   return {
     closePublishModal,
