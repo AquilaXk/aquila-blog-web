@@ -876,5 +876,16 @@ test.describe("wave6 round4 public markdown regressions", () => {
         "> [!NOTE] Title\n> Paragraph line inside callout\n>     lazy continuation inside callout\n    echo <b>$HOME</b>"
       )
     ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    const unclosedMathInToggleHtml = renderMarkdownHtml(
+      ":::toggle First\n$$\nunclosed\n:::\n\n<b>bold outside toggle</b>\n\n$$\n<b>math</b>\n$$"
+    )
+    expect(unclosedMathInToggleHtml).toContain("<strong>bold outside toggle</strong>")
+    expect(unclosedMathInToggleHtml).toContain("aq-formula-card")
+    expect(renderMarkdownHtml(":::callout info\n- **Promoted Title**\n  $$\n  <!--\n  x = 1\n  $$\n:::\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml(":::callout info Shell Example\n    # install deps <b>$HOME</b>\n    echo $HOME\n:::")).toContain("# install deps &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml("> [!NOTE] Title <!-- inline -->\n> Paragraph with <!-- inline --> text\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    const indentedAsideHtml = renderMarkdownHtml("<aside>\n    💡 Note\n    Body <b>bold inside aside</b>\n    </aside>\n    echo <b>$HOME</b>")
+    expect(indentedAsideHtml).toContain("<strong>bold inside aside</strong>")
+    expect(indentedAsideHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
   })
 })

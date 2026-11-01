@@ -7,7 +7,10 @@ import {
   collectTripleColonBody,
   extractAsideOpenTail,
   extractPromotedCalloutTitle,
+  isAsideCloseLineExcluded,
   isDedicatedFormulaFenceLine,
+  isLineStartInCommentRanges,
+  isTopLevelFormulaStopLine,
   parseCardMetadataComment,
   parseCustomDirectiveHeader,
   stripClosingAsideTag,
@@ -16,7 +19,6 @@ import {
 import {
   hasCommonMarkCodeIndent,
   overlapsSortedRanges,
-  parseOpeningCodeFence,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
 import { trimMarkdownPreservingCodeIndent } from "src/libs/markdown/renderingNormalizeModel"
@@ -186,15 +188,17 @@ const scanAsideClosingLines = (
   startIndex: number,
   bodyLines: string[],
   lineStarts: readonly number[],
-  excludedRanges: readonly MathSpanRange[]
+  codeBlockRanges: readonly MathSpanRange[],
+  commentRanges: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } | null => {
   for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
     const currentLine = lines[cursor]!
     const lineStart = lineStarts[cursor]!
-    const inExcluded = overlapsSortedRanges(
-      excludedRanges,
-      lineStart,
-      lineStart + Math.max(1, currentLine.length)
+    const inExcluded = isAsideCloseLineExcluded(
+      codeBlockRanges,
+      commentRanges,
+      currentLine,
+      lineStart
     )
     const closedLine = inExcluded ? null : stripClosingAsideTag(currentLine)
     if (closedLine !== null) {
@@ -211,27 +215,43 @@ const collectAsideBodyLines = (
   startIndex: number,
   openingTail: string,
   lineStarts: readonly number[],
-  excludedRanges: readonly MathSpanRange[]
+  codeBlockRanges: readonly MathSpanRange[],
+  commentRanges: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } | null => {
   const inlineClosed = stripClosingAsideTag(openingTail)
   if (inlineClosed !== null) {
     return { closedIndex: startIndex, bodyLines: inlineClosed.length > 0 ? [inlineClosed] : [] }
   }
   const bodyLines = openingTail.length > 0 ? [openingTail] : []
-  return scanAsideClosingLines(lines, startIndex, bodyLines, lineStarts, excludedRanges)
+  return scanAsideClosingLines(
+    lines,
+    startIndex,
+    bodyLines,
+    lineStarts,
+    codeBlockRanges,
+    commentRanges
+  )
 }
 
 const tryParseAsideBlock = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[],
-  excludedRanges: readonly MathSpanRange[]
+  codeBlockRanges: readonly MathSpanRange[],
+  commentRanges: readonly MathSpanRange[]
 ): { nextIndex: number; segment: MarkdownSegment | null; fallbackLines: string[] } | null => {
   const line = lines[startIndex]!
   const openingTail = extractAsideOpenTail(line)
   if (openingTail === null) return null
 
-  const collected = collectAsideBodyLines(lines, startIndex, openingTail, lineStarts, excludedRanges)
+  const collected = collectAsideBodyLines(
+    lines,
+    startIndex,
+    openingTail,
+    lineStarts,
+    codeBlockRanges,
+    commentRanges
+  )
   if (!collected) {
     return { nextIndex: startIndex + 1, segment: null, fallbackLines: [line] }
   }
@@ -261,7 +281,7 @@ const tryParseFormulaBlock = (
   const bodyLines: string[] = []
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
-    if (parseOpeningCodeFence(line) !== null) return { closedIndex: -1, formula: "" }
+    if (isTopLevelFormulaStopLine(line)) return { closedIndex: -1, formula: "" }
     const lineStart = lineStarts[index]!
     if (
       isDedicatedFormulaFenceLine(line) &&
@@ -285,7 +305,7 @@ const consumeBlockquoteCalloutOrLines = (
     cursor += 1
   }
   const firstContentIndex = quoteLines.findIndex((row) => row.trim().length > 0)
-  if (firstContentIndex >= 0) {
+  if (firstContentIndex >= 0 && !hasCommonMarkCodeIndent(quoteLines[firstContentIndex]!)) {
     const header = parseCalloutHeader(quoteLines[firstContentIndex]!.trim())
     if (header) {
       return {
@@ -308,7 +328,7 @@ type SegmentConsumerContext = {
   lines: readonly string[]
   lineStarts: readonly number[]
   codeBlockRanges: readonly MathSpanRange[]
-  codeAndCommentRanges: readonly MathSpanRange[]
+  commentRanges: readonly MathSpanRange[]
   pendingDirectiveMetadata: PendingDirectiveMetadata | null
   flushAndPush: (segment: MarkdownSegment) => void
   markdownBuffer: string[]
@@ -338,7 +358,8 @@ const tryConsumeCustomDirectiveAt = (
     ctx.lines,
     index + 1,
     ctx.lineStarts,
-    ctx.codeAndCommentRanges
+    ctx.codeBlockRanges,
+    ctx.commentRanges
   )
   if (closedIndex >= 0) {
     const metadata =
@@ -374,7 +395,7 @@ const tryConsumeColonBlockAt = (
       ctx.lines,
       index + 1,
       ctx.lineStarts,
-      ctx.codeAndCommentRanges
+      ctx.codeBlockRanges, ctx.commentRanges
     )
     if (closedIndex >= 0) {
       ctx.flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
@@ -389,7 +410,7 @@ const tryConsumeColonBlockAt = (
       ctx.lines,
       index + 1,
       ctx.lineStarts,
-      ctx.codeAndCommentRanges
+      ctx.codeBlockRanges, ctx.commentRanges
     )
     if (closedIndex >= 0) {
       ctx.flushAndPush({
@@ -439,7 +460,8 @@ const tryConsumeAsideAt = (
     ctx.lines,
     index,
     ctx.lineStarts,
-    ctx.codeAndCommentRanges
+    ctx.codeBlockRanges,
+    ctx.commentRanges
   )
   if (!asideStep) return null
   if (asideStep.segment) ctx.flushAndPush(asideStep.segment)
@@ -464,7 +486,7 @@ const tryConsumeStructuredBlockAt = (
 
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
-  const { codeBlockRanges, commentRanges, codeAndCommentRanges, listRanges } =
+  const { codeBlockRanges, commentRanges, listRanges } =
     parseCommonMarkBlockRanges(content)
   let nextLineStart = 0
   const lineStarts = lines.map((entry) => {
@@ -512,7 +534,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       index += 1
       continue
     }
-    if (overlapsSortedRanges(commentRanges, lineStart, lineEnd)) {
+    if (isLineStartInCommentRanges(commentRanges, line, lineStart)) {
       pendingDirectiveMetadata = null
       markdownBuffer.push(line)
       index += 1
@@ -523,7 +545,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       lines,
       lineStarts,
       codeBlockRanges,
-      codeAndCommentRanges,
+      commentRanges,
       pendingDirectiveMetadata,
       flushAndPush,
       markdownBuffer,

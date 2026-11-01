@@ -1,6 +1,7 @@
 import {
   hasCommonMarkCodeIndent,
   overlapsSortedRanges,
+  parseOpeningCodeFence,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
@@ -14,6 +15,8 @@ export type PendingDirectiveMetadata = {
 }
 
 export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
+export const SUPPORTED_DIRECTIVE_OPEN_PATTERN =
+  /^:::(?:callout|toggle|bookmark|embed|file)(?:[ \t\r]|$)/
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 
 export const extractAsideOpenTail = (line: string): string | null => {
@@ -34,6 +37,84 @@ export const stripClosingAsideTag = (value: string): string | null => {
 
 export const isDedicatedFormulaFenceLine = (line: string): boolean =>
   !hasCommonMarkCodeIndent(line) && line.trim() === "$$"
+
+export const isTopLevelFormulaStopLine = (line: string): boolean =>
+  parseOpeningCodeFence(line) !== null ||
+  SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(line) ||
+  (!hasCommonMarkCodeIndent(line) && extractAsideOpenTail(line) !== null)
+
+const hasUnclosedDirectiveBefore = (text: string, openIndex: number): boolean => {
+  const prefixLines = text.slice(0, openIndex).split("\n")
+  let inDirective = false
+  for (const rawLine of prefixLines) {
+    if (hasCommonMarkCodeIndent(rawLine)) continue
+    if (!inDirective && SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(rawLine)) {
+      inDirective = true
+    } else if (inDirective && DIRECTIVE_CLOSE_LINE_PATTERN.test(rawLine)) {
+      inDirective = false
+    }
+  }
+  return inDirective
+}
+
+const hasUnclosedAsideBefore = (text: string, openIndex: number): boolean => {
+  const prefixLines = text.slice(0, openIndex).split("\n")
+  let inAside = false
+  for (const rawLine of prefixLines) {
+    if (!inAside && !hasCommonMarkCodeIndent(rawLine)) {
+      const openTail = extractAsideOpenTail(rawLine)
+      if (openTail !== null && stripClosingAsideTag(openTail) === null) {
+        inAside = true
+      }
+    } else if (inAside && stripClosingAsideTag(rawLine) !== null) {
+      inAside = false
+    }
+  }
+  return inAside
+}
+
+export const isDedicatedFormulaBoundaryLine = (
+  text: string,
+  openIndex: number,
+  strippedLine: string
+): boolean => {
+  if (
+    SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(strippedLine) ||
+    (!hasCommonMarkCodeIndent(strippedLine) && extractAsideOpenTail(strippedLine) !== null)
+  ) {
+    return true
+  }
+  if (DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine)) {
+    return hasUnclosedDirectiveBefore(text, openIndex)
+  }
+  if (stripClosingAsideTag(strippedLine) !== null) {
+    return hasUnclosedAsideBefore(text, openIndex)
+  }
+  return false
+}
+
+export const isLineStartInCommentRanges = (
+  commentRanges: readonly MathSpanRange[],
+  line: string,
+  lineStart: number
+): boolean => {
+  if (commentRanges.length === 0) return false
+  const firstNonSpaceOffset = lineStart + (line.length - line.trimStart().length)
+  return overlapsSortedRanges(commentRanges, firstNonSpaceOffset, firstNonSpaceOffset + 1)
+}
+
+export const isAsideCloseLineExcluded = (
+  codeBlockRanges: readonly MathSpanRange[],
+  commentRanges: readonly MathSpanRange[],
+  line: string,
+  lineStart: number
+): boolean => {
+  const lineEnd = lineStart + Math.max(1, line.length)
+  if (overlapsSortedRanges(codeBlockRanges, lineStart, lineEnd)) return true
+  if (commentRanges.length === 0) return false
+  const closeTagOffset = lineStart + Math.max(0, line.trimEnd().length - "</aside>".length)
+  return overlapsSortedRanges(commentRanges, closeTagOffset, closeTagOffset + 1)
+}
 
 export const extractPromotedHeadingTitle = (trimmedLine: string): string | null => {
   let hashCount = 0
@@ -77,8 +158,10 @@ export const findPromotedCalloutTitleLineIndex = (
   endExclusive: number
 ): number => {
   for (let index = startIndex; index < endExclusive; index += 1) {
-    const trimmed = lines[index]!.trim()
+    const line = lines[index]!
+    const trimmed = line.trim()
     if (!trimmed) continue
+    if (hasCommonMarkCodeIndent(line)) return -1
     return isPromotedCalloutTitleLine(trimmed) ? index : -1
   }
   return -1
@@ -92,7 +175,11 @@ export const extractPromotedCalloutTitle = (
     return { title: "", bodyLines }
   }
 
-  const trimmedLine = bodyLines[firstBodyLineIndex]!.trim()
+  const rawFirstLine = bodyLines[firstBodyLineIndex]!
+  if (hasCommonMarkCodeIndent(rawFirstLine)) {
+    return { title: "", bodyLines }
+  }
+  const trimmedLine = rawFirstLine.trim()
   const promoted =
     extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)
   if (!promoted) {
@@ -203,15 +290,17 @@ export const findDirectiveCloseLineIndex = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[] = [],
-  excludedRanges: readonly MathSpanRange[] = []
+  excludedRanges: readonly MathSpanRange[] = [],
+  commentRanges: readonly MathSpanRange[] = []
 ): number => {
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index]!
     const lineStart = lineStarts[index]
     if (
       lineStart !== undefined &&
-      excludedRanges.length > 0 &&
-      overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))
+      ((excludedRanges.length > 0 &&
+        overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))) ||
+        isLineStartInCommentRanges(commentRanges, line, lineStart))
     ) {
       continue
     }
@@ -226,9 +315,16 @@ export const collectTripleColonBody = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[] = [],
-  excludedRanges: readonly MathSpanRange[] = []
+  excludedRanges: readonly MathSpanRange[] = [],
+  commentRanges: readonly MathSpanRange[] = []
 ): { closedIndex: number; bodyLines: string[] } => {
-  const closedIndex = findDirectiveCloseLineIndex(lines, startIndex, lineStarts, excludedRanges)
+  const closedIndex = findDirectiveCloseLineIndex(
+    lines,
+    startIndex,
+    lineStarts,
+    excludedRanges,
+    commentRanges
+  )
   if (closedIndex < 0) {
     return { closedIndex: -1, bodyLines: lines.slice(startIndex) }
   }

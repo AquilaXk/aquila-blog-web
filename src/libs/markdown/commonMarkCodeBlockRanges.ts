@@ -14,8 +14,11 @@ import {
   extractAsideOpenTail,
   findDirectiveCloseLineIndex,
   findPromotedCalloutTitleLineIndex,
+  isAsideCloseLineExcluded,
   isDedicatedFormulaFenceLine,
+  isLineStartInCommentRanges,
   isPromotedCalloutTitleLine,
+  isTopLevelFormulaStopLine,
   parseCustomDirectiveHeader,
   stripClosingAsideTag,
 } from "./renderingDirectiveModel"
@@ -23,6 +26,7 @@ import { parseStandaloneMarkdownImageLine } from "./renderingImageModel"
 
 export type CommonMarkBlockRanges = {
   codeBlockRanges: MathSpanRange[]
+  fencedCodeRanges: MathSpanRange[]
   commentRanges: MathSpanRange[]
   codeAndCommentRanges: MathSpanRange[]
   listRanges: MathSpanRange[]
@@ -45,6 +49,7 @@ const BLOCKQUOTE_CALLOUT_TOKEN_PATTERN = /^\[!([A-Za-z0-9_-]+)\]([+-])?/
 const MAX_BLOCK_RANGE_CACHE_ENTRIES = 8
 const EMPTY_BLOCK_RANGES: CommonMarkBlockRanges = {
   codeBlockRanges: [],
+  fencedCodeRanges: [],
   commentRanges: [],
   codeAndCommentRanges: [],
   listRanges: [],
@@ -78,6 +83,16 @@ const maskBlockquoteHeaderLine = (line: string): string => {
   return hasCr ? `${prefix}${rest}\r` : `${prefix}${rest}`
 }
 
+const unindentLinePreservingLength = (line: string): string => {
+  const hasCr = line.endsWith("\r")
+  const core = hasCr ? line.slice(0, -1) : line
+  const trimmedStart = core.trimStart()
+  const leadingLen = core.length - trimmedStart.length
+  if (leadingLen === 0) return line
+  const shifted = `${trimmedStart}${" ".repeat(leadingLen)}`
+  return hasCr ? `${shifted}\r` : shifted
+}
+
 const maskLinesInRange = (lines: string[], startIndex: number, endIndex: number): void => {
   for (let i = startIndex; i <= endIndex; i += 1) {
     lines[i] = maskLineWithBreakAndHeading(lines[i]!)
@@ -93,9 +108,19 @@ const computeLineStarts = (lines: readonly string[]): number[] => {
   })
 }
 
+const isFencedCodeAstNode = (source: string, start: number, end: number): boolean => {
+  const newlineIdx = source.indexOf("\n", start)
+  const firstLine = source
+    .slice(start, newlineIdx < 0 || newlineIdx > end ? end : newlineIdx)
+    .replace(/^(?:[ \t]*>[ \t]?)+/, "")
+  return parseOpeningCodeFence(firstLine) !== null
+}
+
 const walkCommonMarkBlockRanges = (
   node: CommonMarkAstNode,
+  source: string,
   rawCodeRanges: MathSpanRange[],
+  rawFencedCodeRanges: MathSpanRange[],
   rawCommentRanges: MathSpanRange[],
   rawListRanges: MathSpanRange[]
 ): void => {
@@ -104,7 +129,12 @@ const walkCommonMarkBlockRanges = (
   const hasValidRange = typeof start === "number" && typeof end === "number" && end > start
 
   if (node.type === "code") {
-    if (hasValidRange) rawCodeRanges.push({ from: start, to: end })
+    if (hasValidRange) {
+      rawCodeRanges.push({ from: start, to: end })
+      if (isFencedCodeAstNode(source, start, end)) {
+        rawFencedCodeRanges.push({ from: start, to: end })
+      }
+    }
     return
   }
 
@@ -124,20 +154,37 @@ const walkCommonMarkBlockRanges = (
 
   if (!Array.isArray(node.children)) return
   for (const child of node.children) {
-    walkCommonMarkBlockRanges(child, rawCodeRanges, rawCommentRanges, rawListRanges)
+    walkCommonMarkBlockRanges(
+      child,
+      source,
+      rawCodeRanges,
+      rawFencedCodeRanges,
+      rawCommentRanges,
+      rawListRanges
+    )
   }
 }
 
 const parseRawCommonMarkRanges = (source: string): CommonMarkBlockRanges => {
   const tree = commonMarkProcessor.parse(source) as CommonMarkAstNode
   const rawCodeRanges: MathSpanRange[] = []
+  const rawFencedCodeRanges: MathSpanRange[] = []
   const rawCommentRanges: MathSpanRange[] = []
   const rawListRanges: MathSpanRange[] = []
-  walkCommonMarkBlockRanges(tree, rawCodeRanges, rawCommentRanges, rawListRanges)
+  walkCommonMarkBlockRanges(
+    tree,
+    source,
+    rawCodeRanges,
+    rawFencedCodeRanges,
+    rawCommentRanges,
+    rawListRanges
+  )
   const codeBlockRanges = mergeSortedSpanRanges(rawCodeRanges)
+  const fencedCodeRanges = mergeSortedSpanRanges(rawFencedCodeRanges)
   const commentRanges = mergeSortedSpanRanges(rawCommentRanges)
   return {
     codeBlockRanges,
+    fencedCodeRanges,
     commentRanges,
     codeAndCommentRanges: mergeSortedSpanRanges([...codeBlockRanges, ...commentRanges]),
     listRanges: mergeSortedSpanRanges(rawListRanges),
@@ -150,7 +197,8 @@ const isExcludedTopLevelLine = (
   ranges: CommonMarkBlockRanges
 ): boolean => {
   const lineEnd = lineStart + Math.max(1, line.length)
-  if (overlapsSortedRanges(ranges.codeAndCommentRanges, lineStart, lineEnd)) return true
+  if (overlapsSortedRanges(ranges.codeBlockRanges, lineStart, lineEnd)) return true
+  if (isLineStartInCommentRanges(ranges.commentRanges, line, lineStart)) return true
   if (hasCommonMarkCodeIndent(line)) return true
   return LEADING_SPACE_OR_TAB_PATTERN.test(line) && overlapsSortedRanges(ranges.listRanges, lineStart, lineEnd)
 }
@@ -172,7 +220,7 @@ const findDedicatedFormulaCloseIndex = (
 ): number => {
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
-    if (parseOpeningCodeFence(line) !== null) return -1
+    if (isTopLevelFormulaStopLine(line)) return -1
     const lineStart = lineStarts[index]!
     if (
       isDedicatedFormulaFenceLine(line) &&
@@ -184,58 +232,83 @@ const findDedicatedFormulaCloseIndex = (
   return -1
 }
 
-const isContainerFormulaStopLine = (
-  line: string,
-  isCloseLine: (candidate: string) => boolean
-): boolean =>
-  parseOpeningCodeFence(line) !== null ||
-  isCloseLine(line) ||
-  line.startsWith(":::") ||
-  extractAsideOpenTail(line) !== null ||
-  stripClosingAsideTag(line) !== null
-
 const findBoundedFormulaCloseInContainer = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[],
-  codeBlockRanges: readonly MathSpanRange[],
-  isCloseLine: (candidate: string) => boolean
+  codeRanges: readonly MathSpanRange[],
+  isCloseLine: (candidate: string) => boolean,
+  allowIndentedFence: boolean
 ): number => {
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
-    if (isContainerFormulaStopLine(line, isCloseLine)) return -1
+    if (isTopLevelFormulaStopLine(line) || isCloseLine(line)) return -1
     const lineStart = lineStarts[index]!
+    const isFence = allowIndentedFence ? line.trim() === "$$" : isDedicatedFormulaFenceLine(line)
     if (
-      isDedicatedFormulaFenceLine(line) &&
-      !overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))
+      isFence &&
+      !overlapsSortedRanges(codeRanges, lineStart, lineStart + Math.max(1, line.length))
     ) {
       return index
     }
   }
   return -1
+}
+
+const isContainerLineExcluded = (
+  line: string,
+  lineStart: number,
+  ranges: CommonMarkBlockRanges,
+  unindentAsideBody: boolean,
+  checkingCloseLine: boolean
+): boolean => {
+  const activeCodeRanges = unindentAsideBody ? ranges.fencedCodeRanges : ranges.codeBlockRanges
+  if (unindentAsideBody && checkingCloseLine) {
+    return isAsideCloseLineExcluded(activeCodeRanges, ranges.commentRanges, line, lineStart)
+  }
+  const lineEnd = lineStart + Math.max(1, line.length)
+  return (
+    overlapsSortedRanges(activeCodeRanges, lineStart, lineEnd) ||
+    isLineStartInCommentRanges(ranges.commentRanges, line, lineStart)
+  )
 }
 
 const resolveContainerCloseWithBoundedFormulas = (
   lines: string[],
   startIndex: number,
   lineStarts: readonly number[],
-  isCloseLine: (candidate: string) => boolean
+  isCloseLine: (candidate: string) => boolean,
+  unindentAsideBody = false
 ): number => {
   let ranges = parseRawCommonMarkRanges(lines.join("\n"))
   for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
-    const line = lines[cursor]!
+    let line = lines[cursor]!
     const lineStart = lineStarts[cursor]!
-    const lineEnd = lineStart + Math.max(1, line.length)
-    if (!overlapsSortedRanges(ranges.codeAndCommentRanges, lineStart, lineEnd) && isCloseLine(line)) {
+    if (
+      !isContainerLineExcluded(line, lineStart, ranges, unindentAsideBody, true) &&
+      isCloseLine(line)
+    ) {
       return cursor
     }
-    if (!isExcludedTopLevelLine(line, lineStart, ranges) && isDedicatedFormulaFenceLine(line)) {
+    if (isContainerLineExcluded(line, lineStart, ranges, unindentAsideBody, false)) {
+      continue
+    }
+    if (unindentAsideBody && hasCommonMarkCodeIndent(line)) {
+      line = unindentLinePreservingLength(line)
+      lines[cursor] = line
+      if (line.startsWith("<!--") || parseOpeningCodeFence(line) !== null) {
+        ranges = parseRawCommonMarkRanges(lines.join("\n"))
+      }
+    }
+    if (isDedicatedFormulaFenceLine(line)) {
+      const activeCodeRanges = unindentAsideBody ? ranges.fencedCodeRanges : ranges.codeBlockRanges
       const formulaClose = findBoundedFormulaCloseInContainer(
         lines,
         cursor,
         lineStarts,
-        ranges.codeBlockRanges,
-        isCloseLine
+        activeCodeRanges,
+        isCloseLine,
+        unindentAsideBody
       )
       if (formulaClose >= 0) {
         maskLinesInRange(lines, cursor, formulaClose)
@@ -268,7 +341,8 @@ const tryMaskAsideBlockAt = (
     lines,
     index + 1,
     lineStarts,
-    isClosingAsideLine
+    isClosingAsideLine,
+    true
   )
   if (closeIndex < 0) {
     lines.splice(index, snapshot.length, ...snapshot)
@@ -287,18 +361,39 @@ const findBlockquoteHeaderAndPromotedIndex = (
   let promotedLineIndex = -1
   let firstContent = ""
   while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
-    const stripped = lines[cursor]!.replace(/^\s*>\s?/, "").trim()
+    const afterQuote = lines[cursor]!.replace(/^\s*>\s?/, "")
+    const stripped = afterQuote.trim()
     if (stripped) {
       if (headerLineIndex < 0) {
-        headerLineIndex = cursor
-        firstContent = stripped
+        headerLineIndex = hasCommonMarkCodeIndent(afterQuote) ? -2 : cursor
+        firstContent = hasCommonMarkCodeIndent(afterQuote) ? "" : stripped
       } else if (promotedLineIndex === -1) {
-        promotedLineIndex = isPromotedCalloutTitleLine(stripped) ? cursor : -2
+        promotedLineIndex =
+          !hasCommonMarkCodeIndent(afterQuote) && isPromotedCalloutTitleLine(stripped)
+            ? cursor
+            : -2
       }
     }
     cursor += 1
   }
   return { cursor, headerLineIndex, promotedLineIndex, firstContent }
+}
+
+const shouldMaskBlockquoteTailLine = (
+  refreshed: CommonMarkBlockRanges,
+  lastLine: string,
+  lastLineStart: number
+): boolean => {
+  const lastLineEnd = lastLineStart + Math.max(1, lastLine.length)
+  if (overlapsSortedRanges(refreshed.codeBlockRanges, lastLineStart, lastLineEnd)) {
+    return false
+  }
+  const afterQuote = lastLine.replace(/^\s*>\s?/, "")
+  const firstContentOffset = lastLineStart + (lastLine.length - afterQuote.trimStart().length)
+  if (overlapsSortedRanges(refreshed.commentRanges, firstContentOffset, firstContentOffset + 1)) {
+    return false
+  }
+  return !overlapsSortedRanges(refreshed.commentRanges, lastLineEnd, lastLineEnd + 1)
 }
 
 const tryMaskBlockquoteCalloutAt = (
@@ -324,14 +419,7 @@ const tryMaskBlockquoteCalloutAt = (
   if (hasFollowingNonBlankLine && lastQuoteIndex > headerLineIndex) {
     const refreshed = parseRawCommonMarkRanges(lines.join("\n"))
     const lastLine = lines[lastQuoteIndex]!
-    const lastLineStart = lineStarts[lastQuoteIndex]!
-    if (
-      !overlapsSortedRanges(
-        refreshed.codeAndCommentRanges,
-        lastLineStart,
-        lastLineStart + Math.max(1, lastLine.length)
-      )
-    ) {
+    if (shouldMaskBlockquoteTailLine(refreshed, lastLine, lineStarts[lastQuoteIndex]!)) {
       lines[lastQuoteIndex] = maskLineWithBreakAndHeading(lastLine)
     }
   }
@@ -344,11 +432,17 @@ const tryMaskColonDirectiveAt = (
   line: string,
   trimmed: string,
   lineStarts: readonly number[],
-  excludedRanges: readonly MathSpanRange[]
+  ranges: CommonMarkBlockRanges
 ): { nextIndex: number; mutated: boolean } | null => {
   if (!line.startsWith(":::")) return null
   if (parseCustomDirectiveHeader(trimmed) !== null) {
-    const closeIndex = findDirectiveCloseLineIndex(lines, index + 1, lineStarts, excludedRanges)
+    const closeIndex = findDirectiveCloseLineIndex(
+      lines,
+      index + 1,
+      lineStarts,
+      ranges.codeBlockRanges,
+      ranges.commentRanges
+    )
     if (closeIndex >= 0) {
       maskLinesInRange(lines, index, closeIndex)
       return { nextIndex: closeIndex + 1, mutated: true }
@@ -362,6 +456,9 @@ const tryMaskColonDirectiveAt = (
       : -1
     const snapshot = lines.slice(index)
     lines[index] = maskLineWithBreakAndHeading(line)
+    if (candidatePromotedIndex >= 0) {
+      lines[candidatePromotedIndex] = maskLineWithBreakAndHeading(lines[candidatePromotedIndex]!)
+    }
     const closeIndex = resolveContainerCloseWithBoundedFormulas(
       lines,
       index + 1,
@@ -371,9 +468,6 @@ const tryMaskColonDirectiveAt = (
     if (closeIndex < 0) {
       lines.splice(index, snapshot.length, ...snapshot)
       return { nextIndex: index + 1, mutated: false }
-    }
-    if (candidatePromotedIndex >= 0 && candidatePromotedIndex < closeIndex) {
-      lines[candidatePromotedIndex] = maskLineWithBreakAndHeading(lines[candidatePromotedIndex]!)
     }
     lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
     return { nextIndex: closeIndex + 1, mutated: true }
@@ -393,14 +487,7 @@ const tryMaskCustomBlockStepAt = (
     lines[index] = maskLineWithBreakAndHeading(line)
     return { nextIndex: index + 1, mutated: true }
   }
-  const colonStep = tryMaskColonDirectiveAt(
-    lines,
-    index,
-    line,
-    trimmed,
-    lineStarts,
-    currentRanges.codeAndCommentRanges
-  )
+  const colonStep = tryMaskColonDirectiveAt(lines, index, line, trimmed, lineStarts, currentRanges)
   if (colonStep) return colonStep
   if (isDedicatedFormulaFenceLine(line)) {
     const closeIndex = findDedicatedFormulaCloseIndex(

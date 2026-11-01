@@ -1,3 +1,4 @@
+import { isDedicatedFormulaBoundaryLine } from "./renderingDirectiveModel"
 export type MathSpanRange = { from: number; to: number }
 
 export type ScannedPandocMathToken = {
@@ -389,7 +390,7 @@ const matchDedicatedDisplayMathToken = (
     const lineEnd = findLineEndOffset(text, cursor)
     const line = text.slice(cursor, lineEnd)
     const stripped = stripLeadingQuoteMarkers(line, openQuoteDepth)
-    if (stripped === null || parseOpeningCodeFence(line) !== null) return null
+    if (stripped === null || parseOpeningCodeFence(line) !== null || isDedicatedFormulaBoundaryLine(text, openIndex, stripped)) return null
     const parsedClose = parseDedicatedLineQuoteDepth(line)
     if (
       parsedClose &&
