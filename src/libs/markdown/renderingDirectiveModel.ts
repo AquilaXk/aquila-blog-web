@@ -1,6 +1,7 @@
 import {
   hasCommonMarkCodeIndent,
   overlapsSortedRanges,
+  parseDedicatedLineQuoteDepth,
   parseOpeningCodeFence,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
@@ -43,41 +44,115 @@ export const isTopLevelFormulaStopLine = (line: string): boolean =>
   SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(line) ||
   (!hasCommonMarkCodeIndent(line) && extractAsideOpenTail(line) !== null)
 
-const hasUnclosedDirectiveBefore = (text: string, openIndex: number): boolean => {
-  const prefixLines = text.slice(0, openIndex).split("\n")
-  let inDirective = false
-  for (const rawLine of prefixLines) {
-    if (hasCommonMarkCodeIndent(rawLine)) continue
-    if (!inDirective && SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(rawLine)) {
-      inDirective = true
-    } else if (inDirective && DIRECTIVE_CLOSE_LINE_PATTERN.test(rawLine)) {
-      inDirective = false
-    }
+const isMatchingClosingFence = (
+  trimmedLine: string,
+  fence: { markerCode: number; length: number }
+): boolean => {
+  const firstCode = trimmedLine.codePointAt(0) ?? 0
+  if (firstCode !== fence.markerCode) return false
+  let runLen = 0
+  while (runLen < trimmedLine.length && trimmedLine.codePointAt(runLen) === firstCode) {
+    runLen += 1
   }
-  return inDirective
+  return runLen >= fence.length && trimmedLine.slice(runLen).trim() === ""
 }
 
-const hasUnclosedAsideBefore = (text: string, openIndex: number): boolean => {
+const scanUnclosedContainerBefore = (
+  text: string,
+  openIndex: number,
+  excludedRanges: readonly MathSpanRange[],
+  kind: "directive" | "aside"
+): boolean => {
   const prefixLines = text.slice(0, openIndex).split("\n")
-  let inAside = false
+  let inContainer = false
+  let activeFence: { markerCode: number; length: number } | null = null
+  let inComment = false
+  let lineStart = 0
+
   for (const rawLine of prefixLines) {
-    if (!inAside && !hasCommonMarkCodeIndent(rawLine)) {
-      const openTail = extractAsideOpenTail(rawLine)
-      if (openTail !== null && stripClosingAsideTag(openTail) === null) {
-        inAside = true
+    const lineEnd = lineStart + Math.max(1, rawLine.length)
+    const candidate = inContainer && kind === "aside" ? rawLine.trimStart() : rawLine
+    const trimmed = candidate.trim()
+    if (activeFence) {
+      if (!hasCommonMarkCodeIndent(candidate) && isMatchingClosingFence(trimmed, activeFence)) {
+        activeFence = null
       }
-    } else if (inAside && stripClosingAsideTag(rawLine) !== null) {
-      inAside = false
+      lineStart += rawLine.length + 1
+      continue
     }
+    if (inComment) {
+      if (rawLine.includes("-->")) inComment = false
+      lineStart += rawLine.length + 1
+      continue
+    }
+    if (overlapsSortedRanges(excludedRanges, lineStart, lineEnd)) {
+      lineStart += rawLine.length + 1
+      continue
+    }
+    const openedFence = !hasCommonMarkCodeIndent(candidate) ? parseOpeningCodeFence(candidate) : null
+    if (openedFence) {
+      activeFence = openedFence
+      lineStart += rawLine.length + 1
+      continue
+    }
+    if (trimmed.startsWith("<!--")) {
+      if (!trimmed.includes("-->")) inComment = true
+      lineStart += rawLine.length + 1
+      continue
+    }
+    if (kind === "directive") {
+      if (!hasCommonMarkCodeIndent(rawLine)) {
+        if (!inContainer && SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(rawLine)) inContainer = true
+        else if (inContainer && DIRECTIVE_CLOSE_LINE_PATTERN.test(rawLine)) inContainer = false
+      }
+    } else if (!inContainer && !hasCommonMarkCodeIndent(rawLine)) {
+      const openTail = extractAsideOpenTail(rawLine)
+      if (openTail !== null && stripClosingAsideTag(openTail) === null) inContainer = true
+    } else if (inContainer && stripClosingAsideTag(rawLine) !== null) {
+      inContainer = false
+    }
+    lineStart += rawLine.length + 1
   }
-  return inAside
+  return inContainer
+}
+
+export const resolveDedicatedMathOpen = (
+  text: string,
+  openIndex: number,
+  openLine: string,
+  excludedRanges: readonly MathSpanRange[]
+): { quoteDepth: number; rest: string; allowAsideIndent: boolean } | null => {
+  const direct = parseDedicatedLineQuoteDepth(openLine)
+  if (direct) return { ...direct, allowAsideIndent: false }
+  const trimmedStart = openLine.trimStart()
+  if (!trimmedStart.startsWith("$$")) return null
+  if (!scanUnclosedContainerBefore(text, openIndex, excludedRanges, "aside")) return null
+  return { quoteDepth: 0, rest: trimmedStart, allowAsideIndent: true }
+}
+
+export const isDedicatedMathCloseLine = (
+  line: string,
+  openQuoteDepth: number,
+  allowAsideIndent: boolean
+): boolean => {
+  if (allowAsideIndent) return line.trim() === "$$"
+  const parsedClose = parseDedicatedLineQuoteDepth(line)
+  return (
+    parsedClose !== null &&
+    parsedClose.quoteDepth === openQuoteDepth &&
+    parsedClose.rest.startsWith("$$") &&
+    parsedClose.rest.slice(2).trim() === ""
+  )
 }
 
 export const isDedicatedFormulaBoundaryLine = (
   text: string,
   openIndex: number,
-  strippedLine: string
+  strippedLine: string,
+  openQuoteDepth: number,
+  excludedRanges: readonly MathSpanRange[]
 ): boolean => {
+  if (openQuoteDepth > 0) return false
   if (
     SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(strippedLine) ||
     (!hasCommonMarkCodeIndent(strippedLine) && extractAsideOpenTail(strippedLine) !== null)
@@ -85,10 +160,10 @@ export const isDedicatedFormulaBoundaryLine = (
     return true
   }
   if (DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine)) {
-    return hasUnclosedDirectiveBefore(text, openIndex)
+    return scanUnclosedContainerBefore(text, openIndex, excludedRanges, "directive")
   }
   if (stripClosingAsideTag(strippedLine) !== null) {
-    return hasUnclosedAsideBefore(text, openIndex)
+    return scanUnclosedContainerBefore(text, openIndex, excludedRanges, "aside")
   }
   return false
 }

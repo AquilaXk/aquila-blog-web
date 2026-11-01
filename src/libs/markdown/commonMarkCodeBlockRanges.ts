@@ -6,7 +6,6 @@ import {
   hasCommonMarkCodeIndent,
   mergeSortedSpanRanges,
   overlapsSortedRanges,
-  parseOpeningCodeFence,
   type MathSpanRange,
 } from "./pandocMathScanner"
 import {
@@ -26,9 +25,7 @@ import { parseStandaloneMarkdownImageLine } from "./renderingImageModel"
 
 export type CommonMarkBlockRanges = {
   codeBlockRanges: MathSpanRange[]
-  fencedCodeRanges: MathSpanRange[]
   commentRanges: MathSpanRange[]
-  codeAndCommentRanges: MathSpanRange[]
   listRanges: MathSpanRange[]
 }
 
@@ -49,9 +46,7 @@ const BLOCKQUOTE_CALLOUT_TOKEN_PATTERN = /^\[!([A-Za-z0-9_-]+)\]([+-])?/
 const MAX_BLOCK_RANGE_CACHE_ENTRIES = 8
 const EMPTY_BLOCK_RANGES: CommonMarkBlockRanges = {
   codeBlockRanges: [],
-  fencedCodeRanges: [],
   commentRanges: [],
-  codeAndCommentRanges: [],
   listRanges: [],
 }
 
@@ -93,6 +88,9 @@ const unindentLinePreservingLength = (line: string): string => {
   return hasCr ? `${shifted}\r` : shifted
 }
 
+const neutralizeAsideOpenTagPreservingLength = (line: string): string =>
+  line.replace(/<(?=aside)/i, "a")
+
 const maskLinesInRange = (lines: string[], startIndex: number, endIndex: number): void => {
   for (let i = startIndex; i <= endIndex; i += 1) {
     lines[i] = maskLineWithBreakAndHeading(lines[i]!)
@@ -108,19 +106,9 @@ const computeLineStarts = (lines: readonly string[]): number[] => {
   })
 }
 
-const isFencedCodeAstNode = (source: string, start: number, end: number): boolean => {
-  const newlineIdx = source.indexOf("\n", start)
-  const firstLine = source
-    .slice(start, newlineIdx < 0 || newlineIdx > end ? end : newlineIdx)
-    .replace(/^(?:[ \t]*>[ \t]?)+/, "")
-  return parseOpeningCodeFence(firstLine) !== null
-}
-
 const walkCommonMarkBlockRanges = (
   node: CommonMarkAstNode,
-  source: string,
   rawCodeRanges: MathSpanRange[],
-  rawFencedCodeRanges: MathSpanRange[],
   rawCommentRanges: MathSpanRange[],
   rawListRanges: MathSpanRange[]
 ): void => {
@@ -129,12 +117,7 @@ const walkCommonMarkBlockRanges = (
   const hasValidRange = typeof start === "number" && typeof end === "number" && end > start
 
   if (node.type === "code") {
-    if (hasValidRange) {
-      rawCodeRanges.push({ from: start, to: end })
-      if (isFencedCodeAstNode(source, start, end)) {
-        rawFencedCodeRanges.push({ from: start, to: end })
-      }
-    }
+    if (hasValidRange) rawCodeRanges.push({ from: start, to: end })
     return
   }
 
@@ -154,39 +137,19 @@ const walkCommonMarkBlockRanges = (
 
   if (!Array.isArray(node.children)) return
   for (const child of node.children) {
-    walkCommonMarkBlockRanges(
-      child,
-      source,
-      rawCodeRanges,
-      rawFencedCodeRanges,
-      rawCommentRanges,
-      rawListRanges
-    )
+    walkCommonMarkBlockRanges(child, rawCodeRanges, rawCommentRanges, rawListRanges)
   }
 }
 
 const parseRawCommonMarkRanges = (source: string): CommonMarkBlockRanges => {
   const tree = commonMarkProcessor.parse(source) as CommonMarkAstNode
   const rawCodeRanges: MathSpanRange[] = []
-  const rawFencedCodeRanges: MathSpanRange[] = []
   const rawCommentRanges: MathSpanRange[] = []
   const rawListRanges: MathSpanRange[] = []
-  walkCommonMarkBlockRanges(
-    tree,
-    source,
-    rawCodeRanges,
-    rawFencedCodeRanges,
-    rawCommentRanges,
-    rawListRanges
-  )
-  const codeBlockRanges = mergeSortedSpanRanges(rawCodeRanges)
-  const fencedCodeRanges = mergeSortedSpanRanges(rawFencedCodeRanges)
-  const commentRanges = mergeSortedSpanRanges(rawCommentRanges)
+  walkCommonMarkBlockRanges(tree, rawCodeRanges, rawCommentRanges, rawListRanges)
   return {
-    codeBlockRanges,
-    fencedCodeRanges,
-    commentRanges,
-    codeAndCommentRanges: mergeSortedSpanRanges([...codeBlockRanges, ...commentRanges]),
+    codeBlockRanges: mergeSortedSpanRanges(rawCodeRanges),
+    commentRanges: mergeSortedSpanRanges(rawCommentRanges),
     listRanges: mergeSortedSpanRanges(rawListRanges),
   }
 }
@@ -237,16 +200,14 @@ const findBoundedFormulaCloseInContainer = (
   startIndex: number,
   lineStarts: readonly number[],
   codeRanges: readonly MathSpanRange[],
-  isCloseLine: (candidate: string) => boolean,
-  allowIndentedFence: boolean
+  isCloseLine: (candidate: string) => boolean
 ): number => {
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
     if (isTopLevelFormulaStopLine(line) || isCloseLine(line)) return -1
     const lineStart = lineStarts[index]!
-    const isFence = allowIndentedFence ? line.trim() === "$$" : isDedicatedFormulaFenceLine(line)
     if (
-      isFence &&
+      isDedicatedFormulaFenceLine(line) &&
       !overlapsSortedRanges(codeRanges, lineStart, lineStart + Math.max(1, line.length))
     ) {
       return index
@@ -259,16 +220,15 @@ const isContainerLineExcluded = (
   line: string,
   lineStart: number,
   ranges: CommonMarkBlockRanges,
-  unindentAsideBody: boolean,
+  isAside: boolean,
   checkingCloseLine: boolean
 ): boolean => {
-  const activeCodeRanges = unindentAsideBody ? ranges.fencedCodeRanges : ranges.codeBlockRanges
-  if (unindentAsideBody && checkingCloseLine) {
-    return isAsideCloseLineExcluded(activeCodeRanges, ranges.commentRanges, line, lineStart)
+  if (isAside && checkingCloseLine) {
+    return isAsideCloseLineExcluded(ranges.codeBlockRanges, ranges.commentRanges, line, lineStart)
   }
   const lineEnd = lineStart + Math.max(1, line.length)
   return (
-    overlapsSortedRanges(activeCodeRanges, lineStart, lineEnd) ||
+    overlapsSortedRanges(ranges.codeBlockRanges, lineStart, lineEnd) ||
     isLineStartInCommentRanges(ranges.commentRanges, line, lineStart)
   )
 }
@@ -278,37 +238,25 @@ const resolveContainerCloseWithBoundedFormulas = (
   startIndex: number,
   lineStarts: readonly number[],
   isCloseLine: (candidate: string) => boolean,
-  unindentAsideBody = false
+  isAside = false
 ): number => {
   let ranges = parseRawCommonMarkRanges(lines.join("\n"))
   for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
-    let line = lines[cursor]!
+    const line = lines[cursor]!
     const lineStart = lineStarts[cursor]!
-    if (
-      !isContainerLineExcluded(line, lineStart, ranges, unindentAsideBody, true) &&
-      isCloseLine(line)
-    ) {
+    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true) && isCloseLine(line)) {
       return cursor
     }
-    if (isContainerLineExcluded(line, lineStart, ranges, unindentAsideBody, false)) {
+    if (isContainerLineExcluded(line, lineStart, ranges, isAside, false)) {
       continue
     }
-    if (unindentAsideBody && hasCommonMarkCodeIndent(line)) {
-      line = unindentLinePreservingLength(line)
-      lines[cursor] = line
-      if (line.startsWith("<!--") || parseOpeningCodeFence(line) !== null) {
-        ranges = parseRawCommonMarkRanges(lines.join("\n"))
-      }
-    }
     if (isDedicatedFormulaFenceLine(line)) {
-      const activeCodeRanges = unindentAsideBody ? ranges.fencedCodeRanges : ranges.codeBlockRanges
       const formulaClose = findBoundedFormulaCloseInContainer(
         lines,
         cursor,
         lineStarts,
-        activeCodeRanges,
-        isCloseLine,
-        unindentAsideBody
+        ranges.codeBlockRanges,
+        isCloseLine
       )
       if (formulaClose >= 0) {
         maskLinesInRange(lines, cursor, formulaClose)
@@ -337,6 +285,9 @@ const tryMaskAsideBlockAt = (
   }
   const snapshot = lines.slice(index)
   lines[index] = maskLineWithBreakAndHeading(line)
+  for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+    lines[cursor] = unindentLinePreservingLength(lines[cursor]!)
+  }
   const closeIndex = resolveContainerCloseWithBoundedFormulas(
     lines,
     index + 1,
@@ -346,9 +297,18 @@ const tryMaskAsideBlockAt = (
   )
   if (closeIndex < 0) {
     lines.splice(index, snapshot.length, ...snapshot)
-    return { nextIndex: index + 1, mutated: false }
+    lines[index] = neutralizeAsideOpenTagPreservingLength(line)
+    return { nextIndex: index + 1, mutated: true }
   }
   lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
+  const afterCloseOffset = closeIndex - index + 1
+  if (afterCloseOffset < snapshot.length) {
+    lines.splice(
+      closeIndex + 1,
+      snapshot.length - afterCloseOffset,
+      ...snapshot.slice(afterCloseOffset)
+    )
+  }
   return { nextIndex: closeIndex + 1, mutated: true }
 }
 
@@ -364,7 +324,7 @@ const findBlockquoteHeaderAndPromotedIndex = (
     const afterQuote = lines[cursor]!.replace(/^\s*>\s?/, "")
     const stripped = afterQuote.trim()
     if (stripped) {
-      if (headerLineIndex < 0) {
+      if (headerLineIndex === -1) {
         headerLineIndex = hasCommonMarkCodeIndent(afterQuote) ? -2 : cursor
         firstContent = hasCommonMarkCodeIndent(afterQuote) ? "" : stripped
       } else if (promotedLineIndex === -1) {
@@ -383,18 +343,12 @@ const shouldMaskBlockquoteTailLine = (
   refreshed: CommonMarkBlockRanges,
   lastLine: string,
   lastLineStart: number
-): boolean => {
-  const lastLineEnd = lastLineStart + Math.max(1, lastLine.length)
-  if (overlapsSortedRanges(refreshed.codeBlockRanges, lastLineStart, lastLineEnd)) {
-    return false
-  }
-  const afterQuote = lastLine.replace(/^\s*>\s?/, "")
-  const firstContentOffset = lastLineStart + (lastLine.length - afterQuote.trimStart().length)
-  if (overlapsSortedRanges(refreshed.commentRanges, firstContentOffset, firstContentOffset + 1)) {
-    return false
-  }
-  return !overlapsSortedRanges(refreshed.commentRanges, lastLineEnd, lastLineEnd + 1)
-}
+): boolean =>
+  !overlapsSortedRanges(
+    refreshed.codeBlockRanges,
+    lastLineStart,
+    lastLineStart + Math.max(1, lastLine.length)
+  )
 
 const tryMaskBlockquoteCalloutAt = (
   lines: string[],
@@ -581,6 +535,3 @@ export const parseCommonMarkBlockRanges = (content: string): CommonMarkBlockRang
 
 export const collectCommonMarkCodeBlockRanges = (content: string): MathSpanRange[] =>
   parseCommonMarkBlockRanges(content).codeBlockRanges
-
-export const collectCommonMarkCodeAndCommentRanges = (content: string): MathSpanRange[] =>
-  parseCommonMarkBlockRanges(content).codeAndCommentRanges

@@ -1,4 +1,4 @@
-import { isDedicatedFormulaBoundaryLine } from "./renderingDirectiveModel"
+import { isDedicatedFormulaBoundaryLine, isDedicatedMathCloseLine, resolveDedicatedMathOpen } from "./renderingDirectiveModel"
 export type MathSpanRange = { from: number; to: number }
 
 export type ScannedPandocMathToken = {
@@ -380,7 +380,8 @@ const matchDedicatedDisplayMathToken = (
   text: string,
   openIndex: number,
   openQuoteDepth: number,
-  excludedRanges: readonly MathSpanRange[]
+  excludedRanges: readonly MathSpanRange[],
+  allowAsideIndent = false
 ): ScannedPandocMathToken | null => {
   const openLineEnd = findLineEndOffset(text, openIndex)
   let cursor = Math.min(text.length, openLineEnd + 1)
@@ -389,15 +390,10 @@ const matchDedicatedDisplayMathToken = (
   while (cursor < limit) {
     const lineEnd = findLineEndOffset(text, cursor)
     const line = text.slice(cursor, lineEnd)
-    const stripped = stripLeadingQuoteMarkers(line, openQuoteDepth)
-    if (stripped === null || parseOpeningCodeFence(line) !== null || isDedicatedFormulaBoundaryLine(text, openIndex, stripped)) return null
-    const parsedClose = parseDedicatedLineQuoteDepth(line)
-    if (
-      parsedClose &&
-      parsedClose.quoteDepth === openQuoteDepth &&
-      parsedClose.rest.startsWith("$$") &&
-      parsedClose.rest.slice(2).trim() === ""
-    ) {
+    const normalizedLine = allowAsideIndent ? line.trimStart() : line
+    const stripped = stripLeadingQuoteMarkers(normalizedLine, openQuoteDepth)
+    if (stripped === null || parseOpeningCodeFence(normalizedLine) !== null || isDedicatedFormulaBoundaryLine(text, openIndex, stripped, openQuoteDepth, excludedRanges)) return null
+    if (isDedicatedMathCloseLine(line, openQuoteDepth, allowAsideIndent)) {
       return tryResolveDedicatedMathAtCloseLine(text, openIndex, cursor, lineEnd, interiorLines, openQuoteDepth, excludedRanges)
     }
     interiorLines.push(stripped)
@@ -470,12 +466,12 @@ export const scanPandocDisplayMathAt = (
   const openLineStart = findLineStartOffset(text, openIndex)
   const openLineEnd = findLineEndOffset(text, openIndex)
   const openLine = text.slice(openLineStart, openLineEnd)
-  const parsedOpen = parseDedicatedLineQuoteDepth(openLine)
+  const parsedOpen = resolveDedicatedMathOpen(text, openIndex, openLine, excluded)
   const isAtStrippedLineStart =
     parsedOpen !== null && openIndex === openLineStart + (openLine.length - parsedOpen.rest.length)
   if (isAtStrippedLineStart && !text.slice(openIndex + 2, openLineEnd).includes("$")) {
     if (singleLineOnly || parsedOpen.rest.slice(2).trim() !== "") return null
-    return matchDedicatedDisplayMathToken(text, openIndex, parsedOpen.quoteDepth, excluded)
+    return matchDedicatedDisplayMathToken(text, openIndex, parsedOpen.quoteDepth, excluded, parsedOpen.allowAsideIndent)
   }
   const closePos = findClosingDoubleDollarOffset(text, openIndex, singleLineOnly, excluded)
   if (closePos < 0) return null
