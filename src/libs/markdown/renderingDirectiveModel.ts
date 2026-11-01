@@ -13,7 +13,7 @@ export type PendingDirectiveMetadata = {
   attrs: Record<string, unknown>
 }
 
-const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
+export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 
 export const extractAsideOpenTail = (line: string): string | null => {
@@ -34,6 +34,76 @@ export const stripClosingAsideTag = (value: string): string | null => {
 
 export const isDedicatedFormulaFenceLine = (line: string): boolean =>
   !hasCommonMarkCodeIndent(line) && line.trim() === "$$"
+
+export const extractPromotedHeadingTitle = (trimmedLine: string): string | null => {
+  let hashCount = 0
+  while (hashCount < trimmedLine.length && trimmedLine.codePointAt(hashCount) === 35) {
+    hashCount += 1
+  }
+  if (hashCount < 1 || hashCount > 6) return null
+  const afterHash = trimmedLine[hashCount]
+  if (!afterHash || !SINGLE_SPACE_CHAR_PATTERN.test(afterHash)) return null
+  const title = trimmedLine.slice(hashCount).trim()
+  return title.length > 0 ? title : null
+}
+
+const stripOptionalListBulletPrefix = (trimmedLine: string): string => {
+  const first = trimmedLine[0]
+  if (first !== "-" && first !== "*" && first !== "+") return trimmedLine
+  const second = trimmedLine[1]
+  if (!second || !SINGLE_SPACE_CHAR_PATTERN.test(second)) return trimmedLine
+  return trimmedLine.slice(2).trimStart()
+}
+
+export const extractPromotedBoldTitle = (trimmedLine: string): string | null => {
+  const candidate = stripOptionalListBulletPrefix(trimmedLine)
+  let marker = ""
+  if (candidate.startsWith("**")) marker = "**"
+  else if (candidate.startsWith("__")) marker = "__"
+  if (!marker) return null
+
+  const closeIndex = candidate.indexOf(marker, 3)
+  if (closeIndex < 0 || candidate.slice(closeIndex + 2).trim().length > 0) return null
+  const promotedTitle = candidate.slice(2, closeIndex).trim()
+  return promotedTitle.length > 0 ? promotedTitle : null
+}
+
+export const isPromotedCalloutTitleLine = (trimmedLine: string): boolean =>
+  (extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)) !== null
+
+export const findPromotedCalloutTitleLineIndex = (
+  lines: readonly string[],
+  startIndex: number,
+  endExclusive: number
+): number => {
+  for (let index = startIndex; index < endExclusive; index += 1) {
+    const trimmed = lines[index]!.trim()
+    if (!trimmed) continue
+    return isPromotedCalloutTitleLine(trimmed) ? index : -1
+  }
+  return -1
+}
+
+export const extractPromotedCalloutTitle = (
+  bodyLines: string[]
+): { title: string; bodyLines: string[] } => {
+  const firstBodyLineIndex = bodyLines.findIndex((row) => row.trim().length > 0)
+  if (firstBodyLineIndex < 0) {
+    return { title: "", bodyLines }
+  }
+
+  const trimmedLine = bodyLines[firstBodyLineIndex]!.trim()
+  const promoted =
+    extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)
+  if (!promoted) {
+    return { title: "", bodyLines }
+  }
+
+  return {
+    title: promoted,
+    bodyLines: bodyLines.filter((_, index) => index !== firstBodyLineIndex),
+  }
+}
 
 export const parseCustomDirectiveHeader = (
   trimmedLine: string

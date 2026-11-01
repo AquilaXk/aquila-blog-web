@@ -854,5 +854,27 @@ test.describe("wave6 round4 public markdown regressions", () => {
     expect(toggleFormulaThenCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
 
     expect(scanPandocDisplayMathAt("Paragraph with $$x + 1\n$$\ny = 1\n$$", 15)).toBeNull()
+
+    const toggleWithInnerBookmarkHtml = renderMarkdownHtml(
+      ":::toggle First\n:::bookmark https://example.com\n:::\n\n```js\necho <b>$HOME</b>\n```\n\n:::toggle Second\nBody\n:::"
+    )
+    expect(toggleWithInnerBookmarkHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(toggleWithInnerBookmarkHtml).toContain("Second")
+    expect(
+      renderMarkdownHtml(":::toggle Solution\n$$\n<!--\nx = 1\n$$\n:::\n    echo <b>$HOME</b>")
+    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(
+      renderMarkdownHtml(":::callout info\n**Promoted Title**\n    echo <b>$HOME</b>\n:::")
+    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(
+      renderMarkdownHtml(
+        "Math $x + 1$\n\n> [!NOTE] Title\n> Intro paragraph\n> **Section heading**\n>     <b>lazy continuation, not code</b>"
+      )
+    ).toContain("<strong>lazy continuation, not code</strong>")
+    expect(
+      renderMarkdownHtml(
+        "> [!NOTE] Title\n> Paragraph line inside callout\n>     lazy continuation inside callout\n    echo <b>$HOME</b>"
+      )
+    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
   })
 })

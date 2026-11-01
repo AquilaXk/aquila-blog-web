@@ -6,6 +6,7 @@ import {
   buildCustomDirectiveSegment,
   collectTripleColonBody,
   extractAsideOpenTail,
+  extractPromotedCalloutTitle,
   isDedicatedFormulaFenceLine,
   parseCardMetadataComment,
   parseCustomDirectiveHeader,
@@ -29,7 +30,6 @@ type ParsedCalloutHeader = {
   defaultCollapsed?: boolean
 }
 
-const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 const CALLOUT_DIRECTIVE_OPEN_PATTERN = /^:::callout(?:[ \t\r]|$)/
 const TOGGLE_DIRECTIVE_OPEN_PATTERN = /^:::toggle(?:[ \t\r]|$)/
 const LEADING_SPACE_OR_TAB_PATTERN = /^[ \t]/
@@ -135,58 +135,6 @@ const parseAsideCalloutHeader = (raw: string): ParsedCalloutHeader | null => {
            defaultCollapsed: blockquoteToken.defaultCollapsed,
          }
       : {}),
-  }
-}
-
-const extractPromotedHeadingTitle = (trimmedLine: string): string | null => {
-  let hashCount = 0
-  while (hashCount < trimmedLine.length && trimmedLine.codePointAt(hashCount) === 35) {
-    hashCount += 1
-  }
-  if (hashCount < 1 || hashCount > 6) return null
-  const afterHash = trimmedLine[hashCount]
-  if (!afterHash || !SINGLE_SPACE_CHAR_PATTERN.test(afterHash)) return null
-  const title = trimmedLine.slice(hashCount).trim()
-  return title.length > 0 ? title : null
-}
-
-const stripOptionalListBulletPrefix = (trimmedLine: string): string => {
-  const first = trimmedLine[0]
-  if (first !== "-" && first !== "*" && first !== "+") return trimmedLine
-  const second = trimmedLine[1]
-  if (!second || !SINGLE_SPACE_CHAR_PATTERN.test(second)) return trimmedLine
-  return trimmedLine.slice(2).trimStart()
-}
-
-const extractPromotedBoldTitle = (trimmedLine: string): string | null => {
-  const candidate = stripOptionalListBulletPrefix(trimmedLine)
-  let marker = ""
-  if (candidate.startsWith("**")) marker = "**"
-  else if (candidate.startsWith("__")) marker = "__"
-  if (!marker) return null
-
-  const closeIndex = candidate.indexOf(marker, 3)
-  if (closeIndex < 0 || candidate.slice(closeIndex + 2).trim().length > 0) return null
-  const promotedTitle = candidate.slice(2, closeIndex).trim()
-  return promotedTitle.length > 0 ? promotedTitle : null
-}
-
-const extractPromotedCalloutTitle = (bodyLines: string[]) => {
-  const firstBodyLineIndex = bodyLines.findIndex((row) => row.trim().length > 0)
-  if (firstBodyLineIndex < 0) {
-    return { title: "", bodyLines }
-  }
-
-  const trimmedLine = bodyLines[firstBodyLineIndex]!.trim()
-  const promoted =
-    extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)
-  if (!promoted) {
-    return { title: "", bodyLines }
-  }
-
-  return {
-    title: promoted,
-    bodyLines: bodyLines.filter((_, index) => index !== firstBodyLineIndex),
   }
 }
 
