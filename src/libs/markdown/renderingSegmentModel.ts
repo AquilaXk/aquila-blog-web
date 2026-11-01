@@ -7,7 +7,6 @@ import {
   collectTripleColonBody,
   extractAsideOpenTail,
   extractPromotedCalloutTitle,
-  isAsideCloseLineExcluded,
   isDedicatedFormulaFenceLine,
   isLineStartInCommentRanges,
   isTopLevelFormulaStopLine,
@@ -188,21 +187,16 @@ const scanAsideClosingLines = (
   startIndex: number,
   bodyLines: string[],
   lineStarts: readonly number[],
-  codeBlockRanges: readonly MathSpanRange[],
-  commentRanges: readonly MathSpanRange[]
+  asideRanges: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } | null => {
+  const openStart = lineStarts[startIndex]!
+  const matchedRange = asideRanges.find((range) => range.from === openStart)
+  if (!matchedRange) return null
   for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
     const currentLine = lines[cursor]!
-    const lineStart = lineStarts[cursor]!
-    const inExcluded = isAsideCloseLineExcluded(
-      codeBlockRanges,
-      commentRanges,
-      currentLine,
-      lineStart
-    )
-    const closedLine = inExcluded ? null : stripClosingAsideTag(currentLine)
-    if (closedLine !== null) {
-      if (closedLine.length > 0) bodyLines.push(closedLine)
+    if (lineStarts[cursor]! === matchedRange.to) {
+      const closedLine = stripClosingAsideTag(currentLine)
+      if (closedLine && closedLine.length > 0) bodyLines.push(closedLine)
       return { closedIndex: cursor, bodyLines }
     }
     bodyLines.push(currentLine)
@@ -215,43 +209,27 @@ const collectAsideBodyLines = (
   startIndex: number,
   openingTail: string,
   lineStarts: readonly number[],
-  codeBlockRanges: readonly MathSpanRange[],
-  commentRanges: readonly MathSpanRange[]
+  asideRanges: readonly MathSpanRange[]
 ): { closedIndex: number; bodyLines: string[] } | null => {
   const inlineClosed = stripClosingAsideTag(openingTail)
   if (inlineClosed !== null) {
     return { closedIndex: startIndex, bodyLines: inlineClosed.length > 0 ? [inlineClosed] : [] }
   }
   const bodyLines = openingTail.length > 0 ? [openingTail] : []
-  return scanAsideClosingLines(
-    lines,
-    startIndex,
-    bodyLines,
-    lineStarts,
-    codeBlockRanges,
-    commentRanges
-  )
+  return scanAsideClosingLines(lines, startIndex, bodyLines, lineStarts, asideRanges)
 }
 
 const tryParseAsideBlock = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[],
-  codeBlockRanges: readonly MathSpanRange[],
-  commentRanges: readonly MathSpanRange[]
+  asideRanges: readonly MathSpanRange[]
 ): { nextIndex: number; segment: MarkdownSegment | null; fallbackLines: string[] } | null => {
   const line = lines[startIndex]!
   const openingTail = extractAsideOpenTail(line)
   if (openingTail === null) return null
 
-  const collected = collectAsideBodyLines(
-    lines,
-    startIndex,
-    openingTail,
-    lineStarts,
-    codeBlockRanges,
-    commentRanges
-  )
+  const collected = collectAsideBodyLines(lines, startIndex, openingTail, lineStarts, asideRanges)
   if (!collected) {
     return { nextIndex: startIndex + 1, segment: null, fallbackLines: [line] }
   }
@@ -329,6 +307,7 @@ type SegmentConsumerContext = {
   lineStarts: readonly number[]
   codeBlockRanges: readonly MathSpanRange[]
   commentRanges: readonly MathSpanRange[]
+  asideRanges: readonly MathSpanRange[]
   pendingDirectiveMetadata: PendingDirectiveMetadata | null
   flushAndPush: (segment: MarkdownSegment) => void
   markdownBuffer: string[]
@@ -456,13 +435,7 @@ const tryConsumeAsideAt = (
   index: number,
   ctx: SegmentConsumerContext
 ): SegmentLineStepResult | null => {
-  const asideStep = tryParseAsideBlock(
-    ctx.lines,
-    index,
-    ctx.lineStarts,
-    ctx.codeBlockRanges,
-    ctx.commentRanges
-  )
+  const asideStep = tryParseAsideBlock(ctx.lines, index, ctx.lineStarts, ctx.asideRanges)
   if (!asideStep) return null
   if (asideStep.segment) ctx.flushAndPush(asideStep.segment)
   else ctx.markdownBuffer.push(asideStep.fallbackLines.join("\n"))
@@ -486,7 +459,7 @@ const tryConsumeStructuredBlockAt = (
 
 export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
   const lines = content.split("\n")
-  const { codeBlockRanges, commentRanges, listRanges } =
+  const { codeBlockRanges, commentRanges, listRanges, asideRanges } =
     parseCommonMarkBlockRanges(content)
   let nextLineStart = 0
   const lineStarts = lines.map((entry) => {
@@ -546,6 +519,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
       lineStarts,
       codeBlockRanges,
       commentRanges,
+      asideRanges,
       pendingDirectiveMetadata,
       flushAndPush,
       markdownBuffer,

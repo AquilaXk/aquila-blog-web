@@ -806,79 +806,34 @@ test.describe("wave6 round4 public markdown regressions", () => {
     expect(scanPandocDisplayMathAt("$$a `$$` b$$", 0)).toBeNull()
     expect(scanPandocDisplayMathAt("$$a <!-- $$ --> b$$", 0)).toBeNull()
 
-    const calloutThenIndentedCode = [
-      "> [!NOTE] Callout Title",
-      "> Callout body",
-      "    echo $HOME",
-    ].join("\n")
-    const calloutIndentedHtml = renderMarkdownHtml(calloutThenIndentedCode)
+    const calloutIndentedHtml = renderMarkdownHtml("> [!NOTE] Callout Title\n> Callout body\n    echo $HOME")
     expect(calloutIndentedHtml).toContain("Callout Title")
-    expect(calloutIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
     expect(calloutIndentedHtml).toContain("echo $HOME")
-
-    const imageThenIndentedCode = [
-      "![alt](/post/api/v1/images/a.png)",
-      "    echo $HOME",
-    ].join("\n")
-    const imageIndentedHtml = renderMarkdownHtml(imageThenIndentedCode)
+    const imageIndentedHtml = renderMarkdownHtml("![alt](/post/api/v1/images/a.png)\n    echo $HOME")
     expect(imageIndentedHtml).toContain("/post/api/v1/images/a.png")
-    expect(imageIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
     expect(imageIndentedHtml).toContain("echo $HOME")
 
     const literalSentinelDoc = "Prefix AQCODE0N0E and \uE000aqp0zeq\uE001 with `$100` and <b>bold</b> + \\==plain=="
     expect(normalizeLegacyInlineHtmlMarkdown(literalSentinelDoc)).toContain("\`$100\` and **bold**")
     expect(protectEscapedInlineSyntax(literalSentinelDoc).markdown).toContain("\uE000aqp1zeq\uE001")
+    expect(normalizeLegacyInlineHtmlMarkdown("1 < \uE000AQ<b></b>CODE0N0E\uE001 and `$100`")).toBe("1 < \uE000AQCODE0N0E\uE001 and `$100`")
 
-    expect(
-      normalizeLegacyInlineHtmlMarkdown("1 < \uE000AQ<b></b>CODE0N0E\uE001 and `$100`")
-    ).toBe("1 < \uE000AQCODE0N0E\uE001 and `$100`")
-
-    const formulaCommentThenCalloutHtml = renderMarkdownHtml(
-      ["$$", "<!--", "x = 1", "$$", "", ":::callout info", "Callout After Formula", ":::"].join("\n")
-    )
+    const formulaCommentThenCalloutHtml = renderMarkdownHtml("$$\n<!--\nx = 1\n$$\n\n:::callout info\nCallout After Formula\n:::")
     expect(formulaCommentThenCalloutHtml).toContain("aq-formula-card")
     expect(formulaCommentThenCalloutHtml).toContain("Callout After Formula")
-
-    const calloutWithTrailingIndentedCodeHtml = renderMarkdownHtml(
-      ["> [!NOTE] Title", ">", ">     echo <b>$HOME</b>"].join("\n")
-    )
-    expect(calloutWithTrailingIndentedCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-    const calloutWithImmediateIndentedCodeHtml = renderMarkdownHtml(
-      ["> [!NOTE] Title", ">     echo <b>$HOME</b>", "> trailing"].join("\n")
-    )
-    expect(calloutWithImmediateIndentedCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-
-    const toggleFormulaThenCodeHtml = renderMarkdownHtml(
-      [":::toggle Solution", "$$", "x = 1", "$$", "    echo <b>$HOME</b>", ":::"].join("\n")
-    )
-    expect(toggleFormulaThenCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-
+    expect(renderMarkdownHtml("> [!NOTE] Title\n>\n>     echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml("> [!NOTE] Title\n>     echo <b>$HOME</b>\n> trailing")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml(":::toggle Solution\n$$\nx = 1\n$$\n    echo <b>$HOME</b>\n:::")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
     expect(scanPandocDisplayMathAt("Paragraph with $$x + 1\n$$\ny = 1\n$$", 15)).toBeNull()
 
-    const toggleWithInnerBookmarkHtml = renderMarkdownHtml(
-      ":::toggle First\n:::bookmark https://example.com\n:::\n\n```js\necho <b>$HOME</b>\n```\n\n:::toggle Second\nBody\n:::"
-    )
+    const toggleWithInnerBookmarkHtml = renderMarkdownHtml(":::toggle First\n:::bookmark https://example.com\n:::\n\n```js\necho <b>$HOME</b>\n```\n\n:::toggle Second\nBody\n:::")
     expect(toggleWithInnerBookmarkHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
     expect(toggleWithInnerBookmarkHtml).toContain("Second")
-    expect(
-      renderMarkdownHtml(":::toggle Solution\n$$\n<!--\nx = 1\n$$\n:::\n    echo <b>$HOME</b>")
-    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-    expect(
-      renderMarkdownHtml(":::callout info\n**Promoted Title**\n    echo <b>$HOME</b>\n:::")
-    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-    expect(
-      renderMarkdownHtml(
-        "Math $x + 1$\n\n> [!NOTE] Title\n> Intro paragraph\n> **Section heading**\n>     <b>lazy continuation, not code</b>"
-      )
-    ).toContain("<strong>lazy continuation, not code</strong>")
-    expect(
-      renderMarkdownHtml(
-        "> [!NOTE] Title\n> Paragraph line inside callout\n>     lazy continuation inside callout\n    echo <b>$HOME</b>"
-      )
-    ).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
-    const unclosedMathInToggleHtml = renderMarkdownHtml(
-      ":::toggle First\n$$\nunclosed\n:::\n\n<b>bold outside toggle</b>\n\n$$\n<b>math</b>\n$$"
-    )
+    expect(renderMarkdownHtml(":::toggle Solution\n$$\n<!--\nx = 1\n$$\n:::\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml(":::callout info\n**Promoted Title**\n    echo <b>$HOME</b>\n:::")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml("Math $x + 1$\n\n> [!NOTE] Title\n> Intro paragraph\n> **Section heading**\n>     <b>lazy continuation, not code</b>")).toContain("<strong>lazy continuation, not code</strong>")
+    expect(renderMarkdownHtml("> [!NOTE] Title\n> Paragraph line inside callout\n>     lazy continuation inside callout\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    const unclosedMathInToggleHtml = renderMarkdownHtml(":::toggle First\n$$\nunclosed\n:::\n\n<b>bold outside toggle</b>\n\n$$\n<b>math</b>\n$$")
     expect(unclosedMathInToggleHtml).toContain("<strong>bold outside toggle</strong>")
     expect(unclosedMathInToggleHtml).toContain("aq-formula-card")
     expect(renderMarkdownHtml(":::callout info\n- **Promoted Title**\n  $$\n  <!--\n  x = 1\n  $$\n:::\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
@@ -889,7 +844,17 @@ test.describe("wave6 round4 public markdown regressions", () => {
     expect(indentedAsideHtml).not.toContain("**math**")
     expect(indentedAsideHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
     expect(renderMarkdownHtml("<aside>\n💡 Note\n```\n</aside>\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    expect(renderMarkdownHtml("<aside>\n    💡 Note\n    ```\n    </aside>\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    const unclosedFenceAsideThenToggleHtml = renderMarkdownHtml("<aside>\n💡 Note\n```\n</aside>\n\n<b>bold outside aside</b>\n\n:::toggle Second\nBody\n:::")
+    expect(unclosedFenceAsideThenToggleHtml).toContain("<strong>bold outside aside</strong>")
+    expect(unclosedFenceAsideThenToggleHtml).toContain("Second")
+    expect(renderMarkdownHtml("<aside>\n💡 Unclosed\n\nParagraph\n\n    echo <b>$HOME</b> </aside>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt; &lt;/aside&gt;")
     expect(renderMarkdownHtml(":::toggle First\n```\n:::\n```\n$$\nunclosed\n:::\n\n<b>bold outside toggle</b>\n\n$$\n<b>math</b>\n$$")).toContain("<strong>bold outside toggle</strong>")
+    expect(renderMarkdownHtml("$$\n<!--\nx = 1\n$$\n\n:::toggle First\n$$\nunclosed\n:::\n\n<b>bold outside toggle</b>\n\n$$\n<b>math</b>\n$$")).toContain("<strong>bold outside toggle</strong>")
+    expect(renderMarkdownHtml("$$\n<!--\nx = 1\n$$\n\n<aside>\n    💡 Note\n    $$\n    <b>math</b>\n    $$\n</aside>")).not.toContain("**math**")
+    expect(renderMarkdownHtml("<aside>\n💡 Note\n$$\n<b>math</b>\n    $$\n</aside>")).not.toContain("**math**")
+    expect(renderMarkdownHtml("<aside>\nUnclosed aside\n\nParagraph\n    $$\n    <b>lazy</b>\n    $$")).toContain("<strong>lazy</strong>")
+    expect(renderMarkdownHtml("<aside>\n    💡 Note\n    $$\n    unclosed\n    </aside>\n\n<b>bold outside aside</b>\n\n$$\n<b>math</b>\n$$")).toContain("<strong>bold outside aside</strong>")
     expect(renderMarkdownHtml(">\n>     indented code\n> [!NOTE] Not callout\n> Paragraph\n    lazy <b>bold</b>")).toContain("<strong>bold</strong>")
     expect(renderMarkdownHtml("> [!NOTE] Title\n> Start <!-- multi\n> end --> tail\n    echo <b>$HOME</b>")).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
   })

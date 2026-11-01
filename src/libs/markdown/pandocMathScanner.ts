@@ -392,7 +392,7 @@ const matchDedicatedDisplayMathToken = (
     const line = text.slice(cursor, lineEnd)
     const normalizedLine = allowAsideIndent ? line.trimStart() : line
     const stripped = stripLeadingQuoteMarkers(normalizedLine, openQuoteDepth)
-    if (stripped === null || parseOpeningCodeFence(normalizedLine) !== null || isDedicatedFormulaBoundaryLine(text, openIndex, stripped, openQuoteDepth, excludedRanges)) return null
+    if (stripped === null || parseOpeningCodeFence(normalizedLine) !== null || isDedicatedFormulaBoundaryLine(text, cursor, lineEnd, stripped, openQuoteDepth)) return null
     if (isDedicatedMathCloseLine(line, openQuoteDepth, allowAsideIndent)) {
       return tryResolveDedicatedMathAtCloseLine(text, openIndex, cursor, lineEnd, interiorLines, openQuoteDepth, excludedRanges)
     }
@@ -466,7 +466,7 @@ export const scanPandocDisplayMathAt = (
   const openLineStart = findLineStartOffset(text, openIndex)
   const openLineEnd = findLineEndOffset(text, openIndex)
   const openLine = text.slice(openLineStart, openLineEnd)
-  const parsedOpen = resolveDedicatedMathOpen(text, openIndex, openLine, excluded)
+  const parsedOpen = resolveDedicatedMathOpen(text, openIndex, openLine)
   const isAtStrippedLineStart =
     parsedOpen !== null && openIndex === openLineStart + (openLine.length - parsedOpen.rest.length)
   if (isAtStrippedLineStart && !text.slice(openIndex + 2, openLineEnd).includes("$")) {
