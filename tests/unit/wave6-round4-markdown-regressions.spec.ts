@@ -828,5 +828,31 @@ test.describe("wave6 round4 public markdown regressions", () => {
     const literalSentinelDoc = "Prefix AQCODE0N0E and \uE000aqp0zeq\uE001 with `$100` and <b>bold</b> + \\==plain=="
     expect(normalizeLegacyInlineHtmlMarkdown(literalSentinelDoc)).toContain("\`$100\` and **bold**")
     expect(protectEscapedInlineSyntax(literalSentinelDoc).markdown).toContain("\uE000aqp1zeq\uE001")
+
+    expect(
+      normalizeLegacyInlineHtmlMarkdown("1 < \uE000AQ<b></b>CODE0N0E\uE001 and `$100`")
+    ).toBe("1 < \uE000AQCODE0N0E\uE001 and `$100`")
+
+    const formulaCommentThenCalloutHtml = renderMarkdownHtml(
+      ["$$", "<!--", "x = 1", "$$", "", ":::callout info", "Callout After Formula", ":::"].join("\n")
+    )
+    expect(formulaCommentThenCalloutHtml).toContain("aq-formula-card")
+    expect(formulaCommentThenCalloutHtml).toContain("Callout After Formula")
+
+    const calloutWithTrailingIndentedCodeHtml = renderMarkdownHtml(
+      ["> [!NOTE] Title", ">", ">     echo <b>$HOME</b>"].join("\n")
+    )
+    expect(calloutWithTrailingIndentedCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+    const calloutWithImmediateIndentedCodeHtml = renderMarkdownHtml(
+      ["> [!NOTE] Title", ">     echo <b>$HOME</b>", "> trailing"].join("\n")
+    )
+    expect(calloutWithImmediateIndentedCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+
+    const toggleFormulaThenCodeHtml = renderMarkdownHtml(
+      [":::toggle Solution", "$$", "x = 1", "$$", "    echo <b>$HOME</b>", ":::"].join("\n")
+    )
+    expect(toggleFormulaThenCodeHtml).toContain("echo &lt;b&gt;$HOME&lt;/b&gt;")
+
+    expect(scanPandocDisplayMathAt("Paragraph with $$x + 1\n$$\ny = 1\n$$", 15)).toBeNull()
   })
 })

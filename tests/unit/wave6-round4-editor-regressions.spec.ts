@@ -733,7 +733,13 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
       { name: "MarkdownMathWidget", from: 16, to: 28 },
     ])
 
-    const selectiveReparseDoc = ["$a `b$ and $c` d$", "", "**bold** and $z + 1$"].join("\n")
+    const astralPoisonedDoc = ["$$", "`𝕏'", "$$", "Text `code`"].join("\n")
+    const astralSpecs = buildMarkdownLivePreviewDecorationSpecs(astralPoisonedDoc, [], false, "reading")
+    expect(astralSpecs.filter((s) => s.kind === "inline-code").map(({ from, to }) => ({ from, to }))).toEqual([
+      { from: 16, to: 22 },
+    ])
+
+        const selectiveReparseDoc = ["$a `b$ and $c` d$", "", "**bold** and $z + 1$"].join("\n")
     const selectiveBundle = getMarkdownLivePreviewBundle(selectiveReparseDoc)
     expect(selectiveBundle.mathSpecs.map((m) => m.math)).toEqual(["z + 1"])
     expect(selectiveBundle.entries.some((e) => e.kind === "strong")).toBe(true)

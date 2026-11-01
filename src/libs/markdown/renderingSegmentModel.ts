@@ -359,6 +359,7 @@ type SegmentLineStepResult = { nextIndex: number }
 type SegmentConsumerContext = {
   lines: readonly string[]
   lineStarts: readonly number[]
+  codeBlockRanges: readonly MathSpanRange[]
   codeAndCommentRanges: readonly MathSpanRange[]
   pendingDirectiveMetadata: PendingDirectiveMetadata | null
   flushAndPush: (segment: MarkdownSegment) => void
@@ -465,7 +466,7 @@ const tryConsumeFormulaBlockAt = (
     ctx.lines,
     index,
     ctx.lineStarts,
-    ctx.codeAndCommentRanges
+    ctx.codeBlockRanges
   )
   if (formulaResult.closedIndex >= 0) {
     ctx.flushAndPush({ type: "formula", formula: formulaResult.formula })
@@ -573,6 +574,7 @@ export const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
     const structuredStep = tryConsumeStructuredBlockAt(index, {
       lines,
       lineStarts,
+      codeBlockRanges,
       codeAndCommentRanges,
       pendingDirectiveMetadata,
       flushAndPush,

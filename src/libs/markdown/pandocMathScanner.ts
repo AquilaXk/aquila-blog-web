@@ -44,7 +44,7 @@ export const extractAlphaNumericOutsideAngles = (text: string): string => {
   for (let i = 0; i < text.length; i += 1) {
     const code = text.codePointAt(i) ?? 0
     if (code === 60) inAngle = true
-    else if (code === 62) inAngle = false
+    else if (code === 62 || code === 10 || code === 13 || code === 0xe000) inAngle = false
     else if (!inAngle && isAsciiAlphaNumericCode(code)) out += text[i]!
   }
   return out
@@ -135,8 +135,13 @@ export const parseOpeningCodeFence = (line: string): { markerCode: number; lengt
   return { markerCode: firstCode, length: runLen }
 }
 
+const isDedicatedMathFlowFenceLine = (line: string): boolean => {
+  const parsed = parseDedicatedLineQuoteDepth(line)
+  return parsed !== null && parsed.rest.startsWith("$$") && parsed.rest.slice(2).trim() === ""
+}
+
 const isMarkdownBlockBoundaryLine = (line: string): boolean => {
-  if (hasCommonMarkCodeIndent(line)) return true
+  if (hasCommonMarkCodeIndent(line) || isDedicatedMathFlowFenceLine(line)) return true
   const trimmed = line.trim()
   if (!trimmed) return true
   return (

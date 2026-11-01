@@ -248,13 +248,34 @@ export const collectMathReplacementSpecs = (
   return specs
 }
 
+const findFirstRangeEndingAfter = (ranges: readonly MathSpanRange[], from: number): number => {
+  let low = 0
+  let high = ranges.length - 1
+  let startIdx = ranges.length
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    if (ranges[mid]!.to > from) {
+      startIdx = mid
+      high = mid - 1
+    } else {
+      low = mid + 1
+    }
+  }
+  return startIdx
+}
+
 export const findFirstPoisoningMathSpec = (
   mathSpecs: readonly MathReplacementSpec[],
   literalRanges: readonly MathSpanRange[]
 ): MathReplacementSpec | null => {
   if (mathSpecs.length === 0 || literalRanges.length === 0) return null
   for (const spec of mathSpecs) {
-    for (const r of literalRanges) {
+    for (
+      let idx = findFirstRangeEndingAfter(literalRanges, spec.from);
+      idx < literalRanges.length;
+      idx += 1
+    ) {
+      const r = literalRanges[idx]!
       if (r.from >= spec.to) break
       if (r.from >= spec.from && r.to > spec.to) return spec
     }
@@ -263,9 +284,11 @@ export const findFirstPoisoningMathSpec = (
 }
 
 export const maskMathSpanPreservingOffsets = (markdown: string, spec: MathSpanRange): string => {
-  const inner = Array.from(markdown.slice(spec.from, spec.to), (ch) =>
-    ch === "\n" || ch === "\r" ? ch : "x"
-  ).join("")
+  let inner = ""
+  for (let i = spec.from; i < spec.to; i += 1) {
+    const ch = markdown[i]!
+    inner += ch === "\n" || ch === "\r" ? ch : "x"
+  }
   return markdown.slice(0, spec.from) + inner + markdown.slice(spec.to)
 }
 
@@ -464,22 +487,6 @@ export const classifySyntaxNodeAgainstMath = (
 const REPLACE_PLAN_SPEC_KINDS = new Set([
   "hide-mark", "horizontal-rule", "task", "list-marker", "wikilink", "quote-mark",
 ])
-
-const findFirstRangeEndingAfter = (ranges: readonly MathSpanRange[], from: number): number => {
-  let low = 0
-  let high = ranges.length - 1
-  let startIdx = ranges.length
-  while (low <= high) {
-    const mid = (low + high) >>> 1
-    if (ranges[mid]!.to > from) {
-      startIdx = mid
-      high = mid - 1
-    } else {
-      low = mid + 1
-    }
-  }
-  return startIdx
-}
 
 export const isLivePlanSpecBlockedByReplacedRanges = (
   markdown: string,

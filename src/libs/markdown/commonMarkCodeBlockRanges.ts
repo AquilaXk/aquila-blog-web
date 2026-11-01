@@ -1,7 +1,7 @@
 import remarkGfm from "remark-gfm"
 import remarkParse from "remark-parse"
 import { unified } from "unified"
-import { getCallout, resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "./calloutRegistry"
+import { resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "./calloutRegistry"
 import {
   hasCommonMarkCodeIndent,
   mergeSortedSpanRanges,
@@ -38,6 +38,7 @@ type CommonMarkAstNode = {
 const SUPPORTED_COLON_DIRECTIVE_PATTERN = /^:::(?:callout|toggle)(?:[ \t\r]|$)/
 const LEADING_SPACE_OR_TAB_PATTERN = /^[ \t]/
 const BLOCKQUOTE_CALLOUT_TOKEN_PATTERN = /^\[!([A-Za-z0-9_-]+)\]([+-])?/
+const PROMOTED_BOLD_TITLE_PATTERN = /^(?:[-+*][ \t]+)?(?:\*\*[^*]+\*\*|__[^_]+__)$/
 const MAX_BLOCK_RANGE_CACHE_ENTRIES = 8
 const EMPTY_BLOCK_RANGES: CommonMarkBlockRanges = {
   codeBlockRanges: [],
@@ -49,12 +50,6 @@ const EMPTY_BLOCK_RANGES: CommonMarkBlockRanges = {
 const commonMarkProcessor = unified().use(remarkParse).use(remarkGfm).freeze()
 const blockRangeCache = new Map<string, CommonMarkBlockRanges>()
 
-const isSupportedContainerDirectiveHeader = (line: string): boolean => {
-  if (!line.startsWith(":::")) return false
-  if (SUPPORTED_COLON_DIRECTIVE_PATTERN.test(line)) return true
-  return parseCustomDirectiveHeader(line.trim()) !== null
-}
-
 const maskLineWithBreakAndHeading = (line: string): string => {
   const hasCr = line.endsWith("\r")
   const bodyLength = hasCr ? line.length - 1 : line.length
@@ -65,6 +60,19 @@ const maskLineWithBreakAndHeading = (line: string): string => {
     masked = "\n"
   }
   return hasCr ? `${masked}\r` : masked
+}
+
+const maskBlockquoteHeaderLine = (line: string): string => {
+  const hasCr = line.endsWith("\r")
+  const bodyLength = hasCr ? line.length - 1 : line.length
+  const gtIndex = line.indexOf(">")
+  if (gtIndex < 0) return maskLineWithBreakAndHeading(line)
+  const prefix = line.slice(0, gtIndex + 1)
+  const rem = bodyLength - prefix.length
+  let rest = ""
+  if (rem >= 2) rest = `#${" ".repeat(rem - 1)}`
+  else if (rem === 1) rest = "#"
+  return hasCr ? `${prefix}${rest}\r` : `${prefix}${rest}`
 }
 
 const maskLinesInRange = (lines: string[], startIndex: number, endIndex: number): void => {
@@ -137,18 +145,16 @@ const isValidBlockquoteCalloutLine = (rawLine: string): boolean => {
   const line = rawLine.trim()
   if (!line) return false
   const tokenMatch = BLOCKQUOTE_CALLOUT_TOKEN_PATTERN.exec(line)
-  if (tokenMatch) {
-    return Boolean(resolveCalloutBlockquote(tokenMatch[1] ?? ""))
-  }
+  if (tokenMatch) return Boolean(resolveCalloutBlockquote(tokenMatch[1] ?? ""))
   const unbracketed = line.replace(/^\[([^\s\]]+)\](?=\s|$)/, "$1")
-  return Boolean(resolveCalloutLegacyEmoji(unbracketed) ?? getCallout("info")) && Boolean(resolveCalloutLegacyEmoji(unbracketed))
+  return Boolean(resolveCalloutLegacyEmoji(unbracketed))
 }
 
 const findDedicatedFormulaCloseIndex = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[],
-  excludedRanges: readonly MathSpanRange[]
+  codeBlockRanges: readonly MathSpanRange[]
 ): number => {
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
@@ -156,7 +162,7 @@ const findDedicatedFormulaCloseIndex = (
     const lineStart = lineStarts[index]!
     if (
       isDedicatedFormulaFenceLine(line) &&
-      !overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))
+      !overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))
     ) {
       return index
     }
@@ -185,7 +191,7 @@ const tryMaskAsideBlockAt = (
   lines: string[],
   index: number,
   lineStarts: readonly number[]
-): { nextIndex: number; mutated: boolean } | null => {
+): { nextIndex: number; mutated: boolean; updatedRanges?: CommonMarkBlockRanges } | null => {
   const line = lines[index]!
   const openingTail = extractAsideOpenTail(line)
   if (openingTail === null) return null
@@ -201,149 +207,232 @@ const tryMaskAsideBlockAt = (
     return { nextIndex: index + 1, mutated: false }
   }
   lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
-  return { nextIndex: closeIndex + 1, mutated: true }
+  return { nextIndex: index + 1, mutated: true, updatedRanges: asideRanges }
+}
+
+const canMaskBlockquoteTailLine = (
+  line: string,
+  lineStart: number,
+  excludedRanges: readonly MathSpanRange[]
+): boolean => {
+  if (overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))) {
+    return false
+  }
+  const stripped = line.replace(/^\s*>\s?/, "")
+  if (hasCommonMarkCodeIndent(stripped) || parseOpeningCodeFence(stripped) !== null) {
+    return false
+  }
+  return !stripped.trimStart().startsWith("<!--")
+}
+
+const findBlockquoteHeaderAndPromotedIndex = (
+  lines: readonly string[],
+  startIndex: number
+): { cursor: number; headerLineIndex: number; promotedLineIndex: number; firstContent: string } => {
+  let cursor = startIndex
+  let headerLineIndex = -1
+  let promotedLineIndex = -1
+  let firstContent = ""
+  while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
+    const stripped = lines[cursor]!.replace(/^\s*>\s?/, "").trim()
+    if (stripped) {
+      if (headerLineIndex < 0) {
+        headerLineIndex = cursor
+        firstContent = stripped
+      } else if (promotedLineIndex < 0) {
+        promotedLineIndex = PROMOTED_BOLD_TITLE_PATTERN.test(stripped) ? cursor : -2
+      }
+    }
+    cursor += 1
+  }
+  return { cursor, headerLineIndex, promotedLineIndex, firstContent }
 }
 
 const tryMaskBlockquoteCalloutAt = (
   lines: string[],
-  startIndex: number
-): { nextIndex: number; mutated: boolean } => {
-  let cursor = startIndex
-  let firstContent = ""
-  while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
-    if (!firstContent) {
-      const stripped = lines[cursor]!.replace(/^\s*>\s?/, "").trim()
-      if (stripped) firstContent = stripped
-    }
-    cursor += 1
-  }
-  if (firstContent && isValidBlockquoteCalloutLine(firstContent)) {
-    lines[cursor - 1] = maskLineWithBreakAndHeading(lines[cursor - 1]!)
-    return { nextIndex: cursor, mutated: true }
-  }
-  return { nextIndex: cursor, mutated: false }
-}
-
-const tryMaskCustomBlockStepAt = (
-  lines: string[],
-  index: number,
+  startIndex: number,
   lineStarts: readonly number[],
   excludedRanges: readonly MathSpanRange[]
 ): { nextIndex: number; mutated: boolean } => {
-  const line = lines[index]!
-  const trimmed = line.trim()
-  if (trimmed.startsWith("![") && parseStandaloneMarkdownImageLine(trimmed)) {
-    lines[index] = maskLineWithBreakAndHeading(line)
-    return { nextIndex: index + 1, mutated: true }
+  const { cursor, headerLineIndex, promotedLineIndex, firstContent } =
+    findBlockquoteHeaderAndPromotedIndex(lines, startIndex)
+  if (headerLineIndex < 0 || !isValidBlockquoteCalloutLine(firstContent)) {
+    return { nextIndex: cursor, mutated: false }
   }
-  if (isSupportedContainerDirectiveHeader(line)) {
+  const lastQuoteIndex = cursor - 1
+  const hasFollowingNonBlankLine = cursor < lines.length && lines[cursor]!.trim().length > 0
+  if (lastQuoteIndex === headerLineIndex && hasFollowingNonBlankLine) {
+    lines[headerLineIndex] = maskLineWithBreakAndHeading(lines[headerLineIndex]!)
+    return { nextIndex: cursor, mutated: true }
+  }
+  lines[headerLineIndex] = maskBlockquoteHeaderLine(lines[headerLineIndex]!)
+  if (promotedLineIndex >= 0) {
+    lines[promotedLineIndex] = maskBlockquoteHeaderLine(lines[promotedLineIndex]!)
+  }
+  if (
+    hasFollowingNonBlankLine &&
+    lastQuoteIndex > headerLineIndex &&
+    canMaskBlockquoteTailLine(lines[lastQuoteIndex]!, lineStarts[lastQuoteIndex]!, excludedRanges)
+  ) {
+    lines[lastQuoteIndex] = maskLineWithBreakAndHeading(lines[lastQuoteIndex]!)
+  }
+  return { nextIndex: cursor, mutated: true }
+}
+
+const tryMaskColonDirectiveAt = (
+  lines: string[],
+  index: number,
+  line: string,
+  trimmed: string,
+  lineStarts: readonly number[],
+  excludedRanges: readonly MathSpanRange[]
+): { nextIndex: number; mutated: boolean } | null => {
+  if (!line.startsWith(":::")) return null
+  if (parseCustomDirectiveHeader(trimmed) !== null) {
     const closeIndex = findDirectiveCloseLineIndex(lines, index + 1, lineStarts, excludedRanges)
-    if (closeIndex >= 0) {
-      lines[index] = maskLineWithBreakAndHeading(line)
-      lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
-      return { nextIndex: closeIndex + 1, mutated: true }
-    }
-    return { nextIndex: index + 1, mutated: false }
-  }
-  if (isDedicatedFormulaFenceLine(line)) {
-    const closeIndex = findDedicatedFormulaCloseIndex(lines, index, lineStarts, excludedRanges)
     if (closeIndex >= 0) {
       maskLinesInRange(lines, index, closeIndex)
       return { nextIndex: closeIndex + 1, mutated: true }
     }
     return { nextIndex: index + 1, mutated: false }
   }
-  if (trimmed.startsWith(">")) {
-    return tryMaskBlockquoteCalloutAt(lines, index)
+  if (SUPPORTED_COLON_DIRECTIVE_PATTERN.test(line)) {
+    const closeIndex = findDirectiveCloseLineIndex(lines, index + 1, lineStarts, excludedRanges)
+    if (closeIndex >= 0) {
+      lines[index] = maskLineWithBreakAndHeading(line)
+      lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
+      return { nextIndex: index + 1, mutated: true }
+    }
+    return { nextIndex: index + 1, mutated: false }
+  }
+  return null
+}
+
+const tryMaskCustomBlockStepAt = (
+  lines: string[],
+  index: number,
+  lineStarts: readonly number[],
+  currentRanges: CommonMarkBlockRanges
+): { nextIndex: number; mutated: boolean; updatedRanges?: CommonMarkBlockRanges } => {
+  const line = lines[index]!
+  const trimmed = line.trim()
+  if (trimmed.startsWith("![") && parseStandaloneMarkdownImageLine(trimmed)) {
+    lines[index] = maskLineWithBreakAndHeading(line)
+    return { nextIndex: index + 1, mutated: true }
+  }
+  const colonStep = tryMaskColonDirectiveAt(
+    lines,
+    index,
+    line,
+    trimmed,
+    lineStarts,
+    currentRanges.codeAndCommentRanges
+  )
+  if (colonStep) return colonStep
+  if (isDedicatedFormulaFenceLine(line)) {
+    const closeIndex = findDedicatedFormulaCloseIndex(
+      lines,
+      index,
+      lineStarts,
+      currentRanges.codeBlockRanges
+    )
+    if (closeIndex >= 0) {
+      maskLinesInRange(lines, index, closeIndex)
+      return { nextIndex: closeIndex + 1, mutated: true }
+    }
+    return { nextIndex: index + 1, mutated: false }
   }
   if (trimmed.startsWith("<")) {
-    return tryMaskAsideBlockAt(lines, index, lineStarts) ?? { nextIndex: index + 1, mutated: false }
+    const asideStep = tryMaskAsideBlockAt(lines, index, lineStarts)
+    if (asideStep) return asideStep
+  }
+  if (trimmed.startsWith(">")) {
+    return tryMaskBlockquoteCalloutAt(lines, index, lineStarts, currentRanges.codeAndCommentRanges)
   }
   return { nextIndex: index + 1, mutated: false }
 }
 
-const hasCandidateCustomSegmentMarker = (markdown: string): boolean =>
-  markdown.includes(":::") ||
-  markdown.includes("$$") ||
-  markdown.includes("![") ||
-  markdown.includes(">") ||
-  markdown.toLowerCase().includes("<aside")
+const isExcludedTopLevelLine = (
+  line: string,
+  lineStart: number,
+  ranges: CommonMarkBlockRanges
+): boolean => {
+  const lineEnd = lineStart + Math.max(1, line.length)
+  if (overlapsSortedRanges(ranges.codeAndCommentRanges, lineStart, lineEnd)) return true
+  if (hasCommonMarkCodeIndent(line)) return true
+  return LEADING_SPACE_OR_TAB_PATTERN.test(line) && overlapsSortedRanges(ranges.listRanges, lineStart, lineEnd)
+}
+
+const needsFreshRangesForLine = (line: string): boolean => {
+  if (LEADING_SPACE_OR_TAB_PATTERN.test(line)) return true
+  const trimmed = line.trimStart()
+  return (
+    trimmed.startsWith(":::") ||
+    trimmed.startsWith("$$") ||
+    trimmed.startsWith("<") ||
+    trimmed.startsWith(">") ||
+    trimmed.startsWith("![")
+  )
+}
 
 const maskCustomSegmentsForCommonMark = (
-  markdown: string,
+  content: string,
   initialRanges: CommonMarkBlockRanges
-): { masked: string; mutated: boolean } => {
-  if (!hasCandidateCustomSegmentMarker(markdown)) {
-    return { masked: markdown, mutated: false }
-  }
-  const lines = markdown.split("\n")
+): CommonMarkBlockRanges => {
+  const lines = content.split("\n")
   const lineStarts = computeLineStarts(lines)
   let currentRanges = initialRanges
-  let mutated = false
+  let dirty = false
   let index = 0
 
   while (index < lines.length) {
     const line = lines[index]!
     const lineStart = lineStarts[index]!
-    const lineEnd = lineStart + Math.max(1, line.length)
-    const isSkipped =
-      overlapsSortedRanges(currentRanges.codeAndCommentRanges, lineStart, lineEnd) ||
-      hasCommonMarkCodeIndent(line) ||
-      (LEADING_SPACE_OR_TAB_PATTERN.test(line) &&
-        overlapsSortedRanges(currentRanges.listRanges, lineStart, lineEnd))
-    if (isSkipped) {
+    if (dirty && needsFreshRangesForLine(line)) {
+      currentRanges = parseRawCommonMarkRanges(lines.join("\n"))
+      dirty = false
+    }
+    if (isExcludedTopLevelLine(line, lineStart, currentRanges)) {
       index += 1
       continue
     }
-    const step = tryMaskCustomBlockStepAt(
-      lines,
-      index,
-      lineStarts,
-      currentRanges.codeAndCommentRanges
-    )
-    if (step.mutated) {
-      mutated = true
-      currentRanges = parseRawCommonMarkRanges(lines.join("\n"))
-    }
+    const step = tryMaskCustomBlockStepAt(lines, index, lineStarts, currentRanges)
+    if (step.updatedRanges) currentRanges = step.updatedRanges
+    if (step.mutated) dirty = true
     index = step.nextIndex
   }
 
-  return { masked: mutated ? lines.join("\n") : markdown, mutated }
+  return dirty ? parseRawCommonMarkRanges(lines.join("\n")) : currentRanges
 }
 
-export const parseCommonMarkBlockRanges = (markdown: string): CommonMarkBlockRanges => {
-  if (!markdown) return EMPTY_BLOCK_RANGES
+const hasPotentialCustomSegments = (content: string): boolean =>
+  content.includes(":::") ||
+  content.includes("$$") ||
+  content.includes("<aside") ||
+  content.includes("<ASIDE") ||
+  content.includes("![") ||
+  content.includes(">")
 
-  const cached = blockRangeCache.get(markdown)
-  if (cached) {
-    blockRangeCache.delete(markdown)
-    blockRangeCache.set(markdown, cached)
-    return cached
-  }
+export const parseCommonMarkBlockRanges = (content: string): CommonMarkBlockRanges => {
+  if (!content) return EMPTY_BLOCK_RANGES
+  const cached = blockRangeCache.get(content)
+  if (cached) return cached
 
-  const initialRanges = parseRawCommonMarkRanges(markdown)
-  const { masked, mutated } = maskCustomSegmentsForCommonMark(markdown, initialRanges)
-  const resolved = mutated ? parseRawCommonMarkRanges(masked) : initialRanges
+  const initialRanges = parseRawCommonMarkRanges(content)
+  const resolved = hasPotentialCustomSegments(content)
+    ? maskCustomSegmentsForCommonMark(content, initialRanges)
+    : initialRanges
 
   if (blockRangeCache.size >= MAX_BLOCK_RANGE_CACHE_ENTRIES) {
     const oldestKey = blockRangeCache.keys().next().value
-    if (oldestKey !== undefined) {
-      blockRangeCache.delete(oldestKey)
-    }
+    if (oldestKey !== undefined) blockRangeCache.delete(oldestKey)
   }
-  blockRangeCache.set(markdown, resolved)
+  blockRangeCache.set(content, resolved)
   return resolved
 }
 
-export const collectCommonMarkCodeBlockRanges = (markdown: string): MathSpanRange[] => {
-  if (
-    !markdown ||
-    (!markdown.includes("    ") &&
-      !markdown.includes("\t") &&
-      !markdown.includes("```") &&
-      !markdown.includes("~~~"))
-  ) {
-    return []
-  }
-  return parseCommonMarkBlockRanges(markdown).codeBlockRanges
-}
+export const collectCommonMarkCodeBlockRanges = (content: string): MathSpanRange[] =>
+  parseCommonMarkBlockRanges(content).codeBlockRanges
+
+export const collectCommonMarkCodeAndCommentRanges = (content: string): MathSpanRange[] =>
+  parseCommonMarkBlockRanges(content).codeAndCommentRanges
