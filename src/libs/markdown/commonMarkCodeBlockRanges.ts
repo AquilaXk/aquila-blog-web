@@ -25,7 +25,6 @@ import {
   maskBlockquoteHeaderLine,
   maskLinesInRange,
   maskLineWithBreakAndHeading,
-  maskUnclosedAsideBeforeBlank,
   neutralizeAsideOpenTagPreservingLength,
   parseCustomDirectiveHeader,
   registerCommonMarkBlockRangeProvider,
@@ -115,10 +114,11 @@ const walkCommonMarkBlockRanges = (
 const parseRawCommonMarkRanges = (
   source: string,
   asideRanges: MathSpanRange[] = [],
-  containerCloseRanges: MathSpanRange[] = []
+  containerCloseRanges: MathSpanRange[] = [],
+  extraCodeRanges: MathSpanRange[] = []
 ): CommonMarkBlockRanges => {
   const tree = commonMarkProcessor.parse(source) as CommonMarkAstNode
-  const rawCodeRanges: MathSpanRange[] = []
+  const rawCodeRanges: MathSpanRange[] = [...extraCodeRanges]
   const rawCommentRanges: MathSpanRange[] = []
   const rawListRanges: MathSpanRange[] = []
   walkCommonMarkBlockRanges(tree, rawCodeRanges, rawCommentRanges, rawListRanges)
@@ -253,7 +253,8 @@ const tryMaskAsideBlockAt = (
   lineStarts: readonly number[],
   currentRanges: CommonMarkBlockRanges,
   asideRanges: MathSpanRange[],
-  containerCloseRanges: MathSpanRange[]
+  containerCloseRanges: MathSpanRange[],
+  extraCodeRanges: MathSpanRange[]
 ): { nextIndex: number; mutated: boolean } | null => {
   const line = lines[index]!
   const openingTail = extractAsideOpenTail(line)
@@ -287,7 +288,12 @@ const tryMaskAsideBlockAt = (
   if (closeIndex < 0) {
     lines.splice(index, snapshot.length, ...snapshot)
     if (hasExcludedAsideCloseOrFenceBeforeBlank(snapshot.slice(1, blankIndex - index))) {
-      maskUnclosedAsideBeforeBlank(lines, index, blankIndex)
+      const lastPreBlank = blankIndex - 1
+      extraCodeRanges.push({
+        from: lineStarts[index]!,
+        to: lineStarts[lastPreBlank]! + Math.max(1, lines[lastPreBlank]!.length),
+      })
+      maskLinesInRange(lines, index, lastPreBlank)
     } else {
       lines[index] = neutralizeAsideOpenTagPreservingLength(line)
     }
@@ -448,7 +454,8 @@ const tryMaskCustomBlockStepAt = (
   lineStarts: readonly number[],
   currentRanges: CommonMarkBlockRanges,
   asideRanges: MathSpanRange[],
-  containerCloseRanges: MathSpanRange[]
+  containerCloseRanges: MathSpanRange[],
+  extraCodeRanges: MathSpanRange[]
 ): { nextIndex: number; mutated: boolean } => {
   const line = lines[index]!
   const trimmed = line.trim()
@@ -486,7 +493,8 @@ const tryMaskCustomBlockStepAt = (
       lineStarts,
       currentRanges,
       asideRanges,
-      containerCloseRanges
+      containerCloseRanges,
+      extraCodeRanges
     )
     if (asideStep) return asideStep
   }
@@ -516,6 +524,7 @@ const maskCustomSegmentsForCommonMark = (
   const lineStarts = computeLineStarts(lines)
   const asideRanges: MathSpanRange[] = []
   const containerCloseRanges: MathSpanRange[] = []
+  const extraCodeRanges: MathSpanRange[] = []
   let currentRanges = initialRanges
   let dirty = false
   let index = 0
@@ -524,7 +533,12 @@ const maskCustomSegmentsForCommonMark = (
     const line = lines[index]!
     const lineStart = lineStarts[index]!
     if (dirty && needsFreshRangesForLine(line)) {
-      currentRanges = parseRawCommonMarkRanges(lines.join("\n"), asideRanges, containerCloseRanges)
+      currentRanges = parseRawCommonMarkRanges(
+        lines.join("\n"),
+        asideRanges,
+        containerCloseRanges,
+        extraCodeRanges
+      )
       dirty = false
     }
     if (isExcludedTopLevelLine(line, lineStart, currentRanges)) {
@@ -537,16 +551,18 @@ const maskCustomSegmentsForCommonMark = (
       lineStarts,
       currentRanges,
       asideRanges,
-      containerCloseRanges
+      containerCloseRanges,
+      extraCodeRanges
     )
     if (step.mutated) dirty = true
     index = step.nextIndex
   }
 
   return dirty
-    ? parseRawCommonMarkRanges(lines.join("\n"), asideRanges, containerCloseRanges)
+    ? parseRawCommonMarkRanges(lines.join("\n"), asideRanges, containerCloseRanges, extraCodeRanges)
     : {
         ...currentRanges,
+        codeBlockRanges: mergeSortedSpanRanges([...currentRanges.codeBlockRanges, ...extraCodeRanges]),
         asideRanges,
         containerCloseRanges: mergeSortedSpanRanges(containerCloseRanges),
       }

@@ -46,20 +46,6 @@ export const maskLineWithBreakAndHeading = (line: string): string => {
   return hasCr ? `${masked}\r` : masked
 }
 
-export const maskLineWithThreeTildes = (line: string): string => {
-  const hasCr = line.endsWith("\r")
-  const bodyLength = hasCr ? line.length - 1 : line.length
-  const masked = `~~~${" ".repeat(Math.max(0, bodyLength - 3))}`
-  return hasCr ? `${masked}\r` : masked
-}
-
-export const maskLineWithSpaces = (line: string): string => {
-  const hasCr = line.endsWith("\r")
-  const bodyLength = hasCr ? line.length - 1 : line.length
-  const masked = " ".repeat(bodyLength)
-  return hasCr ? `${masked}\r` : masked
-}
-
 export const maskBlockquoteHeaderLine = (line: string): string => {
   const hasCr = line.endsWith("\r")
   const bodyLength = hasCr ? line.length - 1 : line.length
@@ -106,32 +92,9 @@ export const hasExcludedAsideCloseOrFenceBeforeBlank = (sliceBeforeBlank: readon
       stripClosingAsideTag(row) !== null ||
       parseOpeningCodeFence(trimmed) !== null ||
       trimmed.startsWith("<!--") ||
-      trimmed.trimEnd() === "$"
+      trimmed.trimEnd() === "$$"
     )
   })
-
-export const maskUnclosedAsideBeforeBlank = (
-  lines: string[],
-  index: number,
-  blankIndex: number
-): void => {
-  let closeFenceIndex = blankIndex - 1
-  while (closeFenceIndex > index && lines[closeFenceIndex]!.replace(/\r$/, "").length < 3) {
-    closeFenceIndex -= 1
-  }
-  if (closeFenceIndex <= index) {
-    maskLinesInRange(lines, index, blankIndex - 1)
-    return
-  }
-  lines[index] = maskLineWithThreeTildes(lines[index]!)
-  for (let cursor = index + 1; cursor < closeFenceIndex; cursor += 1) {
-    lines[cursor] = maskLineWithSpaces(lines[cursor]!)
-  }
-  lines[closeFenceIndex] = maskLineWithThreeTildes(lines[closeFenceIndex]!)
-  if (closeFenceIndex + 1 <= blankIndex - 1) {
-    maskLinesInRange(lines, closeFenceIndex + 1, blankIndex - 1)
-  }
-}
 
 export const extractAsideOpenTail = (line: string): string | null => {
   const trimmedStart = line.trimStart()
@@ -161,8 +124,12 @@ export const isValidAsideCloseCandidate = (
   if (stripClosingAsideTag(candidate) === null) return false
   if (lineIndex < blankIndex) return true
   const rawOriginal = snapshot[lineIndex - index]!
+  if (!hasCommonMarkCodeIndent(rawOriginal)) return true
   const beforeClose = stripClosingAsideTag(rawOriginal)
-  if (!beforeClose || beforeClose.trim().length === 0) return true
+  const firstNonBlank = snapshot.slice(1).find((row) => row.trim().length > 0) ?? ""
+  if ((!beforeClose || beforeClose.trim().length === 0) && hasCommonMarkCodeIndent(firstNonBlank)) {
+    return true
+  }
   const lineStart = lineStarts[lineIndex]!
   return !overlapsSortedRanges(preAsideCodeRanges, lineStart, lineStart + Math.max(1, rawOriginal.length))
 }
@@ -197,7 +164,7 @@ export const isDedicatedMathCloseLine = (
   return (
     parsedClose !== null &&
     parsedClose.quoteDepth === openQuoteDepth &&
-    parsedClose.rest.startsWith("$") &&
+    parsedClose.rest.startsWith("$$") &&
     parsedClose.rest.slice(2).trim() === ""
   )
 }
@@ -217,9 +184,15 @@ export const isDedicatedFormulaBoundaryLine = (
     return true
   }
   if (
-    blockRangeProvider !== null &&
-    (DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) || stripClosingAsideTag(strippedLine) !== null)
+    DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) ||
+    stripClosingAsideTag(strippedLine) !== null
   ) {
+    if (blockRangeProvider === null) {
+      return (
+        DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) ||
+        (!hasCommonMarkCodeIndent(strippedLine) && stripClosingAsideTag(strippedLine) !== null)
+      )
+    }
     const { containerCloseRanges } = blockRangeProvider(text)
     return overlapsSortedRanges(containerCloseRanges, lineStart, Math.max(lineStart + 1, lineEnd))
   }
