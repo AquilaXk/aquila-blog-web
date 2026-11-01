@@ -25,7 +25,7 @@ import {
   findDoubleBraceColorSpans,
   stripDoubleBraceColorTokensOnce,
 } from "../../src/libs/markdown/inlineTokenScanners"
-import { skipInlineLiteralConstructAt } from "../../src/libs/markdown/pandocMathScanner"
+import { scanPandocDisplayMathAt, skipInlineLiteralConstructAt } from "../../src/libs/markdown/pandocMathScanner"
 import { mountMermaidErrorStateDom } from "../../src/libs/markdown/mermaidRuntimeSanitize"
 import {
   normalizeSafeMarkdownLinkHref,
@@ -791,5 +791,42 @@ test.describe("wave6 round4 public markdown regressions", () => {
     expect(nestedDirectiveOuterCodeHtml).toContain('class="aq-code aq-pretty-pre"')
     expect(nestedDirectiveOuterCodeHtml).toContain("echo $HOME")
     expect(nestedDirectiveOuterCodeHtml).not.toContain(String.raw`\$HOME`)
+
+    const mathWithBackticks = ["$$", "x = 1", "```", "y = 2", "$$"].join("\n")
+    expect(scanPandocDisplayMathAt(mathWithBackticks, 0)).toBeNull()
+
+    const quotedMath = ["> $$", "> x + y", "> $$"].join("\n")
+    expect(scanPandocDisplayMathAt(quotedMath, 2)?.math.trim()).toBe("x + y")
+    const brokenQuotedMath = ["> $$", "x + y", "> $$"].join("\n")
+    expect(scanPandocDisplayMathAt(brokenQuotedMath, 2)).toBeNull()
+
+    const unclosedDedicatedThenInline = ["$$", "x", "", "Paragraph $$y$$ end"].join("\n")
+    expect(scanPandocDisplayMathAt(unclosedDedicatedThenInline, 0)).toBeNull()
+
+    expect(scanPandocDisplayMathAt("$$a `$$` b$$", 0)).toBeNull()
+    expect(scanPandocDisplayMathAt("$$a <!-- $$ --> b$$", 0)).toBeNull()
+
+    const calloutThenIndentedCode = [
+      "> [!NOTE] Callout Title",
+      "> Callout body",
+      "    echo $HOME",
+    ].join("\n")
+    const calloutIndentedHtml = renderMarkdownHtml(calloutThenIndentedCode)
+    expect(calloutIndentedHtml).toContain("Callout Title")
+    expect(calloutIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(calloutIndentedHtml).toContain("echo $HOME")
+
+    const imageThenIndentedCode = [
+      "![alt](/post/api/v1/images/a.png)",
+      "    echo $HOME",
+    ].join("\n")
+    const imageIndentedHtml = renderMarkdownHtml(imageThenIndentedCode)
+    expect(imageIndentedHtml).toContain("/post/api/v1/images/a.png")
+    expect(imageIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
+    expect(imageIndentedHtml).toContain("echo $HOME")
+
+    const literalSentinelDoc = "Prefix AQCODE0N0E and \uE000aqp0zeq\uE001 with `$100` and <b>bold</b> + \\==plain=="
+    expect(normalizeLegacyInlineHtmlMarkdown(literalSentinelDoc)).toContain("\`$100\` and **bold**")
+    expect(protectEscapedInlineSyntax(literalSentinelDoc).markdown).toContain("\uE000aqp1zeq\uE001")
   })
 })

@@ -1,8 +1,6 @@
 import {
-  countCodePointRun,
   hasCommonMarkCodeIndent,
   overlapsSortedRanges,
-  parseOpeningCodeFence,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
@@ -15,43 +13,27 @@ export type PendingDirectiveMetadata = {
   attrs: Record<string, unknown>
 }
 
-export type ActiveCodeFence = {
-  markerCode: number
-  length: number
-}
-
 const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
-const WHITESPACE_ONLY_PATTERN = /^[ \t]*$/
+const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 
-const stripCarriageReturn = (line: string): string =>
-  line.endsWith("\r") ? line.slice(0, -1) : line
-
-export const stepTopLevelCodeFence = (
-  rawLine: string,
-  activeFence: ActiveCodeFence | null
-): { activeFence: ActiveCodeFence | null; inFence: boolean } => {
-  const line = stripCarriageReturn(rawLine)
-  if (hasCommonMarkCodeIndent(line)) {
-    return { activeFence, inFence: activeFence !== null }
-  }
-  const leadingSpaces = countCodePointRun(line, 0, 32)
-  const trimmedStart = line.slice(leadingSpaces)
-  if (!activeFence) {
-    if (trimmedStart.startsWith(">")) {
-      return { activeFence: null, inFence: false }
-    }
-    const opened = parseOpeningCodeFence(line)
-    return { activeFence: opened, inFence: opened !== null }
-  }
-  const runLen = countCodePointRun(trimmedStart, 0, activeFence.markerCode)
-  if (
-    runLen >= activeFence.length &&
-    WHITESPACE_ONLY_PATTERN.test(trimmedStart.slice(runLen))
-  ) {
-    return { activeFence: null, inFence: true }
-  }
-  return { activeFence, inFence: true }
+export const extractAsideOpenTail = (line: string): string | null => {
+  const trimmedStart = line.trimStart()
+  if (!trimmedStart.toLowerCase().startsWith("<aside")) return null
+  const nextChar = trimmedStart[6]
+  if (nextChar === ">") return trimmedStart.slice(7)
+  if (!nextChar || !SINGLE_SPACE_CHAR_PATTERN.test(nextChar)) return null
+  const closeAngle = trimmedStart.indexOf(">", 7)
+  return closeAngle < 0 ? null : trimmedStart.slice(closeAngle + 1)
 }
+
+export const stripClosingAsideTag = (value: string): string | null => {
+  const trimmedEnd = value.trimEnd()
+  if (!trimmedEnd.toLowerCase().endsWith("</aside>")) return null
+  return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
+}
+
+export const isDedicatedFormulaFenceLine = (line: string): boolean =>
+  !hasCommonMarkCodeIndent(line) && line.trim() === "$$"
 
 export const parseCustomDirectiveHeader = (
   trimmedLine: string
@@ -150,23 +132,21 @@ export const parseCardMetadataComment = (trimmedLine: string): PendingDirectiveM
 export const findDirectiveCloseLineIndex = (
   lines: readonly string[],
   startIndex: number,
-  lineStarts?: readonly number[],
-  codeBlockRanges?: readonly MathSpanRange[]
+  lineStarts: readonly number[] = [],
+  excludedRanges: readonly MathSpanRange[] = []
 ): number => {
-  let activeFence: ActiveCodeFence | null = null
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index]!
-    const fenceStep = stepTopLevelCodeFence(line, activeFence)
-    activeFence = fenceStep.activeFence
-    if (fenceStep.inFence) continue
-    if (lineStarts && codeBlockRanges && codeBlockRanges.length > 0) {
-      const lineStart = lineStarts[index]!
-      if (overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))) {
-        continue
-      }
+    const lineStart = lineStarts[index]
+    if (
+      lineStart !== undefined &&
+      excludedRanges.length > 0 &&
+      overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))
+    ) {
+      continue
     }
     if (DIRECTIVE_CLOSE_LINE_PATTERN.test(line)) {
-      return activeFence === null ? index : -1
+      return index
     }
   }
   return -1
@@ -175,10 +155,10 @@ export const findDirectiveCloseLineIndex = (
 export const collectTripleColonBody = (
   lines: readonly string[],
   startIndex: number,
-  lineStarts?: readonly number[],
-  codeBlockRanges?: readonly MathSpanRange[]
+  lineStarts: readonly number[] = [],
+  excludedRanges: readonly MathSpanRange[] = []
 ): { closedIndex: number; bodyLines: string[] } => {
-  const closedIndex = findDirectiveCloseLineIndex(lines, startIndex, lineStarts, codeBlockRanges)
+  const closedIndex = findDirectiveCloseLineIndex(lines, startIndex, lineStarts, excludedRanges)
   if (closedIndex < 0) {
     return { closedIndex: -1, bodyLines: lines.slice(startIndex) }
   }

@@ -696,7 +696,9 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     const crossFenceBundle = getMarkdownLivePreviewBundle(crossFenceBacktickDoc)
     expect(crossFenceBundle.mathSpecs).toEqual([{ from: 0, to: 9, math: "\n`a'\n", displayMode: true }])
     const crossFenceSpecs = buildMarkdownLivePreviewDecorationSpecs(crossFenceBacktickDoc, [], false, "reading")
-    expect(crossFenceSpecs.filter((s) => s.kind === "inline-code" || s.kind === "hide-mark")).toEqual([])
+    expect(crossFenceSpecs.filter((s) => s.kind === "inline-code").map(({ from, to }) => ({ from, to }))).toEqual([
+      { from: 15, to: 21 },
+    ])
     const separatedParagraphSpecs = buildMarkdownLivePreviewDecorationSpecs("$$\n`a'\n$$\n\nText `code`", [], false, "reading")
     expect(separatedParagraphSpecs.filter((s) => s.kind === "inline-code").map(({ from, to }) => ({ from, to }))).toEqual([
       { from: 16, to: 22 },
@@ -715,7 +717,6 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     ])
     const unclosedBacktickDisplay = "$$a `$$` b$$ and $$c = 1$$"
     expect(getMarkdownLivePreviewBundle(unclosedBacktickDisplay).mathSpecs).toEqual([
-      { from: 0, to: 7, math: "a `", displayMode: true },
       { from: 10, to: 19, math: " and ", displayMode: true },
     ])
     expect(getMarkdownLivePreviewBundle("```tex\n$$\nx = 1\n$$\n```").mathSpecs).toEqual([])
@@ -731,6 +732,15 @@ test.describe("Wave-6 Round 4 live editor regressions", () => {
     expect(headingSnap.widgets.map(({ name, from, to }) => ({ name, from, to }))).toEqual([
       { name: "MarkdownMathWidget", from: 16, to: 28 },
     ])
+
+    const selectiveReparseDoc = ["$a `b$ and $c` d$", "", "**bold** and $z + 1$"].join("\n")
+    const selectiveBundle = getMarkdownLivePreviewBundle(selectiveReparseDoc)
+    expect(selectiveBundle.mathSpecs.map((m) => m.math)).toEqual(["z + 1"])
+    expect(selectiveBundle.entries.some((e) => e.kind === "strong")).toBe(true)
+
+    const highlightMathSnap = collectDecoSnapshot("==$x + 1$==\n\n> quote start\n> $$\n> y = 2\n> $$\n> quote end\n\ncursor")
+    expect(highlightMathSnap.classes.some((c) => c.cls.includes("cm-live-highlight"))).toBe(true)
+    expect(highlightMathSnap.classes.filter((c) => c.cls.includes("cm-live-quote")).length).toBeGreaterThanOrEqual(2)
   })
 })
 

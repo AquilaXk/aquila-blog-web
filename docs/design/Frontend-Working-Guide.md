@@ -28,3 +28,7 @@ raw `serverApiFetch`는 스트리밍·특수 Response 소비에만 남긴다.
 - `src/libs/server/adminPage.ts` — `readAdminProtectedBootstrap`
 - `src/pages/feed.tsx` — RSS 503 경로
 - `src/pages/index.tsx`, `src/libs/server/postDetailPage.ts` — fail-fast 에러 전파 및 notFound 가드
+
+## 관련 의사결정 문서
+
+- 마크다운 에디터 및 공개 렌더러 파서·수식·센티넬·CodeMirror 6 장식 아키텍처와 트레이드오프는 `docs/design/markdown-editor-and-renderer-decisions.md`를 따른다.

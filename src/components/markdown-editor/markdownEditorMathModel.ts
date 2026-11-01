@@ -5,13 +5,12 @@ import {
   isEscapedMarkdownAt,
   mergeSortedSpanRanges,
   overlapsSortedRanges,
+  parseDedicatedLineQuoteDepth,
   scanInlineCodeSpanEnd,
   scanPandocDisplayMathAt,
   scanPandocInlineMathAt,
   type MathSpanRange,
 } from "../../libs/markdown/pandocMathScanner"
-
-export type { MathSpanRange as MathLiteralRange } from "../../libs/markdown/pandocMathScanner"
 
 export type MathReplacementSpec = {
   from: number
@@ -23,30 +22,18 @@ export type MathReplacementSpec = {
 const MAX_MATH_BLOCKS_PER_DOC = 512
 
 export const MATH_LITERAL_SYNTAX_NODE_NAMES = new Set([
-  "InlineCode",
-  "FencedCode",
-  "CodeBlock",
-  "HTMLBlock",
-  "HTMLTag",
-  "Comment",
-  "CommentBlock",
-  "ProcessingInstruction",
-  "URL",
-  "Autolink",
+  "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock", "HTMLTag",
+  "Comment", "CommentBlock", "ProcessingInstruction", "URL", "Autolink",
 ])
 
 export const MATH_INTERIOR_ABORT_SYNTAX_NODE_NAMES = new Set([
-  "InlineCode",
-  "FencedCode",
-  "CodeBlock",
-  "HTMLBlock",
-  "Comment",
-  "CommentBlock",
-  "ProcessingInstruction",
-  "Autolink",
+  "InlineCode", "FencedCode", "CodeBlock", "HTMLBlock",
+  "Comment", "CommentBlock", "ProcessingInstruction", "Autolink",
 ])
 
-const BLOCK_LITERAL_SYNTAX_NODE_NAMES = new Set(["FencedCode", "CodeBlock", "HTMLBlock"])
+const BLOCK_LITERAL_SYNTAX_NODE_NAMES = new Set([
+  "FencedCode", "CodeBlock", "HTMLBlock", "CommentBlock",
+])
 
 export type CollectedSyntaxLiteralRanges = {
   literalRanges: MathSpanRange[]
@@ -61,9 +48,7 @@ const walkSyntaxLiteralNodes = (
 ): void => {
   if (BLOCK_LITERAL_SYNTAX_NODE_NAMES.has(node.name)) {
     const range = { from: node.from, to: node.to }
-    if (node.name === "FencedCode" || node.name === "CodeBlock") {
-      out.codeBlockRanges.push(range)
-    }
+    if (node.name === "FencedCode" || node.name === "CodeBlock") out.codeBlockRanges.push(range)
     out.blockLiteralRanges.push(range)
     out.interiorLiteralRanges.push(range)
     out.literalRanges.push(range)
@@ -135,10 +120,7 @@ const overlapsActiveLine = (
   activeLineFrom: number,
   activeLineTo: number
 ): boolean =>
-  activeLineFrom >= 0 &&
-  activeLineTo >= activeLineFrom &&
-  from <= activeLineTo &&
-  to >= activeLineFrom
+  activeLineFrom >= 0 && activeLineTo >= activeLineFrom && from <= activeLineTo && to >= activeLineFrom
 
 const isSkippedDollarAt = (
   docText: string,
@@ -149,17 +131,57 @@ const isSkippedDollarAt = (
   isEscapedMarkdownAt(docText, index) ||
   overlapsSortedRanges(excludedRanges, index, index + 1)
 
+type MathScanExclusions = {
+  delimiter: readonly MathSpanRange[]
+  interior: readonly MathSpanRange[]
+  blockLiteral: readonly MathSpanRange[]
+  codeOnly: readonly MathSpanRange[]
+}
+
+const isDedicatedDisplayFenceLineAt = (docText: string, index: number): boolean => {
+  const lineStart = findLineStartOffset(docText, index)
+  const lineEnd = findLineEndOffset(docText, index)
+  const line = docText.slice(lineStart, lineEnd)
+  const parsed = parseDedicatedLineQuoteDepth(line)
+  if (!parsed) return false
+  const strippedStart = lineStart + (line.length - parsed.rest.length)
+  return index === strippedStart && parsed.rest.startsWith("$$") && parsed.rest.slice(2).trim() === ""
+}
+
+const hasInnerDoubleDollarInRanges = (
+  docText: string,
+  innerFrom: number,
+  innerTo: number,
+  ranges: readonly MathSpanRange[]
+): boolean => {
+  for (const r of ranges) {
+    if (r.to <= innerFrom) continue
+    if (r.from >= innerTo) break
+    const sliceStart = Math.max(innerFrom, r.from)
+    const sliceEnd = Math.min(innerTo, r.to)
+    if (sliceEnd - sliceStart >= 2 && docText.slice(sliceStart, sliceEnd).includes("$$")) return true
+  }
+  return false
+}
+
 const tryMatchDisplayMathAt = (
   docText: string,
   index: number,
-  delimiterExcluded: readonly MathSpanRange[],
-  blockExcluded: readonly MathSpanRange[]
+  exclusions: MathScanExclusions
 ): { spec: MathReplacementSpec | null; nextIndex: number } => {
-  if (overlapsSortedRanges(delimiterExcluded, index, index + 2)) {
+  if (overlapsSortedRanges(exclusions.delimiter, index, index + 2)) {
     return { spec: null, nextIndex: index + 2 }
   }
-  const display = scanPandocDisplayMathAt(docText, index, { excludedRanges: blockExcluded })
-  if (!display) {
+  const isDedicatedOpen = isDedicatedDisplayFenceLineAt(docText, index)
+  const display = scanPandocDisplayMathAt(docText, index, {
+    excludedRanges: isDedicatedOpen ? exclusions.codeOnly : exclusions.blockLiteral,
+  })
+  if (!display) return { spec: null, nextIndex: index + 2 }
+  if (
+    !isDedicatedOpen &&
+    (overlapsSortedRanges(exclusions.delimiter, display.to - 2, display.to) ||
+      hasInnerDoubleDollarInRanges(docText, index + 2, display.to - 2, exclusions.interior))
+  ) {
     return { spec: null, nextIndex: index + 2 }
   }
   return {
@@ -171,20 +193,14 @@ const tryMatchDisplayMathAt = (
 const tryMatchMathAt = (
   docText: string,
   index: number,
-  delimiterExcluded: readonly MathSpanRange[],
-  interiorExcluded: readonly MathSpanRange[],
-  blockExcluded: readonly MathSpanRange[]
+  exclusions: MathScanExclusions
 ): { spec: MathReplacementSpec | null; nextIndex: number } => {
   const runLength = countCodePointRun(docText, index, 36)
-  if (runLength > 2) {
-    return { spec: null, nextIndex: index + runLength }
-  }
-  if (runLength === 2) {
-    return tryMatchDisplayMathAt(docText, index, delimiterExcluded, blockExcluded)
-  }
-  const inline = scanPandocInlineMathAt(docText, index, { excludedRanges: interiorExcluded })
+  if (runLength > 2) return { spec: null, nextIndex: index + runLength }
+  if (runLength === 2) return tryMatchDisplayMathAt(docText, index, exclusions)
+  const inline = scanPandocInlineMathAt(docText, index, { excludedRanges: exclusions.interior })
   const validInline =
-    inline && !overlapsSortedRanges(delimiterExcluded, inline.to - 1, inline.to) ? inline : null
+    inline && !overlapsSortedRanges(exclusions.delimiter, inline.to - 1, inline.to) ? inline : null
   return {
     spec: validInline
       ? { from: validInline.from, to: validInline.to, math: validInline.math, displayMode: false }
@@ -200,32 +216,29 @@ export const collectMathReplacementSpecs = (
   shouldRevealAll = false,
   literalRanges?: readonly MathSpanRange[],
   interiorLiteralRanges?: readonly MathSpanRange[],
-  codeBlockRanges?: readonly MathSpanRange[]
+  codeBlockRanges?: readonly MathSpanRange[],
+  blockLiteralRanges?: readonly MathSpanRange[]
 ): MathReplacementSpec[] => {
   if (shouldRevealAll || !docText.includes("$")) return []
 
-  const delimiterExcluded = buildExcludedMathRanges(docText, literalRanges)
-  const interiorExcluded =
+  const delimiter = buildExcludedMathRanges(docText, literalRanges)
+  const interior =
     interiorLiteralRanges === undefined || interiorLiteralRanges === literalRanges
-      ? delimiterExcluded
+      ? delimiter
       : buildExcludedMathRanges(docText, interiorLiteralRanges)
-  const blockExcluded =
-    codeBlockRanges === undefined ? delimiterExcluded : mergeSortedSpanRanges(codeBlockRanges)
+  const codeOnly = codeBlockRanges === undefined ? delimiter : mergeSortedSpanRanges(codeBlockRanges)
+  const blockLiteral =
+    blockLiteralRanges === undefined ? codeOnly : mergeSortedSpanRanges(blockLiteralRanges)
+  const exclusions: MathScanExclusions = { delimiter, interior, blockLiteral, codeOnly }
   const specs: MathReplacementSpec[] = []
   let index = 0
 
   while (index < docText.length && specs.length < MAX_MATH_BLOCKS_PER_DOC) {
-    if (isSkippedDollarAt(docText, index, delimiterExcluded)) {
+    if (isSkippedDollarAt(docText, index, delimiter)) {
       index += 1
       continue
     }
-    const { spec, nextIndex } = tryMatchMathAt(
-      docText,
-      index,
-      delimiterExcluded,
-      interiorExcluded,
-      blockExcluded
-    )
+    const { spec, nextIndex } = tryMatchMathAt(docText, index, exclusions)
     if (spec && !overlapsActiveLine(spec.from, spec.to, activeLineFrom, activeLineTo)) {
       specs.push(spec)
     }
@@ -235,13 +248,31 @@ export const collectMathReplacementSpecs = (
   return specs
 }
 
-export const collectMarkdownMathSpans = collectMathReplacementSpecs
+export const findFirstPoisoningMathSpec = (
+  mathSpecs: readonly MathReplacementSpec[],
+  literalRanges: readonly MathSpanRange[]
+): MathReplacementSpec | null => {
+  if (mathSpecs.length === 0 || literalRanges.length === 0) return null
+  for (const spec of mathSpecs) {
+    for (const r of literalRanges) {
+      if (r.from >= spec.to) break
+      if (r.from >= spec.from && r.to > spec.to) return spec
+    }
+  }
+  return null
+}
+
+export const maskMathSpanPreservingOffsets = (markdown: string, spec: MathSpanRange): string => {
+  const inner = Array.from(markdown.slice(spec.from, spec.to), (ch) =>
+    ch === "\n" || ch === "\r" ? ch : "x"
+  ).join("")
+  return markdown.slice(0, spec.from) + inner + markdown.slice(spec.to)
+}
 
 export type LivePreviewMathAugmentation = {
   literalRanges: MathSpanRange[]
   blockLiteralRanges: MathSpanRange[]
   mathRanges: MathSpanRange[]
-  displayMathRanges: MathSpanRange[]
   mathSpecs: MathReplacementSpec[]
 }
 
@@ -257,7 +288,6 @@ export const augmentLivePreviewLiteralRangesWithMath = (
       literalRanges: [...literalRanges],
       blockLiteralRanges: [...blockLiteralRanges],
       mathRanges: [],
-      displayMathRanges: [],
       mathSpecs: [],
     }
   }
@@ -268,14 +298,14 @@ export const augmentLivePreviewLiteralRangesWithMath = (
     false,
     literalRanges,
     interiorLiteralRanges,
-    codeBlockRanges
+    codeBlockRanges,
+    blockLiteralRanges
   )
   if (mathSpecs.length === 0) {
     return {
       literalRanges: [...literalRanges],
       blockLiteralRanges: [...blockLiteralRanges],
       mathRanges: [],
-      displayMathRanges: [],
       mathSpecs,
     }
   }
@@ -290,7 +320,6 @@ export const augmentLivePreviewLiteralRangesWithMath = (
         ? mergeSortedSpanRanges([...blockLiteralRanges, ...displayMathRanges])
         : [...blockLiteralRanges],
     mathRanges,
-    displayMathRanges,
     mathSpecs,
   }
 }
@@ -310,44 +339,21 @@ export type MathSyntaxNodeDisposition =
   | "suppress-container"
 
 export const INLINE_DELIMITER_SYNTAX_NODE_NAMES = new Set([
-  "EmphasisMark",
-  "StrikethroughMark",
-  "CodeMark",
-  "LinkMark",
-  "URL",
+  "EmphasisMark", "StrikethroughMark", "CodeMark", "LinkMark", "URL",
 ])
 
 const INLINE_MATH_SENSITIVE_CONTAINERS = new Set([
-  "Emphasis",
-  "StrongEmphasis",
-  "Strikethrough",
-  "Link",
-  "Image",
+  "Emphasis", "StrongEmphasis", "Strikethrough", "Link", "Image",
 ])
 
 const DISPLAY_MATH_CONTAINER_BLOCKS = new Set(["Blockquote", "BulletList", "OrderedList"])
 
 const MATH_LEAF_GUARDED_NODE_NAMES = new Set([
-  "HeaderMark",
-  "EmphasisMark",
-  "StrikethroughMark",
-  "CodeMark",
-  "LinkMark",
-  "URL",
-  "QuoteMark",
-  "ListMark",
-  "TaskMarker",
-  "HorizontalRule",
-  "FencedCode",
-  "CodeBlock",
-  "InlineCode",
+  "HeaderMark", "EmphasisMark", "StrikethroughMark", "CodeMark", "LinkMark", "URL",
+  "QuoteMark", "ListMark", "TaskMarker", "HorizontalRule", "FencedCode", "CodeBlock", "InlineCode",
 ])
 
-const enclosesSortedRange = (
-  ranges: readonly MathSpanRange[],
-  from: number,
-  to: number
-): boolean => {
+const enclosesSortedRange = (ranges: readonly MathSpanRange[], from: number, to: number): boolean => {
   let low = 0
   let high = ranges.length - 1
   let candidate = -1
@@ -425,9 +431,7 @@ export const isNodeShadowedByMath = (
     const m = mathRanges[i]!
     if (m.from >= nodeTo) break
     if (m.to <= nodeFrom) continue
-    if (!(m.from >= nodeFrom && m.to <= nodeTo && m.to - m.from < nodeTo - nodeFrom)) {
-      return true
-    }
+    if (!(m.from >= nodeFrom && m.to <= nodeTo && m.to - m.from < nodeTo - nodeFrom)) return true
   }
   return false
 }
@@ -458,13 +462,24 @@ export const classifySyntaxNodeAgainstMath = (
 }
 
 const REPLACE_PLAN_SPEC_KINDS = new Set([
-  "hide-mark",
-  "horizontal-rule",
-  "task",
-  "list-marker",
-  "wikilink",
-  "quote-mark",
+  "hide-mark", "horizontal-rule", "task", "list-marker", "wikilink", "quote-mark",
 ])
+
+const findFirstRangeEndingAfter = (ranges: readonly MathSpanRange[], from: number): number => {
+  let low = 0
+  let high = ranges.length - 1
+  let startIdx = ranges.length
+  while (low <= high) {
+    const mid = (low + high) >>> 1
+    if (ranges[mid]!.to > from) {
+      startIdx = mid
+      high = mid - 1
+    } else {
+      low = mid + 1
+    }
+  }
+  return startIdx
+}
 
 export const isLivePlanSpecBlockedByReplacedRanges = (
   markdown: string,
@@ -475,28 +490,37 @@ export const isLivePlanSpecBlockedByReplacedRanges = (
 ): boolean => {
   if (replacedRanges.length === 0 || specFrom >= checkTo) return specFrom >= checkTo
   const isReplaceSpec = REPLACE_PLAN_SPEC_KINDS.has(specKind)
-  for (const r of replacedRanges) {
+  const allowEqualBounds =
+    !isReplaceSpec && (specKind === "highlight" || specKind === "inline-color")
+  const specLen = checkTo - specFrom
+  for (
+    let idx = findFirstRangeEndingAfter(replacedRanges, specFrom);
+    idx < replacedRanges.length;
+    idx += 1
+  ) {
+    const r = replacedRanges[idx]!
     if (r.from >= checkTo) break
-    if (r.to <= specFrom) continue
-    if (
-      isReplaceSpec ||
-      !(r.from >= specFrom && r.to <= checkTo && r.to - r.from < checkTo - specFrom) ||
-      markdown.slice(r.from, r.to).includes("\n")
-    ) {
-      return true
-    }
+    const rLen = r.to - r.from
+    const fitsInside =
+      r.from >= specFrom && r.to <= checkTo && (allowEqualBounds ? rLen <= specLen : rLen < specLen)
+    if (isReplaceSpec || !fitsInside || markdown.slice(r.from, r.to).includes("\n")) return true
   }
   return false
 }
 
 const isAbsorbedDedicatedDisplayOpen = (
   markdown: string,
+  nodeName: "Table" | "Blockquote" | "BulletList" | "OrderedList",
   nodeFrom: number,
   mathFrom: number
 ): { truncatedTo: number } | null => {
   const openLineStart = findLineStartOffset(markdown, mathFrom)
   if (openLineStart <= nodeFrom) return null
-  if (!/^[ \t]{0,3}$/.test(markdown.slice(openLineStart, mathFrom))) return null
+  if (nodeName === "BulletList" || nodeName === "OrderedList") {
+    if (mathFrom !== openLineStart) return null
+  } else if (!/^ {0,3}$/.test(markdown.slice(openLineStart, mathFrom))) {
+    return null
+  }
   const openLineEnd = findLineEndOffset(markdown, mathFrom + 2)
   if (markdown.slice(mathFrom + 2, openLineEnd).trim() !== "") return null
   const truncatedTo =
@@ -508,7 +532,7 @@ const isAbsorbedDedicatedDisplayOpen = (
 
 export const resolveBlockNodeEndWithMath = (
   markdown: string,
-  nodeName: "Table" | "Blockquote",
+  nodeName: "Table" | "Blockquote" | "BulletList" | "OrderedList",
   nodeFrom: number,
   nodeTo: number,
   maths: readonly MathReplacementSpec[]
@@ -518,7 +542,7 @@ export const resolveBlockNodeEndWithMath = (
     if (m.to <= nodeFrom) continue
     if (m.from >= effectiveTo) break
     if (!markdown.slice(m.from, m.to).includes("\n")) continue
-    const absorbed = isAbsorbedDedicatedDisplayOpen(markdown, nodeFrom, m.from)
+    const absorbed = isAbsorbedDedicatedDisplayOpen(markdown, nodeName, nodeFrom, m.from)
     if (absorbed) {
       effectiveTo = absorbed.truncatedTo
       break
@@ -546,4 +570,3 @@ export const filterItemsOutsideSortedRanges = <T extends MathSpanRange>(
   excluded.length === 0
     ? [...items]
     : items.filter((item) => !overlapsSortedRanges(excluded, item.from, item.to))
-

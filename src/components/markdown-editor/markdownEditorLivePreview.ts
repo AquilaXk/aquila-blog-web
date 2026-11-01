@@ -7,6 +7,9 @@ import {
   augmentLivePreviewLiteralRangesWithMath,
   classifySyntaxNodeAgainstMath,
   collectSyntaxLiteralRanges,
+  findFirstPoisoningMathSpec,
+  maskMathSpanPreservingOffsets,
+  resolveBlockNodeEndWithMath,
   type MathReplacementSpec,
 } from "./markdownEditorMathModel"
 
@@ -40,7 +43,7 @@ export const unpackLivePreviewEntryMeta = (packed: number) => ({
 
 export type MarkdownLiveSelection = { from: number; to: number }
 
-type MarkdownSyntaxNode = {
+export type MarkdownSyntaxNode = {
   name: string
   from: number
   to: number
@@ -90,7 +93,8 @@ const resolveFallbackLineRange = (markdown: string, offset: number): MarkdownLiv
 }
 
 const mergeRanges = (ranges: MarkdownLiveSourceRange[]) => {
-  const sorted = [...ranges].sort((left, right) => left.from - right.from || left.to - right.to)
+  const sorted = [...ranges]
+  sorted.sort((left, right) => left.from - right.from || left.to - right.to)
   const merged: MarkdownLiveSourceRange[] = []
   for (const range of sorted) {
     const previous = merged.at(-1)
@@ -101,19 +105,6 @@ const mergeRanges = (ranges: MarkdownLiveSourceRange[]) => {
     }
   }
   return merged
-}
-
-const hasPrecedingOverlap = (
-  sortedRanges: ReadonlyArray<{ from: number; to: number }>,
-  candidate: number,
-  from: number
-): boolean => {
-  const candidateFrom = sortedRanges[candidate]!.from
-  for (let i = candidate - 1; i >= 0; i -= 1) {
-    if (sortedRanges[i]!.to > from) return true
-    if (sortedRanges[i]!.to <= candidateFrom) break
-  }
-  return false
 }
 
 export const hasIntervalOverlap = (
@@ -135,8 +126,7 @@ export const hasIntervalOverlap = (
       high = mid - 1
     }
   }
-  if (candidate === -1) return false
-  return sortedRanges[candidate]!.to > from || hasPrecedingOverlap(sortedRanges, candidate, from)
+  return candidate !== -1 && sortedRanges[candidate]!.to > from
 }
 
 export const hasEnclosingInterval = (
@@ -239,11 +229,12 @@ const createPlanEntry = (
 export type MarkdownLivePreviewBundle = {
   entries: MarkdownLivePreviewPlanEntry[]
   mathSpecs: MathReplacementSpec[]
+  syntaxRoot: MarkdownSyntaxNode
 }
 
 const cachedPreviewEntriesByNode = new WeakMap<
   MarkdownSyntaxNode,
-  { markdown: string; entries: MarkdownLivePreviewPlanEntry[]; mathSpecs: MathReplacementSpec[] }
+  { markdown: string } & MarkdownLivePreviewBundle
 >()
 
 const isWrappedSpanBlockedByLiterals = (
@@ -381,6 +372,7 @@ type LivePreviewAstWalkContext = {
   markdown: string; documentNode: MarkdownSyntaxNode
   wikilinkRanges: readonly MarkdownLiveSourceRange[]
   mathRanges: readonly MarkdownLiveSourceRange[]
+  mathSpecs: readonly MathReplacementSpec[]
   entries: MarkdownLivePreviewPlanEntry[]; taskRanges: MarkdownLiveSourceRange[]
 }
 
@@ -435,6 +427,27 @@ const appendLeafSyntaxEntry = (
   return false
 }
 
+const appendNodeDecorationEntry = (node: MarkdownSyntaxNode, ctx: LivePreviewAstWalkContext): void => {
+  const decoration = decorationForNode(node)
+  if (!decoration) return
+  if (
+    node.name === "Blockquote" ||
+    node.name === "BulletList" ||
+    node.name === "OrderedList"
+  ) {
+    const end = resolveBlockNodeEndWithMath(
+      ctx.markdown,
+      node.name,
+      node.from,
+      node.to,
+      ctx.mathSpecs
+    )
+    if (end === null) return
+    decoration.to = end
+  }
+  ctx.entries.push(createPlanEntry(decoration))
+}
+
 const visitChildNodes = (
   node: MarkdownSyntaxNode, activeHeading: MarkdownSyntaxNode | null,
   ctx: LivePreviewAstWalkContext, skipInlineDelimiters = false
@@ -467,10 +480,40 @@ const visitLivePreviewSyntaxNode = (
   }
   if (node.name === "Task") ctx.taskRanges.push({ from: node.from, to: node.to })
   if (mathDisposition !== "suppress-container") {
-    const decoration = decorationForNode(node)
-    if (decoration) ctx.entries.push(createPlanEntry(decoration))
+    appendNodeDecorationEntry(node, ctx)
   }
   visitChildNodes(node, activeHeading, ctx)
+}
+
+const resolveSyntaxRootAndMathAugmentation = (
+  markdown: string,
+  initialRoot: MarkdownSyntaxNode
+) => {
+  let syntaxRoot = initialRoot
+  let rawLiterals = collectSyntaxLiteralRanges(syntaxRoot)
+  let augmented = augmentLivePreviewLiteralRangesWithMath(
+    markdown,
+    rawLiterals.literalRanges,
+    rawLiterals.blockLiteralRanges,
+    rawLiterals.interiorLiteralRanges,
+    rawLiterals.codeBlockRanges
+  )
+  let maskedSource = markdown
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const poisoned = findFirstPoisoningMathSpec(augmented.mathSpecs, rawLiterals.literalRanges)
+    if (!poisoned) break
+    maskedSource = maskMathSpanPreservingOffsets(maskedSource, poisoned)
+    syntaxRoot = fallbackMarkdownParser.parse(maskedSource).topNode
+    rawLiterals = collectSyntaxLiteralRanges(syntaxRoot)
+    augmented = augmentLivePreviewLiteralRangesWithMath(
+      markdown,
+      rawLiterals.literalRanges,
+      rawLiterals.blockLiteralRanges,
+      rawLiterals.interiorLiteralRanges,
+      rawLiterals.codeBlockRanges
+    )
+  }
+  return { syntaxRoot, ...augmented }
 }
 
 export const getMarkdownLivePreviewBundle = (
@@ -479,30 +522,23 @@ export const getMarkdownLivePreviewBundle = (
 ): MarkdownLivePreviewBundle => {
   const cached = cachedPreviewEntriesByNode.get(documentNode)
   if (cached && cached.markdown === markdown) {
-    return { entries: cached.entries, mathSpecs: cached.mathSpecs }
+    return { entries: cached.entries, mathSpecs: cached.mathSpecs, syntaxRoot: cached.syntaxRoot }
   }
 
   const entries: MarkdownLivePreviewPlanEntry[] = []
-  const rawLiterals = collectSyntaxLiteralRanges(documentNode)
-  const { literalRanges, blockLiteralRanges, mathRanges, mathSpecs } =
-    augmentLivePreviewLiteralRangesWithMath(
-      markdown,
-      rawLiterals.literalRanges,
-      rawLiterals.blockLiteralRanges,
-      rawLiterals.interiorLiteralRanges,
-      rawLiterals.codeBlockRanges
-    )
+  const { syntaxRoot, literalRanges, blockLiteralRanges, mathRanges, mathSpecs } =
+    resolveSyntaxRootAndMathAugmentation(markdown, documentNode)
   const wikilinkRanges = collectRegexPlanEntries(markdown, blockLiteralRanges, literalRanges, entries)
   const taskRanges: MarkdownLiveSourceRange[] = []
-  visitLivePreviewSyntaxNode(documentNode, null, null, {
-    markdown, documentNode, wikilinkRanges, mathRanges, entries, taskRanges,
+  visitLivePreviewSyntaxNode(syntaxRoot, null, null, {
+    markdown, documentNode: syntaxRoot, wikilinkRanges, mathRanges, mathSpecs, entries, taskRanges,
   })
 
   entries.sort((a, b) => a.from - b.from || a.to - b.to)
   tagEntriesInsideTasks(entries, taskRanges)
 
-  cachedPreviewEntriesByNode.set(documentNode, { markdown, entries, mathSpecs })
-  return { entries, mathSpecs }
+  cachedPreviewEntriesByNode.set(documentNode, { markdown, entries, mathSpecs, syntaxRoot })
+  return { entries, mathSpecs, syntaxRoot }
 }
 
 export const buildMarkdownLivePreviewEntries = (

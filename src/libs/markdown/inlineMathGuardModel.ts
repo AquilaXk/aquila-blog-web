@@ -1,120 +1,21 @@
 import { collectCommonMarkCodeBlockRanges } from "./commonMarkCodeBlockRanges"
 import {
   countCodePointRun,
+  extractAlphaNumericOutsideAngles,
+  extractAsciiAlphaNumeric,
   findContainingSortedRangeEnd,
-  findLineEndOffset,
-  hasBlankLineBetween,
   isEscapedMarkdownAt,
+  matchAutolinkEnd,
+  matchBareUrlEnd,
+  matchHtmlCommentEnd,
+  matchLinkDestinationEnd,
   scanInlineCodeSpanEnd,
   scanPandocDisplayMathAt,
   scanPandocInlineMathAt,
   type MathSpanRange,
 } from "./pandocMathScanner"
 
-const AUTOLINK_SCHEMES = ["http://", "https://", "ftp://", "mailto:"] as const
 const ESCAPED_DOLLAR_TOKEN = String.raw`\$`
-
-const isAsciiAlphaNumericCode = (code: number): boolean => {
-  const isDigit = code >= 48 && code <= 57
-  const isUpper = code >= 65 && code <= 90
-  const isLower = code >= 97 && code <= 122
-  return isDigit || isUpper || isLower
-}
-
-const skipSpacesAndTabs = (text: string, start: number): number => {
-  let cursor = start
-  while (cursor < text.length && (text.codePointAt(cursor) === 32 || text.codePointAt(cursor) === 9)) {
-    cursor += 1
-  }
-  return cursor
-}
-
-const matchHtmlCommentEnd = (text: string, index: number): number => {
-  if (!text.startsWith("<!--", index)) return -1
-  const closeIdx = text.indexOf("-->", index + 4)
-  return closeIdx < 0 ? text.length : closeIdx + 3
-}
-
-const scanAutolinkClosingAngle = (text: string, start: number): number => {
-  for (let cursor = start; cursor < text.length; cursor += 1) {
-    const code = text.codePointAt(cursor) ?? 0
-    if (code === 62) return cursor + 1
-    if (code <= 32 || code === 60) return -1
-  }
-  return -1
-}
-
-const matchAutolinkEnd = (text: string, index: number): number => {
-  if (text.codePointAt(index) !== 60) return -1
-  const probe = text.slice(index + 1, index + 12).toLowerCase()
-  if (!AUTOLINK_SCHEMES.some((scheme) => probe.startsWith(scheme))) return -1
-  return scanAutolinkClosingAngle(text, index + 2)
-}
-
-const isBareUrlStopCode = (code: number): boolean =>
-  code <= 32 || code === 60 || code === 62 || code === 41
-
-const matchBareUrlEnd = (text: string, index: number): number => {
-  const lowerSlice = text.slice(index, index + 8).toLowerCase()
-  if (!lowerSlice.startsWith("http://") && !lowerSlice.startsWith("https://")) return -1
-  if (index > 0 && isAsciiAlphaNumericCode(text.codePointAt(index - 1) ?? 0)) return -1
-  let cursor = index + 7
-  while (cursor < text.length && !isBareUrlStopCode(text.codePointAt(cursor) ?? 0)) {
-    cursor += 1
-  }
-  return cursor
-}
-
-const resolveAngleDestinationClose = (text: string, angleClose: number): number => {
-  const closeParen = text.indexOf(")", angleClose + 1)
-  if (closeParen < 0 || hasBlankLineBetween(text, angleClose + 1, closeParen)) return -1
-  return closeParen + 1
-}
-
-const scanAngleBracketDestination = (text: string, openAngle: number): number => {
-  for (let cursor = openAngle + 1; cursor < text.length; cursor += 1) {
-    const code = text.codePointAt(cursor) ?? 0
-    if (code === 10 || code === 13 || code === 60) return -1
-    if (code === 62 && !isEscapedMarkdownAt(text, cursor)) {
-      return resolveAngleDestinationClose(text, cursor)
-    }
-  }
-  return -1
-}
-
-const isBlankLineAfterNewline = (text: string, newlinePos: number): boolean =>
-  text.slice(newlinePos + 1, findLineEndOffset(text, newlinePos + 1)).trim() === ""
-
-const adjustParenDepthAt = (text: string, pos: number, depth: number): number => {
-  if (isEscapedMarkdownAt(text, pos)) return depth
-  const code = text.codePointAt(pos) ?? 0
-  if (code === 40) return depth + 1
-  return code === 41 ? depth - 1 : depth
-}
-
-const scanBalancedParenDestination = (text: string, start: number): number => {
-  let depth = 1
-  for (let pos = start; pos < text.length; pos += 1) {
-    if (text.codePointAt(pos) === 10 && isBlankLineAfterNewline(text, pos)) return -1
-    depth = adjustParenDepthAt(text, pos, depth)
-    if (depth === 0) return pos + 1
-  }
-  return -1
-}
-
-const matchLinkDestinationEnd = (text: string, index: number): number => {
-  if (
-    text.codePointAt(index) !== 93 ||
-    text.codePointAt(index + 1) !== 40 ||
-    isEscapedMarkdownAt(text, index)
-  ) {
-    return -1
-  }
-  const cursor = skipSpacesAndTabs(text, index + 2)
-  return text.codePointAt(cursor) === 60
-    ? scanAngleBracketDestination(text, cursor)
-    : scanBalancedParenDestination(text, cursor)
-}
 
 const skipUnescapedBacktickAt = (text: string, index: number): number => {
   if (isEscapedMarkdownAt(text, index)) return -1
@@ -236,26 +137,24 @@ const decodeNumericEntitiesForSentinelProbe = (source: string): string =>
   })
 
 const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels => {
-  const prefix = `\uE000aqp${nonce}_`
+  const prefix = `\uE000aqp${nonce}z`
   return {
     prefix,
     eq: `${prefix}eq\uE001`,
     lt: `${prefix}lt\uE001`,
     lb: `${prefix}lb\uE001`,
     rb: `${prefix}rb\uE001`,
-    entityPattern: new RegExp(`${prefix}ent[0-9]+\uE001`, "g"),
+    entityPattern: new RegExp(`${prefix}ent[0-9]+e\uE001`, "g"),
   }
 }
 
 export const DEFAULT_PROTECTED_INLINE_SENTINELS = buildProtectedInlineSentinels(0)
 
 export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
-  const needsDecodedProbe = source.includes("&#") || source.includes("\\_")
-  const probe = needsDecodedProbe
-    ? `${source}\n${decodeNumericEntitiesForSentinelProbe(source).replaceAll("\\_", "_")}`
-    : source
+  const decoded = source.includes("&#") ? decodeNumericEntitiesForSentinelProbe(source) : source
+  const probe = `${extractAsciiAlphaNumeric(source)}\n${extractAlphaNumericOutsideAngles(source)}\n${extractAsciiAlphaNumeric(decoded)}\n${extractAlphaNumericOutsideAngles(decoded)}`
   let nonce = 0
-  while (probe.includes(`aqp${nonce}_`)) {
+  while (probe.includes(`aqp${nonce}z`)) {
     nonce += 1
   }
   return nonce === 0 ? DEFAULT_PROTECTED_INLINE_SENTINELS : buildProtectedInlineSentinels(nonce)
@@ -302,7 +201,7 @@ const registerEntityToken = (
   const existing = registry.entityByRaw.get(raw)
   if (existing) return existing
   const entry: ProtectedInlineTokenEntry = {
-    token: `${sentinels.prefix}ent${registry.entityByRaw.size}\uE001`,
+    token: `${sentinels.prefix}ent${registry.entityByRaw.size}e\uE001`,
     raw,
     unescaped: "<",
   }

@@ -7,6 +7,8 @@ import {
 } from "./inlineTokenScanners"
 import {
   countCodePointRun,
+  extractAlphaNumericOutsideAngles,
+  extractAsciiAlphaNumeric,
   findContainingSortedRangeEnd,
   isEscapedMarkdownAt,
   mergeSortedSpanRanges,
@@ -258,12 +260,12 @@ const replacePairedFormattingTags = (
 
 const createChunkCodeSpanPrefix = (chunk: string): string => {
   const decoded = chunk.includes("&") ? decodeLegacyHtmlEntities(chunk) : chunk
-  const probe = `${chunk}\n${decoded}\n${decoded.replace(/(?:<[^>]*>|\s)+/g, "")}`
+  const probe = `${extractAsciiAlphaNumeric(chunk)}\n${extractAlphaNumericOutsideAngles(chunk)}\n${extractAsciiAlphaNumeric(decoded)}\n${extractAlphaNumericOutsideAngles(decoded)}`
   let nonce = 0
-  while (probe.includes(`AQCODE${nonce}_`)) {
+  while (probe.includes(`AQCODE${nonce}N`)) {
     nonce += 1
   }
-  return `\uE000AQCODE${nonce}_`
+  return `\uE000AQCODE${nonce}N`
 }
 
 const restoreStoredCodeSpans = (
@@ -275,7 +277,7 @@ const restoreStoredCodeSpans = (
   let restored = text
   for (let idx = codeSpans.length - 1; idx >= 0; idx -= 1) {
     const span = codeSpans[idx] ?? ""
-    restored = restored.replaceAll(`${prefix}${idx}\uE001`, () => span)
+    restored = restored.replaceAll(`${prefix}${idx}E\uE001`, () => span)
   }
   return restored
 }
@@ -396,7 +398,7 @@ export const normalizeLegacyInlineHtmlSpans = (input: string) => {
     if (!value) return ""
     const idx = storedSpans.length
     storedSpans.push(value)
-    return `${prefix}${idx}\uE001`
+    return `${prefix}${idx}E\uE001`
   }
   const restoreSpans = (value: string): string =>
     restoreStoredCodeSpans(value, prefix, storedSpans)
