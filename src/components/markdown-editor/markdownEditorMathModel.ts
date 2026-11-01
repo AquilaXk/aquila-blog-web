@@ -209,18 +209,13 @@ const tryMatchMathAt = (
   }
 }
 
-export const collectMathReplacementSpecs = (
+const buildMathScanExclusions = (
   docText: string,
-  activeLineFrom = -1,
-  activeLineTo = -1,
-  shouldRevealAll = false,
   literalRanges?: readonly MathSpanRange[],
   interiorLiteralRanges?: readonly MathSpanRange[],
   codeBlockRanges?: readonly MathSpanRange[],
   blockLiteralRanges?: readonly MathSpanRange[]
-): MathReplacementSpec[] => {
-  if (shouldRevealAll || !docText.includes("$")) return []
-
+): MathScanExclusions => {
   const delimiter = buildExcludedMathRanges(docText, literalRanges)
   const interior =
     interiorLiteralRanges === undefined || interiorLiteralRanges === literalRanges
@@ -229,12 +224,19 @@ export const collectMathReplacementSpecs = (
   const codeOnly = codeBlockRanges === undefined ? delimiter : mergeSortedSpanRanges(codeBlockRanges)
   const blockLiteral =
     blockLiteralRanges === undefined ? codeOnly : mergeSortedSpanRanges(blockLiteralRanges)
-  const exclusions: MathScanExclusions = { delimiter, interior, blockLiteral, codeOnly }
+  return { delimiter, interior, blockLiteral, codeOnly }
+}
+
+const scanMathReplacementSpecs = (
+  docText: string,
+  activeLineFrom: number,
+  activeLineTo: number,
+  exclusions: MathScanExclusions
+): MathReplacementSpec[] => {
   const specs: MathReplacementSpec[] = []
   let index = 0
-
   while (index < docText.length && specs.length < MAX_MATH_BLOCKS_PER_DOC) {
-    if (isSkippedDollarAt(docText, index, delimiter)) {
+    if (isSkippedDollarAt(docText, index, exclusions.delimiter)) {
       index += 1
       continue
     }
@@ -244,8 +246,25 @@ export const collectMathReplacementSpecs = (
     }
     index = nextIndex
   }
-
   return specs
+}
+
+export const collectMathReplacementSpecs = (
+  docText: string,
+  activeLineFrom = -1,
+  activeLineTo = -1,
+  shouldRevealAll = false,
+  literalRanges?: readonly MathSpanRange[],
+  interiorLiteralRanges?: readonly MathSpanRange[],
+  codeBlockRanges?: readonly MathSpanRange[]
+): MathReplacementSpec[] => {
+  if (shouldRevealAll || !docText.includes("$")) return []
+  return scanMathReplacementSpecs(
+    docText,
+    activeLineFrom,
+    activeLineTo,
+    buildMathScanExclusions(docText, literalRanges, interiorLiteralRanges, codeBlockRanges)
+  )
 }
 
 const findFirstRangeEndingAfter = (ranges: readonly MathSpanRange[], from: number): number => {
@@ -306,24 +325,20 @@ export const augmentLivePreviewLiteralRangesWithMath = (
   interiorLiteralRanges: readonly MathSpanRange[] = literalRanges,
   codeBlockRanges?: readonly MathSpanRange[]
 ): LivePreviewMathAugmentation => {
-  if (!markdown.includes("$")) {
-    return {
-      literalRanges: [...literalRanges],
-      blockLiteralRanges: [...blockLiteralRanges],
-      mathRanges: [],
-      mathSpecs: [],
-    }
-  }
-  const mathSpecs = collectMathReplacementSpecs(
-    markdown,
-    -1,
-    -1,
-    false,
-    literalRanges,
-    interiorLiteralRanges,
-    codeBlockRanges,
-    blockLiteralRanges
-  )
+  const mathSpecs = markdown.includes("$")
+    ? scanMathReplacementSpecs(
+        markdown,
+        -1,
+        -1,
+        buildMathScanExclusions(
+          markdown,
+          literalRanges,
+          interiorLiteralRanges,
+          codeBlockRanges,
+          blockLiteralRanges
+        )
+      )
+    : []
   if (mathSpecs.length === 0) {
     return {
       literalRanges: [...literalRanges],

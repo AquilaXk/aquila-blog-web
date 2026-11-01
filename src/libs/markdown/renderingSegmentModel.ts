@@ -194,7 +194,7 @@ const scanAsideClosingLines = (
   if (!matchedRange) return null
   for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
     const currentLine = lines[cursor]!
-    if (lineStarts[cursor]! === matchedRange.to) {
+    if (lineStarts[cursor] === matchedRange.to) {
       const closedLine = stripClosingAsideTag(currentLine)
       if (closedLine && closedLine.length > 0) bodyLines.push(closedLine)
       return { closedIndex: cursor, bodyLines }

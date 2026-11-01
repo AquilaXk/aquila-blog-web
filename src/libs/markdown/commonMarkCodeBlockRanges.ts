@@ -12,6 +12,7 @@ import {
   ASIDE_TAG_CASE_INSENSITIVE_PATTERN,
   DIRECTIVE_CLOSE_LINE_PATTERN,
   extractAsideOpenTail,
+  findBlockquoteHeaderAndPromotedIndex,
   findDirectiveCloseLineIndex,
   findFirstBlankLineIndex,
   findPromotedCalloutTitleLineIndex,
@@ -19,7 +20,6 @@ import {
   isAsideCloseLineExcluded,
   isDedicatedFormulaFenceLine,
   isLineStartInCommentRanges,
-  isPromotedCalloutTitleLine,
   isTopLevelFormulaStopLine,
   isValidAsideCloseCandidate,
   maskBlockquoteHeaderLine,
@@ -218,16 +218,14 @@ const resolveContainerCloseWithBoundedFormulas = (
   isAside = false
 ): number => {
   let ranges = parseRawCommonMarkRanges(lines.join("\n"))
-  for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
+  let cursor = startIndex
+  while (cursor < lines.length) {
     const line = lines[cursor]!
     const lineStart = lineStarts[cursor]!
     if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true) && isCloseLine(line, cursor)) {
       return cursor
     }
-    if (isContainerLineExcluded(line, lineStart, ranges, isAside, false)) {
-      continue
-    }
-    if (isDedicatedFormulaFenceLine(line)) {
+    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, false) && isDedicatedFormulaFenceLine(line)) {
       const formulaClose = findBoundedFormulaCloseInContainer(
         lines,
         cursor,
@@ -238,9 +236,11 @@ const resolveContainerCloseWithBoundedFormulas = (
       if (formulaClose >= 0) {
         maskLinesInRange(lines, cursor, formulaClose)
         ranges = parseRawCommonMarkRanges(lines.join("\n"))
-        cursor = formulaClose
+        cursor = formulaClose + 1
+        continue
       }
     }
+    cursor += 1
   }
   return -1
 }
@@ -313,33 +313,6 @@ const tryMaskAsideBlockAt = (
     )
   }
   return { nextIndex: closeIndex + 1, mutated: true }
-}
-
-const findBlockquoteHeaderAndPromotedIndex = (
-  lines: readonly string[],
-  startIndex: number
-): { cursor: number; headerLineIndex: number; promotedLineIndex: number; firstContent: string } => {
-  let cursor = startIndex
-  let headerLineIndex = -1
-  let promotedLineIndex = -1
-  let firstContent = ""
-  while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
-    const afterQuote = lines[cursor]!.replace(/^\s*>\s?/, "")
-    const stripped = afterQuote.trim()
-    if (stripped) {
-      if (headerLineIndex === -1) {
-        headerLineIndex = hasCommonMarkCodeIndent(afterQuote) ? -2 : cursor
-        firstContent = hasCommonMarkCodeIndent(afterQuote) ? "" : stripped
-      } else if (promotedLineIndex === -1) {
-        promotedLineIndex =
-          !hasCommonMarkCodeIndent(afterQuote) && isPromotedCalloutTitleLine(stripped)
-            ? cursor
-            : -2
-      }
-    }
-    cursor += 1
-  }
-  return { cursor, headerLineIndex, promotedLineIndex, firstContent }
 }
 
 const shouldMaskBlockquoteTailLine = (

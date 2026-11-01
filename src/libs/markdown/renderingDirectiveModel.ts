@@ -126,7 +126,7 @@ export const isValidAsideCloseCandidate = (
   const rawOriginal = snapshot[lineIndex - index]!
   if (!hasCommonMarkCodeIndent(rawOriginal)) return true
   const beforeClose = stripClosingAsideTag(rawOriginal)
-  const firstNonBlank = snapshot.slice(1).find((row) => row.trim().length > 0) ?? ""
+  const firstNonBlank = snapshot.slice(1, blankIndex - index).find((row) => row.trim().length > 0) ?? ""
   if ((!beforeClose || beforeClose.trim().length === 0) && hasCommonMarkCodeIndent(firstNonBlank)) {
     return true
   }
@@ -257,6 +257,53 @@ export const extractPromotedBoldTitle = (trimmedLine: string): string | null => 
 
 export const isPromotedCalloutTitleLine = (trimmedLine: string): boolean =>
   (extractPromotedHeadingTitle(trimmedLine) ?? extractPromotedBoldTitle(trimmedLine)) !== null
+
+type BlockquoteHeaderScanState = {
+  headerLineIndex: number
+  promotedLineIndex: number
+  firstContent: string
+}
+
+const stepBlockquoteHeaderScan = (
+  state: BlockquoteHeaderScanState,
+  line: string,
+  cursor: number
+): void => {
+  const afterQuote = line.replace(/^\s*>\s?/, "")
+  const stripped = afterQuote.trim()
+  if (!stripped) return
+  const indented = hasCommonMarkCodeIndent(afterQuote)
+  if (state.headerLineIndex === -1) {
+    if (indented) {
+      state.headerLineIndex = -2
+      return
+    }
+    state.headerLineIndex = cursor
+    state.firstContent = stripped
+    return
+  }
+  if (state.promotedLineIndex === -1) {
+    state.promotedLineIndex =
+      !indented && isPromotedCalloutTitleLine(stripped) ? cursor : -2
+  }
+}
+
+export const findBlockquoteHeaderAndPromotedIndex = (
+  lines: readonly string[],
+  startIndex: number
+): { cursor: number; headerLineIndex: number; promotedLineIndex: number; firstContent: string } => {
+  const state: BlockquoteHeaderScanState = {
+    headerLineIndex: -1,
+    promotedLineIndex: -1,
+    firstContent: "",
+  }
+  let cursor = startIndex
+  while (cursor < lines.length && lines[cursor]!.trimStart().startsWith(">")) {
+    stepBlockquoteHeaderScan(state, lines[cursor]!, cursor)
+    cursor += 1
+  }
+  return { cursor, ...state }
+}
 
 export const findPromotedCalloutTitleLineIndex = (
   lines: readonly string[],

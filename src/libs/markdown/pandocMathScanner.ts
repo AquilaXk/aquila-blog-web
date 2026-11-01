@@ -421,14 +421,15 @@ const findClosingDoubleDollarOffset = (
   excludedRanges: readonly MathSpanRange[]
 ): number => {
   const scanLimit = Math.min(text.length - 1, openIndex + 2 + DEFAULT_MAX_DISPLAY_MATH_LENGTH)
-  for (let cursor = openIndex + 2; cursor < scanLimit; cursor += 1) {
+  let cursor = openIndex + 2
+  while (cursor < scanLimit) {
     const code = text.codePointAt(cursor) ?? 0
     if (singleLineOnly && (code === 10 || code === 13)) return -1
     if (overlapsSortedRanges(excludedRanges, cursor, cursor + 1)) return -1
     const skippedEnd = stepDisplayMathInnerConstructAt(text, cursor)
     if (skippedEnd > cursor) {
       if (text.slice(cursor, skippedEnd).includes("$$")) return -1
-      cursor = skippedEnd - 1
+      cursor = skippedEnd
       continue
     }
     if (
@@ -439,6 +440,7 @@ const findClosingDoubleDollarOffset = (
     ) {
       return cursor
     }
+    cursor += 1
   }
   return -1
 }
