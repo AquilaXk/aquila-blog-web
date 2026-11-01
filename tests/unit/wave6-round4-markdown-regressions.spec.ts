@@ -808,10 +808,10 @@ test.describe("wave6 round4 public markdown regressions", () => {
 
     const calloutIndentedHtml = renderMarkdownHtml("> [!NOTE] Callout Title\n> Callout body\n    echo $HOME")
     expect(calloutIndentedHtml).toContain("Callout Title")
-    expect(calloutIndentedHtml).toContain("echo $HOME")
+    expect(calloutIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
     const imageIndentedHtml = renderMarkdownHtml("![alt](/post/api/v1/images/a.png)\n    echo $HOME")
     expect(imageIndentedHtml).toContain("/post/api/v1/images/a.png")
-    expect(imageIndentedHtml).toContain("echo $HOME")
+    expect(imageIndentedHtml).toContain('class="aq-code aq-pretty-pre"')
 
     const literalSentinelDoc = "Prefix AQCODE0N0E and \uE000aqp0zeq\uE001 with `$100` and <b>bold</b> + \\==plain=="
     expect(normalizeLegacyInlineHtmlMarkdown(literalSentinelDoc)).toContain("\`$100\` and **bold**")

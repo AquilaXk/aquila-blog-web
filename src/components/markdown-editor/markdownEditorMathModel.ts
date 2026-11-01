@@ -5,12 +5,12 @@ import {
   isEscapedMarkdownAt,
   mergeSortedSpanRanges,
   overlapsSortedRanges,
+  parseDedicatedLineQuoteDepth,
   scanInlineCodeSpanEnd,
   scanPandocDisplayMathAt,
   scanPandocInlineMathAt,
   type MathSpanRange,
 } from "../../libs/markdown/pandocMathScanner"
-import { resolveDedicatedMathOpen } from "../../libs/markdown/renderingDirectiveModel"
 
 export type MathReplacementSpec = {
   from: number
@@ -142,7 +142,7 @@ const isDedicatedDisplayFenceLineAt = (docText: string, index: number): boolean 
   const lineStart = findLineStartOffset(docText, index)
   const lineEnd = findLineEndOffset(docText, index)
   const line = docText.slice(lineStart, lineEnd)
-  const parsed = resolveDedicatedMathOpen(docText, index, line)
+  const parsed = parseDedicatedLineQuoteDepth(line)
   if (!parsed) return false
   const strippedStart = lineStart + (line.length - parsed.rest.length)
   return index === strippedStart && parsed.rest.startsWith("$$") && parsed.rest.slice(2).trim() === ""

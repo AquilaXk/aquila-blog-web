@@ -1,4 +1,3 @@
-import { parseCommonMarkBlockRanges } from "src/libs/markdown/commonMarkCodeBlockRanges"
 import {
   hasCommonMarkCodeIndent,
   overlapsSortedRanges,
@@ -14,6 +13,19 @@ export type CustomDirectiveKind = "bookmark" | "embed" | "file"
 export type PendingDirectiveMetadata = {
   kind: CustomDirectiveKind
   attrs: Record<string, unknown>
+}
+
+export type CommonMarkContainerRangeSnapshot = {
+  asideRanges: MathSpanRange[]
+  containerCloseRanges: MathSpanRange[]
+}
+
+let blockRangeProvider: ((content: string) => CommonMarkContainerRangeSnapshot) | null = null
+
+export const registerCommonMarkBlockRangeProvider = (
+  provider: (content: string) => CommonMarkContainerRangeSnapshot
+): void => {
+  blockRangeProvider = provider
 }
 
 export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
@@ -88,30 +100,15 @@ export const findFirstBlankLineIndex = (lines: readonly string[], startIndex: nu
 }
 
 export const hasExcludedAsideCloseOrFenceBeforeBlank = (sliceBeforeBlank: readonly string[]): boolean =>
-  sliceBeforeBlank.some(
-    (row) =>
+  sliceBeforeBlank.some((row) => {
+    const trimmed = row.trimStart()
+    return (
       stripClosingAsideTag(row) !== null ||
-      parseOpeningCodeFence(row.trimStart()) !== null ||
-      row.trimStart().startsWith("<!--")
-  )
-
-export const unindentAsideScanLines = (
-  lines: string[],
-  startIndex: number,
-  blankIndex: number
-): void => {
-  const firstNonBlank = lines.slice(startIndex, blankIndex).find((row) => row.trim().length > 0) ?? ""
-  const asideStartsIndented = /^[ \t]/.test(firstNonBlank)
-  const limit = asideStartsIndented ? lines.length : blankIndex
-  for (let cursor = startIndex; cursor < limit; cursor += 1) {
-    const raw = lines[cursor]!
-    if (cursor >= blankIndex && hasCommonMarkCodeIndent(raw)) {
-      const beforeClose = stripClosingAsideTag(raw)
-      if (beforeClose !== null && beforeClose.trim().length > 0) continue
-    }
-    lines[cursor] = unindentLinePreservingLength(raw)
-  }
-}
+      parseOpeningCodeFence(trimmed) !== null ||
+      trimmed.startsWith("<!--") ||
+      trimmed.trimEnd() === "$"
+    )
+  })
 
 export const maskUnclosedAsideBeforeBlank = (
   lines: string[],
@@ -123,7 +120,7 @@ export const maskUnclosedAsideBeforeBlank = (
     closeFenceIndex -= 1
   }
   if (closeFenceIndex <= index) {
-    lines[index] = neutralizeAsideOpenTagPreservingLength(lines[index]!)
+    maskLinesInRange(lines, index, blankIndex - 1)
     return
   }
   lines[index] = maskLineWithThreeTildes(lines[index]!)
@@ -131,6 +128,9 @@ export const maskUnclosedAsideBeforeBlank = (
     lines[cursor] = maskLineWithSpaces(lines[cursor]!)
   }
   lines[closeFenceIndex] = maskLineWithThreeTildes(lines[closeFenceIndex]!)
+  if (closeFenceIndex + 1 <= blankIndex - 1) {
+    maskLinesInRange(lines, closeFenceIndex + 1, blankIndex - 1)
+  }
 }
 
 export const extractAsideOpenTail = (line: string): string | null => {
@@ -149,6 +149,24 @@ export const stripClosingAsideTag = (value: string): string | null => {
   return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
 }
 
+export const isValidAsideCloseCandidate = (
+  candidate: string,
+  lineIndex: number,
+  index: number,
+  blankIndex: number,
+  snapshot: readonly string[],
+  lineStarts: readonly number[],
+  preAsideCodeRanges: readonly MathSpanRange[]
+): boolean => {
+  if (stripClosingAsideTag(candidate) === null) return false
+  if (lineIndex < blankIndex) return true
+  const rawOriginal = snapshot[lineIndex - index]!
+  const beforeClose = stripClosingAsideTag(rawOriginal)
+  if (!beforeClose || beforeClose.trim().length === 0) return true
+  const lineStart = lineStarts[lineIndex]!
+  return !overlapsSortedRanges(preAsideCodeRanges, lineStart, lineStart + Math.max(1, rawOriginal.length))
+}
+
 export const isDedicatedFormulaFenceLine = (line: string): boolean =>
   !hasCommonMarkCodeIndent(line) && line.trim() === "$$"
 
@@ -163,16 +181,11 @@ export const resolveDedicatedMathOpen = (
   openLine: string
 ): { quoteDepth: number; rest: string; allowAsideIndent: boolean } | null => {
   const inAside =
+    blockRangeProvider !== null &&
     ASIDE_TAG_CASE_INSENSITIVE_PATTERN.test(text) &&
-    overlapsSortedRanges(parseCommonMarkBlockRanges(text).asideRanges, openIndex, openIndex + 1)
-  const direct = parseDedicatedLineQuoteDepth(openLine)
-  if (direct) {
-    return { ...direct, allowAsideIndent: direct.quoteDepth === 0 && inAside }
-  }
-  if (!inAside) return null
-  const trimmedStart = openLine.trimStart()
-  if (!trimmedStart.startsWith("$$")) return null
-  return { quoteDepth: 0, rest: trimmedStart, allowAsideIndent: true }
+    overlapsSortedRanges(blockRangeProvider(text).asideRanges, openIndex, openIndex + 1)
+  const parsed = parseDedicatedLineQuoteDepth(inAside ? openLine.trimStart() : openLine)
+  return parsed ? { ...parsed, allowAsideIndent: inAside } : null
 }
 
 export const isDedicatedMathCloseLine = (
@@ -180,12 +193,11 @@ export const isDedicatedMathCloseLine = (
   openQuoteDepth: number,
   allowAsideIndent: boolean
 ): boolean => {
-  if (allowAsideIndent) return line.trim() === "$$"
-  const parsedClose = parseDedicatedLineQuoteDepth(line)
+  const parsedClose = parseDedicatedLineQuoteDepth(allowAsideIndent ? line.trimStart() : line)
   return (
     parsedClose !== null &&
     parsedClose.quoteDepth === openQuoteDepth &&
-    parsedClose.rest.startsWith("$$") &&
+    parsedClose.rest.startsWith("$") &&
     parsedClose.rest.slice(2).trim() === ""
   )
 }
@@ -205,10 +217,10 @@ export const isDedicatedFormulaBoundaryLine = (
     return true
   }
   if (
-    DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) ||
-    stripClosingAsideTag(strippedLine) !== null
+    blockRangeProvider !== null &&
+    (DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) || stripClosingAsideTag(strippedLine) !== null)
   ) {
-    const { containerCloseRanges } = parseCommonMarkBlockRanges(text)
+    const { containerCloseRanges } = blockRangeProvider(text)
     return overlapsSortedRanges(containerCloseRanges, lineStart, Math.max(lineStart + 1, lineEnd))
   }
   return false

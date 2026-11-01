@@ -21,14 +21,15 @@ import {
   isLineStartInCommentRanges,
   isPromotedCalloutTitleLine,
   isTopLevelFormulaStopLine,
+  isValidAsideCloseCandidate,
   maskBlockquoteHeaderLine,
   maskLinesInRange,
   maskLineWithBreakAndHeading,
   maskUnclosedAsideBeforeBlank,
   neutralizeAsideOpenTagPreservingLength,
   parseCustomDirectiveHeader,
+  registerCommonMarkBlockRangeProvider,
   stripClosingAsideTag,
-  unindentAsideScanLines,
   unindentLinePreservingLength,
 } from "./renderingDirectiveModel"
 import { parseStandaloneMarkdownImageLine } from "./renderingImageModel"
@@ -176,11 +177,11 @@ const findBoundedFormulaCloseInContainer = (
   startIndex: number,
   lineStarts: readonly number[],
   codeRanges: readonly MathSpanRange[],
-  isCloseLine: (candidate: string) => boolean
+  isCloseLine: (candidate: string, lineIndex: number) => boolean
 ): number => {
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index]!
-    if (isTopLevelFormulaStopLine(line) || isCloseLine(line)) return -1
+    if (isTopLevelFormulaStopLine(line) || isCloseLine(line, index)) return -1
     const lineStart = lineStarts[index]!
     if (
       isDedicatedFormulaFenceLine(line) &&
@@ -213,14 +214,14 @@ const resolveContainerCloseWithBoundedFormulas = (
   lines: string[],
   startIndex: number,
   lineStarts: readonly number[],
-  isCloseLine: (candidate: string) => boolean,
+  isCloseLine: (candidate: string, lineIndex: number) => boolean,
   isAside = false
 ): number => {
   let ranges = parseRawCommonMarkRanges(lines.join("\n"))
   for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
     const line = lines[cursor]!
     const lineStart = lineStarts[cursor]!
-    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true) && isCloseLine(line)) {
+    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true) && isCloseLine(line, cursor)) {
       return cursor
     }
     if (isContainerLineExcluded(line, lineStart, ranges, isAside, false)) {
@@ -244,13 +245,13 @@ const resolveContainerCloseWithBoundedFormulas = (
   return -1
 }
 
-const isClosingAsideLine = (line: string): boolean => stripClosingAsideTag(line) !== null
 const isClosingDirectiveLine = (line: string): boolean => DIRECTIVE_CLOSE_LINE_PATTERN.test(line)
 
 const tryMaskAsideBlockAt = (
   lines: string[],
   index: number,
   lineStarts: readonly number[],
+  currentRanges: CommonMarkBlockRanges,
   asideRanges: MathSpanRange[],
   containerCloseRanges: MathSpanRange[]
 ): { nextIndex: number; mutated: boolean } | null => {
@@ -264,12 +265,23 @@ const tryMaskAsideBlockAt = (
   const blankIndex = findFirstBlankLineIndex(lines, index + 1)
   const snapshot = lines.slice(index)
   lines[index] = maskLineWithBreakAndHeading(line)
-  unindentAsideScanLines(lines, index + 1, blankIndex)
+  for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+    lines[cursor] = unindentLinePreservingLength(lines[cursor]!)
+  }
   const closeIndex = resolveContainerCloseWithBoundedFormulas(
     lines,
     index + 1,
     lineStarts,
-    isClosingAsideLine,
+    (candidate, cursor) =>
+      isValidAsideCloseCandidate(
+        candidate,
+        cursor,
+        index,
+        blankIndex,
+        snapshot,
+        lineStarts,
+        currentRanges.codeBlockRanges
+      ),
     true
   )
   if (closeIndex < 0) {
@@ -280,9 +292,6 @@ const tryMaskAsideBlockAt = (
       lines[index] = neutralizeAsideOpenTagPreservingLength(line)
     }
     return { nextIndex: index + 1, mutated: true }
-  }
-  for (let cursor = blankIndex; cursor < closeIndex; cursor += 1) {
-    lines[cursor] = unindentLinePreservingLength(lines[cursor]!)
   }
   const closeStart = lineStarts[closeIndex]!
   const closeEnd = closeStart + Math.max(1, lines[closeIndex]!.length)
@@ -475,6 +484,7 @@ const tryMaskCustomBlockStepAt = (
       lines,
       index,
       lineStarts,
+      currentRanges,
       asideRanges,
       containerCloseRanges
     )
@@ -569,3 +579,5 @@ export const parseCommonMarkBlockRanges = (content: string): CommonMarkBlockRang
 
 export const collectCommonMarkCodeBlockRanges = (content: string): MathSpanRange[] =>
   parseCommonMarkBlockRanges(content).codeBlockRanges
+
+registerCommonMarkBlockRangeProvider(parseCommonMarkBlockRanges)
