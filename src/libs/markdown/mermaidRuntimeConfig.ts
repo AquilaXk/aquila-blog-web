@@ -325,6 +325,12 @@ export const cleanupTemporaryMermaidDom = (renderId: string) => {
   }
 }
 
+let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
+let lastInitializedThemeKey: string | null = null
+let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
+let activeTimedOutRenderSettlement: Promise<unknown> | null = null
+let mermaidExecutionQueue: Promise<unknown> = Promise.resolve()
+
 export const renderMermaidInstanceWithTimeout = async (
   mermaidInstance: MermaidRuntimeInstance,
   renderId: string,
@@ -332,37 +338,42 @@ export const renderMermaidInstanceWithTimeout = async (
   timeoutMs = MERMAID_RENDER_TIMEOUT_MS
 ): Promise<{ svg: string }> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
-  let timedOut = false
   const renderPromise = Promise.resolve(mermaidInstance.render(renderId, sourceToRender))
   try {
     const timed = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        timedOut = true
         cleanupTemporaryMermaidDom(renderId)
+        const settlement = renderPromise.then(
+          () => cleanupTemporaryMermaidDom(renderId),
+          () => cleanupTemporaryMermaidDom(renderId)
+        )
+        const chainedSettlement: Promise<unknown> = (
+          activeTimedOutRenderSettlement ?? Promise.resolve()
+        )
+          .then(
+            () => settlement,
+            () => settlement
+          )
+          .finally(() => {
+            if (activeTimedOutRenderSettlement === chainedSettlement) {
+              activeTimedOutRenderSettlement = null
+            }
+          })
+        activeTimedOutRenderSettlement = chainedSettlement
         reject(new Error(`MERMAID_RENDER_TIMEOUT:${timeoutMs}`))
       }, timeoutMs)
     })
     return await Promise.race([renderPromise, timed])
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId)
-    if (timedOut) {
-      void renderPromise.then(
-        () => cleanupTemporaryMermaidDom(renderId),
-        () => cleanupTemporaryMermaidDom(renderId)
-      )
-    }
   }
 }
-
-let sharedMermaidPromise: Promise<MermaidRuntimeInstance> | null = null
-let lastInitializedThemeKey: string | null = null
-let activeMermaidParseWarningHandler: ((error: unknown) => void) | null = null
-let mermaidExecutionQueue: Promise<unknown> = Promise.resolve()
 
 export const resetSharedMermaidRuntimeForTests = () => {
   sharedMermaidPromise = null
   lastInitializedThemeKey = null
   activeMermaidParseWarningHandler = null
+  activeTimedOutRenderSettlement = null
   mermaidExecutionQueue = Promise.resolve()
 }
 
@@ -410,6 +421,9 @@ export const runSerializedMermaidTask = <T>(
   runtimeLoader?: () => Promise<unknown>
 ): Promise<T> => {
   const scheduled = mermaidExecutionQueue.then(async () => {
+    while (activeTimedOutRenderSettlement) {
+      await activeTimedOutRenderSettlement
+    }
     const preset = resolveMermaidPreset(scheme)
     const mermaidRuntime = await ensureSharedMermaidInstance(runtimeLoader)
     activeMermaidParseWarningHandler = onParseWarning ?? null
@@ -421,8 +435,8 @@ export const runSerializedMermaidTask = <T>(
     }
   })
   mermaidExecutionQueue = scheduled.then(
-    () => undefined,
-    () => undefined
+    () => activeTimedOutRenderSettlement ?? undefined,
+    () => activeTimedOutRenderSettlement ?? undefined
   )
   return scheduled
 }

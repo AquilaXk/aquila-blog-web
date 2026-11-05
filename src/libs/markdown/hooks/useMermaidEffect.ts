@@ -102,7 +102,7 @@ const useMermaidEffect = (
     scheduleRun()
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        scheduleRun()
+        scheduleRun(true)
       }
     }
     let lastObservedWidth = Math.floor(root.getBoundingClientRect().width)

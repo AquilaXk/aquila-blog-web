@@ -141,6 +141,7 @@ export const markMermaidBlockRendered = (
   block.dataset.mermaidPreset = preset.mode
   block.dataset.mermaidRendered = "true"
   block.dataset.mermaidRetryCount = "0"
+  delete block.dataset.mermaidTimeoutRetryCount
   delete block.dataset.mermaidErrorKind
   block.classList.remove("aq-mermaid-error")
 }
