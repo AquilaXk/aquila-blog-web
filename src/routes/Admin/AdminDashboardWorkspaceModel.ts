@@ -1,4 +1,5 @@
 import type { IconName } from "src/components/icons/AppIcon"
+import { formatWithNormalizedHours } from "src/libs/utils"
 
 export type SystemHealthPayload = {
   status?: string
@@ -98,7 +99,7 @@ export const resolveDashboardDataUpdatedAt = (...timestamps: number[]) => {
 const DASHBOARD_FRESHNESS_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
 })
 
@@ -107,14 +108,17 @@ const DASHBOARD_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
 })
 
 export const formatDashboardFreshnessLabel = (dataUpdatedAtMs: number) => {
   if (!dataUpdatedAtMs) return null
 
-  const formatted = DASHBOARD_FRESHNESS_FORMATTER.format(new Date(dataUpdatedAtMs))
+  const formatted = formatWithNormalizedHours(
+    DASHBOARD_FRESHNESS_FORMATTER,
+    new Date(dataUpdatedAtMs)
+  )
 
   return `${formatted} 기준`
 }
@@ -151,7 +155,7 @@ export const formatInstant = (value: string | null | undefined) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return DASHBOARD_INSTANT_FORMATTER.format(date)
+  return formatWithNormalizedHours(DASHBOARD_INSTANT_FORMATTER, date)
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

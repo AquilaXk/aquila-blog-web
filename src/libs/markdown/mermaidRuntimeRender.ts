@@ -68,6 +68,7 @@ type ControllerInternalState = {
   renderQueue: Promise<void>
   activeQueueCount: number
   renderingBlocks: Set<HTMLElement>
+  blockRetryTimers: Map<HTMLElement, number>
   observedBlocks: WeakSet<HTMLElement>
   premeasuredRects: WeakMap<HTMLElement, DOMRect>
   renderSequence: number
@@ -131,16 +132,44 @@ const batchMeasureCandidateBlocks = (
   }
 }
 
-const scheduleBlockRetry = (state: ControllerInternalState, block: HTMLElement): boolean => {
+const clearBlockRetryTimer = (state: ControllerInternalState, block: HTMLElement) => {
+  const existingTimerId = state.blockRetryTimers.get(block)
+  if (existingTimerId === undefined) return
+  window.clearTimeout(existingTimerId)
+  state.options.retryTimers.delete(existingTimerId)
+  state.blockRetryTimers.delete(block)
+}
+
+const clearAllBlockRetryTimers = (state: ControllerInternalState) => {
+  state.blockRetryTimers.forEach((timerId) => {
+    window.clearTimeout(timerId)
+    state.options.retryTimers.delete(timerId)
+  })
+  state.blockRetryTimers.clear()
+}
+
+const scheduleBlockRetry = (
+  state: ControllerInternalState,
+  block: HTMLElement,
+  options?: { isTimeoutRetry?: boolean }
+): boolean => {
+  clearBlockRetryTimer(state, block)
+  if (options?.isTimeoutRetry) {
+    const timeoutRetryCount = Number.parseInt(block.dataset.mermaidTimeoutRetryCount || "0", 10)
+    if (timeoutRetryCount >= 1) return false
+    block.dataset.mermaidTimeoutRetryCount = String(timeoutRetryCount + 1)
+  }
   const retryCount = Number.parseInt(block.dataset.mermaidRetryCount || "0", 10)
   if (retryCount >= MAX_RETRY_COUNT) return false
   block.dataset.mermaidRetryCount = String(retryCount + 1)
   state.premeasuredRects.delete(block)
   const timerId = window.setTimeout(() => {
     state.options.retryTimers.delete(timerId)
+    state.blockRetryTimers.delete(block)
     state.enqueueRender(block)
   }, RETRY_BASE_DELAY_MS * (retryCount + 1))
   state.options.retryTimers.add(timerId)
+  state.blockRetryTimers.set(block, timerId)
   return true
 }
 
@@ -236,8 +265,14 @@ const renderSourceIntoStageBlock = async ({
   })
 }
 
-const isRetriableMermaidError = (error: unknown): boolean =>
-  !isMermaidSyntaxError(error) && !isMermaidRenderTimeoutError(error)
+const isRetriableMermaidError = (error: unknown, block?: HTMLElement): boolean => {
+  if (isMermaidSyntaxError(error)) return false
+  if (isMermaidRenderTimeoutError(error)) {
+    const timeoutRetryCount = Number.parseInt(block?.dataset.mermaidTimeoutRetryCount || "0", 10)
+    return timeoutRetryCount < 1
+  }
+  return true
+}
 
 const tryRenderFallbackMermaidSource = async ({
   state,
@@ -272,7 +307,12 @@ const tryRenderFallbackMermaidSource = async ({
       "[mermaid] fallback render failed",
       fallbackError
     )
-    return isRetriableMermaidError(fallbackError) && scheduleBlockRetry(state, block)
+    return (
+      isRetriableMermaidError(fallbackError, block) &&
+      scheduleBlockRetry(state, block, {
+        isTimeoutRetry: isMermaidRenderTimeoutError(fallbackError),
+      })
+    )
   }
 }
 
@@ -295,6 +335,7 @@ const handleBlockRenderFailure = async ({
 
   const fallbackSource = stripRiskyFlowchartDirectives(prepared.desiredSource).trim()
   const canTryFallback =
+    !isMermaidRenderTimeoutError(error) &&
     Boolean(fallbackSource) &&
     fallbackSource !== prepared.desiredSource &&
     fallbackSource !== prepared.renderableSource
@@ -310,8 +351,18 @@ const handleBlockRenderFailure = async ({
     if (handledByFallback) return
   }
 
-  if (isRetriableMermaidError(error) && scheduleBlockRetry(state, block)) return
+  if (
+    isRetriableMermaidError(error, block) &&
+    scheduleBlockRetry(state, block, { isTimeoutRetry: isMermaidRenderTimeoutError(error) })
+  ) {
+    return
+  }
 
+  if (isMermaidRenderTimeoutError(error)) {
+    block.dataset.mermaidErrorKind = "timeout"
+  } else {
+    delete block.dataset.mermaidErrorKind
+  }
   markMermaidBlockError(
     block,
     state.options.preset,
@@ -445,7 +496,9 @@ const ensureLazyIntersectionObserver = (state: ControllerInternalState): Interse
 }
 
 const enqueueBlockIntoRenderQueue = (state: ControllerInternalState, block: HTMLElement) => {
-  if (!block || state.renderingBlocks.has(block)) return
+  if (!block) return
+  clearBlockRetryTimer(state, block)
+  if (state.renderingBlocks.has(block)) return
   state.renderingBlocks.add(block)
   state.activeQueueCount += 1
   state.renderQueue = state.renderQueue
@@ -468,10 +521,19 @@ const resetControllerLayoutCache = (
   state.cachedDesktopWideLaneBounds = undefined
   state.premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
   if (!clearBlockCache) return
+  clearAllBlockRetryTimers(state)
   state.options.root
-    .querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']")
+    .querySelectorAll<HTMLElement>(
+      "[data-mermaid-rendered='true'], [data-mermaid-rendered='error'][data-mermaid-error-kind='timeout'], [data-mermaid-rendered='pending']"
+    )
     .forEach((block) => {
-      delete block.dataset.mermaidRendered
+      if (block.dataset.mermaidRendered !== "pending") {
+        delete block.dataset.mermaidRendered
+        delete block.dataset.mermaidErrorKind
+        block.classList?.remove?.("aq-mermaid-error")
+      }
+      delete block.dataset.mermaidTimeoutRetryCount
+      block.dataset.mermaidRetryCount = "0"
     })
 }
 
@@ -505,6 +567,7 @@ export const createMermaidRuntimeController = (options: MermaidRuntimeController
     renderQueue: Promise.resolve(),
     activeQueueCount: 0,
     renderingBlocks: new Set<HTMLElement>(),
+    blockRetryTimers: new Map<HTMLElement, number>(),
     observedBlocks: new WeakSet<HTMLElement>(),
     premeasuredRects: new WeakMap<HTMLElement, DOMRect>(),
     renderSequence: 0,
@@ -514,7 +577,8 @@ export const createMermaidRuntimeController = (options: MermaidRuntimeController
   }
 
   state.enqueueRender = (block: HTMLElement) => enqueueBlockIntoRenderQueue(state, block)
-  const isRendering = () => state.activeQueueCount > 0 || state.renderingBlocks.size > 0
+  const isRendering = () =>
+    state.activeQueueCount > 0 || state.renderingBlocks.size > 0 || state.blockRetryTimers.size > 0
 
   return {
     isRendering,
@@ -522,6 +586,7 @@ export const createMermaidRuntimeController = (options: MermaidRuntimeController
       resetControllerLayoutCache(state, isRendering, clearBlockCache),
     renderMermaidBlocks: () => runControllerMermaidBlocks(state),
     dispose: () => {
+      clearAllBlockRetryTimers(state)
       state.mermaidOverlayCleanup?.()
       state.mermaidOverlayCleanup = null
       state.intersectionObserver?.disconnect()

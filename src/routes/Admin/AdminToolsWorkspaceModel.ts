@@ -1,5 +1,6 @@
-export type JsonValue = unknown
+import { formatWithNormalizedHours } from "src/libs/utils"
 
+export type JsonValue = unknown
 export type TaskRetryPolicy = {
   label: string
   maxRetries: number
@@ -73,7 +74,7 @@ const TOOLS_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE,
 })
 
@@ -83,7 +84,7 @@ export const formatInstant = (value: string | null | undefined) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return TOOLS_INSTANT_FORMATTER.format(date)
+  return formatWithNormalizedHours(TOOLS_INSTANT_FORMATTER, date)
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

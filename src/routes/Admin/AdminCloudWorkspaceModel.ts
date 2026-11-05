@@ -1,5 +1,5 @@
 import type { CloudFile, CloudMediaKind } from "src/apis/backend/cloud"
-import { formatFileSize } from "src/libs/utils"
+import { formatFileSize, formatWithNormalizedHours } from "src/libs/utils"
 
 export type CloudMediaFilter = "ALL" | CloudMediaKind
 export type CloudSortMode = "LATEST" | "OLDEST" | "NAME" | "SIZE"
@@ -71,13 +71,15 @@ const CLOUD_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Asia/Seoul",
 })
 
 export const formatCloudDate = (value?: string) => {
   if (!value) return "날짜 없음"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "날짜 없음"
-  return CLOUD_DATE_FORMATTER.format(date)
+  return formatWithNormalizedHours(CLOUD_DATE_FORMATTER, date)
 }
 
 export const getUploadStatusLabel = (status: UploadQueueStatus) => {

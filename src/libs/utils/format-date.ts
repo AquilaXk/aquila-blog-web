@@ -25,7 +25,7 @@ const getDateTimePartsFormatter = (lang: string, timeZone: string): Intl.DateTim
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
     timeZone,
   })
   dateTimePartsFormatterCache.set(key, formatter)
@@ -84,7 +84,7 @@ const toParts = (
     if (part.type === "year") year = part.value
     else if (part.type === "month") month = part.value
     else if (part.type === "day") day = part.value
-    else if (part.type === "hour") hour = part.value
+    else if (part.type === "hour") hour = part.value === "24" ? "00" : part.value
     else if (part.type === "minute") minute = part.value
   }
 
@@ -116,6 +116,15 @@ export const formatShortDateTime = (
   if (!parts) return ""
   return `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`
 }
+
+export const formatWithNormalizedHours = (
+  formatter: Intl.DateTimeFormat,
+  date: Date
+): string =>
+  formatter
+    .formatToParts(date)
+    .map((part) => (part.type === "hour" && part.value === "24" ? "00" : part.value))
+    .join("")
 
 export const formatIsoDateTime = (value?: string, fallback: string = "-"): string => {
   if (!value) return fallback

@@ -2,7 +2,24 @@ import { expect, test } from "@playwright/test"
 import { EditorSelection, EditorState } from "@codemirror/state"
 import { markdown } from "@codemirror/lang-markdown"
 import { GFM } from "@lezer/markdown"
+import {
+  MERMAID_RENDER_TIMEOUT_MS,
+  renderMermaidInstanceWithTimeout,
+  renderSerializedMermaidSvg,
+  resetSharedMermaidRuntimeForTests,
+} from "../../src/libs/markdown/mermaidRuntimeConfig"
 import { createMermaidRuntimeController } from "../../src/libs/markdown/mermaidRuntimeRender"
+import {
+  formatDateTime,
+  formatShortDateTime,
+  formatWithNormalizedHours,
+} from "../../src/libs/utils"
+import {
+  formatDashboardFreshnessLabel,
+  formatInstant as formatDashboardInstant,
+} from "../../src/routes/Admin/AdminDashboardWorkspaceModel"
+import { formatInstant as formatToolsInstant } from "../../src/routes/Admin/AdminToolsWorkspaceModel"
+import { formatCloudDate } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 import { shouldScheduleMermaidResize } from "../../src/libs/markdown/hooks/useMermaidEffect"
 import { createPrismEffectRuntime } from "../../src/libs/markdown/prismEffectRuntime"
 import {
@@ -563,5 +580,313 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
         },
       ])
     ).toThrow(/reserved/i)
+  })
+
+  test("AC7: Mermaid cold-chunk timeout retries once, cleans temporary DOM nodes, unlocks on resetLayoutCache(true), and formats midnight KST as 00:xx", async () => {
+    expect.soft(MERMAID_RENDER_TIMEOUT_MS).toBe(15000)
+    expect.soft(formatDateTime("2026-10-08T15:18:45Z", "ko-KR", "Asia/Seoul")).toBe("2026.10.09 00:18")
+    expect.soft(formatShortDateTime("2026-10-08T15:18:45Z", "ko-KR", "Asia/Seoul")).toBe("10.09 00:18")
+    expect
+      .soft(formatDateTime("2026-10-08T15:18:45Z", "ko-KR-u-hc-h24", "Asia/Seoul"))
+      .toBe("2026.10.09 00:18")
+    expect
+      .soft(formatShortDateTime("2026-10-08T15:18:45Z", "ko-KR-u-hc-h24", "Asia/Seoul"))
+      .toBe("10.09 00:18")
+    const h24Formatter = new Intl.DateTimeFormat("ko-KR-u-hc-h24", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Seoul",
+    })
+    expect.soft(formatWithNormalizedHours(h24Formatter, new Date("2026-10-08T15:18:45Z"))).toBe("00:18")
+    expect.soft(formatDashboardFreshnessLabel(Date.parse("2026-10-08T15:18:45Z"))).toBe("00:18 기준")
+    expect.soft(formatDashboardInstant("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatDashboardInstant("2026-10-08T15:18:45Z")).toContain("00:18")
+    expect.soft(formatToolsInstant("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatToolsInstant("2026-10-08T15:18:45Z")).toContain("00:18")
+    expect.soft(formatCloudDate("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatCloudDate("2026-10-08T15:18:45Z")).toContain("00:18")
+
+    const origWin = (globalThis as Record<string, unknown>).window
+    const origDoc = (globalThis as Record<string, unknown>).document
+    const strayNodes = new Map<string, { remove: () => void }>()
+    const registerStraySet = (renderId: string) => {
+      for (const targetId of [`d${renderId}`, `i${renderId}`, renderId]) {
+        strayNodes.set(targetId, {
+          remove: () => {
+            strayNodes.delete(targetId)
+          },
+        })
+      }
+    }
+
+    const makeStageBlock = (source: string, initialZeroWidth = false) => {
+      const code = {
+        className: "language-mermaid",
+        textContent: source,
+        getAttribute: (name: string) => (name === "data-language" ? "mermaid" : null),
+      } as unknown as HTMLElement
+      let innerHTMLValue = `<code class="language-mermaid">${source}</code>`
+      let zeroWidthPending = initialZeroWidth
+      const classes = new Set<string>(["aq-mermaid"])
+      const block = {
+        isConnected: true,
+        get clientWidth() {
+          return zeroWidthPending ? 0 : 640
+        },
+        className: "aq-mermaid",
+        classList: {
+          add: (cls: string) => {
+            classes.add(cls)
+          },
+          remove: (cls: string) => {
+            classes.delete(cls)
+          },
+          contains: (cls: string) => classes.has(cls),
+        },
+        dataset: {
+          aqMermaid: "true",
+          mermaidRendered: "pending",
+          mermaidSource: source,
+        } as DOMStringMap,
+        style: {
+          minHeight: "",
+          overflowX: "",
+          setProperty: () => {},
+        },
+        textContent: source,
+        getAttribute: (name: string) => (name === "data-mermaid-source" ? source : null),
+        closest: () => null,
+        querySelector: () => code,
+        querySelectorAll: () => [],
+        appendChild: () => {},
+        replaceChildren: () => {},
+        getBoundingClientRect: () => {
+          if (zeroWidthPending) {
+            zeroWidthPending = false
+            return { width: 0, height: 0, left: 0, right: 0, top: 0, bottom: 0 } as DOMRect
+          }
+          return { width: 640, height: 180, left: 40, right: 680, top: 0, bottom: 180 } as DOMRect
+        },
+      } as unknown as HTMLElement
+      Object.defineProperty(block, "innerHTML", {
+        get: () => innerHTMLValue,
+        set: (next: string) => {
+          innerHTMLValue = next
+        },
+      })
+      return block
+    }
+
+    try {
+      resetSharedMermaidRuntimeForTests()
+      ;(globalThis as Record<string, unknown>).window = {
+        matchMedia: () => ({ matches: false }),
+        innerHeight: 900,
+        setTimeout: (fn: () => void) => globalThis.setTimeout(fn, 5),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      }
+      ;(globalThis as Record<string, unknown>).document = {
+        getElementById: (id: string) => strayNodes.get(id) ?? null,
+        createElement: () => {
+          const svg = {
+            getAttribute: (attr: string) => (attr === "viewBox" ? "0 0 400 200" : null),
+            setAttribute: () => {},
+            removeAttribute: () => {},
+            querySelectorAll: () => [],
+            style: {},
+          }
+          return {
+            className: "",
+            style: { setProperty: () => {} },
+            innerHTML: "",
+            textContent: "",
+            setAttribute: () => {},
+            appendChild: () => {},
+            querySelector: (sel: string) => (sel === "svg" ? svg : null),
+            addEventListener: () => {},
+          }
+        },
+      }
+
+      let settleRender!: () => void
+      const renderGate = new Promise<void>((resolve) => {
+        settleRender = resolve
+      })
+
+      await expect(
+        renderMermaidInstanceWithTimeout(
+          {
+            initialize: () => {},
+            render: async (id) => {
+              registerStraySet(id)
+              await renderGate
+              registerStraySet(id)
+              return { svg: "<svg></svg>" }
+            },
+          },
+          "aq-timeout-node",
+          "flowchart TD\nA-->B",
+          10
+        )
+      ).rejects.toThrow(/MERMAID_RENDER_TIMEOUT:10/)
+      expect.soft(strayNodes.size).toBe(0)
+      settleRender()
+      await renderGate
+      await Promise.resolve()
+      await Promise.resolve()
+      expect.soft(strayNodes.size).toBe(0)
+
+      resetSharedMermaidRuntimeForTests()
+      let settleTask1!: () => void
+      const task1Gate = new Promise<void>((resolve) => {
+        settleTask1 = resolve
+      })
+      let task2Started = false
+      const mockSharedRuntime: {
+        initialize: () => void
+        parseError?: (err: unknown) => void
+        render: (id: string, src: string) => Promise<{ svg: string }>
+      } = {
+        initialize: () => {},
+        render: async (id, src) => {
+          if (id === "aq-task-1") {
+            await task1Gate
+            mockSharedRuntime.parseError?.("late error")
+            return { svg: `<svg>${src}</svg>` }
+          }
+          task2Started = true
+          return { svg: `<svg>${src}</svg>` }
+        },
+      }
+      const runtimeLoader = async () => mockSharedRuntime
+
+      const task1Promise = renderSerializedMermaidSvg({
+        scheme: "light",
+        renderId: "aq-task-1",
+        source: "flowchart TD\nT1-->T2",
+        runtimeLoader,
+        timeoutMs: 10,
+      })
+      const task2Promise = renderSerializedMermaidSvg({
+        scheme: "light",
+        renderId: "aq-task-2",
+        source: "flowchart TD\nT3-->T4",
+        runtimeLoader,
+        timeoutMs: 200,
+      })
+
+      await expect(task1Promise).rejects.toThrow(/MERMAID_RENDER_TIMEOUT:10/)
+      expect.soft(task2Started).toBe(false)
+      settleTask1()
+      const task2Result = await task2Promise
+      expect.soft(task2Started).toBe(true)
+      expect.soft(task2Result.svg).toContain("T3-->T4")
+
+      const blockRecover = makeStageBlock(
+        "stateDiagram-v2\n  classDef highlight fill:#f00\n  [*] --> R1",
+        true
+      )
+      const blockPersistent = makeStageBlock("flowchart TD\nP1-->P2")
+      const blocks = [blockRecover, blockPersistent]
+      const root = {
+        querySelectorAll: (selector: string) => {
+          if (selector.includes("code")) return []
+          if (selector.includes("data-mermaid-rendered")) {
+            return blocks.filter((b) => {
+              if (
+                selector.includes("[data-mermaid-rendered='true']") &&
+                b.dataset.mermaidRendered === "true"
+              ) {
+                return true
+              }
+              if (
+                selector.includes("[data-mermaid-error-kind='timeout']") &&
+                b.dataset.mermaidRendered === "error" &&
+                b.dataset.mermaidErrorKind === "timeout"
+              ) {
+                return true
+              }
+              if (
+                selector.includes("[data-mermaid-rendered='pending']") &&
+                b.dataset.mermaidRendered === "pending"
+              ) {
+                return true
+              }
+              return false
+            })
+          }
+          return blocks
+        },
+      } as unknown as HTMLElement
+
+      let recoverAttempts = 0
+      const recoverRenderedSources: string[] = []
+      let persistentAttempts = 0
+      const retryTimers = new Set<number>()
+      const controller = createMermaidRuntimeController({
+        root,
+        preset: { mode: "github", themeKey: "test-light-304", config: {} },
+        allowDesktopWideLane: false,
+        lazyViewport: false,
+        shouldLogMermaidWarnings: false,
+        getMermaid: async () => ({
+          initialize: () => {},
+          render: async (_id, src) => {
+            if (src.includes("R1")) {
+              recoverAttempts += 1
+              recoverRenderedSources.push(src)
+              if (recoverAttempts === 1) {
+                throw new Error("MERMAID_RENDER_TIMEOUT:15000")
+              }
+              return { svg: `<svg viewBox="0 0 400 200"><text>${src}</text></svg>` }
+            }
+            persistentAttempts += 1
+            if (persistentAttempts <= 2) {
+              throw new Error("MERMAID_RENDER_TIMEOUT:15000")
+            }
+            return { svg: `<svg viewBox="0 0 400 200"><text>${src}</text></svg>` }
+          },
+        }),
+        isDisposed: () => false,
+        retryTimers,
+        readParseWarning: () => null,
+        clearParseWarning: () => {},
+      })
+
+      await controller.renderMermaidBlocks()
+      for (let step = 0; step < 40 && (retryTimers.size > 0 || controller.isRendering()); step += 1) {
+        await new Promise((r) => setTimeout(r, 5))
+      }
+
+      expect.soft(recoverAttempts).toBe(2)
+      expect.soft(recoverRenderedSources).toHaveLength(2)
+      expect.soft(recoverRenderedSources.every((src) => src.includes("classDef highlight"))).toBe(true)
+      expect.soft(blockRecover.dataset.mermaidRendered).toBe("true")
+      expect.soft(blockRecover.dataset.mermaidErrorKind).toBeUndefined()
+      expect.soft(blockRecover.dataset.mermaidTimeoutRetryCount).toBeUndefined()
+
+      expect.soft(persistentAttempts).toBe(2)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBe("error")
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBe("timeout")
+      expect.soft(blockPersistent.dataset.mermaidTimeoutRetryCount).toBe("1")
+      expect.soft(blockPersistent.classList.contains("aq-mermaid-error")).toBe(true)
+
+      controller.resetLayoutCache(true)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidTimeoutRetryCount).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidRetryCount).toBe("0")
+      expect.soft(blockPersistent.classList.contains("aq-mermaid-error")).toBe(false)
+
+      await controller.renderMermaidBlocks()
+      expect.soft(persistentAttempts).toBe(3)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBe("true")
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBeUndefined()
+    } finally {
+      resetSharedMermaidRuntimeForTests()
+      ;(globalThis as Record<string, unknown>).window = origWin
+      ;(globalThis as Record<string, unknown>).document = origDoc
+    }
   })
 })
