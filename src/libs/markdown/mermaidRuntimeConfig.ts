@@ -414,6 +414,14 @@ const applyMermaidThemePreset = (
   lastInitializedThemeKey = preset.themeKey
 }
 
+const awaitTimedOutRenderSettlement = (): Promise<void> =>
+  activeTimedOutRenderSettlement
+    ? activeTimedOutRenderSettlement.then(
+        () => awaitTimedOutRenderSettlement(),
+        () => awaitTimedOutRenderSettlement()
+      )
+    : Promise.resolve()
+
 export const runSerializedMermaidTask = <T>(
   scheme: "dark" | "light",
   onParseWarning: ((error: unknown) => void) | undefined,
@@ -421,9 +429,7 @@ export const runSerializedMermaidTask = <T>(
   runtimeLoader?: () => Promise<unknown>
 ): Promise<T> => {
   const scheduled = mermaidExecutionQueue.then(async () => {
-    while (activeTimedOutRenderSettlement) {
-      await activeTimedOutRenderSettlement
-    }
+    await awaitTimedOutRenderSettlement()
     const preset = resolveMermaidPreset(scheme)
     const mermaidRuntime = await ensureSharedMermaidInstance(runtimeLoader)
     activeMermaidParseWarningHandler = onParseWarning ?? null
@@ -435,8 +441,8 @@ export const runSerializedMermaidTask = <T>(
     }
   })
   mermaidExecutionQueue = scheduled.then(
-    () => activeTimedOutRenderSettlement ?? undefined,
-    () => activeTimedOutRenderSettlement ?? undefined
+    awaitTimedOutRenderSettlement,
+    awaitTimedOutRenderSettlement
   )
   return scheduled
 }
