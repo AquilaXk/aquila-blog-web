@@ -69,6 +69,7 @@ export const usePostDetailEngagementActions = ({
   activeDetailIdRef.current = detailId
   const didIncrementHitRef = useRef<string | null>(null)
   const likeInFlightRef = useRef(false)
+  const likeRequestSeqRef = useRef(0)
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
   const [hitCount, setHitCount] = useState(incomingHitCount ?? 0)
   const [likesCount, setLikesCount] = useState(incomingLikesCount ?? 0)
@@ -77,6 +78,7 @@ export const usePostDetailEngagementActions = ({
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
 
   useEffect(() => {
+    likeRequestSeqRef.current += 1
     likeInFlightRef.current = false
     setLikePending(false)
     if (!detailId) {
@@ -140,6 +142,11 @@ export const usePostDetailEngagementActions = ({
     const nextLiked = !prevLiked
     const optimisticCount = Math.max(0, prevLikesCount + (nextLiked ? 1 : -1))
 
+    likeRequestSeqRef.current += 1
+    const requestSeq = likeRequestSeqRef.current
+    const isActiveRequest = () =>
+      activeDetailIdRef.current === requestDetailId && likeRequestSeqRef.current === requestSeq
+
     likeInFlightRef.current = true
     setLikePending(true)
     setLiked(nextLiked)
@@ -156,18 +163,18 @@ export const usePostDetailEngagementActions = ({
         queryKey.post(requestDetailId),
         (prev) => (prev ? { ...prev, likesCount: response.data.likesCount } : prev)
       )
-      if (activeDetailIdRef.current === requestDetailId) {
+      if (isActiveRequest()) {
         setLiked(response.data.liked)
         setLikesCount(response.data.likesCount)
       }
     } catch {
       writePostLikedInStorage(normalizedId, prevLiked)
-      if (activeDetailIdRef.current === requestDetailId) {
+      if (isActiveRequest()) {
         setLiked(prevLiked)
         setLikesCount(prevLikesCount)
       }
     } finally {
-      if (activeDetailIdRef.current === requestDetailId) {
+      if (isActiveRequest()) {
         likeInFlightRef.current = false
         setLikePending(false)
       }
