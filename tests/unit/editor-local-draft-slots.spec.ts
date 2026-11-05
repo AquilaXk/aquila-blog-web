@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { expect, test } from "@playwright/test"
+import { clearAllAdminEditorLocalDrafts } from "../../src/libs/privacy/browserStorageRegistry"
 import * as editorStudioStorageModel from "../../src/routes/Admin/editorStudioStorageModel"
 import {
   LOCAL_DRAFT_CREATE_STORAGE_KEY,
@@ -915,6 +918,26 @@ test.describe("editor local draft context slots", () => {
       expect(storage.getItem("aquila_blog_liked_posts_v1")).toBe('["42"]')
       expect(dispatchedEvents).toEqual(["aquila-local-drafts-changed"])
     })
+
+    const restoreThrowingWindow = setGlobal("window", {
+      get localStorage(): Storage {
+        throw new Error("SecurityError: localStorage disabled")
+      },
+    })
+    try {
+      expect(() => clearAllAdminEditorLocalDrafts()).not.toThrow()
+    } finally {
+      restoreThrowingWindow()
+    }
+
+    const repoRoot = path.resolve(__dirname, "../..")
+    const adminShellSource = readFileSync(path.join(repoRoot, "src/routes/Admin/AdminShell.tsx"), "utf8")
+    const adminLoginSource = readFileSync(path.join(repoRoot, "src/pages/admin/login.tsx"), "utf8")
+    const authSessionSource = readFileSync(path.join(repoRoot, "src/hooks/useAuthSession.ts"), "utf8")
+
+    expect(adminShellSource).toContain("clearAllAdminEditorLocalDrafts()")
+    expect(adminLoginSource.match(/clearAllAdminEditorLocalDrafts\(\)/g)?.length).toBe(2)
+    expect(authSessionSource).toContain("clearAllAdminEditorLocalDrafts()")
   })
 })
 

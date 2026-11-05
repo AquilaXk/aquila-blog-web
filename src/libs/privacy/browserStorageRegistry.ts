@@ -227,20 +227,22 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
 
 export const clearAllAdminEditorLocalDrafts = (): void => {
   if (typeof window === "undefined") return
-  const keysToRemove: string[] = []
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index)
-    if (!key) continue
-    if (
-      key === "admin.editor.localDraft.create.v3" ||
-      key.startsWith("admin.editor.localDraft.create.") ||
-      key.startsWith("admin.editor.localDraft.post.")
-    ) {
-      keysToRemove.push(key)
+  try {
+    const keysToRemove: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!key) continue
+      if (
+        key === "admin.editor.localDraft.create.v3" ||
+        key.startsWith("admin.editor.localDraft.create.") ||
+        key.startsWith("admin.editor.localDraft.post.")
+      ) {
+        keysToRemove.push(key)
+      }
     }
-  }
-  for (const key of keysToRemove) {
-    window.localStorage.removeItem(key)
-  }
-  window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key)
+    }
+    window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+  } catch {}
 }

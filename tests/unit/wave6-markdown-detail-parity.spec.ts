@@ -866,7 +866,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(metadata.modifiedDate).toBe("2026-03-15T00:00:00.000Z")
   })
 
-  test("11. PostHeader, FloatingActionRail, MobileSummaryActions, and usePostDetailEngagementActions wire interactive like toggle, storage persistence, and error rollback", async () => {
+  test("13. PostHeader, FloatingActionRail, MobileSummaryActions, and usePostDetailEngagementActions wire interactive like toggle, storage persistence, and error rollback", async () => {
     const PostHeaderModule = await import("../../src/routes/Detail/PostDetail/PostHeader")
     const PostHeaderEngagementSection = PostHeaderModule.PostHeaderEngagementSection
     const engagementModule = (await import(
@@ -1006,25 +1006,40 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       const { usePostDetailEngagementActions } = await import(
         "../../src/routes/Detail/PostDetail/usePostDetailEngagementActions"
       )
+      const ReactRuntime = (await import("react")) as unknown as {
+        __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: { H: unknown }
+      }
       const previousFetch = globalThis.fetch
-      const calls: Array<{ url: string; method: string }> = []
+      const likeCalls: Array<{ url: string; method: string }> = []
       let shouldFailLikeRequest = false
-      let resolvePendingLike: ((val: Response) => void) | null = null
+      let pendingLikeResolver: ((val: Response) => void) | null = null
+      let interceptNextLike = false
 
       try {
         globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
           const url = String(input)
           const method = init?.method ?? "GET"
-          calls.push({ url, method })
+          if (url.endsWith("/hit")) {
+            return new Response(
+              JSON.stringify({
+                resultCode: "200-1",
+                msg: "ok",
+                data: { hitCount: 11 },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } }
+            )
+          }
+          likeCalls.push({ url, method })
           if (shouldFailLikeRequest) {
             return new Response(
               JSON.stringify({ resultCode: "500-1", msg: "error", data: null }),
               { status: 500, headers: { "content-type": "application/json" } }
             )
           }
-          if (resolvePendingLike) {
+          if (interceptNextLike) {
+            interceptNextLike = false
             return await new Promise<Response>((resolve) => {
-              resolvePendingLike = resolve
+              pendingLikeResolver = resolve
             })
           }
           const liked = method === "PUT"
@@ -1042,56 +1057,195 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
         const queryClient = new QueryClient()
         queryClient.setQueryData(queryKey.post("42"), samplePost)
 
-        let latestHookResult: ReturnType<typeof usePostDetailEngagementActions> | null = null
-        const getHookResult = () =>
-          latestHookResult as ReturnType<typeof usePostDetailEngagementActions> | null
-        const HookProbe = () => {
-          latestHookResult = usePostDetailEngagementActions({ data: samplePost, postId: "42" })
-          return null
+        const createStatefulHookHarness = <Args, Result>(hookFn: (args: Args) => Result) => {
+          const refSlots: Array<{ current: unknown }> = []
+          const stateSlots: unknown[] = []
+          const effectSlots: Array<{
+            deps?: readonly unknown[]
+            cleanup?: (() => void) | void
+          }> = []
+          let currentArgs: Args
+
+          const runPass = (): Result => {
+            let refCursor = 0
+            let stateCursor = 0
+            let effectCursor = 0
+            const pendingEffects: Array<{
+              index: number
+              create: () => (() => void) | void
+              deps?: readonly unknown[]
+            }> = []
+            const prevDispatcher =
+              ReactRuntime.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H
+            ReactRuntime.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = {
+              useContext: () => queryClient,
+              useRef: (init: unknown) => {
+                const idx = refCursor++
+                if (!(idx in refSlots)) {
+                  refSlots[idx] = { current: init }
+                }
+                return refSlots[idx]
+              },
+              useState: (init: unknown) => {
+                const idx = stateCursor++
+                if (!(idx in stateSlots)) {
+                  stateSlots[idx] = typeof init === "function" ? (init as () => unknown)() : init
+                }
+                const setState = (next: unknown) => {
+                  const prev = stateSlots[idx]
+                  stateSlots[idx] =
+                    typeof next === "function" ? (next as (p: unknown) => unknown)(prev) : next
+                }
+                return [stateSlots[idx], setState]
+              },
+              useEffect: (create: () => (() => void) | void, deps?: readonly unknown[]) => {
+                const idx = effectCursor++
+                const prev = effectSlots[idx]
+                const changed =
+                  !prev ||
+                  !deps ||
+                  !prev.deps ||
+                  deps.length !== prev.deps.length ||
+                  deps.some((val, i) => !Object.is(val, prev.deps![i]))
+                if (changed) {
+                  pendingEffects.push({ index: idx, create, deps })
+                }
+              },
+              useCallback: (fn: unknown) => fn,
+            }
+            try {
+              const out = hookFn(currentArgs)
+              for (const eff of pendingEffects) {
+                effectSlots[eff.index]?.cleanup?.()
+                const cleanup = eff.create()
+                effectSlots[eff.index] = { deps: eff.deps, cleanup }
+              }
+              return out
+            } finally {
+              ReactRuntime.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
+                prevDispatcher
+            }
+          }
+
+          return {
+            render: (args: Args): Result => {
+              currentArgs = args
+              runPass()
+              return runPass()
+            },
+          }
         }
 
-        const renderHookSnapshot = () => {
-          renderToStaticMarkup(
-            materializePlaywrightJsx(
-              createElement(
-                QueryClientProvider,
-                { client: queryClient },
-                createElement(HookProbe)
-              )
-            ) as ReactElement
-          )
-        }
+        const harness = createStatefulHookHarness(usePostDetailEngagementActions)
 
-        renderHookSnapshot()
-        expect(getHookResult()?.likesCount).toBe(5)
-        expect(getHookResult()?.liked).toBe(false)
+        let state = harness.render({ data: samplePost, postId: "42" })
+        expect(state.likesCount).toBe(5)
+        expect(state.liked).toBe(false)
+        expect(state.likePending).toBe(false)
 
-        await getHookResult()!.handleToggleLike()
-        expect(calls).toEqual([{ url: "http://localhost:8080/post/api/v1/posts/42/like", method: "PUT" }])
+        await state.handleToggleLike()
+        state = harness.render({
+          data: queryClient.getQueryData<PostDetail>(queryKey.post("42")) ?? samplePost,
+          postId: "42",
+        })
+        expect(likeCalls).toEqual([
+          { url: "http://localhost:8080/post/api/v1/posts/42/like", method: "PUT" },
+        ])
+        expect(state.liked).toBe(true)
+        expect(state.likesCount).toBe(6)
+        expect(state.likePending).toBe(false)
         expect(isPostLikedInStorage!("42")).toBe(true)
         expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(6)
 
-        resolvePendingLike = () => {}
-        const firstTogglePromise = getHookResult()!.handleToggleLike()
-        await getHookResult()!.handleToggleLike()
-        expect(calls).toHaveLength(2)
-        ;(resolvePendingLike as unknown as (val: Response) => void)(
+        await state.handleToggleLike()
+        state = harness.render({
+          data: queryClient.getQueryData<PostDetail>(queryKey.post("42")) ?? samplePost,
+          postId: "42",
+        })
+        expect(likeCalls).toEqual([
+          { url: "http://localhost:8080/post/api/v1/posts/42/like", method: "PUT" },
+          { url: "http://localhost:8080/post/api/v1/posts/42/like", method: "DELETE" },
+        ])
+        expect(state.liked).toBe(false)
+        expect(state.likesCount).toBe(5)
+        expect(state.likePending).toBe(false)
+        expect(isPostLikedInStorage!("42")).toBe(false)
+        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(5)
+
+        interceptNextLike = true
+        const inFlightPut = state.handleToggleLike()
+        state = harness.render({
+          data: { ...samplePost, hitCount: 99, likesCount: 5 },
+          postId: "42",
+        })
+        expect(state.likePending).toBe(true)
+        expect(state.liked).toBe(true)
+        expect(state.likesCount).toBe(6)
+        expect(state.hitCount).toBe(99)
+
+        await state.handleToggleLike()
+        expect(likeCalls).toHaveLength(3)
+        ;(pendingLikeResolver as unknown as (val: Response) => void)(
           new Response(
             JSON.stringify({
               resultCode: "200-1",
               msg: "ok",
-              data: { likesCount: 7, liked: true },
+              data: { likesCount: 6, liked: true },
             }),
             { status: 200, headers: { "content-type": "application/json" } }
           )
         )
-        resolvePendingLike = null
-        await firstTogglePromise
+        pendingLikeResolver = null
+        await inFlightPut
+        state = harness.render({
+          data: queryClient.getQueryData<PostDetail>(queryKey.post("42")) ?? samplePost,
+          postId: "42",
+        })
+        expect(state.likePending).toBe(false)
+        expect(state.liked).toBe(true)
+        expect(state.likesCount).toBe(6)
+
+        interceptNextLike = true
+        const staleDeleteOn42 = state.handleToggleLike()
+        const post99: PostDetail = {
+          ...samplePost,
+          id: "99",
+          slug: "post-99",
+          likesCount: 20,
+          hitCount: 3,
+        }
+        queryClient.setQueryData(queryKey.post("99"), post99)
+        state = harness.render({ data: post99, postId: "99" })
+        expect(state.likePending).toBe(false)
+        expect(state.liked).toBe(false)
+        expect(state.likesCount).toBe(20)
+        expect(state.hitCount).toBe(3)
+        ;(pendingLikeResolver as unknown as (val: Response) => void)(
+          new Response(
+            JSON.stringify({
+              resultCode: "200-1",
+              msg: "ok",
+              data: { likesCount: 5, liked: false },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+        )
+        pendingLikeResolver = null
+        await staleDeleteOn42
+        state = harness.render({ data: post99, postId: "99" })
+        expect(state.likesCount).toBe(20)
+        expect(state.liked).toBe(false)
+        expect(state.likePending).toBe(false)
+        expect(isPostLikedInStorage!("42")).toBe(false)
+        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(5)
 
         shouldFailLikeRequest = true
-        writePostLikedInStorage!("42", false)
-        await getHookResult()!.handleToggleLike()
-        expect(isPostLikedInStorage!("42")).toBe(false)
+        await state.handleToggleLike()
+        state = harness.render({ data: post99, postId: "99" })
+        expect(state.liked).toBe(false)
+        expect(state.likesCount).toBe(20)
+        expect(state.likePending).toBe(false)
+        expect(isPostLikedInStorage!("99")).toBe(false)
       } finally {
         globalThis.fetch = previousFetch
       }

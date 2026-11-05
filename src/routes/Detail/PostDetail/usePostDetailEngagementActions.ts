@@ -62,28 +62,40 @@ export const usePostDetailEngagementActions = ({
 }: UsePostDetailEngagementActionsArgs) => {
   const queryClient = useQueryClient()
   const detailId = data?.id
+  const incomingHitCount = data?.hitCount
+  const incomingLikesCount = data?.likesCount
+  const hasData = Boolean(data)
+  const activeDetailIdRef = useRef<string | undefined>(detailId)
+  activeDetailIdRef.current = detailId
   const didIncrementHitRef = useRef<string | null>(null)
   const likeInFlightRef = useRef(false)
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
-  const [hitCount, setHitCount] = useState(data?.hitCount ?? 0)
-  const [likesCount, setLikesCount] = useState(data?.likesCount ?? 0)
+  const [hitCount, setHitCount] = useState(incomingHitCount ?? 0)
+  const [likesCount, setLikesCount] = useState(incomingLikesCount ?? 0)
   const [liked, setLiked] = useState(false)
   const [likePending, setLikePending] = useState(false)
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
 
   useEffect(() => {
-    if (!data) return
-    setHitCount(data.hitCount ?? 0)
-    setLikesCount(data.likesCount ?? 0)
-  }, [data, data?.hitCount, data?.likesCount, data?.id])
-
-  useEffect(() => {
+    likeInFlightRef.current = false
+    setLikePending(false)
     if (!detailId) {
       setLiked(false)
       return
     }
     setLiked(isPostLikedInStorage(String(detailId)))
   }, [detailId])
+
+  useEffect(() => {
+    if (!hasData) return
+    setHitCount(incomingHitCount ?? 0)
+  }, [hasData, detailId, incomingHitCount])
+
+  useEffect(() => {
+    if (!hasData) return
+    if (likeInFlightRef.current) return
+    setLikesCount(incomingLikesCount ?? 0)
+  }, [hasData, detailId, incomingLikesCount])
 
   useEffect(() => {
     if (!detailId) return
@@ -121,7 +133,8 @@ export const usePostDetailEngagementActions = ({
 
   const handleToggleLike = useCallback(async () => {
     if (!detailId || likeInFlightRef.current) return
-    const normalizedId = String(detailId)
+    const requestDetailId = detailId
+    const normalizedId = String(requestDetailId)
     const prevLiked = liked
     const prevLikesCount = likesCount
     const nextLiked = !prevLiked
@@ -135,22 +148,29 @@ export const usePostDetailEngagementActions = ({
 
     try {
       const response = await apiFetch<RsData<{ likesCount: number; liked: boolean }>>(
-        `/post/api/v1/posts/${detailId}/like`,
+        `/post/api/v1/posts/${requestDetailId}/like`,
         { method: nextLiked ? "PUT" : "DELETE" }
       )
-      setLiked(response.data.liked)
-      setLikesCount(response.data.likesCount)
       writePostLikedInStorage(normalizedId, response.data.liked)
-      queryClient.setQueryData<PostDetailType | undefined>(queryKey.post(detailId), (prev) =>
-        prev ? { ...prev, likesCount: response.data.likesCount } : prev
+      queryClient.setQueryData<PostDetailType | undefined>(
+        queryKey.post(requestDetailId),
+        (prev) => (prev ? { ...prev, likesCount: response.data.likesCount } : prev)
       )
+      if (activeDetailIdRef.current === requestDetailId) {
+        setLiked(response.data.liked)
+        setLikesCount(response.data.likesCount)
+      }
     } catch {
-      setLiked(prevLiked)
-      setLikesCount(prevLikesCount)
       writePostLikedInStorage(normalizedId, prevLiked)
+      if (activeDetailIdRef.current === requestDetailId) {
+        setLiked(prevLiked)
+        setLikesCount(prevLikesCount)
+      }
     } finally {
-      likeInFlightRef.current = false
-      setLikePending(false)
+      if (activeDetailIdRef.current === requestDetailId) {
+        likeInFlightRef.current = false
+        setLikePending(false)
+      }
     }
   }, [detailId, liked, likesCount, queryClient])
 

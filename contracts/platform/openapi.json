@@ -180,6 +180,68 @@
         }
       }
     },
+    "/post/api/v1/posts/{id}/like": {
+      "put": {
+        "tags": [
+          "api-v-1-post-interaction-controller"
+        ],
+        "operationId": "like",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsDataPostLikeToggleResBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "api-v-1-post-interaction-controller"
+        ],
+        "operationId": "unlike",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsDataPostLikeToggleResBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/member/api/v1/adm/members/{id}/profileWorkspace/draft": {
       "put": {
         "tags": [
@@ -890,6 +952,108 @@
         }
       }
     },
+    "/system/api/v1/adm/cloud/files/{id}": {
+      "get": {
+        "tags": [
+          "api-v-1-adm-cloud-controller"
+        ],
+        "operationId": "getFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudFileDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "api-v-1-adm-cloud-controller"
+        ],
+        "operationId": "delete_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsDataVoid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "api-v-1-adm-cloud-controller"
+        ],
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCloudFileReqBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsDataCloudFileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/member/api/v1/adm/members/{id}/nickname": {
       "patch": {
         "tags": [
@@ -1021,6 +1185,15 @@
               "type": "integer",
               "format": "int64",
               "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
             }
           }
         ],
@@ -1210,68 +1383,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminDashboardSnapshot"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/system/api/v1/adm/cloud/files/{id}": {
-      "get": {
-        "tags": [
-          "api-v-1-adm-cloud-controller"
-        ],
-        "operationId": "getFile",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "exclusiveMinimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/CloudFileDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "api-v-1-adm-cloud-controller"
-        ],
-        "operationId": "delete_1",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "exclusiveMinimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/RsDataVoid"
                 }
               }
             }
@@ -2706,6 +2817,32 @@
           }
         }
       },
+      "PostLikeToggleResBody": {
+        "type": "object",
+        "properties": {
+          "liked": {
+            "type": "boolean"
+          },
+          "likesCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RsDataPostLikeToggleResBody": {
+        "type": "object",
+        "properties": {
+          "resultCode": {
+            "type": "string"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PostLikeToggleResBody"
+          }
+        }
+      },
       "ProfileCardLinkItemRequest": {
         "type": "object",
         "properties": {
@@ -3815,6 +3952,23 @@
         "properties": {
           "profileImageUrl": {
             "type": "string"
+          }
+        }
+      },
+      "UpdateCloudFileReqBody": {
+        "type": "object",
+        "properties": {
+          "originalFilename": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folderPath": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

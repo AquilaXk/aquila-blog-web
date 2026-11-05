@@ -49,31 +49,11 @@ export const MobileSummaryBar = styled.div `
       gap: 6px;
 
       span {
-        display: inline;
-        font-size: 0.8125rem;
-        font-weight: 650;
-      }
-    }
-
-    > span {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 4px;
-      border-radius: 0;
-      border: 0;
-      background: transparent;
-      color: ${({ theme }) => theme.colors.gray10};
-      font-size: 0.8125rem;
-      font-weight: 650;
-      cursor: default;
-      user-select: none;
-
-      > span {
         min-height: 44px;
         display: inline-flex;
         align-items: center;
+        font-size: 0.8125rem;
+        font-weight: 650;
       }
     }
   }
