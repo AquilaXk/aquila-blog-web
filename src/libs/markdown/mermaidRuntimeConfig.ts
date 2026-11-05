@@ -19,7 +19,7 @@ export const MERMAID_DESKTOP_WIDE_MAX_PX = 980
 export const MERMAID_DESKTOP_SAFE_MARGIN_PX = 24
 export const MERMAID_EXPAND_THRESHOLD_PX = 80
 export const MERMAID_VIEWPORT_ROOT_MARGIN = "360px 0px"
-export const MERMAID_RENDER_TIMEOUT_MS = 6000
+export const MERMAID_RENDER_TIMEOUT_MS = 15000
 export const MERMAID_COMPLEX_SCALE_CAP = 0.88
 
 const MERMAID_VISUAL_PRESET: MermaidVisualPreset = "github"
@@ -318,6 +318,13 @@ export const formatMermaidErrorReason = (
   return fallback
 }
 
+export const cleanupTemporaryMermaidDom = (renderId: string) => {
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return
+  for (const targetId of [`d${renderId}`, `i${renderId}`, renderId]) {
+    document.getElementById(targetId)?.remove?.()
+  }
+}
+
 export const renderMermaidInstanceWithTimeout = async (
   mermaidInstance: MermaidRuntimeInstance,
   renderId: string,
@@ -325,19 +332,25 @@ export const renderMermaidInstanceWithTimeout = async (
   timeoutMs = MERMAID_RENDER_TIMEOUT_MS
 ): Promise<{ svg: string }> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
+  let timedOut = false
+  const renderPromise = Promise.resolve(mermaidInstance.render(renderId, sourceToRender))
   try {
     const timed = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () => reject(new Error(`MERMAID_RENDER_TIMEOUT:${timeoutMs}`)),
-        timeoutMs
-      )
+      timeoutId = setTimeout(() => {
+        timedOut = true
+        cleanupTemporaryMermaidDom(renderId)
+        reject(new Error(`MERMAID_RENDER_TIMEOUT:${timeoutMs}`))
+      }, timeoutMs)
     })
-    return await Promise.race([
-      Promise.resolve(mermaidInstance.render(renderId, sourceToRender)),
-      timed,
-    ])
+    return await Promise.race([renderPromise, timed])
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId)
+    if (timedOut) {
+      void renderPromise.then(
+        () => cleanupTemporaryMermaidDom(renderId),
+        () => cleanupTemporaryMermaidDom(renderId)
+      )
+    }
   }
 }
 

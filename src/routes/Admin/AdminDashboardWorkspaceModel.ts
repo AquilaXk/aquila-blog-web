@@ -98,7 +98,7 @@ export const resolveDashboardDataUpdatedAt = (...timestamps: number[]) => {
 const DASHBOARD_FRESHNESS_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
 })
 
@@ -107,7 +107,7 @@ const DASHBOARD_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
 })
 

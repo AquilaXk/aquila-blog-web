@@ -73,7 +73,7 @@ const TOOLS_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE,
 })
 

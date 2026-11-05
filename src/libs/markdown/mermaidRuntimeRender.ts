@@ -236,8 +236,14 @@ const renderSourceIntoStageBlock = async ({
   })
 }
 
-const isRetriableMermaidError = (error: unknown): boolean =>
-  !isMermaidSyntaxError(error) && !isMermaidRenderTimeoutError(error)
+const isRetriableMermaidError = (error: unknown, block?: HTMLElement): boolean => {
+  if (isMermaidSyntaxError(error)) return false
+  if (isMermaidRenderTimeoutError(error)) {
+    const retryCount = Number.parseInt(block?.dataset.mermaidRetryCount || "0", 10)
+    return retryCount < 1
+  }
+  return true
+}
 
 const tryRenderFallbackMermaidSource = async ({
   state,
@@ -272,7 +278,7 @@ const tryRenderFallbackMermaidSource = async ({
       "[mermaid] fallback render failed",
       fallbackError
     )
-    return isRetriableMermaidError(fallbackError) && scheduleBlockRetry(state, block)
+    return isRetriableMermaidError(fallbackError, block) && scheduleBlockRetry(state, block)
   }
 }
 
@@ -310,8 +316,13 @@ const handleBlockRenderFailure = async ({
     if (handledByFallback) return
   }
 
-  if (isRetriableMermaidError(error) && scheduleBlockRetry(state, block)) return
+  if (isRetriableMermaidError(error, block) && scheduleBlockRetry(state, block)) return
 
+  if (isMermaidRenderTimeoutError(error)) {
+    block.dataset.mermaidErrorKind = "timeout"
+  } else {
+    delete block.dataset.mermaidErrorKind
+  }
   markMermaidBlockError(
     block,
     state.options.preset,
@@ -469,9 +480,13 @@ const resetControllerLayoutCache = (
   state.premeasuredRects = new WeakMap<HTMLElement, DOMRect>()
   if (!clearBlockCache) return
   state.options.root
-    .querySelectorAll<HTMLElement>("[data-mermaid-rendered='true']")
+    .querySelectorAll<HTMLElement>(
+      "[data-mermaid-rendered='true'], [data-mermaid-rendered='error'][data-mermaid-error-kind='timeout']"
+    )
     .forEach((block) => {
       delete block.dataset.mermaidRendered
+      delete block.dataset.mermaidErrorKind
+      block.dataset.mermaidRetryCount = "0"
     })
 }
 
