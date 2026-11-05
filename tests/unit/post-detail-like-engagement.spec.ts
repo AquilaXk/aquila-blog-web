@@ -312,8 +312,30 @@ test.describe("PostDetail interactive like controls and engagement hook lifecycl
         expect(hookState.liked).toBe(true)
         expect(hookState.likesCount).toBe(7)
 
+        const resolveStaleDeleteOn42 = pendingLikeResolvers.shift()
+        const resolveSecondPutOn42 = pendingLikeResolvers.shift()
+
         await act(async () => {
-          pendingLikeResolvers.shift()?.(
+          resolveSecondPutOn42?.(
+            new Response(
+              JSON.stringify({
+                resultCode: "200-1",
+                msg: "ok",
+                data: { likesCount: 9, liked: true },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } }
+            )
+          )
+          await secondPutOn42
+        })
+        expect(hookState.likePending).toBe(false)
+        expect(hookState.liked).toBe(true)
+        expect(hookState.likesCount).toBe(9)
+        expect(isPostLikedInStorage("42")).toBe(true)
+        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(9)
+
+        await act(async () => {
+          resolveStaleDeleteOn42?.(
             new Response(
               JSON.stringify({
                 resultCode: "200-1",
@@ -325,28 +347,45 @@ test.describe("PostDetail interactive like controls and engagement hook lifecycl
           )
           await staleDeleteOn42
         })
-        expect(hookState.likePending).toBe(true)
+        expect(hookState.likePending).toBe(false)
         expect(hookState.liked).toBe(true)
-        expect(hookState.likesCount).toBe(7)
+        expect(hookState.likesCount).toBe(9)
+        expect(isPostLikedInStorage("42")).toBe(true)
+        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(9)
 
+        let roundTripDeleteOn42!: Promise<void>
         await act(async () => {
-          pendingLikeResolvers.shift()?.(
+          roundTripDeleteOn42 = hookState.handleToggleLike()
+        })
+        expect(hookState.liked).toBe(false)
+        expect(hookState.likesCount).toBe(8)
+        expect(isPostLikedInStorage("42")).toBe(false)
+
+        probeProps.data = post99
+        probeProps.postId = "99"
+        await renderProbe()
+        expect(hookState.liked).toBe(false)
+        expect(hookState.likesCount).toBe(20)
+
+        probeProps.data = queryClient.getQueryData<PostDetail>(queryKey.post("42"))
+        probeProps.postId = "42"
+        await renderProbe()
+        expect(hookState.liked).toBe(false)
+
+        const resolveRoundTripDeleteOn42 = pendingLikeResolvers.shift()
+        await act(async () => {
+          resolveRoundTripDeleteOn42?.(
             new Response(
-              JSON.stringify({
-                resultCode: "200-1",
-                msg: "ok",
-                data: { likesCount: 8, liked: true },
-              }),
-              { status: 200, headers: { "content-type": "application/json" } }
+              JSON.stringify({ resultCode: "500-1", msg: "error", data: null }),
+              { status: 500, headers: { "content-type": "application/json" } }
             )
           )
-          await secondPutOn42
+          await roundTripDeleteOn42
         })
         expect(hookState.likePending).toBe(false)
         expect(hookState.liked).toBe(true)
-        expect(hookState.likesCount).toBe(8)
+        expect(hookState.likesCount).toBe(9)
         expect(isPostLikedInStorage("42")).toBe(true)
-        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(8)
 
         interceptLikeQueue = false
         probeProps.data = post99

@@ -70,6 +70,7 @@ export const usePostDetailEngagementActions = ({
   const didIncrementHitRef = useRef<string | null>(null)
   const likeInFlightRef = useRef(false)
   const likeRequestSeqRef = useRef(0)
+  const latestPostRequestSeqRef = useRef<Map<string, number>>(new Map())
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
   const [hitCount, setHitCount] = useState(incomingHitCount ?? 0)
   const [likesCount, setLikesCount] = useState(incomingLikesCount ?? 0)
@@ -78,7 +79,7 @@ export const usePostDetailEngagementActions = ({
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
 
   useEffect(() => {
-    likeRequestSeqRef.current += 1
+    activeDetailIdRef.current = detailId
     likeInFlightRef.current = false
     setLikePending(false)
     if (!detailId) {
@@ -142,10 +143,12 @@ export const usePostDetailEngagementActions = ({
     const nextLiked = !prevLiked
     const optimisticCount = Math.max(0, prevLikesCount + (nextLiked ? 1 : -1))
 
-    likeRequestSeqRef.current += 1
-    const requestSeq = likeRequestSeqRef.current
-    const isActiveRequest = () =>
-      activeDetailIdRef.current === requestDetailId && likeRequestSeqRef.current === requestSeq
+    const requestSeq = ++likeRequestSeqRef.current
+    latestPostRequestSeqRef.current.set(normalizedId, requestSeq)
+    const isLatestForPost = () =>
+      latestPostRequestSeqRef.current.get(normalizedId) === requestSeq
+    const isActiveViewForPost = () =>
+      isLatestForPost() && activeDetailIdRef.current === requestDetailId
 
     likeInFlightRef.current = true
     setLikePending(true)
@@ -158,23 +161,28 @@ export const usePostDetailEngagementActions = ({
         `/post/api/v1/posts/${requestDetailId}/like`,
         { method: nextLiked ? "PUT" : "DELETE" }
       )
-      writePostLikedInStorage(normalizedId, response.data.liked)
-      queryClient.setQueryData<PostDetailType | undefined>(
-        queryKey.post(requestDetailId),
-        (prev) => (prev ? { ...prev, likesCount: response.data.likesCount } : prev)
-      )
-      if (isActiveRequest()) {
-        setLiked(response.data.liked)
+      const resolvedLiked = Boolean(response.data.liked)
+      if (isLatestForPost()) {
+        writePostLikedInStorage(normalizedId, resolvedLiked)
+        queryClient.setQueryData<PostDetailType | undefined>(
+          queryKey.post(requestDetailId),
+          (prev) => (prev ? { ...prev, likesCount: response.data.likesCount } : prev)
+        )
+      }
+      if (isActiveViewForPost()) {
+        setLiked(resolvedLiked)
         setLikesCount(response.data.likesCount)
       }
     } catch {
-      writePostLikedInStorage(normalizedId, prevLiked)
-      if (isActiveRequest()) {
+      if (isLatestForPost()) {
+        writePostLikedInStorage(normalizedId, prevLiked)
+      }
+      if (isActiveViewForPost()) {
         setLiked(prevLiked)
         setLikesCount(prevLikesCount)
       }
     } finally {
-      if (isActiveRequest()) {
+      if (isActiveViewForPost()) {
         likeInFlightRef.current = false
         setLikePending(false)
       }
