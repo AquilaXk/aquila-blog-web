@@ -215,32 +215,39 @@ export const StyledWrapper = styled.header `
     line-height: 1;
   }
 
-  .likeButton {
+  .likeButton,
+  .shareButton {
     display: inline-flex;
     align-items: center;
     gap: 0.42rem;
     min-height: 40px;
-    padding: 0 0.85rem;
     border-radius: 6px;
     border: 1px solid var(--aq-border);
     background: transparent;
-    color: var(--aq-muted);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 12px;
-    font-weight: 600;
     cursor: pointer;
     transition:
       border-color 0.18s ease,
       background-color 0.18s ease,
       color 0.18s ease;
 
+    &:hover:not(:disabled) {
+      border-color: var(--aq-border-strong, var(--aq-text));
+      background: var(--aq-surface-elevated, transparent);
+    }
+  }
+
+  .likeButton {
+    padding: 0 0.85rem;
+    color: var(--aq-muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+
     svg {
       font-size: 0.95rem;
     }
 
     &:hover:not(:disabled) {
-      border-color: var(--aq-border-strong, var(--aq-text));
-      background: var(--aq-surface-elevated, transparent);
       color: var(--aq-text);
     }
 
@@ -256,30 +263,13 @@ export const StyledWrapper = styled.header `
   }
 
   .shareButton {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.42rem;
-    min-height: 40px;
     padding: 0 0.9rem;
-    border-radius: 6px;
-    border: 1px solid var(--aq-border);
-    background: transparent;
     color: var(--aq-text);
     font-size: 0.9rem;
     font-weight: 700;
-    cursor: pointer;
-    transition:
-      border-color 0.18s ease,
-      background-color 0.18s ease,
-      color 0.18s ease;
 
     svg {
       font-size: 1rem;
-    }
-
-    &:hover:not(:disabled) {
-      border-color: var(--aq-border-strong, var(--aq-text));
-      background: var(--aq-surface-elevated, transparent);
     }
   }
 

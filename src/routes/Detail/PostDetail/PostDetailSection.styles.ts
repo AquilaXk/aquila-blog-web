@@ -20,9 +20,9 @@ export const MobileSummaryBar = styled.div `
       justify-content: center;
       padding: 0;
       border-radius: 6px;
-      border: 1px solid ${({ theme }) => theme.colors.gray6};
-      background: ${({ theme }) => theme.publicDesign.readableSurface};
-      color: ${({ theme }) => theme.colors.gray10};
+      border: 1px solid var(--aq-border);
+      background: var(--aq-surface);
+      color: var(--aq-text-secondary);
       box-shadow: none;
       cursor: pointer;
 
@@ -33,9 +33,9 @@ export const MobileSummaryBar = styled.div `
     }
 
     button[data-active="true"] {
-      border-color: ${({ theme }) => theme.colors.accentBorder};
-      background: ${({ theme }) => theme.publicDesign.readableSurface};
-      color: ${({ theme }) => (theme.colors.accentLink)};
+      border-color: var(--aq-accent);
+      background: var(--aq-surface);
+      color: var(--aq-accent-link);
     }
 
     button span,

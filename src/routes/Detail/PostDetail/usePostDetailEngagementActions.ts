@@ -7,25 +7,17 @@ import type { PostDetail as PostDetailType, RsData } from "src/types"
 
 export const LIKED_POSTS_STORAGE_KEY = "aquila_blog_liked_posts_v1"
 const LIKED_POSTS_MAX_ENTRIES = 200
-const SAFE_POST_ID_CHARS = [
-  "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-  "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
-  "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-  "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-  "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-  "-", "_",
-] as const
+const SAFE_POST_ID_ALPHABET =
+  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 
 const toSafeLikedPostId = (rawPostId: string): string => {
   const trimmed = rawPostId.trim()
   if (!trimmed || trimmed.length > 64) return ""
   let safeId = ""
   for (let i = 0; i < trimmed.length; i += 1) {
-    const idx = SAFE_POST_ID_CHARS.indexOf(
-      trimmed[i] as (typeof SAFE_POST_ID_CHARS)[number]
-    )
+    const idx = SAFE_POST_ID_ALPHABET.indexOf(trimmed[i])
     if (idx < 0) return ""
-    safeId += SAFE_POST_ID_CHARS[idx]
+    safeId += SAFE_POST_ID_ALPHABET[idx]
   }
   return safeId
 }

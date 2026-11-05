@@ -204,7 +204,7 @@ export const PostHeaderEngagementSection: React.FC<{
             className="likeButton"
             aria-pressed={liked}
             data-active={liked}
-            aria-label={liked ? `좋아요 취소 (현재 ${resolvedLikesCount}개)` : `좋아요 (현재 ${resolvedLikesCount}개)`}
+            aria-label={`${liked ? "좋아요 취소" : "좋아요"} (현재 ${resolvedLikesCount}개)`}
             disabled={likePending || !onToggleLike}
             onClick={onToggleLike}
           >

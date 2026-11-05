@@ -52,6 +52,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
   shareFeedback,
   onSharePost,
 }: FloatingActionRailProps) {
+  const likeLabel = liked ? "좋아요 취소" : "좋아요"
   return (
     <aside ref={railRef as Ref<HTMLElement>} className="leftRail" data-hybrid-active={active} aria-hidden={!showFloatingLike}>
       {showFloatingLike ? (
@@ -63,9 +64,9 @@ export const FloatingActionRail = memo(function FloatingActionRail({
                 className="floatingActionButton floatingLikeBadge"
                 aria-pressed={liked}
                 data-active={liked}
-                title={liked ? "좋아요 취소" : "좋아요"}
-                data-tooltip={liked ? "좋아요 취소" : "좋아요"}
-                aria-label={liked ? `좋아요 취소 (현재 ${likesCount}개)` : `좋아요 (현재 ${likesCount}개)`}
+                title={likeLabel}
+                data-tooltip={likeLabel}
+                aria-label={`${likeLabel} (현재 ${likesCount}개)`}
                 disabled={likePending || !onToggleLike}
                 onClick={onToggleLike}
               >
@@ -122,7 +123,7 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         aria-pressed={liked}
         data-active={liked}
         data-feedback="true"
-        aria-label={liked ? `좋아요 취소 (현재 ${likesCount}개)` : `좋아요 (현재 ${likesCount}개)`}
+        aria-label={`${liked ? "좋아요 취소" : "좋아요"} (현재 ${likesCount}개)`}
         disabled={likePending || !onToggleLike}
         onClick={onToggleLike}
       >
