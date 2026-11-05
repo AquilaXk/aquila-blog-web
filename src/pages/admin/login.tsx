@@ -176,6 +176,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
       return
     }
 
+    setError("")
     setChallengeId("")
     setCode("")
     setChallengeExpiresAt(null)

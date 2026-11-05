@@ -17,7 +17,7 @@ import {
   type JsonValue,
   type NoticeState,
 } from "./EditorStudioWorkspaceControllerRootModel"
-import type { EditorMode, PublishActionType } from "./editorStudioState"
+import type { EditorMode } from "./editorStudioState"
 import type { MarkdownEditorFocusRequest } from "src/components/markdown-editor/MarkdownEditor"
 
 type PublishNoticeTarget = "auto" | "page" | "modal"
@@ -148,8 +148,6 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     [postId, setEditorMode, setIsTempDraftMode, setPostId, setPostVersion]
   )
 
-  const publishModalHintByAction = useCallback((_actionType: PublishActionType): string => "", [])
-
   const setPublishStatus = useCallback(
     (next: NoticeState, target: PublishNoticeTarget = "auto") => {
       if (target === "page") {
@@ -179,7 +177,6 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    publishModalHintByAction,
     refreshPublicPostReadViews,
     run,
     setPublishStatus,

@@ -64,7 +64,6 @@ type UseMarkdownEditorMediaTransfersArgs = {
   resolveDropTargetPosition?: (coords: { x: number; y: number }) => number | null
   setUploadInFlight: (delta: number) => void
   setEditorError: (message: string) => void
-  insertUploadedMarkdown: (markdown: string) => void
 }
 
 export const useMarkdownEditorMediaTransfers = ({
@@ -82,7 +81,6 @@ export const useMarkdownEditorMediaTransfers = ({
   resolveDropTargetPosition,
   setUploadInFlight,
   setEditorError,
-  insertUploadedMarkdown,
 }: UseMarkdownEditorMediaTransfersArgs) => {
   const retainedUploadErrorRef = useRef("")
 
@@ -296,7 +294,7 @@ export const useMarkdownEditorMediaTransfers = ({
       clearUploadError()
       const sizeError = validateMarkdownAttachmentSize(file)
       if (sizeError) {
-        setEditorError(sizeError)
+        reportUploadError(sizeError)
         return
       }
 
@@ -311,7 +309,7 @@ export const useMarkdownEditorMediaTransfers = ({
       documentGenerationRef,
       insertAtActiveSelection,
       onUploadFile,
-      setEditorError,
+      reportUploadError,
     ]
   )
 

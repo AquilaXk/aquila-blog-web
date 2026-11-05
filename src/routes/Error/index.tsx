@@ -4,25 +4,21 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import { useLanguage } from "src/libs/language"
 
 const CustomError = () => {
-  const { language } = useLanguage()
+  const { t } = useLanguage()
 
   return (
     <StyledWrapper>
       <div className="shell">
         <div className="status">ERROR · 404</div>
         <div className="copy">
-          <h1>{language === "en" ? "Page not found." : "찾을 수 없는 페이지입니다."}</h1>
-          <p>
-            {language === "en"
-              ? "The address may have changed or the post may have been removed. Return home or browse the about page."
-              : "주소가 바뀌었거나 삭제된 글일 수 있습니다. 홈으로 돌아가 최신 글이나 블로그 소개부터 다시 확인하세요."}
-          </p>
+          <h1>{t("error404Title")}</h1>
+          <p>{t("error404Desc")}</p>
         </div>
         <div className="actions">
           <Link href="/" className="primary">
-            {language === "en" ? "Back to Home" : "홈으로 이동"}
+            {t("error404HomeButton")}
           </Link>
-          <Link href="/about">{language === "en" ? "About Blog" : "블로그 소개"}</Link>
+          <Link href="/about">{t("emptyAboutButton")}</Link>
         </div>
       </div>
     </StyledWrapper>

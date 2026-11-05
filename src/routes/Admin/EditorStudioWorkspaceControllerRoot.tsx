@@ -162,7 +162,6 @@ export const EditorStudioWorkspaceController = ({
     handleTitleChange,
     handleTitleFieldRef,
     handleTitleKeyDown,
-    publishModalHintByAction,
     refreshPublicPostReadViews,
     setPublishStatus,
   } = useEditorStudioWorkspaceControllerRuntime({
@@ -538,7 +537,6 @@ export const EditorStudioWorkspaceController = ({
     isPreviewThumbnailError,
     loadingKey,
     publishActionType,
-    publishModalHintByAction,
     safePreviewThumbnail,
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,

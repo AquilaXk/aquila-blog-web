@@ -184,4 +184,13 @@ export const LoginBackLink = styled(Link)`
   &:hover {
     color: ${({ theme }) => theme.colors.gray12};
   }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.blue7};
+    outline-offset: 2px;
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 `

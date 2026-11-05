@@ -212,11 +212,18 @@ export const useEditorStudioLocalDraftLifecycle = ({
       source,
       postVersionRef.current
     )
+    const hasCurrentDraftContent =
+      currentLocalDraftCore.title.trim().length > 0 ||
+      currentLocalDraftCore.content.trim().length > 0 ||
+      currentLocalDraftCore.summary.trim().length > 0 ||
+      currentLocalDraftCore.thumbnailUrl.trim().length > 0 ||
+      currentLocalDraftCore.tags.length > 0 ||
+      currentLocalDraftCore.category.trim().length > 0
+    if (!hasCurrentDraftContent) {
+      return
+    }
     const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
-    if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) {
-      if (options?.silent === false) {
-        setPublishStatus({ tone: "success", text: `브라우저 임시저장 완료 (${describeLocalDraftSlot(payload)})` }, "page")
-      }
+    if (options?.silent && lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) {
       return
     }
 

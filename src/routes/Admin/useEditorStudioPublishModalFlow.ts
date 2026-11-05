@@ -23,7 +23,6 @@ type UseEditorStudioPublishModalFlowParams = {
   isPreviewThumbnailError: boolean
   loadingKey: string
   publishActionType: PublishActionType
-  publishModalHintByAction: (actionType: PublishActionType) => string
   safePreviewThumbnail: string
   setIsMobileMetaEditorOpen: Dispatch<SetStateAction<boolean>>
   setIsMobileThumbnailEditorOpen: Dispatch<SetStateAction<boolean>>
@@ -44,7 +43,6 @@ export const useEditorStudioPublishModalFlow = ({
   isPreviewThumbnailError,
   loadingKey,
   publishActionType,
-  publishModalHintByAction,
   safePreviewThumbnail,
   setIsMobileMetaEditorOpen,
   setIsMobileThumbnailEditorOpen,
@@ -71,7 +69,7 @@ export const useEditorStudioPublishModalFlow = ({
     setPublishActionType(actionType)
     setPublishModalNotice({
       tone: "idle",
-      text: publishModalHintByAction(actionType),
+      text: "",
     })
     const shouldOpenThumbnailEditorByDefault = Boolean(safePreviewThumbnail && !isPreviewThumbnailError)
     setIsMobileThumbnailEditorOpen(shouldOpenThumbnailEditorByDefault)
@@ -81,7 +79,6 @@ export const useEditorStudioPublishModalFlow = ({
     activateComposeSurface,
     flushPendingAuthoringMetadata,
     isPreviewThumbnailError,
-    publishModalHintByAction,
     safePreviewThumbnail,
     setIsMobileMetaEditorOpen,
     setIsMobileThumbnailEditorOpen,
@@ -98,13 +95,11 @@ export const useEditorStudioPublishModalFlow = ({
     ) return
     setPublishModalNotice({
       tone: "idle",
-      text: publishModalHintByAction(publishActionType),
+      text: "",
     })
     setIsPublishModalOpen(false)
   }, [
     loadingKey,
-    publishActionType,
-    publishModalHintByAction,
     setIsPublishModalOpen,
     setPublishModalNotice,
   ])

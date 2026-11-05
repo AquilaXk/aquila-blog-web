@@ -398,13 +398,6 @@ const StyledWrapper = styled.div`
       font-weight: 700;
       line-height: 1.35;
     }
-
-    p {
-      margin: 0;
-      color: ${({ theme }) => theme.colors.gray10};
-      font-size: 0.88rem;
-      line-height: 1.5;
-    }
   }
 
   .searchLoadingGrid {
@@ -468,12 +461,6 @@ const StyledWrapper = styled.div`
       color: ${({ theme }) => theme.colors.gray12};
       font-size: 0.9rem;
       font-weight: 800;
-    }
-
-    span {
-      color: ${({ theme }) => theme.colors.gray10};
-      font-size: 0.8rem;
-      line-height: 1.5;
     }
   }
 

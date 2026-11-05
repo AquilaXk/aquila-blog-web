@@ -30,7 +30,6 @@ test.describe("editor slash menu and toolbar usability", () => {
   test("markdown editor wires slash command menu with real-time filtering and 1-click shortcuts", () => {
     const editorContent = [
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.tsx"), "utf8"),
-      readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorSlashMenu.tsx"), "utf8"),
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/useMarkdownEditorSlashMenu.ts"), "utf8"),
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorToolbar.tsx"), "utf8"),
     ].join("\n")
@@ -40,7 +39,9 @@ test.describe("editor slash menu and toolbar usability", () => {
     expect(editorContent).toContain("slashMenuItems")
     expect(editorContent).toContain("checkSlashCommand")
     expect(editorContent).toContain("slashFrom")
-    expect(editorContent).toContain("제목 1 (H1)")
+    expect(editorContent).toContain('triggerLabel="제목"')
+    expect(editorContent).not.toContain('["제목 1 (H1)"')
+    expect(editorContent).not.toContain('["제목 2 (H2)"')
     expect(editorContent).toContain("인용구")
     expect(editorContent).toContain("코드 블록")
   })

@@ -223,7 +223,6 @@ test.describe("Wave 6 Unit 3: EditorStudio conflict recovery & metadata catalog"
       )
       const noopCatalog = () => undefined
       const returnTrueAsync = async () => true
-      const emptyHint = () => ""
       let catalogApi!: ReturnType<typeof useEditorStudioMetaCatalog>
       let modalFlowApi!: ReturnType<typeof useEditorStudioPublishModalFlow>
 
@@ -244,7 +243,6 @@ test.describe("Wave 6 Unit 3: EditorStudio conflict recovery & metadata catalog"
           isPreviewThumbnailError: false,
           loadingKey: "",
           publishActionType: "create",
-          publishModalHintByAction: emptyHint,
           safePreviewThumbnail: "",
           setIsMobileMetaEditorOpen: noopCatalog,
           setIsMobileThumbnailEditorOpen: noopCatalog,
