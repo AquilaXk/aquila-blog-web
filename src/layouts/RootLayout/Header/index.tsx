@@ -10,7 +10,7 @@ type Props = {
 }
 
 const Header: React.FC<Props> = ({ fullWidth, blogTitle }) => {
-  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const wrapperRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -106,7 +106,7 @@ const Header: React.FC<Props> = ({ fullWidth, blogTitle }) => {
 
 export default Header
 
-const StyledWrapper = styled.div`
+const StyledWrapper = styled.header`
   z-index: 50;
   position: sticky;
   top: 0;
@@ -155,10 +155,6 @@ const StyledWrapper = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-
-        em {
-          display: none;
-        }
       }
 
       .nav {

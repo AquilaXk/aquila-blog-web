@@ -16,8 +16,8 @@ const meta: Meta<typeof AdminHubSurface> = {
     },
     metrics: [
       { label: "POSTS", value: "12", detail: "active list", tone: "good" },
-      { label: "PUBLISHED", value: "9", detail: "loaded rows", tone: "good" },
-      { label: "DRAFTS", value: "3", detail: "loaded rows", tone: "warn" },
+      { label: "PUBLISHED", value: "9", detail: "최근 20건 기준", tone: "good" },
+      { label: "DRAFTS", value: "3", detail: "최근 20건 기준", tone: "warn" },
       { label: "EVENTS", value: "0", detail: "security events", tone: "neutral" },
     ],
     contentItems: [

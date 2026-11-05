@@ -280,19 +280,19 @@ const AdminHubPage: NextPage<AdminHubPageProps> = ({
     {
       label: "PUBLISHED",
       value: String(publishedRows.length),
-      detail: "loaded rows",
+      detail: "최근 20건 기준",
       tone: publishedRows.length > 0 ? ("good" as const) : ("neutral" as const),
     },
     {
       label: "DRAFTS",
       value: String(draftRows.length),
-      detail: "loaded rows",
+      detail: "최근 20건 기준",
       tone: draftRows.length > 0 ? ("warn" as const) : ("neutral" as const),
     },
     {
       label: "VIEWS",
       value: String(loadedViewsCount),
-      detail: "loaded rows",
+      detail: "최근 20건 기준",
       tone: loadedViewsCount > 0 ? ("good" as const) : ("neutral" as const),
     },
   ]

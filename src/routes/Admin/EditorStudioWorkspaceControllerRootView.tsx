@@ -112,6 +112,7 @@ type EditorStudioWorkspaceControllerRootViewBag = {
   resetThumbnailToAutoMode: () => void
   removeTagFromPost: (tag: string) => void
   restoreLocalDraft: () => void
+  saveLocalDraft: (options?: { silent?: boolean }) => void
   selectLocalDraftCandidate: (key: string) => void
   restoredLocalDraft: LocalDraftFingerprintSnapshot[]
   result: string
@@ -176,7 +177,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     openThumbnailFileInput, postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent,
     postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
     postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
-    previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft,
+    previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft,
     selectLocalDraftCandidate, restoredLocalDraft, safePreviewThumbnail, serverBaselineEditorFingerprintRef,
     sessionMember, setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError,
     setPostVisibility, setTagDraft, tagDraft, thumbnailImageFileInputRef, thumbnailImageFileName,
@@ -351,8 +352,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     publishActionButtonDisabled,
     publishActionTriggerDisabled,
   } = publishActionViewModel
-  const shouldShowPublishModalNotice = publishModalNotice.tone !== "idle"
-  const shouldShowPublishNotice = publishNotice.tone !== "idle"
+  const shouldShowPublishModalNotice =
+    publishModalNotice.tone !== "idle" && publishModalNotice.text.trim().length > 0
+  const shouldShowPublishNotice =
+    publishNotice.tone !== "idle" && publishNotice.text.trim().length > 0
   const isThumbnailUploadDisabled = disabled("uploadThumbnail")
   const handleThumbnailZoomModalChange = useCallback(
     (nextZoom: number) => {
@@ -405,9 +408,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     recordEditorCommitDurationForRuntimeGuard(actualDuration)
   }, [])
   const handleDedicatedEditorRequestSave = useCallback(() => {
-    if (publishActionTriggerDisabled) return
-    openPublishModal(editorPrimaryActionType)
-  }, [editorPrimaryActionType, openPublishModal, publishActionTriggerDisabled])
+    saveLocalDraft({ silent: false })
+  }, [saveLocalDraft])
 
   const dedicatedEditorCanvas = useMemo(
     () => (
@@ -476,7 +478,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         saveStateText={composeStatusText}
         saveStateTone={composeStatusTone}
         primaryActionDisabled={publishActionTriggerDisabled}
-        primaryActionLabel="발행하기"
+        primaryActionLabel={editorMode === "edit" && !isTempDraftMode ? "발행 설정" : "발행하기"}
         onPrimaryAction={() => openPublishModal(editorPrimaryActionType)}
         postTags={postTags}
         tagDraft={tagDraft}

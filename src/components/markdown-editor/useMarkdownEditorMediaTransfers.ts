@@ -15,6 +15,7 @@ import {
 } from "./markdownEditorMediaTransferModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
+  buildUploadingAttachmentPlaceholder as buildUploadingFilePlaceholder,
   buildUploadingImagePlaceholder,
   createUploadPlaceholderId,
   listFilesFromDataTransfer,
@@ -284,31 +285,9 @@ export const useMarkdownEditorMediaTransfers = ({
   const handleImageInput = useCallback(
     async (file: File | null) => {
       if (!file || !onUploadImage) return
-      clearUploadError()
-      setUploadInFlight(1)
-      let uploaded: MarkdownImageUploadResult
-      try {
-        uploaded = await onUploadImage(file)
-      } catch (error) {
-        setEditorError(
-          resolveMarkdownEditorUploadErrorMessage(error, {
-            kind: "image",
-            fileName: file.name,
-            fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
-          })
-        )
-        return
-      } finally {
-        setUploadInFlight(-1)
-      }
-      const resolved = resolveMarkdownImageEmbed(uploaded, file.name)
-      if ("error" in resolved) {
-        setEditorError(resolved.error)
-        return
-      }
-      insertUploadedMarkdown(resolved.markdown)
+      await uploadImageWithPlaceholder(file)
     },
-    [clearUploadError, insertUploadedMarkdown, onUploadImage, setEditorError, setUploadInFlight]
+    [onUploadImage, uploadImageWithPlaceholder]
   )
 
   const handleFileInput = useCallback(
@@ -321,31 +300,19 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
-      setUploadInFlight(1)
-      let uploaded: MarkdownFileUploadResult
-      try {
-        uploaded = await onUploadFile(file)
-      } catch (error) {
-        setEditorError(
-          resolveMarkdownEditorUploadErrorMessage(error, {
-            kind: "file",
-            fileName: file.name,
-            fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
-          })
-        )
-        return
-      } finally {
-        setUploadInFlight(-1)
-      }
-
-      const resolved = resolveMarkdownAttachmentLink(uploaded, file.name)
-      if ("error" in resolved) {
-        setEditorError(resolved.error)
-        return
-      }
-      insertUploadedMarkdown(resolved.markdown)
+      const startedGeneration = documentGenerationRef.current
+      const placeholder = buildUploadingFilePlaceholder(file.name || "file", createUploadPlaceholderId())
+      insertAtActiveSelection(placeholder)
+      await completeReservedAttachmentUpload(file, placeholder, { startedGeneration })
     },
-    [clearUploadError, insertUploadedMarkdown, onUploadFile, setEditorError, setUploadInFlight]
+    [
+      clearUploadError,
+      completeReservedAttachmentUpload,
+      documentGenerationRef,
+      insertAtActiveSelection,
+      onUploadFile,
+      setEditorError,
+    ]
   )
 
   const processTransferFiles = useCallback(

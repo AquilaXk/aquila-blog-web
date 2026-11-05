@@ -35,7 +35,7 @@ for (const field of ["한 줄 역할", "계정 이름"]) {
 }
 
 test("publishing refreshes the member shell profile through client navigation", async ({ page }) => {
-  const sidebar = page.locator("aside").filter({ has: page.getByText("ENGINEERING JOURNAL", { exact: true }) })
+  const sidebar = page.locator("aside").filter({ has: page.getByRole("link", { name: "허브", exact: true }) })
   const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }
   const published = { ...draft, blogTitle: "Cached journal" }
   const nextDraft = { ...published, blogTitle: "Published journal" }
@@ -71,7 +71,7 @@ test("publishing refreshes the member shell profile through client navigation", 
 })
 
 test("failed publication retains the committed member shell profile cache", async ({ page }) => {
-  const sidebar = page.locator("aside").filter({ has: page.getByText("ENGINEERING JOURNAL", { exact: true }) })
+  const sidebar = page.locator("aside").filter({ has: page.getByRole("link", { name: "허브", exact: true }) })
   const member = { id: 1, username: "owner", nickname: "Owner", isAdmin: true }
   const published = { ...draft, blogTitle: "Committed journal" }
   const nextDraft = { ...published, blogTitle: "Unpublished journal" }

@@ -224,7 +224,7 @@ const NavBar = () => {
           <button
             type="button"
             className="searchTrigger"
-            aria-label="글과 태그 검색으로 이동"
+            aria-label={language === "ko" ? "글과 태그 검색으로 이동" : "Go to post and tag search"}
             aria-keyshortcuts="Meta+K Control+K"
             onClick={requestFocusFeedSearch}
           >
@@ -238,7 +238,7 @@ const NavBar = () => {
           ref={mobileMenuButtonRef}
           type="button"
           className="mobileMenuButton"
-          aria-label="메뉴"
+          aria-label={language === "ko" ? "메뉴" : "Menu"}
           aria-expanded={mobileMenuOpen}
           aria-haspopup="dialog"
           onClick={() => setMobileMenuOpen((value) => !value)}
@@ -267,7 +267,7 @@ const MobileMenuBackdrop = styled.div`
   z-index: ${zIndexes.mobileNavOverlay};
   background: color-mix(
     in srgb,
-    var(--aq-text) ${({ theme }) => (theme.scheme === "dark" ? "48%" : "20%")},
+    var(--aq-text) 20%,
     transparent
   );
   pointer-events: auto;

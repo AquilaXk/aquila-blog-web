@@ -156,7 +156,7 @@ export const RightTocRail = memo(function RightTocRail({
                 onClick={onToggleDetailed}
                 aria-pressed={showDetailedToc}
               >
-                {showDetailedToc ? "h4 접기" : "h4 보기"}
+                {showDetailedToc ? "세부 목차 접기" : "세부 목차 보기"}
               </button>
             )}
           </div>

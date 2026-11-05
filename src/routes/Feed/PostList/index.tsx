@@ -74,7 +74,6 @@ const FilterLoadingStateInner: React.FC = () => {
         </div>
         <div className="searchLoadingCopy">
           <h3>{t("loadingTitle")}</h3>
-          <p>{t("loadingDesc")}</p>
         </div>
       </div>
       <div className="searchLoadingGrid skeletonGrid" aria-hidden="true">
@@ -237,7 +236,6 @@ const PostList: React.FC<Props> = ({
             <div className="loadMoreSkeletonShell" aria-hidden="true">
               <div className="loadMoreSkeletonCopy">
                 <strong>{t("loadMorePreparingTitle")}</strong>
-                <span>{t("loadMorePreparingDesc")}</span>
               </div>
               <div className="skeletonGrid">
                 {NEXT_SKELETON_KEYS.map((key) => (

@@ -213,7 +213,12 @@ export const useEditorStudioLocalDraftLifecycle = ({
       postVersionRef.current
     )
     const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
-    if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) return
+    if (lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) {
+      if (options?.silent === false) {
+        setPublishStatus({ tone: "success", text: `브라우저 임시저장 완료 (${describeLocalDraftSlot(payload)})` }, "page")
+      }
+      return
+    }
 
     const previousOwnAutosave = ownSessionAutosaveRef.current
     ownSessionAutosaveRef.current = {

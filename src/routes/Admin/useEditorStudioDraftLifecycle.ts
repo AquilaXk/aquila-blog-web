@@ -232,7 +232,7 @@ export const useEditorStudioDraftLifecycle = ({
     setPublishStatus(
       {
         tone: "idle",
-        text: "새 글 모드입니다. 글 작성 버튼은 새 글 생성에만 사용됩니다.",
+        text: "",
       },
       "page"
     )

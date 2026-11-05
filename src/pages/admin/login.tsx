@@ -1,4 +1,3 @@
-import styled from "@emotion/styled"
 import type { components } from "@shared/contracts"
 import type { GetServerSideProps, NextPage } from "next"
 import { useRouter } from "next/router"
@@ -10,6 +9,25 @@ import { normalizeAdminNextPath } from "src/libs/router"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { isValidAuthEmail, normalizeAuthEmail } from "src/libs/validation/auth"
+import {
+  LoginBackLink,
+  LoginError,
+  LoginField,
+  LoginFieldHeading,
+  LoginFields,
+  LoginForm,
+  LoginHeading,
+  LoginInput,
+  LoginPanel,
+  LoginPreference,
+  LoginSecondaryActions,
+  LoginSecondaryButton,
+  LoginSection,
+  LoginStage,
+  LoginStatus,
+  LoginSubmit,
+  LoginTimer,
+} from "src/routes/Admin/AdminLogin.styles"
 
 type AdminLoginPageProps = {
   nextPath: string
@@ -391,13 +409,22 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
                       value={code}
                     />
                   </LoginField>
-                  <LoginSecondaryButton
-                    disabled={!hydrated || isBusy}
-                    onClick={resetChallenge}
-                    type="button"
-                  >
-                    이메일 다시 입력
-                  </LoginSecondaryButton>
+                  <LoginSecondaryActions>
+                    <LoginSecondaryButton
+                      disabled={!hydrated || isBusy}
+                      onClick={resetChallenge}
+                      type="button"
+                    >
+                      이메일 다시 입력
+                    </LoginSecondaryButton>
+                    <LoginSecondaryButton
+                      disabled={!hydrated || isBusy}
+                      onClick={() => void requestCode()}
+                      type="button"
+                    >
+                      인증 코드 재전송
+                    </LoginSecondaryButton>
+                  </LoginSecondaryActions>
                 </>
               )}
             </LoginStage>
@@ -415,6 +442,7 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
             {submitLabel}
           </LoginSubmit>
         </LoginForm>
+        <LoginBackLink href="/">← 블로그로 돌아가기</LoginBackLink>
       </LoginPanel>
     </LoginSection>
   )
@@ -422,168 +450,3 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
 
 export default AdminLoginPage
 
-const LoginSection = styled.section`
-  display: grid;
-  min-height: 100dvh;
-  padding: 1.5rem;
-  place-items: center;
-`
-
-const LoginPanel = styled.div`
-  width: min(100%, 26rem);
-  padding: 2rem;
-  border: 1px solid ${({ theme }) => theme.colors.gray6};
-  border-radius: 12px;
-  background: ${({ theme }) => theme.colors.gray1};
-`
-
-const LoginHeading = styled.h1`
-  margin: 0;
-  color: ${({ theme }) => theme.colors.gray12};
-  font-size: 1.5rem;
-`
-
-const LoginForm = styled.form`
-  display: grid;
-  gap: 1rem;
-  margin-top: 1.5rem;
-`
-
-const LoginFields = styled.div`
-  display: grid;
-  gap: 1rem;
-`
-
-const LoginStage = styled.div`
-  display: grid;
-  align-content: start;
-  gap: 1rem;
-  min-height: 7.5rem;
-  animation: admin-login-stage-enter 160ms ease-out;
-
-  @keyframes admin-login-stage-enter {
-    from {
-      opacity: 0;
-      transform: translateY(0.25rem);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-`
-
-const LoginField = styled.label`
-  display: grid;
-  gap: 0.45rem;
-  color: ${({ theme }) => theme.colors.gray11};
-  font-size: 0.9rem;
-  font-weight: 650;
-`
-
-const LoginFieldHeading = styled.span`
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-`
-
-const LoginTimer = styled.span`
-  color: ${({ theme }) => theme.colors.gray12};
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-`
-
-const LoginInput = styled.input`
-  width: 100%;
-  min-height: 2.75rem;
-  box-sizing: border-box;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid ${({ theme }) => theme.colors.gray7};
-  border-radius: 6px;
-  background: ${({ theme }) => theme.colors.gray1};
-  color: ${({ theme }) => theme.colors.gray12};
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue7};
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    opacity: 0.65;
-  }
-`
-
-const LoginError = styled.p`
-  margin: 0;
-  color: ${({ theme }) => theme.colors.red11};
-  font-size: 0.9rem;
-`
-
-const LoginStatus = styled.p`
-  margin: 0;
-  color: ${({ theme }) => theme.colors.gray11};
-  font-size: 0.9rem;
-  line-height: 1.5;
-`
-
-const LoginPreference = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${({ theme }) => theme.colors.gray11};
-  font-size: 0.9rem;
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
-`
-
-const LoginSecondaryButton = styled.button`
-  min-height: 2.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid ${({ theme }) => theme.colors.gray7};
-  border-radius: 6px;
-  background: ${({ theme }) => theme.colors.gray1};
-  color: ${({ theme }) => theme.colors.gray11};
-  font: inherit;
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue7};
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.65;
-  }
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
-`
-
-const LoginSubmit = styled.button`
-  min-height: 2.75rem;
-  border: 0;
-  border-radius: 6px;
-  background: ${({ theme }) => theme.publicDesign.accent};
-  color: ${({ theme }) => theme.colors.gray1};
-  font: inherit;
-  font-weight: 700;
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.blue7};
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.65;
-  }
-`

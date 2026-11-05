@@ -97,7 +97,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           aria-label={copied ? "코드가 복사되었습니다" : copyFailed ? "코드 복사에 실패했습니다" : "코드 복사"}
           title={copied ? "복사됨" : copyFailed ? "복사 실패" : "복사"}
         >
-          {copied ? "COPIED" : copyFailed ? "Copy failed" : "COPY"}
+          {copied ? "COPIED" : copyFailed ? "COPY FAILED" : "COPY"}
         </button>
       </div>
       <div className="aq-code-body">

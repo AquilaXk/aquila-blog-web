@@ -150,7 +150,6 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
           </BrandMark>
           <BrandCopy>
             <strong>{brandTitle}</strong>
-            <span>ENGINEERING JOURNAL</span>
           </BrandCopy>
         </BrandBlock>
 
@@ -295,14 +294,6 @@ const BrandCopy = styled.div`
     font-size: 0.88rem;
     font-weight: 850;
     letter-spacing: 0;
-  }
-
-  span {
-    color: ${adminTextMuted};
-    font-size: 0.54rem;
-    font-weight: 760;
-    letter-spacing: 0.16em;
-    line-height: 1.1;
   }
 `
 

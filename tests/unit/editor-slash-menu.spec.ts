@@ -30,6 +30,7 @@ test.describe("editor slash menu and toolbar usability", () => {
   test("markdown editor wires slash command menu with real-time filtering and 1-click shortcuts", () => {
     const editorContent = [
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.tsx"), "utf8"),
+      readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorSlashMenu.tsx"), "utf8"),
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/useMarkdownEditorSlashMenu.ts"), "utf8"),
       readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorToolbar.tsx"), "utf8"),
     ].join("\n")

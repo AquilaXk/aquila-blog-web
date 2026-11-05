@@ -45,16 +45,24 @@ const resolveSortOptionLabel = (
   return t("sortLikes")
 }
 
-const resolveFilterSummary = (normalizedQuery: string, currentTag: string | undefined) => {
+const resolveFilterSummary = (
+  normalizedQuery: string,
+  currentTag: string | undefined,
+  language: "ko" | "en" = "ko"
+) => {
   if (!normalizedQuery && !currentTag) return ""
   const parts: string[] = []
-  if (normalizedQuery.length > 0) parts.push(`검색 "${normalizedQuery}"`)
-  if (currentTag) parts.push(`태그 "${currentTag}"`)
+  if (normalizedQuery.length > 0) {
+    parts.push(language === "en" ? `Search "${normalizedQuery}"` : `검색 "${normalizedQuery}"`)
+  }
+  if (currentTag) {
+    parts.push(language === "en" ? `Tag "${currentTag}"` : `태그 "${currentTag}"`)
+  }
   return parts.join(" · ")
 }
 
 const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const [q, setQ] = useState("")
   const [sortMode, setSortMode] = useState<FeedSortMode>("latest")
   const [sortOpen, setSortOpen] = useState(false)
@@ -196,8 +204,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const resultCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
   const showBootstrapDegraded = initialBootstrapDegraded && !hasInitialLoadSucceeded
   const filterSummary = useMemo(
-    () => resolveFilterSummary(normalizedQuery, currentTag),
-    [currentTag, normalizedQuery]
+    () => resolveFilterSummary(normalizedQuery, currentTag, language),
+    [currentTag, language, normalizedQuery]
   )
 
   const handleClearFilters = useCallback(() => {

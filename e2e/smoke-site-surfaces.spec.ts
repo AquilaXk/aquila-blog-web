@@ -358,7 +358,7 @@ test.describe("공개 표면 스모크: EasySubway 제품", () => {
     // [Phase 1 P0] 교통약자를 위한 무장애 경로 기준 4대 규격 렌더 검증
     const routeSpec = page.getByRole("region", { name: "교통약자를 위한 무장애 경로 기준" })
     await expect(routeSpec).toBeVisible()
-    await expect(routeSpec).toContainText("검증 완료")
+    await expect(routeSpec).toContainText("핵심 4대 기준")
     for (const specCategory of ["수직 이동", "환승 연계", "시설 데이터", "운행 안전"]) {
       await expect(routeSpec).toContainText(specCategory)
     }

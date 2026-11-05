@@ -148,11 +148,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     [postId, setEditorMode, setIsTempDraftMode, setPostId, setPostVersion]
   )
 
-  const publishModalHintByAction = useCallback((actionType: PublishActionType): string => {
-    if (actionType === "create") return "작성 전 확인이 필요한 항목만 이곳에 표시됩니다."
-    if (actionType === "modify") return "수정 전 확인이 필요한 항목만 이곳에 표시됩니다."
-    return "새 글 작성 전 확인이 필요한 항목만 이곳에 표시됩니다."
-  }, [])
+  const publishModalHintByAction = useCallback((_actionType: PublishActionType): string => "", [])
 
   const setPublishStatus = useCallback(
     (next: NoticeState, target: PublishNoticeTarget = "auto") => {

@@ -271,14 +271,14 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
   const metricCards: OpsMetric[] = [
     {
       key: "slot",
-      label: "Active slot",
+      label: "시스템 상태",
       value: props.systemHealthStatus,
       detail: `version ${version}`,
       tone: toOpsTone(props.systemHealthStatus),
     },
     {
       key: "api-p95",
-      label: "API p95",
+      label: "작업 큐 대기",
       value: queueValue,
       detail: dashboardSnapshot
         ? `processing ${dashboardSnapshot.taskQueue.processingCount}`
@@ -287,14 +287,14 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
     },
     {
       key: "error-rate",
-      label: "Error rate",
+      label: "주의 이벤트",
       value: `${queueFailures + authFailures}건`,
       detail: `queue ${queueFailures} · auth ${authFailures}`,
       tone: queueFailures + authFailures ? "warn" : "good",
     },
     {
       key: "cache-hit",
-      label: "Cache hit",
+      label: "캐시 · DB",
       value: redisStatus,
       detail: `db ${dbStatus}`,
       tone: toOpsTone(redisStatus),
@@ -391,7 +391,7 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
               data-variant="primary"
               onClick={() => props.focusSection("execution")}
             >
-              Rollback
+              복구 작업 이동
             </HeaderLink>
           </HeroActions>
         </HeroTop>

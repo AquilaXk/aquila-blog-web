@@ -15,7 +15,7 @@ const PinnedPosts: React.FC<Props> = ({ posts }) => {
   return (
     <StyledWrapper>
       <div className="wrapper">
-        <div className="header">{t("pinnedPostsHeader")}</div>
+        <h2 className="header">{t("pinnedPostsHeader")}</h2>
       </div>
       <div className="list">
         {posts.map((post) => (

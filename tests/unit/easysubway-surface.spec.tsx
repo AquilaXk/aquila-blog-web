@@ -62,7 +62,7 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
     const markup = renderRouteSpecTable()
 
     expect(markup).toContain("교통약자를 위한 무장애 경로 기준")
-    expect(markup).toContain("검증 완료")
+    expect(markup).toContain("핵심 4대 기준")
     expect(markup).toContain("엘리베이터 직결 동선")
     expect(markup).toContain("9-2 승차 위치 안내")
     expect(markup).toContain("역사 편의시설 실측 정보")
@@ -100,8 +100,8 @@ test.describe("EasySubway 표면 컴포넌트 단위 테스트", () => {
     expect(PRODUCT_FEATURES).toHaveLength(2)
 
     const [pick, route] = PRODUCT_FEATURES
-    expect(pick.tag).toBe("01 / STATION SELECTION")
-    expect(route.tag).toBe("02 / ROUTE SPECIFICATION")
+    expect(pick.tag).toBe("01 · 노선도 역 선택")
+    expect(route.tag).toBe("02 · 무장애 경로 탐색")
 
     // Feature 01은 단일 화면 완결성을 긍정형으로 진술
     expect(pick.keyword).toBe("단일 화면")
