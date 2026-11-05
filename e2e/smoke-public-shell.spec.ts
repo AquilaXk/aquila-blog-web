@@ -508,7 +508,7 @@ test.describe("core smoke public shell", () => {
   await expect(
     page.getByLabel("post engagement").getByText("좋아요 3", { exact: true })
   ).toBeVisible()
-  await expect(page.getByRole("button", { name: /좋아요/ })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /좋아요/ }).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "게시글 공유" })).toBeVisible()
   await expect(page.getByRole("button", { name: /댓글/ })).toHaveCount(0)
   await expect(page.getByText(/^댓글(?:\s|$)/)).toHaveCount(0)

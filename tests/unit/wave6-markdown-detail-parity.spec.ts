@@ -45,7 +45,7 @@ import {
   MobileSummaryActions,
 } from "../../src/routes/Detail/PostDetail/PostDetailActionSections"
 import { createTheme } from "../../src/styles/theme"
-import type { TPost } from "../../src/types"
+import type { PostDetail, TPost } from "../../src/types"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
 const REPO_ROOT = path.resolve(__dirname, "../..")
@@ -865,4 +865,243 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(metadata.date).toBe("2026-03-15T00:00:00.000Z")
     expect(metadata.modifiedDate).toBe("2026-03-15T00:00:00.000Z")
   })
+
+  test("11. PostHeader, FloatingActionRail, MobileSummaryActions, and usePostDetailEngagementActions wire interactive like toggle, storage persistence, and error rollback", async () => {
+    const PostHeaderModule = await import("../../src/routes/Detail/PostDetail/PostHeader")
+    const PostHeaderEngagementSection = PostHeaderModule.PostHeaderEngagementSection
+    const engagementModule = (await import(
+      "../../src/routes/Detail/PostDetail/usePostDetailEngagementActions"
+    )) as Record<string, unknown>
+
+    expect(engagementModule.LIKED_POSTS_STORAGE_KEY).toBe("aquila_blog_liked_posts_v1")
+    const readLikedPostIds = engagementModule.readLikedPostIds as (() => string[]) | undefined
+    const isPostLikedInStorage = engagementModule.isPostLikedInStorage as
+      | ((postId: string) => boolean)
+      | undefined
+    const writePostLikedInStorage = engagementModule.writePostLikedInStorage as
+      | ((postId: string, liked: boolean) => void)
+      | undefined
+
+    expect(typeof readLikedPostIds).toBe("function")
+    expect(typeof isPostLikedInStorage).toBe("function")
+    expect(typeof writePostLikedInStorage).toBe("function")
+
+    const samplePost: PostDetail = {
+      id: "42",
+      date: { start_date: "2026-10-01" },
+      slug: "post-42",
+      title: "Interactive Like Test",
+      content: "Body",
+      createdAt: "2026-10-01T00:00:00Z",
+      modifiedAt: "2026-10-01T00:00:00Z",
+      createdTime: "2026-10-01T00:00:00Z",
+      fullWidth: false,
+      likesCount: 5,
+      hitCount: 10,
+      type: ["Post"],
+      status: ["Public"],
+    }
+
+    const renderLikeSurfaces = (liked: boolean, likePending: boolean, likesCount: number) =>
+      renderToStaticMarkup(
+        materializePlaywrightJsx(
+          createElement(ThemeProvider, {
+            theme: lightTheme,
+            children: createElement(
+              Fragment,
+              null,
+              createElement(PostHeaderEngagementSection as never, {
+                key: "header",
+                publishedAt: "2026. 10. 01.",
+                viewText: "10 VIEWS",
+                showReadingTime: false,
+                modifiedAt: "",
+                resolvedLikesCount: likesCount,
+                liked,
+                likePending,
+                onToggleLike: () => {},
+                hideShareActionOnDesktop: false,
+                hideActionButtonsOnMobile: false,
+                onSharePost: () => {},
+                shareFeedback: null,
+                shareFeedbackMessage: "복사 완료",
+              }),
+              createElement(FloatingActionRail, {
+                key: "floating",
+                railRef: { current: null },
+                innerRef: { current: null },
+                active: false,
+                showFloatingLike: true,
+                likesCount,
+                liked,
+                likePending,
+                onToggleLike: () => {},
+                shareFeedback: null,
+                onSharePost: () => {},
+              }),
+              createElement(MobileSummaryActions, {
+                key: "mobile",
+                likesCount,
+                liked,
+                likePending,
+                onToggleLike: () => {},
+                shareFeedback: null,
+                onSharePost: () => {},
+              })
+            ),
+          })
+        ) as ReactElement
+      )
+
+    const unlikedHtml = renderLikeSurfaces(false, false, 5)
+    expect(unlikedHtml).toContain('class="likeButton"')
+    expect(unlikedHtml).toContain('aria-label="좋아요 (현재 5개)"')
+    expect(unlikedHtml).toContain('aria-pressed="false"')
+    expect(unlikedHtml).toContain('class="floatingActionButton floatingLikeBadge"')
+
+    const likedPendingHtml = renderLikeSurfaces(true, true, 6)
+    expect(likedPendingHtml).toContain('aria-label="좋아요 취소 (현재 6개)"')
+    expect(likedPendingHtml).toContain('aria-pressed="true"')
+    expect(likedPendingHtml).toContain('data-active="true"')
+    expect(likedPendingHtml).toContain("disabled")
+
+    const store = new Map<string, string>()
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window")
+    try {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        writable: true,
+        value: {
+          location: { hostname: "localhost" },
+          localStorage: {
+            get length() {
+              return store.size
+            },
+            clear: () => store.clear(),
+            getItem: (key: string) => store.get(key) ?? null,
+            key: (idx: number) => Array.from(store.keys())[idx] ?? null,
+            removeItem: (key: string) => {
+              store.delete(key)
+            },
+            setItem: (key: string, val: string) => {
+              store.set(key, val)
+            },
+          },
+        },
+      })
+
+      for (let i = 1; i <= 205; i += 1) {
+        writePostLikedInStorage!(String(i), true)
+      }
+      const cappedIds = readLikedPostIds!()
+      expect(cappedIds).toHaveLength(200)
+      expect(isPostLikedInStorage!("205")).toBe(true)
+      expect(isPostLikedInStorage!("1")).toBe(false)
+
+      writePostLikedInStorage!("205", false)
+      expect(isPostLikedInStorage!("205")).toBe(false)
+
+      store.clear()
+      const { queryKey } = await import("../../src/constants/queryKey")
+      const { usePostDetailEngagementActions } = await import(
+        "../../src/routes/Detail/PostDetail/usePostDetailEngagementActions"
+      )
+      const previousFetch = globalThis.fetch
+      const calls: Array<{ url: string; method: string }> = []
+      let shouldFailLikeRequest = false
+      let resolvePendingLike: ((val: Response) => void) | null = null
+
+      try {
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input)
+          const method = init?.method ?? "GET"
+          calls.push({ url, method })
+          if (shouldFailLikeRequest) {
+            return new Response(
+              JSON.stringify({ resultCode: "500-1", msg: "error", data: null }),
+              { status: 500, headers: { "content-type": "application/json" } }
+            )
+          }
+          if (resolvePendingLike) {
+            return await new Promise<Response>((resolve) => {
+              resolvePendingLike = resolve
+            })
+          }
+          const liked = method === "PUT"
+          const likesCount = liked ? 6 : 5
+          return new Response(
+            JSON.stringify({
+              resultCode: "200-1",
+              msg: "ok",
+              data: { likesCount, liked },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+        }) as typeof fetch
+
+        const queryClient = new QueryClient()
+        queryClient.setQueryData(queryKey.post("42"), samplePost)
+
+        let latestHookResult: ReturnType<typeof usePostDetailEngagementActions> | null = null
+        const getHookResult = () =>
+          latestHookResult as ReturnType<typeof usePostDetailEngagementActions> | null
+        const HookProbe = () => {
+          latestHookResult = usePostDetailEngagementActions({ data: samplePost, postId: "42" })
+          return null
+        }
+
+        const renderHookSnapshot = () => {
+          renderToStaticMarkup(
+            materializePlaywrightJsx(
+              createElement(
+                QueryClientProvider,
+                { client: queryClient },
+                createElement(HookProbe)
+              )
+            ) as ReactElement
+          )
+        }
+
+        renderHookSnapshot()
+        expect(getHookResult()?.likesCount).toBe(5)
+        expect(getHookResult()?.liked).toBe(false)
+
+        await getHookResult()!.handleToggleLike()
+        expect(calls).toEqual([{ url: "http://localhost:8080/post/api/v1/posts/42/like", method: "PUT" }])
+        expect(isPostLikedInStorage!("42")).toBe(true)
+        expect(queryClient.getQueryData<PostDetail>(queryKey.post("42"))?.likesCount).toBe(6)
+
+        resolvePendingLike = () => {}
+        const firstTogglePromise = getHookResult()!.handleToggleLike()
+        await getHookResult()!.handleToggleLike()
+        expect(calls).toHaveLength(2)
+        ;(resolvePendingLike as unknown as (val: Response) => void)(
+          new Response(
+            JSON.stringify({
+              resultCode: "200-1",
+              msg: "ok",
+              data: { likesCount: 7, liked: true },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+        )
+        resolvePendingLike = null
+        await firstTogglePromise
+
+        shouldFailLikeRequest = true
+        writePostLikedInStorage!("42", false)
+        await getHookResult()!.handleToggleLike()
+        expect(isPostLikedInStorage!("42")).toBe(false)
+      } finally {
+        globalThis.fetch = previousFetch
+      }
+    } finally {
+      if (previousWindow) {
+        Object.defineProperty(globalThis, "window", previousWindow)
+      } else {
+        delete (globalThis as Record<string, unknown>).window
+      }
+    }
+  })
 })
+

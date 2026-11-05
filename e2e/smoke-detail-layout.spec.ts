@@ -536,11 +536,11 @@ test.describe("core smoke detail layout", () => {
   const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "6 VIEWS" })
   const mobileToc = page.locator('[aria-label="접이식 목차"]')
   await expect(page.getByRole("button", { name: /공유/ })).toHaveCount(1)
-  await expect(page.getByRole("button", { name: /^좋아요/ })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /^좋아요/ })).toHaveCount(1)
   await expect(engagementRow).toBeHidden()
   await expect(metaViewStat).toHaveText("6 VIEWS")
   await expect(metaViewStat).toBeHidden()
-  await expect(compactActionBar.getByLabel("좋아요 2", { exact: true })).toBeVisible()
+  await expect(compactActionBar.getByRole("button", { name: /^좋아요/ })).toBeVisible()
   await expect(compactActionBar.getByRole("button", { name: /^공유/ })).toBeVisible()
   await expect(compactActionBar.getByRole("button", { name: /^댓글/ })).toHaveCount(0)
   await expect(page.locator("aside.rightRail")).toBeHidden()
@@ -551,8 +551,8 @@ test.describe("core smoke detail layout", () => {
   const tocRowBox = await firstTocRow.boundingBox()
   expect(tocRowBox?.height ?? 0).toBeGreaterThanOrEqual(44)
   const actionMetrics = await compactActionBar.evaluate((bar) => {
-    const firstButton = bar.querySelector("button")
-    const buttonBox = firstButton?.getBoundingClientRect()
+    const shareActionButton = bar.querySelector('button[data-tone="accent"]')
+    const buttonBox = shareActionButton?.getBoundingClientRect()
     const barStyle = window.getComputedStyle(bar)
     return {
       position: barStyle.position,

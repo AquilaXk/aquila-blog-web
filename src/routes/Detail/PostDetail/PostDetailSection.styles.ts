@@ -24,6 +24,12 @@ export const MobileSummaryBar = styled.div `
       background: ${({ theme }) => theme.publicDesign.readableSurface};
       color: ${({ theme }) => theme.colors.gray10};
       box-shadow: none;
+      cursor: pointer;
+
+      &:disabled {
+        cursor: default;
+        opacity: 0.72;
+      }
     }
 
     button[data-active="true"] {

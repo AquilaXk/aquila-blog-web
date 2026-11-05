@@ -18,6 +18,9 @@ import { StyledWrapper } from "./PostHeader.styles"
 type Props = {
   data: PostDetail
   likesCount?: number
+  liked?: boolean
+  likePending?: boolean
+  onToggleLike?: () => void
   hitCount?: number
   hideShareActionOnDesktop?: boolean
   hideActionButtonsOnMobile?: boolean
@@ -150,13 +153,16 @@ const PostHeaderAuthorMeta: React.FC<{
   )
 }
 
-const PostHeaderEngagementSection: React.FC<{
+export const PostHeaderEngagementSection: React.FC<{
   publishedAt: string
   viewText: string
   showReadingTime: boolean
   readingMinutes?: number
   modifiedAt: string
   resolvedLikesCount: number
+  liked: boolean
+  likePending: boolean
+  onToggleLike?: () => void
   hideShareActionOnDesktop: boolean
   hideActionButtonsOnMobile: boolean
   onSharePost?: () => void
@@ -169,6 +175,9 @@ const PostHeaderEngagementSection: React.FC<{
   readingMinutes,
   modifiedAt,
   resolvedLikesCount,
+  liked,
+  likePending,
+  onToggleLike,
   hideShareActionOnDesktop,
   hideActionButtonsOnMobile,
   onSharePost,
@@ -190,10 +199,18 @@ const PostHeaderEngagementSection: React.FC<{
             ) : null}
             {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
           </div>
-          <span className="likeButton">
-            <AppIcon name="heart" />
+          <button
+            type="button"
+            className="likeButton"
+            aria-pressed={liked}
+            data-active={liked}
+            aria-label={liked ? `좋아요 취소 (현재 ${resolvedLikesCount}개)` : `좋아요 (현재 ${resolvedLikesCount}개)`}
+            disabled={likePending || !onToggleLike}
+            onClick={onToggleLike}
+          >
+            <AppIcon name={liked ? "heart-filled" : "heart"} />
             <span>좋아요 {resolvedLikesCount}</span>
-          </span>
+          </button>
           {onSharePost ? (
             <button
               type="button"
@@ -225,6 +242,9 @@ const PostHeaderEngagementSection: React.FC<{
 const PostHeader: React.FC<Props> = (props) => {
   const {
     data,
+    liked = false,
+    likePending = false,
+    onToggleLike,
     hideShareActionOnDesktop = false,
     hideActionButtonsOnMobile = false,
     shareFeedback = null,
@@ -268,6 +288,9 @@ const PostHeader: React.FC<Props> = (props) => {
             readingMinutes={readingMinutes}
             modifiedAt={vm.modifiedAt}
             resolvedLikesCount={vm.resolvedLikesCount}
+            liked={liked}
+            likePending={likePending}
+            onToggleLike={onToggleLike}
             hideShareActionOnDesktop={hideShareActionOnDesktop}
             hideActionButtonsOnMobile={hideActionButtonsOnMobile}
             onSharePost={onSharePost}

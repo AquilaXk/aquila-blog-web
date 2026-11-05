@@ -149,10 +149,20 @@ export const StyledWrapper = styled.div `
   button.floatingActionButton {
     cursor: pointer;
 
-    &:hover {
+    &:hover:not(:disabled) {
       border-color: var(--aq-accent-link);
       background: var(--aq-surface);
       color: var(--aq-accent-link);
+    }
+
+    &[data-active="true"] {
+      border-color: var(--aq-accent);
+      color: var(--aq-accent);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.72;
     }
   }
 
@@ -205,21 +215,7 @@ export const StyledWrapper = styled.div `
   }
 
   .floatingLikeBadge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25rem;
-    border: 0;
-    background: transparent;
-    color: var(--aq-muted);
-    cursor: default;
-    user-select: none;
-
-    svg {
-      width: 1em;
-      height: 1em;
-      font-size: 1.125rem;
-    }
+    color: var(--aq-text-secondary);
   }
 
   .floatingShareStat {

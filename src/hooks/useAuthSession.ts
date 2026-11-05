@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { queryKey } from "src/constants/queryKey"
 import type { ProfileCardLinkItem } from "src/constants/profileCardLinks"
+import { clearAllAdminEditorLocalDrafts } from "src/libs/privacy/browserStorageRegistry"
 import type { BlogDesignType, LegacyBlogScheme } from "src/types"
 
 const AUTH_ME_ANON_SUPPRESS_UNTIL_KEY = "auth:me:anon-probe-suppress-until:v1"
@@ -155,6 +156,7 @@ const useAuthSession = () => {
       await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })
     } catch {
     } finally {
+      clearAllAdminEditorLocalDrafts()
       setMe(null)
     }
   }

@@ -294,7 +294,7 @@ test.describe("mobile layout public", () => {
   await expect(metaViewStat).toBeHidden()
   await expect(historicalLikeCount).toBeVisible()
   await expect(shareButton).toBeVisible()
-  await expect(compactActionBar.getByRole("button", { name: /좋아요/ })).toHaveCount(0)
+  await expect(compactActionBar.getByRole("button", { name: /좋아요/ })).toHaveCount(1)
   await expect(compactActionBar.getByRole("button", { name: /댓글/ })).toHaveCount(0)
   await expect(page.getByText(/^댓글(?:\s|$)/)).toHaveCount(0)
   await expect(editButton).toHaveCount(0)

@@ -5,6 +5,50 @@ import { queryKey } from "src/constants/queryKey"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import type { PostDetail as PostDetailType, RsData } from "src/types"
 
+export const LIKED_POSTS_STORAGE_KEY = "aquila_blog_liked_posts_v1"
+const LIKED_POSTS_MAX_ENTRIES = 200
+
+export const readLikedPostIds = (): string[] => {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = window.localStorage.getItem(LIKED_POSTS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const ids: string[] = []
+    for (const item of parsed) {
+      if (typeof item !== "string") continue
+      const trimmed = item.trim()
+      if (trimmed && !ids.includes(trimmed)) {
+        ids.push(trimmed)
+      }
+    }
+    return ids.slice(-LIKED_POSTS_MAX_ENTRIES)
+  } catch {
+    return []
+  }
+}
+
+export const isPostLikedInStorage = (postId: string): boolean => {
+  const normalized = postId.trim()
+  if (!normalized) return false
+  return readLikedPostIds().includes(normalized)
+}
+
+export const writePostLikedInStorage = (postId: string, liked: boolean): void => {
+  if (typeof window === "undefined") return
+  const normalized = postId.trim()
+  if (!normalized) return
+  try {
+    const existing = readLikedPostIds().filter((id) => id !== normalized)
+    const next = liked
+      ? [...existing, normalized].slice(-LIKED_POSTS_MAX_ENTRIES)
+      : existing
+    window.localStorage.setItem(LIKED_POSTS_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+  }
+}
+
 type ShareFeedback = "copied" | "shared" | "failed"
 
 type UsePostDetailEngagementActionsArgs = {
@@ -19,14 +63,27 @@ export const usePostDetailEngagementActions = ({
   const queryClient = useQueryClient()
   const detailId = data?.id
   const didIncrementHitRef = useRef<string | null>(null)
+  const likeInFlightRef = useRef(false)
   const shareFeedbackResetTimerRef = useRef<number | null>(null)
   const [hitCount, setHitCount] = useState(data?.hitCount ?? 0)
+  const [likesCount, setLikesCount] = useState(data?.likesCount ?? 0)
+  const [liked, setLiked] = useState(false)
+  const [likePending, setLikePending] = useState(false)
   const [shareFeedback, setShareFeedback] = useState<ShareFeedback | null>(null)
 
   useEffect(() => {
     if (!data) return
     setHitCount(data.hitCount ?? 0)
-  }, [data, data?.hitCount, data?.id])
+    setLikesCount(data.likesCount ?? 0)
+  }, [data, data?.hitCount, data?.likesCount, data?.id])
+
+  useEffect(() => {
+    if (!detailId) {
+      setLiked(false)
+      return
+    }
+    setLiked(isPostLikedInStorage(String(detailId)))
+  }, [detailId])
 
   useEffect(() => {
     if (!detailId) return
@@ -61,6 +118,41 @@ export const usePostDetailEngagementActions = ({
       }
     }
   }, [])
+
+  const handleToggleLike = useCallback(async () => {
+    if (!detailId || likeInFlightRef.current) return
+    const normalizedId = String(detailId)
+    const prevLiked = liked
+    const prevLikesCount = likesCount
+    const nextLiked = !prevLiked
+    const optimisticCount = Math.max(0, prevLikesCount + (nextLiked ? 1 : -1))
+
+    likeInFlightRef.current = true
+    setLikePending(true)
+    setLiked(nextLiked)
+    setLikesCount(optimisticCount)
+    writePostLikedInStorage(normalizedId, nextLiked)
+
+    try {
+      const response = await apiFetch<RsData<{ likesCount: number; liked: boolean }>>(
+        `/post/api/v1/posts/${detailId}/like`,
+        { method: nextLiked ? "PUT" : "DELETE" }
+      )
+      setLiked(response.data.liked)
+      setLikesCount(response.data.likesCount)
+      writePostLikedInStorage(normalizedId, response.data.liked)
+      queryClient.setQueryData<PostDetailType | undefined>(queryKey.post(detailId), (prev) =>
+        prev ? { ...prev, likesCount: response.data.likesCount } : prev
+      )
+    } catch {
+      setLiked(prevLiked)
+      setLikesCount(prevLikesCount)
+      writePostLikedInStorage(normalizedId, prevLiked)
+    } finally {
+      likeInFlightRef.current = false
+      setLikePending(false)
+    }
+  }, [detailId, liked, likesCount, queryClient])
 
   const flashShareFeedback = useCallback((next: ShareFeedback) => {
     if (typeof window === "undefined") return
@@ -111,6 +203,10 @@ export const usePostDetailEngagementActions = ({
 
   return {
     hitCount,
+    likesCount,
+    liked,
+    likePending,
+    handleToggleLike,
     handleSharePost,
     shareFeedback,
   }
