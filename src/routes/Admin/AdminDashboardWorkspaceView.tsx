@@ -93,7 +93,7 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
                   onRefresh={onRefresh}
                 />
                 <HeaderLink as={Link} href="/admin/tools">Doctor 실행</HeaderLink>
-                <HeaderLink as={Link} href="/admin/tools" data-variant="primary">Rollback</HeaderLink>
+                <HeaderLink as={Link} href="/admin/tools" data-variant="primary">복구 도구</HeaderLink>
               </HeroActions>
             </HeroTop>
           </HeroPanel>

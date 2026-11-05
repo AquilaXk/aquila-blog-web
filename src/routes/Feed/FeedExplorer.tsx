@@ -45,11 +45,19 @@ const resolveSortOptionLabel = (
   return t("sortLikes")
 }
 
-const resolveFilterSummary = (normalizedQuery: string, currentTag: string | undefined) => {
+const resolveFilterSummary = (
+  normalizedQuery: string,
+  currentTag: string | undefined,
+  t: (key: "searchButton" | "filterTagPrefix") => string
+) => {
   if (!normalizedQuery && !currentTag) return ""
   const parts: string[] = []
-  if (normalizedQuery.length > 0) parts.push(`검색 "${normalizedQuery}"`)
-  if (currentTag) parts.push(`태그 "${currentTag}"`)
+  if (normalizedQuery.length > 0) {
+    parts.push(`${t("searchButton")} "${normalizedQuery}"`)
+  }
+  if (currentTag) {
+    parts.push(`${t("filterTagPrefix")} "${currentTag}"`)
+  }
   return parts.join(" · ")
 }
 
@@ -196,8 +204,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const resultCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
   const showBootstrapDegraded = initialBootstrapDegraded && !hasInitialLoadSucceeded
   const filterSummary = useMemo(
-    () => resolveFilterSummary(normalizedQuery, currentTag),
-    [currentTag, normalizedQuery]
+    () => resolveFilterSummary(normalizedQuery, currentTag, t),
+    [currentTag, normalizedQuery, t]
   )
 
   const handleClearFilters = useCallback(() => {

@@ -190,7 +190,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
 
   figure[data-rehype-pretty-code-figure] code,
   figure[data-rehype-pretty-code-figure] code span {
-    color: ${ (theme.scheme === "dark" ? "var(--shiki-dark)" : "var(--shiki-light)")};
+    color: var(--shiki-light);
     background-color: transparent !important;
   }
 
@@ -200,9 +200,8 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     min-width: 0;
     border-radius: 0;
     overflow: hidden;
-    border: 1px solid ${ theme.colors.gray6};
-    background: ${
-      theme.scheme === "dark" ? "rgba(15, 23, 42, 0.62)" : "rgba(248, 250, 252, 0.92)"};
+    border: 1px solid ${theme.colors.gray6};
+    background: rgba(248, 250, 252, 0.92);
   }
 
   figure[data-rehype-pretty-code-figure] pre {
@@ -226,14 +225,12 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
   }
 
   figure[data-rehype-pretty-code-figure] [data-highlighted-line] {
-    border-left-color: ${ (theme.scheme === "dark" ? "#60a5fa" : "#3b82f6")};
-    background: ${
-      theme.scheme === "dark" ? "rgba(96, 165, 250, 0.11)" : "rgba(59, 130, 246, 0.12)"};
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.12);
   }
 
   figure[data-rehype-pretty-code-figure] [data-highlighted-chars] {
-    background: ${
-      theme.scheme === "dark" ? "rgba(250, 204, 21, 0.2)" : "rgba(250, 204, 21, 0.24)"};
+    background: rgba(250, 204, 21, 0.24);
     border-radius: 4px;
     padding: 0.06em 0.22em;
   }

@@ -167,6 +167,19 @@ export const StyledWrapper = styled.div`
     text-underline-offset: 3px;
   }
 
+  .project-main {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .project-summary {
+    margin: 0;
+    color: var(--aq-subtle);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .stack-row,
     .stack-row a {

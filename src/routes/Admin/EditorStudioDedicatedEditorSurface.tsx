@@ -420,7 +420,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           onPointerDown={() => dismissMobilePanelsOnCanvasTap(isZenMode, setPanelUiMask)}
         >
           <EditorStudioDedicatedMetaSection>
-            {!isInspectorOpen ? localDraftRestoreCardNode : null}
+            {localDraftRestoreCardNode}
             <TitleInput
               ref={handleTitleInputRef}
               id="post-title"
@@ -461,7 +461,6 @@ export const EditorStudioDedicatedEditorSurface = ({
                 />
               </EditorTagRow>
               {postCategory.trim() ? <EditorHeaderMetaPill data-testid="editor-category-meta-pill">분류 · {splitCategoryDisplay(postCategory).label}</EditorHeaderMetaPill> : null}
-              <EditorHeaderMetaPill>본문 형식 · Markdown</EditorHeaderMetaPill>
             </EditorHeaderMetaRow>
           </EditorStudioDedicatedMetaSection>
 
@@ -539,7 +538,6 @@ export const EditorStudioDedicatedEditorSurface = ({
               </datalist>
               <small>하나의 글에는 넓은 분류를 하나만 선택하세요. 세부 키워드는 태그로 추가할 수 있습니다.</small>
             </label>
-            {localDraftRestoreCardNode}
             <section>
               <span>태그</span>
               <EditorTagRow aria-label="발행 태그">

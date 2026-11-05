@@ -15,7 +15,6 @@ const Logo = ({ blogTitle: blogTitleProp }: Props) => {
     <StyledWrapper href="/" aria-label={blogTitle}>
       <BrandMark className="brandMark" priority />
       <span className="brandText">{blogTitle}</span>
-      <em>ENGINEERING JOURNAL</em>
     </StyledWrapper>
   )
 }
@@ -51,20 +50,5 @@ const StyledWrapper = styled(Link)`
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  em {
-    color: var(--aq-muted);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.625rem;
-    line-height: 1;
-    font-weight: 600;
-    font-style: normal;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-
-    @media (max-width: 1024px) {
-      display: none;
-    }
   }
 `

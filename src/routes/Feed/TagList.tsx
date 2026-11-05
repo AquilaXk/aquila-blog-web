@@ -144,7 +144,7 @@ const TagList: React.FC = () => {
                 onClick={handleClickTagButton}
               >
                 <span className="name">{key}</span>
-                <span className="count">{String(count).padStart(2, "0")}</span>
+                <span className="count">{count}</span>
               </button>
             </li>
           ))}

@@ -32,7 +32,7 @@ const PostDetailMobileToc = ({
               aria-pressed={Boolean(showDetailedToc)}
               onClick={onToggleDetailed}
             >
-              {showDetailedToc ? "h4 접기" : "h4 보기"}
+              {showDetailedToc ? "세부 목차 접기" : "세부 목차 보기"}
             </button>
           </div>
         ) : null}

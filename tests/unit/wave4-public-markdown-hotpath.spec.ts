@@ -286,7 +286,8 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
     expect(aboutStyles).toContain("@media (max-width: 820px), (pointer: coarse)")
 
     const logoTsx = readRepoFile("src/layouts/RootLayout/Header/Logo.tsx")
-    expect(logoTsx).toContain("@media (max-width: 1024px)")
+    expect(logoTsx).toContain("@media (max-width: ${layoutBreakpoint.navCompact}px), (pointer: coarse)")
+    expect(logoTsx).not.toContain("ENGINEERING JOURNAL")
 
     const navBarTsx = readRepoFile("src/layouts/RootLayout/Header/NavBar.tsx")
     expect(navBarTsx).toContain("width: clamp(156px, 18vw, 212px);")

@@ -85,7 +85,7 @@ test.describe("admin posts workspace link contract", () => {
 
     expect(source).not.toContain("onOpenPostDetail")
     expect(source).not.toContain("onCopyPostDetailLink")
-    expect(editorSurfaceSource).toContain("본문 형식 · Markdown")
+    expect(editorSurfaceSource).not.toContain("본문 형식 · Markdown")
     expect(editorSurfaceSource).not.toContain("onOpenPostDetail")
     expect(editorSurfaceSource).not.toContain("onCopyPostDetailLink")
     expect(editorSurfaceSource).not.toContain("상세 열기")

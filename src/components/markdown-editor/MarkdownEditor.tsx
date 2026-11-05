@@ -462,14 +462,6 @@ export const MarkdownEditor = ({
   )
   const toolbarCommands = useMemo(() => projectMarkdownEditorToolbarCommands(), [])
 
-  const insertUploadedMarkdown = useCallback(
-    (markdown: string) => {
-      if (insertMarkdownAtEditorSelection(markdown)) return
-      commitMarkdown(`${valueRef.current}${markdown}`, true)
-    },
-    [commitMarkdown, insertMarkdownAtEditorSelection]
-  )
-
   const handleCloseFindReplace = useCallback(() => {
     findReplace.closePanel()
     liveSurfaceRef.current?.focus(selectionRef.current)
@@ -482,7 +474,7 @@ export const MarkdownEditor = ({
       applyPlannedMarkdownMutation, applyRecordedMarkdownMutation: applyMutationPlan,
       applyBackgroundMarkdownMutation, resolveActiveSelection,
       resolveDropTargetPosition: (coords) => liveSurfaceRef.current?.posAtCoords(coords) ?? null,
-      setUploadInFlight, setEditorError: setUploadError, insertUploadedMarkdown,
+      setUploadInFlight, setEditorError: setUploadError,
     })
 
   const resolveSlashCoords = useCallback((pos: number) => liveSurfaceRef.current?.coordsAtPos?.(pos) ?? null, [])

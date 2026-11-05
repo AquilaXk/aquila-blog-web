@@ -220,17 +220,20 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
                   {projectItems.map((item) => (
                     <div className="stack-row" key={item.name}>
                       <strong>{item.role || item.linkLabel}</strong>
-                      {item.safeHref ? (
-                        <a
-                          href={item.safeHref}
-                          target={isExternalHref(item.safeHref) ? "_blank" : undefined}
-                          rel={isExternalHref(item.safeHref) ? "noopener noreferrer" : undefined}
-                        >
-                          {item.name}
-                        </a>
-                      ) : (
-                        <span>{item.name}</span>
-                      )}
+                      <div className="project-main">
+                        {item.safeHref ? (
+                          <a
+                            href={item.safeHref}
+                            target={isExternalHref(item.safeHref) ? "_blank" : undefined}
+                            rel={isExternalHref(item.safeHref) ? "noopener noreferrer" : undefined}
+                          >
+                            {item.name}
+                          </a>
+                        ) : (
+                          <span>{item.name}</span>
+                        )}
+                        {item.summary ? <p className="project-summary">{item.summary}</p> : null}
+                      </div>
                     </div>
                   ))}
                 </div>

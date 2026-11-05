@@ -64,7 +64,7 @@ export const StyledWrapper = styled.header `
     margin: 0.875rem 0 1.375rem;
     font-size: clamp(42px, 5.3vw, 70px);
     line-height: 1.08;
-    letter-spacing: -0.065em;
+    letter-spacing: -0.035em;
     font-weight: 600;
     color: var(--aq-text);
     overflow-wrap: break-word;

@@ -84,8 +84,8 @@ const resolveHeroLabels = (data: PostDetail): string[] => {
   const primaryTag = primaryCategory ? "" : findPrimaryTag(data.tags)
   const primaryTaxonomy = primaryCategory || primaryTag
   const rawTypeLabel = data.type?.[0]?.trim() || "Post"
-  const typeLabel = rawTypeLabel === "Post" ? "Production note" : rawTypeLabel
-  return primaryTaxonomy ? [primaryTaxonomy, typeLabel] : [typeLabel]
+  const typeLabel = rawTypeLabel === "Post" ? "" : rawTypeLabel
+  return [primaryTaxonomy, typeLabel].filter(Boolean)
 }
 
 export const resolvePostHeaderViewModel = (props: Props) => {

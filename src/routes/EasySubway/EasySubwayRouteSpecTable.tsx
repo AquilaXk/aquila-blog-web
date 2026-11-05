@@ -15,7 +15,7 @@ export const EasySubwayRouteSpecTable: React.FC<Props> = ({
   <S.RouteSpecPanel role="region" aria-label="교통약자를 위한 무장애 경로 기준">
     <S.RouteSpecHeader>
       <S.RouteSpecTitle>교통약자를 위한 무장애 경로 기준</S.RouteSpecTitle>
-      <S.RouteSpecTag>검증 완료</S.RouteSpecTag>
+      <S.RouteSpecTag>핵심 4대 기준</S.RouteSpecTag>
     </S.RouteSpecHeader>
     <S.RouteSpecList>
       {specs.map((spec) => (

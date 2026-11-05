@@ -127,7 +127,7 @@ const NavBar = () => {
               ref={mobileMenuPanelRef}
               role="dialog"
               aria-modal="true"
-              aria-label="메뉴"
+              aria-label={t("navMenu")}
               className="mobileMenuPanel"
               onKeyDown={handleMobileMenuKeyDown}
             >
@@ -163,8 +163,8 @@ const NavBar = () => {
                 <button
                   type="button"
                   className="mobileLangToggleBtn"
-                  aria-label={language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}
-                  title={language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}
+                  aria-label={t("langToggleMobileLabel")}
+                  title={t("langToggleMobileLabel")}
                   onClick={() => {
                     toggleLanguage()
                     closeMobileMenu()
@@ -172,7 +172,7 @@ const NavBar = () => {
                   data-language={language}
                 >
                   <GlobeIcon />
-                  <span>{language === "ko" ? "Switch to English (EN)" : "한국어 (KO)로 전환"}</span>
+                  <span>{t("langToggleMobileLabel")}</span>
                 </button>
               </div>
             </MobileMenuPanel>
@@ -211,8 +211,8 @@ const NavBar = () => {
         <button
           type="button"
           className="langToggleBtn"
-          aria-label={language === "ko" ? "Switch to English" : "한국어로 전환"}
-          title={language === "ko" ? "Switch to English" : "한국어로 전환"}
+          aria-label={t("langToggleLabel")}
+          title={t("langToggleLabel")}
           onClick={toggleLanguage}
           data-language={language}
         >
@@ -224,7 +224,7 @@ const NavBar = () => {
           <button
             type="button"
             className="searchTrigger"
-            aria-label="글과 태그 검색으로 이동"
+            aria-label={t("navSearchTriggerAria")}
             aria-keyshortcuts="Meta+K Control+K"
             onClick={requestFocusFeedSearch}
           >
@@ -238,7 +238,7 @@ const NavBar = () => {
           ref={mobileMenuButtonRef}
           type="button"
           className="mobileMenuButton"
-          aria-label="메뉴"
+          aria-label={t("navMenu")}
           aria-expanded={mobileMenuOpen}
           aria-haspopup="dialog"
           onClick={() => setMobileMenuOpen((value) => !value)}
@@ -267,7 +267,7 @@ const MobileMenuBackdrop = styled.div`
   z-index: ${zIndexes.mobileNavOverlay};
   background: color-mix(
     in srgb,
-    var(--aq-text) ${({ theme }) => (theme.scheme === "dark" ? "48%" : "20%")},
+    var(--aq-text) 20%,
     transparent
   );
   pointer-events: auto;
