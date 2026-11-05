@@ -198,30 +198,22 @@ export const StyledWrapper = styled.div `
     }
   }
 
-  .floatingShareButton {
-    color: var(--aq-text-secondary);
-  }
-
   .floatingLikeCluster {
     display: grid;
     justify-items: center;
     row-gap: 8px;
   }
 
-  .floatingLikeStat {
-    display: grid;
-    justify-items: center;
-    row-gap: 0.36rem;
-  }
-
-  .floatingLikeBadge {
-    color: var(--aq-text-secondary);
-  }
-
+  .floatingLikeStat,
   .floatingShareStat {
     display: grid;
     justify-items: center;
     row-gap: 0.36rem;
+  }
+
+  .floatingLikeBadge,
+  .floatingShareButton {
+    color: var(--aq-text-secondary);
   }
 
   .floatingLikeCount {
