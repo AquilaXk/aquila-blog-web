@@ -62,8 +62,8 @@ export const StyledWrapper = styled.header `
 
   .title {
     margin: 0.875rem 0 1.375rem;
-    font-size: clamp(32px, 4.2vw, 52px);
-    line-height: 1.16;
+    font-size: clamp(42px, 5.3vw, 70px);
+    line-height: 1.08;
     letter-spacing: -0.035em;
     font-weight: 600;
     color: var(--aq-text);
