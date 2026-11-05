@@ -8,6 +8,7 @@ import ProfileImage from "src/components/ProfileImage"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { useAdminShellProfile } from "src/hooks/useAdminShellProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
+import { clearAllAdminEditorLocalDrafts } from "src/libs/privacy/browserStorageRegistry"
 import { toAdminLoginPath } from "src/libs/router"
 import type { AdminProfile } from "src/types/adminProfile"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
@@ -136,7 +137,11 @@ const AdminShell = ({ currentSection, member, profileSnapshot = null, children }
   const currentTitle = SECTION_TITLES[currentSection]
 
   const handleLogout = async () => {
-    await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
+    try {
+      await apiFetch("/member/api/v1/auth/logout", { method: "DELETE" }).catch(() => undefined)
+    } finally {
+      clearAllAdminEditorLocalDrafts()
+    }
     const rawNextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.href = toAdminLoginPath(rawNextPath, "/admin")
   }

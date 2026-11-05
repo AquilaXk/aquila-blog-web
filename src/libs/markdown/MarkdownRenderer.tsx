@@ -285,8 +285,7 @@ const renderMarkdownPreElement = ({ node, children, className: _className, ...pr
 
 const renderMarkdownImageElement = (
   { src, alt, node }: MarkdownElementProps,
-  state: MarkdownRenderPassState,
-  imageRenderOrderRef?: { current: number }
+  state: MarkdownRenderPassState
 ) => {
   const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
   if (!imageSrc) {
@@ -297,9 +296,7 @@ const renderMarkdownImageElement = (
       </span>
     )
   }
-  const imageIndex = allocateNodeOrderIndex(node, state.imageIndices, () =>
-    imageRenderOrderRef ? imageRenderOrderRef.current++ : state.nextImageIndex++
-  )
+  const imageIndex = allocateNodeOrderIndex(node, state.imageIndices, () => state.nextImageIndex++)
   const { widthPx, heightPx, aspectRatio } = resolveMarkdownImageDimensions(imageSrc)
   return (
     <MarkdownImageFigure
@@ -319,16 +316,12 @@ export const createMarkdownComponentVariants = ({
   footnoteMarker,
   tableLayouts,
   renderPassStateRef,
-  tableRenderIndexRef,
-  imageRenderOrderRef,
   sentinels,
 }: {
   footnotes: ReturnType<typeof resolveMarkdownRenderModel>["footnotes"]
   footnoteMarker: string
   tableLayouts: ReturnType<typeof resolveMarkdownRenderModel>["tableLayouts"]
   renderPassStateRef?: { current: MarkdownRenderPassState }
-  tableRenderIndexRef?: { current: number }
-  imageRenderOrderRef?: { current: number }
   sentinels?: ProtectedInlineSentinels
 }) => {
   const fallbackPassStateRef = { current: createMarkdownRenderPassState() }
@@ -371,9 +364,7 @@ export const createMarkdownComponentVariants = ({
     li: ({ children, node: _node, ...props }: MarkdownElementProps) => <li {...props}>{normalizeInline(children)}</li>,
     table({ children, node, ...props }: MarkdownElementProps) {
       const state = getPassState()
-      const tableIndex = allocateNodeOrderIndex(node, state.tableIndices, () =>
-        tableRenderIndexRef ? tableRenderIndexRef.current++ : state.nextTableIndex++
-      )
+      const tableIndex = allocateNodeOrderIndex(node, state.tableIndices, () => state.nextTableIndex++)
       return (
         <MarkdownTableRenderer layout={tableLayouts[tableIndex] || null} {...props}>
           {children}
@@ -385,8 +376,7 @@ export const createMarkdownComponentVariants = ({
     ),
     th: (props: MarkdownTableCellProps) => renderTableCell("th", props),
     td: (props: MarkdownTableCellProps) => renderTableCell("td", props),
-    img: (props: MarkdownElementProps) =>
-      renderMarkdownImageElement(props, getPassState(), imageRenderOrderRef),
+    img: (props: MarkdownElementProps) => renderMarkdownImageElement(props, getPassState()),
     a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
       const normalizedChildren = normalizeAnchorInlineChildren(children, sentinels)
       const safeHref = resolveSafeRenderedAnchorHref(href)
@@ -465,11 +455,21 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
     [content, trustedContentHtml]
   )
-  const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker } = renderModel
-  const { tableLayouts } = renderModel
+  const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker, tableLayouts } = renderModel
   const sentinels = useMemo(
     () => createProtectedInlineSentinels(`${content ?? ""}\n${normalizedContent}`),
     [content, normalizedContent]
+  )
+  const standaloneImageIndices = useMemo(
+    () =>
+      segments.reduce<{ next: number; indices: number[] }>(
+        (acc, segment) => {
+          acc.indices.push(segment.type === "image" ? acc.next++ : -1)
+          return acc
+        },
+        { next: 0, indices: [] }
+      ).indices,
+    [segments]
   )
 
   useMermaidEffect(rootRef, renderKey, !disableMermaid, {
@@ -561,8 +561,6 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     return <MarkdownRendererRoot data-force-scheme={forceScheme}>본문이 없습니다.</MarkdownRendererRoot>
   }
 
-  let standaloneImageIndex = -1
-
   return (
     <MarkdownRendererRoot
       ref={rootRef}
@@ -572,17 +570,16 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
       onClick={handleRootClick}
       onKeyDown={handleRootKeyDown}
     >
-      {segments.map((segment, index) => {
-        const imageIndex = segment.type === "image" ? (standaloneImageIndex += 1) : -1
-        return renderMarkdownSegment({
+      {segments.map((segment, index) =>
+        renderMarkdownSegment({
           segment,
           index,
-          imageIndex,
+          imageIndex: standaloneImageIndices[index] ?? -1,
           editableImages,
           onImageWidthCommit,
           renderMarkdown,
         })
-      })}
+      )}
       <MarkdownFootnoteAppendix footnotes={footnotes} renderMarkdown={renderMarkdown} />
     </MarkdownRendererRoot>
   )

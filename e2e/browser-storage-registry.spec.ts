@@ -53,6 +53,7 @@ test("browser storage registry retains only current public and administrator key
       expect.objectContaining({ area: "localStorage", key: "auth.admin.savedEmail.v1" }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.create." }),
       expect.objectContaining({ area: "localStorage", key: "admin.editor.localDraft.post." }),
+      expect.objectContaining({ area: "localStorage", key: "aquila_blog_liked_posts_v1", purpose: "post-liked-state" }),
       expect.objectContaining({
         area: "sessionStorage",
         key: "auth:me:anon-probe-suppress-until:v1",
@@ -93,6 +94,7 @@ test("browser storage registry covers source storage constants", () => {
       key: "admin.editor.localDraft.post.",
     }),
     expect.objectContaining({ name: "CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX", key: "aquila-cloud-video-upload-session" }),
+    expect.objectContaining({ name: "LIKED_POSTS_STORAGE_KEY", key: "aquila_blog_liked_posts_v1" }),
   ]))
   expect(sourceConstants.map(({ name }) => name)).not.toEqual(
     expect.arrayContaining(["LOCAL_DRAFT_V1_STORAGE_KEY", "LOCAL_DRAFT_STORAGE_KEY"]),

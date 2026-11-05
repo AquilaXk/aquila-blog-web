@@ -1,3 +1,4 @@
+import { clearAllAdminEditorLocalDrafts } from "src/libs/privacy/browserStorageRegistry"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
@@ -328,4 +329,8 @@ export const removeLocalDraftCandidate = (source: LocalDraftSource, key: string)
     window.localStorage.removeItem(key)
     window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
   }
+}
+
+export const clearAllLocalDrafts = (): void => {
+  clearAllAdminEditorLocalDrafts()
 }

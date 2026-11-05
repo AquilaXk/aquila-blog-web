@@ -1,40 +1,61 @@
-import { isDedicatedFormulaBoundaryLine, isDedicatedMathCloseLine, resolveDedicatedMathOpen } from "./renderingDirectiveModel"
 export type MathSpanRange = { from: number; to: number }
-
-export type ScannedPandocMathToken = {
-  kind: "inline" | "display"
-  from: number
-  to: number
-  math: string
+export type CommonMarkContainerRangeSnapshot = {
+  asideRanges: MathSpanRange[]
+  containerCloseRanges: MathSpanRange[]
 }
+export type ScannedPandocMathToken = { kind: "inline" | "display"; from: number; to: number; math: string }
 
 export const DEFAULT_MAX_INLINE_MATH_LENGTH = 2048
 export const DEFAULT_MAX_DISPLAY_MATH_LENGTH = 16384
+export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
+export const SUPPORTED_DIRECTIVE_OPEN_PATTERN = /^:::(?:callout|toggle|bookmark|embed|file)(?:[ \t\r]|$)/
+export const ASIDE_TAG_CASE_INSENSITIVE_PATTERN = /<aside/i
+
+let blockRangeProvider: ((content: string) => CommonMarkContainerRangeSnapshot) | null = null
+
+export const registerCommonMarkBlockRangeProvider = (
+  provider: (content: string) => CommonMarkContainerRangeSnapshot
+): void => {
+  blockRangeProvider = provider
+}
 
 const COMMONMARK_CODE_INDENT_PATTERN = /^(?: {4}|\t| {1,3}\t)/
 const SINGLE_WHITESPACE_PATTERN = /^\s$/u
+const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 const THEMATIC_BREAK_LINE_PATTERN = /^(?:\*[ \t]*){3,}$|^(?:-[ \t]*){3,}$|^(?:_[ \t]*){3,}$/
 const LIST_MARKER_LINE_PATTERN = /^(?:[-+*]|\d+[.)])[ \t]/
 const HTML_OPEN_TAG_LINE_PATTERN = /^<[a-zA-Z!/]/
 const AUTOLINK_SCHEMES = ["http://", "https://", "ftp://", "mailto:"] as const
 
-export const hasCommonMarkCodeIndent = (line: string): boolean =>
-  COMMONMARK_CODE_INDENT_PATTERN.test(line)
+export const hasCommonMarkCodeIndent = (line: string): boolean => COMMONMARK_CODE_INDENT_PATTERN.test(line)
+
+export const extractAsideOpenTail = (line: string): string | null => {
+  const trimmedStart = line.trimStart()
+  if (!trimmedStart.toLowerCase().startsWith("<aside")) return null
+  const nextChar = trimmedStart[6]
+  if (nextChar === ">") return trimmedStart.slice(7)
+  if (!nextChar || !SINGLE_SPACE_CHAR_PATTERN.test(nextChar)) return null
+  const closeAngle = trimmedStart.indexOf(">", 7)
+  return closeAngle < 0 ? null : trimmedStart.slice(closeAngle + 1)
+}
+
+export const stripClosingAsideTag = (value: string): string | null => {
+  const trimmedEnd = value.trimEnd()
+  if (!trimmedEnd.toLowerCase().endsWith("</aside>")) return null
+  return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
+}
 
 const ALLOWED_ASCII_PREFIX_CODES = new Set([
   40, 91, 123, 34, 39, 45, 61, 47, 43, 60, 62, 44, 59, 58, 33, 63, 42, 95, 126, 124,
 ])
-
 const isAsciiDigitCode = (code: number): boolean => code >= 48 && code <= 57
-
 export const isAsciiAlphaNumericCode = (code: number): boolean =>
   (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 
 export const extractAsciiAlphaNumeric = (text: string): string => {
   let out = ""
   for (let i = 0; i < text.length; i += 1) {
-    const code = text.codePointAt(i) ?? 0
-    if (isAsciiAlphaNumericCode(code)) out += text[i]!
+    if (isAsciiAlphaNumericCode(text.codePointAt(i) ?? 0)) out += text[i]!
   }
   return out
 }
@@ -56,18 +77,11 @@ export const isUnicodeWhitespaceChar = (ch: string | undefined): boolean =>
 
 export const isEscapedMarkdownAt = (text: string, index: number): boolean => {
   let slashCount = 0
-  for (let cursor = index - 1; cursor >= 0 && text.codePointAt(cursor) === 92; cursor -= 1) {
-    slashCount += 1
-  }
+  for (let cursor = index - 1; cursor >= 0 && text.codePointAt(cursor) === 92; cursor -= 1) slashCount += 1
   return (slashCount & 1) === 1
 }
 
-export const countCodePointRun = (
-  text: string,
-  start: number,
-  targetCode: number,
-  limit = text.length
-): number => {
+export const countCodePointRun = (text: string, start: number, targetCode: number, limit = text.length): number => {
   const end = Math.min(text.length, limit)
   let cursor = start
   while (cursor < end && text.codePointAt(cursor) === targetCode) cursor += 1
@@ -353,6 +367,49 @@ export const overlapsSortedRanges = (
   return false
 }
 
+export const resolveDedicatedMathOpen = (
+  text: string,
+  openIndex: number,
+  openLine: string
+): { quoteDepth: number; rest: string; allowAsideIndent: boolean } | null => {
+  const inAside =
+    blockRangeProvider !== null &&
+    ASIDE_TAG_CASE_INSENSITIVE_PATTERN.test(text) &&
+    overlapsSortedRanges(blockRangeProvider(text).asideRanges, openIndex, openIndex + 1)
+  const parsed = parseDedicatedLineQuoteDepth(inAside ? openLine.trimStart() : openLine)
+  return parsed ? { ...parsed, allowAsideIndent: inAside } : null
+}
+
+export const isDedicatedMathCloseLine = (line: string, openQuoteDepth: number, allowAsideIndent: boolean): boolean => {
+  const parsedClose = parseDedicatedLineQuoteDepth(allowAsideIndent ? line.trimStart() : line)
+  return (
+    parsedClose !== null &&
+    parsedClose.quoteDepth === openQuoteDepth &&
+    parsedClose.rest.startsWith("$$") &&
+    parsedClose.rest.slice(2).trim() === ""
+  )
+}
+
+export const isDedicatedFormulaBoundaryLine = (
+  text: string,
+  lineStart: number,
+  lineEnd: number,
+  strippedLine: string,
+  openQuoteDepth: number
+): boolean => {
+  if (openQuoteDepth > 0) return false
+  if (SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(strippedLine) || (!hasCommonMarkCodeIndent(strippedLine) && extractAsideOpenTail(strippedLine) !== null)) {
+    return true
+  }
+  if (DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) || stripClosingAsideTag(strippedLine) !== null) {
+    if (blockRangeProvider === null) {
+      return DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) || (!hasCommonMarkCodeIndent(strippedLine) && stripClosingAsideTag(strippedLine) !== null)
+    }
+    return overlapsSortedRanges(blockRangeProvider(text).containerCloseRanges, lineStart, Math.max(lineStart + 1, lineEnd))
+  }
+  return false
+}
+
 const tryResolveDedicatedMathAtCloseLine = (
   text: string,
   openIndex: number,
@@ -366,13 +423,7 @@ const tryResolveDedicatedMathAtCloseLine = (
   if (closePos < 0 || closePos > lineEnd) return null
   const to = closePos + 2
   const math = openQuoteDepth > 0 ? interiorLines.join("\n") : text.slice(openIndex + 2, closePos)
-  if (
-    !math.trim() ||
-    overlapsSortedRanges(excludedRanges, openIndex, openIndex + 2) ||
-    overlapsSortedRanges(excludedRanges, closePos, to)
-  ) {
-    return null
-  }
+  if (!math.trim() || overlapsSortedRanges(excludedRanges, openIndex, openIndex + 2) || overlapsSortedRanges(excludedRanges, closePos, to)) return null
   return { kind: "display", from: openIndex, to, math }
 }
 
@@ -383,8 +434,7 @@ const matchDedicatedDisplayMathToken = (
   excludedRanges: readonly MathSpanRange[],
   allowAsideIndent = false
 ): ScannedPandocMathToken | null => {
-  const openLineEnd = findLineEndOffset(text, openIndex)
-  let cursor = Math.min(text.length, openLineEnd + 1)
+  let cursor = Math.min(text.length, findLineEndOffset(text, openIndex) + 1)
   const limit = Math.min(text.length, openIndex + 2 + DEFAULT_MAX_DISPLAY_MATH_LENGTH)
   const interiorLines: string[] = []
   while (cursor < limit) {
@@ -432,12 +482,7 @@ const findClosingDoubleDollarOffset = (
       cursor = skippedEnd
       continue
     }
-    if (
-      code === 36 &&
-      text.codePointAt(cursor + 1) === 36 &&
-      text.codePointAt(cursor + 2) !== 36 &&
-      !isEscapedMarkdownAt(text, cursor)
-    ) {
+    if (code === 36 && text.codePointAt(cursor + 1) === 36 && text.codePointAt(cursor + 2) !== 36 && !isEscapedMarkdownAt(text, cursor)) {
       return cursor
     }
     cursor += 1
@@ -446,12 +491,7 @@ const findClosingDoubleDollarOffset = (
 }
 
 const isValidDisplayMathOpenAt = (text: string, openIndex: number): boolean => {
-  if (
-    text.codePointAt(openIndex) !== 36 ||
-    text.codePointAt(openIndex + 1) !== 36 ||
-    text.codePointAt(openIndex + 2) === 36 ||
-    isEscapedMarkdownAt(text, openIndex)
-  ) {
+  if (text.codePointAt(openIndex) !== 36 || text.codePointAt(openIndex + 1) !== 36 || text.codePointAt(openIndex + 2) === 36 || isEscapedMarkdownAt(text, openIndex)) {
     return false
   }
   return !(openIndex > 0 && text.codePointAt(openIndex - 1) === 36 && !isEscapedMarkdownAt(text, openIndex - 1))
@@ -469,8 +509,7 @@ export const scanPandocDisplayMathAt = (
   const openLineEnd = findLineEndOffset(text, openIndex)
   const openLine = text.slice(openLineStart, openLineEnd)
   const parsedOpen = resolveDedicatedMathOpen(text, openIndex, openLine)
-  const isAtStrippedLineStart =
-    parsedOpen !== null && openIndex === openLineStart + (openLine.length - parsedOpen.rest.length)
+  const isAtStrippedLineStart = parsedOpen !== null && openIndex === openLineStart + (openLine.length - parsedOpen.rest.length)
   if (isAtStrippedLineStart && !text.slice(openIndex + 2, openLineEnd).includes("$")) {
     if (singleLineOnly || parsedOpen.rest.slice(2).trim() !== "") return null
     return matchDedicatedDisplayMathToken(text, openIndex, parsedOpen.quoteDepth, excluded, parsedOpen.allowAsideIndent)
@@ -497,35 +536,19 @@ const isAbortingInlineMathCode = (text: string, cursor: number, code: number): b
   return code === 93 && text.codePointAt(cursor + 1) === 40 && !isEscapedMarkdownAt(text, cursor)
 }
 
-const findClosingSingleDollarOffset = (
-  text: string,
-  openIndex: number,
-  excluded: readonly MathSpanRange[],
-  maxScanLength: number
-): number => {
+const findClosingSingleDollarOffset = (text: string, openIndex: number, excluded: readonly MathSpanRange[], maxScanLength: number): number => {
   const scanLimit = Math.min(text.length, openIndex + 1 + maxScanLength)
   for (let cursor = openIndex + 1; cursor < scanLimit; cursor += 1) {
     const code = text.codePointAt(cursor) ?? 0
-    if (isAbortingInlineMathCode(text, cursor, code)) return -1
-    if (overlapsSortedRanges(excluded, cursor, cursor + 1)) return -1
-    if (code === 36 && !isEscapedMarkdownAt(text, cursor)) {
-      return text.codePointAt(cursor + 1) === 36 ? -1 : cursor
-    }
+    if (isAbortingInlineMathCode(text, cursor, code) || overlapsSortedRanges(excluded, cursor, cursor + 1)) return -1
+    if (code === 36 && !isEscapedMarkdownAt(text, cursor)) return text.codePointAt(cursor + 1) === 36 ? -1 : cursor
   }
   return -1
 }
 
 const isValidInlineMathOpenAt = (text: string, openIndex: number): boolean => {
-  if (
-    text.codePointAt(openIndex) !== 36 ||
-    text.codePointAt(openIndex + 1) === 36 ||
-    isEscapedMarkdownAt(text, openIndex)
-  ) {
-    return false
-  }
-  if (openIndex > 0 && text.codePointAt(openIndex - 1) === 36 && !isEscapedMarkdownAt(text, openIndex - 1)) {
-    return false
-  }
+  if (text.codePointAt(openIndex) !== 36 || text.codePointAt(openIndex + 1) === 36 || isEscapedMarkdownAt(text, openIndex)) return false
+  if (openIndex > 0 && text.codePointAt(openIndex - 1) === 36 && !isEscapedMarkdownAt(text, openIndex - 1)) return false
   return isAllowedPandocInlineMathPrefix(text, openIndex)
 }
 
@@ -537,37 +560,22 @@ export const scanPandocInlineMathAt = (
   if (!isValidInlineMathOpenAt(text, openIndex)) return null
   const firstInner = text[openIndex + 1]
   if (!firstInner || isUnicodeWhitespaceChar(firstInner)) return null
-
   const excluded = options?.excludedRanges ?? []
   const maxLen = options?.maxScanLength ?? DEFAULT_MAX_INLINE_MATH_LENGTH
   const closePos = findClosingSingleDollarOffset(text, openIndex, excluded, maxLen)
   if (closePos < openIndex + 2) return null
-
   const lastInner = text[closePos - 1]
   if (!lastInner || isUnicodeWhitespaceChar(lastInner)) return null
-
   const afterCloseCode = text.codePointAt(closePos + 1) ?? -1
-  if (isAsciiDigitCode(afterCloseCode) || afterCloseCode === 36) return null
-  if (overlapsSortedRanges(excluded, openIndex, closePos + 1)) return null
-
+  if (isAsciiDigitCode(afterCloseCode) || afterCloseCode === 36 || overlapsSortedRanges(excluded, openIndex, closePos + 1)) return null
   return { kind: "inline", from: openIndex, to: closePos + 1, math: text.slice(openIndex + 1, closePos) }
 }
 
-export type InlineLiteralSkipOptions = {
-  honorEscapes?: boolean
-  codeScanLimit?: number
-  singleLineDisplayMath?: boolean
-}
+export type InlineLiteralSkipOptions = { honorEscapes?: boolean; codeScanLimit?: number; singleLineDisplayMath?: boolean }
 
-const skipDollarLiteralConstructAt = (
-  text: string,
-  cursor: number,
-  singleLineDisplayMath?: boolean
-): number => {
+const skipDollarLiteralConstructAt = (text: string, cursor: number, singleLineDisplayMath?: boolean): number => {
   const run = countCodePointRun(text, cursor, 36)
-  if (run === 2) {
-    return scanPandocDisplayMathAt(text, cursor, { singleLineOnly: singleLineDisplayMath })?.to ?? cursor + 2
-  }
+  if (run === 2) return scanPandocDisplayMathAt(text, cursor, { singleLineOnly: singleLineDisplayMath })?.to ?? cursor + 2
   if (run === 1) return scanPandocInlineMathAt(text, cursor)?.to ?? cursor + 1
   return cursor + run
 }
@@ -578,11 +586,7 @@ const skipBackslashEscapeAt = (text: string, cursor: number): number => {
   return cursor + 1 + (next > 0xffff ? 2 : 1)
 }
 
-export const skipInlineLiteralConstructAt = (
-  text: string,
-  cursor: number,
-  options?: InlineLiteralSkipOptions
-): number => {
+export const skipInlineLiteralConstructAt = (text: string, cursor: number, options?: InlineLiteralSkipOptions): number => {
   if (options?.honorEscapes === false || isEscapedMarkdownAt(text, cursor)) return -1
   const code = text.codePointAt(cursor) ?? 0
   if (code === 92) return skipBackslashEscapeAt(text, cursor)

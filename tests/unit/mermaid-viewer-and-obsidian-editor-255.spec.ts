@@ -323,11 +323,19 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
       footnotes: [],
       footnoteMarker: "marker",
       tableLayouts: [],
-      tableRenderIndexRef: { current: 0 },
-      imageRenderOrderRef: { current: 0 },
     })
     expect(variants.getComponents(false, false)).toBe(variants.getComponents(false, false))
     expect(variants.getComponents(true, false)).toBe(variants.getComponents(true, false))
+
+    const { readFileSync } = require("node:fs") as typeof import("node:fs")
+    const { resolve } = require("node:path") as typeof import("node:path")
+    const rendererSource = readFileSync(
+      resolve(__dirname, "../../src/libs/markdown/MarkdownRenderer.tsx"),
+      "utf8"
+    )
+    expect(rendererSource).not.toContain("tableRenderIndexRef")
+    expect(rendererSource).not.toContain("imageRenderOrderRef")
+    expect(rendererSource).not.toContain("let standaloneImageIndex")
   })
 
   test("AC4: PostDetail subcomponents are wrapped in React.memo and applyHybridRail accepts cached topOffset", () => {

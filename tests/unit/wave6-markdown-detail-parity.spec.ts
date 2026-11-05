@@ -864,5 +864,13 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     } as TPost)
     expect(metadata.date).toBe("2026-03-15T00:00:00.000Z")
     expect(metadata.modifiedDate).toBe("2026-03-15T00:00:00.000Z")
+
+    const markdownRendererSource = readFileSync(
+      path.join(REPO_ROOT, "src/libs/markdown/MarkdownRenderer.tsx"),
+      "utf8"
+    )
+    expect(markdownRendererSource).toContain("standaloneImageIndices")
+    expect(markdownRendererSource).not.toContain("tableRenderIndexRef")
+    expect(markdownRendererSource).not.toContain("imageRenderOrderRef")
   })
 })

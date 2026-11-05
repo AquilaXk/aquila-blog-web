@@ -33,6 +33,9 @@ type FloatingActionRailProps = {
   active: boolean
   showFloatingLike: boolean
   likesCount: number
+  liked?: boolean
+  likePending?: boolean
+  onToggleLike?: () => void
   shareFeedback: ShareFeedback
   onSharePost: () => void
 }
@@ -43,18 +46,32 @@ export const FloatingActionRail = memo(function FloatingActionRail({
   active,
   showFloatingLike,
   likesCount,
+  liked = false,
+  likePending = false,
+  onToggleLike,
   shareFeedback,
   onSharePost,
 }: FloatingActionRailProps) {
+  const likeLabel = liked ? "좋아요 취소" : "좋아요"
   return (
     <aside ref={railRef as Ref<HTMLElement>} className="leftRail" data-hybrid-active={active} aria-hidden={!showFloatingLike}>
       {showFloatingLike ? (
         <div ref={innerRef as Ref<HTMLDivElement>} className="leftRailInner">
           <div className="floatingLikeCluster">
             <div className="floatingLikeStat">
-              <span className="floatingLikeBadge" aria-hidden="true">
-                <AppIcon name="heart" />
-              </span>
+              <button
+                type="button"
+                className="floatingActionButton floatingLikeBadge"
+                aria-pressed={liked}
+                data-active={liked}
+                title={likeLabel}
+                data-tooltip={likeLabel}
+                aria-label={`${likeLabel} (현재 ${likesCount}개)`}
+                disabled={likePending || !onToggleLike}
+                onClick={onToggleLike}
+              >
+                <AppIcon name={liked ? "heart-filled" : "heart"} />
+              </button>
               <span className="floatingLikeCount">좋아요 {likesCount}</span>
             </div>
             <div className="floatingShareStat">
@@ -83,21 +100,36 @@ export const FloatingActionRail = memo(function FloatingActionRail({
 
 type MobileSummaryActionsProps = {
   likesCount: number
+  liked?: boolean
+  likePending?: boolean
+  onToggleLike?: () => void
   shareFeedback: ShareFeedback
   onSharePost: () => void
 }
 
 export const MobileSummaryActions = memo(function MobileSummaryActions({
   likesCount,
+  liked = false,
+  likePending = false,
+  onToggleLike,
   shareFeedback,
   onSharePost,
 }: MobileSummaryActionsProps) {
   return (
     <MobileSummaryBar aria-label="빠른 이동 및 반응">
-      <span className="mobileLikeStat" aria-label={`좋아요 ${likesCount}`}>
-        <AppIcon name="heart" />
+      <button
+        type="button"
+        className="mobileLikeStat"
+        aria-pressed={liked}
+        data-active={liked}
+        data-feedback="true"
+        aria-label={`${liked ? "좋아요 취소" : "좋아요"} (현재 ${likesCount}개)`}
+        disabled={likePending || !onToggleLike}
+        onClick={onToggleLike}
+      >
+        <AppIcon name={liked ? "heart-filled" : "heart"} />
         <span>{`좋아요 ${likesCount}`}</span>
-      </span>
+      </button>
       <button
         type="button"
         data-active={Boolean(shareFeedback)}

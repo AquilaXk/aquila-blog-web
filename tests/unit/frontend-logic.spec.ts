@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test"
 import { readFileSync } from "node:fs"
 import path from "node:path"
+import { createElement } from "react"
+import { renderToString } from "react-dom/server"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ApiError } from "../../src/apis/backend/client"
+import { queryKey } from "../../src/constants/queryKey"
 import {
   CLOUD_SYNC_UPLOAD_MAX_BYTES,
   type CloudFile,
@@ -16,8 +20,10 @@ import {
   toValidPage,
   toValidPageSize,
 } from "../../src/apis/backend/posts/PostApiRequestModel"
-import { shouldFetchAuthSession } from "../../src/hooks/useAuthSession"
+import useAuthSession, { shouldFetchAuthSession } from "../../src/hooks/useAuthSession"
+import { registeredBrowserStorageKeys } from "../../src/libs/privacy/browserStorageRegistry"
 import { getSearchDebounceMs } from "../../src/hooks/useDebouncedValue"
+import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 import {
   DASHBOARD_COLLECTION_FAILED_LABEL,
   DASHBOARD_DATA_MISSING_LABEL,
@@ -425,4 +431,117 @@ caption
       updateCachedCloudFilesForMutation([], movedFile, "ALL", "/ops/2026").map((f) => f.id),
     ).toEqual([1])
   })
+
+  test("useAuthSession logout clears admin editor local drafts even when backend logout fails, and browserStorageRegistry documents logout and post-like keys", async () => {
+    const store = new Map<string, string>([
+      ["admin.editor.localDraft.create.v3", '{"title":"create"}'],
+      ["admin.editor.localDraft.create.doc-1.v3", '{"title":"doc-create"}'],
+      ["admin.editor.localDraft.post.42.doc-1.v3", '{"title":"post-42"}'],
+      ["admin.editor.customCategories", '["Tech"]'],
+    ])
+    const mockLocalStorage: Storage = {
+      get length() {
+        return store.size
+      },
+      clear: () => store.clear(),
+      getItem: (key: string) => store.get(key) ?? null,
+      key: (index: number) => Array.from(store.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+    }
+    const mockSessionStorage: Storage = {
+      length: 0,
+      clear: () => {},
+      getItem: () => null,
+      key: () => null,
+      removeItem: () => {},
+      setItem: () => {},
+    }
+
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window")
+    const previousFetch = globalThis.fetch
+    let capturedLogout: (() => Promise<void>) | null = null
+    const dispatchedEvents: string[] = []
+
+    try {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        writable: true,
+        value: {
+          localStorage: mockLocalStorage,
+          sessionStorage: mockSessionStorage,
+          location: { origin: "http://localhost:3000" },
+          dispatchEvent: (event: Event) => {
+            dispatchedEvents.push(event.type)
+            return true
+          },
+        },
+      })
+      globalThis.fetch = (async () => new Response("server error", { status: 500 })) as typeof fetch
+
+      const queryClient = new QueryClient()
+      queryClient.setQueryData(queryKey.authMe(), {
+        id: 1,
+        username: "admin",
+        nickname: "Admin",
+        isAdmin: true,
+      })
+
+      const Probe = () => {
+        const session = useAuthSession()
+        capturedLogout = session.logout
+        return null
+      }
+
+      renderToString(
+        materializePlaywrightJsx(
+          createElement(QueryClientProvider, { client: queryClient }, createElement(Probe))
+        ) as never
+      )
+      expect(typeof capturedLogout).toBe("function")
+      await capturedLogout!()
+
+      expect(store.has("admin.editor.localDraft.create.v3")).toBe(false)
+      expect(store.has("admin.editor.localDraft.create.doc-1.v3")).toBe(false)
+      expect(store.has("admin.editor.localDraft.post.42.doc-1.v3")).toBe(false)
+      expect(store.get("admin.editor.customCategories")).toBe('["Tech"]')
+      expect(dispatchedEvents).toEqual(["aquila-local-drafts-changed"])
+      expect(queryClient.getQueryData(queryKey.authMe())).toBeNull()
+      expect(queryClient.getQueryData(queryKey.authMeProbe())).toBe(false)
+    } finally {
+      globalThis.fetch = previousFetch
+      if (previousWindow) {
+        Object.defineProperty(globalThis, "window", previousWindow)
+      } else {
+        delete (globalThis as Record<string, unknown>).window
+      }
+    }
+
+    const draftKeys = [
+      "admin.editor.localDraft.create.",
+      "admin.editor.localDraft.create.v3",
+      "admin.editor.localDraft.post.",
+    ]
+    for (const key of draftKeys) {
+      const entry = registeredBrowserStorageKeys.find((item) => item.key === key)
+      expect(entry?.deletion).toContain("logout")
+    }
+    const likedPostsEntry = registeredBrowserStorageKeys.find(
+      (item) => item.key === "aquila_blog_liked_posts_v1"
+    )
+    expect(likedPostsEntry).toEqual({
+      area: "localStorage",
+      key: "aquila_blog_liked_posts_v1",
+      purpose: "post-liked-state",
+      required: false,
+      retention: "until unliked or browser storage is cleared, capped to 200 post IDs",
+      deletion: "unlike toggle or browser storage deletion",
+      stores: "JSON array of liked post ID strings for client UI state",
+    })
+  })
 })
+

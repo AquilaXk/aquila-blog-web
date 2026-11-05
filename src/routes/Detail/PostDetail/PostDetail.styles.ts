@@ -149,10 +149,20 @@ export const StyledWrapper = styled.div `
   button.floatingActionButton {
     cursor: pointer;
 
-    &:hover {
+    &:hover:not(:disabled) {
       border-color: var(--aq-accent-link);
       background: var(--aq-surface);
       color: var(--aq-accent-link);
+    }
+
+    &[data-active="true"] {
+      border-color: var(--aq-accent);
+      color: var(--aq-accent);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.72;
     }
   }
 
@@ -188,44 +198,22 @@ export const StyledWrapper = styled.div `
     }
   }
 
-  .floatingShareButton {
-    color: var(--aq-text-secondary);
-  }
-
   .floatingLikeCluster {
     display: grid;
     justify-items: center;
     row-gap: 8px;
   }
 
-  .floatingLikeStat {
-    display: grid;
-    justify-items: center;
-    row-gap: 0.36rem;
-  }
-
-  .floatingLikeBadge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25rem;
-    border: 0;
-    background: transparent;
-    color: var(--aq-muted);
-    cursor: default;
-    user-select: none;
-
-    svg {
-      width: 1em;
-      height: 1em;
-      font-size: 1.125rem;
-    }
-  }
-
+  .floatingLikeStat,
   .floatingShareStat {
     display: grid;
     justify-items: center;
     row-gap: 0.36rem;
+  }
+
+  .floatingLikeBadge,
+  .floatingShareButton {
+    color: var(--aq-text-secondary);
   }
 
   .floatingLikeCount {

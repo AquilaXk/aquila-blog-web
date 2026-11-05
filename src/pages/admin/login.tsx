@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { apiFetch } from "src/apis/backend/client"
 import { toAuthErrorMessage } from "src/apis/backend/errorMessages"
 import type { AuthMember } from "src/hooks/useAuthSession"
+import { clearAllAdminEditorLocalDrafts } from "src/libs/privacy/browserStorageRegistry"
 import { normalizeAdminNextPath } from "src/libs/router"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
@@ -267,6 +268,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
           resetChallenge()
           setError("관리자 세션을 종료하지 못했습니다. 새 코드를 요청해주세요.")
           return
+        } finally {
+          clearAllAdminEditorLocalDrafts()
         }
         resetChallenge()
         setError("관리자 세션을 확인하지 못했습니다. 새 코드를 요청해주세요.")
@@ -282,6 +285,8 @@ const AdminLoginPage: NextPage<AdminLoginPageProps> = ({ nextPath }) => {
             "비관리자 세션을 종료하지 못했습니다. 새 코드를 요청해주세요."
           )
           return
+        } finally {
+          clearAllAdminEditorLocalDrafts()
         }
         resetChallenge()
         setError("관리자 권한이 필요한 페이지입니다.")

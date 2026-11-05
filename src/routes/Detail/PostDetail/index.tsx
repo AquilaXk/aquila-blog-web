@@ -106,6 +106,10 @@ const PostDetail: React.FC = () => {
   const showFloatingLike = (data?.type?.[0] ?? "Post") === "Post"
   const {
     hitCount,
+    likesCount,
+    liked,
+    likePending,
+    handleToggleLike,
     handleSharePost,
     shareFeedback,
   } = usePostDetailEngagementActions({
@@ -428,7 +432,10 @@ const PostDetail: React.FC = () => {
         <section className="detailHero">
           <PostHeader
             data={data}
-            likesCount={data.likesCount}
+            likesCount={likesCount}
+            liked={liked}
+            likePending={likePending}
+            onToggleLike={handleToggleLike}
             hitCount={hitCount}
             hideShareActionOnDesktop={showFloatingLike}
             hideActionButtonsOnMobile
@@ -452,7 +459,10 @@ const PostDetail: React.FC = () => {
           innerRef={leftRailInnerRef}
           active={leftHybridRailActive}
           showFloatingLike={showFloatingLike}
-          likesCount={data.likesCount ?? 0}
+          likesCount={likesCount}
+          liked={liked}
+          likePending={likePending}
+          onToggleLike={handleToggleLike}
           shareFeedback={shareFeedback}
           onSharePost={handleSharePost}
         />
@@ -460,7 +470,10 @@ const PostDetail: React.FC = () => {
         <article ref={articleRef}>
           {isPostType ? (
             <MobileSummaryActions
-              likesCount={data.likesCount ?? 0}
+              likesCount={likesCount}
+              liked={liked}
+              likePending={likePending}
+              onToggleLike={handleToggleLike}
               shareFeedback={shareFeedback}
               onSharePost={handleSharePost}
             />

@@ -94,7 +94,7 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     purpose: "editor-local-draft-create-prefix",
     required: false,
     retention: "7 days from savedAt or until the owning browser document clears its slot",
-    deletion: "owning-slot clear, successful create publish, TTL expiry, or browser storage deletion",
+    deletion: "owning-slot clear, successful create publish, logout, TTL expiry, or browser storage deletion",
     stores: "document-owned create-context draft title, markdown, canonical summary source and intent, thumbnail, tags, category, visibility, source, savedAt",
   },
   {
@@ -103,7 +103,7 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     purpose: "editor-local-draft-create",
     required: false,
     retention: "7 days TTL per active authoring session",
-    deletion: "explicit clear or successful publication",
+    deletion: "explicit clear, successful publication, or logout",
     stores: "persisted uncommitted post drafts",
   },
   {
@@ -112,7 +112,7 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     purpose: "editor-local-draft-post-prefix",
     required: false,
     retention: "7 days from savedAt or until manually cleared; reject new slots at 20 without evicting valid drafts",
-    deletion: "manual clear, successful modify, TTL expiry, or browser storage deletion",
+    deletion: "manual clear, successful modify, logout, TTL expiry, or browser storage deletion",
     stores: "per-post current draft payloads with canonical summary source and intent",
   },
   {
@@ -150,6 +150,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     retention: "until upload completes, is cancelled, becomes stale, or browser storage is cleared",
     deletion: "upload completion, cancellation, stale session cleanup, or browser storage deletion",
     stores: "resumable cloud video upload session id keyed by file metadata",
+  },
+  {
+    area: "localStorage",
+    key: "aquila_blog_liked_posts_v1",
+    purpose: "post-liked-state",
+    required: false,
+    retention: "until unliked or browser storage is cleared, capped to 200 post IDs",
+    deletion: "unlike toggle or browser storage deletion",
+    stores: "JSON array of liked post ID strings for client UI state",
   },
   {
     area: "sessionStorage",
@@ -215,3 +224,25 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
     stores: "feed explorer scroll, query, and snapshot restoration state",
   },
 ]
+
+export const clearAllAdminEditorLocalDrafts = (): void => {
+  if (typeof window === "undefined") return
+  try {
+    const keysToRemove: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!key) continue
+      if (
+        key === "admin.editor.localDraft.create.v3" ||
+        key.startsWith("admin.editor.localDraft.create.") ||
+        key.startsWith("admin.editor.localDraft.post.")
+      ) {
+        keysToRemove.push(key)
+      }
+    }
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key)
+    }
+    window.dispatchEvent?.(new Event("aquila-local-drafts-changed"))
+  } catch {}
+}

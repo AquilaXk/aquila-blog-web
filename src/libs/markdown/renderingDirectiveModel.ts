@@ -1,12 +1,34 @@
 import {
+  ASIDE_TAG_CASE_INSENSITIVE_PATTERN,
+  DIRECTIVE_CLOSE_LINE_PATTERN,
+  SUPPORTED_DIRECTIVE_OPEN_PATTERN,
+  extractAsideOpenTail,
   hasCommonMarkCodeIndent,
+  isDedicatedFormulaBoundaryLine,
+  isDedicatedMathCloseLine,
   overlapsSortedRanges,
-  parseDedicatedLineQuoteDepth,
   parseOpeningCodeFence,
+  registerCommonMarkBlockRangeProvider,
+  resolveDedicatedMathOpen,
+  stripClosingAsideTag,
+  type CommonMarkContainerRangeSnapshot,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
+
+export {
+  ASIDE_TAG_CASE_INSENSITIVE_PATTERN,
+  DIRECTIVE_CLOSE_LINE_PATTERN,
+  SUPPORTED_DIRECTIVE_OPEN_PATTERN,
+  extractAsideOpenTail,
+  isDedicatedFormulaBoundaryLine,
+  isDedicatedMathCloseLine,
+  registerCommonMarkBlockRangeProvider,
+  resolveDedicatedMathOpen,
+  stripClosingAsideTag,
+  type CommonMarkContainerRangeSnapshot,
+}
 
 export type CustomDirectiveKind = "bookmark" | "embed" | "file"
 
@@ -15,24 +37,7 @@ export type PendingDirectiveMetadata = {
   attrs: Record<string, unknown>
 }
 
-export type CommonMarkContainerRangeSnapshot = {
-  asideRanges: MathSpanRange[]
-  containerCloseRanges: MathSpanRange[]
-}
-
-let blockRangeProvider: ((content: string) => CommonMarkContainerRangeSnapshot) | null = null
-
-export const registerCommonMarkBlockRangeProvider = (
-  provider: (content: string) => CommonMarkContainerRangeSnapshot
-): void => {
-  blockRangeProvider = provider
-}
-
-export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
-export const SUPPORTED_DIRECTIVE_OPEN_PATTERN =
-  /^:::(?:callout|toggle|bookmark|embed|file)(?:[ \t\r]|$)/
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
-export const ASIDE_TAG_CASE_INSENSITIVE_PATTERN = /<aside/i
 
 export const maskLineWithBreakAndHeading = (line: string): string => {
   const hasCr = line.endsWith("\r")
@@ -96,22 +101,6 @@ export const hasExcludedAsideCloseOrFenceBeforeBlank = (sliceBeforeBlank: readon
     )
   })
 
-export const extractAsideOpenTail = (line: string): string | null => {
-  const trimmedStart = line.trimStart()
-  if (!trimmedStart.toLowerCase().startsWith("<aside")) return null
-  const nextChar = trimmedStart[6]
-  if (nextChar === ">") return trimmedStart.slice(7)
-  if (!nextChar || !SINGLE_SPACE_CHAR_PATTERN.test(nextChar)) return null
-  const closeAngle = trimmedStart.indexOf(">", 7)
-  return closeAngle < 0 ? null : trimmedStart.slice(closeAngle + 1)
-}
-
-export const stripClosingAsideTag = (value: string): string | null => {
-  const trimmedEnd = value.trimEnd()
-  if (!trimmedEnd.toLowerCase().endsWith("</aside>")) return null
-  return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
-}
-
 export const isValidAsideCloseCandidate = (
   candidate: string,
   lineIndex: number,
@@ -141,63 +130,6 @@ export const isTopLevelFormulaStopLine = (line: string): boolean =>
   parseOpeningCodeFence(line) !== null ||
   SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(line) ||
   (!hasCommonMarkCodeIndent(line) && extractAsideOpenTail(line) !== null)
-
-export const resolveDedicatedMathOpen = (
-  text: string,
-  openIndex: number,
-  openLine: string
-): { quoteDepth: number; rest: string; allowAsideIndent: boolean } | null => {
-  const inAside =
-    blockRangeProvider !== null &&
-    ASIDE_TAG_CASE_INSENSITIVE_PATTERN.test(text) &&
-    overlapsSortedRanges(blockRangeProvider(text).asideRanges, openIndex, openIndex + 1)
-  const parsed = parseDedicatedLineQuoteDepth(inAside ? openLine.trimStart() : openLine)
-  return parsed ? { ...parsed, allowAsideIndent: inAside } : null
-}
-
-export const isDedicatedMathCloseLine = (
-  line: string,
-  openQuoteDepth: number,
-  allowAsideIndent: boolean
-): boolean => {
-  const parsedClose = parseDedicatedLineQuoteDepth(allowAsideIndent ? line.trimStart() : line)
-  return (
-    parsedClose !== null &&
-    parsedClose.quoteDepth === openQuoteDepth &&
-    parsedClose.rest.startsWith("$$") &&
-    parsedClose.rest.slice(2).trim() === ""
-  )
-}
-
-export const isDedicatedFormulaBoundaryLine = (
-  text: string,
-  lineStart: number,
-  lineEnd: number,
-  strippedLine: string,
-  openQuoteDepth: number
-): boolean => {
-  if (openQuoteDepth > 0) return false
-  if (
-    SUPPORTED_DIRECTIVE_OPEN_PATTERN.test(strippedLine) ||
-    (!hasCommonMarkCodeIndent(strippedLine) && extractAsideOpenTail(strippedLine) !== null)
-  ) {
-    return true
-  }
-  if (
-    DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) ||
-    stripClosingAsideTag(strippedLine) !== null
-  ) {
-    if (blockRangeProvider === null) {
-      return (
-        DIRECTIVE_CLOSE_LINE_PATTERN.test(strippedLine) ||
-        (!hasCommonMarkCodeIndent(strippedLine) && stripClosingAsideTag(strippedLine) !== null)
-      )
-    }
-    const { containerCloseRanges } = blockRangeProvider(text)
-    return overlapsSortedRanges(containerCloseRanges, lineStart, Math.max(lineStart + 1, lineEnd))
-  }
-  return false
-}
 
 export const isLineStartInCommentRanges = (
   commentRanges: readonly MathSpanRange[],

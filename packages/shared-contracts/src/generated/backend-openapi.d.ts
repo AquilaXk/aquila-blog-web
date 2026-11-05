@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/posts/{id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["like"];
+        post?: never;
+        delete: operations["unlike"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/member/api/v1/adm/members/{id}/profileWorkspace/draft": {
         parameters: {
             query?: never;
@@ -309,6 +325,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/api/v1/adm/cloud/files/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFile"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_1"];
+        options?: never;
+        head?: never;
+        patch: operations["update"];
+        trace?: never;
+    };
     "/member/api/v1/adm/members/{id}/nickname": {
         parameters: {
             query?: never;
@@ -466,22 +498,6 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/system/api/v1/adm/cloud/files/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getFile"];
-        put?: never;
-        post?: never;
-        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1057,6 +1073,16 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["PostWriteResultDto"];
         };
+        PostLikeToggleResBody: {
+            liked?: boolean;
+            /** Format: int32 */
+            likesCount?: number;
+        };
+        RsDataPostLikeToggleResBody: {
+            resultCode?: string;
+            msg?: string;
+            data?: components["schemas"]["PostLikeToggleResBody"];
+        };
         ProfileCardLinkItemRequest: {
             icon?: string;
             label: string;
@@ -1384,6 +1410,10 @@ export interface components {
         };
         ProfileImageUploadResponse: {
             profileImageUrl?: string;
+        };
+        UpdateCloudFileReqBody: {
+            originalFilename?: string | null;
+            folderPath?: string | null;
         };
         UpdateProfileIdentityRequest: {
             nickname: string;
@@ -1875,6 +1905,50 @@ export interface operations {
             };
         };
     };
+    like: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataPostLikeToggleResBody"];
+                };
+            };
+        };
+    };
+    unlike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataPostLikeToggleResBody"];
+                };
+            };
+        };
+    };
     saveProfileWorkspaceDraft: {
         parameters: {
             query?: never;
@@ -2336,6 +2410,76 @@ export interface operations {
             };
         };
     };
+    getFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CloudFileDto"];
+                };
+            };
+        };
+    };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataVoid"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCloudFileReqBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataCloudFileDto"];
+                };
+            };
+        };
+    };
     updateProfileIdentity: {
         parameters: {
             query?: never;
@@ -2410,7 +2554,9 @@ export interface operations {
     };
     content: {
         parameters: {
-            query?: never;
+            query?: {
+                download?: boolean;
+            };
             header?: never;
             path: {
                 id: number;
@@ -2588,50 +2734,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdminDashboardSnapshot"];
-                };
-            };
-        };
-    };
-    getFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CloudFileDto"];
-                };
-            };
-        };
-    };
-    delete_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RsDataVoid"];
                 };
             };
         };

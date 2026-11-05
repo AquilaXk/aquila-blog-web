@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { expect, test } from "@playwright/test"
+import { clearAllAdminEditorLocalDrafts } from "../../src/libs/privacy/browserStorageRegistry"
 import * as editorStudioStorageModel from "../../src/routes/Admin/editorStudioStorageModel"
 import {
   LOCAL_DRAFT_CREATE_STORAGE_KEY,
@@ -885,4 +888,56 @@ test.describe("editor local draft context slots", () => {
       })
     ).toEqual({ action: "skip" })
   })
+
+  test("clearAllLocalDrafts removes all create and post draft keys, preserves unrelated keys, and dispatches change event", () => {
+    withLocalStorage((storage) => {
+      const dispatchedEvents: string[] = []
+      ;(globalThis.window as unknown as { dispatchEvent: (event: Event) => boolean }).dispatchEvent = (
+        event: Event
+      ) => {
+        dispatchedEvents.push(event.type)
+        return true
+      }
+
+      storage.setItem(LOCAL_DRAFT_CREATE_STORAGE_KEY, '{"title":"legacy create"}')
+      storage.setItem("admin.editor.localDraft.create.doc-1.v3", '{"title":"doc create"}')
+      storage.setItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.doc-1.v3`, '{"title":"post 42"}')
+      storage.setItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}99.v3`, '{"title":"post 99"}')
+      storage.setItem("admin.editor.customTags", '["typescript"]')
+      storage.setItem("aquila_blog_liked_posts_v1", '["42"]')
+
+      const clearAll = (editorStudioStorageModel as { clearAllLocalDrafts?: () => void }).clearAllLocalDrafts
+      expect(typeof clearAll).toBe("function")
+      clearAll?.()
+
+      expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
+      expect(storage.getItem("admin.editor.localDraft.create.doc-1.v3")).toBeNull()
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.doc-1.v3`)).toBeNull()
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}99.v3`)).toBeNull()
+      expect(storage.getItem("admin.editor.customTags")).toBe('["typescript"]')
+      expect(storage.getItem("aquila_blog_liked_posts_v1")).toBe('["42"]')
+      expect(dispatchedEvents).toEqual(["aquila-local-drafts-changed"])
+    })
+
+    const restoreThrowingWindow = setGlobal("window", {
+      get localStorage(): Storage {
+        throw new Error("SecurityError: localStorage disabled")
+      },
+    })
+    try {
+      expect(() => clearAllAdminEditorLocalDrafts()).not.toThrow()
+    } finally {
+      restoreThrowingWindow()
+    }
+
+    const repoRoot = path.resolve(__dirname, "../..")
+    const adminShellSource = readFileSync(path.join(repoRoot, "src/routes/Admin/AdminShell.tsx"), "utf8")
+    const adminLoginSource = readFileSync(path.join(repoRoot, "src/pages/admin/login.tsx"), "utf8")
+    const authSessionSource = readFileSync(path.join(repoRoot, "src/hooks/useAuthSession.ts"), "utf8")
+
+    expect(adminShellSource).toContain("clearAllAdminEditorLocalDrafts()")
+    expect(adminLoginSource.match(/clearAllAdminEditorLocalDrafts\(\)/g)?.length).toBe(2)
+    expect(authSessionSource).toContain("clearAllAdminEditorLocalDrafts()")
+  })
 })
+
