@@ -143,3 +143,8 @@ yarn test:e2e:live
 | [Frontend Working Guide](docs/design/Frontend-Working-Guide.md) | SSR 에러 핸들링, API 호출 규칙, Fail-fast 원칙 |
 | [Editorial Design Guide](docs/design/family-look-guide.md) | 에디토리얼 디자인 시스템 명세 및 토큰 매핑 규칙 |
 | [Security CSP Rollout](docs/design/security-csp-rollout.md) | 인라인 스크립트 해시 강제 및 CSP 정책 |
+
+## 라이선스
+
+- 웹 애플리케이션 소스코드: [MIT License](LICENSE)
+- 블로그 게시글 및 미디어 콘텐츠([blog.aquilaxk.site](https://blog.aquilaxk.site)): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (출처 표시 조건부 허용)
