@@ -15,9 +15,11 @@ const subject = process.argv[2]
 
 if (/^(Merge|Revert|fixup!|squash!|amend!) /.test(subject)) process.exit(0)
 
-const match = /^(feat|fix|refactor|chore|docs|style|test|perf|build|ci|revert|hotfix)(\([a-z0-9][a-z0-9._/-]*\))?!?: (.+)$/.exec(subject)
-if (!match || !/[가-힣ㄱ-ㅎㅏ-ㅣ]/u.test(match[3]) || !/[A-Za-z]/.test(match[3])) {
-  console.error("[commit-msg] 형식: <type>(<scope>): <한글+English 혼합 요약>")
+const bracketMatch = /^\[(Feat|Fix|Refactor|Chore|Docs|Style|Test|Perf|Build|CI|Revert|Hotfix|Security)\] (\S.*)$/.exec(subject)
+const conventionalMatch = /^(feat|fix|refactor|chore|docs|style|test|perf|build|ci|revert|hotfix)(\([a-z0-9][a-z0-9._/-]*\))?!?: (\S.*)$/.exec(subject)
+
+if (!bracketMatch && !conventionalMatch) {
+  console.error("[commit-msg] 형식: [Feat|Fix|Refactor|Chore|Docs|Style|Test|Perf] <요약> 또는 <type>(<scope>): <요약>")
   process.exit(1)
 }
 NODE

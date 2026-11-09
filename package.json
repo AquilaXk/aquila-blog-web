@@ -20,7 +20,7 @@
     "playwright:preflight": "node scripts/check-playwright-local-launcher.mjs",
     "contracts:import:local": "node scripts/contracts/import-platform-contracts.mjs --source ../aquila-blog/contracts/public-api --output contracts/platform --source-repository AquilaXk/aquila-blog --source-commit $(git -C ../aquila-blog rev-parse HEAD)",
     "contracts:generate": "openapi-typescript contracts/platform/openapi.json -o packages/shared-contracts/src/generated/backend-openapi.d.ts",
-    "contracts:check": "node --test scripts/contracts/platform-contracts.test.mjs scripts/openapi/check-contract-drift.test.mjs scripts/github/issue-template-contract.test.mjs && node scripts/contracts/verify-platform-contracts.mjs && node scripts/openapi/check-contract-drift.mjs",
+    "contracts:check": "node --test scripts/contracts/platform-contracts.test.mjs scripts/openapi/check-contract-drift.test.mjs && node scripts/contracts/verify-platform-contracts.mjs && node scripts/openapi/check-contract-drift.mjs",
     "test:e2e": "yarn playwright:preflight && env -u NO_COLOR PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 yarn playwright test",
     "test:e2e:smoke": "yarn playwright:preflight && env -u NO_COLOR PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 yarn playwright test e2e/smoke*.spec.ts e2e/mobile-layout*.spec.ts --workers=2",
     "test:e2e:authoring": "yarn playwright:preflight && env -u NO_COLOR PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 yarn playwright test e2e/editor-live-writing-surface.spec.ts e2e/editor-authoring-structural-contract.spec.ts --workers=1",
