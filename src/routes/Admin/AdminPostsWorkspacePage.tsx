@@ -31,6 +31,7 @@ import {
   type AdminPostsWorkspacePageProps,
 } from "./AdminPostsWorkspacePageCommands"
 import { AdminPostsWorkspacePageView } from "./AdminPostsWorkspacePageView"
+import { revalidateSavedPost } from "./editorPostSaveRefresh"
 
 export { getAdminPostsWorkspacePageProps } from "./AdminPostsWorkspacePageCommands"
 
@@ -186,6 +187,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch(`/post/api/v1/posts/${row.id}`, { method: "DELETE" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
+        await revalidateSavedPost(row.id).catch(() => undefined)
         await refreshWorkspaceLists()
         showToast({
           tone: "success",
@@ -214,6 +216,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch<PostWriteResult>(`/post/api/v1/adm/posts/${row.id}/restore`, { method: "POST" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
+        await revalidateSavedPost(row.id).catch(() => undefined)
         await refreshWorkspaceLists()
         showToast({
           tone: "success",
@@ -236,6 +239,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
         setToast(null)
         await apiFetch(`/post/api/v1/adm/posts/${row.id}/hard`, { method: "DELETE" })
         await invalidatePublicPostReadCaches(queryClient, row.id)
+        await revalidateSavedPost(row.id).catch(() => undefined)
         await refreshWorkspaceLists()
         showToast({
           tone: "success",

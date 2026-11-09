@@ -38,11 +38,22 @@ export const ErrorFallbackView = ({
   requestId = null,
   onRetry,
 }: ErrorFallbackViewProps) => {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const copy = copyByVariant[variant]
-  const title = variant === "global" ? t("error500Title") : copy.title
-  const description = variant === "global" ? t("error500Desc") : copy.description
-  const meta = requestId ? `요청 ID: ${requestId}` : undefined
+  const isEnglish = language === "en"
+  const title = isEnglish
+    ? variant === "global"
+      ? t("error500Title")
+      : "Could not render this content"
+    : copy.title
+  const description = isEnglish
+    ? variant === "global"
+      ? t("error500Desc")
+      : "An error occurred while displaying this section. Please try again."
+    : copy.description
+  const meta = requestId ? (isEnglish ? `Request ID: ${requestId}` : `요청 ID: ${requestId}`) : undefined
+  const retryLabel = isEnglish ? "Retry" : "다시 시도"
+  const homeLabel = isEnglish ? t("error500Home") : "홈으로 이동"
 
   const fallback = (
     <FallbackShell>
@@ -56,11 +67,11 @@ export const ErrorFallbackView = ({
           <>
             {onRetry ? (
               <button type="button" onClick={onRetry}>
-                {t("error500Retry")}
+                {retryLabel}
               </button>
             ) : null}
             <Link href="/" data-tone="primary">
-              {t("error500Home")}
+              {homeLabel}
             </Link>
           </>
         }

@@ -550,6 +550,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
         onClearLocalDraft={clearLocalDraft}
         onUploadPostImage={handleMarkdownEditorImageUpload}
+        onUploadPostAttachment={handleMarkdownEditorFileUpload}
         onInsertMarkdownSnippet={handleInsertCloudMarkdownSnippet}
         publishModal={
           isPublishModalOpen ? (

@@ -13,18 +13,15 @@ export const calloutRegistry = {
   },
   warning: {
     blockquoteToken: "WARNING",
-    aliases: [
-      "CAUTION",
-      "ATTENTION",
-      "FAILURE",
-      "FAIL",
-      "MISSING",
-      "DANGER",
-      "ERROR",
-      "BUG",
-    ],
+    aliases: ["CAUTION", "ATTENTION", "MISSING"],
     marker: "!",
-    legacyEmoji: ["⚠️", "⚠", "🚨", "❗", "⛔"],
+    legacyEmoji: ["⚠️", "⚠", "❗"],
+  },
+  danger: {
+    blockquoteToken: "DANGER",
+    aliases: ["ERROR", "BUG", "FAILURE", "FAIL"],
+    marker: "!",
+    legacyEmoji: ["🚨", "⛔"],
   },
   outline: {
     blockquoteToken: "OUTLINE",

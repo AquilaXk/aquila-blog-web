@@ -64,7 +64,8 @@ export const openImageLightboxOverlay = (
 
   activeImageLightboxCleanup?.()
   const returnFocusTarget = resolveReturnFocusTarget(options.trigger)
-  const altText = options.alt || options.caption || "이미지 확대 보기"
+  const isEnglish = (document.documentElement?.lang ?? "").toLowerCase().startsWith("en")
+  const altText = options.alt || options.caption || (isEnglish ? "Expanded image view" : "이미지 확대 보기")
   const captionText = options.caption || options.alt || ""
 
   const overlay = document.createElement("div")
@@ -105,10 +106,13 @@ export const openImageLightboxOverlay = (
   actionsBar.style.borderBottom = "1px solid var(--aq-border)"
   actionsBar.style.background = "var(--aq-page-bg)"
 
-  const zoomOutButton = createOverlayActionButton("-", "축소")
-  const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
-  const zoomInButton = createOverlayActionButton("+", "확대")
-  const closeButton = createOverlayActionButton("닫기", "닫기")
+  const zoomOutButton = createOverlayActionButton("-", isEnglish ? "Zoom out" : "축소")
+  const zoomResetButton = createOverlayActionButton("100%", isEnglish ? "Reset zoom" : "배율 초기화")
+  const zoomInButton = createOverlayActionButton("+", isEnglish ? "Zoom in" : "확대")
+  const closeButton = createOverlayActionButton(
+    isEnglish ? "Close" : "닫기",
+    isEnglish ? "Close" : "닫기"
+  )
   for (const btn of [zoomOutButton, zoomResetButton, zoomInButton, closeButton]) {
     btn.style.minWidth = "44px"
     btn.style.minHeight = "44px"

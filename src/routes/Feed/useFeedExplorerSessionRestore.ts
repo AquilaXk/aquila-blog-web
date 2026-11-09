@@ -134,7 +134,32 @@ export const useFeedExplorerSessionRestore = ({
     hasInitializedRestoreRef.current = true
     pruneFeedExplorerStateStorage(window.sessionStorage)
 
-    const restored = parseFeedExplorerRestoreState(window.sessionStorage.getItem(restoreStorageKey))
+    let resolvedRestoreKey = restoreStorageKey
+    let restored = parseFeedExplorerRestoreState(window.sessionStorage.getItem(resolvedRestoreKey))
+    const hasExplicitRouteSort =
+      router.query.sort === "latest" || router.query.sort === "views" || router.query.sort === "likes"
+    if (!hasExplicitRouteSort) {
+      const sortCandidates: FeedSortMode[] = ["latest", "views", "likes"]
+      for (const candidateSort of sortCandidates) {
+        const candidateKey = getFeedExplorerRestoreKey(
+          currentTag || "",
+          FEED_EXPLORE_PAGE_SIZE,
+          FEED_EXPLORER_ORDER,
+          candidateSort
+        )
+        const candidateState = parseFeedExplorerRestoreState(
+          window.sessionStorage.getItem(candidateKey)
+        )
+        if (
+          candidateState &&
+          candidateState.tag === (currentTag || "") &&
+          (!restored || candidateState.savedAt > restored.savedAt)
+        ) {
+          restored = candidateState
+          resolvedRestoreKey = candidateKey
+        }
+      }
+    }
     if (restored?.tag !== (currentTag || "")) return
 
     restoreStateRef.current = restored
@@ -147,7 +172,7 @@ export const useFeedExplorerSessionRestore = ({
     }
 
     const restoredSnapshot = parseFeedExplorerRestoreSnapshot(
-      window.sessionStorage.getItem(restoreSnapshotStorageKey)
+      window.sessionStorage.getItem(getFeedExplorerSnapshotKey(resolvedRestoreKey))
     )
     if (
       restoredSnapshot?.pages?.length &&
@@ -162,7 +187,7 @@ export const useFeedExplorerSessionRestore = ({
       restoreQueryPagesRef.current = restoredPages
       restoreQueryPageParamsRef.current = restoredPageParams
     }
-  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady, setQ, setSortMode])
+  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady, router.query.sort, setQ, setSortMode])
 
   useEffect(() => {
     if (hasHydratedQuerySnapshotRef.current) return

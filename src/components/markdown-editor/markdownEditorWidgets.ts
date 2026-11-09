@@ -120,7 +120,8 @@ export class MarkdownImageWidget extends WidgetType {
     private readonly src: string,
     private readonly alt: string,
     private readonly widthPx?: number,
-    private readonly align?: string
+    private readonly align?: string,
+    private readonly title?: string
   ) {
     super()
   }
@@ -130,7 +131,8 @@ export class MarkdownImageWidget extends WidgetType {
       other.src === this.src &&
       other.alt === this.alt &&
       other.widthPx === this.widthPx &&
-      other.align === this.align
+      other.align === this.align &&
+      other.title === this.title
     )
   }
 
@@ -144,6 +146,7 @@ export class MarkdownImageWidget extends WidgetType {
     const safeSrc = normalizeSafeMarkdownImageSrc(this.src)
     if (safeSrc) img.src = safeSrc
     img.alt = this.alt
+    if (this.title) img.title = this.title
     if (this.widthPx) img.width = this.widthPx
     img.loading = "lazy"
     wrap.appendChild(img)

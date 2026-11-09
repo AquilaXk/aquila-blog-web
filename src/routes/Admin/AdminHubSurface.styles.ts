@@ -133,7 +133,7 @@ export const SecondaryActionLink = styled.a`
 
 export const MetricGrid = styled.section`
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};

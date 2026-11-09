@@ -40,6 +40,9 @@ const resolveCollapsedAttr = (isCollapsible: boolean, isCollapsed: boolean): "tr
   return isCollapsed ? "true" : "false"
 }
 
+const isEnglishDocumentLang = (): boolean =>
+  typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("en")
+
 const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   language,
   title,
@@ -55,6 +58,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   const copyFailed = (uiMask & CODE_COPY_FAILED_BIT) !== 0
   const copyStatusBits = uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)
   const label = title?.trim() || toLanguageLabel(language)
+  const isEnglish = isEnglishDocumentLang()
 
   useEffect(() => {
     const shouldCollapse = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
@@ -94,8 +98,20 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           type="button"
           className={`aq-code-copy${copied ? " is-copied" : ""}${copyFailed ? " is-failed" : ""}`}
           onClick={handleCopy}
-          aria-label={copied ? "코드가 복사되었습니다" : copyFailed ? "코드 복사에 실패했습니다" : "코드 복사"}
-          title={copied ? "복사됨" : copyFailed ? "복사 실패" : "복사"}
+          aria-label={
+            copied
+              ? isEnglish ? "Code copied" : "코드가 복사되었습니다"
+              : copyFailed
+                ? isEnglish ? "Failed to copy code" : "코드 복사에 실패했습니다"
+                : isEnglish ? "Copy code" : "코드 복사"
+          }
+          title={
+            copied
+              ? isEnglish ? "Copied" : "복사됨"
+              : copyFailed
+                ? isEnglish ? "Copy failed" : "복사 실패"
+                : isEnglish ? "Copy" : "복사"
+          }
         >
           {copied ? "COPIED" : copyFailed ? "COPY FAILED" : "COPY"}
         </button>
@@ -110,7 +126,13 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           aria-expanded={!isCollapsed}
           onClick={() => setUiMask((prev) => prev ^ CODE_COLLAPSED_BIT)}
         >
-          {isCollapsed ? `전체 코드 펼치기 (${lineCount}줄)` : "코드 접기"}
+          {isCollapsed
+            ? isEnglish
+              ? `Expand full code (${lineCount} lines)`
+              : `전체 코드 펼치기 (${lineCount}줄)`
+            : isEnglish
+              ? "Collapse code"
+              : "코드 접기"}
         </button>
       ) : null}
     </div>

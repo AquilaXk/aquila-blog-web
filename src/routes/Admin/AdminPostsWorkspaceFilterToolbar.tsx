@@ -138,9 +138,10 @@ const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`
   ${({ theme }) => baseButton({ theme })};
   min-height: 42px;
   padding: 0 0.82rem;
-  background: ${({ theme, "data-active": active }) => (active ? theme.colors.gray1 : theme.colors.gray2)};
-  color: ${({ theme }) => theme.colors.gray12};
-  border-color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray6 : theme.colors.gray5)};
+  background: ${({ theme, "data-active": active }) => (active ? theme.colors.gray12 : theme.colors.gray2)};
+  color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray1 : theme.colors.gray12)};
+  border-color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray12 : theme.colors.gray5)};
+  font-weight: ${({ "data-active": active }) => (active ? 840 : 760)};
   ${focusVisibleRing}
 
   @media (max-width: 768px), (pointer: coarse) {

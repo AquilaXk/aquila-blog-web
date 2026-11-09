@@ -14,6 +14,9 @@ type EditorStudioCloudAssetPickerProps = {
   onUploadPostImage?: (
     file: File
   ) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>
+  onUploadPostAttachment?: (
+    file: File
+  ) => Promise<{ url?: string; name?: string }>
   onInsertMarkdownSnippet?: (snippet: string) => void
 }
 
@@ -25,18 +28,20 @@ const sanitizeMarkdownLabel = (rawName: string | undefined): string =>
 
 export const buildCloudAssetMarkdownSnippet = (
   file: CloudFile,
-  promotedPublicImageUrl?: string
+  promotedPublicAssetUrl?: string
 ): string => {
   const safeLabel = sanitizeMarkdownLabel(file.originalFilename)
+  const targetUrl = promotedPublicAssetUrl?.trim() || ""
+  if (!targetUrl) return ""
   if (isImageCloudAsset(file)) {
-    const targetUrl = promotedPublicImageUrl?.trim() || getCloudFileContentUrl(file.id)
     return `![${safeLabel}](${targetUrl})`
   }
-  return `[${safeLabel}](${getCloudFileDownloadUrl(file.id)})`
+  return `[${safeLabel}](${targetUrl})`
 }
 
 export const EditorStudioCloudAssetPicker = ({
   onUploadPostImage,
+  onUploadPostAttachment,
   onInsertMarkdownSnippet,
 }: EditorStudioCloudAssetPickerProps = {}) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -75,43 +80,70 @@ export const EditorStudioCloudAssetPicker = ({
 
   const handleInsertOrCopySnippet = useCallback(
     async (file: CloudFile) => {
+      if (promotingFileId !== null) return
       setErrorText("")
-      let promotedPublicImageUrl: string | undefined
+      let promotedPublicAssetUrl = ""
+      const isImageAsset = isImageCloudAsset(file)
 
-      if (isImageCloudAsset(file) && onUploadPostImage) {
-        setPromotingFileId(file.id)
-        try {
-          const response = await fetch(getCloudFileContentUrl(file.id), {
-            credentials: "include",
-          })
-          if (!response.ok) {
-            throw new Error(`클라우드 이미지를 내려받지 못했습니다. (HTTP ${response.status})`)
-          }
-          const blob = await response.blob()
-          const uploadFile = new File(
-            [blob],
-            file.originalFilename || `cloud-image-${file.id}.png`,
-            { type: blob.type || file.contentType || "image/png" }
-          )
-          const uploaded = await onUploadPostImage(uploadFile)
-          const resolvedUrl = (uploaded.src || uploaded.url || "").trim()
-          if (!resolvedUrl) {
-            throw new Error("공개 포스트 이미지 URL을 발급받지 못했습니다.")
-          }
-          promotedPublicImageUrl = resolvedUrl
-        } catch (error) {
-          setErrorText(
-            error instanceof Error && error.message.trim()
-              ? error.message
-              : "클라우드 이미지를 공개 본문 이미지로 변환하지 못했습니다."
-          )
-          setPromotingFileId(null)
-          return
-        }
-        setPromotingFileId(null)
+      if (isImageAsset && !onUploadPostImage) {
+        setErrorText("공개 본문 이미지 업로드 경로가 연결되지 않아 클라우드 이미지를 삽입할 수 없습니다.")
+        return
+      }
+      if (!isImageAsset && !onUploadPostAttachment) {
+        setErrorText("공개 첨부 파일 업로드 경로가 연결되지 않아 클라우드 파일을 삽입할 수 없습니다.")
+        return
       }
 
-      const snippet = buildCloudAssetMarkdownSnippet(file, promotedPublicImageUrl)
+      setPromotingFileId(file.id)
+      try {
+        const sourceUrl = isImageAsset
+          ? getCloudFileContentUrl(file.id)
+          : getCloudFileDownloadUrl(file.id)
+        const response = await fetch(sourceUrl, {
+          credentials: "include",
+        })
+        if (!response.ok) {
+          throw new Error(
+            `${isImageAsset ? "클라우드 이미지" : "클라우드 파일"}를 내려받지 못했습니다. (HTTP ${response.status})`
+          )
+        }
+        const blob = await response.blob()
+        const uploadFile = new File(
+          [blob],
+          file.originalFilename || (isImageAsset ? `cloud-image-${file.id}.png` : `cloud-file-${file.id}`),
+          {
+            type:
+              blob.type ||
+              file.contentType ||
+              (isImageAsset ? "image/png" : "application/octet-stream"),
+          }
+        )
+        if (isImageAsset && onUploadPostImage) {
+          const uploaded = await onUploadPostImage(uploadFile)
+          promotedPublicAssetUrl = (uploaded.src || uploaded.url || "").trim()
+        } else if (!isImageAsset && onUploadPostAttachment) {
+          const uploaded = await onUploadPostAttachment(uploadFile)
+          promotedPublicAssetUrl = (uploaded.url || "").trim()
+        }
+        if (!promotedPublicAssetUrl) {
+          throw new Error("공개 포스트 자산 URL을 발급받지 못했습니다.")
+        }
+      } catch (error) {
+        setErrorText(
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : "클라우드 자산을 공개 본문 자산으로 변환하지 못했습니다."
+        )
+        setPromotingFileId(null)
+        return
+      }
+      setPromotingFileId(null)
+
+      const snippet = buildCloudAssetMarkdownSnippet(file, promotedPublicAssetUrl)
+      if (!snippet) {
+        setErrorText("공개 본문 마크다운 링크를 생성하지 못했습니다.")
+        return
+      }
       onInsertMarkdownSnippet?.(snippet)
       try {
         if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -126,7 +158,7 @@ export const EditorStudioCloudAssetPicker = ({
         setErrorText("클립보드 복사에 실패했습니다. 수동으로 마크다운 링크를 복사해 주세요.")
       }
     },
-    [onInsertMarkdownSnippet, onUploadPostImage]
+    [onInsertMarkdownSnippet, onUploadPostAttachment, onUploadPostImage, promotingFileId]
   )
 
   return (
@@ -137,11 +169,15 @@ export const EditorStudioCloudAssetPicker = ({
           {isOpen ? "목록 접기" : "클라우드 파일 불러오기"}
         </SecondaryButton>
       </div>
-      <small>개인 클라우드 이미지를 공개 본문 이미지로 승격해 삽입하거나 마크다운 링크를 복사합니다.</small>
+      <small>개인 클라우드 자산을 공개 본문 이미지·첨부파일로 승격해 삽입하거나 마크다운 링크를 복사합니다.</small>
       {isOpen ? (
         <div className="pickerBody">
           <div className="pickerToolbar">
-            <SecondaryButton type="button" onClick={() => void loadRecentCloudAssets()} disabled={isLoading}>
+            <SecondaryButton
+              type="button"
+              onClick={() => void loadRecentCloudAssets()}
+              disabled={isLoading || promotingFileId !== null}
+            >
               {isLoading ? "불러오는 중..." : "새로고침"}
             </SecondaryButton>
           </div>
@@ -162,7 +198,7 @@ export const EditorStudioCloudAssetPicker = ({
                     </div>
                     <SecondaryButton
                       type="button"
-                      disabled={isPromoting}
+                      disabled={promotingFileId !== null}
                       onClick={() => void handleInsertOrCopySnippet(file)}
                     >
                       {isPromoting

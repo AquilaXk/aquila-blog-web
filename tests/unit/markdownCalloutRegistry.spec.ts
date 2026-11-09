@@ -13,6 +13,7 @@ test("parses all canonical callout tokens from the typed registry", () => {
     ["TIP", "tip", "T"],
     ["INFO", "info", "i"],
     ["WARNING", "warning", "!"],
+    ["DANGER", "danger", "!"],
     ["OUTLINE", "outline", "≡"],
     ["EXAMPLE", "example", "✓"],
     ["SUMMARY", "summary", "§"],
@@ -32,13 +33,22 @@ test("parses all canonical callout tokens from the typed registry", () => {
 })
 
 test("resolves aliases, legacy emoji, and the default TIP token from the registry", () => {
-  for (const [alias, kind] of [["NOTE", "info"], ["CAUTION", "warning"], ["IMPORTANT", "summary"]] as const) {
+  for (const [alias, kind] of [
+    ["NOTE", "info"],
+    ["CAUTION", "warning"],
+    ["ERROR", "danger"],
+    ["BUG", "danger"],
+    ["FAILURE", "danger"],
+    ["FAIL", "danger"],
+    ["IMPORTANT", "summary"],
+  ] as const) {
     expect(resolveCalloutBlockquote(alias)).toEqual({ kind, callout: getCallout(kind) })
     expect(parseMarkdownSegments(`> [!${alias}] 제목\n> body`)).toEqual([
       expect.objectContaining({ type: "callout", kind, title: "제목", emoji: getCallout(kind).marker, content: "body" }),
     ])
   }
   expect(resolveCalloutLegacyEmoji("💡 제목")).toEqual(expect.objectContaining({ kind: "tip", emoji: "💡" }))
+  expect(resolveCalloutLegacyEmoji("🚨 위험")).toEqual(expect.objectContaining({ kind: "danger", emoji: "🚨" }))
   expect(defaultCalloutBlockquoteToken).toBe("TIP")
 })
 

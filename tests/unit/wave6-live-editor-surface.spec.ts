@@ -493,5 +493,23 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     expect(nestedPreviewDoc.slice(colorMarks[1]!.from, colorMarks[1]!.to)).toBe(
       "`code` and [link](https://example.com)"
     )
+
+    const imageDoc = 'First paragraph\n\n![Architecture](/post/api/v1/images/posts/arch.webp "Diagram Title"){width=480 align=center}'
+    const imageState = EditorState.create({
+      doc: imageDoc,
+      selection: EditorSelection.cursor(0),
+      extensions: [markdown({ extensions: GFM }), decorationField],
+    })
+    const imageDecoSet = imageState.field(decorationField)
+    const imageReplacedRanges: Array<{ from: number; to: number; widget: unknown }> = []
+    imageDecoSet.between(0, imageDoc.length, (from, to, value) => {
+      const widget = (value.spec as { widget?: unknown }).widget
+      if (widget instanceof MarkdownImageWidget) {
+        imageReplacedRanges.push({ from, to, widget })
+      }
+    })
+    expect(imageReplacedRanges).toHaveLength(1)
+    expect(imageReplacedRanges[0]!.from).toBe(imageDoc.indexOf("![Architecture]"))
+    expect(imageReplacedRanges[0]!.to).toBe(imageDoc.length)
   })
 })

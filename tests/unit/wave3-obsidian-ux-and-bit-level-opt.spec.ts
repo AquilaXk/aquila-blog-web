@@ -42,12 +42,12 @@ test.describe("Wave 3 — Issue #261: Obsidian UX Parity & Bit-Level Optimizatio
     expect(resolveCalloutBlockquote("check")?.kind).toBe("tip")
     expect(resolveCalloutBlockquote("done")?.kind).toBe("tip")
 
-    expect(resolveCalloutBlockquote("failure")?.kind).toBe("warning")
-    expect(resolveCalloutBlockquote("fail")?.kind).toBe("warning")
+    expect(resolveCalloutBlockquote("failure")?.kind).toBe("danger")
+    expect(resolveCalloutBlockquote("fail")?.kind).toBe("danger")
     expect(resolveCalloutBlockquote("missing")?.kind).toBe("warning")
-    expect(resolveCalloutBlockquote("danger")?.kind).toBe("warning")
-    expect(resolveCalloutBlockquote("error")?.kind).toBe("warning")
-    expect(resolveCalloutBlockquote("bug")?.kind).toBe("warning")
+    expect(resolveCalloutBlockquote("danger")?.kind).toBe("danger")
+    expect(resolveCalloutBlockquote("error")?.kind).toBe("danger")
+    expect(resolveCalloutBlockquote("bug")?.kind).toBe("danger")
 
     expect(resolveCalloutBlockquote("quote")?.kind).toBe("outline")
     expect(resolveCalloutBlockquote("cite")?.kind).toBe("outline")

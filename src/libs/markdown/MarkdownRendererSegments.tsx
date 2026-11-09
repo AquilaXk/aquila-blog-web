@@ -23,6 +23,7 @@ const DEFAULT_CALLOUT_TITLES: Record<string, string> = {
   info: "배경 메모",
   tip: "실전 팁",
   warning: "주의 포인트",
+  danger: "위험 경고",
   example: "예시 시나리오",
   outline: "읽기 가이드",
 }
@@ -48,6 +49,14 @@ const renderCalloutIcon = (kind: CalloutKind): ReactNode => {
           <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
           <path d="M9 18h6" />
           <path d="M10 22h4" />
+        </svg>
+      )
+    case "danger":
+      return (
+        <svg {...commonProps}>
+          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
         </svg>
       )
     case "warning":

@@ -1359,6 +1359,7 @@ export interface components {
             contentHtmlSanitizerPolicyVersion?: "content-html-v1" | null;
             /** @enum {string} */
             contentHtmlTrustState?: "TRUSTED_CURRENT" | "UNKNOWN" | "REJECTED";
+            thumbnail?: string | null;
         };
         RsDataPostWithContentDto: {
             resultCode?: string;

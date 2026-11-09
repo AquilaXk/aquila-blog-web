@@ -388,6 +388,7 @@ export const useAdminProfileWorkspacePageModel = ({
 
       if (shouldSaveDisplayName) {
         await persistDisplayName(sessionMember.id, normalizedDisplayName)
+        void revalidatePublicBlogAppearance()
       }
 
       let successText = "임시 저장했습니다."
@@ -470,6 +471,9 @@ export const useAdminProfileWorkspacePageModel = ({
         return
       }
 
+      if (shouldSaveDisplayName) {
+        void revalidatePublicBlogAppearance()
+      }
       if (workspaceForPublish) {
         applyWorkspaceState(workspaceForPublish)
       }

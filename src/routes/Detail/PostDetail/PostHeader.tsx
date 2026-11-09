@@ -57,11 +57,13 @@ const resolvePostDates = (data: PostDetail, locale: string = CONFIG.lang) => {
 }
 
 const resolveShareFeedbackMessage = (
-  shareFeedback: Props["shareFeedback"]
+  shareFeedback: Props["shareFeedback"],
+  locale: string = CONFIG.lang
 ): string => {
-  if (shareFeedback === "failed") return "공유에 실패했습니다."
-  if (shareFeedback === "shared") return "공유 완료"
-  return "복사 완료"
+  const isEnglish = locale.toLowerCase().startsWith("en")
+  if (shareFeedback === "failed") return isEnglish ? "Failed to share." : "공유에 실패했습니다."
+  if (shareFeedback === "shared") return isEnglish ? "Shared" : "공유 완료"
+  return isEnglish ? "Link copied" : "복사 완료"
 }
 
 const numberFormatters = new Map<string, Intl.NumberFormat>()
@@ -105,7 +107,7 @@ export const resolvePostHeaderViewModel = (props: Props, locale: string = CONFIG
   const thumbnailFocusX = parseThumbnailFocusXFromUrl(rawThumbnail)
   const thumbnailFocusY = parseThumbnailFocusYFromUrl(rawThumbnail)
   const thumbnailZoom = parseThumbnailZoomFromUrl(rawThumbnail)
-  const shareFeedbackMessage = resolveShareFeedbackMessage(shareFeedback)
+  const shareFeedbackMessage = resolveShareFeedbackMessage(shareFeedback, locale)
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const viewCount = hitCount ?? data.hitCount ?? 0
   const viewText = `${getNumberFormatter(locale).format(viewCount)} VIEWS`

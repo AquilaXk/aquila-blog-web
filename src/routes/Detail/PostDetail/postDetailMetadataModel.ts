@@ -1,4 +1,5 @@
 import { CONFIG } from "site.config"
+import { extractFirstPostContentImageUrl } from "src/apis/backend/posts/PostApiMappers"
 import {
   resolveMetadataImageUrl,
   resolveOpenGraphType,
@@ -32,7 +33,19 @@ const toIsoDate = (value: string | undefined) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const normalizePostImage = (post: TPost) => resolveMetadataImageUrl(post.thumbnail, SITE_URL)
+const normalizePostImage = (post: TPost) => {
+  const postWithContent = post as TPost & {
+    content?: string
+    trustedContentHtml?: { html?: string }
+  }
+  const candidate =
+    post.thumbnail?.trim() ||
+    extractFirstPostContentImageUrl(
+      postWithContent.content,
+      postWithContent.trustedContentHtml?.html
+    )
+  return resolveMetadataImageUrl(candidate, SITE_URL)
+}
 
 const normalizeAuthorName = (post: TPost) =>
   post.authorName?.trim() ||

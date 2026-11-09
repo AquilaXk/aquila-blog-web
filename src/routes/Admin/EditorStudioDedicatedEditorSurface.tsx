@@ -148,7 +148,7 @@ type EditorStudioDedicatedEditorSurfaceProps = {
   onRestoreLocalDraft: () => void; localDraftCandidates: Array<{ key: string; label: string }>
   selectedLocalDraftCandidateKey: string; onSelectLocalDraftCandidate: (key: string) => void
   onDiscardLocalDraftCandidate: () => void; onDismissLocalDraftRestoreSuggestion: () => void
-  onClearLocalDraft: () => void; publishModal: ReactNode; onUploadPostImage?: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>; onInsertMarkdownSnippet?: (snippet: string) => void
+  onClearLocalDraft: () => void; publishModal: ReactNode; onUploadPostImage?: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>; onUploadPostAttachment?: (file: File) => Promise<{ url?: string; name?: string }>; onInsertMarkdownSnippet?: (snippet: string) => void
 }
 
 type LocalDraftRestoreSuggestionProps = {
@@ -273,7 +273,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   publishNoticeTone, publishNoticeText, onReloadLatestServerPost = null, isLocalDraftRestoreSuggestionVisible,
   isLocalDraftRestoreSuggestionActionsDisabled, onRestoreLocalDraft, localDraftCandidates,
   selectedLocalDraftCandidateKey, onSelectLocalDraftCandidate, onDiscardLocalDraftCandidate,
-  onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal, onUploadPostImage, onInsertMarkdownSnippet,
+  onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal, onUploadPostImage, onUploadPostAttachment, onInsertMarkdownSnippet,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const [panelUiMask, setPanelUiMask] = useState(EDITOR_SURFACE_ZEN_BITS)
   const isGuideOpen = (panelUiMask & EDITOR_SURFACE_GUIDE_OPEN) !== 0
@@ -564,7 +564,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                 </button>
               </EditorInspectorTagInputRow>
             </section>
-            <EditorStudioCloudAssetPicker onUploadPostImage={onUploadPostImage} onInsertMarkdownSnippet={onInsertMarkdownSnippet} />
+            <EditorStudioCloudAssetPicker onUploadPostImage={onUploadPostImage} onUploadPostAttachment={onUploadPostAttachment} onInsertMarkdownSnippet={onInsertMarkdownSnippet} />
             {linkWarningCount > 0 ? (
               <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
             ) : null}

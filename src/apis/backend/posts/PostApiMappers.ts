@@ -239,8 +239,34 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
   }
 }
 
+const FRONTMATTER_THUMBNAIL_REGEX =
+  /^\s*(?:thumbnail|thumb|cover|coverimage|cover_image)\s*:\s*['"]?([^'"\r\n]+)['"]?\s*$/im
+const MARKDOWN_FIRST_IMAGE_REGEX = /!\[[^\][\r\n]*\]\(\s*([^)\s"']+)(?:\s+["'][^"']*["'])?\s*\)/
+const HTML_FIRST_IMAGE_REGEX = /<img\b[^>]*?\bsrc=["']([^"']+)["']/i
+
+export const extractFirstPostContentImageUrl = (
+  content?: string | null,
+  html?: string | null
+): string => {
+  const rawContent = typeof content === "string" ? content : ""
+  if (rawContent) {
+    const frontmatterThumb = FRONTMATTER_THUMBNAIL_REGEX.exec(rawContent)?.[1]?.trim()
+    if (frontmatterThumb) return frontmatterThumb
+    const mdMatch = MARKDOWN_FIRST_IMAGE_REGEX.exec(rawContent)?.[1]?.trim()
+    if (mdMatch) return mdMatch
+    const inlineHtmlMatch = HTML_FIRST_IMAGE_REGEX.exec(rawContent)?.[1]?.trim()
+    if (inlineHtmlMatch) return inlineHtmlMatch
+  }
+  const rawHtml = typeof html === "string" ? html : ""
+  if (rawHtml) {
+    const htmlMatch = HTML_FIRST_IMAGE_REGEX.exec(rawHtml)?.[1]?.trim()
+    if (htmlMatch) return htmlMatch
+  }
+  return ""
+}
+
 export const mapPostDetail = async (
-  post: ApiPostWithContentDto & { thumbnail?: string },
+  post: ApiPostWithContentDto & { thumbnail?: string | null },
   { allowTrustedContentHtml }: { allowTrustedContentHtml: boolean },
 ): Promise<PostDetail> => {
   const postContent = post.content ?? ""
@@ -256,6 +282,10 @@ export const mapPostDetail = async (
   const trustedContentHtml = !allowTrustedContentHtml || postContent.trim()
     ? undefined
     : await resolveTrustedContentHtml(post)
+  const resolvedThumbnail = pickPreferredImageUrl(
+    post.thumbnail,
+    extractFirstPostContentImageUrl(postContent, trustedContentHtml?.html)
+  )
 
   return {
     ...mapPostDto({
@@ -270,7 +300,7 @@ export const mapPostDetail = async (
       title: post.title,
       summary: post.summary,
       summarySource: post.summarySource,
-      thumbnail: post.thumbnail,
+      thumbnail: resolvedThumbnail || undefined,
       tags,
       category,
       published: post.published,

@@ -18,12 +18,14 @@ import {
 } from "../../src/components/markdown-editor/markdownEditorTableModel"
 import { resolveActiveTableCellOffset } from "../../src/components/markdown-editor/MarkdownEditor"
 import { sortCloudFiles } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
+import { buildCloudAssetMarkdownSnippet } from "../../src/routes/Admin/EditorStudioCloudAssetPicker"
 import {
   parseEditorMeta,
   splitFrontmatterBlock,
   stripLeadingEditorMetadataLines,
 } from "../../src/routes/Admin/editorStudioMetaModel"
 import { dedupeStrings } from "../../src/routes/Admin/editorStudioMetaModelHelpers"
+import { buildPostDetailMetadata } from "../../src/routes/Detail/PostDetail/postDetailMetadataModel"
 
 test.describe("wave5 admin, editor, and mapper optimizations", () => {
   test("mapPostDetail preserves post.thumbnail and parses frontmatter in a single pass", async () => {
@@ -60,6 +62,48 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
     expect(detail.tags).toEqual(["kotlin", "nextjs"])
     expect(detail.summary).toBe("Deep dive into single-pass parsing")
     expect(detail.content).toBe("# Heading\nBody paragraph")
+
+    const fallbackDetail = await mapPostDetail(
+      {
+        id: 43,
+        createdAt: "2026-10-20T09:00:00.000Z",
+        modifiedAt: "2026-10-21T10:30:00.000Z",
+        authorId: 1,
+        authorName: "Aquila",
+        title: "Fallback Image Post",
+        summary: "Summary",
+        summarySource: "MANUAL",
+        content: "# Heading\n\n![Cover](/post/api/v1/images/posts/first-image.webp)\n\nParagraph",
+        published: true,
+        listed: true,
+        tempDraft: false,
+        hitCount: 0,
+        likesCount: 0,
+      },
+      { allowTrustedContentHtml: false }
+    )
+    expect(fallbackDetail.thumbnail).toBe("/post/api/v1/images/posts/first-image.webp")
+    const fallbackMeta = buildPostDetailMetadata({ ...fallbackDetail, thumbnail: undefined })
+    expect(fallbackMeta.image).toMatch(/\/post\/api\/v1\/images\/posts\/first-image\.webp$/)
+
+    const mockDocAsset = {
+      id: 7,
+      ownerMemberId: 1,
+      originalFilename: "report.pdf",
+      contentType: "application/pdf",
+      mediaKind: "DOCUMENT" as const,
+      byteSize: 1024,
+      folderPath: "",
+      createdAt: "2026-10-20T00:00:00Z",
+      modifiedAt: "2026-10-20T00:00:00Z",
+    }
+    expect(buildCloudAssetMarkdownSnippet(mockDocAsset)).toBe("")
+    expect(
+      buildCloudAssetMarkdownSnippet(
+        mockDocAsset,
+        "/post/api/v1/files/posts/report.pdf"
+      )
+    ).toBe("[report.pdf](/post/api/v1/files/posts/report.pdf)")
   })
 
   test("extractPostIdFromSlug and normalizeStringArray avoid redundant allocations", () => {

@@ -582,5 +582,15 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     line-height: 1.65;
   }
 
+  .cm-live-image-wrap {
+    display: inline-block; max-width: min(100%, var(--aq-image-width, 100%));
+    &[data-align="center"], &[data-align="right"], &[data-align="left"], &[data-align="wide"], &[data-align="full"] { display: flex; width: 100%; max-width: 100%; }
+    &[data-align="center"], &[data-align="wide"] { justify-content: center; }
+    &[data-align="right"] { justify-content: flex-end; }
+    &[data-align="left"] { justify-content: flex-start; }
+    .cm-live-image { max-width: min(100%, var(--aq-image-width, 100%)); height: auto; }
+    &[data-align="full"] .cm-live-image { width: 100%; max-width: 100%; }
+  }
+
   &[aria-disabled="true"] .cm-editor { cursor: not-allowed; opacity: 0.7; }
 `

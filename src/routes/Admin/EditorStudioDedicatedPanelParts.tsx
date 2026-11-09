@@ -524,14 +524,14 @@ export const EditorStudioGuideModal = ({ onClose }: { onClose: () => void }) => 
           </p>
           <EditorGuideGrid>
             {[
-              ["제목과 강조", "문서 구조와 인라인 강조", "# 제목 1\n## 제목 2\n### 제목 3\n**굵게** · _기울임_"],
+              ["제목과 강조", "문서 구조와 인라인 강조", "# 제목 1\n## 제목 2\n### 제목 3\n**굵게** · _기울임_ · ==하이라이트=="],
               ["목록과 인용", "일반 목록, 작업 목록, 인용문", "- 목록\n- [x] 완료\n- [ ] 예정\n> 인용문"],
-              ["콜아웃", "TIP, INFO, WARNING, SUMMARY", "> [!TIP]\n> **제목**\n> 내용"],
+              ["콜아웃", "TIP, INFO, WARNING, DANGER, SUMMARY", "> [!DANGER]\n> **제목**\n> 내용"],
               ["토글", "긴 보조 설명을 접어두기", ":::toggle 자세히 보기\n내용\n:::"],
               ["표와 코드", "GFM table과 fenced code", "| 항목 | 설명 |\n| --- | --- |\n\n```kotlin title=\"invalidatePost.kt\"\ncode\n```"],
               ["Mermaid", "흐름과 구조 다이어그램", "```mermaid\nflowchart LR\n A --> B\n```"],
               ["수식과 색상", "KaTeX block과 제한된 인라인 색상", "$$\nE = mc^2\n$$\n{{color:#155eef|강조}}"],
-              ["미디어와 링크 카드", "이미지, bookmark, embed, file", "![설명](URL)\n:::bookmark URL\n제목\n설명\n:::"],
+              ["미디어와 링크 카드", "이미지 정렬·크기, 위키링크, bookmark", "![설명](URL){width=480 align=center}\n[[글제목]]\n:::bookmark URL\n제목\n설명\n:::"],
             ].map(([title, description, code]) => (
               <section key={title}>
                 <h3>{title}</h3>

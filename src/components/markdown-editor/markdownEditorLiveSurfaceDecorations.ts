@@ -75,7 +75,7 @@ type TableReplacementSpec = RangeSpec & { markdown: string }
 type CalloutReplacementSpec = RangeSpec & {
   type: string; title: string; content: string; foldState: "+" | "-" | null
 }
-type ImageReplacementSpec = RangeSpec & { alt: string; src: string; widthPx?: number; align?: string }
+type ImageReplacementSpec = RangeSpec & { alt: string; src: string; title?: string; widthPx?: number; align?: string }
 type MermaidReplacementSpec = RangeSpec & { source: string }
 
 let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
@@ -120,16 +120,10 @@ export const computeMinimalDocChange = (current: string, next: string) => {
 }
 
 let cachedDocBlocksEntry: {
-  doc: EditorState["doc"]
-  tree: ReturnType<typeof syntaxTree>
-  markdownValue: string
-  previewEntries: readonly MarkdownLivePreviewPlanEntry[]
-  tables: TableReplacementSpec[]
-  callouts: CalloutReplacementSpec[]
-  images: ImageReplacementSpec[]
-  maths: MathReplacementSpec[]
-  mermaids: MermaidReplacementSpec[]
-  activeWatchRanges: RangeSpec[]
+  doc: EditorState["doc"]; tree: ReturnType<typeof syntaxTree>; markdownValue: string
+  previewEntries: readonly MarkdownLivePreviewPlanEntry[]; tables: TableReplacementSpec[]
+  callouts: CalloutReplacementSpec[]; images: ImageReplacementSpec[]
+  maths: MathReplacementSpec[]; mermaids: MermaidReplacementSpec[]; activeWatchRanges: RangeSpec[]
 } | null = null
 
 const parseCalloutBlockquoteSpec = (raw: string, from: number, to: number): CalloutReplacementSpec | null => {
@@ -149,10 +143,17 @@ const parseCalloutBlockquoteSpec = (raw: string, from: number, to: number): Call
   }
 }
 
+const resolveImageNodeEnd = (markdownValue: string, nodeTo: number): number => {
+  const attrMatch = /^[ \t]*\{[^}\r\n]*\}/.exec(markdownValue.slice(nodeTo, nodeTo + 160))
+  return attrMatch ? nodeTo + attrMatch[0].length : nodeTo
+}
+
 const parseImageReplacementSpec = (raw: string, from: number, to: number): ImageReplacementSpec | null => {
   if (!raw.includes("\n") && !raw.includes("\r")) {
     const parsed = parseStandaloneMarkdownImageLine(raw)
-    if (parsed) return { from, to, alt: parsed.alt, src: parsed.src, widthPx: parsed.widthPx, align: parsed.align }
+    if (parsed) {
+      return { from, to, alt: parsed.alt, src: parsed.src, title: parsed.title, widthPx: parsed.widthPx, align: parsed.align }
+    }
   }
   const match = /^!\[([^\][\r\n]*)\]\(([^()\r\n]*)\)$/.exec(raw)
   return match ? { from, to, alt: match[1] ?? "", src: match[2] ?? "" } : null
@@ -275,7 +276,8 @@ const walkSyntaxTreeForDocBlocks = (node: MarkdownSyntaxNode, collector: DocBloc
     }
   } else if (!isNodeShadowedByMath(collector.maths, node.from, node.to)) {
     if (node.name === "Image") {
-      pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
+      const replaceTo = resolveImageNodeEnd(collector.markdownValue, node.to)
+      pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, replaceTo), node.from, replaceTo))
     } else if (node.name === "FencedCode" && collector.hasMermaidMarker) {
       pushIfPresent(collector.mermaids, parseMermaidReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
     }
@@ -466,7 +468,7 @@ const appendBlockWidgetDecorations = (
     decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
   }
   for (const img of groups.images) {
-    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align) }).range(img.from, img.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align, img.title) }).range(img.from, img.to))
   }
   for (const m of groups.maths) {
     decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))

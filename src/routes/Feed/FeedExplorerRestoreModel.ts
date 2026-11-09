@@ -339,9 +339,11 @@ export const parseFeedExplorerRestoreSnapshot = (raw: string | null): FeedExplor
   }
 }
 
-export const toPersistFingerprint = (state: Pick<FeedExplorerRestoreState, "q" | "tag" | "loadedPages" | "scrollY">) => {
+export const toPersistFingerprint = (
+  state: Pick<FeedExplorerRestoreState, "q" | "tag" | "loadedPages" | "scrollY" | "sortMode">
+) => {
   const scrollBucket = Math.trunc(Math.max(0, state.scrollY) / FEED_EXPLORER_SCROLL_BUCKET_PX)
-  return `${state.q}\u0000${state.tag}\u0000${state.loadedPages}\u0000${scrollBucket}`
+  return `${state.q}\u0000${state.tag}\u0000${state.loadedPages}\u0000${scrollBucket}\u0000${state.sortMode ?? "latest"}`
 }
 
 const SAVED_AT_FAST_REGEX = /^\s*\{[^{}]*"savedAt"\s*:\s*(\d+)/

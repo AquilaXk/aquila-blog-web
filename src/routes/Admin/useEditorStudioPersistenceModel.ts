@@ -1,7 +1,6 @@
 import type { ChangeEvent, ClipboardEvent as ReactClipboardEvent, Dispatch, SetStateAction } from "react"
 import { useCallback } from "react"
 import { getApiBaseUrl } from "src/apis/backend/client"
-import { getCloudFileDownloadUrl, uploadCloudFile } from "src/apis/backend/cloud"
 import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
 import {
   buildImageOptimizationSummary,
@@ -169,37 +168,17 @@ export const useEditorStudioPersistenceUploads = ({
     const formData = new FormData()
     formData.append("file", file, file.name)
 
-    const fallbackToCloudAttachment = async (): Promise<UploadPostFileResponse> => {
-      const cloudFile = await uploadCloudFile(file, "/post-attachments")
-      return {
-        data: {
-          url: getCloudFileDownloadUrl(cloudFile.id),
-          name: cloudFile.originalFilename || file.name,
-        },
-      }
+    const response = await uploadWithConflictRetry(async () =>
+      fetch(`${getApiBaseUrl()}/post/api/v1/posts/files`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      })
+    )
+    if (!response.ok) {
+      throw new Error(`첨부 파일 업로드에 실패했습니다. (HTTP ${response.status})`)
     }
-
-    try {
-      const response = await uploadWithConflictRetry(async () =>
-        fetch(`${getApiBaseUrl()}/post/api/v1/posts/files`, {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        })
-      )
-      if (!response.ok && (response.status === 404 || response.status === 405)) {
-        return await fallbackToCloudAttachment()
-      }
-      return (await response.json()) as UploadPostFileResponse
-    } catch (error) {
-      const status = typeof (error as { status?: unknown })?.status === "number"
-        ? (error as { status: number }).status
-        : 0
-      if (status === 404 || status === 405) {
-        return await fallbackToCloudAttachment()
-      }
-      throw error
-    }
+    return (await response.json()) as UploadPostFileResponse
   }, [uploadWithConflictRetry])
 
   const handleMarkdownEditorFileUpload = useCallback(async (file: File): Promise<MarkdownFileUploadAttrs> => {
