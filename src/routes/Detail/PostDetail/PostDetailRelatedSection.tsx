@@ -1,5 +1,6 @@
 import { memo } from "react"
 import Link from "next/link"
+import { useLanguage } from "src/libs/language"
 import { formatDate } from "src/libs/utils"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import type { TPost } from "src/types"
@@ -47,14 +48,15 @@ const RelatedPostsSectionComponent = ({
   showRelatedAuthorSkeleton,
   relatedByAuthorPosts,
 }: RelatedPostsSectionProps) => {
+  const { t } = useLanguage()
   const relatedPosts = selectUniqueRelatedPosts(relatedByTagPosts, relatedByAuthorPosts, 2)
   const showSkeleton = relatedPosts.length === 0 && (showRelatedTagSkeleton || showRelatedAuthorSkeleton)
 
   if (!showSkeleton && relatedPosts.length === 0) return null
 
   return (
-    <RelatedSection aria-label="관련 글">
-      <h3>관련 글</h3>
+    <RelatedSection aria-label={t("postRelatedAria")}>
+      <h3>{t("postRelatedHeading")}</h3>
       <ul>
         {showSkeleton
           ? renderSkeletonItems("related")

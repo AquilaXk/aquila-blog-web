@@ -7,7 +7,11 @@ const TARGET_PATHS = [
   "src/routes/Company",
   "src/routes/EasySubway",
   "src/routes/Feed",
-  "src/routes/Settings",
+  "src/routes/Detail",
+  "src/routes/About",
+  "src/routes/Admin",
+  "src/components/markdown-editor",
+  "src/libs/markdown",
   "src/layouts/RootLayout",
 ]
 
@@ -20,7 +24,12 @@ const TARGET_PATHS = [
  * 주든 저장소 루트 기준이므로(`front/src/...`), 비교는 suffix로 한다 - 앱 기준 경로와 문자열
  * 일치만 보면 커밋된 diff에서 예외가 조용히 풀린다.
  */
-const COLOR_SOURCE_ALLOWLIST = ["src/design-system/marketingPalette.ts"]
+const COLOR_SOURCE_ALLOWLIST = [
+  "src/design-system/marketingPalette.ts",
+  "src/design-system/tokens.ts",
+  "src/styles/colors.ts",
+  "src/routes/Admin/adminColorTokens.ts",
+]
 
 export const isColorSourceFile = (file) =>
   COLOR_SOURCE_ALLOWLIST.some((allowed) => file === allowed || file.endsWith(`/${allowed}`))

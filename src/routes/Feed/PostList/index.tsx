@@ -4,6 +4,7 @@ import Link from "next/link"
 import PostCard from "src/routes/Feed/PostList/PostCard"
 import InitialLoadErrorState from "src/routes/Feed/PostList/InitialLoadErrorState"
 import AppIcon from "src/components/icons/AppIcon"
+import { skeletonShimmerCss } from "src/design-system/StatePresenters"
 import { TPost } from "src/types"
 import { useLanguage } from "src/libs/language"
 
@@ -526,8 +527,8 @@ const StyledWrapper = styled.div`
     &::after {
       content: "";
       display: block;
+      ${skeletonShimmerCss}
       background: ${({ theme }) => theme.colors.gray3};
-      animation: feed-card-skeleton-pulse 1.1s ease-in-out infinite;
     }
 
     &::before {
@@ -556,14 +557,5 @@ const StyledWrapper = styled.div`
     min-height: 11.5rem;
     border-radius: 0;
     background: transparent;
-  }
-
-  @keyframes feed-card-skeleton-pulse {
-    0% {
-      opacity: 0.45;
-    }
-    100% {
-      opacity: 0.8;
-    }
   }
 `

@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/router"
 import {
-  type SetStateAction, useDeferredValue, useCallback, useEffect, useMemo, useRef, useState, useTransition,
+  useDeferredValue, useCallback, useEffect, useMemo, useRef, useState, useTransition,
 } from "react"
 import { layoutBreakpoint } from "src/design-system/tokens"
 import useAuthSession from "src/hooks/useAuthSession"
@@ -37,14 +37,6 @@ import {
   toEditorPostRoute, uploadWithConflictRetry, type NoticeState, type PostForEditor,
   type CanonicalSummaryState, type SummaryIntent, type RsData,
 } from "./EditorStudioWorkspaceControllerRootModel"
-
-const MODAL_UI_PUBLISH_OPEN = 1
-const MODAL_UI_MOBILE_THUMB_OPEN = 1 << 1
-const MODAL_UI_MOBILE_META_OPEN = 1 << 2
-const applyBitFlag = (mask: number, bit: number, action: SetStateAction<boolean>) => {
-  const enabled = typeof action === "function" ? action((mask & bit) !== 0) : action
-  return enabled ? mask | bit : mask & ~bit
-}
 
 type MarkdownEditorFlush = () => string
 type MarkdownEditorChangeMeta = {
@@ -98,13 +90,9 @@ export const EditorStudioWorkspaceController = ({
     fingerprint: "",
     firstImage: "",
   })
-  const [modalUiMask, setModalUiMask] = useState(0)
-  const isPublishModalOpen = (modalUiMask & MODAL_UI_PUBLISH_OPEN) !== 0
-  const isMobileThumbnailEditorOpen = (modalUiMask & MODAL_UI_MOBILE_THUMB_OPEN) !== 0
-  const isMobileMetaEditorOpen = (modalUiMask & MODAL_UI_MOBILE_META_OPEN) !== 0
-  const setIsPublishModalOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_PUBLISH_OPEN, v)), [])
-  const setIsMobileThumbnailEditorOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_MOBILE_THUMB_OPEN, v)), [])
-  const setIsMobileMetaEditorOpen = useCallback((v: SetStateAction<boolean>) => setModalUiMask((m) => applyBitFlag(m, MODAL_UI_MOBILE_META_OPEN, v)), [])
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
+  const [isMobileThumbnailEditorOpen, setIsMobileThumbnailEditorOpen] = useState(false)
+  const [isMobileMetaEditorOpen, setIsMobileMetaEditorOpen] = useState(false)
   const [publishActionType, setPublishActionType] = useState<PublishActionType>("create")
   const [previewThumbnailSourceUrl, setPreviewThumbnailSourceUrl] = useState("")
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState("")

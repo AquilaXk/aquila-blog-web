@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { useLanguage } from "src/libs/language"
 import type { TocItem } from "./PostDetailTocModel"
 
 type PostDetailMobileTocProps = {
@@ -18,12 +19,13 @@ const PostDetailMobileToc = ({
   onToggleDetailed,
   onNavigate,
 }: PostDetailMobileTocProps) => {
+  const { t } = useLanguage()
   if (items.length === 0) return null
 
   return (
-    <details className="mobileToc" aria-label="접이식 목차">
-      <summary className="mobileTocSummary">목차</summary>
-      <nav aria-label="목차">
+    <details className="mobileToc" aria-label={t("postTocLabel")}>
+      <summary className="mobileTocSummary">{t("postTocLabel")}</summary>
+      <nav aria-label={t("postTocLabel")}>
         {hasDepth4Toc && onToggleDetailed ? (
           <div className="mobileTocHead">
             <button
@@ -32,7 +34,7 @@ const PostDetailMobileToc = ({
               aria-pressed={Boolean(showDetailedToc)}
               onClick={onToggleDetailed}
             >
-              {showDetailedToc ? "세부 목차 접기" : "세부 목차 보기"}
+              {showDetailedToc ? t("postTocHideDetailed") : t("postTocShowDetailed")}
             </button>
           </div>
         ) : null}

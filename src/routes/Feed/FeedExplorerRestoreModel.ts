@@ -21,6 +21,7 @@ export type FeedExplorerRestoreState = {
   scrollY: number
   loadedPages: number
   savedAt: number
+  sortMode?: "latest" | "views" | "likes"
 }
 
 export type FeedExplorerRestoreSnapshot = {
@@ -80,8 +81,13 @@ export type IdleCallbackDeadlineLike = {
   timeRemaining: () => number
 }
 
-export const getFeedExplorerRestoreKey = (tag: string, pageSize: number, order: "asc" | "desc") =>
-  `${FEED_EXPLORER_RESTORE_KEY_PREFIX}:tag=${encodeURIComponent(normalizeTagQuery(tag))}:size=${pageSize}:order=${order}`
+export const getFeedExplorerRestoreKey = (
+  tag: string,
+  pageSize: number,
+  order: "asc" | "desc",
+  sortMode: "latest" | "views" | "likes" = "latest"
+) =>
+  `${FEED_EXPLORER_RESTORE_KEY_PREFIX}:tag=${encodeURIComponent(normalizeTagQuery(tag))}:size=${pageSize}:order=${order}${sortMode === "latest" ? "" : `:sort=${sortMode}`}`
 
 export const getFeedExplorerSnapshotKey = (restoreKey: string) =>
   `${restoreKey}${FEED_EXPLORER_SNAPSHOT_SUFFIX}`
@@ -389,7 +395,7 @@ export const pruneFeedExplorerStateStorage = (storage: Storage) => {
 
 export const shouldRestoreFeedExplorerSession = (
   sortMode: "latest" | "views" | "likes"
-): boolean => sortMode === "latest"
+): boolean => sortMode === "latest" || sortMode === "views" || sortMode === "likes"
 
 export const toFeedExplorerInfiniteQueryKey = ({
   kw,
@@ -456,6 +462,10 @@ export const parseFeedExplorerRestoreState = (raw: string | null): FeedExplorerR
         : 1
     const savedAt =
       typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+    const sortMode =
+      parsed.sortMode === "latest" || parsed.sortMode === "views" || parsed.sortMode === "likes"
+        ? parsed.sortMode
+        : undefined
 
     if (savedAt <= 0) return null
     if (Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) return null
@@ -466,6 +476,7 @@ export const parseFeedExplorerRestoreState = (raw: string | null): FeedExplorerR
       scrollY,
       loadedPages,
       savedAt,
+      ...(sortMode ? { sortMode } : {}),
     }
   } catch {
     return null

@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { skeletonShimmerCss } from "src/design-system/StatePresenters"
 import {
   AdminInlineActionRow,
   AdminStatusPill,
@@ -66,7 +67,7 @@ export const ListSkeleton = styled.div`
   .headerRow,
   .row {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) 120px 96px 132px 72px 108px;
+    grid-template-columns: minmax(0, 1fr) 120px 96px 132px 72px 108px;
   }
 
   .headerRow {
@@ -103,6 +104,7 @@ export const ListSkeleton = styled.div`
     display: block;
     height: 12px;
     border-radius: 4px;
+    ${skeletonShimmerCss}
     background: ${({ theme }) => theme.colors.gray3};
   }
 
@@ -215,12 +217,6 @@ export const PostsDesktopTable = styled.table`
     color: ${({ theme }) => theme.colors.gray10};
   }
 
-  .selectCell {
-    width: 42px;
-    white-space: nowrap;
-    vertical-align: middle;
-  }
-
   .topicCell {
     width: 120px;
     vertical-align: middle;
@@ -247,14 +243,6 @@ export const PostsDesktopTable = styled.table`
     width: 108px;
     white-space: nowrap;
     vertical-align: middle;
-  }
-
-  .check {
-    display: inline-flex;
-    width: 16px;
-    height: 16px;
-    border: 1px solid ${({ theme }) => theme.colors.gray6};
-    border-radius: 4px;
   }
 
   tbody tr:last-of-type td {

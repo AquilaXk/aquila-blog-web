@@ -111,7 +111,7 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
   const canonicalUrl =
     props.canonicalUrl === undefined ? props.url : props.canonicalUrl
   const ogType = resolveOpenGraphType(props.type)
-  const resolvedImage = sanitizeMetadataImageUrl(props.image)
+  const resolvedImage = resolveMetadataImageUrl(props.image)
 
   return (
     <Head>

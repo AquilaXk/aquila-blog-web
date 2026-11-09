@@ -109,8 +109,8 @@ export const useFeedExplorerSessionRestore = ({
   })
 
   const restoreStorageKey = useMemo(
-    () => getFeedExplorerRestoreKey(currentTag || "", FEED_EXPLORE_PAGE_SIZE, FEED_EXPLORER_ORDER),
-    [currentTag]
+    () => getFeedExplorerRestoreKey(currentTag || "", FEED_EXPLORE_PAGE_SIZE, FEED_EXPLORER_ORDER, sortMode),
+    [currentTag, sortMode]
   )
   const restoreSnapshotStorageKey = useMemo(
     () => getFeedExplorerSnapshotKey(restoreStorageKey),
@@ -175,7 +175,7 @@ export const useFeedExplorerSessionRestore = ({
       tag: activeTag,
       pageSize: FEED_EXPLORE_PAGE_SIZE,
       order: FEED_EXPLORER_ORDER,
-      sortMode: "latest",
+      sortMode,
     })
 
     const existingPages = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(restoreQueryKey)?.pages
@@ -214,7 +214,7 @@ export const useFeedExplorerSessionRestore = ({
       tag: activeTag,
       pageSize: FEED_EXPLORE_PAGE_SIZE,
       order: FEED_EXPLORER_ORDER,
-      sortMode: "latest",
+      sortMode,
     })
 
     hasScheduledIdleRevalidateRef.current = true
@@ -236,7 +236,8 @@ export const useFeedExplorerSessionRestore = ({
     const restoreKey = getFeedExplorerRestoreKey(
       normalizedSnapshotTag,
       FEED_EXPLORE_PAGE_SIZE,
-      FEED_EXPLORER_ORDER
+      FEED_EXPLORER_ORDER,
+      sortMode
     )
     const snapshotKey = getFeedExplorerSnapshotKey(restoreKey)
     const state: FeedExplorerRestoreState = {
@@ -245,6 +246,7 @@ export const useFeedExplorerSessionRestore = ({
       scrollY: Math.max(0, Math.trunc(window.scrollY || 0)),
       loadedPages: Math.max(1, snapshot.loadedPagesCount),
       savedAt: Date.now(),
+      sortMode,
     }
     const persistFingerprint = toPersistFingerprint(state)
     if (lastPersistFingerprintRef.current === persistFingerprint) {
@@ -260,7 +262,7 @@ export const useFeedExplorerSessionRestore = ({
         tag: normalizedSnapshotTag,
         pageSize: FEED_EXPLORE_PAGE_SIZE,
         order: FEED_EXPLORER_ORDER,
-        sortMode: "latest",
+        sortMode,
       })
       const queryData = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(feedQueryKey)
       writeSnapshotPagesToSessionStorage(snapshotKey, state.savedAt, queryData)

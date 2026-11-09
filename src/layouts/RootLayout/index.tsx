@@ -64,7 +64,6 @@ const RootLayout = ({
   // 읽는 문서 구조가 무효화되고, 표면의 <header>/<footer>도 main 자손이 되어 banner/contentinfo
   // 역할을 잃는다. 이 라우트에서만 껍데기를 div로 내려 main을 하나로 유지한다.
   const LayoutShell = isStandaloneSurfaceRoute ? StandaloneShell : StyledMain
-  const isDesignAwareRoute = pathname[1] !== "_" && pathname !== "/sitemap.xml"
   const shouldLoadAdminProfile =
     !isStandaloneSurfaceRoute &&
     !isAdminLoginRoute &&

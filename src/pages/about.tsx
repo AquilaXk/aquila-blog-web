@@ -19,7 +19,7 @@ import { hasServerAuthCookie } from "src/libs/server/authSession"
 import { appendSsrDebugTiming, isSsrDebugEnabled, timed } from "src/libs/server/serverTiming"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { resolveRenderableProfileLinkHref } from "src/libs/utils/profileCardLinks"
-import { parseLanguagePreference, type SiteLanguage } from "src/libs/language"
+import { parseLanguagePreference, useLanguage, type SiteLanguage } from "src/libs/language"
 
 export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ req, res }) => {
   const ssrStartedAt = performance.now()
@@ -78,6 +78,7 @@ type AboutPageProps = {
 }
 
 const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, initialAdminProfileSource }) => {
+  const { t } = useLanguage()
   const shouldRefreshProfile = shouldRefetchAdminProfileSource(initialAdminProfileSource)
   const adminProfile = useAdminProfile(initialAdminProfile, {
     refetchOnMount: shouldRefreshProfile,
@@ -88,11 +89,11 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
     return (
       <ErrorState
         label="UNAVAILABLE"
-        title="프로필 정보를 불러올 수 없습니다"
-        description="잠시 후 다시 시도해주세요."
+        title={t("aboutUnavailableTitle")}
+        description={t("aboutUnavailableDesc")}
         actions={
           <button type="button" onClick={() => window.location.reload()}>
-            다시 시도
+            {t("aboutRetry")}
           </button>
         }
       />

@@ -412,7 +412,7 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
       <OpsGrid>
         <PanelCard>
           <PanelHeader>
-            <h2>Public read latency</h2>
+            <h2>Operational activity share</h2>
             <StatusChip data-tone={toOpsTone(props.overviewStatusLabel)}>
               LIVE
             </StatusChip>
@@ -443,21 +443,21 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
             {[
               {
                 key: "route",
-                title: "Caddy route",
+                title: "Caddy 라우트",
                 summary: `system ${props.systemHealthStatus}`,
                 tone: toOpsTone(props.systemHealthStatus),
                 value: props.systemHealthStatus,
               },
               {
                 key: "readiness",
-                title: "Readiness",
+                title: "DB 준비 상태",
                 summary: `db ${dbStatus}`,
                 tone: toOpsTone(dbStatus),
                 value: dbStatus === "UP" ? "PASS" : dbStatus,
               },
               {
                 key: "redis",
-                title: "Redis memory",
+                title: "Redis 연결",
                 summary: `redis ${redisStatus}`,
                 tone: toOpsTone(redisStatus),
                 value: redisStatus === "UP" ? "PASS" : redisStatus,
@@ -482,7 +482,7 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
         <PanelCard data-size="wide">
           <PanelHeader>
             <h2>Live logs</h2>
-            <span>Loki · production</span>
+            <span>Snapshot · live</span>
           </PanelHeader>
           <LogLines>
             {logRows.map((row) => (

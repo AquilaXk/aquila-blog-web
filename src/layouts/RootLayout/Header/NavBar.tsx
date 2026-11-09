@@ -9,6 +9,7 @@ import { waitForFeedSearchInputFocus } from "src/routes/Feed/feedSearchFocus"
 import { zIndexes } from "src/styles/zIndexes"
 import { useLanguage } from "src/libs/language"
 import {
+  focusTopicsRailElement,
   GlobeIcon,
   isTypingTarget,
   MenuIcon,
@@ -199,6 +200,7 @@ const NavBar = () => {
                 aria-current={isActive ? "page" : undefined}
                 data-ui="nav-control"
                 data-active={isActive ? "true" : "false"}
+                onClick={id === "topics" ? () => { setActiveHash("topics"); focusTopicsRailElement() } : undefined}
               >
                 {label}
               </Link>

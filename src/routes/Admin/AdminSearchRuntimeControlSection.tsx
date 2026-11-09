@@ -120,6 +120,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     pipeline: initialForm(),
     mirror: initialForm(),
   })
+  const [runtimeFlagsSummary, setRuntimeFlagsSummary] = useState<string>("")
   const [record, setRecord] =
     useState<SearchRuntimeControlSessionRecord | null>(null)
   const [display, setDisplay] =
@@ -131,6 +132,50 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
   const postInFlight = useRef(false)
   const statusInFlight = useRef(false)
   const restoredOperationId = useRef<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    void apiFetch<{
+      data?: {
+        pipelineForceControl?: boolean
+        mirrorForceDisabled?: boolean
+      }
+    }>("/system/api/v1/adm/search/runtime-flags", {
+      cache: "no-store",
+    })
+      .then((res) => {
+        if (!active || !res?.data) return
+        const { pipelineForceControl, mirrorForceDisabled } = res.data
+        setForms((current) => ({
+          pipeline: {
+            ...current.pipeline,
+            target:
+              typeof pipelineForceControl === "boolean"
+                ? pipelineForceControl
+                : current.pipeline.target,
+          },
+          mirror: {
+            ...current.mirror,
+            target:
+              typeof mirrorForceDisabled === "boolean"
+                ? mirrorForceDisabled
+                : current.mirror.target,
+          },
+        }))
+        if (
+          typeof pipelineForceControl === "boolean" ||
+          typeof mirrorForceDisabled === "boolean"
+        ) {
+          setRuntimeFlagsSummary(
+            `Current flags · pipeline=${String(pipelineForceControl ?? "unknown")}, mirrorDisabled=${String(mirrorForceDisabled ?? "unknown")}`
+          )
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   const consumeReceipt = useCallback(
     (
@@ -368,7 +413,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     >
       <SubSectionHeading>
         <strong>Search runtime controls</strong>
-        <small>Durable operations</small>
+        <small>{runtimeFlagsSummary || "Durable operations"}</small>
       </SubSectionHeading>
       {busy ? (
         <InlineNotice aria-live="polite">

@@ -2,15 +2,17 @@ import { useRouter } from "next/router"
 import { CONFIG } from "site.config"
 import MetaConfig from "src/components/MetaConfig"
 import { ErrorFallbackView } from "src/components/error/ErrorFallbackView"
+import { useLanguage } from "src/libs/language"
 
 const ServerErrorPage = () => {
   const router = useRouter()
+  const { t } = useLanguage()
 
   return (
     <>
       <MetaConfig
-        title="문제가 발생했습니다"
-        description="요청한 화면을 표시하지 못했습니다."
+        title={t("error500Title")}
+        description={t("error500Desc")}
         type="website"
         url={CONFIG.link}
         robots="noindex, follow"

@@ -19,7 +19,10 @@ import {
   resolveFeedSortTriggerKeyDown,
   toFeedApiSortParam,
 } from "../../src/routes/Feed/FeedSortMenuModel"
-import { shouldRestoreFeedExplorerSession } from "../../src/routes/Feed/FeedExplorerRestoreModel"
+import {
+  getFeedExplorerRestoreKey,
+  shouldRestoreFeedExplorerSession,
+} from "../../src/routes/Feed/FeedExplorerRestoreModel"
 
 test.describe("feed server sort params", () => {
   test("maps sortMode to HIT_COUNT/LIKES_COUNT API sort values", () => {
@@ -49,10 +52,14 @@ test.describe("feed server sort params", () => {
     expect(JSON.stringify(latestKey)).not.toBe(JSON.stringify(viewsKey))
   })
 
-  test("session restore scroll/prefetch is latest-only", () => {
+  test("session restore scroll/prefetch supports all sort modes with isolated keys", () => {
     expect(shouldRestoreFeedExplorerSession("latest")).toBe(true)
-    expect(shouldRestoreFeedExplorerSession("views")).toBe(false)
-    expect(shouldRestoreFeedExplorerSession("likes")).toBe(false)
+    expect(shouldRestoreFeedExplorerSession("views")).toBe(true)
+    expect(shouldRestoreFeedExplorerSession("likes")).toBe(true)
+    expect(getFeedExplorerRestoreKey("Kotlin", 24, "desc", "latest")).not.toBe(
+      getFeedExplorerRestoreKey("Kotlin", 24, "desc", "views")
+    )
+    expect(getFeedExplorerRestoreKey("Kotlin", 24, "desc", "views")).toContain(":sort=views")
   })
 
   test("ranked views/likes use shorter staleTime and remount/focus refetch", () => {

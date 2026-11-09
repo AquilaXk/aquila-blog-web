@@ -113,7 +113,7 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
           <OpsGrid>
             <PanelCard>
               <PanelHeader>
-                <h2>Public read latency</h2>
+                <h2>Operational activity share</h2>
                 {snapshotCollectionFailed ? (
                   <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
                 ) : (
@@ -172,7 +172,7 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
                 {snapshotCollectionFailed ? (
                   <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
                 ) : (
-                  <span>Loki · production</span>
+                  <span>Snapshot · live</span>
                 )}
               </PanelHeader>
               <LogLines>

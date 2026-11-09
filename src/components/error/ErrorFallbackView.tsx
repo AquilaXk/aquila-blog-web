@@ -2,6 +2,7 @@ import Link from "next/link"
 import styled from "@emotion/styled"
 import { ErrorState } from "src/design-system/StatePresenters"
 import { ThemeProvider } from "src/layouts/RootLayout/ThemeProvider"
+import { useLanguage } from "src/libs/language"
 
 type ErrorFallbackVariant = "global" | "surface"
 
@@ -37,7 +38,10 @@ export const ErrorFallbackView = ({
   requestId = null,
   onRetry,
 }: ErrorFallbackViewProps) => {
+  const { t } = useLanguage()
   const copy = copyByVariant[variant]
+  const title = variant === "global" ? t("error500Title") : copy.title
+  const description = variant === "global" ? t("error500Desc") : copy.description
   const meta = requestId ? `요청 ID: ${requestId}` : undefined
 
   const fallback = (
@@ -45,18 +49,18 @@ export const ErrorFallbackView = ({
       <ErrorState
         data-error-boundary={variant}
         label={copy.status}
-        title={copy.title}
-        description={copy.description}
+        title={title}
+        description={description}
         meta={meta}
         actions={
           <>
             {onRetry ? (
               <button type="button" onClick={onRetry}>
-                다시 시도
+                {t("error500Retry")}
               </button>
             ) : null}
             <Link href="/" data-tone="primary">
-              홈으로 이동
+              {t("error500Home")}
             </Link>
           </>
         }

@@ -83,7 +83,6 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
         <ListSkeleton>
           <div className="desktopRows">
             <div className="headerRow">
-              <span className="selectCell" />
               <span>Title</span>
               <span className="topicCell">Topic</span>
               <span className="statusCell">Status</span>
@@ -93,9 +92,6 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
             </div>
             {Array.from({ length: LIST_SKELETON_ROW_COUNT }, (_, index) => (
               <div className="row" key={`desktop-skeleton-${index}`}>
-                <div className="cell selectCell">
-                  <span className="line tiny" />
-                </div>
                 <div className="cell titleCell">
                   <span className="line wide" />
                   <span className="line short muted" />
@@ -185,7 +181,6 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
         <PostsDesktopTable>
           <thead>
             <tr>
-              <th className="selectCell"></th>
               <th>Title</th>
               <th className="topicCell">Topic</th>
               <th className="statusCell">Status</th>
@@ -197,9 +192,6 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
           <tbody onKeyDown={onListKeyDown}>
             {listState.rows.map((row) => (
               <tr key={row.id} {...rowProps}>
-                <td className="selectCell">
-                  <span className="check" aria-hidden="true" />
-                </td>
                 <td>
                   <TitleCell>
                     {isDeletedScope ? (

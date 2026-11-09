@@ -39,6 +39,7 @@ import {
 import type { PostVisibility } from "./editorStudioState"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { PUBLISH_VISIBILITY_OPTIONS } from "./EditorStudioWorkspaceControllerRootModel"
+import { EditorStudioCloudAssetPicker } from "./EditorStudioCloudAssetPicker"
 
 export {
   analyzeMarkdownLinks,
@@ -563,6 +564,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                 </button>
               </EditorInspectorTagInputRow>
             </section>
+            <EditorStudioCloudAssetPicker />
             {linkWarningCount > 0 ? (
               <p role="alert">링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 {linkWarningCount}개 있습니다. 주소를 완성해 주세요.</p>
             ) : null}

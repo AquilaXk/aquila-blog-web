@@ -20,6 +20,8 @@ export const ExplorerCard = styled.section`
 
   .feedTitle {
     min-width: 0;
+    display: grid;
+    gap: 4px;
   }
 
   .feedHeading,
@@ -30,6 +32,46 @@ export const ExplorerCard = styled.section`
     line-height: 1.25;
     letter-spacing: -0.03em;
     font-weight: 750;
+  }
+
+  .feedIntroMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--aq-text-secondary);
+  }
+
+  .feedIntroRole {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-subtle);
+    color: var(--aq-text);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .feedIntroCopy {
+    strong {
+      color: var(--aq-text);
+      font-weight: 700;
+    }
+  }
+
+  .feedIntroLink {
+    color: var(--aq-text);
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .searchSlot {

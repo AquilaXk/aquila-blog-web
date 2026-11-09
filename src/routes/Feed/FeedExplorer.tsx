@@ -7,10 +7,12 @@ import {
   useState,
   type KeyboardEvent,
 } from "react"
+import Link from "next/link"
 import SearchInput from "./SearchInput"
 import PinnedPosts from "./PostList/PinnedPosts"
 import PostList from "./PostList"
 import TagList from "./TagList"
+import type { AdminProfile } from "src/hooks/useAdminProfile"
 import useExplorePostsQuery from "src/hooks/useExplorePostsQuery"
 import { useDebouncedValue } from "src/hooks/useDebouncedValue"
 import { useRouter } from "next/router"
@@ -33,6 +35,7 @@ const LOAD_MORE_THROTTLE_MS = 800
 const LOAD_MORE_OBSERVER_THROTTLE_MS = 180
 
 type FeedExplorerProps = {
+  adminProfile?: AdminProfile | null
   initialBootstrapDegraded?: boolean
 }
 
@@ -61,7 +64,10 @@ const resolveFilterSummary = (
   return parts.join(" · ")
 }
 
-const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = false }) => {
+const FeedExplorer: React.FC<FeedExplorerProps> = ({
+  adminProfile,
+  initialBootstrapDegraded = false,
+}) => {
   const { t } = useLanguage()
   const [q, setQ] = useState("")
   const [sortMode, setSortMode] = useState<FeedSortMode>("latest")
@@ -73,6 +79,20 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
   const sortMenuRef = useRef<HTMLDivElement | null>(null)
   const sortTriggerRef = useRef<HTMLButtonElement | null>(null)
   const sortListboxRef = useRef<HTMLDivElement | null>(null)
+  const hasSyncedInitialQueryRef = useRef(false)
+
+  useEffect(() => {
+    if (!router.isReady || hasSyncedInitialQueryRef.current) return
+    hasSyncedInitialQueryRef.current = true
+    const queryQ = typeof router.query.q === "string" ? router.query.q.trim() : ""
+    const querySort = typeof router.query.sort === "string" ? router.query.sort.trim() : ""
+    if (queryQ) {
+      setQ(queryQ)
+    }
+    if (querySort === "latest" || querySort === "views" || querySort === "likes") {
+      setSortMode(querySort)
+    }
+  }, [router.isReady, router.query.q, router.query.sort])
 
   const currentTag = normalizeOptionalTagQuery(
     typeof router.query.tag === "string" ? router.query.tag : undefined
@@ -280,6 +300,11 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
     sortActiveIndex >= 0 && sortActiveIndex < FEED_SORT_OPTIONS.length
       ? feedSortOptionId(FEED_SORT_OPTIONS[sortActiveIndex].value)
       : undefined
+  const introRole = adminProfile?.profileRole?.trim() || ""
+  const introHeadline = adminProfile?.homeIntroTitle?.trim() || ""
+  const introDescription =
+    adminProfile?.homeIntroDescription?.trim() || adminProfile?.profileBio?.trim() || ""
+  const hasEditorialIntro = Boolean(introRole || introHeadline || introDescription)
 
   return (
     <>
@@ -292,6 +317,21 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({ initialBootstrapDegraded = 
           <ExplorerCard>
             <div className="feedTitle">
               <h1 className="feedHeading">{t("recentPosts")}</h1>
+              {hasEditorialIntro ? (
+                <div className="feedIntroMeta">
+                  {introRole ? <span className="feedIntroRole">{introRole}</span> : null}
+                  {introHeadline || introDescription ? (
+                    <span className="feedIntroCopy">
+                      {introHeadline ? <strong>{introHeadline}</strong> : null}
+                      {introHeadline && introDescription ? " · " : null}
+                      {introDescription ? <span>{introDescription}</span> : null}
+                    </span>
+                  ) : null}
+                  <Link href="/about" className="feedIntroLink">
+                    {t("navAbout")} →
+                  </Link>
+                </div>
+              ) : null}
             </div>
             <div className="searchSlot">
               <SearchInput

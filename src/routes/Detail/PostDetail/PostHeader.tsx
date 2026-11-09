@@ -12,6 +12,7 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
+import { useLanguage } from "src/libs/language"
 import { PostDetail } from "src/types"
 import { StyledWrapper } from "./PostHeader.styles"
 
@@ -184,7 +185,24 @@ export const PostHeaderEngagementSection: React.FC<{
   shareFeedback,
   shareFeedbackMessage,
 }) => {
+  const { t, language } = useLanguage()
   const hasReadingTime = Boolean(showReadingTime && readingMinutes && readingMinutes > 0)
+  const readingMinutesValue = Math.max(1, readingMinutes ?? 1)
+  const readingTimeCopy =
+    language === "en"
+      ? `${readingMinutesValue}${t("postReadingMinutes")}`
+      : `약 ${readingMinutesValue}${t("postReadingMinutes")}`
+  const likeLabel = liked ? t("postUnlikeAction") : t("postLikeAction")
+  const likeAriaLabel =
+    language === "en"
+      ? `${likeLabel} (${resolvedLikesCount})`
+      : `${likeLabel} (현재 ${resolvedLikesCount}개)`
+  const localizedShareFeedback =
+    shareFeedback === "failed"
+      ? t("postShareFailed")
+      : shareFeedback === "shared"
+        ? t("postShareShared")
+        : shareFeedbackMessage || t("postShareCopied")
   return (
     <div className="metaUtilities">
       <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
@@ -194,7 +212,7 @@ export const PostHeaderEngagementSection: React.FC<{
             <span className="statChip">{viewText}</span>
             {hasReadingTime ? (
               <span className="statChip metaReadingTime">
-                {`약 ${Math.max(1, readingMinutes ?? 1)}분 읽기`}
+                {readingTimeCopy}
               </span>
             ) : null}
             {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
@@ -204,23 +222,23 @@ export const PostHeaderEngagementSection: React.FC<{
             className="likeButton"
             aria-pressed={liked}
             data-active={liked}
-            aria-label={`${liked ? "좋아요 취소" : "좋아요"} (현재 ${resolvedLikesCount}개)`}
+            aria-label={likeAriaLabel}
             disabled={likePending || !onToggleLike}
             onClick={onToggleLike}
           >
             <AppIcon name={liked ? "heart-filled" : "heart"} />
-            <span>좋아요 {resolvedLikesCount}</span>
+            <span>{`${t("postLikeAction")} ${resolvedLikesCount}`}</span>
           </button>
           {onSharePost ? (
             <button
               type="button"
               className="shareButton"
               data-hide-desktop={hideShareActionOnDesktop}
-              aria-label="게시글 공유"
+              aria-label={t("postShareAria")}
               onClick={onSharePost}
             >
               <AppIcon name="share" />
-              <span>공유</span>
+              <span>{t("postShareAction")}</span>
             </button>
           ) : null}
         </div>
@@ -231,7 +249,7 @@ export const PostHeaderEngagementSection: React.FC<{
             role="status"
             aria-live="polite"
           >
-            {shareFeedbackMessage}
+            {localizedShareFeedback}
           </span>
         ) : null}
       </div>
@@ -240,6 +258,7 @@ export const PostHeaderEngagementSection: React.FC<{
 }
 
 const PostHeader: React.FC<Props> = (props) => {
+  const { t } = useLanguage()
   const {
     data,
     liked = false,
@@ -260,7 +279,7 @@ const PostHeader: React.FC<Props> = (props) => {
     <StyledWrapper>
       <Link href="/" className="backLink">
         <span aria-hidden="true">←</span>
-        <span>모든 글</span>
+        <span>{t("postAllPosts")}</span>
       </Link>
       {vm.heroLabels.length > 0 ? (
         <div className="heroLabel">

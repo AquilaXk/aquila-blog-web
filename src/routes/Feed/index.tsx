@@ -1,6 +1,6 @@
 import Footer from "./Footer"
 import styled from "@emotion/styled"
-import type { AdminProfile } from "src/hooks/useAdminProfile"
+import { useAdminProfile, type AdminProfile } from "src/hooks/useAdminProfile"
 import FeedExplorer from "./FeedExplorer"
 
 type Props = {
@@ -8,11 +8,15 @@ type Props = {
   initialHomeBootstrapStatus?: "ready" | "degraded" | "shell"
 }
 
-const Feed: React.FC<Props> = ({ initialHomeBootstrapStatus = "ready" }) => {
+const Feed: React.FC<Props> = ({ initialAdminProfile, initialHomeBootstrapStatus = "ready" }) => {
+  const adminProfile = useAdminProfile(initialAdminProfile)
   return (
     <StyledWrapper data-ui="feed-home-product-shell">
       <div className="mid">
-        <FeedExplorer initialBootstrapDegraded={initialHomeBootstrapStatus === "degraded"} />
+        <FeedExplorer
+          adminProfile={adminProfile}
+          initialBootstrapDegraded={initialHomeBootstrapStatus === "degraded"}
+        />
         <div className="footer">
           <Footer />
         </div>

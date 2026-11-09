@@ -84,3 +84,24 @@ export const waitForFeedSearchRoute = (router: NextRouter) =>
       settle(() => reject(error instanceof Error ? error : new Error(String(error))))
     })
   })
+
+let clearTopicsHighlightTimer: ReturnType<typeof setTimeout> | null = null
+
+export const focusTopicsRailElement = () => {
+  if (typeof document === "undefined") return
+  const topicsRoot = document.getElementById("topics")
+  if (!topicsRoot) return
+
+  topicsRoot.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  topicsRoot.setAttribute("data-topics-highlighted", "true")
+  if (clearTopicsHighlightTimer) {
+    clearTimeout(clearTopicsHighlightTimer)
+  }
+  clearTopicsHighlightTimer = setTimeout(() => {
+    topicsRoot.removeAttribute("data-topics-highlighted")
+    clearTopicsHighlightTimer = null
+  }, 1400)
+
+  const firstButton = topicsRoot.querySelector<HTMLButtonElement>("button")
+  firstButton?.focus({ preventScroll: true })
+}

@@ -164,36 +164,36 @@ const SlashMenuItemButton = styled.button<{ $active: boolean }>`
   .icon[data-tone="heading"],
   .icon[data-tone="callout-info"],
   .icon[data-tone="table"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.2)" : "#e9f3f7")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#14569b")};
-    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.34)" : "rgba(20, 86, 155, 0.16)")};
+    background: ${({ theme }) => theme.colors.blue3};
+    color: ${({ theme }) => theme.colors.blue11};
+    border-color: ${({ theme }) => theme.colors.blue7};
   }
 
   .icon[data-tone="list"],
   .icon[data-tone="code"],
   .icon[data-tone="math"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.2)" : "#f6f3f9")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
-    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.34)" : "rgba(91, 54, 120, 0.16)")};
+    background: ${({ theme }) => theme.colors.indigo3};
+    color: ${({ theme }) => theme.colors.indigo11};
+    border-color: ${({ theme }) => theme.colors.indigo7};
   }
 
   .icon[data-tone="callout-tip"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#edf3ec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
-    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.32)" : "rgba(37, 92, 62, 0.16)")};
+    background: ${({ theme }) => theme.colors.green3};
+    color: ${({ theme }) => theme.colors.green11};
+    border-color: ${({ theme }) => theme.colors.green7};
   }
 
   .icon[data-tone="callout-warning"],
   .icon[data-tone="media"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.2)" : "#fbf3db")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fcd34d" : "#78490a")};
-    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.32)" : "rgba(120, 73, 10, 0.16)")};
+    background: ${({ theme }) => theme.colors.orange3};
+    color: ${({ theme }) => theme.colors.orange11};
+    border-color: ${({ theme }) => theme.colors.orange7};
   }
 
   .icon[data-tone="callout-danger"] {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(239, 68, 68, 0.2)" : "#fdebec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fca5a5" : "#9c2520")};
-    border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(239, 68, 68, 0.32)" : "rgba(156, 37, 32, 0.16)")};
+    background: ${({ theme }) => theme.colors.red3};
+    color: ${({ theme }) => theme.colors.red11};
+    border-color: ${({ theme }) => theme.colors.red7};
   }
 
   .icon.icon-emoji {

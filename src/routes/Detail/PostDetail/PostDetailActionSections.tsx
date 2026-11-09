@@ -1,5 +1,6 @@
 import { memo, type Ref, type RefObject } from "react"
 import AppIcon from "src/components/icons/AppIcon"
+import { useLanguage } from "src/libs/language"
 import { MobileSummaryBar } from "./PostDetail.styles"
 import type { TocItem } from "./PostDetailTocModel"
 
@@ -52,7 +53,20 @@ export const FloatingActionRail = memo(function FloatingActionRail({
   shareFeedback,
   onSharePost,
 }: FloatingActionRailProps) {
-  const likeLabel = liked ? "좋아요 취소" : "좋아요"
+  const { t, language } = useLanguage()
+  const likeLabel = liked ? t("postUnlikeAction") : t("postLikeAction")
+  const likeAriaLabel =
+    language === "en"
+      ? `${likeLabel} (${likesCount})`
+      : `${likeLabel} (현재 ${likesCount}개)`
+  const shareFeedbackText =
+    shareFeedback === "failed"
+      ? t("postShareFailed")
+      : shareFeedback === "shared"
+        ? t("postShareShared")
+        : shareFeedback === "copied"
+          ? t("postShareCopied")
+          : ""
   return (
     <aside ref={railRef as Ref<HTMLElement>} className="leftRail" data-hybrid-active={active} aria-hidden={!showFloatingLike}>
       {showFloatingLike ? (
@@ -66,21 +80,21 @@ export const FloatingActionRail = memo(function FloatingActionRail({
                 data-active={liked}
                 title={likeLabel}
                 data-tooltip={likeLabel}
-                aria-label={`${likeLabel} (현재 ${likesCount}개)`}
+                aria-label={likeAriaLabel}
                 disabled={likePending || !onToggleLike}
                 onClick={onToggleLike}
               >
                 <AppIcon name={liked ? "heart-filled" : "heart"} />
               </button>
-              <span className="floatingLikeCount">좋아요 {likesCount}</span>
+              <span className="floatingLikeCount">{`${t("postLikeAction")} ${likesCount}`}</span>
             </div>
             <div className="floatingShareStat">
               <button
                 type="button"
                 className="floatingActionButton floatingShareButton"
-                title="공유"
-                data-tooltip="공유"
-                aria-label="게시글 공유"
+                title={t("postShareAction")}
+                data-tooltip={t("postShareAction")}
+                aria-label={t("postShareAria")}
                 onClick={onSharePost}
               >
                 <AppIcon name="share" />
@@ -88,7 +102,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
             </div>
             {shareFeedback ? (
               <span className="floatingShareFeedback" role="status" aria-live="polite">
-                {resolveFloatingShareFeedbackLabel(shareFeedback)}
+                {shareFeedbackText || resolveFloatingShareFeedbackLabel(shareFeedback)}
               </span>
             ) : null}
           </div>
@@ -115,6 +129,20 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
   shareFeedback,
   onSharePost,
 }: MobileSummaryActionsProps) {
+  const { t, language } = useLanguage()
+  const likeLabel = liked ? t("postUnlikeAction") : t("postLikeAction")
+  const likeAriaLabel =
+    language === "en"
+      ? `${likeLabel} (${likesCount})`
+      : `${likeLabel} (현재 ${likesCount}개)`
+  const shareButtonText =
+    shareFeedback === "copied"
+      ? t("postShareCopied")
+      : shareFeedback === "shared"
+        ? t("postShareShared")
+        : shareFeedback === "failed"
+          ? t("postShareFailed")
+          : t("postShareAction")
   return (
     <MobileSummaryBar aria-label="빠른 이동 및 반응">
       <button
@@ -123,12 +151,12 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         aria-pressed={liked}
         data-active={liked}
         data-feedback="true"
-        aria-label={`${liked ? "좋아요 취소" : "좋아요"} (현재 ${likesCount}개)`}
+        aria-label={likeAriaLabel}
         disabled={likePending || !onToggleLike}
         onClick={onToggleLike}
       >
         <AppIcon name={liked ? "heart-filled" : "heart"} />
-        <span>{`좋아요 ${likesCount}`}</span>
+        <span>{`${t("postLikeAction")} ${likesCount}`}</span>
       </button>
       <button
         type="button"
@@ -136,11 +164,11 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         data-feedback={Boolean(shareFeedback)}
         data-tone="accent"
         aria-live="polite"
-        aria-label={resolveMobileShareAriaLabel(shareFeedback)}
+        aria-label={shareFeedback ? shareButtonText : resolveMobileShareAriaLabel(shareFeedback)}
         onClick={onSharePost}
       >
         <AppIcon name="share" />
-        <span>{resolveMobileShareButtonLabel(shareFeedback)}</span>
+        <span>{shareButtonText || resolveMobileShareButtonLabel(shareFeedback)}</span>
       </button>
     </MobileSummaryBar>
   )
@@ -173,13 +201,14 @@ export const RightTocRail = memo(function RightTocRail({
   onToggleDetailed,
   onNavigate,
 }: RightTocRailProps) {
+  const { t } = useLanguage()
   return (
     <aside ref={railRef as Ref<HTMLElement>} className="rightRail" data-hybrid-active={active} aria-hidden={!showStickyToc}>
       {showStickyToc ? (
-        <nav ref={innerRef as Ref<HTMLElement>} className="rightRailInner" aria-label="목차">
+        <nav ref={innerRef as Ref<HTMLElement>} className="rightRailInner" aria-label={t("postTocLabel")}>
           <div className="rightRailHead">
             <div className="rightRailTitleGroup">
-              <h2 className="rightRailTitle">목차</h2>
+              <h2 className="rightRailTitle">{t("postTocLabel")}</h2>
             </div>
             {hasDepth4Toc && (
               <button
@@ -188,7 +217,7 @@ export const RightTocRail = memo(function RightTocRail({
                 onClick={onToggleDetailed}
                 aria-pressed={showDetailedToc}
               >
-                {showDetailedToc ? "세부 목차 접기" : "세부 목차 보기"}
+                {showDetailedToc ? t("postTocHideDetailed") : t("postTocShowDetailed")}
               </button>
             )}
           </div>

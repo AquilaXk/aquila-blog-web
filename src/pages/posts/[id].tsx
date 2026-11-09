@@ -10,7 +10,7 @@ import {
 } from "src/libs/server/postDetailPage"
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { buildPostDetailMetadata } from "src/routes/Detail/PostDetail/postDetailMetadataModel"
-import { ErrorState } from "src/design-system/StatePresenters"
+import { ErrorState, skeletonShimmerCss } from "src/design-system/StatePresenters"
 import { resolvePostDetailRenderState } from "src/routes/Detail/postDetailRenderState"
 
 export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ params, res, req }) => {
@@ -115,8 +115,8 @@ const LoadingShell = styled.section`
   .cover,
   .line {
     border-radius: 2px;
+    ${skeletonShimmerCss}
     background: ${({ theme }) => theme.colors.gray3};
-    animation: detail-skeleton-pulse 1.2s ease-in-out infinite;
   }
 
   .hero {

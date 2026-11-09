@@ -26,7 +26,14 @@ const skeletonPulse = `
   }
 `
 
-const SkeletonBlock = styled.div`
+export const skeletonShimmerCss = `
+  background: var(--aq-surface-subtle);
+  animation: aq-skeleton-pulse ${duration.skeleton}ms ${easing.standard} infinite;
+  ${skeletonPulse}
+  ${respectReducedMotion}
+`
+
+export const SkeletonBlock = styled.div`
   border-radius: 6px;
   background: ${({ theme }) => theme.colors.gray3};
   animation: aq-skeleton-pulse ${duration.skeleton}ms ${easing.standard} infinite;

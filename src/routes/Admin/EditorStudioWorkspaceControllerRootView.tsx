@@ -30,23 +30,107 @@ import { buildEditorStateFingerprint, detectPublishPlaceholderIssue, type LocalD
 import { isLocalDraftRestoreSuggestionEligible, type LocalDraftFingerprintSnapshot } from "./useEditorStudioDraftLifecycleModel"
 import { MARKDOWN_EDITOR_MERMAID_ENABLED, PUBLISH_VISIBILITY_OPTIONS, recordEditorCommitDurationForRuntimeGuard, type SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 
-type EditorStudioWorkspaceControllerRootViewBag = {
+export type EditorStudioDocumentSlice = {
   addTagsToPost: (tags: string[]) => void
   addTagToPost: (tag: string) => void
-  applyFirstBodyImageToThumbnail: () => void
-  clearLocalDraft: () => void
-  discardLocalDraftCandidate: () => void
-  closePublishModal: () => void
-  commitPreviewThumbTransform: (next: { focusX: number; focusY: number; zoom: number }) => void
+  commitPostCategory: () => void
   customCategoryCatalog: string[]
   customTagCatalog: string[]
   deferredContentDerived: { firstImage: string }
-  dismissedLocalDraft: LocalDraftFingerprintSnapshot[]
-  dismissLocalDraftRestoreSuggestion: () => void
   disabled: (key: string) => boolean
   editorMode: "create" | "edit"
-  finalizePreviewThumbPointer: PointerEventHandler<HTMLDivElement>
+  getCurrentPostContent: () => string
+  handleExitDedicatedEditor: () => void
+  handleFlushMarkdownReady: (flushFn: (() => string) | null) => void
+  handleFocusTitle: () => void
   handleMarkdownEditorChange: (next: string, meta?: { editorFocused: boolean }) => void
+  handlePostCategoryChange: (value: string) => void
+  handlePostSummaryChange: (value: string) => void
+  handleReloadLatestServerPost: () => Promise<void>
+  handleTitleChange: ChangeEventHandler<HTMLTextAreaElement>
+  handleTitleFieldRef: (node: HTMLTextAreaElement | null) => void
+  handleTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
+  isCompactMobileLayout: boolean
+  isDedicatedEditorRoute: boolean
+  isDedicatedNewEditorRoute: boolean
+  isMobileMetaEditorOpen: boolean
+  isNewEditorBootstrapPending: boolean
+  isTempDraftMode: boolean
+  lastSaveError: { errorType: string } | null
+  loadingKey: string
+  postCategory: string
+  postContent: string
+  postId: string
+  postSummary: string
+  postSummarySource: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE"
+  postTags: string[]
+  postTitle: string
+  postVisibility: PostVisibility
+  removeTagFromPost: (tag: string) => void
+  result: string
+  serverBaselineEditorFingerprintRef: { current: string }
+  sessionMember: unknown
+  setIsMobileMetaEditorOpen: (updater: (current: boolean) => boolean) => void
+  setPostVisibility: (nextVisibility: PostVisibility) => void
+  setTagDraft: (value: string) => void
+  summaryIntent: SummaryIntent
+  tagDraft: string
+}
+
+export type EditorStudioDraftLifecycleSlice = {
+  clearLocalDraft: () => void
+  discardLocalDraftCandidate: () => void
+  dismissedLocalDraft: LocalDraftFingerprintSnapshot[]
+  dismissLocalDraftRestoreSuggestion: () => void
+  lastLocalDraftFingerprintRef: { current: string }
+  localDraftCandidate: LocalDraftFingerprintSnapshot | null
+  localDraftCandidates: LocalDraftFingerprintSnapshot[]
+  localDraftSavedAt: string
+  localDraftSource: LocalDraftSource
+  restoreLocalDraft: () => void
+  restoredLocalDraft: LocalDraftFingerprintSnapshot[]
+  saveLocalDraft: (options?: { silent?: boolean }) => void
+  selectLocalDraftCandidate: (key: string) => void
+}
+
+export type EditorStudioThumbnailSlice = {
+  applyFirstBodyImageToThumbnail: () => void
+  commitPreviewThumbTransform: (next: { focusX: number; focusY: number; zoom: number }) => void
+  finalizePreviewThumbPointer: PointerEventHandler<HTMLDivElement>
+  handlePreviewThumbPointerDown: PointerEventHandler<HTMLDivElement>
+  handlePreviewThumbPointerMove: PointerEventHandler<HTMLDivElement>
+  handleThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
+  handleThumbnailPaste: ClipboardEventHandler<HTMLElement>
+  handleThumbnailUrlModalChange: (value: string) => void
+  isMobileThumbnailEditorOpen: boolean
+  isPreviewThumbDragging: boolean
+  isPreviewThumbnailError: boolean
+  openThumbnailFileInput: () => void
+  postThumbnailFocusX: number
+  postThumbnailFocusY: number
+  postThumbnailUrl: string
+  postThumbnailZoom: number
+  previewThumbFrameRef: RefObject<HTMLDivElement | null>
+  previewThumbTransformRef: { current: { focusX: number; focusY: number; zoom: number } }
+  resetThumbnailToAutoMode: () => void
+  safePreviewThumbnail: string
+  setIsMobileThumbnailEditorOpen: (updater: (current: boolean) => boolean) => void
+  setIsPreviewThumbnailError: (value: boolean) => void
+  thumbnailImageFileInputRef: RefObject<HTMLInputElement | null>
+  thumbnailImageFileName: string
+}
+
+export type EditorStudioPublishModalSlice = {
+  closePublishModal: () => void
+  handleConfirmPublish: () => Promise<void>
+  isPublishModalOpen: boolean
+  openPublishModal: (type: PublishActionType) => void
+  publishActionType: PublishActionType
+  publishModalNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
+  publishNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
+}
+
+export type EditorStudioUploadHandlersSlice = {
   handleMarkdownEditorFileUpload: (file: File) => Promise<{
     url?: string
     name?: string
@@ -55,79 +139,14 @@ type EditorStudioWorkspaceControllerRootViewBag = {
     description?: string
   }>
   handleMarkdownEditorImageUpload: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>
-  handleConfirmPublish: () => Promise<void>
-  handleExitDedicatedEditor: () => void
-  handleFlushMarkdownReady: (flushFn: (() => string) | null) => void
-  commitPostCategory: () => void
-  handlePostCategoryChange: (value: string) => void
-  handlePostSummaryChange: (value: string) => void
-  handlePreviewThumbPointerDown: PointerEventHandler<HTMLDivElement>
-  handlePreviewThumbPointerMove: PointerEventHandler<HTMLDivElement>
-  handleReloadLatestServerPost: () => Promise<void>
-  handleThumbnailImageFileChange: ChangeEventHandler<HTMLInputElement>
-  handleThumbnailPaste: ClipboardEventHandler<HTMLElement>
-  handleThumbnailUrlModalChange: (value: string) => void
-  handleTitleChange: ChangeEventHandler<HTMLTextAreaElement>
-  handleTitleFieldRef: (node: HTMLTextAreaElement | null) => void
-  handleTitleKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
-  handleFocusTitle: () => void
-  isCompactMobileLayout: boolean
-  isDedicatedEditorRoute: boolean
-  isDedicatedNewEditorRoute: boolean
-  isMobileMetaEditorOpen: boolean
-  isMobileThumbnailEditorOpen: boolean
-  isNewEditorBootstrapPending: boolean
-  isPreviewThumbDragging: boolean
-  isPreviewThumbnailError: boolean
-  isPublishModalOpen: boolean
-  isTempDraftMode: boolean
-  getCurrentPostContent: () => string
-  lastLocalDraftFingerprintRef: { current: string }
-  lastSaveError: { errorType: string } | null
-  loadingKey: string
-  localDraftCandidate: LocalDraftFingerprintSnapshot | null
-  localDraftCandidates: LocalDraftFingerprintSnapshot[]
-  localDraftSavedAt: string
-  localDraftSource: LocalDraftSource
-  openPublishModal: (type: PublishActionType) => void
-  openThumbnailFileInput: () => void
-  postCategory: string
-  postContent: string
-  postId: string
-  postSummary: string
-  postSummarySource: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE"
-  summaryIntent: SummaryIntent
-  postTags: string[]
-  postThumbnailFocusX: number
-  postThumbnailFocusY: number
-  postThumbnailUrl: string
-  postThumbnailZoom: number
-  postTitle: string
-  postVisibility: PostVisibility
-  publishActionType: PublishActionType
-  publishModalNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
-  publishNotice: { tone: "idle" | "loading" | "success" | "error"; text: string }
-  previewThumbFrameRef: RefObject<HTMLDivElement | null>
-  previewThumbTransformRef: { current: { focusX: number; focusY: number; zoom: number } }
-  resetThumbnailToAutoMode: () => void
-  removeTagFromPost: (tag: string) => void
-  restoreLocalDraft: () => void
-  saveLocalDraft: (options?: { silent?: boolean }) => void
-  selectLocalDraftCandidate: (key: string) => void
-  restoredLocalDraft: LocalDraftFingerprintSnapshot[]
-  result: string
-  safePreviewThumbnail: string
-  serverBaselineEditorFingerprintRef: { current: string }
-  sessionMember: unknown
-  setIsMobileMetaEditorOpen: (updater: (current: boolean) => boolean) => void
-  setIsMobileThumbnailEditorOpen: (updater: (current: boolean) => boolean) => void
-  setIsPreviewThumbnailError: (value: boolean) => void
-  setPostVisibility: (nextVisibility: PostVisibility) => void
-  setTagDraft: (value: string) => void
-  tagDraft: string
-  thumbnailImageFileInputRef: RefObject<HTMLInputElement | null>
-  thumbnailImageFileName: string
 }
+
+export type EditorStudioWorkspaceControllerRootViewBag =
+  & EditorStudioDocumentSlice
+  & EditorStudioDraftLifecycleSlice
+  & EditorStudioThumbnailSlice
+  & EditorStudioPublishModalSlice
+  & EditorStudioUploadHandlersSlice
 
 type EditorStudioWorkspaceControllerRootViewProps = {
   props: EditorStudioWorkspaceControllerRootViewBag

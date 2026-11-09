@@ -494,11 +494,11 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       image: "/easysubway/og-image.png#focusX=50&focusY=50",
     })
     expect(multiHostSurfaceHeadHtml).toContain('<meta property="og:type" content="article"/>')
-    expect(multiHostSurfaceHeadHtml).toContain(
-      '<meta property="og:image" content="/easysubway/og-image.png"/>'
+    expect(multiHostSurfaceHeadHtml).toMatch(
+      /<meta property="og:image" content="https?:\/\/[^"#]+\/easysubway\/og-image\.png"\/>/
     )
-    expect(multiHostSurfaceHeadHtml).toContain(
-      '<meta name="twitter:image" content="/easysubway/og-image.png"/>'
+    expect(multiHostSurfaceHeadHtml).toMatch(
+      /<meta name="twitter:image" content="https?:\/\/[^"#]+\/easysubway\/og-image\.png"\/>/
     )
 
     const renderActions = (shareFeedback: "copied" | "shared" | "failed" | null) =>

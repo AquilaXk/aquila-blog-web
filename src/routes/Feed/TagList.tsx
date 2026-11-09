@@ -211,6 +211,8 @@ export default memo(TagList)
 const StyledWrapper = styled.div`
   min-width: 0;
   scroll-margin-top: calc(var(--app-header-height, 65px) + 12px);
+  border-radius: 6px;
+  transition: outline-color 180ms ease, background-color 180ms ease;
   --feed-tag-border: var(--aq-border);
   --feed-tag-border-strong: var(--aq-border-strong);
   --feed-tag-hover-border: var(--aq-subtle);
@@ -219,6 +221,12 @@ const StyledWrapper = styled.div`
   --feed-tag-accent: var(--aq-accent);
   --feed-tag-accent-text: var(--aq-text);
   --feed-tag-accent-muted: var(--aq-surface-subtle);
+
+  &[data-topics-highlighted="true"] {
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 4px;
+    background: var(--aq-surface-subtle);
+  }
 
   .desktopPanel {
     display: none;
