@@ -1,4 +1,5 @@
 import {
+  isWrapSelectionActive,
   planHardBreak,
   planIndentLines,
   planInsertMarkdownLink,
@@ -14,7 +15,12 @@ import {
   planMarkdownEditorTableTab,
 } from "./markdownEditorTableModel"
 
-export { planMarkdownEditorTableCellNavigation, planMarkdownEditorTableEnter }
+export {
+  isWrapSelectionActive,
+  planMarkdownEditorTableCellNavigation,
+  planMarkdownEditorTableEnter,
+  planToggleWrapSelection,
+}
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import { matchListMarkerLine } from "./markdownEditorListCommandsModel"
 import { resolveMarkdownEditorCommandShortcut } from "./markdownEditorCommandRegistryModel"

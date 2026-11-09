@@ -33,6 +33,11 @@ export const requestMarkdownEditorFocus = (selection?: { from: number; to: numbe
   markdownEditorFocusRequestRef.current?.(selection)
 }
 
+export const requestMarkdownEditorInsertSnippet = (
+  insertSnippet: string,
+  fallbackSelection?: { from: number; to: number }
+): boolean => Boolean(markdownEditorFocusRequestRef.current?.({ insertSnippet, fallbackSelection }))
+
 type UseEditorStudioWorkspaceControllerRuntimeArgs = {
   isPublishModalOpen: boolean
   loadingKey: string

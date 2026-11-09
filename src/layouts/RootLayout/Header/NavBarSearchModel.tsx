@@ -87,21 +87,40 @@ export const waitForFeedSearchRoute = (router: NextRouter) =>
 
 let clearTopicsHighlightTimer: ReturnType<typeof setTimeout> | null = null
 
-export const focusTopicsRailElement = () => {
-  if (typeof document === "undefined") return
-  const topicsRoot = document.getElementById("topics")
-  if (!topicsRoot) return
+const MOBILE_TOPICS_SELECTOR =
+  '[data-topics-mobile="true"], .mobileTags, [data-ui="feed-tag-chip-rail"]'
 
-  topicsRoot.scrollIntoView({ behavior: "smooth", block: "nearest" })
-  topicsRoot.setAttribute("data-topics-highlighted", "true")
+const isElementVisible = (el: HTMLElement | null): el is HTMLElement =>
+  Boolean(el && el.offsetParent !== null)
+
+export const focusTopicsRailElement = (): boolean => {
+  if (typeof document === "undefined") return false
+  const topicsRoot = document.getElementById("topics")
+  const desktopPanel = topicsRoot?.querySelector?.<HTMLElement>(".desktopPanel") ?? null
+  const isDesktopVisible =
+    isElementVisible(topicsRoot) && (!desktopPanel || isElementVisible(desktopPanel))
+  const mobileRail =
+    topicsRoot?.querySelector?.<HTMLElement>(MOBILE_TOPICS_SELECTOR) ??
+    document.querySelector?.<HTMLElement>(MOBILE_TOPICS_SELECTOR) ??
+    null
+  const target = isDesktopVisible ? topicsRoot : mobileRail ?? topicsRoot
+  if (!target) return false
+
+  target.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
+  const highlightTarget = topicsRoot ?? target
+  highlightTarget.setAttribute?.("data-topics-highlighted", "true")
   if (clearTopicsHighlightTimer) {
     clearTimeout(clearTopicsHighlightTimer)
   }
   clearTopicsHighlightTimer = setTimeout(() => {
-    topicsRoot.removeAttribute("data-topics-highlighted")
+    highlightTarget.removeAttribute?.("data-topics-highlighted")
     clearTopicsHighlightTimer = null
   }, 1400)
 
-  const firstButton = topicsRoot.querySelector<HTMLButtonElement>("button")
-  firstButton?.focus({ preventScroll: true })
+  const focusScope = isDesktopVisible ? desktopPanel ?? target : target
+  const firstFocusable = focusScope.querySelector?.<HTMLElement>(
+    "button, a, input, [tabindex]:not([tabindex='-1'])"
+  )
+  ;(firstFocusable ?? target).focus?.({ preventScroll: true })
+  return true
 }

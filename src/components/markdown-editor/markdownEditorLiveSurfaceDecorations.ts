@@ -16,7 +16,9 @@ import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
 import {
   MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
   MarkdownMermaidWidget, MarkdownRuleWidget, MarkdownTableWidget, MarkdownTaskWidget, MarkdownWikilinkWidget,
+  parseCalloutBlockquoteSpec, type CalloutReplacementSpec,
 } from "./markdownEditorWidgets"
+export { parseCalloutBlockquoteSpec } from "./markdownEditorWidgets"
 
 export const setComposition = StateEffect.define<boolean>()
 export const setPointerSelecting = StateEffect.define<boolean>()
@@ -72,9 +74,6 @@ const MARK_DECORATION_BY_KIND: Partial<Record<MarkdownLivePreviewDecoration["kin
 
 type RangeSpec = { from: number; to: number }
 type TableReplacementSpec = RangeSpec & { markdown: string }
-type CalloutReplacementSpec = RangeSpec & {
-  type: string; title: string; content: string; foldState: "+" | "-" | null
-}
 type ImageReplacementSpec = RangeSpec & { alt: string; src: string; title?: string; widthPx?: number; align?: string }
 type MermaidReplacementSpec = RangeSpec & { source: string }
 
@@ -125,23 +124,6 @@ let cachedDocBlocksEntry: {
   callouts: CalloutReplacementSpec[]; images: ImageReplacementSpec[]
   maths: MathReplacementSpec[]; mermaids: MermaidReplacementSpec[]; activeWatchRanges: RangeSpec[]
 } | null = null
-
-const parseCalloutBlockquoteSpec = (raw: string, from: number, to: number): CalloutReplacementSpec | null => {
-  const trimmed = raw.trim()
-  const newlineIndex = trimmed.indexOf("\n")
-  const firstLine = (newlineIndex >= 0 ? trimmed.slice(0, newlineIndex) : trimmed).replace(/\r$/, "")
-  const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\]([+-])?/.exec(firstLine)
-  if (!calloutMatch) return null
-  const modifier = calloutMatch[2]
-  return {
-    from,
-    to,
-    type: calloutMatch[1] ?? "note",
-    foldState: modifier === "+" || modifier === "-" ? modifier : null,
-    title: firstLine.slice(calloutMatch[0].length).trim(),
-    content: newlineIndex >= 0 ? trimmed.slice(newlineIndex + 1) : "",
-  }
-}
 
 const resolveImageNodeEnd = (markdownValue: string, nodeTo: number): number => {
   const attrMatch = /^[ \t]*\{[^}\r\n]*\}/.exec(markdownValue.slice(nodeTo, nodeTo + 160))

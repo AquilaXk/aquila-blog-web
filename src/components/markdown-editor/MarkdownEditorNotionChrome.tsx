@@ -16,7 +16,11 @@ import {
   computeGutterTopPosition,
   moveBlockMenuFocus,
 } from "./markdownEditorNotionChromeModel"
-import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import {
+  isWrapSelectionActive,
+  planReplaceSelection,
+  type PlannedTextMutation,
+} from "./markdownEditorTextMutation"
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
 
@@ -423,8 +427,8 @@ export const MarkdownEditorNotionChrome = ({
   ]
 
   const inlineButtons = [
-    { label: "선택 영역 굵게", glyph: "B", active: /^\*\*[\s\S]+\*\*$/.test(selectedText), run: () => onApplyFormatShortcut("bold") },
-    { label: "선택 영역 기울임", glyph: "I", active: /^\*[^*][\s\S]*\*$/.test(selectedText), run: () => onApplyFormatShortcut("italic") },
+    { label: "선택 영역 굵게", glyph: "B", active: isWrapSelectionActive(value, selection.from, selection.to, "**", "**"), run: () => onApplyFormatShortcut("bold") },
+    { label: "선택 영역 기울임", glyph: "I", active: isWrapSelectionActive(value, selection.from, selection.to, "_", "_"), run: () => onApplyFormatShortcut("italic") },
     { label: "선택 영역 취소선", glyph: "S", active: /^~~[\s\S]+~~$/.test(selectedText), run: () => onApplyFormatShortcut("strikethrough") },
     { label: "선택 영역 인라인 코드", glyph: "<>", active: /^`[^`]+`$/.test(selectedText), run: () => onApplyFormatShortcut("inlineCode") },
     { label: "선택 영역 하이라이트", glyph: "==", active: /^==[\s\S]+==$/.test(selectedText), run: () => onApplySnippet("==", "==", { toggle: true }) },

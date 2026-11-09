@@ -19,11 +19,11 @@ const PostDetailMobileToc = ({
   onToggleDetailed,
   onNavigate,
 }: PostDetailMobileTocProps) => {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   if (items.length === 0) return null
 
   return (
-    <details className="mobileToc" aria-label="접이식 목차">
+    <details className="mobileToc" aria-label={language === "en" ? "Collapsible table of contents" : "접이식 목차"}>
       <summary className="mobileTocSummary">{t("postTocLabel")}</summary>
       <nav aria-label={t("postTocLabel")}>
         {hasDepth4Toc && onToggleDetailed ? (

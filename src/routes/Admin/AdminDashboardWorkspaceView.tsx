@@ -4,7 +4,11 @@ import type { AuthMember } from "src/hooks/useAuthSession"
 import {
   Chart,
   ChartBar,
+  ChartBarColumn,
+  ChartBarLabel,
   ChartBars,
+  ChartBarTrack,
+  ChartBarValue,
   HeaderLink,
   HeroActions,
   HeroCopy,
@@ -113,7 +117,7 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
           <OpsGrid>
             <PanelCard>
               <PanelHeader>
-                <h2>Public read latency</h2>
+                <h2>운영 지표 요약</h2>
                 {snapshotCollectionFailed ? (
                   <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
                 ) : (
@@ -124,12 +128,17 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
                 {chartBars.length ? (
                   <ChartBars>
                     {chartBars.map((bar) => (
-                      <ChartBar
-                        key={bar.key}
-                        aria-label={`${bar.label} ${bar.height}`}
-                        data-tone={bar.tone}
-                        style={{ height: `${bar.height}%` }}
-                      />
+                      <ChartBarColumn key={bar.key}>
+                        <ChartBarValue>{`${bar.value}건`}</ChartBarValue>
+                        <ChartBarTrack>
+                          <ChartBar
+                            aria-label={`${bar.label} ${bar.value}건`}
+                            data-tone={bar.tone}
+                            style={{ height: `${bar.height}%` }}
+                          />
+                        </ChartBarTrack>
+                        <ChartBarLabel>{bar.label}</ChartBarLabel>
+                      </ChartBarColumn>
                     ))}
                   </ChartBars>
                 ) : (

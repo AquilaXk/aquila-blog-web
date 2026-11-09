@@ -66,6 +66,26 @@ export const planInsertBlockSnippet = (
   return planReplaceSelection(insertAt, replaceEnd, spec.snippet, spec.cursorOffset)
 }
 
+export const planStandaloneSnippetInsertion = (
+  current: string,
+  selection: { from: number; to: number },
+  snippet: string
+): PlannedTextMutation => {
+  const from = Math.max(0, Math.min(selection.from, current.length))
+  const to = Math.max(from, Math.min(selection.to, current.length))
+  const prefix = from > 0 && current[from - 1] !== "\n" ? "\n\n" : ""
+  const suffix = to < current.length && current[to] !== "\n" ? "\n\n" : "\n"
+  const replacement = `${prefix}${snippet}${suffix}`
+  const cursor = from + replacement.length
+  return {
+    rangeStart: from,
+    rangeEnd: to,
+    replacement,
+    selectionStart: cursor,
+    selectionEnd: cursor,
+  }
+}
+
 export const blockMarkdownSnippets = [
   { label: "Code", title: "코드 블록", ...codeBlockSnippet },
   { label: "Table", title: "표", ...tableBlockSnippet },

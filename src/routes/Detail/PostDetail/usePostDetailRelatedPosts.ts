@@ -110,12 +110,9 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
 
     let disposed = false
     let observer: IntersectionObserver | null = null
-    let idleHandle: number | null = null
-    let idleMode: "idle" | "timeout" | null = null
 
     const activateRelatedFetch = () => {
-      if (disposed) return
-      setShouldFetchRelated(true)
+      if (!disposed) setShouldFetchRelated(true)
     }
 
     const triggerNode = prefetchTriggerRef.current
@@ -135,30 +132,21 @@ export const usePostDetailRelatedPosts = ({ data, prefetchTriggerRef }: UsePostD
       observer.observe(triggerNode)
     }
 
+    let cancelIdle: () => void
     if (typeof idleWindow.requestIdleCallback === "function") {
-      idleMode = "idle"
-      idleHandle = idleWindow.requestIdleCallback(
-        () => {
-          activateRelatedFetch()
-        },
-        { timeout: RELATED_QUERY_IDLE_TIMEOUT_MS }
-      )
+      const id = idleWindow.requestIdleCallback(activateRelatedFetch, {
+        timeout: RELATED_QUERY_IDLE_TIMEOUT_MS,
+      })
+      cancelIdle = () => idleWindow.cancelIdleCallback?.(id)
     } else {
-      idleMode = "timeout"
-      idleHandle = window.setTimeout(() => {
-        activateRelatedFetch()
-      }, RELATED_QUERY_IDLE_TIMEOUT_MS)
+      const id = window.setTimeout(activateRelatedFetch, RELATED_QUERY_IDLE_TIMEOUT_MS)
+      cancelIdle = () => window.clearTimeout(id)
     }
 
     return () => {
       disposed = true
       observer?.disconnect()
-      if (idleHandle === null) return
-      if (idleMode === "idle" && typeof idleWindow.cancelIdleCallback === "function") {
-        idleWindow.cancelIdleCallback(idleHandle)
-        return
-      }
-      window.clearTimeout(idleHandle)
+      cancelIdle()
     }
   }, [data?.id, detailType, prefetchTriggerRef, shouldFetchRelated])
 

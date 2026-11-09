@@ -42,16 +42,18 @@ const NavBar = () => {
   })
 
   useEffect(() => {
-    const syncHash = () => {
-      const locationHash = window.location.hash.replace(/^#/, "").split("?")[0] || ""
-      setActiveHash(locationHash)
-    }
-    const locationHash = window.location.hash.replace(/^#/, "").split("?")[0] || ""
+    const readLocationHash = () => window.location.hash.replace(/^#/, "").split("?")[0] || ""
+    const syncHash = () => setActiveHash(readLocationHash())
     const routeHash = router.asPath.split("#")[1]?.split("?")[0] || ""
-    setActiveHash(locationHash || routeHash)
+    setActiveHash(readLocationHash() || routeHash)
     window.addEventListener("hashchange", syncHash)
     return () => window.removeEventListener("hashchange", syncHash)
   }, [router.asPath])
+
+  const isNavLinkActive = (id: string) =>
+    (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
+    (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
+    (id === "about" && router.pathname === "/about")
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -143,10 +145,7 @@ const NavBar = () => {
               </button>
               {primaryLinks.map(([id, , to, labelKey]) => {
                 const label = t(labelKey)
-                const isActive =
-                  (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
-                  (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
-                  (id === "about" && router.pathname === "/about")
+                const isActive = isNavLinkActive(id)
                 return (
                   <Link
                     key={to}
@@ -154,7 +153,7 @@ const NavBar = () => {
                     data-nav-id={id}
                     aria-label={label}
                     aria-current={isActive ? "page" : undefined}
-                    onClick={closeMobileMenu}
+                    onClick={id === "topics" ? () => { closeMobileMenu(); setActiveHash("topics"); window.requestAnimationFrame(() => focusTopicsRailElement()) } : closeMobileMenu}
                   >
                     {label}
                   </Link>
@@ -187,10 +186,7 @@ const NavBar = () => {
       <ul className="primaryLinks">
         {primaryLinks.map(([id, , to, labelKey]) => {
           const label = t(labelKey)
-          const isActive =
-            (id === "notes" && router.pathname === "/" && activeHash !== "topics") ||
-            (id === "topics" && router.pathname === "/" && activeHash === "topics") ||
-            (id === "about" && router.pathname === "/about")
+          const isActive = isNavLinkActive(id)
           return (
             <li key={id}>
               <Link

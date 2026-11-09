@@ -221,27 +221,35 @@ export const renderMarkdownSegment = ({
   }
 
   if (segment.type === "embed") {
+    const safeUrl = normalizeSafeMarkdownUrl(segment.url || "")
     const previewUrl =
       (segment.embedUrl ? resolveEmbedPreviewUrl(segment.embedUrl) : "") ||
-      resolveEmbedPreviewUrl(segment.url)
-    const providerLabel = segment.provider || segment.siteName || inferLinkProvider(segment.url)
+      (safeUrl ? resolveEmbedPreviewUrl(safeUrl) : "")
+    const providerLabel =
+      segment.provider || segment.siteName || (safeUrl ? inferLinkProvider(safeUrl) : "")
     const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
     return (
-      <div key={`embed-${index}`} className="aq-embed-card">
+      <div key={`embed-${index}`} className="aq-embed-card" data-disabled={safeUrl ? undefined : "true"}>
         <div className="aq-embed-header">
           <div className="aq-embed-copy">
             {providerLabel ? <small>{providerLabel}</small> : null}
             <strong>{segment.title || "임베드"}</strong>
           </div>
-          <a href={segment.url} target="_blank" rel="noreferrer">
-            원본 열기
-          </a>
+          {safeUrl ? (
+            <a href={safeUrl} target="_blank" rel="noreferrer">
+              원본 열기
+            </a>
+          ) : (
+            <span className="aq-embed-open" data-disabled="true" aria-disabled="true">
+              원본 열기
+            </span>
+          )}
         </div>
         {previewUrl ? (
           <div className="aq-embed-frame">
             <iframe
               src={previewUrl}
-              title={segment.title || segment.url}
+              title={segment.title || safeUrl || "임베드"}
               loading="lazy"
               sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -265,15 +273,27 @@ export const renderMarkdownSegment = ({
   }
 
   if (segment.type === "file") {
+    const safeUrl = normalizeSafeMarkdownUrl(segment.url || "")
     const meta = [segment.mimeType || "", formatReadableFileSize(segment.sizeBytes)].filter(Boolean).join(" · ")
+    const cardBody = (
+      <div className="aq-link-card-copy">
+        {meta ? <small>{meta}</small> : null}
+        <strong>{segment.name || "첨부 파일"}</strong>
+        {safeUrl ? <span>{safeUrl}</span> : null}
+      </div>
+    )
+    if (!safeUrl) {
+      return (
+        <div key={`file-${index}`} className="aq-file-card" data-disabled="true" aria-disabled="true">
+          <div className="aq-file-card__body">{cardBody}</div>
+          {segment.description ? <p>{segment.description}</p> : null}
+        </div>
+      )
+    }
     return (
       <div key={`file-${index}`} className="aq-file-card">
-        <a href={segment.url} target="_blank" rel="noreferrer">
-          <div className="aq-link-card-copy">
-            {meta ? <small>{meta}</small> : null}
-            <strong>{segment.name || "첨부 파일"}</strong>
-            <span>{segment.url}</span>
-          </div>
+        <a href={safeUrl} target="_blank" rel="noreferrer">
+          {cardBody}
         </a>
         {segment.description ? <p>{segment.description}</p> : null}
       </div>

@@ -204,18 +204,6 @@ const LoadingShell = styled.section`
     width: min(70%, 620px);
   }
 
-  @keyframes detail-skeleton-pulse {
-    0% {
-      opacity: 0.7;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0.7;
-    }
-  }
-
   @media (min-width: 1280px) {
     .layout {
       grid-template-columns: minmax(0, 1fr) 17rem;

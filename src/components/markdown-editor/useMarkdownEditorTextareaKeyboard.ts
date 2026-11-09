@@ -39,6 +39,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   setTextareaSelection: (from: number, to?: number) => void
   onRequestSave?: () => void
   onToggleViewMode?: () => void
+  onOpenFindReplace?: () => void
   isCompletionActive?: () => boolean
 }
 
@@ -69,6 +70,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   setTextareaSelection,
   onRequestSave,
   onToggleViewMode,
+  onOpenFindReplace,
   isCompletionActive,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
   const handleTabKeyDown = useCallback(
@@ -135,6 +137,21 @@ export const useMarkdownEditorTextareaKeyboard = ({
       return true
     },
     [onRequestSave]
+  )
+
+  const handleFindReplaceShortcutKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>): boolean => {
+      if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.shiftKey || !onOpenFindReplace) {
+        return false
+      }
+      const lower = event.key.toLowerCase()
+      if (lower !== "f" && lower !== "h") return false
+      event.preventDefault()
+      rememberTextareaSelection()
+      onOpenFindReplace()
+      return true
+    },
+    [onOpenFindReplace, rememberTextareaSelection]
   )
 
   const handleViewModeShortcutKeyDown = useCallback(
@@ -231,11 +248,16 @@ export const useMarkdownEditorTextareaKeyboard = ({
 
   const runReadOnlyKeyHandlers = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      for (const handler of [handleSaveShortcutKeyDown, handleViewModeShortcutKeyDown, handleHomeEndKeyDown]) {
+      for (const handler of [
+        handleSaveShortcutKeyDown,
+        handleFindReplaceShortcutKeyDown,
+        handleViewModeShortcutKeyDown,
+        handleHomeEndKeyDown,
+      ]) {
         if (handler(event)) return
       }
     },
-    [handleHomeEndKeyDown, handleSaveShortcutKeyDown, handleViewModeShortcutKeyDown]
+    [handleFindReplaceShortcutKeyDown, handleHomeEndKeyDown, handleSaveShortcutKeyDown, handleViewModeShortcutKeyDown]
   )
 
   const runAuthoringKeyHandlers = useCallback(
@@ -243,6 +265,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       const handlers = [
         handleEnterKeyDown,
         handleSaveShortcutKeyDown,
+        handleFindReplaceShortcutKeyDown,
         handleFormatShortcutKeyDown,
         handleLineCommandKeyDown,
         handleAutoPairKeyDown,
@@ -255,6 +278,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
     [
       handleAutoPairKeyDown,
       handleEnterKeyDown,
+      handleFindReplaceShortcutKeyDown,
       handleFormatShortcutKeyDown,
       handleHomeEndKeyDown,
       handleLineCommandKeyDown,

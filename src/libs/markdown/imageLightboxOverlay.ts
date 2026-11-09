@@ -1,3 +1,4 @@
+import { getClientStoredLanguage } from "src/libs/language"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 import {
   attachStageDragPan,
@@ -64,7 +65,9 @@ export const openImageLightboxOverlay = (
 
   activeImageLightboxCleanup?.()
   const returnFocusTarget = resolveReturnFocusTarget(options.trigger)
-  const isEnglish = (document.documentElement?.lang ?? "").toLowerCase().startsWith("en")
+  const isEnglish =
+    (document.documentElement?.lang ?? "").toLowerCase().startsWith("en") ||
+    getClientStoredLanguage() === "en"
   const altText = options.alt || options.caption || (isEnglish ? "Expanded image view" : "이미지 확대 보기")
   const captionText = options.caption || options.alt || ""
 

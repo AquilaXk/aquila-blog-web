@@ -48,16 +48,88 @@ export const planWrapSelection = (
   }
 }
 
-const countAsterisksBefore = (text: string, index: number): number => {
+const countMarkerRunBefore = (text: string, index: number, marker: string): number => {
   let count = 0
-  for (let i = index - 1; i >= 0 && text[i] === "*"; i -= 1) count += 1
+  for (let i = index - 1; i >= 0 && text[i] === marker; i -= 1) count += 1
   return count
 }
 
-const countAsterisksAfter = (text: string, index: number): number => {
+const countMarkerRunAfter = (text: string, index: number, marker: string): number => {
   let count = 0
-  for (let i = index; i < text.length && text[i] === "*"; i += 1) count += 1
+  for (let i = index; i < text.length && text[i] === marker; i += 1) count += 1
   return count
+}
+
+const resolveSymmetricWrapPairs = (
+  before: string,
+  after: string
+): ReadonlyArray<{ before: string; after: string }> => {
+  if ((before === "**" && after === "**") || (before === "__" && after === "__")) {
+    return [
+      { before, after },
+      before === "**" ? { before: "__", after: "__" } : { before: "**", after: "**" },
+    ]
+  }
+  if ((before === "*" && after === "*") || (before === "_" && after === "_")) {
+    return [
+      { before, after },
+      before === "*" ? { before: "_", after: "_" } : { before: "*", after: "*" },
+    ]
+  }
+  return [{ before, after }]
+}
+
+const isSingleEmphasisDelimiter = (before: string, after: string): boolean =>
+  (before === "*" && after === "*") || (before === "_" && after === "_")
+
+const hasSurroundingDelimiterPair = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  before: string,
+  after: string
+): boolean => {
+  const singleEmphasis = isSingleEmphasisDelimiter(before, after)
+  return (
+    selectionStart >= before.length &&
+    value.slice(selectionStart - before.length, selectionStart) === before &&
+    value.slice(selectionEnd, selectionEnd + after.length) === after &&
+    (!singleEmphasis ||
+      (countMarkerRunBefore(value, selectionStart, before) % 2 === 1 &&
+        countMarkerRunAfter(value, selectionEnd, after) % 2 === 1))
+  )
+}
+
+const hasEnclosedDelimiterPair = (selected: string, before: string, after: string): boolean => {
+  const singleEmphasis = isSingleEmphasisDelimiter(before, after)
+  return (
+    selected.startsWith(before) &&
+    selected.endsWith(after) &&
+    selected.length >= before.length + after.length &&
+    (!singleEmphasis ||
+      (countMarkerRunAfter(selected, 0, before) % 2 === 1 &&
+        countMarkerRunBefore(selected, selected.length, after) % 2 === 1))
+  )
+}
+
+export const isWrapSelectionActive = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  before: string,
+  after: string
+): boolean => {
+  const selected = value.slice(selectionStart, selectionEnd)
+  for (const pair of resolveSymmetricWrapPairs(before, after)) {
+    if (
+      hasSurroundingDelimiterPair(value, selectionStart, selectionEnd, pair.before, pair.after) ||
+      (selected.length > pair.before.length + pair.after.length &&
+        hasEnclosedDelimiterPair(selected, pair.before, pair.after))
+    ) {
+      return true
+    }
+  }
+  return false
 }
 
 export const planToggleWrapSelection = (
@@ -68,42 +140,30 @@ export const planToggleWrapSelection = (
   after: string
 ): PlannedTextMutation => {
   const selected = value.slice(selectionStart, selectionEnd)
-  const isSingleAsterisk = before === "*" && after === "*"
+  const pairs = resolveSymmetricWrapPairs(before, after)
 
-  const hasSurroundingMatch =
-    selectionStart >= before.length &&
-    value.slice(selectionStart - before.length, selectionStart) === before &&
-    value.slice(selectionEnd, selectionEnd + after.length) === after &&
-    (!isSingleAsterisk ||
-      (countAsterisksBefore(value, selectionStart) % 2 === 1 &&
-        countAsterisksAfter(value, selectionEnd) % 2 === 1))
-
-  if (hasSurroundingMatch) {
-    return {
-      rangeStart: selectionStart - before.length,
-      rangeEnd: selectionEnd + after.length,
-      replacement: selected,
-      selectionStart: selectionStart - before.length,
-      selectionEnd: selectionEnd - before.length,
+  for (const pair of pairs) {
+    if (hasSurroundingDelimiterPair(value, selectionStart, selectionEnd, pair.before, pair.after)) {
+      return {
+        rangeStart: selectionStart - pair.before.length,
+        rangeEnd: selectionEnd + pair.after.length,
+        replacement: selected,
+        selectionStart: selectionStart - pair.before.length,
+        selectionEnd: selectionEnd - pair.before.length,
+      }
     }
   }
 
-  const hasEnclosedMatch =
-    selected.startsWith(before) &&
-    selected.endsWith(after) &&
-    selected.length >= before.length + after.length &&
-    (!isSingleAsterisk ||
-      (countAsterisksAfter(selected, 0) % 2 === 1 &&
-        countAsterisksBefore(selected, selected.length) % 2 === 1))
-
-  if (hasEnclosedMatch) {
-    const inner = selected.slice(before.length, selected.length - after.length)
-    return {
-      rangeStart: selectionStart,
-      rangeEnd: selectionEnd,
-      replacement: inner,
-      selectionStart,
-      selectionEnd: selectionStart + inner.length,
+  for (const pair of pairs) {
+    if (hasEnclosedDelimiterPair(selected, pair.before, pair.after)) {
+      const inner = selected.slice(pair.before.length, selected.length - pair.after.length)
+      return {
+        rangeStart: selectionStart,
+        rangeEnd: selectionEnd,
+        replacement: inner,
+        selectionStart,
+        selectionEnd: selectionStart + inner.length,
+      }
     }
   }
 

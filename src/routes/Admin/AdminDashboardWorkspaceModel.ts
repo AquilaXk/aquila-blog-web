@@ -64,6 +64,7 @@ export type DashboardQuickAction = {
 export type DashboardChartBar = {
   key: string
   label: string
+  value: number
   height: number
   tone: "neutral" | "good" | "warn"
 }

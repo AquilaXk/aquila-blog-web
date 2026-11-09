@@ -1,4 +1,5 @@
 import { FC, ReactNode, useEffect, useMemo, useState } from "react"
+import { useLanguage } from "src/libs/language"
 import { toLanguageLabel } from "src/libs/markdown/rendering"
 
 export const COLLAPSIBLE_CODE_LINE_THRESHOLD = 35
@@ -50,6 +51,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   highlightLines,
   preElement,
 }) => {
+  const { language: siteLanguage } = useLanguage()
   const lineCount = useMemo(() => countRawCodeLines(rawCode), [rawCode])
   const isCollapsible = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
   const [uiMask, setUiMask] = useState(() => packCodeBlockUiState(isCollapsible, "idle"))
@@ -58,7 +60,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   const copyFailed = (uiMask & CODE_COPY_FAILED_BIT) !== 0
   const copyStatusBits = uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)
   const label = title?.trim() || toLanguageLabel(language)
-  const isEnglish = isEnglishDocumentLang()
+  const isEnglish = siteLanguage === "en" || isEnglishDocumentLang()
 
   useEffect(() => {
     const shouldCollapse = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD

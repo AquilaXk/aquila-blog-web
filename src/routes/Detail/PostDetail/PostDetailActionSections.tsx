@@ -7,26 +7,36 @@ import type { TocItem } from "./PostDetailTocModel"
 type ShareFeedback = "copied" | "shared" | "failed" | null
 
 export const resolveFloatingShareFeedbackLabel = (
-  shareFeedback: Exclude<ShareFeedback, null>
+  shareFeedback: Exclude<ShareFeedback, null>,
+  isEnglish: boolean = false
 ): string => {
-  if (shareFeedback === "failed") return "공유 실패"
-  if (shareFeedback === "shared") return "공유 완료"
-  return "복사 완료"
+  if (shareFeedback === "failed") return isEnglish ? "Failed to share" : "공유 실패"
+  if (shareFeedback === "shared") return isEnglish ? "Shared" : "공유 완료"
+  return isEnglish ? "Link copied" : "복사 완료"
 }
 
-export const resolveMobileShareAriaLabel = (shareFeedback: ShareFeedback): string => {
-  if (shareFeedback === "failed") return "공유 실패, 다시 시도"
-  if (shareFeedback === "shared") return "공유 완료"
-  if (shareFeedback === "copied") return "공유 링크 복사 완료"
-  return "공유"
+export const resolveMobileShareAriaLabel = (
+  shareFeedback: ShareFeedback,
+  isEnglish: boolean = false
+): string => {
+  if (shareFeedback === "failed") return isEnglish ? "Share failed, try again" : "공유 실패, 다시 시도"
+  if (shareFeedback === "shared") return isEnglish ? "Shared" : "공유 완료"
+  if (shareFeedback === "copied") return isEnglish ? "Link copied" : "공유 링크 복사 완료"
+  return isEnglish ? "Share" : "공유"
 }
 
-export const resolveMobileShareButtonLabel = (shareFeedback: ShareFeedback): string => {
-  if (shareFeedback === "copied") return "복사 완료"
-  if (shareFeedback === "shared") return "공유 완료"
-  if (shareFeedback === "failed") return "공유 실패"
-  return "공유"
-}
+export const resolveMobileShareButtonLabel = (
+  shareFeedback: ShareFeedback,
+  isEnglish: boolean = false
+): string =>
+  shareFeedback
+    ? resolveFloatingShareFeedbackLabel(shareFeedback, isEnglish)
+    : isEnglish
+      ? "Share"
+      : "공유"
+
+const formatLikeAriaLabel = (likeLabel: string, count: number, isEnglish: boolean) =>
+  isEnglish ? `${likeLabel} (${count})` : `${likeLabel} (현재 ${count}개)`
 
 type FloatingActionRailProps = {
   railRef: RefObject<HTMLElement | null>
@@ -54,19 +64,9 @@ export const FloatingActionRail = memo(function FloatingActionRail({
   onSharePost,
 }: FloatingActionRailProps) {
   const { t, language } = useLanguage()
+  const isEnglish = language === "en"
   const likeLabel = liked ? t("postUnlikeAction") : t("postLikeAction")
-  const likeAriaLabel =
-    language === "en"
-      ? `${likeLabel} (${likesCount})`
-      : `${likeLabel} (현재 ${likesCount}개)`
-  const shareFeedbackText =
-    shareFeedback === "failed"
-      ? t("postShareFailed")
-      : shareFeedback === "shared"
-        ? t("postShareShared")
-        : shareFeedback === "copied"
-          ? t("postShareCopied")
-          : ""
+  const likeAriaLabel = formatLikeAriaLabel(likeLabel, likesCount, isEnglish)
   return (
     <aside ref={railRef as Ref<HTMLElement>} className="leftRail" data-hybrid-active={active} aria-hidden={!showFloatingLike}>
       {showFloatingLike ? (
@@ -102,7 +102,7 @@ export const FloatingActionRail = memo(function FloatingActionRail({
             </div>
             {shareFeedback ? (
               <span className="floatingShareFeedback" role="status" aria-live="polite">
-                {shareFeedbackText || resolveFloatingShareFeedbackLabel(shareFeedback)}
+                {resolveFloatingShareFeedbackLabel(shareFeedback, isEnglish)}
               </span>
             ) : null}
           </div>
@@ -130,21 +130,11 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
   onSharePost,
 }: MobileSummaryActionsProps) {
   const { t, language } = useLanguage()
+  const isEnglish = language === "en"
   const likeLabel = liked ? t("postUnlikeAction") : t("postLikeAction")
-  const likeAriaLabel =
-    language === "en"
-      ? `${likeLabel} (${likesCount})`
-      : `${likeLabel} (현재 ${likesCount}개)`
-  const shareButtonText =
-    shareFeedback === "copied"
-      ? t("postShareCopied")
-      : shareFeedback === "shared"
-        ? t("postShareShared")
-        : shareFeedback === "failed"
-          ? t("postShareFailed")
-          : t("postShareAction")
+  const likeAriaLabel = formatLikeAriaLabel(likeLabel, likesCount, isEnglish)
   return (
-    <MobileSummaryBar aria-label="빠른 이동 및 반응">
+    <MobileSummaryBar aria-label={isEnglish ? "Quick actions and reactions" : "빠른 이동 및 반응"}>
       <button
         type="button"
         className="mobileLikeStat"
@@ -164,11 +154,11 @@ export const MobileSummaryActions = memo(function MobileSummaryActions({
         data-feedback={Boolean(shareFeedback)}
         data-tone="accent"
         aria-live="polite"
-        aria-label={shareFeedback ? shareButtonText : resolveMobileShareAriaLabel(shareFeedback)}
+        aria-label={resolveMobileShareAriaLabel(shareFeedback, isEnglish)}
         onClick={onSharePost}
       >
         <AppIcon name="share" />
-        <span>{shareButtonText || resolveMobileShareButtonLabel(shareFeedback)}</span>
+        <span>{resolveMobileShareButtonLabel(shareFeedback, isEnglish)}</span>
       </button>
     </MobileSummaryBar>
   )

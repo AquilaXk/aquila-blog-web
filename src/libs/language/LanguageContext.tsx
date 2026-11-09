@@ -34,28 +34,31 @@ export const parseLanguagePreference = (
   return null
 }
 
+const getClientDoc = () =>
+  typeof document !== "undefined" ? document : typeof window !== "undefined" ? window.document : undefined
+const getClientStorage = () =>
+  typeof localStorage !== "undefined" ? localStorage : typeof window !== "undefined" ? window.localStorage : undefined
+
 export const getClientStoredLanguage = (): SiteLanguage | null => {
-  if (typeof document === "undefined") return null
   try {
-    const fromCookie = parseLanguagePreference(document.cookie)
+    const fromCookie = parseLanguagePreference(getClientDoc()?.cookie)
     if (fromCookie) return fromCookie
-    const fromStorage = localStorage.getItem(LANGUAGE_STORAGE_KEY)
-    if (fromStorage) {
-      const parsedStorage = parseLanguagePreference(`${LANGUAGE_COOKIE_KEY}=${fromStorage}`)
-      if (parsedStorage) return parsedStorage
-    }
+    const fromStorage = getClientStorage()?.getItem(LANGUAGE_STORAGE_KEY)
+    if (fromStorage) return parseLanguagePreference(`${LANGUAGE_COOKIE_KEY}=${fromStorage}`)
   } catch {}
   return null
 }
 
 export const setClientStoredLanguage = (lang: SiteLanguage): void => {
-  if (typeof document === "undefined") return
   try {
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
+    getClientStorage()?.setItem(LANGUAGE_STORAGE_KEY, lang)
   } catch {}
   try {
-    document.cookie = `${LANGUAGE_COOKIE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`
-    document.documentElement.lang = lang === "ko" ? "ko-KR" : "en-US"
+    const doc = getClientDoc()
+    if (doc) {
+      doc.cookie = `${LANGUAGE_COOKIE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`
+      if (doc.documentElement) doc.documentElement.lang = lang === "ko" ? "ko-KR" : "en-US"
+    }
   } catch {}
 }
 

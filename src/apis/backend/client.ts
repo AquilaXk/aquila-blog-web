@@ -63,7 +63,7 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
-    matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|bootstrap)(\/|$)/i,
+    matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|bootstrap|related\/author)(\/|$)/i,
     policy: {
       cacheMode: "revalidate",
       retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,

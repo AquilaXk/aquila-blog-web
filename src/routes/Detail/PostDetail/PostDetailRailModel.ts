@@ -53,14 +53,25 @@ export const hasStickyBlockingAncestor = (node: HTMLElement | null) => {
   return blocked
 }
 
-export const clearInlineRailStyle = (inner: HTMLElement | null) => {
+const assignInlineRailStyle = (
+  inner: HTMLElement | null,
+  position = "",
+  top = "",
+  left = "",
+  width = "",
+  transform = ""
+) => {
   if (!inner) return
-  inner.style.position = ""
-  inner.style.top = ""
-  inner.style.left = ""
-  inner.style.width = ""
+  inner.style.position = position
+  inner.style.top = top
+  inner.style.left = left
+  inner.style.width = width
   inner.style.bottom = ""
-  inner.style.transform = ""
+  inner.style.transform = transform
+}
+
+export const clearInlineRailStyle = (inner: HTMLElement | null) => {
+  assignInlineRailStyle(inner)
 }
 
 export const measureHybridRail = (
@@ -116,30 +127,22 @@ export const applyHybridRail = (
   }
 
   if (window.scrollY < startFixedScrollY) {
-    inner.style.position = "absolute"
-    inner.style.top = "0px"
-    inner.style.left = "0px"
-    inner.style.width = "100%"
-    inner.style.bottom = ""
-    inner.style.transform = ""
+    assignInlineRailStyle(inner, "absolute", "0px", "0px", "100%")
     return
   }
 
   if (window.scrollY > endFixedScrollY) {
     const bottomTop = Math.max(0, metrics.articleBottomDoc - metrics.railTopDoc - metrics.innerHeight)
-    inner.style.position = "absolute"
-    inner.style.top = `${bottomTop}px`
-    inner.style.left = "0px"
-    inner.style.width = "100%"
-    inner.style.bottom = ""
-    inner.style.transform = ""
+    assignInlineRailStyle(inner, "absolute", `${bottomTop}px`, "0px", "100%")
     return
   }
 
-  inner.style.position = "fixed"
-  inner.style.top = `${topOffset}px`
-  inner.style.left = `${metrics.left}px`
-  inner.style.width = `${metrics.width}px`
-  inner.style.bottom = ""
-  inner.style.transform = "translateZ(0)"
+  assignInlineRailStyle(
+    inner,
+    "fixed",
+    `${topOffset}px`,
+    `${metrics.left}px`,
+    `${metrics.width}px`,
+    "translateZ(0)"
+  )
 }

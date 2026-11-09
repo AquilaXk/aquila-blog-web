@@ -8,53 +8,46 @@ export const DEFAULT_THUMBNAIL_ZOOM = 1
 export const MIN_THUMBNAIL_ZOOM = 1
 export const MAX_THUMBNAIL_ZOOM = 2.5
 
-const roundThumbnailFocusX = (value: number) => Math.round(value * 10) / 10
-const roundThumbnailFocusY = (value: number) => Math.round(value * 10) / 10
-const roundThumbnailZoom = (value: number) => Math.round(value * 100) / 100
-
-export const clampThumbnailFocusX = (value: number) => {
-  if (!Number.isFinite(value)) return DEFAULT_THUMBNAIL_FOCUS_X
-  if (value < 0) return 0
-  if (value > 100) return 100
-  return roundThumbnailFocusX(value)
+const clampRounded = (
+  value: number,
+  fallback: number,
+  min: number,
+  max: number,
+  factor: number
+) => {
+  if (!Number.isFinite(value)) return fallback
+  if (value < min) return min
+  if (value > max) return max
+  return Math.round(value * factor) / factor
 }
 
-export const clampThumbnailFocusY = (value: number) => {
-  if (!Number.isFinite(value)) return DEFAULT_THUMBNAIL_FOCUS_Y
-  if (value < 0) return 0
-  if (value > 100) return 100
-  return roundThumbnailFocusY(value)
-}
-
-export const getThumbnailFocusXFromUrl = (raw: string): number | null => {
+const extractLastTokenNumber = (
+  raw: string,
+  regex: RegExp,
+  clampFn: (value: number) => number
+): number | null => {
   const value = raw.trim()
   if (!value) return null
-
   let match: RegExpMatchArray | null = null
-  for (const token of value.matchAll(THUMBNAIL_FOCUS_X_TOKEN_REGEX)) {
+  for (const token of value.matchAll(regex)) {
     match = token
   }
-
   if (!match || match.length < 2) return null
   const parsed = Number.parseFloat(match[1])
-  if (!Number.isFinite(parsed)) return null
-  return clampThumbnailFocusX(parsed)
+  return Number.isFinite(parsed) ? clampFn(parsed) : null
 }
 
-export const getThumbnailFocusYFromUrl = (raw: string): number | null => {
-  const value = raw.trim()
-  if (!value) return null
+export const clampThumbnailFocusX = (value: number) =>
+  clampRounded(value, DEFAULT_THUMBNAIL_FOCUS_X, 0, 100, 10)
 
-  let match: RegExpMatchArray | null = null
-  for (const token of value.matchAll(THUMBNAIL_FOCUS_TOKEN_REGEX)) {
-    match = token
-  }
+export const clampThumbnailFocusY = (value: number) =>
+  clampRounded(value, DEFAULT_THUMBNAIL_FOCUS_Y, 0, 100, 10)
 
-  if (!match || match.length < 2) return null
-  const parsed = Number.parseFloat(match[1])
-  if (!Number.isFinite(parsed)) return null
-  return clampThumbnailFocusY(parsed)
-}
+export const getThumbnailFocusXFromUrl = (raw: string): number | null =>
+  extractLastTokenNumber(raw, THUMBNAIL_FOCUS_X_TOKEN_REGEX, clampThumbnailFocusX)
+
+export const getThumbnailFocusYFromUrl = (raw: string): number | null =>
+  extractLastTokenNumber(raw, THUMBNAIL_FOCUS_TOKEN_REGEX, clampThumbnailFocusY)
 
 export const parseThumbnailFocusYFromUrl = (
   raw: string,
@@ -66,27 +59,11 @@ export const parseThumbnailFocusXFromUrl = (
   fallback = DEFAULT_THUMBNAIL_FOCUS_X
 ) => getThumbnailFocusXFromUrl(raw) ?? fallback
 
-export const clampThumbnailZoom = (value: number) => {
-  if (!Number.isFinite(value)) return DEFAULT_THUMBNAIL_ZOOM
-  if (value < MIN_THUMBNAIL_ZOOM) return MIN_THUMBNAIL_ZOOM
-  if (value > MAX_THUMBNAIL_ZOOM) return MAX_THUMBNAIL_ZOOM
-  return roundThumbnailZoom(value)
-}
+export const clampThumbnailZoom = (value: number) =>
+  clampRounded(value, DEFAULT_THUMBNAIL_ZOOM, MIN_THUMBNAIL_ZOOM, MAX_THUMBNAIL_ZOOM, 100)
 
-export const getThumbnailZoomFromUrl = (raw: string): number | null => {
-  const value = raw.trim()
-  if (!value) return null
-
-  let match: RegExpMatchArray | null = null
-  for (const token of value.matchAll(THUMBNAIL_ZOOM_TOKEN_REGEX)) {
-    match = token
-  }
-
-  if (!match || match.length < 2) return null
-  const parsed = Number.parseFloat(match[1])
-  if (!Number.isFinite(parsed)) return null
-  return clampThumbnailZoom(parsed)
-}
+export const getThumbnailZoomFromUrl = (raw: string): number | null =>
+  extractLastTokenNumber(raw, THUMBNAIL_ZOOM_TOKEN_REGEX, clampThumbnailZoom)
 
 export const parseThumbnailZoomFromUrl = (
   raw: string,

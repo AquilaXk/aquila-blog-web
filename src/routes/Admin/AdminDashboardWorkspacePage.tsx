@@ -247,6 +247,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
   const chartBars: DashboardChartBar[] = rawChartBars.map((item) => ({
     key: item.key,
     label: item.label,
+    value: item.value,
     height: item.value > 0 ? Math.max(14, Math.round((item.value / maxChartBarValue) * 100)) : 8,
     tone: item.tone,
   }))

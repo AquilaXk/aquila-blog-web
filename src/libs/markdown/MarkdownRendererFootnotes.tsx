@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react"
+import { useLanguage } from "src/libs/language"
 import type { MarkdownFootnote } from "src/libs/markdown/renderingFootnoteModel"
 import { normalizeSafeMarkdownLinkHref } from "src/libs/markdown/safeMarkdownUrl"
 
@@ -14,6 +15,9 @@ export const isExternalHttpHref = (href: string): boolean =>
 
 export const resolveSafeRenderedAnchorHref = (rawHref: unknown): string =>
   typeof rawHref === "string" ? normalizeSafeMarkdownLinkHref(rawHref) : ""
+
+const isEnglishDocLang = (): boolean =>
+  typeof document !== "undefined" && (document.documentElement?.lang ?? "").toLowerCase().startsWith("en")
 
 const extractFootnotePlainTextPreview = (content: string): string => {
   const cleaned = content
@@ -34,6 +38,8 @@ export const MarkdownFootnoteReferenceLink = ({
   marker,
   ...props
 }: MarkdownFootnoteReferenceLinkProps) => {
+  const { language } = useLanguage()
+  const isEnglish = language === "en" || isEnglishDocLang()
   const safeHref = resolveSafeRenderedAnchorHref(href)
   if (!safeHref) {
     return <span>{children}</span>
@@ -57,6 +63,9 @@ export const MarkdownFootnoteReferenceLink = ({
   const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
   const fallbackSuffix = `${footnote.identifier}-${occurrence}`
   const tooltipId = `aq-footnote-tooltip-${referenceId || fallbackSuffix}`
+  const refAriaLabel = isEnglish
+    ? `Footnote ${footnote.number} reference ${occurrence}`
+    : `각주 ${footnote.number} 참조 ${occurrence}`
 
   return (
     <sup className="aq-footnote-reference">
@@ -66,7 +75,7 @@ export const MarkdownFootnoteReferenceLink = ({
         id={referenceId}
         data-footnote-ref
         aria-describedby={plainTextPreview ? tooltipId : "aq-footnote-heading"}
-        aria-label={`각주 ${footnote.number} 참조 ${occurrence}`}
+        aria-label={refAriaLabel}
       >
         {children}
       </a>
@@ -79,9 +88,16 @@ export const MarkdownFootnoteReferenceLink = ({
   )
 }
 
-const renderFootnoteBackref = (footnoteNumber: number, referenceId: string, index: number) => {
+const renderFootnoteBackref = (
+  footnoteNumber: number,
+  referenceId: string,
+  index: number,
+  isEnglish: boolean
+) => {
   const safeBackrefHref = normalizeSafeMarkdownLinkHref(`#${referenceId}`)
-  const ariaLabel = `본문의 각주 ${footnoteNumber}번 참조 ${index + 1}로 돌아가기`
+  const ariaLabel = isEnglish
+    ? `Back to footnote ${footnoteNumber} reference ${index + 1}`
+    : `본문의 각주 ${footnoteNumber}번 참조 ${index + 1}로 돌아가기`
   if (!safeBackrefHref) {
     return (
       <span key={referenceId} aria-label={ariaLabel}>
@@ -108,17 +124,19 @@ export const MarkdownFootnoteAppendix = ({
   footnotes: readonly MarkdownFootnote[]
   renderMarkdown: RenderMarkdown
 }) => {
+  const { language } = useLanguage()
+  const isEnglish = language === "en" || isEnglishDocLang()
   if (!footnotes.length) return null
 
   return (
     <section className="aq-footnotes" aria-labelledby="aq-footnote-heading">
-      <h2 id="aq-footnote-heading">각주</h2>
+      <h2 id="aq-footnote-heading">{isEnglish ? "Footnotes" : "각주"}</h2>
       <ol>
         {footnotes.map((footnote) => (
           <li key={footnote.identifier} id={footnote.targetId}>
             {renderMarkdown(footnote.content, `footnote-definition-${footnote.identifier}`)}
             {footnote.referenceIds.map((referenceId, index) =>
-              renderFootnoteBackref(footnote.number, referenceId, index)
+              renderFootnoteBackref(footnote.number, referenceId, index, isEnglish)
             )}
           </li>
         ))}

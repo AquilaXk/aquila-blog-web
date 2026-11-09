@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getCloudFileDownloadUrl, type CloudFile } from "src/apis/backend/cloud"
 import AppIcon from "src/components/icons/AppIcon"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
@@ -180,9 +180,26 @@ const CloudFileDetailDrawer = ({
 
   const detailPanelRef = useRef<HTMLElement | null>(null)
   const isDrawerMode = detailMode === "drawer"
+  const isEditing = editingFileId !== null
+  useEffect(() => {
+    setEditingFileId(null)
+  }, [selectedFile.id])
+
+  useEffect(() => {
+    if (!isEditing || isDeleteConfirmOpen) return
+    const handleEditEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || isUpdatePending) return
+      event.preventDefault()
+      event.stopPropagation()
+      setEditingFileId(null)
+    }
+    document.addEventListener("keydown", handleEditEscape, true)
+    return () => document.removeEventListener("keydown", handleEditEscape, true)
+  }, [isDeleteConfirmOpen, isEditing, isUpdatePending])
+
   const { handleKeyDown } = useModalFocusTrap({
     open: isDrawerMode,
-    paused: isDeleteConfirmOpen,
+    paused: isDeleteConfirmOpen || isEditing,
     onClose,
     containerRef: detailPanelRef,
   })
@@ -203,7 +220,17 @@ const CloudFileDetailDrawer = ({
         aria-modal={isDrawerMode ? "true" : undefined}
         aria-label="클라우드 상세정보"
         data-mode={detailMode}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(event) => {
+          if (isEditing && event.key === "Escape") {
+            if (!isUpdatePending) {
+              event.preventDefault()
+              event.stopPropagation()
+              setEditingFileId(null)
+            }
+            return
+          }
+          handleKeyDown(event)
+        }}
       >
         <DetailHeader>
           <h2>파일 정보</h2>
@@ -304,55 +331,16 @@ const CloudFileDetailDrawer = ({
 
 const AdminCloudWorkspacePage = () => {
   const {
-    activeFolderPath,
-    activeUploadCount,
-    allVisibleChecked,
-    availableFolders,
-    checkedFileIds,
-    closeDeleteConfirm,
-    completedUploadCount,
-    debouncedKeyword,
-    deleteCancelButtonRef,
-    deleteConfirm,
-    deleteDialogRef,
-    files,
-    filesQuery,
-    filter,
-    handleCancelUpload,
-    handleClearFinishedUploads,
-    handleConfirmDelete,
-    handleCopyFileLink,
-    handleDeleteDialogKeyDown,
-    handleDeleteSelected,
-    handlePreviewFile,
-    handleRequestDeleteFile,
-    handleRetryUpload,
-    handleSelectFolder,
-    handleToggleAllChecked,
-    handleToggleChecked,
-    handleUpdateFile,
-    handleUploadDragLeave,
-    handleUploadDragOver,
-    handleUploadDrop,
-    handleUploadSelect,
-    isDetailDrawerMode,
-    isDeletePending,
-    isDragActive,
-    keyword,
-    notice,
-    selectedFile,
-    setFilter,
-    setIsComposing,
-    setIsDetailPanelOpen,
-    setKeyword,
-    setSelectedFileId,
-    setSortMode,
-    setToast,
-    shouldShowDetailPanel,
-    sortMode,
-    toast,
-    uploadInputRef,
-    uploadQueue,
+    activeFolderPath, activeUploadCount, allVisibleChecked, availableFolders, checkedFileIds,
+    closeDeleteConfirm, completedUploadCount, debouncedKeyword, deleteCancelButtonRef, deleteConfirm,
+    deleteDialogRef, files, filesQuery, filter, handleCancelUpload, handleClearFinishedUploads,
+    handleConfirmDelete, handleCopyFileLink, handleDeleteDialogKeyDown, handleDeleteSelected,
+    handlePreviewFile, handleRequestDeleteFile, handleRetryUpload, handleSelectFolder,
+    handleToggleAllChecked, handleToggleChecked, handleUpdateFile, handleUploadDragLeave,
+    handleUploadDragOver, handleUploadDrop, handleUploadSelect, isDetailDrawerMode, isDeletePending,
+    isDragActive, keyword, notice, selectedFile, setFilter, setIsComposing, setIsDetailPanelOpen,
+    setKeyword, setSelectedFileId, setSortMode, setToast, shouldShowDetailPanel, sortMode, toast,
+    uploadInputRef, uploadQueue,
   } = useAdminCloudWorkspaceActions()
 
   const summary = useMemo(() => getCloudSummary(files), [files])

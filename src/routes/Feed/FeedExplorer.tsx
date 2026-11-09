@@ -29,6 +29,7 @@ import {
   type FeedSortMode,
 } from "./FeedSortMenuModel"
 import { useFeedExplorerSessionRestore } from "./useFeedExplorerSessionRestore"
+import { focusTopicsRailElement } from "src/layouts/RootLayout/Header/NavBarSearchModel"
 
 const LOAD_MORE_THROTTLE_MS = 800
 const LOAD_MORE_OBSERVER_THROTTLE_MS = 180
@@ -92,6 +93,13 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
       setSortMode(querySort)
     }
   }, [router.isReady, router.query.q, router.query.sort])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.location.hash === "#topics" || router.asPath.endsWith("#topics")) {
+      window.requestAnimationFrame(() => focusTopicsRailElement())
+    }
+  }, [router.asPath])
 
   const currentTag = normalizeOptionalTagQuery(
     typeof router.query.tag === "string" ? router.query.tag : undefined

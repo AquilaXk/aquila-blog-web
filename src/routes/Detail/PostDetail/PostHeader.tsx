@@ -200,12 +200,6 @@ export const PostHeaderEngagementSection: React.FC<{
     language === "en"
       ? `${likeLabel} (${resolvedLikesCount})`
       : `${likeLabel} (현재 ${resolvedLikesCount}개)`
-  const localizedShareFeedback =
-    shareFeedback === "failed"
-      ? t("postShareFailed")
-      : shareFeedback === "shared"
-        ? t("postShareShared")
-        : shareFeedbackMessage || t("postShareCopied")
   return (
     <div className="metaUtilities">
       <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
@@ -252,7 +246,7 @@ export const PostHeaderEngagementSection: React.FC<{
             role="status"
             aria-live="polite"
           >
-            {localizedShareFeedback}
+            {language === "en" ? resolveShareFeedbackMessage(shareFeedback, "en") : shareFeedbackMessage}
           </span>
         ) : null}
       </div>

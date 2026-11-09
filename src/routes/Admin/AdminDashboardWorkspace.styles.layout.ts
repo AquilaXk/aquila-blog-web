@@ -273,8 +273,36 @@ export const ChartBars = styled.div`
   min-height: 16rem;
 `
 
+export const ChartBarColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  height: 100%;
+  min-height: 16rem;
+  min-width: 0;
+`
+
+export const ChartBarValue = styled.strong`
+  font-size: 0.72rem;
+  font-weight: 760;
+  color: ${adminTextPrimary};
+  line-height: 1.2;
+  white-space: nowrap;
+`
+
+export const ChartBarTrack = styled.div`
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 11rem;
+`
+
 export const ChartBar = styled.i`
   display: block;
+  width: 100%;
   min-height: 8%;
   border-radius: 4px 4px 0 0;
   background: ${adminTeal};
@@ -286,6 +314,17 @@ export const ChartBar = styled.i`
   &[data-tone="neutral"] {
     background: ${adminTextSecondary};
   }
+`
+
+export const ChartBarLabel = styled.span`
+  font-size: 0.72rem;
+  font-weight: 680;
+  color: ${adminTextMuted};
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
 `
 
 export const StatusRows = styled.div`

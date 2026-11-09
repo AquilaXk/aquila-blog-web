@@ -4,6 +4,7 @@ import "katex/dist/katex.min.css"
 import { renderSerializedMermaidSvg } from "../../libs/markdown/mermaidRuntimeConfig"
 import { sanitizeRenderableMermaidSource } from "../../libs/markdown/mermaidRuntimeSanitize"
 import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownUrl"
+import { extractPromotedCalloutTitle } from "../../libs/markdown/renderingDirectiveModel"
 import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
 
 export type MermaidColorScheme = "dark" | "light"
@@ -248,6 +249,46 @@ const attachEmptyCalloutHeader = (
   })
 }
 
+export type CalloutReplacementSpec = {
+  from: number
+  to: number
+  type: string
+  title: string
+  content: string
+  foldState: "+" | "-" | null
+}
+
+export const parseCalloutBlockquoteSpec = (
+  raw: string,
+  from: number = 0,
+  to: number = 0
+): CalloutReplacementSpec | null => {
+  const trimmed = raw.trim()
+  const newlineIndex = trimmed.indexOf("\n")
+  const firstLine = (newlineIndex >= 0 ? trimmed.slice(0, newlineIndex) : trimmed).replace(/\r$/, "")
+  const calloutMatch = /^>[ \t]*\[!([a-zA-Z0-9_-]+)\]([+-])?/.exec(firstLine)
+  if (!calloutMatch) return null
+  const modifier = calloutMatch[2]
+  let title = firstLine.slice(calloutMatch[0].length).trim()
+  let content = newlineIndex >= 0 ? trimmed.slice(newlineIndex + 1) : ""
+  if (!title && content) {
+    const strippedLines = content.split(/\r?\n/).map((line) => line.replace(/^[ \t]*>[ \t]?/, ""))
+    const promoted = extractPromotedCalloutTitle(strippedLines)
+    if (promoted.title) {
+      title = promoted.title
+      content = promoted.bodyLines.join("\n")
+    }
+  }
+  return {
+    from,
+    to,
+    type: calloutMatch[1] ?? "note",
+    foldState: modifier === "+" || modifier === "-" ? modifier : null,
+    title,
+    content,
+  }
+}
+
 export class MarkdownCalloutWidget extends WidgetType {
   constructor(
     readonly calloutType: string,
@@ -272,6 +313,7 @@ export class MarkdownCalloutWidget extends WidgetType {
   toDOM(view?: EditorView) {
     const rawKind = this.calloutType.toLowerCase()
     const tone = resolveLiveCalloutTone(rawKind)
+    const isFoldable = this.foldState === "+" || this.foldState === "-"
     const isCollapsed = this.foldState === "-"
     const root = document.createElement("div")
     root.className = `cm-live-callout cm-live-callout-${rawKind} cm-live-callout-tone-${tone.kind}${
@@ -282,6 +324,16 @@ export class MarkdownCalloutWidget extends WidgetType {
       if (this.foldState) root.dataset.foldState = this.foldState
     }
 
+    let resolvedTitle = this.title
+    let strippedContent = this.content.replace(/^[ \t]*>[ \t]?/gm, "").trim()
+    if (!resolvedTitle && strippedContent) {
+      const promoted = extractPromotedCalloutTitle(strippedContent.split(/\r?\n/))
+      if (promoted.title) {
+        resolvedTitle = promoted.title
+        strippedContent = promoted.bodyLines.join("\n").trim()
+      }
+    }
+
     const header = document.createElement("div")
     header.className = "cm-live-callout-header"
 
@@ -290,22 +342,38 @@ export class MarkdownCalloutWidget extends WidgetType {
     badge.setAttribute("aria-hidden", "true")
     badge.textContent = tone.icon
 
-    const foldIcon = document.createElement("span")
-    foldIcon.className = "cm-live-callout-fold"
-    foldIcon.textContent = isCollapsed ? "▶" : "▼"
-
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-callout-title"
-    appendInlineMarkdownNodes(titleSpan, this.title || this.calloutType.toUpperCase())
+    appendInlineMarkdownNodes(titleSpan, resolvedTitle || this.calloutType.toUpperCase())
 
     header.appendChild(badge)
     header.appendChild(titleSpan)
-    header.appendChild(foldIcon)
+    let foldIcon: HTMLElement | null = null
+    if (isFoldable) {
+      foldIcon = document.createElement("span")
+      foldIcon.className = "cm-live-callout-fold"
+      foldIcon.textContent = isCollapsed ? "▶" : "▼"
+      header.appendChild(foldIcon)
+    }
     root.appendChild(header)
 
-    const strippedContent = this.content.replace(/^[ \t]*>[ \t]?/gm, "").trim()
-    if (strippedContent) {
+    if (strippedContent && isFoldable && foldIcon) {
       attachCollapsibleCalloutBody(root, header, foldIcon, strippedContent, isCollapsed, this.from, view)
+    } else if (strippedContent) {
+      const body = document.createElement("div")
+      body.className = "cm-live-callout-body"
+      appendInlineMarkdownNodes(body, strippedContent)
+      root.appendChild(body)
+      attachEmptyCalloutHeader(root, header, this.from, view)
+      if (view) {
+        body.addEventListener("mousedown", (e) => {
+          const target = e.target as HTMLElement | null
+          if (target?.closest("a")) return
+          e.preventDefault()
+          e.stopPropagation()
+          moveCursorToWidgetOrigin(view, root, this.from)
+        })
+      }
     } else {
       attachEmptyCalloutHeader(root, header, this.to || this.from, view)
     }

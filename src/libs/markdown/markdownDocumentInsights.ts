@@ -37,29 +37,23 @@ export type MarkdownDocumentInsights = {
 
 const FENCE_OPEN_PATTERN = /^\s{0,3}(`{3,}|~{3,})/
 
-const isUnicodeWhitespace = (code: number): boolean => {
-  if (code <= 0x7f) {
-    return code === 0x20 || (code >= 0x09 && code <= 0x0d)
-  }
-  return (
-    code === 0xa0 ||
-    code === 0x1680 ||
-    (code >= 0x2000 && code <= 0x200a) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    code === 0x202f ||
-    code === 0x205f ||
-    code === 0x3000 ||
-    code === 0xfeff
-  )
-}
+const isUnicodeWhitespace = (code: number): boolean =>
+  code <= 0x7f
+    ? code === 0x20 || (code >= 0x09 && code <= 0x0d)
+    : code === 0xa0 ||
+      code === 0x1680 ||
+      (code >= 0x2000 && code <= 0x200a) ||
+      code === 0x2028 ||
+      code === 0x2029 ||
+      code === 0x202f ||
+      code === 0x205f ||
+      code === 0x3000 ||
+      code === 0xfeff
 
 export const countCodePoints = (text: string): number => {
   let count = 0
   for (let index = 0; index < text.length; index += 1) {
-    if ((text.codePointAt(index) ?? 0) > 0xffff) {
-      index += 1
-    }
+    if ((text.codePointAt(index) ?? 0) > 0xffff) index += 1
     count += 1
   }
   return count
@@ -68,42 +62,25 @@ export const countCodePoints = (text: string): number => {
 export const countWords = (text: string): number =>
   countTrimmedCodePointsAndWords(text).wordCount
 
-const findTrimmedBounds = (text: string): { start: number; end: number } => {
-  let start = 0
-  const len = text.length
-  while (start < len && isUnicodeWhitespace(text.codePointAt(start) ?? 0)) {
-    start += 1
-  }
-  let end = len
-  while (end > start && isUnicodeWhitespace(text.codePointAt(end - 1) ?? 0)) {
-    end -= 1
-  }
-  return { start, end }
-}
-
 const countTrimmedCodePointsAndWords = (
   text: string
 ): { characterCount: number; wordCount: number } => {
-  const { start, end } = findTrimmedBounds(text)
-  if (start >= end) {
-    return { characterCount: 0, wordCount: 0 }
-  }
+  const trimmed = text.trim()
+  if (!trimmed) return { characterCount: 0, wordCount: 0 }
 
   let characterCount = 0
   let wordCount = 0
   let inWord = false
 
-  for (let index = start; index < end; index += 1) {
-    const code = text.codePointAt(index) ?? 0
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const code = trimmed.codePointAt(index) ?? 0
     if (isUnicodeWhitespace(code)) {
       inWord = false
     } else if (!inWord) {
       inWord = true
       wordCount += 1
     }
-    if (code > 0xffff) {
-      index += 1
-    }
+    if (code > 0xffff) index += 1
     characterCount += 1
   }
 
@@ -116,25 +93,13 @@ const HEADING_INLINE_SYNTAX_CODES = new Set([
 
 export const hasHeadingInlineSyntax = (text: string): boolean => {
   for (let index = 0; index < text.length; index += 1) {
-    if (HEADING_INLINE_SYNTAX_CODES.has(text.codePointAt(index) ?? 0)) {
-      return true
-    }
+    if (HEADING_INLINE_SYNTAX_CODES.has(text.codePointAt(index) ?? 0)) return true
   }
   return false
 }
 
-const collapseAsciiWhitespace = (text: string): string => {
-  let needsCollapse = false
-  const len = text.length
-  for (let index = 0; index < len; index += 1) {
-    const code = text.codePointAt(index) ?? 0
-    if (code === 0x09 || (code === 0x20 && index > 0 && text.codePointAt(index - 1) === 0x20)) {
-      needsCollapse = true
-      break
-    }
-  }
-  return needsCollapse ? text.replace(/[ \t]+/g, " ").trim() : text.trim()
-}
+const collapseAsciiWhitespace = (text: string): string =>
+  text.replace(/[ \t]+/g, " ").trim()
 
 const stripInlineColorHeadingTokens = (value: string): string => {
   let current = value
@@ -278,18 +243,9 @@ export const formatMarkdownHeadingLabel = (text: string): string => {
   return collapseAsciiWhitespace(formatted)
 }
 
-const trimEdgeHyphens = (value: string): string => {
-  let start = 0
-  let end = value.length
-  while (start < end && value.codePointAt(start) === 45) start += 1
-  while (end > start && value.codePointAt(end - 1) === 45) end -= 1
-  return value.slice(start, end)
-}
-
 export const toMarkdownHeadingSlug = (value: string) => {
-  const normalized = value.trim().toLowerCase()
-  const stripped = normalized.replace(/[^\p{L}\p{N}\s-]/gu, "")
-  const dashed = trimEdgeHyphens(stripped.replace(/\s+/g, "-").replace(/-+/g, "-"))
+  const stripped = value.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "")
+  const dashed = stripped.replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
   return dashed || "section"
 }
 

@@ -333,7 +333,7 @@ caption
     expect(pageSource).toContain("isRefreshing = isManualRefreshing")
     expect(pageSource).not.toContain("isRefreshing = systemHealthQuery.isFetching")
     expect(viewSource).toContain("snapshotCollectionFailed")
-    expect(viewSource).not.toMatch(/Public read latency[\s\S]*collectionFailed \?/)
+    expect(viewSource).not.toMatch(/운영 지표 요약[\s\S]*collectionFailed \?/)
     expect(viewSource).not.toMatch(/Live logs[\s\S]*collectionFailed \?/)
   })
 

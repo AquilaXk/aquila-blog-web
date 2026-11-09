@@ -220,7 +220,7 @@ test.describe("관리자 표면 공통 계약", () => {
     expect(workspaceSource).toContain('"/system/api/v1/adm/dashboard-snapshot"')
     expect(workspaceSource).toContain("const chartBars: DashboardChartBar[]")
     expect(workspaceSource).toContain("const logRows: DashboardLogRow[]")
-    expect(viewSource).toContain("<h2>Public read latency</h2>")
+    expect(viewSource).toContain("<h2>운영 지표 요약</h2>")
     expect(viewSource).toContain("<h2>Steady-state guard</h2>")
     expect(viewSource).toContain("<h2>Live logs</h2>")
     expect(viewSource).toContain('<StatusRows data-ui="dashboard-guard-rows">')

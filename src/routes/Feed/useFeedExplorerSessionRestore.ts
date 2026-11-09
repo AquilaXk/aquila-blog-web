@@ -310,13 +310,6 @@ export const useFeedExplorerSessionRestore = ({
       }
       persistFeedExplorerState()
     }
-    const scheduleIdlePersist = () => {
-      if (cancelIdlePersistRef.current) return
-      cancelIdlePersistRef.current = scheduleIdleRevalidate(() => {
-        cancelIdlePersistRef.current = null
-        persistFeedExplorerState()
-      })
-    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
@@ -327,7 +320,7 @@ export const useFeedExplorerSessionRestore = ({
     window.addEventListener("pagehide", flushPersist)
     window.addEventListener("beforeunload", flushPersist)
     document.addEventListener("visibilitychange", handleVisibilityChange)
-    router.events.on("routeChangeStart", scheduleIdlePersist)
+    router.events.on("routeChangeStart", flushPersist)
 
     return () => {
       if (cancelIdlePersistRef.current) {
@@ -337,7 +330,7 @@ export const useFeedExplorerSessionRestore = ({
       window.removeEventListener("pagehide", flushPersist)
       window.removeEventListener("beforeunload", flushPersist)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
-      router.events.off("routeChangeStart", scheduleIdlePersist)
+      router.events.off("routeChangeStart", flushPersist)
     }
   }, [persistFeedExplorerState, router.events])
 
@@ -346,6 +339,7 @@ export const useFeedExplorerSessionRestore = ({
 
     const restoreState = restoreStateRef.current
     if (!restoreState || hasRestoredScrollRef.current) return
+    if (restoreState.tag !== (currentTag || "") || restoreState.q !== normalizedQuery) return
 
     const targetPages = restoreTargetPagesRef.current
     if (loadedPagesCount < targetPages && hasNextPage && !isFetchingNextPage) {
@@ -363,11 +357,13 @@ export const useFeedExplorerSessionRestore = ({
       })
     })
   }, [
+    currentTag,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isInitialLoading,
     loadedPagesCount,
+    normalizedQuery,
     sortMode,
   ])
 

@@ -2,6 +2,7 @@ import { type DehydratedState, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/router"
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import useAuthSession from "src/hooks/useAuthSession"
 import { setAdminProfileCache, refreshAdminProfileCache, type AdminProfile } from "src/hooks/useAdminProfile"
@@ -90,29 +91,10 @@ export const useAdminProfileWorkspacePageModel = ({
     setDraftState(resolved)
   }, [])
   const {
-    addAboutItem,
-    addAboutProject,
-    addAboutSection,
-    appendLinkItem,
-    moveAboutItem,
-    moveAboutProject,
-    moveAboutSection,
-    moveLinkItem,
-    removeAboutItem,
-    removeAboutProject,
-    removeAboutSection,
-    removeLinkItem,
-    reorderLinkItems,
-    updateAboutProject,
-    updateAboutSection,
-    updateDraft,
-    updateLinkItem,
-  } = useAdminProfileWorkspaceDraftActions({
-    setDraft,
-    setOpenIconPicker,
-  })
-
-
+    addAboutItem, addAboutProject, addAboutSection, appendLinkItem, moveAboutItem, moveAboutProject,
+    moveAboutSection, moveLinkItem, removeAboutItem, removeAboutProject, removeAboutSection,
+    removeLinkItem, reorderLinkItems, updateAboutProject, updateAboutSection, updateDraft, updateLinkItem,
+  } = useAdminProfileWorkspaceDraftActions({ setDraft, setOpenIconPicker })
 
   const applyWorkspaceState = useCallback(
     (workspace: ProfileWorkspaceResponse) => {
@@ -138,8 +120,10 @@ export const useAdminProfileWorkspacePageModel = ({
       const nextWorkspace = await saveProfileWorkspaceImage(memberId, draftRef.current, profileImageUrl)
       applyWorkspaceState(nextWorkspace)
       setDraft((currentDraft) => ({ ...currentDraft, profileImageUrl }))
+      void invalidatePublicPostReadCaches(queryClient)
+      void revalidatePublicBlogAppearance()
     },
-    [applyWorkspaceState, setDraft]
+    [applyWorkspaceState, queryClient, setDraft]
   )
 
   useEffect(() => {
@@ -303,6 +287,7 @@ export const useAdminProfileWorkspacePageModel = ({
       })
       setMe(updatedMember)
       setAdminProfileCache(queryClient, updatedMember)
+      await invalidatePublicPostReadCaches(queryClient)
       return updatedMember
     },
     [queryClient, setMe]
@@ -459,6 +444,7 @@ export const useAdminProfileWorkspacePageModel = ({
         applyWorkspaceState(nextWorkspace)
         await refreshAdminShellProfile(queryClient, sessionMember.id)
         const profileRefreshed = await refreshAdminProfileCache(queryClient)
+        await invalidatePublicPostReadCaches(queryClient)
         const publicCacheRevalidated = await revalidatePublicBlogAppearance()
         const isPublicSiteUpdated = profileRefreshed && publicCacheRevalidated
         setPreviewMode("published")

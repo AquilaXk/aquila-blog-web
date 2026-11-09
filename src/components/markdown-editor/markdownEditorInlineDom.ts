@@ -34,8 +34,14 @@ type InlineDomToken =
   | { kind: "wikilink"; from: number; end: number; display: string }
 
 const MAX_INLINE_NESTING_DEPTH = 4
-const INLINE_TRIGGER_PATTERN = /[`*~=$[{<]/
+const INLINE_TRIGGER_PATTERN = /[`*~_=$[{<]/
 const SINGLE_WHITESPACE_PATTERN = /^\s$/u
+const SINGLE_WORD_CHAR_PATTERN = /^[0-9A-Za-z\p{L}\p{N}]$/u
+
+const isWordCharAt = (text: string, index: number): boolean => {
+  if (index < 0 || index >= text.length) return false
+  return SINGLE_WORD_CHAR_PATTERN.test(text[index] ?? "")
+}
 
 let cachedKatex: KatexRuntime | null = null
 let katexLoadPromise: Promise<KatexRuntime | null> | null = null
@@ -138,7 +144,8 @@ const isClosingDoubleDelimiterAt = (
   (text.codePointAt(pos - 1) !== markerCode || isEscapedMarkdownAt(text, pos - 1)) &&
   text.codePointAt(pos + 2) !== markerCode &&
   !isEscapedMarkdownAt(text, pos) &&
-  !isWhitespaceAt(text, pos - 1)
+  !isWhitespaceAt(text, pos - 1) &&
+  (markerCode !== 95 || !isWordCharAt(text, pos + 2))
 
 const findClosingDoubleDelimiter = (
   text: string,
@@ -180,6 +187,9 @@ const matchPairedDoubleDelimiterAt = (
       : null
   }
   const innerStart = from + 2
+  if (markerCode === 95 && isWordCharAt(text, from - 1)) {
+    return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
+  }
   if (!isValidInlineOpenerAt(text, innerStart)) {
     return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
   }
@@ -193,7 +203,8 @@ const matchPairedDoubleDelimiterAt = (
   return { kind: "literal", from, end: innerStart, raw: text.slice(from, innerStart) }
 }
 
-const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
+const matchEmphasisAt = (text: string, from: number, markerCode = 42): InlineDomToken | null => {
+  if (markerCode === 95 && isWordCharAt(text, from - 1)) return null
   const innerStart = from + 1
   if (!isValidInlineOpenerAt(text, innerStart)) return null
   const lineEnd = findInlineLineEnd(text, innerStart)
@@ -207,12 +218,16 @@ const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
       pos = skipped
       continue
     }
-    if (text.codePointAt(pos) !== 42 || isEscapedMarkdownAt(text, pos)) {
+    if (text.codePointAt(pos) !== markerCode || isEscapedMarkdownAt(text, pos)) {
       pos += 1
       continue
     }
-    const closeRun = countCodePointRun(text, pos, 42)
-    if (closeRun === 1 && !isWhitespaceAt(text, pos - 1)) {
+    const closeRun = countCodePointRun(text, pos, markerCode)
+    if (
+      closeRun === 1 &&
+      !isWhitespaceAt(text, pos - 1) &&
+      (markerCode !== 95 || !isWordCharAt(text, pos + 1))
+    ) {
       return { kind: "em", from, end: pos + 1, content: text.slice(innerStart, pos) }
     }
     pos += closeRun
@@ -223,7 +238,12 @@ const matchEmphasisAt = (text: string, from: number): InlineDomToken | null => {
 const matchStarDelimiterAt = (text: string, from: number): InlineDomToken | null =>
   text.codePointAt(from + 1) === 42
     ? matchPairedDoubleDelimiterAt(text, from, 42, "strong")
-    : matchEmphasisAt(text, from)
+    : matchEmphasisAt(text, from, 42)
+
+const matchUnderscoreDelimiterAt = (text: string, from: number): InlineDomToken | null =>
+  text.codePointAt(from + 1) === 95
+    ? matchPairedDoubleDelimiterAt(text, from, 95, "strong")
+    : matchEmphasisAt(text, from, 95)
 
 const matchMathAt = (text: string, from: number): InlineDomToken | null => {
   const runLen = countCodePointRun(text, from, 36)
@@ -351,6 +371,7 @@ const matchInlineTokenAt = (text: string, cursor: number): InlineDomToken | null
   if (code === 60) return matchLineBreakTagAt(text, cursor)
   if (code === 96) return matchInlineCodeAt(text, cursor)
   if (code === 42) return matchStarDelimiterAt(text, cursor)
+  if (code === 95) return matchUnderscoreDelimiterAt(text, cursor)
   if (code === 126) return matchPairedDoubleDelimiterAt(text, cursor, 126, "del")
   if (code === 61) return matchPairedDoubleDelimiterAt(text, cursor, 61, "mark")
   if (code === 36) return matchMathAt(text, cursor)

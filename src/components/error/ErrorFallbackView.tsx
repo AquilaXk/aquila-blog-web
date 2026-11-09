@@ -2,7 +2,7 @@ import Link from "next/link"
 import styled from "@emotion/styled"
 import { ErrorState } from "src/design-system/StatePresenters"
 import { ThemeProvider } from "src/layouts/RootLayout/ThemeProvider"
-import { useLanguage } from "src/libs/language"
+import { getClientStoredLanguage, translations, useLanguage } from "src/libs/language"
 
 type ErrorFallbackVariant = "global" | "surface"
 
@@ -38,22 +38,23 @@ export const ErrorFallbackView = ({
   requestId = null,
   onRetry,
 }: ErrorFallbackViewProps) => {
-  const { t, language } = useLanguage()
+  const { language } = useLanguage()
+  const isEnglish = language === "en" || getClientStoredLanguage() === "en"
+  const dict = isEnglish ? translations.en : translations.ko
   const copy = copyByVariant[variant]
-  const isEnglish = language === "en"
   const title = isEnglish
     ? variant === "global"
-      ? t("error500Title")
+      ? dict.error500Title
       : "Could not render this content"
     : copy.title
   const description = isEnglish
     ? variant === "global"
-      ? t("error500Desc")
+      ? dict.error500Desc
       : "An error occurred while displaying this section. Please try again."
     : copy.description
-  const meta = requestId ? (isEnglish ? `Request ID: ${requestId}` : `요청 ID: ${requestId}`) : undefined
+  const meta = requestId ? `${isEnglish ? "Request" : "요청"} ID: ${requestId}` : undefined
   const retryLabel = isEnglish ? "Retry" : "다시 시도"
-  const homeLabel = isEnglish ? t("error500Home") : "홈으로 이동"
+  const homeLabel = isEnglish ? dict.error500Home : "홈으로 이동"
 
   const fallback = (
     <FallbackShell>

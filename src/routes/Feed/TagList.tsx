@@ -162,7 +162,8 @@ const TagList: React.FC = () => {
       </section>
 
       <div
-        className="chipRail"
+        className="chipRail mobileTags"
+        data-topics-mobile="true"
         data-ui="feed-tag-chip-rail"
         role="group"
         aria-label={t("tagSelectAria")}

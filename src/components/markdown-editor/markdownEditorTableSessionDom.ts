@@ -59,7 +59,7 @@ export const createTableImeProxyElement = (): HTMLTextAreaElement => {
 const readCellText = (grid: MarkdownTableGrid, row: number, col: number): string =>
   row === 0 ? (grid.headers[col] ?? "") : (grid.rows[row - 1]?.[col] ?? "")
 
-const resolveInlineShortcutKind = (event: KeyboardEvent): TableCellInlineFormatKind | null => {
+export const resolveInlineShortcutKind = (event: KeyboardEvent): TableCellInlineFormatKind | null => {
   if (event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     return "line-break"
   }
@@ -67,7 +67,7 @@ const resolveInlineShortcutKind = (event: KeyboardEvent): TableCellInlineFormatK
   const lowerKey = event.key.toLowerCase()
   if (!event.shiftKey && lowerKey === "b") return "bold"
   if (!event.shiftKey && lowerKey === "i") return "italic"
-  if (!event.shiftKey && lowerKey === "e") return "code"
+  if (event.shiftKey && lowerKey === "c") return "code"
   if (event.shiftKey && (lowerKey === "x" || lowerKey === "s")) return "strikethrough"
   return null
 }

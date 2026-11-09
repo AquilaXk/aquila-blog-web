@@ -59,19 +59,7 @@ export const nodeCollectionTouchesHeading = (
   nodes: Iterable<Node> | ArrayLike<Node> | null | undefined
 ): boolean => {
   if (!nodes) return false
-  if (typeof (nodes as ArrayLike<Node>).length === "number") {
-    const arrayLike = nodes as ArrayLike<Node>
-    let index = 0
-    while (index < arrayLike.length) {
-      if (nodeTouchesHeading(arrayLike[index], true)) return true
-      index += 1
-    }
-    return false
-  }
-  for (const node of nodes as Iterable<Node>) {
-    if (nodeTouchesHeading(node, true)) return true
-  }
-  return false
+  return Array.from(nodes).some((node) => nodeTouchesHeading(node, true))
 }
 
 export const shouldSyncTocFromMutations = (mutations: Iterable<MutationRecord>): boolean => {

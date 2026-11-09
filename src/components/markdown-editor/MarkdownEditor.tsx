@@ -4,7 +4,9 @@ import { planMarkdownEditorLineCommand, type MarkdownEditorLineCommand } from ".
 import { planToggleListCommand, type MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import { EditorRoot, ToolbarError, LiveEditorBody } from "./MarkdownEditor.styles"
 import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./markdownEditorTextMutation"
-import { codeBlockSnippet, planInsertBlockSnippet, type BlockSnippetSpec } from "./markdownEditorBlockSnippets"
+import {
+  codeBlockSnippet, planInsertBlockSnippet, planStandaloneSnippetInsertion, type BlockSnippetSpec,
+} from "./markdownEditorBlockSnippets"
 import { projectMarkdownEditorToolbarCommands, type MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
 import { MarkdownEditorFindReplace } from "./MarkdownEditorFindReplace"
 import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
@@ -19,39 +21,33 @@ import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
 import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
 import { useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
-import {
-  TABLE_ADD_ROW_EDIT,
-  resolveActiveTableCellOffset,
-  useMarkdownEditorTableControls,
-} from "./useMarkdownEditorTableControls"
+import { TABLE_ADD_ROW_EDIT, resolveActiveTableCellOffset, useMarkdownEditorTableControls } from "./useMarkdownEditorTableControls"
 export { isTableEditActionDisabled, resolveActiveTableCellOffset } from "./useMarkdownEditorTableControls"
 export { matchSlashCommandTrigger, resolveSlashCommandMutation, SLASH_COMMAND_SPECS } from "./useMarkdownEditorSlashMenu"
 
 type MarkdownChangeMeta = { editorFocused: boolean }
 export type MarkdownEditorFocusSelection = { from: number; to: number }
-export type MarkdownEditorFocusRequest = (selection?: MarkdownEditorFocusSelection) => void
+export type MarkdownEditorFocusRequestOptions =
+  | MarkdownEditorFocusSelection
+  | { insertSnippet: string; fallbackSelection?: MarkdownEditorFocusSelection }
+export type MarkdownEditorFocusRequest = (options?: MarkdownEditorFocusRequestOptions) => boolean | void
 
 type MarkdownEditorProps = {
-  value: string
-  disabled?: boolean
-  disableMermaid?: boolean
+  value: string; disabled?: boolean; disableMermaid?: boolean
   onRequestFocusTitle?: () => void
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
   onSelectionChange?: (selection: MarkdownEditorFocusSelection) => void
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
-  onRequestSave?: () => void
-  onUploadingChange?: (isUploading: boolean) => void
+  onRequestSave?: () => void; onUploadingChange?: (isUploading: boolean) => void
   onUploadImage?: (file: File) => Promise<MarkdownImageUploadResult>
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
 }
 
 type TextareaSelection = MarkdownEditorFocusSelection
 
-const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode => {
-  if (prev === "live") return "source"
-  return prev === "source" ? "reading" : "live"
-}
+const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode =>
+  prev === "live" ? "source" : prev === "source" ? "reading" : "live"
 
 const isEditorAuthoringDisabled = (disabled: boolean, viewMode: MarkdownEditorSurfaceMode): boolean =>
   disabled || viewMode === "reading"
@@ -60,17 +56,13 @@ const selectSameOrNextSelection = (prev: TextareaSelection, next: TextareaSelect
   prev.from === next.from && prev.to === next.to ? prev : next
 
 const clampSelectionToLength = (from: number, to: number, length: number): TextareaSelection => ({
-  from: Math.max(0, Math.min(from, length)),
-  to: Math.max(0, Math.min(to, length)),
+  from: Math.max(0, Math.min(from, length)), to: Math.max(0, Math.min(to, length)),
 })
 
-const createOptionalInputPicker = (
-  enabled: boolean,
-  inputRef: RefObject<HTMLInputElement | null>
-): (() => void) | undefined => (enabled ? () => inputRef.current?.click() : undefined)
+const createOptionalInputPicker = (enabled: boolean, inputRef: RefObject<HTMLInputElement | null>): (() => void) | undefined =>
+  enabled ? () => inputRef.current?.click() : undefined
 
-const selectOptionalCallback = <T,>(enabled: boolean, callback: T): T | undefined =>
-  enabled ? callback : undefined
+const selectOptionalCallback = <T,>(enabled: boolean, callback: T): T | undefined => (enabled ? callback : undefined)
 
 const TEXTAREA_KEYBOARD_HELP =
   `표 셀에서는 Tab과 Shift+Tab으로 다음 또는 이전 셀로 이동합니다. 표 밖에서는 Tab은 2칸 들여쓰기, Shift+Tab은 내어쓰기입니다. 괄호·따옴표·인라인 코드는 자동으로 쌍을 입력합니다. Alt+ArrowUp과 Alt+ArrowDown은 현재 줄을 이동하고, Shift+Alt+ArrowDown은 복제합니다. ${modShortcutLabel}Shift+K는 현재 줄을 삭제합니다. Escape를 누른 다음 Tab은 포커스를 다음 요소로 이동합니다.`
@@ -83,6 +75,8 @@ type LifecycleEffectsInput = {
   liveSurfaceRef: RefObject<MarkdownEditorLiveSurfaceHandle | null>
   setDraftValue: (next: string) => void; resetTableAvailability: () => void
   invalidateFindReplace: (resetQuery?: boolean) => void; closeSlashMenu: () => void
+  resolveActiveSelection: () => TextareaSelection
+  applyMutationPlan: (plan: PlannedTextMutation, options?: { clearUploadError?: boolean }) => boolean
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
 }
@@ -90,7 +84,8 @@ type LifecycleEffectsInput = {
 const useMarkdownEditorLifecycleEffects = ({
   value, disabled, viewMode, valueRef, documentGenerationRef, pendingFindReplaceInvalidationRef,
   liveEditorBodyRef, liveSurfaceRef, setDraftValue, resetTableAvailability,
-  invalidateFindReplace, closeSlashMenu, onFlushMarkdownReady, onFocusRequestReady,
+  invalidateFindReplace, closeSlashMenu, resolveActiveSelection, applyMutationPlan,
+  onFlushMarkdownReady, onFocusRequestReady,
 }: LifecycleEffectsInput) => {
   useEffect(() => {
     if (value === valueRef.current) return
@@ -110,12 +105,20 @@ const useMarkdownEditorLifecycleEffects = ({
   }, [liveEditorBodyRef, onFlushMarkdownReady, valueRef])
 
   useEffect(() => {
-    const focusIfEnabled: MarkdownEditorFocusRequest = (selection) => {
-      if (!disabled) liveSurfaceRef.current?.focus(selection)
+    const focusIfEnabled: MarkdownEditorFocusRequest = (options) => {
+      if (disabled) return false
+      if (options && "insertSnippet" in options) {
+        if (!liveSurfaceRef.current) return false
+        const active = resolveActiveSelection()
+        const rawSel = active.from === 0 && active.to === 0 && options.fallbackSelection ? options.fallbackSelection : active
+        return applyMutationPlan(planStandaloneSnippetInsertion(valueRef.current, rawSel, options.insertSnippet))
+      }
+      liveSurfaceRef.current?.focus(options)
+      return true
     }
     onFocusRequestReady?.(focusIfEnabled)
     return () => onFocusRequestReady?.(null)
-  }, [disabled, liveSurfaceRef, onFocusRequestReady])
+  }, [applyMutationPlan, disabled, liveSurfaceRef, onFocusRequestReady, resolveActiveSelection, valueRef])
 
   useEffect(() => {
     if (!pendingFindReplaceInvalidationRef.current) return
@@ -490,7 +493,8 @@ export const MarkdownEditor = ({
   useMarkdownEditorLifecycleEffects({
     value, disabled, viewMode, valueRef, documentGenerationRef, pendingFindReplaceInvalidationRef,
     liveEditorBodyRef, liveSurfaceRef, setDraftValue, resetTableAvailability,
-    invalidateFindReplace, closeSlashMenu, onFlushMarkdownReady, onFocusRequestReady,
+    invalidateFindReplace, closeSlashMenu, resolveActiveSelection, applyMutationPlan,
+    onFlushMarkdownReady, onFocusRequestReady,
   })
 
   const isCompletionOrSlashMenuActive = useCallback(
@@ -509,7 +513,8 @@ export const MarkdownEditor = ({
     rememberTextareaSelection, applyMutationPlan, applyRecordedMutation: applyMutationPlan,
     setTextareaSelection: setEditorSelection,
     onRequestSave: selectOptionalCallback(Boolean(onRequestSave), handleRequestSave),
-    onToggleViewMode: cycleViewMode, isCompletionActive: isCompletionOrSlashMenuActive,
+    onToggleViewMode: cycleViewMode, onOpenFindReplace: findReplace.open,
+    isCompletionActive: isCompletionOrSlashMenuActive,
   })
 
   const handleLiveSelectionChange = useCallback(

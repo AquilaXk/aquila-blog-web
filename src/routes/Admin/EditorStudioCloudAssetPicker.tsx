@@ -6,6 +6,7 @@ import {
   getCloudFileDownloadUrl,
   listCloudFiles,
 } from "src/apis/backend/cloud"
+import { escapeMarkdownLinkDestination } from "src/components/markdown-editor/markdownEditorUploadModel"
 import { SecondaryButton } from "./EditorStudioDedicatedEditorSurfaceParts"
 
 const CLOUD_PICKER_MAX_ITEMS = 12
@@ -31,8 +32,9 @@ export const buildCloudAssetMarkdownSnippet = (
   promotedPublicAssetUrl?: string
 ): string => {
   const safeLabel = sanitizeMarkdownLabel(file.originalFilename)
-  const targetUrl = promotedPublicAssetUrl?.trim() || ""
-  if (!targetUrl) return ""
+  const rawTargetUrl = promotedPublicAssetUrl?.trim() || ""
+  if (!rawTargetUrl) return ""
+  const targetUrl = escapeMarkdownLinkDestination(rawTargetUrl)
   if (isImageCloudAsset(file)) {
     return `![${safeLabel}](${targetUrl})`
   }

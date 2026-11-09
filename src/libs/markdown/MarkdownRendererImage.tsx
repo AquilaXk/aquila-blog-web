@@ -18,6 +18,7 @@ export const MarkdownImageFigure = memo(
     const frameRef = useRef<HTMLElement>(null)
     const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(null)
     const liveWidthRef = useRef<number | null>(null)
+    const pointerCleanupRef = useRef<(() => void) | null>(null)
     const [draftWidthPx, setDraftWidthPx] = useState<number | null>(null)
 
     useEffect(() => {
@@ -25,10 +26,18 @@ export const MarkdownImageFigure = memo(
       liveWidthRef.current = null
     }, [src, widthPx])
 
+    useEffect(
+      () => () => {
+        pointerCleanupRef.current?.()
+        pointerCleanupRef.current = null
+      },
+      []
+    )
+
     const effectiveWidthPx = draftWidthPx ?? widthPx
     const effectiveHeightPx = heightPx
     const effectiveAspectRatio =
-      aspectRatio || (effectiveWidthPx && effectiveHeightPx ? `${effectiveWidthPx} / ${effectiveHeightPx}` : undefined)
+      aspectRatio || (widthPx && heightPx ? `${widthPx} / ${heightPx}` : undefined)
     const safeSrc = normalizeSafeMarkdownImageSrc(src)
 
     useEffect(() => {
@@ -78,6 +87,7 @@ export const MarkdownImageFigure = memo(
             aria-label="이미지 폭 조절"
             onPointerDown={(event) => {
               if (!frameRef.current) return
+              pointerCleanupRef.current?.()
               const containerWidth = frameRef.current.parentElement?.clientWidth ?? frameRef.current.clientWidth
               const currentWidth =
                 draftWidthPx ??
@@ -100,9 +110,15 @@ export const MarkdownImageFigure = memo(
                 setDraftWidthPx(Math.round(nextWidth))
               }
 
-              const handlePointerUp = () => {
+              const detachPointerListeners = () => {
                 window.removeEventListener("pointermove", handlePointerMove)
                 window.removeEventListener("pointerup", handlePointerUp)
+                window.removeEventListener("pointercancel", handlePointerCancel)
+                pointerCleanupRef.current = null
+              }
+
+              const handlePointerUp = () => {
+                detachPointerListeners()
                 const nextWidth = liveWidthRef.current ?? widthPx ?? currentWidth
                 dragStateRef.current = null
                 liveWidthRef.current = null
@@ -110,8 +126,17 @@ export const MarkdownImageFigure = memo(
                 onWidthCommit?.({ src: safeSrc, alt, index: imageIndex, widthPx: nextWidth })
               }
 
+              const handlePointerCancel = () => {
+                detachPointerListeners()
+                dragStateRef.current = null
+                liveWidthRef.current = null
+                setDraftWidthPx(null)
+              }
+
+              pointerCleanupRef.current = detachPointerListeners
               window.addEventListener("pointermove", handlePointerMove)
               window.addEventListener("pointerup", handlePointerUp, { once: true })
+              window.addEventListener("pointercancel", handlePointerCancel, { once: true })
             }}
           >
             <span />

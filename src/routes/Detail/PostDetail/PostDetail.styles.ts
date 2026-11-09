@@ -15,10 +15,7 @@ export const StyledWrapper = styled.div `
   &::before {
     content: "";
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    inset: 0;
     z-index: -1;
     width: 100%;
     background: var(--aq-page-bg);
@@ -262,8 +259,7 @@ export const StyledWrapper = styled.div `
       text-transform: uppercase;
     }
 
-    .tocDepthToggle,
-    .tocToggle {
+    .tocDepthToggle {
       border: 1px solid var(--aq-border);
       border-radius: 6px;
       background: var(--aq-surface);
@@ -374,12 +370,9 @@ export const StyledWrapper = styled.div `
     }
 
     .detailLayout,
-    .detailLayout[data-toc="true"],
-    .detailLayout[data-toc="false"] {
+    .detailLayout[data-toc] {
       width: auto;
       display: block;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0;
       padding: 30px 20px 70px;
     }
 
@@ -392,8 +385,7 @@ export const StyledWrapper = styled.div `
       max-width: 760px;
     }
 
-    .mobileToc,
-    .mobileTocBlock {
+    .mobileToc {
       display: block;
       margin: 0 0 28px;
       border: 1px solid var(--aq-border);

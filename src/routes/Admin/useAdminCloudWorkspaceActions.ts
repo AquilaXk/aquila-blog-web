@@ -179,9 +179,17 @@ export const useAdminCloudWorkspaceActions = () => {
   }, [toast])
 
   useEffect(() => {
+    const controllers = uploadControllersRef.current
+    return () => {
+      controllers.forEach((controller) => controller.abort())
+      controllers.clear()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!shouldShowDetailPanel || deleteConfirm) return
     const handleEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return
+      if (event.key !== "Escape" || event.defaultPrevented) return
       event.preventDefault()
       setIsDetailPanelOpen(false)
     }
@@ -538,54 +546,15 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   return {
-    activeFolderPath,
-    activeUploadCount,
-    allVisibleChecked,
-    availableFolders,
-    checkedFileIds,
-    closeDeleteConfirm,
-    completedUploadCount,
-    debouncedKeyword,
-    deleteCancelButtonRef,
-    deleteConfirm,
-    deleteDialogRef,
-    files,
-    filesQuery,
-    filter,
-    handleCancelUpload,
-    handleClearFinishedUploads,
-    handleConfirmDelete,
-    handleCopyFileLink,
-    handleDeleteDialogKeyDown,
-    handleDeleteSelected,
-    handlePreviewFile,
-    handleRequestDeleteFile,
-    handleRetryUpload,
-    handleSelectFolder,
-    handleToggleAllChecked,
-    handleToggleChecked,
-    handleUpdateFile,
-    handleUploadDragLeave,
-    handleUploadDragOver,
-    handleUploadDrop,
-    handleUploadSelect,
-    isDetailDrawerMode,
-    isDeletePending,
-    isDragActive,
-    keyword,
-    notice,
-    selectedFile,
-    setFilter,
-    setIsComposing,
-    setIsDetailPanelOpen,
-    setKeyword,
-    setSelectedFileId,
-    setSortMode,
-    setToast,
-    shouldShowDetailPanel,
-    sortMode,
-    toast,
-    uploadInputRef,
-    uploadQueue,
+    activeFolderPath, activeUploadCount, allVisibleChecked, availableFolders, checkedFileIds,
+    closeDeleteConfirm, completedUploadCount, debouncedKeyword, deleteCancelButtonRef, deleteConfirm,
+    deleteDialogRef, files, filesQuery, filter, handleCancelUpload, handleClearFinishedUploads,
+    handleConfirmDelete, handleCopyFileLink, handleDeleteDialogKeyDown, handleDeleteSelected,
+    handlePreviewFile, handleRequestDeleteFile, handleRetryUpload, handleSelectFolder,
+    handleToggleAllChecked, handleToggleChecked, handleUpdateFile, handleUploadDragLeave,
+    handleUploadDragOver, handleUploadDrop, handleUploadSelect, isDetailDrawerMode, isDeletePending,
+    isDragActive, keyword, notice, selectedFile, setFilter, setIsComposing, setIsDetailPanelOpen,
+    setKeyword, setSelectedFileId, setSortMode, setToast, shouldShowDetailPanel, sortMode, toast,
+    uploadInputRef, uploadQueue,
   }
 }

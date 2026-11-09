@@ -60,86 +60,66 @@ export const startsWithAsciiCaseInsensitive = (
   return true
 }
 
-export const matchRawBrTagAt = (text: string, start: number): number => {
-  if (text.codePointAt(start) !== 60) return -1
-  let cursor = skipAsciiSpaces(text, start + 1)
+const matchBrBodyAt = (text: string, afterOpen: number): number => {
+  let cursor = skipAsciiSpaces(text, afterOpen)
   if (!startsWithAsciiCaseInsensitive(text, cursor, "br")) return -1
   cursor = skipAsciiSpaces(text, cursor + 2)
-  if (text.codePointAt(cursor) === 47) {
-    cursor = skipAsciiSpaces(text, cursor + 1)
-  }
-  return text.codePointAt(cursor) === 62 ? cursor + 1 : -1
+  if (text.codePointAt(cursor) === 47) cursor = skipAsciiSpaces(text, cursor + 1)
+  return cursor
+}
+
+export const matchRawBrTagAt = (text: string, start: number): number => {
+  if (text.codePointAt(start) !== 60) return -1
+  const cursor = matchBrBodyAt(text, start + 1)
+  return cursor > 0 && text.codePointAt(cursor) === 62 ? cursor + 1 : -1
 }
 
 const LT_HTML_ENTITY_STICKY_PATTERN = /&(?:lt|LT|#0*60|#[xX]0*3[cC]);/y
 const GT_HTML_ENTITY_STICKY_PATTERN = /&(?:gt|GT|#0*62|#[xX]0*3[eE]);/y
 
-const matchHtmlLtEntityEndAt = (text: string, start: number): number => {
+const matchStickyEntityEndAt = (text: string, start: number, pattern: RegExp): number => {
   if (text.codePointAt(start) !== 38) return -1
-  LT_HTML_ENTITY_STICKY_PATTERN.lastIndex = start
-  return LT_HTML_ENTITY_STICKY_PATTERN.test(text) ? LT_HTML_ENTITY_STICKY_PATTERN.lastIndex : -1
-}
-
-const matchHtmlGtEntityEndAt = (text: string, start: number): number => {
-  if (text.codePointAt(start) !== 38) return -1
-  GT_HTML_ENTITY_STICKY_PATTERN.lastIndex = start
-  return GT_HTML_ENTITY_STICKY_PATTERN.test(text) ? GT_HTML_ENTITY_STICKY_PATTERN.lastIndex : -1
+  pattern.lastIndex = start
+  return pattern.test(text) ? pattern.lastIndex : -1
 }
 
 export const matchEntityBrTagAt = (text: string, start: number): number => {
-  const afterLt = matchHtmlLtEntityEndAt(text, start)
+  const afterLt = matchStickyEntityEndAt(text, start, LT_HTML_ENTITY_STICKY_PATTERN)
   if (afterLt < 0) return -1
-  let cursor = skipAsciiSpaces(text, afterLt)
-  if (!startsWithAsciiCaseInsensitive(text, cursor, "br")) return -1
-  cursor = skipAsciiSpaces(text, cursor + 2)
-  if (text.codePointAt(cursor) === 47) {
-    cursor = skipAsciiSpaces(text, cursor + 1)
-  }
-  return matchHtmlGtEntityEndAt(text, cursor)
+  const cursor = matchBrBodyAt(text, afterLt)
+  return cursor > 0 ? matchStickyEntityEndAt(text, cursor, GT_HTML_ENTITY_STICKY_PATTERN) : -1
 }
 
-export const hasRawBrTag = (text: string): boolean => {
-  let index = text.indexOf("<")
+export const hasRawBrTag = (text: string): boolean =>
+  findRawBrTagSpans(text, false).length > 0
+
+const findTagSpansByTrigger = (
+  text: string,
+  trigger: string,
+  honorEscapes: boolean,
+  matcher: (text: string, index: number) => number
+): TextRangeSpan[] => {
+  const spans: TextRangeSpan[] = []
+  let index = text.indexOf(trigger)
   while (index >= 0) {
-    if (matchRawBrTagAt(text, index) > index) return true
-    index = text.indexOf("<", index + 1)
+    const end = honorEscapes && isEscapedMarkdownAt(text, index) ? -1 : matcher(text, index)
+    if (end > index) {
+      spans.push({ from: index, to: end })
+      index = text.indexOf(trigger, end)
+    } else {
+      index = text.indexOf(trigger, index + 1)
+    }
   }
-  return false
+  return spans
 }
 
 export const findRawBrTagSpans = (
   text: string,
   honorMarkdownEscapes = false
-): TextRangeSpan[] => {
-  const spans: TextRangeSpan[] = []
-  let index = text.indexOf("<")
-  while (index >= 0) {
-    const escaped = honorMarkdownEscapes && isEscapedMarkdownAt(text, index)
-    const end = escaped ? -1 : matchRawBrTagAt(text, index)
-    if (end > index) {
-      spans.push({ from: index, to: end })
-      index = text.indexOf("<", end)
-    } else {
-      index = text.indexOf("<", index + 1)
-    }
-  }
-  return spans
-}
+): TextRangeSpan[] => findTagSpansByTrigger(text, "<", honorMarkdownEscapes, matchRawBrTagAt)
 
-const findEntityBrTagSpans = (text: string): TextRangeSpan[] => {
-  const spans: TextRangeSpan[] = []
-  let index = text.indexOf("&")
-  while (index >= 0) {
-    const end = isEscapedMarkdownAt(text, index) ? -1 : matchEntityBrTagAt(text, index)
-    if (end > index) {
-      spans.push({ from: index, to: end })
-      index = text.indexOf("&", end)
-    } else {
-      index = text.indexOf("&", index + 1)
-    }
-  }
-  return spans
-}
+const findEntityBrTagSpans = (text: string): TextRangeSpan[] =>
+  findTagSpansByTrigger(text, "&", true, matchEntityBrTagAt)
 
 const replaceSpansWithLiteral = (
   text: string,
