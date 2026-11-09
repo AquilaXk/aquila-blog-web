@@ -501,6 +501,16 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       /<meta name="twitter:image" content="https?:\/\/[^"#]+\/easysubway\/og-image\.png"\/>/
     )
 
+    const websiteSurfaceHeadHtml = renderMetaHeadHtml({
+      ...pageMeta,
+      type: "Website",
+      image: "/easysubway/og-image.png#focusX=50&focusY=50",
+    })
+    expect(websiteSurfaceHeadHtml).toContain('<meta property="og:type" content="website"/>')
+    expect(websiteSurfaceHeadHtml).toContain(
+      '<meta property="og:image" content="/easysubway/og-image.png"/>'
+    )
+
     const renderActions = (shareFeedback: "copied" | "shared" | "failed" | null) =>
       renderToStaticMarkup(
         materializePlaywrightJsx(

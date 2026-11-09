@@ -85,6 +85,13 @@ const translationTable = {
   ],
   error500Home: ["홈으로 이동", "Back to home"],
   error500Retry: ["새로고침", "Reload"],
+  postAuthorAnonymous: ["익명", "Anonymous"],
+  postDetailErrorTitle: ["글을 불러오지 못했습니다", "Failed to load post"],
+  postDetailErrorDesc: [
+    "일시적인 오류로 글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+    "A temporary error occurred while loading the post. Please try again shortly.",
+  ],
+  postDetailErrorRetry: ["다시 시도", "Retry"],
 } as const
 
 export type TranslationKey = keyof typeof translationTable

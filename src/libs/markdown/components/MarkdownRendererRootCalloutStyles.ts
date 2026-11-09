@@ -137,6 +137,10 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     --ad-accent: ${theme.colors.orange10};
   }
 
+  .aq-callout.aq-admonition-danger {
+    --ad-accent: ${theme.colors.red10};
+  }
+
   .aq-callout.aq-admonition-outline {
     --ad-accent: ${theme.colors.gray11};
     --ad-body-bg: ${theme.publicDesign.surfaceElevated};

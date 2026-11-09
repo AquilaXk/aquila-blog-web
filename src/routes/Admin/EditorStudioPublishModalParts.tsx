@@ -77,7 +77,7 @@ export const EditorStudioPublishCardSettings = ({
 }: CardSettingsProps) => (
   <PostPreviewSetup>
     <PostPreviewHeader>
-      <strong>카드 요소 편집</strong>
+      <strong>상세 히어로 & 공유 이미지 편집</strong>
       {setupDescription ? <span>{setupDescription}</span> : null}
     </PostPreviewHeader>
     {isCompactMobileLayout ? (
@@ -90,7 +90,7 @@ export const EditorStudioPublishCardSettings = ({
           >
             <div>
               <strong>썸네일 위치 조정</strong>
-              <span>드래그/확대로 카드 크롭을 빠르게 맞춥니다.</span>
+              <span>드래그/확대로 글 상세 상단 히어로 및 공유 대표 이미지 초점을 맞춥니다.</span>
             </div>
             <span>{isMobileThumbnailEditorOpen ? closeToggleLabel : "열기"}</span>
           </CompactPublishEditorToggle>

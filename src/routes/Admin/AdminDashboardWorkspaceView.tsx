@@ -113,7 +113,7 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
           <OpsGrid>
             <PanelCard>
               <PanelHeader>
-                <h2>Operational activity share</h2>
+                <h2>Public read latency</h2>
                 {snapshotCollectionFailed ? (
                   <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
                 ) : (

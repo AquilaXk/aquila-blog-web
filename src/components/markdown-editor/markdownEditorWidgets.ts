@@ -116,22 +116,35 @@ export class MarkdownMathWidget extends WidgetType {
 }
 
 export class MarkdownImageWidget extends WidgetType {
-  constructor(private readonly src: string, private readonly alt: string) {
+  constructor(
+    private readonly src: string,
+    private readonly alt: string,
+    private readonly widthPx?: number,
+    private readonly align?: string
+  ) {
     super()
   }
 
   eq(other: MarkdownImageWidget) {
-    return other.src === this.src && other.alt === this.alt
+    return (
+      other.src === this.src &&
+      other.alt === this.alt &&
+      other.widthPx === this.widthPx &&
+      other.align === this.align
+    )
   }
 
   toDOM() {
     const wrap = document.createElement("span")
     wrap.className = "cm-live-image-wrap"
+    if (this.align) wrap.dataset.align = this.align
+    if (this.widthPx) wrap.style.setProperty("--aq-image-width", `${this.widthPx}px`)
     const img = document.createElement("img")
     img.className = "cm-live-image"
     const safeSrc = normalizeSafeMarkdownImageSrc(this.src)
     if (safeSrc) img.src = safeSrc
     img.alt = this.alt
+    if (this.widthPx) img.width = this.widthPx
     img.loading = "lazy"
     wrap.appendChild(img)
     return wrap
@@ -162,7 +175,8 @@ const moveCursorToWidgetOrigin = (
 export const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: string } => {
   const token = rawType.toLowerCase()
   if (["tip", "hint", "success", "check", "done"].includes(token)) return { kind: "tip", icon: "💡" }
-  if (["warning", "caution", "attention", "failure", "fail", "missing", "danger", "error", "bug"].includes(token)) {
+  if (["danger", "error", "bug", "failure", "fail"].includes(token)) return { kind: "danger", icon: "🚨" }
+  if (["warning", "caution", "attention", "missing"].includes(token)) {
     return { kind: "warning", icon: "⚠️" }
   }
   if (["summary", "abstract", "tldr", "important"].includes(token)) return { kind: "summary", icon: "📌" }

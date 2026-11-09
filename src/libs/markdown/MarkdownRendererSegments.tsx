@@ -288,6 +288,7 @@ export const renderMarkdownSegment = ({
         widthPx={segment.widthPx}
         heightPx={segment.heightPx}
         aspectRatio={segment.aspectRatio}
+        align={segment.align}
         eager={imageIndex === 0}
         editable={editableImages}
         imageIndex={imageIndex}

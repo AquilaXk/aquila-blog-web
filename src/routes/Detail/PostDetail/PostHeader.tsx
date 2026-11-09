@@ -34,9 +34,10 @@ type Props = {
   showThumbnail?: boolean
 }
 
-const resolvePostAuthorMeta = (data: PostDetail) => {
+const resolvePostAuthorMeta = (data: PostDetail, locale: string = CONFIG.lang) => {
   const postAuthor = data.author?.find((author) => author.name?.trim()) ?? null
-  const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || "익명"
+  const fallbackAuthor = locale.startsWith("en") ? "Anonymous" : "익명"
+  const authorName = data.authorName?.trim() || postAuthor?.name?.trim() || fallbackAuthor
   const authorImageSrc = data.authorProfileImgUrl || postAuthor?.profile_photo || ""
   return {
     authorName,
@@ -44,13 +45,13 @@ const resolvePostAuthorMeta = (data: PostDetail) => {
   }
 }
 
-const resolvePostDates = (data: PostDetail) => {
+const resolvePostDates = (data: PostDetail, locale: string = CONFIG.lang) => {
   const effectiveCreated = data.createdAt || data.createdTime || ""
   const effectiveModified = data.modifiedAt || data.modifiedTime || ""
-  const publishedAt = formatDateTime(effectiveCreated, CONFIG.lang)
+  const publishedAt = formatDateTime(effectiveCreated, locale)
   const modifiedAt =
     effectiveModified && effectiveModified !== effectiveCreated
-      ? formatDateTime(effectiveModified, CONFIG.lang)
+      ? formatDateTime(effectiveModified, locale)
       : ""
   return { publishedAt, modifiedAt }
 }
@@ -92,10 +93,10 @@ const resolveHeroLabels = (data: PostDetail): string[] => {
   return [primaryTaxonomy, typeLabel].filter(Boolean)
 }
 
-export const resolvePostHeaderViewModel = (props: Props) => {
+export const resolvePostHeaderViewModel = (props: Props, locale: string = CONFIG.lang) => {
   const { data, likesCount, hitCount, shareFeedback = null, deckSummary } = props
-  const { authorName, authorImageSrc } = resolvePostAuthorMeta(data)
-  const { publishedAt, modifiedAt } = resolvePostDates(data)
+  const { authorName, authorImageSrc } = resolvePostAuthorMeta(data, locale)
+  const { publishedAt, modifiedAt } = resolvePostDates(data, locale)
   const heroLabels = resolveHeroLabels(data)
   const rawThumbnail = data.thumbnail || ""
   const thumbnailSrc = rawThumbnail
@@ -107,7 +108,7 @@ export const resolvePostHeaderViewModel = (props: Props) => {
   const shareFeedbackMessage = resolveShareFeedbackMessage(shareFeedback)
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const viewCount = hitCount ?? data.hitCount ?? 0
-  const viewText = `${getNumberFormatter(CONFIG.lang).format(viewCount)} VIEWS`
+  const viewText = `${getNumberFormatter(locale).format(viewCount)} VIEWS`
   const resolvedLikesCount = likesCount ?? data.likesCount ?? 0
 
   return {
@@ -258,7 +259,7 @@ export const PostHeaderEngagementSection: React.FC<{
 }
 
 const PostHeader: React.FC<Props> = (props) => {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const {
     data,
     liked = false,
@@ -273,7 +274,11 @@ const PostHeader: React.FC<Props> = (props) => {
     readingMinutes,
     showThumbnail = true,
   } = props
-  const vm = resolvePostHeaderViewModel(props)
+  const locale = language === "en" ? "en-US" : CONFIG.lang
+  const vm = resolvePostHeaderViewModel(props, locale)
+  const visibleTags = Array.isArray(data.tags)
+    ? data.tags.map((tag) => tag.trim()).filter(Boolean)
+    : []
 
   return (
     <StyledWrapper>
@@ -293,6 +298,19 @@ const PostHeader: React.FC<Props> = (props) => {
       ) : null}
       <h1 className="title">{data.title}</h1>
       {vm.resolvedDeckSummary ? <p className="deck">{vm.resolvedDeckSummary}</p> : null}
+      {visibleTags.length > 0 ? (
+        <div className="postTagChips" aria-label={t("tagListAria")}>
+          {visibleTags.map((tag) => (
+            <Link
+              key={tag}
+              href={`/?tag=${encodeURIComponent(tag)}`}
+              className="postTagChip"
+            >
+              #{tag}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       <div className="metaRow">
         <PostHeaderAuthorMeta

@@ -7,7 +7,6 @@ import {
   useState,
   type KeyboardEvent,
 } from "react"
-import Link from "next/link"
 import SearchInput from "./SearchInput"
 import PinnedPosts from "./PostList/PinnedPosts"
 import PostList from "./PostList"
@@ -131,6 +130,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     q,
     router,
     setQ,
+    setSortMode,
     sortMode,
   })
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
@@ -230,8 +230,17 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
 
   const handleClearFilters = useCallback(() => {
     setQ("")
-    if (!currentTag) return
-    const { category: _deprecatedCategory, ...restQuery } = router.query
+    setSortMode("latest")
+    const hasRouteFilterParams = Boolean(
+      currentTag || router.query.q || router.query.sort || router.query.category
+    )
+    if (!hasRouteFilterParams) return
+    const {
+      category: _deprecatedCategory,
+      q: _queryKeyword,
+      sort: _querySort,
+      ...restQuery
+    } = router.query
     startTransition(() => {
       void replaceShallowRoutePreservingScroll(router, {
         pathname: "/",
@@ -327,9 +336,6 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
                       {introDescription ? <span>{introDescription}</span> : null}
                     </span>
                   ) : null}
-                  <Link href="/about" className="feedIntroLink">
-                    {t("navAbout")} →
-                  </Link>
                 </div>
               ) : null}
             </div>

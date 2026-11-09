@@ -7,11 +7,17 @@ export const clampImageDimensionPx = (value: number) => Math.min(2400, Math.max(
 
 export const normalizeImageAlign = (
   value: string | null | undefined
-): "left" | "center" | "wide" | "full" | undefined => {
+): "left" | "center" | "right" | "wide" | "full" | undefined => {
   if (!value) return undefined
 
   const normalized = value.trim().toLowerCase()
-  if (normalized === "left" || normalized === "center" || normalized === "wide" || normalized === "full") {
+  if (
+    normalized === "left" ||
+    normalized === "center" ||
+    normalized === "right" ||
+    normalized === "wide" ||
+    normalized === "full"
+  ) {
     return normalized
   }
 
@@ -25,7 +31,7 @@ export type ParsedStandaloneMarkdownImage = {
   widthPx?: number
   heightPx?: number
   aspectRatio?: string
-  align?: "left" | "center" | "wide" | "full"
+  align?: "left" | "center" | "right" | "wide" | "full"
 }
 
 export const resolveMarkdownImageDimensions = (
@@ -101,7 +107,7 @@ export const parseStandaloneMarkdownImageLine = (
   const metadata = (match[4] || "").trim()
   const widthFromSuffixMatch = metadata.match(/(?:^|\s)width=(\d{2,4})(?:$|\s)/i)
   const heightFromSuffixMatch = metadata.match(/(?:^|\s)height=(\d{2,4})(?:$|\s)/i)
-  const alignFromSuffixMatch = metadata.match(/(?:^|\s)align=(left|center|wide|full)(?:$|\s)/i)
+  const alignFromSuffixMatch = metadata.match(/(?:^|\s)align=(left|center|right|wide|full)(?:$|\s)/i)
   const widthFromSuffix = Number.parseInt(widthFromSuffixMatch?.[1] || "", 10)
   const heightFromSuffix = Number.parseInt(heightFromSuffixMatch?.[1] || "", 10)
   const widthFromTitleMatch = title.match(/(?:^|\s)width=(\d{2,4})(?:$|\s)/i)

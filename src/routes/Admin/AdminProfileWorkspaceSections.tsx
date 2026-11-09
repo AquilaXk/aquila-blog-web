@@ -141,6 +141,11 @@ export const AdminProfileWorkspaceSections = (props: AdminProfileWorkspaceSectio
                 ) : null}
               </div>
               <p>변경 사항은 초안 저장 후 공개 적용으로 블로그와 About 페이지에 반영됩니다.</p>
+              {hasMissingExposureItems ? (
+                <p className="exposureMissingHint">
+                  미입력 공개 항목: {missingExposureItems.join(" · ")}
+                </p>
+              ) : null}
             </EditorPaneHeader>
             {renderAdminProfileWorkspaceSection(props)}
           </EditorSurface>

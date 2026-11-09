@@ -168,7 +168,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       title: "인증 보안",
       summary: `차단 ${dashboardSnapshot.authSecurity.blockedEventCount} · 최근 ${dashboardSnapshot.authSecurity.recentEventCount}`,
       tone: dashboardSnapshot.authSecurity.blockedEventCount ? "warn" : "good",
-      href: "/admin/tools",
+      href: "/admin/tools?tab=auth",
       actionLabel: "기록 보기",
     },
     {
@@ -181,7 +181,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
         dashboardSnapshot.storageCleanup.blockedBySafetyThreshold || dashboardSnapshot.storageCleanup.eligibleForPurgeCount > 0
           ? "warn"
           : "good",
-      href: "/admin/tools",
+      href: "/admin/tools?tab=cleanup",
       actionLabel: "정리 진단",
     },
   ] : [
@@ -192,7 +192,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
         ? DASHBOARD_COLLECTION_FAILED_LABEL
         : `${DASHBOARD_DATA_MISSING_LABEL} · ${DASHBOARD_BACKEND_CHECK_LABEL}`,
       tone: missingOrFailedTone,
-      href: "/admin/tools",
+      href: "/admin/tools?tab=queue",
       actionLabel: "진단 열기",
     },
   ]

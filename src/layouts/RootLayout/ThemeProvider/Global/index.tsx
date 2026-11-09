@@ -3,9 +3,7 @@ import { Global as _Global, css, useTheme } from "@emotion/react"
 import { colors, createPublicDesignTokens } from "src/styles"
 
 const lightDesign = createPublicDesignTokens("light")
-const darkDesign = createPublicDesignTokens("dark")
 const lightColors = colors.light
-const darkColors = colors.dark
 
 export const Global = () => {
   const theme = useTheme()
@@ -41,27 +39,6 @@ export const Global = () => {
           --aq-on-accent: ${lightColors.accentControlText};
           --aq-focus-ring: ${lightColors.indigo8};
           --aq-feed-chip-bg: ${lightDesign.readableSurface};
-        }
-
-        html[data-aquila-scheme="dark"] {
-          --aq-page-bg: ${darkDesign.pageBackgroundColor};
-          --aq-page-bg-image: ${darkDesign.pageBackgroundImage};
-          --aq-surface: ${darkDesign.readableSurface};
-          --aq-surface-elevated: ${darkDesign.surfaceElevated};
-          --aq-surface-subtle: ${darkDesign.surfaceElevated};
-          --aq-border: ${darkDesign.border};
-          --aq-border-strong: ${darkDesign.borderStrong};
-          --aq-text: ${darkColors.gray12};
-          --aq-text-secondary: ${darkColors.gray11};
-          --aq-muted: ${darkColors.gray10};
-          --aq-subtle: ${darkColors.gray9};
-          --aq-header-bg: color-mix(in srgb, ${darkDesign.pageBackgroundColor} 92%, transparent);
-          --aq-accent: ${darkDesign.accent};
-          --aq-accent-muted: ${darkDesign.accentMuted};
-          --aq-accent-link: ${darkColors.accentLink};
-          --aq-on-accent: ${darkColors.gray1};
-          --aq-focus-ring: ${darkColors.indigo8};
-          --aq-feed-chip-bg: ${darkDesign.surfaceElevated};
         }
 
         body {

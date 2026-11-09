@@ -413,7 +413,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     >
       <SubSectionHeading>
         <strong>Search runtime controls</strong>
-        <small>{runtimeFlagsSummary || "Durable operations"}</small>
+        <small>{runtimeFlagsSummary || "Durable operations · 검색 색인 파이프라인 및 미러링 강제 제어"}</small>
       </SubSectionHeading>
       {busy ? (
         <InlineNotice aria-live="polite">

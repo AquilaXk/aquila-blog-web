@@ -74,13 +74,45 @@ export const StyledWrapper = styled.header `
 
   .deck {
     max-width: 820px;
-    margin: 0 0 2rem;
+    margin: 0 0 1.5rem;
     color: var(--aq-muted);
     font-size: 1.125rem;
     line-height: 1.75;
     overflow-wrap: anywhere;
     word-break: keep-all;
     text-wrap: pretty;
+  }
+
+  .postTagChips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 1.5rem;
+  }
+
+  .postTagChip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-elevated, var(--aq-surface));
+    color: var(--aq-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    transition:
+      border-color 0.16s ease,
+      color 0.16s ease,
+      background-color 0.16s ease;
+
+    &:hover {
+      border-color: var(--aq-border-strong, var(--aq-text));
+      color: var(--aq-text);
+    }
   }
 
   .metaRow {

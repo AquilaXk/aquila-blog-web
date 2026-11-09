@@ -8,7 +8,8 @@ import {
   useEffect,
   useRef,
 } from "react"
-import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
+import { getFeedPostsPage, invalidatePublicPostReadCaches } from "src/apis/backend/posts"
+import { registerInternalPostSuggestions } from "src/components/markdown-editor/markdownEditorCompletions"
 import { revalidateSavedPost } from "./editorPostSaveRefresh"
 import {
   isComposingKeyboardEvent,
@@ -66,6 +67,27 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
   setResult,
 }: UseEditorStudioWorkspaceControllerRuntimeArgs) => {
   const titleFieldRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getFeedPostsPage({ page: 1, pageSize: 50 })
+      .then((page) => {
+        if (cancelled || !Array.isArray(page?.posts)) return
+        registerInternalPostSuggestions(
+          page.posts
+            .filter((post) => Boolean(post?.title?.trim()))
+            .map((post) => ({
+              id: post.id,
+              slug: post.slug || String(post.id),
+              title: post.title.trim(),
+            }))
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const refreshPublicPostReadViews = useCallback(async (affectedPostId?: string | number) => {
     const resolvedPostId =

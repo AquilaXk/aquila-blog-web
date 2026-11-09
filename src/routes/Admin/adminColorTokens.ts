@@ -64,16 +64,6 @@ const adminDarkThemeVariables = buildAdminThemeVariables("dark", {
 
 export const adminSystemThemeVariables = (theme: Theme) => `
   ${theme.scheme === "dark" ? adminDarkThemeVariables : adminLightThemeVariables}
-
-  html[data-aquila-scheme-bootstrap-source="cookie"][data-aquila-scheme-bootstrap="dark"] &,
-  html[data-aquila-scheme-bootstrap-source="system"][data-aquila-scheme-bootstrap="dark"] & {
-    ${adminDarkThemeVariables}
-  }
-
-  html[data-aquila-scheme-bootstrap-source="cookie"][data-aquila-scheme-bootstrap="light"] &,
-  html[data-aquila-scheme-bootstrap-source="system"][data-aquila-scheme-bootstrap="light"] & {
-    ${adminLightThemeVariables}
-  }
 `
 
 export const adminAppBackground = `var(--admin-app-bg, ${lightDesign.pageBackgroundColor})`

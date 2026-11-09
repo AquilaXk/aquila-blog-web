@@ -10,17 +10,38 @@ import { SecondaryButton } from "./EditorStudioDedicatedEditorSurfaceParts"
 
 const CLOUD_PICKER_MAX_ITEMS = 12
 
-const buildCloudAssetMarkdownSnippet = (file: CloudFile): string => {
-  const safeLabel = (file.originalFilename || "attachment").replace(/[[\]\\]/g, "\\$&")
-  if (file.mediaKind === "PHOTO") {
-    return `![${safeLabel}](${getCloudFileContentUrl(file.id)})`
+type EditorStudioCloudAssetPickerProps = {
+  onUploadPostImage?: (
+    file: File
+  ) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>
+  onInsertMarkdownSnippet?: (snippet: string) => void
+}
+
+const isImageCloudAsset = (file: CloudFile): boolean =>
+  file.mediaKind === "PHOTO" || Boolean(file.contentType?.toLowerCase().startsWith("image/"))
+
+const sanitizeMarkdownLabel = (rawName: string | undefined): string =>
+  (rawName || "attachment").replace(/[[\]\\]/g, "\\$&")
+
+export const buildCloudAssetMarkdownSnippet = (
+  file: CloudFile,
+  promotedPublicImageUrl?: string
+): string => {
+  const safeLabel = sanitizeMarkdownLabel(file.originalFilename)
+  if (isImageCloudAsset(file)) {
+    const targetUrl = promotedPublicImageUrl?.trim() || getCloudFileContentUrl(file.id)
+    return `![${safeLabel}](${targetUrl})`
   }
   return `[${safeLabel}](${getCloudFileDownloadUrl(file.id)})`
 }
 
-export const EditorStudioCloudAssetPicker = () => {
+export const EditorStudioCloudAssetPicker = ({
+  onUploadPostImage,
+  onInsertMarkdownSnippet,
+}: EditorStudioCloudAssetPickerProps = {}) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [promotingFileId, setPromotingFileId] = useState<number | null>(null)
   const [errorText, setErrorText] = useState("")
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [files, setFiles] = useState<CloudFile[]>([])
@@ -52,17 +73,61 @@ export const EditorStudioCloudAssetPicker = () => {
     })
   }, [files.length, isLoading, loadRecentCloudAssets])
 
-  const handleCopySnippet = useCallback(async (file: CloudFile) => {
-    const snippet = buildCloudAssetMarkdownSnippet(file)
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(snippet)
-        setCopiedId(file.id)
+  const handleInsertOrCopySnippet = useCallback(
+    async (file: CloudFile) => {
+      setErrorText("")
+      let promotedPublicImageUrl: string | undefined
+
+      if (isImageCloudAsset(file) && onUploadPostImage) {
+        setPromotingFileId(file.id)
+        try {
+          const response = await fetch(getCloudFileContentUrl(file.id), {
+            credentials: "include",
+          })
+          if (!response.ok) {
+            throw new Error(`클라우드 이미지를 내려받지 못했습니다. (HTTP ${response.status})`)
+          }
+          const blob = await response.blob()
+          const uploadFile = new File(
+            [blob],
+            file.originalFilename || `cloud-image-${file.id}.png`,
+            { type: blob.type || file.contentType || "image/png" }
+          )
+          const uploaded = await onUploadPostImage(uploadFile)
+          const resolvedUrl = (uploaded.src || uploaded.url || "").trim()
+          if (!resolvedUrl) {
+            throw new Error("공개 포스트 이미지 URL을 발급받지 못했습니다.")
+          }
+          promotedPublicImageUrl = resolvedUrl
+        } catch (error) {
+          setErrorText(
+            error instanceof Error && error.message.trim()
+              ? error.message
+              : "클라우드 이미지를 공개 본문 이미지로 변환하지 못했습니다."
+          )
+          setPromotingFileId(null)
+          return
+        }
+        setPromotingFileId(null)
       }
-    } catch {
-      setErrorText("클립보드 복사에 실패했습니다. 수동으로 마크다운 링크를 복사해 주세요.")
-    }
-  }, [])
+
+      const snippet = buildCloudAssetMarkdownSnippet(file, promotedPublicImageUrl)
+      onInsertMarkdownSnippet?.(snippet)
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(snippet)
+        }
+        setCopiedId(file.id)
+      } catch {
+        if (onInsertMarkdownSnippet) {
+          setCopiedId(file.id)
+          return
+        }
+        setErrorText("클립보드 복사에 실패했습니다. 수동으로 마크다운 링크를 복사해 주세요.")
+      }
+    },
+    [onInsertMarkdownSnippet, onUploadPostImage]
+  )
 
   return (
     <CloudAssetPickerSection aria-label="개인 클라우드 자산 빠른 삽입">
@@ -72,7 +137,7 @@ export const EditorStudioCloudAssetPicker = () => {
           {isOpen ? "목록 접기" : "클라우드 파일 불러오기"}
         </SecondaryButton>
       </div>
-      <small>개인 클라우드에 올린 최근 파일의 마크다운 링크를 복사해 본문에 붙여넣을 수 있습니다.</small>
+      <small>개인 클라우드 이미지를 공개 본문 이미지로 승격해 삽입하거나 마크다운 링크를 복사합니다.</small>
       {isOpen ? (
         <div className="pickerBody">
           <div className="pickerToolbar">
@@ -86,17 +151,33 @@ export const EditorStudioCloudAssetPicker = () => {
           ) : null}
           {files.length > 0 ? (
             <ul className="assetList">
-              {files.map((file) => (
-                <li key={file.id} className="assetItem">
-                  <div className="assetMeta">
-                    <strong title={file.originalFilename}>{file.originalFilename}</strong>
-                    <span>{file.mediaKind === "PHOTO" ? "이미지" : "첨부파일"}</span>
-                  </div>
-                  <SecondaryButton type="button" onClick={() => void handleCopySnippet(file)}>
-                    {copiedId === file.id ? "복사됨" : "마크다운 복사"}
-                  </SecondaryButton>
-                </li>
-              ))}
+              {files.map((file) => {
+                const isPromoting = promotingFileId === file.id
+                const isCopied = copiedId === file.id
+                return (
+                  <li key={file.id} className="assetItem">
+                    <div className="assetMeta">
+                      <strong title={file.originalFilename}>{file.originalFilename}</strong>
+                      <span>{isImageCloudAsset(file) ? "이미지" : "첨부파일"}</span>
+                    </div>
+                    <SecondaryButton
+                      type="button"
+                      disabled={isPromoting}
+                      onClick={() => void handleInsertOrCopySnippet(file)}
+                    >
+                      {isPromoting
+                        ? "업로드 중..."
+                        : isCopied
+                          ? onInsertMarkdownSnippet
+                            ? "삽입·복사됨"
+                            : "복사됨"
+                          : onInsertMarkdownSnippet
+                            ? "본문 삽입"
+                            : "마크다운 복사"}
+                    </SecondaryButton>
+                  </li>
+                )
+              })}
             </ul>
           ) : null}
         </div>

@@ -482,6 +482,19 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     )
   }
 
+  const handleInsertCloudMarkdownSnippet = (snippet: string) => {
+    const current = getCurrentPostContent()
+    const from = Math.max(0, Math.min(editorSelection.from, current.length))
+    const to = Math.max(from, Math.min(editorSelection.to, current.length))
+    const prefix = from > 0 && current[from - 1] !== "\n" ? "\n\n" : ""
+    const suffix = to < current.length && current[to] !== "\n" ? "\n\n" : "\n"
+    const inserted = `${prefix}${snippet}${suffix}`
+    const nextContent = `${current.slice(0, from)}${inserted}${current.slice(to)}`
+    const nextCursor = from + inserted.length
+    handleMarkdownEditorChange(nextContent, { editorFocused: false })
+    setEditorSelection({ from: nextCursor, to: nextCursor })
+    requestMarkdownEditorFocus({ from: nextCursor, to: nextCursor })
+  }
   const conflictReloadAction =
     lastSaveError?.errorType === "version-conflict" && hasSelectedManagedPost
       ? () => void handleReloadLatestServerPost()
@@ -536,6 +549,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onDiscardLocalDraftCandidate={discardLocalDraftCandidate}
         onDismissLocalDraftRestoreSuggestion={dismissLocalDraftRestoreSuggestion}
         onClearLocalDraft={clearLocalDraft}
+        onUploadPostImage={handleMarkdownEditorImageUpload}
+        onInsertMarkdownSnippet={handleInsertCloudMarkdownSnippet}
         publishModal={
           isPublishModalOpen ? (
             <EditorStudioPublishModal

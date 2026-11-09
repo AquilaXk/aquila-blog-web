@@ -41,8 +41,10 @@ export default async function handler(
       (targetPaths.length > 0 ? targetPaths : ["/"])
         .map((path) => path.startsWith("/") ? path : `/${path}`)
     ))
-    // 상세는 요청별 SSR이므로 재생성할 정적 산출물이 없다. 피드 무효화는 위에서 유지한다.
-    const dynamicPaths = normalizedPaths.filter((path) => /^\/posts\/[1-9]\d*\/?$/.test(path))
+    // 상세·사이트맵·소개는 요청별 SSR이므로 재생성할 정적 산출물이 없다. 피드 무효화는 위에서 유지한다.
+    const isDynamicSsrOnlyPath = (path: string) =>
+      path.startsWith("/posts/") || path === "/sitemap.xml" || path === "/about"
+    const dynamicPaths = normalizedPaths.filter(isDynamicSsrOnlyPath)
     const paths = normalizedPaths.filter((path) => !dynamicPaths.includes(path))
     await Promise.all(paths.map((path) => res.revalidate(path)))
 

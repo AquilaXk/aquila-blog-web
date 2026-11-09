@@ -412,7 +412,7 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
       <OpsGrid>
         <PanelCard>
           <PanelHeader>
-            <h2>Operational activity share</h2>
+            <h2>Public read latency</h2>
             <StatusChip data-tone={toOpsTone(props.overviewStatusLabel)}>
               LIVE
             </StatusChip>

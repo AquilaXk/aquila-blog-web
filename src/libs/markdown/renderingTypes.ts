@@ -52,7 +52,7 @@ export type MarkdownSegment =
       widthPx?: number
       heightPx?: number
       aspectRatio?: string
-      align?: "left" | "center" | "wide" | "full"
+      align?: "left" | "center" | "right" | "wide" | "full"
     }
 
 export type MarkdownRenderModel = {

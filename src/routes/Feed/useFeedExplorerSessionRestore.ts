@@ -41,6 +41,7 @@ type UseFeedExplorerSessionRestoreOptions = {
   q: string
   router: NextRouter
   setQ: Dispatch<SetStateAction<string>>
+  setSortMode?: Dispatch<SetStateAction<FeedSortMode>>
   sortMode: FeedSortMode
 }
 
@@ -88,6 +89,7 @@ export const useFeedExplorerSessionRestore = ({
   q,
   router,
   setQ,
+  setSortMode,
   sortMode,
 }: UseFeedExplorerSessionRestoreOptions): UseFeedExplorerSessionRestoreResult => {
   const queryClient = useQueryClient()
@@ -140,6 +142,9 @@ export const useFeedExplorerSessionRestore = ({
     if (restored.q.length > 0) {
       setQ(restored.q)
     }
+    if (restored.sortMode) {
+      setSortMode?.(restored.sortMode)
+    }
 
     const restoredSnapshot = parseFeedExplorerRestoreSnapshot(
       window.sessionStorage.getItem(restoreSnapshotStorageKey)
@@ -157,7 +162,7 @@ export const useFeedExplorerSessionRestore = ({
       restoreQueryPagesRef.current = restoredPages
       restoreQueryPageParamsRef.current = restoredPageParams
     }
-  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady, setQ])
+  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady, setQ, setSortMode])
 
   useEffect(() => {
     if (hasHydratedQuerySnapshotRef.current) return

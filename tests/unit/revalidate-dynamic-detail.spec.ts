@@ -10,7 +10,7 @@ test.afterEach(() => {
   else process.env.TOKEN_FOR_REVALIDATE = originalToken
 })
 
-for (const paths of [["/posts/101"], ["/", "/posts/101"], []]) {
+for (const paths of [["/posts/101"], ["/", "/posts/101", "/sitemap.xml", "/about"], []]) {
   test(`revalidates only static artifacts for ${JSON.stringify(paths)}`, async () => {
     const credential = "test-only-revalidation-token"
     process.env.TOKEN_FOR_REVALIDATE = credential

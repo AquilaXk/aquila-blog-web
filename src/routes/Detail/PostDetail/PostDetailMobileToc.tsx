@@ -23,7 +23,7 @@ const PostDetailMobileToc = ({
   if (items.length === 0) return null
 
   return (
-    <details className="mobileToc" aria-label={t("postTocLabel")}>
+    <details className="mobileToc" aria-label="접이식 목차">
       <summary className="mobileTocSummary">{t("postTocLabel")}</summary>
       <nav aria-label={t("postTocLabel")}>
         {hasDepth4Toc && onToggleDetailed ? (

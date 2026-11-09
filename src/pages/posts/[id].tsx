@@ -11,6 +11,7 @@ import {
 import { withSsrMetrics } from "src/libs/server/withSsrMetrics"
 import { buildPostDetailMetadata } from "src/routes/Detail/PostDetail/postDetailMetadataModel"
 import { ErrorState, skeletonShimmerCss } from "src/design-system/StatePresenters"
+import { useLanguage } from "src/libs/language"
 import { resolvePostDetailRenderState } from "src/routes/Detail/postDetailRenderState"
 
 export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", async ({ params, res, req }) => {
@@ -19,6 +20,7 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
 })
 
 const CanonicalPostPage: NextPageWithLayout = () => {
+  const { t } = useLanguage()
   const { post, isNotFound, isError, isPending, refetch } = usePostQuery()
   const renderState = resolvePostDetailRenderState({
     isNotFound,
@@ -33,11 +35,11 @@ const CanonicalPostPage: NextPageWithLayout = () => {
     return (
       <ErrorState
         label="ERROR"
-        title="글을 불러오지 못했습니다"
-        description="일시적인 오류로 글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요."
+        title={t("postDetailErrorTitle")}
+        description={t("postDetailErrorDesc")}
         actions={
           <button type="button" onClick={() => void refetch()}>
-            다시 시도
+            {t("postDetailErrorRetry")}
           </button>
         }
       />

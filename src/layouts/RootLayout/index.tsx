@@ -48,6 +48,7 @@ const RootLayout = ({
   // Enforce intentional light-only DOM/query scheme (PR 1275 / HIG P5-5).
   useScheme()
   const { pathname } = useRouter()
+  const isDesignAwareRoute = pathname[1] !== "_" && pathname !== "/sitemap.xml"
   const isPublicBlogRoute = pathname === "/" || pathname === "/about" || pathname === "/posts/[id]"
   const isDedicatedEditorRoute =
     pathname === "/admin/editor" ||
@@ -65,6 +66,7 @@ const RootLayout = ({
   // 역할을 잃는다. 이 라우트에서만 껍데기를 div로 내려 main을 하나로 유지한다.
   const LayoutShell = isStandaloneSurfaceRoute ? StandaloneShell : StyledMain
   const shouldLoadAdminProfile =
+    isDesignAwareRoute &&
     !isStandaloneSurfaceRoute &&
     !isAdminLoginRoute &&
     (isPublicBlogRoute ||

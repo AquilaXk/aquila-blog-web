@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { NextPage } from "next"
+import { useRouter } from "next/router"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
@@ -42,6 +43,7 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   initialProfileSnapshot = null,
   initialSnapshot = EMPTY_INITIAL_SNAPSHOT,
 }) => {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const { me, authStatus } = useAuthSession()
   const sessionMember = authStatus === "loading" || authStatus === "unavailable" ? initialMember : me || initialMember
@@ -65,6 +67,13 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   const [systemHealthCheckedAt, setSystemHealthCheckedAt] = useState<string | null>(initialSnapshot.systemHealthFetchedAt)
   const [activeDiagnosticTab, setActiveDiagnosticTab] = useState<DiagnosticTab | null>(null)
   const [freshnessClock, setFreshnessClock] = useState<number | null>(null)
+
+  useEffect(() => {
+    const queryTab = Array.isArray(router.query.tab) ? router.query.tab[0] : router.query.tab
+    if (queryTab === "queue" || queryTab === "cleanup" || queryTab === "auth") {
+      setActiveDiagnosticTab(queryTab)
+    }
+  }, [router.query.tab])
   const systemHealthQuery = useQuery({
     queryKey: SYSTEM_HEALTH_QUERY_KEY,
     queryFn: async (): Promise<SystemHealthPayload> => apiFetch<SystemHealthPayload>("/system/api/v1/adm/health"),

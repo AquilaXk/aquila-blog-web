@@ -1,9 +1,8 @@
 import styled from "@emotion/styled";
 export const EditorStudioRoot = styled.main `
   box-sizing: border-box;
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  margin: 0;
   height: 100vh;
   min-height: 100vh;
   height: 100dvh;
@@ -297,8 +296,8 @@ export const EditorStudioFrame = styled.div<{
   }
 
   @media (max-width: 820px) {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100%;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     overflow-x: hidden;
@@ -334,8 +333,8 @@ export const EditorStudioDedicatedMetaSection = styled.section`
   padding: 28px 32px 12px 64px;
 
   @media (max-width: 820px) {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
     padding: 10px 16px 8px 16px;
   }
@@ -542,7 +541,7 @@ export const PublishNotice = styled.div`
   &[data-tone="loading"] { color: ${({ theme }) => theme.colors.blue11}; border: 1px solid ${({ theme }) => theme.colors.blue7}; background: ${({ theme }) => theme.colors.blue3}; }
   &[data-tone="success"] { color: ${({ theme }) => theme.colors.green11}; border: 1px solid ${({ theme }) => theme.colors.green7}; background: ${({ theme }) => theme.colors.green3}; }
   &[data-tone="error"] { color: ${({ theme }) => theme.colors.red11}; border: 1px solid ${({ theme }) => theme.colors.red7}; background: ${({ theme }) => theme.colors.red3}; }
-  @media (max-width: 820px) { left: 16px; right: 16px; bottom: 16px; }
+  @media (max-width: 820px) { left: 16px; right: 16px; bottom: calc(3.2rem + env(safe-area-inset-bottom, 0px)); }
 `;
 export {
   EditorGuideBackdrop,

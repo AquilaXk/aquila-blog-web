@@ -170,7 +170,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
 
           <div className="about-grid">
             <section>
-              <h2>Profile</h2>
+              <h2>{t("aboutProfileHeading")}</h2>
               <div className="profile-inline">
                 <div className="profile-image" data-ui="about-avatar">
                   <ProfileImage
@@ -192,7 +192,7 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
 
             {hasProfileLinks ? (
               <section>
-                <h2>Links</h2>
+                <h2>{t("aboutLinksHeading")}</h2>
                 <div className="stack-list">
                   {contactLinks.map((item) => (
                     <div className="stack-row" key={`${item.label}-${item.safeHref}`}>

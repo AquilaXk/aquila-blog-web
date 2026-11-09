@@ -498,6 +498,6 @@ test("runtime image removes vulnerable Node tooling and upgrades the fixed OpenS
   const source = readFileSync(dockerfilePath, "utf8")
   const runtimeStage = source.slice(source.lastIndexOf("FROM node:20-alpine"))
 
-  assert.match(runtimeStage, /^[ \t]*&& apk upgrade --no-cache libcrypto3 libssl3 \\$/m)
+  assert.match(runtimeStage, /^[ \t]*&& apk upgrade --no-cache libcrypto3 libssl3(?: musl musl-utils zlib)? \\$/m)
   assert.match(runtimeStage, /^[ \t]*&& rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx \\$/m)
 })

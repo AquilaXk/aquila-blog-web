@@ -23,9 +23,9 @@ const renderSkeletonItems = (prefix: string) =>
     </RelatedSkeletonItem>
   ))
 
-const getRelatedPostMeta = (post: TPost) => {
+const getRelatedPostMeta = (post: TPost, locale = "ko-KR") => {
   const taxonomy = post.tags?.[0] || post.category?.[0] || post.type?.[0] || "Post"
-  return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "")}`
+  return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "", locale)}`
 }
 
 export const selectUniqueRelatedPosts = (
@@ -48,7 +48,8 @@ const RelatedPostsSectionComponent = ({
   showRelatedAuthorSkeleton,
   relatedByAuthorPosts,
 }: RelatedPostsSectionProps) => {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const locale = language === "en" ? "en-US" : "ko-KR"
   const relatedPosts = selectUniqueRelatedPosts(relatedByTagPosts, relatedByAuthorPosts, 2)
   const showSkeleton = relatedPosts.length === 0 && (showRelatedTagSkeleton || showRelatedAuthorSkeleton)
 
@@ -65,7 +66,7 @@ const RelatedPostsSectionComponent = ({
                 <Link href={toCanonicalPostPath(post.id)}>
                   <span className="relatedItemCopy">
                     <strong>{post.title}</strong>
-                    <span className="relatedMeta">{getRelatedPostMeta(post)}</span>
+                    <span className="relatedMeta">{getRelatedPostMeta(post, locale)}</span>
                   </span>
                   <span className="relatedArrow" aria-hidden="true">→</span>
                 </Link>

@@ -11,6 +11,7 @@ import {
   isNodeShadowedByMath, resolveBlockNodeEndWithMath, type MathReplacementSpec,
 } from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
+import { parseStandaloneMarkdownImageLine } from "../../libs/markdown/renderingImageModel"
 import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
 import {
   MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
@@ -53,12 +54,8 @@ const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], str
 const HIDE_MARK_DECORATION = Decoration.replace({})
 const TASK_SPACE_DECORATION = Decoration.mark({ class: "cm-live-task-space" })
 const RULE_DECORATION = Decoration.replace({ widget: new MarkdownRuleWidget() })
-const QUOTE_MARKER_DECORATION = Decoration.replace({
-  widget: new MarkdownMarkerWidget("", "cm-live-quote-marker"),
-})
-const BULLET_MARKER_DECORATION = Decoration.replace({
-  widget: new MarkdownMarkerWidget("•", "cm-live-list-marker"),
-})
+const QUOTE_MARKER_DECORATION = Decoration.replace({ widget: new MarkdownMarkerWidget("", "cm-live-quote-marker") })
+const BULLET_MARKER_DECORATION = Decoration.replace({ widget: new MarkdownMarkerWidget("•", "cm-live-list-marker") })
 const CODE_FENCE_OPEN_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-fence-open" })
 const CODE_BODY_LINE_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-body-line" })
 const CODE_FENCE_CLOSE_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-fence-close" })
@@ -78,7 +75,7 @@ type TableReplacementSpec = RangeSpec & { markdown: string }
 type CalloutReplacementSpec = RangeSpec & {
   type: string; title: string; content: string; foldState: "+" | "-" | null
 }
-type ImageReplacementSpec = RangeSpec & { alt: string; src: string }
+type ImageReplacementSpec = RangeSpec & { alt: string; src: string; widthPx?: number; align?: string }
 type MermaidReplacementSpec = RangeSpec & { source: string }
 
 let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
@@ -153,6 +150,10 @@ const parseCalloutBlockquoteSpec = (raw: string, from: number, to: number): Call
 }
 
 const parseImageReplacementSpec = (raw: string, from: number, to: number): ImageReplacementSpec | null => {
+  if (!raw.includes("\n") && !raw.includes("\r")) {
+    const parsed = parseStandaloneMarkdownImageLine(raw)
+    if (parsed) return { from, to, alt: parsed.alt, src: parsed.src, widthPx: parsed.widthPx, align: parsed.align }
+  }
   const match = /^!\[([^\][\r\n]*)\]\(([^()\r\n]*)\)$/.exec(raw)
   return match ? { from, to, alt: match[1] ?? "", src: match[2] ?? "" } : null
 }
@@ -465,7 +466,7 @@ const appendBlockWidgetDecorations = (
     decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
   }
   for (const img of groups.images) {
-    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt) }).range(img.from, img.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align) }).range(img.from, img.to))
   }
   for (const m of groups.maths) {
     decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))

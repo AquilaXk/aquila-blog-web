@@ -25,6 +25,29 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     width: min(100%, var(--aq-image-width));
   }
 
+  .aq-image-frame[data-align="left"] {
+    margin-left: 0;
+    margin-right: auto;
+  }
+
+  .aq-image-frame[data-align="center"] {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .aq-image-frame[data-align="right"] {
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .aq-image-frame[data-align="wide"],
+  .aq-image-frame[data-align="full"] {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .aq-image-frame img {
     display: block;
     width: 100%;

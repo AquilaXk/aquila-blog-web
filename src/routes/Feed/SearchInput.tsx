@@ -32,7 +32,7 @@ const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
           className="mid"
           type="search"
           placeholder={t("searchPlaceholder")}
-          aria-label={props["aria-label"] || t("searchInputAria")}
+          aria-label={props["aria-label"] || "Search posts by keyword"}
           {...props}
         />
       </div>

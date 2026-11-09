@@ -9,6 +9,7 @@ export const MarkdownImageFigure = memo(
     widthPx,
     heightPx,
     aspectRatio,
+    align,
     eager = false,
     editable = false,
     imageIndex,
@@ -54,6 +55,7 @@ export const MarkdownImageFigure = memo(
         ref={frameRef}
         className="aq-image-frame"
         data-width-mode={effectiveWidthPx ? "custom" : "default"}
+        data-align={align || undefined}
         data-editable={editable ? "true" : "false"}
         style={frameStyle}
       >

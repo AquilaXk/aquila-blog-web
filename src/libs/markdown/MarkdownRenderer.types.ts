@@ -22,6 +22,7 @@ export type MarkdownImageFigureProps = {
   widthPx?: number
   heightPx?: number
   aspectRatio?: string
+  align?: "left" | "center" | "right" | "wide" | "full"
   eager?: boolean
   editable?: boolean
   imageIndex: number
