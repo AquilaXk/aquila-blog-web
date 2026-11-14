@@ -389,7 +389,7 @@ const tryConsumeColonBlockAt = (
   }
 
   if (open.kind === "toggle") {
-    const title = (open.quotedTitle !== null ? open.quotedTitle : open.remainder).trim() || "토글"
+    const title = (open.quotedTitle !== null ? open.quotedTitle : open.remainder).trim()
     const { closedIndex, bodyLines } = collectTripleColonBody(
       ctx.lines,
       index + 1,

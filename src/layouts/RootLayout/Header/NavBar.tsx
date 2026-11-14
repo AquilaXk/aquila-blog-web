@@ -1,6 +1,7 @@
 import styled from "@emotion/styled"
 import { control, layoutBreakpoint } from "src/design-system/tokens"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -24,12 +25,21 @@ import {
   waitForFocusTrapRestore,
 } from "./NavBarSearchModel"
 
+const LazyQuickSearchPalette = dynamic(
+  () => import("src/components/quick-search/QuickSearchPalette"),
+  { ssr: false }
+)
+
 const NavBar = () => {
   const router = useRouter()
   const { language, toggleLanguage, t } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [quickSearchLoaded, setQuickSearchLoaded] = useState(false)
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  const [shortcutLabel, setShortcutLabel] = useState("Ctrl K")
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null)
+  const searchTriggerRef = useRef<HTMLButtonElement>(null)
   const [activeHash, setActiveHash] = useState<string | null>(null)
   const focusFeedSearchInFlightRef = useRef<Promise<void> | null>(null)
 
@@ -37,12 +47,26 @@ const NavBar = () => {
     setMobileMenuOpen(false)
   }, [])
 
+  const closeQuickSearch = useCallback(() => {
+    setQuickSearchOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return
+    const navWithUa = navigator as Navigator & { userAgentData?: { platform?: string } }
+    const platform = navWithUa.userAgentData?.platform || navigator.platform || ""
+    if (/mac|iphone|ipad|ipod/i.test(platform)) {
+      setShortcutLabel("⌘ K")
+    }
+  }, [])
+
   const { handleKeyDown: handleMobileMenuKeyDown } = useModalFocusTrap({
     open: mobileMenuOpen,
     onClose: closeMobileMenu,
     containerRef: mobileMenuPanelRef,
     returnFocusRef: mobileMenuButtonRef,
-    paused: false,
+    paused: quickSearchOpen,
+    lockScroll: true,
   })
 
   useEffect(() => {
@@ -70,60 +94,90 @@ const NavBar = () => {
     return () => media.removeEventListener("change", closeWhenDesktop)
   }, [mobileMenuOpen])
 
-  const focusFeedSearch = useCallback(() => {
-    if (focusFeedSearchInFlightRef.current) {
-      return focusFeedSearchInFlightRef.current
-    }
-
-    const run = (async () => {
-      if (router.pathname !== "/") {
-        await waitForFeedSearchRoute(router)
+  const focusFeedSearch = useCallback(
+    (feedQuery?: string) => {
+      if (focusFeedSearchInFlightRef.current) {
+        return focusFeedSearchInFlightRef.current
       }
 
-      const focused = await waitForFeedSearchInputFocus()
-      if (!focused) {
-        throw new Error("Failed to focus feed search input")
-      }
-    })()
+      const trimmedQuery = (feedQuery || "").trim()
+      const run = (async () => {
+        if (trimmedQuery) {
+          await router.push({ pathname: "/", query: { q: trimmedQuery } })
+        } else if (router.pathname !== "/") {
+          await waitForFeedSearchRoute(router)
+        }
 
-    const clearInFlightFocus = () => {
-      if (focusFeedSearchInFlightRef.current === run) {
-        focusFeedSearchInFlightRef.current = null
-      }
-    }
-    focusFeedSearchInFlightRef.current = run
-    void run.then(clearInFlightFocus, clearInFlightFocus)
-    return run
-  }, [router])
+        const focused = await waitForFeedSearchInputFocus()
+        if (!focused) {
+          throw new Error("Failed to focus feed search input")
+        }
+      })()
 
-  const requestFocusFeedSearch = useCallback(() => {
+      const clearInFlightFocus = () => {
+        if (focusFeedSearchInFlightRef.current === run) {
+          focusFeedSearchInFlightRef.current = null
+        }
+      }
+      focusFeedSearchInFlightRef.current = run
+      void run.then(clearInFlightFocus, clearInFlightFocus)
+      return run
+    },
+    [router]
+  )
+
+  const handleOpenInFeed = useCallback(
+    (feedQuery?: string) => {
+      const wasMenuOpen = mobileMenuOpen
+      setMobileMenuOpen(false)
+      void (async () => {
+        if (wasMenuOpen) {
+          await waitForFocusTrapRestore()
+        }
+        await focusFeedSearch(feedQuery)
+      })().catch(reportFocusFeedSearchFailure)
+    },
+    [focusFeedSearch, mobileMenuOpen]
+  )
+
+  const openQuickSearch = useCallback(() => {
     const wasMenuOpen = mobileMenuOpen
     setMobileMenuOpen(false)
-    void (async () => {
-      if (wasMenuOpen) {
-        await waitForFocusTrapRestore()
-      }
-      await focusFeedSearch()
-    })().catch(reportFocusFeedSearchFailure)
-  }, [focusFeedSearch, mobileMenuOpen])
+    if (!wasMenuOpen) {
+      setQuickSearchLoaded(true)
+      setQuickSearchOpen(true)
+      return
+    }
+    void waitForFocusTrapRestore().then(() => {
+      setQuickSearchLoaded(true)
+      setQuickSearchOpen(true)
+    })
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const isSearchShortcut =
-        (event.metaKey || event.ctrlKey) &&
-        (event.key.toLowerCase() === "k" || event.code === "KeyK")
-      if (!isSearchShortcut) return
       if (event.defaultPrevented || isTypingTarget(event.target)) return
+      const isCmdOrCtrlK =
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        (event.key.toLowerCase() === "k" || event.code === "KeyK")
+      const isSlashShortcut =
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key === "/"
+      if (!isCmdOrCtrlK && !isSlashShortcut) return
 
       event.preventDefault()
-      requestFocusFeedSearch()
+      openQuickSearch()
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [requestFocusFeedSearch])
+  }, [openQuickSearch])
 
   const mobileMenu =
     typeof document !== "undefined" && mobileMenuOpen
@@ -142,7 +196,7 @@ const NavBar = () => {
                 type="button"
                 data-ui="mobile-nav-search"
                 aria-keyshortcuts="Meta+K Control+K"
-                onClick={requestFocusFeedSearch}
+                onClick={openQuickSearch}
               >
                 <SearchIcon />
                 <span>{t("navSearch")}</span>
@@ -232,15 +286,16 @@ const NavBar = () => {
 
         {router.pathname !== "/" && (
           <button
+            ref={searchTriggerRef}
             type="button"
             className="searchTrigger"
             aria-label={t("navSearchTriggerAria")}
             aria-keyshortcuts="Meta+K Control+K"
-            onClick={requestFocusFeedSearch}
+            onClick={openQuickSearch}
           >
             <SearchIcon />
             <span>{t("navSearchShortcut")}</span>
-            <kbd>⌘ K</kbd>
+            <kbd>{shortcutLabel}</kbd>
           </button>
         )}
 
@@ -258,6 +313,13 @@ const NavBar = () => {
       </div>
 
       {mobileMenu}
+      {quickSearchLoaded ? (
+        <LazyQuickSearchPalette
+          open={quickSearchOpen}
+          onClose={closeQuickSearch}
+          onOpenInFeed={handleOpenInFeed}
+        />
+      ) : null}
     </StyledWrapper>
   )
 }

@@ -16,6 +16,7 @@ import { resolveMarkdownImageDimensions } from "src/libs/markdown/renderingImage
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
 import { openImageLightboxOverlay } from "src/libs/markdown/imageLightboxOverlay"
 import type { TranslationKey } from "src/libs/language"
+import { HeadingAnchorButton } from "src/libs/markdown/components/HeadingAnchorButton"
 import PrettyCodeBlock from "src/libs/markdown/components/PrettyCodeBlock"
 import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
 import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
@@ -221,11 +222,12 @@ const renderMarkdownPreElement = ({ node, children, className: _className, ...pr
   }
   const highlightedLines = highlightLines ? parseHighlightedLineNumbers(highlightLines) : undefined
   const initialCode = renderImmediateCodeToHtml({ source: rawCode, language, highlightedLines })
+  const cleanRawCode = initialCode.cleanSource
   return (
     <PrettyCodeBlock
       language={initialCode.language}
       title={title}
-      rawCode={rawCode}
+      rawCode={cleanRawCode}
       highlightLines={highlightLines}
       preElement={
         <pre {...props} className="aq-code aq-pretty-pre">
@@ -233,9 +235,10 @@ const renderMarkdownPreElement = ({ node, children, className: _className, ...pr
             className={`language-${initialCode.language}`}
             data-language={initialCode.language}
             data-prism-language={initialCode.language}
-            data-prism-source={rawCode}
-            data-raw-code={rawCode}
+            data-prism-source={cleanRawCode}
+            data-raw-code={cleanRawCode}
             data-highlight-lines={highlightLines || undefined}
+            data-has-diff={initialCode.hasDiff ? "true" : undefined}
             dangerouslySetInnerHTML={{ __html: initialCode.html }}
           />
         </pre>
@@ -298,7 +301,19 @@ export const createMarkdownComponentVariants = ({
   ) => {
     const normalizedChildren = normalizeInline(children)
     const resolvedId = resolveHeadingNodeId(getPassState(), node, id, normalizedChildren)
-    return <Tag id={resolvedId} {...props}>{normalizedChildren}</Tag>
+    const showAnchor = Boolean(resolvedId && resolvedId !== "aq-footnote-heading")
+    return (
+      <Tag id={resolvedId} {...props}>
+        {normalizedChildren}
+        {showAnchor ? (
+          <HeadingAnchorButton
+            id={resolvedId}
+            copyAria={t ? t("headingCopyAnchorAria") : "Copy section link"}
+            copiedText={t ? t("headingCopiedToast") : "Copied"}
+          />
+        ) : null}
+      </Tag>
+    )
   }
 
   const renderTableCell = (
@@ -344,7 +359,7 @@ export const createMarkdownComponentVariants = ({
       renderMarkdownImageElement(
         props,
         getPassState(),
-        t ?? ((key) => (key === "markdownBlockedImage" ? "차단된 이미지" : ""))
+        t ?? (() => "")
       ),
     a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
       const normalizedChildren = normalizeAnchorInlineChildren(children, sentinels)

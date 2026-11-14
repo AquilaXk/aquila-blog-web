@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "src/apis/backend/client"
 import { queryKey } from "src/constants/queryKey"
+import { useLanguage } from "src/libs/language"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import type { PostDetail as PostDetailType, RsData } from "src/types"
 
@@ -74,6 +75,7 @@ export const usePostDetailEngagementActions = ({
   data,
   postId,
 }: UsePostDetailEngagementActionsArgs) => {
+  const { t } = useLanguage()
   const queryClient = useQueryClient()
   const detailId = data?.id
   const incomingHitCount = data?.hitCount
@@ -237,7 +239,7 @@ export const usePostDetailEngagementActions = ({
       }
 
       if (typeof window !== "undefined" && typeof window.prompt === "function") {
-        const promptResult = window.prompt("링크를 복사하세요.", shareUrl)
+        const promptResult = window.prompt(t("postSharePrompt"), shareUrl)
         if (promptResult !== null) {
           flashShareFeedback("copied")
         }
@@ -248,7 +250,7 @@ export const usePostDetailEngagementActions = ({
       }
       flashShareFeedback("failed")
     }
-  }, [data, flashShareFeedback, postId])
+  }, [data, flashShareFeedback, postId, t])
 
   return {
     hitCount,

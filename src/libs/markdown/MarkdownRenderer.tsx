@@ -64,12 +64,13 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   editableImages = false,
   onImageWidthCommit,
 }) => {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const rootRef = useRef<HTMLDivElement>(null)
   const renderPassStateRef = useRef<MarkdownRenderPassState>(createMarkdownRenderPassState())
+  const blockedImageLabel = t("markdownBlockedImage")
   const renderModel = useMemo(
-    () => resolveMarkdownRenderModel({ content, trustedContentHtml }),
-    [content, trustedContentHtml]
+    () => resolveMarkdownRenderModel({ content, trustedContentHtml, blockedImageLabel }),
+    [blockedImageLabel, content, trustedContentHtml]
   )
   const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker, tableLayouts } = renderModel
   const sentinels = useMemo(
@@ -97,7 +98,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   usePrismEffect(rootRef, renderKey, true, {
     mutationDebounceMs: 96,
   })
-  useTrustedHtmlCodeBlocksEffect(rootRef, Boolean(resolvedContentHtml), renderKey, t)
+  useTrustedHtmlCodeBlocksEffect(rootRef, Boolean(resolvedContentHtml), renderKey, t, language)
 
   useEffect(() => {
     syncFocusableMarkdownImages(rootRef.current, editableImages)

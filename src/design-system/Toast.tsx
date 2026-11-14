@@ -126,6 +126,22 @@ const ToastViewport = styled.div<{ "data-tone": ToastTone; $zIndex: number }>`
     gap: 0.6rem;
     flex-wrap: wrap;
     align-items: center;
+
+    button,
+    a {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: ${layoutBreakpoint.editorCompact}px), (pointer: coarse) {
+      button,
+      a {
+        min-width: 44px;
+        min-height: 44px;
+      }
+    }
   }
 
   @media (max-width: ${layoutBreakpoint.editorCompact}px) {

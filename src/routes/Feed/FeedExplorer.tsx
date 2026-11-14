@@ -19,6 +19,7 @@ import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import { FEED_EXPLORE_PAGE_SIZE } from "src/constants/feed"
 import { normalizeKeywordQuery, normalizeOptionalTagQuery } from "src/libs/query/normalize"
 import { useLanguage } from "src/libs/language"
+import type { TPost } from "src/types"
 import { ExplorerCard, FeedBody, FilterContextBar } from "./FeedExplorer.styles"
 import { FEED_EXPLORER_ORDER, shouldRestoreFeedExplorerSession } from "./FeedExplorerRestoreModel"
 import {
@@ -82,6 +83,12 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
   const sortTriggerRef = useRef<HTMLButtonElement | null>(null)
   const sortListboxRef = useRef<HTMLDivElement | null>(null)
   const lastSyncedAsPathRef = useRef<string | null>(null)
+  const skipUrlSyncUntilMatchedRef = useRef<{ q: string; sort: FeedSortMode } | null>(null)
+  const currentTag = normalizeOptionalTagQuery(
+    typeof router.query.tag === "string" ? router.query.tag : undefined
+  )
+  const debouncedQ = useDebouncedValue(q, isComposing)
+  const normalizedQuery = normalizeKeywordQuery(debouncedQ)
 
   useEffect(() => {
     if (!router.isReady || lastSyncedAsPathRef.current === router.asPath) return
@@ -93,7 +100,17 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     const nextSortMode: FeedSortMode | null =
       querySort === "latest" || querySort === "views" || querySort === "likes" ? querySort : null
 
-    if (hasQueryQ || isSubsequentRouteSync) {
+    const normalizedQueryQ = normalizeKeywordQuery(queryQ)
+    const normalizedInputQ = normalizeKeywordQuery(q)
+    const shouldSyncQ = (hasQueryQ || isSubsequentRouteSync) && normalizedInputQ !== normalizedQueryQ
+    const targetQ = shouldSyncQ ? normalizedQueryQ : normalizedInputQ
+    const targetSort = nextSortMode ?? (isSubsequentRouteSync ? "latest" : sortMode)
+
+    if (targetQ !== normalizedQuery || targetSort !== sortMode) {
+      skipUrlSyncUntilMatchedRef.current = { q: targetQ, sort: targetSort }
+    }
+
+    if (shouldSyncQ) {
       setQ(queryQ)
     }
     if (nextSortMode) {
@@ -101,7 +118,54 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     } else if (isSubsequentRouteSync) {
       setSortMode("latest")
     }
-  }, [router.asPath, router.isReady, router.query])
+  }, [normalizedQuery, q, router.asPath, router.isReady, router.query, sortMode])
+
+  useEffect(() => {
+    if (!router.isReady || isComposing) return
+    const settledInputQuery = normalizeKeywordQuery(q)
+    if (settledInputQuery !== normalizedQuery) return
+
+    const pendingRouteSync = skipUrlSyncUntilMatchedRef.current
+    if (pendingRouteSync) {
+      if (normalizedQuery === pendingRouteSync.q && sortMode === pendingRouteSync.sort) {
+        skipUrlSyncUntilMatchedRef.current = null
+      } else {
+        return
+      }
+    }
+
+    const rawRouteQ = typeof router.query.q === "string" ? router.query.q : ""
+    const routeQ = normalizeKeywordQuery(rawRouteQ)
+    const rawRouteSort = typeof router.query.sort === "string" ? router.query.sort.trim() : ""
+    const routeSort: FeedSortMode =
+      rawRouteSort === "views" || rawRouteSort === "likes" ? rawRouteSort : "latest"
+    const desiredQ = normalizedQuery || undefined
+    const desiredSort = sortMode === "latest" ? undefined : sortMode
+    const hasRedundantQ = "q" in router.query && !desiredQ
+    const hasRedundantSort = "sort" in router.query && !desiredSort
+
+    if (routeQ === (desiredQ ?? "") && routeSort === sortMode && !hasRedundantQ && !hasRedundantSort) {
+      return
+    }
+
+    const {
+      category: _deprecatedCategory,
+      q: _prevQ,
+      sort: _prevSort,
+      ...restQuery
+    } = router.query
+
+    startTransition(() => {
+      void replaceShallowRoutePreservingScroll(router, {
+        pathname: "/",
+        query: {
+          ...restQuery,
+          q: desiredQ,
+          sort: desiredSort,
+        },
+      })
+    })
+  }, [isComposing, normalizedQuery, q, router, sortMode])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -110,14 +174,11 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     }
   }, [router.asPath])
 
-  const currentTag = normalizeOptionalTagQuery(
-    typeof router.query.tag === "string" ? router.query.tag : undefined
-  )
-  const debouncedQ = useDebouncedValue(q, isComposing)
-  const normalizedQuery = normalizeKeywordQuery(debouncedQ)
   const {
+    allPosts,
     pinnedPosts,
     regularPosts,
+    totalCount,
     loadedPagesCount,
     hasNextPage,
     isInitialLoading,
@@ -242,8 +303,18 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
   }, [])
 
   const hasFilter = Boolean(normalizedQuery || currentTag)
-  const visiblePosts = resolveFeedVisiblePosts(pinnedPosts, regularPosts, isRetainedDataError)
-  const resultCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
+  const rawVisiblePosts = resolveFeedVisiblePosts(pinnedPosts, regularPosts, isRetainedDataError)
+  const visiblePosts = hasFilter
+    ? {
+        pinnedPosts: [] as TPost[],
+        regularPosts:
+          allPosts.length > 0
+            ? allPosts
+            : [...rawVisiblePosts.pinnedPosts, ...rawVisiblePosts.regularPosts],
+      }
+    : rawVisiblePosts
+  const loadedCount = visiblePosts.pinnedPosts.length + visiblePosts.regularPosts.length
+  const resultCount = totalCount > 0 ? Math.max(totalCount, loadedCount) : loadedCount
   const showBootstrapDegraded = initialBootstrapDegraded && !hasInitialLoadSucceeded
   const filterSummary = useMemo(
     () => resolveFilterSummary(normalizedQuery, currentTag, t),
@@ -251,6 +322,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
   )
 
   const handleClearFilters = useCallback(() => {
+    skipUrlSyncUntilMatchedRef.current = null
     setQ("")
     setSortMode("latest")
     const hasRouteFilterParams = Boolean(
@@ -453,6 +525,8 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
           )}
           <PostList
             posts={visiblePosts.regularPosts}
+            searchQuery={normalizedQuery}
+            sortMode={sortMode}
             hasFilter={hasFilter}
             hasExternalResults={visiblePosts.pinnedPosts.length > 0}
             onClearFilters={handleClearFilters}

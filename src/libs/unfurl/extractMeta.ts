@@ -46,12 +46,27 @@ const htmlDecode = (value: string) =>
     })
     .trim()
 
-const collectMetaTagValues = (html: string): Map<string, string> => {
+const MAX_HEAD_SCAN_CHARS = 512 * 1024
+
+const sliceHeadDocument = (html: string): string => {
+  if (!html) return ""
+  const upperLimit = Math.min(html.length, MAX_HEAD_SCAN_CHARS)
+  const bounded = upperLimit < html.length ? html.slice(0, upperLimit) : html
+  const lower = bounded.toLowerCase()
+  const headCloseIndex = lower.indexOf("</head>")
+  if (headCloseIndex >= 0) {
+    return bounded.slice(0, headCloseIndex)
+  }
+  const bodyOpenIndex = lower.indexOf("<body")
+  return bodyOpenIndex >= 0 ? bounded.slice(0, bodyOpenIndex) : bounded
+}
+
+const collectMetaTagValues = (headHtml: string): Map<string, string> => {
   const values = new Map<string, string>()
   META_TAG_REGEX.lastIndex = 0
 
   let metaMatch: RegExpExecArray | null
-  while ((metaMatch = META_TAG_REGEX.exec(html)) !== null) {
+  while ((metaMatch = META_TAG_REGEX.exec(headHtml)) !== null) {
     const rawAttrs = metaMatch[1] || ""
     let propertyKey = ""
     let nameKey = ""
@@ -219,7 +234,8 @@ export const formatReadableFileSize = (sizeBytes?: number | null) => formatFileS
 
 export const extractUnfurlMetadata = (url: string, html: string): UnfurlMetadata => {
   const parsedUrl = new URL(url)
-  const metaValues = collectMetaTagValues(html)
+  const headHtml = sliceHeadDocument(html)
+  const metaValues = collectMetaTagValues(headHtml)
   const siteName =
     firstMetaValue(metaValues, ["og:site_name", "application-name"]) || humanizeHost(parsedUrl.hostname)
   const provider = inferLinkProvider(url) || siteName
@@ -238,7 +254,7 @@ export const extractUnfurlMetadata = (url: string, html: string): UnfurlMetadata
     url,
     title:
       firstMetaValue(metaValues, ["og:title", "twitter:title"]) ||
-      extractTitleElement(html) ||
+      extractTitleElement(headHtml) ||
       humanizeHost(parsedUrl.hostname),
     description: firstMetaValue(metaValues, ["og:description", "twitter:description", "description"]),
     siteName,

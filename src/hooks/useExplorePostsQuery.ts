@@ -129,15 +129,18 @@ const useExplorePostsQuery = ({
     },
   })
 
-  const { pinnedPosts, regularPosts } = useMemo(() => {
+  const { allPosts, pinnedPosts, regularPosts, totalCount } = useMemo(() => {
     const pages = query.data?.pages
     if (!pages || pages.length === 0) {
       return {
+        allPosts: EMPTY_POSTS,
         pinnedPosts: EMPTY_POSTS,
         regularPosts: EMPTY_POSTS,
+        totalCount: 0,
       }
     }
 
+    const all: TPost[] = []
     const pinned: TPost[] = []
     const regular: TPost[] = []
     const seenPostIds = new Set<string>()
@@ -147,6 +150,7 @@ const useExplorePostsQuery = ({
         const postId = String(post.id)
         if (seenPostIds.has(postId)) continue
         seenPostIds.add(postId)
+        all.push(post)
 
         if (post.tags?.includes("Pinned")) {
           pinned.push(post)
@@ -156,15 +160,27 @@ const useExplorePostsQuery = ({
       }
     }
 
+    const firstPage = pages[0]
+    const resolvedTotalCount =
+      firstPage.paginationMode !== "cursor" &&
+      typeof firstPage.totalCount === "number" &&
+      Number.isFinite(firstPage.totalCount)
+        ? Math.max(all.length, firstPage.totalCount)
+        : all.length
+
     return {
+      allPosts: all,
       pinnedPosts: pinned,
       regularPosts: regular,
+      totalCount: resolvedTotalCount,
     }
   }, [query.data])
 
   return {
+    allPosts,
     pinnedPosts,
     regularPosts,
+    totalCount,
     loadedPagesCount: query.data?.pages.length ?? 0,
     hasNextPage: query.hasNextPage ?? false,
     // 첫 결과가 없으면 router 준비 전에도 로딩을 유지해 서버와 초기 화면을 맞춘다.

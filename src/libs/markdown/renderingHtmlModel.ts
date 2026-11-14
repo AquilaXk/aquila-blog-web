@@ -101,24 +101,27 @@ const isAsciiAlphaNumeric = (char: string) => {
 }
 
 const extractPlainTextByHtmlScanner = (rawHtml: string) => {
+  if (!rawHtml) return ""
+  const chunks: string[] = []
   let index = 0
-  let plainText = ""
 
   while (index < rawHtml.length) {
-    const currentChar = rawHtml[index]
-    if (currentChar !== "<") {
-      plainText += currentChar
-      index += 1
-      continue
+    const ltIndex = rawHtml.indexOf("<", index)
+    if (ltIndex < 0) {
+      chunks.push(rawHtml.slice(index))
+      break
+    }
+    if (ltIndex > index) {
+      chunks.push(rawHtml.slice(index, ltIndex))
     }
 
-    const tagEndIndex = rawHtml.indexOf(">", index + 1)
+    const tagEndIndex = rawHtml.indexOf(">", ltIndex + 1)
     if (tagEndIndex < 0) {
-      plainText += rawHtml.slice(index)
+      chunks.push(rawHtml.slice(ltIndex))
       break
     }
 
-    const rawTagBody = rawHtml.slice(index + 1, tagEndIndex).trim()
+    const rawTagBody = rawHtml.slice(ltIndex + 1, tagEndIndex).trim()
     if (rawTagBody.length === 0 || rawTagBody.startsWith("!")) {
       index = tagEndIndex + 1
       continue
@@ -141,13 +144,13 @@ const extractPlainTextByHtmlScanner = (rawHtml: string) => {
     const tagName = rawTagBody.slice(tagNameStart, tagPointer).toLowerCase()
 
     if (!closing && BLOCK_BREAK_TAGS.has(tagName)) {
-      plainText += "\n"
+      chunks.push("\n")
     }
 
     index = tagEndIndex + 1
   }
 
-  return plainText
+  return chunks.length <= 1 ? (chunks[0] ?? "") : chunks.join("")
 }
 
 export const extractPlainTextFromHtmlFragment = (rawHtml: string) => {
@@ -168,57 +171,40 @@ export const isMermaidSource = (rawCode: string) => {
   return MERMAID_SOURCE_PATTERN.test(normalized)
 }
 
-const normalizeMermaidCodeBlocksInHtml = (html: string) =>
-  html.replace(/<pre\b[^>]*>\s*<code\b([^>]*)>([\s\S]*?)<\/code>\s*<\/pre>/gi, (full, rawCodeAttrs, rawCodeBody) => {
-    const attrs = String(rawCodeAttrs || "")
-    const lowerAttrs = attrs.toLowerCase()
-    const hasMermaidClass =
-      lowerAttrs.includes("language-mermaid") || lowerAttrs.includes("data-language=\"mermaid\"")
-    const source = extractMermaidSource(String(rawCodeBody || ""))
-    const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source)
-    if (!hasMermaidClass && !looksLikeMermaid) return full
-    if (!source) return full
+const HTML_UNIFIED_BLOCK_REGEX = /<(pre|p)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+const PRE_CODE_INNER_REGEX = /^\s*<code\b([^>]*)>([\s\S]*?)<\/code>\s*$/i
 
-    return renderMermaidPre(source)
-  })
+const transformParagraphMermaid = (full: string, rawBody: string): string => {
+  const normalizedText = normalizeEscapedMermaidFences(extractPlainTextFromHtml(rawBody)).trim()
+  if (!normalizedText) return full
 
-const normalizeMermaidParagraphsInHtml = (html: string) =>
-  html.replace(/<p\b[^>]*>([\s\S]*?)<\/p>/gi, (full, rawBody) => {
-    const body = String(rawBody || "")
-    const normalizedText = normalizeEscapedMermaidFences(extractPlainTextFromHtml(body)).trim()
-    if (!normalizedText) return full
+  const hasMermaidFence =
+    /^`{3,}\s*mermaid\b/i.test(normalizedText) || /^\\`{3,}\s*mermaid\b/i.test(rawBody.trim())
+  const source = extractMermaidSource(rawBody)
+  const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source) && hasMermaidConnectorOrKeyword(source)
 
-    const hasMermaidFence =
-      /^`{3,}\s*mermaid\b/i.test(normalizedText) || /^\\`{3,}\s*mermaid\b/i.test(body.trim())
-    const source = extractMermaidSource(body)
-    const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source) && hasMermaidConnectorOrKeyword(source)
+  if (!hasMermaidFence && !looksLikeMermaid) return full
+  if (!source) return full
+  return renderMermaidPre(source)
+}
 
-    if (!hasMermaidFence && !looksLikeMermaid) return full
-    if (!source) return full
+const transformStandalonePreMermaid = (full: string, rawPreAttrs: string, rawBody: string): string => {
+  if (/<code\b/i.test(rawBody)) return full
 
-    return renderMermaidPre(source)
-  })
+  const lowerAttrs = rawPreAttrs.toLowerCase()
+  const hasMermaidHint =
+    lowerAttrs.includes("aq-mermaid") ||
+    lowerAttrs.includes("language-mermaid") ||
+    lowerAttrs.includes("data-language=\"mermaid\"") ||
+    lowerAttrs.includes("data-language='mermaid'")
 
-const normalizeStandaloneMermaidPreBlocksInHtml = (html: string) =>
-  html.replace(/<pre\b([^>]*)>([\s\S]*?)<\/pre>/gi, (full, rawPreAttrs, rawBody) => {
-    if (/<code\b/i.test(rawBody)) return full
+  const source = extractMermaidSource(rawBody)
+  const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source)
 
-    const attrs = String(rawPreAttrs || "")
-    const lowerAttrs = attrs.toLowerCase()
-    const hasMermaidHint =
-      lowerAttrs.includes("aq-mermaid") ||
-      lowerAttrs.includes("language-mermaid") ||
-      lowerAttrs.includes("data-language=\"mermaid\"") ||
-      lowerAttrs.includes("data-language='mermaid'")
-
-    const source = extractMermaidSource(String(rawBody || ""))
-    const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source)
-
-    if (!hasMermaidHint && !looksLikeMermaid) return full
-    if (!source) return full
-
-    return renderMermaidPre(source)
-  })
+  if (!hasMermaidHint && !looksLikeMermaid) return full
+  if (!source) return full
+  return renderMermaidPre(source)
+}
 
 const readHtmlAttribute = (rawAttrs: string, name: string) => {
   const normalizedName = name.toLowerCase()
@@ -361,46 +347,98 @@ const extractCodeSourceFromHtmlBlock = (rawPreAttrs: string, rawCodeAttrs: strin
   readHtmlAttribute(rawContainerAttrs, "data-prism-source") ||
   extractPlainTextFromHtml(rawCodeBody)
 
-const normalizeContentHtmlCodeBlocks = (html: string) => {
-  const blockMatches: Array<{
-    start: number
-    end: number
-    full: string
-    preAttrs: string
-    codeAttrs: string
-    codeBody: string
-  }> = []
-  HTML_CODE_BLOCK_REGEX.lastIndex = 0
+type UnifiedHtmlBlockMatch =
+  | {
+      kind: "paragraph"
+      start: number
+      end: number
+      replacement: string
+    }
+  | {
+      kind: "standalonePre"
+      start: number
+      end: number
+      replacement: string
+    }
+  | {
+      kind: "codePre"
+      start: number
+      end: number
+      full: string
+      preAttrs: string
+      codeAttrs: string
+      codeBody: string
+      codeIndex: number
+    }
+
+export const normalizeContentHtmlForMermaid = (rawHtml: string): string => {
+  if (!rawHtml) return ""
+
+  const blocks: UnifiedHtmlBlockMatch[] = []
+  const codePreOffsets: number[] = []
+  HTML_UNIFIED_BLOCK_REGEX.lastIndex = 0
+
   let match: RegExpExecArray | null
-  while ((match = HTML_CODE_BLOCK_REGEX.exec(html)) !== null) {
-    blockMatches.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      full: match[0],
-      preAttrs: match[1] || "",
-      codeAttrs: match[2] || "",
-      codeBody: match[3] || "",
-    })
+  while ((match = HTML_UNIFIED_BLOCK_REGEX.exec(rawHtml)) !== null) {
+    const tagName = (match[1] || "").toLowerCase()
+    const rawAttrs = match[2] || ""
+    const rawBody = match[3] || ""
+    const start = match.index
+    const end = start + match[0].length
+
+    if (tagName === "p") {
+      const replacement = transformParagraphMermaid(match[0], rawBody)
+      if (replacement !== match[0]) {
+        blocks.push({ kind: "paragraph", start, end, replacement })
+      }
+      continue
+    }
+
+    const preCodeMatch = PRE_CODE_INNER_REGEX.exec(rawBody)
+    if (preCodeMatch) {
+      const codeIndex = codePreOffsets.length
+      codePreOffsets.push(start)
+      blocks.push({
+        kind: "codePre",
+        start,
+        end,
+        full: match[0],
+        preAttrs: rawAttrs,
+        codeAttrs: preCodeMatch[1] || "",
+        codeBody: preCodeMatch[2] || "",
+        codeIndex,
+      })
+      continue
+    }
+
+    const standaloneReplacement = transformStandalonePreMermaid(match[0], rawAttrs, rawBody)
+    if (standaloneReplacement !== match[0]) {
+      blocks.push({ kind: "standalonePre", start, end, replacement: standaloneReplacement })
+    }
   }
-  if (blockMatches.length === 0) return html
 
-  const containerAttrsByBlock = collectCodeContainerAttrsForPreOffsets(
-    html,
-    blockMatches.map((entry) => entry.start)
-  )
+  if (blocks.length === 0) return rawHtml
 
-  let output = ""
+  const containerAttrsByCodeBlock =
+    codePreOffsets.length > 0 ? collectCodeContainerAttrsForPreOffsets(rawHtml, codePreOffsets) : []
+
+  const chunks: string[] = []
   let lastIndex = 0
 
-  for (let idx = 0; idx < blockMatches.length; idx += 1) {
-    const entry = blockMatches[idx]
-    output += html.slice(lastIndex, entry.start)
+  for (let i = 0; i < blocks.length; i += 1) {
+    const entry = blocks[i]
+    chunks.push(rawHtml.slice(lastIndex, entry.start))
     lastIndex = entry.end
 
-    const containerAttrs = containerAttrsByBlock[idx] || ""
+    if (entry.kind !== "codePre") {
+      chunks.push(entry.replacement)
+      continue
+    }
+
+    const containerAttrs = containerAttrsByCodeBlock[entry.codeIndex] || ""
     const source = extractCodeSourceFromHtmlBlock(entry.preAttrs, entry.codeAttrs, containerAttrs, entry.codeBody)
     if (!source) {
-      output += entry.full
+      chunks.push(entry.full)
       continue
     }
 
@@ -413,7 +451,7 @@ const normalizeContentHtmlCodeBlocks = (html: string) => {
       readHtmlAttribute(containerAttrs, "class").toLowerCase().includes("aq-mermaid")
     if (hasMermaidHint || isMermaidSource(source)) {
       const mermaidSource = extractMermaidSource(source)
-      output += mermaidSource ? renderMermaidPre(mermaidSource) : entry.full
+      chunks.push(mermaidSource ? renderMermaidPre(mermaidSource) : entry.full)
       continue
     }
 
@@ -434,21 +472,12 @@ const normalizeContentHtmlCodeBlocks = (html: string) => {
       .filter(Boolean)
       .join(" ")
 
-    output += `<pre${entry.preAttrs}><code ${normalizedCodeAttrs}>${presentation.html}</code></pre>`
+    chunks.push(`<pre${entry.preAttrs}><code ${normalizedCodeAttrs}>${presentation.html}</code></pre>`)
   }
 
-  output += html.slice(lastIndex)
-  return output
+  chunks.push(rawHtml.slice(lastIndex))
+  return chunks.join("")
 }
-
-export const normalizeContentHtmlForMermaid = (rawHtml: string): string =>
-  rawHtml
-    ? normalizeContentHtmlCodeBlocks(
-      normalizeStandaloneMermaidPreBlocksInHtml(
-        normalizeMermaidParagraphsInHtml(normalizeMermaidCodeBlocksInHtml(rawHtml))
-      )
-    )
-    : ""
 
 export const shouldPreferMarkdownPipeline = (markdown: string) => {
   if (!markdown.trim()) return false
@@ -508,14 +537,14 @@ const removeHtmlTagAttribute = (tag: string, attribute: string) => {
 const rewriteHtmlTagSrc = (tag: string, safeSrc: string) =>
   removeHtmlTagAttribute(tag, "src").replace(/(\s*\/?>)$/, ` src="${safeSrc}"$1`)
 
-export const filterTrustedPostImageHtml = (html: string) => {
+export const filterTrustedPostImageHtml = (html: string, blockedFallbackLabel = "Blocked image") => {
   const withoutResponsiveSources = html.replace(/<source\b[^>]*>/gi, (tag) =>
     getHtmlTagAttribute(tag, "srcset") ? "" : tag)
 
   return withoutResponsiveSources.replace(/<img\b[^>]*>/gi, (tag) => {
     const safeSrc = normalizePublicPostImageUrl(getHtmlTagAttribute(tag, "src"))
     if (safeSrc) return rewriteHtmlTagSrc(removeHtmlTagAttribute(tag, "srcset"), safeSrc)
-    const blockedLabel = getHtmlTagAttribute(tag, "alt") || "차단된 이미지"
+    const blockedLabel = getHtmlTagAttribute(tag, "alt") || blockedFallbackLabel
     return `<span class="aq-image-blocked" role="img" aria-label="${escapeHtmlAttribute(blockedLabel)}">${escapeHtml(blockedLabel)}</span>`
   })
 }

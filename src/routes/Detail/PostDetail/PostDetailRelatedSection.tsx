@@ -6,9 +6,10 @@ import { toCanonicalPostPath } from "src/libs/utils/postPath"
 import type { TPost } from "src/types"
 import { RelatedSection, RelatedSkeletonItem } from "./PostDetail.styles"
 
-const RELATED_SKELETON_COUNT = 2
+const RELATED_SKELETON_COUNT = 4
+const RELATED_POSTS_DEFAULT_LIMIT = 4
 
-type RelatedPostsSectionProps = {
+export type RelatedPostsSectionProps = {
   showRelatedTagSkeleton: boolean
   relatedByTagPosts: TPost[]
   showRelatedAuthorSkeleton: boolean
@@ -23,28 +24,36 @@ const renderSkeletonItems = (prefix: string) =>
     </RelatedSkeletonItem>
   ))
 
-const getRelatedPostMeta = (post: TPost) => {
+const formatRelatedPostMeta = (post: TPost, locale: string) => {
   const taxonomy = post.tags?.[0] || post.category?.[0] || post.type?.[0] || "Post"
-  return `${taxonomy} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "")}`
+  const rawDate = post.createdAt || post.date?.start_date || post.createdTime || ""
+  return `${taxonomy} · ${formatDate(rawDate, locale)}`
 }
-
-const formatRelatedPostMeta = (post: TPost, locale: string) =>
-  locale === "ko-KR"
-    ? getRelatedPostMeta(post)
-    : `${post.tags?.[0] || post.category?.[0] || post.type?.[0] || "Post"} · ${formatDate(post.createdAt || post.date?.start_date || post.createdTime || "", locale)}`
 
 export const selectUniqueRelatedPosts = (
   relatedByTagPosts: readonly TPost[],
   relatedByAuthorPosts: readonly TPost[],
-  limit = 2
+  limit = RELATED_POSTS_DEFAULT_LIMIT
 ): TPost[] => {
   if (limit <= 0) return []
-  const posts = [...relatedByTagPosts, ...relatedByAuthorPosts].filter(
-    (post): post is TPost => Boolean(post?.id && post?.slug)
-  )
-  return posts
-    .filter((post, index) => posts.findIndex((item) => item.id === post.id) === index)
-    .slice(0, limit)
+  const seenIds = new Set<string>()
+  const selected: TPost[] = []
+  const sources = [relatedByTagPosts, relatedByAuthorPosts]
+
+  for (let s = 0; s < sources.length; s += 1) {
+    const list = sources[s]
+    for (let i = 0; i < list.length; i += 1) {
+      const post = list[i]
+      if (!post?.id || !post?.slug) continue
+      const postId = String(post.id)
+      if (seenIds.has(postId)) continue
+      seenIds.add(postId)
+      selected.push(post)
+      if (selected.length >= limit) return selected
+    }
+  }
+
+  return selected
 }
 
 const RelatedPostsSectionComponent = ({
@@ -55,7 +64,11 @@ const RelatedPostsSectionComponent = ({
 }: RelatedPostsSectionProps) => {
   const { t, language } = useLanguage()
   const locale = language === "en" ? "en-US" : "ko-KR"
-  const relatedPosts = selectUniqueRelatedPosts(relatedByTagPosts, relatedByAuthorPosts, 2)
+  const relatedPosts = selectUniqueRelatedPosts(
+    relatedByTagPosts,
+    relatedByAuthorPosts,
+    RELATED_POSTS_DEFAULT_LIMIT
+  )
   const showSkeleton = relatedPosts.length === 0 && (showRelatedTagSkeleton || showRelatedAuthorSkeleton)
 
   if (!showSkeleton && relatedPosts.length === 0) return null

@@ -14,9 +14,16 @@ This repository includes patterns and algorithms adapted from or inspired by the
 ## Quartz v4
 
 - Repository: https://github.com/jackyzha0/quartz
-- Reference path: `quartz/plugins/transformers/ofm.ts`
-- Applied in: `src/libs/markdown/MarkdownRendererInline.tsx`, `src/libs/markdown/inlineTokenScanners.ts`
+- Reference paths: `quartz/plugins/transformers/ofm.ts`, `quartz/components/scripts/search.inline.ts`
+- Applied in: `src/libs/markdown/MarkdownRendererInline.tsx`, `src/libs/markdown/inlineTokenScanners.ts`, `src/components/quick-search/QuickSearchPalette.tsx`, `src/components/quick-search/quickSearchHighlight.ts`
 - License: MIT License (Copyright (c) 2021 Jacky Zhao)
+
+## uFuzzy
+
+- Repository: https://github.com/leeoniya/uFuzzy
+- Reference pattern: Split-token normalization and single-pass multi-token highlighting
+- Applied in: `src/components/quick-search/quickSearchHighlight.ts`
+- License: MIT License (Copyright (c) 2022 Leon Sorokin)
 
 ## Fumadocs
 
@@ -35,9 +42,23 @@ This repository includes patterns and algorithms adapted from or inspired by the
 ## Starlight
 
 - Repository: https://github.com/withastro/starlight
-- Reference pattern: Code frame / Expressive Code progressive enhancement
-- Applied in: `src/libs/markdown/useTrustedHtmlCodeBlocksEffect.ts`
+- Reference pattern: Code frame / Expressive Code progressive enhancement, `MobileTableOfContents` sticky section bar
+- Applied in: `src/libs/markdown/useTrustedHtmlCodeBlocksEffect.ts`, `src/routes/Detail/PostDetail/PostDetailMobileToc.tsx`
 - License: MIT License (Copyright (c) 2023 Astro Contributors)
+
+## Shiki (`@shikijs/transformers`)
+
+- Repository: https://github.com/shikijs/shiki
+- Reference path: `packages/transformers/src/transformers/notation-diff.ts` (`transformerNotationDiff`)
+- Applied in: `src/libs/markdown/prismRuntime.ts`
+- License: MIT License (Copyright (c) 2021 Pine Wu, Anthony Fu)
+
+## medium-zoom
+
+- Repository: https://github.com/francoischalifour/medium-zoom
+- Reference path: `src/medium-zoom.js`
+- Applied in: `src/libs/markdown/imageLightboxOverlay.ts`
+- License: MIT License (Copyright (c) 2017 François Chalifour)
 
 ---
 

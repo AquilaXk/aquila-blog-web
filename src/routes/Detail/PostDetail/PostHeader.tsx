@@ -12,7 +12,7 @@ import {
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
-import { useLanguage } from "src/libs/language"
+import { translations, useLanguage } from "src/libs/language"
 import { PostDetail } from "src/types"
 import { StyledWrapper } from "./PostHeader.styles"
 
@@ -110,7 +110,12 @@ export const resolvePostHeaderViewModel = (props: Props, locale: string = CONFIG
   const shareFeedbackMessage = resolveShareFeedbackMessage(shareFeedback, locale)
   const resolvedDeckSummary = deckSummary ?? data.summary ?? ""
   const viewCount = hitCount ?? data.hitCount ?? 0
-  const viewText = `${getNumberFormatter(locale).format(viewCount)} VIEWS`
+  const isEnglish = locale.toLowerCase().startsWith("en")
+  const headerT = isEnglish ? translations.en : translations.ko
+  const formattedViews = getNumberFormatter(locale).format(viewCount)
+  const viewText = isEnglish
+    ? `${formattedViews} ${headerT.postViewsLabel}`
+    : `${headerT.postViewsLabel} ${formattedViews}`
   const resolvedLikesCount = likesCount ?? data.likesCount ?? 0
 
   return {
@@ -203,8 +208,8 @@ export const PostHeaderEngagementSection: React.FC<{
   return (
     <div className="metaUtilities">
       <div className="actions" data-hide-mobile={hideActionButtonsOnMobile}>
-        <div className="engagementRow" aria-label="post engagement">
-          <div className="stats" aria-label="post stats">
+        <div className="engagementRow" aria-label={t("postEngagementAria")}>
+          <div className="stats" aria-label={t("postStatsAria")}>
             <span className="statChip">{publishedAt}</span>
             <span className="statChip">{viewText}</span>
             {hasReadingTime ? (
@@ -212,7 +217,9 @@ export const PostHeaderEngagementSection: React.FC<{
                 {readingTimeCopy}
               </span>
             ) : null}
-            {modifiedAt ? <span className="statChip">UPDATED {modifiedAt}</span> : null}
+            {modifiedAt ? (
+              <span className="statChip">{`${t("postUpdatedLabel")} ${modifiedAt}`}</span>
+            ) : null}
           </div>
           <button
             type="button"
@@ -335,24 +342,42 @@ const PostHeader: React.FC<Props> = (props) => {
 
       {showThumbnail && vm.thumbnailSrc ? (
         <div className="thumbnail">
-          <img
-            src={vm.thumbnailSrc}
-            alt={data.title}
-            loading="eager"
-            {...({ fetchpriority: "high" } as Record<string, string>)}
-            decoding="async"
-            draggable={false}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: `${vm.thumbnailFocusX}% ${vm.thumbnailFocusY}%`,
-              transform: `scale(${vm.thumbnailZoom})`,
-              transformOrigin: `${vm.thumbnailFocusX}% ${vm.thumbnailFocusY}%`,
+          <button
+            type="button"
+            className="thumbnailTrigger"
+            aria-label={t("postThumbnailZoomAria")}
+            onClick={(event) => {
+              const trigger = event.currentTarget
+              void import("src/libs/markdown/imageLightboxOverlay")
+                .then(({ openImageLightboxOverlay }) => {
+                  openImageLightboxOverlay({
+                    src: vm.thumbnailSrc,
+                    alt: data.title,
+                    trigger,
+                  })
+                })
+                .catch(() => {})
             }}
-          />
+          >
+            <img
+              src={vm.thumbnailSrc}
+              alt={data.title}
+              loading="eager"
+              {...({ fetchpriority: "high" } as Record<string, string>)}
+              decoding="async"
+              draggable={false}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: `${vm.thumbnailFocusX}% ${vm.thumbnailFocusY}%`,
+                transform: `scale(${vm.thumbnailZoom})`,
+                transformOrigin: `${vm.thumbnailFocusX}% ${vm.thumbnailFocusY}%`,
+              }}
+            />
+          </button>
         </div>
       ) : null}
     </StyledWrapper>

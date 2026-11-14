@@ -8,9 +8,12 @@ import { skeletonShimmerCss } from "src/design-system/StatePresenters"
 import { TPost } from "src/types"
 import { useLanguage } from "src/libs/language"
 import { resolveFeedInitialMountCount } from "../FeedExplorerRestoreModel"
+import type { FeedSortMode } from "../FeedSortMenuModel"
 
 type Props = {
   posts: TPost[]
+  searchQuery?: string
+  sortMode?: FeedSortMode
   hasFilter?: boolean
   hasExternalResults?: boolean
   onClearFilters?: () => void
@@ -93,6 +96,8 @@ FilterLoadingState.displayName = "FilterLoadingState"
 
 const PostList: React.FC<Props> = ({
   posts,
+  searchQuery,
+  sortMode = "latest",
   hasFilter = false,
   hasExternalResults = false,
   onClearFilters,
@@ -210,7 +215,12 @@ const PostList: React.FC<Props> = ({
             className="deferredPostCardWrap"
           >
             {shouldMountCard ? (
-              <PostCard data={post} layout="regular" />
+              <PostCard
+                data={post}
+                layout="regular"
+                searchQuery={searchQuery}
+                sortMode={sortMode}
+              />
             ) : (
               <article className="deferredPostCardPlaceholder" aria-hidden="true" />
             )}

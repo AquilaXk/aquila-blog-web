@@ -53,12 +53,22 @@ const TagList: React.FC = () => {
   const allCount = totalPostCount
 
   const navigateWithTag = useCallback((value?: string) => {
-    const { category: _deprecatedCategory, ...restQuery } = router.query
+    const {
+      category: _deprecatedCategory,
+      q: rawQ,
+      sort: rawSort,
+      ...restQuery
+    } = router.query
+    const preservedQ = typeof rawQ === "string" && rawQ.trim().length > 0 ? rawQ.trim() : undefined
+    const preservedSort =
+      rawSort === "views" || rawSort === "likes" ? rawSort : undefined
     startTransition(() => {
       void replaceShallowRoutePreservingScroll(router, {
         pathname: "/",
         query: {
           ...restQuery,
+          q: preservedQ,
+          sort: preservedSort,
           tag: value,
         },
       })

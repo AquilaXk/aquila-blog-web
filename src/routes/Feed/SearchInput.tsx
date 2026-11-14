@@ -1,5 +1,14 @@
 import styled from "@emotion/styled"
-import React, { ChangeEvent, InputHTMLAttributes, Ref, useCallback, useRef } from "react"
+import React, {
+  ChangeEvent,
+  InputHTMLAttributes,
+  KeyboardEvent,
+  Ref,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import AppIcon from "src/components/icons/AppIcon"
 import {
   FEED_SEARCH_FIELD_MIN_HEIGHT_PX,
@@ -27,10 +36,17 @@ const assignInputRef = (targetRef: Ref<HTMLInputElement> | undefined, node: HTML
   }
 }
 
-const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = false, ...props }) => {
+const SearchInput: React.FC<Props> = ({
+  inputRef,
+  onClear,
+  hideClearButton = false,
+  onKeyDown,
+  ...props
+}) => {
   const { t } = useLanguage()
   const inputId = props.id || FEED_SEARCH_INPUT_ID
   const localInputRef = useRef<HTMLInputElement | null>(null)
+  const [shortcutLabel, setShortcutLabel] = useState("Ctrl K")
   const hasQueryValue =
     typeof props.value === "string"
       ? props.value.length > 0
@@ -38,6 +54,15 @@ const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = fal
         ? String(props.value).length > 0
         : false
   const canClear = !hideClearButton && hasQueryValue && !props.disabled && !props.readOnly
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return
+    const navWithUa = navigator as Navigator & { userAgentData?: { platform?: string } }
+    const platform = navWithUa.userAgentData?.platform || navigator.platform || ""
+    if (/mac|iphone|ipad|ipod/i.test(platform)) {
+      setShortcutLabel("⌘K")
+    }
+  }, [])
 
   const setMergedRef = useCallback(
     (node: HTMLInputElement | null) => {
@@ -62,6 +87,20 @@ const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = fal
     input?.focus()
   }, [onClear, props])
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      onKeyDown?.(event)
+      if (event.defaultPrevented || event.key !== "Escape") return
+      if (hasQueryValue && !props.disabled && !props.readOnly) {
+        event.preventDefault()
+        handleClear()
+        return
+      }
+      event.currentTarget.blur()
+    },
+    [handleClear, hasQueryValue, onKeyDown, props.disabled, props.readOnly]
+  )
+
   return (
     <StyledWrapper data-touch-token-revision={TOUCH_TOKEN_BUNDLE_REVISION}>
       <div className="field">
@@ -76,6 +115,7 @@ const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = fal
           placeholder={t("searchPlaceholder")}
           aria-label={props["aria-label"] || t("searchInputAria")}
           {...props}
+          onKeyDown={handleKeyDown}
         />
         {canClear ? (
           <button
@@ -86,6 +126,11 @@ const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = fal
           >
             <AppIcon name="close" />
           </button>
+        ) : !hasQueryValue && !props.disabled ? (
+          <span className="shortcutBadge" aria-hidden="true">
+            <kbd>{shortcutLabel}</kbd>
+            <kbd>/</kbd>
+          </span>
         ) : null}
       </div>
     </StyledWrapper>
@@ -96,12 +141,6 @@ export default SearchInput
 
 const StyledWrapper = styled.div`
   min-width: 0;
-
-  &:focus-within > .field {
-    border-color: var(--aq-focus-ring);
-    outline: 2px solid var(--aq-focus-ring);
-    outline-offset: 2px;
-  }
 
   > .field {
     display: flex;
@@ -199,13 +238,47 @@ const StyledWrapper = styled.div`
     }
   }
 
+  > .field > .shortcutBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 5px;
+      border-radius: 4px;
+      border: 1px solid var(--aq-border);
+      background: var(--aq-page-bg);
+      color: var(--aq-muted);
+      font-family: inherit;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.01em;
+    }
+
+    @media (max-width: 820px), (pointer: coarse) {
+      display: none;
+    }
+  }
+
   > .field:focus-within {
     border-color: var(--aq-accent);
+    outline: 2px solid var(--aq-focus-ring);
+    outline-offset: 2px;
     background: var(--aq-surface);
     box-shadow: none;
 
     .searchIcon {
       color: var(--aq-muted);
+    }
+
+    .shortcutBadge {
+      display: none;
     }
   }
 

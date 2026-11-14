@@ -1,4 +1,4 @@
-import { memo, type Ref, type RefObject } from "react"
+import { memo, type MutableRefObject, type Ref, type RefObject } from "react"
 import AppIcon from "src/components/icons/AppIcon"
 import { useLanguage } from "src/libs/language"
 import { MobileSummaryBar } from "./PostDetail.styles"
@@ -168,6 +168,7 @@ type RightTocRailProps = {
   railRef: RefObject<HTMLElement | null>
   innerRef: RefObject<HTMLElement | null>
   listRef: RefObject<HTMLOListElement | null>
+  buttonRefsById?: MutableRefObject<Map<string, HTMLButtonElement>>
   active: boolean
   showStickyToc: boolean
   visibleTocItems: TocItem[]
@@ -182,6 +183,7 @@ export const RightTocRail = memo(function RightTocRail({
   railRef,
   innerRef,
   listRef,
+  buttonRefsById,
   active,
   showStickyToc,
   visibleTocItems,
@@ -215,6 +217,14 @@ export const RightTocRail = memo(function RightTocRail({
             {visibleTocItems.map((item) => (
               <li key={item.id} data-level={item.level}>
                 <button
+                  ref={(node) => {
+                    if (!buttonRefsById) return
+                    if (node) {
+                      buttonRefsById.current.set(item.id, node)
+                    } else {
+                      buttonRefsById.current.delete(item.id)
+                    }
+                  }}
                   type="button"
                   data-active={activeTocId === item.id}
                   aria-current={activeTocId === item.id ? "location" : undefined}

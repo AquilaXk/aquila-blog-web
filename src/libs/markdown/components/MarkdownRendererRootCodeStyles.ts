@@ -45,6 +45,68 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     font-weight: 600;
   }
 
+  .aq-code-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .aq-code-lang {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid #27334a;
+    border-radius: 4px;
+    background: #131d32;
+    color: #a9c5ff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .aq-code-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #27334a;
+    border-radius: 4px;
+    background: transparent;
+    color: #7895c9;
+    min-height: 28px;
+    padding: 0 0.45rem;
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+  }
+
+  .aq-code-wrap:hover {
+    color: #a9c5ff;
+    border-color: #3f5275;
+  }
+
+  .aq-code-wrap[aria-pressed="true"] {
+    color: #dbe7ff;
+    border-color: #60a5fa;
+    background: rgba(59, 130, 246, 0.22);
+  }
+
+  .aq-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .aq-code-copy {
     display: inline-flex;
     align-items: center;
@@ -177,6 +239,51 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     user-select: none;
   }
 
+  .aq-code-block[data-wrap="true"] .aq-code,
+  .aq-code-block[data-wrap="true"] .aq-pretty-pre code,
+  .aq-code-block[data-wrap="true"] .aq-pretty-pre code > [data-line] {
+    width: 100%;
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .aq-pretty-pre code[data-has-diff="true"] [data-line] {
+    padding-left: calc(var(--aq-code-gutter-width) + var(--aq-code-gutter-gap) + 0.72rem);
+  }
+
+  .aq-pretty-pre code [data-line][data-diff="add"],
+  figure[data-rehype-pretty-code-figure] [data-line][data-diff="add"] {
+    background: rgba(34, 197, 94, 0.16);
+    border-left: 2px solid #22c55e;
+  }
+
+  .aq-pretty-pre code [data-line][data-diff="remove"],
+  figure[data-rehype-pretty-code-figure] [data-line][data-diff="remove"] {
+    background: rgba(239, 68, 68, 0.16);
+    border-left: 2px solid #ef4444;
+  }
+
+  .aq-pretty-pre code [data-line][data-diff]::after {
+    position: absolute;
+    left: calc(var(--aq-code-gutter-width) + 0.28rem);
+    top: 0;
+    font-weight: 700;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .aq-pretty-pre code [data-line][data-diff="add"]::after {
+    content: "+";
+    color: #4ade80;
+  }
+
+  .aq-pretty-pre code [data-line][data-diff="remove"]::after {
+    content: "-";
+    color: #f87171;
+  }
+
   .aq-pretty-pre code > [data-highlighted-line] {
     background: rgba(96, 165, 250, 0.11);
     border-radius: 0;
@@ -304,7 +411,6 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     }
 
     .aq-code-block {
-      --aq-code-gutter-width: 1.16rem;
       --aq-code-gutter-gap: 0.46rem;
     }
 
@@ -316,8 +422,20 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
       padding: 6px 12px;
     }
 
+    .aq-code-wrap {
+      min-width: 44px;
+      min-height: 44px;
+    }
+
     .aq-code-copy {
       font-size: 0.74rem;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .aq-code-wrap {
+      min-width: 44px;
+      min-height: 44px;
     }
   }
 

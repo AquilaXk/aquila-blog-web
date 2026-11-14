@@ -9,6 +9,70 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     scroll-margin-top: 6.8rem;
   }
 
+  .aq-heading-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.42rem;
+    padding: 0 0.2rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--aq-muted);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.14s ease, color 0.14s ease, background-color 0.14s ease;
+
+    &::before {
+      content: "#";
+    }
+
+    &[data-copied="true"]::before {
+      content: "✓";
+    }
+
+    &[data-copied="true"] {
+      opacity: 1;
+      color: var(--aq-accent-link);
+      background: var(--aq-accent-muted);
+    }
+
+    &:hover,
+    &:focus-visible {
+      opacity: 1;
+      color: var(--aq-accent-link);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  h1:hover > .aq-heading-anchor,
+  h2:hover > .aq-heading-anchor,
+  h3:hover > .aq-heading-anchor,
+  h4:hover > .aq-heading-anchor,
+  h1:focus-within > .aq-heading-anchor,
+  h2:focus-within > .aq-heading-anchor,
+  h3:focus-within > .aq-heading-anchor,
+  h4:focus-within > .aq-heading-anchor {
+    opacity: 1;
+  }
+
+  @media (max-width: 820px), (pointer: coarse) {
+    .aq-heading-anchor {
+      opacity: 0.65;
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+
   figure {
     margin: 1.25rem 0;
   }

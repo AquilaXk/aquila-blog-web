@@ -169,12 +169,91 @@ const escapeHtml = (value: string) =>
 
 const normalizeCodeLineBreaks = (value: string) => value.replace(/\r\n?|\u2028|\u2029/g, "\n")
 
+// 참조 구현: @shikijs/transformers `transformerNotationDiff` (https://github.com/shikijs/shiki, MIT License)
+// 줄 끝 주석의 `[!code ++]`, `[!code --]`, `[!code highlight]` 지시자를 단일 패스로 분리한다.
+const CODE_ANNOTATION_MARKER_PATTERN =
+  /(?:\s*(?:\/\/|--|#)\s*|\s*\/\*\s*|\s*<!--\s*)\[!code\s+(\+\+|--|highlight)\]\s*(?:\*\/|-->)?\s*$/
+
+export type CodeDiffKind = "add" | "remove"
+
+export type CodeLineAnnotationResult = {
+  cleanSource: string
+  diffLines: ReadonlyMap<number, CodeDiffKind>
+  highlightedLines: ReadonlySet<number>
+  hasAnnotations: boolean
+}
+
+export const extractCodeLineAnnotations = (source: string): CodeLineAnnotationResult => {
+  const normalized = normalizeCodeLineBreaks(source)
+  if (!normalized.includes("[!code ")) {
+    return {
+      cleanSource: normalized,
+      diffLines: new Map<number, CodeDiffKind>(),
+      highlightedLines: new Set<number>(),
+      hasAnnotations: false,
+    }
+  }
+
+  const diffLines = new Map<number, CodeDiffKind>()
+  const highlightedLines = new Set<number>()
+  let cleanSource = ""
+  let lineStart = 0
+  let lineNumber = 1
+  let hasAnnotations = false
+
+  while (lineStart <= normalized.length) {
+    const lineEnd = normalized.indexOf("\n", lineStart)
+    const rawLine =
+      lineEnd === -1 ? normalized.slice(lineStart) : normalized.slice(lineStart, lineEnd)
+    const match = CODE_ANNOTATION_MARKER_PATTERN.exec(rawLine)
+    if (match) {
+      hasAnnotations = true
+      const directive = match[1]
+      if (directive === "++") {
+        diffLines.set(lineNumber, "add")
+      } else if (directive === "--") {
+        diffLines.set(lineNumber, "remove")
+      } else if (directive === "highlight") {
+        highlightedLines.add(lineNumber)
+      }
+      cleanSource += rawLine.slice(0, match.index)
+    } else {
+      cleanSource += rawLine
+    }
+    if (lineEnd === -1) break
+    cleanSource += "\n"
+    lineStart = lineEnd + 1
+    lineNumber += 1
+  }
+
+  return {
+    cleanSource,
+    diffLines,
+    highlightedLines,
+    hasAnnotations,
+  }
+}
+
+const mergeHighlightedLineSets = (
+  a?: ReadonlySet<number>,
+  b?: ReadonlySet<number>
+): ReadonlySet<number> | undefined => {
+  if ((!a || a.size === 0) && (!b || b.size === 0)) return undefined
+  if (!a || a.size === 0) return b
+  if (!b || b.size === 0) return a
+  const merged = new Set<number>(a)
+  for (const line of b) merged.add(line)
+  return merged
+}
+
 export const renderLineWrappedHtml = (
   source: string,
-  highlightedLines?: ReadonlySet<number>
+  highlightedLines?: ReadonlySet<number>,
+  diffLines?: ReadonlyMap<number, CodeDiffKind>
 ) => {
   const html = normalizeCodeLineBreaks(source)
   const hasHighlights = Boolean(highlightedLines && highlightedLines.size > 0)
+  const hasDiffs = Boolean(diffLines && diffLines.size > 0)
   let result = ""
   let lineStart = 0
   let lineNumber = 1
@@ -186,7 +265,9 @@ export const renderLineWrappedHtml = (
       hasHighlights && highlightedLines!.has(lineNumber)
         ? ' data-highlighted-line="true"'
         : ""
-    result += `<span class="line" data-line="true"${highlightedAttr}>${
+    const diffKind = hasDiffs ? diffLines!.get(lineNumber) : undefined
+    const diffAttr = diffKind ? ` data-diff="${diffKind}"` : ""
+    result += `<span class="line" data-line="true"${highlightedAttr}${diffAttr}>${
       line.length > 0 ? line : "<br />"
     }</span>`
     if (lineEnd === -1) break
@@ -199,8 +280,9 @@ export const renderLineWrappedHtml = (
 
 export const renderPlainCodeToHtml = (
   source: string,
-  highlightedLines?: ReadonlySet<number>
-) => renderLineWrappedHtml(escapeHtml(source), highlightedLines)
+  highlightedLines?: ReadonlySet<number>,
+  diffLines?: ReadonlyMap<number, CodeDiffKind>
+) => renderLineWrappedHtml(escapeHtml(source), highlightedLines, diffLines)
 
 export const loadPrismCore = async () => {
   if (!prismLoader) {
@@ -247,13 +329,15 @@ const resolvePrismGrammar = (language: string) => {
 const highlightWithPrism = (
   source: string,
   language: string,
-  highlightedLines?: ReadonlySet<number>
+  highlightedLines?: ReadonlySet<number>,
+  diffLines?: ReadonlyMap<number, CodeDiffKind>
 ) => {
   const grammar = resolvePrismGrammar(language)
   if (!grammar || typeof (Prism as PrismLike).highlight !== "function") return null
   return renderLineWrappedHtml(
     (Prism as PrismLike).highlight!(source, grammar, language),
-    highlightedLines
+    highlightedLines,
+    diffLines
   )
 }
 
@@ -261,38 +345,58 @@ export type RenderImmediateCodeOptions = {
   source: string
   language?: string | null
   highlightedLines?: ReadonlySet<number>
+  diffLines?: ReadonlyMap<number, CodeDiffKind>
 }
 
 export const renderImmediateCodeToHtml = (
   inputOrSource: RenderImmediateCodeOptions | string,
   maybeLanguage?: string | null,
-  maybeOptions?: { showLineNumbers?: boolean; highlightedLines?: ReadonlySet<number> }
+  maybeOptions?: {
+    showLineNumbers?: boolean
+    highlightedLines?: ReadonlySet<number>
+    diffLines?: ReadonlyMap<number, CodeDiffKind>
+  }
 ) => {
-  const source =
+  const rawSource =
     typeof inputOrSource === "string" ? inputOrSource : inputOrSource.source
   const language =
     typeof inputOrSource === "string" ? maybeLanguage : inputOrSource.language
-  const highlightedLines =
+  const inputHighlightedLines =
     typeof inputOrSource === "string"
       ? maybeOptions?.highlightedLines
       : inputOrSource.highlightedLines
+  const inputDiffLines =
+    typeof inputOrSource === "string" ? maybeOptions?.diffLines : inputOrSource.diffLines
 
+  const annotations = extractCodeLineAnnotations(rawSource)
+  const source = annotations.cleanSource
+  const highlightedLines = mergeHighlightedLineSets(
+    inputHighlightedLines,
+    annotations.highlightedLines
+  )
+  const diffLines =
+    inputDiffLines && inputDiffLines.size > 0 ? inputDiffLines : annotations.diffLines
+  const hasDiff = diffLines.size > 0
   const resolvedLanguage = resolvePrismLanguage(source, language)
 
   if (resolvedLanguage === "mermaid" || resolvedLanguage === "text") {
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source, highlightedLines),
+      html: renderPlainCodeToHtml(source, highlightedLines, diffLines),
+      cleanSource: source,
+      hasDiff,
     }
   }
 
-  const html = highlightWithPrism(source, resolvedLanguage, highlightedLines)
+  const html = highlightWithPrism(source, resolvedLanguage, highlightedLines, diffLines)
   if (!html) {
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source, highlightedLines),
+      html: renderPlainCodeToHtml(source, highlightedLines, diffLines),
+      cleanSource: source,
+      hasDiff,
     }
   }
 
@@ -300,25 +404,40 @@ export const renderImmediateCodeToHtml = (
     language: resolvedLanguage,
     highlighted: true,
     html,
+    cleanSource: source,
+    hasDiff,
   }
 }
 
 export const highlightCodeToHtml = async ({
-  source,
+  source: rawSource,
   language,
-  highlightedLines,
+  highlightedLines: inputHighlightedLines,
+  diffLines: inputDiffLines,
 }: {
   source: string
   language?: string | null
   highlightedLines?: ReadonlySet<number>
+  diffLines?: ReadonlyMap<number, CodeDiffKind>
 }) => {
+  const annotations = extractCodeLineAnnotations(rawSource)
+  const source = annotations.cleanSource
+  const highlightedLines = mergeHighlightedLineSets(
+    inputHighlightedLines,
+    annotations.highlightedLines
+  )
+  const diffLines =
+    inputDiffLines && inputDiffLines.size > 0 ? inputDiffLines : annotations.diffLines
+  const hasDiff = diffLines.size > 0
   const resolvedLanguage = resolvePrismLanguage(source, language)
 
   if (resolvedLanguage === "mermaid" || resolvedLanguage === "text") {
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source, highlightedLines),
+      html: renderPlainCodeToHtml(source, highlightedLines, diffLines),
+      cleanSource: source,
+      hasDiff,
     }
   }
 
@@ -326,6 +445,7 @@ export const highlightCodeToHtml = async ({
     source,
     language: resolvedLanguage,
     highlightedLines,
+    diffLines,
   })
   if (immediateResult.highlighted) {
     return immediateResult
@@ -339,7 +459,9 @@ export const highlightCodeToHtml = async ({
     return {
       language: resolvedLanguage,
       highlighted: false,
-      html: renderPlainCodeToHtml(source, highlightedLines),
+      html: renderPlainCodeToHtml(source, highlightedLines, diffLines),
+      cleanSource: source,
+      hasDiff,
     }
   }
 
@@ -348,7 +470,10 @@ export const highlightCodeToHtml = async ({
     highlighted: true,
     html: renderLineWrappedHtml(
       loadedPrism.highlight(source, grammar, resolvedLanguage),
-      highlightedLines
+      highlightedLines,
+      diffLines
     ),
+    cleanSource: source,
+    hasDiff,
   }
 }

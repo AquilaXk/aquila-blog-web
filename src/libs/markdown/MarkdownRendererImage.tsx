@@ -86,7 +86,7 @@ export const MarkdownImageFigure = memo(
           <button
             type="button"
             className="aq-image-resize-handle"
-            aria-label="이미지 폭 조절"
+            aria-label={t("markdownResizeImageAria")}
             onPointerDown={(event) => {
               if (!frameRef.current) return
               pointerCleanupRef.current?.()

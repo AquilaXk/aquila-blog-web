@@ -331,8 +331,25 @@ export const StyledWrapper = styled.header `
     padding-bottom: 52%;
   }
 
+  .thumbnailTrigger {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: -2px;
+    }
+  }
+
   @media (max-width: 820px), (pointer: coarse) {
     .backLink,
+    .postTagChip,
     .shareFeedbackPill,
     .likeButton,
     .shareButton {

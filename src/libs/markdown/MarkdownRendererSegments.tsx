@@ -125,7 +125,7 @@ export const renderMarkdownSegment = ({
       <details className="aq-toggle" key={`toggle-${index}`}>
         <summary>
           <span className="aq-toggle__caret" aria-hidden="true" />
-          <span className="aq-toggle__title">{segment.title}</span>
+          <span className="aq-toggle__title">{segment.title || t("markdownToggleLabel")}</span>
         </summary>
         {segment.content ? (
           <div className="aq-toggle__body">{renderMarkdown(segment.content, `toggle-body-${index}`)}</div>

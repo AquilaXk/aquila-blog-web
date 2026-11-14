@@ -3,7 +3,7 @@ import dynamic from "next/dynamic"
 import PostHeader from "./PostHeader"
 import usePostQuery from "src/hooks/usePostQuery"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
-import { RelatedPostsSection } from "./PostDetailRelatedSection"
+import type { RelatedPostsSectionProps } from "./PostDetailRelatedSection"
 import {
   buildInitialTocFromMarkdown,
   collectTocFromArticle,
@@ -31,17 +31,28 @@ import PostDetailMobileToc from "./PostDetailMobileToc"
 import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions"
 import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
+import { useLanguage } from "src/libs/language"
 import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 
-const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"), {
-  loading: () => (
-    <div className="markdownLoadingSkeleton" aria-busy="true" aria-label="본문 불러오는 중">
+const MarkdownLoadingSkeleton: React.FC = () => {
+  const { t } = useLanguage()
+  return (
+    <div className="markdownLoadingSkeleton" aria-busy="true" aria-label={t("postLoadingAria")}>
       <span className="skeletonLine skeletonLineWide" />
       <span className="skeletonLine skeletonLineFull" />
       <span className="skeletonLine skeletonLineMid" />
     </div>
-  ),
+  )
+}
+
+const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRenderer"), {
+  loading: () => <MarkdownLoadingSkeleton />,
 })
+
+const RelatedPostsSection = dynamic<RelatedPostsSectionProps>(
+  () => import("./PostDetailRelatedSection").then((mod) => mod.RelatedPostsSection),
+  { ssr: false }
+)
 
 export const RAIL_UI_DETAILED_TOC = 1
 export const RAIL_UI_LEFT_ACTIVE = 1 << 1
@@ -57,6 +68,7 @@ const PostDetail: React.FC = () => {
   const rightRailRef = useRef<HTMLElement | null>(null)
   const rightRailInnerRef = useRef<HTMLElement | null>(null)
   const rightTocListRef = useRef<HTMLOListElement | null>(null)
+  const rightTocButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const readProgressRef = useRef<HTMLSpanElement | null>(null)
   const documentInsights = useMemo(
     () => createMarkdownDocumentInsights(data?.content ?? ""),
@@ -165,22 +177,25 @@ const PostDetail: React.FC = () => {
       const listNode = rightTocListRef.current
       if (!listNode) return
 
-      const activeButton = listNode.querySelector<HTMLElement>('button[data-active="true"]')
+      const activeButton = rightTocButtonRefs.current.get(activeTocId)
       if (!activeButton) return
 
-      const listRect = listNode.getBoundingClientRect()
-      const activeRect = activeButton.getBoundingClientRect()
       const revealPadding = 12
-      const overflowTop = listRect.top + revealPadding - activeRect.top
+      const buttonTop =
+        activeButton.offsetParent === listNode
+          ? activeButton.offsetTop
+          : activeButton.offsetTop - listNode.offsetTop
+      const buttonBottom = buttonTop + activeButton.offsetHeight
+      const viewTop = listNode.scrollTop
+      const viewBottom = viewTop + listNode.clientHeight
 
-      if (overflowTop > 0) {
-        listNode.scrollTop = Math.max(0, listNode.scrollTop - overflowTop)
+      if (buttonTop - revealPadding < viewTop) {
+        listNode.scrollTop = Math.max(0, buttonTop - revealPadding)
         return
       }
 
-      const overflowBottom = activeRect.bottom - (listRect.bottom - revealPadding)
-      if (overflowBottom > 0) {
-        listNode.scrollTop += overflowBottom
+      if (buttonBottom + revealPadding > viewBottom) {
+        listNode.scrollTop = buttonBottom + revealPadding - listNode.clientHeight
       }
     })
 
@@ -261,11 +276,11 @@ const PostDetail: React.FC = () => {
       const rightEnabled = showStickyTocRef.current && viewportWidth >= RIGHT_RAIL_HYBRID_MIN_VIEWPORT_PX
       if (remeasure) {
         railTopOffsetRef.current = resolveRailTopOffset()
+        const articleBottomDoc = window.scrollY + article.getBoundingClientRect().bottom
         scrollableHeightRef.current = Math.max(
           1,
-          document.documentElement.scrollHeight - window.innerHeight
+          articleBottomDoc - window.innerHeight
         )
-        const articleBottomDoc = window.scrollY + article.getBoundingClientRect().bottom
         hybridRailMetricsRef.current.left = measureHybridRail(
           leftRailRef.current,
           leftRailInnerRef.current,
@@ -417,7 +432,12 @@ const PostDetail: React.FC = () => {
     const targetTop = heading.getBoundingClientRect().top + window.scrollY - (railTopOffsetRef.current + 24)
     tocScrollLockRef.current = { id, until: Date.now() + 700 }
     setActiveTocId(id)
-    window.scrollTo({ top: targetTop, behavior: "smooth" })
+    if (typeof window !== "undefined") {
+      window.history?.replaceState?.(null, "", `#${id}`)
+      const reducedMotion =
+        window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true
+      window.scrollTo({ top: targetTop, behavior: reducedMotion ? "auto" : "smooth" })
+    }
   }, [])
 
   const handleToggleDetailedToc = useCallback(() => {
@@ -517,6 +537,7 @@ const PostDetail: React.FC = () => {
           railRef={rightRailRef}
           innerRef={rightRailInnerRef}
           listRef={rightTocListRef}
+          buttonRefsById={rightTocButtonRefs}
           active={rightHybridRailActive}
           showStickyToc={showStickyToc}
           visibleTocItems={visibleTocItems}

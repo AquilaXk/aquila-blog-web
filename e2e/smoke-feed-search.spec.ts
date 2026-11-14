@@ -475,26 +475,34 @@ test.describe("core smoke feed and search", () => {
   expect(dataPrefetchRequests).toEqual([])
 })
 
-  test("non-home header search button opens the feed search input", async ({ page }) => {
+  test("non-home header search button opens the quick search palette without leaving /about", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
     await page.goto("/about")
     await page.getByRole("button", { name: "글과 태그 검색으로 이동" }).click()
-    await expect(page).toHaveURL((url) => new URL(url).pathname === "/")
-    await waitForFeedSearchInputFocus(page)
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/about")
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
   })
 
-  test("Meta+K focuses feed search input on home", async ({ page }) => {
+  test("Meta+K opens quick search palette on home", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
     await page.goto("/")
     await triggerSearchShortcut(page)
-    await waitForFeedSearchInputFocus(page)
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
   })
 
-  test("모바일 메뉴 검색과 Ctrl+K는 피드 검색 입력을 연다", async ({ page }) => {
+  test("모바일 메뉴 검색과 Ctrl+K는 빠른 검색 팔레트를 연다", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
@@ -505,7 +513,11 @@ test.describe("core smoke feed and search", () => {
     await expect(searchItem).toBeVisible()
     await expect(searchItem).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K")
     await searchItem.click()
-    await waitForFeedSearchInputFocus(page)
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
 
     await page.getByRole("button", { name: "메뉴" }).click()
     await expect(page.getByRole("dialog", { name: "메뉴" })).toBeVisible()
@@ -513,40 +525,52 @@ test.describe("core smoke feed and search", () => {
     await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
 
     await triggerSearchShortcut(page)
-    await waitForFeedSearchInputFocus(page)
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
   })
 
-  test("from /about Meta+K navigates to / and focuses search input", async ({ page }) => {
+  test("from /about Meta+K opens quick search palette and Open in Feed navigates to /", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
     await page.goto("/about")
     await triggerSearchShortcut(page)
-    await expect(page).toHaveURL((url) => new URL(url).pathname === "/")
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/about")
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await dialog.locator(".qsInput").fill("Next")
+    await dialog.locator(".qsFeedLink").click()
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/" && url.searchParams.get("q") === "Next")
     await waitForFeedSearchInputFocus(page)
   })
 
-  test("from /about rapid duplicate search triggers still focus feed search input", async ({ page }) => {
+  test("from /about rapid duplicate search triggers keep quick search open", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
     await page.goto("/about")
     await Promise.all([triggerSearchShortcut(page), triggerSearchShortcut(page)])
-    await expect(page).toHaveURL((url) => new URL(url).pathname === "/")
-    await waitForFeedSearchInputFocus(page)
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/about")
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
   })
 
-  test("second search after completed focus still navigates from /about", async ({ page }) => {
+  test("closing quick search on home allows reopening it on /about", async ({ page }) => {
     await mockFeedEndpoints(page)
     await mockAnonymousSession(page)
 
     await page.goto("/")
     await triggerSearchShortcut(page)
-    await waitForFeedSearchInputFocus(page)
+    const dialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(dialog).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
 
     await page.goto("/about")
     await triggerSearchShortcut(page)
-    await expect(page).toHaveURL((url) => new URL(url).pathname === "/")
-    await waitForFeedSearchInputFocus(page)
+    await expect(page).toHaveURL((url) => new URL(url).pathname === "/about")
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator(".qsInput")).toBeFocused()
   })
 })

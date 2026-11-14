@@ -90,6 +90,7 @@ export const useModalFocusTrap = ({
 }: UseModalFocusTrapOptions) => {
   const triggerRef = useRef<HTMLElement | null>(null)
   const pausedRef = useRef(paused)
+  const handledTabEventsRef = useRef<WeakSet<Event> | null>(null)
   const trapActive = open && !paused
 
   pausedRef.current = paused
@@ -131,6 +132,8 @@ export const useModalFocusTrap = ({
   useEffect(() => {
     if (!trapActive) return
 
+    const handledTabEvents = new WeakSet<Event>()
+
     const handleCaptureKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault()
@@ -139,17 +142,29 @@ export const useModalFocusTrap = ({
         return
       }
       if (event.key === "Tab") {
+        handledTabEvents.add(event)
         trapTabNavigation(event, containerRef.current)
       }
     }
 
+    const handleCleanup = () => {
+      document.removeEventListener("keydown", handleCaptureKeyDown, true)
+    }
+
+    handledTabEventsRef.current = handledTabEvents
     document.addEventListener("keydown", handleCaptureKeyDown, true)
-    return () => document.removeEventListener("keydown", handleCaptureKeyDown, true)
+    return () => {
+      if (handledTabEventsRef.current === handledTabEvents) {
+        handledTabEventsRef.current = null
+      }
+      handleCleanup()
+    }
   }, [trapActive, onClose, containerRef])
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
       if (!trapActive || event.defaultPrevented || event.key !== "Tab") return
+      if (handledTabEventsRef.current?.has(event.nativeEvent)) return
       trapTabNavigation(event, containerRef.current)
     },
     [containerRef, trapActive]

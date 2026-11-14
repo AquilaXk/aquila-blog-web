@@ -415,7 +415,7 @@ export const buildCustomDirectiveSegment = (
     return {
       type: "bookmark",
       url,
-      title: inlineTitle || firstLine.trim() || "북마크",
+      title: inlineTitle || firstLine.trim(),
       description: inlineTitle ? fullBody : secondaryText,
       ...directiveMetadata,
     }
@@ -424,7 +424,7 @@ export const buildCustomDirectiveSegment = (
     return {
       type: "embed",
       url,
-      title: inlineTitle || firstLine.trim() || "임베드",
+      title: inlineTitle || firstLine.trim(),
       caption: inlineTitle ? fullBody : secondaryText,
       ...directiveMetadata,
     }
@@ -432,7 +432,7 @@ export const buildCustomDirectiveSegment = (
   return {
     type: "file",
     url,
-    name: inlineTitle || firstLine.trim() || "파일",
+    name: inlineTitle || firstLine.trim(),
     description: inlineTitle ? fullBody : secondaryText,
     ...directiveMetadata,
   }

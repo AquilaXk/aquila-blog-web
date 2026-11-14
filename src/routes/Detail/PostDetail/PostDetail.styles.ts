@@ -387,6 +387,9 @@ export const StyledWrapper = styled.div `
 
     .mobileToc {
       display: block;
+      position: sticky;
+      top: calc(var(--app-header-height, var(--app-header-mobile-height, 64px)) + 8px);
+      z-index: 20;
       margin: 0 0 28px;
       border: 1px solid var(--aq-border);
       border-radius: 6px;
@@ -397,6 +400,8 @@ export const StyledWrapper = styled.div `
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.65rem;
+      min-width: 0;
       min-height: ${control.lg}px;
       padding: 0 0.9rem;
       color: var(--aq-text);
@@ -412,6 +417,7 @@ export const StyledWrapper = styled.div `
 
       &::after {
         content: "";
+        flex-shrink: 0;
         width: 7px;
         height: 7px;
         border-right: 1.5px solid var(--aq-muted);
@@ -419,6 +425,26 @@ export const StyledWrapper = styled.div `
         transform: translateY(-2px) rotate(45deg);
         transition: transform 180ms ease;
       }
+    }
+
+    .mobileTocSummaryLabel {
+      flex-shrink: 0;
+      color: var(--aq-muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .mobileTocCurrentSection {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--aq-text);
+      font-size: 0.84rem;
+      font-weight: 700;
     }
 
     .mobileToc[open] .mobileTocSummary::after {

@@ -257,7 +257,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       {
         type: "bookmark",
         url: "",
-        title: "북마크",
+        title: "",
         description: "",
       },
     ])

@@ -40,8 +40,14 @@ const footnoteTargetId = (number: number) => `aq-footnote-${number}`
 const footnoteReferenceId = (number: number, occurrence: number) => `aq-footnote-ref-${number}-${occurrence}`
 const combinedSegmentBoundary = "\n\n---\n\n"
 
+const MARKDOWN_AST_PARSER = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath)
+  .freeze()
+
 const parseMarkdownAst = (markdown: string) =>
-  unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(markdown) as MarkdownAstNode
+  MARKDOWN_AST_PARSER.parse(markdown) as MarkdownAstNode
 
 const getOffsets = (node: MarkdownAstNode) => {
   const start = node.position?.start.offset

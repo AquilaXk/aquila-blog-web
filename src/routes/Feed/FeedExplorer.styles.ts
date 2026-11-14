@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { layoutBreakpoint } from "src/design-system/tokens"
+import { FEED_TAG_RAIL_WIDTH_PX } from "./feedUiTokens"
 
 const FEED_POST_COLUMN_MAX_WIDTH_REM = 100
 
@@ -238,7 +239,7 @@ export const ExplorerCard = styled.section`
 export const FeedBody = styled.section`
   --feed-post-column-max-width: ${FEED_POST_COLUMN_MAX_WIDTH_REM}rem;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: ${FEED_TAG_RAIL_WIDTH_PX}px minmax(0, 1fr);
   gap: 48px;
   min-width: 0;
   overflow: visible;

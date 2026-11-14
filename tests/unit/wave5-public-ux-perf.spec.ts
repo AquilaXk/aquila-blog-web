@@ -160,7 +160,8 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
 
     const lightboxOverlay = readRepoFile("src/libs/markdown/imageLightboxOverlay.ts")
     expect(lightboxOverlay).toContain("image.draggable = false")
-    expect(lightboxOverlay).toContain('zoomLevel > 1 ? "top left" : "center center"')
+    expect(lightboxOverlay).toContain('stageImg.style.transformOrigin = "center center"')
+    expect(lightboxOverlay).toContain("LIGHTBOX_SCROLL_CLOSE_DELTA_PX = 24")
 
     const navBar = readRepoFile("src/layouts/RootLayout/Header/NavBar.tsx")
     expect(navBar).toContain("router.asPath.split(\"#\")[1]")

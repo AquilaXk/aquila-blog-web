@@ -507,10 +507,10 @@ test.describe("core smoke public shell", () => {
   await page.goto("/posts/101")
   await expect(page.getByText("상세 E2E 글")).toBeVisible()
   await expect.poll(() => hitCountRequest).toBe(1)
-  const viewStatChip = page.locator(".stats .statChip").filter({ hasText: "8 VIEWS" })
+  const viewStatChip = page.locator(".stats .statChip").filter({ hasText: "조회 8" })
   await expect(viewStatChip).toBeVisible()
   await expect(
-    page.getByLabel("post engagement").getByText("좋아요 3", { exact: true })
+    page.getByLabel("게시글 반응").getByText("좋아요 3", { exact: true })
   ).toBeVisible()
   await expect(page.getByRole("button", { name: /좋아요/ }).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "게시글 공유" })).toBeVisible()

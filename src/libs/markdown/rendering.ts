@@ -40,16 +40,19 @@ export {
 export const resolveMarkdownRenderModel = ({
   content,
   trustedContentHtml,
+  blockedImageLabel,
 }: {
   content?: string
   trustedContentHtml?: TrustedContentHtml
+  blockedImageLabel?: string
 }): MarkdownRenderModel => {
   const normalizedContent = normalizeMarkdownForRender(content || "")
   const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
   const resolvedContentHtml = normalizedContent
     ? ""
     : filterTrustedPostImageHtml(
-        normalizeContentHtmlForMermaid(trustedContentHtml?.html.trim() || "")
+        normalizeContentHtmlForMermaid(trustedContentHtml?.html.trim() || ""),
+        blockedImageLabel
       )
   const footnoteModel = resolvedContentHtml
     ? { footnotes: [], marker: "", segments: [] }

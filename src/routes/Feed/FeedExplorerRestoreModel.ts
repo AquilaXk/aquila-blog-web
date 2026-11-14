@@ -216,7 +216,7 @@ export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
   const dateStart =
     post.date?.start_date ||
     (created.length >= 10 ? created.slice(0, 10) : "1970-01-01")
-  const authorName = post.authorName || post.author?.[0]?.name || "익명"
+  const authorName = (post.authorName || post.author?.[0]?.name || "").trim()
 
   return {
     id: post.id,

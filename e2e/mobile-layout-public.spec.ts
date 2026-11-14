@@ -101,7 +101,11 @@ test.describe("mobile layout public", () => {
     await menuButton.click()
     await page.getByRole("button", { name: "검색" }).click()
     await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
-    await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeFocused()
+    const quickSearchDialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(quickSearchDialog).toBeVisible()
+    await expect(quickSearchDialog.locator(".qsInput")).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(quickSearchDialog).toHaveCount(0)
 
     await menuButton.click()
     await page.locator(".mobileLangToggleBtn").click()
@@ -281,8 +285,8 @@ test.describe("mobile layout public", () => {
 
   await page.goto("/posts/991")
 
-  const engagementRow = page.locator('[aria-label="post engagement"]')
-  const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "25 VIEWS" })
+  const engagementRow = page.locator('[aria-label="게시글 반응"]')
+  const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "조회 25" })
   const compactActionBar = page.getByLabel("빠른 이동 및 반응")
   const historicalLikeCount = compactActionBar.getByText("좋아요 1", { exact: true })
   const shareButton = compactActionBar.getByRole("button", { name: /^공유/ })
@@ -290,7 +294,7 @@ test.describe("mobile layout public", () => {
   const deleteButton = page.getByRole("button", { name: "삭제" }).first()
 
   await expect(engagementRow).toBeHidden()
-  await expect(metaViewStat).toHaveText("25 VIEWS")
+  await expect(metaViewStat).toHaveText("조회 25")
   await expect(metaViewStat).toBeHidden()
   await expect(historicalLikeCount).toBeVisible()
   await expect(shareButton).toBeVisible()

@@ -9,8 +9,19 @@ import Router from "next/router"
 import { useLanguage } from "src/libs/language"
 import ProfileImage from "src/components/ProfileImage"
 import { getNavigatorConnection } from "src/routes/Feed/FeedExplorerRestoreModel"
+import { splitHighlightSegments } from "src/components/quick-search/quickSearchHighlight"
+import type { FeedSortMode } from "src/routes/Feed/FeedSortMenuModel"
 
 const prefetchedPaths = new Set<string>()
+
+const renderHighlightedText = (text: string, query: string | undefined) => {
+  if (!query || !query.trim()) return text
+  const segments = splitHighlightSegments(text, query)
+  if (segments.length === 1 && !segments[0].highlighted) return text
+  return segments.map((segment, index) =>
+    segment.highlighted ? <mark key={index}>{segment.text}</mark> : segment.text
+  )
+}
 
 export const canPrefetchOnCurrentNetwork = () => {
   if (typeof navigator === "undefined") return true
@@ -26,9 +37,11 @@ export const canPrefetchOnCurrentNetwork = () => {
 type Props = {
   data: TPost
   layout?: "regular" | "pinned"
+  searchQuery?: string
+  sortMode?: FeedSortMode
 }
 
-const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
+const PostCard: React.FC<Props> = ({ data, layout = "regular", searchQuery, sortMode = "latest" }) => {
   const { language, t } = useLanguage()
   const postPath = toCanonicalPostPath(data.id)
   const isEn = language === "en"
@@ -90,8 +103,12 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
       onBlur={clearPrefetchTimer}
     >
       <article>
-        <header><h2>{data.title}</h2></header>
-        {data.summary && <p className="summary">{data.summary}</p>}
+        <header>
+          <h2>{renderHighlightedText(data.title, searchQuery)}</h2>
+        </header>
+        {data.summary && (
+          <p className="summary">{renderHighlightedText(data.summary, searchQuery)}</p>
+        )}
         <div className="meta">
           {createdAtText && (
             <span>
@@ -118,6 +135,22 @@ const PostCard: React.FC<Props> = ({ data, layout = "regular" }) => {
               </span>
               <strong className="authorName">{authorName}</strong>
             </span>
+          )}
+          {sortMode === "views" && typeof data.hitCount === "number" && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="sortMetric">
+                {t("postViewsMeta")} {data.hitCount}
+              </span>
+            </>
+          )}
+          {sortMode === "likes" && typeof data.likesCount === "number" && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="sortMetric">
+                {t("postLikesMeta")} {data.likesCount}
+              </span>
+            </>
           )}
         </div>
       </article>
@@ -254,6 +287,18 @@ const StyledWrapper = styled.a`
     color: var(--aq-text);
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+
+  .sortMetric {
+    font-variant-numeric: tabular-nums;
+  }
+
+  mark {
+    background: var(--aq-accent-muted);
+    color: var(--aq-accent-link, var(--aq-accent));
+    border-radius: 3px;
+    padding: 0 0.14em;
+    font-weight: 700;
   }
 
   @media (hover: hover) and (pointer: fine) {

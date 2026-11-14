@@ -1,4 +1,5 @@
-import { memo } from "react"
+// 참조 구현: Astro Starlight `MobileTableOfContents` (https://github.com/withastro/starlight, MIT License, Copyright (c) 2023 Astro Contributors)
+import { memo, useMemo } from "react"
 import { useLanguage } from "src/libs/language"
 import type { TocItem } from "./PostDetailTocModel"
 
@@ -20,11 +21,20 @@ const PostDetailMobileToc = ({
   onNavigate,
 }: PostDetailMobileTocProps) => {
   const { t, language } = useLanguage()
+  const activeItem = useMemo(
+    () => items.find((item) => item.id === activeTocId) ?? items[0] ?? null,
+    [activeTocId, items]
+  )
   if (items.length === 0) return null
 
   return (
     <details className="mobileToc" aria-label={language === "en" ? "Collapsible table of contents" : "접이식 목차"}>
-      <summary className="mobileTocSummary">{t("postTocLabel")}</summary>
+      <summary className="mobileTocSummary">
+        <span className="mobileTocSummaryLabel">{t("postTocLabel")}</span>
+        {activeItem ? (
+          <span className="mobileTocCurrentSection">{activeItem.text}</span>
+        ) : null}
+      </summary>
       <nav aria-label={t("postTocLabel")}>
         {hasDepth4Toc && onToggleDetailed ? (
           <div className="mobileTocHead">

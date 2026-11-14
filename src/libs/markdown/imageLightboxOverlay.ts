@@ -1,12 +1,14 @@
+// 참조 구현: medium-zoom (https://github.com/francoischalifour/medium-zoom, MIT License, Copyright (c) 2017 François Chalifour)
 import { overlayScrim } from "src/design-system/tokens"
 import { getClientStoredLanguage, translations } from "src/libs/language"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 import {
-  attachStageDragPan,
   createOverlayActionButton,
   handleZoomShortcutKey,
   trapOverlayTabFocus,
 } from "./mermaidRuntimeOverlay"
+
+const LIGHTBOX_SCROLL_CLOSE_DELTA_PX = 24
 
 export type ImageLightboxOverlayOptions = {
   src: string
@@ -39,7 +41,10 @@ const createLightboxImageElement = (src: string, alt: string): HTMLImageElement 
   image.style.height = "auto"
   image.style.objectFit = "contain"
   image.style.userSelect = "none"
-  image.style.transition = "transform 0.14s ease"
+  image.style.transformOrigin = "center center"
+  image.style.transform = "translate3d(0px, 0px, 0) scale(1)"
+  image.style.transition = "transform 0.18s cubic-bezier(0.2, 0, 0.2, 1)"
+  image.style.cursor = "zoom-out"
   return image
 }
 
@@ -136,12 +141,43 @@ export const openImageLightboxOverlay = (
   stage.appendChild(stageImg)
 
   let zoomLevel = 1
+  let panX = 0
+  let panY = 0
+  let dragging = false
+  let movedDuringPointer = false
+  let activePointerId: number | null = null
+  let dragStartX = 0
+  let dragStartY = 0
+  let panStartX = 0
+  let panStartY = 0
+
+  const clampPanOffsets = (nextX: number, nextY: number, scale: number) => {
+    if (scale <= 1) return { x: 0, y: 0 }
+    const stageRect = stage.getBoundingClientRect()
+    const baseWidth = stageImg.offsetWidth || stageRect.width
+    const baseHeight = stageImg.offsetHeight || stageRect.height
+    const maxPanX = Math.max(0, (baseWidth * scale - stageRect.width) / 2 + 48)
+    const maxPanY = Math.max(0, (baseHeight * scale - stageRect.height) / 2 + 48)
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, nextX)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
+    }
+  }
+
+  const syncImageTransform = () => {
+    stageImg.style.transformOrigin = "center center"
+    stageImg.style.transform = `translate3d(${Math.round(panX)}px, ${Math.round(panY)}px, 0) scale(${zoomLevel})`
+    stage.style.cursor = zoomLevel > 1 ? (dragging ? "grabbing" : "grab") : ""
+    stageImg.style.cursor = zoomLevel > 1 ? (dragging ? "grabbing" : "grab") : "zoom-out"
+  }
+
   const applyZoom = (nextZoom: number) => {
     zoomLevel = Math.max(0.5, Math.min(3, Math.round(nextZoom * 100) / 100))
     zoomResetButton.textContent = `${Math.round(zoomLevel * 100)}%`
-    stage.style.cursor = zoomLevel > 1 ? "grab" : ""
-    stageImg.style.transform = `scale(${zoomLevel})`
-    stageImg.style.transformOrigin = zoomLevel > 1 ? "top left" : "center center"
+    const clamped = clampPanOffsets(panX, panY, zoomLevel)
+    panX = clamped.x
+    panY = clamped.y
+    syncImageTransform()
   }
 
   const handleZoomOut = () => applyZoom(zoomLevel - 0.25)
@@ -163,7 +199,53 @@ export const openImageLightboxOverlay = (
   overlay.appendChild(panel)
   document.body.appendChild(overlay)
 
-  const detachDragPan = attachStageDragPan(stage, () => zoomLevel)
+  const handlePointerDown = (event: PointerEvent) => {
+    if (zoomLevel <= 1) return
+    if (typeof event.button === "number" && event.button !== 0) return
+    event.preventDefault?.()
+    dragging = true
+    movedDuringPointer = false
+    activePointerId = event.pointerId
+    dragStartX = event.clientX
+    dragStartY = event.clientY
+    panStartX = panX
+    panStartY = panY
+    stageImg.style.transition = "none"
+    syncImageTransform()
+    stage.setPointerCapture?.(event.pointerId)
+  }
+
+  const handlePointerMove = (event: PointerEvent) => {
+    if (!dragging) return
+    if (activePointerId !== null && event.pointerId !== activePointerId) return
+    const deltaX = event.clientX - dragStartX
+    const deltaY = event.clientY - dragStartY
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      movedDuringPointer = true
+    }
+    const clamped = clampPanOffsets(panStartX + deltaX, panStartY + deltaY, zoomLevel)
+    panX = clamped.x
+    panY = clamped.y
+    syncImageTransform()
+  }
+
+  const stopDragging = () => {
+    if (!dragging) return
+    dragging = false
+    if (activePointerId !== null) {
+      stage.releasePointerCapture?.(activePointerId)
+      activePointerId = null
+    }
+    stageImg.style.transition = "transform 0.18s cubic-bezier(0.2, 0, 0.2, 1)"
+    syncImageTransform()
+  }
+
+  stage.addEventListener("pointerdown", handlePointerDown)
+  stage.addEventListener("pointermove", handlePointerMove)
+  stage.addEventListener("pointerup", stopDragging)
+  stage.addEventListener("pointercancel", stopDragging)
+
+  const initialScrollY = typeof window !== "undefined" ? window.scrollY : 0
   const releaseBodyScrollLock = acquireBodyScrollLock()
   let closed = false
   let closeOverlay: () => void
@@ -189,7 +271,30 @@ export const openImageLightboxOverlay = (
   }
 
   const handleOverlayClick = (event: MouseEvent) => {
-    if (event.target === overlay) {
+    if (event.target === overlay || (event.target === stage && zoomLevel <= 1)) {
+      closeOverlay()
+    }
+  }
+
+  const handleImageClick = () => {
+    if (movedDuringPointer) {
+      movedDuringPointer = false
+      return
+    }
+    if (zoomLevel === 1) {
+      closeOverlay()
+    }
+  }
+
+  const handleWheel = (event: WheelEvent) => {
+    if (zoomLevel === 1 && Math.abs(event.deltaY) > 0) {
+      closeOverlay()
+    }
+  }
+
+  const handleWindowScroll = () => {
+    if (typeof window === "undefined") return
+    if (Math.abs(window.scrollY - initialScrollY) > LIGHTBOX_SCROLL_CLOSE_DELTA_PX) {
       closeOverlay()
     }
   }
@@ -204,15 +309,21 @@ export const openImageLightboxOverlay = (
     if (activeImageLightboxCleanup === closeOverlay) {
       activeImageLightboxCleanup = null
     }
-    detachDragPan()
+    stage.removeEventListener("pointerdown", handlePointerDown)
+    stage.removeEventListener("pointermove", handlePointerMove)
+    stage.removeEventListener("pointerup", stopDragging)
+    stage.removeEventListener("pointercancel", stopDragging)
     releaseBodyScrollLock()
     overlay.remove()
     document.removeEventListener("keydown", handleOverlayKeyDown)
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", handlePopState)
+      window.removeEventListener("scroll", handleWindowScroll)
     }
     closeButton.removeEventListener("click", closeOverlay)
     overlay.removeEventListener("click", handleOverlayClick)
+    stageImg.removeEventListener("click", handleImageClick)
+    overlay.removeEventListener("wheel", handleWheel)
     if (returnFocusTarget?.isConnected) {
       returnFocusTarget.focus()
     }
@@ -221,10 +332,13 @@ export const openImageLightboxOverlay = (
   activeImageLightboxCleanup = closeOverlay
   closeButton.focus()
   overlay.addEventListener("click", handleOverlayClick)
+  stageImg.addEventListener("click", handleImageClick)
+  overlay.addEventListener("wheel", handleWheel, { passive: true })
   closeButton.addEventListener("click", closeOverlay)
   document.addEventListener("keydown", handleOverlayKeyDown)
   if (typeof window !== "undefined") {
     window.addEventListener("popstate", handlePopState)
+    window.addEventListener("scroll", handleWindowScroll, { passive: true })
   }
 
   return closeOverlay

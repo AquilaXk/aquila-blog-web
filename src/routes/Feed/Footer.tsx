@@ -1,6 +1,8 @@
 import { CONFIG } from "site.config"
 import React from "react"
+import Link from "next/link"
 import styled from "@emotion/styled"
+import { useLanguage } from "src/libs/language"
 
 const d = new Date()
 const y = d.getFullYear()
@@ -11,6 +13,7 @@ type Props = {
 }
 
 const Footer: React.FC<Props> = ({ className }) => {
+  const { t } = useLanguage()
   return (
     <StyledWrapper className={className}>
       <div className="footerLinks">
@@ -21,6 +24,9 @@ const Footer: React.FC<Props> = ({ className }) => {
         >
           © {CONFIG.profile.name} {from === y || !from ? y : `${from} - ${y}`} · CC BY 4.0
         </a>
+        <Link href="/feed" className="rssLink">
+          {t("rssFeedLink")}
+        </Link>
       </div>
     </StyledWrapper>
   )

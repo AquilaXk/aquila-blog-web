@@ -10,12 +10,27 @@ export const PRISM_INITIAL_HYDRATION_TIMEOUT_MS = 1200
 
 type PrismScheduleRun = (options?: { fullRescan?: boolean; block?: HTMLElement }) => void
 
-const extractLanguageFromClassList = (block: HTMLElement) =>
-  Array.from(block.classList)
-    .find((className) => className.startsWith("language-"))
-    ?.replace("language-", "")
-    .trim()
-    .toLowerCase() || ""
+const extractLanguageFromClassList = (block: HTMLElement) => {
+  const { classList } = block
+  for (let i = 0; i < classList.length; i += 1) {
+    const className = classList[i]
+    if (className && className.startsWith("language-")) {
+      return className.replace("language-", "").trim().toLowerCase()
+    }
+  }
+  return ""
+}
+
+const replaceBlockLanguageClass = (block: HTMLElement, nextLanguage: string) => {
+  const { classList } = block
+  for (let i = classList.length - 1; i >= 0; i -= 1) {
+    const className = classList[i]
+    if (className && className.startsWith("language-")) {
+      classList.remove(className)
+    }
+  }
+  classList.add(`language-${nextLanguage}`)
+}
 
 const extractLanguage = (block: HTMLElement): string => {
   const classLanguage = extractLanguageFromClassList(block)
@@ -138,41 +153,47 @@ export const createPrismEffectRuntime = ({
     return targets
   }
 
-  const hasCodeBlockMissingLineWrappers = () =>
-    Array.from(root.querySelectorAll<HTMLElement>("pre > code")).some(
-      (block) => !isMermaidCodeBlock(block) && !block.querySelector("[data-line]")
-    )
+  const hasCodeBlockMissingLineWrappers = () => {
+    const blocks = root.querySelectorAll<HTMLElement>("pre > code")
+    for (const block of blocks) {
+      if (!isMermaidCodeBlock(block) && !block.querySelector("[data-line]")) {
+        return true
+      }
+    }
+    return false
+  }
 
   const highlightCodeBlocks = async (codeBlocks: HTMLElement[]) => {
     if (!codeBlocks.length) return
 
-    const languageByBlock = codeBlocks
-      .map((block) => ({
-        block,
-        rawLanguage: extractLanguage(block),
-        source: extractCodeSource(block),
-      }))
-      .map((entry) => {
-        const inferred = isGenericLanguage(entry.rawLanguage)
-          ? inferPrismLanguageFromSource(entry.source)
-          : entry.rawLanguage
-        const hasSyntaxMarkup = blockHasSyntaxMarkup(entry.block)
-        const hasLineWrappers = Boolean(entry.block.querySelector("[data-line]"))
+    const languageByBlock: Array<{
+      block: HTMLElement
+      language: string
+      source: string
+    }> = []
 
-        return {
-          ...entry,
-          language: inferred,
-          shouldHighlight:
-            inferred.length > 0 &&
-            inferred !== "mermaid" &&
-            (!hasSyntaxMarkup || !hasLineWrappers),
-          alreadyHighlighted:
-            entry.block.dataset.prismLanguage === inferred &&
-            entry.block.dataset.prismSource === entry.source &&
-            hasLineWrappers,
-        }
-      })
-      .filter((entry) => entry.shouldHighlight && !entry.alreadyHighlighted)
+    for (let i = 0; i < codeBlocks.length; i += 1) {
+      const block = codeBlocks[i]
+      const rawLanguage = extractLanguage(block)
+      const source = extractCodeSource(block)
+      const inferred = isGenericLanguage(rawLanguage)
+        ? inferPrismLanguageFromSource(source)
+        : rawLanguage
+      const hasSyntaxMarkup = blockHasSyntaxMarkup(block)
+      const hasLineWrappers = Boolean(block.querySelector("[data-line]"))
+      const shouldHighlight =
+        inferred.length > 0 &&
+        inferred !== "mermaid" &&
+        (!hasSyntaxMarkup || !hasLineWrappers)
+      const alreadyHighlighted =
+        block.dataset.prismLanguage === inferred &&
+        block.dataset.prismSource === source &&
+        hasLineWrappers
+
+      if (shouldHighlight && !alreadyHighlighted) {
+        languageByBlock.push({ block, language: inferred, source })
+      }
+    }
 
     if (!languageByBlock.length) return
 
@@ -191,20 +212,23 @@ export const createPrismEffectRuntime = ({
         language,
         highlightedLines,
       })
-      Array.from(block.classList)
-        .filter((className) => className.startsWith("language-"))
-        .forEach((className) => block.classList.remove(className))
-      block.classList.add(`language-${immediate.language}`)
+      const cleanSource = immediate.cleanSource
+      replaceBlockLanguageClass(block, immediate.language)
       block.innerHTML = ensureLineWrappedHtml({
         html: immediate.html,
         language: immediate.language,
-        source,
+        source: cleanSource,
         highlightedLines,
       })
       block.dataset.prismLanguage = immediate.language
-      block.dataset.prismSource = source
+      block.dataset.prismSource = cleanSource
       block.dataset.language = immediate.language
-      block.dataset.rawCode = source
+      block.dataset.rawCode = cleanSource
+      if (immediate.hasDiff) {
+        block.dataset.hasDiff = "true"
+      } else {
+        delete block.dataset.hasDiff
+      }
       if (immediate.highlighted) {
         block.dataset.prismHighlighted = "true"
         continue
@@ -212,7 +236,7 @@ export const createPrismEffectRuntime = ({
       asyncCandidates.push({
         block,
         language,
-        source,
+        source: cleanSource,
         highlightedLines,
       })
     }
@@ -233,27 +257,31 @@ export const createPrismEffectRuntime = ({
     )
     if (isDisposed()) return
 
-    highlightedBlocks.forEach(({ block, source, highlightedLines, result }) => {
-      if (!block.isConnected || !root.contains(block)) return
+    for (let index = 0; index < highlightedBlocks.length; index += 1) {
+      const { block, highlightedLines, result } = highlightedBlocks[index]
+      if (!block.isConnected || !root.contains(block)) continue
       const language = result.language
-      Array.from(block.classList)
-        .filter((className) => className.startsWith("language-"))
-        .forEach((className) => block.classList.remove(className))
-      block.classList.add(`language-${language}`)
+      const cleanSource = result.cleanSource
+      replaceBlockLanguageClass(block, language)
       block.innerHTML = ensureLineWrappedHtml({
         html: result.html,
         language,
-        source,
+        source: cleanSource,
         highlightedLines,
       })
       block.dataset.prismLanguage = language
-      block.dataset.prismSource = source
+      block.dataset.prismSource = cleanSource
       block.dataset.language = language
-      block.dataset.rawCode = source
+      block.dataset.rawCode = cleanSource
+      if (result.hasDiff) {
+        block.dataset.hasDiff = "true"
+      } else {
+        delete block.dataset.hasDiff
+      }
       if (result.highlighted) {
         block.dataset.prismHighlighted = "true"
       }
-    })
+    }
   }
 
   const handleMutationRecords = (mutations: MutationRecord[], scheduleRun: PrismScheduleRun) => {
