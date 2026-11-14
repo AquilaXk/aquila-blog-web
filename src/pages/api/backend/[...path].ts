@@ -118,27 +118,73 @@ const hasErrorInCauseChain = <T extends Error>(
   return false
 }
 
-const pipeWebStreamToResponse = async (stream: ReadableStream<Uint8Array>, res: NextApiResponse) => {
+const isResponseStreamClosed = (res: NextApiResponse & { closed?: boolean }): boolean =>
+  Boolean(res.destroyed || res.writableEnded || res.closed)
+
+const pipeWebStreamToResponse = async (
+  stream: ReadableStream<Uint8Array>,
+  res: NextApiResponse & { closed?: boolean },
+) => {
   const reader = stream.getReader()
+  let closedByEvent = false
+  const isClosed = () => closedByEvent || isResponseStreamClosed(res)
+  const cancelReader = async () => {
+    await reader.cancel().catch(() => undefined)
+  }
+  const onPrematureClose = () => {
+    closedByEvent = true
+    void reader.cancel().catch(() => undefined)
+  }
+  const canListen = typeof res.once === "function" && typeof res.off === "function"
+  if (canListen) {
+    res.once("close", onPrematureClose)
+    res.once("error", onPrematureClose)
+  }
   try {
     while (true) {
+      if (isClosed()) {
+        await cancelReader()
+        break
+      }
       const { done, value } = await reader.read()
+      if (isClosed()) {
+        await cancelReader()
+        break
+      }
       if (done) break
       if (!value || value.byteLength === 0) continue
+      if (isClosed()) {
+        await cancelReader()
+        break
+      }
       const chunkView = Buffer.from(value.buffer, value.byteOffset, value.byteLength)
       if (!res.write(chunkView)) {
         await new Promise<void>((resolve) => {
+          if (isClosed() || !canListen) {
+            resolve()
+            return
+          }
           const cleanup = () => {
             res.off("drain", cleanup)
             res.off("close", cleanup)
+            res.off("error", cleanup)
             resolve()
           }
           res.once("drain", cleanup)
           res.once("close", cleanup)
+          res.once("error", cleanup)
         })
+        if (isClosed()) {
+          await cancelReader()
+          break
+        }
       }
     }
   } finally {
+    if (canListen) {
+      res.off("close", onPrematureClose)
+      res.off("error", onPrematureClose)
+    }
     reader.releaseLock()
   }
 }
@@ -272,10 +318,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await pipeWebStreamToResponse(upstreamResponse.body, res)
-    res.end()
+    if (!isResponseStreamClosed(res)) {
+      res.end()
+    }
   } catch (error) {
-    if (error instanceof ProxyBodyTooLargeError || hasErrorInCauseChain(error, ProxyBodyTooLargeError)) {
+    const isTooLarge =
+      error instanceof ProxyBodyTooLargeError || hasErrorInCauseChain(error, ProxyBodyTooLargeError)
+    const isCapacityExceeded =
+      !isTooLarge &&
+      (error instanceof ProxyBodyCapacityExceededError ||
+        hasErrorInCauseChain(error, ProxyBodyCapacityExceededError))
+    const isTimeout =
+      !isTooLarge &&
+      !isCapacityExceeded &&
+      (error instanceof ProxyBodyTimeoutError ||
+        hasErrorInCauseChain(error, ProxyBodyTimeoutError) ||
+        controller.signal.aborted || isAbortLikeError(error))
+
+    if (isTooLarge) {
       metricResult = "4xx"
+    } else if (isCapacityExceeded) {
+      metricResult = "5xx"
+    } else if (isTimeout) {
+      metricResult = "timeout"
+    } else {
+      metricResult = error instanceof TypeError ? "network_error" : "other_error"
+    }
+
+    if (res.headersSent || res.writableEnded || res.destroyed || (res as { closed?: boolean }).closed) {
+      if (!res.destroyed && typeof res.destroy === "function") {
+        res.destroy()
+      }
+      return
+    }
+
+    if (isTooLarge) {
       const maxMb = Math.floor(resolveMaxProxyBodyBytes() / (1024 * 1024))
       res.status(413).json({
         message: `파일 용량이 너무 큽니다. ${maxMb}MB 이하 파일로 다시 시도해주세요.`,
@@ -283,26 +360,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       return
     }
-    if (
-      error instanceof ProxyBodyCapacityExceededError ||
-      hasErrorInCauseChain(error, ProxyBodyCapacityExceededError)
-    ) {
-      metricResult = "5xx"
+    if (isCapacityExceeded) {
       res.status(503).json({ message: "동시에 처리 중인 업로드가 많습니다. 잠시 후 다시 시도해주세요.", requestId })
       return
     }
-    if (
-      error instanceof ProxyBodyTimeoutError ||
-      hasErrorInCauseChain(error, ProxyBodyTimeoutError) ||
-      controller.signal.aborted ||
-      isAbortLikeError(error)
-    ) {
-      metricResult = "timeout"
+    if (isTimeout) {
       res.status(504).json({ message: "Backend proxy request timed out.", requestId })
       return
     }
 
-    metricResult = error instanceof TypeError ? "network_error" : "other_error"
     res.status(502).json({ message: "Backend proxy request failed.", requestId })
   } finally {
     getRuntimeMetrics().observeBackendFetch({

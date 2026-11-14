@@ -249,6 +249,7 @@ const tryMaskAsideBlockAt = (
   }
   const blankIndex = findFirstBlankLineIndex(lines, index + 1)
   const snapshot = lines.slice(index)
+  const maskSnapshot = lineMasks.slice(index)
   lines[index] = maskLineWithBreakAndHeading(line)
   lineMasks[index]! |= LINE_BIT_CONTAINER
   for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
@@ -271,6 +272,7 @@ const tryMaskAsideBlockAt = (
   )
   if (closeIndex < 0) {
     lines.splice(index, snapshot.length, ...snapshot)
+    lineMasks.set(maskSnapshot, index)
     if (hasExcludedAsideCloseOrFenceBeforeBlank(snapshot.slice(1, blankIndex - index))) {
       const lastPreBlank = blankIndex - 1
       extraCodeRanges.push({
@@ -394,6 +396,7 @@ const tryMaskColonDirectiveAt = (
         ? findPromotedCalloutTitleLineIndex(lines, index + 1, lines.length)
         : -1
     const snapshot = lines.slice(index)
+    const maskSnapshot = lineMasks.slice(index)
     lines[index] = maskLineWithBreakAndHeading(line)
     lineMasks[index]! |= LINE_BIT_CONTAINER
     if (candidatePromotedIndex >= 0) {
@@ -409,7 +412,7 @@ const tryMaskColonDirectiveAt = (
     )
     if (closeIndex < 0) {
       lines.splice(index, snapshot.length, ...snapshot)
-      lineMasks.fill(0, index)
+      lineMasks.set(maskSnapshot, index)
       return { nextIndex: index + 1, mutated: false }
     }
     recordContainerCloseLine(containerCloseRanges, lineStarts, lines, closeIndex)
@@ -472,10 +475,10 @@ const needsFreshRangesForLine = (line: string): boolean => {
   )
 }
 
-const maskCustomSegmentsForCommonMark = (
+const runCustomSegmentMaskPipeline = (
   content: string,
   initialRanges: CommonMarkBlockRanges
-): CommonMarkBlockRanges => {
+): { ranges: CommonMarkBlockRanges; state: MaskPipelineState; dirty: boolean } => {
   const lines = content.split("\n")
   const lineStarts = computeLineStarts(lines)
   const state: MaskPipelineState = {
@@ -507,7 +510,7 @@ const maskCustomSegmentsForCommonMark = (
     index = step.nextIndex
   }
 
-  return dirty
+  const ranges = dirty
     ? refreshPipelineRanges(state)
     : {
         ...currentRanges,
@@ -518,6 +521,34 @@ const maskCustomSegmentsForCommonMark = (
         asideRanges: state.asideRanges,
         containerCloseRanges: mergeSortedSpanRanges(state.containerCloseRanges),
       }
+  return { ranges, state, dirty }
+}
+
+const maskCustomSegmentsForCommonMark = (
+  content: string,
+  initialRanges: CommonMarkBlockRanges
+): CommonMarkBlockRanges => runCustomSegmentMaskPipeline(content, initialRanges).ranges
+
+export const inspectCommonMarkLineMasks = (content: string): Uint8Array => {
+  if (!content) return new Uint8Array(0)
+  const initialRanges = parseRawCommonMarkRanges(content)
+  if (!hasPotentialCustomSegments(content)) {
+    const lines = content.split("\n")
+    const state: MaskPipelineState = {
+      lines,
+      lineStarts: computeLineStarts(lines),
+      lineMasks: new Uint8Array(lines.length),
+      initialListRanges: initialRanges.listRanges,
+      asideRanges: [],
+      containerCloseRanges: [],
+      extraCodeRanges: [],
+    }
+    refreshPipelineRanges(state)
+    return state.lineMasks
+  }
+  const { state, dirty } = runCustomSegmentMaskPipeline(content, initialRanges)
+  if (!dirty) refreshPipelineRanges(state)
+  return state.lineMasks
 }
 
 const hasPotentialCustomSegments = (content: string): boolean =>

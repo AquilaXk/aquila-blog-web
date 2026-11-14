@@ -10,6 +10,7 @@ type SnapshotReadResult<T> = {
 
 const snapshotCache = new Map<string, SnapshotEntry>()
 const inflightLoads = new Map<string, Promise<unknown>>()
+let cacheGeneration = 0
 
 const readSnapshot = <T>(key: string): T | null => {
   const entry = snapshotCache.get(key)
@@ -53,22 +54,28 @@ export async function readServerSnapshot<T>(
     }
   }
 
+  const startGeneration = cacheGeneration
   const loadPromise = loader()
   inflightLoads.set(key, loadPromise)
 
   try {
     const value = await loadPromise
-    writeSnapshot(key, ttlMs, value)
+    if (startGeneration === cacheGeneration && inflightLoads.get(key) === loadPromise) {
+      writeSnapshot(key, ttlMs, value)
+    }
     return {
       value,
       source: "live",
     }
   } finally {
-    inflightLoads.delete(key)
+    if (inflightLoads.get(key) === loadPromise) {
+      inflightLoads.delete(key)
+    }
   }
 }
 
 export function invalidateServerSnapshotCache(keyPrefix?: string): void {
+  cacheGeneration += 1
   if (!keyPrefix) {
     snapshotCache.clear()
     inflightLoads.clear()

@@ -1,4 +1,5 @@
 import {
+  assertImageDimensionsSafe,
   hasAlphaTransparency,
   type ProbedImageHeader,
   readAndProbeImageFileHeader,
@@ -282,6 +283,7 @@ const optimizeImageByPolicy = async (
   if (originalWidth <= 0 || originalHeight <= 0) {
     throw new Error("이미지 해상도를 확인할 수 없습니다.")
   }
+  assertImageDimensionsSafe(originalWidth, originalHeight)
 
   const constrained = constrainByLongEdge(originalWidth, originalHeight, policy.maxLongEdge)
   if (
@@ -350,6 +352,7 @@ export const buildProfileImageEditedFile = async (
   if (sourceWidth <= 0 || sourceHeight <= 0) {
     throw new Error("프로필 편집에 사용할 이미지 해상도를 확인할 수 없습니다.")
   }
+  assertImageDimensionsSafe(sourceWidth, sourceHeight)
 
   const sourceSize = { width: sourceWidth, height: sourceHeight }
   const { focusX, focusY } = clampProfileImageEditFocusBySource({
