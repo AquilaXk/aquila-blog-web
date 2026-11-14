@@ -1,6 +1,8 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { boxShadowColor } from "src/design-system/tokens"
 import { zIndexes } from "src/styles/zIndexes"
+import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
 
 export const EditorRoot = styled.section`
   box-sizing: border-box;
@@ -193,7 +195,7 @@ export const ToolbarMenuPanel = styled.div<{
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   border-radius: 6px;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 10px 28px ${boxShadowColor.popover};
 `
 
 export const ToolbarMenuItem = styled.button`
@@ -311,7 +313,7 @@ export const FindReplaceActions = styled.div`
   button:disabled { opacity: 0.45; cursor: not-allowed; }
 `
 
-export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
+export const LiveEditorBody = styled.div<{ $isEmpty?: boolean; $isReading?: boolean }>`
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
@@ -348,7 +350,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   }
 
   @media (max-width: 820px) { font-size: 16px; line-height: 1.7; }
-  [data-testid="markdown-editor-live-surface"] { height: 100%; }
+  [data-testid="markdown-editor-live-surface"] { height: 100%; ${({ $isReading }) => ($isReading ? "display: none;" : "")} }
 
   .cm-editor {
     height: 100%;
@@ -371,7 +373,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-content ::selection,
   .cm-selectionBackground,
   & .cm-focused .cm-selectionBackground {
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(56, 139, 253, 0.45)" : "rgba(9, 105, 218, 0.32)")};
+    background: ${EDITOR_SYNTAX_COLORS.selectionLight};
   }
   .cm-cursor { border-left-color: ${({ theme }) => theme.colors.gray12}; }
 
@@ -398,8 +400,8 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     border: none;
     border-radius: 4px;
     padding: 0.14em 0.4em;
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(110, 118, 129, 0.25)" : "rgba(135, 131, 120, 0.15)")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#ff7b72" : "#eb5757")};
+    background: ${EDITOR_SYNTAX_COLORS.inlineCodeSurface};
+    color: ${EDITOR_SYNTAX_COLORS.inlineCodeText};
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.87em;
     font-weight: 500;
@@ -412,7 +414,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   }
 
   .cm-live-highlight {
-    background-color: rgba(255, 208, 0, 0.35);
+    background-color: ${EDITOR_SYNTAX_COLORS.highlightSurface};
     border-radius: 4px;
     padding: 0 2px;
     box-decoration-break: clone;
@@ -426,9 +428,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     padding: 1px 7px 1px 5px;
     margin: 0 2px;
     border-radius: 4px;
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.18)" : "rgba(144, 101, 176, 0.12)")};
-    border: 1px solid ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.32)" : "rgba(144, 101, 176, 0.24)")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#6940a5")};
+    background: ${EDITOR_SYNTAX_COLORS.wikilinkSurface};
+    border: 1px solid ${EDITOR_SYNTAX_COLORS.wikilinkBorder};
+    color: ${EDITOR_SYNTAX_COLORS.wikilinkText};
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.4;
@@ -438,13 +440,13 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
     &:hover {
-      background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.28)" : "rgba(144, 101, 176, 0.2)")};
-      border-color: ${({ theme }) => (theme.scheme === "dark" ? "rgba(168, 85, 247, 0.45)" : "rgba(144, 101, 176, 0.36)")};
-      color: ${({ theme }) => (theme.scheme === "dark" ? "#f3e8ff" : "#532c8c")};
+      background: ${EDITOR_SYNTAX_COLORS.wikilinkHoverSurface};
+      border-color: ${EDITOR_SYNTAX_COLORS.wikilinkHoverBorder};
+      color: ${EDITOR_SYNTAX_COLORS.wikilinkHoverText};
       text-decoration: none;
     }
 
-    &:focus-visible { outline: 2px solid var(--aq-accent-link, #155eef); outline-offset: 1px; }
+    &:focus-visible { outline: 2px solid var(--aq-accent-link, ${EDITOR_SYNTAX_COLORS.accentBlueControl}); outline-offset: 1px; }
     @media (max-width: 768px), (pointer: coarse) { min-height: 44px; min-width: 44px; }
   }
 
@@ -507,7 +509,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
     &.is-checked {
       background: ${({ theme }) => theme.publicDesign.accent};
       border-color: ${({ theme }) => theme.publicDesign.accent};
-      color: #fff;
+      color: ${EDITOR_SYNTAX_COLORS.whiteText};
     }
   }
   .cm-live-task-space { display: inline-block; width: 0; text-decoration: none; }
@@ -525,7 +527,7 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
   .cm-live-list { border-left: 1px solid ${({ theme }) => theme.colors.gray5}; padding-left: 2px; }
 
   .cm-line.cm-live-code-line {
-    background: ${({ theme }) => (theme.scheme === "dark" ? theme.publicDesign.surfaceElevated : "#f7f6f3")};
+    background: ${EDITOR_SYNTAX_COLORS.codeBlockLineSurface};
     border-left: 1px solid ${({ theme }) => theme.publicDesign.border};
     border-right: 1px solid ${({ theme }) => theme.publicDesign.border};
     padding-left: 12px;
@@ -555,9 +557,9 @@ export const LiveEditorBody = styled.div<{ $isEmpty?: boolean }>`
       transform: translateY(-50%);
       padding: 1px 7px;
       border-radius: 4px;
-      border: 1px solid ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.32)" : "rgba(20, 86, 155, 0.16)")};
-      background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.18)" : "#e9f3f7")};
-      color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#14569b")};
+      border: 1px solid ${EDITOR_SYNTAX_COLORS.codeLangBadgeBorder};
+      background: ${EDITOR_SYNTAX_COLORS.codeLangBadgeSurface};
+      color: ${EDITOR_SYNTAX_COLORS.codeLangBadgeText};
       font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       text-transform: lowercase;
       pointer-events: none;

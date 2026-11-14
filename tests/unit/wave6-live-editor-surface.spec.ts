@@ -24,12 +24,12 @@ import {
   pointerSelectingField,
   setComposition,
 } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
-import { activeEmptyLineField } from "../../src/components/markdown-editor/markdownEditorNotionModel"
+import { activeEmptyLineField } from "../../src/components/markdown-editor/markdownEditorBlockModel"
 import {
   MarkdownBookmarkBlockWidget,
-  notionContainerBlockField,
-  parseNotionContainerBlocks,
-} from "../../src/components/markdown-editor/markdownEditorNotionWidgets"
+  blockContainerBlockField,
+  parseBlockContainerBlocks,
+} from "../../src/components/markdown-editor/markdownEditorBlockWidgets"
 import {
   handleFenceEnter,
   handleFenceShiftEnter,
@@ -97,7 +97,7 @@ const createDecorationEditorState = (doc: string, cursorPos: number, mode: "live
     extensions: [
       markdown({ extensions: GFM }), compositionField, pointerSelectingField,
       editorModeField.init(() => mode), disableMermaidField.init(() => false),
-      decorationField, notionContainerBlockField, activeEmptyLineField,
+      decorationField, blockContainerBlockField, activeEmptyLineField,
       EditorState.readOnly.of(mode === "reading"), EditorView.editable.of(mode !== "reading"),
     ],
   })
@@ -266,7 +266,7 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     })
   })
 
-  test("hardens media transfers, widget sanitization, scheme-aware serialized Mermaid runtime, and Notion bookmark URLs", async () => {
+  test("hardens media transfers, widget sanitization, scheme-aware serialized Mermaid runtime, and container bookmark URLs", async () => {
     expect(
       resolveMarkdownImageEmbed(
         { url: "https://blog.aquilaxk.site/post/api/v1/images/posts/chart.png", alt: "Diagram [v1]" },
@@ -325,9 +325,9 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
       })
     ).toEqual(["image/webp", "image/jpeg", "image/png"])
 
-    expect(parseNotionContainerBlocks(":::bookmark https://user:pass@example.com\n:::")).toEqual([])
-    expect(parseNotionContainerBlocks(":::bookmark https://exa\u0007mple.com\n:::")).toEqual([])
-    const validBookmarkBlocks = parseNotionContainerBlocks(":::bookmark https://example.com/docs Docs\nGuide\n:::")
+    expect(parseBlockContainerBlocks(":::bookmark https://user:pass@example.com\n:::")).toEqual([])
+    expect(parseBlockContainerBlocks(":::bookmark https://exa\u0007mple.com\n:::")).toEqual([])
+    const validBookmarkBlocks = parseBlockContainerBlocks(":::bookmark https://example.com/docs Docs\nGuide\n:::")
     expect(validBookmarkBlocks).toHaveLength(1)
     expect(validBookmarkBlocks[0]).toMatchObject({ kind: "bookmark", url: "https://example.com/docs", title: "Docs" })
 
@@ -403,13 +403,13 @@ test.describe("Wave-6 Unit 2 live MarkdownEditor surface", () => {
     expect(liveSurfaceSource).toContain("dragend")
     expect(liveSurfaceSource).toContain("blur")
 
-    const notionChromeSource = srcFile("components", "markdown-editor", "MarkdownEditorNotionChrome.tsx")
-    expect(notionChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeBubbleToolbarPosition/)
-    expect(notionChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeGutterTopPosition/)
+    const blockChromeSource = srcFile("components", "markdown-editor", "MarkdownEditorBlockChrome.tsx")
+    expect(blockChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeBubbleToolbarPosition/)
+    expect(blockChromeSource).not.toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?computeGutterTopPosition/)
 
-    const stylesCombined = srcFile("components", "markdown-editor", "MarkdownEditor.styles.ts") + notionChromeSource
+    const stylesCombined = srcFile("components", "markdown-editor", "MarkdownEditor.styles.ts") + blockChromeSource
     expect(stylesCombined).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*?overflow-x:\s*auto/)
-    expect(notionChromeSource).toMatch(/@media\s*\(pointer:\s*coarse\)\s*\{\s*display:\s*none;\s*\}/)
+    expect(blockChromeSource).toMatch(/@media\s*\(pointer:\s*coarse\)\s*\{\s*display:\s*none;\s*\}/)
   })
 
   test("aligns inline DOM scanners, safe anchor href assignment, and nested live-preview highlight/color decorations", () => {

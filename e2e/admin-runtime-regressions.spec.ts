@@ -70,17 +70,15 @@ test.describe("관리자 런타임 회귀 계약", () => {
     expect(proxySource).toContain("DECODED_RESPONSE_HEADERS.has(normalizedKey)")
   })
 
-  test("클라우드 목록은 프록시 가능한 URL 생성기를 유지하고 업로드는 프록시를 우회한다", () => {
+  test("클라우드 목록은 정규화된 API URL 생성기를 유지하고 업로드 타임아웃을 적용한다", () => {
     const clientSource = readFrontSource("apis/backend/client.ts")
     const cloudSource = readFrontSource("apis/backend/cloud.ts")
 
-    expect(clientSource).toContain('type BackendProxyMode = "auto" | "bypass"')
-    expect(clientSource).toContain("backendProxy?: BackendProxyMode")
-    expect(clientSource).toContain('backendProxy === "bypass"')
+    expect(clientSource).toContain("export const getApiRequestUrl = (path: string) =>")
+    expect(clientSource).not.toContain("BackendProxyMode")
     expect(cloudSource).toContain('import { ApiError, apiFetch, getApiRequestUrl } from "./client"')
     expect(cloudSource).toContain("const CLOUD_UPLOAD_TIMEOUT_MS = 10 * 60_000 + 30_000")
     expect(cloudSource).toContain("timeoutMs: CLOUD_UPLOAD_TIMEOUT_MS")
-    expect(cloudSource).toContain('backendProxy: "bypass"')
     expect(cloudSource).toContain("getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content`)")
     expect(cloudSource).not.toContain("getApiBaseUrl")
   })

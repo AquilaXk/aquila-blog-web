@@ -16,8 +16,9 @@ import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfe
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
 import { type MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import { MarkdownEditorLiveSurface, type MarkdownEditorLiveSurfaceHandle } from "./MarkdownEditorLiveSurface"
-import { planMarkdownSnippetMutation, planStripBlockLinePrefix } from "./markdownEditorNotionModel"
-import { MarkdownEditorNotionChrome } from "./MarkdownEditorNotionChrome"
+import { MarkdownEditorReadingPreview } from "./MarkdownEditorReadingPreview"
+import { planMarkdownSnippetMutation, planStripBlockLinePrefix } from "./markdownEditorBlockModel"
+import { MarkdownEditorBlockChrome } from "./MarkdownEditorBlockChrome"
 import { MarkdownEditorSlashMenu } from "./MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "./MarkdownEditorToolbar"
 import { useMarkdownEditorSlashMenu } from "./useMarkdownEditorSlashMenu"
@@ -514,6 +515,7 @@ export const MarkdownEditor = ({
     setTextareaSelection: setEditorSelection,
     onRequestSave: selectOptionalCallback(Boolean(onRequestSave), handleRequestSave),
     onToggleViewMode: cycleViewMode, onOpenFindReplace: findReplace.open,
+    isFindReplaceOpen: Boolean(findReplace.panel), onCloseFindReplace: handleCloseFindReplace,
     isCompletionActive: isCompletionOrSlashMenuActive,
   })
 
@@ -565,8 +567,8 @@ export const MarkdownEditor = ({
       />
       {renderUploadErrorBanner(uploadError)}
       {renderFindReplaceSection(findReplace, handleCloseFindReplace)}
-      <LiveEditorBody ref={liveEditorBodyRef} aria-disabled={disabled} $isEmpty={!draftValue}>
-        <MarkdownEditorNotionChrome
+      <LiveEditorBody ref={liveEditorBodyRef} aria-disabled={disabled} $isEmpty={!draftValue} $isReading={viewMode === "reading"}>
+        <MarkdownEditorBlockChrome
           containerRef={liveEditorBodyRef} mode={viewMode} disabled={isAuthoringDisabled}
           value={draftValue} selection={editorSelection} isSlashMenuOpen={slashMenuState.isOpen}
           isFindReplaceOpen={Boolean(findReplace.panel)} resolveCoords={resolveSlashCoords}
@@ -581,6 +583,7 @@ export const MarkdownEditor = ({
           onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}
         />
+        {viewMode === "reading" ? <MarkdownEditorReadingPreview value={draftValue} disableMermaid={disableMermaid} /> : null}
       </LiveEditorBody>
       <MarkdownEditorSlashMenu
         isOpen={slashMenuState.isOpen} position={slashMenuState.position}

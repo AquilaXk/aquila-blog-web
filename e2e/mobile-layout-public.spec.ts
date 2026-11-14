@@ -26,7 +26,7 @@ test.describe("mobile layout public", () => {
   await mockFeedEndpoints(page)
 
   await page.goto("/")
-  const searchInput = page.getByLabel("Search posts by keyword")
+  const searchInput = page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)
   await expect(searchInput).toBeVisible()
   const searchInputBox = await searchInput.boundingBox()
   expect(searchInputBox?.width ?? 0).toBeGreaterThanOrEqual(210)
@@ -67,7 +67,7 @@ test.describe("mobile layout public", () => {
   test("모바일 헤더 메뉴는 body portal·focus-trap·검색 진입점을 유지한다", async ({ page }) => {
     await mockFeedEndpoints(page)
     await page.goto("/")
-    await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+    await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
 
     const menuButton = page.getByRole("button", { name: "메뉴" })
     await menuButton.click()
@@ -101,7 +101,7 @@ test.describe("mobile layout public", () => {
     await menuButton.click()
     await page.getByRole("button", { name: "검색" }).click()
     await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
-    await expect(page.getByLabel("Search posts by keyword")).toBeFocused()
+    await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeFocused()
 
     await menuButton.click()
     await page.locator(".mobileLangToggleBtn").click()

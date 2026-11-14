@@ -11,7 +11,6 @@ import {
   isLineStartInCommentRanges,
   isTopLevelFormulaStopLine,
   parseCardMetadataComment,
-  parseCustomDirectiveHeader,
   stripClosingAsideTag,
   type PendingDirectiveMetadata,
 } from "src/libs/markdown/renderingDirectiveModel"
@@ -20,6 +19,10 @@ import {
   overlapsSortedRanges,
   type MathSpanRange,
 } from "src/libs/markdown/pandocMathScanner"
+import {
+  parseOpeningDirectiveLine,
+  parseCustomDirectiveFromOpening,
+} from "src/libs/markdown/sharedDirectiveContainerParser"
 import { trimMarkdownPreservingCodeIndent } from "src/libs/markdown/renderingNormalizeModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 
@@ -29,10 +32,9 @@ type ParsedCalloutHeader = {
   emoji: string
   foldable?: boolean
   defaultCollapsed?: boolean
+  explicitTitle?: boolean
 }
 
-const CALLOUT_DIRECTIVE_OPEN_PATTERN = /^:::callout(?:[ \t\r]|$)/
-const TOGGLE_DIRECTIVE_OPEN_PATTERN = /^:::toggle(?:[ \t\r]|$)/
 const LEADING_SPACE_OR_TAB_PATTERN = /^[ \t]/
 
 const isAsciiCalloutToken = (token: string): boolean => {
@@ -143,8 +145,8 @@ const buildCalloutSegment = (
   header: ParsedCalloutHeader,
   bodyLines: string[]
 ): MarkdownSegment => {
-  const promoted = extractPromotedCalloutTitle(bodyLines)
-  const resolvedTitle = promoted.title || header.title
+  const promoted = header.explicitTitle ? { title: "", bodyLines } : extractPromotedCalloutTitle(bodyLines)
+  const resolvedTitle = header.explicitTitle ? header.title : promoted.title || header.title
 
   return {
     type: "callout",
@@ -324,72 +326,77 @@ const tryConsumeImageLine = (
   return { nextIndex: index + 1 }
 }
 
-const tryConsumeCustomDirectiveAt = (
+const tryConsumeColonBlockAt = (
   line: string,
-  trimmed: string,
+  _trimmed: string,
   index: number,
   ctx: SegmentConsumerContext
 ): SegmentLineStepResult | null => {
   if (!line.startsWith(":::")) return null
-  const customDirective = parseCustomDirectiveHeader(trimmed)
-  if (!customDirective) return null
-  const { closedIndex, bodyLines } = collectTripleColonBody(
-    ctx.lines,
-    index + 1,
-    ctx.lineStarts,
-    ctx.codeBlockRanges,
-    ctx.commentRanges
-  )
-  if (closedIndex >= 0) {
-    const metadata =
-      ctx.pendingDirectiveMetadata?.kind === customDirective.directive
-        ? ctx.pendingDirectiveMetadata.attrs
-        : {}
-    ctx.flushAndPush(
-      buildCustomDirectiveSegment(
-        customDirective.directive,
-        normalizeSafeMarkdownUrl(customDirective.rawUrl),
-        customDirective.inlineTitle,
-        bodyLines,
-        metadata
-      )
-    )
-    return { nextIndex: closedIndex + 1 }
-  }
-  ctx.markdownBuffer.push(line)
-  return { nextIndex: index + 1 }
-}
+  const open = parseOpeningDirectiveLine(line)
+  if (!open) return null
 
-const tryConsumeColonBlockAt = (
-  line: string,
-  trimmed: string,
-  index: number,
-  ctx: SegmentConsumerContext
-): SegmentLineStepResult | null => {
-  const customStep = tryConsumeCustomDirectiveAt(line, trimmed, index, ctx)
-  if (customStep) return customStep
-  if (CALLOUT_DIRECTIVE_OPEN_PATTERN.test(line)) {
-    const rawHeader = line.slice(":::callout".length).trim()
+  const customDirective = parseCustomDirectiveFromOpening(open)
+  if (customDirective) {
     const { closedIndex, bodyLines } = collectTripleColonBody(
       ctx.lines,
       index + 1,
       ctx.lineStarts,
-      ctx.codeBlockRanges, ctx.commentRanges
+      ctx.codeBlockRanges,
+      ctx.commentRanges,
+      open.fenceLength
     )
     if (closedIndex >= 0) {
-      ctx.flushAndPush(buildCalloutSegment(resolveDirectiveCalloutHeader(rawHeader), bodyLines))
+      const metadata =
+        ctx.pendingDirectiveMetadata?.kind === customDirective.directive
+          ? ctx.pendingDirectiveMetadata.attrs
+          : {}
+      ctx.flushAndPush(
+        buildCustomDirectiveSegment(
+          customDirective.directive,
+          normalizeSafeMarkdownUrl(customDirective.rawUrl),
+          customDirective.inlineTitle,
+          bodyLines,
+          metadata
+        )
+      )
       return { nextIndex: closedIndex + 1 }
     }
     ctx.markdownBuffer.push(line)
     return { nextIndex: index + 1 }
   }
-  if (TOGGLE_DIRECTIVE_OPEN_PATTERN.test(line)) {
-    const title = line.slice(":::toggle".length).trim() || "토글"
+
+  if (open.kind === "callout") {
     const { closedIndex, bodyLines } = collectTripleColonBody(
       ctx.lines,
       index + 1,
       ctx.lineStarts,
-      ctx.codeBlockRanges, ctx.commentRanges
+      ctx.codeBlockRanges,
+      ctx.commentRanges,
+      open.fenceLength
+    )
+    if (closedIndex >= 0) {
+      const baseHeader = resolveDirectiveCalloutHeader(open.remainder)
+      const hasQuotedTitle = open.quotedTitle !== null && open.quotedTitle.length > 0
+      const header: ParsedCalloutHeader = hasQuotedTitle
+        ? { ...baseHeader, title: open.quotedTitle!, explicitTitle: true }
+        : baseHeader
+      ctx.flushAndPush(buildCalloutSegment(header, bodyLines))
+      return { nextIndex: closedIndex + 1 }
+    }
+    ctx.markdownBuffer.push(line)
+    return { nextIndex: index + 1 }
+  }
+
+  if (open.kind === "toggle") {
+    const title = (open.quotedTitle !== null ? open.quotedTitle : open.remainder).trim() || "토글"
+    const { closedIndex, bodyLines } = collectTripleColonBody(
+      ctx.lines,
+      index + 1,
+      ctx.lineStarts,
+      ctx.codeBlockRanges,
+      ctx.commentRanges,
+      open.fenceLength
     )
     if (closedIndex >= 0) {
       ctx.flushAndPush({
@@ -402,6 +409,7 @@ const tryConsumeColonBlockAt = (
     ctx.markdownBuffer.push(line)
     return { nextIndex: index + 1 }
   }
+
   return null
 }
 

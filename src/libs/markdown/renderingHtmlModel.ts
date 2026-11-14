@@ -20,7 +20,7 @@ const HTML_ENTITY_MAP: Record<string, string> = {
 
 const HTML_ATTRIBUTE_REGEX = /([^\s=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
 const HTML_CODE_BLOCK_REGEX = /<pre\b([^>]*)>\s*<code\b([^>]*)>([\s\S]*?)<\/code>\s*<\/pre>/gi
-const HTML_CODE_CONTAINER_OPEN_REGEX = /<(div|section|figure)\b([^>]*)>/gi
+const HTML_CONTAINER_TAG_REGEX = /<(\/?)(div|section|figure)\b([^>]*)>/gi
 
 const HAS_FENCED_CODE_BLOCK_REGEX = /(^|\n)\s*[`~]{3,}[\w-]*[\t ]*\n[\s\S]*?\n[`~]{3,}(?=\n|$)/
 const HAS_MERMAID_BLOCK_REGEX = /(^|\n)\s*[`~]{3,}\s*mermaid\b[\t ]*\n[\s\S]*?\n[`~]{3,}(?=\n|$)/i
@@ -87,7 +87,7 @@ const decodeHtmlCodePoint = (entity: string, codePoint: number) =>
     ? String.fromCodePoint(codePoint)
     : entity
 
-const BLOCK_BREAK_TAGS = new Set(["p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"])
+const BLOCK_BREAK_TAGS = new Set(["br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"])
 
 const isAsciiWhitespace = (char: string) => char === " " || char === "\n" || char === "\t" || char === "\r"
 
@@ -150,22 +150,13 @@ const extractPlainTextByHtmlScanner = (rawHtml: string) => {
   return plainText
 }
 
-const extractPlainTextFromHtml = (rawHtml: string) => {
+export const extractPlainTextFromHtmlFragment = (rawHtml: string) => {
   if (!rawHtml) return ""
   if (!rawHtml.includes("<")) return decodeHtmlEntitiesOnce(rawHtml)
-
-  if (typeof window !== "undefined" && typeof window.DOMParser !== "undefined") {
-    const parser = new window.DOMParser()
-    const doc = parser.parseFromString(rawHtml, "text/html")
-
-    doc.querySelectorAll("br").forEach((br) => br.replaceWith("\n"))
-    doc.querySelectorAll("p,div,li,tr,h1,h2,h3,h4,h5,h6").forEach((el) => el.append("\n"))
-
-    return doc.body.textContent || ""
-  }
-
   return decodeHtmlEntitiesOnce(extractPlainTextByHtmlScanner(rawHtml))
 }
+
+const extractPlainTextFromHtml = extractPlainTextFromHtmlFragment
 
 const extractMermaidSource = (rawCode: string) => {
   return extractNormalizedMermaidSource(extractPlainTextFromHtml(rawCode))
@@ -283,36 +274,68 @@ export const countHtmlTags = (source: string, tagName: string, closing: boolean)
   return source.match(pattern)?.length ?? 0
 }
 
-const extractNearestCodeContainerAttrs = (html: string, preOffset: number) => {
-  const prefix = html.slice(0, preOffset)
-  const candidates: Array<{ attrs: string; index: number; tagName: string }> = []
-  HTML_CODE_CONTAINER_OPEN_REGEX.lastIndex = 0
+type OpenHtmlContainerFrame = {
+  tagName: string
+  attrs: string
+  hasCodeSource: boolean
+}
 
-  let match: RegExpExecArray | null
-  while ((match = HTML_CODE_CONTAINER_OPEN_REGEX.exec(prefix))) {
-    candidates.push({
-      attrs: match[2] || "",
-      index: match.index,
-      tagName: (match[1] || "").toLowerCase(),
-    })
+const resolveNearestCodeAttrsFromStack = (stack: readonly OpenHtmlContainerFrame[]): string => {
+  for (let index = stack.length - 1; index >= 0; index -= 1) {
+    if (stack[index].hasCodeSource) return stack[index].attrs
   }
+  return ""
+}
 
-  for (let index = candidates.length - 1; index >= 0; index -= 1) {
-    const candidate = candidates[index]
-    if (
-      !readHtmlAttribute(candidate.attrs, "data-raw-code") &&
-      !readHtmlAttribute(candidate.attrs, "data-prism-source")
-    ) {
+const collectCodeContainerAttrsForPreOffsets = (
+  html: string,
+  preOffsets: readonly number[]
+): string[] => {
+  const results = new Array<string>(preOffsets.length).fill("")
+  if (preOffsets.length === 0) return results
+
+  const stack: OpenHtmlContainerFrame[] = []
+  HTML_CONTAINER_TAG_REGEX.lastIndex = 0
+  let targetIdx = 0
+  let match: RegExpExecArray | null
+
+  while ((match = HTML_CONTAINER_TAG_REGEX.exec(html)) !== null) {
+    const tagStart = match.index
+    while (targetIdx < preOffsets.length && preOffsets[targetIdx] <= tagStart) {
+      results[targetIdx] = resolveNearestCodeAttrsFromStack(stack)
+      targetIdx += 1
+    }
+    if (targetIdx >= preOffsets.length) break
+
+    const isClosing = match[1] === "/"
+    const tagName = (match[2] || "").toLowerCase()
+    const rawAttrs = match[3] || ""
+
+    if (!isClosing) {
+      if (!rawAttrs.trimEnd().endsWith("/")) {
+        const hasCodeSource = Boolean(
+          readHtmlAttribute(rawAttrs, "data-raw-code") ||
+          readHtmlAttribute(rawAttrs, "data-prism-source")
+        )
+        stack.push({ tagName, attrs: rawAttrs, hasCodeSource })
+      }
       continue
     }
 
-    const segment = prefix.slice(candidate.index)
-    const openCount = countHtmlTags(segment, candidate.tagName, false)
-    const closeCount = countHtmlTags(segment, candidate.tagName, true)
-    if (openCount > closeCount) return candidate.attrs
+    for (let index = stack.length - 1; index >= 0; index -= 1) {
+      if (stack[index].tagName === tagName) {
+        stack.length = index
+        break
+      }
+    }
   }
 
-  return ""
+  while (targetIdx < preOffsets.length) {
+    results[targetIdx] = resolveNearestCodeAttrsFromStack(stack)
+    targetIdx += 1
+  }
+
+  return results
 }
 
 const extractCodeLanguageFromAttrs = (rawPreAttrs: string, rawCodeAttrs: string, rawContainerAttrs: string) => {
@@ -338,29 +361,65 @@ const extractCodeSourceFromHtmlBlock = (rawPreAttrs: string, rawCodeAttrs: strin
   readHtmlAttribute(rawContainerAttrs, "data-prism-source") ||
   extractPlainTextFromHtml(rawCodeBody)
 
-const normalizeContentHtmlCodeBlocks = (html: string) =>
-  html.replace(HTML_CODE_BLOCK_REGEX, (full, rawPreAttrs, rawCodeAttrs, rawCodeBody, offset) => {
-    const preAttrs = String(rawPreAttrs || "")
-    const codeAttrs = String(rawCodeAttrs || "")
-    const containerAttrs = extractNearestCodeContainerAttrs(html, Number(offset) || 0)
-    const source = extractCodeSourceFromHtmlBlock(preAttrs, codeAttrs, containerAttrs, String(rawCodeBody || ""))
-    if (!source) return full
+const normalizeContentHtmlCodeBlocks = (html: string) => {
+  const blockMatches: Array<{
+    start: number
+    end: number
+    full: string
+    preAttrs: string
+    codeAttrs: string
+    codeBody: string
+  }> = []
+  HTML_CODE_BLOCK_REGEX.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = HTML_CODE_BLOCK_REGEX.exec(html)) !== null) {
+    blockMatches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      full: match[0],
+      preAttrs: match[1] || "",
+      codeAttrs: match[2] || "",
+      codeBody: match[3] || "",
+    })
+  }
+  if (blockMatches.length === 0) return html
 
-    const language = extractCodeLanguageFromAttrs(preAttrs, codeAttrs, containerAttrs)
-    const codeClassName = readHtmlAttribute(codeAttrs, "class")
+  const containerAttrsByBlock = collectCodeContainerAttrsForPreOffsets(
+    html,
+    blockMatches.map((entry) => entry.start)
+  )
+
+  let output = ""
+  let lastIndex = 0
+
+  for (let idx = 0; idx < blockMatches.length; idx += 1) {
+    const entry = blockMatches[idx]
+    output += html.slice(lastIndex, entry.start)
+    lastIndex = entry.end
+
+    const containerAttrs = containerAttrsByBlock[idx] || ""
+    const source = extractCodeSourceFromHtmlBlock(entry.preAttrs, entry.codeAttrs, containerAttrs, entry.codeBody)
+    if (!source) {
+      output += entry.full
+      continue
+    }
+
+    const language = extractCodeLanguageFromAttrs(entry.preAttrs, entry.codeAttrs, containerAttrs)
+    const codeClassName = readHtmlAttribute(entry.codeAttrs, "class")
     const hasMermaidHint =
       language.toLowerCase() === "mermaid" ||
       codeClassName.toLowerCase().includes("language-mermaid") ||
-      readHtmlAttribute(preAttrs, "class").toLowerCase().includes("aq-mermaid") ||
+      readHtmlAttribute(entry.preAttrs, "class").toLowerCase().includes("aq-mermaid") ||
       readHtmlAttribute(containerAttrs, "class").toLowerCase().includes("aq-mermaid")
     if (hasMermaidHint || isMermaidSource(source)) {
       const mermaidSource = extractMermaidSource(source)
-      return mermaidSource ? renderMermaidPre(mermaidSource) : full
+      output += mermaidSource ? renderMermaidPre(mermaidSource) : entry.full
+      continue
     }
 
     const presentation = renderImmediateCodeToHtml({ source, language })
     const retainedCodeAttrs = stripHtmlAttributes(
-      codeAttrs,
+      entry.codeAttrs,
       new Set(["class", "data-language", "data-prism-language", "data-prism-source", "data-raw-code"])
     )
     const normalizedClassName = mergeClassNames(codeClassName, `language-${presentation.language}`)
@@ -375,8 +434,12 @@ const normalizeContentHtmlCodeBlocks = (html: string) =>
       .filter(Boolean)
       .join(" ")
 
-    return `<pre${preAttrs}><code ${normalizedCodeAttrs}>${presentation.html}</code></pre>`
-  })
+    output += `<pre${entry.preAttrs}><code ${normalizedCodeAttrs}>${presentation.html}</code></pre>`
+  }
+
+  output += html.slice(lastIndex)
+  return output
+}
 
 export const normalizeContentHtmlForMermaid = (rawHtml: string): string =>
   rawHtml

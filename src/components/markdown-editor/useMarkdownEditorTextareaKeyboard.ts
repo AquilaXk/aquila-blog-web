@@ -18,14 +18,30 @@ import {
   planMarkdownEditorAutoPairInsert,
 } from "./markdownEditorAutoPairModel"
 import {
-  planNotionBlockPrefixBackspace,
-  planNotionSpaceInputRule,
-} from "./markdownEditorNotionModel"
+  planBlockPrefixBackspace,
+  planBlockSpaceInputRule,
+} from "./markdownEditorBlockModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 type TextareaSelection = {
   from: number
   to: number
+}
+
+export const handleMarkdownEditorEscapeKeyDown = (
+  event: { key: string; preventDefault: () => void },
+  isFindReplaceOpen: boolean,
+  onCloseFindReplace: (() => void) | undefined,
+  allowNativeTabAfterEscapeRef: MutableRefObject<boolean>
+): boolean => {
+  if (event.key !== "Escape") return false
+  if (isFindReplaceOpen && onCloseFindReplace) {
+    event.preventDefault()
+    onCloseFindReplace()
+    return true
+  }
+  allowNativeTabAfterEscapeRef.current = true
+  return true
 }
 
 type UseMarkdownEditorTextareaKeyboardArgs = {
@@ -40,6 +56,8 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   onRequestSave?: () => void
   onToggleViewMode?: () => void
   onOpenFindReplace?: () => void
+  isFindReplaceOpen?: boolean
+  onCloseFindReplace?: () => void
   isCompletionActive?: () => boolean
 }
 
@@ -71,6 +89,8 @@ export const useMarkdownEditorTextareaKeyboard = ({
   onRequestSave,
   onToggleViewMode,
   onOpenFindReplace,
+  isFindReplaceOpen = false,
+  onCloseFindReplace,
   isCompletionActive,
 }: UseMarkdownEditorTextareaKeyboardArgs) => {
   const handleTabKeyDown = useCallback(
@@ -215,8 +235,8 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (event.metaKey || event.ctrlKey || event.altKey) return false
       const { from, to } = rememberTextareaSelection()
       let rulePlan: PlannedTextMutation | null = null
-      if (event.key === "Backspace") rulePlan = planNotionBlockPrefixBackspace(valueRef.current, from, to)
-      else if (event.key === " ") rulePlan = planNotionSpaceInputRule(valueRef.current, from, to)
+      if (event.key === "Backspace") rulePlan = planBlockPrefixBackspace(valueRef.current, from, to)
+      else if (event.key === " ") rulePlan = planBlockSpaceInputRule(valueRef.current, from, to)
       if (rulePlan) {
         event.preventDefault()
         applyRecordedMutation(rulePlan)
@@ -289,17 +309,23 @@ export const useMarkdownEditorTextareaKeyboard = ({
   const handleTextareaKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
       if (isIgnoredEditorKeyEvent(disabled, event)) return
+      if (isCompletionActive?.() && isCompletionHandledKey(event.key)) return
+      if (
+        handleMarkdownEditorEscapeKeyDown(
+          event,
+          isFindReplaceOpen,
+          onCloseFindReplace,
+          allowNativeTabAfterEscapeRef
+        )
+      ) {
+        return
+      }
       if (authoringDisabled) {
         runReadOnlyKeyHandlers(event)
         return
       }
       if (isInsideTableOrFormInput(event.target)) {
         handleSaveShortcutKeyDown(event)
-        return
-      }
-      if (isCompletionActive?.() && isCompletionHandledKey(event.key)) return
-      if (event.key === "Escape") {
-        allowNativeTabAfterEscapeRef.current = true
         return
       }
       if (event.key === "Tab") {
@@ -316,6 +342,8 @@ export const useMarkdownEditorTextareaKeyboard = ({
       handleSaveShortcutKeyDown,
       handleTabKeyDown,
       isCompletionActive,
+      isFindReplaceOpen,
+      onCloseFindReplace,
       runAuthoringKeyHandlers,
       runReadOnlyKeyHandlers,
     ]

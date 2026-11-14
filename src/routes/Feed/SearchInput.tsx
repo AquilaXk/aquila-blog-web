@@ -1,5 +1,5 @@
 import styled from "@emotion/styled"
-import React, { InputHTMLAttributes, Ref } from "react"
+import React, { ChangeEvent, InputHTMLAttributes, Ref, useCallback, useRef } from "react"
 import AppIcon from "src/components/icons/AppIcon"
 import {
   FEED_SEARCH_FIELD_MIN_HEIGHT_PX,
@@ -14,11 +14,53 @@ export { FEED_SEARCH_INPUT_ID } from "./feedSearchFocus"
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
   inputRef?: Ref<HTMLInputElement>
+  onClear?: () => void
+  hideClearButton?: boolean
 }
 
-const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
+const assignInputRef = (targetRef: Ref<HTMLInputElement> | undefined, node: HTMLInputElement | null) => {
+  if (!targetRef) return
+  if (typeof targetRef === "function") {
+    targetRef(node)
+  } else {
+    (targetRef as React.MutableRefObject<HTMLInputElement | null>).current = node
+  }
+}
+
+const SearchInput: React.FC<Props> = ({ inputRef, onClear, hideClearButton = false, ...props }) => {
   const { t } = useLanguage()
   const inputId = props.id || FEED_SEARCH_INPUT_ID
+  const localInputRef = useRef<HTMLInputElement | null>(null)
+  const hasQueryValue =
+    typeof props.value === "string"
+      ? props.value.length > 0
+      : typeof props.value === "number"
+        ? String(props.value).length > 0
+        : false
+  const canClear = !hideClearButton && hasQueryValue && !props.disabled && !props.readOnly
+
+  const setMergedRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      localInputRef.current = node
+      assignInputRef(inputRef, node)
+    },
+    [inputRef]
+  )
+
+  const handleClear = useCallback(() => {
+    const input = localInputRef.current
+    if (onClear) {
+      onClear()
+    } else if (input) {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
+      valueSetter?.call(input, "")
+      props.onChange?.({
+        target: input,
+        currentTarget: input,
+      } as ChangeEvent<HTMLInputElement>)
+    }
+    input?.focus()
+  }, [onClear, props])
 
   return (
     <StyledWrapper data-touch-token-revision={TOUCH_TOKEN_BUNDLE_REVISION}>
@@ -28,13 +70,23 @@ const SearchInput: React.FC<Props> = ({ inputRef, ...props }) => {
         </span>
         <input
           id={inputId}
-          ref={inputRef}
+          ref={setMergedRef}
           className="mid"
           type="search"
           placeholder={t("searchPlaceholder")}
-          aria-label={props["aria-label"] || "Search posts by keyword"}
+          aria-label={props["aria-label"] || t("searchInputAria")}
           {...props}
         />
+        {canClear ? (
+          <button
+            type="button"
+            className="clearButton"
+            aria-label={t("searchClearAria")}
+            onClick={handleClear}
+          >
+            <AppIcon name="close" />
+          </button>
+        ) : null}
       </div>
     </StyledWrapper>
   )
@@ -116,6 +168,37 @@ const StyledWrapper = styled.div`
     }
   }
 
+  > .field > .clearButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
+    min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
+    margin: -5px -10px -5px 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--aq-subtle);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--aq-text);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: -2px;
+      color: var(--aq-text);
+    }
+
+    svg {
+      width: 15px;
+      height: 15px;
+    }
+  }
+
   > .field:focus-within {
     border-color: var(--aq-accent);
     background: var(--aq-surface);
@@ -137,7 +220,7 @@ const StyledWrapper = styled.div`
     > .field > .mid {
       min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
       padding: 0.34rem 0;
-      font-size: 0.82rem;
+      font-size: 1rem;
       line-height: 1.45;
     }
   }

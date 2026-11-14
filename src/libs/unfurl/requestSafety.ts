@@ -1,8 +1,25 @@
+import type { IncomingMessage } from "node:http"
 import { request as httpRequest } from "node:http"
 import { request as httpsRequest } from "node:https"
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib"
+import {
+  isPrivateIpv4,
+  isPrivateIpv6,
+  parseIpv6Words,
+} from "src/libs/network/publicHostSafety"
+
+export { isPrivateIpv4, isPrivateIpv6, parseIpv6Words }
+
+export const MAX_UNFURL_RESPONSE_BYTES = 262_144
+
+export class UnfurlResponseTooLargeError extends Error {
+  constructor() {
+    super("외부 링크 응답 크기가 허용 상한(256KB)을 초과했습니다.")
+    this.name = "UnfurlResponseTooLargeError"
+  }
+}
 
 const ALLOWED_UNFURL_HOST_SUFFIXES = [
   "github.com",
@@ -35,50 +52,6 @@ const DEFAULT_PORT_BY_PROTOCOL: Record<"http:" | "https:", string> = {
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308])
 const MAX_UNFURL_REDIRECTS = 4
 
-const IPV4_PRIVATE_RANGES: Array<[number, number]> = [
-  [0x00000000, 0x00ffffff], // 0.0.0.0/8
-  [0x0a000000, 0x0affffff], // 10.0.0.0/8
-  [0x64400000, 0x647fffff], // 100.64.0.0/10
-  [0x7f000000, 0x7fffffff], // 127.0.0.0/8
-  [0xa9fe0000, 0xa9feffff], // 169.254.0.0/16
-  [0xac100000, 0xac1fffff], // 172.16.0.0/12
-  [0xc0a80000, 0xc0a8ffff], // 192.168.0.0/16
-  [0xc6120000, 0xc613ffff], // 198.18.0.0/15
-]
-
-const IPV6_PRIVATE_PREFIXES = [
-  "::",
-  "::1",
-  "fc",
-  "fd",
-  "fe8",
-  "fe9",
-  "fea",
-  "feb",
-] as const
-
-const ipv4ToNumber = (ip: string) => {
-  const octets = ip.split(".").map((octet) => Number.parseInt(octet, 10))
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
-    return null
-  }
-
-  return (
-    ((octets[0] << 24) >>> 0) +
-    ((octets[1] << 16) >>> 0) +
-    ((octets[2] << 8) >>> 0) +
-    (octets[3] >>> 0)
-  )
-}
-
-const isPrivateIpv4 = (ip: string) => {
-  const numericIp = ipv4ToNumber(ip)
-  if (numericIp === null) return true
-  return IPV4_PRIVATE_RANGES.some(([start, end]) => numericIp >= start && numericIp <= end)
-}
-
-const normalizeIpv6 = (ip: string) => ip.trim().toLowerCase()
-
 type ResolvedPublicAddress = {
   address: string
   family: number
@@ -89,19 +62,6 @@ const resolveDefaultPort = (protocol: string) => {
     return DEFAULT_PORT_BY_PROTOCOL[protocol]
   }
   throw new Error("http/https URL만 지원합니다.")
-}
-
-const isPrivateIpv6 = (ip: string) => {
-  const normalized = normalizeIpv6(ip)
-
-  if (normalized.startsWith("::ffff:")) {
-    const mappedIpv4 = normalized.slice("::ffff:".length)
-    return isPrivateIpv4(mappedIpv4)
-  }
-
-  return IPV6_PRIVATE_PREFIXES.some(
-    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}:`)
-  )
 }
 
 const resolvePublicAddress = async (hostname: string): Promise<ResolvedPublicAddress> => {
@@ -197,15 +157,122 @@ const assertSafeUnfurlUrl = (rawUrl: string) => {
 
 export const normalizeSafeUnfurlUrl = (rawUrl: string) => assertSafeUnfurlUrl(rawUrl)
 
-const decodeResponseBuffer = (buffer: Buffer, encoding: string) => {
+export const decodeUnfurlResponseBuffer = (buffer: Buffer, encoding: string) => {
+  if (buffer.byteLength > MAX_UNFURL_RESPONSE_BYTES) {
+    throw new UnfurlResponseTooLargeError()
+  }
+
   const normalizedEncoding = encoding.trim().toLowerCase()
   if (!normalizedEncoding || normalizedEncoding === "identity") return buffer
 
-  if (normalizedEncoding === "gzip") return gunzipSync(buffer)
-  if (normalizedEncoding === "deflate") return inflateSync(buffer)
-  if (normalizedEncoding === "br") return brotliDecompressSync(buffer)
+  const zlibOptions = { maxOutputLength: MAX_UNFURL_RESPONSE_BYTES }
+  if (normalizedEncoding === "gzip") return gunzipSync(buffer, zlibOptions)
+  if (normalizedEncoding === "deflate") return inflateSync(buffer, zlibOptions)
+  if (normalizedEncoding === "br") return brotliDecompressSync(buffer, zlibOptions)
   return buffer
 }
+
+const buildFetchHeadersFromIncoming = (rawHeaders: IncomingMessage["headers"]) => {
+  const responseHeaders = new Headers()
+  Object.entries(rawHeaders).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      responseHeaders.set(key, value)
+      return
+    }
+    if (Array.isArray(value)) {
+      responseHeaders.set(key, value.join(", "))
+    }
+  })
+  return responseHeaders
+}
+
+export type BoundedIncomingResponseStream = {
+  statusCode?: number
+  headers: IncomingMessage["headers"]
+  on(event: "data", listener: (chunk: Buffer | string) => void): unknown
+  on(event: "end", listener: () => void): unknown
+  on(event: "error", listener: (error: Error) => void): unknown
+  destroy: (error?: Error) => unknown
+  resume: () => unknown
+}
+
+export const readBoundedIncomingResponse = (
+  response: BoundedIncomingResponseStream,
+  abortUpstream?: () => void
+): Promise<Response> =>
+  new Promise<Response>((resolve, reject) => {
+    const statusCode = response.statusCode || 502
+    const responseHeaders = buildFetchHeadersFromIncoming(response.headers)
+
+    if (REDIRECT_STATUS_CODES.has(statusCode)) {
+      response.resume()
+      resolve(
+        new Response(null, {
+          status: statusCode,
+          headers: responseHeaders,
+        })
+      )
+      return
+    }
+
+    const declaredLengthRaw = response.headers["content-length"]
+    const declaredLength =
+      typeof declaredLengthRaw === "string" ? Number.parseInt(declaredLengthRaw, 10) : Number.NaN
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_UNFURL_RESPONSE_BYTES) {
+      const limitError = new UnfurlResponseTooLargeError()
+      response.destroy(limitError)
+      abortUpstream?.()
+      reject(limitError)
+      return
+    }
+
+    const rawChunks: Buffer[] = []
+    let receivedBytes = 0
+    let settled = false
+
+    const fail = (error: unknown) => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+
+    response.on("data", (chunk) => {
+      if (settled) return
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      receivedBytes += buf.byteLength
+      if (receivedBytes > MAX_UNFURL_RESPONSE_BYTES) {
+        const limitError = new UnfurlResponseTooLargeError()
+        response.destroy()
+        abortUpstream?.()
+        fail(limitError)
+        return
+      }
+      rawChunks.push(buf)
+    })
+
+    response.on("error", fail)
+    response.on("end", () => {
+      if (settled) return
+      try {
+        const rawBody = Buffer.concat(rawChunks, receivedBytes)
+        const contentEncoding = `${response.headers["content-encoding"] || ""}`
+        const decodedBody = decodeUnfurlResponseBuffer(rawBody, contentEncoding)
+        responseHeaders.delete("content-encoding")
+        settled = true
+        resolve(
+          new Response(
+            decodedBody.toString("utf8"),
+            {
+              status: statusCode,
+              headers: responseHeaders,
+            }
+          )
+        )
+      } catch (error) {
+        fail(error)
+      }
+    })
+  })
 
 const fetchViaResolvedPublicAddress = async ({
   currentUrl,
@@ -241,41 +308,9 @@ const fetchViaResolvedPublicAddress = async ({
         ...(currentUrl.protocol === "https:" ? { servername: currentUrl.hostname } : {}),
       },
       (response) => {
-        const rawChunks: Buffer[] = []
-
-        response.on("data", (chunk) => {
-          rawChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        })
-        response.on("error", reject)
-        response.on("end", async () => {
-          try {
-            const rawBody = Buffer.concat(rawChunks)
-            const contentEncoding = `${response.headers["content-encoding"] || ""}`
-            const decodedBody = decodeResponseBuffer(rawBody, contentEncoding)
-            const responseHeaders = new Headers()
-            Object.entries(response.headers).forEach(([key, value]) => {
-              if (typeof value === "string") {
-                responseHeaders.set(key, value)
-                return
-              }
-              if (Array.isArray(value)) {
-                responseHeaders.set(key, value.join(", "))
-              }
-            })
-            responseHeaders.delete("content-encoding")
-            resolve(
-              new Response(
-                decodedBody.toString("utf8"),
-                {
-                  status: response.statusCode || 502,
-                  headers: responseHeaders,
-                }
-              )
-            )
-          } catch (error) {
-            reject(error)
-          }
-        })
+        void readBoundedIncomingResponse(response, () => {
+          request.destroy()
+        }).then(resolve, reject)
       }
     )
 

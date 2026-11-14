@@ -1,4 +1,5 @@
-import { getClientStoredLanguage } from "src/libs/language"
+import { overlayScrim } from "src/design-system/tokens"
+import { getClientStoredLanguage, translations } from "src/libs/language"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 import {
   attachStageDragPan,
@@ -68,7 +69,8 @@ export const openImageLightboxOverlay = (
   const isEnglish =
     (document.documentElement?.lang ?? "").toLowerCase().startsWith("en") ||
     getClientStoredLanguage() === "en"
-  const altText = options.alt || options.caption || (isEnglish ? "Expanded image view" : "이미지 확대 보기")
+  const overlayT = isEnglish ? translations.en : translations.ko
+  const altText = options.alt || options.caption || overlayT.lightboxDialogAria
   const captionText = options.caption || options.alt || ""
 
   const overlay = document.createElement("div")
@@ -80,7 +82,7 @@ export const openImageLightboxOverlay = (
   overlay.style.position = "fixed"
   overlay.style.inset = "0"
   overlay.style.zIndex = "180"
-  overlay.style.background = "rgba(15, 23, 42, 0.48)"
+  overlay.style.background = overlayScrim.lightbox
   overlay.style.display = "grid"
   overlay.style.alignItems = "center"
   overlay.style.justifyItems = "center"
@@ -109,12 +111,12 @@ export const openImageLightboxOverlay = (
   actionsBar.style.borderBottom = "1px solid var(--aq-border)"
   actionsBar.style.background = "var(--aq-page-bg)"
 
-  const zoomOutButton = createOverlayActionButton("-", isEnglish ? "Zoom out" : "축소")
-  const zoomResetButton = createOverlayActionButton("100%", isEnglish ? "Reset zoom" : "배율 초기화")
-  const zoomInButton = createOverlayActionButton("+", isEnglish ? "Zoom in" : "확대")
+  const zoomOutButton = createOverlayActionButton("-", overlayT.lightboxZoomOut)
+  const zoomResetButton = createOverlayActionButton("100%", overlayT.lightboxZoomReset)
+  const zoomInButton = createOverlayActionButton("+", overlayT.lightboxZoomIn)
   const closeButton = createOverlayActionButton(
-    isEnglish ? "Close" : "닫기",
-    isEnglish ? "Close" : "닫기"
+    overlayT.mermaidClose,
+    overlayT.lightboxClose
   )
   for (const btn of [zoomOutButton, zoomResetButton, zoomInButton, closeButton]) {
     btn.style.minWidth = "44px"
@@ -192,6 +194,10 @@ export const openImageLightboxOverlay = (
     }
   }
 
+  const handlePopState = () => {
+    closeOverlay()
+  }
+
   closeOverlay = () => {
     if (closed) return
     closed = true
@@ -202,6 +208,9 @@ export const openImageLightboxOverlay = (
     releaseBodyScrollLock()
     overlay.remove()
     document.removeEventListener("keydown", handleOverlayKeyDown)
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", handlePopState)
+    }
     closeButton.removeEventListener("click", closeOverlay)
     overlay.removeEventListener("click", handleOverlayClick)
     if (returnFocusTarget?.isConnected) {
@@ -214,6 +223,9 @@ export const openImageLightboxOverlay = (
   overlay.addEventListener("click", handleOverlayClick)
   closeButton.addEventListener("click", closeOverlay)
   document.addEventListener("keydown", handleOverlayKeyDown)
+  if (typeof window !== "undefined") {
+    window.addEventListener("popstate", handlePopState)
+  }
 
   return closeOverlay
 }

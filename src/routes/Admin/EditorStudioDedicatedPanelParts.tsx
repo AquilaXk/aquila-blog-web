@@ -2,7 +2,9 @@ import { useRef } from "react"
 import styled from "@emotion/styled"
 import { CONFIG } from "site.config"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { boxShadowColor, overlayScrim } from "src/design-system/tokens"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
+import { colors } from "src/styles/colors"
 import { zIndexes } from "src/styles/zIndexes"
 
 export const EditorStudioStatusBar = styled.footer`
@@ -132,7 +134,7 @@ export const EditorOutline = styled.aside`
     border-right: 0;
     border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
     border-radius: 16px 16px 0 0;
-    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    box-shadow: 0 -16px 40px ${boxShadowColor.bottomSheet};
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 `
@@ -349,7 +351,7 @@ export const EditorInspector = styled.aside`
     max-height: min(78dvh, 580px);
     border-top: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
     border-radius: 16px 16px 0 0;
-    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.22);
+    box-shadow: 0 -16px 40px ${boxShadowColor.bottomSheet};
     padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
 
     select,
@@ -365,7 +367,7 @@ export const EditorGuideBackdrop = styled.div`
   z-index: ${zIndexes.editorGuide};
   display: flex;
   justify-content: flex-end;
-  background: rgba(10, 12, 16, 0.42);
+  background: ${overlayScrim.sheet};
 `
 
 export const EditorGuidePanel = styled.aside`
@@ -376,7 +378,7 @@ export const EditorGuidePanel = styled.aside`
   grid-template-rows: auto 1fr;
   border-left: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: -24px 0 70px rgba(0, 0, 0, 0.18);
+  box-shadow: -24px 0 70px ${boxShadowColor.drawer};
 
   header {
     height: 64px;
@@ -530,7 +532,7 @@ export const EditorStudioGuideModal = ({ onClose }: { onClose: () => void }) => 
               ["토글", "긴 보조 설명을 접어두기", ":::toggle 자세히 보기\n내용\n:::"],
               ["표와 코드", "GFM table과 fenced code", "| 항목 | 설명 |\n| --- | --- |\n\n```kotlin title=\"invalidatePost.kt\"\ncode\n```"],
               ["Mermaid", "흐름과 구조 다이어그램", "```mermaid\nflowchart LR\n A --> B\n```"],
-              ["수식과 색상", "KaTeX block과 제한된 인라인 색상", "$$\nE = mc^2\n$$\n{{color:#155eef|강조}}"],
+              ["수식과 색상", "KaTeX block과 제한된 인라인 색상", `$$\nE = mc^2\n$$\n{{color:${colors.light.accentControl}|강조}}`],
               ["미디어와 링크 카드", "이미지 정렬·크기, 위키링크, bookmark", "![설명](URL){width=480 align=center}\n[[글제목]]\n:::bookmark URL\n제목\n설명\n:::"],
             ].map(([title, description, code]) => (
               <section key={title}>

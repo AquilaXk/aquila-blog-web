@@ -4,31 +4,10 @@ import {
   red,
   green,
   orange,
-  grayDark,
-  blueDark,
-  redDark,
-  greenDark,
-  orangeDark,
   indigo,
-  indigoDark,
 } from "@radix-ui/colors"
 
-export type Colors = typeof colors.light & typeof colors.dark
-
-const nearBlackDarkGray = {
-  gray1: "#121212",
-  gray2: "#181818",
-  gray3: "#1f1f1f",
-  gray4: "#262626",
-  gray5: "#2d2d2d",
-  gray6: "#363636",
-  gray7: "#414141",
-  gray8: "#4f4f4f",
-  gray9: "#8f96a3",
-  gray10: "#b2b2b2",
-  gray11: "#d8d8d8",
-  gray12: "#f5f5f5",
-}
+export type Colors = typeof lightColors
 
 const balancedLightGray = {
   gray1: "#ffffff",
@@ -61,41 +40,19 @@ const semanticLight = {
   statusDangerText: red.red11,
 }
 
-const semanticDark = {
-  accentLink: blueDark.blue10,
-  accentControl: blueDark.blue9,
-  accentControlHover: blueDark.blue10,
-  accentControlText: "#f8fafc",
-  accentSurfaceSubtle: "rgba(59, 130, 246, 0.09)",
-  accentSurfaceStrong: "rgba(59, 130, 246, 0.14)",
-  accentBorder: blueDark.blue8,
-  statusSuccessSurface: "rgba(34, 197, 94, 0.11)",
-  statusSuccessBorder: greenDark.green8,
-  statusSuccessText: greenDark.green11,
-  statusDangerSurface: "rgba(239, 68, 68, 0.11)",
-  statusDangerBorder: redDark.red8,
-  statusDangerText: redDark.red11,
+const lightColors = {
+  ...indigo,
+  ...gray,
+  ...balancedLightGray,
+  ...blue,
+  ...red,
+  ...green,
+  ...orange,
+  ...semanticLight,
 }
 
+// Intentional light-only shell: keep colors.dark type-compatible without bundling @radix-ui/colors *Dark scales.
 export const colors = {
-  light: {
-    ...indigo,
-    ...gray,
-    ...balancedLightGray,
-    ...blue,
-    ...red,
-    ...green,
-    ...orange,
-    ...semanticLight,
-  },
-  dark: {
-    ...indigoDark,
-    ...grayDark,
-    ...nearBlackDarkGray,
-    ...blueDark,
-    ...redDark,
-    ...greenDark,
-    ...orangeDark,
-    ...semanticDark,
-  },
+  light: lightColors,
+  dark: lightColors,
 }

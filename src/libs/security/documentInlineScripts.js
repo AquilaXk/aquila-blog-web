@@ -57,25 +57,28 @@ const CLIENT_RUNTIME_RECOVERY_SCRIPT = `
     if (value && typeof value.message === "string") return value.message;
     return "";
   };
-  var shouldReload = function () {
+  var readStorageItem = function (key) {
     try {
-      return sessionStorage.getItem(getStorageKey()) !== "1";
+      return window.sessionStorage.getItem(key);
     } catch (_) {
-      return true;
+      return null;
     }
   };
-  var markReloaded = function (reason) {
+  var writeStorageItem = function (key, value) {
     try {
-      var storageKey = getStorageKey();
-      sessionStorage.setItem(storageKey, "1");
-      if (typeof reason === "string" && reason.length > 0) {
-        sessionStorage.setItem(storageKey + ":reason", reason);
-      }
-    } catch (_) {}
+      window.sessionStorage.setItem(key, value);
+      return window.sessionStorage.getItem(key) === value;
+    } catch (_) {
+      return false;
+    }
   };
   var reloadOnce = function (reason) {
-    if (!shouldReload()) return;
-    markReloaded(reason);
+    var storageKey = getStorageKey();
+    if (readStorageItem(storageKey) === "1") return;
+    if (!writeStorageItem(storageKey, "1")) return;
+    if (typeof reason === "string" && reason.length > 0) {
+      writeStorageItem(storageKey + ":reason", reason);
+    }
     window.location.reload();
   };
   window.addEventListener(

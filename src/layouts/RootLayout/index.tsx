@@ -39,6 +39,9 @@ export const resolveShouldRefetchAdminProfile = ({
     initialAdminProfile == null ||
     initialAdminProfileShouldRefetch)
 
+export const isPublicBlogRoutePath = (pathname: string): boolean =>
+  pathname === "/" || pathname === "/feed" || pathname === "/about" || pathname === "/posts/[id]"
+
 const RootLayout = ({
   children,
   initialAdminProfile = null,
@@ -49,7 +52,7 @@ const RootLayout = ({
   useScheme()
   const { pathname } = useRouter()
   const isDesignAwareRoute = pathname[1] !== "_" && pathname !== "/sitemap.xml"
-  const isPublicBlogRoute = pathname === "/" || pathname === "/about" || pathname === "/posts/[id]"
+  const isPublicBlogRoute = isPublicBlogRoutePath(pathname)
   const isDedicatedEditorRoute =
     pathname === "/admin/editor" ||
     pathname === "/admin/editor/[id]" ||

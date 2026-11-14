@@ -97,6 +97,39 @@ export const semanticColors = (theme: Theme) => ({
   dotDanger: theme.colors.statusDangerText,
 })
 
+export const overlayScrim = {
+  lightbox: "rgba(15, 23, 42, 0.48)",
+  diagram: "rgba(15, 23, 36, 0.56)",
+  modal: "rgba(0, 0, 0, 0.42)",
+  sheet: "rgba(10, 12, 16, 0.42)",
+  adminDetail: "rgba(0, 0, 0, 0.36)",
+  adminPreview: "rgba(0, 0, 0, 0.32)",
+  adminStrong: "rgba(6, 10, 16, 0.76)",
+} as const
+
+export const boxShadowColor = {
+  subtleHover: "rgba(15, 23, 42, 0.06)",
+  cardSubtle: "rgba(15, 23, 42, 0.05)",
+  cardHover: "rgba(15, 23, 42, 0.1)",
+  cardFloating: "rgba(0, 0, 0, 0.14)",
+  menuMedium: "rgba(0, 0, 0, 0.16)",
+  drawer: "rgba(0, 0, 0, 0.18)",
+  modalElevated: "rgba(0, 0, 0, 0.2)",
+  popover: "rgba(0, 0, 0, 0.24)",
+  drawerStrong: "rgba(0, 0, 0, 0.28)",
+  modalStrong: "rgba(0, 0, 0, 0.34)",
+  bottomSheet: "rgba(15, 23, 42, 0.22)",
+  swatchBorder: "rgba(15, 23, 42, 0.16)",
+} as const
+
+export const tableChromeTokens = {
+  lightBackground: "rgba(255, 255, 255, 0.94)",
+  lightShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+  hoverBorder: "rgba(59, 130, 246, 0.18)",
+  hoverRing: "0 0 0 1px rgba(59, 130, 246, 0.08)",
+  lightHeaderRule: "rgba(0, 0, 0, 0.16)",
+} as const
+
 export const designTokens = {
   space,
   radius,
@@ -107,4 +140,7 @@ export const designTokens = {
   layoutBreakpoint,
   editorialLabel,
   semanticColors,
+  overlayScrim,
+  boxShadowColor,
+  tableChromeTokens,
 } as const

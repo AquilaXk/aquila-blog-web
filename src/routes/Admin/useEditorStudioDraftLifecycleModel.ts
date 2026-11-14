@@ -1,10 +1,13 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
-  type Dispatch, type MutableRefObject, type SetStateAction,
 } from "react"
 import { localDraftSourcesEqual, type LocalDraftPayload, type LocalDraftSource } from "./editorStudioMetaModel"
-import type { PostVisibility } from "./editorStudioState"
-import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
+import type {
+  NoticeTone,
+  PublishNotice,
+  PublishTarget,
+  UseEditorStudioLocalDraftLifecycleParams,
+} from "./editorStudioDraftLifecycleTypes"
 import {
   describeLocalDraftSlot, listLocalDraftCandidates, readLocalDraftCandidate,
   removeLocalDraftCandidate, resolveCurrentDocumentDraftStorageKey, resolveLocalDraftSource,
@@ -27,39 +30,6 @@ export {
   type LocalDraftAutosaveDecisionInput, type LocalDraftBaselineReadySignal,
   type LocalDraftFingerprintSnapshot,
 } from "./editorStudioDraftAutosaveDecisionModel"
-
-type StudioSetState<T> = Dispatch<SetStateAction<T>>
-type NoticeTone = "idle" | "loading" | "success" | "error"
-type PublishNotice = { tone: NoticeTone; text: string }
-type PublishTarget = "page" | "modal"
-type EditorMode = "create" | "edit"
-
-type UseEditorStudioLocalDraftLifecycleParams = {
-  editorMode: EditorMode; postId: string; postVersion: number | null; loadingKey: string
-  postTitle: string; postContent: string; getCurrentPostContent: () => string
-  postSummary: string; postSummarySource: CanonicalSummaryState["summarySource"]; summaryIntent: SummaryIntent
-  postThumbnailUrl: string; postThumbnailFocusX: number; postThumbnailFocusY: number; postThumbnailZoom: number
-  postTags: string[]; postCategory: string; postVisibility: PostVisibility
-  setEditorMode: StudioSetState<EditorMode>; setIsTempDraftMode: StudioSetState<boolean>
-  setPostId: StudioSetState<string>; setPostVersion: StudioSetState<number | null>
-  setPreviewThumbnailSourceUrl: StudioSetState<string>; setPostTitle: StudioSetState<string>
-  setPostContent: StudioSetState<string>; setPostSummary: StudioSetState<string>
-  setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
-  setSummaryIntent: StudioSetState<SummaryIntent>; setPostThumbnailUrl: StudioSetState<string>
-  setPostThumbnailFocusX: StudioSetState<number>; setPostThumbnailFocusY: StudioSetState<number>
-  setPostThumbnailZoom: StudioSetState<number>; setPostTags: StudioSetState<string[]>
-  setPostCategory: StudioSetState<string>; setPostVisibility: StudioSetState<PostVisibility>
-  setLocalDraftSavedAt: StudioSetState<string>
-  setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
-  dedupeStrings: (items: string[]) => string[]; normalizeCategoryValue: (value: string) => string
-  buildLocalDraftFingerprint: (payload: Omit<LocalDraftPayload, "savedAt" | "source" | "postVersion">) => string
-  persistLocalDraft: (payload: LocalDraftPayload) => void
-  readLocalDraft: (source: LocalDraftSource) => LocalDraftPayload | null
-  removeLocalDraft: (source: LocalDraftSource) => void
-  lastLocalDraftFingerprintRef: MutableRefObject<string>
-  lastWriteFingerprintRef: MutableRefObject<string>
-  lastWriteIdempotencyKeyRef: MutableRefObject<string>
-}
 
 export const useEditorStudioLocalDraftLifecycle = ({
   buildLocalDraftFingerprint, dedupeStrings, editorMode, lastLocalDraftFingerprintRef,

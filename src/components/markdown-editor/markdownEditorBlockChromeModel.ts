@@ -1,6 +1,6 @@
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 
-export const NOTION_COLOR_SWATCH_SPECS = [
+export const EDITOR_COLOR_SWATCH_SPECS = [
   { label: "글자 기본색", token: "default", hex: "#787774" },
   { label: "글자 파란색", token: "sky", hex: "#2383e2" },
   { label: "글자 초록색", token: "emerald", hex: "#10b981" },

@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import { extractUnfurlMetadata } from "src/libs/unfurl/extractMeta"
-import { fetchSafeUnfurlResponse, normalizeSafeUnfurlUrl } from "src/libs/unfurl/requestSafety"
+import {
+  fetchSafeUnfurlResponse,
+  MAX_UNFURL_RESPONSE_BYTES,
+  normalizeSafeUnfurlUrl,
+} from "src/libs/unfurl/requestSafety"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 import { shouldBypassAdminGuardForQa } from "src/libs/server/adminGuard"
 
@@ -94,17 +98,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const contentType = response.headers.get("content-type") || ""
-      if (!contentType.includes("text/html")) {
+      const mediaType = contentType.split(";", 1)[0].trim().toLowerCase()
+      if (mediaType !== "text/html" && mediaType !== "application/xhtml+xml") {
         const { status, body } = createError(415, "HTML 문서만 unfurl할 수 있습니다.")
         return res.status(status).json(body)
       }
 
-      const html = (await response.text()).slice(0, 250_000)
+      const html = (await response.text()).slice(0, MAX_UNFURL_RESPONSE_BYTES)
       const metadata = extractUnfurlMetadata(finalUrl.toString(), html)
       return res.status(200).json({ ok: true, data: metadata })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "링크 메타데이터를 불러오지 못했습니다."
-      const { status, body } = createError(504, message)
+    } catch {
+      const { status, body } = createError(504, "링크 메타데이터를 불러오지 못했습니다.")
       return res.status(status).json(body)
     } finally {
       clearTimeout(timeout)

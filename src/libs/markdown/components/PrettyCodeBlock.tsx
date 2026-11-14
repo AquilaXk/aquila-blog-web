@@ -41,9 +41,6 @@ const resolveCollapsedAttr = (isCollapsible: boolean, isCollapsed: boolean): "tr
   return isCollapsed ? "true" : "false"
 }
 
-const isEnglishDocumentLang = (): boolean =>
-  typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("en")
-
 const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   language,
   title,
@@ -51,7 +48,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   highlightLines,
   preElement,
 }) => {
-  const { language: siteLanguage } = useLanguage()
+  const { t } = useLanguage()
   const lineCount = useMemo(() => countRawCodeLines(rawCode), [rawCode])
   const isCollapsible = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
   const [uiMask, setUiMask] = useState(() => packCodeBlockUiState(isCollapsible, "idle"))
@@ -60,7 +57,6 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
   const copyFailed = (uiMask & CODE_COPY_FAILED_BIT) !== 0
   const copyStatusBits = uiMask & (CODE_COPIED_BIT | CODE_COPY_FAILED_BIT)
   const label = title?.trim() || toLanguageLabel(language)
-  const isEnglish = siteLanguage === "en" || isEnglishDocumentLang()
 
   useEffect(() => {
     const shouldCollapse = lineCount > COLLAPSIBLE_CODE_LINE_THRESHOLD
@@ -101,21 +97,11 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           className={`aq-code-copy${copied ? " is-copied" : ""}${copyFailed ? " is-failed" : ""}`}
           onClick={handleCopy}
           aria-label={
-            copied
-              ? isEnglish ? "Code copied" : "코드가 복사되었습니다"
-              : copyFailed
-                ? isEnglish ? "Failed to copy code" : "코드 복사에 실패했습니다"
-                : isEnglish ? "Copy code" : "코드 복사"
+            copied ? t("codeCopiedAria") : copyFailed ? t("codeCopyFailedAria") : t("codeCopyAria")
           }
-          title={
-            copied
-              ? isEnglish ? "Copied" : "복사됨"
-              : copyFailed
-                ? isEnglish ? "Copy failed" : "복사 실패"
-                : isEnglish ? "Copy" : "복사"
-          }
+          title={copied ? t("codeCopied") : copyFailed ? t("codeCopyFailed") : t("codeCopy")}
         >
-          {copied ? "COPIED" : copyFailed ? "COPY FAILED" : "COPY"}
+          {copied ? t("codeCopiedButton") : copyFailed ? t("codeCopyFailedButton") : t("codeCopyButton")}
         </button>
       </div>
       <div className="aq-code-body">
@@ -128,13 +114,7 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
           aria-expanded={!isCollapsed}
           onClick={() => setUiMask((prev) => prev ^ CODE_COLLAPSED_BIT)}
         >
-          {isCollapsed
-            ? isEnglish
-              ? `Expand full code (${lineCount} lines)`
-              : `전체 코드 펼치기 (${lineCount}줄)`
-            : isEnglish
-              ? "Collapse code"
-              : "코드 접기"}
+          {isCollapsed ? `${t("codeExpandPrefix")} (${lineCount}${t("codeLinesUnit")})` : t("codeCollapse")}
         </button>
       ) : null}
     </div>

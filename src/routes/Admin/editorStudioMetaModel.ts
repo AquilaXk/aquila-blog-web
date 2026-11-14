@@ -1,9 +1,7 @@
 import { getApiBaseUrl } from "src/apis/backend/client"
 import { normalizeMetaItems } from "src/apis/backend/posts/PostApiMappers"
-import {
-  hasNonCanonicalPostImageSource,
-  isCanonicalPostImageUploadUrl,
-} from "src/libs/markdown/postImageUrlPolicy"
+import { hasNonCanonicalPostImageSource } from "src/libs/markdown/postImageMarkdownPolicy"
+import { isCanonicalPostImageUploadUrl } from "src/libs/markdown/postImageUrlPolicy"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {

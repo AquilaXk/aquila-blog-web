@@ -12,8 +12,8 @@ import {
   editorModeField,
   pointerSelectingField,
 } from "../../src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
-import { activeEmptyLineField } from "../../src/components/markdown-editor/markdownEditorNotionModel"
-import { notionContainerBlockField } from "../../src/components/markdown-editor/markdownEditorNotionWidgets"
+import { activeEmptyLineField } from "../../src/components/markdown-editor/markdownEditorBlockModel"
+import { blockContainerBlockField } from "../../src/components/markdown-editor/markdownEditorBlockWidgets"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
@@ -48,7 +48,7 @@ const createDecorationEditorState = (
       editorModeField.init(() => mode),
       disableMermaidField.init(() => false),
       decorationField,
-      notionContainerBlockField,
+      blockContainerBlockField,
       activeEmptyLineField,
       EditorState.readOnly.of(mode === "reading"),
       EditorView.editable.of(mode !== "reading"),

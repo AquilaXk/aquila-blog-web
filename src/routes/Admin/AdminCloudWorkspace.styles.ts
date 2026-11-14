@@ -3,7 +3,9 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminAppBackground as appBackground,
   adminBorder as border,
+  adminCloudSelectionAccent,
   adminGold as accentGold,
+  adminGoldTintFocus,
   adminSurface as surface,
   adminSurfaceAccent as surfaceAccent,
   adminSurfaceMuted as surfaceMuted,
@@ -117,7 +119,7 @@ export const SearchInput = styled.input`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 
   @media (max-width: 768px), (pointer: coarse) {
@@ -173,7 +175,7 @@ export const UploadZone = styled.button`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(9, 105, 218, 0.2));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 
   @media (max-width: 768px), (pointer: coarse) {
@@ -290,7 +292,7 @@ export const FileTable = styled.table`
   }
 
   tbody tr[data-selected="true"] td:first-of-type {
-    border-left-color: #58a6ff;
+    border-left-color: ${adminCloudSelectionAccent};
   }
 
   td:nth-of-type(1) {

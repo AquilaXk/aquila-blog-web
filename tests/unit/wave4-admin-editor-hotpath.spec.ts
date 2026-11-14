@@ -22,10 +22,10 @@ import {
 import { EditorState } from "@codemirror/state"
 import {
   buildLogicalLines,
-  getCachedNotionLineMeta,
+  getCachedBlockLineMeta,
   planToggleBlockLinePrefix,
   resolveSelectedLines,
-} from "../../src/components/markdown-editor/markdownEditorNotionModel"
+} from "../../src/components/markdown-editor/markdownEditorBlockModel"
 import {
   matchListMarkerLine,
   planToggleListCommand,
@@ -80,7 +80,7 @@ test.describe("Wave-4 Track B hot-path and responsive deslop invariants", () => 
     ).toContain("mermaid")
   })
 
-  test("single-pass buildLogicalLines, resolveSelectedLines, and getCachedNotionLineMeta preserve fence and line parity", () => {
+  test("single-pass buildLogicalLines, resolveSelectedLines, and getCachedBlockLineMeta preserve fence and line parity", () => {
     const doc = [
       "# Title",
       "Paragraph line",
@@ -121,12 +121,12 @@ test.describe("Wave-4 Track B hot-path and responsive deslop invariants", () => 
     expect(trailingEmptySelection?.[0]?.start).toBe(doc.length)
 
     const cmDoc = EditorState.create({ doc }).doc
-    const meta = getCachedNotionLineMeta(cmDoc)
+    const meta = getCachedBlockLineMeta(cmDoc)
     expect(meta.checkedTaskLineStarts).toEqual([lines[5]!.start])
     expect(meta.fencedRanges).toEqual([
       { from: lines[2]!.start, to: lines[4]!.end + 1 },
     ])
-    expect(getCachedNotionLineMeta(cmDoc)).toBe(meta)
+    expect(getCachedBlockLineMeta(cmDoc)).toBe(meta)
 
     const toggled = planToggleBlockLinePrefix(doc, 0, 3, "## ")
     expect(toggled?.replacement).toBe("## Title")
@@ -327,13 +327,13 @@ test.describe("Wave-4 Track B hot-path and responsive deslop invariants", () => 
     expect(slashMenu).toContain("max-width: calc(100vw - 24px);")
     expect(slashMenu).toContain("@media (pointer: coarse)")
 
-    const notionChrome = readRepoFile(
-      "src/components/markdown-editor/MarkdownEditorNotionChrome.tsx",
+    const blockChrome = readRepoFile(
+      "src/components/markdown-editor/MarkdownEditorBlockChrome.tsx",
     )
-    expect(notionChrome).not.toContain("outline: none !important")
-    expect(notionChrome).toContain("box-shadow: none;")
-    expect(notionChrome).toContain("@media (pointer: coarse)")
-    expect(notionChrome).not.toContain("min-height: 36px;")
+    expect(blockChrome).not.toContain("outline: none !important")
+    expect(blockChrome).toContain("box-shadow: none;")
+    expect(blockChrome).toContain("@media (pointer: coarse)")
+    expect(blockChrome).not.toContain("min-height: 36px;")
 
     const liveSurfaceCommands = readRepoFile(
       "src/components/markdown-editor/markdownEditorLiveSurfaceCommands.ts",

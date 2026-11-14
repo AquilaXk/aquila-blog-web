@@ -1,4 +1,6 @@
 import styled from "@emotion/styled";
+import { boxShadowColor } from "src/design-system/tokens";
+import { adminTagChipPalettes } from "./adminColorTokens";
 export const EditorStudioRoot = styled.main `
   box-sizing: border-box;
   width: 100%;
@@ -354,37 +356,23 @@ export const SelectedTagChip = styled.span`
   max-width: 100%;
   min-height: 26px;
   border-radius: 5px;
-  border: 1px solid rgba(35, 131, 226, 0.25);
-  background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(35, 131, 226, 0.18)" : "#e9f3f7")};
-  color: ${({ theme }) => (theme.scheme === "dark" ? "#93c5fd" : "#14569b")};
+  border: 1px solid ${adminTagChipPalettes[0].border};
+  background: ${adminTagChipPalettes[0].bg};
+  color: ${adminTagChipPalettes[0].color};
   overflow: hidden;
   transition: border-color 0.18s ease, background 0.18s ease;
 
-  &:nth-of-type(6n + 2) {
-    border-color: rgba(144, 101, 176, 0.25);
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(144, 101, 176, 0.2)" : "#f6f3f9")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#d8b4fe" : "#5b3678")};
-  }
-  &:nth-of-type(6n + 3) {
-    border-color: rgba(16, 185, 129, 0.25);
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(16, 185, 129, 0.18)" : "#edf3ec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#6ee7b7" : "#255c3e")};
-  }
-  &:nth-of-type(6n + 4) {
-    border-color: rgba(245, 158, 11, 0.28);
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(245, 158, 11, 0.18)" : "#fbf3db")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fcd34d" : "#78490a")};
-  }
-  &:nth-of-type(6n + 5) {
-    border-color: rgba(235, 87, 87, 0.25);
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(235, 87, 87, 0.18)" : "#fdebec")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#fca5a5" : "#9c2520")};
-  }
-  &:nth-of-type(6n + 6) {
-    border-color: rgba(2, 132, 199, 0.25);
-    background: ${({ theme }) => (theme.scheme === "dark" ? "rgba(2, 132, 199, 0.18)" : "#e0f2fe")};
-    color: ${({ theme }) => (theme.scheme === "dark" ? "#7dd3fc" : "#075985")};
-  }
+  ${adminTagChipPalettes
+    .slice(1)
+    .map(
+      (palette, offset) => `
+  &:nth-of-type(6n + ${offset + 2}) {
+    border-color: ${palette.border};
+    background: ${palette.bg};
+    color: ${palette.color};
+  }`
+    )
+    .join("")}
 
   .label {
     display: inline-flex;
@@ -403,7 +391,7 @@ export const SelectedTagChip = styled.span`
     min-width: 24px; padding: 0 5px; border: 0; border-left: 1px solid currentColor;
     background: transparent; color: inherit; opacity: 0.72; cursor: pointer; flex: 0 0 auto;
     font-size: 0.94rem; line-height: 1; transition: opacity 0.15s ease, background 0.15s ease;
-    &:hover { opacity: 1; background: rgba(15, 23, 42, 0.06); }
+    &:hover { opacity: 1; background: ${boxShadowColor.subtleHover}; }
     &:focus-visible { opacity: 1; outline: 2px solid currentColor; outline-offset: -2px; }
     @media (max-width: 768px), (pointer: coarse) { min-width: 44px; min-height: 44px; }
   }

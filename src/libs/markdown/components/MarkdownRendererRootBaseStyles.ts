@@ -1,4 +1,5 @@
 import { css, type Theme } from "@emotion/react"
+import { boxShadowColor } from "src/design-system/tokens"
 
 export const markdownRendererRootBaseStyles = (theme: Theme) => css`
   h1,
@@ -169,7 +170,7 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     font-weight: 450;
     line-height: 1.5;
     white-space: normal;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+    box-shadow: 0 2px 8px ${boxShadowColor.cardHover};
     pointer-events: none;
     opacity: 0;
     visibility: hidden;

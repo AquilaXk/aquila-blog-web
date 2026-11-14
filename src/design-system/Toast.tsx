@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { type ReactNode } from "react"
+import { useLanguage } from "src/libs/language"
 import { focusVisibleRing } from "./focusRing"
 import { fixedBottomSafeArea, fixedHorizontalSafeArea } from "./safeArea"
 import { editorialLabel, layoutBreakpoint, radius, semanticColors, space } from "./tokens"
@@ -25,6 +26,7 @@ export const Toast = ({
   actions,
   zIndex = 40,
 }: ToastProps) => {
+  const { t } = useLanguage()
   if (!open) return null
 
   const showActions = Boolean(actions) || Boolean(onOpenChange)
@@ -50,7 +52,7 @@ export const Toast = ({
           {actions}
           {onOpenChange ? (
             <DismissButton type="button" onClick={() => onOpenChange(false)}>
-              닫기
+              {t("toastDismiss")}
             </DismissButton>
           ) : null}
         </div>

@@ -1,6 +1,7 @@
 import type { Theme } from "@emotion/react"
 import styled from "@emotion/styled"
 import { useRef, type ReactNode } from "react"
+import { useLanguage } from "src/libs/language"
 import { zIndexes } from "src/styles/zIndexes"
 import { focusVisibleRing } from "./focusRing"
 import { modalSafeAreaPadding } from "./safeArea"
@@ -29,20 +30,23 @@ export const ConfirmDialog = ({
   title,
   description,
   confirmLabel,
-  cancelLabel = "취소",
+  cancelLabel,
   confirmTone = "danger",
   actionRowBackground,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) => {
+  const { t } = useLanguage()
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const resolvedCancelLabel = cancelLabel ?? t("dialogCancel")
 
   const { handleKeyDown } = useModalFocusTrap({
     open,
     onClose: onCancel,
     containerRef: dialogRef,
     initialFocusRef: cancelButtonRef,
+    lockScroll: true,
   })
 
   if (!open) return null
@@ -62,7 +66,7 @@ export const ConfirmDialog = ({
         <Description id={descriptionId}>{description}</Description>
         <ActionRow $actionRowBackground={actionRowBackground}>
           <GhostButton ref={cancelButtonRef} type="button" onClick={onCancel}>
-            {cancelLabel}
+            {resolvedCancelLabel}
           </GhostButton>
           <ConfirmButton type="button" data-tone={confirmTone} onClick={onConfirm}>
             {confirmLabel}

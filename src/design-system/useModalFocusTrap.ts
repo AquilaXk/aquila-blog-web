@@ -5,6 +5,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
 } from "react"
+import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -38,6 +39,44 @@ type UseModalFocusTrapOptions = {
   initialFocusRef?: RefObject<HTMLElement | null>
   returnFocusRef?: RefObject<HTMLElement | null>
   paused?: boolean
+  lockScroll?: boolean
+}
+
+const trapTabNavigation = (
+  event: Pick<KeyboardEvent, "shiftKey" | "preventDefault">,
+  container: HTMLElement | null
+) => {
+  if (!container) return
+  const focusableElements = getFocusableElements(container)
+  if (focusableElements.length === 0) {
+    event.preventDefault()
+    return
+  }
+
+  const firstElement = focusableElements[0]
+  const lastElement = focusableElements[focusableElements.length - 1]
+  const activeElement = document.activeElement as HTMLElement | null
+
+  if (activeElement === container || !activeElement || !container.contains(activeElement)) {
+    event.preventDefault()
+    if (event.shiftKey) {
+      lastElement.focus()
+    } else {
+      firstElement.focus()
+    }
+    return
+  }
+
+  if (event.shiftKey && activeElement === firstElement) {
+    event.preventDefault()
+    lastElement.focus()
+    return
+  }
+
+  if (!event.shiftKey && activeElement === lastElement) {
+    event.preventDefault()
+    firstElement.focus()
+  }
 }
 
 export const useModalFocusTrap = ({
@@ -47,12 +86,18 @@ export const useModalFocusTrap = ({
   initialFocusRef,
   returnFocusRef,
   paused = false,
+  lockScroll = false,
 }: UseModalFocusTrapOptions) => {
   const triggerRef = useRef<HTMLElement | null>(null)
   const pausedRef = useRef(paused)
   const trapActive = open && !paused
 
   pausedRef.current = paused
+
+  useEffect(() => {
+    if (!open || !lockScroll) return
+    return acquireBodyScrollLock()
+  }, [open, lockScroll])
 
   useEffect(() => {
     if (!open) return
@@ -86,54 +131,26 @@ export const useModalFocusTrap = ({
   useEffect(() => {
     if (!trapActive) return
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return
-      event.preventDefault()
-      onClose()
+    const handleCaptureKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+        return
+      }
+      if (event.key === "Tab") {
+        trapTabNavigation(event, containerRef.current)
+      }
     }
 
-    window.addEventListener("keydown", handleEscape)
-    return () => window.removeEventListener("keydown", handleEscape)
-  }, [trapActive, onClose])
+    document.addEventListener("keydown", handleCaptureKeyDown, true)
+    return () => document.removeEventListener("keydown", handleCaptureKeyDown, true)
+  }, [trapActive, onClose, containerRef])
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      if (!trapActive || event.key !== "Tab") return
-
-      const container = containerRef.current
-      if (!container) return
-
-      const focusableElements = getFocusableElements(container)
-
-      if (focusableElements.length === 0) {
-        event.preventDefault()
-        return
-      }
-
-      const firstElement = focusableElements[0]
-      const lastElement = focusableElements[focusableElements.length - 1]
-      const activeElement = document.activeElement as HTMLElement | null
-
-      if (activeElement === container || !activeElement || !container.contains(activeElement)) {
-        event.preventDefault()
-        if (event.shiftKey) {
-          lastElement.focus()
-        } else {
-          firstElement.focus()
-        }
-        return
-      }
-
-      if (event.shiftKey && activeElement === firstElement) {
-        event.preventDefault()
-        lastElement.focus()
-        return
-      }
-
-      if (!event.shiftKey && activeElement === lastElement) {
-        event.preventDefault()
-        firstElement.focus()
-      }
+      if (!trapActive || event.defaultPrevented || event.key !== "Tab") return
+      trapTabNavigation(event, containerRef.current)
     },
     [containerRef, trapActive]
   )

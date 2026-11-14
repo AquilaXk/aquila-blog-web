@@ -67,3 +67,18 @@ export async function readServerSnapshot<T>(
     inflightLoads.delete(key)
   }
 }
+
+export function invalidateServerSnapshotCache(keyPrefix?: string): void {
+  if (!keyPrefix) {
+    snapshotCache.clear()
+    inflightLoads.clear()
+    return
+  }
+
+  for (const key of snapshotCache.keys()) {
+    if (key.startsWith(keyPrefix)) snapshotCache.delete(key)
+  }
+  for (const key of inflightLoads.keys()) {
+    if (key.startsWith(keyPrefix)) inflightLoads.delete(key)
+  }
+}

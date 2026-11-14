@@ -377,6 +377,11 @@ const PostDetail: React.FC = () => {
     registry.addResizeObserver(resizeTargets, () => {
       remeasureScheduler.schedule()
     })
+    const handleDetailsToggle = () => {
+      remeasureScheduler.schedule()
+    }
+    article.addEventListener("toggle", handleDetailsToggle, true)
+    registry.add(() => article.removeEventListener("toggle", handleDetailsToggle, true))
 
     const fontSet = document.fonts
     if (fontSet) {

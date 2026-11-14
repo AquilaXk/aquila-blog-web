@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import path from "node:path"
 import { pathToFileURL } from "node:url"
 
 const DEFAULT_BASE_REFS = ["origin/main", "main"]
-const TARGET_PATHS = [
+export const TARGET_PATHS = [
   "src/design-system",
   "src/routes/Company",
   "src/routes/EasySubway",
@@ -13,7 +15,11 @@ const TARGET_PATHS = [
   "src/components/markdown-editor",
   "src/libs/markdown",
   "src/layouts/RootLayout",
+  "src/pages",
+  "packages",
 ]
+export const DIRECT_COLOR_EXTENSION_PATTERN = /\.(ts|tsx|mts|cts|js|mjs|css)$/
+const IGNORED_SCAN_DIRS = new Set(["node_modules", "dist", "build", ".next", "__generated__"])
 
 /**
  * 색 리터럴을 정의해도 되는 유일한 파일들. 게이트의 목적은 "hex 금지"가 아니라 "색 정의 지점을
@@ -25,10 +31,24 @@ const TARGET_PATHS = [
  * 일치만 보면 커밋된 diff에서 예외가 조용히 풀린다.
  */
 const COLOR_SOURCE_ALLOWLIST = [
+  // Marketing landing page gradient and brand palette
   "src/design-system/marketingPalette.ts",
+  // Canonical design tokens (shadows, scrims, table chrome, semantic surface tokens)
   "src/design-system/tokens.ts",
+  // Root Radix light-only color scale definitions
   "src/styles/colors.ts",
+  // Admin CSS variable palette and admin tag chip palettes
   "src/routes/Admin/adminColorTokens.ts",
+  // Supported user markdown {{color:...}} named color map
+  "src/libs/markdown/inlineColor.ts",
+  // Dark-surface fenced code block and syntax-highlighting token theme
+  "src/libs/markdown/components/MarkdownRendererRootCodeStyles.ts",
+  // Mermaid SVG diagram library theme configurations
+  "src/libs/markdown/mermaidRuntimeConfig.ts",
+  // Editor block menu inline color picker swatch options
+  "src/components/markdown-editor/markdownEditorBlockChromeModel.ts",
+  // CodeMirror 6 live surface callout and syntax palette tokens
+  "src/components/markdown-editor/markdownEditorSyntaxThemeTokens.ts",
 ]
 
 export const isColorSourceFile = (file) =>
@@ -39,6 +59,14 @@ const DIRECT_COLOR_PATTERN =
 const FUNCTION_COLOR_START_PATTERN = /(?:^|[^A-Za-z0-9_-])(?:rgba?|hsla?)\(/
 const FRAGMENT_REFERENCE_PATTERN =
   /(?:href\s*=\s*(?:["']#[A-Za-z][\w:-]*["']|\{\s*["']#[A-Za-z][\w:-]*["']\s*\})|url\(\s*["']?#[A-Za-z][\w:-]*["']?\s*\))/g
+
+export const isDirectColorViolationLine = (sourceLine) => {
+  const colorSourceLine = sourceLine.replace(FRAGMENT_REFERENCE_PATTERN, "")
+  return (
+    DIRECT_COLOR_PATTERN.test(colorSourceLine) ||
+    FUNCTION_COLOR_START_PATTERN.test(colorSourceLine)
+  )
+}
 
 const runGit = (args, options = {}) =>
   execFileSync("git", args, {
@@ -118,12 +146,7 @@ export const findDirectColorViolations = (diffText) => {
     }
 
     const sourceLine = line.slice(1)
-    const colorSourceLine = sourceLine.replace(FRAGMENT_REFERENCE_PATTERN, "")
-    if (
-      !isColorSourceFile(currentFile) &&
-      (DIRECT_COLOR_PATTERN.test(colorSourceLine) ||
-        FUNCTION_COLOR_START_PATTERN.test(colorSourceLine))
-    ) {
+    if (!isColorSourceFile(currentFile) && isDirectColorViolationLine(sourceLine)) {
       violations.push({
         file: currentFile,
         line: addedLineNumber,
@@ -143,6 +166,73 @@ const formatViolations = (violations) =>
     .join("\n")
 
 export const committedDiffRange = (baseRef) => `${baseRef}..HEAD`
+
+export const findDirectColorViolationsInSource = (filePath, sourceText) => {
+  const normalizedPath = filePath.split(path.sep).join("/")
+  if (isColorSourceFile(normalizedPath)) return []
+  const violations = []
+  const lines = sourceText.split(/\r?\n/)
+  for (let index = 0; index < lines.length; index += 1) {
+    const sourceLine = lines[index]
+    if (isDirectColorViolationLine(sourceLine)) {
+      violations.push({
+        file: normalizedPath,
+        line: index + 1,
+        source: sourceLine.trim(),
+      })
+    }
+  }
+  return violations
+}
+
+const walkTargetFiles = (rootDir, relativeDir, out = []) => {
+  const absoluteDir = path.join(rootDir, relativeDir)
+  if (!existsSync(absoluteDir)) return out
+  for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
+    const relativePath = path.join(relativeDir, entry.name).split(path.sep).join("/")
+    if (entry.isDirectory()) {
+      if (IGNORED_SCAN_DIRS.has(entry.name)) continue
+      walkTargetFiles(rootDir, relativePath, out)
+      continue
+    }
+    if (
+      entry.isFile() &&
+      DIRECT_COLOR_EXTENSION_PATTERN.test(entry.name) &&
+      !entry.name.endsWith(".d.ts")
+    ) {
+      out.push(relativePath)
+    }
+  }
+  return out
+}
+
+export const collectFullScanViolations = (
+  rootDir = process.cwd(),
+  targetPaths = TARGET_PATHS
+) => {
+  const violations = []
+  for (const targetRoot of targetPaths) {
+    for (const relativePath of walkTargetFiles(rootDir, targetRoot)) {
+      const sourceText = readFileSync(path.join(rootDir, relativePath), "utf8")
+      violations.push(...findDirectColorViolationsInSource(relativePath, sourceText))
+    }
+  }
+  return violations
+}
+
+export const shouldUseFullScan = ({ diffText, headSha, baseSha, scanMode }) => {
+  if (scanMode === "full") return true
+  if (diffText.trim().length > 0) return false
+  return Boolean(headSha && baseSha && headSha === baseSha)
+}
+
+const resolveGitShaSafe = (rev) => {
+  try {
+    return runGit(["rev-parse", rev], { silent: true }).trim()
+  } catch {
+    return ""
+  }
+}
 
 export const collectDiffText = () => {
   if (!isInsideGitWorkTree()) {
@@ -164,17 +254,40 @@ export const collectDiffText = () => {
 }
 
 export const main = () => {
-  const violations = findDirectColorViolations(collectDiffText())
+  const scanMode = process.env.DESIGN_COLOR_SCAN_MODE?.trim().toLowerCase() || ""
+  const diffText = collectDiffText()
+  let useFullScan = scanMode === "full"
+  if (!useFullScan && isInsideGitWorkTree() && diffText.trim().length === 0) {
+    try {
+      const baseRef = resolveBaseRef()
+      useFullScan = shouldUseFullScan({
+        diffText,
+        headSha: resolveGitShaSafe("HEAD"),
+        baseSha: resolveGitShaSafe(baseRef),
+        scanMode,
+      })
+    } catch {
+      useFullScan = false
+    }
+  }
+
+  const violations = useFullScan
+    ? collectFullScanViolations(process.cwd(), TARGET_PATHS)
+    : findDirectColorViolations(diffText)
 
   if (violations.length === 0) {
-    console.log("[design-colors] ok: no new direct hex/rgb/hsl colors in guarded UI paths")
+    console.log(
+      useFullScan
+        ? "[design-colors] ok (full scan): no direct hex/rgb/hsl colors in guarded UI paths"
+        : "[design-colors] ok: no new direct hex/rgb/hsl colors in guarded UI paths"
+    )
     return
   }
 
   console.error(
     [
-      "[design-colors] New direct color literals are not allowed in guarded UI paths.",
-      "Use front/src/design-system semantic tokens or the existing Emotion theme instead.",
+      "[design-colors] Direct color literals are not allowed in guarded UI paths.",
+      "Use src/design-system semantic tokens or canonical token modules instead.",
       formatViolations(violations),
     ].join("\n")
   )

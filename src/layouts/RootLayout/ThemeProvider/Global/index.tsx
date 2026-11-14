@@ -99,7 +99,7 @@ export const Global = () => {
 
         ::selection {
           background: ${theme.colors.blue7};
-          color: #fff;
+          color: ${theme.colors.accentControlText};
         }
 
         * {

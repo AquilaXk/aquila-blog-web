@@ -2,21 +2,36 @@ import { syntaxTree } from "@codemirror/language"
 import { EditorState, StateEffect, StateField, type Range, type StateEffectType } from "@codemirror/state"
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
+  buildActiveWatchRanges,
+  resolveTaskPrefixRange,
+  walkSyntaxTreeForDocBlocks,
+  type DocBlockCollector,
+  type ImageReplacementSpec,
+  type MermaidReplacementSpec,
+  type RangeSpec,
+  type TableReplacementSpec,
+} from "./markdownEditorLiveBlockCollector"
+import {
+  collectUniqueSortedIndicesForRegions,
+  computeDirtyRegionsForTransaction,
+  haveSameActiveWatchHitsIndexed,
+  isRangeCoveredBySortedRegions,
+  type DecorationRangeSpec,
+} from "./markdownEditorLiveDecorationRegions"
+import {
   getMarkdownLivePreviewBundle, isTokenActive, resolveMarkdownLivePreviewPlanFromEntries,
   type MarkdownEditorSurfaceMode, type MarkdownLivePreviewDecoration,
-  type MarkdownLivePreviewPlanEntry, type MarkdownSyntaxNode,
+  type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
 import {
-  filterDisjointPreorderItems, filterItemsOutsideSortedRanges, isLivePlanSpecBlockedByReplacedRanges,
-  isNodeShadowedByMath, resolveBlockNodeEndWithMath, type MathReplacementSpec,
+  filterDisjointPreorderItems, filterItemsOutsideSortedRanges, hasNewlineBetween, isLivePlanSpecBlockedByReplacedRanges,
+  type MathReplacementSpec,
 } from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
-import { parseStandaloneMarkdownImageLine } from "../../libs/markdown/renderingImageModel"
-import { parseLeadingTableLayoutLine } from "./markdownEditorTableMetadataModel"
 import {
   MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
   MarkdownMermaidWidget, MarkdownRuleWidget, MarkdownTableWidget, MarkdownTaskWidget, MarkdownWikilinkWidget,
-  parseCalloutBlockquoteSpec, type CalloutReplacementSpec,
+  type CalloutReplacementSpec,
 } from "./markdownEditorWidgets"
 export { parseCalloutBlockquoteSpec } from "./markdownEditorWidgets"
 
@@ -72,16 +87,13 @@ const MARK_DECORATION_BY_KIND: Partial<Record<MarkdownLivePreviewDecoration["kin
     Object.entries(markClassByKind).map(([kind, className]) => [kind, Decoration.mark({ class: className! })])
   )
 
-type RangeSpec = { from: number; to: number }
-type TableReplacementSpec = RangeSpec & { markdown: string }
-type ImageReplacementSpec = RangeSpec & { alt: string; src: string; title?: string; widthPx?: number; align?: string }
-type MermaidReplacementSpec = RangeSpec & { source: string }
-
-let cachedDocStringEntry: { doc: EditorState["doc"]; text: string } | null = null
+const docStringCacheByDoc = new WeakMap<EditorState["doc"], string>()
 export const getDocString = (doc: EditorState["doc"]): string => {
-  if (cachedDocStringEntry && cachedDocStringEntry.doc === doc) return cachedDocStringEntry.text
-  const text = doc.toString()
-  cachedDocStringEntry = { doc, text }
+  let text = docStringCacheByDoc.get(doc)
+  if (text === undefined) {
+    text = doc.toString()
+    docStringCacheByDoc.set(doc, text)
+  }
   return text
 }
 
@@ -118,162 +130,36 @@ export const computeMinimalDocChange = (current: string, next: string) => {
   return { from, to: currentEnd, insert: next.slice(from, nextEnd) }
 }
 
-let cachedDocBlocksEntry: {
-  doc: EditorState["doc"]; tree: ReturnType<typeof syntaxTree>; markdownValue: string
-  previewEntries: readonly MarkdownLivePreviewPlanEntry[]; tables: TableReplacementSpec[]
-  callouts: CalloutReplacementSpec[]; images: ImageReplacementSpec[]
-  maths: MathReplacementSpec[]; mermaids: MermaidReplacementSpec[]; activeWatchRanges: RangeSpec[]
-} | null = null
-
-const resolveImageNodeEnd = (markdownValue: string, nodeTo: number): number => {
-  const attrMatch = /^[ \t]*\{[^}\r\n]*\}/.exec(markdownValue.slice(nodeTo, nodeTo + 160))
-  return attrMatch ? nodeTo + attrMatch[0].length : nodeTo
-}
-
-const parseImageReplacementSpec = (raw: string, from: number, to: number): ImageReplacementSpec | null => {
-  if (!raw.includes("\n") && !raw.includes("\r")) {
-    const parsed = parseStandaloneMarkdownImageLine(raw)
-    if (parsed) {
-      return { from, to, alt: parsed.alt, src: parsed.src, title: parsed.title, widthPx: parsed.widthPx, align: parsed.align }
-    }
-  }
-  const match = /^!\[([^\][\r\n]*)\]\(([^()\r\n]*)\)$/.exec(raw)
-  return match ? { from, to, alt: match[1] ?? "", src: match[2] ?? "" } : null
-}
-
-const parseMermaidReplacementSpec = (raw: string, from: number, to: number): MermaidReplacementSpec | null => {
-  const firstBreak = raw.indexOf("\n")
-  if (firstBreak === -1) return null
-  const lastBreak = raw.lastIndexOf("\n")
-  const firstLine = raw.slice(0, firstBreak).replace(/\r$/, "")
-  const closeLine = raw.slice(lastBreak + 1).replace(/\r$/, "")
-  const openMatch = /^( {0,3})(`{3,}|~{3,})\s*mermaid\b/i.exec(firstLine)
-  if (!openMatch || !/^( {0,3})(`{3,}|~{3,})\s*$/.test(closeLine)) return null
-  const bodyEnd = lastBreak > 0 && raw.codePointAt(lastBreak - 1) === 13 ? lastBreak - 1 : lastBreak
-  const source = firstBreak >= lastBreak ? "" : raw.slice(firstBreak + 1, bodyEnd).replaceAll("\r\n", "\n")
-  return { from, to, source }
-}
-
-const ACTIVE_WIDGET_KINDS = new Set<MarkdownLivePreviewDecoration["kind"]>([
-  "task", "wikilink", "list-marker", "quote-mark", "fenced-code",
-])
-
-const resolveTaskPrefixRange = (markdownValue: string, from: number, to: number) => {
-  const markerMatch = /^\[[ xX]\]/.exec(markdownValue.slice(from, to))
-  const markerTo = from + (markerMatch ? markerMatch[0].length : Math.min(3, to - from))
-  let prefixFrom = from
-  while (prefixFrom > 0 && /[ \t]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
-  if (prefixFrom > 0 && /[-+*]/.test(markdownValue[prefixFrom - 1] ?? "")) prefixFrom -= 1
-  return { from: prefixFrom, to: markerTo, markerTo }
-}
-
-const collectEntryWatchRanges = (
-  markdownValue: string,
-  entry: MarkdownLivePreviewPlanEntry,
-  raw: RangeSpec[]
-): void => {
-  if (entry.hideWhenActiveRange) raw.push({ ...entry.hideWhenActiveRange })
-  if (entry.secondaryHideWhenActiveRange) raw.push({ ...entry.secondaryHideWhenActiveRange })
-  if (entry.kind === "task") {
-    const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
-    raw.push({ from: taskPrefix.from, to: taskPrefix.to })
-  } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
-    raw.push({ from: entry.from, to: entry.to })
-  }
-}
-
-const dedupeSortedRanges = (sorted: readonly RangeSpec[]): RangeSpec[] => {
-  const deduped: RangeSpec[] = []
-  for (const r of sorted) {
-    const prev = deduped.at(-1)
-    if (!prev || prev.from !== r.from || prev.to !== r.to) deduped.push(r)
-  }
-  return deduped
-}
-
-const buildActiveWatchRanges = (
-  markdownValue: string,
-  previewEntries: readonly MarkdownLivePreviewPlanEntry[],
+type CachedDocBlocksEntry = {
+  tree: ReturnType<typeof syntaxTree>
+  markdownValue: string
+  previewEntries: readonly MarkdownLivePreviewPlanEntry[]
+  tables: TableReplacementSpec[]
+  callouts: CalloutReplacementSpec[]
+  images: ImageReplacementSpec[]
+  maths: MathReplacementSpec[]
+  mermaids: MermaidReplacementSpec[]
   blockGroups: readonly (readonly RangeSpec[])[]
-): RangeSpec[] => {
-  const raw: RangeSpec[] = []
-  for (const entry of previewEntries) collectEntryWatchRanges(markdownValue, entry, raw)
-  for (const group of blockGroups) {
-    for (const item of group) raw.push({ from: item.from, to: item.to })
-  }
-  raw.sort((a, b) => a.from - b.from || a.to - b.to)
-  return dedupeSortedRanges(raw)
+  activeWatchRanges: RangeSpec[]
 }
+
+const docBlocksCacheByDoc = new WeakMap<EditorState["doc"], CachedDocBlocksEntry>()
 
 export const haveSameActiveWatchHits = (
   activeWatchRanges: readonly RangeSpec[],
   prevSelections: readonly RangeSpec[],
   nextSelections: readonly RangeSpec[]
-): boolean => {
-  for (let i = 0; i < activeWatchRanges.length; i += 1) {
-    const range = activeWatchRanges[i]!
-    if (isTokenActive(range.from, range.to, prevSelections) !== isTokenActive(range.from, range.to, nextSelections)) {
-      return false
-    }
-  }
-  return true
+): boolean => haveSameActiveWatchHitsIndexed(activeWatchRanges, prevSelections, nextSelections)
+
+const getCachedDocBlocksIfReady = (state: EditorState): CachedDocBlocksEntry | null => {
+  const cached = docBlocksCacheByDoc.get(state.doc)
+  return cached && cached.tree === syntaxTree(state) ? cached : null
 }
 
-const pushIfPresent = <T>(list: T[], item: T | null) => {
-  if (item) list.push(item)
-}
-
-const collectTableBlockSpec = (
-  state: EditorState,
-  markdownValue: string,
-  nodeFrom: number,
-  nodeTo: number
-): TableReplacementSpec | null => {
-  let tableFrom = nodeFrom
-  const headerLine = state.doc.lineAt(nodeFrom)
-  if (headerLine.number > 1) {
-    const prevLine = state.doc.line(headerLine.number - 1)
-    const parsedComment = parseLeadingTableLayoutLine(prevLine.text)
-    if (parsedComment.kind === "malformed") return null
-    if (parsedComment.kind === "valid") tableFrom = prevLine.from
-  }
-  return { from: tableFrom, to: nodeTo, markdown: markdownValue.slice(tableFrom, nodeTo) }
-}
-
-type DocBlockCollector = {
-  state: EditorState; markdownValue: string; hasCalloutMarker: boolean; hasMermaidMarker: boolean
-  maths: readonly MathReplacementSpec[]; tables: TableReplacementSpec[]
-  callouts: CalloutReplacementSpec[]; images: ImageReplacementSpec[]; mermaids: MermaidReplacementSpec[]
-}
-
-const walkSyntaxTreeForDocBlocks = (node: MarkdownSyntaxNode, collector: DocBlockCollector): void => {
-  if (node.name === "Table" || node.name === "Blockquote") {
-    const end = resolveBlockNodeEndWithMath(collector.markdownValue, node.name, node.from, node.to, collector.maths)
-    if (end !== null && !isNodeShadowedByMath(collector.maths, node.from, end)) {
-      if (node.name === "Table") {
-        pushIfPresent(collector.tables, collectTableBlockSpec(collector.state, collector.markdownValue, node.from, end))
-      } else if (collector.hasCalloutMarker) {
-        pushIfPresent(collector.callouts, parseCalloutBlockquoteSpec(collector.markdownValue.slice(node.from, end), node.from, end))
-      }
-    }
-  } else if (!isNodeShadowedByMath(collector.maths, node.from, node.to)) {
-    if (node.name === "Image") {
-      const replaceTo = resolveImageNodeEnd(collector.markdownValue, node.to)
-      pushIfPresent(collector.images, parseImageReplacementSpec(collector.markdownValue.slice(node.from, replaceTo), node.from, replaceTo))
-    } else if (node.name === "FencedCode" && collector.hasMermaidMarker) {
-      pushIfPresent(collector.mermaids, parseMermaidReplacementSpec(collector.markdownValue.slice(node.from, node.to), node.from, node.to))
-    }
-  }
-  for (let child = node.firstChild; child; child = child.nextSibling) {
-    walkSyntaxTreeForDocBlocks(child, collector)
-  }
-}
-
-const getCachedDocBlocks = (state: EditorState) => {
+const getCachedDocBlocks = (state: EditorState): CachedDocBlocksEntry => {
   const tree = syntaxTree(state)
-  if (cachedDocBlocksEntry && cachedDocBlocksEntry.doc === state.doc && cachedDocBlocksEntry.tree === tree) {
-    return cachedDocBlocksEntry
-  }
+  const existing = docBlocksCacheByDoc.get(state.doc)
+  if (existing && existing.tree === tree) return existing
   const markdownValue = getDocString(state.doc)
   const { entries: previewEntries, mathSpecs: maths, syntaxRoot } = getMarkdownLivePreviewBundle(markdownValue, tree.topNode)
   const collector: DocBlockCollector = {
@@ -283,9 +169,13 @@ const getCachedDocBlocks = (state: EditorState) => {
   }
   walkSyntaxTreeForDocBlocks(syntaxRoot, collector)
   const { tables, callouts, images, mermaids } = collector
-  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, [tables, callouts, images, maths, mermaids])
-  cachedDocBlocksEntry = { doc: state.doc, tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, activeWatchRanges }
-  return cachedDocBlocksEntry
+  const blockGroups = [tables, callouts, images, maths, mermaids] as const
+  const activeWatchRanges = buildActiveWatchRanges(markdownValue, previewEntries, blockGroups)
+  const entry: CachedDocBlocksEntry = {
+    tree, markdownValue, previewEntries, tables, callouts, images, maths, mermaids, blockGroups, activeWatchRanges,
+  }
+  docBlocksCacheByDoc.set(state.doc, entry)
+  return entry
 }
 
 type PlanSpecDecorationContext = {
@@ -493,21 +383,34 @@ const isPlanSpecSkipped = (
   return isLivePlanSpecBlockedByReplacedRanges(markdownValue, spec.kind, spec.from, checkTo, replacedRanges)
 }
 
-export const buildDecorations = (state: EditorState): DecorationSet => {
-  const currentMode = state.field(editorModeField, false) ?? "live"
-  if (currentMode === "source") return Decoration.none
+const pickItemsByRegions = <T extends DecorationRangeSpec>(
+  items: readonly T[],
+  targetRegions?: readonly DecorationRangeSpec[]
+): readonly T[] => {
+  if (!targetRegions) return items
+  const indices = collectUniqueSortedIndicesForRegions(items, targetRegions)
+  const picked: T[] = new Array(indices.length)
+  for (let i = 0; i < indices.length; i += 1) picked[i] = items[indices[i]!]!
+  return picked
+}
 
-  const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } = getCachedDocBlocks(state)
+const resolveDecorationsInScope = (
+  state: EditorState,
+  blocks: CachedDocBlocksEntry,
+  currentMode: MarkdownEditorSurfaceMode,
+  targetRegions?: readonly DecorationRangeSpec[]
+): Range<Decoration>[] => {
+  const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } = blocks
   const selections = currentMode === "reading" ? [] : state.selection.ranges.map(({ from, to }) => ({ from, to }))
   const compRange = resolveCompositionRange(state, currentMode)
   const disableMermaid = state.field(disableMermaidField, false) ?? false
 
   const filtered = {
-    tables: filterEligibleBlockSpecs(tables, selections, compRange),
-    callouts: filterDisjointPreorderItems(filterEligibleBlockSpecs(callouts, selections, compRange)),
-    images: filterEligibleBlockSpecs(images, selections, compRange),
-    maths: filterEligibleBlockSpecs(maths, selections, compRange),
-    mermaids: disableMermaid ? [] : filterEligibleBlockSpecs(mermaids, selections, compRange),
+    tables: filterEligibleBlockSpecs(pickItemsByRegions(tables, targetRegions), selections, compRange),
+    callouts: filterDisjointPreorderItems(filterEligibleBlockSpecs(pickItemsByRegions(callouts, targetRegions), selections, compRange)),
+    images: filterEligibleBlockSpecs(pickItemsByRegions(images, targetRegions), selections, compRange),
+    maths: filterEligibleBlockSpecs(pickItemsByRegions(maths, targetRegions), selections, compRange),
+    mermaids: disableMermaid ? [] : filterEligibleBlockSpecs(pickItemsByRegions(mermaids, targetRegions), selections, compRange),
   }
   filtered.tables = filterItemsOutsideSortedRanges(filtered.tables, filtered.callouts)
   filtered.mermaids = filterItemsOutsideSortedRanges(filtered.mermaids, filtered.callouts)
@@ -516,10 +419,11 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   const nonMathRanges = sortRanges([...outerBlockRanges, ...filtered.images])
   filtered.maths = filterItemsOutsideSortedRanges(filtered.maths, nonMathRanges)
   const replacedRanges = sortRanges([...nonMathRanges, ...filtered.maths])
-  const multiLineMaths = filtered.maths.filter((m) => markdownValue.slice(m.from, m.to).includes("\n"))
+  const multiLineMaths = filtered.maths.filter((m) => hasNewlineBetween(markdownValue, m.from, m.to))
   const blockOrMultiLineReplaced = sortRanges([...nonMathRanges, ...multiLineMaths])
 
-  const plan = resolveMarkdownLivePreviewPlanFromEntries(previewEntries, selections, false, currentMode)
+  const scopedEntries = pickItemsByRegions(previewEntries, targetRegions)
+  const plan = resolveMarkdownLivePreviewPlanFromEntries(scopedEntries, selections, false, currentMode)
   const decorations: Range<Decoration>[] = []
   const ctx: PlanSpecDecorationContext = {
     state, markdownValue, selections, decorations,
@@ -534,7 +438,17 @@ export const buildDecorations = (state: EditorState): DecorationSet => {
   }
 
   appendBlockWidgetDecorations(decorations, filtered)
-  return Decoration.set(decorations, true)
+  return decorations
+}
+
+export const buildDecorations = (
+  state: EditorState,
+  visibleRanges?: readonly DecorationRangeSpec[]
+): DecorationSet => {
+  const currentMode = state.field(editorModeField, false) ?? "live"
+  if (currentMode === "source" || (visibleRanges && visibleRanges.length === 0)) return Decoration.none
+  const blocks = getCachedDocBlocks(state)
+  return Decoration.set(resolveDecorationsInScope(state, blocks, currentMode, visibleRanges), true)
 }
 
 const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): boolean =>
@@ -558,8 +472,55 @@ const canReuseSelectionDecorations = (startState: EditorState, nextState: Editor
   )
 }
 
+const tryIncrementalDecorationUpdate = (
+  decorations: DecorationSet,
+  transaction: Parameters<Parameters<typeof StateField.define<DecorationSet>>[0]["update"]>[1],
+  treeChanged: boolean
+): DecorationSet | null => {
+  if (!transaction.docChanged && treeChanged) return null
+  const prevMode = transaction.startState.field(editorModeField, false) ?? "live"
+  const nextMode = transaction.state.field(editorModeField, false) ?? "live"
+  if (prevMode !== "live" || nextMode !== "live") return null
+  if (
+    (transaction.startState.field(compositionField, false) ?? false) ||
+    (transaction.state.field(compositionField, false) ?? false) ||
+    (transaction.startState.field(disableMermaidField, false) ?? false) !==
+      (transaction.state.field(disableMermaidField, false) ?? false)
+  ) {
+    return null
+  }
+  const prevBlocks = transaction.docChanged ? getCachedDocBlocksIfReady(transaction.startState) : null
+  if (transaction.docChanged && !prevBlocks) return null
+
+  const nextBlocks = getCachedDocBlocks(transaction.state)
+  const dirtyRegions = computeDirtyRegionsForTransaction(
+    transaction.state,
+    syntaxTree(transaction.startState),
+    syntaxTree(transaction.state),
+    transaction.changes,
+    transaction.docChanged,
+    transaction.startState.selection.ranges,
+    transaction.state.selection.ranges,
+    nextBlocks.blockGroups,
+    prevBlocks ? prevBlocks.blockGroups : null
+  )
+  if (dirtyRegions === null) return null
+  if (dirtyRegions.length === 0) {
+    return transaction.docChanged ? decorations.map(transaction.changes) : decorations
+  }
+  const mapped = transaction.docChanged ? decorations.map(transaction.changes) : decorations
+  const replacementDecos = resolveDecorationsInScope(transaction.state, nextBlocks, nextMode, dirtyRegions)
+  return mapped.update({
+    filterFrom: dirtyRegions[0]!.from,
+    filterTo: dirtyRegions[dirtyRegions.length - 1]!.to,
+    filter: (from, to) => !isRangeCoveredBySortedRegions(dirtyRegions, from, to),
+    add: replacementDecos,
+    sort: true,
+  })
+}
+
 export const decorationField = StateField.define<DecorationSet>({
-  create: buildDecorations,
+  create: (state) => buildDecorations(state),
   update: (decorations, transaction) => {
     if ((transaction.state.field(pointerSelectingField, false) ?? false) && !transaction.docChanged) {
       return decorations.map(transaction.changes)
@@ -571,9 +532,13 @@ export const decorationField = StateField.define<DecorationSet>({
         return decorations
       }
     }
-    return transaction.docChanged || transaction.selection || treeChanged || hasRelevantEffect
-      ? buildDecorations(transaction.state)
-      : decorations.map(transaction.changes)
+    if (!transaction.docChanged && !transaction.selection && !treeChanged && !hasRelevantEffect) {
+      return decorations.map(transaction.changes)
+    }
+    const incremental = !hasRelevantEffect
+      ? tryIncrementalDecorationUpdate(decorations, transaction, treeChanged)
+      : null
+    return incremental ?? buildDecorations(transaction.state)
   },
   provide: (field) => EditorView.decorations.from(field),
 })

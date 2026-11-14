@@ -18,7 +18,7 @@ import {
 import {
   hasNonCanonicalPostImageSource,
   markdownCardThumbnailSources,
-} from "../../src/libs/markdown/postImageUrlPolicy"
+} from "../../src/libs/markdown/postImageMarkdownPolicy"
 import {
   normalizeMalformedTrailingSpaceEmphasis,
   normalizeMalformedTrailingSpaceEmphasisLine,

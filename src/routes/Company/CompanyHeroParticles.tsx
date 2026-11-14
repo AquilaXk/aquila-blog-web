@@ -1,106 +1,26 @@
 import { useEffect, useRef } from "react"
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
+import {
+  computeFrameTrigRates,
+  createParticleSoABuffers,
+  resolveParticleClearance,
+  smoothstep,
+} from "./companyHeroParticleMath"
 
-type ParticleSeed = {
-  refX: number
-  refY: number
-  posX: number
-  posY: number
-  scale: number
-  seedA: number
-  seedB: number
-  colorIndex: number
-}
-
-export type ParticleClearanceSpec = {
-  cx: number
-  cy: number
-  clearRx: number
-  clearRy: number
-  innerStop: number
-  outerStop: number
-  maxAlpha: number
-}
-
-export const smoothstep = (edge0: number, edge1: number, value: number) => {
-  if (edge0 === edge1) return 0
-  const clamped = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
-  return clamped * clamped * (3 - 2 * clamped)
-}
-
-export const resolveParticleClearance = (
-  width: number,
-  height: number
-): ParticleClearanceSpec => {
-  const cx = width * 0.5
-  const cy = height * 0.5
-  if (width < 768) {
-    return {
-      cx,
-      cy,
-      clearRx: Math.max(width * 0.56, 210),
-      clearRy: Math.max(height * 0.46, 220),
-      innerStop: 0.86,
-      outerStop: 1.18,
-      maxAlpha: 0.48,
-    }
-  }
-  return {
-    cx,
-    cy,
-    clearRx: Math.max(1, Math.min(width * 0.48, 420)),
-    clearRy: Math.max(1, Math.min(height * 0.36, 230)),
-    innerStop: 0.76,
-    outerStop: 1.16,
-    maxAlpha: 0.76,
-  }
-}
-
-export const computeCenterClearance = (
-  screenX: number,
-  screenY: number,
-  width: number,
-  height: number,
-  spec: ParticleClearanceSpec = resolveParticleClearance(width, height)
-) => {
-  const cx = spec.cx ?? width * 0.5
-  const cy = spec.cy ?? height * 0.5
-  const nx = (screenX - cx) / spec.clearRx
-  const ny = (screenY - cy) / spec.clearRy
-  const normSq = nx * nx + ny * ny
-  if (normSq <= spec.innerStop * spec.innerStop) return 0
-  if (normSq >= spec.outerStop * spec.outerStop) return 1
-  return smoothstep(spec.innerStop, spec.outerStop, Math.sqrt(normSq))
-}
-
-export const createParticleSeeds = (cols: number, rows: number, paletteLength: number): ParticleSeed[] => {
-  const seeds: ParticleSeed[] = []
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const idx = row * cols + col
-      const jitterX = Math.sin(idx * 12.9898 + 78.233) * 0.38
-      const jitterY = Math.cos(idx * 45.164 + 19.13) * 0.38
-      const u = (col + 0.5 + jitterX) / cols
-      const v = (row + 0.5 + jitterY) / rows
-      const refX = u * 2 - 1
-      const refY = v * 2 - 1
-      const seedA = (Math.sin(idx * 91.7) + 1) * 0.5
-      const seedB = (Math.cos(idx * 37.3) + 1) * 0.5
-      seeds.push({
-        refX,
-        refY,
-        posX: 0,
-        posY: 0,
-        scale: 0.35,
-        seedA,
-        seedB,
-        colorIndex: idx % paletteLength,
-      })
-    }
-  }
-  return seeds
-}
+export {
+  computeCenterClearance,
+  computeFrameTrigRates,
+  createParticleSeeds,
+  createParticleSoABuffers,
+  evaluateParticleWavesFromSoA,
+  resolveParticleClearance,
+  smoothstep,
+  type FrameTrigRates,
+  type ParticleClearanceSpec,
+  type ParticleSeed,
+  type ParticleSoABuffers,
+} from "./companyHeroParticleMath"
 
 const ParticlesStage = styled.div`
   position: absolute;
@@ -144,7 +64,8 @@ const CompanyHeroParticles: React.FC = () => {
 
     const cols = finePointer ? 22 : 15
     const rows = finePointer ? 12 : 9
-    const particles = createParticleSeeds(cols, rows, palette.length)
+    const particles = createParticleSoABuffers(cols, rows, palette.length)
+    const supportsRoundRect = typeof ctx.roundRect === "function"
 
     let width = 0
     let height = 0
@@ -159,7 +80,6 @@ const CompanyHeroParticles: React.FC = () => {
     let innerStopSq = clearance.innerStop * clearance.innerStop
     let outerStopSq = clearance.outerStop * clearance.outerStop
     let baseScale = 0.75
-    let lastFillStyle = ""
     let ringX = 0.18
     let ringY = -0.12
     let targetX = 0.18
@@ -196,7 +116,6 @@ const CompanyHeroParticles: React.FC = () => {
       innerStopSq = clearance.innerStop * clearance.innerStop
       outerStopSq = clearance.outerStop * clearance.outerStop
       baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
-      lastFillStyle = ""
     }
 
     const drawCapsule = (
@@ -206,19 +125,14 @@ const CompanyHeroParticles: React.FC = () => {
       angle: number,
       halfLen: number,
       radius: number,
-      color: string,
       alpha: number
     ) => {
       const cos = Math.cos(angle)
       const sin = Math.sin(angle)
       context.setTransform(cos * dpr, sin * dpr, -sin * dpr, cos * dpr, cx * dpr, cy * dpr)
       context.globalAlpha = alpha
-      if (color !== lastFillStyle) {
-        context.fillStyle = color
-        lastFillStyle = color
-      }
       context.beginPath()
-      if (typeof context.roundRect === "function") {
+      if (supportsRoundRect) {
         context.roundRect(-halfLen, -radius, halfLen * 2, radius * 2, radius)
       } else {
         context.rect(-halfLen, -radius, halfLen * 2, radius * 2)
@@ -250,85 +164,97 @@ const CompanyHeroParticles: React.FC = () => {
 
       const halfWidth = clearance.cx
       const halfHeight = clearance.cy
+      const {
+        s14, c14, s10, c10, s085, c085, s28, c28, s22, c22, s09, c09,
+      } = computeFrameTrigRates(time)
+      const {
+        bucketCount, bucketStarts, bucketEnds,
+        refX: pRefX, refY: pRefY, posX: pPosX, posY: pPosY, scale: pScale, trigBases,
+      } = particles
 
-      for (let i = 0; i < particles.length; i += 1) {
-        const p = particles[i]
-        const dx = p.refX - ringX
-        const dy = p.refY - ringY
-        const dist = Math.hypot(dx, dy)
-        const noiseJitter = Math.sin(p.refX * 6.5 + p.refY * 5.2 + time * 1.4) * 0.014
-        const distJittered = Math.max(0, dist + noiseJitter)
+      for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+        const start = bucketStarts[bucket]!
+        const end = bucketEnds[bucket]!
+        if (start >= end) continue
+        ctx.fillStyle = palette[bucket]!
 
-        const bandOuter =
-          smoothstep(ringRadius - ringWidth * 2, ringRadius, dist) -
-          smoothstep(ringRadius, ringRadius + ringWidth, distJittered)
-        const bandInner =
-          smoothstep(ringRadius - ringWidthInner * 2, ringRadius, dist) -
-          smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
-        const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
+        for (let i = start; i < end; i += 1) {
+          const rx = pRefX[i]!
+          const ry = pRefY[i]!
+          const b = i * 14
 
-        const clampedOuter = Math.max(0, bandOuter)
-        const clampedInner = Math.max(0, bandInner)
-        const tOuter = clampedOuter * clampedOuter
-        const tInner = clampedInner * clampedInner * clampedInner
-        const ambientWave =
-          ((Math.sin(p.refX * 3.4 + p.seedA * 4.2 + time) +
-            Math.cos(p.refY * 3.1 + p.seedB * 4.2 + time * 0.85)) *
-            0.25 +
-            0.5) *
-          0.42
+          const dx = rx - ringX
+          const dy = ry - ringY
+          const dist = Math.hypot(dx, dy)
+          const noiseJitter = (trigBases[b]! * c14 + trigBases[b + 1]! * s14) * 0.014
+          const distJittered = Math.max(0, dist + noiseJitter)
 
-        const targetScale =
-          0.26 + ambientWave + tOuter * 0.85 + tInner * 1.95 + insideCore * 0.28
+          const bandOuter =
+            smoothstep(ringRadius - ringWidth * 2, ringRadius, dist) -
+            smoothstep(ringRadius, ringRadius + ringWidth, distJittered)
+          const bandInner =
+            smoothstep(ringRadius - ringWidthInner * 2, ringRadius, dist) -
+            smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
+          const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
 
-        const dispX =
-          Math.sin(p.refX * 12 + time * 2.8) * 0.014 * Math.min(1, dist) +
-          Math.cos(p.seedA * 6.28 + time) * 0.008
-        const dispY =
-          Math.cos(p.refY * 12 + time * 2.2) * 0.014 * Math.min(1, dist) +
-          Math.sin(p.seedB * 6.28 + time) * 0.008
+          const clampedOuter = Math.max(0, bandOuter)
+          const clampedInner = Math.max(0, bandInner)
+          const tOuter = clampedOuter * clampedOuter
+          const tInner = clampedInner * clampedInner * clampedInner
+          const ambientWave =
+            (((trigBases[b + 2]! * c10 + trigBases[b + 3]! * s10) +
+              (trigBases[b + 5]! * c085 - trigBases[b + 4]! * s085)) *
+              0.25 +
+              0.5) *
+            0.42
 
-        const pushFactor = Math.sqrt(tInner * Math.sqrt(tInner)) * ringDisplacement
-        p.posX = p.posX * 0.8 + (p.refX + dispX - ringX) * pushFactor
-        p.posY = p.posY * 0.8 + (p.refY + dispY - ringY) * pushFactor
-        p.scale += (targetScale - p.scale) * 0.2
+          const targetScale =
+            0.26 + ambientWave + tOuter * 0.85 + tInner * 1.95 + insideCore * 0.28
 
-        const finalX = p.refX + dispX + p.posX * 0.28
-        const finalY = p.refY + dispY + p.posY * 0.28
+          const clampedDist = Math.min(1, dist)
+          const dispX =
+            (trigBases[b + 6]! * c28 + trigBases[b + 7]! * s28) * 0.014 * clampedDist +
+            (trigBases[b + 9]! * c10 - trigBases[b + 8]! * s10) * 0.008
+          const dispY =
+            (trigBases[b + 11]! * c22 - trigBases[b + 10]! * s22) * 0.014 * clampedDist +
+            (trigBases[b + 12]! * c10 + trigBases[b + 13]! * s10) * 0.008
 
-        const px = (finalX + 1) * halfWidth
-        const py = (finalY + 1) * halfHeight
-        const nx = (px - halfWidth) * invClearRx
-        const ny = (py - halfHeight) * invClearRy
-        const normSq = nx * nx + ny * ny
-        if (normSq <= innerStopSq) continue
+          const pushFactor = Math.sqrt(tInner * Math.sqrt(tInner)) * ringDisplacement
+          const nextPosX = pPosX[i]! * 0.8 + (rx + dispX - ringX) * pushFactor
+          const nextPosY = pPosY[i]! * 0.8 + (ry + dispY - ringY) * pushFactor
+          const nextScale = pScale[i]! + (targetScale - pScale[i]!) * 0.2
+          pPosX[i] = nextPosX
+          pPosY[i] = nextPosY
+          pScale[i] = nextScale
 
-        const centerClearance =
-          normSq >= outerStopSq
-            ? 1
-            : smoothstep(clearance.innerStop, clearance.outerStop, Math.sqrt(normSq))
-        const alpha =
-          Math.min(clearance.maxAlpha, Math.max(0.08, p.scale * 0.34)) * centerClearance
+          const finalX = rx + dispX + nextPosX * 0.28
+          const finalY = ry + dispY + nextPosY * 0.28
 
-        if (alpha < 0.05) continue
+          const px = (finalX + 1) * halfWidth
+          const py = (finalY + 1) * halfHeight
+          const nx = (px - halfWidth) * invClearRx
+          const ny = (py - halfHeight) * invClearRy
+          const normSq = nx * nx + ny * ny
+          if (normSq <= innerStopSq) continue
 
-        const angle =
-          Math.atan2(finalY - ringY, finalX - ringX) +
-          Math.sin(p.seedA * 6.28 + time * 0.9) * 0.35
+          const centerClearance =
+            normSq >= outerStopSq
+              ? 1
+              : smoothstep(clearance.innerStop, clearance.outerStop, Math.sqrt(normSq))
+          const alpha =
+            Math.min(clearance.maxAlpha, Math.max(0.08, nextScale * 0.34)) * centerClearance
 
-        const halfLen = (2.4 + p.scale * 3.6) * baseScale
-        const pillRadius = (1.05 + p.scale * 1.15) * baseScale
+          if (alpha < 0.05) continue
 
-        drawCapsule(
-          ctx,
-          px,
-          py,
-          angle,
-          halfLen,
-          pillRadius,
-          palette[p.colorIndex],
-          alpha
-        )
+          const angle =
+            Math.atan2(finalY - ringY, finalX - ringX) +
+            (trigBases[b + 8]! * c09 + trigBases[b + 9]! * s09) * 0.35
+
+          const halfLen = (2.4 + nextScale * 3.6) * baseScale
+          const pillRadius = (1.05 + nextScale * 1.15) * baseScale
+
+          drawCapsule(ctx, px, py, angle, halfLen, pillRadius, alpha)
+        }
       }
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)

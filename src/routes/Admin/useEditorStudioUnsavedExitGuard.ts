@@ -12,6 +12,8 @@ import {
   EDITOR_UNSAVED_CHANGES_MESSAGE,
   isEditorStudioBootstrapNavigation,
   isSamePathEditorSurfaceNavigation,
+  readHistoryStateKey,
+  resolveBlockedHistoryNavigationDelta,
   resolveEditorRouteNavigationRetry,
   restoreEditorUrlAfterBlockedHistoryPop,
   shouldBlockEditorBeforeUnload,
@@ -27,6 +29,7 @@ type UseEditorStudioUnsavedExitGuardParams = {
 type PendingNavigation = {
   kind: "route" | "action" | "history"
   url?: string
+  historyDelta?: number
   action?: () => void
   routeIntent?: EditorRouteNavigationIntent
 }
@@ -63,6 +66,9 @@ export const useEditorStudioUnsavedExitGuard = ({
   const allowBeforeUnloadBypassRef = useRef(false)
   const pendingRouteIntentRef = useRef<EditorRouteNavigationIntent | null>(null)
   const editorHistoryStateRef = useRef<unknown>(null)
+  const historyKeyOrderRef = useRef<Map<string, number>>(new Map())
+  const nextKeyOrderRef = useRef(0)
+  const suppressSyntheticPopCountRef = useRef(0)
   const getIsDirtyRef = useRef(getIsDirty)
   const isDirtyRef = useRef(isDirty)
   getIsDirtyRef.current = getIsDirty
@@ -106,7 +112,8 @@ export const useEditorStudioUnsavedExitGuard = ({
 
     if (pending.kind === "history") {
       allowNavigationRef.current = true
-      window.history.back()
+      const delta = pending.historyDelta ?? -1
+      window.history.go(delta)
       return
     }
 
@@ -134,6 +141,11 @@ export const useEditorStudioUnsavedExitGuard = ({
 
     const captureEditorHistoryState = () => {
       editorHistoryStateRef.current = window.history.state
+      const key = readHistoryStateKey(window.history.state)
+      if (key && !historyKeyOrderRef.current.has(key)) {
+        nextKeyOrderRef.current += 1
+        historyKeyOrderRef.current.set(key, nextKeyOrderRef.current)
+      }
     }
     captureEditorHistoryState()
 
@@ -160,6 +172,11 @@ export const useEditorStudioUnsavedExitGuard = ({
     }) as typeof router.replace
 
     router.beforePopState(({ as }) => {
+      if (suppressSyntheticPopCountRef.current > 0) {
+        suppressSyntheticPopCountRef.current -= 1
+        captureEditorHistoryState()
+        return false
+      }
       if (allowNavigationRef.current) {
         clearAllowNavigation()
         return true
@@ -172,7 +189,20 @@ export const useEditorStudioUnsavedExitGuard = ({
       if (isSamePathEditorSurfaceNavigation(router.asPath, as)) return true
       if (!readIsDirty()) return true
 
-      pendingRef.current = { kind: "history" }
+      const delta = resolveBlockedHistoryNavigationDelta(
+        editorHistoryStateRef.current,
+        window.history.state,
+        historyKeyOrderRef.current
+      )
+      if (delta > 0 && typeof window.history.go === "function") {
+        suppressSyntheticPopCountRef.current += 1
+        pendingRef.current = { kind: "history", historyDelta: delta, url: as }
+        setConfirmOpen(true)
+        window.history.go(-delta)
+        return false
+      }
+
+      pendingRef.current = { kind: "history", historyDelta: -1, url: as }
       setConfirmOpen(true)
       restoreEditorUrlAfterBlockedHistoryPop(
         router.asPath,

@@ -1,9 +1,59 @@
-const MEGABYTE = 1024 * 1024
+import {
+  hasAlphaTransparency,
+  type ProbedImageHeader,
+  readAndProbeImageFileHeader,
+} from "./imageUploadHeaderProbe"
+import {
+  bytesToMbText,
+  clampProfileImageEditFocus,
+  clampProfileImageEditFocusBySource,
+  clampProfileImageEditZoom,
+  constrainByLongEdge,
+  ensureFileIsUploadable,
+  extensionFromMimeType,
+  IMAGE_UPLOAD_POLICIES,
+  type ImageUploadPolicy,
+  type ImageUploadTarget,
+  normalizeMimeType,
+  POST_IMAGE_UPLOAD_RULE_LABEL,
+  type PreparedImageUpload,
+  PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_X,
+  PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_Y,
+  PROFILE_IMAGE_EDIT_DEFAULT_OUTPUT_SIZE,
+  PROFILE_IMAGE_EDIT_MAX_ZOOM,
+  PROFILE_IMAGE_EDIT_MIN_ZOOM,
+  PROFILE_IMAGE_UPLOAD_RULE_LABEL,
+  type ProfileImageEditTransform,
+  type ProfileImageSourceSize,
+  resolveProfileImageEditDrawRatios,
+  resolveTransferOutputMimeTypes,
+  sanitizeFileBaseName,
+} from "./profileImagePolicy"
+
+export {
+  clampProfileImageEditFocus,
+  clampProfileImageEditFocusBySource,
+  clampProfileImageEditZoom,
+  ensureFileIsUploadable,
+  hasAlphaTransparency,
+  POST_IMAGE_UPLOAD_RULE_LABEL,
+  type PreparedImageUpload,
+  PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_X,
+  PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_Y,
+  PROFILE_IMAGE_EDIT_DEFAULT_OUTPUT_SIZE,
+  PROFILE_IMAGE_EDIT_MAX_ZOOM,
+  PROFILE_IMAGE_EDIT_MIN_ZOOM,
+  PROFILE_IMAGE_UPLOAD_RULE_LABEL,
+  type ProfileImageEditTransform,
+  type ProfileImageSourceSize,
+  resolveProfileImageEditDrawRatios,
+  resolveTransferOutputMimeTypes,
+}
+
 const MIN_RETRY_LONG_EDGE = 480
 const RETRY_SCALE_FACTOR = 0.86
 const LOSSY_QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58]
 
-type ImageUploadTarget = "profile" | "post"
 type EncodedCandidate = {
   blob: Blob
   mimeType: string
@@ -11,193 +61,28 @@ type EncodedCandidate = {
   height: number
 }
 
-type ImageUploadPolicy = {
-  maxBytes: number
-  targetBytes: number
-  maxLongEdge: number
-  maxSourceBytes: number
-  outputMimeTypes: readonly string[]
-}
-
-export type PreparedImageUpload = {
-  file: File
-  optimized: boolean
-  originalBytes: number
-  optimizedBytes: number
-  originalWidth: number
-  originalHeight: number
-  width: number
-  height: number
-}
-
-export type ProfileImageEditTransform = {
-  focusX: number
-  focusY: number
-  zoom: number
-  outputSize?: number
-}
-
-export type ProfileImageSourceSize = {
-  width: number
-  height: number
-}
-
-const IMAGE_UPLOAD_POLICIES: Record<ImageUploadTarget, ImageUploadPolicy> = {
-  profile: {
-    maxBytes: 2 * MEGABYTE,
-    targetBytes: 700 * 1024,
-    maxLongEdge: 1024,
-    maxSourceBytes: 30 * MEGABYTE,
-    outputMimeTypes: ["image/webp", "image/jpeg", "image/png"],
-  },
-  post: {
-    maxBytes: 8 * MEGABYTE,
-    targetBytes: 3_500 * 1024,
-    maxLongEdge: 2560,
-    maxSourceBytes: 40 * MEGABYTE,
-    outputMimeTypes: ["image/webp", "image/jpeg", "image/png"],
-  },
-}
-
-const ALLOWED_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/pjpeg",
-  "image/png",
-  "image/x-png",
-  "image/gif",
-  "image/webp",
-  "image/x-webp",
-])
-
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
-
-export const PROFILE_IMAGE_UPLOAD_RULE_LABEL = "JPG/PNG/GIF/WebP, 자동 최적화 후 최대 2MB"
-export const POST_IMAGE_UPLOAD_RULE_LABEL = "JPG/PNG/GIF/WebP, 자동 최적화 후 최대 8MB"
-export const PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_X = 50
-export const PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_Y = 38
-export const PROFILE_IMAGE_EDIT_MIN_ZOOM = 1
-export const PROFILE_IMAGE_EDIT_MAX_ZOOM = 2.8
-export const PROFILE_IMAGE_EDIT_DEFAULT_OUTPUT_SIZE = 512
-
-const normalizeMimeType = (raw: string): string =>
-  raw
-    .trim()
-    .toLowerCase()
-    .replace("image/jpg", "image/jpeg")
-    .replace("image/pjpeg", "image/jpeg")
-    .replace("image/x-png", "image/png")
-    .replace("image/x-webp", "image/webp")
-
-const hasAllowedExtension = (fileName: string): boolean => {
-  const normalized = fileName.trim().toLowerCase()
-  return ALLOWED_EXTENSIONS.some((ext) => normalized.endsWith(ext))
-}
-
-const bytesToMbText = (bytes: number): string => `${(bytes / MEGABYTE).toFixed(1)}MB`
-
-export const clampProfileImageEditFocus = (value: number): number => {
-  if (!Number.isFinite(value)) return PROFILE_IMAGE_EDIT_DEFAULT_FOCUS_X
-  return Math.min(100, Math.max(0, value))
-}
-
-export const clampProfileImageEditZoom = (value: number): number => {
-  if (!Number.isFinite(value)) return PROFILE_IMAGE_EDIT_MIN_ZOOM
-  return Math.min(PROFILE_IMAGE_EDIT_MAX_ZOOM, Math.max(PROFILE_IMAGE_EDIT_MIN_ZOOM, value))
-}
-
-export const resolveProfileImageEditDrawRatios = (
-  sourceSize: ProfileImageSourceSize,
-  zoom: number
-): { drawWidth: number; drawHeight: number } => {
-  const safeZoom = clampProfileImageEditZoom(zoom)
-  const sourceWidth = Math.max(1, sourceSize.width)
-  const sourceHeight = Math.max(1, sourceSize.height)
-  const sourceAspect = sourceWidth / sourceHeight
-
-  const baseDrawWidth = sourceAspect >= 1 ? sourceAspect : 1
-  const baseDrawHeight = sourceAspect >= 1 ? 1 : 1 / sourceAspect
-
-  return {
-    drawWidth: baseDrawWidth * safeZoom,
-    drawHeight: baseDrawHeight * safeZoom,
-  }
-}
-
-export const clampProfileImageEditFocusBySource = ({
-  focusX,
-  focusY,
-  zoom,
-  sourceSize,
-}: {
-  focusX: number
-  focusY: number
-  zoom: number
-  sourceSize: ProfileImageSourceSize
-}): { focusX: number; focusY: number } => {
-  const { drawWidth, drawHeight } = resolveProfileImageEditDrawRatios(sourceSize, zoom)
-  const minCenterX = Math.max(0, 1 - drawWidth / 2)
-  const maxCenterX = Math.min(1, drawWidth / 2)
-  const minCenterY = Math.max(0, 1 - drawHeight / 2)
-  const maxCenterY = Math.min(1, drawHeight / 2)
-
-  const normalizedFocusX = clampProfileImageEditFocus(focusX) / 100
-  const normalizedFocusY = clampProfileImageEditFocus(focusY) / 100
-
-  const safeCenterX = minCenterX <= maxCenterX ? Math.min(maxCenterX, Math.max(minCenterX, normalizedFocusX)) : 0.5
-  const safeCenterY = minCenterY <= maxCenterY ? Math.min(maxCenterY, Math.max(minCenterY, normalizedFocusY)) : 0.5
-
-  return {
-    focusX: safeCenterX * 100,
-    focusY: safeCenterY * 100,
-  }
-}
-
-const ensureFileIsUploadable = (file: File, target: ImageUploadTarget): void => {
-  const policy = IMAGE_UPLOAD_POLICIES[target]
-  if (file.size <= 0) {
-    throw new Error("빈 파일은 업로드할 수 없습니다.")
-  }
-
-  if (file.size > policy.maxSourceBytes) {
-    throw new Error(`원본 파일이 너무 큽니다. ${bytesToMbText(policy.maxSourceBytes)} 이하 파일로 시도해주세요.`)
-  }
-
-  const mimeType = normalizeMimeType(file.type || "")
-  const validMimeType = mimeType.length > 0 && ALLOWED_MIME_TYPES.has(mimeType)
-  const validExtension = hasAllowedExtension(file.name)
-
-  if (!validMimeType && !validExtension) {
-    throw new Error("지원하지 않는 이미지 형식입니다. JPG/PNG/GIF/WebP 파일만 업로드할 수 있습니다.")
-  }
-}
-
-const sanitizeFileBaseName = (fileName: string): string => {
-  const lastDotIndex = fileName.lastIndexOf(".")
-  const rawBase = lastDotIndex > 0 ? fileName.slice(0, lastDotIndex) : fileName
-  const normalized = rawBase.trim().replace(/[^a-zA-Z0-9가-힣._-]/g, "-").replace(/-+/g, "-")
-  return normalized || "image"
-}
-
-const extensionFromMimeType = (mimeType: string): string => {
-  if (mimeType === "image/webp") return "webp"
-  if (mimeType === "image/jpeg") return "jpg"
-  if (mimeType === "image/png") return "png"
-  return "jpg"
-}
-
 const canvasToBlob = (canvas: HTMLCanvasElement, mimeType: string, quality?: number): Promise<Blob | null> =>
   new Promise((resolve) => {
     canvas.toBlob(resolve, mimeType, quality)
   })
 
+const canvasEncodeSupportCache = new Map<string, boolean>()
+
 const isCanvasEncodeSupported = (mimeType: string): boolean => {
-  const canvas = document.createElement("canvas")
-  try {
-    return canvas.toDataURL(mimeType).startsWith(`data:${mimeType}`)
-  } catch {
-    return false
+  const cached = canvasEncodeSupportCache.get(mimeType)
+  if (cached !== undefined) return cached
+
+  let supported = false
+  if (typeof document !== "undefined") {
+    const canvas = document.createElement("canvas")
+    try {
+      supported = canvas.toDataURL(mimeType).startsWith(`data:${mimeType}`)
+    } catch {
+      supported = false
+    }
   }
+  canvasEncodeSupportCache.set(mimeType, supported)
+  return supported
 }
 
 const loadImageFromFile = (file: File): Promise<HTMLImageElement> =>
@@ -218,55 +103,15 @@ const loadImageFromFile = (file: File): Promise<HTMLImageElement> =>
     image.src = objectUrl
   })
 
-const constrainByLongEdge = (
-  width: number,
-  height: number,
-  maxLongEdge: number
-): { width: number; height: number } => {
-  const longEdge = Math.max(width, height)
-  if (longEdge <= maxLongEdge) {
-    return { width, height }
-  }
-
-  const scale = maxLongEdge / longEdge
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
-  }
-}
-
-export const hasAlphaTransparency = (rgbaData: Uint8ClampedArray): boolean => {
-  for (let index = 3; index < rgbaData.length; index += 4) {
-    if ((rgbaData[index] ?? 255) < 255) return true
-  }
-  return false
-}
-
-export const resolveTransferOutputMimeTypes = (
-  outputMimeTypes: readonly string[],
-  options: { sourceMimeType: string; hasTransparency: boolean }
-): string[] => {
-  const normalizedSource = normalizeMimeType(options.sourceMimeType || "")
-  if (!options.hasTransparency || normalizedSource === "image/jpeg") {
-    return [...outputMimeTypes]
-  }
-  const alphaSafe = outputMimeTypes
-    .map(normalizeMimeType)
-    .filter((mime) => mime !== "image/jpeg")
-  if (!alphaSafe.includes("image/png")) {
-    alphaSafe.push("image/png")
-  }
-  return alphaSafe
-}
-
 const detectCanvasAlphaTransparency = (
   canvas: HTMLCanvasElement,
   width: number,
   height: number,
-  sourceMimeType: string
+  sourceMimeType: string,
+  probedHeader?: ProbedImageHeader,
 ): boolean => {
   const normalizedSource = normalizeMimeType(sourceMimeType || "")
-  if (normalizedSource === "image/jpeg") return false
+  if (normalizedSource === "image/jpeg" || probedHeader?.isOpaque) return false
   const context = canvas.getContext("2d", { alpha: true })
   if (!context || typeof context.getImageData !== "function") {
     return normalizedSource === "image/png" || normalizedSource === "image/webp" || normalizedSource === "image/gif"
@@ -384,7 +229,8 @@ const findBestEncodedImageCandidate = async (
   image: HTMLImageElement,
   initialSize: { width: number; height: number },
   sourceMimeType: string,
-  policy: ImageUploadPolicy
+  policy: ImageUploadPolicy,
+  probedHeader?: ProbedImageHeader,
 ): Promise<EncodedCandidate | null> => {
   let bestCandidate: EncodedCandidate | null = null
   let currentWidth = initialSize.width
@@ -395,7 +241,13 @@ const findBestEncodedImageCandidate = async (
     const canvas = drawToCanvas(image, currentWidth, currentHeight)
     outputMimeTypes ??= resolveTransferOutputMimeTypes(policy.outputMimeTypes, {
       sourceMimeType,
-      hasTransparency: detectCanvasAlphaTransparency(canvas, currentWidth, currentHeight, sourceMimeType),
+      hasTransparency: detectCanvasAlphaTransparency(
+        canvas,
+        currentWidth,
+        currentHeight,
+        sourceMimeType,
+        probedHeader,
+      ),
     })
     const candidates = await encodeCandidates(canvas, currentWidth, currentHeight, policy, outputMimeTypes)
     const smallestCandidate = candidates[0] ?? null
@@ -415,11 +267,14 @@ const findBestEncodedImageCandidate = async (
 
 const optimizeImageByPolicy = async (
   sourceFile: File,
-  policy: ImageUploadPolicy
+  policy: ImageUploadPolicy,
+  probedHeader?: ProbedImageHeader,
 ): Promise<PreparedImageUpload> => {
   const sourceMimeType = normalizeMimeType(sourceFile.type || "")
   const looksLikeGif =
-    sourceMimeType === "image/gif" || sourceFile.name.trim().toLowerCase().endsWith(".gif")
+    probedHeader?.format === "gif" ||
+    sourceMimeType === "image/gif" ||
+    sourceFile.name.trim().toLowerCase().endsWith(".gif")
   const image = await loadImageFromFile(sourceFile)
   const originalWidth = image.naturalWidth || image.width
   const originalHeight = image.naturalHeight || image.height
@@ -461,7 +316,8 @@ const optimizeImageByPolicy = async (
     image,
     constrained,
     sourceMimeType,
-    policy
+    policy,
+    probedHeader,
   )
   if (acceptedCandidate) {
     return toPreparedFile(acceptedCandidate, sourceFile, originalWidth, originalHeight)
@@ -473,15 +329,17 @@ const optimizeImageByPolicy = async (
 }
 
 const prepareImageForUpload = async (file: File, target: ImageUploadTarget): Promise<PreparedImageUpload> => {
-  ensureFileIsUploadable(file, target)
-  return await optimizeImageByPolicy(file, IMAGE_UPLOAD_POLICIES[target])
+  const normalizedMimeType = ensureFileIsUploadable(file, target)
+  const probedHeader = await readAndProbeImageFileHeader(file, normalizedMimeType)
+  return await optimizeImageByPolicy(file, IMAGE_UPLOAD_POLICIES[target], probedHeader)
 }
 
 export const buildProfileImageEditedFile = async (
   sourceFile: File,
   transform: ProfileImageEditTransform
 ): Promise<File> => {
-  ensureFileIsUploadable(sourceFile, "profile")
+  const normalizedMimeType = ensureFileIsUploadable(sourceFile, "profile")
+  const probedHeader = await readAndProbeImageFileHeader(sourceFile, normalizedMimeType)
 
   const image = await loadImageFromFile(sourceFile)
   const outputSize = Math.max(256, Math.round(transform.outputSize || PROFILE_IMAGE_EDIT_DEFAULT_OUTPUT_SIZE))
@@ -524,7 +382,13 @@ export const buildProfileImageEditedFile = async (
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
 
   const sourceMimeType = normalizeMimeType(sourceFile.type || "")
-  const hasTransparency = detectCanvasAlphaTransparency(canvas, outputSize, outputSize, sourceMimeType)
+  const hasTransparency = detectCanvasAlphaTransparency(
+    canvas,
+    outputSize,
+    outputSize,
+    sourceMimeType,
+    probedHeader,
+  )
   const webpBlob = isCanvasEncodeSupported("image/webp") ? await canvasToBlob(canvas, "image/webp", 0.92) : null
   const fallbackMimeType = hasTransparency ? "image/png" : "image/jpeg"
   const fallbackBlob =

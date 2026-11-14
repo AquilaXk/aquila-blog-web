@@ -26,7 +26,13 @@ export const buildUploadingImagePlaceholder = (fileName: string, uploadId: strin
 export const buildUploadingAttachmentPlaceholder = (fileName: string, uploadId: string): string =>
   `[업로드 중: ${sanitizeUploadPlaceholderFileName(fileName)} · ${uploadId}…]()`
 
-export const isImageFile = (file: File): boolean => file.type.startsWith("image/")
+export const isImageFile = (file: File): boolean => {
+  const lowerType = (file.type || "").split(";", 1)[0]?.trim().toLowerCase() || ""
+  if (lowerType === "image/svg+xml" || (file.name || "").trim().toLowerCase().endsWith(".svg")) {
+    return false
+  }
+  return lowerType.startsWith("image/")
+}
 
 export const extractImageFileFromClipboard = (clipboardData: DataTransfer | null): File | null => {
   if (!clipboardData) return null

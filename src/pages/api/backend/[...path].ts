@@ -104,13 +104,39 @@ const resolveProxyPath = (req: NextApiRequest): string => {
   return normalizeApiRequestPath(`${pathname}${query || ""}`)
 }
 
+const hasErrorInCauseChain = <T extends Error>(
+  error: unknown,
+  ctor: new (...args: never[]) => T,
+): boolean => {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current)
+    if (current instanceof ctor) return true
+    current = "cause" in current ? (current as { cause?: unknown }).cause : undefined
+  }
+  return false
+}
+
 const pipeWebStreamToResponse = async (stream: ReadableStream<Uint8Array>, res: NextApiResponse) => {
   const reader = stream.getReader()
   try {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      if (value) res.write(Buffer.from(value))
+      if (!value || value.byteLength === 0) continue
+      const chunkView = Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+      if (!res.write(chunkView)) {
+        await new Promise<void>((resolve) => {
+          const cleanup = () => {
+            res.off("drain", cleanup)
+            res.off("close", cleanup)
+            resolve()
+          }
+          res.once("drain", cleanup)
+          res.once("close", cleanup)
+        })
+      }
     }
   } finally {
     reader.releaseLock()
@@ -248,7 +274,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await pipeWebStreamToResponse(upstreamResponse.body, res)
     res.end()
   } catch (error) {
-    if (error instanceof ProxyBodyTooLargeError) {
+    if (error instanceof ProxyBodyTooLargeError || hasErrorInCauseChain(error, ProxyBodyTooLargeError)) {
       metricResult = "4xx"
       const maxMb = Math.floor(resolveMaxProxyBodyBytes() / (1024 * 1024))
       res.status(413).json({
@@ -257,12 +283,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       return
     }
-    if (error instanceof ProxyBodyCapacityExceededError) {
+    if (
+      error instanceof ProxyBodyCapacityExceededError ||
+      hasErrorInCauseChain(error, ProxyBodyCapacityExceededError)
+    ) {
       metricResult = "5xx"
       res.status(503).json({ message: "동시에 처리 중인 업로드가 많습니다. 잠시 후 다시 시도해주세요.", requestId })
       return
     }
-    if (error instanceof ProxyBodyTimeoutError || controller.signal.aborted || isAbortLikeError(error)) {
+    if (
+      error instanceof ProxyBodyTimeoutError ||
+      hasErrorInCauseChain(error, ProxyBodyTimeoutError) ||
+      controller.signal.aborted ||
+      isAbortLikeError(error)
+    ) {
       metricResult = "timeout"
       res.status(504).json({ message: "Backend proxy request timed out.", requestId })
       return

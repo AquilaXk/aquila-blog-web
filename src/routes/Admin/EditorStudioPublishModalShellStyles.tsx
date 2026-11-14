@@ -1,10 +1,11 @@
 import styled from "@emotion/styled"
+import { boxShadowColor, overlayScrim } from "src/design-system/tokens"
 import { zIndexes } from "src/styles/zIndexes"
 
 export const PublishModalBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.42);
+  background: ${overlayScrim.modal};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,7 +28,7 @@ export const PublishDialog = styled.div`
   padding: 1.1rem 1.15rem 0;
   display: grid;
   gap: 0.95rem;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 18px 48px ${boxShadowColor.modalStrong};
 
   &[data-variant="drawer"] {
     width: min(560px, 100vw);
@@ -42,7 +43,7 @@ export const PublishDialog = styled.div`
     border-bottom: 0;
     padding-top: max(1rem, env(safe-area-inset-top, 0px));
     padding-bottom: 0;
-    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.28);
+    box-shadow: -18px 0 44px ${boxShadowColor.drawerStrong};
   }
 
   @media (max-width: 720px) {

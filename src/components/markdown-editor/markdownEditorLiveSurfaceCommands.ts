@@ -6,6 +6,7 @@ import { EditorSelection, Transaction } from "@codemirror/state"
 import { EditorView, type KeyBinding } from "@codemirror/view"
 import { cycleTaskCheckboxInLine } from "./markdownEditorKeyboardModel"
 import { compositionField, getDocString } from "./markdownEditorLiveSurfaceDecorations"
+import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
 
 export const selectNextOccurrenceCommand = (view: EditorView): boolean => {
   const { state } = view
@@ -204,21 +205,21 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-live-image-wrap": { display: "block", margin: "8px 0" },
   ".cm-live-image": { maxWidth: "100%", borderRadius: "6px" },
   ".cm-live-callout": {
-    borderLeft: "4px solid #2383e2",
-    backgroundColor: "rgba(35, 131, 226, 0.08)",
+    borderLeft: `4px solid ${EDITOR_SYNTAX_COLORS.calloutTones.info.border}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.info.bg,
     borderRadius: "8px",
     padding: "11px 14px",
     margin: "12px 0",
   },
-  ".cm-live-callout-tone-info": { borderLeftColor: "#2383e2", backgroundColor: "rgba(35, 131, 226, 0.08)" },
-  ".cm-live-callout-tone-summary": { borderLeftColor: "#06b6d4", backgroundColor: "rgba(6, 182, 212, 0.08)" },
-  ".cm-live-callout-tone-tip": { borderLeftColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.08)" },
-  ".cm-live-callout-tone-warning": { borderLeftColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.09)" },
-  ".cm-live-callout-tone-danger": { borderLeftColor: "#eb5757", backgroundColor: "rgba(235, 87, 87, 0.09)" },
-  ".cm-live-callout-tone-purple": { borderLeftColor: "#9065b0", backgroundColor: "rgba(144, 101, 176, 0.09)" },
+  ".cm-live-callout-tone-info": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.info.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.info.bg },
+  ".cm-live-callout-tone-summary": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.summary.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.summary.bg },
+  ".cm-live-callout-tone-tip": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.tip.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.tip.bg },
+  ".cm-live-callout-tone-warning": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.warning.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.warning.bg },
+  ".cm-live-callout-tone-danger": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.danger.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.danger.bg },
+  ".cm-live-callout-tone-purple": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.bg },
   ".cm-live-callout-tone-default, .cm-live-callout-tone-outline": {
-    borderLeftColor: "#787774",
-    backgroundColor: "rgba(135, 131, 120, 0.09)",
+    borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.default.border,
+    backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.default.bg,
   },
   ".cm-live-callout-header": {
     display: "flex",
@@ -235,7 +236,7 @@ export const liveSurfaceTheme = EditorView.theme({
     width: "22px",
     height: "22px",
     borderRadius: "5px",
-    backgroundColor: "rgba(135, 131, 120, 0.12)",
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint12,
     fontSize: "0.96em",
     lineHeight: "1",
     flexShrink: "0",
@@ -246,18 +247,18 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-line.cm-live-container-active-line": {
     paddingLeft: "14px",
     paddingRight: "14px",
-    borderLeft: "4px solid #2383e2",
-    backgroundColor: "rgba(35, 131, 226, 0.07)",
+    borderLeft: `4px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint07,
   },
   ".cm-line.cm-live-container-active-toggle, .cm-line.cm-live-container-active-bookmark": {
-    borderLeftColor: "#9065b0",
-    backgroundColor: "rgba(144, 101, 176, 0.06)",
+    borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.border,
+    backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.activeBg,
   },
-  ".cm-line.cm-live-container-tone-tip": { borderLeftColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.07)" },
-  ".cm-line.cm-live-container-tone-warning": { borderLeftColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.08)" },
-  ".cm-line.cm-live-container-tone-danger": { borderLeftColor: "#eb5757", backgroundColor: "rgba(235, 87, 87, 0.08)" },
-  ".cm-line.cm-live-container-tone-purple": { borderLeftColor: "#9065b0", backgroundColor: "rgba(144, 101, 176, 0.08)" },
-  ".cm-line.cm-live-container-tone-default": { borderLeftColor: "#787774", backgroundColor: "rgba(135, 131, 120, 0.08)" },
+  ".cm-line.cm-live-container-tone-tip": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.tip.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.tip.lineBg },
+  ".cm-line.cm-live-container-tone-warning": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.warning.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.warning.lineBg },
+  ".cm-line.cm-live-container-tone-danger": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.danger.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.danger.lineBg },
+  ".cm-line.cm-live-container-tone-purple": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.border, backgroundColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.lineBg },
+  ".cm-line.cm-live-container-tone-default": { borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.default.border, backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint08 },
   ".cm-line.cm-live-container-line-open": {
     paddingTop: "6px",
     borderTopLeftRadius: "6px",
@@ -269,8 +270,8 @@ export const liveSurfaceTheme = EditorView.theme({
     borderBottomRightRadius: "6px",
   },
   ".cm-live-toggle-block": {
-    border: "1px solid rgba(128, 128, 128, 0.22)",
-    backgroundColor: "rgba(135, 131, 120, 0.05)",
+    border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder22}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint05,
     borderRadius: "8px",
     padding: "10px 14px",
     margin: "10px 0",
@@ -291,8 +292,8 @@ export const liveSurfaceTheme = EditorView.theme({
     borderRadius: "4px",
     fontSize: "11px",
     cursor: "pointer",
-    color: "#2383e2",
-    backgroundColor: "rgba(35, 131, 226, 0.1)",
+    color: EDITOR_SYNTAX_COLORS.accentBlue,
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint10,
   },
   ".cm-live-toggle-title": { cursor: "text", flex: "1 1 auto" },
   ".cm-live-toggle-block.is-collapsed .cm-live-toggle-body": { display: "none" },
@@ -302,8 +303,8 @@ export const liveSurfaceTheme = EditorView.theme({
     display: "flex",
     alignItems: "flex-start",
     gap: "12px",
-    border: "1px solid rgba(128, 128, 128, 0.24)",
-    backgroundColor: "rgba(135, 131, 120, 0.05)",
+    border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder24}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint05,
     borderRadius: "8px",
     padding: "12px 14px",
     margin: "10px 0",
@@ -323,7 +324,7 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-live-bookmark-url": {
     fontSize: "0.78em",
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    color: "#2383e2",
+    color: EDITOR_SYNTAX_COLORS.accentBlue,
     opacity: 0.85,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -331,16 +332,16 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-bookmark-open": {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    width: "24px", height: "24px", borderRadius: "5px", border: "1px solid rgba(128, 128, 128, 0.22)",
-    color: "#2383e2", textDecoration: "none", fontSize: "12px", fontWeight: "700", flexShrink: "0",
+    width: "24px", height: "24px", borderRadius: "5px", border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder22}`,
+    color: EDITOR_SYNTAX_COLORS.accentBlue, textDecoration: "none", fontSize: "12px", fontWeight: "700", flexShrink: "0",
   },
   ".cm-live-table code, .cm-live-callout code, .cm-live-toggle-block code": {
     fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
-    fontSize: "0.86em", color: "#eb5757", backgroundColor: "rgba(135, 131, 120, 0.15)",
+    fontSize: "0.86em", color: EDITOR_SYNTAX_COLORS.inlineCodeText, backgroundColor: EDITOR_SYNTAX_COLORS.inlineCodeSurface,
     padding: "0.14em 0.38em", borderRadius: "4px",
   },
   ".cm-live-table mark.cm-live-highlight, .cm-live-callout mark.cm-live-highlight, .cm-live-toggle-block mark.cm-live-highlight": {
-    backgroundColor: "rgba(250, 204, 21, 0.32)", color: "inherit", padding: "0.06em 0.24em", borderRadius: "3px",
+    backgroundColor: EDITOR_SYNTAX_COLORS.calloutHighlightSurface, color: "inherit", padding: "0.06em 0.24em", borderRadius: "3px",
   },
   ".cm-live-table del.cm-live-strikethrough, .cm-live-callout del.cm-live-strikethrough, .cm-live-toggle-block del.cm-live-strikethrough": {
     textDecoration: "line-through", opacity: 0.68,
@@ -362,10 +363,10 @@ export const liveSurfaceTheme = EditorView.theme({
     alignSelf: "flex-start",
     gap: "2px",
     padding: "3px 6px",
-    border: "1px solid rgba(128, 128, 128, 0.22)",
-    backgroundColor: "color-mix(in srgb, var(--surface-elevated, #ffffff) 96%, #f7f6f3 4%)",
+    border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder22}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.tableToolbarBg,
     borderRadius: "8px",
-    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.05)",
+    boxShadow: EDITOR_SYNTAX_COLORS.tableToolbarShadow,
   },
   ".cm-live-table-toolbar-btn": {
     display: "inline-flex",
@@ -387,22 +388,22 @@ export const liveSurfaceTheme = EditorView.theme({
   '.cm-live-table-toolbar-btn[data-group-start="true"]': {
     marginLeft: "3px",
     paddingLeft: "8px",
-    borderLeft: "1px solid rgba(128, 128, 128, 0.22)",
+    borderLeft: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder22}`,
     borderTopLeftRadius: "0",
     borderBottomLeftRadius: "0",
   },
   ".cm-live-table-toolbar-btn:hover:not(:disabled)": {
-    backgroundColor: "rgba(35, 131, 226, 0.1)",
-    color: "#2383e2",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint10,
+    color: EDITOR_SYNTAX_COLORS.accentBlue,
   },
   '.cm-live-table-wrap[data-active-mode="row"] .cm-live-table-toolbar-btn[data-group="row"]:not(:disabled), .cm-live-table-wrap[data-active-mode="col"] .cm-live-table-toolbar-btn[data-group="col"]:not(:disabled)': {
-    backgroundColor: "rgba(35, 131, 226, 0.08)",
-    color: "#14569b",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint08,
+    color: EDITOR_SYNTAX_COLORS.accentBlueDark,
   },
   '.cm-live-table-toolbar-btn[aria-pressed="true"]': {
-    backgroundColor: "rgba(35, 131, 226, 0.14)",
-    borderColor: "rgba(35, 131, 226, 0.38)",
-    color: "#2383e2",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint14,
+    borderColor: EDITOR_SYNTAX_COLORS.accentBlueBorder38,
+    color: EDITOR_SYNTAX_COLORS.accentBlue,
     fontWeight: "650",
   },
   ".cm-live-table-toolbar-btn:disabled": { opacity: 0.35, cursor: "not-allowed" },
@@ -420,7 +421,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-table th, .cm-live-table td": {
     position: "relative",
-    border: "1px solid rgba(128, 128, 128, 0.24)",
+    border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder24}`,
     padding: "7px 12px",
     textAlign: "left",
     cursor: "text",
@@ -431,7 +432,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-table th": {
     paddingTop: "14px",
-    backgroundColor: "color-mix(in srgb, var(--surface-elevated, #f7f6f3) 90%, rgba(135, 131, 120, 0.18) 10%)",
+    backgroundColor: EDITOR_SYNTAX_COLORS.tableHeaderBg,
     fontWeight: "650",
   },
   '.cm-live-table-wrap[data-header-row="false"] .cm-live-table th, .cm-live-table-wrap[data-testid="cm-live-table-widget"]:not([data-header-row="true"]) .cm-live-table th': {
@@ -439,17 +440,17 @@ export const liveSurfaceTheme = EditorView.theme({
     fontWeight: "500",
   },
   '.cm-live-table-wrap[data-header-col="true"] .cm-live-table tbody td:first-child': {
-    backgroundColor: "color-mix(in srgb, var(--surface-elevated, #f7f6f3) 90%, rgba(135, 131, 120, 0.18) 10%)",
+    backgroundColor: EDITOR_SYNTAX_COLORS.tableHeaderBg,
     fontWeight: "650",
   },
   ".cm-live-table th.is-selected-col, .cm-live-table td.is-selected-col, .cm-live-table th.is-selected-row, .cm-live-table td.is-selected-row": {
-    backgroundColor: "rgba(35, 131, 226, 0.08)",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint08,
   },
   ".cm-live-table th.is-drop-target-col": {
-    borderLeft: "2px solid #2383e2",
+    borderLeft: `2px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
   },
   ".cm-live-table tr.is-drop-target-row td, .cm-live-table tr.is-drop-target-row th": {
-    borderTop: "2px solid #2383e2",
+    borderTop: `2px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
   },
   ".cm-live-table-col-handle": {
     position: "absolute",
@@ -462,7 +463,7 @@ export const liveSurfaceTheme = EditorView.theme({
     border: "1px solid transparent",
     borderRadius: "4px",
     backgroundColor: "transparent",
-    color: "#52514e",
+    color: EDITOR_SYNTAX_COLORS.tableHandleText,
     fontSize: "10px",
     lineHeight: "9px",
     cursor: "grab",
@@ -480,7 +481,7 @@ export const liveSurfaceTheme = EditorView.theme({
     border: "1px solid transparent",
     borderRadius: "4px",
     backgroundColor: "transparent",
-    color: "#52514e",
+    color: EDITOR_SYNTAX_COLORS.tableHandleText,
     fontSize: "10px",
     lineHeight: "1",
     cursor: "grab",
@@ -489,9 +490,9 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-table th:hover .cm-live-table-col-handle, .cm-live-table th.is-selected-col .cm-live-table-col-handle, .cm-live-table-col-handle:hover, .cm-live-table-col-handle:focus-visible, .cm-live-table tr:hover .cm-live-table-row-handle, .cm-live-table td.is-selected-row .cm-live-table-row-handle, .cm-live-table th.is-selected-row .cm-live-table-row-handle, .cm-live-table-row-handle:hover, .cm-live-table-row-handle:focus-visible": {
     opacity: 1,
-    backgroundColor: "rgba(35, 131, 226, 0.12)",
-    borderColor: "rgba(35, 131, 226, 0.32)",
-    color: "#14569b",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint12,
+    borderColor: EDITOR_SYNTAX_COLORS.accentBlueBorder32,
+    color: EDITOR_SYNTAX_COLORS.accentBlueDark,
   },
   ".cm-live-table-col-resizer": {
     position: "absolute",
@@ -504,14 +505,14 @@ export const liveSurfaceTheme = EditorView.theme({
     zIndex: "2",
   },
   ".cm-live-table-col-resizer:hover, .cm-live-table-col-resizer:active": {
-    backgroundColor: "#2383e2",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlue,
     width: "2px",
     right: "-1px",
   },
   ".cm-live-table th.is-active-cell, .cm-live-table td.is-active-cell": {
-    outline: "2px solid #2383e2",
+    outline: `2px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
     outlineOffset: "-2px",
-    backgroundColor: "rgba(35, 131, 226, 0.06)",
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint06,
   },
   ".cm-live-table-cell-input": {
     width: "100%",
@@ -526,20 +527,20 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-live-table-footer-row": { display: "flex", alignItems: "stretch", gap: "4px" },
   ".cm-live-table-add-col": {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    width: "24px", border: "1px solid rgba(128, 128, 128, 0.2)",
-    backgroundColor: "rgba(135, 131, 120, 0.04)", color: "inherit", borderRadius: "6px",
+    width: "24px", border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder20}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint04, color: "inherit", borderRadius: "6px",
     cursor: "pointer", fontSize: "14px", opacity: 0.68,
   },
   ".cm-live-table-add-corner": {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    width: "24px", height: "26px", flexShrink: "0", border: "1px solid rgba(128, 128, 128, 0.2)",
-    backgroundColor: "rgba(135, 131, 120, 0.04)", color: "inherit", borderRadius: "6px",
+    width: "24px", height: "26px", flexShrink: "0", border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder20}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint04, color: "inherit", borderRadius: "6px",
     cursor: "pointer", fontSize: "13px", opacity: 0.68,
   },
   ".cm-live-table-add-col:hover:not(:disabled), .cm-live-table-add-row:hover:not(:disabled), .cm-live-table-add-corner:hover:not(:disabled)": {
-    borderColor: "rgba(35, 131, 226, 0.45)",
-    backgroundColor: "rgba(35, 131, 226, 0.08)",
-    color: "#2383e2",
+    borderColor: EDITOR_SYNTAX_COLORS.accentBlueBorder45,
+    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint08,
+    color: EDITOR_SYNTAX_COLORS.accentBlue,
     opacity: 1,
   },
   ".cm-live-table-add-col:disabled, .cm-live-table-add-row:disabled, .cm-live-table-add-corner:disabled": {
@@ -548,15 +549,15 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-table-add-row": {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    height: "26px", flex: "1 1 auto", width: "100%", border: "1px solid rgba(128, 128, 128, 0.2)",
-    backgroundColor: "rgba(135, 131, 120, 0.04)", color: "inherit", borderRadius: "6px",
+    height: "26px", flex: "1 1 auto", width: "100%", border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder20}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint04, color: "inherit", borderRadius: "6px",
     cursor: "pointer", fontSize: "12.5px", fontWeight: "550", opacity: 0.68,
   },
   ".cm-live-mermaid": {
     margin: "12px 0",
     padding: "12px 16px",
     borderRadius: "6px",
-    border: "1px solid rgba(128, 128, 128, 0.24)",
+    border: `1px solid ${EDITOR_SYNTAX_COLORS.neutralBorder24}`,
     overflowX: "auto",
     cursor: "pointer",
   },
@@ -574,7 +575,7 @@ export const liveSurfaceTheme = EditorView.theme({
   },
   ".cm-live-mermaid-fallback": { margin: "0", fontSize: "13px", whiteSpace: "pre-wrap" },
   ".cm-live-callout-header:focus-visible, .cm-live-toggle-caret:focus-visible, .cm-live-bookmark-open:focus-visible, .cm-live-table-toolbar-btn:focus-visible, .cm-live-table-col-handle:focus-visible, .cm-live-table-row-handle:focus-visible, .cm-live-table-add-col:focus-visible, .cm-live-table-add-row:focus-visible, .cm-live-table-add-corner:focus-visible": {
-    outline: "2px solid #2383e2",
+    outline: `2px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
     outlineOffset: "1px",
   },
   "@media (max-width: 768px), (pointer: coarse)": {

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react"
+import { translations, type TranslationKey } from "src/libs/language/translations"
 import type { CalloutKind, MarkdownSegment } from "src/libs/markdown/rendering"
 import FormulaRender from "src/libs/markdown/FormulaRender"
 import { MarkdownImageFigure } from "src/libs/markdown/MarkdownRendererImage"
+import { normalizePublicExternalThumbnailUrl } from "src/libs/markdown/externalThumbnailUrlPolicy"
 import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
 import type { MarkdownImageWidthCommitPayload } from "src/libs/markdown/MarkdownRenderer.types"
@@ -16,17 +18,20 @@ type RenderMarkdownSegmentPayload = {
   editableImages: boolean
   onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
   renderMarkdown: RenderMarkdownBlock
+  t?: (key: TranslationKey) => string
 }
 
-const DEFAULT_CALLOUT_TITLES: Record<string, string> = {
-  summary: "핵심 요약",
-  info: "배경 메모",
-  tip: "실전 팁",
-  warning: "주의 포인트",
-  danger: "위험 경고",
-  example: "예시 시나리오",
-  outline: "읽기 가이드",
+const DEFAULT_CALLOUT_TITLE_KEYS: Record<string, TranslationKey> = {
+  summary: "calloutTitleSummary",
+  info: "calloutTitleInfo",
+  tip: "calloutTitleTip",
+  warning: "calloutTitleWarning",
+  danger: "calloutTitleDanger",
+  example: "calloutTitleExample",
+  outline: "calloutTitleOutline",
 }
+
+const fallbackTranslate = (key: TranslationKey): string => translations.ko[key]
 
 const renderCalloutIcon = (kind: CalloutKind): ReactNode => {
   const commonProps = {
@@ -113,6 +118,7 @@ export const renderMarkdownSegment = ({
   editableImages,
   onImageWidthCommit,
   renderMarkdown,
+  t = fallbackTranslate,
 }: RenderMarkdownSegmentPayload) => {
   if (segment.type === "toggle") {
     return (
@@ -130,9 +136,10 @@ export const renderMarkdownSegment = ({
 
   if (segment.type === "callout") {
     if (segment.foldable) {
+      const titleKey = DEFAULT_CALLOUT_TITLE_KEYS[segment.kind]
       const resolvedTitle =
         segment.title ||
-        DEFAULT_CALLOUT_TITLES[segment.kind] ||
+        (titleKey ? t(titleKey) : "") ||
         segment.kind.toUpperCase()
       return (
         <details
@@ -185,18 +192,20 @@ export const renderMarkdownSegment = ({
     const safeUrl = normalizeSafeMarkdownUrl(segment.url || "")
     const providerLabel =
       segment.provider || segment.siteName || (safeUrl ? inferLinkProvider(safeUrl) : "")
-    const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
+    const rawThumbnail = segment.thumbnailUrl || ""
+    const thumbnailSrc =
+      normalizePublicPostImageUrl(rawThumbnail) || normalizePublicExternalThumbnailUrl(rawThumbnail)
     const cardInner = (
       <>
         {thumbnailSrc ? (
           <div className="aq-link-card-thumb" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
+            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
           </div>
         ) : null}
         <div className="aq-link-card-copy">
           {providerLabel ? <small>{providerLabel}</small> : null}
-          <strong>{segment.title || safeUrl || "북마크"}</strong>
+          <strong>{segment.title || safeUrl || t("markdownBookmarkLabel")}</strong>
           {safeUrl ? <span>{safeUrl}</span> : null}
           {segment.description ? <p>{segment.description}</p> : null}
         </div>
@@ -213,7 +222,7 @@ export const renderMarkdownSegment = ({
 
     return (
       <div key={`bookmark-${index}`} className="aq-bookmark-card">
-        <a href={safeUrl} target="_blank" rel="noreferrer">
+        <a href={safeUrl} target="_blank" rel="noopener noreferrer">
           {cardInner}
         </a>
       </div>
@@ -227,21 +236,23 @@ export const renderMarkdownSegment = ({
       (safeUrl ? resolveEmbedPreviewUrl(safeUrl) : "")
     const providerLabel =
       segment.provider || segment.siteName || (safeUrl ? inferLinkProvider(safeUrl) : "")
-    const thumbnailSrc = normalizePublicPostImageUrl(segment.thumbnailUrl || "")
+    const rawThumbnail = segment.thumbnailUrl || ""
+    const thumbnailSrc =
+      normalizePublicPostImageUrl(rawThumbnail) || normalizePublicExternalThumbnailUrl(rawThumbnail)
     return (
       <div key={`embed-${index}`} className="aq-embed-card" data-disabled={safeUrl ? undefined : "true"}>
         <div className="aq-embed-header">
           <div className="aq-embed-copy">
             {providerLabel ? <small>{providerLabel}</small> : null}
-            <strong>{segment.title || "임베드"}</strong>
+            <strong>{segment.title || t("markdownEmbedLabel")}</strong>
           </div>
           {safeUrl ? (
-            <a href={safeUrl} target="_blank" rel="noreferrer">
-              원본 열기
+            <a href={safeUrl} target="_blank" rel="noopener noreferrer">
+              {t("markdownEmbedOpenSource")}
             </a>
           ) : (
             <span className="aq-embed-open" data-disabled="true" aria-disabled="true">
-              원본 열기
+              {t("markdownEmbedOpenSource")}
             </span>
           )}
         </div>
@@ -249,7 +260,7 @@ export const renderMarkdownSegment = ({
           <div className="aq-embed-frame">
             <iframe
               src={previewUrl}
-              title={segment.title || safeUrl || "임베드"}
+              title={segment.title || safeUrl || t("markdownEmbedLabel")}
               loading="lazy"
               sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -258,13 +269,13 @@ export const renderMarkdownSegment = ({
           </div>
         ) : (
           <div className="aq-embed-fallback">
-            <p>이 사이트는 인라인 임베드를 지원하지 않아 링크 카드로 대체했습니다.</p>
+            <p>{t("markdownEmbedFallback")}</p>
           </div>
         )}
         {thumbnailSrc && !previewUrl ? (
           <div className="aq-embed-thumb" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" />
+            <img src={thumbnailSrc} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
           </div>
         ) : null}
         {segment.caption ? <p className="aq-embed-caption">{segment.caption}</p> : null}
@@ -278,7 +289,7 @@ export const renderMarkdownSegment = ({
     const cardBody = (
       <div className="aq-link-card-copy">
         {meta ? <small>{meta}</small> : null}
-        <strong>{segment.name || "첨부 파일"}</strong>
+        <strong>{segment.name || t("markdownAttachmentLabel")}</strong>
         {safeUrl ? <span>{safeUrl}</span> : null}
       </div>
     )
@@ -292,7 +303,7 @@ export const renderMarkdownSegment = ({
     }
     return (
       <div key={`file-${index}`} className="aq-file-card">
-        <a href={safeUrl} target="_blank" rel="noreferrer">
+        <a href={safeUrl} target="_blank" rel="noopener noreferrer">
           {cardBody}
         </a>
         {segment.description ? <p>{segment.description}</p> : null}

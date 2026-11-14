@@ -16,6 +16,12 @@ import {
 } from "src/libs/markdown/pandocMathScanner"
 import type { MarkdownSegment } from "src/libs/markdown/renderingTypes"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
+import {
+  findClosingDirectiveFenceLine,
+  parseCustomDirectiveFromOpening,
+  parseOpeningDirectiveLine,
+  type CustomDirectiveKind,
+} from "src/libs/markdown/sharedDirectiveContainerParser"
 
 export {
   ASIDE_TAG_CASE_INSENSITIVE_PATTERN,
@@ -30,7 +36,7 @@ export {
   type CommonMarkContainerRangeSnapshot,
 }
 
-export type CustomDirectiveKind = "bookmark" | "embed" | "file"
+export type { CustomDirectiveKind }
 
 export type PendingDirectiveMetadata = {
   kind: CustomDirectiveKind
@@ -280,28 +286,14 @@ export const extractPromotedCalloutTitle = (
 export const parseCustomDirectiveHeader = (
   trimmedLine: string
 ): { directive: CustomDirectiveKind; rawUrl: string; inlineTitle: string } | null => {
-  if (!trimmedLine.startsWith(":::")) return null
-  const afterPrefix = trimmedLine.slice(3)
-  const firstSpace = afterPrefix.search(/\s/)
-  const rawKind = (firstSpace < 0 ? afterPrefix : afterPrefix.slice(0, firstSpace)).toLowerCase()
-  if (rawKind !== "bookmark" && rawKind !== "embed" && rawKind !== "file") {
-    return null
-  }
-  if (firstSpace < 0) {
-    return { directive: rawKind, rawUrl: "", inlineTitle: "" }
-  }
-  const remainder = afterPrefix.slice(firstSpace).trim()
-  if (!remainder) {
-    return { directive: rawKind, rawUrl: "", inlineTitle: "" }
-  }
-  const urlSpace = remainder.search(/\s/)
-  if (urlSpace < 0) {
-    return { directive: rawKind, rawUrl: remainder, inlineTitle: "" }
-  }
+  const open = parseOpeningDirectiveLine(trimmedLine)
+  if (!open) return null
+  const custom = parseCustomDirectiveFromOpening(open)
+  if (!custom) return null
   return {
-    directive: rawKind,
-    rawUrl: remainder.slice(0, urlSpace),
-    inlineTitle: remainder.slice(urlSpace).trim(),
+    directive: custom.directive,
+    rawUrl: custom.rawUrl,
+    inlineTitle: custom.inlineTitle,
   }
 }
 
@@ -376,39 +368,32 @@ export const findDirectiveCloseLineIndex = (
   startIndex: number,
   lineStarts: readonly number[] = [],
   excludedRanges: readonly MathSpanRange[] = [],
-  commentRanges: readonly MathSpanRange[] = []
-): number => {
-  for (let index = startIndex; index < lines.length; index += 1) {
-    const line = lines[index]!
-    const lineStart = lineStarts[index]
-    if (
-      lineStart !== undefined &&
-      ((excludedRanges.length > 0 &&
-        overlapsSortedRanges(excludedRanges, lineStart, lineStart + Math.max(1, line.length))) ||
-        isLineStartInCommentRanges(commentRanges, line, lineStart))
-    ) {
-      continue
-    }
-    if (DIRECTIVE_CLOSE_LINE_PATTERN.test(line)) {
-      return index
-    }
-  }
-  return -1
-}
+  commentRanges: readonly MathSpanRange[] = [],
+  openFenceLength = 3
+): number =>
+  findClosingDirectiveFenceLine(lines, startIndex, openFenceLength, {
+    lineStarts,
+    excludedRanges,
+    commentRanges,
+    overlapsRange: overlapsSortedRanges,
+    isCommentLineStart: isLineStartInCommentRanges,
+  })
 
 export const collectTripleColonBody = (
   lines: readonly string[],
   startIndex: number,
   lineStarts: readonly number[] = [],
   excludedRanges: readonly MathSpanRange[] = [],
-  commentRanges: readonly MathSpanRange[] = []
+  commentRanges: readonly MathSpanRange[] = [],
+  openFenceLength = 3
 ): { closedIndex: number; bodyLines: string[] } => {
   const closedIndex = findDirectiveCloseLineIndex(
     lines,
     startIndex,
     lineStarts,
     excludedRanges,
-    commentRanges
+    commentRanges,
+    openFenceLength
   )
   if (closedIndex < 0) {
     return { closedIndex: -1, bodyLines: lines.slice(startIndex) }
@@ -424,13 +409,14 @@ export const buildCustomDirectiveSegment = (
   directiveMetadata: Record<string, unknown>
 ): MarkdownSegment => {
   const [firstLine = "", ...restLines] = bodyLines
+  const fullBody = bodyLines.join("\n").trim()
   const secondaryText = restLines.join("\n").trim()
   if (directive === "bookmark") {
     return {
       type: "bookmark",
       url,
       title: inlineTitle || firstLine.trim() || "북마크",
-      description: inlineTitle ? bodyLines.join("\n").trim() : secondaryText,
+      description: inlineTitle ? fullBody : secondaryText,
       ...directiveMetadata,
     }
   }
@@ -438,16 +424,16 @@ export const buildCustomDirectiveSegment = (
     return {
       type: "embed",
       url,
-      title: firstLine.trim() || "임베드",
-      caption: secondaryText,
+      title: inlineTitle || firstLine.trim() || "임베드",
+      caption: inlineTitle ? fullBody : secondaryText,
       ...directiveMetadata,
     }
   }
   return {
     type: "file",
     url,
-    name: firstLine.trim() || "파일",
-    description: secondaryText,
+    name: inlineTitle || firstLine.trim() || "파일",
+    description: inlineTitle ? fullBody : secondaryText,
     ...directiveMetadata,
   }
 }

@@ -3,8 +3,10 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder as border,
   adminBorderStrong as borderStrong,
+  adminCloudSelectionAccent,
   adminControlText as controlText,
   adminGold as accentGold,
+  adminGoldTintFocus,
   adminSurface as surface,
   adminSurfaceAccent as surfaceAccent,
   adminSurfaceMuted as surfaceMuted,
@@ -86,7 +88,7 @@ export const SortSelect = styled.select`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 `
 
@@ -158,7 +160,7 @@ export const PrimaryButton = styled.button`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(185, 149, 79, 0.18));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 `
 
@@ -229,7 +231,7 @@ export const IconButton = styled.button`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(111, 149, 255, 0.22));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 `
 
@@ -267,7 +269,7 @@ export const ViewModeButton = styled.button`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--admin-focus-ring, rgba(111, 149, 255, 0.22));
+    box-shadow: 0 0 0 3px ${adminGoldTintFocus};
   }
 `
 
@@ -448,7 +450,7 @@ export const FileNameButton = styled.button`
   &:focus-visible {
     outline: none;
     color: ${accentGold};
-    box-shadow: inset 0 -2px 0 #58a6ff;
+    box-shadow: inset 0 -2px 0 ${adminCloudSelectionAccent};
   }
 
   @media (max-width: 768px), (pointer: coarse) {

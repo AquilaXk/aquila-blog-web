@@ -10,16 +10,16 @@ import {
 import { decorationField } from "src/components/markdown-editor/markdownEditorLiveSurfaceDecorations"
 import {
   isBlockLinePrefixSnippet,
-  planNotionBlockPrefixBackspace,
-  planNotionSpaceInputRule,
+  planBlockPrefixBackspace,
+  planBlockSpaceInputRule,
   planStripBlockLinePrefix,
   planToggleBlockLinePrefix,
-} from "src/components/markdown-editor/markdownEditorNotionModel"
+} from "src/components/markdown-editor/markdownEditorBlockModel"
 import {
-  MarkdownNotionCalloutBlockWidget,
-  notionContainerBlockField,
-  parseNotionContainerBlocks,
-} from "src/components/markdown-editor/markdownEditorNotionWidgets"
+  MarkdownCalloutBlockWidget,
+  blockContainerBlockField,
+  parseBlockContainerBlocks,
+} from "src/components/markdown-editor/markdownEditorBlockWidgets"
 import {
   applyMarkdownTableGridAction,
   applyMarkdownTableGridCellEdit,
@@ -83,7 +83,7 @@ const installFakeInlineDocument = () => {
   }
 }
 
-test.describe("Notion-parity Markdown editor model", () => {
+test.describe("Block-level Markdown editor model", () => {
   test("recognizes block line prefix snippets and toggles headings and blockquotes at line start", () => {
     expect(isBlockLinePrefixSnippet("# ", "")).toBe(true)
     expect(isBlockLinePrefixSnippet("## ", "")).toBe(true)
@@ -141,44 +141,44 @@ test.describe("Notion-parity Markdown editor model", () => {
   })
 
   test("converts [], >>>, ---, and !!! + Space into task, toggle, divider, and callout blocks", () => {
-    expect(planNotionSpaceInputRule("[]", 2, 2)).toEqual({
+    expect(planBlockSpaceInputRule("[]", 2, 2)).toEqual({
       rangeStart: 0, rangeEnd: 2, replacement: "- [ ] ", selectionStart: 6, selectionEnd: 6,
     })
-    expect(planNotionSpaceInputRule("  [x]", 5, 5)).toEqual({
+    expect(planBlockSpaceInputRule("  [x]", 5, 5)).toEqual({
       rangeStart: 0, rangeEnd: 5, replacement: "  - [x] ", selectionStart: 8, selectionEnd: 8,
     })
-    expect(planNotionSpaceInputRule(">>>", 3, 3)).toEqual({
+    expect(planBlockSpaceInputRule(">>>", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: ":::toggle 토글 제목\n\n:::", selectionStart: 10, selectionEnd: 15,
     })
-    expect(planNotionSpaceInputRule("---", 3, 3)).toEqual({
+    expect(planBlockSpaceInputRule("---", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: "---\n", selectionStart: 4, selectionEnd: 4,
     })
-    expect(planNotionSpaceInputRule("***", 3, 3)).toEqual({
+    expect(planBlockSpaceInputRule("***", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: "---\n", selectionStart: 4, selectionEnd: 4,
     })
-    expect(planNotionSpaceInputRule("!!!", 3, 3)).toEqual({
+    expect(planBlockSpaceInputRule("!!!", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: "> [!INFO]\n> ", selectionStart: 12, selectionEnd: 12,
     })
-    expect(planNotionSpaceInputRule("```ts\n[]\n```", 8, 8)).toBeNull()
+    expect(planBlockSpaceInputRule("```ts\n[]\n```", 8, 8)).toBeNull()
   })
 
   test("strips heading, list, and quote prefixes on single Backspace right after prefix", () => {
-    expect(planNotionBlockPrefixBackspace("## Heading", 3, 3)).toEqual({
+    expect(planBlockPrefixBackspace("## Heading", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: "", selectionStart: 0, selectionEnd: 0,
     })
-    expect(planNotionBlockPrefixBackspace("  - [ ] Task", 8, 8)).toEqual({
+    expect(planBlockPrefixBackspace("  - [ ] Task", 8, 8)).toEqual({
       rangeStart: 2, rangeEnd: 8, replacement: "", selectionStart: 2, selectionEnd: 2,
     })
-    expect(planNotionBlockPrefixBackspace("- Bullet", 2, 2)).toEqual({
+    expect(planBlockPrefixBackspace("- Bullet", 2, 2)).toEqual({
       rangeStart: 0, rangeEnd: 2, replacement: "", selectionStart: 0, selectionEnd: 0,
     })
-    expect(planNotionBlockPrefixBackspace("1. Ordered", 3, 3)).toEqual({
+    expect(planBlockPrefixBackspace("1. Ordered", 3, 3)).toEqual({
       rangeStart: 0, rangeEnd: 3, replacement: "", selectionStart: 0, selectionEnd: 0,
     })
-    expect(planNotionBlockPrefixBackspace("> Quote", 2, 2)).toEqual({
+    expect(planBlockPrefixBackspace("> Quote", 2, 2)).toEqual({
       rangeStart: 0, rangeEnd: 2, replacement: "", selectionStart: 0, selectionEnd: 0,
     })
-    expect(planNotionBlockPrefixBackspace("## Heading", 4, 4)).toBeNull()
+    expect(planBlockPrefixBackspace("## Heading", 4, 4)).toBeNull()
   })
 
   test("parses :::toggle and :::bookmark container blocks while ignoring fenced code blocks", () => {
@@ -200,7 +200,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       "```",
     ].join("\n")
 
-    const blocks = parseNotionContainerBlocks(doc)
+    const blocks = parseBlockContainerBlocks(doc)
     expect(blocks).toEqual([
       {
         kind: "toggle",
@@ -221,7 +221,7 @@ test.describe("Notion-parity Markdown editor model", () => {
     ])
   })
 
-  test("filters slash commands by Notion keyword aliases and includes list, image, and file commands", () => {
+  test("filters slash commands by block keyword aliases and includes list, image, and file commands", () => {
     const ids = SLASH_COMMAND_SPECS.map((spec) => spec.id)
     expect(ids).toContain("bullet-list")
     expect(ids).toContain("ordered-list")
@@ -467,7 +467,7 @@ test.describe("Notion-parity Markdown editor model", () => {
 
   test("parses :::callout container blocks and switches between CalloutWidget and active container line classes", () => {
     const doc = [
-      ":::callout [💡] 노션 라이브 프리뷰 팁",
+      ":::callout [💡] 에디터 라이브 프리뷰 팁",
       "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
       ":::",
       "",
@@ -476,7 +476,7 @@ test.describe("Notion-parity Markdown editor model", () => {
       ":::",
     ].join("\n")
 
-    const blocks = parseNotionContainerBlocks(doc)
+    const blocks = parseBlockContainerBlocks(doc)
     expect(blocks).toEqual([
       {
         kind: "callout",
@@ -484,9 +484,9 @@ test.describe("Notion-parity Markdown editor model", () => {
         to: doc.indexOf("\n\n:::callout warning"),
         tone: "tip",
         icon: "💡",
-        title: "노션 라이브 프리뷰 팁",
+        title: "에디터 라이브 프리뷰 팁",
         body: "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
-        bodyOffset: ":::callout [💡] 노션 라이브 프리뷰 팁\n".length,
+        bodyOffset: ":::callout [💡] 에디터 라이브 프리뷰 팁\n".length,
       },
       {
         kind: "callout",
@@ -502,46 +502,46 @@ test.describe("Notion-parity Markdown editor model", () => {
 
     const renderedSegments = parseMarkdownSegments(doc)
     expect(renderedSegments).toEqual([
-      expect.objectContaining({ type: "callout", kind: "tip", title: "노션 라이브 프리뷰 팁" }),
+      expect.objectContaining({ type: "callout", kind: "tip", title: "에디터 라이브 프리뷰 팁" }),
       expect.objectContaining({ type: "callout", kind: "warning", title: "주의사항 안내" }),
     ])
 
     const stateInactive = EditorState.create({
       doc: `${doc}\n\n바깥 문단`,
       selection: { anchor: doc.length + 3 },
-      extensions: [notionContainerBlockField],
+      extensions: [blockContainerBlockField],
     })
-    const inactiveSet = stateInactive.field(notionContainerBlockField)
+    const inactiveSet = stateInactive.field(blockContainerBlockField)
     const inactiveWidgets = collectDecorationEntries(inactiveSet, stateInactive.doc.length)
       .map((entry) => entry.widget)
       .filter(Boolean)
     expect(inactiveWidgets).toHaveLength(2)
-    expect(inactiveWidgets[0]).toBeInstanceOf(MarkdownNotionCalloutBlockWidget)
+    expect(inactiveWidgets[0]).toBeInstanceOf(MarkdownCalloutBlockWidget)
     expect(resolveLiveCalloutTone("tip").icon).toBe("💡")
 
     const stateMovedOutside = stateInactive.update({ selection: { anchor: doc.length + 5 } }).state
-    expect(stateMovedOutside.field(notionContainerBlockField)).toBe(inactiveSet)
+    expect(stateMovedOutside.field(blockContainerBlockField)).toBe(inactiveSet)
 
     const fakeCalloutDom = {
       dataset: {
         from: "0",
-        sig: ["tip", "💡", "노션 라이브 프리뷰 팁", "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.", "24"].join("\0"),
+        sig: ["tip", "💡", "에디터 라이브 프리뷰 팁", "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.", "25"].join("\0"),
       },
     } as unknown as HTMLElement
-    const shiftedCalloutWidget = new MarkdownNotionCalloutBlockWidget(
+    const shiftedCalloutWidget = new MarkdownCalloutBlockWidget(
       "tip",
       "💡",
-      "노션 라이브 프리뷰 팁",
+      "에디터 라이브 프리뷰 팁",
       "활성 줄을 벗어나면 깔끔한 카드 블록으로 전환됩니다.",
       32,
       120,
-      24
+      25
     )
     expect(shiftedCalloutWidget.updateDOM(fakeCalloutDom)).toBe(true)
     expect(fakeCalloutDom.dataset.from).toBe("32")
 
     const stateActive = stateInactive.update({ selection: { anchor: 5 } }).state
-    const activeSet = stateActive.field(notionContainerBlockField)
+    const activeSet = stateActive.field(blockContainerBlockField)
     const activeLineClasses = collectDecorationEntries(activeSet, doc.indexOf("\n\n:::callout warning"))
       .map((entry) => entry.className)
       .filter(Boolean)

@@ -6,7 +6,7 @@ import ts from "typescript"
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const frontRoot = path.resolve(scriptDir, "..")
 
-const PRODUCTION_HARD_LIMIT = 2_500
+const PRODUCTION_HARD_LIMIT = 600
 const PRODUCTION_SOFT_LIMIT = 600
 const E2E_ROOT_SPEC_HARD_LIMIT = 2_500
 const E2E_ROOT_SPEC_ADVISORY_LIMIT = 800
@@ -17,15 +17,18 @@ const productionSoftAllowlist = {}
 
 const e2eRootAllowlist = {}
 
-const productionRoots = ["src", "pages"]
+const productionRoots = ["src", "pages", "packages"]
 const generatedPathPatterns = [
   /(^|\/)__generated__\//,
   /(^|\/)generated\//,
+  /(^|\/)dist\//,
+  /(^|\/)build\//,
+  /(^|\/)node_modules\//,
   /\.generated\./,
   /\.d\.ts$/,
 ]
 
-const isSourceFile = (filePath) => /\.(ts|tsx|mts|cts)$/.test(filePath)
+const isSourceFile = (filePath) => /\.(ts|tsx|mts|cts|js|mjs)$/.test(filePath)
 const isProductionFile = (filePath) =>
   isSourceFile(filePath) &&
   !generatedPathPatterns.some((pattern) => pattern.test(filePath))
@@ -47,6 +50,9 @@ const walk = (relativeDir) => {
   for (const entry of readdirSync(absoluteDir, { withFileTypes: true })) {
     const relativePath = normalizePath(path.join(relativeDir, entry.name))
     if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".next") {
+        continue
+      }
       files.push(...walk(relativePath))
       continue
     }

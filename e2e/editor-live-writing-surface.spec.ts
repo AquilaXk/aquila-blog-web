@@ -1406,25 +1406,25 @@ test.describe("live Markdown writing surface", () => {
     }).toBe(true)
   })
 
-  test("supports Notion floating selection bubble, left-gutter plus slash trigger, and live input rules", async ({ page }) => {
+  test("supports floating selection bubble, left-gutter plus slash trigger, and live input rules", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 840 })
-    await routeAuthenticatedEditor(page, "Notion writing line")
+    await routeAuthenticatedEditor(page, "Editor writing line")
     await openEditorDraft(page)
 
     await selectMarkdownRange(page, 0, 6)
     const selectionBubble = page.getByRole("toolbar", { name: "선택 텍스트 빠른 서식" })
     await expect(selectionBubble).toBeVisible()
     await selectionBubble.getByRole("button", { name: "선택 영역 하이라이트" }).click()
-    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+    await expect.poll(() => readMarkdown(page)).toBe("==Editor== writing line")
 
     await selectMarkdownRange(page, 0, 10)
     await expect(selectionBubble).toBeVisible()
     await selectionBubble.getByRole("button", { name: "선택 영역 제목 2" }).click()
-    await expect.poll(() => readMarkdown(page)).toBe("## ==Notion== writing line")
+    await expect.poll(() => readMarkdown(page)).toBe("## ==Editor== writing line")
 
     await selectMarkdownRangeWithoutAssertion(page, 3, 3)
     await editorContent(page).press("Backspace")
-    await expect.poll(() => readMarkdown(page)).toBe("==Notion== writing line")
+    await expect.poll(() => readMarkdown(page)).toBe("==Editor== writing line")
 
     await fillMarkdown(page, "")
     const gutterPlus = page.getByRole("button", { name: "현재 줄에 블록 삽입" })

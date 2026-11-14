@@ -1,13 +1,17 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
+  TARGET_PATHS,
   collectDiffText,
+  collectFullScanViolations,
   committedDiffRange,
   findDirectColorViolations,
+  findDirectColorViolationsInSource,
   isColorSourceFile,
+  shouldUseFullScan,
 } from "./check-design-colors.mjs"
 
 test("findDirectColorViolations reports added hex colors", () => {
@@ -152,5 +156,65 @@ test("collectDiffText skips non-git build directories", () => {
     assert.equal(collectDiffText(), "")
   } finally {
     process.chdir(originalCwd)
+  }
+})
+
+test("TARGET_PATHS includes src/pages and packages", () => {
+  assert.ok(TARGET_PATHS.includes("src/pages"))
+  assert.ok(TARGET_PATHS.includes("packages"))
+})
+
+test("shouldUseFullScan detects HEAD === baseRef silent pass condition and explicit full mode", () => {
+  assert.equal(
+    shouldUseFullScan({ diffText: "", headSha: "abc123", baseSha: "abc123", scanMode: "" }),
+    true
+  )
+  assert.equal(
+    shouldUseFullScan({ diffText: "diff...", headSha: "abc123", baseSha: "def456", scanMode: "" }),
+    false
+  )
+  assert.equal(
+    shouldUseFullScan({ diffText: "diff...", headSha: "abc123", baseSha: "def456", scanMode: "full" }),
+    true
+  )
+})
+
+test("collectFullScanViolations scans src/pages and packages and ignores dist/.d.ts", () => {
+  const sandbox = mkdtempSync(join(tmpdir(), "design-colors-full-scan-"))
+  try {
+    mkdirSync(join(sandbox, "src/pages"), { recursive: true })
+    mkdirSync(join(sandbox, "packages/shared-ui-tokens/src"), { recursive: true })
+    mkdirSync(join(sandbox, "packages/shared-ui-tokens/dist"), { recursive: true })
+    mkdirSync(join(sandbox, "src/design-system"), { recursive: true })
+
+    writeFileSync(join(sandbox, "src/pages/sample.tsx"), 'export const x = "#ff00aa"\n')
+    writeFileSync(
+      join(sandbox, "packages/shared-ui-tokens/src/index.js"),
+      'export const bad = "rgb(1, 2, 3)"\n'
+    )
+    writeFileSync(
+      join(sandbox, "packages/shared-ui-tokens/dist/index.js"),
+      'export const built = "#123456"\n'
+    )
+    writeFileSync(
+      join(sandbox, "src/design-system/marketingPalette.ts"),
+      'export const palette = { accent: "#123456" }\n'
+    )
+
+    const violations = collectFullScanViolations(sandbox, TARGET_PATHS)
+    assert.deepEqual(violations, [
+      { file: "src/pages/sample.tsx", line: 1, source: 'export const x = "#ff00aa"' },
+      {
+        file: "packages/shared-ui-tokens/src/index.js",
+        line: 1,
+        source: 'export const bad = "rgb(1, 2, 3)"',
+      },
+    ])
+    assert.deepEqual(
+      findDirectColorViolationsInSource("src/pages/ok.tsx", 'const href = "#heading"'),
+      []
+    )
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
   }
 })

@@ -1,3 +1,21 @@
+import {
+  extractAlphaNumericOutsideAngles,
+  extractAsciiAlphaNumeric,
+  isAsciiAlphaNumericCode,
+  isAsciiDigitCode,
+  isAsciiMathPrefixCode,
+  isAsciiSpaceCode,
+  isUnicodeWhitespaceChar,
+  matchLowerAsciiPrefixAt,
+} from "./asciiScannerTable"
+
+export {
+  extractAlphaNumericOutsideAngles,
+  extractAsciiAlphaNumeric,
+  isAsciiAlphaNumericCode,
+  isUnicodeWhitespaceChar,
+}
+
 export type MathSpanRange = { from: number; to: number }
 export type CommonMarkContainerRangeSnapshot = {
   asideRanges: MathSpanRange[]
@@ -7,8 +25,9 @@ export type ScannedPandocMathToken = { kind: "inline" | "display"; from: number;
 
 export const DEFAULT_MAX_INLINE_MATH_LENGTH = 2048
 export const DEFAULT_MAX_DISPLAY_MATH_LENGTH = 16384
-export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:::[ \t\r]*$/
-export const SUPPORTED_DIRECTIVE_OPEN_PATTERN = /^:::(?:callout|toggle|bookmark|embed|file)(?:[ \t\r]|$)/
+export const DIRECTIVE_CLOSE_LINE_PATTERN = /^:{3,}[ \t\r]*$/
+export const SUPPORTED_DIRECTIVE_OPEN_PATTERN =
+  /^:{3,}(?:callout|toggle|bookmark|embed|video|youtube|file|attachment|pdf)(?:[ \t\r]|$)/i
 export const ASIDE_TAG_CASE_INSENSITIVE_PATTERN = /<aside/i
 
 let blockRangeProvider: ((content: string) => CommonMarkContainerRangeSnapshot) | null = null
@@ -20,18 +39,16 @@ export const registerCommonMarkBlockRangeProvider = (
 }
 
 const COMMONMARK_CODE_INDENT_PATTERN = /^(?: {4}|\t| {1,3}\t)/
-const SINGLE_WHITESPACE_PATTERN = /^\s$/u
 const SINGLE_SPACE_CHAR_PATTERN = /^\s$/
 const THEMATIC_BREAK_LINE_PATTERN = /^(?:\*[ \t]*){3,}$|^(?:-[ \t]*){3,}$|^(?:_[ \t]*){3,}$/
 const LIST_MARKER_LINE_PATTERN = /^(?:[-+*]|\d+[.)])[ \t]/
 const HTML_OPEN_TAG_LINE_PATTERN = /^<[a-zA-Z!/]/
-const AUTOLINK_SCHEMES = ["http://", "https://", "ftp://", "mailto:"] as const
 
 export const hasCommonMarkCodeIndent = (line: string): boolean => COMMONMARK_CODE_INDENT_PATTERN.test(line)
 
 export const extractAsideOpenTail = (line: string): string | null => {
   const trimmedStart = line.trimStart()
-  if (!trimmedStart.toLowerCase().startsWith("<aside")) return null
+  if (!matchLowerAsciiPrefixAt(trimmedStart, 0, "<aside")) return null
   const nextChar = trimmedStart[6]
   if (nextChar === ">") return trimmedStart.slice(7)
   if (!nextChar || !SINGLE_SPACE_CHAR_PATTERN.test(nextChar)) return null
@@ -41,39 +58,10 @@ export const extractAsideOpenTail = (line: string): string | null => {
 
 export const stripClosingAsideTag = (value: string): string | null => {
   const trimmedEnd = value.trimEnd()
-  if (!trimmedEnd.toLowerCase().endsWith("</aside>")) return null
-  return trimmedEnd.slice(0, -"</aside>".length).trimEnd()
+  const tailStart = trimmedEnd.length - 8
+  if (tailStart < 0 || !matchLowerAsciiPrefixAt(trimmedEnd, tailStart, "</aside>")) return null
+  return trimmedEnd.slice(0, tailStart).trimEnd()
 }
-
-const ALLOWED_ASCII_PREFIX_CODES = new Set([
-  40, 91, 123, 34, 39, 45, 61, 47, 43, 60, 62, 44, 59, 58, 33, 63, 42, 95, 126, 124,
-])
-const isAsciiDigitCode = (code: number): boolean => code >= 48 && code <= 57
-export const isAsciiAlphaNumericCode = (code: number): boolean =>
-  (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
-
-export const extractAsciiAlphaNumeric = (text: string): string => {
-  let out = ""
-  for (let i = 0; i < text.length; i += 1) {
-    if (isAsciiAlphaNumericCode(text.codePointAt(i) ?? 0)) out += text[i]!
-  }
-  return out
-}
-
-export const extractAlphaNumericOutsideAngles = (text: string): string => {
-  let out = ""
-  let inAngle = false
-  for (let i = 0; i < text.length; i += 1) {
-    const code = text.codePointAt(i) ?? 0
-    if (code === 60) inAngle = true
-    else if (code === 62 || code === 10 || code === 13 || code === 0xe000) inAngle = false
-    else if (!inAngle && isAsciiAlphaNumericCode(code)) out += text[i]!
-  }
-  return out
-}
-
-export const isUnicodeWhitespaceChar = (ch: string | undefined): boolean =>
-  ch !== undefined && SINGLE_WHITESPACE_PATTERN.test(ch)
 
 export const isEscapedMarkdownAt = (text: string, index: number): boolean => {
   let slashCount = 0
@@ -255,21 +243,23 @@ const scanAutolinkClosingAngle = (text: string, start: number): number => {
 }
 
 export const matchAutolinkEnd = (text: string, index: number): number => {
-  if (text.codePointAt(index) !== 60) return -1
-  const probe = text.slice(index + 1, index + 12).toLowerCase()
-  if (!AUTOLINK_SCHEMES.some((scheme) => probe.startsWith(scheme))) return -1
-  return scanAutolinkClosingAngle(text, index + 2)
+  if (text.charCodeAt(index) !== 60) return -1
+  const next = text.charCodeAt(index + 1) | 0x20
+  const hasScheme =
+    (next === 104 && (matchLowerAsciiPrefixAt(text, index + 1, "http://") || matchLowerAsciiPrefixAt(text, index + 1, "https://"))) ||
+    (next === 102 && matchLowerAsciiPrefixAt(text, index + 1, "ftp://")) ||
+    (next === 109 && matchLowerAsciiPrefixAt(text, index + 1, "mailto:"))
+  return hasScheme ? scanAutolinkClosingAngle(text, index + 2) : -1
 }
 
 const isBareUrlStopCode = (code: number): boolean =>
   code <= 32 || code === 60 || code === 62 || code === 41
 
 export const matchBareUrlEnd = (text: string, index: number): number => {
-  const lowerSlice = text.slice(index, index + 8).toLowerCase()
-  if (!lowerSlice.startsWith("http://") && !lowerSlice.startsWith("https://")) return -1
-  if (index > 0 && isAsciiAlphaNumericCode(text.codePointAt(index - 1) ?? 0)) return -1
+  if (!matchLowerAsciiPrefixAt(text, index, "http://") && !matchLowerAsciiPrefixAt(text, index, "https://")) return -1
+  if (index > 0 && isAsciiAlphaNumericCode(text.charCodeAt(index - 1))) return -1
   let cursor = index + 7
-  while (cursor < text.length && !isBareUrlStopCode(text.codePointAt(cursor) ?? 0)) cursor += 1
+  while (cursor < text.length && !isBareUrlStopCode(text.charCodeAt(cursor))) cursor += 1
   return cursor
 }
 
@@ -524,10 +514,11 @@ export const scanPandocDisplayMathAt = (
 }
 
 export const isAllowedPandocInlineMathPrefix = (text: string, openIndex: number): boolean => {
-  if (openIndex === 0 || isUnicodeWhitespaceChar(text[openIndex - 1])) return true
-  const prevCode = text.codePointAt(openIndex - 1) ?? 0
+  if (openIndex === 0) return true
+  const prevCode = text.charCodeAt(openIndex - 1)
+  if (prevCode >= 0x80 || isAsciiSpaceCode(prevCode)) return true
   if (prevCode === 92) return !isEscapedMarkdownAt(text, openIndex)
-  return prevCode > 0x7f || ALLOWED_ASCII_PREFIX_CODES.has(prevCode)
+  return isAsciiMathPrefixCode(prevCode)
 }
 
 const isAbortingInlineMathCode = (text: string, cursor: number, code: number): boolean => {

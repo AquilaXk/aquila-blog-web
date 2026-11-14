@@ -20,15 +20,15 @@ const EXISTING_BLOCK_PREFIX_RE = /^(#{1,6}[ \t]+|>[ \t]?)/
 const STRIP_BLOCK_PREFIX_RE =
   /^(?<indent>[ \t]*)(?<prefix>#{1,6}[ \t]+|[-*+] \[[ xX]\] |[-*+] |\d+\. |>[ \t]?)/
 const QUOTE_PREFIX_RE = /^(>[ \t]?)/
-const NOTION_TODO_INPUT_RE = /^(?<indent>[ \t]*)\[(?<check>[ xX]?)\]$/
-const NOTION_TOGGLE_INPUT_RE = /^(?<indent>[ \t]*)>>>$/
-const NOTION_DIVIDER_INPUT_RE = /^(?<indent>[ \t]*)(?:---|[*]{3})$/
-const NOTION_CALLOUT_INPUT_RE = /^(?<indent>[ \t]*)!!!$/
-const NOTION_BACKSPACE_PREFIX_RE =
+const BLOCK_TODO_INPUT_RE = /^(?<indent>[ \t]*)\[(?<check>[ xX]?)\]$/
+const BLOCK_TOGGLE_INPUT_RE = /^(?<indent>[ \t]*)>>>$/
+const BLOCK_DIVIDER_INPUT_RE = /^(?<indent>[ \t]*)(?:---|[*]{3})$/
+const BLOCK_CALLOUT_INPUT_RE = /^(?<indent>[ \t]*)!!!$/
+const BLOCK_BACKSPACE_PREFIX_RE =
   /^(?<indent>[ \t]*)(?<prefix>#{1,6}[ \t]+|[-*+] \[[ xX]\] |[-*+] |\d+\. |> )$/
 const CHECKED_TASK_LINE_RE = /^[ \t]*[-*+][ \t]+\[[xX]\][ \t]+/
-const NOTION_TOGGLE_TEMPLATE = ":::toggle 토글 제목\n\n:::"
-const NOTION_CALLOUT_TEMPLATE = "> [!INFO]\n> "
+const BLOCK_TOGGLE_TEMPLATE = ":::toggle 토글 제목\n\n:::"
+const BLOCK_CALLOUT_TEMPLATE = "> [!INFO]\n> "
 const ACTIVE_EMPTY_LINE_PLACEHOLDER =
   "'/'를 눌러 블록을 삽입하거나 내용을 입력하세요..."
 
@@ -285,7 +285,7 @@ export const planMarkdownSnippetMutation = (
     : planWrapSelection(value, selectionStart, selectionEnd, before, after)
 }
 
-export const planNotionSpaceInputRule = (
+export const planBlockSpaceInputRule = (
   value: string,
   selectionStart: number,
   selectionEnd: number
@@ -300,7 +300,7 @@ export const planNotionSpaceInputRule = (
   const lineBeforeCursor = value.slice(lineStart, selectionStart)
   const lineAfterCursor = value.slice(selectionStart, lineEnd)
 
-  const todoMatch = NOTION_TODO_INPUT_RE.exec(lineBeforeCursor)
+  const todoMatch = BLOCK_TODO_INPUT_RE.exec(lineBeforeCursor)
   if (todoMatch?.groups) {
     const indent = todoMatch.groups.indent ?? ""
     const check = (todoMatch.groups.check ?? "").toLowerCase() === "x" ? "x" : " "
@@ -316,17 +316,17 @@ export const planNotionSpaceInputRule = (
   }
 
   if (lineAfterCursor.trim().length === 0) {
-    if (NOTION_TOGGLE_INPUT_RE.test(lineBeforeCursor)) {
+    if (BLOCK_TOGGLE_INPUT_RE.test(lineBeforeCursor)) {
       return {
         rangeStart: lineStart,
         rangeEnd: lineEnd,
-        replacement: NOTION_TOGGLE_TEMPLATE,
+        replacement: BLOCK_TOGGLE_TEMPLATE,
         selectionStart: lineStart + 10,
         selectionEnd: lineStart + 15,
       }
     }
 
-    if (NOTION_DIVIDER_INPUT_RE.test(lineBeforeCursor)) {
+    if (BLOCK_DIVIDER_INPUT_RE.test(lineBeforeCursor)) {
       return {
         rangeStart: lineStart,
         rangeEnd: lineEnd,
@@ -336,11 +336,11 @@ export const planNotionSpaceInputRule = (
       }
     }
 
-    if (NOTION_CALLOUT_INPUT_RE.test(lineBeforeCursor)) {
+    if (BLOCK_CALLOUT_INPUT_RE.test(lineBeforeCursor)) {
       return {
         rangeStart: lineStart,
         rangeEnd: lineEnd,
-        replacement: NOTION_CALLOUT_TEMPLATE,
+        replacement: BLOCK_CALLOUT_TEMPLATE,
         selectionStart: lineStart + 12,
         selectionEnd: lineStart + 12,
       }
@@ -350,7 +350,7 @@ export const planNotionSpaceInputRule = (
   return null
 }
 
-export const planNotionBlockPrefixBackspace = (
+export const planBlockPrefixBackspace = (
   value: string,
   selectionStart: number,
   selectionEnd: number
@@ -361,7 +361,7 @@ export const planNotionBlockPrefixBackspace = (
 
   const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1
   const lineBeforeCursor = value.slice(lineStart, selectionStart)
-  const match = NOTION_BACKSPACE_PREFIX_RE.exec(lineBeforeCursor)
+  const match = BLOCK_BACKSPACE_PREFIX_RE.exec(lineBeforeCursor)
   if (!match?.groups) return null
 
   const indent = match.groups.indent ?? ""
@@ -375,17 +375,17 @@ export const planNotionBlockPrefixBackspace = (
   }
 }
 
-type NotionDocLineMeta = {
+type BlockDocLineMeta = {
   doc: EditorState["doc"]
   checkedTaskLineStarts: readonly number[]
   fencedRanges: readonly { from: number; to: number }[]
 }
 
-let cachedNotionLineMeta: NotionDocLineMeta | null = null
+let cachedBlockLineMeta: BlockDocLineMeta | null = null
 
-export const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineMeta => {
-  if (cachedNotionLineMeta && cachedNotionLineMeta.doc === doc) {
-    return cachedNotionLineMeta
+export const getCachedBlockLineMeta = (doc: EditorState["doc"]): BlockDocLineMeta => {
+  if (cachedBlockLineMeta && cachedBlockLineMeta.doc === doc) {
+    return cachedBlockLineMeta
   }
   const docText = getDocString(doc)
   if (
@@ -393,12 +393,12 @@ export const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineM
     !docText.includes("~~~") &&
     !/\[[xX]\]/.test(docText)
   ) {
-    cachedNotionLineMeta = {
+    cachedBlockLineMeta = {
       doc,
       checkedTaskLineStarts: [],
       fencedRanges: [],
     }
-    return cachedNotionLineMeta
+    return cachedBlockLineMeta
   }
 
   const checkedTaskLineStarts: number[] = []
@@ -419,8 +419,8 @@ export const getCachedNotionLineMeta = (doc: EditorState["doc"]): NotionDocLineM
     return true
   })
 
-  cachedNotionLineMeta = { doc, checkedTaskLineStarts, fencedRanges }
-  return cachedNotionLineMeta
+  cachedBlockLineMeta = { doc, checkedTaskLineStarts, fencedRanges }
+  return cachedBlockLineMeta
 }
 
 const resolveActiveEmptyLineFrom = (
@@ -447,7 +447,7 @@ const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
     return Decoration.none
   }
 
-  const meta = getCachedNotionLineMeta(state.doc)
+  const meta = getCachedBlockLineMeta(state.doc)
   const activeEmptyLineFrom =
     mode === "reading" ? -1 : resolveActiveEmptyLineFrom(state, meta.fencedRanges)
   if (

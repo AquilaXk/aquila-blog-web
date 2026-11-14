@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test"
+const { match } = require("next/dist/compiled/path-to-regexp")
 const nextConfig = require("../../next.config.js")
 
 test.describe("next.config.js static asset cache headers", () => {
-  test("defines long-term cache headers for static public assets", async () => {
+  test("defines long-term cache headers for static public assets without polluting SSR HTML routes", async () => {
     const headersList = await nextConfig.headers()
     const bySource = new Map<string, Array<{ key: string; value: string }>>()
     for (const entry of headersList) {
@@ -10,8 +11,13 @@ test.describe("next.config.js static asset cache headers", () => {
     }
 
     expect(bySource.has("/:path*")).toBe(true)
+    expect(bySource.has("/easysubway/:path*")).toBe(false)
+    expect(bySource.has("/company/:path*")).toBe(false)
 
-    const easysubwayHeaders = bySource.get("/easysubway/:path*")
+    const easysubwayStaticSource = "/easysubway/:path+.:ext(webp|png|jpg|jpeg|gif|svg|ico|avif)"
+    const companyStaticSource = "/company/:path+.:ext(webp|png|jpg|jpeg|gif|svg|ico|avif)"
+
+    const easysubwayHeaders = bySource.get(easysubwayStaticSource)
     expect(easysubwayHeaders).toBeDefined()
     expect(easysubwayHeaders).toEqual(
       expect.arrayContaining([
@@ -22,7 +28,7 @@ test.describe("next.config.js static asset cache headers", () => {
       ])
     )
 
-    const companyHeaders = bySource.get("/company/:path*")
+    const companyHeaders = bySource.get(companyStaticSource)
     expect(companyHeaders).toBeDefined()
     expect(companyHeaders).toEqual(
       expect.arrayContaining([
@@ -32,6 +38,17 @@ test.describe("next.config.js static asset cache headers", () => {
         },
       ])
     )
+
+    const matchEasysubway = match(easysubwayStaticSource)
+    expect(Boolean(matchEasysubway("/easysubway"))).toBe(false)
+    expect(Boolean(matchEasysubway("/easysubway/"))).toBe(false)
+    expect(Boolean(matchEasysubway("/easysubway/og-image.png"))).toBe(true)
+    expect(Boolean(matchEasysubway("/easysubway/badges/seoul_1_compact_256.webp"))).toBe(true)
+
+    const matchCompany = match(companyStaticSource)
+    expect(Boolean(matchCompany("/company"))).toBe(false)
+    expect(Boolean(matchCompany("/company/"))).toBe(false)
+    expect(Boolean(matchCompany("/company/blog-home.webp"))).toBe(true)
 
     const brandMascotHeaders = bySource.get("/brand-mascot.:slug*.png")
     expect(brandMascotHeaders).toBeDefined()

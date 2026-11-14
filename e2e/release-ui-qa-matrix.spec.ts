@@ -51,12 +51,12 @@ test.describe("release UI QA matrix", () => {
       })
 
       await page.goto("/")
-      await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+      await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
       await expect(page.locator("a[href^='/posts/'] h2").first()).toBeVisible()
       await expectDocumentInsideViewport(page)
 
       routeRequests.length = 0
-      await page.getByLabel("Search posts by keyword").fill("release matrix")
+      await page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/).fill("release matrix")
       await expect.poll(() => routeRequests.some((url) => url.includes("/posts/search"))).toBeTruthy()
       await expect(page.locator("a[href^='/posts/'] h2").first()).toBeVisible()
       await expectDocumentInsideViewport(page)

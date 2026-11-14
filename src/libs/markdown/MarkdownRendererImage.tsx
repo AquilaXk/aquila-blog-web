@@ -1,4 +1,5 @@
 import { memo, type CSSProperties, useEffect, useRef, useState } from "react"
+import { useLanguage } from "src/libs/language"
 import type { MarkdownImageFigureProps } from "src/libs/markdown/MarkdownRenderer.types"
 import { normalizeSafeMarkdownImageSrc } from "src/libs/markdown/safeMarkdownUrl"
 
@@ -15,6 +16,7 @@ export const MarkdownImageFigure = memo(
     imageIndex,
     onWidthCommit,
   }: MarkdownImageFigureProps) => {
+    const { t } = useLanguage()
     const frameRef = useRef<HTMLElement>(null)
     const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(null)
     const liveWidthRef = useRef<number | null>(null)
@@ -55,7 +57,7 @@ export const MarkdownImageFigure = memo(
         : undefined
 
     if (!safeSrc) {
-      const blockedLabel = alt || "차단된 이미지"
+      const blockedLabel = alt || t("markdownBlockedImage")
       return <span className="aq-image-blocked" role="img" aria-label={blockedLabel}>{blockedLabel}</span>
     }
 

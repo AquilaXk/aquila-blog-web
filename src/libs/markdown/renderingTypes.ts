@@ -1,6 +1,7 @@
 import type { MarkdownTableLayout } from "src/libs/markdown/tableMetadata"
 import type { MarkdownFootnote } from "src/libs/markdown/renderingFootnoteModel"
 import type { CalloutKind } from "src/libs/markdown/calloutRegistry"
+import { INLINE_TEXT_COLOR_OPTIONS } from "src/libs/markdown/inlineColor"
 
 export type { CalloutKind } from "src/libs/markdown/calloutRegistry"
 
@@ -72,7 +73,7 @@ const x = 1
 - 체크리스트:
   - [ ] 할 일
   - [x] 완료한 일
-- 글자색: \`{{color:#60a5fa|강조 텍스트}}\`
+- 글자색: \`{{color:${INLINE_TEXT_COLOR_OPTIONS[0].value}|강조 텍스트}}\`
 - 머메이드: \`\`\`mermaid
 graph TD
   A[Start] --> B{Check}

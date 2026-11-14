@@ -133,3 +133,14 @@ export const adminFocusRing = (theme: Theme, width = 3) =>
 
 export const adminActionGroupSurface = (theme: Theme) =>
   theme.scheme === "light" ? adminActionGroupLightSurface : adminActionGroupDarkSurface
+
+export const adminTagChipPalettes = [
+  { border: "rgba(35, 131, 226, 0.25)", bg: "#e9f3f7", color: "#14569b" },
+  { border: "rgba(144, 101, 176, 0.25)", bg: "#f6f3f9", color: "#5b3678" },
+  { border: "rgba(16, 185, 129, 0.25)", bg: "#edf3ec", color: "#255c3e" },
+  { border: "rgba(245, 158, 11, 0.28)", bg: "#fbf3db", color: "#78490a" },
+  { border: "rgba(235, 87, 87, 0.25)", bg: "#fdebec", color: "#9c2520" },
+  { border: "rgba(2, 132, 199, 0.25)", bg: "#e0f2fe", color: "#075985" },
+] as const
+
+export const adminCloudSelectionAccent = "#58a6ff"

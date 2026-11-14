@@ -7,6 +7,7 @@ import AppIcon from "src/components/icons/AppIcon"
 import { skeletonShimmerCss } from "src/design-system/StatePresenters"
 import { TPost } from "src/types"
 import { useLanguage } from "src/libs/language"
+import { resolveFeedInitialMountCount } from "../FeedExplorerRestoreModel"
 
 type Props = {
   posts: TPost[]
@@ -18,6 +19,7 @@ type Props = {
   isFetchingNextPage?: boolean
   isFetchNextPageError?: boolean
   hasNextPage?: boolean
+  restoreScrollY?: number
   onLoadMore?: () => void
   onRetryInitialLoad?: () => void
   onRetryLoadMore?: () => void
@@ -99,6 +101,7 @@ const PostList: React.FC<Props> = ({
   isFetchingNextPage = false,
   isFetchNextPageError = false,
   hasNextPage = false,
+  restoreScrollY = 0,
   onLoadMore,
   onRetryInitialLoad,
   onRetryLoadMore,
@@ -107,9 +110,12 @@ const PostList: React.FC<Props> = ({
   const { t } = useLanguage()
   const deferredMountTriggerRef = useRef<HTMLDivElement | null>(null)
   const previousFirstPostIdRef = useRef<string | null>(null)
-  const [mountedCardCount, setMountedCardCount] = useState(() =>
-    Math.min(posts.length, DEFERRED_MOUNT_INITIAL_COUNT)
+  const targetInitialMountCount = resolveFeedInitialMountCount(
+    posts.length,
+    restoreScrollY,
+    DEFERRED_MOUNT_INITIAL_COUNT
   )
+  const [mountedCardCount, setMountedCardCount] = useState(targetInitialMountCount)
   const showInitialLoadError = !isInitialLoading && isInitialLoadError && !posts.length && !hasExternalResults
   const showEmptyState = !showInitialLoadError && !isInitialLoading && !posts.length && !hasExternalResults
 
@@ -119,7 +125,7 @@ const PostList: React.FC<Props> = ({
     previousFirstPostIdRef.current = posts.length ? nextFirstPostId : null
     const hasListReplaced =
       Boolean(previousFirstPostId) && Boolean(nextFirstPostId) && previousFirstPostId !== nextFirstPostId
-    const nextInitialCount = Math.min(posts.length, DEFERRED_MOUNT_INITIAL_COUNT)
+    const nextInitialCount = targetInitialMountCount
 
     if (hasListReplaced && mountedCardCount !== nextInitialCount) {
       setMountedCardCount(nextInitialCount)
@@ -175,7 +181,7 @@ const PostList: React.FC<Props> = ({
       disposed = true
       observer?.disconnect()
     }
-  }, [mountedCardCount, posts])
+  }, [mountedCardCount, posts, targetInitialMountCount])
 
   return (
     <StyledWrapper>

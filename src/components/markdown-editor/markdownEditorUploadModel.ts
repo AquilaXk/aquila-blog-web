@@ -3,10 +3,34 @@ import { normalizePostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 export const MARKDOWN_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
 export const MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE = "첨부 파일은 10MB 이하여야 합니다."
+export const MARKDOWN_ATTACHMENT_UNSAFE_TYPE_MESSAGE =
+  "HTML, SVG, JavaScript 등 실행 가능한 파일은 첨부할 수 없습니다."
 export const MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE = "첨부 파일 업로드에 실패했습니다."
 export const MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE = "첨부 파일 업로드 결과 URL을 확인할 수 없습니다."
 export const MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE = "이미지 업로드에 실패했습니다."
 export const MARKDOWN_IMAGE_URL_MISSING_MESSAGE = "이미지 업로드 결과 URL을 확인할 수 없습니다."
+
+const DANGEROUS_ATTACHMENT_EXTENSIONS = new Set([
+  ".html",
+  ".htm",
+  ".svg",
+  ".svgz",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".xhtml",
+])
+
+const DANGEROUS_ATTACHMENT_MIME_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+  "application/ecmascript",
+  "text/ecmascript",
+])
 
 export type MarkdownFileUploadResult = {
   url?: string
@@ -27,11 +51,64 @@ export type MarkdownImageUploadResult = {
   heightPx?: number
 }
 
-export const validateMarkdownAttachmentSize = (file: File): string | null => {
+const extractLowercaseExtension = (pathOrName: string): string => {
+  const clean = pathOrName.split(/[?#]/, 1)[0]?.trim() || ""
+  const base = clean.slice(clean.lastIndexOf("/") + 1)
+  const dotIdx = base.lastIndexOf(".")
+  if (dotIdx <= 0) return ""
+  return base.slice(dotIdx).toLowerCase()
+}
+
+export const isDangerousMarkdownAttachmentType = (name: string, mimeType = ""): boolean => {
+  const ext = extractLowercaseExtension(name)
+  if (ext && DANGEROUS_ATTACHMENT_EXTENSIONS.has(ext)) return true
+
+  const normalizedMime = mimeType.split(";", 1)[0]?.trim().toLowerCase() || ""
+  return Boolean(normalizedMime && DANGEROUS_ATTACHMENT_MIME_TYPES.has(normalizedMime))
+}
+
+export const validateMarkdownAttachmentSize = (file: Pick<File, "size"> & Partial<Pick<File, "name" | "type">>): string | null => {
   if (file.size > MARKDOWN_ATTACHMENT_MAX_BYTES) {
     return MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE
   }
+  if (isDangerousMarkdownAttachmentType(file.name || "", file.type || "")) {
+    return MARKDOWN_ATTACHMENT_UNSAFE_TYPE_MESSAGE
+  }
   return null
+}
+
+const hasControlChars = (value: string): boolean => {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.codePointAt(i) ?? 0
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
+
+const normalizeSafeAttachmentUrl = (rawUrl: string): string => {
+  const trimmed = rawUrl.trim()
+  if (!trimmed || hasControlChars(trimmed) || trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
+    return ""
+  }
+
+  try {
+    if (trimmed.startsWith("/")) {
+      const parsed = new URL(trimmed, "https://attachment-policy.invalid")
+      const ext = extractLowercaseExtension(parsed.pathname)
+      if (ext && DANGEROUS_ATTACHMENT_EXTENSIONS.has(ext)) return ""
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+    }
+
+    const parsed = new URL(trimmed)
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
+      return ""
+    }
+    const ext = extractLowercaseExtension(parsed.pathname)
+    if (ext && DANGEROUS_ATTACHMENT_EXTENSIONS.has(ext)) return ""
+    return parsed.toString()
+  } catch {
+    return ""
+  }
 }
 
 export const escapeMarkdownLinkLabel = (value: string) => value.replace(/[\\[\]]/g, String.raw`\$&`)
@@ -56,14 +133,14 @@ export const resolveMarkdownAttachmentLink = (
   uploaded: MarkdownFileUploadResult,
   fallbackName: string
 ): { markdown: string } | { error: string } => {
-  const url = String(uploaded.url || "").trim()
-  if (!url) {
+  const safeUrl = normalizeSafeAttachmentUrl(String(uploaded.url || ""))
+  if (!safeUrl) {
     return { error: MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE }
   }
 
   const name = String(uploaded.name || fallbackName).trim() || fallbackName
   return {
-    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${escapeMarkdownLinkDestination(url)})\n`,
+    markdown: `\n\n[${escapeMarkdownLinkLabel(name)}](${escapeMarkdownLinkDestination(safeUrl)})\n`,
   }
 }
 

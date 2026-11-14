@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { overlayScrim } from "src/design-system/tokens"
 import {
   adminBorder as border,
   adminBorderStrong as borderStrong,
@@ -60,7 +61,7 @@ export const DetailScrim = styled.button`
     display: block;
     border: 0;
     padding: 0;
-    background: rgba(0, 0, 0, 0.32);
+    background: ${overlayScrim.adminPreview};
   }
 
   @media (max-width: 1280px) {
@@ -70,7 +71,7 @@ export const DetailScrim = styled.button`
     display: block;
     border: 0;
     padding: 0;
-    background: rgba(0, 0, 0, 0.32);
+    background: ${overlayScrim.adminPreview};
   }
 `
 
@@ -358,7 +359,7 @@ export const ConfirmBackdrop = styled.div`
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.36);
+  background: ${overlayScrim.adminDetail};
 `
 
 export const ConfirmDialog = styled.div`

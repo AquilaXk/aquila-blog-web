@@ -1,6 +1,6 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { control } from "src/design-system/tokens"
+import { boxShadowColor, control, overlayScrim } from "src/design-system/tokens"
 import {
   AdminInfoPanelCard,
   AdminRailCard,
@@ -279,7 +279,7 @@ export const ToastCard = styled.div`
   background: ${({ theme }) => theme.colors.gray1};
   color: ${({ theme }) => theme.colors.gray12};
   line-height: 1.58;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 4px 16px ${boxShadowColor.cardFloating};
 
   &[data-tone="success"] {
     border-color: ${({ theme }) => theme.colors.green8};
@@ -319,7 +319,7 @@ export const ModalOverlay = styled.div`
   z-index: 2200;
   display: grid;
   place-items: center;
-  background: rgba(6, 10, 16, 0.76);
+  background: ${overlayScrim.adminStrong};
   padding: 1rem;
 `
 
@@ -330,7 +330,7 @@ export const ModalCard = styled.section`
   border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray2};
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px ${boxShadowColor.modalElevated};
   padding: 1rem;
   display: grid;
   gap: 0.9rem;

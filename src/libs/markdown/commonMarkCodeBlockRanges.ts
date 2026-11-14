@@ -3,6 +3,15 @@ import remarkParse from "remark-parse"
 import { unified } from "unified"
 import { resolveCalloutBlockquote, resolveCalloutLegacyEmoji } from "./calloutRegistry"
 import {
+  findBoundedFormulaCloseInContainer,
+  findDedicatedFormulaCloseIndex,
+  isContainerLineExcluded,
+  LINE_BIT_CONTAINER,
+  LINE_BIT_MATH,
+  markMaskRangeBits,
+  scanMaskedLineBitmaskRanges,
+} from "./commonMarkLineMaskScanner"
+import {
   hasCommonMarkCodeIndent,
   mergeSortedSpanRanges,
   overlapsSortedRanges,
@@ -10,28 +19,29 @@ import {
 } from "./pandocMathScanner"
 import {
   ASIDE_TAG_CASE_INSENSITIVE_PATTERN,
-  DIRECTIVE_CLOSE_LINE_PATTERN,
   extractAsideOpenTail,
   findBlockquoteHeaderAndPromotedIndex,
   findDirectiveCloseLineIndex,
   findFirstBlankLineIndex,
   findPromotedCalloutTitleLineIndex,
   hasExcludedAsideCloseOrFenceBeforeBlank,
-  isAsideCloseLineExcluded,
   isDedicatedFormulaFenceLine,
   isLineStartInCommentRanges,
-  isTopLevelFormulaStopLine,
   isValidAsideCloseCandidate,
   maskBlockquoteHeaderLine,
   maskLinesInRange,
   maskLineWithBreakAndHeading,
   neutralizeAsideOpenTagPreservingLength,
-  parseCustomDirectiveHeader,
   registerCommonMarkBlockRangeProvider,
   stripClosingAsideTag,
   unindentLinePreservingLength,
 } from "./renderingDirectiveModel"
 import { parseStandaloneMarkdownImageLine } from "./renderingImageModel"
+import {
+  parseCustomDirectiveFromOpening,
+  parseOpeningDirectiveLine,
+  resolveClosingDirectiveFenceLength,
+} from "./sharedDirectiveContainerParser"
 
 export type CommonMarkBlockRanges = {
   codeBlockRanges: MathSpanRange[]
@@ -51,8 +61,6 @@ type CommonMarkAstNode = {
   }
 }
 
-const CALLOUT_DIRECTIVE_OPEN_PATTERN = /^:::callout(?:[ \t\r]|$)/
-const SUPPORTED_COLON_DIRECTIVE_PATTERN = /^:::(?:callout|toggle)(?:[ \t\r]|$)/
 const LEADING_SPACE_OR_TAB_PATTERN = /^[ \t]/
 const BLOCKQUOTE_CALLOUT_TOKEN_PATTERN = /^\[!([A-Za-z0-9_-]+)\]([+-])?/
 const MAX_BLOCK_RANGE_CACHE_ENTRIES = 8
@@ -152,90 +160,70 @@ const isValidBlockquoteCalloutLine = (rawLine: string): boolean => {
   return Boolean(resolveCalloutLegacyEmoji(unbracketed))
 }
 
-const findDedicatedFormulaCloseIndex = (
-  lines: readonly string[],
-  startIndex: number,
-  lineStarts: readonly number[],
-  codeBlockRanges: readonly MathSpanRange[]
-): number => {
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index]!
-    if (isTopLevelFormulaStopLine(line)) return -1
-    const lineStart = lineStarts[index]!
-    if (
-      isDedicatedFormulaFenceLine(line) &&
-      !overlapsSortedRanges(codeBlockRanges, lineStart, lineStart + Math.max(1, line.length))
-    ) {
-      return index
-    }
-  }
-  return -1
+type MaskPipelineState = {
+  lines: string[]
+  lineStarts: readonly number[]
+  lineMasks: Uint8Array
+  initialListRanges: readonly MathSpanRange[]
+  asideRanges: MathSpanRange[]
+  containerCloseRanges: MathSpanRange[]
+  extraCodeRanges: MathSpanRange[]
 }
 
-const findBoundedFormulaCloseInContainer = (
-  lines: readonly string[],
-  startIndex: number,
-  lineStarts: readonly number[],
-  codeRanges: readonly MathSpanRange[],
-  isCloseLine: (candidate: string, lineIndex: number) => boolean
-): number => {
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index]!
-    if (isTopLevelFormulaStopLine(line) || isCloseLine(line, index)) return -1
-    const lineStart = lineStarts[index]!
-    if (
-      isDedicatedFormulaFenceLine(line) &&
-      !overlapsSortedRanges(codeRanges, lineStart, lineStart + Math.max(1, line.length))
-    ) {
-      return index
-    }
-  }
-  return -1
-}
-
-const isContainerLineExcluded = (
-  line: string,
-  lineStart: number,
-  ranges: CommonMarkBlockRanges,
-  isAside: boolean,
-  checkingCloseLine: boolean
-): boolean => {
-  if (isAside && checkingCloseLine) {
-    return isAsideCloseLineExcluded(ranges.codeBlockRanges, ranges.commentRanges, line, lineStart)
-  }
-  const lineEnd = lineStart + Math.max(1, line.length)
-  return (
-    overlapsSortedRanges(ranges.codeBlockRanges, lineStart, lineEnd) ||
-    isLineStartInCommentRanges(ranges.commentRanges, line, lineStart)
-  )
-}
+const refreshPipelineRanges = (state: MaskPipelineState): CommonMarkBlockRanges =>
+  scanMaskedLineBitmaskRanges(state)
 
 const resolveContainerCloseWithBoundedFormulas = (
-  lines: string[],
+  state: MaskPipelineState,
   startIndex: number,
-  lineStarts: readonly number[],
   isCloseLine: (candidate: string, lineIndex: number) => boolean,
-  isAside = false
+  isAside = false,
+  initialDirectiveFenceLength?: number
 ): number => {
-  let ranges = parseRawCommonMarkRanges(lines.join("\n"))
+  const { lines, lineStarts, lineMasks } = state
+  let ranges = refreshPipelineRanges(state)
   let cursor = startIndex
+  const fenceStack =
+    initialDirectiveFenceLength !== undefined ? [Math.max(3, initialDirectiveFenceLength)] : null
   while (cursor < lines.length) {
     const line = lines[cursor]!
     const lineStart = lineStarts[cursor]!
-    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true) && isCloseLine(line, cursor)) {
-      return cursor
+    if (!isContainerLineExcluded(line, lineStart, ranges, isAside, true)) {
+      if (fenceStack) {
+        const closeLen = resolveClosingDirectiveFenceLength(line)
+        if (closeLen >= 3) {
+          while (fenceStack.length > 0 && closeLen >= fenceStack[fenceStack.length - 1]!) {
+            fenceStack.pop()
+            if (fenceStack.length === 0) return cursor
+          }
+          cursor += 1
+          continue
+        }
+        const nestedOpen = parseOpeningDirectiveLine(line)
+        const topFence = fenceStack[fenceStack.length - 1] ?? 3
+        if (nestedOpen && nestedOpen.fenceLength < topFence) {
+          fenceStack.push(nestedOpen.fenceLength)
+        }
+      } else if (isCloseLine(line, cursor)) {
+        return cursor
+      }
     }
     if (!isContainerLineExcluded(line, lineStart, ranges, isAside, false) && isDedicatedFormulaFenceLine(line)) {
+      const topFence = fenceStack ? (fenceStack[fenceStack.length - 1] ?? 3) : 0
+      const formulaBoundaryClose = fenceStack
+        ? (candidate: string) => resolveClosingDirectiveFenceLength(candidate) >= topFence
+        : isCloseLine
       const formulaClose = findBoundedFormulaCloseInContainer(
         lines,
         cursor,
         lineStarts,
         ranges.codeBlockRanges,
-        isCloseLine
+        formulaBoundaryClose
       )
       if (formulaClose >= 0) {
         maskLinesInRange(lines, cursor, formulaClose)
-        ranges = parseRawCommonMarkRanges(lines.join("\n"))
+        markMaskRangeBits(lineMasks, cursor, formulaClose, LINE_BIT_MATH)
+        ranges = refreshPipelineRanges(state)
         cursor = formulaClose + 1
         continue
       }
@@ -245,34 +233,30 @@ const resolveContainerCloseWithBoundedFormulas = (
   return -1
 }
 
-const isClosingDirectiveLine = (line: string): boolean => DIRECTIVE_CLOSE_LINE_PATTERN.test(line)
-
 const tryMaskAsideBlockAt = (
-  lines: string[],
+  state: MaskPipelineState,
   index: number,
-  lineStarts: readonly number[],
-  currentRanges: CommonMarkBlockRanges,
-  asideRanges: MathSpanRange[],
-  containerCloseRanges: MathSpanRange[],
-  extraCodeRanges: MathSpanRange[]
+  currentRanges: CommonMarkBlockRanges
 ): { nextIndex: number; mutated: boolean } | null => {
+  const { lines, lineStarts, lineMasks, asideRanges, containerCloseRanges, extraCodeRanges } = state
   const line = lines[index]!
   const openingTail = extractAsideOpenTail(line)
   if (openingTail === null) return null
   if (stripClosingAsideTag(openingTail) !== null) {
     lines[index] = maskLineWithBreakAndHeading(line)
+    lineMasks[index]! |= LINE_BIT_CONTAINER
     return { nextIndex: index + 1, mutated: true }
   }
   const blankIndex = findFirstBlankLineIndex(lines, index + 1)
   const snapshot = lines.slice(index)
   lines[index] = maskLineWithBreakAndHeading(line)
+  lineMasks[index]! |= LINE_BIT_CONTAINER
   for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
     lines[cursor] = unindentLinePreservingLength(lines[cursor]!)
   }
   const closeIndex = resolveContainerCloseWithBoundedFormulas(
-    lines,
+    state,
     index + 1,
-    lineStarts,
     (candidate, cursor) =>
       isValidAsideCloseCandidate(
         candidate,
@@ -294,6 +278,7 @@ const tryMaskAsideBlockAt = (
         to: lineStarts[lastPreBlank]! + Math.max(1, lines[lastPreBlank]!.length),
       })
       maskLinesInRange(lines, index, lastPreBlank)
+      markMaskRangeBits(lineMasks, index, lastPreBlank, LINE_BIT_CONTAINER)
     } else {
       lines[index] = neutralizeAsideOpenTagPreservingLength(line)
     }
@@ -304,6 +289,7 @@ const tryMaskAsideBlockAt = (
   asideRanges.push({ from: lineStarts[index]!, to: closeStart })
   containerCloseRanges.push({ from: closeStart, to: closeEnd })
   lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
+  lineMasks[closeIndex]! |= LINE_BIT_CONTAINER
   const afterCloseOffset = closeIndex - index + 1
   if (afterCloseOffset < snapshot.length) {
     lines.splice(
@@ -327,10 +313,10 @@ const shouldMaskBlockquoteTailLine = (
   )
 
 const tryMaskBlockquoteCalloutAt = (
-  lines: string[],
-  startIndex: number,
-  lineStarts: readonly number[]
+  state: MaskPipelineState,
+  startIndex: number
 ): { nextIndex: number; mutated: boolean } => {
+  const { lines, lineStarts, lineMasks } = state
   const { cursor, headerLineIndex, promotedLineIndex, firstContent } =
     findBlockquoteHeaderAndPromotedIndex(lines, startIndex)
   if (headerLineIndex < 0 || !isValidBlockquoteCalloutLine(firstContent)) {
@@ -340,17 +326,21 @@ const tryMaskBlockquoteCalloutAt = (
   const hasFollowingNonBlankLine = cursor < lines.length && lines[cursor]!.trim().length > 0
   if (lastQuoteIndex === headerLineIndex && hasFollowingNonBlankLine) {
     lines[headerLineIndex] = maskLineWithBreakAndHeading(lines[headerLineIndex]!)
+    lineMasks[headerLineIndex]! |= LINE_BIT_CONTAINER
     return { nextIndex: cursor, mutated: true }
   }
   lines[headerLineIndex] = maskBlockquoteHeaderLine(lines[headerLineIndex]!)
+  lineMasks[headerLineIndex]! |= LINE_BIT_CONTAINER
   if (promotedLineIndex >= 0) {
     lines[promotedLineIndex] = maskBlockquoteHeaderLine(lines[promotedLineIndex]!)
+    lineMasks[promotedLineIndex]! |= LINE_BIT_CONTAINER
   }
   if (hasFollowingNonBlankLine && lastQuoteIndex > headerLineIndex) {
-    const refreshed = parseRawCommonMarkRanges(lines.join("\n"))
+    const refreshed = refreshPipelineRanges(state)
     const lastLine = lines[lastQuoteIndex]!
     if (shouldMaskBlockquoteTailLine(refreshed, lastLine, lineStarts[lastQuoteIndex]!)) {
       lines[lastQuoteIndex] = maskLineWithBreakAndHeading(lastLine)
+      lineMasks[lastQuoteIndex]! |= LINE_BIT_CONTAINER
     }
   }
   return { nextIndex: cursor, mutated: true }
@@ -370,81 +360,81 @@ const recordContainerCloseLine = (
 }
 
 const tryMaskColonDirectiveAt = (
-  lines: string[],
+  state: MaskPipelineState,
   index: number,
   line: string,
-  trimmed: string,
-  lineStarts: readonly number[],
-  ranges: CommonMarkBlockRanges,
-  containerCloseRanges: MathSpanRange[]
+  ranges: CommonMarkBlockRanges
 ): { nextIndex: number; mutated: boolean } | null => {
   if (!line.startsWith(":::")) return null
-  if (parseCustomDirectiveHeader(trimmed) !== null) {
+  const open = parseOpeningDirectiveLine(line)
+  if (!open) return null
+  const { lines, lineStarts, lineMasks, containerCloseRanges } = state
+
+  if (parseCustomDirectiveFromOpening(open) !== null) {
     const closeIndex = findDirectiveCloseLineIndex(
       lines,
       index + 1,
       lineStarts,
       ranges.codeBlockRanges,
-      ranges.commentRanges
+      ranges.commentRanges,
+      open.fenceLength
     )
     if (closeIndex >= 0) {
       recordContainerCloseLine(containerCloseRanges, lineStarts, lines, closeIndex)
       maskLinesInRange(lines, index, closeIndex)
+      markMaskRangeBits(lineMasks, index, closeIndex, LINE_BIT_CONTAINER)
       return { nextIndex: closeIndex + 1, mutated: true }
     }
     return { nextIndex: index + 1, mutated: false }
   }
-  if (SUPPORTED_COLON_DIRECTIVE_PATTERN.test(line)) {
-    const isCallout = CALLOUT_DIRECTIVE_OPEN_PATTERN.test(line)
-    const candidatePromotedIndex = isCallout
-      ? findPromotedCalloutTitleLineIndex(lines, index + 1, lines.length)
-      : -1
+
+  if (open.kind === "callout" || open.kind === "toggle") {
+    const candidatePromotedIndex =
+      open.kind === "callout" && !open.quotedTitle
+        ? findPromotedCalloutTitleLineIndex(lines, index + 1, lines.length)
+        : -1
     const snapshot = lines.slice(index)
     lines[index] = maskLineWithBreakAndHeading(line)
+    lineMasks[index]! |= LINE_BIT_CONTAINER
     if (candidatePromotedIndex >= 0) {
       lines[candidatePromotedIndex] = maskLineWithBreakAndHeading(lines[candidatePromotedIndex]!)
+      lineMasks[candidatePromotedIndex]! |= LINE_BIT_CONTAINER
     }
     const closeIndex = resolveContainerCloseWithBoundedFormulas(
-      lines,
+      state,
       index + 1,
-      lineStarts,
-      isClosingDirectiveLine
+      () => false,
+      false,
+      open.fenceLength
     )
     if (closeIndex < 0) {
       lines.splice(index, snapshot.length, ...snapshot)
+      lineMasks.fill(0, index)
       return { nextIndex: index + 1, mutated: false }
     }
     recordContainerCloseLine(containerCloseRanges, lineStarts, lines, closeIndex)
     lines[closeIndex] = maskLineWithBreakAndHeading(lines[closeIndex]!)
-    return { nextIndex: closeIndex + 1, mutated: true }
+    lineMasks[closeIndex]! |= LINE_BIT_CONTAINER
+    return { nextIndex: index + 1, mutated: true }
   }
+
   return null
 }
 
 const tryMaskCustomBlockStepAt = (
-  lines: string[],
+  state: MaskPipelineState,
   index: number,
-  lineStarts: readonly number[],
-  currentRanges: CommonMarkBlockRanges,
-  asideRanges: MathSpanRange[],
-  containerCloseRanges: MathSpanRange[],
-  extraCodeRanges: MathSpanRange[]
+  currentRanges: CommonMarkBlockRanges
 ): { nextIndex: number; mutated: boolean } => {
+  const { lines, lineStarts, lineMasks } = state
   const line = lines[index]!
   const trimmed = line.trim()
   if (trimmed.startsWith("![") && parseStandaloneMarkdownImageLine(trimmed)) {
     lines[index] = maskLineWithBreakAndHeading(line)
+    lineMasks[index]! |= LINE_BIT_CONTAINER
     return { nextIndex: index + 1, mutated: true }
   }
-  const colonStep = tryMaskColonDirectiveAt(
-    lines,
-    index,
-    line,
-    trimmed,
-    lineStarts,
-    currentRanges,
-    containerCloseRanges
-  )
+  const colonStep = tryMaskColonDirectiveAt(state, index, line, currentRanges)
   if (colonStep) return colonStep
   if (isDedicatedFormulaFenceLine(line)) {
     const closeIndex = findDedicatedFormulaCloseIndex(
@@ -455,24 +445,17 @@ const tryMaskCustomBlockStepAt = (
     )
     if (closeIndex >= 0) {
       maskLinesInRange(lines, index, closeIndex)
+      markMaskRangeBits(lineMasks, index, closeIndex, LINE_BIT_MATH)
       return { nextIndex: closeIndex + 1, mutated: true }
     }
     return { nextIndex: index + 1, mutated: false }
   }
   if (trimmed.startsWith("<")) {
-    const asideStep = tryMaskAsideBlockAt(
-      lines,
-      index,
-      lineStarts,
-      currentRanges,
-      asideRanges,
-      containerCloseRanges,
-      extraCodeRanges
-    )
+    const asideStep = tryMaskAsideBlockAt(state, index, currentRanges)
     if (asideStep) return asideStep
   }
   if (trimmed.startsWith(">")) {
-    return tryMaskBlockquoteCalloutAt(lines, index, lineStarts)
+    return tryMaskBlockquoteCalloutAt(state, index)
   }
   return { nextIndex: index + 1, mutated: false }
 }
@@ -495,9 +478,15 @@ const maskCustomSegmentsForCommonMark = (
 ): CommonMarkBlockRanges => {
   const lines = content.split("\n")
   const lineStarts = computeLineStarts(lines)
-  const asideRanges: MathSpanRange[] = []
-  const containerCloseRanges: MathSpanRange[] = []
-  const extraCodeRanges: MathSpanRange[] = []
+  const state: MaskPipelineState = {
+    lines,
+    lineStarts,
+    lineMasks: new Uint8Array(lines.length),
+    initialListRanges: initialRanges.listRanges,
+    asideRanges: [],
+    containerCloseRanges: [],
+    extraCodeRanges: [],
+  }
   let currentRanges = initialRanges
   let dirty = false
   let index = 0
@@ -506,38 +495,28 @@ const maskCustomSegmentsForCommonMark = (
     const line = lines[index]!
     const lineStart = lineStarts[index]!
     if (dirty && needsFreshRangesForLine(line)) {
-      currentRanges = parseRawCommonMarkRanges(
-        lines.join("\n"),
-        asideRanges,
-        containerCloseRanges,
-        extraCodeRanges
-      )
+      currentRanges = refreshPipelineRanges(state)
       dirty = false
     }
     if (isExcludedTopLevelLine(line, lineStart, currentRanges)) {
       index += 1
       continue
     }
-    const step = tryMaskCustomBlockStepAt(
-      lines,
-      index,
-      lineStarts,
-      currentRanges,
-      asideRanges,
-      containerCloseRanges,
-      extraCodeRanges
-    )
+    const step = tryMaskCustomBlockStepAt(state, index, currentRanges)
     if (step.mutated) dirty = true
     index = step.nextIndex
   }
 
   return dirty
-    ? parseRawCommonMarkRanges(lines.join("\n"), asideRanges, containerCloseRanges, extraCodeRanges)
+    ? refreshPipelineRanges(state)
     : {
         ...currentRanges,
-        codeBlockRanges: mergeSortedSpanRanges([...currentRanges.codeBlockRanges, ...extraCodeRanges]),
-        asideRanges,
-        containerCloseRanges: mergeSortedSpanRanges(containerCloseRanges),
+        codeBlockRanges: mergeSortedSpanRanges([
+          ...currentRanges.codeBlockRanges,
+          ...state.extraCodeRanges,
+        ]),
+        asideRanges: state.asideRanges,
+        containerCloseRanges: mergeSortedSpanRanges(state.containerCloseRanges),
       }
 }
 

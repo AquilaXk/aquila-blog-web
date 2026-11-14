@@ -107,8 +107,8 @@ Unsafe
 description
 :::
 
-<!-- aq-embed {"embedUrl":"https://www.youtube.com/embed/abc"} -->
-:::embed https://www.youtube.com/watch?v=abc
+<!-- aq-embed {"embedUrl":"https://www.youtube.com/embed/abc123def45"} -->
+:::embed https://www.youtube.com/watch?v=abc123def45
 Safe
 caption
 :::`)
@@ -120,8 +120,8 @@ caption
     expect(bookmark).not.toHaveProperty("thumbnailUrl")
     expect(embed).toMatchObject({
       type: "embed",
-      embedUrl: "https://www.youtube.com/embed/abc",
-      url: "https://www.youtube.com/watch?v=abc",
+      embedUrl: "https://www.youtube.com/embed/abc123def45",
+      url: "https://www.youtube.com/watch?v=abc123def45",
     })
 
     const renderedSafeEmbed = JSON.stringify(
@@ -133,7 +133,7 @@ caption
         renderMarkdown: (md) => md,
       })
     )
-    expect(renderedSafeEmbed).toContain("https://www.youtube.com/embed/abc")
+    expect(renderedSafeEmbed).toContain("https://www.youtube.com/embed/abc123def45")
     expect(renderedSafeEmbed).toContain("allow-scripts allow-same-origin allow-popups allow-presentation")
 
     const renderedCraftedEmbed = JSON.stringify(

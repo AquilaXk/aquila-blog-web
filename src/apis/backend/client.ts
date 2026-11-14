@@ -19,11 +19,6 @@ const GET_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 type GetCacheMode = "revalidate" | "no-store"
 type ApiRequestCredentials = "include" | "omit"
-type BackendProxyMode = "auto" | "bypass"
-
-type ApiRequestUrlOptions = {
-  backendProxy?: BackendProxyMode
-}
 
 type GetRequestPolicy = {
   cacheMode: GetCacheMode
@@ -100,7 +95,6 @@ const resolveGetRequestPolicy = (path: string): GetRequestPolicy => {
 
 export type ApiFetchOptions = RequestInit & {
   timeoutMs?: number
-  backendProxy?: BackendProxyMode
 }
 
 const isServer = () => typeof window === "undefined"
@@ -326,12 +320,8 @@ export const getApiBaseUrl = () => {
   return DEFAULT_API_BASE_URL
 }
 
-export const getApiRequestUrl = (path: string, options: ApiRequestUrlOptions = {}) => {
+export const getApiRequestUrl = (path: string) => {
   const safePath = normalizeApiRequestPath(path)
-  if (options.backendProxy === "bypass") {
-    return `${getApiBaseUrl()}${safePath}`
-  }
-
   return `${getApiBaseUrl()}${safePath}`
 }
 
@@ -340,8 +330,8 @@ export const apiFetch = async <T>(
   init: ApiFetchOptions = {}
 ): Promise<T> => {
   const safePath = normalizeApiRequestPath(path)
-  const { timeoutMs: _timeoutMs, backendProxy = "auto", ...requestInit } = init
-  const url = getApiRequestUrl(safePath, { backendProxy })
+  const { timeoutMs: _timeoutMs, ...requestInit } = init
+  const url = getApiRequestUrl(safePath)
   const headers = new Headers(requestInit.headers || {})
   const serverMetrics = isServer() ? createServerApiFetchMetricsContext(safePath, headers) : null
   let serverOutcomeObserved = false

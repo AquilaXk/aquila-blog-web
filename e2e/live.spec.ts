@@ -58,7 +58,7 @@ test.describe("live public release gate", () => {
     expect(title).not.toBe("")
 
     const searchResponse = page.waitForResponse((response) => response.url().includes("/post/api/v1/posts/search") && response.ok())
-    await page.getByLabel("Search posts by keyword").fill(title)
+    await page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/).fill(title)
     await searchResponse
     await expect(page.locator(`a[href='${detailPath}']`).first()).toBeVisible()
 

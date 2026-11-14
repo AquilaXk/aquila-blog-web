@@ -333,7 +333,7 @@ test("홈 피드 주요 영역은 reduced motion과 landmark 계약에서 심각
   await page.goto("/")
   await expect(page.locator("main")).toBeVisible()
   await expect(page.locator("h1").first()).toBeVisible()
-  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
   await expectPrimaryLandmarks(page)
   await expectLaunchGateAccessibility(page, testInfo, "home-reduced-motion")
 })
@@ -512,7 +512,7 @@ test("피드 empty state는 keyboard와 screen-reader landmark gate를 통과한
 
   await page.goto("/")
   await expect(page.getByRole("heading", { name: "아직 게시글이 없습니다." })).toBeVisible()
-  await page.getByLabel("Search posts by keyword").fill("없는검색어")
+  await page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/).fill("없는검색어")
   await expect(page.getByRole("heading", { name: "검색 결과가 없습니다." })).toBeVisible()
   await expectPrimaryLandmarks(page)
   await expectLaunchGateAccessibility(page, testInfo, "feed-empty-state")

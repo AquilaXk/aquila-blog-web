@@ -111,6 +111,10 @@ test.describe("core smoke public shell", () => {
   const rootLayoutSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/index.tsx"), "utf8")
   const headerSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/index.tsx"), "utf8")
   const navBarSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/NavBar.tsx"), "utf8")
+  const navBarMobileMenuStylesSource = readFileSync(
+    path.resolve(__dirname, "../src/layouts/RootLayout/Header/NavBarMobileMenu.styles.ts"),
+    "utf8"
+  )
   const logoSource = readFileSync(path.resolve(__dirname, "../src/layouts/RootLayout/Header/Logo.tsx"), "utf8")
   const adminShellSource = readFileSync(path.resolve(__dirname, "../src/routes/Admin/AdminShell.tsx"), "utf8")
   const adminPageSource = readFileSync(path.resolve(__dirname, "../src/libs/server/adminPage.ts"), "utf8")
@@ -177,8 +181,8 @@ test.describe("core smoke public shell", () => {
   expect(navBarSource).toContain('from "src/design-system/useModalFocusTrap"')
   expect(navBarSource).toContain("useModalFocusTrap({")
   expect(navBarSource).toContain("returnFocusRef: mobileMenuButtonRef")
-  expect(navBarSource).toContain('from "src/styles/zIndexes"')
-  expect(navBarSource).toContain("zIndexes.mobileNavOverlay")
+  expect(navBarMobileMenuStylesSource).toContain('from "src/styles/zIndexes"')
+  expect(navBarMobileMenuStylesSource).toContain("zIndexes.mobileNavOverlay")
   expect(navBarSource).toContain('data-ui="mobile-nav-search"')
   expect(navBarSource).toContain('aria-keyshortcuts="Meta+K Control+K"')
   expect(navBarSource).toContain(".primaryLinks,")

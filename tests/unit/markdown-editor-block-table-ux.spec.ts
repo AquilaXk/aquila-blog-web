@@ -253,8 +253,8 @@ const createPopoverTarget = () => ({
   closest: (sel: string) => (sel === "[data-table-popover]" ? {} : null),
 })
 
-test.describe("Notion-parity Markdown editor table UX", () => {
-  test("preserves decorationField reference on non-active cursor moves and supports Notion table visual toggles, column resizer, and boundary arrow navigation", async () => {
+test.describe("Block-level Markdown editor table UX", () => {
+  test("preserves decorationField reference on non-active cursor moves and supports block table visual toggles, column resizer, and boundary arrow navigation", async () => {
     const sampleDoc = "# Heading\n\nPlain paragraph text with **bold** word."
     const state0 = EditorState.create({
       doc: sampleDoc,

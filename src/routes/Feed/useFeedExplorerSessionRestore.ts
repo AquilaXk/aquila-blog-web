@@ -1,15 +1,27 @@
 import { type InfiniteData, useQueryClient } from "@tanstack/react-query"
 import type { NextRouter } from "next/router"
-import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback, useEffect, useMemo, useRef } from "react"
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type { ExplorePostsPage } from "src/apis/backend/posts"
 import { FEED_EXPLORE_PAGE_SIZE } from "src/constants/feed"
 import { normalizeKeywordQuery, normalizeTagQuery } from "src/libs/query/normalize"
 import {
   FEED_EXPLORER_ORDER,
+  FEED_EXPLORER_SCROLL_BUCKET_PX,
   FEED_EXPLORER_SNAPSHOT_MAX_BYTES,
+  getFeedExplorerCursorKey,
   getFeedExplorerRestoreKey,
   getFeedExplorerSnapshotKey,
   isCursorOnlyPublicFeedRestoreSnapshot,
+  parseFeedExplorerCursorScrollY,
   parseFeedExplorerRestoreSnapshot,
   parseFeedExplorerRestoreState,
   pruneFeedExplorerStateStorage,
@@ -18,7 +30,6 @@ import {
   scheduleIdleRevalidate,
   shouldRestoreFeedExplorerSession,
   toFeedExplorerInfiniteQueryKey,
-  toPersistFingerprint,
   toRestoredPage,
   toRestoredPageParams,
   toSnapshotPage,
@@ -47,7 +58,52 @@ type UseFeedExplorerSessionRestoreOptions = {
 
 type UseFeedExplorerSessionRestoreResult = {
   hasRestoredScrollRef: MutableRefObject<boolean>
+  restoreScrollY: number
   restoreStateRef: MutableRefObject<FeedExplorerRestoreState | null>
+}
+
+const safeGetSessionItem = (key: string): string | null => {
+  try {
+    return window.sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+const safeSetSessionItem = (key: string, value: string): boolean => {
+  try {
+    window.sessionStorage.setItem(key, value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const safeRemoveSessionItem = (key: string): void => {
+  try {
+    window.sessionStorage.removeItem(key)
+  } catch {}
+}
+
+export const shouldApplyRestoredFeedSession = (
+  restored: FeedExplorerRestoreState | null,
+  routerQuery: Record<string, unknown>,
+  currentTag: string
+): boolean => {
+  if (!restored || restored.tag !== currentTag) return false
+
+  if ("q" in routerQuery && routerQuery.q !== undefined) {
+    const rawRouteQ = typeof routerQuery.q === "string" ? routerQuery.q.trim() : ""
+    const normalizedRouteQ = normalizeKeywordQuery(rawRouteQ)
+    if (restored.q !== normalizedRouteQ) return false
+  }
+
+  const routeSort = routerQuery.sort
+  if (routeSort === "latest" || routeSort === "views" || routeSort === "likes") {
+    if ((restored.sortMode ?? "latest") !== routeSort) return false
+  }
+
+  return true
 }
 
 const writeSnapshotPagesToSessionStorage = (
@@ -57,7 +113,7 @@ const writeSnapshotPagesToSessionStorage = (
 ) => {
   const pages = queryData?.pages ?? []
   if (pages.length === 0) {
-    window.sessionStorage.removeItem(snapshotKey)
+    safeRemoveSessionItem(snapshotKey)
     return
   }
 
@@ -72,9 +128,9 @@ const writeSnapshotPagesToSessionStorage = (
   }
   const snapshotJson = JSON.stringify(snapshotPayload)
   if (snapshotJson.length <= FEED_EXPLORER_SNAPSHOT_MAX_BYTES) {
-    window.sessionStorage.setItem(snapshotKey, snapshotJson)
+    safeSetSessionItem(snapshotKey, snapshotJson)
   } else {
-    window.sessionStorage.removeItem(snapshotKey)
+    safeRemoveSessionItem(snapshotKey)
   }
 }
 
@@ -101,8 +157,11 @@ export const useFeedExplorerSessionRestore = ({
   const hasScheduledIdleRevalidateRef = useRef(false)
   const restoreTargetPagesRef = useRef(1)
   const hasInitializedRestoreRef = useRef(false)
+  const [restoreScrollY, setRestoreScrollY] = useState(0)
   const hasRestoredScrollRef = useRef(false)
-  const lastPersistFingerprintRef = useRef("")
+  const lastStructureFingerprintRef = useRef("")
+  const lastScrollBucketRef = useRef(-1)
+  const initializedAsPathRef = useRef<string | null>(null)
   const cancelIdlePersistRef = useRef<(() => void) | null>(null)
   const restoreSnapshotRef = useRef({
     q: "",
@@ -128,14 +187,29 @@ export const useFeedExplorerSessionRestore = ({
   }, [currentTag, loadedPagesCount, q])
 
   useEffect(() => {
+    if (!router.isReady) return
+    if (initializedAsPathRef.current && initializedAsPathRef.current !== router.asPath) {
+      restoreStateRef.current = null
+      restoreQueryPagesRef.current = null
+      restoreQueryPageParamsRef.current = null
+      hasRestoredScrollRef.current = true
+      setRestoreScrollY(0)
+      initializedAsPathRef.current = router.asPath
+    }
+  }, [router.asPath, router.isReady])
+
+  useEffect(() => {
     if (!router.isReady || hasInitializedRestoreRef.current) return
     if (typeof window === "undefined") return
 
     hasInitializedRestoreRef.current = true
-    pruneFeedExplorerStateStorage(window.sessionStorage)
+    initializedAsPathRef.current = router.asPath
+    try {
+      pruneFeedExplorerStateStorage(window.sessionStorage)
+    } catch {}
 
     let resolvedRestoreKey = restoreStorageKey
-    let restored = parseFeedExplorerRestoreState(window.sessionStorage.getItem(resolvedRestoreKey))
+    let restored = parseFeedExplorerRestoreState(safeGetSessionItem(resolvedRestoreKey))
     const hasExplicitRouteSort =
       router.query.sort === "latest" || router.query.sort === "views" || router.query.sort === "likes"
     if (!hasExplicitRouteSort) {
@@ -147,9 +221,7 @@ export const useFeedExplorerSessionRestore = ({
           FEED_EXPLORER_ORDER,
           candidateSort
         )
-        const candidateState = parseFeedExplorerRestoreState(
-          window.sessionStorage.getItem(candidateKey)
-        )
+        const candidateState = parseFeedExplorerRestoreState(safeGetSessionItem(candidateKey))
         if (
           candidateState &&
           candidateState.tag === (currentTag || "") &&
@@ -160,19 +232,32 @@ export const useFeedExplorerSessionRestore = ({
         }
       }
     }
-    if (restored?.tag !== (currentTag || "")) return
+    if (!shouldApplyRestoredFeedSession(restored, router.query, currentTag || "")) return
+    if (!restored) return
 
-    restoreStateRef.current = restored
+    const cursorEntry = parseFeedExplorerCursorScrollY(
+      safeGetSessionItem(getFeedExplorerCursorKey(resolvedRestoreKey))
+    )
+    const effectiveScrollY =
+      cursorEntry && cursorEntry.savedAt >= restored.savedAt ? cursorEntry.scrollY : restored.scrollY
+    const effectiveRestored: FeedExplorerRestoreState = {
+      ...restored,
+      scrollY: effectiveScrollY,
+    }
+
+    restoreStateRef.current = effectiveRestored
+    setRestoreScrollY(effectiveScrollY)
     restoreTargetPagesRef.current = Math.min(resolveRestorePageCap(), Math.max(1, restored.loadedPages))
-    if (restored.q.length > 0) {
+    const hasExplicitRouteQ = "q" in router.query && router.query.q !== undefined
+    if (restored.q.length > 0 && !hasExplicitRouteQ) {
       setQ(restored.q)
     }
-    if (restored.sortMode) {
+    if (restored.sortMode && !hasExplicitRouteSort) {
       setSortMode?.(restored.sortMode)
     }
 
     const restoredSnapshot = parseFeedExplorerRestoreSnapshot(
-      window.sessionStorage.getItem(getFeedExplorerSnapshotKey(resolvedRestoreKey))
+      safeGetSessionItem(getFeedExplorerSnapshotKey(resolvedRestoreKey))
     )
     if (
       restoredSnapshot?.pages?.length &&
@@ -187,7 +272,17 @@ export const useFeedExplorerSessionRestore = ({
       restoreQueryPagesRef.current = restoredPages
       restoreQueryPageParamsRef.current = restoredPageParams
     }
-  }, [currentTag, q, restoreSnapshotStorageKey, restoreStorageKey, router.isReady, router.query.sort, setQ, setSortMode])
+  }, [
+    currentTag,
+    q,
+    restoreSnapshotStorageKey,
+    restoreStorageKey,
+    router.asPath,
+    router.isReady,
+    router.query,
+    setQ,
+    setSortMode,
+  ])
 
   useEffect(() => {
     if (hasHydratedQuerySnapshotRef.current) return
@@ -270,45 +365,97 @@ export const useFeedExplorerSessionRestore = ({
       sortMode
     )
     const snapshotKey = getFeedExplorerSnapshotKey(restoreKey)
-    const state: FeedExplorerRestoreState = {
-      q: normalizedSnapshotQuery,
-      tag: normalizedSnapshotTag,
-      scrollY: Math.max(0, Math.trunc(window.scrollY || 0)),
-      loadedPages: Math.max(1, snapshot.loadedPagesCount),
-      savedAt: Date.now(),
-      sortMode,
-    }
-    const persistFingerprint = toPersistFingerprint(state)
-    if (lastPersistFingerprintRef.current === persistFingerprint) {
+    const cursorKey = getFeedExplorerCursorKey(restoreKey)
+    const scrollY = Math.max(0, Math.trunc(window.scrollY || 0))
+    const loadedPages = Math.max(1, snapshot.loadedPagesCount)
+    const scrollBucket = Math.trunc(scrollY / FEED_EXPLORER_SCROLL_BUCKET_PX)
+    const structureFingerprint = `${normalizedSnapshotQuery}\u0000${normalizedSnapshotTag}\u0000${loadedPages}\u0000${sortMode}`
+
+    if (
+      lastStructureFingerprintRef.current === structureFingerprint &&
+      lastScrollBucketRef.current === scrollBucket
+    ) {
       return
     }
 
-    try {
-      window.sessionStorage.setItem(restoreKey, JSON.stringify(state))
-      lastPersistFingerprintRef.current = persistFingerprint
+    const savedAt = Date.now()
+    if (lastStructureFingerprintRef.current === structureFingerprint) {
+      safeSetSessionItem(cursorKey, JSON.stringify({ scrollY, savedAt }))
+      lastScrollBucketRef.current = scrollBucket
+      return
+    }
 
-      const feedQueryKey = toFeedExplorerInfiniteQueryKey({
-        kw: normalizedSnapshotQuery,
-        tag: normalizedSnapshotTag,
-        pageSize: FEED_EXPLORE_PAGE_SIZE,
-        order: FEED_EXPLORER_ORDER,
-        sortMode,
-      })
-      const queryData = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(feedQueryKey)
-      writeSnapshotPagesToSessionStorage(snapshotKey, state.savedAt, queryData)
+    const state: FeedExplorerRestoreState = {
+      q: normalizedSnapshotQuery,
+      tag: normalizedSnapshotTag,
+      scrollY,
+      loadedPages,
+      savedAt,
+      sortMode,
+    }
+    safeSetSessionItem(restoreKey, JSON.stringify(state))
+    safeSetSessionItem(cursorKey, JSON.stringify({ scrollY, savedAt }))
+    lastStructureFingerprintRef.current = structureFingerprint
+    lastScrollBucketRef.current = scrollBucket
+
+    const feedQueryKey = toFeedExplorerInfiniteQueryKey({
+      kw: normalizedSnapshotQuery,
+      tag: normalizedSnapshotTag,
+      pageSize: FEED_EXPLORE_PAGE_SIZE,
+      order: FEED_EXPLORER_ORDER,
+      sortMode,
+    })
+    const queryData = queryClient.getQueryData<InfiniteData<ExplorePostsPage>>(feedQueryKey)
+    writeSnapshotPagesToSessionStorage(snapshotKey, savedAt, queryData)
+    try {
       pruneFeedExplorerStateStorage(window.sessionStorage)
     } catch {}
   }, [queryClient, sortMode])
 
+  const persistScrollCursorOnly = useCallback(() => {
+    if (typeof window === "undefined" || !shouldRestoreFeedExplorerSession(sortMode)) return
+    const snapshot = restoreSnapshotRef.current
+    const normalizedSnapshotTag = normalizeTagQuery(snapshot.tag)
+    const scrollY = Math.max(0, Math.trunc(window.scrollY || 0))
+    const scrollBucket = Math.trunc(scrollY / FEED_EXPLORER_SCROLL_BUCKET_PX)
+    if (lastScrollBucketRef.current === scrollBucket) return
+    const restoreKey = getFeedExplorerRestoreKey(
+      normalizedSnapshotTag,
+      FEED_EXPLORE_PAGE_SIZE,
+      FEED_EXPLORER_ORDER,
+      sortMode
+    )
+    safeSetSessionItem(
+      getFeedExplorerCursorKey(restoreKey),
+      JSON.stringify({ scrollY, savedAt: Date.now() })
+    )
+    lastScrollBucketRef.current = scrollBucket
+  }, [sortMode])
+
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
 
+    let scrollTimerId: number | null = null
     const flushPersist = () => {
+      if (scrollTimerId !== null) {
+        window.clearTimeout(scrollTimerId)
+        scrollTimerId = null
+      }
       if (cancelIdlePersistRef.current) {
         cancelIdlePersistRef.current()
         cancelIdlePersistRef.current = null
       }
       persistFeedExplorerState()
+    }
+
+    const handleScroll = () => {
+      if (scrollTimerId !== null) {
+        window.clearTimeout(scrollTimerId)
+      }
+      scrollTimerId = window.setTimeout(() => {
+        scrollTimerId = null
+        persistScrollCursorOnly()
+      }, 180)
     }
 
     const handleVisibilityChange = () => {
@@ -317,22 +464,27 @@ export const useFeedExplorerSessionRestore = ({
       }
     }
 
+    window.addEventListener("scroll", handleScroll, { passive: true })
     window.addEventListener("pagehide", flushPersist)
     window.addEventListener("beforeunload", flushPersist)
     document.addEventListener("visibilitychange", handleVisibilityChange)
     router.events.on("routeChangeStart", flushPersist)
 
     return () => {
+      if (scrollTimerId !== null) {
+        window.clearTimeout(scrollTimerId)
+      }
       if (cancelIdlePersistRef.current) {
         cancelIdlePersistRef.current()
         cancelIdlePersistRef.current = null
       }
+      window.removeEventListener("scroll", handleScroll)
       window.removeEventListener("pagehide", flushPersist)
       window.removeEventListener("beforeunload", flushPersist)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       router.events.off("routeChangeStart", flushPersist)
     }
-  }, [persistFeedExplorerState, router.events])
+  }, [persistFeedExplorerState, persistScrollCursorOnly, router.events])
 
   useEffect(() => {
     if (!shouldRestoreFeedExplorerSession(sortMode)) return
@@ -369,6 +521,7 @@ export const useFeedExplorerSessionRestore = ({
 
   return {
     hasRestoredScrollRef,
+    restoreScrollY,
     restoreStateRef,
   }
 }

@@ -1,3 +1,10 @@
+/**
+ * Metadata extraction adapted with attribution from:
+ * - Ghost (`TryGhost/Ghost`, MIT License)
+ *   `ghost/core/server/services/oembed/extract-metadata.ts`
+ * Attribute-order-independent `<meta>` scanning and strict external URL safety checks.
+ */
+import { normalizePublicExternalThumbnailUrl } from "src/libs/markdown/externalThumbnailUrlPolicy"
 import { formatFileSize } from "src/libs/utils"
 
 export type UnfurlMetadata = {
@@ -13,34 +20,20 @@ export type UnfurlMetadata = {
 const FILE_EXTENSION_PATTERN =
   /\.(?:pdf|doc|docx|xls|xlsx|ppt|pptx|zip|tar|gz|tgz|rar|7z|txt|csv|md|rtf|json|xml|yaml|yml|svg|psd|ai|sketch|fig|mp3|wav|ogg|mp4|mov|avi|mkv)$/i
 
-const META_PATTERNS = [
-  /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<title[^>]*>([^<]*)<\/title>/i,
-] as const
-
-const DESCRIPTION_PATTERNS = [
-  /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-] as const
-
-const SITE_NAME_PATTERNS = [
-  /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<meta[^>]+name=["']application-name["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-] as const
-
-const IMAGE_PATTERNS = [
-  /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-  /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']*)["'][^>]*>/i,
-] as const
+const EMBED_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/
+const EMBED_SEGMENT_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const META_TAG_REGEX = /<meta\b([^>]*?)>/gi
+const TITLE_TAG_REGEX = /<title[^>]*>([^<]*)<\/title>/i
+const ATTR_PAIR_REGEX = /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g
 
 const HTML_ENTITY_MAP: Record<string, string> = {
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": "\"",
-  "&#39;": "'",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: "\"",
+  "#39": "'",
+  "#x27": "'",
+  apos: "'",
 }
 
 const hostMatches = (hostname: string, suffix: string) =>
@@ -48,16 +41,58 @@ const hostMatches = (hostname: string, suffix: string) =>
 
 const htmlDecode = (value: string) =>
   value
-    .replace(/&(amp|lt|gt|quot|#39);/g, (entity) => HTML_ENTITY_MAP[entity] || entity)
+    .replace(/&(amp|lt|gt|quot|#39|#x27|apos);/gi, (entity, key: string) => {
+      return HTML_ENTITY_MAP[key.toLowerCase()] || entity
+    })
     .trim()
 
-const firstMatch = (html: string, patterns: readonly RegExp[]) => {
-  for (const pattern of patterns) {
-    const match = html.match(pattern)
-    const value = match?.[1]?.trim()
-    if (value) return htmlDecode(value)
+const collectMetaTagValues = (html: string): Map<string, string> => {
+  const values = new Map<string, string>()
+  META_TAG_REGEX.lastIndex = 0
+
+  let metaMatch: RegExpExecArray | null
+  while ((metaMatch = META_TAG_REGEX.exec(html)) !== null) {
+    const rawAttrs = metaMatch[1] || ""
+    let propertyKey = ""
+    let nameKey = ""
+    let itempropKey = ""
+    let contentValue = ""
+
+    ATTR_PAIR_REGEX.lastIndex = 0
+    let attrMatch: RegExpExecArray | null
+    while ((attrMatch = ATTR_PAIR_REGEX.exec(rawAttrs)) !== null) {
+      const attrName = (attrMatch[1] || "").toLowerCase()
+      const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? ""
+      if (attrName === "property") propertyKey = attrVal.trim().toLowerCase()
+      else if (attrName === "name") nameKey = attrVal.trim().toLowerCase()
+      else if (attrName === "itemprop") itempropKey = attrVal.trim().toLowerCase()
+      else if (attrName === "content") contentValue = attrVal
+    }
+
+    const decodedContent = htmlDecode(contentValue)
+    if (!decodedContent) continue
+
+    const key = propertyKey || nameKey || itempropKey
+    if (key && !values.has(key)) {
+      values.set(key, decodedContent)
+    }
+  }
+
+  return values
+}
+
+const firstMetaValue = (metaValues: ReadonlyMap<string, string>, keys: readonly string[]): string => {
+  for (const key of keys) {
+    const value = metaValues.get(key)
+    if (value) return value
   }
   return ""
+}
+
+const extractTitleElement = (html: string): string => {
+  const match = TITLE_TAG_REGEX.exec(html)
+  const rawTitle = match?.[1]?.trim() || ""
+  return rawTitle ? htmlDecode(rawTitle) : ""
 }
 
 const humanizeHost = (hostname: string) =>
@@ -80,7 +115,6 @@ export const inferLinkProvider = (url: string) => {
     if (hostMatches(host, "codepen.io")) return "CodePen"
     if (hostMatches(host, "codesandbox.io")) return "CodeSandbox"
     if (hostMatches(host, "github.com")) return "GitHub"
-    if (hostMatches(host, "notion.so") || hostMatches(host, "notion.site")) return "Notion"
     if (hostMatches(host, "medium.com")) return "Medium"
 
     return humanizeHost(parsedUrl.hostname)
@@ -100,6 +134,8 @@ export const isLikelyFileUrl = (url: string) => {
   }
 }
 
+const isValidEmbedVideoId = (id: string) => EMBED_VIDEO_ID_PATTERN.test(id)
+
 export const resolveEmbedPreviewUrl = (url: string) => {
   try {
     const parsedUrl = new URL(url)
@@ -107,25 +143,28 @@ export const resolveEmbedPreviewUrl = (url: string) => {
     const host = parsedUrl.hostname.replace(/^www\./i, "").toLowerCase()
 
     if (host === "youtube.com" || host === "youtu.be") {
-      const embedMatch = parsedUrl.pathname.match(/^\/embed\/([a-zA-Z0-9_-]+)/)
+      const embedMatch = parsedUrl.pathname.match(/^\/embed\/([A-Za-z0-9_-]+)$/)
+      const shortMatch = parsedUrl.pathname.match(/^\/([A-Za-z0-9_-]+)\/?$/)
       const videoId =
         host === "youtu.be"
-          ? parsedUrl.pathname.replace(/^\/+/, "")
+          ? shortMatch?.[1] || ""
           : embedMatch?.[1] || parsedUrl.searchParams.get("v") || ""
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : ""
+      return isValidEmbedVideoId(videoId) ? `https://www.youtube.com/embed/${videoId}` : ""
     }
 
     if (host === "vimeo.com" || host === "player.vimeo.com") {
-      const videoId =
+      const vimeoMatch =
         host === "player.vimeo.com"
-          ? parsedUrl.pathname.replace(/^\/video\/+/, "").replace(/^\/+/, "")
-          : parsedUrl.pathname.replace(/^\/+/, "")
-      return videoId ? `https://player.vimeo.com/video/${videoId}` : ""
+          ? parsedUrl.pathname.match(/^\/video\/([A-Za-z0-9_-]+)\/?$/)
+          : parsedUrl.pathname.match(/^\/([A-Za-z0-9_-]+)\/?$/)
+      const videoId = vimeoMatch?.[1] || ""
+      return isValidEmbedVideoId(videoId) ? `https://player.vimeo.com/video/${videoId}` : ""
     }
 
     if (hostMatches(host, "loom.com")) {
-      const loomId = parsedUrl.pathname.split("/").filter(Boolean).pop() || ""
-      return loomId ? `https://www.loom.com/embed/${loomId}` : ""
+      const loomMatch = parsedUrl.pathname.match(/^\/(?:share|embed)\/([A-Za-z0-9_-]+)\/?$/)
+      const loomId = loomMatch?.[1] || ""
+      return isValidEmbedVideoId(loomId) ? `https://www.loom.com/embed/${loomId}` : ""
     }
 
     if (hostMatches(host, "figma.com")) {
@@ -147,17 +186,20 @@ export const resolveEmbedPreviewUrl = (url: string) => {
 
     if (hostMatches(host, "codepen.io")) {
       const parts = parsedUrl.pathname.split("/").filter(Boolean)
-      if (parts.length >= 3 && (parts[1] === "pen" || parts[1] === "embed")) {
+      if (
+        parts.length >= 3 &&
+        (parts[1] === "pen" || parts[1] === "embed") &&
+        EMBED_SEGMENT_PATTERN.test(parts[0]) &&
+        EMBED_SEGMENT_PATTERN.test(parts[2])
+      ) {
         return `https://codepen.io/${parts[0]}/embed/${parts[2]}?default-tab=result`
       }
     }
 
     if (hostMatches(host, "codesandbox.io")) {
-      if (parsedUrl.pathname.startsWith("/s/")) {
-        return `https://codesandbox.io/embed${parsedUrl.pathname}?view=preview`
-      }
-      if (parsedUrl.pathname.startsWith("/embed/s/")) {
-        return `https://codesandbox.io${parsedUrl.pathname}?view=preview`
+      const sandboxMatch = parsedUrl.pathname.match(/^\/(?:embed\/)?s\/([A-Za-z0-9_-]{3,64})\/?$/)
+      if (sandboxMatch) {
+        return `https://codesandbox.io/embed/s/${sandboxMatch[1]}?view=preview`
       }
     }
   } catch {
@@ -177,18 +219,28 @@ export const formatReadableFileSize = (sizeBytes?: number | null) => formatFileS
 
 export const extractUnfurlMetadata = (url: string, html: string): UnfurlMetadata => {
   const parsedUrl = new URL(url)
-  const siteName = firstMatch(html, SITE_NAME_PATTERNS) || humanizeHost(parsedUrl.hostname)
+  const metaValues = collectMetaTagValues(html)
+  const siteName =
+    firstMetaValue(metaValues, ["og:site_name", "application-name"]) || humanizeHost(parsedUrl.hostname)
   const provider = inferLinkProvider(url) || siteName
   const embedUrl = resolveEmbedPreviewUrl(url)
-  const thumbnailCandidate = firstMatch(html, IMAGE_PATTERNS)
+  const thumbnailCandidate = firstMetaValue(metaValues, [
+    "og:image:secure_url",
+    "og:image",
+    "twitter:image:src",
+    "twitter:image",
+  ])
   const thumbnailUrl = thumbnailCandidate
-    ? new URL(thumbnailCandidate, parsedUrl).toString()
+    ? normalizePublicExternalThumbnailUrl(thumbnailCandidate, parsedUrl.toString())
     : ""
 
   return {
     url,
-    title: firstMatch(html, META_PATTERNS) || humanizeHost(parsedUrl.hostname),
-    description: firstMatch(html, DESCRIPTION_PATTERNS),
+    title:
+      firstMetaValue(metaValues, ["og:title", "twitter:title"]) ||
+      extractTitleElement(html) ||
+      humanizeHost(parsedUrl.hostname),
+    description: firstMetaValue(metaValues, ["og:description", "twitter:description", "description"]),
     siteName,
     provider,
     thumbnailUrl,

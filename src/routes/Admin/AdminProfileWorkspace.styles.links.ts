@@ -1,6 +1,6 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
-import { control } from "src/design-system/tokens"
+import { boxShadowColor, control } from "src/design-system/tokens"
 import {
   adminGold,
   adminGoldTintLine,
@@ -204,7 +204,7 @@ export const IconPickerPanel = styled.div`
   border-radius: 6px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 4px 16px ${boxShadowColor.menuMedium};
   padding: 0.4rem;
   display: grid;
   gap: 0.32rem;

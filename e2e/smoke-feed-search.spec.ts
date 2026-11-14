@@ -27,7 +27,7 @@ const triggerSearchShortcut = async (page: Page) => {
 }
 
 const waitForFeedSearchInputFocus = async (page: Page) => {
-  const searchInput = page.getByLabel("Search posts by keyword")
+  const searchInput = page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)
   await expect(searchInput).toBeFocused()
 }
 
@@ -59,7 +59,7 @@ test.describe("core smoke feed and search", () => {
   })
 
   await page.goto("/")
-  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
   await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
   await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
   await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
@@ -256,14 +256,14 @@ test.describe("core smoke feed and search", () => {
   await mockFeedEndpoints(page)
 
   await page.goto("/")
-  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
   await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
   await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
   await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
   await expect(page.getByText("비밀스러운 지식들을 탐구하는데 목적을 두고 있습니다")).toHaveCount(0)
 
   await page.reload()
-  await expect(page.getByLabel("Search posts by keyword")).toBeVisible()
+  await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
   await expect(page.getByRole("button", { name: "글과 태그 검색으로 이동" })).toHaveCount(0)
   await expect(page.getByRole("heading", { level: 1, name: "비밀스러운 IT 공작소" })).toHaveCount(0)
   await expect(page.locator('[data-ui="feed-brand-role"]')).toHaveCount(0)
@@ -314,7 +314,7 @@ test.describe("core smoke feed and search", () => {
 
   await page.goto("/")
   await expect(page.getByRole("button", { name: "전체보기" })).toBeVisible()
-  const searchInput = page.getByLabel("Search posts by keyword")
+  const searchInput = page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)
   await searchInput.fill("alpha")
 
   await expect.poll(() => capturedKw.some((value) => value === "alpha")).toBeTruthy()
@@ -387,7 +387,7 @@ test.describe("core smoke feed and search", () => {
 
   await page.goto("/")
   await expect(page.getByRole("button", { name: "전체보기" })).toBeVisible()
-  const searchInput = page.getByLabel("Search posts by keyword")
+  const searchInput = page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)
   await searchInput.fill("alpha beta")
 
   await expect.poll(() => capturedKw.some((value) => value === "alpha beta")).toBeTruthy()

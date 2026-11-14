@@ -321,7 +321,7 @@ test.describe("perf feed scroll budgets", () => {
   await waitForPageReady(page)
 
   capturedExploreRequests.length = 0
-  await page.getByLabel("Search posts by keyword").fill("latency")
+  await page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/).fill("latency")
 
   await expect(page.getByRole("heading", { name: "CLS 예산 점검 1401" })).toBeVisible()
   await expect

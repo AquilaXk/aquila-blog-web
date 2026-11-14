@@ -17,7 +17,7 @@ test.describe("adaptivity hit-area", () => {
   test("모바일 홈 핵심 컨트롤은 44px 이상 터치 타깃을 유지한다", async ({ page }) => {
     await openMobileHome(page)
 
-    await expectMinTouchTarget(page, page.getByLabel("Search posts by keyword"), "feed search")
+    await expectMinTouchTarget(page, page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/), "feed search")
     await expectMinTouchTarget(page, page.getByRole("button", { name: "메뉴" }), "mobile menu")
     await expectMinTouchTarget(page, page.getByRole("button", { name: "전체보기" }), "topic chip")
 

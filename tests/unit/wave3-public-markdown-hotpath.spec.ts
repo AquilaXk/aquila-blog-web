@@ -17,6 +17,7 @@ import {
   computeCenterClearance,
   resolveParticleClearance,
 } from "../../src/routes/Company/CompanyHeroParticles"
+import { boxShadowColor } from "../../src/design-system/tokens"
 
 const ROOT_DIR = path.resolve(__dirname, "../..")
 const readRepoFile = (relPath: string) => readFileSync(path.join(ROOT_DIR, relPath), "utf8")
@@ -200,7 +201,8 @@ test.describe("wave3 public pages, responsive layout, deslop, and markdown hot p
     const baseStyles = readRepoFile(
       "src/libs/markdown/components/MarkdownRendererRootBaseStyles.ts"
     )
-    expect(baseStyles).toContain("0 2px 8px rgba(15, 23, 42, 0.1)")
+    expect(boxShadowColor.cardHover).toBe("rgba(15, 23, 42, 0.1)")
+    expect(baseStyles).toContain("0 2px 8px ${boxShadowColor.cardHover}")
     expect(baseStyles).not.toContain("0 8px 24px rgba(15, 23, 42, 0.14)")
 
     const lightboxSource = readRepoFile("src/libs/markdown/imageLightboxOverlay.ts")

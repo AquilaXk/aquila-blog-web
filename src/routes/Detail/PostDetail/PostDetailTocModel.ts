@@ -1,3 +1,4 @@
+// 참조 구현: Fumadocs (`fuma-nama/fumadocs`, `packages/core/src/toc.tsx`, MIT License, Copyright (c) 2024 Fuma Nama)
 import {
   createMarkdownDocumentInsights,
   createMarkdownHeadingSlugAllocator,
@@ -202,20 +203,32 @@ export type HeadingOffset = {
   topDoc: number
 }
 
+// 참조 구현: Fumadocs 활성 TOC 측정/가시성 필터 (https://github.com/fuma-nama/fumadocs, MIT License, Copyright (c) 2024 Fuma Nama)
 export const measureHeadingOffsets = (
   items: readonly TocItem[],
   scrollY: number = typeof window !== "undefined" ? window.scrollY : 0
 ): HeadingOffset[] => {
   if (typeof document === "undefined" || !items.length) return []
   const result: HeadingOffset[] = []
+  let lastVisibleTopDoc: number | null = null
   for (const item of items) {
     const el = document.getElementById(item.id)
-    if (el) {
-      result.push({
-        id: item.id,
-        topDoc: scrollY + el.getBoundingClientRect().top,
-      })
+    if (!el) continue
+    const inClosedDetails =
+      typeof el.closest === "function" && el.closest("details:not([open])") !== null
+    const rect = el.getBoundingClientRect()
+    const isZeroSizeBox = rect.height === 0 && (rect.width === undefined || rect.width === 0)
+    if (inClosedDetails || isZeroSizeBox) {
+      continue
     }
+    const rawTopDoc = scrollY + rect.top
+    const monotonicTopDoc: number =
+      lastVisibleTopDoc !== null ? Math.max(lastVisibleTopDoc, rawTopDoc) : rawTopDoc
+    lastVisibleTopDoc = monotonicTopDoc
+    result.push({
+      id: item.id,
+      topDoc: monotonicTopDoc,
+    })
   }
   return result
 }

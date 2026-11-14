@@ -4,18 +4,19 @@ import {
 } from "react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { boxShadowColor } from "src/design-system/tokens"
 import { zIndexes } from "src/styles/zIndexes"
 import type { MarkdownFormatShortcut } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import {
-  NOTION_COLOR_SWATCH_SPECS,
+  EDITOR_COLOR_SWATCH_SPECS,
   computeActiveLineState,
   computeBlockMenuPosition,
   computeBubbleToolbarPosition,
   computeGutterTopPosition,
   moveBlockMenuFocus,
-} from "./markdownEditorNotionChromeModel"
+} from "./markdownEditorBlockChromeModel"
 import {
   isWrapSelectionActive,
   planReplaceSelection,
@@ -24,7 +25,7 @@ import {
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
 
-type MarkdownEditorNotionChromeProps = {
+type MarkdownEditorBlockChromeProps = {
   containerRef: RefObject<HTMLElement | null>
   mode: "live" | "source" | "reading"
   disabled: boolean
@@ -205,14 +206,14 @@ const ColorSwatchMenuButton = styled.button<{ $color: string }>`
 `
 const ColorSwatchDot = styled.span<{ $color: string }>`
   display: inline-block; width: 11px; height: 11px; border-radius: 3px;
-  background: ${({ $color }) => $color}; border: 1px solid rgba(15, 23, 42, 0.16); flex-shrink: 0;
+  background: ${({ $color }) => $color}; border: 1px solid ${boxShadowColor.swatchBorder}; flex-shrink: 0;
 `
 
-export const MarkdownEditorNotionChrome = ({
+export const MarkdownEditorBlockChrome = ({
   containerRef, mode, disabled, value, selection, isSlashMenuOpen, isFindReplaceOpen,
   resolveCoords, onApplySnippet, onApplyFormatShortcut, onApplyListCommand,
   onStripBlockPrefix, onApplyLineCommand, onTriggerSlashCommand,
-}: MarkdownEditorNotionChromeProps) => {
+}: MarkdownEditorBlockChromeProps) => {
   const [isDismissed, setIsDismissed] = useState(false)
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false)
   const [layoutTick, setLayoutTick] = useState(0)
@@ -456,7 +457,7 @@ export const MarkdownEditorNotionChrome = ({
           <BlockMenuSectionDivider aria-hidden="true" />
           <BlockMenuSectionHeader aria-hidden="true">글자 색상</BlockMenuSectionHeader>
           <ColorSwatchRow>
-            {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+            {EDITOR_COLOR_SWATCH_SPECS.map((swatch) => (
               <ColorSwatchMenuButton key={swatch.label} type="button" role="menuitem" aria-label={swatch.label} title={swatch.label} $color={swatch.hex} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}>
                 <ColorSwatchDot $color={swatch.hex} />
                 <span aria-hidden="true">A</span>
@@ -483,7 +484,7 @@ export const MarkdownEditorNotionChrome = ({
             <BubbleActionButton key={item.label} type="button" aria-label={item.label} aria-pressed={item.active} onMouseDown={(event) => event.preventDefault()} onClick={item.run}>{item.glyph}</BubbleActionButton>
           ))}
           <BubbleDivider aria-hidden="true" />
-          {NOTION_COLOR_SWATCH_SPECS.map((swatch) => (
+          {EDITOR_COLOR_SWATCH_SPECS.map((swatch) => (
             <BubbleActionButton key={swatch.label} type="button" aria-label={`선택 영역 ${swatch.label}`} title={swatch.label} onMouseDown={(event) => event.preventDefault()} onClick={() => applyLineColorSwatch(swatch.token)}>
               <ColorSwatchDot $color={swatch.hex} />
             </BubbleActionButton>

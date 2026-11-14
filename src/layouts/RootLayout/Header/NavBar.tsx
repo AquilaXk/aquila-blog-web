@@ -6,8 +6,12 @@ import { useRouter } from "next/router"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { waitForFeedSearchInputFocus } from "src/routes/Feed/feedSearchFocus"
-import { zIndexes } from "src/styles/zIndexes"
 import { useLanguage } from "src/libs/language"
+import {
+  MobileMenuBackdrop,
+  MobileMenuLayer,
+  MobileMenuPanel,
+} from "./NavBarMobileMenu.styles"
 import {
   focusTopicsRailElement,
   GlobeIcon,
@@ -153,7 +157,15 @@ const NavBar = () => {
                     data-nav-id={id}
                     aria-label={label}
                     aria-current={isActive ? "page" : undefined}
-                    onClick={id === "topics" ? () => { closeMobileMenu(); setActiveHash("topics"); window.requestAnimationFrame(() => focusTopicsRailElement()) } : closeMobileMenu}
+                    onClick={
+                      id === "topics"
+                        ? () => {
+                            closeMobileMenu()
+                            setActiveHash("topics")
+                            window.requestAnimationFrame(() => focusTopicsRailElement())
+                          }
+                        : closeMobileMenu
+                    }
                   >
                     {label}
                   </Link>
@@ -251,112 +263,6 @@ const NavBar = () => {
 }
 
 export default NavBar
-
-const MobileMenuLayer = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: ${zIndexes.mobileNavOverlay};
-  pointer-events: none;
-`
-
-const MobileMenuBackdrop = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: ${zIndexes.mobileNavOverlay};
-  background: color-mix(
-    in srgb,
-    var(--aq-text) 20%,
-    transparent
-  );
-  pointer-events: auto;
-`
-
-const MobileMenuPanel = styled.div`
-  position: fixed;
-  top: calc(var(--app-header-height, 59px) + 8px);
-  right: max(0.75rem, env(safe-area-inset-right, 0px));
-  z-index: ${zIndexes.mobileNavOverlay};
-  display: grid;
-  width: min(240px, calc(100vw - 1.5rem));
-  border: 1px solid var(--aq-border-strong);
-  border-radius: 6px;
-  background: var(--aq-surface);
-  padding: 6px;
-  pointer-events: auto;
-
-  a,
-  button {
-    display: flex;
-    width: 100%;
-    min-height: ${control.lg}px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    border: 0;
-    background: transparent;
-    color: var(--aq-text);
-    padding: 0 10px;
-    text-align: left;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 650;
-    cursor: pointer;
-  }
-
-  button[data-ui="mobile-nav-search"] {
-    justify-content: flex-start;
-    gap: 8px;
-
-    svg {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-      color: var(--aq-muted);
-    }
-  }
-
-  .mobileLangSwitchRow {
-    display: flex;
-    margin-top: 4px;
-    padding: 6px 2px 2px;
-    border-top: 1px solid var(--aq-border);
-
-    .mobileLangToggleBtn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
-      width: 100%;
-      min-height: ${control.lg}px;
-      padding: 0 10px;
-      border: none;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--aq-muted);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: left;
-      transition: color 0.15s ease, background-color 0.15s ease;
-
-      svg {
-        width: 16px;
-        height: 16px;
-        flex-shrink: 0;
-      }
-
-      &:hover {
-        color: var(--aq-text);
-        background: var(--aq-surface-elevated);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--aq-focus-ring);
-        outline-offset: 1px;
-      }
-    }
-  }
-`
 
 const StyledWrapper = styled.div`
   position: relative;

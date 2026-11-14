@@ -10,7 +10,10 @@ test.beforeEach(async ({ page }) => {
 test.describe("core smoke detail blocks and typography", () => {
   test("V4 코드블럭은 제목 metadata를 toolbar title로 렌더한다", () => {
     const codeModelSource = readFileSync(path.resolve(__dirname, "../src/libs/markdown/renderingCodeModel.ts"), "utf8")
-    const rendererSource = readFileSync(path.resolve(__dirname, "../src/libs/markdown/MarkdownRenderer.tsx"), "utf8")
+    const rendererComponentsSource = readFileSync(
+      path.resolve(__dirname, "../src/libs/markdown/MarkdownRendererComponents.tsx"),
+      "utf8"
+    )
     const prettyCodeSource = readFileSync(
       path.resolve(__dirname, "../src/libs/markdown/components/PrettyCodeBlock.tsx"),
       "utf8"
@@ -47,8 +50,8 @@ test.describe("core smoke detail blocks and typography", () => {
     expect(codeModelSource).toContain('filenameMatch[1] || filenameMatch[2] || filenameMatch[3] || ""')
     expect(codeModelSource).toContain("const meta = readCodeMeta(codeAstNode)")
     expect(codeModelSource).toContain("title: extractCodeTitle(meta)")
-    expect(rendererSource).toContain("extractCodeMetaFromPreChildren(children, node)")
-    expect(rendererSource).toContain("title={title}")
+    expect(rendererComponentsSource).toContain("extractCodeMetaFromPreChildren(children, node)")
+    expect(rendererComponentsSource).toContain("title={title}")
     expect(prettyCodeSource).toContain("const label = title?.trim() || toLanguageLabel(language)")
     expect(prettyCodeSource).toContain('<span className="aq-code-title">{label}</span>')
     expect(codeStyleSource).toContain(".aq-code-toolbar")

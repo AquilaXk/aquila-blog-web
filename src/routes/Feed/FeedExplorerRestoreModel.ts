@@ -1,6 +1,7 @@
 import { queryKey } from "src/constants/queryKey"
 import { type ExplorePostsPage } from "src/apis/backend/posts"
 import {
+  FEED_EXPLORER_CURSOR_SUFFIX,
   FEED_EXPLORER_RESTORE_KEY_PREFIX,
   FEED_EXPLORER_SNAPSHOT_SUFFIX,
 } from "src/libs/feed/feedRestoreCache"
@@ -91,6 +92,49 @@ export const getFeedExplorerRestoreKey = (
 
 export const getFeedExplorerSnapshotKey = (restoreKey: string) =>
   `${restoreKey}${FEED_EXPLORER_SNAPSHOT_SUFFIX}`
+
+export const getFeedExplorerCursorKey = (restoreKey: string) =>
+  `${restoreKey}${FEED_EXPLORER_CURSOR_SUFFIX}`
+
+export const parseFeedExplorerCursorScrollY = (
+  raw: string | null
+): { scrollY: number; savedAt: number } | null => {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { scrollY?: unknown; savedAt?: unknown }
+    if (!parsed || typeof parsed !== "object") return null
+    const savedAt =
+      typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+    if (savedAt <= 0 || Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) return null
+    const scrollY =
+      typeof parsed.scrollY === "number" && Number.isFinite(parsed.scrollY)
+        ? Math.max(0, Math.trunc(parsed.scrollY))
+        : -1
+    if (scrollY < 0) return null
+    return { scrollY, savedAt }
+  } catch {
+    return null
+  }
+}
+
+export const resolveFeedInitialMountCount = (
+  postsCount: number,
+  restoreScrollY: number,
+  baseInitialCount = 8,
+  estimatedCardHeightPx = 184,
+  viewportHeightPx?: number
+): number => {
+  if (postsCount <= 0) return 0
+  const baseCount = Math.min(postsCount, Math.max(1, baseInitialCount))
+  if (!(restoreScrollY > 0)) return baseCount
+  const resolvedViewportHeight =
+    viewportHeightPx ??
+    (typeof window !== "undefined" && Number.isFinite(window.innerHeight) && window.innerHeight > 0
+      ? window.innerHeight
+      : 900)
+  const neededCards = Math.ceil((restoreScrollY + resolvedViewportHeight) / estimatedCardHeightPx) + 2
+  return Math.min(postsCount, Math.max(baseCount, neededCards))
+}
 
 export const getNavigatorConnection = (): NavigatorConnectionLike | undefined => {
   if (typeof navigator === "undefined") return undefined
@@ -366,33 +410,42 @@ export const extractSavedAt = (raw: string | null) => {
 export const pruneFeedExplorerStateStorage = (storage: Storage) => {
   const candidates: Array<{ key: string; savedAt: number }> = []
 
-  for (let i = 0; i < storage.length; i += 1) {
-    const key = storage.key(i)
-    if (!key) continue
-    if (!key.startsWith(FEED_EXPLORER_RESTORE_KEY_PREFIX)) continue
-    if (key.endsWith(FEED_EXPLORER_SNAPSHOT_SUFFIX)) continue
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (!key) continue
+      if (!key.startsWith(FEED_EXPLORER_RESTORE_KEY_PREFIX)) continue
+      if (key.endsWith(FEED_EXPLORER_SNAPSHOT_SUFFIX) || key.endsWith(FEED_EXPLORER_CURSOR_SUFFIX)) {
+        continue
+      }
 
-    const snapshotKey = getFeedExplorerSnapshotKey(key)
-    const savedAt = extractSavedAt(storage.getItem(key))
+      const snapshotKey = getFeedExplorerSnapshotKey(key)
+      const cursorKey = getFeedExplorerCursorKey(key)
+      const savedAt = extractSavedAt(storage.getItem(key))
 
-    if (savedAt <= 0 || Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) {
-      storage.removeItem(key)
-      storage.removeItem(snapshotKey)
-      continue
+      if (savedAt <= 0 || Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) {
+        storage.removeItem(key)
+        storage.removeItem(snapshotKey)
+        storage.removeItem(cursorKey)
+        continue
+      }
+
+      candidates.push({ key, savedAt })
     }
 
-    candidates.push({ key, savedAt })
+    if (candidates.length <= FEED_EXPLORER_RESTORE_MAX_KEYS) return
+
+    candidates
+      .sort((a, b) => b.savedAt - a.savedAt)
+      .slice(FEED_EXPLORER_RESTORE_MAX_KEYS)
+      .forEach(({ key }) => {
+        storage.removeItem(key)
+        storage.removeItem(getFeedExplorerSnapshotKey(key))
+        storage.removeItem(getFeedExplorerCursorKey(key))
+      })
+  } catch {
+    // 스토리지 접근이 차단된 환경에서는 정리 실패를 무시한다.
   }
-
-  if (candidates.length <= FEED_EXPLORER_RESTORE_MAX_KEYS) return
-
-  candidates
-    .sort((a, b) => b.savedAt - a.savedAt)
-    .slice(FEED_EXPLORER_RESTORE_MAX_KEYS)
-    .forEach(({ key }) => {
-      storage.removeItem(key)
-      storage.removeItem(getFeedExplorerSnapshotKey(key))
-    })
 }
 
 export const shouldRestoreFeedExplorerSession = (

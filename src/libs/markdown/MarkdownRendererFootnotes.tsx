@@ -10,6 +10,28 @@ type MarkdownFootnoteReferenceLinkProps = ComponentPropsWithoutRef<"a"> & {
   marker: string
 }
 
+type FootnoteLookupIndex = {
+  byHref: Map<string, { footnote: MarkdownFootnote; occurrenceByRefId: Map<string, number> }>
+}
+
+const footnoteLookupCache = new WeakMap<readonly MarkdownFootnote[], FootnoteLookupIndex>()
+
+const getFootnoteLookupIndex = (footnotes: readonly MarkdownFootnote[]): FootnoteLookupIndex => {
+  const cached = footnoteLookupCache.get(footnotes)
+  if (cached) return cached
+  const byHref = new Map<string, { footnote: MarkdownFootnote; occurrenceByRefId: Map<string, number> }>()
+  for (const footnote of footnotes) {
+    const occurrenceByRefId = new Map<string, number>()
+    for (let i = 0; i < footnote.referenceIds.length; i += 1) {
+      occurrenceByRefId.set(footnote.referenceIds[i]!, i + 1)
+    }
+    byHref.set(`#${footnote.targetId}`, { footnote, occurrenceByRefId })
+  }
+  const index = { byHref }
+  footnoteLookupCache.set(footnotes, index)
+  return index
+}
+
 export const isExternalHttpHref = (href: string): boolean =>
   href.startsWith("http://") || href.startsWith("https://")
 
@@ -45,10 +67,9 @@ export const MarkdownFootnoteReferenceLink = ({
     return <span>{children}</span>
   }
   const referenceId = title?.startsWith(`${marker}:`) ? title.slice(marker.length + 1) : ""
-  const footnote = footnotes.find(
-    (candidate) =>
-      safeHref === `#${candidate.targetId}` && candidate.referenceIds.includes(referenceId)
-  )
+  const entry = getFootnoteLookupIndex(footnotes).byHref.get(safeHref)
+  const occurrence = entry ? (entry.occurrenceByRefId.get(referenceId) ?? 0) : 0
+  const footnote = occurrence > 0 ? entry?.footnote : undefined
   if (!footnote) {
     const externalProps = isExternalHttpHref(safeHref)
       ? { target: "_blank", rel: "noopener noreferrer" }
@@ -59,7 +80,6 @@ export const MarkdownFootnoteReferenceLink = ({
       </a>
     )
   }
-  const occurrence = footnote.referenceIds.indexOf(referenceId) + 1
   const plainTextPreview = extractFootnotePlainTextPreview(footnote.content)
   const fallbackSuffix = `${footnote.identifier}-${occurrence}`
   const tooltipId = `aq-footnote-tooltip-${referenceId || fallbackSuffix}`

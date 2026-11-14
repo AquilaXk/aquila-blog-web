@@ -1,4 +1,13 @@
+import { overlayScrim } from "src/design-system/tokens"
+import { getClientStoredLanguage, translations } from "src/libs/language"
 import { acquireBodyScrollLock } from "src/libs/utils/bodyScrollLock"
+
+const resolveOverlayTranslations = () => {
+  const isEnglish =
+    (typeof document !== "undefined" ? (document.documentElement?.lang ?? "").toLowerCase().startsWith("en") : false) ||
+    getClientStoredLanguage() === "en"
+  return isEnglish ? translations.en : translations.ko
+}
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -182,23 +191,30 @@ const configureMermaidStageSvg = (stageSvg: SVGSVGElement | null) => {
   stageSvg.style.transition = "transform 0.14s ease"
 }
 
-const appendCopySourceButtonIfPresent = (actionsBar: HTMLElement, sourceText: string) => {
+const appendCopySourceButtonIfPresent = (
+  actionsBar: HTMLElement,
+  sourceText: string,
+  overlayT: ReturnType<typeof resolveOverlayTranslations>
+) => {
   const trimmed = sourceText.trim()
   if (!trimmed) return
-  const copySourceButton = createOverlayActionButton("코드 복사", "Mermaid 원본 코드 복사")
+  const copySourceButton = createOverlayActionButton(
+    overlayT.mermaidCopyCode,
+    overlayT.mermaidCopyCodeAria
+  )
   copySourceButton.addEventListener("click", () => {
     const writePromise =
       typeof navigator !== "undefined" ? navigator.clipboard?.writeText(sourceText) : undefined
     if (!writePromise) {
-      copySourceButton.textContent = "복사 실패"
+      copySourceButton.textContent = overlayT.mermaidCopyFailed
       return
     }
     void writePromise
       .then(() => {
-        copySourceButton.textContent = "복사됨"
+        copySourceButton.textContent = overlayT.mermaidCopyDone
       })
       .catch(() => {
-        copySourceButton.textContent = "복사 실패"
+        copySourceButton.textContent = overlayT.mermaidCopyFailed
       })
   })
   actionsBar.appendChild(copySourceButton)
@@ -213,16 +229,17 @@ export const openMermaidOverlay = (
 
   previousCleanup?.()
   const previousFocusedElement = resolvePreviousActiveElement()
+  const overlayT = resolveOverlayTranslations()
 
   const overlay = document.createElement("div")
   overlay.setAttribute("data-aq-mermaid-overlay", "true")
   overlay.setAttribute("role", "dialog")
   overlay.setAttribute("aria-modal", "true")
-  overlay.setAttribute("aria-label", "Mermaid 확대 보기")
+  overlay.setAttribute("aria-label", overlayT.mermaidOverlayAria)
   overlay.style.position = "fixed"
   overlay.style.inset = "0"
   overlay.style.zIndex = "180"
-  overlay.style.background = "rgba(15, 23, 36, 0.56)"
+  overlay.style.background = overlayScrim.diagram
   overlay.style.display = "grid"
   overlay.style.alignItems = "center"
   overlay.style.justifyItems = "center"
@@ -242,6 +259,8 @@ export const openMermaidOverlay = (
 
   const actionsBar = document.createElement("div")
   actionsBar.className = "aq-mermaid-modal-actions"
+  actionsBar.setAttribute("role", "toolbar")
+  actionsBar.setAttribute("aria-label", overlayT.mermaidToolbarAria)
   actionsBar.style.display = "flex"
   actionsBar.style.alignItems = "center"
   actionsBar.style.justifyContent = "flex-end"
@@ -251,10 +270,10 @@ export const openMermaidOverlay = (
   actionsBar.style.background = "var(--aq-page-bg)"
   actionsBar.style.borderBottom = "1px solid var(--aq-border)"
 
-  const zoomOutButton = createOverlayActionButton("-", "축소")
-  const zoomResetButton = createOverlayActionButton("100%", "배율 초기화")
-  const zoomInButton = createOverlayActionButton("+", "확대")
-  const closeButton = createOverlayActionButton("닫기", "닫기")
+  const zoomOutButton = createOverlayActionButton("-", overlayT.mermaidZoomOutAria)
+  const zoomResetButton = createOverlayActionButton("100%", overlayT.mermaidResetAria)
+  const zoomInButton = createOverlayActionButton("+", overlayT.mermaidZoomInAria)
+  const closeButton = createOverlayActionButton(overlayT.mermaidClose, overlayT.mermaidClose)
 
   const stage = document.createElement("div")
   stage.style.overflow = "auto"
@@ -301,7 +320,7 @@ export const openMermaidOverlay = (
   actionsBar.appendChild(zoomOutButton)
   actionsBar.appendChild(zoomResetButton)
   actionsBar.appendChild(zoomInButton)
-  appendCopySourceButtonIfPresent(actionsBar, sourceText)
+  appendCopySourceButtonIfPresent(actionsBar, sourceText, overlayT)
   actionsBar.appendChild(closeButton)
 
   panel.appendChild(actionsBar)
@@ -340,6 +359,10 @@ export const openMermaidOverlay = (
     }
   }
 
+  const handlePopState = () => {
+    closeOverlay()
+  }
+
   closeOverlay = () => {
     if (closed) return
     closed = true
@@ -347,6 +370,9 @@ export const openMermaidOverlay = (
     releaseBodyScrollLock()
     overlay.remove()
     document.removeEventListener("keydown", handleOverlayKeyDown)
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", handlePopState)
+    }
     closeButton.removeEventListener("click", closeOverlay)
     overlay.removeEventListener("click", handleOverlayClick)
     if (previousFocusedElement?.isConnected) {
@@ -358,6 +384,9 @@ export const openMermaidOverlay = (
   overlay.addEventListener("click", handleOverlayClick)
   closeButton.addEventListener("click", closeOverlay)
   document.addEventListener("keydown", handleOverlayKeyDown)
+  if (typeof window !== "undefined") {
+    window.addEventListener("popstate", handlePopState)
+  }
 
   return closeOverlay
 }

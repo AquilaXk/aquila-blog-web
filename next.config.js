@@ -125,11 +125,11 @@ module.exports = {
         headers: buildSecurityHeaders(),
       },
       {
-        source: "/easysubway/:path*",
+        source: "/easysubway/:path+.:ext(webp|png|jpg|jpeg|gif|svg|ico|avif)",
         headers: staticAssetCacheHeaders,
       },
       {
-        source: "/company/:path*",
+        source: "/company/:path+.:ext(webp|png|jpg|jpeg|gif|svg|ico|avif)",
         headers: staticAssetCacheHeaders,
       },
       {

@@ -1,8 +1,7 @@
+import { isAsciiAlphaNumericCode } from "./asciiScannerTable"
 import { collectCommonMarkCodeBlockRanges } from "./commonMarkCodeBlockRanges"
 import {
   countCodePointRun,
-  extractAlphaNumericOutsideAngles,
-  extractAsciiAlphaNumeric,
   findContainingSortedRangeEnd,
   isEscapedMarkdownAt,
   matchAutolinkEnd,
@@ -150,14 +149,98 @@ const buildProtectedInlineSentinels = (nonce: number): ProtectedInlineSentinels 
 
 export const DEFAULT_PROTECTED_INLINE_SENTINELS = buildProtectedInlineSentinels(0)
 
-export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
-  const decoded = source.includes("&#") ? decodeNumericEntitiesForSentinelProbe(source) : source
-  const probe = `${extractAsciiAlphaNumeric(source)}\n${extractAlphaNumericOutsideAngles(source)}\n${extractAsciiAlphaNumeric(decoded)}\n${extractAlphaNumericOutsideAngles(decoded)}`
-  let nonce = 0
-  while (probe.includes(`aqp${nonce}z`)) {
-    nonce += 1
+const MAX_32BIT_MASKED_NONCE = 31
+
+const scanSentinelCollisionMask = (
+  text: string,
+  outsideAnglesOnly: boolean,
+  initialMask: number,
+  overflowNonces: Set<number>
+): number => {
+  let usedMask = initialMask
+  let inAngle = false
+  let state = 0
+  let digitNonce = 0
+  let hasLeadingZero = false
+
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i)
+    if (outsideAnglesOnly) {
+      if (code === 60) {
+        inAngle = true
+        continue
+      }
+      if (code === 62 || code === 10 || code === 13 || code === 0xe000) {
+        inAngle = false
+        continue
+      }
+      if (inAngle) continue
+    }
+    if (!isAsciiAlphaNumericCode(code)) continue
+    if (state === 3) {
+      if (code >= 48 && code <= 57) {
+        digitNonce = code - 48
+        hasLeadingZero = code === 48
+        state = 4
+        continue
+      }
+      state = code === 97 ? 1 : 0
+      continue
+    }
+    if (state === 4) {
+      if (code >= 48 && code <= 57) {
+        if (hasLeadingZero) {
+          state = 0
+          continue
+        }
+        const nextNonce = digitNonce * 10 + (code - 48)
+        if (nextNonce <= Number.MAX_SAFE_INTEGER) {
+          digitNonce = nextNonce
+        } else {
+          state = 0
+        }
+        continue
+      }
+      if (code === 122) {
+        if (digitNonce <= MAX_32BIT_MASKED_NONCE) usedMask |= 1 << digitNonce
+        else overflowNonces.add(digitNonce)
+        state = 0
+        continue
+      }
+      state = code === 97 ? 1 : 0
+      continue
+    }
+    if (code === 97) state = 1
+    else if (state === 1 && code === 113) state = 2
+    else if (state === 2 && code === 112) state = 3
+    else state = 0
   }
-  return nonce === 0 ? DEFAULT_PROTECTED_INLINE_SENTINELS : buildProtectedInlineSentinels(nonce)
+
+  return usedMask
+}
+
+export const createProtectedInlineSentinels = (source: string): ProtectedInlineSentinels => {
+  const hasNumericEntity = source.includes("&#")
+  if (!hasNumericEntity && !source.includes("a")) {
+    return DEFAULT_PROTECTED_INLINE_SENTINELS
+  }
+  const overflowNonces = new Set<number>()
+  let usedMask = scanSentinelCollisionMask(source, false, 0, overflowNonces)
+  usedMask = scanSentinelCollisionMask(source, true, usedMask, overflowNonces)
+  if (hasNumericEntity) {
+    const decoded = decodeNumericEntitiesForSentinelProbe(source)
+    usedMask = scanSentinelCollisionMask(decoded, false, usedMask, overflowNonces)
+    usedMask = scanSentinelCollisionMask(decoded, true, usedMask, overflowNonces)
+  }
+  const freeMask = ~usedMask
+  if (freeMask !== 0) {
+    const lowestFreeBit = freeMask & -freeMask
+    const nonce = 31 - Math.clz32(lowestFreeBit)
+    return nonce === 0 ? DEFAULT_PROTECTED_INLINE_SENTINELS : buildProtectedInlineSentinels(nonce)
+  }
+  let nonce = 32
+  while (overflowNonces.has(nonce)) nonce += 1
+  return buildProtectedInlineSentinels(nonce)
 }
 
 const LT_ENTITY_PREFIX_PATTERN = /^&(?:lt|LT|#0*60|#[xX]0*3[cC]);/

@@ -148,15 +148,13 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
     padding: 0.14em 0.4em 0.16em;
     background: var(
       --aq-inline-code-bg,
-      ${theme.publicDesign.inlineCodeBg ??
-      (theme.scheme === "dark" ? "rgba(255, 255, 255, 0.075)" : "rgba(15, 23, 36, 0.055)")}
+      ${theme.publicDesign.inlineCodeBg}
     );
     color: var(--aq-inline-code-fg, ${theme.colors.gray12});
     box-shadow: inset 0 0 0 1px
       var(
         --aq-inline-code-border,
-        ${theme.publicDesign.inlineCodeBorder ??
-        (theme.scheme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 36, 0.12)")}
+        ${theme.publicDesign.inlineCodeBorder}
       );
     letter-spacing: -0.01em;
     font-size: ${articleTypographyScale.codeFontSize};

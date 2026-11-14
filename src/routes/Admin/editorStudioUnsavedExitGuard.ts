@@ -177,3 +177,41 @@ export const restoreEditorUrlAfterBlockedHistoryPop = (
   const state = typeof historyState !== "undefined" ? historyState : (history?.state ?? null)
   history?.pushState(state, "", editorAsPath)
 }
+
+export const readHistoryStateIndex = (state: unknown): number | null => {
+  if (!state || typeof state !== "object") return null
+  const record = state as Record<string, unknown>
+  if (typeof record.idx === "number" && Number.isFinite(record.idx)) return record.idx
+  if (typeof record.index === "number" && Number.isFinite(record.index)) return record.index
+  return null
+}
+
+export const readHistoryStateKey = (state: unknown): string | null => {
+  if (!state || typeof state !== "object") return null
+  const key = (state as Record<string, unknown>).key
+  return typeof key === "string" && key.length > 0 ? key : null
+}
+
+export const resolveBlockedHistoryNavigationDelta = (
+  editorState: unknown,
+  poppedState: unknown,
+  keyOrderMap?: ReadonlyMap<string, number>
+): number => {
+  const editorIndex = readHistoryStateIndex(editorState)
+  const poppedIndex = readHistoryStateIndex(poppedState)
+  if (editorIndex !== null && poppedIndex !== null && poppedIndex !== editorIndex) {
+    return poppedIndex - editorIndex
+  }
+  if (keyOrderMap) {
+    const editorKey = readHistoryStateKey(editorState)
+    const poppedKey = readHistoryStateKey(poppedState)
+    if (editorKey && poppedKey && editorKey !== poppedKey) {
+      const trackedEditor = keyOrderMap.get(editorKey)
+      const trackedPopped = keyOrderMap.get(poppedKey)
+      if (trackedEditor !== undefined && trackedPopped !== undefined && trackedPopped !== trackedEditor) {
+        return trackedPopped - trackedEditor
+      }
+    }
+  }
+  return -1
+}

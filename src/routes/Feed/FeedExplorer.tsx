@@ -30,6 +30,7 @@ import {
 } from "./FeedSortMenuModel"
 import { useFeedExplorerSessionRestore } from "./useFeedExplorerSessionRestore"
 import { focusTopicsRailElement } from "src/layouts/RootLayout/Header/NavBarSearchModel"
+import { Toast } from "src/design-system/Toast"
 
 const LOAD_MORE_THROTTLE_MS = 800
 const LOAD_MORE_OBSERVER_THROTTLE_MS = 180
@@ -74,25 +75,33 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
   const [sortOpen, setSortOpen] = useState(false)
   const [sortActiveIndex, setSortActiveIndex] = useState(0)
   const [isComposing, setIsComposing] = useState(false)
+  const [dismissedRetainedError, setDismissedRetainedError] = useState(false)
   const router = useRouter()
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const sortMenuRef = useRef<HTMLDivElement | null>(null)
   const sortTriggerRef = useRef<HTMLButtonElement | null>(null)
   const sortListboxRef = useRef<HTMLDivElement | null>(null)
-  const hasSyncedInitialQueryRef = useRef(false)
+  const lastSyncedAsPathRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!router.isReady || hasSyncedInitialQueryRef.current) return
-    hasSyncedInitialQueryRef.current = true
+    if (!router.isReady || lastSyncedAsPathRef.current === router.asPath) return
+    const isSubsequentRouteSync = lastSyncedAsPathRef.current !== null
+    lastSyncedAsPathRef.current = router.asPath
     const queryQ = typeof router.query.q === "string" ? router.query.q.trim() : ""
     const querySort = typeof router.query.sort === "string" ? router.query.sort.trim() : ""
-    if (queryQ) {
+    const hasQueryQ = "q" in router.query
+    const nextSortMode: FeedSortMode | null =
+      querySort === "latest" || querySort === "views" || querySort === "likes" ? querySort : null
+
+    if (hasQueryQ || isSubsequentRouteSync) {
       setQ(queryQ)
     }
-    if (querySort === "latest" || querySort === "views" || querySort === "likes") {
-      setSortMode(querySort)
+    if (nextSortMode) {
+      setSortMode(nextSortMode)
+    } else if (isSubsequentRouteSync) {
+      setSortMode("latest")
     }
-  }, [router.isReady, router.query.q, router.query.sort])
+  }, [router.asPath, router.isReady, router.query])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -127,7 +136,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     sortMode,
     enabled: router.isReady,
   })
-  const { hasRestoredScrollRef, restoreStateRef } = useFeedExplorerSessionRestore({
+  const { hasRestoredScrollRef, restoreScrollY, restoreStateRef } = useFeedExplorerSessionRestore({
     currentTag,
     fetchNextPage,
     hasNextPage,
@@ -141,6 +150,11 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
     setSortMode,
     sortMode,
   })
+  useEffect(() => {
+    if (!isRetainedDataError) {
+      setDismissedRetainedError(false)
+    }
+  }, [isRetainedDataError])
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const lastLoadMoreAtRef = useRef(0)
   const lastObserverTriggerAtRef = useRef(0)
@@ -351,6 +365,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
               <SearchInput
                 inputRef={searchInputRef}
                 value={q}
+                onClear={() => setQ("")}
                 onChange={(event) => setQ(event.target.value)}
                 onCompositionStart={() => setIsComposing(true)}
                 onCompositionEnd={() => setIsComposing(false)}
@@ -442,10 +457,15 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
             hasExternalResults={visiblePosts.pinnedPosts.length > 0}
             onClearFilters={handleClearFilters}
             isInitialLoading={isInitialLoading}
-            isInitialLoadError={isInitialLoadError || isRetainedDataError || (showBootstrapDegraded && resultCount === 0)}
+            isInitialLoadError={
+              isInitialLoadError ||
+              (isRetainedDataError && resultCount === 0) ||
+              (showBootstrapDegraded && resultCount === 0)
+            }
             isFetchingNextPage={isFetchingNextPage}
             isFetchNextPageError={isFetchNextPageError}
             hasNextPage={hasNextPage}
+            restoreScrollY={restoreScrollY}
             onLoadMore={handleLoadMore}
             onRetryInitialLoad={refetchInitialPage}
             onRetryLoadMore={handleRetryLoadMore}
@@ -453,10 +473,26 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
           />
         </section>
       </FeedBody>
+      <Toast
+        open={Boolean(isRetainedDataError && resultCount > 0 && !dismissedRetainedError)}
+        tone="danger"
+        message={t("feedRefetchError")}
+        onOpenChange={(open) => {
+          if (!open) setDismissedRetainedError(true)
+        }}
+        actions={
+          <button type="button" onClick={() => void refetchInitialPage()}>
+            {t("initialErrorRetry")}
+          </button>
+        }
+      />
     </>
   )
 }
 
 export default FeedExplorer
-export const resolveFeedVisiblePosts = <T,>(pinnedPosts: T[], regularPosts: T[], isRetainedDataError: boolean) =>
-  isRetainedDataError ? { pinnedPosts: [] as T[], regularPosts: [] as T[] } : { pinnedPosts, regularPosts }
+export const resolveFeedVisiblePosts = <T,>(
+  pinnedPosts: T[],
+  regularPosts: T[],
+  _isRetainedDataError: boolean
+) => ({ pinnedPosts, regularPosts })
