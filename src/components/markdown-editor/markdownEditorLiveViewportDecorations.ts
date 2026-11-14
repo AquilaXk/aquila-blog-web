@@ -125,9 +125,6 @@ export const blockDecorationField = StateField.define<DecorationSet>({
         return decorations
       }
     }
-    if (!transaction.docChanged && !transaction.selection && !treeChanged && !hasRelevantEffect) {
-      return decorations.map(transaction.changes)
-    }
     const incremental = !hasRelevantEffect
       ? tryIncrementalDecorationSetUpdate(decorations, transaction, treeChanged, resolveBlockDecorationsInScope)
       : null
