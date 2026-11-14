@@ -3,6 +3,9 @@ import { EditorState, StateEffect, StateField, type Range, type StateEffectType 
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view"
 import {
   buildActiveWatchRanges,
+  computeMinimalDocChange,
+  findTaskListGapEnd,
+  isTaskCheckedRange,
   resolveTaskPrefixRange,
   walkSyntaxTreeForDocBlocks,
   type DocBlockCollector,
@@ -97,38 +100,7 @@ export const getDocString = (doc: EditorState["doc"]): string => {
   return text
 }
 
-const isHighSurrogateUnit = (text: string, index: number): boolean => {
-  const cp = text.codePointAt(index) ?? 0
-  return cp > 0xffff || (cp >= 0xd800 && cp <= 0xdbff)
-}
-
-const isLowSurrogateUnit = (text: string, index: number): boolean => {
-  const cp = text.codePointAt(index) ?? 0
-  return cp >= 0xdc00 && cp <= 0xdfff
-}
-
-export const computeMinimalDocChange = (current: string, next: string) => {
-  let from = 0
-  const minLen = Math.min(current.length, next.length)
-  while (from < minLen && current[from] === next[from]) from += 1
-  if (from > 0 && (isHighSurrogateUnit(current, from - 1) || isHighSurrogateUnit(next, from - 1))) {
-    from -= 1
-  }
-  let currentEnd = current.length
-  let nextEnd = next.length
-  while (currentEnd > from && nextEnd > from && current[currentEnd - 1] === next[nextEnd - 1]) {
-    currentEnd -= 1
-    nextEnd -= 1
-  }
-  if (
-    (currentEnd < current.length && isLowSurrogateUnit(current, currentEnd)) ||
-    (nextEnd < next.length && isLowSurrogateUnit(next, nextEnd))
-  ) {
-    currentEnd += 1
-    nextEnd += 1
-  }
-  return { from, to: currentEnd, insert: next.slice(from, nextEnd) }
-}
+export { computeMinimalDocChange }
 
 type CachedDocBlocksEntry = {
   tree: ReturnType<typeof syntaxTree>
@@ -143,6 +115,8 @@ type CachedDocBlocksEntry = {
   activeWatchRanges: RangeSpec[]
 }
 
+export type { CachedDocBlocksEntry }
+
 const docBlocksCacheByDoc = new WeakMap<EditorState["doc"], CachedDocBlocksEntry>()
 
 export const haveSameActiveWatchHits = (
@@ -151,12 +125,12 @@ export const haveSameActiveWatchHits = (
   nextSelections: readonly RangeSpec[]
 ): boolean => haveSameActiveWatchHitsIndexed(activeWatchRanges, prevSelections, nextSelections)
 
-const getCachedDocBlocksIfReady = (state: EditorState): CachedDocBlocksEntry | null => {
+export const getCachedDocBlocksIfReady = (state: EditorState): CachedDocBlocksEntry | null => {
   const cached = docBlocksCacheByDoc.get(state.doc)
   return cached && cached.tree === syntaxTree(state) ? cached : null
 }
 
-const getCachedDocBlocks = (state: EditorState): CachedDocBlocksEntry => {
+export const getCachedDocBlocks = (state: EditorState): CachedDocBlocksEntry => {
   const tree = syntaxTree(state)
   const existing = docBlocksCacheByDoc.get(state.doc)
   if (existing && existing.tree === tree) return existing
@@ -182,36 +156,55 @@ type PlanSpecDecorationContext = {
   state: EditorState; markdownValue: string; selections: { from: number; to: number }[]
   styledHeadingLineStarts: Set<number>; styledCodeFenceLineStarts: Set<number>
   decorations: Range<Decoration>[]
+  disallowMultilineReplace: boolean
 }
 
 type ResolvedPreviewSpec = ReturnType<typeof resolveMarkdownLivePreviewPlanFromEntries>[number]
 
+const pushReplaceDecoration = (
+  ctx: PlanSpecDecorationContext,
+  deco: Decoration,
+  from: number,
+  to: number
+): void => {
+  if (from >= to) return
+  if (ctx.disallowMultilineReplace && hasNewlineBetween(ctx.markdownValue, from, to)) return
+  ctx.decorations.push(deco.range(from, to))
+}
+
 const appendTaskWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): void => {
   const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
   if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return
-  const checked = /\[[xX]\]/.test(ctx.markdownValue.slice(spec.from, taskPrefix.markerTo))
-  ctx.decorations.push(
-    Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo) }).range(spec.from, taskPrefix.markerTo)
+  const checked = isTaskCheckedRange(ctx.markdownValue, spec.from, taskPrefix.markerTo)
+  pushReplaceDecoration(
+    ctx,
+    Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo) }),
+    spec.from,
+    taskPrefix.markerTo
   )
-  if (ctx.markdownValue[taskPrefix.markerTo] === " " || ctx.markdownValue[taskPrefix.markerTo] === "\t") {
+  const trailingCode = ctx.markdownValue.charCodeAt(taskPrefix.markerTo)
+  if (trailingCode === 32 || trailingCode === 9) {
     ctx.decorations.push(TASK_SPACE_DECORATION.range(taskPrefix.markerTo, taskPrefix.markerTo + 1))
   }
 }
 
 const appendListMarkerWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): void => {
-  const taskGapMatch = /^([ \t]+)\[[ xX]\]/.exec(ctx.markdownValue.slice(spec.to, spec.to + 8))
-  if (taskGapMatch) {
-    if (!isTokenActive(spec.from, spec.to + taskGapMatch[0].length, ctx.selections)) {
-      ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to + taskGapMatch[1]!.length))
+  const gapEnd = findTaskListGapEnd(ctx.markdownValue, spec.to)
+  if (gapEnd !== -1) {
+    if (!isTokenActive(spec.from, gapEnd + 3, ctx.selections)) {
+      pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, spec.from, gapEnd)
     }
     return
   }
   if (isTokenActive(spec.from, spec.to, ctx.selections)) return
-  const source = ctx.markdownValue.slice(spec.from, spec.to)
-  const deco = /^\d/.test(source)
-    ? Decoration.replace({ widget: new MarkdownMarkerWidget(source, "cm-live-list-marker") })
-    : BULLET_MARKER_DECORATION
-  ctx.decorations.push(deco.range(spec.from, spec.to))
+  const firstCode = ctx.markdownValue.charCodeAt(spec.from)
+  const deco =
+    firstCode >= 48 && firstCode <= 57
+      ? Decoration.replace({
+          widget: new MarkdownMarkerWidget(ctx.markdownValue.slice(spec.from, spec.to), "cm-live-list-marker"),
+        })
+      : BULLET_MARKER_DECORATION
+  pushReplaceDecoration(ctx, deco, spec.from, spec.to)
 }
 
 const appendActiveAwareWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext): boolean => {
@@ -229,7 +222,7 @@ const appendActiveAwareWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDec
     spec.kind === "wikilink"
       ? Decoration.replace({ widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to) })
       : QUOTE_MARKER_DECORATION
-  ctx.decorations.push(deco.range(spec.from, spec.to))
+  pushReplaceDecoration(ctx, deco, spec.from, spec.to)
   return true
 }
 
@@ -301,11 +294,11 @@ const appendSinglePlanSpecDecoration = (
   blockOrMultiLineReplaced: readonly RangeSpec[]
 ): void => {
   if (spec.kind === "hide-mark") {
-    ctx.decorations.push(HIDE_MARK_DECORATION.range(spec.from, spec.to))
+    pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, spec.from, spec.to)
     return
   }
   if (spec.kind === "horizontal-rule") {
-    ctx.decorations.push(RULE_DECORATION.range(spec.from, spec.to))
+    pushReplaceDecoration(ctx, RULE_DECORATION, spec.from, spec.to)
     return
   }
   if (spec.kind === "inline-color") {
@@ -394,12 +387,34 @@ const pickItemsByRegions = <T extends DecorationRangeSpec>(
   return picked
 }
 
-const resolveDecorationsInScope = (
+export type DecorationBuildOptions = {
+  includeBlocks: boolean
+  includeInline: boolean
+  disallowMultilineReplace: boolean
+}
+
+const DEFAULT_DECORATION_BUILD_OPTIONS: DecorationBuildOptions = {
+  includeBlocks: true,
+  includeInline: true,
+  disallowMultilineReplace: false,
+}
+
+export const hasAnyDocBlockWidgets = (blocks: CachedDocBlocksEntry): boolean =>
+  blocks.tables.length > 0 ||
+  blocks.callouts.length > 0 ||
+  blocks.images.length > 0 ||
+  blocks.maths.length > 0 ||
+  blocks.mermaids.length > 0
+
+export const resolveScopedDecorations = (
   state: EditorState,
   blocks: CachedDocBlocksEntry,
   currentMode: MarkdownEditorSurfaceMode,
-  targetRegions?: readonly DecorationRangeSpec[]
+  targetRegions?: readonly DecorationRangeSpec[],
+  options: DecorationBuildOptions = DEFAULT_DECORATION_BUILD_OPTIONS
 ): Range<Decoration>[] => {
+  const decorations: Range<Decoration>[] = []
+  if (!options.includeInline && !hasAnyDocBlockWidgets(blocks)) return decorations
   const { markdownValue, previewEntries, tables, callouts, images, maths, mermaids } = blocks
   const selections = currentMode === "reading" ? [] : state.selection.ranges.map(({ from, to }) => ({ from, to }))
   const compRange = resolveCompositionRange(state, currentMode)
@@ -418,26 +433,30 @@ const resolveDecorationsInScope = (
   filtered.images = filterDisjointPreorderItems(filterItemsOutsideSortedRanges(filtered.images, outerBlockRanges))
   const nonMathRanges = sortRanges([...outerBlockRanges, ...filtered.images])
   filtered.maths = filterItemsOutsideSortedRanges(filtered.maths, nonMathRanges)
-  const replacedRanges = sortRanges([...nonMathRanges, ...filtered.maths])
-  const multiLineMaths = filtered.maths.filter((m) => hasNewlineBetween(markdownValue, m.from, m.to))
-  const blockOrMultiLineReplaced = sortRanges([...nonMathRanges, ...multiLineMaths])
 
-  const scopedEntries = pickItemsByRegions(previewEntries, targetRegions)
-  const plan = resolveMarkdownLivePreviewPlanFromEntries(scopedEntries, selections, false, currentMode)
-  const decorations: Range<Decoration>[] = []
-  const ctx: PlanSpecDecorationContext = {
-    state, markdownValue, selections, decorations,
-    styledHeadingLineStarts: new Set<number>(),
-    styledCodeFenceLineStarts: new Set<number>(),
-  }
+  if (options.includeInline) {
+    const replacedRanges = sortRanges([...nonMathRanges, ...filtered.maths])
+    const multiLineMaths = filtered.maths.filter((m) => hasNewlineBetween(markdownValue, m.from, m.to))
+    const blockOrMultiLineReplaced = sortRanges([...nonMathRanges, ...multiLineMaths])
 
-  for (const spec of plan) {
-    if (!isPlanSpecSkipped(markdownValue, spec, replacedRanges, compRange)) {
-      appendSinglePlanSpecDecoration(spec, ctx, blockOrMultiLineReplaced)
+    const scopedEntries = pickItemsByRegions(previewEntries, targetRegions)
+    const plan = resolveMarkdownLivePreviewPlanFromEntries(scopedEntries, selections, false, currentMode)
+    const ctx: PlanSpecDecorationContext = {
+      state, markdownValue, selections, decorations,
+      styledHeadingLineStarts: new Set<number>(),
+      styledCodeFenceLineStarts: new Set<number>(),
+      disallowMultilineReplace: options.disallowMultilineReplace,
+    }
+    for (const spec of plan) {
+      if (!isPlanSpecSkipped(markdownValue, spec, replacedRanges, compRange)) {
+        appendSinglePlanSpecDecoration(spec, ctx, blockOrMultiLineReplaced)
+      }
     }
   }
 
-  appendBlockWidgetDecorations(decorations, filtered)
+  if (options.includeBlocks) {
+    appendBlockWidgetDecorations(decorations, filtered)
+  }
   return decorations
 }
 
@@ -448,10 +467,10 @@ export const buildDecorations = (
   const currentMode = state.field(editorModeField, false) ?? "live"
   if (currentMode === "source" || (visibleRanges && visibleRanges.length === 0)) return Decoration.none
   const blocks = getCachedDocBlocks(state)
-  return Decoration.set(resolveDecorationsInScope(state, blocks, currentMode, visibleRanges), true)
+  return Decoration.set(resolveScopedDecorations(state, blocks, currentMode, visibleRanges), true)
 }
 
-const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): boolean =>
+export const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): boolean =>
   effects.some(
     (effect) =>
       effect.is(setComposition) ||
@@ -460,7 +479,7 @@ const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): 
       effect.is(setDisableMermaid)
   )
 
-const canReuseSelectionDecorations = (startState: EditorState, nextState: EditorState): boolean => {
+export const canReuseSelectionDecorations = (startState: EditorState, nextState: EditorState): boolean => {
   if ((nextState.field(editorModeField, false) ?? "live") === "reading") return true
   const isComposing =
     (nextState.field(compositionField, false) ?? false) || (startState.field(compositionField, false) ?? false)
@@ -472,10 +491,18 @@ const canReuseSelectionDecorations = (startState: EditorState, nextState: Editor
   )
 }
 
-const tryIncrementalDecorationUpdate = (
+export type ScopedDecorationResolver = (
+  state: EditorState,
+  blocks: CachedDocBlocksEntry,
+  currentMode: MarkdownEditorSurfaceMode,
+  dirtyRegions: readonly DecorationRangeSpec[]
+) => Range<Decoration>[]
+
+export const tryIncrementalDecorationSetUpdate = (
   decorations: DecorationSet,
   transaction: Parameters<Parameters<typeof StateField.define<DecorationSet>>[0]["update"]>[1],
-  treeChanged: boolean
+  treeChanged: boolean,
+  resolveScope: ScopedDecorationResolver
 ): DecorationSet | null => {
   if (!transaction.docChanged && treeChanged) return null
   const prevMode = transaction.startState.field(editorModeField, false) ?? "live"
@@ -509,7 +536,8 @@ const tryIncrementalDecorationUpdate = (
     return transaction.docChanged ? decorations.map(transaction.changes) : decorations
   }
   const mapped = transaction.docChanged ? decorations.map(transaction.changes) : decorations
-  const replacementDecos = resolveDecorationsInScope(transaction.state, nextBlocks, nextMode, dirtyRegions)
+  const replacementDecos = resolveScope(transaction.state, nextBlocks, nextMode, dirtyRegions)
+  if (mapped.size === 0 && replacementDecos.length === 0) return mapped
   return mapped.update({
     filterFrom: dirtyRegions[0]!.from,
     filterTo: dirtyRegions[dirtyRegions.length - 1]!.to,
@@ -536,7 +564,7 @@ export const decorationField = StateField.define<DecorationSet>({
       return decorations.map(transaction.changes)
     }
     const incremental = !hasRelevantEffect
-      ? tryIncrementalDecorationUpdate(decorations, transaction, treeChanged)
+      ? tryIncrementalDecorationSetUpdate(decorations, transaction, treeChanged, resolveScopedDecorations)
       : null
     return incremental ?? buildDecorations(transaction.state)
   },

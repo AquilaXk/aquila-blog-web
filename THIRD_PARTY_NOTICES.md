@@ -36,8 +36,15 @@ This repository includes patterns and algorithms adapted from or inspired by the
 
 - Repository: https://github.com/silverbulletmd/silverbullet
 - Reference path: `client/codemirror/decoration_regions.ts`
-- Applied in: `src/components/markdown-editor/markdownEditorLiveDecorationRegions.ts`, `src/components/markdown-editor/markdownEditorLiveSurfaceDecorations.ts`
+- Applied in: `src/components/markdown-editor/markdownEditorLiveDecorationRegions.ts`, `src/components/markdown-editor/markdownEditorLiveSurfaceDecorations.ts`, `src/components/markdown-editor/markdownEditorLiveViewportDecorations.ts`
 - License: MIT License (Copyright (c) 2022 Zef Hemel / SilverBullet contributors)
+
+## CodeMirror 6 (`@codemirror/view`)
+
+- Repository: https://github.com/codemirror/view
+- Reference pattern: `ViewPlugin.fromClass`, `view.visibleRanges` viewport-scoped decoration updates
+- Applied in: `src/components/markdown-editor/markdownEditorLiveViewportDecorations.ts`
+- License: MIT License (Copyright (c) 2018-2026 Marijn Haverbeke and contributors)
 
 ## Starlight
 

@@ -52,7 +52,6 @@ import {
 import {
   compositionField,
   computeMinimalDocChange,
-  decorationField,
   disableMermaidField,
   editorModeField,
   getDocString,
@@ -62,6 +61,10 @@ import {
   setEditorMode,
   setPointerSelecting,
 } from "./markdownEditorLiveSurfaceDecorations"
+import {
+  blockDecorationField,
+  liveInlineViewportPlugin,
+} from "./markdownEditorLiveViewportDecorations"
 export {
   buildDecorations,
   compositionField,
@@ -242,7 +245,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
         pointerSelectingField,
         editorModeField.init(() => initialState.mode),
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
-        decorationField,
+        blockDecorationField,
+        liveInlineViewportPlugin,
         blockContainerBlockField,
         activeEmptyLineField,
         liveSurfaceTheme,

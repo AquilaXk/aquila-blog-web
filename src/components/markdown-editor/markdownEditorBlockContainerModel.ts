@@ -1,3 +1,8 @@
+import {
+  resolveCalloutBlockquote,
+  resolveCalloutLegacyEmoji,
+  type CalloutKind,
+} from "../../libs/markdown/calloutRegistry"
 import { normalizeSafeMarkdownUrl } from "../../libs/markdown/safeMarkdownUrl"
 import {
   parseCustomDirectiveFromOpening,
@@ -8,7 +13,7 @@ import {
 const FENCE_DELIMITER_LINE_RE =
   /^(?: {0,3}>)*[ \t]*(?:(?:[-*+](?: \[[ xX]\])? |\d+\. )[ \t]*)?( {0,3})(`{3,}|~{3,})(.*)$/
 const LEADING_EMOJI_RE =
-  /^\[?(ℹ️|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)\]?(?:[ \t]+|$)/u
+  /^\[?(ℹ️?|⚠️|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F)?)\]?(?:[ \t]+|$)/u
 
 export type EditorCalloutTone = "info" | "tip" | "warning" | "danger" | "purple" | "default"
 
@@ -93,28 +98,55 @@ type OpenContainerCandidate =
       bodyLines: string[]
     }
 
+const CONTAINER_TONE_BY_CALLOUT_KIND: Record<CalloutKind, { tone: EditorCalloutTone; icon: string }> = {
+  info: { tone: "info", icon: "ℹ️" },
+  tip: { tone: "tip", icon: "💡" },
+  warning: { tone: "warning", icon: "⚠️" },
+  danger: { tone: "danger", icon: "🚨" },
+  outline: { tone: "default", icon: "📋" },
+  example: { tone: "tip", icon: "✨" },
+  summary: { tone: "purple", icon: "📌" },
+}
+
 const CALLOUT_TONE_KEYWORD_MAP: Record<string, { tone: EditorCalloutTone; icon: string }> = {
   info: { tone: "info", icon: "ℹ️" },
   note: { tone: "info", icon: "ℹ️" },
+  question: { tone: "info", icon: "ℹ️" },
+  help: { tone: "info", icon: "ℹ️" },
+  faq: { tone: "info", icon: "ℹ️" },
+  todo: { tone: "info", icon: "ℹ️" },
   tip: { tone: "tip", icon: "💡" },
   hint: { tone: "tip", icon: "💡" },
   success: { tone: "tip", icon: "✅" },
   check: { tone: "tip", icon: "✅" },
+  done: { tone: "tip", icon: "💡" },
   warning: { tone: "warning", icon: "⚠️" },
   caution: { tone: "warning", icon: "⚠️" },
+  attention: { tone: "warning", icon: "⚠️" },
+  missing: { tone: "warning", icon: "⚠️" },
   danger: { tone: "danger", icon: "🚨" },
   error: { tone: "danger", icon: "🚨" },
+  bug: { tone: "danger", icon: "🚨" },
+  failure: { tone: "danger", icon: "🚨" },
+  fail: { tone: "danger", icon: "🚨" },
   purple: { tone: "purple", icon: "📌" },
   summary: { tone: "purple", icon: "📌" },
   important: { tone: "purple", icon: "📌" },
+  abstract: { tone: "purple", icon: "📌" },
+  tldr: { tone: "purple", icon: "📌" },
   default: { tone: "default", icon: "💡" },
   outline: { tone: "default", icon: "📋" },
+  quote: { tone: "default", icon: "📋" },
+  cite: { tone: "default", icon: "📋" },
+  example: { tone: "tip", icon: "✨" },
 }
 
 const CALLOUT_EMOJI_TONE_MAP: Record<string, EditorCalloutTone> = {
   "💡": "tip",
   "✨": "tip",
   "✅": "tip",
+  "✔️": "tip",
+  "☑️": "tip",
   "ℹ️": "info",
   "ℹ": "info",
   "⚠️": "warning",
@@ -125,11 +157,33 @@ const CALLOUT_EMOJI_TONE_MAP: Record<string, EditorCalloutTone> = {
   "📌": "purple",
   "📚": "purple",
   "🧾": "purple",
+  "📋": "default",
+  "📝": "default",
+  "🗒️": "default",
 }
 
 const normalizeEmojiIcon = (raw: string): string => {
   if (raw === "ℹ") return "ℹ️"
   return raw === "⚠" ? "⚠️" : raw
+}
+
+const resolveCalloutToneFromKeyword = (token: string): { tone: EditorCalloutTone; icon: string } | undefined => {
+  if (Object.hasOwn(CALLOUT_TONE_KEYWORD_MAP, token)) {
+    return CALLOUT_TONE_KEYWORD_MAP[token]
+  }
+  const registryEntry = resolveCalloutBlockquote(token)
+  return registryEntry ? CONTAINER_TONE_BY_CALLOUT_KIND[registryEntry.kind] : undefined
+}
+
+const resolveCalloutToneFromEmoji = (normalizedIcon: string, rawEmoji: string): EditorCalloutTone => {
+  if (Object.hasOwn(CALLOUT_EMOJI_TONE_MAP, normalizedIcon)) {
+    return CALLOUT_EMOJI_TONE_MAP[normalizedIcon]!
+  }
+  if (Object.hasOwn(CALLOUT_EMOJI_TONE_MAP, rawEmoji)) {
+    return CALLOUT_EMOJI_TONE_MAP[rawEmoji]!
+  }
+  const legacyEntry = resolveCalloutLegacyEmoji(normalizedIcon) ?? resolveCalloutLegacyEmoji(rawEmoji)
+  return legacyEntry ? CONTAINER_TONE_BY_CALLOUT_KIND[legacyEntry.kind].tone : "info"
 }
 
 const parseCalloutContainerPayload = (
@@ -145,9 +199,7 @@ const parseCalloutContainerPayload = (
   if (rest.length > 0) {
     const firstSpace = rest.search(/[ \t]/)
     const firstToken = (firstSpace === -1 ? rest : rest.slice(0, firstSpace)).toLowerCase()
-    const mappedKeyword = Object.hasOwn(CALLOUT_TONE_KEYWORD_MAP, firstToken)
-      ? CALLOUT_TONE_KEYWORD_MAP[firstToken]
-      : undefined
+    const mappedKeyword = resolveCalloutToneFromKeyword(firstToken)
     if (mappedKeyword) {
       tone = mappedKeyword.tone
       icon = mappedKeyword.icon
@@ -161,7 +213,7 @@ const parseCalloutContainerPayload = (
     const rawEmoji = headerEmojiMatch[1]!
     icon = normalizeEmojiIcon(rawEmoji)
     if (!hasExplicitTone) {
-      tone = CALLOUT_EMOJI_TONE_MAP[icon] ?? CALLOUT_EMOJI_TONE_MAP[rawEmoji] ?? "info"
+      tone = resolveCalloutToneFromEmoji(icon, rawEmoji)
     }
     rest = rest.slice(headerEmojiMatch[0].length).trim()
   }
@@ -183,7 +235,7 @@ const parseCalloutContainerPayload = (
       const rawEmoji = bodyEmojiMatch[1]!
       icon = normalizeEmojiIcon(rawEmoji)
       if (!hasExplicitTone) {
-        tone = CALLOUT_EMOJI_TONE_MAP[icon] ?? CALLOUT_EMOJI_TONE_MAP[rawEmoji] ?? "info"
+        tone = resolveCalloutToneFromEmoji(icon, rawEmoji)
       }
       rest = firstLine.slice(bodyEmojiMatch[0].length).trim()
       remainingBodyLines = remainingBodyLines.slice(1)

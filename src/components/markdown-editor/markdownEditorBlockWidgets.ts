@@ -11,7 +11,7 @@ import {
   type EditorFileContainerBlock,
   type EditorToggleContainerBlock,
 } from "./markdownEditorBlockContainerModel"
-import { hasIntervalOverlap, isTokenActive } from "./markdownEditorLivePreview"
+import { forEachOverlappingSortedIndex, isRangeActiveInSelections } from "./markdownEditorLiveDecorationRegions"
 import { editorModeField, getDocString, setEditorMode } from "./markdownEditorLiveSurfaceDecorations"
 import { appendInlineMarkdownNodes } from "./markdownEditorWidgets"
 
@@ -410,28 +410,41 @@ export class MarkdownFileBlockWidget extends WidgetType {
   }
 }
 
-let cachedContainerBlocksEntry: { doc: EditorState["doc"]; blocks: readonly EditorContainerBlock[] } | null = null
+const containerBlocksCacheByDoc = new WeakMap<EditorState["doc"], readonly EditorContainerBlock[]>()
 
-const getCachedBlockContainerBlocks = (doc: EditorState["doc"]): readonly EditorContainerBlock[] => {
-  if (cachedContainerBlocksEntry && cachedContainerBlocksEntry.doc === doc) return cachedContainerBlocksEntry.blocks
+export const getCachedBlockContainerBlocks = (doc: EditorState["doc"]): readonly EditorContainerBlock[] => {
+  const cached = containerBlocksCacheByDoc.get(doc)
+  if (cached) return cached
   const blocks = parseBlockContainerBlocks(getDocString(doc))
-  cachedContainerBlocksEntry = { doc, blocks }
+  containerBlocksCacheByDoc.set(doc, blocks)
   return blocks
 }
 
 const isContainerBlockActive = (block: EditorContainerBlock, selections: readonly { from: number; to: number }[]) =>
-  isTokenActive(block.from, block.to, selections) || hasIntervalOverlap(selections, block.from, block.to)
+  isRangeActiveInSelections(block.from, block.to, selections)
 
-const haveSameActiveContainerBlocks = (
+export const haveSameActiveContainerBlocks = (
   blocks: readonly EditorContainerBlock[],
   prevRanges: readonly { from: number; to: number }[],
   nextRanges: readonly { from: number; to: number }[]
 ): boolean => {
   if (blocks.length === 0) return true
-  for (const block of blocks) {
-    if (isContainerBlockActive(block, prevRanges) !== isContainerBlockActive(block, nextRanges)) return false
+  const checkSelectionRanges = (ranges: readonly { from: number; to: number }[]): boolean => {
+    for (let i = 0; i < ranges.length; i += 1) {
+      const sel = ranges[i]!
+      const qFrom = Math.min(sel.from, sel.to)
+      const qTo = Math.max(sel.from, sel.to)
+      const same = forEachOverlappingSortedIndex(blocks, qFrom, qTo, true, (block) => {
+        if (isContainerBlockActive(block, prevRanges) !== isContainerBlockActive(block, nextRanges)) {
+          return false
+        }
+        return true
+      })
+      if (!same) return false
+    }
+    return true
   }
-  return true
+  return checkSelectionRanges(prevRanges) && checkSelectionRanges(nextRanges)
 }
 
 const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => {

@@ -5,6 +5,7 @@ import { renderSerializedMermaidSvg } from "../../libs/markdown/mermaidRuntimeCo
 import { sanitizeRenderableMermaidSource } from "../../libs/markdown/mermaidRuntimeSanitize"
 import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownUrl"
 import { extractPromotedCalloutTitle } from "../../libs/markdown/renderingDirectiveModel"
+import { resolveCalloutBlockquote, type CalloutKind } from "../../libs/markdown/calloutRegistry"
 import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
 
 export type MermaidColorScheme = "dark" | "light"
@@ -176,17 +177,19 @@ const moveCursorToWidgetOrigin = (
   }
 }
 
+const LIVE_CALLOUT_TONE_BY_KIND: Record<CalloutKind, { kind: string; icon: string }> = {
+  tip: { kind: "tip", icon: "💡" },
+  info: { kind: "info", icon: "ℹ️" },
+  warning: { kind: "warning", icon: "⚠️" },
+  danger: { kind: "danger", icon: "🚨" },
+  outline: { kind: "outline", icon: "💬" },
+  example: { kind: "example", icon: "✨" },
+  summary: { kind: "summary", icon: "📌" },
+}
+
 export const resolveLiveCalloutTone = (rawType: string): { kind: string; icon: string } => {
-  const token = rawType.toLowerCase()
-  if (["tip", "hint", "success", "check", "done"].includes(token)) return { kind: "tip", icon: "💡" }
-  if (["danger", "error", "bug", "failure", "fail"].includes(token)) return { kind: "danger", icon: "🚨" }
-  if (["warning", "caution", "attention", "missing"].includes(token)) {
-    return { kind: "warning", icon: "⚠️" }
-  }
-  if (["summary", "abstract", "tldr", "important"].includes(token)) return { kind: "summary", icon: "📌" }
-  if (token === "example") return { kind: "example", icon: "✨" }
-  if (["outline", "quote", "cite"].includes(token)) return { kind: "outline", icon: "💬" }
-  return { kind: "info", icon: "ℹ️" }
+  const entry = resolveCalloutBlockquote(rawType)
+  return entry ? LIVE_CALLOUT_TONE_BY_KIND[entry.kind] : LIVE_CALLOUT_TONE_BY_KIND.info
 }
 
 const attachCollapsibleCalloutBody = (

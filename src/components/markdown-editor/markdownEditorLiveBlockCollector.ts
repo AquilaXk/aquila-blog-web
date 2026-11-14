@@ -86,6 +86,30 @@ export const resolveTaskPrefixRange = (markdownValue: string, from: number, to: 
   return { from: prefixFrom, to: markerTo, markerTo }
 }
 
+export const isTaskCheckedRange = (text: string, from: number, to: number): boolean => {
+  for (let i = from; i + 2 < to; i += 1) {
+    if (text.charCodeAt(i) === 91 && text.charCodeAt(i + 2) === 93) {
+      const inner = text.charCodeAt(i + 1)
+      if (inner === 120 || inner === 88) return true
+    }
+  }
+  return false
+}
+
+export const findTaskListGapEnd = (text: string, gapFrom: number): number => {
+  const limit = Math.min(text.length, gapFrom + 8)
+  let cursor = gapFrom
+  while (cursor < limit) {
+    const ch = text.charCodeAt(cursor)
+    if (ch !== 32 && ch !== 9) break
+    cursor += 1
+  }
+  if (cursor === gapFrom || cursor + 3 > limit) return -1
+  if (text.charCodeAt(cursor) !== 91 || text.charCodeAt(cursor + 2) !== 93) return -1
+  const inner = text.charCodeAt(cursor + 1)
+  return inner === 32 || inner === 120 || inner === 88 ? cursor : -1
+}
+
 const collectEntryWatchRanges = (
   markdownValue: string,
   entry: MarkdownLivePreviewPlanEntry,
@@ -203,4 +227,37 @@ export const walkSyntaxTreeForDocBlocks = (
   for (let child = node.firstChild; child; child = child.nextSibling) {
     walkSyntaxTreeForDocBlocks(child, collector)
   }
+}
+
+const isHighSurrogateUnit = (text: string, index: number): boolean => {
+  const cp = text.codePointAt(index) ?? 0
+  return cp > 0xffff || (cp >= 0xd800 && cp <= 0xdbff)
+}
+
+const isLowSurrogateUnit = (text: string, index: number): boolean => {
+  const cp = text.codePointAt(index) ?? 0
+  return cp >= 0xdc00 && cp <= 0xdfff
+}
+
+export const computeMinimalDocChange = (current: string, next: string) => {
+  let from = 0
+  const minLen = Math.min(current.length, next.length)
+  while (from < minLen && current[from] === next[from]) from += 1
+  if (from > 0 && (isHighSurrogateUnit(current, from - 1) || isHighSurrogateUnit(next, from - 1))) {
+    from -= 1
+  }
+  let currentEnd = current.length
+  let nextEnd = next.length
+  while (currentEnd > from && nextEnd > from && current[currentEnd - 1] === next[nextEnd - 1]) {
+    currentEnd -= 1
+    nextEnd -= 1
+  }
+  if (
+    (currentEnd < current.length && isLowSurrogateUnit(current, currentEnd)) ||
+    (nextEnd < next.length && isLowSurrogateUnit(next, nextEnd))
+  ) {
+    currentEnd += 1
+    nextEnd += 1
+  }
+  return { from, to: currentEnd, insert: next.slice(from, nextEnd) }
 }
