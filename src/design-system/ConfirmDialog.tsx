@@ -1,0 +1,185 @@
+import type { Theme } from "@emotion/react"
+import styled from "@emotion/styled"
+import { useRef, type ReactNode } from "react"
+import { useLanguage } from "src/libs/language"
+import { zIndexes } from "src/styles/zIndexes"
+import { focusVisibleRing } from "./focusRing"
+import { modalSafeAreaPadding } from "./safeArea"
+import { useModalFocusTrap } from "./useModalFocusTrap"
+
+export type ConfirmDialogTone = "default" | "danger"
+
+export type ConfirmDialogProps = {
+  open: boolean
+  titleId: string
+  descriptionId: string
+  title: ReactNode
+  description: ReactNode
+  confirmLabel: string
+  cancelLabel?: string
+  confirmTone?: ConfirmDialogTone
+  actionRowBackground?: (theme: Theme) => string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export const ConfirmDialog = ({
+  open,
+  titleId,
+  descriptionId,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  confirmTone = "danger",
+  actionRowBackground,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) => {
+  const { t } = useLanguage()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const resolvedCancelLabel = cancelLabel ?? t("dialogCancel")
+
+  const { handleKeyDown } = useModalFocusTrap({
+    open,
+    onClose: onCancel,
+    containerRef: dialogRef,
+    initialFocusRef: cancelButtonRef,
+    lockScroll: true,
+  })
+
+  if (!open) return null
+
+  return (
+    <ConfirmBackdrop role="presentation" onClick={onCancel}>
+      <ConfirmPanel
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={handleKeyDown}
+      >
+        <strong id={titleId}>{title}</strong>
+        <Description id={descriptionId}>{description}</Description>
+        <ActionRow $actionRowBackground={actionRowBackground}>
+          <GhostButton ref={cancelButtonRef} type="button" onClick={onCancel}>
+            {resolvedCancelLabel}
+          </GhostButton>
+          <ConfirmButton type="button" data-tone={confirmTone} onClick={onConfirm}>
+            {confirmLabel}
+          </ConfirmButton>
+        </ActionRow>
+      </ConfirmPanel>
+    </ConfirmBackdrop>
+  )
+}
+
+const ConfirmBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: ${zIndexes.confirmDialog};
+  display: grid;
+  place-items: center;
+  ${modalSafeAreaPadding}
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.gray12} 42%, transparent);
+`
+
+const ConfirmPanel = styled.div`
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.95rem;
+  padding: 1.1rem;
+  border-radius: 12px;
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  background: ${({ theme }) => theme.colors.gray1};
+  box-shadow: none;
+
+  > strong {
+    font-size: 1.02rem;
+    letter-spacing: -0.02em;
+  }
+`
+
+const Description = styled.p`
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+  color: ${({ theme }) => theme.colors.gray10};
+  line-height: 1.55;
+
+  .rowTitle {
+    color: ${({ theme }) => theme.colors.gray12};
+    font-weight: 800;
+  }
+`
+
+const ActionRow = styled.div<{ $actionRowBackground?: (theme: Theme) => string }>`
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
+  border-top: 1px solid ${({ theme }) => theme.colors.gray5};
+  padding-top: 12px;
+  background: ${({ theme, $actionRowBackground }) =>
+    $actionRowBackground ? $actionRowBackground(theme) : "transparent"};
+  border-radius: 0;
+`
+
+const GhostButton = styled.button`
+  border: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.gray11};
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  ${focusVisibleRing}
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    min-height: 44px;
+  }
+`
+
+const ConfirmButton = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.gray12};
+  background: transparent;
+  color: ${({ theme }) => theme.colors.gray12};
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  ${focusVisibleRing}
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+  }
+
+  &[data-tone="danger"] {
+    border-color: ${({ theme }) => theme.colors.statusDangerBorder};
+    color: ${({ theme }) => theme.colors.statusDangerText};
+
+    &:hover {
+      background: color-mix(in srgb, ${({ theme }) => theme.colors.statusDangerBorder} 12%, transparent);
+    }
+  }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    min-height: 44px;
+  }
+`

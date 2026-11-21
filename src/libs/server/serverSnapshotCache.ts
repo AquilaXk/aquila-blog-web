@@ -1,0 +1,103 @@
+type SnapshotEntry = {
+  value: unknown
+  expiresAt: number
+}
+
+type SnapshotReadResult<T> = {
+  value: T | null
+  source: "snapshot" | "live"
+}
+
+const MAX_SNAPSHOT_CACHE_ENTRIES = 128
+
+const snapshotCache = new Map<string, SnapshotEntry>()
+const inflightLoads = new Map<string, Promise<unknown>>()
+let cacheGeneration = 0
+
+const readSnapshot = <T>(key: string): T | null => {
+  const entry = snapshotCache.get(key)
+  if (!entry) return null
+
+  if (entry.expiresAt <= Date.now()) {
+    snapshotCache.delete(key)
+    return null
+  }
+
+  snapshotCache.delete(key)
+  snapshotCache.set(key, entry)
+  return entry.value as T
+}
+
+const writeSnapshot = <T>(key: string, ttlMs: number, value: T | null) => {
+  if (value === null) return
+  if (snapshotCache.has(key)) {
+    snapshotCache.delete(key)
+  } else if (snapshotCache.size >= MAX_SNAPSHOT_CACHE_ENTRIES) {
+    const oldestKey = snapshotCache.keys().next().value
+    if (oldestKey !== undefined) {
+      snapshotCache.delete(oldestKey)
+    }
+  }
+  snapshotCache.set(key, {
+    value,
+    expiresAt: Date.now() + Math.max(ttlMs, 0),
+  })
+}
+
+export async function readServerSnapshot<T>(
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<T | null>
+): Promise<SnapshotReadResult<T>> {
+  const cached = readSnapshot<T>(key)
+  if (cached !== null) {
+    return {
+      value: cached,
+      source: "snapshot",
+    }
+  }
+
+  const pending = inflightLoads.get(key)
+  if (pending) {
+    const value = (await pending) as T | null
+    return {
+      value,
+      source: value === null ? "live" : "snapshot",
+    }
+  }
+
+  const startGeneration = cacheGeneration
+  const loadPromise = loader()
+  inflightLoads.set(key, loadPromise)
+
+  try {
+    const value = await loadPromise
+    if (startGeneration === cacheGeneration && inflightLoads.get(key) === loadPromise) {
+      writeSnapshot(key, ttlMs, value)
+    }
+    return {
+      value,
+      source: "live",
+    }
+  } finally {
+    if (inflightLoads.get(key) === loadPromise) {
+      inflightLoads.delete(key)
+    }
+  }
+}
+
+export function invalidateServerSnapshotCache(keyPrefix?: string): void {
+  cacheGeneration += 1
+  if (!keyPrefix) {
+    snapshotCache.clear()
+    inflightLoads.clear()
+    return
+  }
+
+  for (const key of snapshotCache.keys()) {
+    if (key.startsWith(keyPrefix)) snapshotCache.delete(key)
+  }
+  for (const key of inflightLoads.keys()) {
+    if (key.startsWith(keyPrefix)) inflightLoads.delete(key)
+  }
+}

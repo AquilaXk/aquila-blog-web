@@ -1,0 +1,211 @@
+import type { QueryClient } from "@tanstack/react-query"
+import {
+  type ChangeEvent,
+  type Dispatch,
+  type KeyboardEvent,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react"
+import { getFeedPostsPage, invalidatePublicPostReadCaches } from "src/apis/backend/posts"
+import { registerInternalPostSuggestions } from "src/components/markdown-editor/markdownEditorCompletions"
+import { revalidateSavedPost } from "./editorPostSaveRefresh"
+import {
+  isComposingKeyboardEvent,
+  pretty,
+  syncTitleTextareaHeight,
+  type JsonValue,
+  type NoticeState,
+} from "./EditorStudioWorkspaceControllerRootModel"
+import type { EditorMode } from "./editorStudioState"
+import type { MarkdownEditorFocusRequest } from "src/components/markdown-editor/MarkdownEditor"
+
+type PublishNoticeTarget = "auto" | "page" | "modal"
+
+const markdownEditorFocusRequestRef: { current: MarkdownEditorFocusRequest | null } = { current: null }
+
+export const handleMarkdownEditorFocusRequestReady = (focus: MarkdownEditorFocusRequest | null) => {
+  markdownEditorFocusRequestRef.current = focus
+}
+
+export const requestMarkdownEditorFocus = (selection?: { from: number; to: number }) => {
+  markdownEditorFocusRequestRef.current?.(selection)
+}
+
+export const requestMarkdownEditorInsertSnippet = (
+  insertSnippet: string,
+  fallbackSelection?: { from: number; to: number }
+): boolean => Boolean(markdownEditorFocusRequestRef.current?.({ insertSnippet, fallbackSelection }))
+
+type UseEditorStudioWorkspaceControllerRuntimeArgs = {
+  isPublishModalOpen: boolean
+  loadingKey: string
+  postId: string
+  postTitle: string
+  queryClient: QueryClient
+  setEditorMode: Dispatch<SetStateAction<EditorMode>>
+  setIsTempDraftMode: Dispatch<SetStateAction<boolean>>
+  setLoadingKey: Dispatch<SetStateAction<string>>
+  setPostId: Dispatch<SetStateAction<string>>
+  setPostTitle: Dispatch<SetStateAction<string>>
+  setPostVersion: Dispatch<SetStateAction<number | null>>
+  setPublishModalNotice: Dispatch<SetStateAction<NoticeState>>
+  setPublishNotice: Dispatch<SetStateAction<NoticeState>>
+  setResult: Dispatch<SetStateAction<string>>
+}
+
+export const useEditorStudioWorkspaceControllerRuntime = ({
+  isPublishModalOpen,
+  loadingKey,
+  postId,
+  postTitle,
+  queryClient,
+  setEditorMode,
+  setIsTempDraftMode,
+  setLoadingKey,
+  setPostId,
+  setPostTitle,
+  setPostVersion,
+  setPublishModalNotice,
+  setPublishNotice,
+  setResult,
+}: UseEditorStudioWorkspaceControllerRuntimeArgs) => {
+  const titleFieldRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getFeedPostsPage({ page: 1, pageSize: 50 })
+      .then((page) => {
+        if (cancelled || !Array.isArray(page?.posts)) return
+        registerInternalPostSuggestions(
+          page.posts
+            .filter((post) => Boolean(post?.title?.trim()))
+            .map((post) => ({
+              id: post.id,
+              slug: post.slug || String(post.id),
+              title: post.title.trim(),
+            }))
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const refreshPublicPostReadViews = useCallback(async (affectedPostId?: string | number) => {
+    const resolvedPostId =
+      typeof affectedPostId === "number"
+        ? affectedPostId
+        : typeof affectedPostId === "string"
+          ? affectedPostId.trim()
+          : postId.trim()
+
+    await invalidatePublicPostReadCaches(queryClient, resolvedPostId || undefined)
+    if (!resolvedPostId) return
+
+    await revalidateSavedPost(resolvedPostId)
+  }, [postId, queryClient])
+
+  const run = useCallback(async (key: string, fn: () => Promise<JsonValue>) => {
+    try {
+      setLoadingKey(key)
+      const data = await fn()
+      setResult(pretty(data))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setResult(pretty({ error: message }))
+    } finally {
+      setLoadingKey("")
+    }
+  }, [setLoadingKey, setResult])
+
+  const disabled = useCallback((key: string) => loadingKey.length > 0 && loadingKey !== key, [loadingKey])
+
+  const handleTitleFieldRef = useCallback((node: HTMLTextAreaElement | null) => {
+    titleFieldRef.current = node
+    syncTitleTextareaHeight(node)
+  }, [])
+
+  const handleTitleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
+    setPostTitle(event.target.value.replace(/\r\n?/g, "\n"))
+    syncTitleTextareaHeight(event.target)
+  }, [setPostTitle])
+
+  const handleTitleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isComposingKeyboardEvent(event)) return
+    if (event.key === "Enter") {
+      event.preventDefault()
+      markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+    } else if (event.key === "ArrowDown") {
+      const target = event.currentTarget
+      if (
+        target.selectionStart === target.selectionEnd &&
+        !target.value.slice(target.selectionEnd).includes("\n")
+      ) {
+        event.preventDefault()
+        markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+      }
+    }
+  }, [])
+
+  const handleFocusTitle = useCallback(() => {
+    const node = titleFieldRef.current
+    if (!node) return
+    node.focus()
+    const len = node.value.length
+    node.setSelectionRange(len, len)
+  }, [])
+
+  useEffect(() => {
+    syncTitleTextareaHeight(titleFieldRef.current)
+  }, [postTitle])
+
+  const handleSelectedPostIdChange = useCallback(
+    (nextPostId: string) => {
+      const normalizedPostId = nextPostId.trim()
+      setPostId(normalizedPostId)
+      if (normalizedPostId !== postId.trim()) {
+        setEditorMode("create")
+        setPostVersion(null)
+        setIsTempDraftMode(false)
+      }
+    },
+    [postId, setEditorMode, setIsTempDraftMode, setPostId, setPostVersion]
+  )
+
+  const setPublishStatus = useCallback(
+    (next: NoticeState, target: PublishNoticeTarget = "auto") => {
+      if (target === "page") {
+        setPublishNotice(next)
+        return
+      }
+
+      if (target === "modal") {
+        setPublishModalNotice(next)
+        return
+      }
+
+      if (isPublishModalOpen) {
+        setPublishModalNotice(next)
+        return
+      }
+
+      setPublishNotice(next)
+    },
+    [isPublishModalOpen, setPublishModalNotice, setPublishNotice]
+  )
+
+  return {
+    disabled,
+    handleFocusTitle,
+    handleSelectedPostIdChange,
+    handleTitleChange,
+    handleTitleFieldRef,
+    handleTitleKeyDown,
+    refreshPublicPostReadViews,
+    run,
+    setPublishStatus,
+  }
+}

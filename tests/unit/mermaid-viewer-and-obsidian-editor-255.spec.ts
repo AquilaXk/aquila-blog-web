@@ -1,0 +1,892 @@
+import { expect, test } from "@playwright/test"
+import { EditorSelection, EditorState } from "@codemirror/state"
+import { markdown } from "@codemirror/lang-markdown"
+import { GFM } from "@lezer/markdown"
+import {
+  MERMAID_RENDER_TIMEOUT_MS,
+  renderMermaidInstanceWithTimeout,
+  renderSerializedMermaidSvg,
+  resetSharedMermaidRuntimeForTests,
+} from "../../src/libs/markdown/mermaidRuntimeConfig"
+import { createMermaidRuntimeController } from "../../src/libs/markdown/mermaidRuntimeRender"
+import {
+  formatDateTime,
+  formatShortDateTime,
+  formatWithNormalizedHours,
+} from "../../src/libs/utils"
+import {
+  formatDashboardFreshnessLabel,
+  formatInstant as formatDashboardInstant,
+} from "../../src/routes/Admin/AdminDashboardWorkspaceModel"
+import { formatInstant as formatToolsInstant } from "../../src/routes/Admin/AdminToolsWorkspaceModel"
+import { formatCloudDate } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
+import { shouldScheduleMermaidResize } from "../../src/libs/markdown/hooks/useMermaidEffect"
+import { createPrismEffectRuntime } from "../../src/libs/markdown/prismEffectRuntime"
+import {
+  applyInlineColors,
+  shouldScheduleFromInlineColorMutations,
+} from "../../src/libs/markdown/hooks/useInlineColorEffect"
+import { shouldScheduleFromTableMutations } from "../../src/libs/markdown/hooks/useResponsiveTableEffect"
+import { resolveMarkdownRenderModel } from "../../src/libs/markdown/rendering"
+import { createDocumentFootnoteModel } from "../../src/libs/markdown/renderingFootnoteModel"
+import { createMarkdownComponentVariants } from "../../src/libs/markdown/MarkdownRenderer"
+import PostHeader from "../../src/routes/Detail/PostDetail/PostHeader"
+import PostDetailMobileToc from "../../src/routes/Detail/PostDetail/PostDetailMobileToc"
+import {
+  FloatingActionRail,
+  MobileSummaryActions,
+  RightTocRail,
+} from "../../src/routes/Detail/PostDetail/PostDetailActionSections"
+import { applyHybridRail } from "../../src/routes/Detail/PostDetail/PostDetailRailModel"
+import {
+  buildDecorations,
+  compositionField,
+  disableMermaidField,
+  editorModeField,
+  pointerSelectingField,
+  setComposition,
+  setDisableMermaid,
+} from "../../src/components/markdown-editor/MarkdownEditorLiveSurface"
+import { MarkdownMermaidWidget } from "../../src/components/markdown-editor/markdownEditorWidgets"
+import {
+  MAX_EDIT_COLUMNS,
+  MAX_EDIT_ROWS,
+  createMarkdownEditorTable,
+  getMarkdownEditorTableEditAvailability,
+  planMarkdownEditorTableEdit,
+} from "../../src/components/markdown-editor/markdownEditorTableModel"
+import { resolveFormatShortcut } from "../../src/components/markdown-editor/markdownEditorKeyboardModel"
+import {
+  INLINE_CODE_SHORTCUT,
+  VIEW_MODE_CYCLE_SHORTCUT,
+  getMarkdownEditorCommand,
+  validateMarkdownEditorCommands,
+} from "../../src/components/markdown-editor/markdownEditorCommandRegistryModel"
+
+test.describe("Issue #255 Track 1 + Track 2 verification", () => {
+  test("AC1: Mermaid controller reuses queue/observer across runs, prevents duplicate in-flight renders, and batches layout reads before writes", async () => {
+    const events: string[] = []
+    const makeBlock = (id: string, initialSource: string) => {
+      let currentSource = initialSource
+      const code = {
+        className: "language-mermaid",
+        get textContent() {
+          return currentSource
+        },
+        getAttribute: (name: string) => (name === "data-language" ? "mermaid" : null),
+      } as unknown as HTMLElement
+      let innerHTMLValue = `<code class="language-mermaid">${initialSource}</code>`
+      const block = {
+        isConnected: true,
+        className: "aq-mermaid",
+        dataset: { aqMermaid: "true", mermaidRendered: "pending", mermaidSource: initialSource } as DOMStringMap,
+        style: {
+          minHeight: "",
+          overflowX: "",
+          setProperty: () => {},
+        },
+        get textContent() {
+          return currentSource
+        },
+        getAttribute: (name: string) => (name === "data-mermaid-source" ? currentSource : null),
+        setSource: (next: string) => {
+          currentSource = next
+          block.dataset.mermaidSource = next
+        },
+        closest: () => null,
+        querySelector: () => code,
+        querySelectorAll: () => [],
+        appendChild: () => {
+          events.push(`write:${id}`)
+        },
+        getBoundingClientRect: () => {
+          events.push(`read:${id}`)
+          return { width: 640, height: 180, left: 40, right: 680, top: 0, bottom: 180 } as DOMRect
+        },
+      } as unknown as HTMLElement & { setSource: (next: string) => void }
+      Object.defineProperty(block, "innerHTML", {
+        get: () => innerHTMLValue,
+        set: (next: string) => {
+          innerHTMLValue = next
+        },
+      })
+      return block
+    }
+
+    const block1 = makeBlock("b1", "flowchart TD\nA1-->B1")
+    const block2 = makeBlock("b2", "flowchart TD\nA2-->B2")
+    const root = {
+      querySelectorAll: (selector: string) => {
+        if (selector.includes("code")) return []
+        return [block1, block2]
+      },
+    } as unknown as HTMLElement
+
+    const origWin = (globalThis as Record<string, unknown>).window
+    const origDoc = (globalThis as Record<string, unknown>).document
+    let renderCalls = 0
+    try {
+      ;(globalThis as Record<string, unknown>).window = {
+        matchMedia: () => ({ matches: false }),
+        innerHeight: 900,
+        setTimeout: globalThis.setTimeout.bind(globalThis),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      }
+      ;(globalThis as Record<string, unknown>).document = {
+        createElement: () => {
+          const svg = {
+            getAttribute: (attr: string) => (attr === "viewBox" ? "0 0 400 200" : null),
+            setAttribute: () => {},
+            removeAttribute: () => {},
+            querySelectorAll: () => [],
+            style: {},
+          }
+          return {
+            className: "",
+            style: { setProperty: () => {} },
+            innerHTML: "",
+            querySelector: (sel: string) => (sel === "svg" ? svg : null),
+            addEventListener: () => {},
+          }
+        },
+      }
+
+      const controller = createMermaidRuntimeController({
+        root,
+        preset: { mode: "github", themeKey: "test-light-255", config: {} },
+        allowDesktopWideLane: false,
+        lazyViewport: false,
+        shouldLogMermaidWarnings: false,
+        getMermaid: async () => ({
+          initialize: () => {},
+          render: async (_id, src) => {
+            renderCalls += 1
+            await new Promise((r) => setTimeout(r, 15))
+            return { svg: `<svg viewBox="0 0 400 200"><text>${src}</text></svg>` }
+          },
+        }),
+        isDisposed: () => false,
+        retryTimers: new Set(),
+        readParseWarning: () => null,
+        clearParseWarning: () => {},
+      })
+
+      await Promise.all([controller.renderMermaidBlocks(), controller.renderMermaidBlocks()])
+
+      expect(renderCalls).toBe(2)
+      const firstWriteIndex = events.findIndex((e) => e.startsWith("write:"))
+      const readIndices = events
+        .map((e, idx) => (e.startsWith("read:") ? idx : -1))
+        .filter((idx) => idx !== -1)
+      expect(readIndices.length).toBeGreaterThanOrEqual(2)
+      for (const readIdx of readIndices) {
+        expect(readIdx).toBeLessThan(firstWriteIndex)
+      }
+
+      // In-place data-mermaid-source update on an already-rendered block triggers re-render
+      block1.setSource("flowchart TD\nA1-->C1")
+      await controller.renderMermaidBlocks()
+      expect(renderCalls).toBe(3)
+      expect(block1.dataset.mermaidRenderedSource).toBe("flowchart TD\nA1-->C1")
+    } finally {
+      ;(globalThis as Record<string, unknown>).window = origWin
+      ;(globalThis as Record<string, unknown>).document = origDoc
+    }
+
+    expect(shouldScheduleMermaidResize(720, 720)).toBe(false)
+    expect(shouldScheduleMermaidResize(720, 721)).toBe(false)
+    expect(shouldScheduleMermaidResize(720, 722)).toBe(true)
+  })
+
+  test("AC2: hasCodeBlockMissingLineWrappers ignores Mermaid code blocks", () => {
+    const mermaidBlock = {
+      classList: { contains: (cls: string) => cls === "language-mermaid" },
+      getAttribute: () => "mermaid",
+      closest: () => ({}),
+      querySelector: () => null,
+    } as unknown as HTMLElement
+
+    const rootOnlyMermaid = {
+      querySelectorAll: () => [mermaidBlock],
+    } as unknown as HTMLElement
+
+    const runtimeMermaidOnly = createPrismEffectRuntime({
+      root: rootOnlyMermaid,
+      isDisposed: () => false,
+    })
+    expect(runtimeMermaidOnly.hasCodeBlockMissingLineWrappers()).toBe(false)
+
+    const tsBlock = {
+      classList: { contains: () => false },
+      getAttribute: () => "ts",
+      closest: () => null,
+      querySelector: () => null,
+    } as unknown as HTMLElement
+    const rootWithTs = {
+      querySelectorAll: () => [mermaidBlock, tsBlock],
+    } as unknown as HTMLElement
+    const runtimeWithTs = createPrismEffectRuntime({
+      root: rootWithTs,
+      isDisposed: () => false,
+    })
+    expect(runtimeWithTs.hasCodeBlockMissingLineWrappers()).toBe(true)
+  })
+
+  test("AC3: Viewer DOM observer filtering, unused contentHtml skip, footnote parse dedup, and MarkdownRenderer memoization", () => {
+    let walkerCalled = false
+    const origDoc = (globalThis as Record<string, unknown>).document
+    try {
+      ;(globalThis as Record<string, unknown>).document = {
+        createTreeWalker: () => {
+          walkerCalled = true
+          return { nextNode: () => false }
+        },
+      }
+      applyInlineColors({ textContent: "일반 텍스트만 있는 본문" } as unknown as HTMLElement)
+      expect(walkerCalled).toBe(false)
+    } finally {
+      ;(globalThis as Record<string, unknown>).document = origDoc
+    }
+
+    expect(
+      shouldScheduleFromInlineColorMutations([
+        {
+          type: "childList",
+          target: { textContent: "{{color:red|기존}}" } as unknown as Node,
+          addedNodes: [{ textContent: "새 일반 문단" }] as unknown as NodeList,
+        } as MutationRecord,
+      ])
+    ).toBe(false)
+    expect(
+      shouldScheduleFromInlineColorMutations([
+        {
+          type: "childList",
+          target: {} as Node,
+          addedNodes: [{ textContent: "강조 {{color:blue|파랑}}" }] as unknown as NodeList,
+        } as MutationRecord,
+      ])
+    ).toBe(true)
+
+    const nonTableNode = {
+      nodeType: 1,
+      matches: () => false,
+      closest: () => null,
+      querySelector: () => null,
+    } as unknown as Element
+    const tableNode = {
+      nodeType: 1,
+      matches: (sel: string) => sel.includes("table"),
+      closest: () => null,
+      querySelector: () => null,
+    } as unknown as Element
+
+    expect(
+      shouldScheduleFromTableMutations([
+        {
+          type: "childList",
+          target: nonTableNode,
+          addedNodes: [nonTableNode] as unknown as NodeList,
+          removedNodes: [] as unknown as NodeList,
+        } as unknown as MutationRecord,
+      ])
+    ).toBe(false)
+    expect(
+      shouldScheduleFromTableMutations([
+        {
+          type: "childList",
+          target: nonTableNode,
+          addedNodes: [tableNode] as unknown as NodeList,
+          removedNodes: [] as unknown as NodeList,
+        } as unknown as MutationRecord,
+      ])
+    ).toBe(true)
+
+    let htmlAccessed = false
+    const model = resolveMarkdownRenderModel({
+      content: "# 본문 제목\n\n내용",
+      trustedContentHtml: {
+        kind: "trusted-content-html",
+        get html() {
+          htmlAccessed = true
+          return "<p>unused</p>"
+        },
+      },
+    })
+    expect(model.resolvedContentHtml).toBe("")
+    expect(htmlAccessed).toBe(false)
+
+    let nonFootnoteContentReads = 0
+    const plainSegment = {
+      type: "markdown" as const,
+      get content() {
+        nonFootnoteContentReads += 1
+        return "일반 문단입니다."
+      },
+    }
+    const fnModel = createDocumentFootnoteModel({
+      source:
+        "일반 문단입니다.\n\n[ext]: https://example.com/doc\n\n각주 참조[^1]\n\n[^1]: 각주 [설명][ext]",
+      segments: [
+        plainSegment,
+        { type: "markdown", content: "[ext]: https://example.com/doc" },
+        { type: "markdown", content: "각주 참조[^1]\n\n[^1]: 각주 [설명][ext]" },
+      ],
+    })
+    expect(fnModel.footnotes).toHaveLength(1)
+    expect(fnModel.footnotes[0]?.content).toContain("https://example.com/doc")
+    expect(nonFootnoteContentReads).toBeLessThanOrEqual(3)
+
+    const variants = createMarkdownComponentVariants({
+      footnotes: [],
+      footnoteMarker: "marker",
+      tableLayouts: [],
+    })
+    expect(variants.getComponents(false, false)).toBe(variants.getComponents(false, false))
+    expect(variants.getComponents(true, false)).toBe(variants.getComponents(true, false))
+
+    const { readFileSync } = require("node:fs") as typeof import("node:fs")
+    const { resolve } = require("node:path") as typeof import("node:path")
+    const rendererSource = readFileSync(
+      resolve(__dirname, "../../src/libs/markdown/MarkdownRenderer.tsx"),
+      "utf8"
+    )
+    expect(rendererSource).not.toContain("tableRenderIndexRef")
+    expect(rendererSource).not.toContain("imageRenderOrderRef")
+    expect(rendererSource).not.toContain("let standaloneImageIndex")
+  })
+
+  test("AC4: PostDetail subcomponents are wrapped in React.memo and applyHybridRail accepts cached topOffset", () => {
+    const memoSymbol = Symbol.for("react.memo")
+    expect((PostHeader as unknown as { $$typeof?: symbol }).$$typeof).toBe(memoSymbol)
+    expect((FloatingActionRail as unknown as { $$typeof?: symbol }).$$typeof).toBe(memoSymbol)
+    expect((MobileSummaryActions as unknown as { $$typeof?: symbol }).$$typeof).toBe(memoSymbol)
+    expect((PostDetailMobileToc as unknown as { $$typeof?: symbol }).$$typeof).toBe(memoSymbol)
+    expect((RightTocRail as unknown as { $$typeof?: symbol }).$$typeof).toBe(memoSymbol)
+
+    const origWin = (globalThis as Record<string, unknown>).window
+    let computedStyleCalls = 0
+    try {
+      ;(globalThis as Record<string, unknown>).window = {
+        scrollY: 300,
+        getComputedStyle: () => {
+          computedStyleCalls += 1
+          return { getPropertyValue: () => "65" }
+        },
+      }
+      const dummyInner = {
+        style: { position: "", top: "", left: "", width: "", bottom: "", transform: "" },
+      } as unknown as HTMLElement
+      applyHybridRail(
+        dummyInner,
+        {
+          enabled: true,
+          stickyBlocked: true,
+          left: 24,
+          width: 180,
+          railTopDoc: 200,
+          articleBottomDoc: 1600,
+          innerHeight: 240,
+        },
+        85
+      )
+      expect(computedStyleCalls).toBe(0)
+      expect(dummyInner.style.position).toBe("fixed")
+      expect(dummyInner.style.top).toBe("85px")
+    } finally {
+      ;(globalThis as Record<string, unknown>).window = origWin
+    }
+  })
+
+  test("AC5: Live Preview preserves non-overlapping decorations during IME composition and renders inactive Mermaid blocks via MarkdownMermaidWidget", async () => {
+    const doc = [
+      "# 문서 제목",
+      "",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "",
+      "```mermaid",
+      "flowchart TD",
+      "  A --> B",
+      "```",
+      "",
+      "한글 입력 중인 **강조** $x+1$ 문단입니다.",
+    ].join("\n")
+
+    const activeLinePos = doc.indexOf("한글 입력 중인") + 2
+    let state = EditorState.create({
+      doc,
+      selection: EditorSelection.cursor(activeLinePos),
+      extensions: [
+        markdown({ extensions: GFM }),
+        compositionField,
+        pointerSelectingField,
+        editorModeField,
+        disableMermaidField,
+      ],
+    })
+    state = state.update({ effects: setComposition.of(true) }).state
+
+    const decoSet = buildDecorations(state)
+    const collected: Array<{ from: number; to: number; value: unknown }> = []
+    decoSet.between(0, state.doc.length, (from, to, value) => {
+      collected.push({ from, to, value })
+    })
+
+    // Non-overlapping lines (heading, table, mermaid) must retain decorations during IME composition
+    expect(collected.length).toBeGreaterThan(0)
+    const activeLine = state.doc.lineAt(activeLinePos)
+    const overlappingActiveLine = collected.filter(
+      (d) => d.from <= activeLine.to && d.to >= activeLine.from
+    )
+    expect(overlappingActiveLine).toHaveLength(0)
+
+    const mermaidStart = doc.indexOf("```mermaid")
+    const mermaidDeco = collected.find((d) => d.from === mermaidStart)
+    expect(mermaidDeco).toBeDefined()
+    const widget = (mermaidDeco?.value as { spec?: { widget?: unknown } })?.spec?.widget
+    expect(widget).toBeInstanceOf(MarkdownMermaidWidget)
+
+    // When disableMermaid is true, MarkdownMermaidWidget is not used
+    const disabledMermaidState = state.update({ effects: setDisableMermaid.of(true) }).state
+    const disabledDecoSet = buildDecorations(disabledMermaidState)
+    let hasMermaidWidgetWhenDisabled = false
+    disabledDecoSet.between(0, disabledMermaidState.doc.length, (_from, _to, value) => {
+      if ((value as { spec?: { widget?: unknown } })?.spec?.widget instanceof MarkdownMermaidWidget) {
+        hasMermaidWidgetWhenDisabled = true
+      }
+    })
+    expect(hasMermaidWidgetWhenDisabled).toBe(false)
+
+    // Verify MarkdownMermaidWidget.toDOM async SVG rendering and error fallback
+    const origDoc = (globalThis as Record<string, unknown>).document
+    try {
+      const makeElem = (tag: string): Record<string, unknown> => {
+        const children: Array<Record<string, unknown>> = []
+        const dataset: Record<string, string> = {}
+        let html = ""
+        const elem: Record<string, unknown> = {
+          tagName: tag.toUpperCase(),
+          className: "",
+          textContent: "",
+          get innerHTML() {
+            return html
+          },
+          set innerHTML(val: string) {
+            html = val
+            if (val === "") {
+              children.length = 0
+            }
+          },
+          dataset,
+          children,
+          appendChild: (child: Record<string, unknown>) => {
+            children.push(child)
+            return child
+          },
+          addEventListener: () => {},
+        }
+        return elem
+      }
+      ;(globalThis as Record<string, unknown>).document = {
+        createElement: (tag: string) => makeElem(tag),
+      }
+
+      const validWidget = new MarkdownMermaidWidget(
+        "flowchart TD\n  A --> B",
+        0,
+        async (_id, src) => ({ svg: `<svg data-test="ok">${src}</svg>` })
+      )
+      const validDom = validWidget.toDOM() as unknown as {
+        dataset: Record<string, string>
+        innerHTML: string
+      }
+      await new Promise((r) => setTimeout(r, 10))
+      expect(validDom.dataset.mermaidState).toBe("rendered")
+      expect(validDom.innerHTML).toContain('<svg data-test="ok">')
+
+      const errorWidget = new MarkdownMermaidWidget(
+        "invalid mermaid syntax",
+        0,
+        async () => {
+          throw new Error("Syntax error in graph")
+        }
+      )
+      const errorDom = errorWidget.toDOM() as unknown as {
+        dataset: Record<string, string>
+        children: Array<{ className: string; textContent: string }>
+      }
+      await new Promise((r) => setTimeout(r, 10))
+      expect(errorDom.dataset.mermaidState).toBe("error")
+      expect(errorDom.children[0]?.className).toBe("cm-live-mermaid-error")
+      expect(errorDom.children[1]?.className).toBe("cm-live-mermaid-fallback")
+    } finally {
+      ;(globalThis as Record<string, unknown>).document = origDoc
+    }
+  })
+
+  test("AC6: Table editing supports up to 200x32 while creation stays 6x6, single-lookup availability works, and inlineCode uses Mod+Shift+C", () => {
+    expect(createMarkdownEditorTable(6, 6)).not.toBeNull()
+    expect(createMarkdownEditorTable(7, 2)).toBeNull()
+    expect(MAX_EDIT_ROWS).toBe(200)
+    expect(MAX_EDIT_COLUMNS).toBe(32)
+
+    const tenCols = Array.from({ length: 10 }, (_, i) => `C${i + 1}`)
+    const header = `| ${tenCols.join(" | ")} |`
+    const delim = `| ${tenCols.map(() => "---").join(" | ")} |`
+    const bodyRows = Array.from(
+      { length: 12 },
+      (_, r) => `| ${tenCols.map((c) => `R${r + 1}${c}`).join(" | ")} |`
+    )
+    const largeTableDoc = ["# 서문", "", header, delim, ...bodyRows, "", "후문"].join("\n")
+    const cursorInLargeTable = largeTableDoc.indexOf("R6C3") + 1
+
+    const availability = getMarkdownEditorTableEditAvailability(
+      largeTableDoc,
+      cursorInLargeTable,
+      cursorInLargeTable
+    )
+    expect(availability).toEqual({
+      addRow: true,
+      deleteRow: true,
+      addColumn: true,
+      deleteColumn: true,
+      alignLeft: true,
+      alignCenter: true,
+      alignRight: true,
+    })
+
+    const editPlan = planMarkdownEditorTableEdit(
+      largeTableDoc,
+      cursorInLargeTable,
+      cursorInLargeTable,
+      { kind: "add-row" }
+    )
+    expect(editPlan).not.toBeNull()
+
+    expect(INLINE_CODE_SHORTCUT).toBe("Mod+Shift+C")
+    expect(VIEW_MODE_CYCLE_SHORTCUT).toBe("Mod+E")
+    expect(
+      resolveFormatShortcut({ key: "e", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
+    ).toBeNull()
+    expect(
+      resolveFormatShortcut({ key: "c", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })
+    ).toBe("inlineCode")
+    expect(() =>
+      validateMarkdownEditorCommands([
+        {
+          ...getMarkdownEditorCommand("block.code")!,
+          shortcut: "Mod+E" as unknown as "Mod+B",
+        },
+      ])
+    ).toThrow(/reserved/i)
+  })
+
+  test("AC7: Mermaid cold-chunk timeout retries once, cleans temporary DOM nodes, unlocks on resetLayoutCache(true), and formats midnight KST as 00:xx", async () => {
+    expect.soft(MERMAID_RENDER_TIMEOUT_MS).toBe(15000)
+    expect.soft(formatDateTime("2026-10-08T15:18:45Z", "ko-KR", "Asia/Seoul")).toBe("2026.10.09 00:18")
+    expect.soft(formatShortDateTime("2026-10-08T15:18:45Z", "ko-KR", "Asia/Seoul")).toBe("10.09 00:18")
+    expect
+      .soft(formatDateTime("2026-10-08T15:18:45Z", "ko-KR-u-hc-h24", "Asia/Seoul"))
+      .toBe("2026.10.09 00:18")
+    expect
+      .soft(formatShortDateTime("2026-10-08T15:18:45Z", "ko-KR-u-hc-h24", "Asia/Seoul"))
+      .toBe("10.09 00:18")
+    const h24Formatter = new Intl.DateTimeFormat("ko-KR-u-hc-h24", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Seoul",
+    })
+    expect.soft(formatWithNormalizedHours(h24Formatter, new Date("2026-10-08T15:18:45Z"))).toBe("00:18")
+    expect.soft(formatDashboardFreshnessLabel(Date.parse("2026-10-08T15:18:45Z"))).toBe("00:18 기준")
+    expect.soft(formatDashboardInstant("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatDashboardInstant("2026-10-08T15:18:45Z")).toContain("00:18")
+    expect.soft(formatToolsInstant("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatToolsInstant("2026-10-08T15:18:45Z")).toContain("00:18")
+    expect.soft(formatCloudDate("2026-10-08T15:18:45Z")).not.toContain("24:")
+    expect.soft(formatCloudDate("2026-10-08T15:18:45Z")).toContain("00:18")
+
+    const origWin = (globalThis as Record<string, unknown>).window
+    const origDoc = (globalThis as Record<string, unknown>).document
+    const strayNodes = new Map<string, { remove: () => void }>()
+    const registerStraySet = (renderId: string) => {
+      for (const targetId of [`d${renderId}`, `i${renderId}`, renderId]) {
+        strayNodes.set(targetId, {
+          remove: () => {
+            strayNodes.delete(targetId)
+          },
+        })
+      }
+    }
+
+    const makeStageBlock = (source: string, initialZeroWidth = false) => {
+      const code = {
+        className: "language-mermaid",
+        textContent: source,
+        getAttribute: (name: string) => (name === "data-language" ? "mermaid" : null),
+      } as unknown as HTMLElement
+      let innerHTMLValue = `<code class="language-mermaid">${source}</code>`
+      let zeroWidthPending = initialZeroWidth
+      const classes = new Set<string>(["aq-mermaid"])
+      const block = {
+        isConnected: true,
+        get clientWidth() {
+          return zeroWidthPending ? 0 : 640
+        },
+        className: "aq-mermaid",
+        classList: {
+          add: (cls: string) => {
+            classes.add(cls)
+          },
+          remove: (cls: string) => {
+            classes.delete(cls)
+          },
+          contains: (cls: string) => classes.has(cls),
+        },
+        dataset: {
+          aqMermaid: "true",
+          mermaidRendered: "pending",
+          mermaidSource: source,
+        } as DOMStringMap,
+        style: {
+          minHeight: "",
+          overflowX: "",
+          setProperty: () => {},
+        },
+        textContent: source,
+        getAttribute: (name: string) => (name === "data-mermaid-source" ? source : null),
+        closest: () => null,
+        querySelector: () => code,
+        querySelectorAll: () => [],
+        appendChild: () => {},
+        replaceChildren: () => {},
+        getBoundingClientRect: () => {
+          if (zeroWidthPending) {
+            zeroWidthPending = false
+            return { width: 0, height: 0, left: 0, right: 0, top: 0, bottom: 0 } as DOMRect
+          }
+          return { width: 640, height: 180, left: 40, right: 680, top: 0, bottom: 180 } as DOMRect
+        },
+      } as unknown as HTMLElement
+      Object.defineProperty(block, "innerHTML", {
+        get: () => innerHTMLValue,
+        set: (next: string) => {
+          innerHTMLValue = next
+        },
+      })
+      return block
+    }
+
+    try {
+      resetSharedMermaidRuntimeForTests()
+      ;(globalThis as Record<string, unknown>).window = {
+        matchMedia: () => ({ matches: false }),
+        innerHeight: 900,
+        setTimeout: (fn: () => void) => globalThis.setTimeout(fn, 5),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      }
+      ;(globalThis as Record<string, unknown>).document = {
+        getElementById: (id: string) => strayNodes.get(id) ?? null,
+        createElement: () => {
+          const svg = {
+            getAttribute: (attr: string) => (attr === "viewBox" ? "0 0 400 200" : null),
+            setAttribute: () => {},
+            removeAttribute: () => {},
+            querySelectorAll: () => [],
+            style: {},
+          }
+          return {
+            className: "",
+            style: { setProperty: () => {} },
+            innerHTML: "",
+            textContent: "",
+            setAttribute: () => {},
+            appendChild: () => {},
+            querySelector: (sel: string) => (sel === "svg" ? svg : null),
+            addEventListener: () => {},
+          }
+        },
+      }
+
+      let settleRender!: () => void
+      const renderGate = new Promise<void>((resolve) => {
+        settleRender = resolve
+      })
+
+      await expect(
+        renderMermaidInstanceWithTimeout(
+          {
+            initialize: () => {},
+            render: async (id) => {
+              registerStraySet(id)
+              await renderGate
+              registerStraySet(id)
+              return { svg: "<svg></svg>" }
+            },
+          },
+          "aq-timeout-node",
+          "flowchart TD\nA-->B",
+          10
+        )
+      ).rejects.toThrow(/MERMAID_RENDER_TIMEOUT:10/)
+      expect.soft(strayNodes.size).toBe(0)
+      settleRender()
+      await renderGate
+      await Promise.resolve()
+      await Promise.resolve()
+      expect.soft(strayNodes.size).toBe(0)
+
+      resetSharedMermaidRuntimeForTests()
+      let settleTask1!: () => void
+      const task1Gate = new Promise<void>((resolve) => {
+        settleTask1 = resolve
+      })
+      let task2Started = false
+      const mockSharedRuntime: {
+        initialize: () => void
+        parseError?: (err: unknown) => void
+        render: (id: string, src: string) => Promise<{ svg: string }>
+      } = {
+        initialize: () => {},
+        render: async (id, src) => {
+          if (id === "aq-task-1") {
+            await task1Gate
+            mockSharedRuntime.parseError?.("late error")
+            return { svg: `<svg>${src}</svg>` }
+          }
+          task2Started = true
+          return { svg: `<svg>${src}</svg>` }
+        },
+      }
+      const runtimeLoader = async () => mockSharedRuntime
+
+      const task1Promise = renderSerializedMermaidSvg({
+        scheme: "light",
+        renderId: "aq-task-1",
+        source: "flowchart TD\nT1-->T2",
+        runtimeLoader,
+        timeoutMs: 10,
+      })
+      const task2Promise = renderSerializedMermaidSvg({
+        scheme: "light",
+        renderId: "aq-task-2",
+        source: "flowchart TD\nT3-->T4",
+        runtimeLoader,
+        timeoutMs: 200,
+      })
+
+      await expect(task1Promise).rejects.toThrow(/MERMAID_RENDER_TIMEOUT:10/)
+      expect.soft(task2Started).toBe(false)
+      settleTask1()
+      const task2Result = await task2Promise
+      expect.soft(task2Started).toBe(true)
+      expect.soft(task2Result.svg).toContain("T3-->T4")
+
+      const blockRecover = makeStageBlock(
+        "stateDiagram-v2\n  classDef highlight fill:#f00\n  [*] --> R1",
+        true
+      )
+      const blockPersistent = makeStageBlock("flowchart TD\nP1-->P2")
+      const blocks = [blockRecover, blockPersistent]
+      const root = {
+        querySelectorAll: (selector: string) => {
+          if (selector.includes("code")) return []
+          if (selector.includes("data-mermaid-rendered")) {
+            return blocks.filter((b) => {
+              if (
+                selector.includes("[data-mermaid-rendered='true']") &&
+                b.dataset.mermaidRendered === "true"
+              ) {
+                return true
+              }
+              if (
+                selector.includes("[data-mermaid-error-kind='timeout']") &&
+                b.dataset.mermaidRendered === "error" &&
+                b.dataset.mermaidErrorKind === "timeout"
+              ) {
+                return true
+              }
+              if (
+                selector.includes("[data-mermaid-rendered='pending']") &&
+                b.dataset.mermaidRendered === "pending"
+              ) {
+                return true
+              }
+              return false
+            })
+          }
+          return blocks
+        },
+      } as unknown as HTMLElement
+
+      let recoverAttempts = 0
+      const recoverRenderedSources: string[] = []
+      let persistentAttempts = 0
+      const retryTimers = new Set<number>()
+      const controller = createMermaidRuntimeController({
+        root,
+        preset: { mode: "github", themeKey: "test-light-304", config: {} },
+        allowDesktopWideLane: false,
+        lazyViewport: false,
+        shouldLogMermaidWarnings: false,
+        getMermaid: async () => ({
+          initialize: () => {},
+          render: async (_id, src) => {
+            if (src.includes("R1")) {
+              recoverAttempts += 1
+              recoverRenderedSources.push(src)
+              if (recoverAttempts === 1) {
+                throw new Error("MERMAID_RENDER_TIMEOUT:15000")
+              }
+              return { svg: `<svg viewBox="0 0 400 200"><text>${src}</text></svg>` }
+            }
+            persistentAttempts += 1
+            if (persistentAttempts <= 2) {
+              throw new Error("MERMAID_RENDER_TIMEOUT:15000")
+            }
+            return { svg: `<svg viewBox="0 0 400 200"><text>${src}</text></svg>` }
+          },
+        }),
+        isDisposed: () => false,
+        retryTimers,
+        readParseWarning: () => null,
+        clearParseWarning: () => {},
+      })
+
+      await controller.renderMermaidBlocks()
+      for (let step = 0; step < 40 && (retryTimers.size > 0 || controller.isRendering()); step += 1) {
+        await new Promise((r) => setTimeout(r, 5))
+      }
+
+      expect.soft(recoverAttempts).toBe(2)
+      expect.soft(recoverRenderedSources).toHaveLength(2)
+      expect.soft(recoverRenderedSources.every((src) => src.includes("classDef highlight"))).toBe(true)
+      expect.soft(blockRecover.dataset.mermaidRendered).toBe("true")
+      expect.soft(blockRecover.dataset.mermaidErrorKind).toBeUndefined()
+      expect.soft(blockRecover.dataset.mermaidTimeoutRetryCount).toBeUndefined()
+
+      expect.soft(persistentAttempts).toBe(2)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBe("error")
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBe("timeout")
+      expect.soft(blockPersistent.dataset.mermaidTimeoutRetryCount).toBe("1")
+      expect.soft(blockPersistent.classList.contains("aq-mermaid-error")).toBe(true)
+
+      controller.resetLayoutCache(true)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidTimeoutRetryCount).toBeUndefined()
+      expect.soft(blockPersistent.dataset.mermaidRetryCount).toBe("0")
+      expect.soft(blockPersistent.classList.contains("aq-mermaid-error")).toBe(false)
+
+      await controller.renderMermaidBlocks()
+      expect.soft(persistentAttempts).toBe(3)
+      expect.soft(blockPersistent.dataset.mermaidRendered).toBe("true")
+      expect.soft(blockPersistent.dataset.mermaidErrorKind).toBeUndefined()
+    } finally {
+      resetSharedMermaidRuntimeForTests()
+      ;(globalThis as Record<string, unknown>).window = origWin
+      ;(globalThis as Record<string, unknown>).document = origDoc
+    }
+  })
+})

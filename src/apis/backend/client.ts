@@ -1,0 +1,518 @@
+import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
+import {
+  evictBrowserRevalidatePayloadCacheEntries,
+  getRevalidateCacheEntry,
+  refreshRevalidateCacheEntry,
+  setRevalidateCacheEntry,
+} from "./clientRevalidateCache"
+import {
+  createServerApiFetchMetricsContext,
+  type ServerApiFetchMetricsContext,
+} from "./serverMetricsBridge"
+
+const DEFAULT_API_BASE_URL = "http://localhost:8080"
+const DEFAULT_API_FETCH_TIMEOUT_MS = 12_000
+const DEFAULT_GET_TRANSIENT_RETRY_COUNT = 1
+const DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS = 120
+const CSRF_PREFLIGHT_HEADER = "X-Aquila-CSRF"
+const GET_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
+
+type GetCacheMode = "revalidate" | "no-store"
+type ApiRequestCredentials = "include" | "omit"
+
+type GetRequestPolicy = {
+  cacheMode: GetCacheMode
+  retryCount: number
+  timeoutMs?: number
+  credentials: ApiRequestCredentials
+}
+
+const DEFAULT_GET_REQUEST_POLICY: GetRequestPolicy = {
+  cacheMode: "no-store",
+  retryCount: 0,
+  credentials: "include",
+}
+
+const GET_REQUEST_POLICY_REGISTRY: Array<{
+  matcher: RegExp
+  policy: Partial<GetRequestPolicy>
+}> = [
+  {
+    matcher: /^\/member\/api\/v1\/auth\/me$/i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 4_000 },
+  },
+  {
+    matcher: /^\/member\/api\/v1\/auth\//i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 5_000 },
+  },
+  {
+    matcher: /^\/(member|post)\/api\/v1\/adm\//i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
+  },
+  {
+    matcher: /^\/system\/api\/v1\/adm\//i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
+  },
+  {
+    matcher: /^\/post\/api\/v1\/posts\/mine(\/|$)/i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
+  },
+  {
+    matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|sitemap|bootstrap|related\/author)(\/|$)/i,
+    policy: {
+      cacheMode: "revalidate",
+      retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
+      timeoutMs: 8_000,
+      credentials: "omit",
+    },
+  },
+  {
+    matcher: /^\/post\/api\/v1\/posts\/[0-9]+(\/|$)/i,
+    policy: {
+      cacheMode: "revalidate",
+      retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
+      timeoutMs: 8_000,
+    },
+  },
+  {
+    matcher: /^\/(member|post|system)\/api\/v1\//i,
+    policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
+  },
+]
+
+const resolveGetRequestPolicy = (path: string): GetRequestPolicy => {
+  const normalizedPath = path.trim().toLowerCase().split(/[?#]/, 1)[0] || "/"
+  const matched = GET_REQUEST_POLICY_REGISTRY.find((entry) => entry.matcher.test(normalizedPath))
+  if (!matched) return DEFAULT_GET_REQUEST_POLICY
+
+  return {
+    cacheMode: matched.policy.cacheMode ?? DEFAULT_GET_REQUEST_POLICY.cacheMode,
+    retryCount: matched.policy.retryCount ?? DEFAULT_GET_REQUEST_POLICY.retryCount,
+    timeoutMs: matched.policy.timeoutMs,
+    credentials: matched.policy.credentials ?? DEFAULT_GET_REQUEST_POLICY.credentials,
+  }
+}
+
+export type ApiFetchOptions = RequestInit & {
+  timeoutMs?: number
+}
+
+const isServer = () => typeof window === "undefined"
+
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, "")
+
+const browserInFlightGetRequests = new Map<string, { url: string; promise: Promise<unknown> }>()
+
+const classifyServerApiFetchError = (error: unknown, signal: AbortSignal | null | undefined) => {
+  if (error instanceof ApiError) {
+    if (error.status >= 400 && error.status < 500) return "4xx" as const
+    if (error.status >= 500 && error.status < 600) return "5xx" as const
+    if (error.status >= 300 && error.status < 400) return "3xx" as const
+    return "other_error" as const
+  }
+  if (error instanceof ApiTimeoutError) return "timeout" as const
+  if (signal?.aborted) return "aborted" as const
+  if (error instanceof ApiNetworkError || error instanceof TypeError || error instanceof DOMException) return "network_error" as const
+  return "other_error" as const
+}
+
+export const evictBrowserRevalidateCacheEntries = (predicate: (url: string) => boolean) => {
+  if (isServer()) return
+  evictBrowserRevalidatePayloadCacheEntries(predicate)
+
+  const inFlightKeysToDelete: string[] = []
+  browserInFlightGetRequests.forEach((entry, key) => {
+    if (entry.url && predicate(entry.url)) inFlightKeysToDelete.push(key)
+  })
+  inFlightKeysToDelete.forEach((key) => {
+    browserInFlightGetRequests.delete(key)
+  })
+}
+
+const resolveStatusMessage = (status: number) => {
+  if (status === 400) return "요청 값이 올바르지 않습니다."
+  if (status === 401) return "로그인이 필요합니다."
+  if (status === 403) return "권한이 없습니다."
+  if (status === 404) return "요청한 정보를 찾을 수 없습니다."
+  if (status === 409) return "요청 충돌이 발생했습니다. 다시 시도해주세요."
+  if (status === 413) return "요청 본문 용량이 너무 큽니다. 용량을 줄여 다시 시도해주세요."
+  if (status === 429) return "요청이 많습니다. 잠시 후 다시 시도해주세요."
+  if (status >= 500) return "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+  return "요청 처리 중 오류가 발생했습니다."
+}
+
+const parseJsonBodyMessage = (body: string) => {
+  if (!body.trim()) return { message: "", resultCode: "" }
+
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown; msg?: unknown; resultCode?: unknown }
+    const message = typeof parsed.msg === "string" ? parsed.msg : parsed.message
+    const resultCode = typeof parsed.resultCode === "string" ? parsed.resultCode.trim() : ""
+    return {
+      message: typeof message === "string" ? message.trim() : "",
+      resultCode,
+    }
+  } catch {
+    return { message: "", resultCode: "" }
+  }
+}
+
+export const readApiResultCode = (body: string) => parseJsonBodyMessage(body).resultCode
+const looksLikeInternalDiagnosticMessage = (message: string) =>
+  /실패:\s/.test(message) || /Exception|endpoint|bucket|provider|stack/i.test(message)
+
+const resolveBodyUserMessage = (body: string) => {
+  const { message } = parseJsonBodyMessage(body)
+  if (!message) return ""
+  if (!/[가-힣]/.test(message)) return ""
+  if (looksLikeInternalDiagnosticMessage(message)) return ""
+  return message
+}
+
+const resolveResponseBodyMessage = (status: number, body: string) => {
+  if (status !== 413) return ""
+  const { message } = parseJsonBodyMessage(body)
+  if (!message) return ""
+  if (!/(용량|초과|MB|이하)/i.test(message)) return ""
+  return /[가-힣]/.test(message) ? message : ""
+}
+
+const sleep = (delayMs: number) => new Promise<void>((resolve) => setTimeout(resolve, delayMs))
+
+const resolveTimeoutMs = (path: string, init: ApiFetchOptions) => {
+  if (typeof init.timeoutMs === "number" && Number.isFinite(init.timeoutMs) && init.timeoutMs > 0) {
+    return init.timeoutMs
+  }
+
+  const normalizedPath = path.toLowerCase()
+  const method = (init.method || "GET").toUpperCase()
+  const isReadMethod = method === "GET" || method === "HEAD"
+  if (isReadMethod) {
+    const getPolicy = resolveGetRequestPolicy(path)
+    if (
+      typeof getPolicy.timeoutMs === "number" &&
+      Number.isFinite(getPolicy.timeoutMs) &&
+      getPolicy.timeoutMs > 0
+    ) {
+      return getPolicy.timeoutMs
+    }
+  }
+  const isFormLikeBody = typeof FormData !== "undefined" && init.body instanceof FormData
+
+  if (normalizedPath.includes("/posts/images") || isFormLikeBody) {
+    return 90_000
+  }
+
+  if (isReadMethod) {
+    return 8_000
+  }
+
+  return DEFAULT_API_FETCH_TIMEOUT_MS
+}
+
+const normalizeRequestId = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
+export class ApiError extends Error {
+  status: number
+  url: string
+  body: string
+  userMessage: string
+  resultCode: string | null
+  requestId: string | null
+
+  constructor(status: number, url: string, body: string, requestId: string | null = null) {
+    const userMessage =
+      resolveBodyUserMessage(body) || resolveResponseBodyMessage(status, body) || resolveStatusMessage(status)
+    const resultCode = readApiResultCode(body) || null
+    super(userMessage)
+    this.name = "ApiError"
+    this.status = status
+    this.url = url
+    this.body = body
+    this.userMessage = userMessage
+    this.resultCode = resultCode
+    this.requestId = normalizeRequestId(requestId)
+  }
+}
+
+export class ApiTimeoutError extends Error {
+  url: string
+  timeoutMs: number
+  requestId: string | null
+
+  constructor(url: string, timeoutMs: number, requestId: string | null = null) {
+    super("요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
+    this.name = "ApiTimeoutError"
+    this.url = url
+    this.timeoutMs = timeoutMs
+    this.requestId = normalizeRequestId(requestId)
+  }
+}
+
+export class ApiNetworkError extends Error {
+  url: string
+  userMessage: string
+  requestId: string | null
+
+  constructor(url: string, requestId: string | null = null) {
+    const userMessage = "네트워크 연결에 실패했습니다. 잠시 후 다시 시도해주세요."
+    super(userMessage)
+    this.name = "ApiNetworkError"
+    this.url = url
+    this.userMessage = userMessage
+    this.requestId = normalizeRequestId(requestId)
+  }
+}
+
+const createTimedSignal = (sourceSignal: AbortSignal | null | undefined, timeoutMs: number) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs)
+
+  const cleanup = () => {
+    clearTimeout(timeoutId)
+    if (sourceSignal) {
+      sourceSignal.removeEventListener("abort", onSourceAbort)
+    }
+  }
+
+  const onSourceAbort = () => {
+    controller.abort(sourceSignal?.reason)
+  }
+
+  if (sourceSignal) {
+    if (sourceSignal.aborted) {
+      controller.abort(sourceSignal.reason)
+    } else {
+      sourceSignal.addEventListener("abort", onSourceAbort, { once: true })
+    }
+  }
+
+  return { signal: controller.signal, cleanup }
+}
+
+export const getApiBaseUrl = () => {
+  const serverUrl = process.env.BACKEND_INTERNAL_URL
+  const publicUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+
+  if (isServer()) {
+    if (serverUrl) return stripTrailingSlash(serverUrl)
+    if (process.env.NODE_ENV === "production") {
+      // 운영 SSR은 내부 API 경로를 강제해 외부 edge/tunnel 우회를 차단한다.
+      throw new Error("BACKEND_INTERNAL_URL is required for server runtime in production.")
+    }
+    if (publicUrl) return stripTrailingSlash(publicUrl)
+  } else if (publicUrl) {
+    return stripTrailingSlash(publicUrl)
+  }
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1"
+    if (!isLocalHost && process.env.NODE_ENV === "production") {
+      throw new Error("NEXT_PUBLIC_BACKEND_URL is required in production.")
+    }
+  }
+
+  return DEFAULT_API_BASE_URL
+}
+
+export const getApiRequestUrl = (path: string) => {
+  const safePath = normalizeApiRequestPath(path)
+  return `${getApiBaseUrl()}${safePath}`
+}
+
+export const apiFetch = async <T>(
+  path: string,
+  init: ApiFetchOptions = {}
+): Promise<T> => {
+  const safePath = normalizeApiRequestPath(path)
+  const { timeoutMs: _timeoutMs, ...requestInit } = init
+  const url = getApiRequestUrl(safePath)
+  const headers = new Headers(requestInit.headers || {})
+  const serverMetrics = isServer() ? createServerApiFetchMetricsContext(safePath, headers) : null
+  let serverOutcomeObserved = false
+  const observeServerOutcome = (result: Parameters<ServerApiFetchMetricsContext["observe"]>[0]) => {
+    if (!serverMetrics) return
+    serverOutcomeObserved = true
+    serverMetrics.observe(result)
+  }
+  const hasBody = requestInit.body !== undefined && requestInit.body !== null
+  const isFormLikeBody =
+    typeof FormData !== "undefined" && requestInit.body instanceof FormData
+  const method = (requestInit.method || "GET").toUpperCase()
+  const isReadMethod = method === "GET" || method === "HEAD"
+  const getRequestPolicy = isReadMethod ? resolveGetRequestPolicy(safePath) : null
+  const requestCredentials: RequestCredentials =
+    requestInit.credentials ??
+    (isReadMethod ? (getRequestPolicy?.credentials ?? DEFAULT_GET_REQUEST_POLICY.credentials) : "include")
+  const canUseRevalidateCache =
+    !isServer() &&
+    method === "GET" &&
+    !hasBody &&
+    getRequestPolicy?.cacheMode !== "no-store" &&
+    requestInit.cache !== "no-store"
+  const canUseInFlightDedupe =
+    !isServer() &&
+    isReadMethod &&
+    !hasBody &&
+    !requestInit.signal &&
+    init.timeoutMs === undefined
+  const inFlightKey = canUseInFlightDedupe ? `${method}:${requestCredentials}:${url}` : null
+  const revalidateCacheEntry = canUseRevalidateCache ? getRevalidateCacheEntry(url) : null
+
+  if (hasBody && !isFormLikeBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+  if (!isReadMethod && requestCredentials !== "omit" && !headers.has(CSRF_PREFLIGHT_HEADER)) {
+    headers.set(CSRF_PREFLIGHT_HEADER, "1")
+  }
+  if (canUseRevalidateCache && revalidateCacheEntry && !headers.has("If-None-Match")) {
+    headers.set("If-None-Match", revalidateCacheEntry.etag)
+  }
+
+  if (inFlightKey) {
+    const existing = browserInFlightGetRequests.get(inFlightKey)
+    if (existing) return existing.promise as Promise<T>
+  }
+
+  const executeRequest = async (): Promise<T> => {
+    try {
+    const resolvedTimeoutMs = resolveTimeoutMs(safePath, init)
+    const getRetryCount = getRequestPolicy?.retryCount ?? 0
+    const canRetryTransientRead =
+      isReadMethod &&
+      !requestInit.signal &&
+      getRetryCount > 0 &&
+      !isServer()
+    const maxAttempts = canRetryTransientRead ? getRetryCount + 1 : 1
+    let response: Response | null = null
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const { signal, cleanup } = createTimedSignal(requestInit.signal, resolvedTimeoutMs)
+
+      try {
+        response = await fetch(url, {
+          ...requestInit,
+          credentials: requestCredentials,
+          headers,
+          signal,
+        })
+        cleanup()
+      } catch (error) {
+        cleanup()
+
+        if (requestInit.signal?.aborted) {
+          throw error
+        }
+
+        const timedOut = error instanceof DOMException && error.name === "TimeoutError"
+        const transientTransportError =
+          error instanceof DOMException || error instanceof TypeError
+        const hasNextAttempt = attempt < maxAttempts - 1
+
+        if (canRetryTransientRead && transientTransportError && hasNextAttempt) {
+          await sleep(DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
+          continue
+        }
+
+        if (timedOut) {
+          const timeoutError = new ApiTimeoutError(url, resolvedTimeoutMs, serverMetrics?.requestId)
+          throw timeoutError
+        }
+
+        if (error instanceof TypeError || error instanceof DOMException) {
+          const networkError = new ApiNetworkError(url, serverMetrics?.requestId)
+          throw networkError
+        }
+
+        throw error
+      }
+
+      if (response.ok || !canRetryTransientRead || attempt >= maxAttempts - 1) {
+        break
+      }
+
+      if (!GET_RETRYABLE_STATUS_CODES.has(response.status)) {
+        break
+      }
+
+      await sleep(DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
+    }
+
+    if (!response) {
+      throw new Error(`apiFetch: missing response for ${url}`)
+    }
+
+    if (response.status === 304 && canUseRevalidateCache && revalidateCacheEntry) {
+      refreshRevalidateCacheEntry(
+        url,
+        revalidateCacheEntry,
+        response.headers.get("etag"),
+        response.headers.get("cache-control"),
+      )
+      observeServerOutcome("2xx")
+      return revalidateCacheEntry.payload as T
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      const apiError = new ApiError(
+        response.status,
+        url,
+        body,
+        serverMetrics?.requestId ?? normalizeRequestId(response.headers.get("x-request-id")),
+      )
+      throw apiError
+    }
+
+    if (response.status === 204) {
+      observeServerOutcome("2xx")
+      return undefined as T
+    }
+
+    const contentLength = response.headers.get("content-length")
+    if (contentLength === "0") {
+      observeServerOutcome("2xx")
+      return undefined as T
+    }
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() || ""
+    const etag = response.headers.get("etag")?.trim() || null
+
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as T
+      if (canUseRevalidateCache && etag) {
+        setRevalidateCacheEntry(url, etag, payload, response.headers.get("cache-control"))
+      }
+      observeServerOutcome("2xx")
+      return payload
+    }
+
+    const body: unknown = await response.text()
+    if (canUseRevalidateCache && etag) {
+      setRevalidateCacheEntry(url, etag, body, response.headers.get("cache-control"))
+    }
+    observeServerOutcome("2xx")
+    return body as T
+    } catch (error) {
+      if (!serverOutcomeObserved) observeServerOutcome(classifyServerApiFetchError(error, requestInit.signal))
+      throw error
+    }
+  }
+
+  if (!inFlightKey) {
+    return executeRequest()
+  }
+
+  const inFlightPromise = executeRequest().finally(() => {
+    if (browserInFlightGetRequests.get(inFlightKey)?.promise === inFlightPromise) {
+      browserInFlightGetRequests.delete(inFlightKey)
+    }
+  })
+  browserInFlightGetRequests.set(inFlightKey, { url, promise: inFlightPromise as Promise<unknown> })
+  return inFlightPromise
+}

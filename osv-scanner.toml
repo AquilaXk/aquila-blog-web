@@ -1,0 +1,7 @@
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+reason = "minimatch 11.0.1 is ESM-only and incompatible with CommonJS eslint 8.x and @redocly/openapi-core dev tooling"
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+reason = "QA-approved temporary exception for transitive picomatch (CVE-2026-112366) in dev/build glob tooling; untrusted runtime input is not passed to picomatch"

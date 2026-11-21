@@ -1,0 +1,76 @@
+import { extractMarkdownTableLayouts } from "src/libs/markdown/tableMetadata"
+import { hashString } from "src/libs/markdown/renderingCodeModel"
+import { filterTrustedPostImageHtml, normalizeContentHtmlForMermaid } from "src/libs/markdown/renderingHtmlModel"
+import { normalizeMarkdownForRender, parseMarkdownSegments } from "src/libs/markdown/renderingMarkdownModel"
+import { createDocumentFootnoteModel } from "src/libs/markdown/renderingFootnoteModel"
+import type { MarkdownRenderModel } from "src/libs/markdown/renderingTypes"
+import type { TrustedContentHtml } from "src/types"
+
+export type {
+  CalloutKind,
+  MarkdownRenderModel,
+  MarkdownSegment,
+} from "src/libs/markdown/renderingTypes"
+export { markdownGuide } from "src/libs/markdown/renderingTypes"
+export {
+  CodeLineBitset,
+  extractCodeHighlightSpec,
+  extractCodeMetaFromPreChildren,
+  extractTextFromCodeAst,
+  hashString,
+  parseCodeLineBitset,
+  parseHighlightedLineNumbers,
+  toLanguageLabel,
+} from "src/libs/markdown/renderingCodeModel"
+export {
+  isMermaidSource,
+  normalizeContentHtmlForMermaid,
+  shouldPreferMarkdownPipeline,
+} from "src/libs/markdown/renderingHtmlModel"
+export {
+  clampImageWidthPx,
+  normalizeImageAlign,
+  parseStandaloneMarkdownImageLine,
+  serializeStandaloneMarkdownImageLine,
+  type ParsedStandaloneMarkdownImage,
+} from "src/libs/markdown/renderingImageModel"
+export {
+  normalizeMarkdownForRender,
+  parseMarkdownSegments,
+} from "src/libs/markdown/renderingMarkdownModel"
+
+export const resolveMarkdownRenderModel = ({
+  content,
+  trustedContentHtml,
+  blockedImageLabel,
+}: {
+  content?: string
+  trustedContentHtml?: TrustedContentHtml
+  blockedImageLabel?: string
+}): MarkdownRenderModel => {
+  const normalizedContent = normalizeMarkdownForRender(content || "")
+  const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
+  const resolvedContentHtml = normalizedContent
+    ? ""
+    : filterTrustedPostImageHtml(
+        normalizeContentHtmlForMermaid(trustedContentHtml?.html.trim() || ""),
+        blockedImageLabel
+      )
+  const footnoteModel = resolvedContentHtml
+    ? { footnotes: [], marker: "", segments: [] }
+    : createDocumentFootnoteModel({ source: cleanedMarkdown, segments: parseMarkdownSegments(cleanedMarkdown) })
+  const segments = footnoteModel.segments
+  const renderKeySeed = resolvedContentHtml
+    ? `html:${resolvedContentHtml}`
+    : `md:${cleanedMarkdown}::footnote:${footnoteModel.marker}::table:${JSON.stringify(tableLayouts)}`
+
+  return {
+    normalizedContent: cleanedMarkdown,
+    resolvedContentHtml,
+    renderKey: `${renderKeySeed.length}:${hashString(renderKeySeed)}`,
+    segments,
+    tableLayouts,
+    footnotes: footnoteModel.footnotes,
+    footnoteMarker: footnoteModel.marker,
+  }
+}

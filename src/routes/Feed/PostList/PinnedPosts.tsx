@@ -1,0 +1,57 @@
+/**
+ * 참조 구현:
+ * - satnaing/astro-paper (src/components/Card.astro, MIT License)
+ */
+import PostCard from "src/routes/Feed/PostList/PostCard"
+import React, { memo } from "react"
+import styled from "@emotion/styled"
+import { TPost } from "src/types"
+import { useLanguage } from "src/libs/language"
+
+type Props = {
+  posts: TPost[]
+}
+
+const PinnedPosts: React.FC<Props> = ({ posts }) => {
+  const { t } = useLanguage()
+  if (posts.length === 0) return null
+
+  return (
+    <StyledWrapper>
+      <div className="wrapper">
+        <h2 className="header">{t("pinnedPostsHeader")}</h2>
+      </div>
+      <div className="list">
+        {posts.map((post) => (
+          <PostCard key={post.id} data={post} layout="pinned" />
+        ))}
+      </div>
+    </StyledWrapper>
+  )
+}
+
+export default memo(PinnedPosts)
+
+const StyledWrapper = styled.div`
+  position: relative;
+  .wrapper {
+    display: flex;
+    margin-bottom: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--aq-border);
+  }
+  .header {
+    display: flex;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    gap: 0.25rem;
+    align-items: center;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+  }
+  .list {
+    margin: 0.5rem 0;
+  }
+`

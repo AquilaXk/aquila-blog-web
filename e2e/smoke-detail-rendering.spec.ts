@@ -1,0 +1,1093 @@
+import { expect, test } from "@playwright/test"
+import { createHash } from "node:crypto"
+import summaryFixtures from "../contracts/platform/summary-fixtures.json"
+import { markdownImplementedFeatureFixture } from "../tests/fixtures/markdownImplementedFeatureFixture"
+import { mockAvatarAsset, mockPublicAdminProfile } from "./helpers/smokeFixtures"
+
+const leadingBlockFixture = summaryFixtures.fixtures.find((fixture) => fixture.id === "leading-block")
+if (!leadingBlockFixture) throw new Error("missing imported summary fixture: leading-block")
+const leadingBlockBodyLines = leadingBlockFixture.content
+  .split("\n\n", 1)[0]
+  .split("\n")
+  .map((line) => line.replace(/^>\s?/, "").replace(/\*\*/g, "").trim())
+  .filter(Boolean)
+
+test.beforeEach(async ({ page }) => {
+  await mockAvatarAsset(page)
+  await mockPublicAdminProfile(page)
+})
+
+test.describe("core smoke detail rendering", () => {
+  test("canonical LEADING_BLOCK은 body quote를 유지하고 header/lead duplicate를 만들지 않는다", async ({ page }) => {
+    await page.route("**/post/api/v1/posts/1520", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1520,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: leadingBlockFixture.title,
+          content: leadingBlockFixture.content,
+          summary: leadingBlockFixture.expected?.summary,
+          summarySource: leadingBlockFixture.expected?.source,
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+    await page.route("**/post/api/v1/posts/1520/hit", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { hitCount: 1 } }) })
+    })
+
+    await page.goto("/posts/1520")
+
+    await expect(page.getByRole("heading", { name: leadingBlockFixture.title })).toBeVisible()
+    const bodyQuote = page.locator(".aq-markdown blockquote")
+    await expect(bodyQuote).toHaveCount(1)
+    for (const line of leadingBlockBodyLines) {
+      await expect(bodyQuote).toContainText(line)
+    }
+    await expect(page.locator(".leadSummary")).toHaveCount(0)
+    await expect(page.locator(".deck")).toHaveCount(0)
+  })
+
+  test("shared implemented feature fixture: public detail renders canonical Markdown semantics", async ({ page }) => {
+    const fixture = markdownImplementedFeatureFixture
+    const postId = 1681
+    let canonicalImageRequests = 0
+    await page.route(`**${fixture.expected.image.src}`, async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
+    await page.route(`**/post/api/v1/posts/${postId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: postId,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: fixture.title,
+          content: fixture.body,
+          contentHtml: null,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+    await page.route(`**/post/api/v1/posts/${postId}/hit`, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { hitCount: 1 } }) })
+    })
+
+    await page.goto(`/posts/${postId}`)
+
+    const markdown = page.locator(".aq-markdown")
+    await expect(markdown.getByRole("heading", { name: fixture.title, level: 1 })).toBeVisible()
+    const callout = markdown.locator(`.aq-callout.aq-admonition-${fixture.expected.callout.kind}`)
+    await expect(callout).toHaveCount(1)
+    await expect(callout.locator(".aq-callout-title")).toHaveText(fixture.expected.callout.title)
+    await expect(callout).toContainText(fixture.expected.callout.content)
+    const table = markdown.locator("table")
+    await expect(table).toHaveCount(fixture.expected.tableCount)
+    await expect(table.getByRole("columnheader", { name: "기능" })).toHaveCount(1)
+    await expect(table.getByRole("cell", { name: "GFM 테이블" })).toHaveCount(1)
+    const ordinaryLink = markdown.getByRole("link", { name: fixture.rendered.ordinaryLink.text })
+    await expect(ordinaryLink).toHaveCount(1)
+    await expect(ordinaryLink).toHaveAttribute("href", fixture.rendered.ordinaryLink.href)
+    await expect(ordinaryLink).toHaveAttribute("title", fixture.rendered.ordinaryLink.title)
+    expect(await ordinaryLink.getAttribute("data-footnote-ref")).toBeNull()
+    const toggle = markdown.locator("details.aq-toggle")
+    await expect(toggle).toHaveCount(1)
+    await expect(toggle.locator("summary")).toHaveText(fixture.expected.toggle.title)
+    await toggle.locator("summary").click()
+    await expect(toggle).toHaveAttribute("open", "")
+    const reference = toggle.locator("a[data-footnote-ref]")
+    await expect(reference).toHaveCount(1)
+    await expect(reference).toHaveAccessibleName(/각주 \d+ 참조 \d+/)
+    const targetHref = await reference.getAttribute("href")
+    const referenceId = await reference.getAttribute("id")
+    if (!targetHref?.startsWith("#") || !referenceId) throw new Error("footnote reference relationship is required")
+
+    const target = markdown.locator(`[id="${targetHref.slice(1)}"]`)
+    await expect(target).toHaveCount(1)
+    await expect(target).toContainText(fixture.rendered.footnote.text)
+    await expect(target.getByRole("link", { name: fixture.rendered.footnote.link.text })).toHaveAttribute(
+      "href",
+      fixture.rendered.footnote.link.href
+    )
+    await expect(target.locator("a[data-footnote-backref]")).toHaveAttribute("href", `#${referenceId}`)
+    await expect(markdown.getByRole("img", { name: fixture.expected.image.alt })).toHaveAttribute("src", fixture.expected.image.src)
+    expect(canonicalImageRequests).toBe(1)
+  })
+
+  test("HTML-only trusted payload는 public detail의 단일 renderer에서 렌더된다", async ({ page }) => {
+    const contentHtml = [
+      "<p>신뢰된 HTML 전용 본문</p>",
+      '<img src="https://cdn.example.invalid/trusted.png" alt="외부 HTML">',
+      '<img src="/post/api/v1/images/trusted.png" alt="정본 HTML">',
+      '<img data-src="/post/api/v1/images/decoy.png" src="https://cdn.example.invalid/data-src-bypass.png" alt="data-src 우회">',
+      '<img alt="quoted decoy src=/post/api/v1/images/decoy.png" src="https://cdn.example.invalid/quoted-attr-bypass.png">',
+      '<picture><source srcset="https://cdn.example.invalid/source.png 1x"><img src="/post/api/v1/images/picture.png" srcset="https://cdn.example.invalid/img-srcset.png 2x" alt="정본 responsive"></picture>',
+    ].join("")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/**", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    for (const imageName of ["trusted.png", "picture.png"]) {
+      await page.route(`**/post/api/v1/images/${imageName}`, async (route) => {
+        canonicalImageRequests += 1
+        await route.fulfill({
+          status: 200,
+          contentType: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+        })
+      })
+    }
+
+    await page.route("**/post/api/v1/posts/1645", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1645,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "신뢰 HTML 본문",
+          content: "",
+          contentHtml,
+          contentHtmlHash: createHash("sha256").update(contentHtml, "utf8").digest("hex"),
+          contentHtmlSanitizerPolicyVersion: "content-html-v1",
+          contentHtmlTrustState: "TRUSTED_CURRENT",
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+    await page.route("**/post/api/v1/posts/1645/hit", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { hitCount: 1 } }),
+      })
+    })
+
+    await page.goto("/posts/1645")
+
+    await expect(page.getByRole("heading", { name: "신뢰 HTML 본문" })).toBeVisible()
+    await expect(page.locator(".aq-markdown")).toContainText("신뢰된 HTML 전용 본문")
+    await expect(page.getByRole("img", { name: "외부 HTML" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "data-src 우회" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "quoted decoy src=/post/api/v1/images/decoy.png" })).toHaveCount(1)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/trusted.png"]')).toHaveCount(1)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/picture.png"]')).toHaveCount(1)
+    await expect(page.locator(".aq-markdown img[srcset], .aq-markdown source[srcset]")).toHaveCount(0)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(2)
+  })
+
+  test("bookmark thumbnail은 canonical post image만 요청한다", async ({ page }) => {
+    const content = [
+      '<!-- aq-bookmark {"thumbnailUrl":"https://cdn.example.invalid/bookmark.png"} -->',
+      ":::bookmark /posts/1",
+      "외부 카드",
+      ":::",
+      "",
+      '<!-- aq-bookmark {"thumbnailUrl":"/post/api/v1/images/bookmark.png"} -->',
+      ":::bookmark /posts/2",
+      "정본 카드",
+      ":::",
+    ].join("\n")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/bookmark.png", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    await page.route("**/post/api/v1/images/bookmark.png", async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
+    await page.route("**/post/api/v1/posts/1646", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1646,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "북마크 이미지 정책",
+          content,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+
+    await page.goto("/posts/1646")
+
+    await expect(page.locator(".aq-bookmark-card")).toHaveCount(2)
+    await expect(page.locator('.aq-bookmark-card img[src="https://cdn.example.invalid/bookmark.png"]')).toHaveCount(0)
+    await expect(page.locator('.aq-bookmark-card img[src="/post/api/v1/images/bookmark.png"]')).toHaveCount(1)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(1)
+  })
+
+  test("Markdown body와 detail thumbnail은 external image를 요청하지 않는다", async ({ page }) => {
+    const content = [
+      "본문 inline ![외부 inline](https://cdn.example.invalid/inline.png) 이미지",
+      "",
+      "![외부 standalone](https://cdn.example.invalid/standalone.png)",
+      "",
+      "![정본 body](/post/api/v1/images/body.png)",
+    ].join("\n")
+    let externalImageRequests = 0
+    let canonicalImageRequests = 0
+
+    await page.route("https://cdn.example.invalid/**", async (route) => {
+      externalImageRequests += 1
+      await route.abort("blockedbyclient")
+    })
+    await page.route("**/post/api/v1/images/body.png", async (route) => {
+      canonicalImageRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" />',
+      })
+    })
+    await page.route("**/post/api/v1/posts/1647", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1647,
+          createdAt: "2026-08-24T00:00:00Z",
+          modifiedAt: "2026-08-24T00:00:00Z",
+          authorId: 1,
+          authorName: "관리자",
+          title: "Markdown 이미지 정책",
+          thumbnail: "https://cdn.example.invalid/header.png",
+          content,
+          summary: "",
+          summarySource: "NONE",
+          tags: [],
+          category: [],
+          published: true,
+          listed: true,
+          likesCount: 0,
+          hitCount: 0,
+        }),
+      })
+    })
+
+    await page.goto("/posts/1647")
+
+    await expect(page.getByRole("img", { name: "외부 inline" })).toHaveCount(1)
+    await expect(page.getByRole("img", { name: "외부 standalone" })).toHaveCount(1)
+    await expect(page.locator('img[src="https://cdn.example.invalid/header.png"]')).toHaveCount(0)
+    await expect(page.locator('.aq-markdown img[src="/post/api/v1/images/body.png"]')).toHaveCount(1)
+    expect(externalImageRequests).toBe(0)
+    expect(canonicalImageRequests).toBe(1)
+  })
+
+  test("상세 본문은 legacy inline code html을 인라인 코드로 정규화한다", async ({ page }) => {
+  await page.route("**/post/api/v1/posts/105", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 105,
+        createdAt: "2026-03-16T00:00:00Z",
+        modifiedAt: "2026-03-16T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "인라인 코드 정규화 회귀 방지",
+        content: [
+          "1. 클라이언트가 <code>/pub/chat/message</code> 로 메시지를 보냅니다.",
+          '2. 서버는 <code>@MessageMapping("/chat/message")</code> 에서 이를 받습니다.',
+          "3. 최종 메시지를 <code>/sub/chat/room/{roomId}</code> 구독자에게 브로드캐스트합니다.",
+        ].join("\n\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/105/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/105")
+  await expect(page.getByText("인라인 코드 정규화 회귀 방지")).toBeVisible()
+  await expect(page.locator(".aq-inline-code").filter({ hasText: "/pub/chat/message" })).toBeVisible()
+  await expect(
+    page.locator(".aq-inline-code").filter({ hasText: '@MessageMapping("/chat/message")' })
+  ).toBeVisible()
+  await expect(
+    page.locator(".aq-inline-code").filter({ hasText: "/sub/chat/room/{roomId}" })
+  ).toBeVisible()
+  await expect(page.getByText("<code>/pub/chat/message</code>")).toHaveCount(0)
+})
+
+  test("상세 본문은 inline color quoted strong 토큰과 blockquote soft line break를 그대로 노출하지 않는다", async ({ page }) => {
+  await page.route("**/post/api/v1/posts/507", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 507,
+        createdAt: "2026-04-08T00:36:08.787Z",
+        modifiedAt: "2026-04-17T01:03:59.132Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "post 507 detail rendering 회귀 방지",
+        content: [
+          "> **세션 = 서버 저장****토큰 = 클라이언트 저장**",
+          "",
+          "👉 {{color:#fb923c|**서버가 사용자가 로그인한 상태를 기억**}}**하고 있기 때문입니다**",
+          "",
+          '왜냐하면 중요한건 {{color:#34d399|**"어디에"}}**저장하느냐가 아니라',
+          "",
+          '*"요청이 진짜 우리 사용자의 의도인가"*를 서버가 판단할 수 있어야 합니다.',
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/507/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/507")
+  await expect(page.getByText("post 507 detail rendering 회귀 방지")).toBeVisible()
+  await expect(page.locator(".aq-inline-color").filter({ hasText: "서버가 사용자가 로그인한 상태를 기억" })).toBeVisible()
+  const coloredQuotedStrong = page.locator(".aq-inline-color").filter({ hasText: '"어디에"' }).first()
+  await expect(coloredQuotedStrong).toBeVisible()
+  await expect(coloredQuotedStrong).not.toContainText("**")
+  await expect(page.getByText("{{color:#fb923c|")).toHaveCount(0)
+  await expect(page.locator(".aq-markdown em").filter({ hasText: '"요청이 진짜 우리 사용자의 의도인가"' })).toBeVisible()
+
+  const blockquoteMetrics = await page.locator("blockquote").first().evaluate((element) => {
+    const html = element.innerHTML
+    return {
+      hasBreak: html.includes("<br"),
+      strongCount: element.querySelectorAll("strong").length,
+      text: element.textContent || "",
+    }
+  })
+
+  expect(blockquoteMetrics.hasBreak).toBeTruthy()
+  expect(blockquoteMetrics.strongCount).toBeGreaterThanOrEqual(2)
+  expect(blockquoteMetrics.text).toContain("세션 = 서버 저장")
+  expect(blockquoteMetrics.text).toContain("토큰 = 클라이언트 저장")
+
+  const markdownText = await page.locator(".aq-markdown").first().evaluate((element) => element.textContent || "")
+  expect(markdownText).not.toContain('**"어디에"**')
+  expect(markdownText).not.toContain('*"요청이 진짜 우리 사용자의 의도인가"*를')
+})
+
+  test("상세 본문은 trailing-space malformed strong marker를 그대로 노출하지 않는다", async ({ page }) => {
+  await page.route("**/post/api/v1/posts/508", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 508,
+        createdAt: "2026-04-08T00:36:08.787Z",
+        modifiedAt: "2026-04-23T01:03:59.132Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "post 508 malformed strong 회귀 방지",
+        content: [
+          '왜냐하면 중요한건 {{color:#34d399|**"어디에" **}}저장하느냐가 아니라',
+          "",
+          "## **구현 예시 **",
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/508/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/508")
+  await expect(page.getByText("post 508 malformed strong 회귀 방지")).toBeVisible()
+
+  const coloredMalformedStrong = page.locator(".aq-inline-color").filter({ hasText: '"어디에"' }).first()
+  await expect(coloredMalformedStrong).toBeVisible()
+  await expect(coloredMalformedStrong).not.toContainText("**")
+  await expect(page.getByRole("heading", { name: "구현 예시" })).toBeVisible()
+
+  const markdownText = await page.locator(".aq-markdown").first().evaluate((element) => element.textContent || "")
+  expect(markdownText).not.toContain('**"어디에" **')
+  expect(markdownText).not.toContain("**구현 예시 **")
+})
+
+  test("상세 코드블럭은 Prism fallback 토큰 하이라이팅을 유지한다", async ({ page }) => {
+  await page.addInitScript(() => {
+    type CodeLineSnapshot = {
+      html: string
+      lineCount: number
+      text: string
+    }
+    const windowWithSnapshots = window as typeof window & {
+      __aqCodeLineSnapshots?: CodeLineSnapshot[]
+    }
+    windowWithSnapshots.__aqCodeLineSnapshots = []
+
+    const capture = () => {
+      const code = document.querySelector<HTMLElement>(".aq-code-block .aq-pretty-pre code")
+      if (!code) return
+      windowWithSnapshots.__aqCodeLineSnapshots?.push({
+        html: code.innerHTML.slice(0, 240),
+        lineCount: code.querySelectorAll("[data-line]").length,
+        text: code.textContent || "",
+      })
+    }
+
+    let frameCount = 0
+    const captureFrame = () => {
+      capture()
+      frameCount += 1
+      if (frameCount < 24) {
+        window.requestAnimationFrame(captureFrame)
+      }
+    }
+    window.requestAnimationFrame(captureFrame)
+    const interval = window.setInterval(capture, 16)
+    window.setTimeout(() => window.clearInterval(interval), 3000)
+  })
+
+  await page.route("**/post/api/v1/posts/104", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 104,
+        createdAt: "2026-03-16T00:00:00Z",
+        modifiedAt: "2026-03-16T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "코드 하이라이트 회귀 방지",
+        content: [
+          "```javascript",
+          "const count = 1",
+          "function run() {",
+          "  return \"ok\"",
+          "}",
+          "```",
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/104/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/104")
+
+  const codeRoot = page.locator(".aq-code-block pre code").first()
+  await expect(codeRoot).toBeVisible()
+  await expect(page.locator(".aq-code-block pre code .token.keyword").first()).toBeVisible()
+  await expect(page.locator(".aq-code-block pre code .token.string").first()).toBeVisible()
+
+  const lineSnapshots = await page.evaluate(() => {
+    const windowWithSnapshots = window as typeof window & {
+      __aqCodeLineSnapshots?: Array<{ html: string; lineCount: number; text: string }>
+    }
+    const code = document.querySelector<HTMLElement>(".aq-code-block .aq-pretty-pre code")
+    if (code) {
+      windowWithSnapshots.__aqCodeLineSnapshots?.push({
+        html: code.innerHTML.slice(0, 240),
+        lineCount: code.querySelectorAll("[data-line]").length,
+        text: code.textContent || "",
+      })
+    }
+    return windowWithSnapshots.__aqCodeLineSnapshots || []
+  })
+  expect(lineSnapshots.length).toBeGreaterThan(0)
+  const codeSnapshots = lineSnapshots.filter((snapshot) => snapshot.text.includes("const count"))
+  expect(codeSnapshots.length).toBeGreaterThan(0)
+  expect(codeSnapshots.some((snapshot) => snapshot.lineCount === 0)).toBe(false)
+
+  const colors = await page.evaluate(() => {
+    const code = document.querySelector<HTMLElement>(".aq-code-block pre code")
+    const keyword = document.querySelector<HTMLElement>(".aq-code-block pre code .token.keyword")
+    const stringToken = document.querySelector<HTMLElement>(".aq-code-block pre code .token.string")
+
+    return {
+      code: code ? window.getComputedStyle(code).color : "",
+      keyword: keyword ? window.getComputedStyle(keyword).color : "",
+      string: stringToken ? window.getComputedStyle(stringToken).color : "",
+    }
+  })
+
+  expect(colors.code).toBeTruthy()
+  expect(colors.keyword).toBeTruthy()
+  expect(colors.string).toBeTruthy()
+  expect(colors.keyword).not.toBe(colors.code)
+  expect(colors.string).not.toBe(colors.code)
+})
+
+  test("상세 코드블럭은 fenced language alias 라벨을 TXT로 떨어뜨리지 않는다", async ({ page }) => {
+  const languageCases = [
+    ["java", "public Token login(User user) {\n  return new Token(access, refresh);\n}", "Java"],
+    ["js", "const value = 1", "JavaScript"],
+    ["javascript", "const value = 1", "JavaScript"],
+    ["ts", "const value: string = 'ok'", "TypeScript"],
+    ["typescript", "const value: string = 'ok'", "TypeScript"],
+    ["tsx", "export const View = () => <div />", "TSX"],
+    ["jsx", "export const View = () => <div />", "JSX"],
+    ["kotlin", "fun login(): Token = token", "Kotlin"],
+    ["kt", "val token = Token()", "Kotlin"],
+    ["python", "def login():\n    return token", "Python"],
+    ["py", "def login():\n    return token", "Python"],
+    ["bash", "echo hello", "Bash"],
+    ["sh", "echo hello", "Shell"],
+    ["shell", "echo hello", "Shell"],
+    ["sql", "SELECT * FROM users", "SQL"],
+    ["yaml", "name: aquila", "YAML"],
+    ["yml", "name: aquila", "YAML"],
+    ["json", "{\"ok\": true}", "JSON"],
+    ["html", "<main>hello</main>", "HTML"],
+    ["xml", "<root>hello</root>", "XML"],
+    ["css", ".login { color: red; }", "CSS"],
+    ["scss", "$color: red;\n.login { color: $color; }", "SCSS"],
+    ["markdown", "# Heading", "Markdown"],
+    ["md", "# Heading", "Markdown"],
+    ["go", "func main() {}", "Go"],
+    ["rust", "fn main() {}", "Rust"],
+    ["rs", "fn main() {}", "Rust"],
+  ] as const
+
+  await page.route("**/post/api/v1/posts/114", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 114,
+        createdAt: "2026-06-15T00:00:00Z",
+        modifiedAt: "2026-06-15T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "코드 언어 라벨 회귀 방지",
+        content: languageCases
+          .map(([language, source]) => ["```" + language, source, "```"].join("\n"))
+          .join("\n\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/114/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/114")
+
+  const languageLabels = page.locator(".aq-code-title")
+  await expect(languageLabels).toHaveCount(languageCases.length)
+  const labels = await languageLabels.allTextContents()
+  expect(labels).toEqual(languageCases.map(([, , label]) => label))
+  expect(labels).not.toContain("TXT")
+})
+
+  test("code-heavy 상세 페이지는 markdown AST prop 누수 없이 hydration 된다", async ({ page }) => {
+  const runtimeErrors: string[] = []
+  const isHydrationRuntimeSignal = (value: string) =>
+    /minified react error|hydration|did not match/i.test(value)
+
+  page.on("pageerror", (error) => {
+    runtimeErrors.push(error.message)
+  })
+
+  page.on("console", (message) => {
+    if (message.type() === "error" && isHydrationRuntimeSignal(message.text())) {
+      runtimeErrors.push(message.text())
+    }
+  })
+
+  await page.route("**/post/api/v1/posts/465", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 465,
+        createdAt: "2026-03-24T01:16:04.400Z",
+        modifiedAt: "2026-03-24T01:16:04.400Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "code-heavy hydration 회귀 방지",
+        content: [
+          "요약 문장에 `inline-code`가 있고 표와 머메이드가 함께 나옵니다.",
+          "",
+          "```text",
+          "src/main/resources",
+          "├── application.yml",
+          "└── static/",
+          "```",
+          "",
+          "> [!INFO] 실시간 기능은 전역 관심사가 빠르게 늘어납니다",
+          "> Config, Security, Interceptor 같은 공통 요소를 `global`에 모아둡니다.",
+          "",
+          "| 항목 | 내용 |",
+          "| --- | --- |",
+          "| 문제 | HTTP 요청/응답만으로는 채팅 같은 실시간 양방향 통신을 자연스럽게 처리하기 어렵습니다. |",
+          "| 핵심 경로 | `/ws-stomp` 로 연결하고 `/pub` 로 발행하며 `/sub` 를 구독합니다. |",
+          "",
+          "```mermaid",
+          "sequenceDiagram",
+          "    participant Client as 클라이언트",
+          "    participant Endpoint as Endpoint<br/>(/ws-stomp)",
+          "    Client->>Endpoint: HTTP Upgrade",
+          "```",
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 1,
+        hitCount: 2,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/465/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 3 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/465")
+  await expect(page.getByText("code-heavy hydration 회귀 방지")).toBeVisible()
+  await expect(page.locator(".aq-markdown code[node], .aq-markdown pre[node]")).toHaveCount(0)
+  await page.waitForTimeout(300)
+  expect(runtimeErrors).toEqual([])
+})
+
+  test("상세 runtime guard 는 hydration 오류에서 build당 1회만 hard reload 한다", async ({ page }) => {
+  await page.route("**/post/api/v1/posts/467", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 467,
+        createdAt: "2026-04-13T00:00:00Z",
+        modifiedAt: "2026-04-13T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "runtime guard reload 회귀 방지",
+        content: "stale build hydration guard",
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 1,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/467/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 2 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/467")
+  await expect(page.getByText("runtime guard reload 회귀 방지")).toBeVisible()
+
+  const reloadPromise = page.waitForEvent("framenavigated", {
+    predicate: (frame) => frame === page.mainFrame(),
+    timeout: 5000,
+  })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new ErrorEvent("error", { message: "Minified React error #418" }))
+  })
+
+  await reloadPromise
+  await expect(page.getByText("runtime guard reload 회귀 방지")).toBeVisible()
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const navigation = performance.getEntriesByType("navigation")[0]
+      return navigation instanceof PerformanceNavigationTiming ? navigation.type : ""
+    })
+  }).toBe("reload")
+  const recoveredTimeOrigin = await page.evaluate(() => performance.timeOrigin)
+
+  const guardState = await page.evaluate(() => {
+    const keys = Object.keys(sessionStorage).filter(
+      (entry) =>
+        entry.indexOf("__aquila_client_runtime_recovery__") === 0 &&
+        entry.indexOf(":reason") === -1
+    )
+
+    return {
+      keys,
+      reasons: keys.map((key) => sessionStorage.getItem(key + ":reason") || ""),
+    }
+  })
+
+  expect(guardState.keys).toHaveLength(1)
+  expect(guardState.keys[0]).toContain("/posts/467")
+  expect(guardState.reasons[0]).toContain("hydration:")
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new ErrorEvent("error", { message: "Minified React error #423" }))
+  })
+  await page.waitForTimeout(500)
+
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(recoveredTimeOrigin)
+})
+
+  test("상세 normal table metadata는 저장 viewport 폭이 아니라 현재 본문 폭을 채운다", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1100 })
+
+  await page.route("**/post/api/v1/posts/466", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 466,
+        createdAt: "2026-04-13T00:00:00Z",
+        modifiedAt: "2026-04-13T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "table width metadata 회귀 방지",
+        content: [
+          '<!-- aq-table {"overflowMode":"normal","columnWidths":[220,320]} -->',
+          "| 항목 | 내용 |",
+          "| --- | --- |",
+          "| 문제 | HTTP 요청/응답만으로는 채팅 같은 실시간 양방향 통신을 자연스럽게 처리하기 어렵습니다. |",
+          "| 핵심 경로 | `/ws-stomp` 로 연결하고 `/pub` 로 발행하며 `/sub` 를 구독합니다. |",
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: ["테스트태그"],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/466/hit", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/466")
+  await expect(page.getByText("table width metadata 회귀 방지")).toBeVisible()
+  await expect(page.locator(".aq-table-scroll")).toBeVisible()
+
+  const metrics = await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>(".aq-table-scroll")
+    const table = document.querySelector<HTMLElement>(".aq-table")
+    if (!shell || !table) return null
+
+    const headerCells = Array.from(table.querySelectorAll<HTMLElement>("thead th"))
+    return {
+      shellWidth: Math.round(shell.getBoundingClientRect().width),
+      tableWidth: Math.round(table.getBoundingClientRect().width),
+      scrollWidth: shell.scrollWidth,
+      clientWidth: shell.clientWidth,
+      headerWidths: headerCells.map((cell) => Math.round(cell.getBoundingClientRect().width)),
+    }
+  })
+
+  expect(metrics).not.toBeNull()
+  expect(Math.abs((metrics?.tableWidth || 0) - (metrics?.shellWidth || 0))).toBeLessThanOrEqual(2)
+  expect((metrics?.scrollWidth || 0) - (metrics?.clientWidth || 0)).toBeLessThanOrEqual(2)
+  expect(metrics?.headerWidths[1] || 0).toBeGreaterThan(metrics?.headerWidths[0] || 0)
+})
+
+  test("상세 본문 타이포그래피는 폭 보정형 shared scale을 따른다", async ({ page }) => {
+  await mockAvatarAsset(page)
+  await page.route("**/post/api/v1/posts/871**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 871,
+        createdAt: "2026-04-22T00:00:00Z",
+        modifiedAt: "2026-04-22T00:00:00Z",
+        authorId: 1,
+        authorName: "관리자",
+        authorUsername: "aquila",
+        authorProfileImageDirectUrl: "/avatar.png",
+        title: "글 제목 크기",
+        content: [
+          "# 제목 1 크기",
+          "",
+          "## 제목 2 크기",
+          "",
+          "### 제목 3 크기",
+          "",
+          "본문 크기",
+          "",
+          "```txt",
+          "코드 블럭 내 폰트 크기",
+          "```",
+          "",
+          "<aside>",
+          "ℹ️",
+          "콜아웃 내 폰트 크기",
+          "</aside>",
+        ].join("\n"),
+        summary: "",
+        summarySource: "NONE",
+        tags: [],
+        category: [],
+        published: true,
+        listed: true,
+        likesCount: 0,
+        hitCount: 0,
+        actorCanModify: false,
+        actorCanDelete: false,
+      }),
+    })
+  })
+
+  await page.route("**/post/api/v1/posts/871/hit**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resultCode: "200-1",
+        msg: "ok",
+        data: { hitCount: 1 },
+      }),
+    })
+  })
+
+  await page.goto("/posts/871")
+  await expect(page.getByRole("heading", { name: "글 제목 크기", level: 1 })).toBeVisible()
+  await expect(page.locator(".aq-callout").filter({ hasText: "콜아웃 내 폰트 크기" })).toBeVisible()
+
+  const readTypography = async (selector: string) =>
+    page.locator(selector).first().evaluate((element) => {
+      const style = window.getComputedStyle(element)
+      return {
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+        fontWeight: style.fontWeight,
+      }
+    })
+
+  await expect(readTypography("h1.title")).resolves.toEqual({
+    fontSize: "48px",
+    lineHeight: "55.2px",
+    fontWeight: "800",
+  })
+  await expect(readTypography(".aq-markdown h1")).resolves.toEqual({
+    fontSize: "32px",
+    lineHeight: "40px",
+    fontWeight: "600",
+  })
+  await expect(readTypography(".aq-markdown h2")).resolves.toEqual({
+    fontSize: "26px",
+    lineHeight: "36px",
+    fontWeight: "600",
+  })
+  await expect(readTypography(".aq-markdown h3")).resolves.toEqual({
+    fontSize: "22px",
+    lineHeight: "31px",
+    fontWeight: "600",
+  })
+  await expect(readTypography(".aq-markdown p")).resolves.toEqual({
+    fontSize: "16px",
+    lineHeight: "26.4px",
+    fontWeight: "400",
+  })
+  await expect(readTypography(".aq-code code, pre code")).resolves.toEqual({
+    fontSize: "15px",
+    lineHeight: "23px",
+    fontWeight: "400",
+  })
+  await expect(readTypography(".aq-callout .aq-markdown-text")).resolves.toEqual({
+    fontSize: "16px",
+    lineHeight: "26.4px",
+    fontWeight: "400",
+  })
+})
+})

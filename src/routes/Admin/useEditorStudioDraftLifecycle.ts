@@ -1,0 +1,546 @@
+import type { NextRouter } from "next/router"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react"
+import { apiFetch } from "src/apis/backend/client"
+import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
+import { replaceRoute } from "src/libs/router"
+import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
+import { isServerTempDraftPost, isTempDraftCandidate, isTempDraftTitlePlaceholder } from "./editorTempDraft"
+import {
+  unwrapTempDraftRecoveryResponse,
+  useEditorStudioLocalDraftLifecycle,
+} from "./useEditorStudioDraftLifecycleModel"
+import {
+  resolvePersistedSummaryResult,
+  type CanonicalSummaryState,
+  type SummaryIntent,
+} from "./EditorStudioWorkspaceControllerRootModel"
+
+import type { PostVisibility, RsData } from "src/types"
+
+type StudioSetState<T> = Dispatch<SetStateAction<T>>
+type NoticeTone = "idle" | "loading" | "success" | "error"
+type PublishNotice = { tone: NoticeTone; text: string }
+type PublishTarget = "page" | "modal"
+type EditorMode = "create" | "edit"
+
+type ResolvedEditorMetaSnapshot = {
+  body: string
+  thumbnailUrl: string
+  thumbnailFocusX: number
+  thumbnailFocusY: number
+  thumbnailZoom: number
+  tags: string[]
+  category: string
+}
+
+type PostForEditor = ApiEditorPostDto & {
+  id: string | number
+  version?: number | null
+  title?: string
+  content?: string
+  contentHtml?: string | null
+  published: boolean
+  listed: boolean
+  tempDraft?: boolean
+}
+
+type AdminPostListItem = {
+  id: number
+  title: string
+  modifiedAt: string
+  deletedAt?: string | null
+  published: boolean
+  listed: boolean
+  tempDraft?: boolean
+}
+
+type PageDto<T> = {
+  content?: T[]
+}
+
+
+type EditorFingerprintPayload = {
+  title: string
+  content: string
+  summary: string
+  summarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
+  thumbnailUrl: string
+  thumbnailFocusX: number
+  thumbnailFocusY: number
+  thumbnailZoom: number
+  tags: string[]
+  category: string
+  visibility: PostVisibility
+}
+
+type UseEditorStudioDraftLifecycleParams = {
+  router: NextRouter
+  toEditorPostRoute: (id: string | number) => string
+  postId: string
+  postVersion: number | null
+  loadingKey: string
+  postTitle: string
+  postContent: string
+  getCurrentPostContent: () => string
+  postSummary: string
+  postSummarySource: CanonicalSummaryState["summarySource"]
+  summaryIntent: SummaryIntent
+  postThumbnailUrl: string
+  postThumbnailFocusX: number
+  postThumbnailFocusY: number
+  postThumbnailZoom: number
+  postTags: string[]
+  postCategory: string
+  postVisibility: PostVisibility
+  editorMode: EditorMode
+  setEditorMode: StudioSetState<EditorMode>
+  setIsTempDraftMode: StudioSetState<boolean>
+  setPostId: StudioSetState<string>
+  setPostVersion: StudioSetState<number | null>
+  setPreviewThumbnailSourceUrl: StudioSetState<string>
+  setPostTitle: StudioSetState<string>
+  setPostContent: StudioSetState<string>
+  setPostSummary: StudioSetState<string>
+  setPostSummarySource: StudioSetState<CanonicalSummaryState["summarySource"]>
+  setSummaryIntent: StudioSetState<SummaryIntent>
+  setPostThumbnailUrl: StudioSetState<string>
+  setPostThumbnailFocusX: StudioSetState<number>
+  setPostThumbnailFocusY: StudioSetState<number>
+  setPostThumbnailZoom: StudioSetState<number>
+  setPostTags: StudioSetState<string[]>
+  setPostCategory: StudioSetState<string>
+  setPostVisibility: StudioSetState<PostVisibility>
+  setLocalDraftSavedAt: StudioSetState<string>
+  setLoadingKey: StudioSetState<string>
+  setResult: StudioSetState<string>
+  setIsNewEditorBootstrapPending: StudioSetState<boolean>
+  activateComposeSurface: () => void
+  setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
+  dedupeStrings: (items: string[]) => string[]
+  normalizeCategoryValue: (value: string) => string
+  buildLocalDraftFingerprint: (
+    payload: Omit<LocalDraftPayload, "savedAt" | "source" | "postVersion">
+  ) => string
+  persistLocalDraft: (payload: LocalDraftPayload) => void
+  readLocalDraft: (source: LocalDraftSource) => LocalDraftPayload | null
+  removeLocalDraft: (source: LocalDraftSource) => void
+  buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
+  pretty: (value: unknown) => string
+  resolveEditorMetaSnapshot: (content: string) => ResolvedEditorMetaSnapshot
+  syncEditorMeta: (content: string, summary: CanonicalSummaryState) => ResolvedEditorMetaSnapshot
+  buildEmptyEditorMetaSnapshot: () => ResolvedEditorMetaSnapshot
+  isBlankServerTempDraft: (
+    post: Pick<PostForEditor, "title" | "published" | "listed" | "tempDraft">,
+    snapshot: ResolvedEditorMetaSnapshot
+  ) => boolean
+  toVisibility: (published: boolean, listed: boolean) => PostVisibility
+  requestTempPostWithConflictRetry: (
+    loadExistingTempPostForRecovery: () => Promise<PostForEditor | null>
+  ) => Promise<RsData<PostForEditor>>
+  defaultThumbnailFocusX: number
+  defaultThumbnailFocusY: number
+  defaultThumbnailZoom: number
+  lastLocalDraftFingerprintRef: MutableRefObject<string>
+  lastWriteFingerprintRef: MutableRefObject<string>
+  lastWriteIdempotencyKeyRef: MutableRefObject<string>
+  serverBaselineEditorFingerprintRef: MutableRefObject<string>
+  tempPostRequestRef: MutableRefObject<Promise<RsData<PostForEditor>> | null>
+}
+
+export const useEditorStudioDraftLifecycle = ({
+  activateComposeSurface, buildEditorStateFingerprint, buildEmptyEditorMetaSnapshot,
+  buildLocalDraftFingerprint, dedupeStrings, defaultThumbnailFocusX, defaultThumbnailFocusY,
+  defaultThumbnailZoom, editorMode, isBlankServerTempDraft,
+  lastLocalDraftFingerprintRef, lastWriteFingerprintRef, lastWriteIdempotencyKeyRef,
+  loadingKey, normalizeCategoryValue, persistLocalDraft, postCategory, postContent,
+  getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent,
+  postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom,
+  postTitle, postVersion, postVisibility, pretty, readLocalDraft, removeLocalDraft,
+  requestTempPostWithConflictRetry, resolveEditorMetaSnapshot, router,
+  serverBaselineEditorFingerprintRef, setEditorMode, setIsNewEditorBootstrapPending,
+  setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
+  setPostCategory, setPostContent,
+  setPostId, setPostSummary, setPostSummarySource, setSummaryIntent, setPostTags,
+  setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom,
+  setPostTitle, setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl,
+  setPublishStatus, setResult, syncEditorMeta, tempPostRequestRef, toEditorPostRoute,
+  toVisibility,
+}: UseEditorStudioDraftLifecycleParams) => {
+  const loadGenerationRef = useRef(0)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  const {
+    localDraftFingerprint, localDraftSource, localDraftCandidate, localDraftCandidates,
+    selectLocalDraftCandidate, discardLocalDraftCandidate, restoredLocalDraft,
+    dismissedLocalDraft, dismissLocalDraftRestoreSuggestion, signalLocalDraftRemoved,
+    saveLocalDraft, preserveLocalDraftForConflictReload, restoreLocalDraft: restoreStoredLocalDraft, clearLocalDraft,
+    cancelPendingAutosave,
+    signalLocalDraftBaselineReady, beginLocalDraftPostLoad, endLocalDraftPostLoad,
+  } = useEditorStudioLocalDraftLifecycle({
+    buildLocalDraftFingerprint, dedupeStrings, editorMode, lastLocalDraftFingerprintRef,
+    lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, loadingKey, normalizeCategoryValue,
+    persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
+    postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
+    postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
+    removeLocalDraft, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
+    setPostCategory, setPostContent, setPostId, setPostSummary,
+    setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
+    setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
+    setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
+  })
+
+  const restoreLocalDraft = useCallback(() => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
+    restoreStoredLocalDraft()
+  }, [restoreStoredLocalDraft, setLoadingKey])
+
+  const switchToCreateMode = useCallback((options?: { keepContent?: boolean }) => {
+    loadGenerationRef.current += 1
+    setLoadingKey("")
+    const keepContent = options?.keepContent ?? true
+    activateComposeSurface()
+    setEditorMode("create")
+    setIsTempDraftMode(false)
+    setPostId("")
+    setPostVersion(null)
+    setPreviewThumbnailSourceUrl("")
+    serverBaselineEditorFingerprintRef.current = ""
+    lastWriteFingerprintRef.current = ""
+    lastWriteIdempotencyKeyRef.current = ""
+    if (!keepContent) {
+      setPostTitle("")
+      setPostContent("")
+      setPostSummary("")
+      setPostSummarySource("NONE")
+      setSummaryIntent({ kind: "auto" })
+      setPostThumbnailUrl("")
+      setPostThumbnailFocusX(defaultThumbnailFocusX)
+      setPostThumbnailFocusY(defaultThumbnailFocusY)
+      setPostThumbnailZoom(defaultThumbnailZoom)
+      setPostTags([])
+      setPostCategory("")
+    }
+    setPublishStatus(
+      {
+        tone: "idle",
+        text: "",
+      },
+      "page"
+    )
+  }, [
+    activateComposeSurface, defaultThumbnailFocusX, defaultThumbnailFocusY,
+    defaultThumbnailZoom, lastWriteFingerprintRef,
+    lastWriteIdempotencyKeyRef, serverBaselineEditorFingerprintRef, setEditorMode,
+    setIsTempDraftMode, setLoadingKey, setPostCategory,
+    setPostContent, setPostId, setPostSummary, setPostSummarySource, setSummaryIntent,
+    setPostTags, setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl,
+    setPostThumbnailZoom, setPostTitle, setPostVersion, setPreviewThumbnailSourceUrl,
+    setPublishStatus,
+  ])
+
+  const applyLoadedPostContext = useCallback((post: PostForEditor) => {
+    activateComposeSurface()
+    setPostId(String(post.id))
+    setPostVersion(typeof post.version === "number" ? post.version : null)
+    setEditorMode("edit")
+    setIsTempDraftMode(isTempDraftCandidate(post))
+    lastWriteFingerprintRef.current = ""
+    lastWriteIdempotencyKeyRef.current = ""
+  }, [
+    activateComposeSurface, lastWriteFingerprintRef,
+    lastWriteIdempotencyKeyRef, setEditorMode, setIsTempDraftMode,
+    setPostId, setPostVersion,
+  ])
+
+  const resolveLoadedPostState = useCallback(
+    (post: PostForEditor) => {
+      const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
+      const shouldMaskTempTitle =
+        isTempDraftCandidate(post) && isTempDraftTitlePlaceholder(post.title ?? "")
+      const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
+      const title = shouldMaskTempTitle ? "" : post.title ?? ""
+      const visibility = toVisibility(!!post.published, !!post.listed)
+      const resolvedSummary = resolvePersistedSummaryResult(
+        { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
+        { summary: post.summary, source: post.summarySource },
+      )
+      if (!resolvedSummary.ok) {
+        throw new Error("canonical summary response is malformed")
+      }
+
+      const canonicalSummary = resolvedSummary.state
+      const snapshot = shouldMaskTempPlaceholder
+        ? (syncEditorMeta("", { summary: "", summarySource: "NONE", intent: { kind: "auto" } }) ??
+          buildEmptyEditorMetaSnapshot())
+        : syncEditorMeta(post.content ?? "", canonicalSummary)
+      return {
+        shouldMaskTempPlaceholder,
+        title,
+        visibility,
+        fingerprintPayload: {
+          title,
+          content: snapshot.body,
+          summary: shouldMaskTempPlaceholder ? "" : canonicalSummary.summary,
+          summarySource: shouldMaskTempPlaceholder ? "NONE" : canonicalSummary.summarySource,
+          summaryIntent: shouldMaskTempPlaceholder ? { kind: "auto" as const } : canonicalSummary.intent,
+          thumbnailUrl: snapshot.thumbnailUrl,
+          thumbnailFocusX: snapshot.thumbnailFocusX,
+          thumbnailFocusY: snapshot.thumbnailFocusY,
+          thumbnailZoom: snapshot.thumbnailZoom,
+          tags: snapshot.tags,
+          category: snapshot.category,
+          visibility,
+        } satisfies EditorFingerprintPayload,
+      }
+    },
+    [
+      buildEmptyEditorMetaSnapshot,
+      isBlankServerTempDraft,
+      resolveEditorMetaSnapshot,
+      syncEditorMeta,
+      toVisibility,
+    ],
+  )
+
+  const loadPostForEditor = useCallback(async (
+    targetPostId: string = postId,
+  ) => {
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
+    beginLocalDraftPostLoad()
+    try {
+      setLoadingKey("postOne")
+      const normalizedTargetPostId = targetPostId.trim()
+      const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
+      if (!isCurrentLoad()) return
+      const resolvedPost = post
+
+      const loadedPostState = resolveLoadedPostState(resolvedPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload,
+      )
+      applyLoadedPostContext(resolvedPost)
+      signalLocalDraftBaselineReady()
+      setResult(pretty(resolvedPost))
+    } catch (error) {
+      if (!isCurrentLoad()) return
+      const message = error instanceof Error ? error.message : String(error)
+      setResult(pretty({ error: message }))
+    } finally {
+      endLocalDraftPostLoad()
+      if (isCurrentLoad()) setLoadingKey("")
+    }
+  }, [
+    applyLoadedPostContext,
+    beginLocalDraftPostLoad,
+    buildEditorStateFingerprint,
+    endLocalDraftPostLoad,
+    postId,
+    pretty,
+    resolveLoadedPostState,
+    serverBaselineEditorFingerprintRef,
+    setLoadingKey,
+    setPostTitle,
+    setPostVisibility,
+    setResult,
+    signalLocalDraftBaselineReady,
+  ])
+
+  const reloadLatestServerPost = useCallback(async (targetPostId: string = postId): Promise<boolean> => {
+    const normalizedTargetPostId = targetPostId.trim()
+    if (!normalizedTargetPostId) return false
+    if (!preserveLocalDraftForConflictReload(normalizedTargetPostId)) return false
+
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
+    beginLocalDraftPostLoad()
+    try {
+      setLoadingKey("postOne")
+      setPublishStatus(
+        { tone: "loading", text: "현재 작성 내용을 임시글로 보관하고 서버 최신본을 불러오는 중입니다..." },
+        "page"
+      )
+      const resolvedPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
+      if (!isCurrentLoad()) return false
+
+      const loadedPostState = resolveLoadedPostState(resolvedPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload
+      )
+      applyLoadedPostContext(resolvedPost)
+      signalLocalDraftBaselineReady()
+      setResult(pretty(resolvedPost))
+      setPublishStatus(
+        {
+          tone: "success",
+          text: "현재 작성 내용을 브라우저 임시글로 보관하고 서버 최신본을 불러왔습니다. 임시글 복구 카드에서 비교하거나 복구해 다시 저장할 수 있습니다.",
+        },
+        "page"
+      )
+      return true
+    } catch (error) {
+      if (!isCurrentLoad()) return false
+      const message = error instanceof Error ? error.message : String(error)
+      const errorNotice: PublishNotice = {
+        tone: "error",
+        text: `서버 최신본 다시 불러오기 실패: ${message} 현재 작성 내용과 브라우저 임시저장은 유지됩니다.`,
+      }
+      setPublishStatus(errorNotice)
+      setPublishStatus(errorNotice, "page")
+      setResult(pretty({ error: message }))
+      return false
+    } finally {
+      endLocalDraftPostLoad()
+      if (isCurrentLoad()) setLoadingKey("")
+    }
+  }, [
+    applyLoadedPostContext, beginLocalDraftPostLoad, buildEditorStateFingerprint,
+    endLocalDraftPostLoad, postId, preserveLocalDraftForConflictReload, pretty,
+    resolveLoadedPostState, serverBaselineEditorFingerprintRef, setLoadingKey,
+    setPostTitle, setPostVisibility, setPublishStatus, setResult, signalLocalDraftBaselineReady,
+  ])
+
+  const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
+    try {
+      try {
+        const response = await apiFetch<RsData<PostForEditor | null> | PostForEditor>(
+          "/post/api/v1/posts/temp"
+        )
+        const directTemp = unwrapTempDraftRecoveryResponse<PostForEditor>(response)
+        if (directTemp) return directTemp
+      } catch {
+        // Fallback to paged scan when direct temp endpoint is unavailable or 404
+      }
+      const data = await apiFetch<PageDto<AdminPostListItem>>(
+        "/post/api/v1/adm/posts?page=1&pageSize=20&kw=&sort=MODIFIED_AT"
+      )
+      const tempRow = (data.content || []).find((row) => isServerTempDraftPost(row) && !row.deletedAt)
+      if (!tempRow?.id) return null
+      return await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${tempRow.id}`)
+    } catch {
+      return null
+    }
+  }, [])
+
+  const handleLoadOrCreateTempPost = useCallback(async (options?: {
+    redirectToEditor?: boolean
+    source?: string
+    returnTo?: string
+  }) => {
+    const generation = ++loadGenerationRef.current
+    const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
+    beginLocalDraftPostLoad()
+    try {
+      setLoadingKey("postTemp")
+      setPublishStatus({ tone: "loading", text: "새 글을 준비하고 있습니다..." }, "page")
+      if (!tempPostRequestRef.current) {
+        tempPostRequestRef.current = requestTempPostWithConflictRetry(loadExistingTempPostForRecovery).finally(() => {
+          tempPostRequestRef.current = null
+        })
+      }
+      const response = await tempPostRequestRef.current
+      if (!isCurrentLoad()) return
+      const tempPost = response.data
+      if (options?.redirectToEditor && tempPost.id) {
+        const query = new URLSearchParams()
+        if (options.source) query.set("source", options.source)
+        if (options.returnTo) query.set("returnTo", options.returnTo)
+        const destination =
+          query.size > 0
+            ? `${toEditorPostRoute(tempPost.id)}?${query.toString()}`
+            : toEditorPostRoute(tempPost.id)
+        await replaceRoute(router, destination)
+        return
+      }
+      const loadedPostState = resolveLoadedPostState(tempPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload,
+      )
+      applyLoadedPostContext(tempPost)
+      setIsTempDraftMode(true)
+      signalLocalDraftBaselineReady()
+      setPublishStatus(
+        {
+          tone: "success",
+          text: loadedPostState.shouldMaskTempPlaceholder
+            ? "새 글을 시작할 수 있습니다."
+            : "저장된 임시 저장본을 불러왔습니다.",
+        },
+        "page"
+      )
+      setResult(pretty(response))
+    } catch (error) {
+      if (!isCurrentLoad()) return
+      const message = error instanceof Error ? error.message : String(error)
+      setPublishStatus({ tone: "error", text: `새 글 불러오기 실패: ${message}` }, "page")
+      setResult(pretty({ error: message }))
+      setIsNewEditorBootstrapPending(false)
+    } finally {
+      endLocalDraftPostLoad()
+      if (isCurrentLoad()) setLoadingKey("")
+    }
+  }, [
+    applyLoadedPostContext,
+    beginLocalDraftPostLoad,
+    buildEditorStateFingerprint,
+    endLocalDraftPostLoad,
+    pretty,
+    requestTempPostWithConflictRetry,
+    resolveLoadedPostState,
+    router,
+    serverBaselineEditorFingerprintRef,
+    setIsNewEditorBootstrapPending,
+    setIsTempDraftMode,
+    setLoadingKey,
+    setPostTitle,
+    setPostVisibility,
+    setPublishStatus,
+    setResult,
+    signalLocalDraftBaselineReady,
+    tempPostRequestRef,
+    toEditorPostRoute,
+    loadExistingTempPostForRecovery,
+  ])
+
+  return {
+    localDraftFingerprint,
+    localDraftSource,
+    localDraftCandidate,
+    localDraftCandidates,
+    selectLocalDraftCandidate,
+    discardLocalDraftCandidate,
+    restoredLocalDraft,
+    dismissedLocalDraft,
+    dismissLocalDraftRestoreSuggestion,
+    signalLocalDraftRemoved,
+    saveLocalDraft,
+    preserveLocalDraftForConflictReload,
+    restoreLocalDraft,
+    clearLocalDraft,
+    cancelPendingAutosave,
+    signalLocalDraftBaselineReady,
+    switchToCreateMode,
+    loadPostForEditor,
+    reloadLatestServerPost,
+    handleLoadOrCreateTempPost,
+  }
+}

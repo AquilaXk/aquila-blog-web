@@ -1,0 +1,357 @@
+// 참조 구현: mixmark-io/turndown (MIT)
+import { normalizeHtmlPasteText } from "./markdownEditorHtmlPasteBypass"
+import { escapeMarkdownLinkDestination } from "./markdownEditorUploadModel"
+
+export {
+  type HtmlPasteBypassCheckInput,
+  hasDocumentStructureHtmlTag,
+  hasMonospaceFontStyle,
+  hasMonospacePreStyle,
+  hasUnsafeActiveHtmlPayload,
+  isOffsetInsideInlineCodeSpan,
+  normalizeHtmlPasteText,
+  shouldBypassHtmlPasteConversion,
+  shouldReportEmptyHtmlPasteError,
+} from "./markdownEditorHtmlPasteBypass"
+
+export const HTML_PASTE_EMPTY_CONTENT_MESSAGE = "붙여넣을 수 있는 안전한 HTML 내용이 없습니다."
+
+export type HtmlPasteImportResult =
+  | { kind: "none" }
+  | { kind: "markdown"; markdown: string }
+  | { kind: "error"; message: typeof HTML_PASTE_EMPTY_CONTENT_MESSAGE }
+
+const ACTIVE_TAGS = new Set([
+  "base", "button", "embed", "form", "iframe", "input", "link", "math",
+  "meta", "object", "script", "style", "svg", "select", "option", "template", "textarea",
+])
+
+const BLOCK_TAGS = new Set([
+  "article", "aside", "blockquote", "div", "footer", "header", "hr", "main", "section",
+  "h1", "h2", "h3", "h4", "h5", "h6", "ol", "p", "pre", "nav",
+  "table", "tbody", "tfoot", "thead", "tr", "ul",
+])
+
+const TABLE_CELL_TAGS = new Set(["td", "th"])
+
+const escapeMarkdownText = (value: string) => value.replace(/[\\`*_{}[\]|<>~]/g, String.raw`\$&`)
+
+const collapseExcessNewlines = (value: string): string => {
+  const result: string[] = []
+  let consecutiveNewlines = 0
+  for (const character of value) {
+    if (character === "\n") {
+      while (result.at(-1) === " " || result.at(-1) === "\t") result.pop()
+      consecutiveNewlines += 1
+      if (consecutiveNewlines <= 2) result.push(character)
+      continue
+    }
+    consecutiveNewlines = 0
+    result.push(character)
+  }
+  return result.join("")
+}
+
+const normalizeMarkdown = (value: string): string =>
+  collapseExcessNewlines(value.replace(/\r\n?/g, "\n")).trim()
+
+export const createHtmlPasteEmptyResult = (): HtmlPasteImportResult => ({
+  kind: "error",
+  message: HTML_PASTE_EMPTY_CONTENT_MESSAGE,
+})
+
+export const resolveSafeHtmlPasteImportBoundary = (html: string | null): HtmlPasteImportResult | null => {
+  if (html === null) return { kind: "none" }
+  if (!normalizeHtmlPasteText(html).trim()) return createHtmlPasteEmptyResult()
+  return null
+}
+
+export const resolveSafeHtmlPasteHref = (rawHref: string): string | null => {
+  const href = rawHref.trim()
+  if (!href) return null
+  try {
+    const url = new URL(href)
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+const normalizeInlineHtmlPasteText = (value: string): string =>
+  String(value)
+    .replace(/\r\n?/g, "\n")
+    .replaceAll("\u00a0", " ")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .replace(/[ \t\n]+/g, " ")
+
+const inlineText = (value: string) => escapeMarkdownText(normalizeInlineHtmlPasteText(value))
+
+const elementTag = (node: Node): string =>
+  node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement).tagName.toLowerCase() : ""
+
+const isActiveNode = (node: Node) => ACTIVE_TAGS.has(elementTag(node))
+
+const safeTextContent = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent || ""
+  if (node.nodeType !== Node.ELEMENT_NODE || isActiveNode(node)) return ""
+  return Array.from(node.childNodes).map(safeTextContent).join("")
+}
+
+const serializeCode = (element: HTMLElement): string => {
+  const source = normalizeHtmlPasteText(safeTextContent(element)).trim()
+  if (!source) return ""
+  const longestBacktickRun = Math.max(0, ...Array.from(source.matchAll(/`+/g), (match) => match[0].length))
+  const delimiter = "`".repeat(longestBacktickRun + 1)
+  return `${delimiter}${source}${delimiter}`
+}
+
+const wrapInlineFormatting = (inner: string, delimiter: string): string => {
+  let start = 0
+  while (start < inner.length && !inner[start]!.trim()) start += 1
+  let end = inner.length
+  while (end > start && !inner[end - 1]!.trim()) end -= 1
+  if (start === end) return inner
+  return `${inner.slice(0, start)}${delimiter}${inner.slice(start, end)}${delimiter}${inner.slice(end)}`
+}
+
+const INLINE_WRAP_DELIMITERS: Record<string, string> = {
+  strong: "**",
+  b: "**",
+  em: "*",
+  i: "*",
+  s: "~~",
+  del: "~~",
+  strike: "~~",
+  mark: "==",
+}
+
+const serializeInlineLinkOrImage = (element: HTMLElement, tag: string, inner: string): string => {
+  if (tag === "a") {
+    const href = resolveSafeHtmlPasteHref(element.getAttribute("href") || "")
+    return href && inner ? `[${inner}](${escapeMarkdownLinkDestination(href)})` : inner
+  }
+  const src = resolveSafeHtmlPasteHref(element.getAttribute("src") || "")
+  const alt = inlineText(element.getAttribute("alt") || "")
+  return src ? `![${alt}](${escapeMarkdownLinkDestination(src)})` : alt
+}
+
+const serializeInline = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) return inlineText(node.textContent || "")
+  if (node.nodeType !== Node.ELEMENT_NODE || isActiveNode(node)) return ""
+
+  const element = node as HTMLElement
+  const tag = element.tagName.toLowerCase()
+  if (tag === "br") return "\n"
+  if (tag === "code") return serializeCode(element)
+  const inner = Array.from(element.childNodes).map(serializeInline).join("")
+  const wrapDelimiter = INLINE_WRAP_DELIMITERS[tag]
+  if (wrapDelimiter) return wrapInlineFormatting(inner, wrapDelimiter)
+  if (tag === "a" || tag === "img") return serializeInlineLinkOrImage(element, tag, inner)
+  return inner
+}
+
+const serializeListItemContent = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) return inlineText(node.textContent || "")
+  if (node.nodeType !== Node.ELEMENT_NODE || isActiveNode(node)) return ""
+
+  const tag = elementTag(node)
+  if (tag === "ol" || tag === "ul") return ""
+  if (TABLE_CELL_TAGS.has(tag)) return serializeInline(node).trim()
+  if (!BLOCK_TAGS.has(tag)) return serializeInline(node)
+
+  return Array.from(node.childNodes)
+    .map(serializeListItemContent)
+    .filter(Boolean)
+    .join("\n\n")
+}
+
+const joinListItemChunks = (
+  contentChunks: ReadonlyArray<{ value: string; block: boolean }>
+): string =>
+  contentChunks
+    .reduce((result, chunk, chunkIndex) => {
+      const previousIsBlock = contentChunks[chunkIndex - 1]?.block || false
+      const boundary = chunkIndex > 0 && (previousIsBlock || chunk.block) ? "\n\n" : ""
+      return `${result}${boundary}${chunk.value}`
+    }, "")
+    .trim()
+
+const findLeadingTaskCheckbox = (item: Element): { checked: boolean } | null => {
+  const queue: Node[] = Array.from(item.childNodes)
+  let steps = 0
+  while (queue.length > 0 && steps < 16) {
+    steps += 1
+    const current = queue.shift()!
+    if (current.nodeType === Node.TEXT_NODE) {
+      if ((current.textContent || "").trim()) return null
+      continue
+    }
+    if (current.nodeType !== Node.ELEMENT_NODE) continue
+    const el = current as HTMLElement
+    const tag = el.tagName.toLowerCase()
+    if (tag === "input") {
+      const inputType = (el.getAttribute("type") || (el as HTMLInputElement).type || "").toLowerCase()
+      if (inputType !== "checkbox") return null
+      const isChecked =
+        (el as HTMLInputElement).checked === true || el.getAttribute("checked") !== null
+      return { checked: isChecked }
+    }
+    if (tag === "p" || tag === "label" || tag === "span" || tag === "div") {
+      queue.unshift(...Array.from(el.childNodes))
+      continue
+    }
+    return null
+  }
+  return null
+}
+
+const serializeSingleListItem = (item: Element, index: number, ordered: boolean): string => {
+  const taskCheckbox = !ordered ? findLeadingTaskCheckbox(item) : null
+  const contentChunks = Array.from(item.childNodes)
+    .filter((child) => !["ol", "ul"].includes(elementTag(child)))
+    .map((child) => ({ value: serializeListItemContent(child), block: BLOCK_TAGS.has(elementTag(child)) }))
+    .filter((chunk) => Boolean(chunk.value))
+  const content = joinListItemChunks(contentChunks)
+  const nested = Array.from(item.children)
+    .filter((child) => ["ol", "ul"].includes(child.tagName.toLowerCase()))
+    .map((child) => serializeList(child as HTMLElement, child.tagName.toLowerCase() === "ol"))
+    .filter(Boolean)
+    .map((value) => value.split("\n").map((line) => `  ${line}`).join("\n"))
+  const marker = ordered ? `${index + 1}.` : taskCheckbox ? (taskCheckbox.checked ? "- [x]" : "- [ ]") : "-"
+  const contentLines = content.split("\n")
+  const firstLine = contentLines.shift() || ""
+  const itemLines = [
+    `${marker}${firstLine ? ` ${firstLine}` : ""}`,
+    ...contentLines.map((line) => `  ${line}`),
+  ]
+  return [...itemLines, ...nested].join("\n")
+}
+
+const serializeList = (element: HTMLElement, ordered: boolean): string =>
+  Array.from(element.children)
+    .filter((child) => child.tagName.toLowerCase() === "li")
+    .map((item, index) => serializeSingleListItem(item, index, ordered))
+    .join("\n")
+
+const serializePreElement = (element: HTMLElement): string => {
+  const codeChild = Array.from(element.children).find((child) => child.tagName.toLowerCase() === "code")
+  if (codeChild) {
+    const langMatch = /(?:language-|lang-)([a-zA-Z0-9_-]+)/.exec(codeChild.className)
+    const lang = langMatch ? langMatch[1] : ""
+    const text = (codeChild.textContent || "").replace(/\r\n?/g, "\n").trimEnd()
+    return `\`\`\`${lang}\n${text}\n\`\`\``
+  }
+  const text = (element.textContent || "").replace(/\r\n?/g, "\n").trimEnd()
+  return `\`\`\`\n${text}\n\`\`\``
+}
+
+const normalizeTableCellMultilineText = (raw: string): string =>
+  raw
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line, idx, arr) => line.length > 0 || (idx > 0 && idx < arr.length - 1))
+    .join("<br>")
+    .replace(/(?:<br>)+/g, "<br>")
+    .replace(/(?<!\\)\|/g, String.raw`\|`)
+
+const serializeTableElement = (element: HTMLElement): string => {
+  const rows = Array.from(element.querySelectorAll("tr"))
+  if (rows.length === 0) return ""
+  const parsedRows = rows
+    .map((tr) =>
+      Array.from(tr.children)
+        .filter((c) => TABLE_CELL_TAGS.has(c.tagName.toLowerCase()))
+        .map((cell) => normalizeTableCellMultilineText(serializeInline(cell).trim()))
+    )
+    .filter((r) => r.length > 0)
+
+  if (parsedRows.length === 0) return ""
+  const maxCols = Math.max(...parsedRows.map((r) => r.length))
+  if (maxCols === 0) return ""
+
+  const normalizedRows = parsedRows.map((r) => {
+    const copy = [...r]
+    while (copy.length < maxCols) copy.push("")
+    return copy
+  })
+
+  const header = normalizedRows[0]!
+  const headerLine = `| ${header.join(" | ")} |`
+  const delimiterLine = `| ${header.map(() => "---").join(" | ")} |`
+  const bodyLines = normalizedRows.slice(1).map((r) => `| ${r.join(" | ")} |`)
+  return [headerLine, delimiterLine, ...bodyLines].join("\n")
+}
+
+const serializeContainerBlocks = (element: HTMLElement): string => {
+  const blocks: string[] = []
+  let inlineRun = ""
+  const flushInlineRun = () => {
+    const value = inlineRun.trim()
+    if (value) blocks.push(value)
+    inlineRun = ""
+  }
+  for (const child of Array.from(element.childNodes)) {
+    if (!BLOCK_TAGS.has(elementTag(child))) {
+      inlineRun += serializeInline(child)
+      continue
+    }
+    flushInlineRun()
+    const value = serializeBlock(child)
+    if (value) blocks.push(value)
+  }
+  flushInlineRun()
+  return blocks.join("\n\n")
+}
+
+const serializeHeadingElement = (element: HTMLElement, tag: string): string => {
+  const content = serializeInline(element).trim()
+  return content ? `${"#".repeat(Number(tag[1]))} ${content}` : ""
+}
+
+const serializeTableRowElement = (element: HTMLElement): string =>
+  Array.from(element.children)
+    .filter((child) => TABLE_CELL_TAGS.has(child.tagName.toLowerCase()))
+    .map(serializeBlock)
+    .filter(Boolean)
+    .join(" ")
+
+const serializeBlockquoteElement = (element: HTMLElement): string => {
+  const inner = serializeContainerBlocks(element).trim()
+  if (!inner) return ""
+  return inner
+    .split("\n")
+    .map((line) => (line.length > 0 ? `> ${line}` : ">"))
+    .join("\n")
+}
+
+const serializeBlock = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) return inlineText(node.textContent || "")
+  if (node.nodeType !== Node.ELEMENT_NODE || isActiveNode(node)) return ""
+
+  const element = node as HTMLElement
+  const tag = element.tagName.toLowerCase()
+  if (tag === "hr") return "---"
+  if (TABLE_CELL_TAGS.has(tag) || tag === "p" || !BLOCK_TAGS.has(tag)) return serializeInline(element).trim()
+  if (tag === "blockquote") return serializeBlockquoteElement(element)
+  if (tag === "tr") return serializeTableRowElement(element)
+  if (/^h[1-6]$/.test(tag)) return serializeHeadingElement(element, tag)
+  if (tag === "pre") return serializePreElement(element)
+  if (tag === "table") return serializeTableElement(element)
+  if (tag === "ul" || tag === "ol") return serializeList(element, tag === "ol")
+  return serializeContainerBlocks(element)
+}
+
+export const convertSafeHtmlPasteToMarkdown = (html: string | null): HtmlPasteImportResult => {
+  if (html === null) return { kind: "none" }
+  const boundary = resolveSafeHtmlPasteImportBoundary(html)
+  if (boundary) return boundary
+  if (typeof DOMParser === "undefined") return createHtmlPasteEmptyResult()
+
+  const document = new DOMParser().parseFromString(html, "text/html")
+  const markdown = normalizeMarkdown(
+    Array.from(document.body.childNodes).map(serializeBlock).filter(Boolean).join("\n\n")
+  )
+  return markdown ? { kind: "markdown", markdown } : createHtmlPasteEmptyResult()
+}

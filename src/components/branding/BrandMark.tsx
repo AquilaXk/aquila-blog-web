@@ -1,0 +1,65 @@
+/**
+ * 참조 구현:
+ * - lucide-icons/lucide (icons/arrow-right.svg, ISC License, Copyright (c) Lucide Contributors)
+ */
+import styled from "@emotion/styled"
+
+type Props = {
+  className?: string
+  priority?: boolean
+}
+
+const BrandMarkSlot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+`
+
+/**
+ * 회사 브랜드 마크. 블로그 헤더·관리자 shell·회사 표면이 같은 자산을 쓴다 - 마크는 표면별 장식이
+ * 아니라 회사 정체성이므로 소비처마다 다른 파일을 두지 않는다.
+ *
+ * 자산은 256px 래스터(`/brand-mascot.d43c0dc3.png`)다. 가장 큰 소비처 슬롯이 36px라 한 장으로
+ * 7x DPR까지 덮는다. 정본을 바꿀 때는 content hash가 포함된 URL도 함께 바꿔 오래된 origin cache를
+ * 재사용하지 않는다.
+ */
+const BrandMark: React.FC<Props> = ({ className, priority = false }) => {
+  return (
+    <BrandMarkSlot className={className} aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand-mascot.d43c0dc3.png"
+        alt=""
+        width={256}
+        height={256}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        draggable={false}
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+      />
+    </BrandMarkSlot>
+  )
+}
+
+export const ArrowRightGlyph: React.FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </svg>
+)
+
+export default BrandMark

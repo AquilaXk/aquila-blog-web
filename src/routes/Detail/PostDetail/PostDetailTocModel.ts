@@ -1,0 +1,301 @@
+// 참조 구현: Fumadocs (`fuma-nama/fumadocs`, `packages/core/src/toc.tsx`, MIT License, Copyright (c) 2024 Fuma Nama)
+import {
+  createMarkdownDocumentInsights,
+  createMarkdownHeadingSlugAllocator,
+  type MarkdownDocumentHeading,
+} from "../../../libs/markdown/markdownDocumentInsights"
+
+export type TocItem = {
+  id: string
+  text: string
+  level: 2 | 3 | 4
+}
+
+export const buildInitialTocFromMarkdown = (
+  markdown: string,
+  precomputedHeadings?: readonly MarkdownDocumentHeading[]
+): TocItem[] => {
+  if (!markdown.trim()) return []
+  const headings = precomputedHeadings ?? createMarkdownDocumentInsights(markdown).headings
+  const items: TocItem[] = []
+  for (const heading of headings) {
+    if (heading.level >= 2 && heading.level <= 4) {
+      items.push({
+        id: heading.id || heading.slug,
+        text: heading.label,
+        level: heading.level as 2 | 3 | 4,
+      })
+    }
+  }
+  return items
+}
+
+const TOC_SELECTOR = ".aq-markdown h2, .aq-markdown h3, .aq-markdown h4"
+const TOC_MUTATION_HEADING_SELECTOR = "h1, h2, h3, h4"
+const TOC_MUTATION_IGNORED_SELECTOR =
+  ".aq-mermaid, .aq-code-block, .aq-footnotes, .aq-heading-anchor, .aq-sr-only, svg"
+
+const resolveMutationElement = (node: Node | null | undefined): Element | null => {
+  if (!node) return null
+  if (typeof (node as Element).matches === "function") return node as Element
+  return node.parentElement ?? null
+}
+
+const isIgnoredTocMutationElement = (element: Element): boolean => {
+  if (typeof SVGElement !== "undefined" && element instanceof SVGElement) return true
+  if (element.tagName?.toLowerCase() === "svg") return true
+  if (element.matches?.(TOC_MUTATION_IGNORED_SELECTOR)) return true
+  return Boolean(element.closest?.(TOC_MUTATION_IGNORED_SELECTOR))
+}
+
+const nodeTouchesHeading = (node: Node | null | undefined, checkDescendants: boolean): boolean => {
+  const element = resolveMutationElement(node)
+  if (!element || isIgnoredTocMutationElement(element)) return false
+  if (element.matches?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  if (element.closest?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  if (checkDescendants && element.querySelector?.(TOC_MUTATION_HEADING_SELECTOR)) return true
+  return false
+}
+
+export const nodeCollectionTouchesHeading = (
+  nodes: Iterable<Node> | ArrayLike<Node> | null | undefined
+): boolean => {
+  if (!nodes) return false
+  return Array.from(nodes).some((node) => nodeTouchesHeading(node, true))
+}
+
+export const shouldSyncTocFromMutations = (mutations: Iterable<MutationRecord>): boolean => {
+  for (const mutation of mutations) {
+    if (mutation.type === "characterData") {
+      if (nodeTouchesHeading(mutation.target, false)) return true
+      continue
+    }
+    if (nodeTouchesHeading(mutation.target, false)) return true
+    if (nodeCollectionTouchesHeading(mutation.addedNodes)) return true
+    if (nodeCollectionTouchesHeading(mutation.removedNodes)) return true
+  }
+  return false
+}
+
+const normalizeHeadingText = (value: string): string =>
+  value
+    .replace(/\s+/g, " ")
+    .replace(/\u200B/g, "")
+    .trim()
+
+const resolveTocHeadingLevel = (tagName: string): TocItem["level"] | null => {
+  if (tagName === "H2") return 2
+  if (tagName === "H3") return 3
+  if (tagName === "H4") return 4
+  return null
+}
+
+export const expandClosedAncestorDetails = (target: Element | null): boolean => {
+  let expanded = false
+  let current: Element | null = target?.parentElement ?? null
+  while (current) {
+    if (current.tagName === "DETAILS") {
+      const detailsElement = current as HTMLDetailsElement
+      if (!detailsElement.open) {
+        detailsElement.open = true
+        detailsElement.setAttribute?.("open", "")
+        expanded = true
+      }
+    }
+    current = current.parentElement ?? null
+  }
+  return expanded
+}
+
+// 참조 구현: jackyzha0/quartz (MIT) — URL 해시 대상 디코딩(Fail-Closed) 및 접힌 details 자동 펼침
+export const revealHashedTargetInArticle = (
+  article: HTMLElement | null,
+  rawHash: string
+): { target: HTMLElement; expanded: boolean } | null => {
+  if (!article || typeof document === "undefined") return null
+  const trimmed = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash
+  if (!trimmed) return null
+  let decodedId: string
+  try {
+    decodedId = decodeURIComponent(trimmed)
+  } catch {
+    return null
+  }
+  if (!decodedId) return null
+  const candidate = document.getElementById(decodedId)
+  if (!candidate || !article.contains(candidate)) return null
+  const expanded = expandClosedAncestorDetails(candidate)
+  return { target: candidate, expanded }
+}
+
+const isIgnoredHeadingChild = (node: ChildNode): boolean => {
+  if (node.nodeType !== 1) return false
+  const element = node as Element
+  if (element.getAttribute?.("data-toc-ignore") === "true") return true
+  if (element.classList?.contains?.("aq-heading-anchor")) return true
+  if (element.classList?.contains?.("aq-sr-only")) return true
+  return Boolean(element.matches?.(".aq-heading-anchor, .aq-sr-only"))
+}
+
+const extractHeadingLabelText = (heading: HTMLElement): string => {
+  const childNodes = heading.childNodes
+  if (!childNodes || childNodes.length === 0) {
+    return normalizeHeadingText(heading.textContent || "")
+  }
+  let raw = ""
+  for (let i = 0; i < childNodes.length; i += 1) {
+    const child = childNodes[i]
+    if (isIgnoredHeadingChild(child)) continue
+    raw += child.textContent || ""
+  }
+  return normalizeHeadingText(raw)
+}
+
+export const collectTocFromArticle = (article: HTMLElement): TocItem[] => {
+  const headings = article.querySelectorAll<HTMLElement>(TOC_SELECTOR)
+  if (!headings.length) return []
+
+  const slugAllocator = createMarkdownHeadingSlugAllocator()
+  const toc: TocItem[] = []
+  let index = 0
+
+  while (index < headings.length) {
+    const heading = headings[index]
+    index += 1
+    if (heading.id === "aq-footnote-heading" || heading.closest?.(".aq-footnotes")) continue
+
+    const text = extractHeadingLabelText(heading)
+    if (!text) continue
+
+    const level = resolveTocHeadingLevel(heading.tagName)
+    if (!level) continue
+
+    const id = slugAllocator.allocate(text, heading.id)
+    if (heading.id !== id) heading.id = id
+
+    toc.push({ id, text, level })
+  }
+
+  return toc
+}
+
+export const isSameToc = (left: TocItem[], right: TocItem[]) =>
+  left.length === right.length &&
+  left.every((item, index) => {
+    const target = right[index]
+    return target && item.id === target.id && item.text === target.text && item.level === target.level
+  })
+
+export const createRafScheduler = (callback: () => void) => {
+  let rafId: number | null = null
+
+  const schedule = () => {
+    if (rafId !== null) return
+    rafId = window.requestAnimationFrame(() => {
+      rafId = null
+      callback()
+    })
+  }
+
+  const cancel = () => {
+    if (rafId === null) return
+    window.cancelAnimationFrame(rafId)
+    rafId = null
+  }
+
+  return { schedule, cancel }
+}
+
+export const createObserverRegistry = () => {
+  const cleanups: Array<() => void> = []
+
+  const add = (cleanup: () => void) => {
+    cleanups.push(cleanup)
+  }
+
+  const addWindowEvent = (
+    type: string,
+    handler: EventListenerOrEventListenerObject,
+    options?: AddEventListenerOptions | boolean
+  ) => {
+    window.addEventListener(type, handler, options)
+    add(() => window.removeEventListener(type, handler, options))
+  }
+
+  const addResizeObserver = (targets: HTMLElement[], callback: ResizeObserverCallback) => {
+    if (!targets.length || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(callback)
+    targets.forEach((target) => observer.observe(target))
+    add(() => observer.disconnect())
+  }
+
+  const cleanup = () => {
+    for (const clear of cleanups.splice(0, cleanups.length)) {
+      clear()
+    }
+  }
+
+  return {
+    add,
+    addWindowEvent,
+    addResizeObserver,
+    cleanup,
+  }
+}
+
+export type HeadingOffset = {
+  id: string
+  topDoc: number
+}
+
+// 참조 구현: Fumadocs 활성 TOC 측정/가시성 필터 (https://github.com/fuma-nama/fumadocs, MIT License, Copyright (c) 2024 Fuma Nama)
+export const measureHeadingOffsets = (
+  items: readonly TocItem[],
+  scrollY: number = typeof window !== "undefined" ? window.scrollY : 0
+): HeadingOffset[] => {
+  if (typeof document === "undefined" || !items.length) return []
+  const result: HeadingOffset[] = []
+  let lastVisibleTopDoc: number | null = null
+  for (const item of items) {
+    const el = document.getElementById(item.id)
+    if (!el) continue
+    const inClosedDetails =
+      typeof el.closest === "function" && el.closest("details:not([open])") !== null
+    const rect = el.getBoundingClientRect()
+    const isZeroSizeBox = rect.height === 0 && (rect.width === undefined || rect.width === 0)
+    if (inClosedDetails || isZeroSizeBox) {
+      continue
+    }
+    const rawTopDoc = scrollY + rect.top
+    const monotonicTopDoc: number =
+      lastVisibleTopDoc !== null ? Math.max(lastVisibleTopDoc, rawTopDoc) : rawTopDoc
+    lastVisibleTopDoc = monotonicTopDoc
+    result.push({
+      id: item.id,
+      topDoc: monotonicTopDoc,
+    })
+  }
+  return result
+}
+
+export const resolveActiveTocIdFromOffsets = (
+  offsets: readonly HeadingOffset[],
+  scrollY: number,
+  boundaryOffset: number
+): string => {
+  if (!offsets.length) return ""
+  const threshold = scrollY + boundaryOffset
+  let lo = 0
+  let hi = offsets.length - 1
+  let activeId = offsets[0].id
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    if (offsets[mid].topDoc <= threshold) {
+      activeId = offsets[mid].id
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  return activeId
+}

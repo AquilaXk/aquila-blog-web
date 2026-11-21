@@ -1,0 +1,539 @@
+import { queryKey } from "src/constants/queryKey"
+import { type ExplorePostsPage } from "src/apis/backend/posts"
+import {
+  FEED_EXPLORER_CURSOR_SUFFIX,
+  FEED_EXPLORER_RESTORE_KEY_PREFIX,
+  FEED_EXPLORER_SNAPSHOT_SUFFIX,
+} from "src/libs/feed/feedRestoreCache"
+import { normalizeKeywordQuery, normalizeTagQuery } from "src/libs/query/normalize"
+import type { PostSummarySource, TPost } from "src/types"
+
+export const FEED_EXPLORER_RESTORE_TTL_MS = 15 * 60_000
+export const FEED_EXPLORER_RESTORE_MAX_PAGES = 8
+export const FEED_EXPLORER_ORDER: "asc" | "desc" = "desc"
+export const FEED_EXPLORER_SNAPSHOT_MAX_PAGES = 4
+export const FEED_EXPLORER_SNAPSHOT_MAX_BYTES = 260_000
+export const FEED_EXPLORER_RESTORE_MAX_KEYS = 4
+export const FEED_EXPLORER_IDLE_REVALIDATE_TIMEOUT_MS = 1200
+export const FEED_EXPLORER_SCROLL_BUCKET_PX = 36
+export type FeedExplorerRestoreState = {
+  q: string
+  tag: string
+  scrollY: number
+  loadedPages: number
+  savedAt: number
+  sortMode?: "latest" | "views" | "likes"
+}
+
+export type FeedExplorerRestoreSnapshot = {
+  savedAt: number
+  pages: FeedExplorerSnapshotPage[]
+  pageParams?: FeedExplorerSnapshotPageParam[]
+}
+
+export type FeedExplorerSnapshotPageParam = number | string | null
+
+export type FeedExplorerSnapshotPost = {
+  id: string
+  title: string
+  createdAt?: string
+  createdTime?: string
+  date?: { start_date: string }
+  modifiedAt?: string
+  modifiedTime?: string
+  published?: boolean
+  listed?: boolean
+  authorId?: number
+  authorName?: string
+  authorUsername?: string
+  authorProfileImgUrl?: string
+  summary: string
+  summarySource: PostSummarySource
+  thumbnail?: string
+  tags?: string[]
+  category?: string[]
+  author?: {
+    id: string
+    name: string
+    profile_photo?: string
+  }[]
+  likesCount?: number
+  hitCount?: number
+}
+
+export type FeedExplorerSnapshotPage = {
+  posts: FeedExplorerSnapshotPost[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  hasNext?: boolean
+  nextCursor?: string | null
+  paginationMode?: "cursor" | "page"
+}
+
+export type NavigatorConnectionLike = {
+  saveData?: boolean
+  effectiveType?: string
+}
+
+export type IdleCallbackHandle = number
+export type IdleCallbackDeadlineLike = {
+  didTimeout: boolean
+  timeRemaining: () => number
+}
+
+export const getFeedExplorerRestoreKey = (
+  tag: string,
+  pageSize: number,
+  order: "asc" | "desc",
+  sortMode: "latest" | "views" | "likes" = "latest"
+) =>
+  `${FEED_EXPLORER_RESTORE_KEY_PREFIX}:tag=${encodeURIComponent(normalizeTagQuery(tag))}:size=${pageSize}:order=${order}${sortMode === "latest" ? "" : `:sort=${sortMode}`}`
+
+export const getFeedExplorerSnapshotKey = (restoreKey: string) =>
+  `${restoreKey}${FEED_EXPLORER_SNAPSHOT_SUFFIX}`
+
+export const getFeedExplorerCursorKey = (restoreKey: string) =>
+  `${restoreKey}${FEED_EXPLORER_CURSOR_SUFFIX}`
+
+export const parseFeedExplorerCursorScrollY = (
+  raw: string | null
+): { scrollY: number; savedAt: number } | null => {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { scrollY?: unknown; savedAt?: unknown }
+    if (!parsed || typeof parsed !== "object") return null
+    const savedAt =
+      typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+    if (savedAt <= 0 || Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) return null
+    const scrollY =
+      typeof parsed.scrollY === "number" && Number.isFinite(parsed.scrollY)
+        ? Math.max(0, Math.trunc(parsed.scrollY))
+        : -1
+    if (scrollY < 0) return null
+    return { scrollY, savedAt }
+  } catch {
+    return null
+  }
+}
+
+export const resolveFeedInitialMountCount = (
+  postsCount: number,
+  restoreScrollY: number,
+  baseInitialCount = 8,
+  estimatedCardHeightPx = 184,
+  viewportHeightPx?: number
+): number => {
+  if (postsCount <= 0) return 0
+  const baseCount = Math.min(postsCount, Math.max(1, baseInitialCount))
+  if (!(restoreScrollY > 0)) return baseCount
+  const resolvedViewportHeight =
+    viewportHeightPx ??
+    (typeof window !== "undefined" && Number.isFinite(window.innerHeight) && window.innerHeight > 0
+      ? window.innerHeight
+      : 900)
+  const neededCards = Math.ceil((restoreScrollY + resolvedViewportHeight) / estimatedCardHeightPx) + 2
+  return Math.min(postsCount, Math.max(baseCount, neededCards))
+}
+
+export const getNavigatorConnection = (): NavigatorConnectionLike | undefined => {
+  if (typeof navigator === "undefined") return undefined
+  return (navigator as Navigator & { connection?: NavigatorConnectionLike }).connection
+}
+
+export const getNavigatorDeviceMemory = () => {
+  if (typeof navigator === "undefined") return undefined
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  return typeof memory === "number" && Number.isFinite(memory) ? memory : undefined
+}
+
+export const resolveRestorePageCap = () => {
+  const connection = getNavigatorConnection()
+  const memory = getNavigatorDeviceMemory()
+
+  if (connection?.saveData) return 2
+  if (connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return 1
+  if (connection?.effectiveType === "3g") return 3
+
+  if (typeof memory === "number" && memory <= 2) return 2
+  if (typeof memory === "number" && memory <= 4) return 4
+  return FEED_EXPLORER_RESTORE_MAX_PAGES
+}
+
+export const resolveSnapshotPageCap = () => {
+  return Math.min(FEED_EXPLORER_SNAPSHOT_MAX_PAGES, resolveRestorePageCap())
+}
+
+export const toSnapshotPost = (post: TPost): FeedExplorerSnapshotPost => {
+  const firstAuthor = post.author?.[0]
+  return {
+    id: post.id,
+    title: post.title,
+    ...(post.createdAt ? { createdAt: post.createdAt } : {}),
+    ...(post.createdTime ? { createdTime: post.createdTime } : {}),
+    ...(post.date?.start_date ? { date: { start_date: post.date.start_date } } : {}),
+    ...(post.modifiedAt ? { modifiedAt: post.modifiedAt } : {}),
+    ...(post.modifiedTime ? { modifiedTime: post.modifiedTime } : {}),
+    ...(typeof post.published === "boolean" ? { published: post.published } : {}),
+    ...(typeof post.listed === "boolean" ? { listed: post.listed } : {}),
+    ...(typeof post.authorId === "number" ? { authorId: post.authorId } : {}),
+    ...(post.authorName ? { authorName: post.authorName } : {}),
+    ...(post.authorUsername ? { authorUsername: post.authorUsername } : {}),
+    ...(post.authorProfileImgUrl ? { authorProfileImgUrl: post.authorProfileImgUrl } : {}),
+    summary: post.summary ?? "",
+    summarySource: post.summarySource ?? "NONE",
+    ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
+    ...(post.tags?.length ? { tags: post.tags } : {}),
+    ...(post.category?.length ? { category: post.category } : {}),
+    ...(firstAuthor
+      ? {
+          author: [
+            {
+              id: firstAuthor.id,
+              name: firstAuthor.name,
+              ...(firstAuthor.profile_photo ? { profile_photo: firstAuthor.profile_photo } : {}),
+            },
+          ],
+        }
+      : {}),
+    ...(typeof post.likesCount === "number" ? { likesCount: post.likesCount } : {}),
+    ...(typeof post.hitCount === "number" ? { hitCount: post.hitCount } : {}),
+  }
+}
+
+export const toSnapshotPage = (page: ExplorePostsPage): FeedExplorerSnapshotPage => ({
+  totalCount: page.totalCount,
+  pageNumber: page.pageNumber,
+  pageSize: page.pageSize,
+  ...(typeof page.hasNext === "boolean" ? { hasNext: page.hasNext } : {}),
+  ...(typeof page.nextCursor === "string" || page.nextCursor === null ? { nextCursor: page.nextCursor } : {}),
+  ...(page.paginationMode ? { paginationMode: page.paginationMode } : {}),
+  posts: page.posts.map(toSnapshotPost),
+})
+
+export const toRestoredPost = (post: FeedExplorerSnapshotPost): TPost => {
+  const created = post.createdAt || post.createdTime || ""
+  const dateStart =
+    post.date?.start_date ||
+    (created.length >= 10 ? created.slice(0, 10) : "1970-01-01")
+  const authorName = (post.authorName || post.author?.[0]?.name || "").trim()
+
+  return {
+    id: post.id,
+    title: post.title,
+    slug: post.id,
+    createdAt: created || undefined,
+    modifiedAt: post.modifiedAt || post.modifiedTime,
+    published: post.published ?? true,
+    listed: post.listed ?? true,
+    authorId: post.authorId,
+    authorName,
+    authorUsername: post.authorUsername,
+    authorProfileImgUrl: post.authorProfileImgUrl || post.author?.[0]?.profile_photo,
+    summary: post.summary,
+    summarySource: post.summarySource,
+    ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
+    ...(post.tags?.length ? { tags: post.tags } : {}),
+    ...(post.category?.length ? { category: post.category } : {}),
+    likesCount: typeof post.likesCount === "number" ? post.likesCount : 0,
+    hitCount: typeof post.hitCount === "number" ? post.hitCount : 0,
+    date: { start_date: dateStart },
+    type: ["Post"],
+    status: ["Public"],
+    author: post.author?.length
+      ? post.author
+      : [
+          {
+            id: String(post.authorId ?? ""),
+            name: authorName,
+            profile_photo: post.authorProfileImgUrl,
+          },
+        ],
+    createdTime: created,
+    modifiedTime: post.modifiedAt || post.modifiedTime,
+    fullWidth: false,
+  }
+}
+
+export const toRestoredPage = (page: FeedExplorerSnapshotPage): ExplorePostsPage => ({
+  totalCount: page.totalCount,
+  pageNumber: page.pageNumber,
+  pageSize: page.pageSize,
+  ...(typeof page.hasNext === "boolean" ? { hasNext: page.hasNext } : {}),
+  ...(typeof page.nextCursor === "string" || page.nextCursor === null ? { nextCursor: page.nextCursor } : {}),
+  ...(page.paginationMode ? { paginationMode: page.paginationMode } : {}),
+  posts: page.posts.map(toRestoredPost),
+})
+
+const normalizeSnapshotPageParam = (value: unknown): FeedExplorerSnapshotPageParam | undefined => {
+  if (value === null) return null
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value)
+  if (typeof value !== "string") return undefined
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+export const toSnapshotPageParam = (value: unknown): FeedExplorerSnapshotPageParam => {
+  return normalizeSnapshotPageParam(value) ?? null
+}
+
+const toFallbackRestoredPageParam = (
+  pages: FeedExplorerSnapshotPage[],
+  index: number
+): FeedExplorerSnapshotPageParam => {
+  const page = pages[index]
+  if (page?.paginationMode !== "cursor") {
+    return typeof page?.pageNumber === "number" && Number.isFinite(page.pageNumber)
+      ? Math.trunc(page.pageNumber)
+      : index + 1
+  }
+  if (index === 0) return null
+
+  const previousCursor = pages[index - 1]?.nextCursor
+  return typeof previousCursor === "string" && previousCursor.trim().length > 0
+    ? previousCursor.trim()
+    : null
+}
+
+export const toRestoredPageParams = (
+  snapshot: FeedExplorerRestoreSnapshot
+): FeedExplorerSnapshotPageParam[] => {
+  const pageParams = Array.isArray(snapshot.pageParams) ? snapshot.pageParams : []
+  return snapshot.pages.map((page, index) => {
+    if (page.paginationMode === "cursor") {
+      return toFallbackRestoredPageParam(snapshot.pages, index)
+    }
+
+    const parsed = normalizeSnapshotPageParam(pageParams[index])
+    return parsed === undefined ? toFallbackRestoredPageParam(snapshot.pages, index) : parsed
+  })
+}
+
+export const isCursorOnlyPublicFeedRestoreSnapshot = (
+  snapshot: FeedExplorerRestoreSnapshot
+): boolean => {
+  if (snapshot.pages.length === 0 || snapshot.pages.some((page) => page.paginationMode !== "cursor")) {
+    return false
+  }
+  if (snapshot.pageParams?.some((pageParam) => typeof pageParam === "number")) return false
+
+  return toRestoredPageParams(snapshot).every(
+    (pageParam, index) =>
+      (index === 0 && pageParam === null) ||
+      (index > 0 && typeof pageParam === "string" && pageParam.trim().length > 0)
+  )
+}
+
+export const scheduleIdleRevalidate = (callback: () => void) => {
+  if (typeof window === "undefined") return () => {}
+
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (
+      cb: (deadline: IdleCallbackDeadlineLike) => void,
+      options?: { timeout?: number }
+    ) => IdleCallbackHandle
+    cancelIdleCallback?: (id: IdleCallbackHandle) => void
+  }
+
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    const idleId = idleWindow.requestIdleCallback(
+      () => {
+        callback()
+      },
+      { timeout: FEED_EXPLORER_IDLE_REVALIDATE_TIMEOUT_MS }
+    )
+
+    return () => {
+      if (typeof idleWindow.cancelIdleCallback === "function") {
+        idleWindow.cancelIdleCallback(idleId)
+      }
+    }
+  }
+
+  const timeoutId = window.setTimeout(callback, FEED_EXPLORER_IDLE_REVALIDATE_TIMEOUT_MS)
+  return () => window.clearTimeout(timeoutId)
+}
+
+export const parseFeedExplorerRestoreSnapshot = (raw: string | null): FeedExplorerRestoreSnapshot | null => {
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<FeedExplorerRestoreSnapshot>
+    if (!parsed || typeof parsed !== "object") return null
+    if (!Array.isArray(parsed.pages)) return null
+    if (parsed.pages.length === 0) return null
+
+    const savedAt =
+      typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+    if (savedAt <= 0) return null
+    if (Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) return null
+
+    const pageParams = Array.isArray(parsed.pageParams)
+      ? parsed.pageParams.map(toSnapshotPageParam).slice(0, parsed.pages.length)
+      : undefined
+
+    return {
+      savedAt,
+      pages: parsed.pages as FeedExplorerSnapshotPage[],
+      ...(pageParams ? { pageParams } : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
+export const toPersistFingerprint = (
+  state: Pick<FeedExplorerRestoreState, "q" | "tag" | "loadedPages" | "scrollY" | "sortMode">
+) => {
+  const scrollBucket = Math.trunc(Math.max(0, state.scrollY) / FEED_EXPLORER_SCROLL_BUCKET_PX)
+  return `${state.q}\u0000${state.tag}\u0000${state.loadedPages}\u0000${scrollBucket}\u0000${state.sortMode ?? "latest"}`
+}
+
+const SAVED_AT_FAST_REGEX = /^\s*\{[^{}]*"savedAt"\s*:\s*(\d+)/
+
+export const extractSavedAt = (raw: string | null) => {
+  if (!raw) return 0
+  const fastMatch = SAVED_AT_FAST_REGEX.exec(raw)
+  if (fastMatch) {
+    const parsedFast = Number(fastMatch[1])
+    if (Number.isFinite(parsedFast)) return parsedFast
+  }
+  try {
+    const parsed = JSON.parse(raw) as { savedAt?: unknown }
+    return typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+  } catch {
+    return 0
+  }
+}
+
+export const pruneFeedExplorerStateStorage = (storage: Storage) => {
+  const candidates: Array<{ key: string; savedAt: number }> = []
+
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (!key) continue
+      if (!key.startsWith(FEED_EXPLORER_RESTORE_KEY_PREFIX)) continue
+      if (key.endsWith(FEED_EXPLORER_SNAPSHOT_SUFFIX) || key.endsWith(FEED_EXPLORER_CURSOR_SUFFIX)) {
+        continue
+      }
+
+      const snapshotKey = getFeedExplorerSnapshotKey(key)
+      const cursorKey = getFeedExplorerCursorKey(key)
+      const savedAt = extractSavedAt(storage.getItem(key))
+
+      if (savedAt <= 0 || Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) {
+        storage.removeItem(key)
+        storage.removeItem(snapshotKey)
+        storage.removeItem(cursorKey)
+        continue
+      }
+
+      candidates.push({ key, savedAt })
+    }
+
+    if (candidates.length <= FEED_EXPLORER_RESTORE_MAX_KEYS) return
+
+    candidates
+      .sort((a, b) => b.savedAt - a.savedAt)
+      .slice(FEED_EXPLORER_RESTORE_MAX_KEYS)
+      .forEach(({ key }) => {
+        storage.removeItem(key)
+        storage.removeItem(getFeedExplorerSnapshotKey(key))
+        storage.removeItem(getFeedExplorerCursorKey(key))
+      })
+  } catch {
+    // 스토리지 접근이 차단된 환경에서는 정리 실패를 무시한다.
+  }
+}
+
+export const shouldRestoreFeedExplorerSession = (
+  sortMode: "latest" | "views" | "likes"
+): boolean => sortMode === "latest" || sortMode === "views" || sortMode === "likes"
+
+export const toFeedExplorerInfiniteQueryKey = ({
+  kw,
+  tag,
+  pageSize,
+  order,
+  sortMode = "latest",
+}: {
+  kw: string
+  tag: string
+  pageSize: number
+  order: "asc" | "desc"
+  sortMode?: "latest" | "views" | "likes"
+}) => {
+  const normalizedKw = normalizeKeywordQuery(kw)
+  const normalizedTag = normalizeTagQuery(tag)
+  const searchMode = normalizedKw.length > 0 && !normalizedTag
+  const feedMode = normalizedKw.length === 0 && !normalizedTag
+  const normalizedSortMode =
+    sortMode === "views" || sortMode === "likes" ? sortMode : "latest"
+
+  if (feedMode) {
+    return queryKey.postsFeedInfinite({
+      pageSize,
+      order,
+      sortMode: normalizedSortMode,
+    })
+  }
+
+  if (searchMode) {
+    return queryKey.postsSearchInfinite({
+      kw: normalizedKw,
+      pageSize,
+      order,
+      sortMode: normalizedSortMode,
+    })
+  }
+
+  return queryKey.postsExploreInfinite({
+    kw: normalizedKw,
+    tag: normalizedTag || undefined,
+    pageSize,
+    order,
+    sortMode: normalizedSortMode,
+  })
+}
+
+export const parseFeedExplorerRestoreState = (raw: string | null): FeedExplorerRestoreState | null => {
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<FeedExplorerRestoreState>
+    if (!parsed || typeof parsed !== "object") return null
+
+    const q = typeof parsed.q === "string" ? normalizeKeywordQuery(parsed.q) : ""
+    const tag = typeof parsed.tag === "string" ? normalizeTagQuery(parsed.tag) : ""
+    const scrollY =
+      typeof parsed.scrollY === "number" && Number.isFinite(parsed.scrollY)
+        ? Math.max(0, Math.trunc(parsed.scrollY))
+        : 0
+    const loadedPages =
+      typeof parsed.loadedPages === "number" && Number.isFinite(parsed.loadedPages)
+        ? Math.max(1, Math.trunc(parsed.loadedPages))
+        : 1
+    const savedAt =
+      typeof parsed.savedAt === "number" && Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0
+    const sortMode =
+      parsed.sortMode === "latest" || parsed.sortMode === "views" || parsed.sortMode === "likes"
+        ? parsed.sortMode
+        : undefined
+
+    if (savedAt <= 0) return null
+    if (Date.now() - savedAt > FEED_EXPLORER_RESTORE_TTL_MS) return null
+
+    return {
+      q,
+      tag,
+      scrollY,
+      loadedPages,
+      savedAt,
+      ...(sortMode ? { sortMode } : {}),
+    }
+  } catch {
+    return null
+  }
+}

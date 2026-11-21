@@ -1,0 +1,30 @@
+import type { TrustedContentHtml } from "src/types"
+
+export type MarkdownImageWidthCommitPayload = {
+  src: string
+  alt: string
+  index: number
+  widthPx: number
+}
+
+export type MarkdownRendererProps = {
+  content?: string
+  trustedContentHtml?: TrustedContentHtml
+  disableMermaid?: boolean
+  forceScheme?: "dark" | "light"
+  editableImages?: boolean
+  onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
+}
+
+export type MarkdownImageFigureProps = {
+  alt: string
+  src: string
+  widthPx?: number
+  heightPx?: number
+  aspectRatio?: string
+  align?: "left" | "center" | "right" | "wide" | "full"
+  eager?: boolean
+  editable?: boolean
+  imageIndex: number
+  onWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
+}

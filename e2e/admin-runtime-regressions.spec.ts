@@ -1,0 +1,159 @@
+import { existsSync, readFileSync } from "node:fs"
+import path from "node:path"
+import { expect, test } from "@playwright/test"
+
+const readFrontSource = (relativePath: string) =>
+  readFileSync(path.resolve(__dirname, "../src", relativePath), "utf8")
+
+test.describe("관리자 런타임 회귀 계약", () => {
+  test("운영 브라우저 API는 클라이언트 IP 보존과 계정 잠금 DoS 방지를 위해 백엔드로 직접 요청한다", () => {
+    const clientSource = readFrontSource("apis/backend/client.ts")
+    const editorRootModelSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts")
+    const proxySourcePath = path.resolve(__dirname, "../src/pages/api/backend/[...path].ts")
+    const notificationsSourcePath = path.resolve(__dirname, "../src/apis/backend/notifications.ts")
+
+    expect(clientSource).not.toContain('const BROWSER_BACKEND_PROXY_PREFIX = "/api/backend"')
+    expect(clientSource).not.toContain("const shouldUseBrowserBackendProxy =")
+    expect(clientSource).not.toContain("return `${BROWSER_BACKEND_PROXY_PREFIX}${safePath}`")
+    expect(clientSource).toContain("return `${getApiBaseUrl()}${safePath}`")
+    expect(existsSync(notificationsSourcePath)).toBe(false)
+    expect(editorRootModelSource).toContain('import { ApiError, apiFetch } from "src/apis/backend/client"')
+    expect(editorRootModelSource).toContain('apiFetch<RsData<PostForEditor>>("/post/api/v1/posts/temp", {')
+    expect(editorRootModelSource).not.toContain('fetch(getApiRequestUrl("/post/api/v1/posts/temp"), {')
+    expect(editorRootModelSource).not.toContain('fetch(`${getApiBaseUrl()}/post/api/v1/posts/temp`, {')
+
+    expect(existsSync(proxySourcePath)).toBe(true)
+    const proxySource = readFileSync(proxySourcePath, "utf8")
+    expect(proxySource).toContain("bodyParser: false")
+    expect(proxySource).toContain("normalizeApiRequestPath")
+    expect(proxySource).toContain("resolveServerApiBaseUrl")
+    expect(proxySource).toContain('import { Readable } from "node:stream"')
+    expect(proxySource).toContain("const isAbortLikeError = (error: unknown) =>")
+    expect(proxySource).toContain("signal: AbortSignal")
+    expect(proxySource).not.toContain("const toArrayBuffer = (buffer: Buffer): ArrayBuffer")
+    expect(proxySource).not.toContain("new Promise<ProxyBodyReadResult>")
+    expect(proxySource).not.toContain('req.on("data", handleData)')
+    expect(proxySource).not.toContain("Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)")
+    expect(proxySource).toContain("const BACKEND_PROXY_TIMEOUT_MS = 10 * 60_000")
+    expect(proxySource).toContain("const DEFAULT_BACKEND_PROXY_MAX_BODY_BYTES = 1 * 1024 * 1024")
+    expect(proxySource).toContain("const DEFAULT_BACKEND_PROXY_MAX_IN_FLIGHT_BODY_BYTES = 8 * 1024 * 1024")
+    expect(proxySource).toContain('process.env.BACKEND_PROXY_MAX_BODY_BYTES')
+    expect(proxySource).toContain('process.env.BACKEND_PROXY_MAX_IN_FLIGHT_BODY_BYTES')
+    expect(proxySource).toContain("reserveProxyBodyBytes(byteCount, maxInFlightBodyBytes)")
+    expect(proxySource).toContain("releaseProxyBodyBytes(reservedBytes)")
+    expect(proxySource).toContain("res.status(503).json")
+    expect(proxySource).toContain('firstHeaderValue(req.headers["content-length"])')
+    expect(proxySource).toContain("throw new ProxyBodyTooLargeError()")
+    expect(proxySource).toContain("throw new ProxyBodyTimeoutError()")
+    expect(proxySource).toContain("if (signal.aborted)")
+    expect(proxySource).not.toContain("req.pause()")
+    expect(proxySource).not.toContain("req.destroy(")
+    expect(proxySource).not.toContain("Buffer.concat(chunks)")
+    expect(proxySource).toContain("Readable.toWeb(req)")
+    expect(proxySource).toContain("proxyBodyRead?.releaseReservation()")
+    expect(proxySource).not.toContain("req as unknown as BodyInit")
+    expect(proxySource).toContain('headers.set("X-Forwarded-Host"')
+    expect(proxySource).toContain('headers.set("X-Forwarded-Proto", "https")')
+    expect(proxySource).toContain('headers.set("X-Forwarded-For", clientIp)')
+    expect(proxySource).toContain("const controller = new AbortController()")
+    expect(proxySource).toContain("const timeoutId = setTimeout(() => controller.abort(), BACKEND_PROXY_TIMEOUT_MS)")
+    expect(proxySource).toContain("signal: controller.signal")
+    expect(proxySource).toContain("clearTimeout(timeoutId)")
+    expect(proxySource).toContain("res.status(413).json")
+    expect(proxySource).toContain("const maxMb = Math.floor(resolveMaxProxyBodyBytes() / (1024 * 1024))")
+    expect(proxySource).toContain("controller.signal.aborted || isAbortLikeError(error)")
+    expect(proxySource).toContain("res.status(504).json")
+    expect(proxySource).toContain('upstreamRequestInit.duplex = "half"')
+    expect(proxySource).toContain('normalizedKey === "host"')
+    expect(proxySource).toContain('normalizedKey === "accept-encoding"')
+    expect(proxySource).toContain('const DECODED_RESPONSE_HEADERS = new Set(["content-encoding", "content-length"])')
+    expect(proxySource).toContain("DECODED_RESPONSE_HEADERS.has(normalizedKey)")
+  })
+
+  test("클라우드 목록은 정규화된 API URL 생성기를 유지하고 업로드 타임아웃을 적용한다", () => {
+    const clientSource = readFrontSource("apis/backend/client.ts")
+    const cloudSource = readFrontSource("apis/backend/cloud.ts")
+
+    expect(clientSource).toContain("export const getApiRequestUrl = (path: string) =>")
+    expect(clientSource).not.toContain("BackendProxyMode")
+    expect(cloudSource).toContain('import { ApiError, apiFetch, getApiRequestUrl } from "./client"')
+    expect(cloudSource).toContain("const CLOUD_UPLOAD_TIMEOUT_MS = 10 * 60_000 + 30_000")
+    expect(cloudSource).toContain("timeoutMs: CLOUD_UPLOAD_TIMEOUT_MS")
+    expect(cloudSource).toContain("getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content`)")
+    expect(cloudSource).not.toContain("getApiBaseUrl")
+  })
+
+  test("프로필 이미지 업로드는 CSRF preflight 헤더를 포함한다", () => {
+    const profilePersistenceSource = readFrontSource("routes/Admin/AdminProfilePersistenceModel.ts")
+
+    expect(profilePersistenceSource).toContain(
+      'export const PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS = { "X-Aquila-CSRF": "1" } as const'
+    )
+    expect(profilePersistenceSource).toContain("headers: PROFILE_IMAGE_CSRF_PREFLIGHT_HEADERS")
+  })
+
+  test("레거시 편집기 프로필 스튜디오는 런타임 경계에서 제거된다", () => {
+    const editorRootSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRoot.tsx")
+    const editorViewSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootView.tsx")
+    const editorModelSource = readFrontSource("routes/Admin/EditorStudioWorkspaceControllerRootModel.ts")
+
+    expect(existsSync(path.resolve(__dirname, "../src/routes/Admin/EditorStudioLegacyProfileSection.tsx"))).toBe(false)
+    expect(existsSync(path.resolve(__dirname, "../src/routes/Admin/useEditorStudioProfileCommands.ts"))).toBe(false)
+    expect(editorRootSource).not.toContain("useEditorStudioProfileCommands")
+    expect(editorViewSource).not.toContain("EditorStudioLegacyProfileSection")
+    expect(editorViewSource).not.toContain("SHOW_LEGACY_PROFILE_STUDIO")
+    expect(editorModelSource).not.toContain("SHOW_LEGACY_PROFILE_STUDIO")
+  })
+
+  test("프로필 이미지 편집 모달은 과거 이미지 선택과 삭제 동선을 제공한다", () => {
+    const modalSource = readFrontSource("routes/Admin/AdminProfileImageEditorModal.tsx")
+    const sectionSource = readFrontSource("routes/Admin/AdminProfileWorkspaceSections.tsx")
+    const pageModelSource = readFrontSource("routes/Admin/AdminProfileWorkspacePageModel.ts")
+
+    expect(modalSource).toContain("previousProfileImages")
+    expect(modalSource).toContain("onSelectPreviousProfileImage")
+    expect(modalSource).toContain("onDeletePreviousProfileImage")
+    expect(sectionSource).toContain("previousProfileImages={previousProfileImages}")
+    expect(pageModelSource).toContain("previousProfileImages")
+  })
+
+  test("새로고침 전 첫 페인트는 light-only bootstrap을 먼저 적용한다", () => {
+    const documentSource = readFrontSource("pages/_document.tsx")
+    const bootstrapSource = readFrontSource("libs/security/documentInlineScripts.js")
+    const schemeSource = readFrontSource("hooks/useScheme.ts")
+
+    expect(documentSource).toContain('from "src/libs/security/documentInlineScripts"')
+    expect(documentSource).toContain('<script dangerouslySetInnerHTML={{ __html: AQUILA_SCHEME_BOOTSTRAP_SCRIPT }} />')
+    expect(bootstrapSource).not.toContain("AQUILA_CONFIGURED_SCHEME")
+    expect(bootstrapSource).not.toContain("prefers-color-scheme: dark")
+    expect(bootstrapSource).not.toContain("darkPreHydrationGuard")
+    expect(bootstrapSource).toContain('var nextScheme = "light"')
+    expect(bootstrapSource).toContain('var bootstrapSource = "configured"')
+    expect(bootstrapSource).toContain('var background = "#f7f7f5"')
+    expect(bootstrapSource).toContain('document.documentElement.dataset.aquilaScheme = nextScheme')
+    expect(bootstrapSource).toContain('document.documentElement.setAttribute("data-aquila-scheme-config", "light")')
+    expect(bootstrapSource).toContain('document.documentElement.setAttribute("data-aquila-scheme-bootstrap", nextScheme)')
+    expect(bootstrapSource).toContain('document.documentElement.setAttribute("data-aquila-scheme-bootstrap-source", bootstrapSource)')
+    expect(bootstrapSource).toContain("colorScheme = nextScheme")
+    expect(bootstrapSource).toContain('html[data-aquila-scheme-bootstrap]{background:" + background + ";color-scheme:" + nextScheme + ";}')
+    expect(bootstrapSource).toContain("html[data-aquila-scheme-bootstrap] body")
+    expect(schemeSource).toContain('const LIGHT_SCHEME: SchemeType = "light"')
+    expect(schemeSource).toContain("initialData: LIGHT_SCHEME")
+    expect(schemeSource).toContain("useIsomorphicLayoutEffect(() =>")
+    expect(schemeSource).toContain("clearSchemeBootstrapStyle")
+    expect(schemeSource).toContain('style[data-aquila-scheme-bootstrap-style="true"]')
+    expect(schemeSource).not.toContain("resolveBootstrapScheme")
+    expect(schemeSource).not.toContain("setCookie")
+    expect(schemeSource).not.toContain("prefers-color-scheme: dark")
+  })
+})
+
+test.describe("공개 피드 접근성 회귀 계약", () => {
+  test("홈 피드 활성 태그는 밝은 배경에서 충분한 대비의 텍스트 색을 사용한다", () => {
+    const tagListSource = readFrontSource("routes/Feed/TagList.tsx")
+
+    expect(tagListSource).toContain('&[data-active="true"]')
+    expect(tagListSource).toContain("color: var(--aq-accent-link, var(--aq-accent));")
+    expect(tagListSource).toContain("font-weight: 700;")
+  })
+})

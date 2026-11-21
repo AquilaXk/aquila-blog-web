@@ -1,0 +1,201 @@
+import { formatWithNormalizedHours } from "src/libs/utils"
+
+export type JsonValue = unknown
+export type TaskRetryPolicy = {
+  label: string
+  maxRetries: number
+  baseDelaySeconds: number
+  backoffMultiplier: number
+  maxDelaySeconds: number
+}
+
+export type SystemHealthPayload = {
+  status?: string
+  details?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export type ActionCardTone = "read" | "write" | "danger" | "infra"
+export type DiagnosticTab = "queue" | "cleanup" | "auth"
+export type ExecutionDomain = "overview" | "diagnostics" | "execution"
+export type ExecutionResultFilter = "all" | "success" | "error" | "stale"
+
+export type ExecutionEntry = {
+  id: string
+  key: string
+  source: string
+  domain: ExecutionDomain
+  tone: ActionCardTone
+  status: "success" | "error"
+  startedAt: string
+  completedAt: string
+  summary: string
+  payload: JsonValue
+}
+
+export const ADMIN_TOOLS_DISPLAY_TIME_ZONE = "Asia/Seoul"
+export const DATA_MISSING_STATUS_LABEL = "데이터 미수집"
+export const CONNECTION_UNAVAILABLE_STATUS_LABEL = "미연결"
+export const DATA_EMPTY_STATUS_LABEL = "데이터 없음"
+export const LOADING_STATUS_LABEL = "갱신 중"
+export const CHECK_REQUIRED_STATUS_LABEL = "점검 필요"
+export const SYSTEM_HEALTH_QUERY_KEY = ["admin", "tools", "system-health"] as const
+export const HEALTH_CACHE_MS = 10_000
+export const RESULTS_FILTER_STORAGE_KEY = "admin.tools.resultsFilter.v1"
+export const SECTION_IDS = {
+  overview: "ops-overview",
+  diagnostics: "ops-diagnostics",
+  execution: "ops-execution",
+  results: "ops-results",
+} as const
+
+export type SectionKey = keyof typeof SECTION_IDS
+
+export const isExecutionResultFilter = (value: string): value is ExecutionResultFilter =>
+  value === "all" || value === "success" || value === "error" || value === "stale"
+
+export const ACTION_META: Record<
+  string,
+  {
+    label: string
+    domain: ExecutionDomain
+    tone: ActionCardTone
+  }
+> = {
+  admPostCount: { label: "전체 글 수 확인", domain: "execution", tone: "read" },
+  systemHealth: { label: "서비스 상태 조회", domain: "execution", tone: "infra" },
+  taskQueueStatus: { label: "작업 큐 진단", domain: "diagnostics", tone: "infra" },
+  cleanupStatus: { label: "파일 정리 진단", domain: "diagnostics", tone: "infra" },
+  authSecurityEvents: { label: "인증 보안 기록 조회", domain: "diagnostics", tone: "infra" },
+}
+
+const TOOLS_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: ADMIN_TOOLS_DISPLAY_TIME_ZONE,
+})
+
+export const formatInstant = (value: string | null | undefined) => {
+  if (!value) return "-"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return formatWithNormalizedHours(TOOLS_INSTANT_FORMATTER, date)
+}
+
+export const formatAge = (seconds: number | null | undefined) => {
+  if (seconds == null) return "-"
+  if (seconds < 60) return `${seconds}초`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}분`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간`
+  return `${Math.floor(seconds / 86400)}일`
+}
+
+export const getFreshnessMeta = (
+  value: string | null | undefined,
+  referenceNow: number | null
+): { label: string; tone: "fresh" | "aging" | "stale" } => {
+  if (!value) return { label: DATA_MISSING_STATUS_LABEL, tone: "stale" }
+
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return { label: DATA_MISSING_STATUS_LABEL, tone: "stale" }
+
+  if (referenceNow == null) return { label: "확인됨", tone: "fresh" }
+
+  const diffMs = referenceNow - timestamp
+  if (diffMs < 90_000) return { label: "방금 확인", tone: "fresh" }
+  if (diffMs < 15 * 60_000) return { label: `${Math.max(1, Math.floor(diffMs / 60_000))}분 전`, tone: "fresh" }
+  if (diffMs < 60 * 60_000) return { label: `${Math.max(15, Math.floor(diffMs / 60_000))}분 전`, tone: "aging" }
+  return { label: `${Math.max(1, Math.floor(diffMs / 3_600_000))}시간 전`, tone: "stale" }
+}
+
+export const formatRetryPolicy = (policy: Partial<TaskRetryPolicy> | null | undefined) => {
+  if (!policy) return "-"
+  const maxRetries = typeof policy.maxRetries === "number" ? policy.maxRetries : 0
+  const baseDelay = typeof policy.baseDelaySeconds === "number" ? policy.baseDelaySeconds : 0
+  const multiplier =
+    typeof policy.backoffMultiplier === "number" && Number.isFinite(policy.backoffMultiplier)
+      ? policy.backoffMultiplier.toFixed(1)
+      : "2.0"
+  const maxDelay = typeof policy.maxDelaySeconds === "number" ? policy.maxDelaySeconds : 0
+  return `${maxRetries}회 / ${baseDelay}초 시작 / x${multiplier} / 최대 ${maxDelay}초`
+}
+
+export const isOperationalStatusMissing = (value: string | null | undefined) => {
+  const normalized = value?.trim()
+  return !normalized || normalized === "UNKNOWN"
+}
+
+export const normalizeOperationalStatusLabel = (value: string | null | undefined): string => {
+  const normalized = value?.trim()
+  if (!normalized || isOperationalStatusMissing(normalized)) return DATA_MISSING_STATUS_LABEL
+  if (normalized === "UP" || normalized === "READY") return "정상"
+  if (normalized === "CONNECTION_FAILED" || normalized === "DOWN" || normalized === "ERROR") return "오류"
+  if (normalized === "MISCONFIGURED") return CHECK_REQUIRED_STATUS_LABEL
+  return normalized
+}
+
+export const getDiagnosticFallbackStatusLabel = (isLoading: boolean, errorMessage: string | null | undefined) => {
+  if (isLoading) return LOADING_STATUS_LABEL
+  if (errorMessage?.trim()) return CONNECTION_UNAVAILABLE_STATUS_LABEL
+  return DATA_EMPTY_STATUS_LABEL
+}
+
+export const getSystemHealthSummary = (health: SystemHealthPayload | null) => {
+  if (!health?.details || typeof health.details !== "object") return []
+
+  return Object.entries(health.details)
+    .slice(0, 4)
+    .map(([key, value]) => {
+      if (value && typeof value === "object" && "status" in value && typeof value.status === "string") {
+        return `${key}: ${normalizeOperationalStatusLabel(value.status)}`
+      }
+
+      return `${key}: ${typeof value === "string" ? normalizeOperationalStatusLabel(value) : "ok"}`
+    })
+}
+
+export const getResultMessage = (payload: JsonValue) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null
+  if ("msg" in payload && typeof (payload as { msg?: unknown }).msg === "string") {
+    return (payload as { msg: string }).msg
+  }
+  if ("message" in payload && typeof (payload as { message?: unknown }).message === "string") {
+    return (payload as { message: string }).message
+  }
+  if ("error" in payload && typeof (payload as { error?: unknown }).error === "string") {
+    return (payload as { error: string }).error
+  }
+  return null
+}
+
+export const buildExecutionSummary = (key: string, status: "success" | "error", payload: JsonValue) => {
+  if (status === "error") return getResultMessage(payload) || "실행에 실패했습니다."
+
+  switch (key) {
+    case "systemHealth": {
+      const health = payload as SystemHealthPayload
+      return `서비스 상태 ${health?.status || "확인"}`
+    }
+    case "admPostCount":
+      return typeof payload === "number" ? `전체 글 ${payload}건을 확인했습니다.` : getResultMessage(payload) || "전체 글 수를 확인했습니다."
+    case "taskQueueStatus":
+      return "작업 큐 진단을 새로고침했습니다."
+    case "cleanupStatus":
+      return "파일 정리 진단을 새로고침했습니다."
+    case "authSecurityEvents":
+      return "인증 보안 기록을 새로고침했습니다."
+    default:
+      return getResultMessage(payload) || ACTION_META[key]?.label || "작업을 실행했습니다."
+  }
+}
+
+export const getStatusTone = (status: string) => {
+  if (status === "정상") return "success"
+  if (status === "오류" || status === CONNECTION_UNAVAILABLE_STATUS_LABEL) return "danger"
+  return "warning"
+}

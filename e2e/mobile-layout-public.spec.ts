@@ -1,0 +1,362 @@
+import { expect, test } from "@playwright/test"
+import {
+  MOBILE_VIEWPORT,
+  captureLayoutSnapshot,
+  mockAnonymousSession,
+  mockAvatarAsset,
+  mockDetailEndpoint,
+  mockFeedEndpoints,
+} from "./helpers/mobileLayoutFixtures"
+import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
+
+test.use({
+  viewport: MOBILE_VIEWPORT,
+  isMobile: true,
+  hasTouch: true,
+})
+
+test.beforeEach(async ({ page }) => {
+  await mockAvatarAsset(page)
+  await mockAnonymousSession(page)
+  await mockPublicAdminProfile(page)
+})
+
+test.describe("mobile layout public", () => {
+  test("iPhone 15 Pro 메인 피드는 카드 overflow 없이 viewport 내부에 렌더된다", async ({ page }) => {
+  await mockFeedEndpoints(page)
+
+  await page.goto("/")
+  const searchInput = page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)
+  await expect(searchInput).toBeVisible()
+  const searchInputBox = await searchInput.boundingBox()
+  expect(searchInputBox?.width ?? 0).toBeGreaterThanOrEqual(210)
+  await page.getByRole("button", { name: "메뉴" }).click()
+  await expect(page.getByRole("dialog", { name: "메뉴" })).toBeVisible()
+  await expect(page.getByRole("link", { name: /(?:글|Notes|Posts)/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /(?:태그|Topics|Tags)/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /(?:소개|About)/ })).toBeVisible()
+  await expect(page.getByRole("button", { name: "검색" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "전체보기" })).toBeVisible()
+  await expect(page.locator("a[href^='/posts/'] h2").first()).toBeVisible()
+  const moreTagButton = page.getByRole("button", { name: /더보기/ })
+  await expect(moreTagButton).toBeVisible()
+
+  const moreTagRect = await moreTagButton.evaluate((button) => {
+    const rect = button.getBoundingClientRect()
+    return { left: rect.left, right: rect.right, width: rect.width }
+  })
+  expect(moreTagRect.left).toBeGreaterThanOrEqual(0)
+  expect(moreTagRect.right).toBeLessThanOrEqual(MOBILE_VIEWPORT.width + 0.5)
+
+  const firstSnapshot = await captureLayoutSnapshot(page)
+  expect(firstSnapshot.htmlScrollWidth).toBeLessThanOrEqual(firstSnapshot.viewportWidth)
+  expect(firstSnapshot.bodyScrollWidth).toBeLessThanOrEqual(firstSnapshot.viewportWidth)
+  expect(firstSnapshot.maxCardRight).toBeLessThanOrEqual(firstSnapshot.viewportWidth + 0.5)
+  expect(firstSnapshot.minCardLeft).toBeGreaterThanOrEqual(-0.5)
+
+  await page.reload()
+  await expect(page.getByRole("button", { name: "전체보기" })).toBeVisible()
+  await expect(page.locator("a[href^='/posts/'] h2").first()).toBeVisible()
+
+  const secondSnapshot = await captureLayoutSnapshot(page)
+  expect(secondSnapshot.htmlScrollWidth).toBeLessThanOrEqual(secondSnapshot.viewportWidth)
+  expect(secondSnapshot.bodyScrollWidth).toBeLessThanOrEqual(secondSnapshot.viewportWidth)
+  expect(Math.abs(firstSnapshot.firstCardWidth - secondSnapshot.firstCardWidth)).toBeLessThanOrEqual(1.5)
+})
+
+  test("모바일 헤더 메뉴는 body portal·focus-trap·검색 진입점을 유지한다", async ({ page }) => {
+    await mockFeedEndpoints(page)
+    await page.goto("/")
+    await expect(page.getByLabel(/Search posts by keyword|키워드로 게시글 검색/)).toBeVisible()
+
+    const menuButton = page.getByRole("button", { name: "메뉴" })
+    await menuButton.click()
+
+    const menu = page.getByRole("dialog", { name: "메뉴" })
+    await expect(menu).toBeVisible()
+
+    const portalParent = await menu.evaluate((element) => element.parentElement?.parentElement?.tagName ?? "")
+    expect(portalParent).toBe("BODY")
+
+    const searchItem = menu.getByRole("button", { name: "검색" })
+    await expect(searchItem).toBeVisible()
+    await expect(searchItem).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K")
+    await expect(menu.locator("kbd")).toHaveCount(0)
+    await expect(page.locator(".langToggleBtn")).toBeHidden()
+
+    await expect(menu.getByRole("button", { name: "닫기" })).toBeFocused()
+    await page.keyboard.press("Tab")
+    await expect(menu.getByRole("link", { name: /(?:글|Notes|Posts)/ })).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(menu).toHaveCount(0)
+    await expect(menuButton).toBeFocused()
+
+    await menuButton.click()
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toBeVisible()
+    await page.locator('[data-ui="mobile-nav-menu"] [role="presentation"]').click({
+      position: { x: 12, y: 24 },
+    })
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
+
+    await menuButton.click()
+    await page.getByRole("button", { name: "검색" }).click()
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
+    const quickSearchDialog = page.locator('[data-ui="quick-search-dialog"]')
+    await expect(quickSearchDialog).toBeVisible()
+    await expect(quickSearchDialog.locator(".qsInput")).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(quickSearchDialog).toHaveCount(0)
+
+    await menuButton.click()
+    await page.locator(".mobileLangToggleBtn").click()
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0)
+  })
+
+  test("iPhone 15 Pro about 페이지는 AuthorLayout 프로필 본문과 원형 avatar 계약을 유지한다", async ({ page }) => {
+  await mockPublicAdminProfile(page)
+  await page.goto("/about")
+  await expect(page.locator(".authorHeader h1")).toHaveText("소개")
+  await expect(page.locator(".authorProse h2")).toHaveText("이유를 먼저 따지고, 운영 가능한 시스템을 설계합니다.")
+  await expect(page.locator(".authorProse")).toContainText("안녕하세요, 백엔드 개발자 아퀼라입니다.")
+
+  const snapshot = await page.evaluate(() => {
+    const readRect = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      return {
+        top: rect.top,
+        width: rect.width,
+        right: rect.right,
+      }
+    }
+
+    return {
+      viewportWidth: window.innerWidth,
+      htmlScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      header: readRect(".authorHeader"),
+      profileCol: readRect(".authorProfileCol"),
+      profileCopy: readRect(".authorProse"),
+      profileCopyText: document.querySelector(".authorProse")?.textContent || "",
+      projects: readRect('[data-ui="about-projects"]'),
+      timeline: readRect('[data-ui="about-timeline-section"]'),
+      avatar: readRect('[data-ui="about-avatar"]'),
+      avatarRadius: window.getComputedStyle(document.querySelector('[data-ui="about-avatar"]') as HTMLElement)
+        .borderRadius,
+    }
+  })
+
+  expect(snapshot.htmlScrollWidth).toBeLessThanOrEqual(snapshot.viewportWidth)
+  expect(snapshot.bodyScrollWidth).toBeLessThanOrEqual(snapshot.viewportWidth)
+  expect(snapshot.header).not.toBeNull()
+  expect(snapshot.profileCol).not.toBeNull()
+  expect(snapshot.profileCopy).not.toBeNull()
+  expect(snapshot.profileCopyText).toContain("Java, Kotlin, Spring Boot")
+  expect(snapshot.projects).not.toBeNull()
+  expect(snapshot.timeline).not.toBeNull()
+  expect(snapshot.profileCol?.top ?? 0).toBeGreaterThan(snapshot.header?.top ?? 0)
+  expect(snapshot.profileCopy?.top ?? 0).toBeGreaterThan(snapshot.profileCol?.top ?? 0)
+  expect(snapshot.projects?.top ?? 0).toBeGreaterThan(snapshot.profileCopy?.top ?? 0)
+  expect(snapshot.timeline?.top ?? 0).toBeGreaterThan(snapshot.projects?.top ?? 0)
+  expect(snapshot.avatar?.width ?? 0).toBeLessThanOrEqual(200)
+  expect(snapshot.avatar?.right ?? 0).toBeLessThanOrEqual(snapshot.viewportWidth + 0.5)
+  expect(["9999px", "50%"]).toContain(snapshot.avatarRadius)
+})
+
+  test("iPhone 15 Pro 상세 본문(table/code block)은 가로 클리핑 없이 유지된다", async ({ page }) => {
+  await mockDetailEndpoint(page)
+
+  await page.goto("/posts/990")
+  await expect(page.getByText("모바일 테이블/코드블록 회귀 테스트")).toBeVisible()
+  const tables = page.locator("table")
+  await expect(tables).toHaveCount(2)
+  await expect(tables.first()).toBeVisible()
+  await expect(page.locator("pre")).toBeVisible()
+
+  const firstSnapshot = await captureLayoutSnapshot(page)
+  expect(firstSnapshot.htmlScrollWidth).toBeLessThanOrEqual(firstSnapshot.viewportWidth)
+  expect(firstSnapshot.bodyScrollWidth).toBeLessThanOrEqual(firstSnapshot.viewportWidth)
+  expect(firstSnapshot.codeShellClientWidth ?? 0).toBeLessThanOrEqual(firstSnapshot.viewportWidth + 0.5)
+  expect((firstSnapshot.codeShellScrollWidth ?? 0) >= (firstSnapshot.codeShellClientWidth ?? 0)).toBeTruthy()
+  expect(["auto", "scroll"]).toContain(firstSnapshot.codeShellOverflowX)
+  expect(firstSnapshot.codeShellTouchAction).toBe("pan-x")
+  expect(firstSnapshot.codeShellOverscrollBehaviorX).toBe("contain")
+  expect((firstSnapshot.codeShellScrollLeftAfter ?? 0) >= (firstSnapshot.codeShellScrollLeftBefore ?? 0)).toBeTruthy()
+  expect(["auto", "scroll", "hidden", "clip"]).toContain(firstSnapshot.codeOverflowX)
+  expect(firstSnapshot.firstTableScrollRight ?? 0).toBeLessThanOrEqual(firstSnapshot.viewportWidth + 0.5)
+  expect(firstSnapshot.secondTableScrollRight ?? 0).toBeLessThanOrEqual(firstSnapshot.viewportWidth + 0.5)
+  expect((firstSnapshot.firstTableScrollWidth ?? 0) >= (firstSnapshot.firstTableScrollClientWidth ?? 0)).toBeTruthy()
+  expect((firstSnapshot.secondTableScrollWidth ?? 0) >= (firstSnapshot.secondTableScrollClientWidth ?? 0)).toBeTruthy()
+  expect(["auto", "scroll"]).toContain(firstSnapshot.firstTableScrollOverflowX)
+  expect(["auto", "scroll"]).toContain(firstSnapshot.secondTableScrollOverflowX)
+  expect((firstSnapshot.tableRight ?? 0) + 2 >= (firstSnapshot.firstTableScrollRight ?? 0)).toBeTruthy()
+  expect((firstSnapshot.secondTableRight ?? 0) + 2 >= (firstSnapshot.secondTableScrollRight ?? 0)).toBeTruthy()
+  expect(firstSnapshot.firstTableCellLabel).toBe("항목")
+  expect(firstSnapshot.firstTableHeadDisplay).not.toBe("none")
+  expect(["none", "normal"]).toContain(firstSnapshot.firstTableCellBeforeContent)
+  expect(firstSnapshot.secondTableHeadDisplay).not.toBe("none")
+  expect(["none", "normal"]).toContain(firstSnapshot.secondTableCellBeforeContent)
+
+  await page.reload()
+  await expect(page.locator("table").first()).toBeVisible()
+  await expect(page.locator("pre")).toBeVisible()
+
+  const secondSnapshot = await captureLayoutSnapshot(page)
+  expect(secondSnapshot.htmlScrollWidth).toBeLessThanOrEqual(secondSnapshot.viewportWidth)
+  expect(secondSnapshot.bodyScrollWidth).toBeLessThanOrEqual(secondSnapshot.viewportWidth)
+  expect(secondSnapshot.codeShellClientWidth ?? 0).toBeLessThanOrEqual(secondSnapshot.viewportWidth + 0.5)
+  expect((secondSnapshot.codeShellScrollWidth ?? 0) >= (secondSnapshot.codeShellClientWidth ?? 0)).toBeTruthy()
+  expect(["auto", "scroll"]).toContain(secondSnapshot.codeShellOverflowX)
+  expect(secondSnapshot.codeShellTouchAction).toBe("pan-x")
+  expect(secondSnapshot.codeShellOverscrollBehaviorX).toBe("contain")
+  expect((secondSnapshot.codeShellScrollLeftAfter ?? 0) >= (secondSnapshot.codeShellScrollLeftBefore ?? 0)).toBeTruthy()
+  expect(["auto", "scroll", "hidden", "clip"]).toContain(secondSnapshot.codeOverflowX)
+  expect(secondSnapshot.firstTableScrollRight ?? 0).toBeLessThanOrEqual(secondSnapshot.viewportWidth + 0.5)
+  expect(secondSnapshot.secondTableScrollRight ?? 0).toBeLessThanOrEqual(secondSnapshot.viewportWidth + 0.5)
+  expect((secondSnapshot.firstTableScrollWidth ?? 0) >= (secondSnapshot.firstTableScrollClientWidth ?? 0)).toBeTruthy()
+  expect((secondSnapshot.secondTableScrollWidth ?? 0) >= (secondSnapshot.secondTableScrollClientWidth ?? 0)).toBeTruthy()
+  expect(["auto", "scroll"]).toContain(secondSnapshot.firstTableScrollOverflowX)
+  expect(["auto", "scroll"]).toContain(secondSnapshot.secondTableScrollOverflowX)
+  expect((secondSnapshot.tableRight ?? 0) + 2 >= (secondSnapshot.firstTableScrollRight ?? 0)).toBeTruthy()
+  expect((secondSnapshot.secondTableRight ?? 0) + 2 >= (secondSnapshot.secondTableScrollRight ?? 0)).toBeTruthy()
+  expect(secondSnapshot.firstTableCellLabel).toBe("항목")
+  expect(secondSnapshot.firstTableHeadDisplay).not.toBe("none")
+  expect(["none", "normal"]).toContain(secondSnapshot.firstTableCellBeforeContent)
+  expect(secondSnapshot.secondTableHeadDisplay).not.toBe("none")
+  expect(["none", "normal"]).toContain(secondSnapshot.secondTableCellBeforeContent)
+})
+
+  test("iPhone 15 Pro 상세 제목은 한국어 단어를 음절 단위로 끊지 않는다", async ({ page }) => {
+  await mockDetailEndpoint(page, {
+    id: 992,
+    title: "Stateless란 무엇인가?",
+    content: "모바일 제목 줄바꿈 회귀 테스트입니다.",
+  })
+
+  await page.goto("/posts/992")
+  const title = page.getByRole("heading", { name: "Stateless란 무엇인가?", level: 1 })
+  await expect(title).toBeVisible()
+
+  const titleWrapSnapshot = await title.evaluate((element) => {
+    const target = "무엇인가?"
+    const textNode = Array.from(element.childNodes).find(
+      (node): node is Text => node.nodeType === Node.TEXT_NODE && (node.textContent || "").includes(target)
+    )
+    if (!textNode || !textNode.textContent) return null
+
+    const startOffset = textNode.textContent.indexOf(target)
+    const range = document.createRange()
+    range.setStart(textNode, startOffset)
+    range.setEnd(textNode, startOffset + target.length)
+    const rects = Array.from(range.getClientRects()).map((rect) => ({
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      width: rect.width,
+    }))
+    range.detach()
+
+    return {
+      target,
+      rects,
+      distinctLineCount: new Set(rects.map((rect) => Math.round(rect.top))).size,
+      viewportWidth: window.innerWidth,
+      htmlScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+    }
+  })
+
+  expect(titleWrapSnapshot).not.toBeNull()
+  expect(titleWrapSnapshot?.distinctLineCount).toBe(1)
+  expect(titleWrapSnapshot?.rects.length).toBe(1)
+  expect(titleWrapSnapshot?.rects[0]?.right ?? 0).toBeLessThanOrEqual(
+    (titleWrapSnapshot?.viewportWidth ?? 0) + 0.5
+  )
+  expect(titleWrapSnapshot?.htmlScrollWidth).toBeLessThanOrEqual(titleWrapSnapshot?.viewportWidth ?? 0)
+  expect(titleWrapSnapshot?.bodyScrollWidth).toBeLessThanOrEqual(titleWrapSnapshot?.viewportWidth ?? 0)
+})
+
+  test("iPhone 15 Pro 상세는 정적 좋아요 수와 공유만 노출한다", async ({ page }) => {
+  await mockDetailEndpoint(page, {
+    id: 991,
+    title: "모바일 액션 위계 테스트",
+    likesCount: 1,
+    hitCount: 24,
+    actorCanModify: true,
+    actorCanDelete: true,
+  })
+
+  await page.goto("/posts/991")
+
+  const engagementRow = page.locator('[aria-label="게시글 반응"]')
+  const metaViewStat = page.locator(".stats .statChip").filter({ hasText: "조회 25" }).first()
+  const compactActionBar = page.getByLabel("빠른 이동 및 반응")
+  const historicalLikeCount = compactActionBar.getByText("좋아요 1", { exact: true })
+  const shareButton = compactActionBar.getByRole("button", { name: /^공유/ })
+  const editButton = page.getByRole("button", { name: "수정" }).first()
+  const deleteButton = page.getByRole("button", { name: "삭제" }).first()
+
+  await expect(engagementRow).toBeHidden()
+  await expect(metaViewStat).toHaveText("조회 25")
+  await expect(metaViewStat).toBeHidden()
+  await expect(historicalLikeCount).toBeVisible()
+  await expect(shareButton).toBeVisible()
+  await expect(compactActionBar.getByRole("button", { name: /좋아요/ })).toHaveCount(1)
+  await expect(compactActionBar.getByRole("button", { name: /댓글/ })).toHaveCount(0)
+  await expect(page.getByText(/^댓글(?:\s|$)/)).toHaveCount(0)
+  await expect(editButton).toHaveCount(0)
+  await expect(deleteButton).toHaveCount(0)
+
+  const [historicalLikeCountBox, shareBox] = await Promise.all([
+    historicalLikeCount.boundingBox(),
+    shareButton.boundingBox(),
+  ])
+
+  expect(historicalLikeCountBox).not.toBeNull()
+  expect(shareBox).not.toBeNull()
+
+  expect(historicalLikeCountBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+  expect((historicalLikeCountBox?.height ?? 0)).toBeLessThanOrEqual(72)
+  expect(Math.abs((historicalLikeCountBox?.y ?? 0) - (shareBox?.y ?? 0))).toBeLessThanOrEqual(4)
+})
+
+test.describe("모바일 상세 MobileSummaryActions 공유 액션", () => {
+  test("모바일 공유 버튼은 최소 44px 터치 타깃과 아이콘 시각 크기를 유지한다", async ({ page }) => {
+    await mockDetailEndpoint(page, {
+      id: 993,
+      title: "반응 버튼 아이콘 크기 테스트",
+      likesCount: 0,
+      hitCount: 10,
+    })
+
+    await page.goto("/posts/993")
+    await expect(page.getByRole("heading", { name: "반응 버튼 아이콘 크기 테스트", level: 1 })).toBeVisible()
+
+    const compactActionBar = page.getByLabel("빠른 이동 및 반응")
+    await expect(compactActionBar).toBeVisible()
+
+    const metrics = await compactActionBar.evaluate((bar) => {
+      const button = bar.querySelector<HTMLButtonElement>('button[data-tone="accent"]')
+      const icon = button?.querySelector<SVGElement>("svg") ?? null
+      const buttonBox = button?.getBoundingClientRect() ?? null
+      const iconBox = icon?.getBoundingClientRect() ?? null
+      const iconStyle = icon ? window.getComputedStyle(icon) : null
+
+      return {
+        buttonWidth: Math.round(buttonBox?.width ?? 0),
+        buttonHeight: Math.round(buttonBox?.height ?? 0),
+        iconWidth: iconBox?.width ?? 0,
+        iconHeight: iconBox?.height ?? 0,
+        iconFontSize: iconStyle ? Number.parseFloat(iconStyle.fontSize) : 0,
+      }
+    })
+
+    expect(metrics.buttonWidth).toBeGreaterThanOrEqual(44)
+    expect(metrics.buttonHeight).toBeGreaterThanOrEqual(44)
+    expect(metrics.iconWidth).toBeGreaterThanOrEqual(15.5)
+    expect(metrics.iconHeight).toBeGreaterThanOrEqual(15.5)
+    expect(metrics.iconFontSize).toBeGreaterThanOrEqual(15.5)
+  })
+})
+})

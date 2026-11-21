@@ -1,0 +1,550 @@
+import {
+  extractNormalizedMermaidSource,
+  normalizeEscapedMermaidFences,
+} from "src/libs/markdown/mermaid"
+import { normalizePublicPostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
+import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
+
+const MERMAID_SOURCE_PATTERN =
+  /^(%%\{|\s*(?:info|flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|c4Context|C4Context|xychart-beta)\b)/
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+  lt: "<",
+  gt: ">",
+  amp: "&",
+  quot: "\"",
+  "#39": "'",
+  "#x27": "'",
+  apos: "'",
+}
+
+const HTML_ATTRIBUTE_REGEX = /([^\s=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
+const HTML_CODE_BLOCK_REGEX = /<pre\b([^>]*)>\s*<code\b([^>]*)>([\s\S]*?)<\/code>\s*<\/pre>/gi
+const HTML_CONTAINER_TAG_REGEX = /<(\/?)(div|section|figure)\b([^>]*)>/gi
+
+const HAS_FENCED_CODE_BLOCK_REGEX = /(^|\n)\s*[`~]{3,}[\w-]*[\t ]*\n[\s\S]*?\n[`~]{3,}(?=\n|$)/
+const HAS_MERMAID_BLOCK_REGEX = /(^|\n)\s*[`~]{3,}\s*mermaid\b[\t ]*\n[\s\S]*?\n[`~]{3,}(?=\n|$)/i
+const containsTokenByCharCodes = (text: string, token: number[]) => {
+  if (!text || token.length === 0 || text.length < token.length) return false
+
+  outer: for (let i = 0; i <= text.length - token.length; i += 1) {
+    for (let j = 0; j < token.length; j += 1) {
+      if (text.charCodeAt(i + j) !== token[j]) {
+        continue outer
+      }
+    }
+    return true
+  }
+
+  return false
+}
+
+const hasMermaidConnectorOrKeyword = (source: string) => {
+  const normalized = source.toLowerCase()
+  if (/\b(subgraph|end)\b/.test(normalized)) return true
+
+  const connectorTokens = [
+    [45, 45, 62],
+    [61, 61, 62],
+    [45, 46, 45, 62],
+    [58, 58, 58],
+  ]
+
+  return connectorTokens.some((token) => containsTokenByCharCodes(normalized, token))
+}
+
+const decodeHtmlEntitiesOnce = (raw: string) =>
+  raw.replace(/&(lt|gt|amp|quot|#39|#x27|apos|#\d+|#x[0-9a-f]+);/gi, (entity, key: string) => {
+    const normalizedKey = key.toLowerCase()
+    if (normalizedKey.startsWith("#x")) {
+      const codePoint = Number.parseInt(normalizedKey.slice(2), 16)
+      return decodeHtmlCodePoint(entity, codePoint)
+    }
+    if (normalizedKey.startsWith("#")) {
+      const codePoint = Number.parseInt(normalizedKey.slice(1), 10)
+      return decodeHtmlCodePoint(entity, codePoint)
+    }
+
+    const decoded = HTML_ENTITY_MAP[normalizedKey]
+    return decoded ?? entity
+  })
+
+const escapeHtml = (raw: string) =>
+  raw
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;")
+
+const escapeHtmlAttribute = (raw: string) => escapeHtml(raw).replaceAll("\n", "&#10;")
+
+const renderMermaidPre = (source: string) =>
+  `<pre class="aq-mermaid" data-aq-mermaid="true" data-mermaid-rendered="pending" data-mermaid-source="${escapeHtmlAttribute(source)}"><code class="language-mermaid">${escapeHtml(source)}</code></pre>`
+
+const decodeHtmlCodePoint = (entity: string, codePoint: number) =>
+  Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+    ? String.fromCodePoint(codePoint)
+    : entity
+
+const BLOCK_BREAK_TAGS = new Set(["br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"])
+
+const isAsciiWhitespace = (char: string) => char === " " || char === "\n" || char === "\t" || char === "\r"
+
+const isAsciiAlphaNumeric = (char: string) => {
+  const code = char.charCodeAt(0)
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122)
+  )
+}
+
+const extractPlainTextByHtmlScanner = (rawHtml: string) => {
+  if (!rawHtml) return ""
+  const chunks: string[] = []
+  let index = 0
+
+  while (index < rawHtml.length) {
+    const ltIndex = rawHtml.indexOf("<", index)
+    if (ltIndex < 0) {
+      chunks.push(rawHtml.slice(index))
+      break
+    }
+    if (ltIndex > index) {
+      chunks.push(rawHtml.slice(index, ltIndex))
+    }
+
+    const tagEndIndex = rawHtml.indexOf(">", ltIndex + 1)
+    if (tagEndIndex < 0) {
+      chunks.push(rawHtml.slice(ltIndex))
+      break
+    }
+
+    const rawTagBody = rawHtml.slice(ltIndex + 1, tagEndIndex).trim()
+    if (rawTagBody.length === 0 || rawTagBody.startsWith("!")) {
+      index = tagEndIndex + 1
+      continue
+    }
+
+    let tagPointer = 0
+    let closing = false
+    if (rawTagBody[tagPointer] === "/") {
+      closing = true
+      tagPointer += 1
+      while (tagPointer < rawTagBody.length && isAsciiWhitespace(rawTagBody[tagPointer])) {
+        tagPointer += 1
+      }
+    }
+
+    const tagNameStart = tagPointer
+    while (tagPointer < rawTagBody.length && isAsciiAlphaNumeric(rawTagBody[tagPointer])) {
+      tagPointer += 1
+    }
+    const tagName = rawTagBody.slice(tagNameStart, tagPointer).toLowerCase()
+
+    if (!closing && BLOCK_BREAK_TAGS.has(tagName)) {
+      chunks.push("\n")
+    }
+
+    index = tagEndIndex + 1
+  }
+
+  return chunks.length <= 1 ? (chunks[0] ?? "") : chunks.join("")
+}
+
+export const extractPlainTextFromHtmlFragment = (rawHtml: string) => {
+  if (!rawHtml) return ""
+  if (!rawHtml.includes("<")) return decodeHtmlEntitiesOnce(rawHtml)
+  return decodeHtmlEntitiesOnce(extractPlainTextByHtmlScanner(rawHtml))
+}
+
+const extractPlainTextFromHtml = extractPlainTextFromHtmlFragment
+
+const extractMermaidSource = (rawCode: string) => {
+  return extractNormalizedMermaidSource(extractPlainTextFromHtml(rawCode))
+}
+
+export const isMermaidSource = (rawCode: string) => {
+  const normalized = extractMermaidSource(rawCode).trimStart()
+  if (!normalized) return false
+  return MERMAID_SOURCE_PATTERN.test(normalized)
+}
+
+const HTML_UNIFIED_BLOCK_REGEX = /<(pre|p)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+const PRE_CODE_INNER_REGEX = /^\s*<code\b([^>]*)>([\s\S]*?)<\/code>\s*$/i
+
+const transformParagraphMermaid = (full: string, rawBody: string): string => {
+  const normalizedText = normalizeEscapedMermaidFences(extractPlainTextFromHtml(rawBody)).trim()
+  if (!normalizedText) return full
+
+  const hasMermaidFence =
+    /^`{3,}\s*mermaid\b/i.test(normalizedText) || /^\\`{3,}\s*mermaid\b/i.test(rawBody.trim())
+  const source = extractMermaidSource(rawBody)
+  const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source) && hasMermaidConnectorOrKeyword(source)
+
+  if (!hasMermaidFence && !looksLikeMermaid) return full
+  if (!source) return full
+  return renderMermaidPre(source)
+}
+
+const transformStandalonePreMermaid = (full: string, rawPreAttrs: string, rawBody: string): string => {
+  if (/<code\b/i.test(rawBody)) return full
+
+  const lowerAttrs = rawPreAttrs.toLowerCase()
+  const hasMermaidHint =
+    lowerAttrs.includes("aq-mermaid") ||
+    lowerAttrs.includes("language-mermaid") ||
+    lowerAttrs.includes("data-language=\"mermaid\"") ||
+    lowerAttrs.includes("data-language='mermaid'")
+
+  const source = extractMermaidSource(rawBody)
+  const looksLikeMermaid = MERMAID_SOURCE_PATTERN.test(source)
+
+  if (!hasMermaidHint && !looksLikeMermaid) return full
+  if (!source) return full
+  return renderMermaidPre(source)
+}
+
+const readHtmlAttribute = (rawAttrs: string, name: string) => {
+  const normalizedName = name.toLowerCase()
+  HTML_ATTRIBUTE_REGEX.lastIndex = 0
+
+  let match: RegExpExecArray | null
+  while ((match = HTML_ATTRIBUTE_REGEX.exec(rawAttrs))) {
+    if (match[1]?.toLowerCase() !== normalizedName) continue
+    return decodeHtmlEntitiesOnce(match[2] ?? match[3] ?? match[4] ?? "")
+  }
+
+  return ""
+}
+
+const stripHtmlAttributes = (rawAttrs: string, names: Set<string>) => {
+  HTML_ATTRIBUTE_REGEX.lastIndex = 0
+  return rawAttrs
+    .replace(HTML_ATTRIBUTE_REGEX, (full, rawName: string) => (names.has(rawName.toLowerCase()) ? "" : full))
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+const mergeClassNames = (...classNames: string[]) => {
+  const tokens = new Set<string>()
+  for (const className of classNames) {
+    className
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean)
+      .forEach((token) => tokens.add(token))
+  }
+  return Array.from(tokens).join(" ")
+}
+
+const COUNT_HTML_TAG_REGEX_CACHE: Record<string, { open: RegExp; close: RegExp }> = {
+  div: { open: /<div\b/gi, close: /<\/div\s*>/gi },
+  section: { open: /<section\b/gi, close: /<\/section\s*>/gi },
+  figure: { open: /<figure\b/gi, close: /<\/figure\s*>/gi },
+}
+
+export const countHtmlTags = (source: string, tagName: string, closing: boolean) => {
+  const normalizedTag = tagName.toLowerCase()
+  let cached = COUNT_HTML_TAG_REGEX_CACHE[normalizedTag]
+  if (!cached) {
+    cached = {
+      open: new RegExp(String.raw`<${normalizedTag}\b`, "gi"),
+      close: new RegExp(String.raw`</${normalizedTag}\s*>`, "gi"),
+    }
+    COUNT_HTML_TAG_REGEX_CACHE[normalizedTag] = cached
+  }
+  const pattern = closing ? cached.close : cached.open
+  pattern.lastIndex = 0
+  return source.match(pattern)?.length ?? 0
+}
+
+type OpenHtmlContainerFrame = {
+  tagName: string
+  attrs: string
+  hasCodeSource: boolean
+}
+
+const resolveNearestCodeAttrsFromStack = (stack: readonly OpenHtmlContainerFrame[]): string => {
+  for (let index = stack.length - 1; index >= 0; index -= 1) {
+    if (stack[index].hasCodeSource) return stack[index].attrs
+  }
+  return ""
+}
+
+const collectCodeContainerAttrsForPreOffsets = (
+  html: string,
+  preOffsets: readonly number[]
+): string[] => {
+  const results = new Array<string>(preOffsets.length).fill("")
+  if (preOffsets.length === 0) return results
+
+  const stack: OpenHtmlContainerFrame[] = []
+  HTML_CONTAINER_TAG_REGEX.lastIndex = 0
+  let targetIdx = 0
+  let match: RegExpExecArray | null
+
+  while ((match = HTML_CONTAINER_TAG_REGEX.exec(html)) !== null) {
+    const tagStart = match.index
+    while (targetIdx < preOffsets.length && preOffsets[targetIdx] <= tagStart) {
+      results[targetIdx] = resolveNearestCodeAttrsFromStack(stack)
+      targetIdx += 1
+    }
+    if (targetIdx >= preOffsets.length) break
+
+    const isClosing = match[1] === "/"
+    const tagName = (match[2] || "").toLowerCase()
+    const rawAttrs = match[3] || ""
+
+    if (!isClosing) {
+      if (!rawAttrs.trimEnd().endsWith("/")) {
+        const hasCodeSource = Boolean(
+          readHtmlAttribute(rawAttrs, "data-raw-code") ||
+          readHtmlAttribute(rawAttrs, "data-prism-source")
+        )
+        stack.push({ tagName, attrs: rawAttrs, hasCodeSource })
+      }
+      continue
+    }
+
+    for (let index = stack.length - 1; index >= 0; index -= 1) {
+      if (stack[index].tagName === tagName) {
+        stack.length = index
+        break
+      }
+    }
+  }
+
+  while (targetIdx < preOffsets.length) {
+    results[targetIdx] = resolveNearestCodeAttrsFromStack(stack)
+    targetIdx += 1
+  }
+
+  return results
+}
+
+const extractCodeLanguageFromAttrs = (rawPreAttrs: string, rawCodeAttrs: string, rawContainerAttrs: string) => {
+  const explicitLanguage =
+    readHtmlAttribute(rawCodeAttrs, "data-language") ||
+    readHtmlAttribute(rawCodeAttrs, "data-prism-language") ||
+    readHtmlAttribute(rawPreAttrs, "data-language") ||
+    readHtmlAttribute(rawPreAttrs, "data-prism-language") ||
+    readHtmlAttribute(rawContainerAttrs, "data-language") ||
+    readHtmlAttribute(rawContainerAttrs, "data-prism-language")
+  if (explicitLanguage) return explicitLanguage
+
+  const className = `${readHtmlAttribute(rawCodeAttrs, "class")} ${readHtmlAttribute(rawPreAttrs, "class")} ${readHtmlAttribute(rawContainerAttrs, "class")}`
+  return className.match(/(?:^|\s)language-([\w-]+)/)?.[1] || "text"
+}
+
+const extractCodeSourceFromHtmlBlock = (rawPreAttrs: string, rawCodeAttrs: string, rawContainerAttrs: string, rawCodeBody: string) =>
+  readHtmlAttribute(rawCodeAttrs, "data-raw-code") ||
+  readHtmlAttribute(rawCodeAttrs, "data-prism-source") ||
+  readHtmlAttribute(rawPreAttrs, "data-raw-code") ||
+  readHtmlAttribute(rawPreAttrs, "data-prism-source") ||
+  readHtmlAttribute(rawContainerAttrs, "data-raw-code") ||
+  readHtmlAttribute(rawContainerAttrs, "data-prism-source") ||
+  extractPlainTextFromHtml(rawCodeBody)
+
+type UnifiedHtmlBlockMatch =
+  | {
+      kind: "paragraph"
+      start: number
+      end: number
+      replacement: string
+    }
+  | {
+      kind: "standalonePre"
+      start: number
+      end: number
+      replacement: string
+    }
+  | {
+      kind: "codePre"
+      start: number
+      end: number
+      full: string
+      preAttrs: string
+      codeAttrs: string
+      codeBody: string
+      codeIndex: number
+    }
+
+export const normalizeContentHtmlForMermaid = (rawHtml: string): string => {
+  if (!rawHtml) return ""
+
+  const blocks: UnifiedHtmlBlockMatch[] = []
+  const codePreOffsets: number[] = []
+  HTML_UNIFIED_BLOCK_REGEX.lastIndex = 0
+
+  let match: RegExpExecArray | null
+  while ((match = HTML_UNIFIED_BLOCK_REGEX.exec(rawHtml)) !== null) {
+    const tagName = (match[1] || "").toLowerCase()
+    const rawAttrs = match[2] || ""
+    const rawBody = match[3] || ""
+    const start = match.index
+    const end = start + match[0].length
+
+    if (tagName === "p") {
+      const replacement = transformParagraphMermaid(match[0], rawBody)
+      if (replacement !== match[0]) {
+        blocks.push({ kind: "paragraph", start, end, replacement })
+      }
+      continue
+    }
+
+    const preCodeMatch = PRE_CODE_INNER_REGEX.exec(rawBody)
+    if (preCodeMatch) {
+      const codeIndex = codePreOffsets.length
+      codePreOffsets.push(start)
+      blocks.push({
+        kind: "codePre",
+        start,
+        end,
+        full: match[0],
+        preAttrs: rawAttrs,
+        codeAttrs: preCodeMatch[1] || "",
+        codeBody: preCodeMatch[2] || "",
+        codeIndex,
+      })
+      continue
+    }
+
+    const standaloneReplacement = transformStandalonePreMermaid(match[0], rawAttrs, rawBody)
+    if (standaloneReplacement !== match[0]) {
+      blocks.push({ kind: "standalonePre", start, end, replacement: standaloneReplacement })
+    }
+  }
+
+  if (blocks.length === 0) return rawHtml
+
+  const containerAttrsByCodeBlock =
+    codePreOffsets.length > 0 ? collectCodeContainerAttrsForPreOffsets(rawHtml, codePreOffsets) : []
+
+  const chunks: string[] = []
+  let lastIndex = 0
+
+  for (let i = 0; i < blocks.length; i += 1) {
+    const entry = blocks[i]
+    chunks.push(rawHtml.slice(lastIndex, entry.start))
+    lastIndex = entry.end
+
+    if (entry.kind !== "codePre") {
+      chunks.push(entry.replacement)
+      continue
+    }
+
+    const containerAttrs = containerAttrsByCodeBlock[entry.codeIndex] || ""
+    const source = extractCodeSourceFromHtmlBlock(entry.preAttrs, entry.codeAttrs, containerAttrs, entry.codeBody)
+    if (!source) {
+      chunks.push(entry.full)
+      continue
+    }
+
+    const language = extractCodeLanguageFromAttrs(entry.preAttrs, entry.codeAttrs, containerAttrs)
+    const codeClassName = readHtmlAttribute(entry.codeAttrs, "class")
+    const hasMermaidHint =
+      language.toLowerCase() === "mermaid" ||
+      codeClassName.toLowerCase().includes("language-mermaid") ||
+      readHtmlAttribute(entry.preAttrs, "class").toLowerCase().includes("aq-mermaid") ||
+      readHtmlAttribute(containerAttrs, "class").toLowerCase().includes("aq-mermaid")
+    if (hasMermaidHint || isMermaidSource(source)) {
+      const mermaidSource = extractMermaidSource(source)
+      chunks.push(mermaidSource ? renderMermaidPre(mermaidSource) : entry.full)
+      continue
+    }
+
+    const presentation = renderImmediateCodeToHtml({ source, language })
+    const retainedCodeAttrs = stripHtmlAttributes(
+      entry.codeAttrs,
+      new Set(["class", "data-language", "data-prism-language", "data-prism-source", "data-raw-code"])
+    )
+    const normalizedClassName = mergeClassNames(codeClassName, `language-${presentation.language}`)
+    const normalizedCodeAttrs = [
+      retainedCodeAttrs,
+      `class="${escapeHtmlAttribute(normalizedClassName)}"`,
+      `data-language="${escapeHtmlAttribute(presentation.language)}"`,
+      `data-prism-language="${escapeHtmlAttribute(presentation.language)}"`,
+      `data-prism-source="${escapeHtmlAttribute(source)}"`,
+      `data-raw-code="${escapeHtmlAttribute(source)}"`,
+    ]
+      .filter(Boolean)
+      .join(" ")
+
+    chunks.push(`<pre${entry.preAttrs}><code ${normalizedCodeAttrs}>${presentation.html}</code></pre>`)
+  }
+
+  chunks.push(rawHtml.slice(lastIndex))
+  return chunks.join("")
+}
+
+export const shouldPreferMarkdownPipeline = (markdown: string) => {
+  if (!markdown.trim()) return false
+  if (HAS_MERMAID_BLOCK_REGEX.test(markdown)) return true
+  return HAS_FENCED_CODE_BLOCK_REGEX.test(markdown)
+}
+const findHtmlTagAttribute = (tag: string, attribute: string) => {
+  const tagName = tag.match(/^<[^\s/>]+/)
+  if (!tagName) return null
+
+  let cursor = tagName[0].length
+  while (cursor < tag.length) {
+    const start = cursor
+    while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+    if (!tag[cursor] || tag[cursor] === ">" || tag[cursor] === "/") break
+
+    const nameStart = cursor
+    while (tag[cursor] && !/[\s=/>]/.test(tag[cursor])) cursor += 1
+    const name = tag.slice(nameStart, cursor)
+    while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+
+    let value = ""
+    if (tag[cursor] === "=") {
+      cursor += 1
+      while (/\s/.test(tag[cursor] ?? "")) cursor += 1
+      const quote = tag[cursor] === '"' || tag[cursor] === "'" ? tag[cursor] : null
+      if (quote) {
+        cursor += 1
+        const valueStart = cursor
+        while (tag[cursor] && tag[cursor] !== quote) cursor += 1
+        value = tag.slice(valueStart, cursor)
+        if (tag[cursor] === quote) cursor += 1
+      } else {
+        const valueStart = cursor
+        while (tag[cursor] && !/[\s>]/.test(tag[cursor])) cursor += 1
+        value = tag.slice(valueStart, cursor)
+      }
+    }
+    if (name.toLowerCase() === attribute.toLowerCase()) return { start, end: cursor, value }
+  }
+  return null
+}
+
+const getHtmlTagAttribute = (tag: string, attribute: string) =>
+  findHtmlTagAttribute(tag, attribute)?.value ?? ""
+
+const removeHtmlTagAttribute = (tag: string, attribute: string) => {
+  let filteredTag = tag
+  let match = findHtmlTagAttribute(filteredTag, attribute)
+  while (match) {
+    filteredTag = `${filteredTag.slice(0, match.start)}${filteredTag.slice(match.end)}`
+    match = findHtmlTagAttribute(filteredTag, attribute)
+  }
+  return filteredTag
+}
+
+const rewriteHtmlTagSrc = (tag: string, safeSrc: string) =>
+  removeHtmlTagAttribute(tag, "src").replace(/(\s*\/?>)$/, ` src="${safeSrc}"$1`)
+
+export const filterTrustedPostImageHtml = (html: string, blockedFallbackLabel = "Blocked image") => {
+  const withoutResponsiveSources = html.replace(/<source\b[^>]*>/gi, (tag) =>
+    getHtmlTagAttribute(tag, "srcset") ? "" : tag)
+
+  return withoutResponsiveSources.replace(/<img\b[^>]*>/gi, (tag) => {
+    const safeSrc = normalizePublicPostImageUrl(getHtmlTagAttribute(tag, "src"))
+    if (safeSrc) return rewriteHtmlTagSrc(removeHtmlTagAttribute(tag, "srcset"), safeSrc)
+    const blockedLabel = getHtmlTagAttribute(tag, "alt") || blockedFallbackLabel
+    return `<span class="aq-image-blocked" role="img" aria-label="${escapeHtmlAttribute(blockedLabel)}">${escapeHtml(blockedLabel)}</span>`
+  })
+}

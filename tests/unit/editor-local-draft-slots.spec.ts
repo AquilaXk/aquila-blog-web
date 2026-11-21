@@ -1,0 +1,943 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
+import { expect, test } from "@playwright/test"
+import { clearAllAdminEditorLocalDrafts } from "../../src/libs/privacy/browserStorageRegistry"
+import * as editorStudioStorageModel from "../../src/routes/Admin/editorStudioStorageModel"
+import {
+  LOCAL_DRAFT_CREATE_STORAGE_KEY,
+  LOCAL_DRAFT_MAX_AGE_MS,
+  LOCAL_DRAFT_POST_SLOT_LIMIT,
+  LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX,
+  describeLocalDraftSlot,
+  localDraftStorageKey,
+  localDraftStorageKeyForDocument,
+  getLocalDraftDocumentId,
+  listLocalDraftCandidates,
+  readLocalDraftCandidate,
+  removeLocalDraftCandidate,
+  persistLocalDraft,
+  readLocalDraft,
+  removeLocalDraft,
+  resolveLocalDraftSource,
+} from "../../src/routes/Admin/editorStudioStorageModel"
+import {
+  localDraftSourcesEqual,
+  type LocalDraftPayload,
+} from "../../src/routes/Admin/editorStudioMetaModel"
+import {
+  decideLocalDraftAutosave,
+  isLocalDraftAutosaveGatedForPostIdTransition,
+  removeLocalDraftCandidateForSource,
+  isLocalDraftBaselineSettleLoadingKey,
+  isLocalDraftRestoreSuggestionEligible,
+  resolveCreateWritePostId,
+  resolveLocalDraftShouldAdoptBaseline,
+  shouldReleasePostIdTransitionGate,
+} from "../../src/routes/Admin/useEditorStudioDraftLifecycleModel"
+
+const createStorage = (): Storage => {
+  const store = new Map<string, string>()
+  return {
+    get length() {
+      return store.size
+    },
+    clear() {
+      store.clear()
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null
+    },
+    removeItem(key: string) {
+      store.delete(key)
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value)
+    },
+  }
+}
+
+const setGlobal = (key: "window", value: unknown) => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, key)
+  Object.defineProperty(globalThis, key, {
+    configurable: true,
+    value,
+    writable: true,
+  })
+  return () => {
+    if (previous) {
+      Object.defineProperty(globalThis, key, previous)
+    } else {
+      delete (globalThis as Record<string, unknown>)[key]
+    }
+  }
+}
+
+const withLocalStorage = (run: (storage: Storage) => void) => {
+  const storage = createStorage()
+  const restoreWindow = setGlobal("window", { localStorage: storage })
+  try {
+    run(storage)
+  } finally {
+    restoreWindow()
+  }
+}
+
+const baseDraft = (
+  overrides: Partial<LocalDraftPayload> & Pick<LocalDraftPayload, "source" | "savedAt" | "title">
+): LocalDraftPayload => ({
+  content: "body",
+  summary: "",
+  summarySource: "NONE",
+  summaryIntent: { kind: "auto" },
+  thumbnailUrl: "",
+  thumbnailFocusX: 50,
+  thumbnailFocusY: 50,
+  thumbnailZoom: 1,
+  tags: [],
+  category: "",
+  visibility: "PUBLIC_LISTED",
+  ...overrides,
+})
+
+test.describe("editor local draft context slots", () => {
+  test("explicit recovery preserves candidates and discards only the selected source slot", () => {
+    withLocalStorage((storage) => {
+      const source = { kind: "post", postId: "42" } as const
+      const first = localDraftStorageKey(source)
+      const second = localDraftStorageKeyForDocument(source, "other-document")
+      const mismatched = localDraftStorageKeyForDocument(source, "wrong-source")
+      const savedAt = new Date().toISOString()
+      const original = JSON.stringify(baseDraft({ source, savedAt, title: "First" }))
+      storage.setItem(first, original)
+      storage.setItem(second, JSON.stringify(baseDraft({ source, savedAt, title: "Second" })))
+      storage.setItem(mismatched, JSON.stringify(baseDraft({
+        source: { kind: "post", postId: "43" }, savedAt, title: "Different post",
+      })))
+
+      expect(listLocalDraftCandidates(source).map(({ key }) => key)).toEqual([first, second])
+      expect(readLocalDraftCandidate(source, first)?.title).toBe("First")
+      expect(storage.getItem(first)).toBe(original)
+      expect(readLocalDraftCandidate(source, mismatched)).toBeNull()
+      removeLocalDraftCandidate(source, mismatched)
+      expect(storage.getItem(mismatched)).not.toBeNull()
+      removeLocalDraftCandidate(source, second)
+      expect(storage.getItem(second)).toBeNull()
+      expect(storage.getItem(first)).toBe(original)
+      expect(listLocalDraftCandidates(source).map(({ key }) => key)).toEqual([first])
+    })
+  })
+
+  test("shows a same-slot restore candidate only when it differs from editor and baseline", () => {
+    const candidate = '{"title":"local"}'
+    const createSource = { kind: "create" } as const
+    const otherSource = { kind: "post", postId: "7" } as const
+    const candidateSnapshot = { key: "create-document-a", source: createSource, fingerprint: candidate }
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(true)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: candidate,
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: candidate,
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [],
+      })
+    ).toBe(false)
+
+    const otherSnapshot = { key: "post-document-b", source: otherSource, fingerprint: candidate }
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, createSource)).toBeNull()
+    expect(removeLocalDraftCandidateForSource(candidateSnapshot, otherSource)).toEqual(candidateSnapshot)
+
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [],
+        dismissed: [candidateSnapshot, otherSnapshot],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: candidateSnapshot,
+        currentSource: createSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+    expect(
+      isLocalDraftRestoreSuggestionEligible({
+        candidate: otherSnapshot,
+        currentSource: otherSource,
+        editorFingerprint: '{"title":"editor"}',
+        serverBaselineFingerprint: '{"title":"server"}',
+        restored: [candidateSnapshot, otherSnapshot],
+        dismissed: [],
+      })
+    ).toBe(false)
+  })
+
+  test("resolves create and per-post storage keys", () => {
+    expect(localDraftStorageKey({ kind: "create" })).toBe(LOCAL_DRAFT_CREATE_STORAGE_KEY)
+    expect(localDraftStorageKey({ kind: "post", postId: "42" })).toBe(
+      `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.v3`
+    )
+    expect(resolveLocalDraftSource("create", "")).toEqual({ kind: "create" })
+    expect(resolveLocalDraftSource("edit", "42")).toEqual({ kind: "post", postId: "42" })
+    expect(resolveLocalDraftSource("edit", "  ")).toEqual({ kind: "create" })
+  })
+
+  test("preserves an incompatible v2 draft instead of deleting or overwriting it", () => {
+    withLocalStorage((storage) => {
+      const legacyKey = "admin.editor.localDraft.create.v2"
+      const legacyDraft = JSON.stringify({
+        title: "보존할 v2 초안",
+        content: "사용자 원문",
+        summary: "기존 요약",
+        savedAt: new Date().toISOString(),
+      })
+      storage.setItem(legacyKey, legacyDraft)
+
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      expect(storage.getItem(legacyKey)).toBe(legacyDraft)
+    })
+  })
+
+  test("isolates create and post slots so edit autosave cannot overwrite create", () => {
+    withLocalStorage((storage) => {
+      persistLocalDraft(
+        baseDraft({
+          title: "create draft",
+          content: "create body",
+          source: { kind: "create" },
+          savedAt: new Date().toISOString(),
+        })
+      )
+      persistLocalDraft(
+        baseDraft({
+          title: "post draft",
+          content: "post body",
+          source: { kind: "post", postId: "7" },
+          savedAt: new Date().toISOString(),
+        })
+      )
+
+      expect(readLocalDraft({ kind: "create" })?.title).toBe("create draft")
+      expect(readLocalDraft({ kind: "post", postId: "7" })?.title).toBe("post draft")
+      expect(storage.getItem(localDraftStorageKeyForDocument({ kind: "create" }, getLocalDraftDocumentId()))).toContain("create draft")
+      expect(storage.getItem(localDraftStorageKeyForDocument({ kind: "post", postId: "7" }, getLocalDraftDocumentId()))).toContain("post draft")
+    })
+  })
+
+  test("never reads, deletes, migrates, expires, or counts retired v1 and v2 values", () => {
+    withLocalStorage((storage) => {
+      expect(editorStudioStorageModel).not.toHaveProperty("LOCAL_DRAFT_V1_STORAGE_KEY")
+      expect(editorStudioStorageModel).not.toHaveProperty("LOCAL_DRAFT_STORAGE_KEY")
+      expect(editorStudioStorageModel).not.toHaveProperty("migrateLocalDraftV1Once")
+
+      const legacyKeys = [
+        "admin.editor.localDraft.v1",
+        "admin.editor.localDraft.create.v2",
+        "admin.editor.localDraft.post.42.v2",
+      ]
+      const legacyValue = JSON.stringify(
+        baseDraft({ title: "legacy", source: { kind: "create" }, savedAt: new Date().toISOString() }),
+      )
+      for (const key of legacyKeys) storage.setItem(key, legacyValue)
+
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      for (const key of legacyKeys) expect(storage.getItem(key)).not.toBeNull()
+
+      persistLocalDraft(baseDraft({ title: "current", source: { kind: "create" }, savedAt: new Date().toISOString() }))
+      for (const key of legacyKeys) expect(storage.getItem(key)).toBe(legacyValue)
+      expect(storage.length).toBe(legacyKeys.length + 1)
+    })
+  })
+
+  test("removeLocalDraft clears only the requested context slot", () => {
+    withLocalStorage(() => {
+      persistLocalDraft(
+        baseDraft({
+          title: "create",
+          source: { kind: "create" },
+          savedAt: new Date().toISOString(),
+        })
+      )
+      persistLocalDraft(
+        baseDraft({
+          title: "post-9",
+          source: { kind: "post", postId: "9" },
+          savedAt: new Date().toISOString(),
+        })
+      )
+
+      removeLocalDraft({ kind: "create" })
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      expect(readLocalDraft({ kind: "post", postId: "9" })?.title).toBe("post-9")
+    })
+  })
+
+  test("does not skip post draft keys when expired entries are removed during scan", () => {
+    withLocalStorage((storage) => {
+      const now = Date.now()
+      const expiredSavedAt = new Date(now - LOCAL_DRAFT_MAX_AGE_MS - 1).toISOString()
+      const validSavedAt = (offsetMs: number) => new Date(now - offsetMs).toISOString()
+
+      storage.setItem(
+        `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`,
+        JSON.stringify({
+          title: "expired",
+          content: "body",
+          summary: "",
+          summarySource: "NONE",
+          summaryIntent: { kind: "auto" },
+          thumbnailUrl: "",
+          thumbnailFocusX: 50,
+          thumbnailFocusY: 50,
+          thumbnailZoom: 1,
+          tags: [],
+          category: "",
+          visibility: "PUBLIC_LISTED",
+          savedAt: expiredSavedAt,
+          source: { kind: "post", postId: "1" },
+        })
+      )
+
+      for (let index = 2; index <= LOCAL_DRAFT_POST_SLOT_LIMIT + 2; index += 1) {
+        storage.setItem(
+          `${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}${index}.v3`,
+          JSON.stringify({
+            title: `post-${index}`,
+            content: "body",
+            summary: "",
+            summarySource: "NONE",
+            summaryIntent: { kind: "auto" },
+            thumbnailUrl: "",
+            thumbnailFocusX: 50,
+            thumbnailFocusY: 50,
+            thumbnailZoom: 1,
+            tags: [],
+            category: "",
+            visibility: "PUBLIC_LISTED",
+            savedAt: validSavedAt((LOCAL_DRAFT_POST_SLOT_LIMIT + 3 - index) * 1000),
+            source: { kind: "post", postId: String(index) },
+          })
+        )
+      }
+
+      expect(() => persistLocalDraft(
+        baseDraft({
+          title: "trigger",
+          source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) },
+          savedAt: new Date(now).toISOString(),
+        })
+      )).toThrow()
+
+      const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
+        (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
+      )
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}1.v3`)).toBeNull()
+      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT + 1)
+      expect(listLocalDraftCandidates({ kind: "post", postId: "2" })[0]?.draft.title).toBe("post-2")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 3) })).toBeNull()
+    })
+  })
+
+  test("expires drafts older than 7 days and rejects new slots without evicting valid manuscripts", () => {
+    withLocalStorage((storage) => {
+      const now = Date.now()
+      persistLocalDraft(
+        baseDraft({
+          title: "expired",
+          source: { kind: "create" },
+          savedAt: new Date(now - LOCAL_DRAFT_MAX_AGE_MS - 1).toISOString(),
+        })
+      )
+      expect(readLocalDraft({ kind: "create" })).toBeNull()
+      expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
+
+      for (let index = 0; index < LOCAL_DRAFT_POST_SLOT_LIMIT; index += 1) {
+        persistLocalDraft(
+          baseDraft({
+            title: `post-${index}`,
+            source: { kind: "post", postId: String(index + 1) },
+            savedAt: new Date(now - (LOCAL_DRAFT_POST_SLOT_LIMIT + 3 - index) * 1000).toISOString(),
+          })
+        )
+      }
+
+      expect(() => persistLocalDraft(baseDraft({
+        title: "overflow", source: { kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT + 1) },
+        savedAt: new Date(now).toISOString(),
+      }))).toThrow()
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("post-0")
+      persistLocalDraft(baseDraft({
+        title: "updated", source: { kind: "post", postId: "1" }, savedAt: new Date(now).toISOString(),
+      }))
+
+      const postKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
+        (key): key is string => Boolean(key?.startsWith(LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX))
+      )
+      expect(postKeys.length).toBe(LOCAL_DRAFT_POST_SLOT_LIMIT)
+      expect(readLocalDraft({ kind: "post", postId: "1" })?.title).toBe("updated")
+      expect(readLocalDraft({ kind: "post", postId: String(LOCAL_DRAFT_POST_SLOT_LIMIT) })?.title)
+        .toBe(`post-${LOCAL_DRAFT_POST_SLOT_LIMIT - 1}`)
+    })
+  })
+
+  test("describeLocalDraftSlot labels create and post restore targets", () => {
+    expect(
+      describeLocalDraftSlot(
+        baseDraft({
+          title: "초안",
+          source: { kind: "create" },
+          savedAt: "2026-07-22T01:23:45.000Z",
+        })
+      )
+    ).toContain("새 글")
+
+    const postLabel = describeLocalDraftSlot(
+      baseDraft({
+        title: "수정 중",
+        source: { kind: "post", postId: "15" },
+        savedAt: "2026-07-22T01:23:45.000Z",
+      })
+    )
+    expect(postLabel).toContain("#15")
+    expect(postLabel).toContain("수정 중")
+  })
+
+  test("persists and reads postVersion for post-slot drafts", () => {
+    withLocalStorage(() => {
+      persistLocalDraft(
+        baseDraft({
+          title: "versioned",
+          source: { kind: "post", postId: "21" },
+          savedAt: new Date().toISOString(),
+          postVersion: 7,
+        })
+      )
+      expect(readLocalDraft({ kind: "post", postId: "21" })?.postVersion).toBe(7)
+
+      persistLocalDraft(
+        baseDraft({
+          title: "create",
+          source: { kind: "create" },
+          savedAt: new Date().toISOString(),
+          postVersion: null,
+        })
+      )
+      expect(readLocalDraft({ kind: "create" })?.postVersion).toBeNull()
+    })
+  })
+
+  test("localDraftSourcesEqual distinguishes create and post slots", () => {
+    expect(localDraftSourcesEqual({ kind: "create" }, { kind: "create" })).toBe(true)
+    expect(localDraftSourcesEqual({ kind: "create" }, { kind: "post", postId: "1" })).toBe(false)
+    expect(
+      localDraftSourcesEqual({ kind: "post", postId: "1" }, { kind: "post", postId: "1" })
+    ).toBe(true)
+    expect(
+      localDraftSourcesEqual({ kind: "post", postId: "1" }, { kind: "post", postId: "2" })
+    ).toBe(false)
+  })
+
+  test("autosave adopts baseline after load settle so server content does not overwrite restorable draft", () => {
+    const serverFingerprint = '{"title":"server"}'
+    const draftFingerprint = '{"title":"local-draft"}'
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: serverFingerprint,
+        lastArmedFingerprint: draftFingerprint,
+        pendingRestorableDraftFingerprint: draftFingerprint,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: serverFingerprint })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: serverFingerprint,
+        lastArmedFingerprint: draftFingerprint,
+        pendingRestorableDraftFingerprint: draftFingerprint,
+      })
+    ).toEqual({ action: "skip" })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: '{"title":"user-edit"}',
+        lastArmedFingerprint: serverFingerprint,
+        pendingRestorableDraftFingerprint: draftFingerprint,
+      })
+    ).toEqual({ action: "schedule" })
+  })
+
+  test("autosave does not recreate a cleared slot until editor fingerprint changes", () => {
+    const publishedFingerprint = '{"title":"published"}'
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: publishedFingerprint,
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: publishedFingerprint })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: publishedFingerprint,
+        lastArmedFingerprint: publishedFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "skip" })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: '{"title":"edited-again"}',
+        lastArmedFingerprint: publishedFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "schedule" })
+  })
+
+  test("unrelated loading settle reschedules pending dirty editor instead of adopting baseline", () => {
+    expect(isLocalDraftBaselineSettleLoadingKey("postOne")).toBe(true)
+    expect(isLocalDraftBaselineSettleLoadingKey("publishTempPost")).toBe(true)
+    expect(isLocalDraftBaselineSettleLoadingKey("uploadThumbnail")).toBe(false)
+    expect(isLocalDraftBaselineSettleLoadingKey("postList")).toBe(false)
+
+    const baselineFingerprint = '{"title":"baseline"}'
+    const dirtyFingerprint = '{"title":"pending-edit"}'
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: dirtyFingerprint,
+        lastArmedFingerprint: baselineFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "schedule" })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: dirtyFingerprint,
+        lastArmedFingerprint: baselineFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: dirtyFingerprint })
+  })
+
+  test("write settle adopts request fingerprint and schedules when editor diverged in flight", () => {
+    const requestFingerprint = '{"title":"published-request"}'
+    const inFlightEditFingerprint = '{"title":"edited-while-publishing"}'
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        baselineFingerprint: requestFingerprint,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: inFlightEditFingerprint,
+        lastArmedFingerprint: requestFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({
+      action: "adopt-baseline-and-schedule",
+      fingerprint: requestFingerprint,
+    })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        baselineFingerprint: requestFingerprint,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: requestFingerprint,
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: requestFingerprint })
+  })
+
+  test("load baseline adopts after success signal even when a non-baseline loadingKey raced idle first", () => {
+    // uploadThumbnail (or any non-baseline key) can clear loadingKey before postOne
+    // finishes. Adoption must still arm once the success signal is pending and idle.
+    expect(
+      resolveLocalDraftShouldAdoptBaseline({
+        loadingKey: "uploadThumbnail",
+        pendingSuccessfulBaseline: true,
+      })
+    ).toBe(false)
+
+    expect(
+      resolveLocalDraftShouldAdoptBaseline({
+        loadingKey: "",
+        pendingSuccessfulBaseline: false,
+      })
+    ).toBe(false)
+
+    expect(
+      resolveLocalDraftShouldAdoptBaseline({
+        loadingKey: "",
+        pendingSuccessfulBaseline: true,
+      })
+    ).toBe(true)
+
+    const serverFingerprint = '{"title":"server-loaded"}'
+    const draftFingerprint = '{"title":"local-draft"}'
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        baselineFingerprint: null,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: serverFingerprint,
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: draftFingerprint,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: serverFingerprint })
+  })
+
+  test("blocks autosave schedule while post load is in flight even if loadingKey is idle", () => {
+    // Concurrent uploadThumbnail (etc.) can clear shared loadingKey before postOne settles.
+    // Stale editor body must not schedule into the newly targeted slot draft.
+    const previousPostFingerprint = '{"title":"previous-post-body"}'
+    const targetSlotDraftFingerprint = '{"title":"target-slot-draft"}'
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostLoadInFlight: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: previousPostFingerprint,
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: targetSlotDraftFingerprint,
+      })
+    ).toEqual({ action: "skip" })
+
+    // Success settle still adopts baseline even if the in-flight flag races the signal.
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostLoadInFlight: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: '{"title":"server-loaded"}',
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: targetSlotDraftFingerprint,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: '{"title":"server-loaded"}' })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostLoadInFlight: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: previousPostFingerprint,
+        lastArmedFingerprint: "",
+        pendingRestorableDraftFingerprint: targetSlotDraftFingerprint,
+      })
+    ).toEqual({ action: "schedule" })
+  })
+
+  test("failed load/publish settle does not adopt baseline without success signal", () => {
+    const dirtyFingerprint = '{"title":"unsaved-edit"}'
+    const baselineFingerprint = '{"title":"baseline"}'
+
+    // loadingKey cleared after failure: shouldAdoptBaseline stays false → reschedule.
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: dirtyFingerprint,
+        lastArmedFingerprint: baselineFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "schedule" })
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostIdTransitionGated: false,
+        hasDraftContent: true,
+        editorFingerprint: dirtyFingerprint,
+        lastArmedFingerprint: baselineFingerprint,
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: dirtyFingerprint })
+  })
+
+  test("resolveCreateWritePostId rejects missing or blank ids", () => {
+    expect(resolveCreateWritePostId(undefined)).toEqual({
+      ok: false,
+      statusText: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+    })
+    expect(resolveCreateWritePostId(null)).toEqual({
+      ok: false,
+      statusText: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+    })
+    expect(resolveCreateWritePostId({})).toEqual({
+      ok: false,
+      statusText: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+    })
+    expect(resolveCreateWritePostId({ id: "" })).toEqual({
+      ok: false,
+      statusText: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+    })
+    expect(resolveCreateWritePostId({ id: "   " })).toEqual({
+      ok: false,
+      statusText: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+    })
+    expect(resolveCreateWritePostId({ id: 42 })).toEqual({ ok: true, postId: "42" })
+    expect(resolveCreateWritePostId({ id: " 7 " })).toEqual({ ok: true, postId: "7" })
+  })
+
+  test("gates create-slot autosave while post id transition awaits load", () => {
+    expect(isLocalDraftAutosaveGatedForPostIdTransition("create", "42")).toBe(true)
+    expect(isLocalDraftAutosaveGatedForPostIdTransition("create", "42", false)).toBe(false)
+    expect(isLocalDraftAutosaveGatedForPostIdTransition("create", "")).toBe(false)
+    expect(isLocalDraftAutosaveGatedForPostIdTransition("edit", "42")).toBe(false)
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: true,
+        hasDraftContent: true,
+        editorFingerprint: '{"title":"previous-edit-body"}',
+        lastArmedFingerprint: '{"title":"old"}',
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "skip" })
+
+    // Successful load settle may still adopt baseline even during the transition edge.
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: true,
+        isPostIdTransitionGated: true,
+        hasDraftContent: true,
+        editorFingerprint: '{"title":"loaded"}',
+        lastArmedFingerprint: '{"title":"previous-edit-body"}',
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "adopt-baseline", fingerprint: '{"title":"loaded"}' })
+  })
+
+  test("failed post load settle keeps gate until user edits or edit context restores", () => {
+    const staleBodyFingerprint = '{"title":"post-a-body"}'
+
+    expect(isLocalDraftAutosaveGatedForPostIdTransition("create", "42", true)).toBe(true)
+
+    expect(
+      shouldReleasePostIdTransitionGate({
+        editorMode: "create",
+        postId: "42",
+        editorFingerprint: staleBodyFingerprint,
+        transitionBaselineFingerprint: staleBodyFingerprint,
+        awaitingLoad: true,
+      })
+    ).toBe(false)
+
+    expect(
+      shouldReleasePostIdTransitionGate({
+        editorMode: "create",
+        postId: "42",
+        editorFingerprint: '{"title":"user-edited"}',
+        transitionBaselineFingerprint: staleBodyFingerprint,
+        awaitingLoad: true,
+      })
+    ).toBe(true)
+
+    expect(
+      shouldReleasePostIdTransitionGate({
+        editorMode: "edit",
+        postId: "42",
+        editorFingerprint: staleBodyFingerprint,
+        transitionBaselineFingerprint: staleBodyFingerprint,
+        awaitingLoad: true,
+      })
+    ).toBe(true)
+
+    expect(
+      shouldReleasePostIdTransitionGate({
+        editorMode: "create",
+        postId: "",
+        editorFingerprint: staleBodyFingerprint,
+        transitionBaselineFingerprint: staleBodyFingerprint,
+        awaitingLoad: true,
+      })
+    ).toBe(true)
+
+    expect(
+      decideLocalDraftAutosave({
+        loadingKey: "",
+        shouldAdoptBaseline: false,
+        isPostIdTransitionGated: true,
+        hasDraftContent: true,
+        editorFingerprint: staleBodyFingerprint,
+        lastArmedFingerprint: '{"title":"old"}',
+        pendingRestorableDraftFingerprint: null,
+      })
+    ).toEqual({ action: "skip" })
+  })
+
+  test("clearAllLocalDrafts removes all create and post draft keys, preserves unrelated keys, and dispatches change event", () => {
+    withLocalStorage((storage) => {
+      const dispatchedEvents: string[] = []
+      ;(globalThis.window as unknown as { dispatchEvent: (event: Event) => boolean }).dispatchEvent = (
+        event: Event
+      ) => {
+        dispatchedEvents.push(event.type)
+        return true
+      }
+
+      storage.setItem(LOCAL_DRAFT_CREATE_STORAGE_KEY, '{"title":"legacy create"}')
+      storage.setItem("admin.editor.localDraft.create.doc-1.v3", '{"title":"doc create"}')
+      storage.setItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.doc-1.v3`, '{"title":"post 42"}')
+      storage.setItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}99.v3`, '{"title":"post 99"}')
+      storage.setItem("admin.editor.customTags", '["typescript"]')
+      storage.setItem("aquila_blog_liked_posts_v1", '["42"]')
+
+      const clearAll = (editorStudioStorageModel as { clearAllLocalDrafts?: () => void }).clearAllLocalDrafts
+      expect(typeof clearAll).toBe("function")
+      clearAll?.()
+
+      expect(storage.getItem(LOCAL_DRAFT_CREATE_STORAGE_KEY)).toBeNull()
+      expect(storage.getItem("admin.editor.localDraft.create.doc-1.v3")).toBeNull()
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}42.doc-1.v3`)).toBeNull()
+      expect(storage.getItem(`${LOCAL_DRAFT_POST_STORAGE_KEY_PREFIX}99.v3`)).toBeNull()
+      expect(storage.getItem("admin.editor.customTags")).toBe('["typescript"]')
+      expect(storage.getItem("aquila_blog_liked_posts_v1")).toBe('["42"]')
+      expect(dispatchedEvents).toEqual(["aquila-local-drafts-changed"])
+    })
+
+    const restoreThrowingWindow = setGlobal("window", {
+      get localStorage(): Storage {
+        throw new Error("SecurityError: localStorage disabled")
+      },
+    })
+    try {
+      expect(() => clearAllAdminEditorLocalDrafts()).not.toThrow()
+    } finally {
+      restoreThrowingWindow()
+    }
+
+    const repoRoot = path.resolve(__dirname, "../..")
+    const adminShellSource = readFileSync(path.join(repoRoot, "src/routes/Admin/AdminShell.tsx"), "utf8")
+    const adminLoginSource = readFileSync(path.join(repoRoot, "src/pages/admin/login.tsx"), "utf8")
+    const authSessionSource = readFileSync(path.join(repoRoot, "src/hooks/useAuthSession.ts"), "utf8")
+
+    expect(adminShellSource).toContain("clearAllAdminEditorLocalDrafts()")
+    expect(adminLoginSource.match(/clearAllAdminEditorLocalDrafts\(\)/g)?.length).toBe(2)
+    expect(authSessionSource).toContain("clearAllAdminEditorLocalDrafts()")
+  })
+})
+

@@ -1,0 +1,585 @@
+/**
+ * 참조 구현:
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/empty.tsx, MIT License)
+ * - timlrx/tailwind-nextjs-starter-blog (layouts/ListLayoutWithTags.tsx, MIT License)
+ */
+import React, { RefObject, memo, useEffect, useRef, useState } from "react"
+import styled from "@emotion/styled"
+import Link from "next/link"
+import PostCard from "src/routes/Feed/PostList/PostCard"
+import InitialLoadErrorState from "src/routes/Feed/PostList/InitialLoadErrorState"
+import AppIcon from "src/components/icons/AppIcon"
+import { skeletonShimmerCss } from "src/design-system/StatePresenters"
+import { TPost } from "src/types"
+import { useLanguage } from "src/libs/language"
+import { resolveFeedInitialMountCount } from "../FeedExplorerRestoreModel"
+import type { FeedSortMode } from "../FeedSortMenuModel"
+
+type Props = {
+  posts: TPost[]
+  searchQuery?: string
+  sortMode?: FeedSortMode
+  hasFilter?: boolean
+  hasExternalResults?: boolean
+  onClearFilters?: () => void
+  isInitialLoading?: boolean
+  isInitialLoadError?: boolean
+  isFetchingNextPage?: boolean
+  isFetchNextPageError?: boolean
+  hasNextPage?: boolean
+  restoreScrollY?: number
+  onLoadMore?: () => void
+  onRetryInitialLoad?: () => void
+  onRetryLoadMore?: () => void
+  loadMoreTriggerRef?: RefObject<HTMLDivElement | null>
+}
+
+type EmptyPostStateProps = {
+  hasFilter: boolean
+  onClearFilters?: () => void
+}
+
+const INITIAL_SKELETON_KEYS = Array.from({ length: 6 }, (_, index) => `skeleton-initial-${index}`)
+const NEXT_SKELETON_KEYS = Array.from({ length: 4 }, (_, index) => `skeleton-next-${index}`)
+const FILTER_SKELETON_KEYS = Array.from({ length: 4 }, (_, index) => `skeleton-filter-${index}`)
+const DEFERRED_MOUNT_INITIAL_COUNT = 8
+const DEFERRED_MOUNT_BATCH_COUNT = 8
+const DEFERRED_MOUNT_ROOT_MARGIN = "680px 0px"
+
+const EmptyPostStateInner: React.FC<EmptyPostStateProps> = ({ hasFilter, onClearFilters }) => {
+  const { t } = useLanguage()
+  return (
+    <section className="emptyState" aria-live="polite">
+      <div className="emptyIcon" aria-hidden="true">
+        <AppIcon name={hasFilter ? "search" : "edit"} />
+      </div>
+      <h2>{hasFilter ? t("emptyFilterTitle") : t("emptyNoPostsTitle")}</h2>
+      <p>{hasFilter ? t("emptyFilterDesc") : t("emptyNoPostsDesc")}</p>
+      <div className="emptyActions">
+        {hasFilter ? (
+          <button type="button" onClick={onClearFilters} className="actionBtn actionBtn--primary">
+            <AppIcon name="search" />
+            {t("filterReset")}
+          </button>
+        ) : (
+          <Link href="/about" className="actionBtn actionBtn--primary">
+            <AppIcon name="service" />
+            {t("emptyAboutButton")}
+          </Link>
+        )}
+      </div>
+    </section>
+  )
+}
+
+const EmptyPostState = memo(EmptyPostStateInner)
+EmptyPostState.displayName = "EmptyPostState"
+
+const FilterLoadingStateInner: React.FC = () => {
+  const { t } = useLanguage()
+  return (
+    <section className="searchLoadingState" aria-live="polite">
+      <div className="searchLoadingHeading">
+        <div className="searchLoadingIcon" aria-hidden="true">
+          <AppIcon name="search" />
+        </div>
+        <div className="searchLoadingCopy">
+          <h3>{t("loadingTitle")}</h3>
+        </div>
+      </div>
+      <div className="searchLoadingGrid skeletonGrid" aria-hidden="true">
+        {FILTER_SKELETON_KEYS.map((key) => (
+          <article key={key} className="skeletonCard" />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const FilterLoadingState = memo(FilterLoadingStateInner)
+FilterLoadingState.displayName = "FilterLoadingState"
+
+const PostList: React.FC<Props> = ({
+  posts,
+  searchQuery,
+  sortMode = "latest",
+  hasFilter = false,
+  hasExternalResults = false,
+  onClearFilters,
+  isInitialLoading = false,
+  isInitialLoadError = false,
+  isFetchingNextPage = false,
+  isFetchNextPageError = false,
+  hasNextPage = false,
+  restoreScrollY = 0,
+  onLoadMore,
+  onRetryInitialLoad,
+  onRetryLoadMore,
+  loadMoreTriggerRef,
+}) => {
+  const { t } = useLanguage()
+  const deferredMountTriggerRef = useRef<HTMLLIElement | null>(null)
+  const previousFirstPostIdRef = useRef<string | null>(null)
+  const targetInitialMountCount = resolveFeedInitialMountCount(
+    posts.length,
+    restoreScrollY,
+    DEFERRED_MOUNT_INITIAL_COUNT
+  )
+  const [mountedCardCount, setMountedCardCount] = useState(targetInitialMountCount)
+  const showInitialLoadError = !isInitialLoading && isInitialLoadError && !posts.length && !hasExternalResults
+  const showEmptyState = !showInitialLoadError && !isInitialLoading && !posts.length && !hasExternalResults
+
+  useEffect(() => {
+    const nextFirstPostId = posts[0] ? String(posts[0].id) : null
+    const previousFirstPostId = previousFirstPostIdRef.current
+    previousFirstPostIdRef.current = posts.length ? nextFirstPostId : null
+    const hasListReplaced =
+      Boolean(previousFirstPostId) && Boolean(nextFirstPostId) && previousFirstPostId !== nextFirstPostId
+    const nextInitialCount = targetInitialMountCount
+
+    if (hasListReplaced && mountedCardCount !== nextInitialCount) {
+      setMountedCardCount(nextInitialCount)
+      return
+    }
+    if (posts.length < mountedCardCount) {
+      setMountedCardCount(posts.length)
+      return
+    }
+    if (mountedCardCount < nextInitialCount) {
+      setMountedCardCount(nextInitialCount)
+      return
+    }
+    if (mountedCardCount >= posts.length) return
+
+    const triggerNode = deferredMountTriggerRef.current
+    if (!triggerNode || typeof IntersectionObserver === "undefined") {
+      setMountedCardCount(posts.length)
+      return
+    }
+
+    let disposed = false
+    let observer: IntersectionObserver | null = null
+    const advanceBatch = () => {
+      if (disposed) return
+      disposed = true
+      observer?.disconnect()
+      setMountedCardCount((prev) =>
+        Math.min(posts.length, Math.max(prev, DEFERRED_MOUNT_INITIAL_COUNT) + DEFERRED_MOUNT_BATCH_COUNT)
+      )
+    }
+    const checkTriggerViewport = () => {
+      if (disposed || typeof window === "undefined") return
+      if (triggerNode.getBoundingClientRect().top <= window.innerHeight + 680) {
+        advanceBatch()
+      }
+    }
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          advanceBatch()
+          return
+        }
+        checkTriggerViewport()
+      },
+      { root: null, rootMargin: DEFERRED_MOUNT_ROOT_MARGIN, threshold: 0.01 }
+    )
+
+    observer.observe(triggerNode)
+    checkTriggerViewport()
+    return () => {
+      disposed = true
+      observer?.disconnect()
+    }
+  }, [mountedCardCount, posts, targetInitialMountCount])
+
+  return (
+    <StyledWrapper>
+      {isInitialLoading &&
+        (hasFilter ? (
+          <FilterLoadingState />
+        ) : (
+          <div className="skeletonGrid" aria-hidden="true">
+            {INITIAL_SKELETON_KEYS.map((key) => (
+              <article key={key} className="skeletonCard" />
+            ))}
+          </div>
+        ))}
+      {showInitialLoadError && (
+        <InitialLoadErrorState hasFilter={hasFilter} onRetryInitialLoad={onRetryInitialLoad} />
+      )}
+      {showEmptyState && <EmptyPostState hasFilter={hasFilter} onClearFilters={onClearFilters} />}
+      {posts.length > 0 && (
+        <ul className="postFeedList">
+          {posts.map((post, index) => {
+            const shouldMountCard = index < mountedCardCount
+            const isTriggerCard = !shouldMountCard && index === mountedCardCount
+
+            return (
+              <li
+                key={post.id}
+                ref={isTriggerCard ? deferredMountTriggerRef : null}
+                className="deferredPostCardWrap"
+              >
+                {shouldMountCard ? (
+                  <PostCard
+                    data={post}
+                    layout="regular"
+                    searchQuery={searchQuery}
+                    sortMode={sortMode}
+                  />
+                ) : (
+                  <article className="deferredPostCardPlaceholder" aria-hidden="true" />
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {(hasNextPage || isFetchingNextPage || isFetchNextPageError) && (
+        <section className="loadMoreArea">
+          <div ref={loadMoreTriggerRef} className="loadMoreTrigger" aria-hidden="true" />
+          {isFetchNextPageError && !isFetchingNextPage && (
+            <div className="loadMoreError" role="alert" aria-live="assertive">
+              <strong>{t("loadMoreErrorTitle")}</strong>
+              <span>{t("loadMoreErrorDesc")}</span>
+              <button type="button" className="loadMoreButton" onClick={onRetryLoadMore ?? onLoadMore}>
+                {t("loadMoreRetry")}
+              </button>
+            </div>
+          )}
+          {hasNextPage && !isFetchNextPageError && (
+            <button
+              type="button"
+              className="loadMoreButton"
+              onClick={onLoadMore}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? t("loadingMore") : t("loadMore")}
+            </button>
+          )}
+          {isFetchingNextPage && (
+            <div className="loadMoreSkeletonShell" aria-hidden="true">
+              <div className="loadMoreSkeletonCopy">
+                <strong>{t("loadMorePreparingTitle")}</strong>
+              </div>
+              <div className="skeletonGrid">
+                {NEXT_SKELETON_KEYS.map((key) => (
+                  <article key={key} className="skeletonCard" />
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+    </StyledWrapper>
+  )
+}
+
+export default memo(PostList)
+
+const StyledWrapper = styled.div`
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+  overflow-anchor: none;
+
+  .emptyState {
+    grid-column: 1 / -1;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    padding: 3rem 1rem;
+    min-height: 12rem;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+    gap: 0.55rem;
+
+    .emptyIcon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 8px;
+      border: 0;
+      background: var(--aq-surface-subtle);
+      color: var(--aq-muted);
+      font-size: 1.08rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.2rem;
+    }
+
+    h2,
+    h3 {
+      margin: 0;
+      color: var(--aq-text);
+      font-size: 1.0625rem;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+    }
+
+    p {
+      margin: 0;
+      max-width: 26rem;
+      color: var(--aq-muted);
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .emptyActions {
+      margin-top: 0.45rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .actionBtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 36px;
+      padding: 0 0.875rem;
+      border-radius: 6px;
+      border: 0;
+      background: var(--aq-surface-subtle);
+      color: var(--aq-text);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+
+      &:hover {
+        background: var(--aq-surface-elevated);
+      }
+
+      @media (max-width: 820px), (pointer: coarse) {
+        min-height: 44px;
+      }
+    }
+
+    .actionBtn--primary {
+      background: var(--aq-text);
+      color: var(--aq-page-bg);
+
+      &:hover {
+        opacity: 0.88;
+        background: var(--aq-text);
+        color: var(--aq-page-bg);
+      }
+    }
+  }
+
+  .searchLoadingState {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--aq-border);
+    min-height: 16rem;
+    padding: 1rem 0;
+    display: grid;
+    gap: 0.9rem;
+
+    .searchLoadingHeading {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .searchLoadingIcon {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      border: 0;
+      color: var(--aq-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      background: var(--aq-surface-subtle);
+    }
+
+    .searchLoadingCopy {
+      display: grid;
+      gap: 0.16rem;
+    }
+
+    h3 {
+      margin: 0;
+      color: var(--aq-text);
+      font-size: 0.95rem;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+  }
+
+  .searchLoadingGrid {
+    padding-top: 0.1rem;
+  }
+
+  .loadMoreArea {
+    grid-column: 1 / -1;
+    display: grid;
+    justify-items: center;
+    gap: 0.8rem;
+    padding-top: 0.35rem;
+  }
+
+  .loadMoreSkeletonShell {
+    width: 100%;
+    display: grid;
+    gap: 0.72rem;
+  }
+
+  .loadMoreError {
+    width: min(100%, 34rem);
+    display: grid;
+    justify-items: center;
+    gap: 0.42rem;
+    border-top: 1px solid ${({ theme }) => theme.colors.red6};
+    border-bottom: 1px solid ${({ theme }) => theme.colors.red6};
+    padding: 0.85rem 0;
+    text-align: center;
+
+    strong {
+      color: ${({ theme }) => theme.colors.red11};
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+
+    span {
+      color: ${({ theme }) => theme.colors.gray10};
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .loadMoreButton {
+      border: 1px solid var(--aq-border-strong);
+      color: var(--aq-text);
+
+      &:hover:not(:disabled) {
+        border-color: var(--aq-text);
+        background: var(--aq-surface-subtle);
+      }
+    }
+  }
+
+  .loadMoreSkeletonCopy {
+    display: grid;
+    gap: 0.12rem;
+    justify-items: center;
+    text-align: center;
+
+    strong {
+      color: ${({ theme }) => theme.colors.gray12};
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+  }
+
+  .loadMoreTrigger {
+    width: 100%;
+    height: 1px;
+  }
+
+  .loadMoreButton {
+    min-height: 36px;
+    padding: 0 0.9rem;
+    border-radius: 6px;
+    border: 1px solid ${({ theme }) => theme.colors.gray6};
+    background: ${({ theme }) => theme.colors.gray2};
+    color: ${({ theme }) => theme.colors.gray12};
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+
+    &:hover:not(:disabled) {
+      border-color: ${({ theme }) => theme.colors.gray8};
+      background: ${({ theme }) => theme.colors.gray3};
+    }
+
+    &:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    @media (max-width: 820px), (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+
+  .skeletonGrid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: start;
+
+    @media (min-width: 768px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    @media (min-width: 1440px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .skeletonCard {
+    position: relative;
+    overflow: hidden;
+    min-height: 11.5rem;
+    max-width: 760px;
+    padding: 20px 0;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+
+    &::before,
+    &::after {
+      content: "";
+      display: block;
+      ${skeletonShimmerCss}
+      background: ${({ theme }) => theme.colors.gray3};
+    }
+
+    &::before {
+      width: 65%;
+      height: 1.95rem;
+    }
+
+    &::after {
+      margin: 0.95rem 0 1rem;
+      border-radius: 4px;
+      min-height: 4.4rem;
+    }
+  }
+
+  .postFeedList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .deferredPostCardWrap {
+    width: 100%;
+    min-width: 0;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--aq-border);
+  }
+
+  .deferredPostCardWrap:last-child {
+    border-bottom: 0;
+  }
+
+  .deferredPostCardPlaceholder {
+    width: 100%;
+    min-height: 11.5rem;
+    border-radius: 0;
+    background: transparent;
+  }
+`
