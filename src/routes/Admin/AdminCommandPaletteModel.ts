@@ -195,7 +195,7 @@ export const getAdminPaletteItems = (
       group: "navigation",
       icon: "camera",
       label: language === "en" ? "Profile Settings" : "프로필 설정",
-      subLabel: language === "en" ? "Identity, About page & social links" : "계정 정보, About 페이지 및 외부 링크",
+      subLabel: language === "en" ? "Identity, About page & social links" : "계정 정보, 소개 페이지 및 외부 링크",
       shortcut: "G U",
       href: "/admin/profile",
       keywords: ["profile", "settings", "프로필", "설정", "소개"],

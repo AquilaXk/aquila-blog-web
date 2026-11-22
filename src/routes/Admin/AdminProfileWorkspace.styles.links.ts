@@ -42,7 +42,7 @@ export const SegmentButton = styled.button`
   ${focusVisibleRing}
 
   @media (max-width: 1100px), (pointer: coarse) {
-    min-height: 38px;
+    min-height: 44px;
   }
 
   &[data-active="true"] {

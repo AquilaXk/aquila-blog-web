@@ -254,13 +254,17 @@ export const PaletteTriggerButton = styled.button`
   }
 
   @media (max-width: 720px) {
-    .paletteLabel {
+    .paletteLabel,
+    kbd {
       display: none;
     }
   }
 
-  @media (max-width: 640px) {
-    display: none;
+  @media (pointer: coarse) {
+    min-width: ${control.lg}px;
+    min-height: ${control.lg}px;
+    justify-content: center;
+    padding: 0 0.5rem;
   }
 `
 

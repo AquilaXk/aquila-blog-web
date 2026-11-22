@@ -280,7 +280,7 @@ const AdminCloudWorkspacePage = () => {
                 aria-label={activeUploadCount > 0 ? "업로드 중" : "파일 업로드"}
                 onClick={() => uploadInputRef.current?.click()}
               >
-                + 새 자산 업로드
+                파일 업로드
               </PrimaryButton>
             </CloudHeaderActions>
           </CloudTitleBar>

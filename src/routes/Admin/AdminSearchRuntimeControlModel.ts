@@ -104,6 +104,50 @@ const isReceipt = (
   )
 }
 
+export const getSearchRuntimeControlLabels = (
+  isEn: boolean
+): Record<
+  SearchRuntimeControl,
+  { heading: string; enabled: string; disabled: string }
+> =>
+  isEn
+    ? {
+        pipeline: {
+          heading: "Search pipeline force control",
+          enabled: "Force enabled",
+          disabled: "Force disabled",
+        },
+        mirror: {
+          heading: "Search mirror force disable",
+          enabled: "Force mirror disabled",
+          disabled: "Allow mirror",
+        },
+      }
+    : {
+        pipeline: {
+          heading: "검색 파이프라인 강제 제어",
+          enabled: "강제 활성화",
+          disabled: "강제 비활성화",
+        },
+        mirror: {
+          heading: "검색 미러 강제 비활성화",
+          enabled: "미러 강제 중지",
+          disabled: "미러 허용",
+        },
+      }
+
+export const getSearchRuntimeReceiptLabel = (
+  status: "ACCEPTED" | "SUCCEEDED",
+  isEn: boolean
+): string =>
+  isEn
+    ? status === "ACCEPTED"
+      ? "Accepted and pending"
+      : "Succeeded"
+    : status === "ACCEPTED"
+      ? "요청 접수 · 처리 대기"
+      : "적용 완료"
+
 export const AdminSearchRuntimeControlModel = {
   limit: {
     reasonMax: 200,

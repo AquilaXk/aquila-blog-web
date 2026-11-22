@@ -148,7 +148,16 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
         healthCollectionLabel === DASHBOARD_COLLECTION_FAILED_LABEL && !systemHealthData
           ? DASHBOARD_COLLECTION_FAILED_LABEL
           : dashboardStatusLabel,
-      badge: rawSystemHealthStatus?.trim() || "PROBE",
+      badge:
+        language === "en"
+          ? rawSystemHealthStatus?.trim() || "PROBE"
+          : rawSystemHealthStatus?.trim() === "UP"
+            ? "정상"
+            : rawSystemHealthStatus?.trim() === "DOWN"
+              ? "장애"
+              : rawSystemHealthStatus?.trim() === "DISABLED"
+                ? "비활성"
+                : "점검",
       detail: healthCardDetail,
       tone: healthCollectionFailed ? "warn" : dashboardStatusTone,
     },
@@ -158,7 +167,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       value: hasSnapshot
         ? `${safeMetrics.readyPendingCount} / ${safeMetrics.processingCount}`
         : missingOrFailedLabel,
-      badge: hasSnapshot ? "READY/PROC" : "QUEUE",
+      badge: language === "en" ? (hasSnapshot ? "READY/PROC" : "QUEUE") : hasSnapshot ? "대기 · 처리" : "대기열",
       detail: taskQueueDetail,
       tone: hasSnapshot ? getTaskQueueTone(dashboardSnapshot) : missingOrFailedTone,
     },
@@ -166,7 +175,14 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       key: "auth-security",
       label: "인증 이상",
       value: hasSnapshot ? `${safeMetrics.blockedEventCount}건` : missingOrFailedLabel,
-      badge: hasSnapshot && safeMetrics.blockedEventCount > 0 ? "ALERT" : "GUARD",
+      badge:
+        language === "en"
+          ? hasSnapshot && safeMetrics.blockedEventCount > 0
+            ? "ALERT"
+            : "GUARD"
+          : hasSnapshot && safeMetrics.blockedEventCount > 0
+            ? "차단 감지"
+            : "정상",
       detail: authSecurityDetail,
       tone: hasSnapshot ? (safeMetrics.blockedEventCount > 0 ? "warn" : "good") : missingOrFailedTone,
     },
@@ -211,7 +227,14 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
         key: "storage-cleanup",
         label: "스토리지 정리",
         value: hasSnapshot ? `${safeMetrics.eligibleForPurgeCount}건` : missingOrFailedLabel,
-        badge: hasSnapshot && safeMetrics.blockedBySafetyThreshold ? "HOLD" : "PURGE",
+        badge:
+          language === "en"
+            ? hasSnapshot && safeMetrics.blockedBySafetyThreshold
+              ? "HOLD"
+              : "PURGE"
+            : hasSnapshot && safeMetrics.blockedBySafetyThreshold
+              ? "보류"
+              : "정리 대상",
         detail: hasSnapshot
           ? safeMetrics.blockedBySafetyThreshold
             ? "안전 임계값 보류"
@@ -227,7 +250,14 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
         key: "queue-incidents",
         label: "큐 이상 감지",
         value: hasSnapshot ? `${queueAlerts}건` : missingOrFailedLabel,
-        badge: hasSnapshot && queueAlerts > 0 ? "INCIDENT" : "CLEAN",
+        badge:
+          language === "en"
+            ? hasSnapshot && queueAlerts > 0
+              ? "INCIDENT"
+              : "CLEAN"
+            : hasSnapshot && queueAlerts > 0
+              ? "점검 필요"
+              : "이상 없음",
         detail: hasSnapshot
           ? `실패 ${safeMetrics.failedCount} · 지연 ${safeMetrics.staleProcessingCount}`
           : missingOrFailedLabel,
@@ -240,9 +270,9 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
     {
       key: "task-queue",
       title: "작업 큐",
-      summary: `ready ${safeMetrics.readyPendingCount} · failed ${safeMetrics.failedCount} · stale ${safeMetrics.staleProcessingCount}`,
+      summary: `대기 ${safeMetrics.readyPendingCount} · 실패 ${safeMetrics.failedCount} · 지연 ${safeMetrics.staleProcessingCount}`,
       tone: getTaskQueueTone(dashboardSnapshot),
-      href: "/admin/tools",
+      href: "/admin/tools?tab=queue",
       actionLabel: "도구 열기",
     },
     {
@@ -257,8 +287,8 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
       key: "storage-cleanup",
       title: "스토리지 정리",
       summary: safeMetrics.blockedBySafetyThreshold
-        ? "안전 임계값으로 purge 보류"
-        : `purge 대상 ${safeMetrics.eligibleForPurgeCount}건`,
+        ? "안전 임계값으로 정리 보류"
+        : `정리 대상 ${safeMetrics.eligibleForPurgeCount}건`,
       tone:
         safeMetrics.blockedBySafetyThreshold || safeMetrics.eligibleForPurgeCount > 0
           ? "warn"
@@ -283,43 +313,43 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({
     ? [
         {
           key: "ready",
-          label: "ready",
+          label: language === "en" ? "Ready" : "대기",
           value: safeMetrics.readyPendingCount,
           tone: safeMetrics.readyPendingCount > 0 ? "good" : "neutral",
         },
         {
           key: "processing",
-          label: "processing",
+          label: language === "en" ? "Processing" : "처리 중",
           value: safeMetrics.processingCount,
           tone: "neutral",
         },
         {
           key: "failed",
-          label: "failed",
+          label: language === "en" ? "Failed" : "실패",
           value: safeMetrics.failedCount,
           tone: safeMetrics.failedCount > 0 ? "danger" : "neutral",
         },
         {
           key: "stale",
-          label: "stale",
+          label: language === "en" ? "Stale" : "지연",
           value: safeMetrics.staleProcessingCount,
           tone: safeMetrics.staleProcessingCount > 0 ? "warn" : "neutral",
         },
         {
           key: "auth-recent",
-          label: "auth",
+          label: language === "en" ? "Auth" : "인증 기록",
           value: safeMetrics.recentEventCount,
           tone: "neutral",
         },
         {
           key: "auth-blocked",
-          label: "blocked",
+          label: language === "en" ? "Blocked" : "차단",
           value: safeMetrics.blockedEventCount,
           tone: safeMetrics.blockedEventCount > 0 ? "danger" : "neutral",
         },
         {
           key: "purge",
-          label: "purge",
+          label: language === "en" ? "Purge" : "정리 대상",
           value: safeMetrics.eligibleForPurgeCount,
           tone: safeMetrics.eligibleForPurgeCount > 0 ? "warn" : "neutral",
         },

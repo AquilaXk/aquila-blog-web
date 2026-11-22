@@ -173,19 +173,19 @@ export const AdminToolsExecutionSection = (props: AdminToolsExecutionSectionProp
                 <>
                   <MetricGrid>
                     <MetricCard>
-                      <small>TEMP</small>
+                      <small>임시 파일</small>
                       <strong>{cleanupDiagnostics.tempCount ?? 0}</strong>
                     </MetricCard>
                     <MetricCard>
-                      <small>PENDING_DELETE</small>
+                      <small>삭제 대기</small>
                       <strong>{cleanupDiagnostics.pendingDeleteCount ?? 0}</strong>
                     </MetricCard>
                     <MetricCard>
-                      <small>purge 후보</small>
+                      <small>영구 삭제 후보</small>
                       <strong>{cleanupDiagnostics.eligibleForPurgeCount ?? 0}</strong>
                     </MetricCard>
                     <MetricCard>
-                      <small>threshold</small>
+                      <small>안전 임계값</small>
                       <strong>{cleanupDiagnostics.cleanupSafetyThreshold ?? 0}</strong>
                     </MetricCard>
                   </MetricGrid>
@@ -193,7 +193,7 @@ export const AdminToolsExecutionSection = (props: AdminToolsExecutionSectionProp
                   {sampleEligibleObjectKeys.length > 0 && (
                     <DetailsPanel>
                       <DetailsSummary>
-                        <span>샘플 object key</span>
+                        <span>정리 대상 파일 키 예시</span>
                         <small>{sampleEligibleObjectKeys.length}개</small>
                       </DetailsSummary>
                       <CompactCodeList>

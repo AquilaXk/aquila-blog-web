@@ -83,10 +83,10 @@ const toOpsTone = (value: string | null | undefined): OpsTone => {
 }
 
 const toToneBadgeCode = (tone: OpsTone) => {
-  if (tone === "danger") return "ERR"
-  if (tone === "warn") return "WARN"
-  if (tone === "good") return "OK"
-  return "IDLE"
+  if (tone === "danger") return "점검 필요"
+  if (tone === "warn") return "주의"
+  if (tone === "good") return "정상"
+  return "대기"
 }
 
 const readStringField = (payload: unknown, key: string) => {
@@ -127,19 +127,19 @@ export const buildToolsOpsBars = (
     : safeEvents.length
 
   const values: Array<{ key: string; label: string; value: number; tone: OpsTone }> = [
-    { key: "ready", label: "ready", value: readyVal, tone: "neutral" },
-    { key: "processing", label: "processing", value: processingVal, tone: "neutral" },
-    { key: "failed", label: "failed", value: failedVal, tone: failedVal > 0 ? "danger" : "good" },
-    { key: "stale", label: "stale", value: staleVal, tone: staleVal > 0 ? "danger" : "good" },
-    { key: "purge", label: "purge", value: purgeVal, tone: purgeVal > 0 ? "warn" : "good" },
-    { key: "auth", label: "auth", value: authVal, tone: authVal > 0 ? "neutral" : "good" },
+    { key: "ready", label: "대기", value: readyVal, tone: "neutral" },
+    { key: "processing", label: "처리 중", value: processingVal, tone: "neutral" },
+    { key: "failed", label: "실패", value: failedVal, tone: failedVal > 0 ? "danger" : "good" },
+    { key: "stale", label: "지연", value: staleVal, tone: staleVal > 0 ? "danger" : "good" },
+    { key: "purge", label: "정리 대상", value: purgeVal, tone: purgeVal > 0 ? "warn" : "good" },
+    { key: "auth", label: "인증 기록", value: authVal, tone: authVal > 0 ? "neutral" : "good" },
   ]
 
   if (hasSnapshotSubtree) {
     const blockedVal = toSafeCount(snapshot?.authSecurity?.blockedEventCount)
     values.push({
       key: "blocked",
-      label: "blocked",
+      label: "차단",
       value: blockedVal,
       tone: blockedVal > 0 ? "danger" : "good",
     })
@@ -185,7 +185,7 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
   const totalAttentionCount = queueFailures + authFailures
   const queueValue =
     hasSnapshotQueue || props.taskQueueDiagnostics
-      ? `${readyPendingCount} ready`
+      ? `${readyPendingCount}건 대기`
       : props.queueStatusLabel
 
   const systemTone = toOpsTone(props.systemHealthStatus)
@@ -205,68 +205,58 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
     {
       key: "system-health",
       title: "시스템 상태",
-      subtitle: `version ${version}`,
+      subtitle: `빌드 ${version} · DB ${dbStatus} · Redis ${redisStatus}`,
       valueText: props.systemHealthStatus,
       badgeText: toToneBadgeCode(systemTone),
       tone: systemTone,
-      actionLabel: "Doctor 실행",
-      onAction: () => {
-        if (isActionBusy) return
-        void props.executeAction("systemHealth", props.fetchSystemHealthCached, {
-          onSuccess: () => props.setSystemHealthCheckedAt(new Date().toISOString()),
-        })
-      },
-      segments: [
-        { key: "db", label: "DB", value: dbStatus.toUpperCase() === "UP" ? 1 : 0, tone: toOpsTone(dbStatus) },
-        { key: "redis", label: "REDIS", value: redisStatus.toUpperCase() === "UP" ? 1 : 0, tone: cacheTone },
-      ],
-      totalCount: 2,
+      segments: [],
+      totalCount: 0,
     },
     {
       key: "task-queue",
       title: "작업 큐",
       subtitle:
         hasSnapshotQueue || props.taskQueueDiagnostics
-          ? `processing ${processingCount}`
-          : "queue snapshot",
+          ? `처리 중 ${processingCount}건`
+          : "스냅샷 대기",
       valueText: queueValue,
       badgeText: toToneBadgeCode(queueTone),
       tone: queueTone,
       actionLabel: "진단 보기",
       onAction: () => props.focusSection("diagnostics", "queue"),
       segments: [
-        { key: "ready", label: "READY", value: readyPendingCount, tone: "info" },
-        { key: "active", label: "ACTIVE", value: processingCount, tone: "primary" },
-        { key: "failed", label: "FAILED", value: failedCount, tone: "danger" },
-        { key: "stale", label: "STALE", value: staleCount, tone: "warn" },
+        { key: "ready", label: "대기", value: readyPendingCount, tone: "info" },
+        { key: "active", label: "처리", value: processingCount, tone: "primary" },
+        { key: "failed", label: "실패", value: failedCount, tone: "danger" },
+        { key: "stale", label: "지연", value: staleCount, tone: "warn" },
       ],
     },
     {
       key: "auth-security",
       title: "인증 · 주의 이벤트",
-      subtitle: `queue ${queueFailures} · auth ${authFailures}`,
+      subtitle: `큐 이상 ${queueFailures} · 차단 ${authFailures}`,
       valueText: `${totalAttentionCount}건`,
       badgeText: toToneBadgeCode(attentionTone),
       tone: attentionTone,
       actionLabel: "보안 기록",
       onAction: () => props.focusSection("execution", "auth"),
       segments: [
-        { key: "events", label: "EVENTS", value: authTotalCount, tone: "info" },
-        { key: "blocked", label: "BLOCKED", value: authFailures, tone: "danger" },
+        { key: "events", label: "전체 기록", value: authTotalCount, tone: "info" },
+        { key: "blocked", label: "차단", value: authFailures, tone: "danger" },
       ],
     },
     {
       key: "storage-cleanup",
       title: "캐시 · 스토리지 정리",
-      subtitle: `db ${dbStatus}`,
+      subtitle: `DB ${dbStatus}`,
       valueText: redisStatus,
       badgeText: toToneBadgeCode(cacheTone),
       tone: cacheTone,
       actionLabel: "정리 진단",
       onAction: () => props.focusSection("execution", "cleanup"),
       segments: [
-        { key: "pending", label: "PENDING", value: pendingDeleteCount, tone: "neutral" },
-        { key: "purge", label: "PURGE", value: purgeCandidateCount, tone: "warn" },
+        { key: "pending", label: "삭제 대기", value: pendingDeleteCount, tone: "neutral" },
+        { key: "purge", label: "정리 후보", value: purgeCandidateCount, tone: "warn" },
       ],
     },
   ]
@@ -297,14 +287,14 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
                     })
               }
             >
-              Doctor 실행
+              상태 다시 확인
             </ToolsHeaderButton>
             <ToolsHeaderButton
               type="button"
               data-variant="primary"
               onClick={() => props.focusSection("execution")}
             >
-              복구 작업 이동
+              복구 섹션 이동
             </ToolsHeaderButton>
           </ToolsHeroActions>
         </ToolsHeroTop>

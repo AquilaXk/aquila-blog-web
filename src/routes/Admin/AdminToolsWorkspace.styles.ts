@@ -69,10 +69,10 @@ export const ToolsHeroCopy = styled.div`
   h2 {
     margin: 0;
     color: ${adminTextPrimary};
-    font-size: clamp(1.18rem, 1.7vw, 1.38rem);
-    font-weight: 780;
-    line-height: 1.2;
-    letter-spacing: -0.025em;
+    font-size: clamp(1.18rem, 1.7vw, 1.36rem);
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
   }
 `
 
@@ -188,19 +188,17 @@ export const ToolsKpiBadge = styled.span<{ "data-tone"?: string }>`
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.1rem 0.44rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: ${adminSurfaceMuted};
+  padding: 0.12rem 0.46rem;
+  border-radius: 6px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurface};
   color: ${adminTextSecondary};
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-weight: 550;
 
   &[data-tone="good"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
@@ -221,9 +219,9 @@ export const ToolsKpiValue = styled.strong`
   display: block;
   color: ${adminTextPrimary};
   font-size: 1.2rem;
-  font-weight: 760;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   line-height: 1.15;
   overflow-wrap: anywhere;
 `
@@ -243,16 +241,16 @@ export const ToolsStatusChip = styled(AdminStatusPill)`
   align-items: center;
   gap: 0.34rem;
   min-height: 24px;
-  padding: 0 0.56rem;
-  border-radius: 999px;
-  border-color: transparent;
-  background: ${adminSurfaceMuted};
-  font-size: 0.71rem;
-  font-weight: 700;
+  padding: 0 0.52rem;
+  border-radius: 6px;
+  border-color: ${adminBorder};
+  background: ${adminSurface};
+  font-size: 0.72rem;
+  font-weight: 550;
 
   &[data-tone="good"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 

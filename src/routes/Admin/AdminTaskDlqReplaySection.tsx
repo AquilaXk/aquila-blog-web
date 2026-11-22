@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
 import { listTaskDlqItems, type TaskDlqItem } from "src/apis/backend/tasks"
+import { useLanguage } from "src/libs/language"
 import { ADMIN_TASK_DLQ_REPLAY_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import {
@@ -39,14 +40,20 @@ type Props = {
   onTerminalReceipt: () => void
 }
 
-const receiptLabel: Record<SafeDlqReplayDisplay["status"], string> = {
-  ACCEPTED: "Accepted and pending",
-  SUCCEEDED: "Succeeded",
-  PARTIAL: "Partially completed",
-  FAILED: "Failed",
+const getReceiptLabel = (status: SafeDlqReplayDisplay["status"], isEn: boolean): string => {
+  if (isEn) {
+    if (status === "ACCEPTED") return "Accepted and pending"
+    if (status === "SUCCEEDED") return "Succeeded"
+    if (status === "PARTIAL") return "Partially completed"
+    return "Failed"
+  }
+  if (status === "ACCEPTED") return "요청 접수 · 처리 대기"
+  if (status === "SUCCEEDED") return "재실행 완료"
+  if (status === "PARTIAL") return "부분 완료"
+  return "실패"
 }
 
-const describeFailure = (error: unknown) => {
+const describeFailure = (error: unknown, isEn: boolean) => {
   if (
     error instanceof ApiError &&
     error.status === 409 &&
@@ -54,15 +61,16 @@ const describeFailure = (error: unknown) => {
   ) {
     return {
       conflict: true,
-      message:
-        "This operation ID conflicts with a different command. Clear it before creating a new request.",
+      message: isEn
+        ? "This operation ID conflicts with a different command. Clear it before creating a new request."
+        : "기존 작업 ID가 다른 명령과 충돌합니다. 초기화한 뒤 새 요청을 보내세요.",
     }
   }
   const requestId = error instanceof ApiError ? error.requestId : null
   return {
     conflict: false,
     message: `${toUserFacingMessage(error)}${
-      requestId ? ` Request ID: ${requestId}` : ""
+      requestId ? ` (${isEn ? "Request ID" : "요청 ID"}: ${requestId})` : ""
     }`,
   }
 }
@@ -78,6 +86,8 @@ export const AdminTaskDlqReplaySection = ({
   taskTypeSuggestions,
   onTerminalReceipt,
 }: Props) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const [reason, setReason] = useState("")
   const [taskType, setTaskType] = useState("")
   const [limit, setLimit] = useState("")
@@ -134,7 +144,11 @@ export const AdminTaskDlqReplaySection = ({
         ? AdminTaskDlqReplayModel.parseAcceptedOperationReceipt(response)
         : AdminTaskDlqReplayModel.parseOperationReceipt(response)
       if (receipt?.operationId !== expectedOperationId) {
-        setNotice("The operation response could not be verified.")
+        setNotice(
+          isEn
+            ? "The operation response could not be verified."
+            : "작업 응답 서명을 검증하지 못했습니다."
+        )
         return false
       }
       const safeDisplay = AdminTaskDlqReplayModel.toSafeDisplay(receipt)
@@ -152,7 +166,7 @@ export const AdminTaskDlqReplaySection = ({
       }
       return true
     },
-    [fetchDlqTasks, onTerminalReceipt]
+    [fetchDlqTasks, isEn, onTerminalReceipt]
   )
 
   const checkStatus = useCallback(
@@ -167,7 +181,7 @@ export const AdminTaskDlqReplaySection = ({
         )
         consumeReceipt(response, sessionRecord.operationId)
       } catch (error) {
-        const failure = describeFailure(error)
+        const failure = describeFailure(error, isEn)
         setConflict(failure.conflict)
         setNotice(failure.message)
       } finally {
@@ -175,7 +189,7 @@ export const AdminTaskDlqReplaySection = ({
         setBusy(false)
       }
     },
-    [consumeReceipt, disabled, record]
+    [consumeReceipt, disabled, isEn, record]
   )
 
   useEffect(() => {
@@ -186,7 +200,9 @@ export const AdminTaskDlqReplaySection = ({
       )
     } catch {
       setNotice(
-        "The saved operation request could not be read. No request was sent."
+        isEn
+          ? "The saved operation request could not be read. No request was sent."
+          : "저장된 작업 요청을 읽지 못해 요청을 보내지 않았습니다."
       )
     }
     if (!restored || restoredOperationId.current === restored.operationId)
@@ -194,7 +210,7 @@ export const AdminTaskDlqReplaySection = ({
     restoredOperationId.current = restored.operationId
     activeRecordRef.current = restored
     setRecord(restored)
-  }, [])
+  }, [isEn])
 
   useEffect(() => {
     if (
@@ -216,7 +232,7 @@ export const AdminTaskDlqReplaySection = ({
       if (record?.operationId) consumeReceipt(response, record.operationId)
     },
     onFailure: (error) => {
-      const failure = describeFailure(error)
+      const failure = describeFailure(error, isEn)
       setConflict(failure.conflict)
       setNotice(failure.message)
     },
@@ -237,7 +253,7 @@ export const AdminTaskDlqReplaySection = ({
       )
       consumeReceipt(response, sessionRecord.operationId, true)
     } catch (error) {
-      const failure = describeFailure(error)
+      const failure = describeFailure(error, isEn)
       setConflict(failure.conflict)
       setNotice(failure.message)
     } finally {
@@ -249,7 +265,11 @@ export const AdminTaskDlqReplaySection = ({
   const submit = async (overrideTaskIds?: number[]) => {
     if (disabled || postInFlight.current || activeRecordRef.current) return
     if (!confirmed) {
-      setNotice("Please confirm the DLQ replay checkbox before submitting.")
+      setNotice(
+        isEn
+          ? "Please confirm the DLQ replay checkbox before submitting."
+          : "재실행 확인 체크박스를 먼저 선택해주세요."
+      )
       return
     }
     const requestedLimit = limit.trim() ? Number(limit) : undefined
@@ -278,7 +298,9 @@ export const AdminTaskDlqReplaySection = ({
       )
     } catch {
       setNotice(
-        "The operation request could not be retained. No request was sent."
+        isEn
+          ? "The operation request could not be retained. No request was sent."
+          : "작업 요청을 세션에 저장하지 못해 요청을 보내지 않았습니다."
       )
       return
     }
@@ -292,7 +314,11 @@ export const AdminTaskDlqReplaySection = ({
     try {
       sessionStorage.removeItem(ADMIN_TASK_DLQ_REPLAY_SESSION_KEY)
     } catch {
-      setNotice("The saved operation request could not be cleared.")
+      setNotice(
+        isEn
+          ? "The saved operation request could not be cleared."
+          : "저장된 작업 요청 기록을 지우지 못했습니다."
+      )
       return
     }
     polling.resetPolling()
@@ -309,15 +335,21 @@ export const AdminTaskDlqReplaySection = ({
 
   return (
     <>
-      <DangerPanel as="section" role="region" aria-label="DLQ replay">
+      <DangerPanel
+        as="section"
+        role="region"
+        aria-label={isEn ? "DLQ replay" : "실패 작업 재실행 (DLQ)"}
+      >
         <SubSectionHeading>
-          <strong>DLQ replay</strong>
-          <small>Durable operation</small>
+          <strong>{isEn ? "DLQ replay" : "실패 작업 재실행 (DLQ)"}</strong>
+          <small>{isEn ? "Durable operation" : "멱등 비동기 복구 작업"}</small>
         </SubSectionHeading>
         {!record || (busy && !display && !notice) ? (
           <FieldGrid>
             <FieldBox className="wide">
-              <FieldLabel htmlFor="admin-task-dlq-reason">Reason</FieldLabel>
+              <FieldLabel htmlFor="admin-task-dlq-reason">
+                {isEn ? "Reason" : "실행 사유"}
+              </FieldLabel>
               <TextArea
                 id="admin-task-dlq-reason"
                 value={reason}
@@ -326,14 +358,16 @@ export const AdminTaskDlqReplaySection = ({
               />
             </FieldBox>
             <FieldBox>
-              <FieldLabel htmlFor="admin-task-dlq-type">Task type</FieldLabel>
+              <FieldLabel htmlFor="admin-task-dlq-type">
+                {isEn ? "Task type" : "작업 유형"}
+              </FieldLabel>
               <Input
                 as="select"
                 id="admin-task-dlq-type"
                 value={taskType}
                 onChange={(event) => setTaskType(event.target.value)}
               >
-                <option value="">All current task types</option>
+                <option value="">{isEn ? "All current task types" : "전체 작업 유형"}</option>
                 {taskTypeSuggestions.map((suggestion) => (
                   <option key={suggestion} value={suggestion}>
                     {suggestion}
@@ -342,7 +376,9 @@ export const AdminTaskDlqReplaySection = ({
               </Input>
             </FieldBox>
             <FieldBox>
-              <FieldLabel htmlFor="admin-task-dlq-limit">Replay limit</FieldLabel>
+              <FieldLabel htmlFor="admin-task-dlq-limit">
+                {isEn ? "Replay limit" : "최대 재실행 건수"}
+              </FieldLabel>
               <Input
                 id="admin-task-dlq-limit"
                 type="number"
@@ -358,7 +394,7 @@ export const AdminTaskDlqReplaySection = ({
                 checked={resetRetryCount}
                 onChange={(event) => setResetRetryCount(event.target.checked)}
               />{" "}
-              Reset retry count
+              {isEn ? "Reset retry count" : "재시도 횟수 초기화"}
             </ConfirmDeleteRow>
             <ConfirmDeleteRow as="label">
               <input
@@ -366,7 +402,7 @@ export const AdminTaskDlqReplaySection = ({
                 checked={confirmed}
                 onChange={(event) => setConfirmed(event.target.checked)}
               />{" "}
-              I confirm this DLQ replay
+              {isEn ? "I confirm this DLQ replay" : "위 조건으로 실패 작업 재실행을 확인했습니다"}
             </ConfirmDeleteRow>
             <ActionRow className="wide">
               <DangerButton
@@ -374,7 +410,7 @@ export const AdminTaskDlqReplaySection = ({
                 disabled={!canSubmit}
                 onClick={() => void submit()}
               >
-                Request DLQ replay
+                {isEn ? "Request DLQ replay" : "DLQ 재실행 요청"}
               </DangerButton>
             </ActionRow>
           </FieldGrid>
@@ -386,21 +422,21 @@ export const AdminTaskDlqReplaySection = ({
                   data-tone={receiptTone(display.status)}
                   aria-live="polite"
                 >
-                  <strong>{receiptLabel[display.status]}</strong>
+                  <strong>{getReceiptLabel(display.status, isEn)}</strong>
                   {display.resultCode ? ` · ${display.resultCode}` : null}
                 </InlineNotice>
                 <SubtleMetaGrid>
                   <SubtleMetaItem>
-                    <span>Selected</span>
-                    <strong>Selected {display.selectedCount}</strong>
+                    <span>{isEn ? "Selected" : "대상 선택"}</span>
+                    <strong>{isEn ? `Selected ${display.selectedCount}` : `${display.selectedCount}건 선택`}</strong>
                   </SubtleMetaItem>
                   <SubtleMetaItem>
-                    <span>Replayed</span>
-                    <strong>Replayed {display.replayedCount}</strong>
+                    <span>{isEn ? "Replayed" : "재실행됨"}</span>
+                    <strong>{isEn ? `Replayed ${display.replayedCount}` : `${display.replayedCount}건 재실행`}</strong>
                   </SubtleMetaItem>
                   <SubtleMetaItem>
-                    <span>Quarantined</span>
-                    <strong>Quarantined {display.quarantinedCount}</strong>
+                    <span>{isEn ? "Quarantined" : "격리 유지"}</span>
+                    <strong>{isEn ? `Quarantined ${display.quarantinedCount}` : `${display.quarantinedCount}건 격리`}</strong>
                   </SubtleMetaItem>
                 </SubtleMetaGrid>
               </>
@@ -420,7 +456,7 @@ export const AdminTaskDlqReplaySection = ({
                 disabled={disabled || busy || polling.isPolling}
                 onClick={() => void checkStatus()}
               >
-                Check status
+                {isEn ? "Check status" : "상태 확인"}
               </QuietButton>
               {conflict || (display && display.status !== "ACCEPTED") ? (
                 <QuietButton
@@ -428,7 +464,7 @@ export const AdminTaskDlqReplaySection = ({
                   disabled={disabled || busy}
                   onClick={clearForNewCommand}
                 >
-                  New command
+                  {isEn ? "New command" : "새 요청 작성"}
                 </QuietButton>
               ) : null}
               {!conflict && !display && notice ? (
@@ -437,7 +473,7 @@ export const AdminTaskDlqReplaySection = ({
                   disabled={disabled || busy}
                   onClick={() => void postRecord(record)}
                 >
-                  Retry same request
+                  {isEn ? "Retry same request" : "동일 요청 재시도"}
                 </QuietButton>
               ) : null}
             </ActionRow>

@@ -32,7 +32,7 @@ export const DetailPanel = styled.aside`
 
   &[data-mode="drawer"] {
     position: fixed;
-    top: var(--app-header-height, 73px);
+    top: var(--app-header-height, 48px);
     right: 0;
     bottom: 0;
     z-index: ${zIndexes.dialog};
@@ -42,7 +42,7 @@ export const DetailPanel = styled.aside`
 
   @media (max-width: 1279px) {
     position: fixed;
-    top: var(--app-header-height, 73px);
+    top: var(--app-header-height, 48px);
     right: 0;
     bottom: 0;
     z-index: ${zIndexes.dialog};
@@ -57,7 +57,7 @@ export const DetailScrim = styled.button`
 
   &[data-mode="drawer"] {
     position: fixed;
-    inset: var(--app-header-height, 73px) 0 0;
+    inset: var(--app-header-height, 48px) 0 0;
     z-index: ${zIndexes.dialog - 1};
     display: block;
     border: 0;
@@ -67,7 +67,7 @@ export const DetailScrim = styled.button`
 
   @media (max-width: 1279px) {
     position: fixed;
-    inset: var(--app-header-height, 73px) 0 0;
+    inset: var(--app-header-height, 48px) 0 0;
     z-index: ${zIndexes.dialog - 1};
     display: block;
     border: 0;

@@ -287,43 +287,44 @@ export const AdminStatusPill = styled.span<{ $size?: "sm" | "md" }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.32rem;
-  min-height: ${({ $size = "md" }) => ($size === "sm" ? "22px" : "26px")};
-  padding: ${({ $size = "md" }) => ($size === "sm" ? "0 0.5rem" : "0 0.62rem")};
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: ${({ theme }) => adminMutedSurface(theme)};
+  gap: 0.34rem;
+  min-height: ${({ $size = "md" }) => ($size === "sm" ? "22px" : "24px")};
+  padding: ${({ $size = "md" }) => ($size === "sm" ? "0 0.45rem" : "0 0.55rem")};
+  border-radius: 6px;
+  border: 1px solid ${({ theme }) => adminCardBorder(theme)};
+  background: ${({ theme }) => adminRaisedSurface(theme)};
   color: ${({ theme }) => adminSecondaryText(theme)};
-  font-size: ${({ $size = "md" }) => ($size === "sm" ? "0.72rem" : "0.75rem")};
-  font-weight: 640;
+  font-size: ${({ $size = "md" }) => ($size === "sm" ? "0.72rem" : "0.74rem")};
+  font-weight: 550;
   line-height: 1;
+  white-space: nowrap;
 
   &[data-tone="neutral"] {
-    border-color: transparent;
-    background: ${({ theme }) => adminMutedSurface(theme)};
+    border-color: ${({ theme }) => adminCardBorder(theme)};
+    background: ${({ theme }) => adminRaisedSurface(theme)};
     color: ${({ theme }) => adminMutedText(theme)};
   }
 
   &[data-tone="accent"] {
-    border-color: transparent;
+    border-color: ${({ theme }) => adminCardBorder(theme)};
     background: ${({ theme }) => adminAccentSurface(theme)};
     color: ${adminGold};
   }
 
   &[data-tone="success"] {
-    border-color: transparent;
+    border-color: ${adminStatusSuccessBorder};
     background: ${adminStatusSuccessBg};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="warn"] {
-    border-color: transparent;
+    border-color: ${adminStatusWarnBorder};
     background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
+    border-color: ${adminStatusDangerBorder};
     background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
   }

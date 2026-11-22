@@ -31,7 +31,7 @@ const requestAdminEmailCode = async (page: Page) => {
   await expect(
     page.getByRole("button", { name: "인증 코드 받기" })
   ).toBeEnabled()
-  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByLabel("이메일", { exact: true }).fill("admin@example.com")
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
 }
 
@@ -84,14 +84,14 @@ test("관리자 이메일 로그인은 저장한 정규화 이메일만 다음 �
 }) => {
   await page.goto("/admin/login")
 
-  await page.getByLabel("이메일").fill("  ADMIN@example.com  ")
-  await page.getByLabel("아이디 저장").check()
+  await page.getByLabel("이메일", { exact: true }).fill("  ADMIN@example.com  ")
+  await page.getByLabel("이메일 저장").check()
   await page.reload()
 
-  await expect(page.getByLabel("이메일")).toHaveValue("admin@example.com")
+  await expect(page.getByLabel("이메일", { exact: true })).toHaveValue("admin@example.com")
   await expect(page.getByLabel("로그인 유지")).not.toBeChecked()
 
-  await page.getByLabel("아이디 저장").uncheck()
+  await page.getByLabel("이메일 저장").uncheck()
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -165,7 +165,7 @@ test("관리자 이메일 요청은 진행 상태를 알리고 코드 입력으�
   )
 
   await page.goto("/admin/login")
-  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByLabel("이메일", { exact: true }).fill("admin@example.com")
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
 
   const inputGroup = page.getByRole("group", { name: "관리자 로그인 입력" })
@@ -212,7 +212,7 @@ test("만료된 관리자 인증 코드는 제출할 수 없다", async ({ page 
   )
 
   await page.goto("/admin/login")
-  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByLabel("이메일", { exact: true }).fill("admin@example.com")
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
 
   await expect(page.getByRole("timer")).toHaveText("00:01")
@@ -256,7 +256,7 @@ test("실제 만료 시각이 지나면 검증 요청을 보내지 않는다", a
   )
 
   await page.goto("/admin/login")
-  await page.getByLabel("이메일").fill("admin@example.com")
+  await page.getByLabel("이메일", { exact: true }).fill("admin@example.com")
   await page.getByRole("button", { name: "인증 코드 받기" }).click()
   await expect(page.getByRole("timer")).toHaveText("00:01")
   await page.getByLabel("인증 코드").fill("12345678")

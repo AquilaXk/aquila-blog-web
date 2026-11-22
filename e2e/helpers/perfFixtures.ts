@@ -536,9 +536,9 @@ export const getVisualLayoutFingerprint = async (page: Page) =>
       ...(route === "/admin/dashboard"
         ? {
             dashboardServiceRailRect: readRect('[data-ui="monitoring-service-rail"]'),
-            dashboardPrioritySectionRect: readSectionRectByHeading("Steady-state guard"),
+            dashboardPrioritySectionRect: readSectionRectByHeading("서브시스템 점검 항목"),
             dashboardPanelGridRect: readSectionRectByHeading("운영 지표 요약"),
-            dashboardFirstPanelRect: readSectionRectByHeading("Live logs"),
+            dashboardFirstPanelRect: readSectionRectByHeading("최근 운영 이벤트"),
           }
         : {}),
     }

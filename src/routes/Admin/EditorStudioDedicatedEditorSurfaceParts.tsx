@@ -182,6 +182,11 @@ export const EditorStudioTopBarActions = styled.div`
       font-size: 0.78rem;
       white-space: nowrap;
       flex-shrink: 0;
+
+      @media (pointer: coarse) {
+        height: auto;
+        min-height: 44px;
+      }
     }
   }
 

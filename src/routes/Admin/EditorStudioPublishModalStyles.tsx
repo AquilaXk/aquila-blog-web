@@ -63,10 +63,9 @@ export const SectionKicker = styled.span`
   align-items: center;
   width: fit-content;
   color: ${adminTextMuted};
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 `
 
 export const VisibilityOptionGrid = styled.div`
@@ -130,10 +129,6 @@ export const FieldHelp = styled.span`
   line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: break-word;
-
-  @media (max-width: 720px) {
-    display: none;
-  }
 `
 
 export const PostPreviewSetup = styled.section`
@@ -199,8 +194,8 @@ export const OptionalCoverSummary = styled.summary`
     font-style: normal;
     font-size: 0.72rem;
     font-weight: 600;
-    padding: 0.22rem 0.56rem;
-    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
     border: 1px solid ${adminBorder};
     background: ${adminSurfaceMuted};
     color: ${adminTextSecondary};

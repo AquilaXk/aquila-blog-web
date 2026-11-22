@@ -175,7 +175,7 @@ export const SearchInput = styled.input`
   height: 34px;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 0 6.6rem 0 2.15rem;
+  padding: 0 4.5rem 0 2.15rem;
   background: ${surfaceMuted};
   color: ${textPrimary};
   font-size: 0.81rem;

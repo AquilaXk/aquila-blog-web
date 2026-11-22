@@ -1,22 +1,12 @@
 /**
  * 참조 구현:
- * - shadcn-ui/ui apps/v4/registry/new-york-v4/blocks/dashboard-01/{page.tsx,components/section-cards.tsx,components/chart-area-interactive.tsx,components/data-table.tsx} (MIT License, Copyright (c) shadcn)
- * - TryGhost/Ghost apps/admin/src/{analytics/views/stats/overview/overview.tsx,posts/list/components/post-list-row.tsx} (MIT License, Copyright (c) Ghost Foundation)
+ * - TryGhost/Ghost apps/shade/src/components/{ui/kpi-card.tsx,ui/data-list.tsx,layout/list-page.tsx} (MIT License, Copyright (c) Ghost Foundation)
+ * - medusajs/medusa packages/design-system/ui/src/components/status-badge (MIT License, Copyright (c) Medusa)
+ * - tremorlabs/tremor packages/tremor-react/src/components/vis-elements/BarList/BarList.tsx (Apache-2.0 License, Copyright (c) Tremor Labs)
  */
 import Link from "next/link"
 import { useState } from "react"
 import { useLanguage } from "src/libs/language"
-import {
-  adminChartAreaBottom,
-  adminChartAreaTop,
-  adminChartGrid,
-  adminChartStroke,
-  adminSurface,
-  adminSurfaceMuted,
-  adminTextMuted,
-  adminTextPrimary,
-  adminTextSecondary,
-} from "src/routes/Admin/adminColorTokens"
 import AppIcon from "./AdminAppIcon"
 import type {
   AdminHubContentItem,
@@ -28,7 +18,7 @@ import type {
 import {
   ActivityList,
   AnalyticsBand,
-  ChartCanvasWrap,
+  AnalyticsSideStack,
   ContentList,
   ContentRow,
   ContentTableHead,
@@ -44,38 +34,24 @@ import {
   MetricGrid,
   Panel,
   PanelHeader,
+  PanelHeaderLink,
   PrimaryActionLink,
   SecondaryActionLink,
   SegmentedToggle,
+  ShareBarCopy,
+  ShareBarFill,
+  ShareBarItem,
+  ShareBarList,
+  ShareBarValue,
   StatusList,
   StatusRow,
+  SubSectionTitle,
 } from "./AdminHubSurface.styles"
 import {
-  buildAdminHubAreaGeometry,
-  HUB_CHART_BASELINE,
-  HUB_CHART_LEFT,
-  HUB_CHART_RIGHT,
-  HUB_CHART_TOP,
-  truncateAdminHubChartLabel,
+  deriveAdminHubShareBars,
+  formatAdminHubContentStatus,
+  formatAdminHubMetricLabel,
 } from "./AdminHubSurfaceModel"
-
-const resolveChartAxisDateOrTitle = (
-  meta: string | undefined,
-  title: string,
-  maxChars: number
-): string => {
-  if (meta) {
-    const isoDateMatch = /(\d{4})[-.](\d{2})[-.](\d{2})/.exec(meta)
-    if (isoDateMatch) {
-      return `${isoDateMatch[2]}.${isoDateMatch[3]}`
-    }
-    const monthDayMatch = /(\d{1,2})\.\s*(\d{1,2})/.exec(meta)
-    if (monthDayMatch) {
-      return `${monthDayMatch[1]!.padStart(2, "0")}.${monthDayMatch[2]!.padStart(2, "0")}`
-    }
-  }
-  return truncateAdminHubChartLabel(title, maxChars)
-}
 
 type AdminHubSurfaceSectionsProps = {
   displayName: string
@@ -106,20 +82,9 @@ export const AdminHubSurfaceSections = ({
 }: AdminHubSurfaceSectionsProps) => {
   const { language } = useLanguage()
   const isEn = language === "en"
-  const [chartMode, setChartMode] = useState<"area" | "bar">("area")
-  const [tableTab, setTableTab] = useState<"all" | "published" | "draft" | "status">("all")
+  const [tableTab, setTableTab] = useState<"all" | "published" | "draft">("all")
 
-  const chartSeries = contentItems.map((item) => ({
-    title: item.title,
-    meta: item.meta,
-    views: typeof item.views === "number" && Number.isFinite(item.views) ? item.views : 0,
-  }))
-  const totalSampleViews = chartSeries.reduce((acc, item) => acc + item.views, 0)
-  const { strokePath, areaPath, coords, maxVal } = buildAdminHubAreaGeometry(
-    chartSeries.map((item) => item.views)
-  )
-  const midVal = Math.round(maxVal / 2)
-
+  const shareBars = deriveAdminHubShareBars(contentItems)
   const healthyChecks = serviceStatusItems.filter((item) => item.tone === "good").length
   const publishedItems = contentItems.filter((item) => item.tone === "good")
   const draftItems = contentItems.filter((item) => item.tone !== "good")
@@ -171,7 +136,7 @@ export const AdminHubSurfaceSections = ({
       <MetricGrid aria-label={isEn ? "Admin Core Metrics" : "관리자 핵심 지표"}>
         {metrics.map((item) => (
           <MetricCard key={item.label} data-slot="card" data-tone={item.tone || "neutral"}>
-            <span className="cardDescription">{item.label}</span>
+            <span className="cardDescription">{formatAdminHubMetricLabel(item.label, isEn)}</span>
             <strong>{item.value}</strong>
             {item.detail ? <div className="cardFooter">{item.detail}</div> : null}
           </MetricCard>
@@ -179,208 +144,16 @@ export const AdminHubSurfaceSections = ({
       </MetricGrid>
 
       <AnalyticsBand>
-        <Panel data-span="full">
+        <Panel>
           <PanelHeader>
             <div className="titleBlock">
-              <h2>{isEn ? "Content Readership Distribution" : "콘텐츠 열람 분포"}</h2>
-              <p>{isEn ? "View share across recently updated posts" : "최근 수정 포스트별 조회 추이"}</p>
+              <div className="titleInline">
+                <h2>{isEn ? "Recent Content" : "최근 콘텐츠"}</h2>
+                <span className="countChip">{contentItems.length}</span>
+              </div>
+              <p>{isEn ? "Latest edited posts and drafts" : "최근 수정한 글과 초안 목록"}</p>
             </div>
-            <SegmentedToggle role="group" aria-label={isEn ? "Chart mode" : "차트 보기 방식"}>
-              <button
-                type="button"
-                aria-pressed={chartMode === "area"}
-                onClick={() => setChartMode("area")}
-              >
-                {isEn ? "Area" : "영역 차트"}
-              </button>
-              <button
-                type="button"
-                aria-pressed={chartMode === "bar"}
-                onClick={() => setChartMode("bar")}
-              >
-                {isEn ? "Bars" : "막대 비교"}
-              </button>
-            </SegmentedToggle>
-          </PanelHeader>
-          <ChartCanvasWrap>
-            <svg
-              viewBox="0 0 600 185"
-              role="img"
-              aria-label={isEn ? "Recent post views chart" : "최근 수정 포스트별 조회 분포 차트"}
-            >
-              <defs>
-                <linearGradient id="adminHubAreaFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" style={{ stopColor: adminChartAreaTop }} />
-                  <stop offset="95%" style={{ stopColor: adminChartAreaBottom }} />
-                </linearGradient>
-              </defs>
-
-              {[24, 86, 117].map((gridY) => (
-                <line
-                  key={`grid-${gridY}`}
-                  x1={HUB_CHART_LEFT}
-                  y1={gridY}
-                  x2={HUB_CHART_RIGHT}
-                  y2={gridY}
-                  stroke={adminChartGrid}
-                  strokeDasharray="3 3"
-                  strokeWidth="1"
-                />
-              ))}
-              <line
-                x1={HUB_CHART_LEFT}
-                y1={HUB_CHART_BASELINE}
-                x2={HUB_CHART_RIGHT}
-                y2={HUB_CHART_BASELINE}
-                stroke={adminChartGrid}
-                strokeWidth="1"
-              />
-
-              <text x="6" y="28" fill={adminTextMuted} fontSize="10" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
-                {coords.length > 0 ? maxVal.toLocaleString() : "0"}
-              </text>
-              {coords.length > 0 && midVal > 0 ? (
-                <text x="6" y="89" fill={adminTextMuted} fontSize="10" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
-                  {midVal.toLocaleString()}
-                </text>
-              ) : null}
-              <text x="6" y={HUB_CHART_BASELINE + 3} fill={adminTextMuted} fontSize="10" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
-                0
-              </text>
-
-              {coords.length === 0 ? (
-                <>
-                  <line
-                    x1={HUB_CHART_LEFT}
-                    y1={HUB_CHART_BASELINE}
-                    x2={HUB_CHART_RIGHT}
-                    y2={HUB_CHART_BASELINE}
-                    stroke={adminChartStroke}
-                    strokeDasharray="4 4"
-                    strokeWidth="1.75"
-                    opacity="0.4"
-                  />
-                  <text
-                    x={(HUB_CHART_LEFT + HUB_CHART_RIGHT) / 2}
-                    y="92"
-                    textAnchor="middle"
-                    fill={adminTextMuted}
-                    fontSize="12"
-                  >
-                    {isEn ? "0 baseline · No recent posts yet" : "0 기준선 · 집계된 최근 포스트 없음"}
-                  </text>
-                </>
-              ) : chartMode === "area" ? (
-                <>
-                  <path d={areaPath} fill="url(#adminHubAreaFill)" />
-                  <path
-                    d={strokePath}
-                    fill="none"
-                    stroke={adminChartStroke}
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {coords.map((pt, idx) => (
-                    <g key={`pt-${idx}`}>
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="3"
-                        fill={adminSurface}
-                        stroke={adminChartStroke}
-                        strokeWidth="1.75"
-                      />
-                      <text
-                        x={pt.x}
-                        y="170"
-                        textAnchor="middle"
-                        fill={adminTextSecondary}
-                        fontSize="10.5"
-                        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                      >
-                        {resolveChartAxisDateOrTitle(
-                          chartSeries[idx]?.meta,
-                          chartSeries[idx]?.title || "",
-                          coords.length === 1 ? 22 : 10
-                        )}
-                      </text>
-                    </g>
-                  ))}
-                </>
-              ) : (
-                coords.map((pt, idx) => {
-                  const barWidth =
-                    coords.length === 1
-                      ? 44
-                      : Math.min(44, Math.max(20, 320 / Math.max(1, coords.length)))
-                  const rawHeight = HUB_CHART_BASELINE - pt.y
-                  const barHeight = pt.val > 0 ? Math.max(6, rawHeight) : 3
-                  return (
-                    <g key={`bar-${idx}`}>
-                      <rect
-                        x={pt.x - barWidth / 2}
-                        y={HUB_CHART_TOP}
-                        width={barWidth}
-                        height={HUB_CHART_BASELINE - HUB_CHART_TOP}
-                        rx="4"
-                        fill={adminSurfaceMuted}
-                      />
-                      <rect
-                        x={pt.x - barWidth / 2}
-                        y={HUB_CHART_BASELINE - barHeight}
-                        width={barWidth}
-                        height={barHeight}
-                        rx="4"
-                        fill={adminChartStroke}
-                        opacity={pt.val > 0 ? 1 : 0.35}
-                      />
-                      {coords.length === 1 ? (
-                        <text
-                          x={pt.x}
-                          y={Math.max(HUB_CHART_TOP - 4, HUB_CHART_BASELINE - barHeight - 6)}
-                          textAnchor="middle"
-                          fill={adminTextPrimary}
-                          fontSize="10"
-                          fontWeight="600"
-                        >
-                          {pt.val.toLocaleString()}
-                        </text>
-                      ) : null}
-                      <text
-                        x={pt.x}
-                        y="170"
-                        textAnchor="middle"
-                        fill={adminTextSecondary}
-                        fontSize="10.5"
-                        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                      >
-                        {resolveChartAxisDateOrTitle(
-                          chartSeries[idx]?.meta,
-                          chartSeries[idx]?.title || "",
-                          coords.length === 1 ? 22 : 10
-                        )}
-                      </text>
-                    </g>
-                  )
-                })
-              )}
-            </svg>
-            <div className="chartFooter">
-              <span>
-                {isEn ? "Sampled posts" : "표본 포스트"}: <strong>{chartSeries.length}</strong>
-              </span>
-              <span>
-                {isEn ? "Sampled views" : "표본 조회 합계"}:{" "}
-                <strong>{totalSampleViews.toLocaleString()}</strong>
-              </span>
-            </div>
-          </ChartCanvasWrap>
-        </Panel>
-
-        <Panel data-span="full">
-          <PanelHeader>
-            <SegmentedToggle role="tablist" aria-label={isEn ? "Recent content views" : "최근 콘텐츠 보기 전환"}>
+            <SegmentedToggle role="tablist" aria-label={isEn ? "Filter recent content" : "최근 콘텐츠 필터"}>
               <button
                 type="button"
                 role="tab"
@@ -405,56 +178,10 @@ export const AdminHubSurfaceSections = ({
               >
                 {isEn ? "Drafts" : "초안"} ({draftItems.length})
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tableTab === "status"}
-                onClick={() => setTableTab("status")}
-              >
-                {isEn ? "Service Status" : "서비스 상태"} ({healthyChecks}/{serviceStatusItems.length})
-              </button>
             </SegmentedToggle>
-            <PrimaryActionLink as={Link} href={primaryAction.href}>
-              <span>+ {primaryAction.cta}</span>
-            </PrimaryActionLink>
           </PanelHeader>
 
-          {tableTab === "status" ? (
-            <>
-              <StatusList aria-label={isEn ? "Service Status" : "서비스 상태"}>
-                {serviceStatusItems.map((item) => (
-                  <StatusRow
-                    key={`${item.label}-${item.value}`}
-                    data-kind="service"
-                    data-tone={item.tone || "neutral"}
-                  >
-                    <span>
-                      <i aria-hidden="true" />
-                      <b>{item.label}</b>
-                    </span>
-                    <strong>{item.value}</strong>
-                  </StatusRow>
-                ))}
-              </StatusList>
-              {activityItems.length > 0 ? (
-                <ActivityList aria-label={isEn ? "Recent Activity" : "최근 활동"}>
-                  {activityItems.map((item) => (
-                    <StatusRow
-                      key={`${item.label}-${item.value}`}
-                      data-kind="activity"
-                      data-tone={item.tone || "neutral"}
-                    >
-                      <span>
-                        <i aria-hidden="true" />
-                        <b>{item.label}</b>
-                      </span>
-                      <strong>{item.value}</strong>
-                    </StatusRow>
-                  ))}
-                </ActivityList>
-              ) : null}
-            </>
-          ) : visibleContentItems.length > 0 ? (
+          {visibleContentItems.length > 0 ? (
             <>
               <ContentTableHead aria-hidden="true">
                 <span>{isEn ? "Post" : "포스트"}</span>
@@ -486,7 +213,7 @@ export const AdminHubSurfaceSections = ({
                     <span className="statusBadgeWrap">
                       <small>
                         <i aria-hidden="true" />
-                        {item.status}
+                        {formatAdminHubContentStatus(item.status, isEn)}
                       </small>
                     </span>
                     <span className="rowArrow" aria-hidden="true">
@@ -505,6 +232,95 @@ export const AdminHubSurfaceSections = ({
             </EmptyPanel>
           )}
         </Panel>
+
+        <AnalyticsSideStack>
+          <Panel>
+            <PanelHeader>
+              <div className="titleBlock">
+                <h2>{isEn ? "Readership Share" : "최근 글 조회 비중"}</h2>
+                <p>{isEn ? "Proportional views across recent posts" : "표본 글 기준 상대 조회 분포"}</p>
+              </div>
+              {contentItems.length > 0 ? (
+                <PanelHeaderLink as={Link} href={primaryAction.secondaryHref}>
+                  <span>{isEn ? "Manage" : "전체 관리"}</span>
+                  <AppIcon name="arrow-right" width={12} height={12} />
+                </PanelHeaderLink>
+              ) : null}
+            </PanelHeader>
+            {shareBars.length > 0 ? (
+              <ShareBarList aria-label={isEn ? "Recent post view share" : "최근 글 조회 비중"}>
+                {shareBars.map((bar) => (
+                  <ShareBarItem as={Link} key={`${bar.href}-${bar.title}`} href={bar.href}>
+                    <ShareBarFill $widthPct={bar.widthPct} aria-hidden="true" />
+                    <ShareBarCopy className="shareBarTitle">{bar.title}</ShareBarCopy>
+                    <ShareBarValue>
+                      {bar.views.toLocaleString()} ({bar.sharePct}%)
+                    </ShareBarValue>
+                  </ShareBarItem>
+                ))}
+              </ShareBarList>
+            ) : (
+              <EmptyPanel>
+                <span>{isEn ? "No recent post view data." : "집계된 최근 글 조회 데이터가 없습니다."}</span>
+              </EmptyPanel>
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelHeader>
+              <div className="titleBlock">
+                <div className="titleInline">
+                  <h2>{isEn ? "Service Status" : "서비스 상태 및 활동"}</h2>
+                  <span className="countChip">
+                    {healthyChecks}/{serviceStatusItems.length}
+                  </span>
+                </div>
+                <p>{isEn ? "Runtime dependencies and queue summary" : "백엔드 의존성과 작업 큐 요약"}</p>
+              </div>
+              <PanelHeaderLink as={Link} href="/admin/dashboard">
+                <span>{isEn ? "Dashboard" : "대시보드"}</span>
+                <AppIcon name="arrow-right" width={12} height={12} />
+              </PanelHeaderLink>
+            </PanelHeader>
+            <StatusList aria-label={isEn ? "Service Status" : "서비스 상태"}>
+              {serviceStatusItems.map((item) => (
+                <StatusRow
+                  key={`${item.label}-${item.value}`}
+                  data-kind="service"
+                  data-tone={item.tone || "neutral"}
+                >
+                  <span>
+                    <i aria-hidden="true" />
+                    <b>{item.label}</b>
+                  </span>
+                  <strong>{item.value}</strong>
+                </StatusRow>
+              ))}
+            </StatusList>
+            {activityItems.length > 0 ? (
+              <>
+                <SubSectionTitle>
+                  <h3>{isEn ? "Operational Summary" : "운영 활동"}</h3>
+                </SubSectionTitle>
+                <ActivityList aria-label={isEn ? "Recent Activity" : "최근 활동"}>
+                  {activityItems.map((item) => (
+                    <StatusRow
+                      key={`${item.label}-${item.value}`}
+                      data-kind="activity"
+                      data-tone={item.tone || "neutral"}
+                    >
+                      <span>
+                        <i aria-hidden="true" />
+                        <b>{item.label}</b>
+                      </span>
+                      <strong>{item.value}</strong>
+                    </StatusRow>
+                  ))}
+                </ActivityList>
+              </>
+            ) : null}
+          </Panel>
+        </AnalyticsSideStack>
       </AnalyticsBand>
     </Main>
   )

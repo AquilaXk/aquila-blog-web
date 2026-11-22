@@ -7,8 +7,6 @@ import {
   DetailsPanel,
   DetailsSummary,
   DiagnosticPanel,
-  DiagnosticsTabButton,
-  DiagnosticsTabs,
   FreshnessBadge,
   InlineNotice,
   MetricCard,
@@ -27,7 +25,6 @@ import {
   formatRetryPolicy,
   getFreshnessMeta,
 } from "src/routes/Admin/AdminToolsWorkspaceModel"
-import { handleTablistKeyDown } from "./adminTablistKeyboard"
 import type { TaskQueueDiagnostics } from "src/routes/Admin/AdminToolsWorkspacePageState"
 import { AdminTaskDlqReplaySection } from "src/routes/Admin/AdminTaskDlqReplaySection"
 import { AdminSearchRuntimeControlSection } from "src/routes/Admin/AdminSearchRuntimeControlSection"
@@ -52,7 +49,6 @@ export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSection
     isBusy,
     isQueueDiagnosticsOpen,
     isQueueLoading,
-    onSelectQueueTab,
     onToggleQueueDiagnosticsOpen,
     taskQueueDiagnostics,
     taskQueueDiagnosticsError,
@@ -96,39 +92,10 @@ export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSection
         </ActionRow>
       </SectionHeading>
 
-      <DiagnosticsTabs
-        role="tablist"
-        aria-label="작업 큐 도메인"
-        onKeyDown={(event) =>
-          handleTablistKeyDown(
-            event,
-            ["queue"] as const,
-            isQueueDiagnosticsOpen ? "queue" : null,
-            () => onSelectQueueTab()
-          )
-        }
-      >
-        {([{ key: "queue", label: "작업 큐 진단" }] as const).map((tab) => (
-          <DiagnosticsTabButton
-            key={tab.key}
-            id={`tab-${tab.key}`}
-            type="button"
-            role="tab"
-            aria-selected={isQueueDiagnosticsOpen}
-            aria-controls={`tabpanel-${tab.key}`}
-            data-active={isQueueDiagnosticsOpen}
-            onClick={onSelectQueueTab}
-          >
-            {tab.label}
-          </DiagnosticsTabButton>
-        ))}
-      </DiagnosticsTabs>
-
       {isQueueDiagnosticsOpen ? (
         <DiagnosticPanel
-          role="tabpanel"
           id="tabpanel-queue"
-          aria-labelledby="tab-queue"
+          aria-label="작업 큐 진단"
         >
           {!!taskQueueDiagnosticsError && (
             <InlineNotice data-tone="danger">{taskQueueDiagnosticsError}</InlineNotice>
@@ -138,11 +105,11 @@ export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSection
             <>
               <MetricGrid>
                 <MetricCard>
-                  <small>ready</small>
+                  <small>대기 중</small>
                   <strong>{taskQueueDiagnostics.readyPendingCount ?? 0}</strong>
                 </MetricCard>
                 <MetricCard>
-                  <small>processing</small>
+                  <small>처리 중</small>
                   <strong>{taskQueueDiagnostics.processingCount ?? 0}</strong>
                 </MetricCard>
                 <MetricCard>
@@ -150,7 +117,7 @@ export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSection
                   <strong>{taskQueueDiagnostics.failedCount ?? 0}</strong>
                 </MetricCard>
                 <MetricCard>
-                  <small>stale</small>
+                  <small>지연 작업</small>
                   <strong>{taskQueueDiagnostics.staleProcessingCount ?? 0}</strong>
                 </MetricCard>
               </MetricGrid>
@@ -169,7 +136,7 @@ export const AdminToolsDiagnosticsSection = (props: AdminToolsDiagnosticsSection
                   </strong>
                 </SubtleMetaItem>
                 <SubtleMetaItem>
-                  <span>processing timeout</span>
+                  <span>처리 제한 시간</span>
                   <strong>{taskQueueDiagnostics.processingTimeoutSeconds ?? 0}초</strong>
                 </SubtleMetaItem>
                 <SubtleMetaItem>

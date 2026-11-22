@@ -1,6 +1,7 @@
 /**
  * 참조 구현:
- * - TryGhost/Ghost apps/admin/src/layout/{admin-frame.tsx,admin-frame-top-bar.tsx,app-sidebar/app-sidebar.tsx} (MIT License, Copyright (c) Ghost Foundation)
+ * - TryGhost/Ghost apps/admin/src/layout/app-sidebar/app-sidebar.tsx (MIT License, Copyright (c) Ghost Foundation)
+ * - medusajs/medusa packages/admin/dashboard/src/components/layout/shell/shell.tsx (MIT License, Copyright (c) Medusa)
  * - shadcn-ui/ui blocks/dashboard-01/{app-sidebar.tsx,nav-main.tsx,site-header.tsx} & ui/dialog.tsx (MIT License, Copyright (c) shadcn)
  */
 import dynamic from "next/dynamic"
@@ -25,7 +26,6 @@ import {
   BrandBlock,
   BrandMark,
   ContentColumn,
-  FrameTopChrome,
   MobileDrawerScrim,
   NavLink,
   ShellFrame,
@@ -96,7 +96,6 @@ const AdminShell = ({
   const systemNavItems = navItems.filter(
     (item) => item.id === "dashboard" || item.id === "tools" || item.id === "profile"
   )
-  const writeNavItem = navItems.find((item) => item.id === "write")
 
   const sidebarIdentityName = (member.nickname || member.username || "관리자").trim()
   const sidebarIdentityInitial = sidebarIdentityName.slice(0, 2).toUpperCase()
@@ -237,31 +236,6 @@ const AdminShell = ({
 
   return (
     <ShellFrame $collapsed={effectiveCollapsed} data-admin-frame="full">
-      <FrameTopChrome data-testid="admin-frame-top-bar">
-        <nav className="framePlaces" aria-label={isEn ? "Places" : "작업 영역 전환"}>
-          <Link href="/admin" className="placeTab" data-active="true">
-            <span className="placeDot" aria-hidden="true" />
-            <span>Studio</span>
-          </Link>
-          <Link href="/" className="placeTab">
-            <span>{isEn ? "View Site" : "공개 사이트"}</span>
-            <AppIcon name="external-link" width={12} height={12} />
-          </Link>
-        </nav>
-
-        <button
-          type="button"
-          className="frameSearchPill"
-          aria-label={isEn ? "Search & Commands (⌘K)" : "검색 및 빠른 이동 (⌘K)"}
-          onMouseEnter={() => void loadCommandPalette()}
-          onClick={() => setIsPaletteOpen(true)}
-        >
-          <AppIcon name="search" width={13} height={13} />
-          <span className="pillText">{isEn ? "Search & run command..." : "검색 및 빠른 명령..."}</span>
-          <kbd>{`${shortcutPrefix}K`}</kbd>
-        </button>
-      </FrameTopChrome>
-
       {isMobileDrawerOpen ? (
         <MobileDrawerScrim
           role="presentation"
@@ -281,7 +255,7 @@ const AdminShell = ({
               </BrandMark>
               <div className="brandCopy">
                 <strong>{brandTitle}</strong>
-                <small>Admin Studio</small>
+                <small>{isEn ? "Admin Workspace" : "관리자 스튜디오"}</small>
               </div>
             </BrandBlock>
             {isMobileDrawerOpen ? (
@@ -293,37 +267,7 @@ const AdminShell = ({
               >
                 <AppIcon name="close" width={16} height={16} />
               </button>
-            ) : (
-              <button
-                type="button"
-                className="railToggleBtn"
-                aria-label={
-                  effectiveCollapsed
-                    ? isEn
-                      ? "Expand sidebar (⌘B)"
-                      : "사이드바 펼치기 (⌘B)"
-                    : isEn
-                      ? "Collapse sidebar (⌘B)"
-                      : "사이드바 접기 (⌘B)"
-                }
-                title={`${shortcutPrefix}B`}
-                onClick={toggleSidebarCollapsed}
-              >
-                <AppIcon name="panel-left" width={15} height={15} />
-              </button>
-            )}
-          </div>
-
-          <div className="quickCreateRow">
-            <Link
-              href={writeNavItem?.href ?? "/admin/editor/new"}
-              className="quickCreateBtn"
-              aria-label={effectiveCollapsed ? (writeNavItem?.label ?? "새 글 작성") : undefined}
-              title={effectiveCollapsed ? (writeNavItem?.label ?? "새 글 작성") : undefined}
-            >
-              <AppIcon name="plus" width={15} height={15} />
-              <span>{writeNavItem?.label ?? "새 글 작성"}</span>
-            </Link>
+            ) : null}
           </div>
 
           <SidebarNavSection>

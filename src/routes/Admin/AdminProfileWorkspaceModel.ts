@@ -29,7 +29,7 @@ export const WORKSPACE_SECTIONS: {
   },
   {
     id: "about",
-    label: "About 페이지",
+    label: "소개 페이지",
   },
   {
     id: "home",

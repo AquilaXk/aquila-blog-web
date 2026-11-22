@@ -123,8 +123,11 @@ export const SearchClearButton = styled.button`
     color: ${textPrimary};
   }
   @media (pointer: coarse) {
-    min-height: 36px;
-    min-width: 40px;
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 `
 

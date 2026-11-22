@@ -1,12 +1,13 @@
 /**
  * 참조 구현:
- * - shadcn-ui/ui apps/v4/registry/new-york-v4/blocks/dashboard-01/components/chart-area-interactive.tsx (MIT License, Copyright (c) shadcn)
- * - TryGhost/Ghost apps/shade/src/components/layout/list-page.tsx (MIT License, Copyright (c) Ghost Foundation)
+ * - TryGhost/Ghost apps/shade/src/components/layout/list-page.tsx & apps/shade/src/components/ui/data-list.tsx (MIT License, Copyright (c) Ghost Foundation)
+ * - tremorlabs/tremor packages/tremor-react/src/components/vis-elements/BarList/BarList.tsx (Apache-2.0 License, Copyright (c) Tremor Labs)
  */
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder,
+  adminBorderStrong,
   adminBorderSubtle,
   adminCardShadow,
   adminStatusWarnBg,
@@ -114,9 +115,20 @@ export const HubRefreshNotice = styled.div`
 `
 
 export const AnalyticsBand = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
+
+  @media (max-width: 1040px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`
+
+export const AnalyticsSideStack = styled.div`
+  display: grid;
+  gap: 1.25rem;
   min-width: 0;
 `
 
@@ -126,8 +138,8 @@ export const PanelHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem 0.85rem;
-  min-height: 3.3rem;
-  padding: 0.78rem 1.15rem;
+  min-height: 3.15rem;
+  padding: 0.72rem 1.15rem;
   border-bottom: 1px solid ${adminBorderSubtle};
 
   .titleBlock {
@@ -145,8 +157,8 @@ export const PanelHeader = styled.div`
   h2 {
     margin: 0;
     color: ${adminTextPrimary};
-    font-size: 0.94rem;
-    font-weight: 700;
+    font-size: 0.92rem;
+    font-weight: 650;
     letter-spacing: -0.015em;
     line-height: 1.25;
   }
@@ -154,39 +166,66 @@ export const PanelHeader = styled.div`
   p {
     margin: 0;
     color: ${adminTextMuted};
-    font-size: 0.76rem;
+    font-size: 0.75rem;
     font-weight: 500;
   }
 
   .countChip {
     display: inline-flex;
     align-items: center;
-    height: 1.25rem;
+    height: 1.3rem;
     padding: 0 0.45rem;
-    border-radius: 999px;
-    background: ${adminSurfaceMuted};
+    border-radius: 6px;
+    border: 1px solid ${adminBorderSubtle};
+    background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
     font-family: ${MONO_FONT};
-    font-size: 0.69rem;
+    font-size: 0.7rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+  }
+`
+
+export const PanelHeaderLink = styled.a`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 32px;
+  padding: 0 0.65rem;
+  border: 1px solid ${adminBorder};
+  border-radius: 6px;
+  background: ${adminSurface};
+  color: ${adminTextSecondary};
+  font-size: 0.76rem;
+  font-weight: 550;
+  text-decoration: none;
+  white-space: nowrap;
+  ${focusVisibleRing}
+
+  &:hover {
+    border-color: ${adminBorderStrong};
+    background: ${adminSurfaceRaised};
+    color: ${adminTextPrimary};
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `
 
 export const SubSectionTitle = styled.div`
   display: flex;
   align-items: center;
-  padding: 0.52rem 1.15rem;
+  padding: 0.5rem 1.15rem;
   border-block: 1px solid ${adminBorderSubtle};
   background: ${adminSurfaceRaised};
 
   h3 {
     margin: 0;
     color: ${adminTextMuted};
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
   }
 `
 
@@ -258,42 +297,64 @@ export const SegmentedToggle = styled.div`
   }
 `
 
-export const ChartCanvasWrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  flex: 1 1 auto;
-  gap: 0.65rem;
-  padding: 1rem 1.15rem 0.9rem;
+export const ShareBarList = styled.div`
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem 1.15rem 1.05rem;
+`
 
-  svg {
-    width: 100%;
-    height: 250px;
-    display: block;
-    overflow: visible;
+export const ShareBarItem = styled.a`
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  ${focusVisibleRing}
 
-    @media (max-width: 768px) {
-      height: auto;
-      min-height: 185px;
-    }
+  &:hover .shareBarTitle {
+    color: ${adminTextPrimary};
   }
 
-  .chartFooter {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding-top: 0.45rem;
-    border-top: 1px solid ${adminBorderSubtle};
-    color: ${adminTextMuted};
-    font-size: 0.74rem;
-    font-variant-numeric: tabular-nums;
-
-    strong {
-      color: ${adminTextPrimary};
-      font-family: ${MONO_FONT};
-      font-weight: 600;
-    }
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
+`
+
+export const ShareBarFill = styled.span<{ $widthPct: number }>`
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: ${({ $widthPct }) => `${Math.max(0, Math.min(100, $widthPct))}%`};
+  border-radius: 6px;
+  background: ${adminSurfaceMuted};
+  transition: width 180ms ease;
+  pointer-events: none;
+`
+
+export const ShareBarCopy = styled.span`
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  color: ${adminTextSecondary};
+  font-size: 0.8rem;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+export const ShareBarValue = styled.span`
+  position: relative;
+  z-index: 1;
+  color: ${adminTextPrimary};
+  font-family: ${MONO_FONT};
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 `

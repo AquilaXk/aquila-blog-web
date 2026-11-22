@@ -16,6 +16,7 @@ import {
   adminStatusWarnBg,
   adminStatusWarnDot,
   adminStatusWarnText,
+  adminSurface,
   adminSurfaceMuted,
   adminSurfaceRaised,
   adminTextMuted,
@@ -167,18 +168,18 @@ export const StatusDotIndicator = styled.i<{ "data-tone": string }>`
 export const VisibilityBadge = styled(AdminStatusPill)<{ "data-tone": string }>`
   min-height: 24px;
   max-width: 100%;
-  padding: 0 0.56rem;
+  padding: 0 0.5rem;
   gap: 0.36rem;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 550;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: ${adminStatusSuccessText};
-  background: ${adminStatusSuccessBg};
-  border-color: transparent;
+  color: ${adminTextSecondary};
+  background: ${adminSurface};
+  border-color: ${adminBorder};
 
   &[data-tone="DRAFT"],
   &[data-tone="draft"] {
@@ -191,13 +192,13 @@ export const VisibilityBadge = styled(AdminStatusPill)<{ "data-tone": string }>`
   &[data-tone="PUBLIC_UNLISTED"] {
     color: ${adminTextSecondary};
     background: ${adminSurfaceMuted};
-    border-color: transparent;
+    border-color: ${adminBorderSubtle};
   }
 
   &[data-tone="PRIVATE"] {
     color: ${adminTextMuted};
     background: ${({ theme }) => adminMutedSurface(theme)};
-    border-color: transparent;
+    border-color: ${adminBorderSubtle};
   }
 
   &[data-tone="danger"] {
@@ -420,9 +421,8 @@ export const TitleAnchor = styled.a`
   }
 
   @media (pointer: coarse) {
-    display: flex;
-    align-items: center;
     min-height: 44px;
+    padding-block: 0.35rem;
   }
 `
 

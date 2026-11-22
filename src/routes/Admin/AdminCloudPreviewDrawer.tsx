@@ -241,7 +241,7 @@ export const LightboxPdfStage = ({
   }
   return (
     <YarlPdfSheet $widthRem={57.5 * pdfZoom} onClick={(e) => e.stopPropagation()}>
-      <canvas ref={canvasRef} aria-label={`${file.originalFilename} 대구경 PDF 뷰어`} />
+      <canvas ref={canvasRef} aria-label={`${file.originalFilename} PDF 문서 미리보기`} />
       <YarlBottomBar role="group" aria-label="PDF 페이지 이동">
         <YarlDarkPill type="button" disabled={currentPage <= 1} onClick={() => onChangePage(Math.max(1, currentPage - 1))}>
           이전 페이지

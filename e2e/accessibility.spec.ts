@@ -431,8 +431,8 @@ test("모바일 header와 관리자 로그인은 keyboard-only 진입에서 심�
   await page.goto("/admin/login")
 
   const adminLoginHeading = page.getByRole("heading", { name: "관리자 로그인" })
-  const emailField = page.getByLabel("이메일")
-  const saveEmailCheckbox = page.getByLabel("아이디 저장")
+  const emailField = page.getByLabel("이메일", { exact: true })
+  const saveEmailCheckbox = page.getByLabel("이메일 저장")
   const keepSignedInCheckbox = page.getByLabel("로그인 유지")
   const requestCodeButton = page.getByRole("button", { name: "인증 코드 받기" })
   await expect(adminLoginHeading).toBeVisible()

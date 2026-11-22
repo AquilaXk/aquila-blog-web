@@ -2,11 +2,11 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { useLanguage } from "src/libs/language"
 import {
   adminBorder,
   adminBorderStrong,
   adminCardShadow,
-  adminFloatingShadow,
   adminStatusDangerBg,
   adminStatusDangerDot,
   adminStatusDangerText,
@@ -70,8 +70,8 @@ const resolveToneDotColor = (tone: BullQueueTone): string => {
 
 export const BullQueueGrid = styled.section`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 0.85rem;
   min-width: 0;
 `
 
@@ -86,12 +86,10 @@ const BullQueueCardEl = styled.article`
   border-radius: 10px;
   background: ${adminSurface};
   box-shadow: ${adminCardShadow};
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  transition: border-color 140ms ease;
 
   &:hover {
     border-color: ${adminBorderStrong};
-    box-shadow: ${adminFloatingShadow};
-    transform: translateY(-2px);
   }
 
   &[data-tone="warn"] .cardPrimaryValue {
@@ -143,10 +141,9 @@ const TitleGroup = styled.div`
     color: ${adminTextMuted};
     font-family: ${MONO_FONT};
     font-size: 0.72rem;
-    line-height: 1.35;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.38;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 `
 
@@ -162,27 +159,28 @@ const QueueStatusPill = styled.span<{ "data-tone"?: string }>`
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  height: 1.35rem;
-  padding: 0 0.5rem;
-  border-radius: 999px;
-  background: ${adminSurfaceMuted};
+  height: 1.4rem;
+  padding: 0 0.48rem;
+  border-radius: 6px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurface};
   color: ${adminTextSecondary};
-  font-family: ${MONO_FONT};
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-weight: 550;
 
   &[data-tone="good"] {
-    background: ${adminStatusSuccessBg};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="warn"] {
+    border-color: transparent;
     background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
+    border-color: transparent;
     background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
   }
@@ -233,7 +231,7 @@ const PulseTrack = styled.div`
   display: flex;
   gap: 2px;
   width: 100%;
-  height: 8px;
+  height: 6px;
   border-radius: 4px;
   overflow: hidden;
   background: ${adminSurfaceMuted};
@@ -290,63 +288,71 @@ export const AdminBullQueueCards = ({
 }: {
   ariaLabel: string
   cards: BullQueueCardItem[]
-}) => (
-  <BullQueueGrid aria-label={ariaLabel} data-ui="bullboard-queue-grid">
-    {cards.map((card) => {
-      const segmentTotal = card.segments.reduce((acc, seg) => acc + Math.max(0, seg.value), 0)
-      const nonZero = card.segments.filter((seg) => seg.value > 0)
-      const displayedTotal = card.totalCount ?? segmentTotal
-      return (
-        <BullQueueCardEl key={card.key} data-tone={card.tone}>
-          <CardHeader>
-            <TitleGroup>
-              <h3>{card.title}</h3>
-              <strong className="cardPrimaryValue">{card.valueText}</strong>
-              {card.subtitle ? <small>{card.subtitle}</small> : null}
-            </TitleGroup>
-            <HeaderContext>
-              <QueueStatusPill data-tone={card.tone}>{card.badgeText}</QueueStatusPill>
-              {card.actionHref && card.actionLabel ? (
-                <ActionLinkText as={Link} href={card.actionHref}>
-                  {card.actionLabel}
-                </ActionLinkText>
-              ) : card.onAction && card.actionLabel ? (
-                <ActionButtonText type="button" onClick={card.onAction}>
-                  {card.actionLabel}
-                </ActionButtonText>
-              ) : null}
-            </HeaderContext>
-          </CardHeader>
+}) => {
+  const { language } = useLanguage()
+  const totalPrefix = language === "en" ? "TOTAL" : "합계"
+  return (
+    <BullQueueGrid aria-label={ariaLabel} data-ui="bullboard-queue-grid">
+      {cards.map((card) => {
+        const segmentTotal = card.segments.reduce((acc, seg) => acc + Math.max(0, seg.value), 0)
+        const nonZero = card.segments.filter((seg) => seg.value > 0)
+        const displayedTotal = card.totalCount ?? segmentTotal
+        return (
+          <BullQueueCardEl key={card.key} data-tone={card.tone}>
+            <CardHeader>
+              <TitleGroup>
+                <h3>{card.title}</h3>
+                <strong className="cardPrimaryValue">{card.valueText}</strong>
+                {card.subtitle ? <small>{card.subtitle}</small> : null}
+              </TitleGroup>
+              <HeaderContext>
+                <QueueStatusPill data-tone={card.tone}>{card.badgeText}</QueueStatusPill>
+                {card.actionHref && card.actionLabel ? (
+                  <ActionLinkText as={Link} href={card.actionHref}>
+                    {card.actionLabel}
+                  </ActionLinkText>
+                ) : card.onAction && card.actionLabel ? (
+                  <ActionButtonText type="button" onClick={card.onAction}>
+                    {card.actionLabel}
+                  </ActionButtonText>
+                ) : null}
+              </HeaderContext>
+            </CardHeader>
 
-          <StatsBox>
-            <PulseTrack aria-hidden="true">
-              {segmentTotal > 0
-                ? nonZero.map((seg) => (
-                    <PulseSegment
-                      key={`${card.key}-pulse-${seg.key}`}
-                      $tone={seg.tone}
-                      style={{ width: `${(seg.value / segmentTotal) * 100}%` }}
-                    />
-                  ))
-                : null}
-            </PulseTrack>
-            <StatsFooter>
-              {card.segments.map((seg) => (
-                <span key={`${card.key}-flag-${seg.key}`} className="flag">
-                  <span
-                    className="flagDot"
-                    style={{ background: resolveToneDotColor(seg.tone) }}
-                    aria-hidden="true"
-                  />
-                  <span>{seg.label}</span>
-                  <span className="flagCount">{seg.value.toLocaleString()}</span>
-                </span>
-              ))}
-              <span className="total">TOTAL {displayedTotal.toLocaleString()}</span>
-            </StatsFooter>
-          </StatsBox>
-        </BullQueueCardEl>
-      )
-    })}
-  </BullQueueGrid>
-)
+            {card.segments.length > 0 ? (
+              <StatsBox>
+                <PulseTrack aria-hidden="true">
+                  {segmentTotal > 0
+                    ? nonZero.map((seg) => (
+                        <PulseSegment
+                          key={`${card.key}-pulse-${seg.key}`}
+                          $tone={seg.tone}
+                          style={{ width: `${(seg.value / segmentTotal) * 100}%` }}
+                        />
+                      ))
+                    : null}
+                </PulseTrack>
+                <StatsFooter>
+                  {card.segments.map((seg) => (
+                    <span key={`${card.key}-flag-${seg.key}`} className="flag">
+                      <span
+                        className="flagDot"
+                        style={{ background: resolveToneDotColor(seg.tone) }}
+                        aria-hidden="true"
+                      />
+                      <span>{seg.label}</span>
+                      <span className="flagCount">{seg.value.toLocaleString()}</span>
+                    </span>
+                  ))}
+                  <span className="total">
+                    {totalPrefix} {displayedTotal.toLocaleString()}
+                  </span>
+                </StatsFooter>
+              </StatsBox>
+            ) : null}
+          </BullQueueCardEl>
+        )
+      })}
+    </BullQueueGrid>
+  )
+}

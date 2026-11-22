@@ -320,13 +320,13 @@ const ScopeTabBadge = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.2rem;
-  height: 1.12rem;
-  padding: 0 0.32rem;
+  min-width: 1.25rem;
+  height: 1.2rem;
+  padding: 0 0.35rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 6px;
   font-family: ${MONO_FONT};
-  font-size: 0.67rem;
+  font-size: 0.68rem;
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -334,8 +334,9 @@ const ScopeTabBadge = styled.span`
   color: ${adminTextSecondary};
 
   [aria-pressed="true"] > & {
-    background: ${adminTeal};
-    color: ${adminControlText};
+    background: ${adminSurfaceRaised};
+    border-color: ${adminBorder};
+    color: ${adminTextPrimary};
   }
 `
 
@@ -456,8 +457,9 @@ const ClearSearchButton = styled.button`
   }
 
   @media (pointer: coarse) {
-    width: 38px;
-    height: 38px;
+    right: 0;
+    width: 44px;
+    height: 44px;
   }
 `
 

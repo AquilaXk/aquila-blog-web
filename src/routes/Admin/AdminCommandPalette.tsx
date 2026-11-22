@@ -284,7 +284,7 @@ export const AdminCommandPalette = ({ isOpen, onClose }: Props) => {
             aria-label={language === "en" ? "Close command palette" : "커맨드 팔레트 닫기"}
             onClick={onClose}
           >
-            <ShortcutHint>ESC</ShortcutHint>
+            <ShortcutHint>Esc</ShortcutHint>
           </ClosePaletteButton>
         </SearchBox>
 
@@ -324,8 +324,8 @@ export const AdminCommandPalette = ({ isOpen, onClose }: Props) => {
             </span>
           </FooterHints>
           <FooterCount>
-            {orderedSections.ordered.length}{" "}
-            {language === "en" ? "commands" : "개 명령"}
+            {orderedSections.ordered.length}
+            {language === "en" ? " commands" : "개 명령"}
           </FooterCount>
         </PaletteFooter>
       </PaletteModal>

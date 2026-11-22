@@ -488,7 +488,9 @@ export const AdminPostsWorkspaceList: React.FC<AdminPostsWorkspaceListProps> = (
                   </div>
                   <span className="date">
                     {getWorkspaceTopicLabel(row)} · {formatDateTime(listScope === "active" ? row.modifiedAt : row.deletedAt)} ·{" "}
-                    {listScope === "active" ? formatWorkspaceViews(row) : "-"} views
+                    {language === "en"
+                      ? `${listScope === "active" ? formatWorkspaceViews(row) : "-"} views`
+                      : `조회 ${listScope === "active" ? formatWorkspaceViews(row) : "-"}`}
                   </span>
                   <PostRowActionControls
                     row={row}

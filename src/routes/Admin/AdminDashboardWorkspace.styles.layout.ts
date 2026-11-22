@@ -113,20 +113,18 @@ export const StatusChip = styled.span`
   justify-content: center;
   gap: 0.36rem;
   min-height: 26px;
-  padding: 0 0.6rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: ${adminSurfaceMuted};
+  padding: 0 0.55rem;
+  border-radius: 6px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurface};
   color: ${adminTextSecondary};
-  font-family: ${MONO_FONT};
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-size: 0.72rem;
+  font-weight: 550;
   white-space: nowrap;
 
   &[data-tone="good"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 

@@ -322,8 +322,8 @@ test.describe("Section 1: Storage Resilience, Admin UX, & Draft Lifecycle", () =
       ) as ReactElement
     )
     expect(toolsHtml).toContain('data-ui="bullboard-queue-grid"')
-    expect(toolsHtml).toContain("TOTAL")
-    expect(toolsHtml).toContain("READY")
+    expect(toolsHtml).toContain("합계")
+    expect(toolsHtml).toContain("대기")
   })
 
   test("performAdminShellLogout confirms unsaved changes BEFORE calling logout or clearing local drafts", async () => {

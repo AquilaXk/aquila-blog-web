@@ -156,7 +156,7 @@ export const CompactCodeList = styled.div`
   code {
     display: block;
     border-radius: 6px;
-    border: 0;
+    border: 1px solid ${adminBorderSubtle};
     background: ${adminTerminalBg};
     color: ${adminTerminalFg};
     padding: 0.55rem 0.72rem;
@@ -218,13 +218,13 @@ export const CardSectionHeading = styled.div`
 `
 
 export const ActionToneBadge = styled(AdminStatusPill)`
-  border-radius: 999px;
-  border-color: transparent;
+  border-radius: 6px;
+  border-color: ${adminBorderSubtle};
   background: ${adminSurfaceMuted};
   color: ${adminTextPrimary};
 
   &[data-tone="write"] {
-    border-color: transparent;
+    border-color: ${adminBorderSubtle};
     background: ${adminSurfaceMuted};
     color: ${adminTextPrimary};
   }
@@ -236,7 +236,7 @@ export const ActionToneBadge = styled(AdminStatusPill)`
   }
 
   &[data-tone="read"] {
-    border-color: transparent;
+    border-color: ${adminBorderSubtle};
     color: ${adminTextSecondary};
   }
 `

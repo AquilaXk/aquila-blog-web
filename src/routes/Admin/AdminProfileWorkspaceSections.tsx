@@ -77,8 +77,8 @@ export const AdminProfileWorkspaceSections = (props: AdminProfileWorkspaceSectio
   const missingExposureItems: string[] = []
   if (!(displayNameInput ?? "").trim()) missingExposureItems.push("계정 이름")
   if (!draft.profileBio.trim()) missingExposureItems.push("짧은 소개")
-  if (!draft.aboutHeadline.trim() || !draft.aboutRole.trim() || !draft.aboutBio.trim()) missingExposureItems.push("About 소개")
-  if (!draft.aboutProjectSectionTitle.trim() || draft.aboutProjects.length === 0) missingExposureItems.push("About 프로젝트")
+  if (!draft.aboutHeadline.trim() || !draft.aboutRole.trim() || !draft.aboutBio.trim()) missingExposureItems.push("소개 본문")
+  if (!draft.aboutProjectSectionTitle.trim() || draft.aboutProjects.length === 0) missingExposureItems.push("주요 프로젝트")
   if (!draft.homeIntroTitle.trim() || !draft.homeIntroDescription.trim()) missingExposureItems.push("메인 헤더 카피")
   const hasMissingExposureItems = missingExposureItems.length > 0
   const activeSectionMeta = WORKSPACE_SECTIONS.find((section) => section.id === activeSection) || WORKSPACE_SECTIONS[0]
@@ -202,7 +202,7 @@ export const AdminProfileWorkspaceSections = (props: AdminProfileWorkspaceSectio
                     <SectionStateBadge data-tone="published">공개본과 차이 있음</SectionStateBadge>
                   ) : null}
                 </div>
-                <p>변경 사항은 초안 저장 후 공개 적용으로 블로그와 About 페이지에 반영됩니다.</p>
+                <p>변경 사항은 초안 저장 후 공개 적용으로 블로그와 소개 페이지에 반영됩니다.</p>
                 {hasMissingExposureItems ? (
                   <p className="exposureMissingHint">
                     미입력 공개 항목: {missingExposureItems.join(" · ")}

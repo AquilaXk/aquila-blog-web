@@ -46,8 +46,8 @@ export const Main = styled.div`
 export const SectionTitleBlock = styled(AdminSectionTitleStack)`
   h2,
   h3 {
-    font-size: 1.02rem;
-    font-weight: 760;
+    font-size: 1rem;
+    font-weight: 650;
     letter-spacing: -0.015em;
   }
 `
@@ -99,16 +99,16 @@ export const SectionHeading = styled(AdminSectionHeading)`
 `
 
 export const StatusBadge = styled(AdminStatusPill)`
-  min-height: 26px;
-  padding: 0 0.62rem;
-  border-radius: 999px;
+  min-height: 24px;
+  padding: 0 0.54rem;
+  border-radius: 6px;
   border-color: transparent;
   background: ${adminStatusWarnBg};
   color: ${adminWarningBadgeText()};
 
   &[data-tone="success"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
@@ -121,15 +121,15 @@ export const StatusBadge = styled(AdminStatusPill)`
 
 export const FreshnessBadge = styled(AdminStatusPill)`
   min-height: 24px;
-  padding: 0 0.56rem;
-  border-radius: 999px;
-  border-color: transparent;
+  padding: 0 0.52rem;
+  border-radius: 6px;
+  border-color: ${adminBorder};
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.71rem;
 
   &[data-tone="fresh"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
@@ -140,7 +140,7 @@ export const FreshnessBadge = styled(AdminStatusPill)`
   }
 
   &[data-tone="stale"] {
-    border-color: transparent;
+    border-color: ${adminBorderSubtle};
     background: ${adminSurfaceMuted};
     color: ${adminTextSecondary};
   }
@@ -323,7 +323,7 @@ export const QuietButton = styled(AdminTextActionButton)`
 
 export const MetricGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.65rem;
 `
 
@@ -338,18 +338,15 @@ export const MetricCard = styled.div`
 
   small {
     color: ${adminTextSecondary};
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.71rem;
-    font-weight: 680;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    font-weight: 550;
   }
 
   strong {
     color: ${adminTextPrimary};
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 1.28rem;
-    font-weight: 760;
+    font-size: 1.24rem;
+    font-weight: 650;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
     overflow-wrap: anywhere;

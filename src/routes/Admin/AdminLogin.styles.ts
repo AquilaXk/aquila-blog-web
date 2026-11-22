@@ -7,7 +7,6 @@ import {
   adminControlText,
   adminGoldTintFocus,
   adminLoginCanvasBg,
-  adminLoginDotGrid,
   adminStatusDangerBg,
   adminStatusDangerBorder,
   adminStatusDangerText,
@@ -32,8 +31,6 @@ export const LoginSection = styled.section`
   min-height: 100svh;
   padding: 1.5rem;
   background-color: ${adminLoginCanvasBg};
-  background-image: ${adminLoginDotGrid};
-  background-size: 16px 16px;
   box-sizing: border-box;
 `
 
@@ -77,7 +74,7 @@ export const LoginBrandOrb = styled.div`
 
 export const LoginPanel = styled.div`
   width: 100%;
-  padding: 1.5rem;
+  padding: 1.75rem;
   border: 1px solid ${adminBorder};
   border-radius: 12px;
   background: ${adminSurface};
@@ -86,6 +83,10 @@ export const LoginPanel = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+
+  @media (max-width: 480px) {
+    padding: 1.35rem;
+  }
 `
 
 export const LoginBrandHeader = styled.div`
@@ -153,7 +154,7 @@ export const LoginStage = styled.div`
 
 export const LoginField = styled.div`
   display: grid;
-  gap: 0.5rem;
+  gap: 0.375rem;
 `
 
 export const LoginLabel = styled.label`

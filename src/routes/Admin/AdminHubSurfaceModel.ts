@@ -256,6 +256,78 @@ export const deriveAdminHubOperationalMetrics = (input: {
   }
 }
 
+export type AdminHubShareBarItem = {
+  href: string
+  title: string
+  views: number
+  widthPct: number
+  sharePct: number
+}
+
+const HUB_METRIC_LABELS_KO: Record<string, string> = {
+  PUBLISHED: "발행된 글",
+  DRAFTS: "작성 중 초안",
+  VIEWS: "누적 조회수",
+  LIKES: "누적 공감",
+  QUEUE: "작업 큐",
+}
+
+const HUB_METRIC_LABELS_EN: Record<string, string> = {
+  PUBLISHED: "Published",
+  DRAFTS: "Drafts",
+  VIEWS: "Views",
+  LIKES: "Likes",
+  QUEUE: "Queue",
+}
+
+const HUB_CONTENT_STATUS_KO: Record<string, string> = {
+  PUBLISHED: "발행됨",
+  DRAFT: "초안",
+  UNLISTED: "링크 공개",
+  PRIVATE: "비공개",
+}
+
+const HUB_CONTENT_STATUS_EN: Record<string, string> = {
+  PUBLISHED: "Published",
+  DRAFT: "Draft",
+  UNLISTED: "Unlisted",
+  PRIVATE: "Private",
+}
+
+export const formatAdminHubMetricLabel = (label: string, isEn: boolean): string =>
+  (isEn ? HUB_METRIC_LABELS_EN : HUB_METRIC_LABELS_KO)[label] ?? label
+
+export const formatAdminHubContentStatus = (status: string, isEn: boolean): string =>
+  (isEn ? HUB_CONTENT_STATUS_EN : HUB_CONTENT_STATUS_KO)[status] ?? status
+
+export const deriveAdminHubShareBars = (
+  items: ReadonlyArray<{ href: string; title: string; views?: number }>
+): AdminHubShareBarItem[] => {
+  if (items.length === 0) return []
+  const normalized = items.map((item) => ({
+    href: item.href,
+    title: item.title,
+    views: typeof item.views === "number" && Number.isFinite(item.views) && item.views > 0 ? item.views : 0,
+  }))
+  normalized.sort((a, b) => b.views - a.views)
+
+  let totalViews = 0
+  let maxViews = 0
+  for (let i = 0; i < normalized.length; i += 1) {
+    const v = normalized[i]!.views
+    totalViews += v
+    if (v > maxViews) maxViews = v
+  }
+
+  return normalized.map((item) => ({
+    href: item.href,
+    title: item.title,
+    views: item.views,
+    widthPct: maxViews > 0 && item.views > 0 ? Math.max(4, Math.round((item.views / maxViews) * 100)) : 0,
+    sharePct: totalViews > 0 ? Math.round((item.views / totalViews) * 100) : 0,
+  }))
+}
+
 export const deriveAdminHubActivityItems = (input: {
   profileUpdatedText: string
   profileCompletion: number

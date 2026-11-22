@@ -67,9 +67,9 @@ type AdminDashboardWorkspaceViewProps = {
 }
 
 const resolveLogLevelTag = (tone: DashboardTone) => {
-  if (tone === "danger") return "[ERR]"
-  if (tone === "warn") return "[WARN]"
-  return "[OK]"
+  if (tone === "danger") return "[오류]"
+  if (tone === "warn") return "[주의]"
+  return "[정상]"
 }
 
 export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewProps) => {
@@ -102,38 +102,35 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
 
   const queueCards: BullQueueCardItem[] = kpiCards.map((item) => {
     const keyLower = item.key.toLowerCase()
-    const segments = keyLower.includes("queue")
+    const segments = keyLower.includes("queue") || keyLower.includes("tasks")
       ? [
-          { key: "ready", label: "READY", value: readyVal, tone: "info" as const },
-          { key: "failed", label: "FAILED", value: failedVal, tone: "danger" as const },
+          { key: "ready", label: isEn ? "Ready" : "대기", value: readyVal, tone: "info" as const },
+          { key: "failed", label: isEn ? "Failed" : "실패", value: failedVal, tone: "danger" as const },
         ]
       : keyLower.includes("purge") || keyLower.includes("clean") || keyLower.includes("storage")
-        ? [
-            { key: "purge", label: "PURGE", value: purgeVal, tone: "warn" as const },
-            { key: "ok", label: "CLEAN", value: item.tone === "good" ? 1 : 0, tone: "good" as const },
-          ]
+        ? purgeVal > 0
+          ? [{ key: "purge", label: isEn ? "Purge" : "정리 대상", value: purgeVal, tone: "warn" as const }]
+          : []
         : keyLower.includes("auth") || keyLower.includes("sec")
-          ? [
-              { key: "blocked", label: "BLOCKED", value: authBlockedVal, tone: "danger" as const },
-              { key: "guard", label: "OK", value: item.tone === "good" ? 1 : 0, tone: "good" as const },
-            ]
-          : [
-              {
-                key: "state",
-                label: item.tone === "danger" ? "ERR" : item.tone === "warn" ? "WARN" : "READY",
-                value: Math.max(1, readyVal + failedVal + purgeVal + authBlockedVal),
-                tone: item.tone,
-              },
-            ]
+          ? authBlockedVal > 0
+            ? [{ key: "blocked", label: isEn ? "Blocked" : "차단", value: authBlockedVal, tone: "danger" as const }]
+            : []
+          : []
     return {
       key: item.key,
       title: item.label,
       subtitle: item.detail,
       valueText: item.value,
-      badgeText: item.badge || item.key.toUpperCase(),
+      badgeText: item.badge || item.key,
       tone: item.tone,
-      actionLabel: keyLower.includes("queue") ? (isEn ? "Inspect" : "진단 보기") : undefined,
-      actionHref: keyLower.includes("queue") ? "/admin/tools?tab=diagnostics" : undefined,
+      actionLabel:
+        keyLower.includes("queue") || keyLower.includes("tasks")
+          ? isEn
+            ? "Inspect"
+            : "진단 보기"
+          : undefined,
+      actionHref:
+        keyLower.includes("queue") || keyLower.includes("tasks") ? "/admin/tools?tab=queue" : undefined,
       segments,
     }
   })
@@ -163,10 +160,10 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
                   isRefreshing={isRefreshing}
                   onRefresh={onRefresh}
                 />
-                <HeaderLink as={Link} href="/admin/tools?tab=diagnostics">
-                  {isEn ? "Run Doctor" : "Doctor 실행"}
+                <HeaderLink as={Link} href="/admin/tools?tab=queue">
+                  {isEn ? "Queue Diagnostics" : "상태 진단"}
                 </HeaderLink>
-                <HeaderLink as={Link} href="/admin/tools?tab=recovery" data-variant="primary">
+                <HeaderLink as={Link} href="/admin/tools?tab=cleanup" data-variant="primary">
                   {isEn ? "Recovery Tools" : "복구 도구"}
                 </HeaderLink>
               </HeroActions>
@@ -181,15 +178,22 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
           <OpsGrid>
             <PanelCard>
               <PanelHeader>
-                <h2>운영 지표 요약</h2>
-                {snapshotCollectionFailed ? (
-                  <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
-                ) : (
-                  <StatusChip data-tone={dashboardStatusTone}>
-                    <StatusDot data-tone={dashboardStatusTone} aria-hidden="true" />
-                    <span>LIVE</span>
-                  </StatusChip>
-                )}
+                <h2>{isEn ? "Operational Metrics" : "운영 지표 요약"}</h2>
+                <StatusChip data-tone={snapshotCollectionFailed ? "warn" : dashboardStatusTone}>
+                  <StatusDot
+                    data-tone={snapshotCollectionFailed ? "warn" : dashboardStatusTone}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {snapshotCollectionFailed
+                      ? isEn
+                        ? "Delayed"
+                        : "일부 지연"
+                      : isEn
+                        ? "Healthy"
+                        : "실시간"}
+                  </span>
+                </StatusChip>
               </PanelHeader>
               <Chart aria-label="운영 스냅샷 기반 지표 차트">
                 {chartBars.length ? (
@@ -227,8 +231,8 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
 
             <PrioritySection>
               <PanelHeader>
-                <h2>Steady-state guard</h2>
-                <span className="monoTag">SUBSYSTEMS</span>
+                <h2>{isEn ? "Subsystem Checks" : "서브시스템 점검 항목"}</h2>
+                <span className="monoTag">{isEn ? "Checks" : "모니터링"}</span>
               </PanelHeader>
               <StatusMenuList role="tablist" aria-label="가드 상태 필터">
                 <StatusMenuTab
@@ -281,12 +285,9 @@ export const AdminDashboardWorkspaceView = (props: AdminDashboardWorkspaceViewPr
             <TerminalCard data-size="wide">
               <TerminalHeader>
                 <div className="terminalTitleGroup">
-                  <AppIcon name="terminal" width={15} height={15} />
-                  <h2>Live logs</h2>
+                  <AppIcon name="list" width={15} height={15} />
+                  <h2>{isEn ? "Recent Events" : "최근 운영 이벤트"}</h2>
                 </div>
-                {snapshotCollectionFailed ? (
-                  <StatusChip data-tone="danger">수집 실패 · 재시도</StatusChip>
-                ) : null}
               </TerminalHeader>
               <LogLines>
                 {logRows.map((row) => (

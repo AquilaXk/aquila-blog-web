@@ -87,16 +87,19 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
   const [isQueueDiagnosticsOpen, setIsQueueDiagnosticsOpen] = useState(true)
   const [activeExecutionTab, setActiveExecutionTab] = useState<ExecutionDiagnosticTab>(() => {
     const queryTab = Array.isArray(router.query.tab) ? router.query.tab[0] : router.query.tab
-    return queryTab === "auth" ? "auth" : "cleanup"
+    if (queryTab === "auth") return "auth"
+    return "cleanup"
   })
   const [freshnessClock, setFreshnessClock] = useState<number | null>(null)
 
   useEffect(() => {
     const queryTab = Array.isArray(router.query.tab) ? router.query.tab[0] : router.query.tab
-    if (queryTab === "queue") {
+    if (queryTab === "queue" || queryTab === "diagnostics") {
       setIsQueueDiagnosticsOpen(true)
     } else if (queryTab === "cleanup" || queryTab === "auth") {
       setActiveExecutionTab(queryTab)
+    } else if (queryTab === "recovery") {
+      setActiveExecutionTab("cleanup")
     }
   }, [router.query.tab])
 

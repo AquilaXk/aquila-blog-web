@@ -29,9 +29,9 @@ export const AdminSectionTitleStack = styled.div`
   h3 {
     margin: 0;
     color: ${({ theme }) => adminPrimaryText(theme)};
-    font-size: 1.05rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font-size: 1.02rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
   }
 
   p {

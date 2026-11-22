@@ -96,8 +96,8 @@ export const HeroCountBadge = styled.span`
   justify-content: center;
   height: 1.35rem;
   padding: 0 0.52rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  border: 1px solid ${adminBorderSubtle};
+  border-radius: 6px;
   background: ${adminSurfaceMuted};
   color: ${adminTextSecondary};
   font-family: ${MONO_FONT};
@@ -321,7 +321,7 @@ export const FloatingBulkBar = styled.div`
   width: max-content;
   max-width: calc(100vw - 1.5rem);
   padding: 0;
-  border-radius: 9999px;
+  border-radius: 10px;
   border: 1px solid ${adminCommandBarBorder};
   background: ${adminCommandBarBg};
   color: ${adminCommandBarFg};
@@ -332,6 +332,15 @@ export const FloatingBulkBar = styled.div`
 
   &::-webkit-scrollbar {
     display: none;
+  }
+
+  @media (max-width: 720px) {
+    bottom: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: calc(100vw - 1.25rem);
+    max-width: calc(100vw - 1.25rem);
+    overflow: hidden;
   }
 `
 

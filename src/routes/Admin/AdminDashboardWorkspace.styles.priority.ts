@@ -101,7 +101,7 @@ export const PrioritySummary = styled.div`
 `
 
 export const TerminalCard = styled(AdminPlainCard)`
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid ${adminTerminalBorder};
   background: ${adminTerminalBg};
   box-shadow: ${adminCardShadow};
@@ -113,15 +113,15 @@ export const TerminalHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  min-height: 2.75rem;
-  padding: 0 1rem;
+  min-height: 2.85rem;
+  padding: 0 1.15rem;
   border-bottom: 1px solid ${adminTerminalBorder};
   background: ${adminTerminalHeaderBg};
 
   .terminalTitleGroup {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
     min-width: 0;
     color: ${adminTerminalMuted};
 
@@ -133,10 +133,9 @@ export const TerminalHeader = styled.div`
   h2 {
     margin: 0;
     color: ${adminTerminalFg};
-    font-family: ${MONO_FONT};
-    font-size: 0.84rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-size: 0.9rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
   }
 `
 

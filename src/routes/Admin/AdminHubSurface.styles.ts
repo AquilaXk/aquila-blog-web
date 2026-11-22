@@ -1,4 +1,4 @@
-// 참조 구현: TryGhost/Ghost apps/shade/src/components/ui/{kpi-card.tsx,table.tsx,badge.tsx} (MIT), shadcn-ui/ui apps/v4/registry/new-york-v4/ui/{card.tsx,badge.tsx} (MIT)
+// 참조 구현: TryGhost/Ghost apps/shade/src/components/ui/{kpi-card.tsx,data-list.tsx} (MIT), medusajs/medusa packages/design-system/ui/src/components/status-badge (MIT), tremorlabs/tremor packages/tremor-react/src/components/vis-elements/BarList (Apache-2.0)
 import { css } from "@emotion/react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
@@ -8,7 +8,6 @@ import {
   adminBorder,
   adminBorderStrong,
   adminBorderSubtle,
-  adminCardGradient,
   adminCardShadow,
   adminControlText,
   adminMutedSurface,
@@ -48,17 +47,17 @@ const outlineDotPillCss = css`
   display: inline-flex;
   align-items: center;
   gap: 0.34rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: ${adminSurfaceMuted};
+  border: 1px solid ${adminBorder};
+  border-radius: 6px;
+  background: ${adminSurface};
   color: ${adminTextSecondary};
-  font-family: ${MONO_FONT};
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 550;
   white-space: nowrap;
 
   i {
-    width: 0.38rem;
-    height: 0.38rem;
+    width: 0.42rem;
+    height: 0.42rem;
     border-radius: 50%;
     background: ${adminTextMuted};
     flex: 0 0 auto;
@@ -135,7 +134,12 @@ export const SecondaryActionLink = styled.a`
 export const MetricGrid = styled.section`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.85rem;
+  gap: 0;
+  border: 1px solid ${adminBorder};
+  border-radius: 10px;
+  background: ${adminSurface};
+  box-shadow: ${adminCardShadow};
+  overflow: hidden;
 
   @media (max-width: 1080px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -150,29 +154,49 @@ export const MetricCard = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.45rem;
+  gap: 0.35rem;
   min-width: 0;
   padding: 1rem 1.15rem;
-  border: 1px solid ${adminBorder};
-  border-radius: 12px;
-  background: ${adminSurface};
-  background-image: ${adminCardGradient};
-  box-shadow: ${adminCardShadow};
+  border: 0;
+  border-right: 1px solid ${adminBorderSubtle};
+  background: transparent;
+
+  &:last-child {
+    border-right: 0;
+  }
+
+  @media (max-width: 1080px) {
+    &:nth-of-type(2n) {
+      border-right: 0;
+    }
+
+    &:nth-of-type(-n + 2) {
+      border-bottom: 1px solid ${adminBorderSubtle};
+    }
+  }
+
+  @media (max-width: 560px) {
+    border-right: 0;
+    border-bottom: 1px solid ${adminBorderSubtle};
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
 
   .cardDescription {
     color: ${adminTextMuted};
-    font-size: 0.73rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 0.78rem;
+    font-weight: 550;
+    letter-spacing: -0.005em;
   }
 
   strong {
     color: ${adminTextPrimary};
-    font-size: 1.85rem;
-    font-weight: 700;
-    line-height: 1.08;
-    letter-spacing: -0.03em;
+    font-size: 1.65rem;
+    font-weight: 650;
+    line-height: 1.12;
+    letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     ${truncateSingleLineCss}
   }
@@ -185,7 +209,7 @@ export const MetricCard = styled.div`
     padding-top: 0;
     border-top: 0;
     color: ${adminTextSecondary};
-    font-size: 0.76rem;
+    font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.35;
     font-variant-numeric: tabular-nums;
@@ -198,7 +222,7 @@ export const Panel = styled.section`
   flex-direction: column;
   min-width: 0;
   border: 1px solid ${adminBorder};
-  border-radius: 12px;
+  border-radius: 10px;
   background: ${adminSurface};
   box-shadow: ${adminCardShadow};
   overflow: hidden;
@@ -267,11 +291,13 @@ export const StatusRow = styled.div`
   }
 
   &[data-kind="service"] strong {
-    padding: 0.16rem 0.52rem;
-    border-radius: 999px;
-    border: 1px solid transparent;
+    padding: 0.18rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid ${adminBorder};
     background: ${({ theme }) => adminMutedSurface(theme)};
     color: ${adminTextSecondary};
+    font-size: 0.72rem;
+    font-weight: 550;
   }
 
   &[data-tone="good"] i {
@@ -279,8 +305,8 @@ export const StatusRow = styled.div`
   }
 
   &[data-kind="service"][data-tone="good"] strong {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
@@ -337,14 +363,14 @@ export const ContentRow = styled.a`
   }
 
   .mediaThumb {
-    width: 36px;
-    height: 36px;
-    flex: 0 0 36px;
+    width: 52px;
+    height: 32px;
+    flex: 0 0 52px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
-    border: 0;
+    border-radius: 6px;
+    border: 1px solid ${adminBorderSubtle};
     background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
   }
@@ -383,17 +409,17 @@ export const ContentRow = styled.a`
 
   small {
     ${outlineDotPillCss}
-    height: 1.45rem;
-    padding: 0 0.54rem;
-    font-size: 0.67rem;
-    letter-spacing: 0.03em;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    font-size: 0.72rem;
+    letter-spacing: -0.005em;
     justify-self: start;
   }
 
   &[data-status="PUBLISHED"] small {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
-    color: ${adminStatusSuccessText};
+    border-color: ${adminBorder};
+    background: ${adminSurface};
+    color: ${adminTextSecondary};
   }
 
   &[data-status="PUBLISHED"] small i {
@@ -401,7 +427,7 @@ export const ContentRow = styled.a`
   }
 
   &[data-status="DRAFT"] small {
-    border-color: transparent;
+    border-color: ${adminBorder};
     background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }

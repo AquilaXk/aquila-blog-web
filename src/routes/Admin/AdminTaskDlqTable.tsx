@@ -97,9 +97,9 @@ export const AdminTaskDlqTable = ({
   }
 
   return (
-    <DlqTableBlock as="section" aria-label="실패 태스크 목록 (DLQ)">
+    <DlqTableBlock as="section" aria-label="실패 작업 목록 (DLQ)">
       <SubSectionHeading>
-        <strong>실패 태스크 목록 (DLQ)</strong>
+        <strong>실패 작업 목록 (DLQ)</strong>
         <small>
           {errorMessage ? "조회 오류" : `${tasks.length}건 대기 중`}
         </small>
@@ -112,7 +112,7 @@ export const AdminTaskDlqTable = ({
             disabled={disabled || selectedTaskIds.size === 0}
             onClick={() => onReplaySelected(Array.from(selectedTaskIds))}
           >
-            선택한 태스크만 리플레이 ({selectedTaskIds.size}개)
+            선택 작업 재실행 ({selectedTaskIds.size}개)
           </QuietButton>
           <QuietButton
             type="button"
@@ -125,11 +125,11 @@ export const AdminTaskDlqTable = ({
       ) : null}
 
       {isLoading ? (
-        <DlqEmptyText>DLQ 태스크 목록 로딩 중...</DlqEmptyText>
+        <DlqEmptyText>실패 작업 목록을 불러오는 중...</DlqEmptyText>
       ) : errorMessage ? (
         <DlqErrorState>
           <InlineNotice data-tone="danger" role="alert">
-            DLQ 목록을 불러오지 못했습니다. {errorMessage}
+            실패 작업 목록을 불러오지 못했습니다. {errorMessage}
           </InlineNotice>
           {onRetryFetch ? (
             <ActionRow>
@@ -144,20 +144,22 @@ export const AdminTaskDlqTable = ({
           ) : null}
         </DlqErrorState>
       ) : tasks.length === 0 ? (
-        <DlqEmptyText>현재 DLQ에 격리된 실패 태스크가 없습니다.</DlqEmptyText>
+        <DlqEmptyText>현재 재실행 대기 중인 실패 작업이 없습니다.</DlqEmptyText>
       ) : (
         <DlqTableScroll>
           <DlqTable>
             <thead>
               <tr>
                 <th className="checkCol">
-                  <input
-                    type="checkbox"
-                    aria-label="DLQ 전체 선택"
-                    checked={allSelected}
-                    disabled={disabled}
-                    onChange={handleToggleAll}
-                  />
+                  <DlqCheckLabel>
+                    <input
+                      type="checkbox"
+                      aria-label="DLQ 전체 선택"
+                      checked={allSelected}
+                      disabled={disabled}
+                      onChange={handleToggleAll}
+                    />
+                  </DlqCheckLabel>
                 </th>
                 <th>ID</th>
                 <th>유형</th>
@@ -176,14 +178,16 @@ export const AdminTaskDlqTable = ({
                 return (
                   <tr key={task.id} data-checked={checked ? "true" : "false"}>
                     <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`태스크 #${task.id} 선택`}
-                        checked={checked}
-                        disabled={disabled}
-                        onClick={(e) => handleToggleRow(task.id, e.shiftKey)}
-                        onChange={() => {}}
-                      />
+                      <DlqCheckLabel>
+                        <input
+                          type="checkbox"
+                          aria-label={`태스크 #${task.id} 선택`}
+                          checked={checked}
+                          disabled={disabled}
+                          onClick={(e) => handleToggleRow(task.id, e.shiftKey)}
+                          onChange={() => {}}
+                        />
+                      </DlqCheckLabel>
                     </td>
                     <td>
                       <JobIdBadge>#{task.id}</JobIdBadge>
@@ -382,14 +386,14 @@ const RetryGaugeCell = styled.div`
 const RetryGaugeTrack = styled.div`
   width: 100%;
   height: 5px;
-  border-radius: 999px;
+  border-radius: 4px;
   background: ${adminSurfaceMuted};
   overflow: hidden;
 `
 
 const RetryGaugeFill = styled.div<{ "data-exhausted"?: string }>`
   height: 100%;
-  border-radius: 999px;
+  border-radius: 4px;
   background: ${({ "data-exhausted": exhausted }) =>
     exhausted === "true" ? adminStatusDangerDot : adminStatusWarnDot};
 `
@@ -425,13 +429,25 @@ const DlqErrorSummary = styled.summary`
 
   .toggleBadge {
     flex: none;
-    padding: 0.1rem 0.46rem;
-    border-radius: 999px;
+    padding: 0.12rem 0.48rem;
+    border-radius: 6px;
     border: 0;
     background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+`
+
+const DlqCheckLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  @media (pointer: coarse) {
+    min-width: 44px;
+    min-height: 44px;
   }
 `
 
@@ -439,7 +455,7 @@ const DlqErrorPre = styled.pre`
   margin: 0.35rem 0 0;
   padding: 0.65rem 0.75rem;
   border-radius: 8px;
-  border: 0;
+  border: 1px solid ${adminBorderSubtle};
   background: ${adminTerminalBg};
   color: ${adminTerminalDanger};
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

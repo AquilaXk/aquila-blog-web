@@ -85,9 +85,9 @@ const getSystemHealthTone = (value: string | null | undefined): AdminHubTone => 
 
 const getDependencyStatusLabel = (value: string | null | undefined) => {
   const normalized = value?.trim()
-  if (normalized === "UP") return "UP"
-  if (normalized === "DOWN") return "DOWN"
-  if (normalized === "DISABLED") return "DISABLED"
+  if (normalized === "UP") return "정상"
+  if (normalized === "DOWN") return "장애"
+  if (normalized === "DISABLED") return "비활성"
   return normalized || DASHBOARD_DATA_MISSING_LABEL
 }
 

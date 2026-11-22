@@ -221,8 +221,8 @@ export const SyncStateBadge = styled.span<{ "data-tone"?: "synced" | "dirty" }>`
   align-items: center;
   gap: 0.4rem;
   min-height: 26px;
-  padding: 0 0.62rem;
-  border-radius: 999px;
+  padding: 0 0.56rem;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: ${({ "data-tone": tone }) =>
     tone === "dirty" ? adminWarningBadgeSurface() : adminStatusSuccessBg};
@@ -268,8 +268,8 @@ export const SectionStateBadge = styled.span`
   align-items: center;
   justify-content: center;
   min-height: 24px;
-  padding: 0 0.58rem;
-  border-radius: 999px;
+  padding: 0 0.52rem;
+  border-radius: 6px;
   border: 1px solid transparent;
   color: ${adminTextSecondary};
   background: ${adminSurfaceMuted};

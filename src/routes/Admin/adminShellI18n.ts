@@ -46,7 +46,7 @@ export const ADMIN_SHELL_TRANSLATIONS: Record<
     shellViewBlog: "블로그 보기",
     shellNewPost: "새 글",
     shellQuickNavAria: "관리자 바로가기",
-    shellLogoutAria: "Logout",
+    shellLogoutAria: "로그아웃",
     shellProfileRoleAdmin: "관리자",
     shellProfileError: "프로필 정보를 불러올 수 없습니다.",
     shellProfileLoading: "프로필 정보를 불러오는 중입니다.",

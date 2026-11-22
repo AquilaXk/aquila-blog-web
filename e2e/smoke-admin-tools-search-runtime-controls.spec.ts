@@ -86,8 +86,8 @@ const setupAdmin = async (page: Page) => {
 
 const openControls = async (page: Page) => {
   await page.goto("/admin/tools")
-  await page.getByRole("tab", { name: "작업 큐 진단" }).click()
-  return page.getByRole("region", { name: "Search runtime controls" })
+  await expect(page.locator("#tabpanel-queue")).toBeVisible()
+  return page.getByRole("region", { name: "검색 런타임 제어" })
 }
 
 test("pipeline keeps one request through timeout, reload, and verified status", async ({
@@ -154,39 +154,39 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
   )
   const region = await openControls(page)
   const group = region.getByRole("group", {
-    name: "Search pipeline force control",
+    name: "검색 파이프라인 강제 제어",
   })
   await group
-    .getByLabel("Search pipeline force control reason")
+    .getByLabel("검색 파이프라인 강제 제어 사유")
     .fill("repair pipeline")
-  await group.getByLabel("Desired state").selectOption("false")
+  await group.getByLabel("적용 상태").selectOption("false")
   await group.getByRole("checkbox").check()
   await group
-    .getByRole("button", { name: "Request Search pipeline force control" })
+    .getByRole("button", { name: "검색 파이프라인 강제 제어 요청" })
     .dblclick()
   await expect.poll(() => requests.length).toBe(1)
-  await expect(group.getByRole("button", { name: "New command" })).toHaveCount(
+  await expect(group.getByRole("button", { name: "새 명령 작성" })).toHaveCount(
     0
   )
-  await group.getByRole("button", { name: "Retry same request" }).click()
+  await group.getByRole("button", { name: "동일 요청 재시도" }).click()
   await expect.poll(() => requests.length).toBe(2)
   expect(requests[1]).toEqual(requests[0])
-  await expect(group.getByText("Accepted and pending")).toBeVisible()
-  await expect(group.getByText("version")).toHaveCount(0)
+  await expect(group.getByText("요청 접수 · 처리 대기")).toBeVisible()
+  await expect(group.getByText("버전")).toHaveCount(0)
   await page.reload()
-  await page.getByRole("tab", { name: "작업 큐 진단" }).click()
+  await expect(page.locator("#tabpanel-queue")).toBeVisible()
   await expect.poll(() => statusReads).toBe(1)
-  await expect(group.getByLabel("Desired state")).toHaveValue("false")
+  await expect(group.getByLabel("적용 상태")).toHaveValue("false")
   await expect(
-    group.getByLabel("Desired state").locator("option:checked")
-  ).toHaveText("Force disabled")
-  await expect(group.getByRole("button", { name: "New command" })).toHaveCount(
+    group.getByLabel("적용 상태").locator("option:checked")
+  ).toHaveText("강제 비활성화")
+  await expect(group.getByRole("button", { name: "새 명령 작성" })).toHaveCount(
     0
   )
-  await group.getByRole("button", { name: "Check status" }).click()
+  await group.getByRole("button", { name: "상태 확인" }).click()
   await expect.poll(() => statusReads).toBe(2)
-  await expect(region.getByText("Succeeded")).toBeVisible()
-  await expect(region.getByText("version 1")).toBeVisible()
+  await expect(region.getByText("적용 완료")).toBeVisible()
+  await expect(region.getByText("버전 1")).toBeVisible()
   await expect(region).not.toContainText(RAW_CANARY)
   expect(
     await page.evaluate(
@@ -195,7 +195,7 @@ test("pipeline keeps one request through timeout, reload, and verified status", 
     )
   ).toBe(true)
   const axe = await new AxeBuilder({ page })
-    .include('[role="region"][aria-label="Search runtime controls"]')
+    .include('[role="region"][aria-label="검색 런타임 제어"]')
     .withTags(["wcag2a", "wcag2aa"])
     .analyze()
   expect(
@@ -275,53 +275,51 @@ test("mirror labels map to exact success and conflict requests", async ({
 
   const region = await openControls(page)
   const group = region.getByRole("group", {
-    name: "Search mirror force disable",
+    name: "검색 미러 강제 비활성화",
   })
-  const desiredState = group.getByLabel("Desired state")
-  const reason = group.getByLabel("Search mirror force disable reason")
+  const desiredState = group.getByLabel("적용 상태")
+  const reason = group.getByLabel("검색 미러 강제 비활성화 사유")
   const confirmation = group.getByRole("checkbox")
   const requestButton = group.getByRole("button", {
-    name: "Request Search mirror force disable",
+    name: "검색 미러 강제 비활성화 요청",
   })
 
-  await desiredState.selectOption({ label: "Allow mirror" })
+  await desiredState.selectOption({ label: "미러 허용" })
   await expect(desiredState).toHaveValue("false")
   await reason.fill("allow mirror")
   await expect(confirmation).not.toBeChecked()
   await confirmation.check()
   await requestButton.click()
   await expect.poll(() => requests.length).toBe(1)
-  await expect(group.getByText("Accepted and pending")).toBeVisible()
-  await group.getByRole("button", { name: "Check status" }).click()
-  await expect(group.getByText("Succeeded")).toBeVisible()
-  await expect(group.getByText("version 2")).toBeVisible()
-  await group.getByRole("button", { name: "New command" }).click()
+  await expect(group.getByText("요청 접수 · 처리 대기")).toBeVisible()
+  await group.getByRole("button", { name: "상태 확인" }).click()
+  await expect(group.getByText("적용 완료")).toBeVisible()
+  await expect(group.getByText("버전 2")).toBeVisible()
+  await group.getByRole("button", { name: "새 명령 작성" }).click()
   await expect(confirmation).not.toBeChecked()
 
-  await desiredState.selectOption({ label: "Force mirror disabled" })
+  await desiredState.selectOption({ label: "미러 강제 중지" })
   await expect(desiredState).toHaveValue("true")
   await reason.fill("conflict")
   await confirmation.check()
   await requestButton.click()
   await expect.poll(() => requests.length).toBe(2)
-  await expect(region.getByRole("alert")).toContainText(
-    "operation ID conflicts"
-  )
-  await expect(group.getByRole("button", { name: "New command" })).toBeVisible()
+  await expect(region.getByRole("alert")).toContainText("충돌합니다")
+  await expect(group.getByRole("button", { name: "새 명령 작성" })).toBeVisible()
   await expect(
-    group.getByRole("button", { name: "Retry same request" })
+    group.getByRole("button", { name: "동일 요청 재시도" })
   ).toHaveCount(0)
-  await group.getByRole("button", { name: "New command" }).click()
+  await group.getByRole("button", { name: "새 명령 작성" }).click()
   await expect(reason).toBeEnabled()
   await expect(confirmation).not.toBeChecked()
   await confirmation.check()
   await requestButton.click()
   await expect.poll(() => requests.length).toBe(3)
-  await expect(region.getByRole("alert")).toContainText("was rejected")
-  await expect(group.getByRole("button", { name: "New command" })).toBeVisible()
+  await expect(region.getByRole("alert")).toContainText("거부되었습니다")
+  await expect(group.getByRole("button", { name: "새 명령 작성" })).toBeVisible()
   await expect(
-    group.getByRole("button", { name: "Retry same request" })
+    group.getByRole("button", { name: "동일 요청 재시도" })
   ).toHaveCount(0)
-  await group.getByRole("button", { name: "New command" }).click()
+  await group.getByRole("button", { name: "새 명령 작성" }).click()
   await expect(confirmation).not.toBeChecked()
 })

@@ -210,6 +210,7 @@ export const ItemMain = styled.div`
     font-size: 0.875rem;
     font-weight: 500;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   mark {
@@ -226,6 +227,18 @@ export const ItemMain = styled.div`
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
+  }
+
+  @media (max-width: 520px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.12rem;
+
+    strong,
+    small {
+      white-space: normal;
+    }
   }
 `
 

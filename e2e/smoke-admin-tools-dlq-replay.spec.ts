@@ -11,7 +11,7 @@ import {
 import { mockPublicAdminProfile } from "./helpers/smokeFixtures"
 
 const RAW_CANARY = "task-id-raw-canary"
-const DLQ_REGION_NAME = "DLQ replay"
+const DLQ_REGION_NAME = "실패 작업 재실행 (DLQ)"
 const TASK_TYPE = "post.write.side-effect"
 const ADMIN_TASK_DLQ_REPLAY_ENDPOINT =
   "/system/api/v1/adm/operations/task-dlq-replay"
@@ -266,12 +266,12 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   })
   await installAdminToolsMocks(page, counters, firstResponseGate)
   await page.goto("/admin/tools")
-  const queueTab = page.getByRole("tab", { name: "작업 큐 진단" })
+  const queuePanel = page.locator("#tabpanel-queue")
   const applicationError = page.getByRole("heading", {
     name: "문제가 발생했습니다",
   })
   await Promise.race([
-    expect(queueTab).toHaveAttribute("aria-selected", "true"),
+    expect(queuePanel).toBeVisible(),
     new Promise<never>((_, reject) => {
       if (pageErrors[0]) reject(new Error(pageErrors[0]))
       else page.once("pageerror", reject)
@@ -290,7 +290,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
     applicationError: 0,
   })
   await Promise.race([
-    page.getByRole("tab", { name: "작업 큐 진단" }).click(),
+    expect(queuePanel).toBeVisible(),
     new Promise<never>((_, reject) => page.once("pageerror", reject)),
     applicationError.waitFor({ state: "visible" }).then(async () => {
       const reports = await page.evaluate(
@@ -309,18 +309,18 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   ])
 
   const region = page.getByRole("region", { name: DLQ_REGION_NAME })
-  const reason = region.getByLabel("Reason")
+  const reason = region.getByLabel("실행 사유")
   const confirmation = region.getByRole("checkbox", {
-    name: "I confirm this DLQ replay",
+    name: "위 조건으로 실패 작업 재실행을 확인했습니다",
   })
-  const submit = region.getByRole("button", { name: "Request DLQ replay" })
+  const submit = region.getByRole("button", { name: "DLQ 재실행 요청" })
 
   await expect(region).toBeVisible()
   await expect(submit).toBeDisabled()
   await reason.fill("Recover this bounded queue batch.")
-  await region.getByLabel("Task type").selectOption(TASK_TYPE)
-  await region.getByLabel("Replay limit").fill("0")
-  await region.getByLabel("Reset retry count").uncheck()
+  await region.getByLabel("작업 유형").selectOption(TASK_TYPE)
+  await region.getByLabel("최대 재실행 건수").fill("0")
+  await region.getByLabel("재시도 횟수 초기화").uncheck()
   await confirmation.check()
   await expect(submit).toBeEnabled()
   await submit.click()
@@ -328,7 +328,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
     "Check the replay request fields."
   )
   expect(counters.post).toBe(0)
-  await region.getByLabel("Replay limit").fill("5")
+  await region.getByLabel("최대 재실행 건수").fill("5")
   const firstPostTimedOut = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -347,7 +347,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   await firstPostTimedOut
 
   const retrySameRequest = region.getByRole("button", {
-    name: "Retry same request",
+    name: "동일 요청 재시도",
   })
   await expect
     .poll(async () => ({
@@ -366,9 +366,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
       regionCount: await region.count(),
       applicationErrorCount: await applicationError.count(),
       pageErrorCount: pageErrors.length,
-      queueTabSelected: await queueTab.evaluateAll((tabs) =>
-        tabs.map((tab) => tab.getAttribute("aria-selected"))
-      ),
+      queuePanelVisible: await queuePanel.isVisible(),
       clientErrorReports: await page.evaluate(() =>
         (window.__AQUILA_CLIENT_ERROR_REPORTS__ || []).map(
           ({
@@ -394,19 +392,19 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
       get: 0,
       sessionPresent: true,
       buttons: expect.arrayContaining([
-        { label: "Retry same request", disabled: false },
+        { label: "동일 요청 재시도", disabled: false },
       ]),
       regionCount: 1,
       applicationErrorCount: 0,
       pageErrorCount: 0,
-      queueTabSelected: ["true"],
+      queuePanelVisible: true,
       clientErrorReports: [],
     })
   await retrySameRequest.click()
   await expect.poll(() => counters.post).toBe(2)
   expect(counters.requests[1]).toEqual(counters.requests[0])
-  await expect(region.getByText("Accepted and pending")).toBeVisible()
-  await expect(region.getByText("Succeeded")).toHaveCount(0)
+  await expect(region.getByText("요청 접수 · 처리 대기")).toBeVisible()
+  await expect(region.getByText("재실행 완료")).toHaveCount(0)
 
   const cleanupDiagnosticsStartedHolder: { release: (() => void) | null } = {
     release: null,
@@ -444,8 +442,8 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   })
   await page.getByRole("tab", { name: "파일 정리 진단" }).click()
   await cleanupDiagnosticsStarted
-  await queueTab.click()
-  const checkStatus = region.getByRole("button", { name: "Check status" })
+  await expect(queuePanel).toBeVisible()
+  const checkStatus = region.getByRole("button", { name: "상태 확인" })
   await expect(checkStatus).toBeVisible()
   await expect(checkStatus).toBeDisabled()
   expect(counters.get).toBe(0)
@@ -453,17 +451,17 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
     throw new Error("The cleanup diagnostics release gate was not registered.")
   cleanupDiagnosticsReleaseHolder.release()
   await expect.poll(() => counters.get).toBe(1)
-  await expect(region.getByText("Partially completed")).toBeVisible()
+  await expect(region.getByText("부분 완료")).toBeVisible()
 
   await page.reload()
-  await page.getByRole("tab", { name: "작업 큐 진단" }).click()
-  await expect(region.getByText("Partially completed")).toBeVisible()
+  await expect(queuePanel).toBeVisible()
+  await expect(region.getByText("부분 완료")).toBeVisible()
   await expect.poll(() => counters.post).toBe(2)
   await expect.poll(() => counters.get).toBe(2)
   await expect(region.getByText("TASKS_PARTIALLY_REPLAYED")).toBeVisible()
-  await expect(region.getByText("Selected 5")).toBeVisible()
-  await expect(region.getByText("Replayed 3")).toBeVisible()
-  await expect(region.getByText("Quarantined 2")).toBeVisible()
+  await expect(region.getByText("5건 선택")).toBeVisible()
+  await expect(region.getByText("3건 재실행")).toBeVisible()
+  await expect(region.getByText("2건 격리")).toBeVisible()
 
   const renderedText = await region.innerText()
   expect(renderedText).not.toContain(RAW_CANARY)
@@ -473,7 +471,7 @@ test("admin DLQ replay keeps a durable accepted-to-terminal receipt without expo
   expect(renderedText).not.toContain(counters.operationId)
 
   const axeResults = await new AxeBuilder({ page })
-    .include('[role="region"][aria-label="DLQ replay"]')
+    .include('[role="region"][aria-label="실패 작업 재실행 (DLQ)"]')
     .withTags(["wcag2a", "wcag2aa"])
     .analyze()
   expect(

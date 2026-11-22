@@ -1,6 +1,5 @@
 // 참조 구현: TryGhost/Ghost apps/admin/src/posts/list/posts-list-screen.tsx (MIT), shadcn-ui/ui apps/v4/registry/new-york-v4/blocks/dashboard-01/components/data-table.tsx (MIT), medusajs/medusa packages/design-system/ui/src/components/command-bar/command-bar.tsx (MIT)
 import type { RefObject } from "react"
-import AppIcon from "./AdminAppIcon"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { useLanguage } from "src/libs/language"
 import type { AdminProfile } from "src/types/adminProfile"
@@ -36,12 +35,11 @@ import {
   ListSection,
   Main,
   PostsHeroCopy,
-  PrimaryCta,
   UnifiedTableCard,
   WorkspaceBody,
   WorkspaceMain,
 } from "./AdminPostsWorkspacePageSections"
-import { AdminWorkspaceHeroActions, AdminWorkspaceHeroLayout } from "./AdminSurfacePrimitives"
+import { AdminWorkspaceHeroLayout } from "./AdminSurfacePrimitives"
 
 export type AdminPostsWorkspacePageViewProps = {
   confirmState: WorkspaceConfirmState
@@ -232,12 +230,6 @@ export const AdminPostsWorkspacePageView = (props: AdminPostsWorkspacePageViewPr
               <h1>{adminT("navPosts", language)}</h1>
               <HeroCountBadge>{totalCountBadgeValue.toLocaleString()}</HeroCountBadge>
             </PostsHeroCopy>
-            <AdminWorkspaceHeroActions>
-              <PrimaryCta type="button" onClick={() => void openWriteRoute()}>
-                <AppIcon name="plus" width={14} height={14} />
-                <span>{adminT("navWrite", language)}</span>
-              </PrimaryCta>
-            </AdminWorkspaceHeroActions>
           </AdminWorkspaceHeroLayout>
         </HeroSection>
 

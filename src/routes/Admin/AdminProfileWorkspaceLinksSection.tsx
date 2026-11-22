@@ -209,7 +209,7 @@ const LinksSectionContent = (props: AdminProfileWorkspaceSectionProps) => {
                       <Input
                         id={labelInputId}
                         value={item.label}
-                        placeholder={section === "service" ? "예: aquila-blog" : "예: 이메일"}
+                        placeholder={section === "service" ? "예: GitHub" : "예: 이메일"}
                         onChange={(event) => updateLinkItem(section, index, "label", event.target.value)}
                       />
                     </FieldBox>

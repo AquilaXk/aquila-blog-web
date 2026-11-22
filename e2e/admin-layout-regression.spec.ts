@@ -277,7 +277,7 @@ const captureDashboardPrioritySnapshot = async (page: Page) =>
     const queueGrid = document.querySelector<HTMLElement>("[data-ui='bullboard-queue-grid']")
     const firstQueueCard = queueGrid?.querySelector<HTMLElement>("article") ?? queueGrid
     const priorityHeading = Array.from(document.querySelectorAll<HTMLElement>("h2")).find(
-      (element) => element.textContent?.trim() === "Steady-state guard",
+      (element) => element.textContent?.trim() === "서브시스템 점검 항목",
     )
     const prioritySection = priorityHeading?.closest<HTMLElement>("section")
     const priorityRows = prioritySection?.querySelector<HTMLElement>("[data-ui='dashboard-guard-rows']")
@@ -303,10 +303,10 @@ test("관리자 대시보드 1440px 데스크톱은 V4 steady-state guard를 fir
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto("/admin/dashboard")
 
-  await expect(page.getByRole("heading", { name: "Steady-state guard" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "서브시스템 점검 항목" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "운영 지표 요약" })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Live logs" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "도구 열기" })).toHaveAttribute("href", "/admin/tools")
+  await expect(page.getByRole("heading", { name: "최근 운영 이벤트" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "도구 열기" })).toHaveAttribute("href", "/admin/tools?tab=queue")
 
   const snapshot = await captureDashboardPrioritySnapshot(page)
 
@@ -320,7 +320,7 @@ test("관리자 대시보드 모바일은 BullQueueCards를 first fold 안에 �
   await page.goto("/admin/dashboard")
 
   await expect(page.locator("[data-ui='bullboard-queue-grid']").first()).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Steady-state guard" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "서브시스템 점검 항목" })).toBeVisible()
 
   const snapshot = await captureDashboardPrioritySnapshot(page)
 
@@ -350,7 +350,7 @@ test("관리자 대시보드는 comment-notification snapshot을 요청하지 �
   })
 
   await page.goto("/admin/dashboard")
-  await expect(page.getByRole("heading", { name: "Steady-state guard" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "서브시스템 점검 항목" })).toBeVisible()
 
   await page.waitForTimeout(250)
   expect(snapshotRequestCount).toBe(0)
@@ -361,7 +361,7 @@ test("관리자 허브 모바일 first fold의 글 작성 진입점은 상단 V4
   await page.goto("/admin")
 
   await expect(page.getByRole("heading", { name: ADMIN_HUB_GREETING_HEADING_PATTERN })).toBeVisible()
-  await expect(page.getByRole("button", { name: "Logout", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "로그아웃", exact: true })).toBeVisible()
 
   const ctaSnapshot = await page.evaluate(() => {
     const cta = Array.from(document.querySelectorAll<HTMLAnchorElement>("header a")).find(

@@ -2,10 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiError, apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
+import { useLanguage } from "src/libs/language"
 import { ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY } from "src/libs/privacy/browserStorageRegistry"
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import {
   AdminSearchRuntimeControlModel,
+  getSearchRuntimeControlLabels,
+  getSearchRuntimeReceiptLabel,
   type SafeSearchRuntimeControlDisplay,
   type SearchRuntimeControl,
   type SearchRuntimeControlSessionRecord,
@@ -45,22 +48,6 @@ const endpoints: Record<SearchRuntimeControl, string> = {
   mirror: "/system/api/v1/adm/search-engine/mirror/force-disable",
 }
 
-const labels: Record<
-  SearchRuntimeControl,
-  { heading: string; enabled: string; disabled: string }
-> = {
-  pipeline: {
-    heading: "Search pipeline force control",
-    enabled: "Force enabled",
-    disabled: "Force disabled",
-  },
-  mirror: {
-    heading: "Search mirror force disable",
-    enabled: "Force mirror disabled",
-    disabled: "Allow mirror",
-  },
-}
-
 const initialForm = (): FormState => ({
   reason: "",
   target: true,
@@ -88,17 +75,13 @@ const isSemanticConflict = (error: unknown) =>
   error.status === 409 &&
   error.resultCode === "409-40"
 
-const receiptLabel: Record<"ACCEPTED" | "SUCCEEDED", string> = {
-  ACCEPTED: "Accepted and pending",
-  SUCCEEDED: "Succeeded",
-}
-
-const describeFailure = (error: unknown, classifyPostRejection = false) => {
+const describeFailure = (error: unknown, classifyPostRejection = false, isEn = false) => {
   if (classifyPostRejection && isSemanticConflict(error))
     return {
       clearable: true,
-      message:
-        "This operation ID conflicts with a different command. Clear it before creating a new request.",
+      message: isEn
+        ? "This operation ID conflicts with a different command. Clear it before creating a new request."
+        : "기존 작업 ID가 다른 명령과 충돌합니다. 초기화한 뒤 새 요청을 보내세요.",
     }
   if (
     classifyPostRejection &&
@@ -109,19 +92,23 @@ const describeFailure = (error: unknown, classifyPostRejection = false) => {
   )
     return {
       clearable: true,
-      message:
-        "The request was rejected. Clear it before creating a new request.",
+      message: isEn
+        ? "The request was rejected. Clear it before creating a new request."
+        : "요청이 거부되었습니다. 초기화한 뒤 새 요청을 보내세요.",
     }
   const requestId = error instanceof ApiError ? error.requestId : null
   return {
     clearable: false,
     message: `${toUserFacingMessage(error)}${
-      requestId ? ` Request ID: ${requestId}` : ""
+      requestId ? ` (${isEn ? "Request ID" : "요청 ID"}: ${requestId})` : ""
     }`,
   }
 }
 
 export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
+  const labels = getSearchRuntimeControlLabels(isEn)
   const [forms, setForms] = useState<Record<SearchRuntimeControl, FormState>>({
     pipeline: initialForm(),
     mirror: initialForm(),
@@ -173,7 +160,9 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
           typeof mirrorForceDisabled === "boolean"
         ) {
           setRuntimeFlagsSummary(
-            `Current flags · pipeline=${String(pipelineForceControl ?? "unknown")}, mirrorDisabled=${String(mirrorForceDisabled ?? "unknown")}`
+            isEn
+              ? `Current flags · pipeline=${String(pipelineForceControl ?? "unknown")}, mirrorDisabled=${String(mirrorForceDisabled ?? "unknown")}`
+              : `현재 설정 · 파이프라인=${String(pipelineForceControl ?? "미확인")}, 미러 비활성=${String(mirrorForceDisabled ?? "미확인")}`
           )
         }
       })
@@ -181,7 +170,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     return () => {
       active = false
     }
-  }, [])
+  }, [isEn])
 
   const consumeReceipt = useCallback(
     (
@@ -205,7 +194,11 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
           sessionRecord
         )
       ) {
-        setNotice("The operation response could not be verified.")
+        setNotice(
+          isEn
+            ? "The operation response could not be verified."
+            : "작업 응답 서명을 검증하지 못했습니다."
+        )
         return false
       }
       setDisplay(AdminSearchRuntimeControlModel.toSafeDisplay(receipt))
@@ -213,7 +206,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       setClearableFailure(false)
       return true
     },
-    []
+    [isEn]
   )
 
   const checkStatus = useCallback(
@@ -228,7 +221,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
         )
         consumeReceipt(response, sessionRecord)
       } catch (error) {
-        const failure = describeFailure(error)
+        const failure = describeFailure(error, false, isEn)
         setClearableFailure(failure.clearable)
         setNotice(failure.message)
       } finally {
@@ -236,7 +229,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
         setBusy(false)
       }
     },
-    [consumeReceipt, disabled, record]
+    [consumeReceipt, disabled, isEn, record]
   )
 
   useEffect(() => {
@@ -256,10 +249,12 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       setRecord(restored)
     } catch {
       setNotice(
-        "The saved operation request could not be read. No request was sent."
+        isEn
+          ? "The saved operation request could not be read. No request was sent."
+          : "저장된 작업 요청을 읽지 못해 요청을 보내지 않았습니다."
       )
     }
-  }, [])
+  }, [isEn])
 
   useEffect(() => {
     if (
@@ -279,7 +274,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       if (record) consumeReceipt(response, record)
     },
     onFailure: (error) => {
-      const failure = describeFailure(error)
+      const failure = describeFailure(error, false, isEn)
       setClearableFailure(failure.clearable)
       setNotice(failure.message)
     },
@@ -299,7 +294,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       })
       consumeReceipt(response, sessionRecord, true)
     } catch (error) {
-      const failure = describeFailure(error, true)
+      const failure = describeFailure(error, true, isEn)
       setClearableFailure(failure.clearable)
       setNotice(failure.message)
     } finally {
@@ -343,7 +338,9 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
       )
     } catch {
       setNotice(
-        "The operation request could not be retained. No request was sent."
+        isEn
+          ? "The operation request could not be retained. No request was sent."
+          : "작업 요청을 세션에 저장하지 못해 요청을 보내지 않았습니다."
       )
       return
     }
@@ -360,7 +357,11 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     try {
       sessionStorage.removeItem(ADMIN_SEARCH_RUNTIME_CONTROL_SESSION_KEY)
     } catch {
-      setNotice("The saved operation request could not be cleared.")
+      setNotice(
+        isEn
+          ? "The saved operation request could not be cleared."
+          : "저장된 작업 요청 기록을 지우지 못했습니다."
+      )
       return
     }
     polling.resetPolling()
@@ -393,7 +394,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
           disabled={disabled || busy || polling.isPolling}
           onClick={() => void checkStatus()}
         >
-          Check status
+          {isEn ? "Check status" : "상태 확인"}
         </QuietButton>
         {!clearableFailure && !display && notice ? (
           <QuietButton
@@ -401,7 +402,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
             disabled={disabled || busy}
             onClick={() => void postRecord(record)}
           >
-            Retry same request
+            {isEn ? "Retry same request" : "동일 요청 재시도"}
           </QuietButton>
         ) : null}
         {display?.status === "SUCCEEDED" || clearableFailure ? (
@@ -410,7 +411,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
             disabled={disabled || busy}
             onClick={clearForNewCommand}
           >
-            New command
+            {isEn ? "New command" : "새 명령 작성"}
           </QuietButton>
         ) : null}
       </>
@@ -424,11 +425,11 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
         data-tone={display.status === "SUCCEEDED" ? "success" : "warning"}
         aria-live="polite"
       >
-        <strong>{receiptLabel[display.status]}</strong>
+        <strong>{getSearchRuntimeReceiptLabel(display.status, isEn)}</strong>
         {display.resultCode ? ` · ${display.resultCode}` : null}
         {` · ${display.controlKey}: ${display.controlValue}`}
         {display.status === "SUCCEEDED"
-          ? ` · version ${display.controlVersion}`
+          ? ` · ${isEn ? "version" : "버전"} ${display.controlVersion}`
           : null}
       </InlineNotice>
     )
@@ -438,16 +439,27 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
     <DangerPanel
       as="section"
       role="region"
-      aria-label="Search runtime controls"
+      aria-label={isEn ? "Search runtime controls" : "검색 런타임 제어"}
       aria-busy={busy}
     >
       <SubSectionHeading>
-        <strong>Search runtime controls</strong>
-        <small>{runtimeFlagsSummary || "Durable operations · 검색 색인 파이프라인 및 미러링 강제 제어"}</small>
+        <strong>{isEn ? "Search runtime controls" : "검색 런타임 제어"}</strong>
+        <small>
+          {runtimeFlagsSummary ||
+            (isEn
+              ? "Durable operations · search index pipeline and mirror force control"
+              : "검색 색인 파이프라인 및 미러링 강제 제어")}
+        </small>
       </SubSectionHeading>
       {busy ? (
         <InlineNotice aria-live="polite">
-          {postInFlight.current ? "Submitting…" : "Checking current status…"}
+          {postInFlight.current
+            ? isEn
+              ? "Submitting…"
+              : "요청 전송 중…"
+            : isEn
+              ? "Checking current status…"
+              : "현재 상태 확인 중…"}
         </InlineNotice>
       ) : null}
       {(["pipeline", "mirror"] as const).map((control) => {
@@ -462,7 +474,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
             <FieldGrid>
               <FieldBox className="wide">
                 <FieldLabel htmlFor={`admin-search-${control}-reason`}>
-                  {labels[control].heading} reason
+                  {isEn ? `${labels[control].heading} reason` : `${labels[control].heading} 사유`}
                 </FieldLabel>
                 <TextArea
                   id={`admin-search-${control}-reason`}
@@ -483,7 +495,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
               </FieldBox>
               <FieldBox>
                 <FieldLabel htmlFor={`admin-search-${control}-target`}>
-                  Desired state
+                  {isEn ? "Desired state" : "적용 상태"}
                 </FieldLabel>
                 <Input
                   as="select"
@@ -520,7 +532,9 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                     }))
                   }
                 />{" "}
-                I confirm this search runtime control
+                {isEn
+                  ? "I confirm this search runtime control"
+                  : `${labels[control].heading} 실행을 확인했습니다`}
               </ConfirmDeleteRow>
               <ActionRow className="wide">
                 <DangerButton
@@ -528,7 +542,7 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
                   disabled={!canSubmit}
                   onClick={() => void submit(control)}
                 >
-                  Request {labels[control].heading}
+                  {isEn ? `Request ${labels[control].heading}` : `${labels[control].heading} 요청`}
                 </DangerButton>
                 {renderActiveActions(isActive)}
               </ActionRow>

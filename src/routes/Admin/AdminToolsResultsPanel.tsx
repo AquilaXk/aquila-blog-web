@@ -200,13 +200,13 @@ export const ResultFilterButton = styled.button`
   align-items: center;
   gap: 0.38rem;
   min-height: 30px;
-  padding: 0 0.72rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: ${adminSurfaceMuted};
+  padding: 0 0.68rem;
+  border-radius: 6px;
+  border: 1px solid ${adminBorderSubtle};
+  background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   font-size: 0.76rem;
-  font-weight: 660;
+  font-weight: 600;
   cursor: pointer;
   ${focusVisibleRing}
 
@@ -222,7 +222,7 @@ export const ResultFilterButton = styled.button`
   }
 
   &[data-active="true"] {
-    border-color: transparent;
+    border-color: ${adminTeal};
     background: ${adminTeal};
     color: ${adminControlText};
 
@@ -367,7 +367,7 @@ export const ResultPanel = styled.pre`
   min-height: 160px;
   padding: 0.9rem;
   border-radius: 8px;
-  border: 0;
+  border: 1px solid ${adminBorderSubtle};
   background: ${adminTerminalBg};
   color: ${adminTerminalFg};
   overflow: auto;

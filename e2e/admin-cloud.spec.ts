@@ -694,7 +694,7 @@ test.describe("관리자 클라우드", () => {
       exact: true,
     })
     await expect(headerUploadButton).toBeVisible()
-    await expect(headerUploadButton).toContainText("새 자산 업로드")
+    await expect(headerUploadButton).toContainText("파일 업로드")
     const cloudDropSurface = page.locator("[data-drag-active]")
     await cloudDropSurface.dispatchEvent("dragover")
     await expect(cloudDropSurface).toHaveAttribute("data-drag-active", "true")

@@ -49,7 +49,7 @@ export const renderAdminProfileAboutSection = (props: AdminProfileWorkspaceSecti
         <SectionBlockHeader>
           <div>
             <h3>상단 소개</h3>
-            <p>About 페이지 최상단에 표시되는 핵심 헤드라인과 소개 문단입니다.</p>
+            <p>소개 페이지 최상단에 표시되는 핵심 헤드라인과 소개 문단입니다.</p>
           </div>
         </SectionBlockHeader>
         <FieldGrid data-columns="2">
@@ -85,7 +85,7 @@ export const renderAdminProfileAboutSection = (props: AdminProfileWorkspaceSecti
             <TextArea
               id="about-bio"
               value={draft.aboutBio}
-              placeholder="About 페이지 첫 문단에서 보여줄 소개를 적어주세요."
+              placeholder="소개 페이지 첫 문단에서 보여줄 소개를 적어주세요."
               onChange={(event) => updateDraft("aboutBio", event.target.value)}
             />
           </FieldBox>
@@ -284,7 +284,7 @@ export const renderAdminProfileAboutSection = (props: AdminProfileWorkspaceSecti
                       <Input
                         id={nameId}
                         value={project.name}
-                        placeholder="예: aquila-blog"
+                        placeholder="예: example-project"
                         onChange={(event) =>
                           updateAboutProject(projectIndex, (current: AboutProjectBlock) => ({
                             ...current,
