@@ -15,7 +15,7 @@
  * 한 번에 바꾸면 이 팔레트의 대비 실측 범위를 넘어선다.
  *
  * ## 왜 토큰 모듈인가
- * `front/scripts/check-design-colors.mjs`가 guarded UI 경로의 새 hex/rgb 리터럴을 막는다. 이 파일이
+ * `scripts/check-design-colors.mjs`가 guarded UI 경로의 새 hex/rgb 리터럴을 막는다. 이 파일이
  * 그 게이트에 등록된 유일한 색 정의 지점이고, 표면 스타일은 여기서 내보낸 토큰만 참조한다.
  */
 

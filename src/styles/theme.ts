@@ -38,24 +38,24 @@ type Options = {
   blogDesign?: BlogDesignType
 }
 
-export const createPublicDesignTokens = (scheme: SchemeType): PublicDesignTokens => {
-  const schemeColors = colors[scheme]
+export const createPublicDesignTokens = (_scheme: SchemeType = "light"): PublicDesignTokens => {
+  const schemeColors = colors.light
 
   return {
-    pageBackgroundColor: scheme === "light" ? "#f7f7f5" : schemeColors.gray1,
+    pageBackgroundColor: "#f7f7f5",
     pageBackgroundImage: "none",
     surface: schemeColors.gray1,
-    surfaceElevated: scheme === "light" ? "#f0f1f2" : schemeColors.gray3,
-    readableSurface: scheme === "light" ? "#ffffff" : schemeColors.gray1,
-    operationSurface: scheme === "light" ? schemeColors.gray1 : schemeColors.gray2,
-    operationSurfaceElevated: scheme === "light" ? schemeColors.gray2 : schemeColors.gray3,
-    border: scheme === "light" ? "#dfe1e5" : schemeColors.gray6,
-    borderStrong: scheme === "light" ? "#c8ccd2" : schemeColors.gray7,
-    accent: scheme === "light" ? "#155eef" : "#78a7ff",
-    accentHover: scheme === "light" ? "#0d4ed8" : "#9bbdff",
-    accentMuted: scheme === "light" ? "#edf4ff" : "#17243d",
-    inlineCodeBg: scheme === "light" ? "rgba(15, 23, 36, 0.055)" : "rgba(255, 255, 255, 0.075)",
-    inlineCodeBorder: scheme === "light" ? "rgba(15, 23, 36, 0.12)" : "rgba(255, 255, 255, 0.12)",
+    surfaceElevated: "#f0f1f2",
+    readableSurface: "#ffffff",
+    operationSurface: schemeColors.gray1,
+    operationSurfaceElevated: schemeColors.gray2,
+    border: "#dfe1e5",
+    borderStrong: "#c8ccd2",
+    accent: "#155eef",
+    accentHover: "#0d4ed8",
+    accentMuted: "#edf4ff",
+    inlineCodeBg: "rgba(15, 23, 36, 0.055)",
+    inlineCodeBorder: "rgba(15, 23, 36, 0.12)",
     shadow: variables.ui.card.shadow,
   }
 }

@@ -51,5 +51,5 @@
 
 | Date | Target | Command or device | Result | Linked issue |
 | --- | --- | --- | --- | --- |
-| 2026-06-20 | browser emulation matrix | `yarn --cwd front test:e2e:release-ui-qa` | pass, 7 tests | none |
-| 2026-06-20 | existing smoke matrix | `yarn --cwd front test:e2e:smoke` | pass, 60 tests | none |
+| 2026-06-20 | browser emulation matrix | `yarn test:e2e:release-ui-qa` | pass, 7 tests | none |
+| 2026-06-20 | existing smoke matrix | `yarn test:e2e:smoke` | pass, 60 tests | none |

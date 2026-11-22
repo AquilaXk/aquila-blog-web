@@ -27,13 +27,12 @@ const repoRoot = resolve(__dirname, "../..")
 const readRepoFile = (relPath: string) => readFileSync(resolve(repoRoot, relPath), "utf8")
 
 test.describe("Issue #266: Obsidian UX, Bit-Level Optimizations & Slop Removal", () => {
-  test("1. Reading Typography: light/dark inline code tokens and tightened PostHeader letter-spacing", () => {
+  test("1. Reading Typography: light-only inline code tokens and tightened PostHeader letter-spacing", () => {
     const lightTokens = createPublicDesignTokens("light")
     const darkTokens = createPublicDesignTokens("dark")
     expect(lightTokens.inlineCodeBg).toBe("rgba(15, 23, 36, 0.055)")
     expect(lightTokens.inlineCodeBorder).toBe("rgba(15, 23, 36, 0.12)")
-    expect(darkTokens.inlineCodeBg).toBe("rgba(255, 255, 255, 0.075)")
-    expect(darkTokens.inlineCodeBorder).toBe("rgba(255, 255, 255, 0.12)")
+    expect(darkTokens).toEqual(lightTokens)
 
     const typographySrc = readRepoFile("src/libs/markdown/contentTypography.ts")
     expect(typographySrc).toContain("--aq-inline-code-bg")

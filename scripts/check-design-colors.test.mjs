@@ -159,9 +159,43 @@ test("collectDiffText skips non-git build directories", () => {
   }
 })
 
-test("TARGET_PATHS includes src/pages and packages", () => {
+test("TARGET_PATHS includes src/styles, src/routes, src/components, src/pages and packages", () => {
+  assert.ok(TARGET_PATHS.includes("src/styles"))
+  assert.ok(TARGET_PATHS.includes("src/routes"))
+  assert.ok(TARGET_PATHS.includes("src/components"))
   assert.ok(TARGET_PATHS.includes("src/pages"))
   assert.ok(TARGET_PATHS.includes("packages"))
+})
+
+test("collectFullScanViolations guards Error/quick-search/styles while allowlisting theme.ts and variables.ts", () => {
+  const sandbox = mkdtempSync(join(tmpdir(), "design-colors-expanded-"))
+  try {
+    mkdirSync(join(sandbox, "src/routes/Error"), { recursive: true })
+    mkdirSync(join(sandbox, "src/components/quick-search"), { recursive: true })
+    mkdirSync(join(sandbox, "src/styles"), { recursive: true })
+
+    writeFileSync(join(sandbox, "src/routes/Error/index.tsx"), 'export const err = "#112233"\n')
+    writeFileSync(
+      join(sandbox, "src/components/quick-search/QuickSearchPalette.styles.ts"),
+      'export const qs = "rgba(1, 2, 3, 0.5)"\n'
+    )
+    writeFileSync(join(sandbox, "src/styles/other.ts"), 'export const other = "#abcdef"\n')
+    writeFileSync(join(sandbox, "src/styles/theme.ts"), 'export const t = "#f7f7f5"\n')
+    writeFileSync(join(sandbox, "src/styles/variables.ts"), 'export const v = "rgba(0,0,0,0.1)"\n')
+
+    const violations = collectFullScanViolations(sandbox, TARGET_PATHS)
+    assert.deepEqual(violations, [
+      { file: "src/styles/other.ts", line: 1, source: 'export const other = "#abcdef"' },
+      { file: "src/routes/Error/index.tsx", line: 1, source: 'export const err = "#112233"' },
+      {
+        file: "src/components/quick-search/QuickSearchPalette.styles.ts",
+        line: 1,
+        source: 'export const qs = "rgba(1, 2, 3, 0.5)"',
+      },
+    ])
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
+  }
 })
 
 test("shouldUseFullScan detects HEAD === baseRef silent pass condition and explicit full mode", () => {

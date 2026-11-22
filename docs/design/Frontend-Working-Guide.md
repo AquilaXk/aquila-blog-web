@@ -15,9 +15,7 @@ raw `serverApiFetch`는 스트리밍·특수 Response 소비에만 남긴다.
 
 | 페이지 유형 | 실패 시 동작 |
 |---|---|
-| 페이지 유형 | 실패 시 동작 |
-|---|---|
-| 공개 GSP/ISR (홈) | 에러 throw → Next.js 500 (Soft 404 방지, 빈 배열 200 OK 캐싱 차단). ISR 재검증 시 기존 캐시 보존 |
+| 공개 GSP/ISR (홈) | `BACKEND_INTERNAL_URL` 호출 실패를 `catch`하면 `status: "degraded"`와 빈 초기 목록(`revalidate: 15`)을 반환한다. 기존 ISR 캐시가 있으면 유지하고 `FeedExplorer`가 안내 상태와 클라이언트 재시도를 제공한다 |
 | 공개 GSSP (글 상세) | 미존재 시 `notFound: true`, 백엔드 오류 시 throw → 500 에러 페이지 |
 | admin GSSP | 401/403 → 로그인 redirect(또는 auth cookie 있을 때 fallback guard). 그 외(5xx/network/timeout) → throw하여 Next 500 (`destination: null` 금지). `timed()`로 bootstrap을 감싼 경우에도 `!ok`면 즉시 rethrow해 fallback으로 삼키지 않는다 |
 | RSS/feed | 503 + `console.error` |

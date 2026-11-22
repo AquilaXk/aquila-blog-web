@@ -51,7 +51,7 @@ test.describe("모바일 레이아웃 소스 경계", () => {
     expect(themeSource).not.toContain('blogDesign === "grid"')
     expect(themeSource).not.toContain("#101214")
     expect(themeSource).not.toContain("#ca6")
-    expect(themeSource).toContain("pageBackgroundColor: scheme === \"light\"")
+    expect(themeSource).toContain('pageBackgroundColor: "#f7f7f5"')
     expect(themeSource).toContain("readableSurface")
     expect(themeSource).toContain("operationSurface")
     expect(themeSource).toContain("operationSurfaceElevated")
