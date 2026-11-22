@@ -16,7 +16,14 @@ type MarkdownEditorPanelPositionParams = {
 
 const COMPACT_TOOLBAR_BREAKPOINT = 720
 
-const computeCompactFixedPosition = (
+export const resolveEditorBoundsTarget = (root: HTMLElement): HTMLElement | null =>
+  root.closest<HTMLElement>("[data-testid='markdown-editor']") ??
+  root
+    .closest<HTMLElement>("[data-testid='editor-writing-column']")
+    ?.querySelector<HTMLElement>("[data-testid='markdown-editor']") ??
+  root.closest<HTMLElement>("[data-testid='markdown-editor-toolbar']")
+
+export const computeCompactFixedPosition = (
   root: HTMLElement,
   panel: HTMLElement,
   editor: HTMLElement | null,
@@ -24,13 +31,14 @@ const computeCompactFixedPosition = (
 ): MarkdownEditorPanelFixedPosition => {
   const rootBounds = root.getBoundingClientRect()
   const panelBounds = panel.getBoundingClientRect()
-  const panelWidth = panelBounds.width
+  const panelWidth = Math.ceil(panelBounds.width)
   const panelHeight = panelBounds.height || 220
   const editorBounds = editor?.getBoundingClientRect()
-  const minLeft = editorBounds ? editorBounds.left + 4 : 12
-  const maxRight = editorBounds ? editorBounds.right - 4 : window.innerWidth - 12
+  const minLeft = editorBounds ? Math.ceil(editorBounds.left) + 4 : 12
+  const maxRight = editorBounds ? Math.floor(editorBounds.right) - 4 : window.innerWidth - 12
   const rawLeft = align === "end" ? rootBounds.right - panelWidth : rootBounds.left
-  const clampedLeft = Math.max(minLeft, Math.min(rawLeft, maxRight - panelWidth))
+  const maxAllowedLeft = Math.max(minLeft, maxRight - panelWidth)
+  const clampedLeft = Math.max(minLeft, Math.min(Math.round(rawLeft), maxAllowedLeft))
   const downwardTop = rootBounds.bottom + 6
   const upwardTop = rootBounds.top - panelHeight - 8
   const top =
@@ -39,7 +47,7 @@ const computeCompactFixedPosition = (
       : Math.round(upwardTop)
   return {
     top,
-    left: Math.round(clampedLeft),
+    left: clampedLeft,
   }
 }
 
@@ -81,9 +89,7 @@ export const useMarkdownEditorPanelPosition = ({
     const root = rootRef.current
     const panel = panelRef.current
     if (!root || !panel) return
-    const editor =
-      root.closest<HTMLElement>("[data-testid='markdown-editor']") ??
-      root.closest<HTMLElement>("[data-testid='markdown-editor-toolbar']")
+    const editor = resolveEditorBoundsTarget(root)
 
     if (typeof window !== "undefined" && window.innerWidth <= COMPACT_TOOLBAR_BREAKPOINT) {
       horizontalOffsetRef.current = 0

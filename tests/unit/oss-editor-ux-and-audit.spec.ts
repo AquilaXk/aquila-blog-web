@@ -34,6 +34,10 @@ import {
 } from "../../src/components/markdown-editor/MarkdownEditorBubbleLinkPopover"
 import { MarkdownEditorSlashMenu } from "../../src/components/markdown-editor/MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "../../src/components/markdown-editor/MarkdownEditorToolbar"
+import {
+  computeCompactFixedPosition,
+  resolveEditorBoundsTarget,
+} from "../../src/components/markdown-editor/useMarkdownEditorPanelPosition"
 import { measureBlockChromeLayout } from "../../src/components/markdown-editor/markdownEditorBlockChromeModel"
 import { EDITOR_SYNTAX_COLORS } from "../../src/components/markdown-editor/markdownEditorSyntaxThemeTokens"
 import {
@@ -763,5 +767,61 @@ test.describe("OSS Editor UX & Deep Audit Fixes", () => {
     expect(editorStylesSource).not.toMatch(/\s:is\(/)
     expect(editorStylesSource).toContain(".cm-line.cm-live-code-line .tok-keyword")
     expect(editorStylesSource).toContain(".cm-line.cm-live-code-line .tok-variableName.tok-definition")
+
+    const makeRectElement = (
+      rect: { left: number; right: number; top: number; bottom: number; width: number; height: number },
+      hooks?: {
+        closest?: (selector: string) => unknown
+        querySelector?: (selector: string) => unknown
+      }
+    ) =>
+      ({
+        getBoundingClientRect: () => rect,
+        closest: hooks?.closest ?? (() => null),
+        querySelector: hooks?.querySelector ?? (() => null),
+      }) as unknown as HTMLElement
+
+    const editorEl = makeRectElement({
+      left: 4.234375,
+      right: 324.234375,
+      top: 90,
+      bottom: 840,
+      width: 320,
+      height: 750,
+    })
+    const toolbarEl = makeRectElement({ left: 0, right: 320, top: 48, bottom: 90, width: 320, height: 42 })
+    const columnEl = makeRectElement(
+      { left: 0, right: 328.46875, top: 0, bottom: 844, width: 328.46875, height: 844 },
+      {
+        querySelector: (selector) => (selector === "[data-testid='markdown-editor']" ? editorEl : null),
+      }
+    )
+    const portaledRootEl = makeRectElement(
+      { left: 0, right: 44, top: 52, bottom: 90, width: 44, height: 38 },
+      {
+        closest: (selector) => {
+          if (selector === "[data-testid='editor-writing-column']") return columnEl
+          if (selector === "[data-testid='markdown-editor-toolbar']") return toolbarEl
+          return null
+        },
+      }
+    )
+    expect(resolveEditorBoundsTarget(portaledRootEl)).toBe(editorEl)
+
+    const panelEl = makeRectElement({ left: 0, right: 204.6, top: 0, bottom: 180, width: 204.6, height: 180 })
+    const prevWindow = (globalThis as { window?: unknown }).window
+    ;(globalThis as { window?: unknown }).window = { innerWidth: 320, innerHeight: 844 }
+    try {
+      const startPos = computeCompactFixedPosition(portaledRootEl, panelEl, editorEl, "start")
+      const endPos = computeCompactFixedPosition(portaledRootEl, panelEl, editorEl, "end")
+      expect(startPos.left).toBeGreaterThanOrEqual(4.234375)
+      expect(endPos.left + 204.6).toBeLessThanOrEqual(324.234375)
+    } finally {
+      if (prevWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window
+      } else {
+        ;(globalThis as { window?: unknown }).window = prevWindow
+      }
+    }
   })
 })

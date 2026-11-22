@@ -96,8 +96,8 @@ export const EditorStudioDedicatedCanvasSection = styled.section`
   box-shadow: none;
 
   @media (max-width: 820px) {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
     padding: 0;
   }
@@ -476,6 +476,16 @@ export const EditorStudioTopBarLead = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+
+  @media (max-width: 820px) {
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 `
 
 export const EditorHeaderMetaPill = styled.span`

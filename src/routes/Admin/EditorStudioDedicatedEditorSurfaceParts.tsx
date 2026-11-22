@@ -98,7 +98,7 @@ export const EditorStudioDedicatedTopBar = styled.header`
   @media (max-width: 820px) {
     height: auto;
     min-height: 46px;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
     gap: 4px 8px;
     padding: 6px 12px;
@@ -107,6 +107,7 @@ export const EditorStudioDedicatedTopBar = styled.header`
     > *:last-child {
       grid-column: 1 / -1;
       width: 100%;
+      min-width: 0;
     }
   }
 `
