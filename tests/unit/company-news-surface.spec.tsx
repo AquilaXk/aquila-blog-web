@@ -34,7 +34,14 @@ import {
   type CompanyNewsItem,
 } from "../../src/routes/Company/CompanyPageModel"
 import {
+  AppleOsGlyph,
+  CheckGlyph,
   CompanyVectorIcon,
+  CopyGlyph,
+  DownloadGlyph,
+  LinuxOsGlyph,
+  SparklesGlyph,
+  WindowsOsGlyph,
   type CompanyIconName,
 } from "../../src/routes/Company/CompanyIcons"
 import {
@@ -412,7 +419,7 @@ test("EasyOffice 다운로드 모델은 OS 판별·릴리스 자산 URL·스튜�
   expect(resolvePlatformChecksums("windows", null)).toEqual([])
 })
 
-test("CompanyVectorIcon은 18종 아이콘 모두를 외부 좌표 참조 없이 24x24 클린룸 SVG로 렌더한다", () => {
+test("CompanyIcons는 25종 아이콘 모두를 Lucide·Simple Icons 원본 24x24 SVG 벡터로 렌더한다", () => {
   const iconNames: readonly CompanyIconName[] = [
     "accessibility",
     "local-engine",
@@ -440,14 +447,33 @@ test("CompanyVectorIcon은 18종 아이콘 모두를 외부 좌표 참조 없이
     expect(html, name).toContain("<svg")
     expect(html, name).toContain('viewBox="0 0 24 24"')
     expect(html, name).toContain('aria-hidden="true"')
+    expect(html, name).not.toContain("<polygon")
+  }
+
+  for (const [label, Glyph] of [
+    ["apple", AppleOsGlyph],
+    ["windows", WindowsOsGlyph],
+    ["linux", LinuxOsGlyph],
+    ["sparkles", SparklesGlyph],
+    ["download", DownloadGlyph],
+    ["copy", CopyGlyph],
+    ["check", CheckGlyph],
+  ] as const) {
+    const html = renderToStaticMarkup(unwrapPw((Glyph as any)({})))
+    expect(html, label).toContain("<svg")
+    expect(html, label).toContain('viewBox="0 0 24 24"')
+    expect(html, label).toContain('aria-hidden="true"')
+    expect(html, label).not.toContain("<polygon")
+    expect(html, label).toContain("<path")
   }
 
   const iconsSource = fs.readFileSync(
     path.resolve(__dirname, "../../src/routes/Company/CompanyIcons.tsx"),
     "utf8",
   )
-  expect(iconsSource).not.toContain("lucide-icons/lucide")
-  expect(iconsSource).not.toContain("CompanyLucideIcon")
+  expect(iconsSource).toContain("lucide-icons/lucide")
+  expect(iconsSource).toContain("simple-icons/simple-icons")
+  expect(iconsSource).not.toContain("<polygon")
 })
 
 test("히어로 커서 물리 엔진은 Aquila 5색 스펙트럼, 속도 슬립스트림, 클릭 파동, 스프링 복원 및 중앙 마스킹을 수행한다", () => {

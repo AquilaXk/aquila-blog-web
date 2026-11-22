@@ -218,8 +218,15 @@ This repository includes patterns and algorithms adapted from or inspired by the
 
 - Repository: https://github.com/lucide-icons/lucide
 - Reference paths: `icons/*.svg` (`24×24` monochrome SVG icon geometry used across public shell, feed, article detail, markdown renderer, lightbox, marketing, admin studio, and markdown editor controls)
-- Applied in: `src/components/icons/AppIcon.tsx`, `src/components/ProfileImage.tsx`, `src/components/branding/BrandMark.tsx`, `src/layouts/RootLayout/Header/NavBarSearchModel.tsx`, `src/components/quick-search/QuickSearchPalette.tsx`, `src/routes/Feed/FeedExplorer.tsx`, `src/routes/Feed/PostList/PostCard.tsx`, `src/routes/Detail/PostDetail/PostHeader.tsx`, `src/routes/Detail/PostDetail/PostDetailMobileToc.tsx`, `src/routes/Detail/PostDetail/PostDetailNavigationChrome.tsx`, `src/routes/Detail/PostDetail/PostDetailRelatedSection.tsx`, `src/libs/markdown/MarkdownRendererSegments.tsx`, `src/libs/markdown/MarkdownRendererFootnotes.tsx`, `src/libs/markdown/imageLightboxOverlay.ts`, `src/libs/markdown/mermaidRuntimeOverlay.ts`, `src/routes/EasySubway/EasySubwayPageView.tsx`, `src/routes/Admin/AdminAppIcon.tsx`, `src/routes/Admin/AdminProfileIcon.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`, `src/components/markdown-editor/markdownEditorBlockSvgIcons.ts`, `src/components/markdown-editor/markdownEditorWidgets.ts`
+- Applied in: `src/components/icons/AppIcon.tsx`, `src/components/ProfileImage.tsx`, `src/components/branding/BrandMark.tsx`, `src/layouts/RootLayout/Header/NavBarSearchModel.tsx`, `src/components/quick-search/QuickSearchPalette.tsx`, `src/routes/Feed/FeedExplorer.tsx`, `src/routes/Feed/PostList/PostCard.tsx`, `src/routes/Detail/PostDetail/PostHeader.tsx`, `src/routes/Detail/PostDetail/PostDetailMobileToc.tsx`, `src/routes/Detail/PostDetail/PostDetailNavigationChrome.tsx`, `src/routes/Detail/PostDetail/PostDetailRelatedSection.tsx`, `src/libs/markdown/MarkdownRendererSegments.tsx`, `src/libs/markdown/MarkdownRendererFootnotes.tsx`, `src/libs/markdown/imageLightboxOverlay.ts`, `src/libs/markdown/mermaidRuntimeOverlay.ts`, `src/routes/EasySubway/EasySubwayPageView.tsx`, `src/routes/Company/CompanyIcons.tsx`, `src/routes/Admin/AdminAppIcon.tsx`, `src/routes/Admin/AdminProfileIcon.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`, `src/components/markdown-editor/markdownEditorBlockSvgIcons.ts`, `src/components/markdown-editor/markdownEditorWidgets.ts`
 - License: ISC License (Copyright (c) 2013-2022 Cole Bemis as part of Feather (MIT); Copyright (c) 2022 Lucide Contributors)
+
+## Simple Icons
+
+- Repository: https://github.com/simple-icons/simple-icons
+- Reference paths: `icons/apple.svg`, `icons/windows.svg`, `icons/linux.svg` (`24×24` monochrome platform brand silhouettes)
+- Applied in: `src/routes/Company/CompanyIcons.tsx`
+- License: CC0 1.0 Universal (Public Domain Dedication)
 
 ## IBM Plex Sans KR
 
