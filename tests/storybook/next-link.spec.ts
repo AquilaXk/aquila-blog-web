@@ -5,14 +5,14 @@ const expectStoryLink = async (page: Page, storyId: string, href: string) => {
   page.on("pageerror", (error) => pageErrors.push(error))
 
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`)
-  await expect(page.locator(`a[href="${href}"]`)).toBeVisible()
+  await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible()
   expect(pageErrors).toEqual([])
 }
 
 const expectStoryLinkRouteWithoutNavigation = async (page: Page, storyId: string, href: string) => {
   const storyUrl = `/iframe.html?id=${storyId}&viewMode=story`
   await page.goto(storyUrl)
-  await page.locator(`a[href="${href}"]`).click()
+  await page.locator(`a[href="${href}"]`).first().click()
 
   await expect.poll(() =>
     page.evaluate(() =>
