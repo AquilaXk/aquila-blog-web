@@ -2,6 +2,7 @@
  * 참조 구현:
  * - TryGhost/Ghost apps/admin/src/editor/{editor-screen.tsx,post-editor.tsx,post-settings-sidebar.tsx} (MIT License, Copyright (c) Ghost Foundation)
  * - TryGhost/Koenig packages/koenig-lexical/ (MIT License, Copyright (c) Ghost Foundation)
+ * - marktext/marktext src/muya/lib/contentState/focus.ts (MIT License, Copyright (c) 2018-present Jocs / MarkText)
  */
 import type { KeyboardEventHandler } from "react"
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
@@ -29,12 +30,15 @@ import {
   EditorStudioFrame,
   EditorStudioGuideModal,
   EditorStudioPageHeading,
+  EditorStudioPaperScrollSheet,
   EditorStudioRoot,
   EditorStudioSaveState,
+  EditorStudioToolbarDock,
   EditorStudioTopBarActions,
   EditorStudioTopBarLead,
   EditorStudioWritingColumn,
   EditorTagRow,
+  EditorVisibilityMonoPill,
   InlineMetaInput,
   MobilePropertiesToggle,
   PrimaryButton,
@@ -45,6 +49,7 @@ import {
 import {
   EditorStudioDedicatedEditorLoadingState,
   LocalDraftRestoreSuggestion,
+  renderEditorFloatingStatusHud,
   renderEditorInspectorPanel,
   renderEditorOutlinePanel,
   renderFloatingMiniTocSpine,
@@ -52,6 +57,7 @@ import {
   type EditorStudioDedicatedEditorSurfaceProps,
 } from "./EditorStudioDedicatedSurfaceComponents"
 import {
+  EDITOR_SURFACE_FOCUS_MODE,
   EDITOR_SURFACE_GUIDE_OPEN,
   EDITOR_SURFACE_INSPECTOR_OPEN,
   EDITOR_SURFACE_MOBILE_PROPS_OPEN,
@@ -60,6 +66,7 @@ import {
   applyBitFlag,
   applyCommaSeparatedTagDraft,
   buildEditorOutlineItems,
+  computeCursorLineAndColumn,
   computeSelectedCharCount,
   countMarkdownLinkWarnings,
   countMarkdownTotalLinks,
@@ -69,16 +76,14 @@ import {
   resolveActiveOutlineItemIndex,
   resolveViewportPanelUiMask,
   toCategorySuggestionLabels,
+  toggleFocusModeBits,
   toggleResponsiveSidebarBits,
-  toggleZenBits,
 } from "./editorStudioDedicatedSurfaceModel"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import {
   EditorialMetaInner,
   EditorEditorialDivider,
   EditorSaveStatusDot,
-  EditorStatusRightGroup,
-  EditorStatusWarningBadge,
   EditorToggleIconWrap,
   EditorWritingChromeBlock,
   EditorWritingChromeDim,
@@ -216,7 +221,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const titleNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const excerptNodeRef = useRef<HTMLTextAreaElement | null>(null)
   const writingAreaRef = useRef<HTMLElement | null>(null)
-  const isZenMode = !isOutlineOpen && !isInspectorOpen
+  const isZenMode = (panelUiMask & EDITOR_SURFACE_FOCUS_MODE) !== 0
   const isPublishModalVisible = Boolean(publishModal)
   const writingFocus = useEditorWritingFocus({
     blocked: isOutlineOpen || isInspectorOpen || isGuideOpen || isPublishModalVisible,
@@ -228,7 +233,7 @@ export const EditorStudioDedicatedEditorSurface = ({
 
   const handleToggleZenMode = useCallback(() => {
     setPanelUiMask((m) => {
-      const next = toggleZenBits(m)
+      const next = toggleFocusModeBits(m)
       if (!isMobileEditorViewport()) writeStoredDesktopSidebarMask(next)
       return next
     })
@@ -265,6 +270,15 @@ export const EditorStudioDedicatedEditorSurface = ({
   const linkWarningCount = useMemo(() => countMarkdownLinkWarnings(deferredPostContent), [deferredPostContent])
   const totalLinkCount = useMemo(() => countMarkdownTotalLinks(deferredPostContent), [deferredPostContent])
   const selectedCharCount = computeSelectedCharCount(activeSelectionRange)
+  const cursorPosition = useMemo(
+    () => computeCursorLineAndColumn(deferredPostContent, activeCursorOffset),
+    [activeCursorOffset, deferredPostContent]
+  )
+  const visibilityShortLabel = useMemo(() => {
+    if (postVisibility === "PUBLIC_LISTED") return adminT("editorVisibilityShortPublic", language)
+    if (postVisibility === "PUBLIC_UNLISTED") return adminT("editorVisibilityShortUnlisted", language)
+    return adminT("editorVisibilityShortPrivate", language)
+  }, [language, postVisibility])
   const handleTagDraftChange = (nextValue: string) =>
     applyCommaSeparatedTagDraft(nextValue, onTagDraftChange, onAddTags)
   const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) =>
@@ -312,7 +326,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   const hasFeatureImage = Boolean(postThumbnailUrl?.trim() || safePreviewThumbnail?.trim())
 
   return (
-    <EditorStudioRoot data-writing-focus={writingFocus}>
+    <EditorStudioRoot data-writing-focus={writingFocus} data-focus-mode={isZenMode ? "true" : "false"}>
       <EditorStudioPageHeading>{adminT("editorPageHeading", language)}</EditorStudioPageHeading>
       <EditorHiddenFileInput ref={thumbnailImageFileInputRef} type="file" accept="image/*" onChange={onThumbnailImageFileChange} />
       <datalist id="editor-tag-suggestions">
@@ -349,26 +363,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               <span>{saveStateText}</span>
             </EditorStudioSaveState>
           ) : null}
-          <EditorStatusRightGroup aria-label={adminT("editorSaveStatusAria", language)}>
-            {selectedCharCount > 0 ? (
-              <span>
-                {isEn ? `${selectedCharCount} selected` : `선택 ${selectedCharCount}자`}
-              </span>
-            ) : null}
-            <span>
-              {outlineInsights.wordCount} {adminT("editorWordUnit", language)}
-            </span>
-            <span>
-              {isEn ? `~${outlineInsights.readingMinutes} min` : `약 ${outlineInsights.readingMinutes}분`}
-            </span>
-            {linkWarningCount > 0 ? (
-              <EditorStatusWarningBadge>
-                {isEn
-                  ? `Links ${totalLinkCount} (${linkWarningCount} warn)`
-                  : `링크 ${totalLinkCount} (주의 ${linkWarningCount})`}
-              </EditorStatusWarningBadge>
-            ) : null}
-          </EditorStatusRightGroup>
+          <EditorVisibilityMonoPill>{visibilityShortLabel}</EditorVisibilityMonoPill>
         </EditorWritingChromeDim>
 
         <EditorWritingChromeDim data-writing-focus={writingFocus}>
@@ -378,7 +373,7 @@ export const EditorStudioDedicatedEditorSurface = ({
               data-mobile-hidden="true"
               $active={isZenMode}
               aria-pressed={isZenMode}
-              onClick={handleToggleZenMode}
+              onMouseDown={(event) => event.preventDefault()} onClick={handleToggleZenMode}
               aria-label={adminT("editorZenToggle", language)}
               title={adminT("editorZenTitle", language)}
             >
@@ -435,106 +430,122 @@ export const EditorStudioDedicatedEditorSurface = ({
           $zenMode={isZenMode}
           onPointerDown={() => dismissMobilePanelsOnCanvasTap(isZenMode, setPanelUiMask)}
         >
-          {renderFloatingMiniTocSpine({
-            language,
-            isOutlineOpen,
-            outlineItems,
-            activeOutlineIndex,
-            writingFocus,
-            onOpenOutline: () => setIsOutlineOpen(true),
-          })}
+          <EditorStudioToolbarDock id="editor-studio-toolbar-slot" />
+          <EditorStudioPaperScrollSheet data-testid="editor-paper-scroll-sheet">
+            {renderFloatingMiniTocSpine({
+              language,
+              isOutlineOpen,
+              outlineItems,
+              activeOutlineIndex,
+              writingFocus,
+              onOpenOutline: () => setIsOutlineOpen(true),
+            })}
 
-          <EditorStudioDedicatedMetaSection>
-            <EditorialMetaInner>
-              <LocalDraftRestoreSuggestion
-                visible={isLocalDraftRestoreSuggestionVisible}
-                disabled={isLocalDraftRestoreSuggestionActionsDisabled}
-                onRestore={onRestoreLocalDraft}
-                candidates={localDraftCandidates}
-                selectedKey={selectedLocalDraftCandidateKey}
-                onSelect={onSelectLocalDraftCandidate}
-                onDiscard={onDiscardLocalDraftCandidate}
-                onClear={onClearLocalDraft}
-                onDismiss={onDismissLocalDraftRestoreSuggestion}
-              />
-              <EditorWritingChromeBlock data-writing-focus={hasFeatureImage ? undefined : writingFocus}>
-                <EditorStudioFeatureImageBar
-                  postThumbnailUrl={postThumbnailUrl}
-                  safePreviewThumbnail={safePreviewThumbnail}
-                  isThumbnailUploading={isThumbnailUploading}
-                  isThumbnailUploadDisabled={isThumbnailUploadDisabled}
-                  onOpenThumbnailFileInput={onOpenThumbnailFileInput}
-                  onResetThumbnailToAutoMode={onResetThumbnailToAutoMode}
+            <EditorStudioDedicatedMetaSection>
+              <EditorialMetaInner>
+                <LocalDraftRestoreSuggestion
+                  visible={isLocalDraftRestoreSuggestionVisible}
+                  disabled={isLocalDraftRestoreSuggestionActionsDisabled}
+                  onRestore={onRestoreLocalDraft}
+                  candidates={localDraftCandidates}
+                  selectedKey={selectedLocalDraftCandidateKey}
+                  onSelect={onSelectLocalDraftCandidate}
+                  onDiscard={onDiscardLocalDraftCandidate}
+                  onClear={onClearLocalDraft}
+                  onDismiss={onDismissLocalDraftRestoreSuggestion}
                 />
-              </EditorWritingChromeBlock>
-              <TitleInput
-                ref={handleTitleInputRef}
-                id="post-title"
-                placeholder={adminT("editorTitlePlaceholder", language)}
-                rows={1}
-                value={postTitle}
-                onChange={onPostTitleChange}
-                onKeyDown={onPostTitleKeyDown}
-              />
-              <InlineExcerptInput
-                ref={excerptNodeRef}
-                data-testid="editor-inline-excerpt"
-                aria-label={isInspectorOpen ? adminT("editorSubtitleLabel", language) : adminT("editorSummaryLabel", language)}
-                placeholder={adminT("editorSummaryPlaceholder", language)}
-                rows={1}
-                maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
-                value={postSummary}
-                onChange={(event) => onPostSummaryChange(event.target.value.replace(/\r\n?/g, " "))}
-                onKeyDown={handleInlineExcerptKeyDown}
-              />
-              <MobilePropertiesToggle
-                type="button"
-                onClick={() => setIsMobilePropertiesOpen((prev) => !prev)}
-                aria-label={adminT("editorPropsToggleAria", language)}
-              >
-                {adminT("editorPropsLabel", language)}{" "}
-                {isMobilePropertiesOpen
-                  ? adminT("editorPropsCollapse", language)
-                  : isEn
-                    ? `${adminT("editorPropsExpand", language)} (${postTags.length} ${adminT("editorTagsUnitSuffix", language)}) ▼`
-                    : `${adminT("editorPropsExpand", language)} (${postTags.length}개 태그) ▼`}
-              </MobilePropertiesToggle>
-              <EditorHeaderMetaRow
-                $collapsedOnMobile={!isMobilePropertiesOpen}
-                $collapsedWhenInspectorOpen={isInspectorOpen && !isZenMode}
-              >
-                <EditorTagRow aria-label={adminT("editorTagInputAria", language)}>
-                  {postTags.map((tag) => (
-                    <SelectedTagChip key={tag}>
-                      <span className="label">{tag}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveTag(tag)}
-                        aria-label={`${tag} ${adminT("editorTagDeleteSuffix", language)}`}
-                      >
-                        <EditorIconClose size={11} />
-                      </button>
-                    </SelectedTagChip>
-                  ))}
-                  <InlineMetaInput
-                    list="editor-tag-suggestions"
-                    placeholder={adminT("editorTagPlaceholder", language)}
-                    value={tagDraft}
-                    onChange={(event) => handleTagDraftChange(event.target.value)}
-                    onKeyDown={handleTagDraftKeyDown}
+                <EditorWritingChromeBlock data-writing-focus={hasFeatureImage ? undefined : writingFocus}>
+                  <EditorStudioFeatureImageBar
+                    postThumbnailUrl={postThumbnailUrl}
+                    safePreviewThumbnail={safePreviewThumbnail}
+                    isThumbnailUploading={isThumbnailUploading}
+                    isThumbnailUploadDisabled={isThumbnailUploadDisabled}
+                    onOpenThumbnailFileInput={onOpenThumbnailFileInput}
+                    onResetThumbnailToAutoMode={onResetThumbnailToAutoMode}
                   />
-                </EditorTagRow>
-                {postCategory.trim() ? (
-                  <EditorHeaderMetaPill data-testid="editor-category-meta-pill">
-                    {adminT("editorCategoryBadgePrefix", language)} · {splitCategoryDisplay(postCategory).label}
-                  </EditorHeaderMetaPill>
-                ) : null}
-              </EditorHeaderMetaRow>
-              <EditorEditorialDivider aria-hidden="true" />
-            </EditorialMetaInner>
-          </EditorStudioDedicatedMetaSection>
+                </EditorWritingChromeBlock>
+                <TitleInput
+                  ref={handleTitleInputRef}
+                  id="post-title"
+                  placeholder={adminT("editorTitlePlaceholder", language)}
+                  rows={1}
+                  value={postTitle}
+                  onChange={onPostTitleChange}
+                  onKeyDown={onPostTitleKeyDown}
+                />
+                <InlineExcerptInput
+                  ref={excerptNodeRef}
+                  data-testid="editor-inline-excerpt"
+                  aria-label={isInspectorOpen ? adminT("editorSubtitleLabel", language) : adminT("editorSummaryLabel", language)}
+                  placeholder={adminT("editorSummaryPlaceholder", language)}
+                  rows={1}
+                  maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
+                  value={postSummary}
+                  onChange={(event) => onPostSummaryChange(event.target.value.replace(/\r\n?/g, " "))}
+                  onKeyDown={handleInlineExcerptKeyDown}
+                />
+                <MobilePropertiesToggle
+                  type="button"
+                  onClick={() => setIsMobilePropertiesOpen((prev) => !prev)}
+                  aria-label={adminT("editorPropsToggleAria", language)}
+                >
+                  {adminT("editorPropsLabel", language)}{" "}
+                  {isMobilePropertiesOpen
+                    ? adminT("editorPropsCollapse", language)
+                    : isEn
+                      ? `${adminT("editorPropsExpand", language)} (${postTags.length} ${adminT("editorTagsUnitSuffix", language)}) ▼`
+                      : `${adminT("editorPropsExpand", language)} (${postTags.length}개 태그) ▼`}
+                </MobilePropertiesToggle>
+                <EditorHeaderMetaRow
+                  $collapsedOnMobile={!isMobilePropertiesOpen}
+                  $collapsedWhenInspectorOpen={isInspectorOpen && !isZenMode}
+                >
+                  <EditorTagRow aria-label={adminT("editorTagInputAria", language)}>
+                    {postTags.map((tag) => (
+                      <SelectedTagChip key={tag}>
+                        <span className="label">{tag}</span>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveTag(tag)}
+                          aria-label={`${tag} ${adminT("editorTagDeleteSuffix", language)}`}
+                        >
+                          <EditorIconClose size={11} />
+                        </button>
+                      </SelectedTagChip>
+                    ))}
+                    <InlineMetaInput
+                      list="editor-tag-suggestions"
+                      placeholder={adminT("editorTagPlaceholder", language)}
+                      value={tagDraft}
+                      onChange={(event) => handleTagDraftChange(event.target.value)}
+                      onKeyDown={handleTagDraftKeyDown}
+                    />
+                  </EditorTagRow>
+                  {postCategory.trim() ? (
+                    <EditorHeaderMetaPill data-testid="editor-category-meta-pill">
+                      {adminT("editorCategoryBadgePrefix", language)} · {splitCategoryDisplay(postCategory).label}
+                    </EditorHeaderMetaPill>
+                  ) : null}
+                </EditorHeaderMetaRow>
+                <EditorEditorialDivider aria-hidden="true" />
+              </EditorialMetaInner>
+            </EditorStudioDedicatedMetaSection>
 
-          <EditorStudioDedicatedCanvasSection>{editorCanvas}</EditorStudioDedicatedCanvasSection>
+            <EditorStudioDedicatedCanvasSection>{editorCanvas}</EditorStudioDedicatedCanvasSection>
+          </EditorStudioPaperScrollSheet>
+
+          {renderEditorFloatingStatusHud({
+            language,
+            sidebarsOpen: isOutlineOpen || isInspectorOpen,
+            writingFocus,
+            cursorLine: cursorPosition.line,
+            cursorColumn: cursorPosition.column,
+            selectedCharCount,
+            wordCount: outlineInsights.wordCount,
+            readingMinutes: outlineInsights.readingMinutes,
+            totalLinkCount,
+            linkWarningCount,
+          })}
 
           {renderPublishNoticeBanner({
             language,

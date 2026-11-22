@@ -139,7 +139,7 @@ export const liveSurfaceTheme = EditorView.theme({
     marginInline: "auto",
     boxSizing: "content-box",
     minHeight: "640px",
-    padding: "16px 40px 64px 72px",
+    padding: "12px 56px 96px 56px",
   },
   ".cm-line": { padding: "0" },
   ".cm-live-image-wrap": { display: "block", margin: "10px 0" },
@@ -153,7 +153,7 @@ export const liveSurfaceTheme = EditorView.theme({
     borderLeft: "3px solid var(--callout-accent)",
     backgroundColor: "var(--callout-bg)",
     boxShadow: EDITOR_SYNTAX_COLORS.blockCardShadow,
-    borderRadius: "12px",
+    borderRadius: "8px",
     padding: "14px 18px",
     margin: "16px 0",
     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
@@ -257,8 +257,8 @@ export const liveSurfaceTheme = EditorView.theme({
   ".cm-line.cm-live-container-active-line": {
     paddingLeft: "14px",
     paddingRight: "14px",
-    borderLeft: `3px solid ${EDITOR_SYNTAX_COLORS.accentBlue}`,
-    backgroundColor: EDITOR_SYNTAX_COLORS.accentBlueTint06,
+    borderLeft: `3px solid ${EDITOR_SYNTAX_COLORS.calloutTones.info.border}`,
+    backgroundColor: EDITOR_SYNTAX_COLORS.neutralTint04,
   },
   ".cm-line.cm-live-container-active-toggle, .cm-line.cm-live-container-active-bookmark": {
     borderLeftColor: EDITOR_SYNTAX_COLORS.calloutTones.purple.border,

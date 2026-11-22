@@ -20,7 +20,7 @@ const ReadingPreviewRoot = styled.div`
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 12px 40px 64px;
+  padding: 12px 56px 64px;
   overscroll-behavior: contain;
 
   @media (max-width: 820px) {

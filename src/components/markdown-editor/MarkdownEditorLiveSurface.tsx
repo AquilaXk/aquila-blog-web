@@ -24,6 +24,7 @@ import {
   foldService,
   syntaxHighlighting,
 } from "@codemirror/language"
+import { classHighlighter } from "@lezer/highlight"
 import { autocompletion, completionStatus } from "@codemirror/autocomplete"
 import {
   Annotation,
@@ -241,6 +242,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         }),
         foldService.of(computeMarkdownFoldRange),
         foldGutter(),
+        syntaxHighlighting(classHighlighter),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         autocompletion({
           override: [wikilinkCompletionSource, codeLanguageCompletionSource],

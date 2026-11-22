@@ -373,10 +373,10 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
       resolve(__dirname, "../../src/routes/Admin/EditorStudioDedicatedPanelParts.tsx"),
       "utf8"
     )
-    const editorStylesSource = readFileSync(
-      resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts"),
-      "utf8"
-    )
+    const editorStylesSource = [
+      readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts"), "utf8"),
+      readFileSync(resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorToolbar.styles.ts"), "utf8"),
+    ].join("\n")
     const toolbarSource = readFileSync(
       resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditorToolbar.tsx"),
       "utf8"

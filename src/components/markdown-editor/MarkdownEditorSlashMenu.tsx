@@ -35,7 +35,17 @@ import {
   type EditorIconProps,
 } from "./MarkdownEditorIcons"
 
-export type SlashCommandGroup = "기본 블록" | "콜아웃 · 확장" | "미디어 · 수식 · 표"
+import {
+  SLASH_GROUP_EN,
+  SLASH_GROUP_FILTERS,
+  SLASH_ITEM_EN_DESCRIPTIONS,
+  SLASH_ITEM_EN_LABELS,
+  SLASH_ITEM_SYNTAX_HINTS,
+  type SlashCommandGroup,
+  type SlashGroupFilter,
+} from "./markdownEditorSlashMenuModel"
+
+export type { SlashCommandGroup }
 
 export type SlashMenuItem = {
   id: string
@@ -109,12 +119,13 @@ const SlashMenuContainer = styled.div<{ $top: number; $left: number; $maxHeight?
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   display: block;
+  width: min(320px, calc(100vw - 24px));
   min-width: 260px;
   max-width: calc(100vw - 24px);
   color: ${({ theme }) => theme.colors.gray12};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  border: 1px solid ${({ theme }) => theme.publicDesign.border};
-  border-radius: 12px;
+  border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+  border-radius: 10px;
   box-shadow: 0 2px 6px ${boxShadowColor.cardHover}, 0 12px 28px ${boxShadowColor.popover};
 
   ul {
@@ -199,10 +210,10 @@ const MenuGroupItemButton = styled.button<{ $active: boolean }>`
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: 16px;
-  padding: 10px 10px;
+  gap: 10px;
+  padding: 7px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: ${({ theme, $active }) => ($active ? theme.colors.gray4 : "transparent")};
   color: ${({ theme }) => theme.colors.gray12};
   text-align: left;
@@ -213,18 +224,60 @@ const MenuGroupItemButton = styled.button<{ $active: boolean }>`
     background: ${({ theme, $active }) => ($active ? theme.colors.gray4 : theme.colors.gray3)};
   }
 
-  svg {
-    width: 24px;
-    height: 24px;
-    color: ${({ theme }) => theme.colors.gray10};
+  .slash-icon-box {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    color: ${({ theme }) => theme.colors.gray11};
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
   }
 
-  > span {
-    font-size: 14px;
-    font-style: normal;
+  .slash-item-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .slash-item-title {
+    font-size: 13.5px;
     font-weight: 600;
-    line-height: 20px;
+    line-height: 18px;
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+
+  .slash-item-desc {
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 15px;
+    color: ${({ theme }) => theme.colors.gray10};
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .slash-syntax-badge {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid ${({ theme }) => theme.publicDesign.border};
+    background: ${({ theme }) => theme.colors.gray2};
+    color: ${({ theme }) => theme.colors.gray10};
+    font-family: var(--aq-font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 14px;
   }
 
   @media (pointer: coarse) {
@@ -269,45 +322,6 @@ const resolveNextSlashMenuIndex = (key: string, prev: number, count: number): nu
   if (key === "Home") return 0
   if (key === "End") return count > 0 ? count - 1 : 0
   return null
-}
-
-type SlashGroupFilter = "all" | SlashCommandGroup
-
-const SLASH_GROUP_FILTERS: ReadonlyArray<{ id: SlashGroupFilter; label: string; labelEn: string }> = [
-  { id: "all", label: "전체", labelEn: "All" },
-  { id: "기본 블록", label: "기본", labelEn: "Basic" },
-  { id: "콜아웃 · 확장", label: "확장", labelEn: "Blocks" },
-  { id: "미디어 · 수식 · 표", label: "미디어", labelEn: "Media" },
-]
-
-const SLASH_GROUP_EN: Readonly<Record<SlashCommandGroup, string>> = {
-  "기본 블록": "Basic Blocks",
-  "콜아웃 · 확장": "Callouts & Toggles",
-  "미디어 · 수식 · 표": "Media, Math & Tables",
-}
-
-const SLASH_ITEM_EN_LABELS: Readonly<Record<string, string>> = {
-  "heading-1": "Heading 1 (H1)",
-  "heading-2": "Heading 2 (H2)",
-  "heading-3": "Heading 3 (H3)",
-  "bullet-list": "Bullet List",
-  "ordered-list": "Numbered List",
-  "task-list": "Task List (Todo)",
-  quote: "Quote",
-  divider: "Divider",
-  "callout-info": "Callout Info",
-  "callout-tip": "Callout Tip",
-  "callout-warning": "Callout Warning",
-  "callout-danger": "Callout Danger",
-  toggle: "Toggle",
-  "code-block": "Code Block",
-  table: "Table",
-  math: "Math Block",
-  mermaid: "Diagram (Mermaid)",
-  image: "Upload Image",
-  attachment: "Attach File",
-  embed: "Embed Block",
-  bookmark: "Bookmark Card",
 }
 
 export const MarkdownEditorSlashMenu = ({
@@ -488,8 +502,22 @@ export const MarkdownEditorSlashMenu = ({
                         onClick={() => item.action()}
                         onMouseEnter={() => setSelectedIndex(flatIndex)}
                       >
-                        <IconComponent size={24} />
-                        <span>{isEn ? (SLASH_ITEM_EN_LABELS[item.id] ?? item.label) : item.label}</span>
+                        <span className="slash-icon-box" aria-hidden="true">
+                          <IconComponent size={18} />
+                        </span>
+                        <span className="slash-item-copy">
+                          <span className="slash-item-title">
+                            {isEn ? (SLASH_ITEM_EN_LABELS[item.id] ?? item.label) : item.label}
+                          </span>
+                          <span className="slash-item-desc">
+                            {isEn ? (SLASH_ITEM_EN_DESCRIPTIONS[item.id] ?? item.description) : item.description}
+                          </span>
+                        </span>
+                        {SLASH_ITEM_SYNTAX_HINTS[item.id] ? (
+                          <span className="slash-syntax-badge" aria-hidden="true">
+                            {SLASH_ITEM_SYNTAX_HINTS[item.id]}
+                          </span>
+                        ) : null}
                       </MenuGroupItemButton>
                     </li>
                   )

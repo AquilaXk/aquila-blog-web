@@ -81,7 +81,9 @@ export const useMarkdownEditorPanelPosition = ({
     const root = rootRef.current
     const panel = panelRef.current
     if (!root || !panel) return
-    const editor = root.closest<HTMLElement>("[data-testid='markdown-editor']")
+    const editor =
+      root.closest<HTMLElement>("[data-testid='markdown-editor']") ??
+      root.closest<HTMLElement>("[data-testid='markdown-editor-toolbar']")
 
     if (typeof window !== "undefined" && window.innerWidth <= COMPACT_TOOLBAR_BREAKPOINT) {
       horizontalOffsetRef.current = 0

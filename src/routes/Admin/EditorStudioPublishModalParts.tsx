@@ -196,7 +196,7 @@ export const resolveSiteOrigin = (): string => {
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin
   }
-  return "https://aquilax.net"
+  return "https://www.aquilaxk.site"
 }
 
 export const resolveSiteHostname = (): string => {
@@ -204,7 +204,7 @@ export const resolveSiteHostname = (): string => {
     const origin = resolveSiteOrigin()
     return new URL(origin).hostname
   } catch {
-    return "aquilax.net"
+    return "www.aquilaxk.site"
   }
 }
 

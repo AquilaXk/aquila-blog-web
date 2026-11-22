@@ -9,11 +9,14 @@ import { adminT } from "./adminI18n"
 import {
   EditorInspector,
   EditorInspectorTagInputRow,
+  EditorMobileSheetScrim,
   EditorOutline,
   EditorOutlineItem,
   EditorPanelHeader,
+  EditorSectionEyebrow,
   EditorStudioLoadingState,
   EditorStudioRoot,
+  EditorStudioStatusBar,
   EditorTagRow,
   LocalDraftRestoreCard,
   PublishNotice,
@@ -273,7 +276,13 @@ export const renderEditorOutlinePanel = ({
         : `약 ${readingMinutes}분 읽기`
       : null
   return (
-    <EditorOutline aria-label={adminT("editorOutlineTitle", language)}>
+    <>
+      <EditorMobileSheetScrim
+        type="button"
+        aria-label={adminT("editorOutlineClose", language)}
+        onClick={() => setIsOutlineOpen(false)}
+      />
+      <EditorOutline aria-label={adminT("editorOutlineTitle", language)}>
       <EditorPanelHeader>
         <h3>{adminT("editorOutlineTitle", language)}</h3>
         <button type="button" aria-label={adminT("editorOutlineClose", language)} onClick={() => setIsOutlineOpen(false)}>
@@ -310,7 +319,8 @@ export const renderEditorOutlinePanel = ({
       ) : (
         <p>{adminT("editorOutlineEmpty", language)}</p>
       )}
-    </EditorOutline>
+      </EditorOutline>
+    </>
   )
 }
 
@@ -410,106 +420,175 @@ export const renderEditorInspectorPanel = ({
       ? `${linkWarningCount} incomplete link(s) detected. Please complete the URL.`
       : `링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 ${linkWarningCount}개 있습니다. 주소를 완성해 주세요.`
   return (
-    <EditorInspector data-testid="editor-inspector-aside" aria-label={adminT("editorPublishSettingsAria", language)}>
-      <EditorPanelHeader>
-        <h3>{adminT("editorSettingsHeading", language)}</h3>
-        <button type="button" aria-label={adminT("editorSettingsCloseAria", language)} onClick={onCloseInspector}>
-          <EditorIconClose size={14} />
-        </button>
-      </EditorPanelHeader>
-      <label>
-        <span>{adminT("editorVisibilityLabel", language)}</span>
-        <select
-          value={postVisibility}
-          onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}
-        >
-          {visibilityOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <section>
-        <span>{adminT("editorTagsHeading", language)}</span>
-        <EditorTagRow aria-label={adminT("editorPublishTagsAria", language)}>
-          {postTags.map((tag) => (
-            <SelectedTagChip key={`inspector-${tag}`}>
-              <span className="label">{tag}</span>
-              <button
-                type="button"
-                onClick={() => onRemoveTag(tag)}
-                aria-label={`${tag} ${adminT("editorTagDeleteSuffix", language)}`}
-              >
-                <EditorIconClose size={11} />
-              </button>
-            </SelectedTagChip>
-          ))}
-        </EditorTagRow>
-        <EditorInspectorTagInputRow>
-          <input
-            list="editor-tag-suggestions"
-            placeholder={adminT("editorTagAddPlaceholder", language)}
-            value={tagDraft}
-            onChange={(event) => onTagDraftChange(event.target.value)}
-            onKeyDown={onTagDraftKeyDown}
-          />
-          <button type="button" onClick={() => onAddTag(tagDraft)} aria-label={adminT("editorTagAddAria", language)}>
-            <EditorIconPlus size={14} />
+    <>
+      <EditorMobileSheetScrim
+        type="button"
+        aria-label={adminT("editorSettingsCloseAria", language)}
+        onClick={onCloseInspector}
+      />
+      <EditorInspector data-testid="editor-inspector-aside" aria-label={adminT("editorPublishSettingsAria", language)}>
+        <EditorPanelHeader>
+          <h3>{adminT("editorSettingsHeading", language)}</h3>
+          <button type="button" aria-label={adminT("editorSettingsCloseAria", language)} onClick={onCloseInspector}>
+            <EditorIconClose size={14} />
           </button>
-        </EditorInspectorTagInputRow>
-      </section>
-      <label>
-        <span>{adminT("editorCategoryOptional", language)}</span>
-        <EditorInspectorTagInputRow>
-          <input
-            list="editor-category-suggestions"
-            placeholder={adminT("editorCategoryPlaceholder", language)}
-            value={formatCategoryDraftInputValue(postCategory)}
-            onChange={(event) => onPostCategoryChange(event.target.value)}
-            onBlur={onCommitPostCategory}
-          />
-          <SecondaryButton
-            type="button"
-            aria-label={adminT("editorCategoryClearAria", language)}
-            onClick={() => onPostCategoryChange("")}
-            disabled={!postCategory}
+        </EditorPanelHeader>
+        <label>
+          <EditorSectionEyebrow aria-hidden="true">
+            {adminT("editorSectionVisibilityEyebrow", language)}
+          </EditorSectionEyebrow>
+          <span>{adminT("editorVisibilityLabel", language)}</span>
+          <select
+            value={postVisibility}
+            onChange={(event) => onPostVisibilityChange(event.target.value as PostVisibility)}
           >
-            {adminT("editorCategoryClear", language)}
-          </SecondaryButton>
-        </EditorInspectorTagInputRow>
-        <datalist id="editor-category-suggestions">
-          {decodedCategorySuggestions.map((category) => (
-            <option key={category} value={category} />
-          ))}
-        </datalist>
-        <small>{adminT("editorCategoryHint", language)}</small>
-      </label>
-      <label>
-        <span>{adminT("editorSummaryLabel", language)}</span>
-        <textarea
-          value={postSummary}
-          maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
-          onChange={(event) => onPostSummaryChange(event.target.value)}
+            {visibilityOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <section>
+          <EditorSectionEyebrow aria-hidden="true">
+            {adminT("editorSectionTaxonomyEyebrow", language)}
+          </EditorSectionEyebrow>
+          <span>{adminT("editorTagsHeading", language)}</span>
+          <EditorTagRow aria-label={adminT("editorPublishTagsAria", language)}>
+            {postTags.map((tag) => (
+              <SelectedTagChip key={`inspector-${tag}`}>
+                <span className="label">{tag}</span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveTag(tag)}
+                  aria-label={`${tag} ${adminT("editorTagDeleteSuffix", language)}`}
+                >
+                  <EditorIconClose size={11} />
+                </button>
+              </SelectedTagChip>
+            ))}
+          </EditorTagRow>
+          <EditorInspectorTagInputRow>
+            <input
+              list="editor-tag-suggestions"
+              placeholder={adminT("editorTagAddPlaceholder", language)}
+              value={tagDraft}
+              onChange={(event) => onTagDraftChange(event.target.value)}
+              onKeyDown={onTagDraftKeyDown}
+            />
+            <button type="button" onClick={() => onAddTag(tagDraft)} aria-label={adminT("editorTagAddAria", language)}>
+              <EditorIconPlus size={14} />
+            </button>
+          </EditorInspectorTagInputRow>
+        </section>
+        <label>
+          <span>{adminT("editorCategoryOptional", language)}</span>
+          <EditorInspectorTagInputRow>
+            <input
+              list="editor-category-suggestions"
+              placeholder={adminT("editorCategoryPlaceholder", language)}
+              value={formatCategoryDraftInputValue(postCategory)}
+              onChange={(event) => onPostCategoryChange(event.target.value)}
+              onBlur={onCommitPostCategory}
+            />
+            <SecondaryButton
+              type="button"
+              aria-label={adminT("editorCategoryClearAria", language)}
+              onClick={() => onPostCategoryChange("")}
+              disabled={!postCategory}
+            >
+              {adminT("editorCategoryClear", language)}
+            </SecondaryButton>
+          </EditorInspectorTagInputRow>
+          <datalist id="editor-category-suggestions">
+            {decodedCategorySuggestions.map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
+          <small>{adminT("editorCategoryHint", language)}</small>
+        </label>
+        <label>
+          <EditorSectionEyebrow aria-hidden="true">
+            {adminT("editorSectionExcerptEyebrow", language)}
+          </EditorSectionEyebrow>
+          <span>{adminT("editorSummaryLabel", language)}</span>
+          <textarea
+            value={postSummary}
+            maxLength={PREVIEW_SUMMARY_MAX_LENGTH}
+            onChange={(event) => onPostSummaryChange(event.target.value)}
+          />
+          <small>
+            {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
+          </small>
+        </label>
+        <EditorStudioCloudAssetPicker
+          onUploadPostImage={onUploadPostImage}
+          onUploadPostAttachment={onUploadPostAttachment}
+          onInsertMarkdownSnippet={onInsertMarkdownSnippet}
         />
-        <small>
-          {postSummary.length}/{PREVIEW_SUMMARY_MAX_LENGTH}
-        </small>
-      </label>
-      <EditorStudioCloudAssetPicker
-        onUploadPostImage={onUploadPostImage}
-        onUploadPostAttachment={onUploadPostAttachment}
-        onInsertMarkdownSnippet={onInsertMarkdownSnippet}
-      />
-      <EditorStudioRevisionHistoryCard
-        postId={managedPostId}
-        disabled={actionsDisabled}
-        onRevisionRestored={onRevisionRestored}
-        currentTitle={currentTitle}
-        currentTags={currentTags}
-        currentContent={currentContent}
-      />
-      {linkWarningCount > 0 ? <p role="alert">{linkWarningMessage}</p> : null}
-    </EditorInspector>
+        <EditorStudioRevisionHistoryCard
+          postId={managedPostId}
+          disabled={actionsDisabled}
+          onRevisionRestored={onRevisionRestored}
+          currentTitle={currentTitle}
+          currentTags={currentTags}
+          currentContent={currentContent}
+        />
+        {linkWarningCount > 0 ? <p role="alert">{linkWarningMessage}</p> : null}
+      </EditorInspector>
+    </>
+  )
+}
+
+export const renderEditorFloatingStatusHud = ({
+  language,
+  sidebarsOpen,
+  writingFocus,
+  cursorLine,
+  cursorColumn,
+  selectedCharCount,
+  wordCount,
+  readingMinutes,
+  totalLinkCount,
+  linkWarningCount,
+}: {
+  language: SiteLanguage
+  sidebarsOpen: boolean
+  writingFocus: WritingFocus
+  cursorLine: number
+  cursorColumn: number
+  selectedCharCount: number
+  wordCount: number
+  readingMinutes: number
+  totalLinkCount: number
+  linkWarningCount: number
+}) => {
+  const isEn = language === "en"
+  const lineColLabel = adminT("editorStatusLineCol", language)
+    .replace("{line}", String(cursorLine))
+    .replace("{col}", String(cursorColumn))
+  return (
+    <EditorStudioStatusBar
+      $sidebarsOpen={sidebarsOpen}
+      data-testid="editor-status-hud"
+      data-writing-focus={writingFocus}
+      aria-label={adminT("editorSaveStatusAria", language)}
+    >
+      <span>{lineColLabel}</span>
+      {selectedCharCount > 0 ? (
+        <span>{isEn ? `${selectedCharCount} sel` : `선택 ${selectedCharCount}자`}</span>
+      ) : null}
+      <span>
+        {wordCount} {adminT("editorWordUnit", language)}
+      </span>
+      <span>{isEn ? `~${readingMinutes} min` : `약 ${readingMinutes}분`}</span>
+      {linkWarningCount > 0 ? (
+        <span>
+          {isEn
+            ? `Links ${totalLinkCount} (${linkWarningCount} warn)`
+            : `링크 ${totalLinkCount} (주의 ${linkWarningCount})`}
+        </span>
+      ) : null}
+    </EditorStudioStatusBar>
   )
 }

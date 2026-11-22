@@ -10,8 +10,16 @@ import { expect, test } from "@playwright/test"
 import { createTheme } from "../../src/styles/theme"
 import { LanguageProvider } from "../../src/libs/language"
 import { EditorStudioDedicatedEditorSurface } from "../../src/routes/Admin/EditorStudioDedicatedEditorSurface"
-import { EDITOR_SURFACE_ZEN_BITS } from "../../src/routes/Admin/editorStudioDedicatedSurfaceModel"
+import {
+  EDITOR_SURFACE_FOCUS_MODE,
+  EDITOR_SURFACE_INSPECTOR_OPEN,
+  EDITOR_SURFACE_OUTLINE_OPEN,
+  EDITOR_SURFACE_ZEN_BITS,
+  toggleFocusModeBits,
+  toggleResponsiveSidebarBits,
+} from "../../src/routes/Admin/editorStudioDedicatedSurfaceModel"
 import { EditorStudioFeatureImageBar } from "../../src/routes/Admin/EditorStudioFeatureImageBar"
+import { EditorStudioPublishModal } from "../../src/routes/Admin/EditorStudioPublishModal"
 import { EditorStudioPublishReadinessCard } from "../../src/routes/Admin/EditorStudioPublishReadinessCard"
 import {
   CHROME_SHOWN,
@@ -27,6 +35,7 @@ import {
 import { MarkdownEditorSlashMenu } from "../../src/components/markdown-editor/MarkdownEditorSlashMenu"
 import { MarkdownEditorToolbar } from "../../src/components/markdown-editor/MarkdownEditorToolbar"
 import { measureBlockChromeLayout } from "../../src/components/markdown-editor/markdownEditorBlockChromeModel"
+import { EDITOR_SYNTAX_COLORS } from "../../src/components/markdown-editor/markdownEditorSyntaxThemeTokens"
 import {
   invalidateServerSnapshotCache,
   readServerSnapshot,
@@ -51,7 +60,7 @@ import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
 
 const lightTheme = createTheme({ scheme: "light" })
 
-const renderNode = (node: unknown): string => {
+const renderNode = (node: unknown, initialLanguage: "ko" | "en" = "ko"): string => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -63,7 +72,7 @@ const renderNode = (node: unknown): string => {
         theme: lightTheme,
         children: materializePlaywrightJsx(
           createElement(LanguageProvider, {
-            initialLanguage: "ko",
+            initialLanguage,
             children: node as React.ReactElement,
           })
         ) as React.ReactElement,
@@ -665,5 +674,94 @@ test.describe("OSS Editor UX & Deep Audit Fixes", () => {
       "utf8"
     )
     expect(sitemapPageSource).toContain("public, s-maxage=600, stale-while-revalidate=3600, stale-if-error=86400")
+  })
+
+  test("Editor overhaul: focus mode bitmask, publish readiness drawer, bilingual 2-row slash menu, and dark code tokens", () => {
+    const withSidebars = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
+    const focused = toggleFocusModeBits(withSidebars)
+    expect((focused & EDITOR_SURFACE_FOCUS_MODE) !== 0).toBe(true)
+    expect((focused & EDITOR_SURFACE_ZEN_BITS) === 0).toBe(true)
+    const reopenedSidebar = toggleResponsiveSidebarBits(focused, EDITOR_SURFACE_OUTLINE_OPEN)
+    expect((reopenedSidebar & EDITOR_SURFACE_OUTLINE_OPEN) !== 0).toBe(true)
+    expect((reopenedSidebar & EDITOR_SURFACE_FOCUS_MODE) === 0).toBe(true)
+
+    const publishDrawerHtml = renderNode(
+      createElement(EditorStudioPublishModal, {
+        closeToggleLabel: "닫기",
+        isCompactMobileLayout: false,
+        isMobileMetaEditorOpen: false,
+        isMobileThumbnailEditorOpen: false,
+        loadingKey: "",
+        modalNotice: { tone: "idle", text: "" },
+        postVisibility: "PUBLIC_LISTED",
+        postTitle: "글쓰기 스튜디오 개편 노트",
+        postSummary: "독자 화면과 일관된 744px 단일 편집 시트 정리",
+        postId: "draft-1",
+        readinessSummary: {
+          hasTitle: true,
+          wordCount: 240,
+          hasBody: true,
+          hasManualSummary: true,
+          tagCount: 2,
+          linkWarningCount: 0,
+          totalLinkCount: 1,
+        },
+        previewMetaEditorPanel: null,
+        publishActionButtonDisabled: false,
+        publishActionButtonText: "발행",
+        publishActionTitle: "발행 확인",
+        shouldShowNotice: false,
+        thumbnailEditorPanel: null,
+        variant: "drawer",
+        visibilityOptions: [{ value: "PUBLIC_LISTED", label: "공개", description: "모든 방문자에게 노출" }],
+        onClose: () => {},
+        onConfirmPublish: () => {},
+        onPostVisibilityChange: () => {},
+        onToggleMobileMetaEditor: () => {},
+        onToggleMobileThumbnailEditor: () => {},
+      })
+    )
+    expect(publishDrawerHtml).toContain('data-testid="editor-publish-readiness"')
+    expect(publishDrawerHtml).toContain("https://www.aquilaxk.site/posts/draft-1")
+
+    const slashEnHtml = renderNode(
+      createElement(MarkdownEditorSlashMenu, {
+        isOpen: true,
+        position: { top: 40, left: 40 },
+        items: [
+          {
+            id: "heading-1",
+            label: "제목 1 (H1)",
+            description: "가장 큰 섹션 제목",
+            icon: "H1",
+            group: "기본 블록",
+            action: () => {},
+          },
+          {
+            id: "code-block",
+            label: "코드 블록 (Code)",
+            description: "언어 구문 강조 코드 블록",
+            icon: "code-block",
+            group: "미디어 · 수식 · 표",
+            action: () => {},
+          },
+        ],
+        onClose: () => {},
+      }),
+      "en"
+    )
+    expect(slashEnHtml).toContain("Large top-level section title")
+    expect(slashEnHtml).toContain("slash-syntax-badge")
+    expect(slashEnHtml).not.toMatch(/[가-힣]/)
+
+    expect(EDITOR_SYNTAX_COLORS.codeBlockLineSurface).toBe("#0f1728")
+
+    const editorStylesSource = fs.readFileSync(
+      path.resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts"),
+      "utf8"
+    )
+    expect(editorStylesSource).not.toMatch(/\s:is\(/)
+    expect(editorStylesSource).toContain(".cm-line.cm-live-code-line .tok-keyword")
+    expect(editorStylesSource).toContain(".cm-line.cm-live-code-line .tok-variableName.tok-definition")
   })
 })

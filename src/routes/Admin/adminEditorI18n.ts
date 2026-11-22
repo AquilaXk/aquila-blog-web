@@ -154,6 +154,18 @@ export type AdminEditorI18nKey =
   | "editorSaveModifying"
   | "editorSaveTempPublishing"
   | "editorSaveTempDone"
+  | "editorVisibilityShortPublic"
+  | "editorVisibilityShortUnlisted"
+  | "editorVisibilityShortPrivate"
+  | "editorVisibilityShortDraft"
+  | "editorCoverEyebrow"
+  | "editorSectionVisibilityEyebrow"
+  | "editorSectionTaxonomyEyebrow"
+  | "editorSectionExcerptEyebrow"
+  | "editorSectionCloudEyebrow"
+  | "editorSectionRevisionsEyebrow"
+  | "editorPublishCancelAria"
+  | "editorStatusLineCol"
 
 export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI18nKey, string>> = {
   ko: {
@@ -309,6 +321,18 @@ export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI
     editorSaveModifying: "글 수정 중입니다...",
     editorSaveTempPublishing: "새 글을 작성하는 중입니다...",
     editorSaveTempDone: "새 글 작성이 완료되었습니다.",
+    editorVisibilityShortPublic: "PUBLIC",
+    editorVisibilityShortUnlisted: "UNLISTED",
+    editorVisibilityShortPrivate: "PRIVATE",
+    editorVisibilityShortDraft: "DRAFT",
+    editorCoverEyebrow: "COVER",
+    editorSectionVisibilityEyebrow: "01 VISIBILITY",
+    editorSectionTaxonomyEyebrow: "02 TAXONOMY",
+    editorSectionExcerptEyebrow: "03 EXCERPT",
+    editorSectionCloudEyebrow: "04 CLOUD ASSETS",
+    editorSectionRevisionsEyebrow: "05 REVISIONS",
+    editorPublishCancelAria: "발행 설정 취소",
+    editorStatusLineCol: "줄 {line}, 열 {col}",
   },
   en: {
     editorPageHeading: "Edit Post",
@@ -463,5 +487,17 @@ export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI
     editorSaveModifying: "Updating post...",
     editorSaveTempPublishing: "Publishing new post...",
     editorSaveTempDone: "New post created.",
+    editorVisibilityShortPublic: "PUBLIC",
+    editorVisibilityShortUnlisted: "UNLISTED",
+    editorVisibilityShortPrivate: "PRIVATE",
+    editorVisibilityShortDraft: "DRAFT",
+    editorCoverEyebrow: "COVER",
+    editorSectionVisibilityEyebrow: "01 VISIBILITY",
+    editorSectionTaxonomyEyebrow: "02 TAXONOMY",
+    editorSectionExcerptEyebrow: "03 EXCERPT",
+    editorSectionCloudEyebrow: "04 CLOUD ASSETS",
+    editorSectionRevisionsEyebrow: "05 REVISIONS",
+    editorPublishCancelAria: "Cancel publish settings",
+    editorStatusLineCol: "Ln {line}, Col {col}",
   },
 }

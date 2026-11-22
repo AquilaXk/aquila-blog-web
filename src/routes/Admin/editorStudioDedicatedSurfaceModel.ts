@@ -7,6 +7,7 @@ export const EDITOR_SURFACE_GUIDE_OPEN = 1
 export const EDITOR_SURFACE_OUTLINE_OPEN = 1 << 1
 export const EDITOR_SURFACE_INSPECTOR_OPEN = 1 << 2
 export const EDITOR_SURFACE_MOBILE_PROPS_OPEN = 1 << 3
+export const EDITOR_SURFACE_FOCUS_MODE = 1 << 4
 export const EDITOR_SURFACE_ZEN_BITS = EDITOR_SURFACE_OUTLINE_OPEN | EDITOR_SURFACE_INSPECTOR_OPEN
 
 export const applyBitFlag = (
@@ -26,10 +27,17 @@ export const toggleZenBits = (mask: number) =>
     ? mask | EDITOR_SURFACE_ZEN_BITS
     : mask & ~EDITOR_SURFACE_ZEN_BITS
 
+export const toggleFocusModeBits = (mask: number) =>
+  (mask & EDITOR_SURFACE_FOCUS_MODE) === 0
+    ? (mask & ~EDITOR_SURFACE_ZEN_BITS) | EDITOR_SURFACE_FOCUS_MODE
+    : mask & ~EDITOR_SURFACE_FOCUS_MODE
+
 export const toggleResponsiveSidebarBits = (mask: number, targetBit: number) => {
-  if (!isMobileEditorViewport()) return applyBitFlag(mask, targetBit, (prev) => !prev)
+  if (!isMobileEditorViewport()) {
+    return applyBitFlag(mask & ~EDITOR_SURFACE_FOCUS_MODE, targetBit, (prev) => !prev)
+  }
   const nextOpen = (mask & targetBit) === 0
-  const cleared = mask & ~EDITOR_SURFACE_ZEN_BITS
+  const cleared = mask & ~(EDITOR_SURFACE_ZEN_BITS | EDITOR_SURFACE_FOCUS_MODE)
   return nextOpen ? cleared | targetBit : cleared
 }
 
@@ -38,7 +46,7 @@ export const resolveViewportPanelUiMask = (
   options: { isMobileViewport: boolean; isTabletViewport: boolean }
 ): number => {
   if (options.isMobileViewport) {
-    return mask & ~EDITOR_SURFACE_ZEN_BITS
+    return mask & ~(EDITOR_SURFACE_ZEN_BITS | EDITOR_SURFACE_FOCUS_MODE)
   }
   if (options.isTabletViewport) {
     return mask & ~EDITOR_SURFACE_INSPECTOR_OPEN

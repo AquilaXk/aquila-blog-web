@@ -295,7 +295,7 @@ const computeSlashMenuTop = (rect: { top: number; bottom: number }): number => {
 
 const clampSlashMenuLeft = (rawLeft: number): number => {
   const vp = readViewportMetrics()
-  return Math.max(Math.round(vp.left + 12), Math.min(Math.round(rawLeft), Math.round(vp.right - 292)))
+  return Math.max(Math.round(vp.left + 12), Math.min(Math.round(rawLeft), Math.round(vp.right - 332)))
 }
 
 const resolveSlashMenuPosition = (

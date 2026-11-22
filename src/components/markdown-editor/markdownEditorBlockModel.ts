@@ -443,6 +443,7 @@ let cachedActiveEmptyLineState: {
   doc: EditorState["doc"]
   mode: string
   emptyLineFrom: number
+  focusLineFrom: number
   decorations: DecorationSet
 } | null = null
 
@@ -455,38 +456,30 @@ const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
   const meta = getCachedBlockLineMeta(state.doc)
   const activeEmptyLineFrom =
     mode === "reading" ? -1 : resolveActiveEmptyLineFrom(state, meta.fencedRanges)
+  const activeFocusLineFrom =
+    mode === "reading"
+      ? -1
+      : state.doc.lineAt(Math.max(0, Math.min(state.selection.main.head, state.doc.length))).from
   if (
     cachedActiveEmptyLineState &&
     cachedActiveEmptyLineState.doc === state.doc &&
     cachedActiveEmptyLineState.mode === mode &&
-    cachedActiveEmptyLineState.emptyLineFrom === activeEmptyLineFrom
+    cachedActiveEmptyLineState.emptyLineFrom === activeEmptyLineFrom &&
+    cachedActiveEmptyLineState.focusLineFrom === activeFocusLineFrom
   ) {
     return cachedActiveEmptyLineState.decorations
   }
 
   const decorations: Range<Decoration>[] = []
-  let insertedActiveEmpty = activeEmptyLineFrom < 0
-
-  for (const taskLineStart of meta.checkedTaskLineStarts) {
-    if (!insertedActiveEmpty && activeEmptyLineFrom < taskLineStart) {
-      decorations.push(
-        Decoration.line({
-          class: "cm-live-empty-line",
-          attributes: {
-            "data-placeholder": ACTIVE_EMPTY_LINE_PLACEHOLDER,
-          },
-        }).range(activeEmptyLineFrom)
-      )
-      insertedActiveEmpty = true
-    }
+  if (activeFocusLineFrom >= 0) {
     decorations.push(
       Decoration.line({
-        class: "cm-live-task-checked-line",
-      }).range(taskLineStart)
+        class: "cm-live-focus-active-line",
+      }).range(activeFocusLineFrom)
     )
   }
 
-  if (!insertedActiveEmpty) {
+  if (activeEmptyLineFrom >= 0) {
     decorations.push(
       Decoration.line({
         class: "cm-live-empty-line",
@@ -497,11 +490,20 @@ const buildActiveEmptyLineDecorations = (state: EditorState): DecorationSet => {
     )
   }
 
-  const result = decorations.length > 0 ? Decoration.set(decorations) : Decoration.none
+  for (const taskLineStart of meta.checkedTaskLineStarts) {
+    decorations.push(
+      Decoration.line({
+        class: "cm-live-task-checked-line",
+      }).range(taskLineStart)
+    )
+  }
+
+  const result = decorations.length > 0 ? Decoration.set(decorations, true) : Decoration.none
   cachedActiveEmptyLineState = {
     doc: state.doc,
     mode,
     emptyLineFrom: activeEmptyLineFrom,
+    focusLineFrom: activeFocusLineFrom,
     decorations: result,
   }
   return result

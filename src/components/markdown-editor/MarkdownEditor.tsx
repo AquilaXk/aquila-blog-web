@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { createPortal } from "react-dom"
 import { useLanguage, type SiteLanguage } from "../../libs/language"
 import {
   EDITOR_ACTIVE_LINE_PLACEHOLDER,
@@ -6,7 +7,7 @@ import {
   editorT,
 } from "./markdownEditorI18n"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
-import { EditorRoot, ToolbarError, LiveEditorBody } from "./MarkdownEditor.styles"
+import { EditorRoot, ToolbarError, ToolbarHiddenInput, LiveEditorBody } from "./MarkdownEditor.styles"
 import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
   projectMarkdownEditorToolbarCommands,
@@ -285,10 +286,39 @@ export const MarkdownEditor = ({
     onFlushMarkdownReady, onFocusRequestReady,
   })
 
+  const [linkPopoverTriggerNonce, setLinkPopoverTriggerNonce] = useState(0)
+  const [toolbarPortalSlot, setToolbarPortalSlot] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setToolbarPortalSlot(document.getElementById("editor-studio-toolbar-slot"))
+  }, [])
+
   const isCompletionOrSlashMenuActive = useCallback(
     () => slashMenuOpenRef.current || Boolean(liveSurfaceRef.current?.isCompletionActive?.()),
     [slashMenuOpenRef]
   )
+
+  const handleOpenLiveLinkPopover = useCallback(
+    (explicitSelection?: TextareaSelection): boolean => {
+      if (isAuthoringDisabled || viewMode !== "live") return false
+      const activeSel = explicitSelection ?? resolveActiveSelection()
+      if (activeSel.from >= activeSel.to) return false
+      setLinkPopoverTriggerNonce((prev) => prev + 1)
+      return true
+    },
+    [isAuthoringDisabled, resolveActiveSelection, viewMode]
+  )
+
+  const handleToolbarLinkPopover = useCallback(() => handleOpenLiveLinkPopover(), [handleOpenLiveLinkPopover])
+
+  const resolvePosAtCoords = useCallback(
+    (coords: { x: number; y: number }) => liveSurfaceRef.current?.posAtCoords(coords) ?? null,
+    []
+  )
+
+  const handleSelectGutterLine = useCallback((lineStart: number) => {
+    liveSurfaceRef.current?.setSelection({ from: lineStart, to: lineStart })
+  }, [])
 
   const handleRequestSave = useCallback(() => {
     if (!onRequestSave) return
@@ -302,6 +332,7 @@ export const MarkdownEditor = ({
     setTextareaSelection: setEditorSelection,
     onRequestSave: selectOptionalCallback(Boolean(onRequestSave), handleRequestSave),
     onToggleViewMode: cycleViewMode, onOpenFindReplace: findReplace.open,
+    onRequestOpenLinkPopover: handleOpenLiveLinkPopover,
     isFindReplaceOpen: Boolean(findReplace.panel), onCloseFindReplace: handleCloseFindReplace,
     isCompletionActive: isCompletionOrSlashMenuActive,
   })
@@ -336,27 +367,33 @@ export const MarkdownEditor = ({
   const handleImageFileSelect = useCallback((file: File | null) => void handleImageInput(file), [handleImageInput])
   const handleAttachmentFileSelect = useCallback((file: File | null) => void handleFileInput(file), [handleFileInput])
 
+  const toolbarElement = (
+    <MarkdownEditorToolbar
+      disabled={disabled} disableMermaid={disableMermaid} viewMode={viewMode}
+      tableRows={tableRows} tableColumns={tableColumns} commandContext={commandContext}
+      toolbarCommands={toolbarCommands} imageInputRef={imageInputRef} fileInputRef={fileInputRef}
+      hasUploadImage={Boolean(onUploadImage)} hasUploadFile={Boolean(onUploadFile)}
+      onTableRowsChange={setTableRows} onTableColumnsChange={setTableColumns}
+      onRememberSelection={rememberTextareaSelection} onApplyCommand={applyMarkdownEditorCommand}
+      onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
+      onApplyListCommand={applyListCommand} onApplyLineCommand={applyLineCommand}
+      onApplyBlockSnippet={applyBlockSnippet} onInsertTable={insertTable}
+      onApplyTableEdit={tableEditAction} isTableEditDisabled={isTableEditDisabled}
+      onOpenFindReplace={findReplace.open} onOpenLinkPopover={handleToolbarLinkPopover}
+      onImageFileSelect={handleImageFileSelect}
+      onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={setViewMode}
+    />
+  )
+
   return (
     <EditorRoot data-testid="markdown-editor">
-      <MarkdownEditorToolbar
-        disabled={disabled} disableMermaid={disableMermaid} viewMode={viewMode}
-        tableRows={tableRows} tableColumns={tableColumns} commandContext={commandContext}
-        toolbarCommands={toolbarCommands} imageInputRef={imageInputRef} fileInputRef={fileInputRef}
-        hasUploadImage={Boolean(onUploadImage)} hasUploadFile={Boolean(onUploadFile)}
-        onTableRowsChange={setTableRows} onTableColumnsChange={setTableColumns}
-        onRememberSelection={rememberTextareaSelection} onApplyCommand={applyMarkdownEditorCommand}
-        onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
-        onApplyListCommand={applyListCommand} onApplyLineCommand={applyLineCommand}
-        onApplyBlockSnippet={applyBlockSnippet} onInsertTable={insertTable}
-        onApplyTableEdit={tableEditAction} isTableEditDisabled={isTableEditDisabled}
-        onOpenFindReplace={findReplace.open} onImageFileSelect={handleImageFileSelect}
-        onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={setViewMode}
-      />
+      {toolbarPortalSlot ? createPortal(toolbarElement, toolbarPortalSlot) : toolbarElement}
       {renderUploadErrorBanner(uploadError)}
       {renderFindReplaceSection(findReplace, language, handleCloseFindReplace)}
       <LiveEditorBody
         ref={liveEditorBodyRef}
         aria-disabled={disabled}
+        data-view-mode={viewMode}
         $isEmpty={!draftValue}
         $isReading={viewMode === "reading"}
         $emptyPlaceholder={EDITOR_EMPTY_BODY_PLACEHOLDER[language]}
@@ -365,7 +402,9 @@ export const MarkdownEditor = ({
         <MarkdownEditorBlockChrome
           containerRef={liveEditorBodyRef} mode={viewMode} disabled={isAuthoringDisabled}
           value={draftValue} selection={editorSelection} isSlashMenuOpen={slashMenuState.isOpen}
-          isFindReplaceOpen={Boolean(findReplace.panel)} resolveCoords={resolveSlashCoords} requestMeasure={requestChromeMeasure}
+          isFindReplaceOpen={Boolean(findReplace.panel)} resolveCoords={resolveSlashCoords}
+          resolvePosAtCoords={resolvePosAtCoords} requestMeasure={requestChromeMeasure}
+          linkPopoverTriggerNonce={linkPopoverTriggerNonce} onSelectGutterLine={handleSelectGutterLine}
           onApplySnippet={applySnippet} onApplyFormatShortcut={applyFormatShortcutOrAppend}
           onApplyListCommand={applyListCommand} onStripBlockPrefix={applyStripBlockPrefix}
           onApplyLineCommand={applyLineCommand} onTriggerSlashCommand={handleTriggerSlashCommand}
@@ -382,6 +421,31 @@ export const MarkdownEditor = ({
       <MarkdownEditorSlashMenu
         isOpen={slashMenuState.isOpen} position={slashMenuState.position}
         items={slashMenuItems} onClose={closeSlashMenu}
+      />
+      <ToolbarHiddenInput
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        aria-hidden="true"
+        tabIndex={-1}
+        disabled={isAuthoringDisabled || !onUploadImage}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0] ?? null
+          handleImageFileSelect(file)
+          event.currentTarget.value = ""
+        }}
+      />
+      <ToolbarHiddenInput
+        ref={fileInputRef}
+        type="file"
+        aria-hidden="true"
+        tabIndex={-1}
+        disabled={isAuthoringDisabled || !onUploadFile}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0] ?? null
+          handleAttachmentFileSelect(file)
+          event.currentTarget.value = ""
+        }}
       />
     </EditorRoot>
   )

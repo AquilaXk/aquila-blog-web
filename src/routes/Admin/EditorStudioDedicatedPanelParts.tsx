@@ -32,18 +32,19 @@ export {
 
 export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   position: absolute;
-  right: 22px;
-  bottom: ${({ $sidebarsOpen }) => ($sidebarsOpen ? "68px" : "18px")};
+  right: 20px;
+  bottom: 16px;
+  pointer-events: none;
   z-index: 16;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 30px;
-  padding: 4px 13px;
+  min-height: 28px;
+  padding: 4px 11px;
   border: 1px solid ${adminBorder};
-  border-radius: 999px;
+  border-radius: 6px;
   background: ${adminSurface};
-  box-shadow: 0 4px 16px ${boxShadowColor.subtleHover};
+  box-shadow: 0 2px 10px ${boxShadowColor.subtleHover};
   color: ${adminTextMuted};
   font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-variant-numeric: tabular-nums;
@@ -69,7 +70,7 @@ export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   }
 
   @media (max-width: 1100px) {
-    bottom: 68px;
+    bottom: ${({ $sidebarsOpen }) => ($sidebarsOpen ? "68px" : "16px")};
     right: 16px;
   }
 
@@ -180,10 +181,20 @@ export const EditorOutline = styled.aside`
     max-height: min(72dvh, 520px);
     border: 0;
     border-top: 1px solid ${adminBorderStrong};
-    border-radius: 16px 16px 0 0;
+    border-radius: 12px 12px 0 0;
     background: ${adminSurface};
     box-shadow: 0 -16px 40px ${boxShadowColor.bottomSheet};
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+
+    &::before {
+      content: "";
+      display: block;
+      width: 36px;
+      height: 4px;
+      margin: 0 auto 10px;
+      border-radius: 999px;
+      background: ${adminBorderStrong};
+    }
   }
 `
 
@@ -412,10 +423,20 @@ export const EditorInspector = styled.aside`
     max-height: min(78dvh, 580px);
     border: 0;
     border-top: 1px solid ${adminBorderStrong};
-    border-radius: 16px 16px 0 0;
+    border-radius: 12px 12px 0 0;
     background: ${adminSurface};
     box-shadow: 0 -16px 40px ${boxShadowColor.bottomSheet};
-    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+
+    &::before {
+      content: "";
+      display: block;
+      width: 36px;
+      height: 4px;
+      margin: 0 auto 10px;
+      border-radius: 999px;
+      background: ${adminBorderStrong};
+    }
 
     select,
     textarea {
@@ -461,12 +482,10 @@ export const EditorHeaderMetaPill = styled.span`
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
+  padding: 0 8px;
+  border-radius: 4px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceMuted};
   color: ${adminTextSecondary};
-  font-size: 0.76rem;
-  font-weight: 600;
-  line-height: 1;
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 `

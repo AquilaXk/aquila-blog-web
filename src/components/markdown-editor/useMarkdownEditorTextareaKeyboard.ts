@@ -56,6 +56,7 @@ type UseMarkdownEditorTextareaKeyboardArgs = {
   onRequestSave?: () => void
   onToggleViewMode?: () => void
   onOpenFindReplace?: () => void
+  onRequestOpenLinkPopover?: (selection: TextareaSelection) => boolean
   isFindReplaceOpen?: boolean
   onCloseFindReplace?: () => void
   isCompletionActive?: () => boolean
@@ -89,6 +90,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
   onRequestSave,
   onToggleViewMode,
   onOpenFindReplace,
+  onRequestOpenLinkPopover,
   isFindReplaceOpen = false,
   onCloseFindReplace,
   isCompletionActive,
@@ -211,10 +213,20 @@ export const useMarkdownEditorTextareaKeyboard = ({
       if (!formatShortcut) return false
       event.preventDefault()
       const { from, to } = rememberTextareaSelection()
+      if (formatShortcut === "link" && from < to && onRequestOpenLinkPopover?.({ from, to })) {
+        return true
+      }
       applyMutationPlan(planFormatShortcutMutation(valueRef.current, from, to, formatShortcut))
       return true
     },
-    [applyMutationPlan, authoringDisabled, handleViewModeShortcutKeyDown, rememberTextareaSelection, valueRef]
+    [
+      applyMutationPlan,
+      authoringDisabled,
+      handleViewModeShortcutKeyDown,
+      onRequestOpenLinkPopover,
+      rememberTextareaSelection,
+      valueRef,
+    ]
   )
 
   const handleLineCommandKeyDown = useCallback(

@@ -20,9 +20,11 @@ test.describe("editor slash menu and toolbar usability", () => {
     expect(content).toContain("할 일 목록 (Todo)")
     expect(content).toContain("표 (Table)")
     expect(content).toContain("구분선 (Divider)")
-    expect(content).toContain("width: 24px")
-    expect(content).toContain("height: 24px")
-    expect(content).toContain("font-size: 14px")
+    expect(content).toContain("width: 32px")
+    expect(content).toContain("height: 32px")
+    expect(content).toContain("font-size: 13.5px")
+    expect(content).toContain("slash-item-desc")
+    expect(content).toContain("slash-syntax-badge")
     expect(content).toContain("overscroll-behavior: contain")
     expect(content).toContain("min-width: 260px")
     expect(content).toContain("일치하는 명령어가 없습니다")
@@ -62,18 +64,18 @@ test.describe("editor slash menu and toolbar usability", () => {
     const partsContent = readFileSync(partsFilePath, "utf8")
 
     expect(partsContent).toContain("font-size: 42px")
-    expect(partsContent).toContain("padding: 28px 40px 0")
+    expect(partsContent).toContain("padding: 36px 56px 0")
     expect(partsContent).toContain("left: 50%")
     expect(partsContent).toContain("border-radius: 999px")
   })
 
-  test("editor body typography is upgraded to 16px sans-serif and Crepe top-bar chevron is 16px svg", () => {
+  test("editor body typography matches article scale and Crepe top-bar chevron is 16px svg", () => {
     const stylesFilePath = resolve(__dirname, "../../src/components/markdown-editor/MarkdownEditor.styles.ts")
     const stylesContent = readFileSync(stylesFilePath, "utf8")
 
     expect(stylesContent).toContain("var(--aq-font-sans")
-    expect(stylesContent).toContain("font-size: 16px")
-    expect(stylesContent).toContain("line-height: 1.75")
+    expect(stylesContent).toContain("articleTypographyScale.bodyFontSize")
+    expect(stylesContent).toContain("articleTypographyScale.bodyLineHeight")
     expect(stylesContent).toContain(".cm-live-fenced-code")
     expect(stylesContent).toContain("width: 32px")
     expect(stylesContent).toContain("height: 32px")

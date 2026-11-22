@@ -204,15 +204,22 @@ This repository includes patterns and algorithms adapted from or inspired by the
 
 - Repository: https://github.com/steven-tey/novel
 - Reference paths: `apps/web/components/tailwind/selectors/link-selector.tsx`, `apps/web/components/tailwind/selectors/text-buttons.tsx`, `apps/web/components/tailwind/slash-command.tsx` (inline selection link editing, URL normalization/validation, floating text bubble, and slash menu patterns)
-- Applied in: `src/components/markdown-editor/MarkdownEditorBubbleLinkPopover.tsx`, `src/components/markdown-editor/MarkdownEditorBlockChrome.tsx`, `src/components/markdown-editor/MarkdownEditorSlashMenu.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`
+- Applied in: `src/components/markdown-editor/MarkdownEditorBubbleLinkPopover.tsx`, `src/components/markdown-editor/MarkdownEditorBlockChrome.tsx`, `src/components/markdown-editor/MarkdownEditorBlockChrome.styles.ts`, `src/components/markdown-editor/MarkdownEditorBlockMenuPopover.tsx`, `src/components/markdown-editor/MarkdownEditorSlashMenu.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`
 - License: Apache License 2.0 (Copyright (c) 2024 Steven Tey)
 
 ## Milkdown Crepe
 
 - Repository: https://github.com/Milkdown/milkdown
 - Reference paths: `packages/crepe/src/feature/toolbar/`, `packages/crepe/src/feature/table/`, `packages/crepe/src/theme/common/` (`top-bar.css`, `toolbar.css`, `block-edit.css`, `link-tooltip.css`, `table.css`, `code-mirror.css` — sticky top formatting bar, `6×6` interactive table picker, selection bubble toolbar, pill table grip handles, contextual table button-group toolbar, multi-layer floating elevation shadows, underline tabbed `.milkdown-slash-menu`, and gutter handle UX)
-- Applied in: `src/components/markdown-editor/MarkdownEditor.tsx`, `src/components/markdown-editor/MarkdownEditor.styles.ts`, `src/components/markdown-editor/MarkdownEditorToolbar.tsx`, `src/components/markdown-editor/MarkdownEditorToolbar.styles.ts`, `src/components/markdown-editor/MarkdownEditorTablePopover.tsx`, `src/components/markdown-editor/useMarkdownEditorPanelPosition.ts`, `src/components/markdown-editor/MarkdownEditorBlockChrome.tsx`, `src/components/markdown-editor/MarkdownEditorSlashMenu.tsx`, `src/components/markdown-editor/MarkdownEditorBubbleLinkPopover.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`, `src/components/markdown-editor/markdownEditorBlockSvgIcons.ts`, `src/components/markdown-editor/markdownEditorTableWidgetDom.ts`, `src/components/markdown-editor/markdownEditorLiveTableAndCardTheme.ts`
+- Applied in: `src/components/markdown-editor/MarkdownEditor.tsx`, `src/components/markdown-editor/MarkdownEditor.styles.ts`, `src/components/markdown-editor/MarkdownEditorToolbar.tsx`, `src/components/markdown-editor/MarkdownEditorToolbar.styles.ts`, `src/components/markdown-editor/MarkdownEditorToolbarIconsMap.tsx`, `src/components/markdown-editor/MarkdownEditorTablePopover.tsx`, `src/components/markdown-editor/useMarkdownEditorPanelPosition.ts`, `src/components/markdown-editor/MarkdownEditorBlockChrome.tsx`, `src/components/markdown-editor/MarkdownEditorBlockChrome.styles.ts`, `src/components/markdown-editor/MarkdownEditorBlockMenuPopover.tsx`, `src/components/markdown-editor/MarkdownEditorSlashMenu.tsx`, `src/components/markdown-editor/markdownEditorSlashMenuModel.ts`, `src/components/markdown-editor/MarkdownEditorBubbleLinkPopover.tsx`, `src/components/markdown-editor/MarkdownEditorIcons.tsx`, `src/components/markdown-editor/markdownEditorBlockSvgIcons.ts`, `src/components/markdown-editor/markdownEditorTableWidgetDom.ts`, `src/components/markdown-editor/markdownEditorLiveTableAndCardTheme.ts`
 - License: MIT License (Copyright (c) 2021 Mirone)
+
+## MarkText
+
+- Repository: https://github.com/marktext/marktext
+- Reference patterns: Focus mode active-paragraph isolation, typewriter bottom scroll clearance (`42vh`), and typing-triggered chrome auto-dimming (`focusMode.less`, `typewriterMode`)
+- Applied in: `src/routes/Admin/editorStudioWritingFocus.ts`, `src/routes/Admin/editorStudioDedicatedSurfaceModel.ts`, `src/components/markdown-editor/MarkdownEditor.styles.ts`, `src/components/markdown-editor/markdownEditorBlockModel.ts`, `src/components/markdown-editor/MarkdownEditorBlockChrome.tsx`
+- License: MIT License (Copyright (c) 2017-present Jocs)
 
 ## Koenig Editor
 

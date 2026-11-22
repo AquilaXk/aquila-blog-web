@@ -8,6 +8,8 @@ import { useRef, type ReactNode } from "react"
 import AppIcon from "./AdminAppIcon"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
+import { useLanguage } from "src/libs/language"
+import { adminT } from "./adminI18n"
 import type { PostVisibility } from "./editorStudioState"
 import {
   adminBorder,
@@ -21,6 +23,7 @@ import {
   EditorStudioPublishVisibilitySection,
   type EditorStudioPublishVisibilityOption,
 } from "./EditorStudioPublishModalParts"
+import { EditorStudioPublishReadinessCard } from "./EditorStudioPublishReadinessCard"
 import {
   PublishButton,
   PublishDialog,
@@ -53,6 +56,15 @@ type EditorStudioPublishModalProps = {
   postSummary?: string
   thumbnailUrl?: string
   postId?: string
+  readinessSummary?: {
+    hasTitle: boolean
+    wordCount: number
+    hasBody: boolean
+    hasManualSummary: boolean
+    tagCount: number
+    linkWarningCount: number
+    totalLinkCount: number
+  }
   previewMetaEditorPanel: ReactNode
   publishActionButtonDisabled: boolean
   publishActionButtonText: string
@@ -83,6 +95,7 @@ export const EditorStudioPublishModal = ({
   postSummary = "",
   thumbnailUrl = "",
   postId = "",
+  readinessSummary,
   previewMetaEditorPanel,
   publishActionButtonDisabled,
   publishActionButtonText,
@@ -99,6 +112,7 @@ export const EditorStudioPublishModal = ({
   onToggleMobileMetaEditor,
   onToggleMobileThumbnailEditor,
 }: EditorStudioPublishModalProps) => {
+  const { language } = useLanguage()
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const isCloseDisabled =
     loadingKey === "writePost" ||
@@ -138,7 +152,7 @@ export const EditorStudioPublishModal = ({
           </div>
           <PublishModalCloseButton
             type="button"
-            aria-label="발행 설정 취소"
+            aria-label={adminT("editorPublishCancelAria", language)}
             disabled={isCloseDisabled}
             onClick={closeWhenIdle}
           >
@@ -146,6 +160,7 @@ export const EditorStudioPublishModal = ({
           </PublishModalCloseButton>
         </PublishModalHeader>
         <PublishModalBody>
+          {readinessSummary ? <EditorStudioPublishReadinessCard {...readinessSummary} /> : null}
           {shouldShowNotice ? (
             <PublishModalNotice data-tone={modalNotice.tone}>
               <span>{modalNotice.text}</span>
@@ -155,7 +170,7 @@ export const EditorStudioPublishModal = ({
                   disabled={isCloseDisabled}
                   onClick={onReloadLatestServerPost}
                 >
-                  서버 최신본 다시 불러오기
+                  {adminT("editorReloadLatest", language)}
                 </PublishButton>
               ) : null}
             </PublishModalNotice>
@@ -190,7 +205,7 @@ export const EditorStudioPublishModal = ({
         </PublishModalBody>
         <PublishModalFooter>
           <PublishButton type="button" disabled={isCloseDisabled} onClick={onClose}>
-            닫기
+            {adminT("editorCloseLabel", language)}
           </PublishButton>
           <PublishPrimaryButton
             type="button"

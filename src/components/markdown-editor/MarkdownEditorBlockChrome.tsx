@@ -2,6 +2,7 @@
  * 참조 구현:
  * - Milkdown/milkdown packages/crepe/src/feature/block-edit/ (MIT License, Copyright (c) 2021 Mirone)
  * - steven-tey/novel packages/headless/src/components/editor-bubble.tsx (Apache-2.0 License, Copyright (c) Steven Tey)
+ * - marktext/marktext (MIT License, Copyright (c) 2017-present Jocs) — 타이핑 중 크롬 자동 감쇠
  */
 import {
   useEffect, useLayoutEffect, useMemo, useRef, useState,
@@ -16,12 +17,7 @@ import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsMode
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import { MarkdownEditorBubbleLinkPopover, parseMarkdownLinkSelection } from "./MarkdownEditorBubbleLinkPopover"
 import {
-  EditorIconArrowDown,
-  EditorIconArrowUp,
   EditorIconBold,
-  EditorIconBulletList,
-  EditorIconCheck,
-  EditorIconDuplicate,
   EditorIconGripSixDots,
   EditorIconHeading1,
   EditorIconHeading2,
@@ -30,20 +26,25 @@ import {
   EditorIconInlineCode,
   EditorIconItalic,
   EditorIconLink,
-  EditorIconOrderedList,
   EditorIconParagraph,
   EditorIconPlus,
   EditorIconQuote,
   EditorIconStrikethrough,
   EditorIconTaskList,
-  EditorIconTrash,
 } from "./MarkdownEditorIcons"
 import {
   EDITOR_COLOR_SWATCH_SPECS,
   computeActiveLineState,
+  computeColorSwatchMutationPlan,
   measureBlockChromeLayout,
   moveBlockMenuFocus,
 } from "./markdownEditorBlockChromeModel"
+import {
+  BubbleColorSwatchPopover,
+  BubbleColorTriggerGlyph,
+  ColorSwatchDot,
+} from "./MarkdownEditorBlockChrome.styles"
+import { MarkdownEditorBlockMenuPopover } from "./MarkdownEditorBlockMenuPopover"
 import {
   isWrapSelectionActive,
   planReplaceSelection,
@@ -61,7 +62,10 @@ type MarkdownEditorBlockChromeProps = {
   isSlashMenuOpen: boolean
   isFindReplaceOpen: boolean
   resolveCoords: (pos: number) => { top: number; bottom: number; left: number; right: number } | null
+  resolvePosAtCoords?: (coords: { x: number; y: number }) => number | null
   requestMeasure?: <T>(spec: { key?: string; read: () => T; write: (measured: T) => void }) => boolean
+  linkPopoverTriggerNonce?: number
+  onSelectGutterLine?: (lineStart: number) => void
   onApplySnippet: (before: string, after?: string, options?: { toggle?: boolean }) => void
   onApplyFormatShortcut: (shortcut: MarkdownFormatShortcut) => void
   onApplyListCommand: (command: MarkdownEditorListCommand) => void
@@ -76,16 +80,18 @@ const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
   top: ${({ $top }) => $top}px;
   left: ${({ $left }) => $left}px;
   max-width: calc(100vw - 24px);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   align-items: center;
+  gap: 1px;
+  padding: 3px 4px;
   border-radius: 8px;
-  border: 1px solid ${({ theme }) => theme.publicDesign.border};
+  border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 2px 8px ${boxShadowColor.popover};
+  box-shadow: 0 2px 6px ${boxShadowColor.cardHover}, 0 10px 24px ${boxShadowColor.popover};
   user-select: none;
 
-  @media (max-width: 820px) {
+  @media (max-width: 720px) {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -97,8 +103,8 @@ const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
 
 const BubbleDivider = styled.span`
   width: 1px;
-  height: 24px;
-  margin: 10px;
+  height: 16px;
+  margin: 0 3px;
   background: color-mix(in srgb, ${({ theme }) => theme.colors.gray8}, transparent 80%);
   flex-shrink: 0;
 `
@@ -107,12 +113,12 @@ const BubbleActionButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin: 6px;
-  padding: 4px;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray10};
   font: 700 12px/1 var(--aq-font-sans);
@@ -124,32 +130,32 @@ const BubbleActionButton = styled.button`
     background: ${({ theme }) => theme.colors.gray3};
     color: ${({ theme }) => theme.colors.gray12};
   }
-  &:active, &[aria-pressed="true"] {
+  &:active, &[aria-pressed="true"], &[aria-expanded="true"] {
     background: ${({ theme }) => theme.colors.gray4};
     color: ${({ theme }) => theme.colors.gray12};
   }
   @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; margin: 2px; }
 `
 
-const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
+const GutterHandleButtonBase = styled.button<{ $top: number; $left: number; $dimmed?: boolean }>`
   position: absolute;
   left: ${({ $left }) => $left}px;
   top: ${({ $top }) => $top}px;
   z-index: 4;
-  width: 32px;
-  height: 32px;
-  padding: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: ${({ theme }) => theme.colors.gray9};
   cursor: pointer;
-  opacity: 0.72;
+  opacity: ${({ $dimmed }) => ($dimmed ? 0.14 : 0.72)};
   user-select: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.18s ease, background-color 0.15s ease, color 0.15s ease;
   ${focusVisibleRing}
   &:hover, &:focus-visible {
     opacity: 1;
@@ -164,7 +170,7 @@ const GutterHandleButtonBase = styled.button<{ $top: number; $left: number }>`
     color: ${({ theme }) => theme.colors.gray12};
   }
   @media (pointer: coarse) { display: none; }
-  @media (max-width: 720px) { display: none; }
+  @media (max-width: 820px) { display: none; }
 `
 
 const GutterPlusButton = styled(GutterHandleButtonBase)`
@@ -176,94 +182,18 @@ const GutterDragMenuButton = styled(GutterHandleButtonBase)`
   letter-spacing: -1px;
 `
 
-const BlockActionMenuPopover = styled.div<{ $top: number; $left: number }>`
-  position: fixed;
-  z-index: ${zIndexes.dropdownMenu + 8};
-  top: ${({ $top }) => $top}px;
-  left: ${({ $left }) => $left}px;
-  width: 220px;
-  max-height: 480px;
-  overflow-y: auto;
-  padding: 5px;
-  border-radius: 9px;
-  border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 2px 6px ${boxShadowColor.cardHover}, 0 10px 28px ${boxShadowColor.popover};
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  user-select: none;
-`
-
-const BlockMenuSectionHeader = styled.div`
-  padding: 4px 8px 2px; font: 650 11px/1.2 var(--aq-font-sans); color: ${({ theme }) => theme.colors.gray9};
-`
-const BlockMenuSectionDivider = styled.div`
-  height: 1px; margin: 3px 2px; background: ${({ theme }) => theme.publicDesign.border};
-`
-const BlockMenuItemButton = styled.button`
-  width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-  border: 0; border-radius: 6px; background: transparent;
-  color: ${({ theme }) => theme.colors.gray12}; font: 550 12.5px/1.2 var(--aq-font-sans);
-  text-align: left; cursor: pointer; transition: background-color 0.1s ease;
-  ${focusVisibleRing}
-  @media (pointer: coarse), (max-width: 768px) { min-height: 44px; }
-  &:hover, &:focus {
-    background: ${({ theme }) => theme.colors.gray3};
-  }
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.gray12};
-    outline-offset: -2px;
-    background: ${({ theme }) => theme.colors.gray3};
-  }
-  &[data-active="true"] { font-weight: 650; }
-  .glyph {
-    display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-    border-radius: 5px; border: 0;
-    background: ${({ theme }) => theme.colors.gray3};
-    font: 700 10.5px/1 ui-monospace, SFMono-Regular, monospace; color: ${({ theme }) => theme.colors.gray12}; flex-shrink: 0;
-  }
-  .check {
-    display: inline-flex;
-    align-items: center;
-    margin-left: auto;
-    color: ${({ theme }) => theme.colors.gray11};
-  }
-`
-const ColorSwatchRow = styled.div`
-  display: flex; align-items: center; gap: 5px; padding: 2px 8px 3px;
-`
-const ColorSwatchMenuButton = styled.button<{ $color: string }>`
-  flex: 1 1 0; height: 24px; border-radius: 6px; border: 1px solid ${({ theme }) => theme.publicDesign.border};
-  background: ${({ theme }) => theme.publicDesign.surfaceElevated}; color: ${({ $color }) => $color};
-  font: 750 11.5px/1 var(--aq-font-sans); display: inline-flex; align-items: center; justify-content: center;
-  gap: 4px; cursor: pointer;
-  ${focusVisibleRing}
-  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; }
-  &:hover, &:focus {
-    border-color: ${({ $color }) => $color};
-    background: ${({ theme }) => theme.publicDesign.readableSurface};
-  }
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.gray12};
-    outline-offset: -2px;
-    border-color: ${({ $color }) => $color};
-    background: ${({ theme }) => theme.publicDesign.readableSurface};
-  }
-`
-const ColorSwatchDot = styled.span<{ $color: string }>`
-  display: inline-block; width: 12px; height: 12px; border-radius: 999px;
-  background: ${({ $color }) => $color}; border: 1px solid ${boxShadowColor.swatchBorder}; flex-shrink: 0;
-`
-
 export const MarkdownEditorBlockChrome = ({
   containerRef, mode, disabled, value, selection, isSlashMenuOpen, isFindReplaceOpen,
-  resolveCoords, requestMeasure, onApplySnippet, onApplyFormatShortcut, onApplyListCommand,
+  resolveCoords, resolvePosAtCoords, requestMeasure, linkPopoverTriggerNonce = 0, onSelectGutterLine,
+  onApplySnippet, onApplyFormatShortcut, onApplyListCommand,
   onStripBlockPrefix, onApplyLineCommand, onTriggerSlashCommand,
 }: MarkdownEditorBlockChromeProps) => {
   const [isDismissed, setIsDismissed] = useState(false)
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false)
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false)
+  const [isColorPopoverOpen, setIsColorPopoverOpen] = useState(false)
+  const [hoveredLineStart, setHoveredLineStart] = useState<number | null>(null)
+  const [isTypingDimmed, setIsTypingDimmed] = useState(false)
   const [layoutTick, setLayoutTick] = useState(0)
   const [bubblePosition, setBubblePosition] = useState<{ top: number; left: number } | null>(null)
   const [gutterTop, setGutterTop] = useState<number | null>(null)
@@ -271,13 +201,37 @@ export const MarkdownEditorBlockChrome = ({
   const [blockMenuPosition, setBlockMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const bubbleRef = useRef<HTMLDivElement | null>(null)
   const blockMenuRef = useRef<HTMLDivElement | null>(null)
+  const colorPopoverRef = useRef<HTMLDivElement | null>(null)
   const gutterHandleRef = useRef<HTMLButtonElement | null>(null)
+  const prevValueRef = useRef(value)
+  const lastLinkNonceRef = useRef(linkPopoverTriggerNonce)
 
   useEffect(() => {
     setIsDismissed(false)
     setIsBlockMenuOpen(false)
     setIsLinkPopoverOpen(false)
+    setIsColorPopoverOpen(false)
   }, [selection.from, selection.to, mode, disabled, isSlashMenuOpen])
+
+  useEffect(() => {
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value
+      if (mode === "live" && !disabled && !isBlockMenuOpen) {
+        setIsTypingDimmed(true)
+        setHoveredLineStart(null)
+      }
+    }
+  }, [disabled, isBlockMenuOpen, mode, value])
+
+  useEffect(() => {
+    if (linkPopoverTriggerNonce === lastLinkNonceRef.current) return
+    lastLinkNonceRef.current = linkPopoverTriggerNonce
+    if (mode === "live" && !disabled && !isSlashMenuOpen && !isFindReplaceOpen && selection.from < selection.to) {
+      setIsDismissed(false)
+      setIsColorPopoverOpen(false)
+      setIsLinkPopoverOpen(true)
+    }
+  }, [disabled, isFindReplaceOpen, isSlashMenuOpen, linkPopoverTriggerNonce, mode, selection.from, selection.to])
 
   useEffect(() => {
     if (mode !== "live" || disabled) return
@@ -294,7 +248,20 @@ export const MarkdownEditorBlockChrome = ({
         setLayoutTick((prev) => prev + 1)
       }
     }
+    const handleMouseMove = (event: MouseEvent) => {
+      setIsTypingDimmed(false)
+      if (!resolvePosAtCoords || isBlockMenuOpen || selection.from !== selection.to) return
+      const pos = resolvePosAtCoords({ x: event.clientX, y: event.clientY })
+      if (pos === null) return
+      const lineStart = pos > 0 ? value.lastIndexOf("\n", pos - 1) + 1 : 0
+      setHoveredLineStart((prev) => (prev === lineStart ? prev : lineStart))
+    }
+    const handleMouseLeave = () => {
+      setHoveredLineStart(null)
+    }
     container?.addEventListener("scroll", bumpLayout, true)
+    container?.addEventListener("mousemove", handleMouseMove)
+    container?.addEventListener("mouseleave", handleMouseLeave)
     window.addEventListener("resize", bumpLayout)
     window.addEventListener("scroll", bumpLayout, true)
     return () => {
@@ -302,15 +269,27 @@ export const MarkdownEditorBlockChrome = ({
         window.cancelAnimationFrame(rafId)
       }
       container?.removeEventListener("scroll", bumpLayout, true)
+      container?.removeEventListener("mousemove", handleMouseMove)
+      container?.removeEventListener("mouseleave", handleMouseLeave)
       window.removeEventListener("resize", bumpLayout)
       window.removeEventListener("scroll", bumpLayout, true)
     }
-  }, [containerRef, disabled, mode])
+  }, [containerRef, disabled, isBlockMenuOpen, mode, resolvePosAtCoords, selection.from, selection.to, value])
 
   const { activeLineStart, activeLineEnd, activeLineText, currentBlockKind, insideFence } = useMemo(
     () => computeActiveLineState(value, selection.from),
     [value, selection.from]
   )
+  const targetGutterPos = hoveredLineStart !== null ? hoveredLineStart : selection.from
+  const targetLineState = useMemo(
+    () =>
+      hoveredLineStart !== null && hoveredLineStart !== activeLineStart
+        ? computeActiveLineState(value, hoveredLineStart)
+        : { activeLineStart, activeLineEnd, activeLineText, currentBlockKind, insideFence },
+    [activeLineEnd, activeLineStart, activeLineText, currentBlockKind, hoveredLineStart, insideFence, value]
+  )
+  const effectiveGutterLineStart = targetLineState.activeLineStart
+  const effectiveBlockKind = targetLineState.currentBlockKind
 
   const selectedText = useMemo(
     () => (selection.from < selection.to && selection.to - selection.from <= 600 ? value.slice(selection.from, selection.to) : ""),
@@ -329,16 +308,21 @@ export const MarkdownEditorBlockChrome = ({
       if (isBlockMenuOpen && !blockMenuRef.current?.contains(target) && !gutterHandleRef.current?.contains(target)) {
         setIsBlockMenuOpen(false)
       }
-      if (canShowBubble && !bubbleRef.current?.contains(target)) {
+      if (canShowBubble && !bubbleRef.current?.contains(target) && !colorPopoverRef.current?.contains(target)) {
         const element = target instanceof Element ? target : target.parentElement
         if (!element?.closest('[data-testid="markdown-editor-content"], [data-testid="markdown-bubble-link-popover"]')) {
           setIsDismissed(true)
           setIsLinkPopoverOpen(false)
+          setIsColorPopoverOpen(false)
         }
       }
     }
     const handleKeyDownCapture = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isColorPopoverOpen) {
+          setIsColorPopoverOpen(false)
+          return
+        }
         if (isLinkPopoverOpen) {
           setIsLinkPopoverOpen(false)
           return
@@ -353,10 +337,10 @@ export const MarkdownEditorBlockChrome = ({
       document.removeEventListener("mousedown", handleMouseDownCapture, true)
       window.removeEventListener("keydown", handleKeyDownCapture, true)
     }
-  }, [canShowBubble, isBlockMenuOpen, isLinkPopoverOpen])
+  }, [canShowBubble, isBlockMenuOpen, isColorPopoverOpen, isLinkPopoverOpen])
 
   const canShowGutterPlus =
-    mode === "live" && !disabled && !isSlashMenuOpen && selection.from === selection.to && !insideFence
+    mode === "live" && !disabled && !isSlashMenuOpen && selection.from === selection.to && !targetLineState.insideFence && targetGutterPos >= 0
 
   useIsomorphicLayoutEffect(() => {
     let cancelled = false
@@ -366,9 +350,10 @@ export const MarkdownEditorBlockChrome = ({
         canShowGutterPlus,
         isBlockMenuOpen,
         selection,
-        activeLineStart,
+        activeLineStart: effectiveGutterLineStart,
         resolveCoords,
         container: containerRef.current,
+        measuredBubbleWidth: bubbleRef.current?.offsetWidth,
       })
     const writeLayout = (measured: ReturnType<typeof readLayout>) => {
       if (cancelled) return
@@ -397,10 +382,10 @@ export const MarkdownEditorBlockChrome = ({
       cancelled = true
     }
   }, [
-    activeLineStart,
     canShowBubble,
     canShowGutterPlus,
     containerRef,
+    effectiveGutterLineStart,
     isBlockMenuOpen,
     layoutTick,
     requestMeasure,
@@ -430,61 +415,32 @@ export const MarkdownEditorBlockChrome = ({
 
   const handleTriggerSlashAtCurrentLine = () => {
     setIsBlockMenuOpen(false)
+    setIsTypingDimmed(false)
+    const insertPos =
+      hoveredLineStart !== null && hoveredLineStart !== activeLineStart
+        ? effectiveGutterLineStart
+        : selection.from
+    const insertEnd =
+      hoveredLineStart !== null && hoveredLineStart !== activeLineStart
+        ? effectiveGutterLineStart
+        : selection.to
     const plan =
-      activeLineText.trim().length === 0
-        ? planReplaceSelection(selection.from, selection.to, "/")
-        : planReplaceSelection(activeLineEnd, activeLineEnd, "\n/")
+      targetLineState.activeLineText.trim().length === 0
+        ? planReplaceSelection(insertPos, insertEnd, "/")
+        : planReplaceSelection(targetLineState.activeLineEnd, targetLineState.activeLineEnd, "\n/")
     onTriggerSlashCommand(plan)
   }
 
-  const runMenuAction = (action: () => void) => {
-    setIsBlockMenuOpen(false)
-    action()
-  }
-
   const applyLineColorSwatch = (token: string) => {
-    if (selection.from < selection.to) {
-      const existingMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(selectedText)
-      if (existingMatch) {
-        const inner = existingMatch[2] ?? ""
-        const replacement = token === "default" || existingMatch[1]?.trim() === token ? inner : `{{color:${token}|${inner}}}`
-        onTriggerSlashCommand(planReplaceSelection(selection.from, selection.to, replacement))
-        return
-      }
-      if (token !== "default") onApplySnippet(`{{color:${token}|`, "}}", { toggle: true })
+    const result = computeColorSwatchMutationPlan(value, selection, selectedText, token)
+    if (result.kind === "replace") {
+      onTriggerSlashCommand(result.plan)
       return
     }
-    const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
-    const nextBreak = value.indexOf("\n", selection.from)
-    const lineEnd = nextBreak === -1 ? value.length : nextBreak
-    const lineText = value.slice(lineStart, lineEnd)
-    const prefixMatch =
-      /^(?:[ \t]*(?:#{1,6}[ \t]+|>+[ \t]*|(?:[-+*]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?))/.exec(lineText)
-    const bodyOffset = prefixMatch ? prefixMatch[0].length : 0
-    const rawBody = lineText.slice(bodyOffset)
-    const existingColorMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(rawBody)
-    const innerText = (existingColorMatch ? existingColorMatch[2] ?? "" : rawBody) || "강조 텍스트"
-    const replacement = token === "default" || existingColorMatch?.[1]?.trim() === token ? innerText : `{{color:${token}|${innerText}}}`
-    onTriggerSlashCommand(planReplaceSelection(lineStart + bodyOffset, lineEnd, replacement))
+    if (result.kind === "wrap") {
+      onApplySnippet(result.before, result.after, { toggle: true })
+    }
   }
-
-  const turnIntoItems = [
-    { kind: "paragraph", label: "일반 문단으로 전환", icon: <EditorIconParagraph size={13} />, run: () => onStripBlockPrefix() },
-    { kind: "h1", label: "제목 1로 블록 전환", icon: <EditorIconHeading1 size={13} />, run: () => onApplySnippet("# ", "") },
-    { kind: "h2", label: "제목 2로 블록 전환", icon: <EditorIconHeading2 size={13} />, run: () => onApplySnippet("## ", "") },
-    { kind: "h3", label: "제목 3으로 블록 전환", icon: <EditorIconHeading3 size={13} />, run: () => onApplySnippet("### ", "") },
-    { kind: "unordered", label: "글머리 목록으로 블록 전환", icon: <EditorIconBulletList size={13} />, run: () => onApplyListCommand("unordered") },
-    { kind: "ordered", label: "번호 목록으로 블록 전환", icon: <EditorIconOrderedList size={13} />, run: () => onApplyListCommand("ordered") },
-    { kind: "task", label: "할 일 목록으로 블록 전환", icon: <EditorIconTaskList size={13} />, run: () => onApplyListCommand("task") },
-    { kind: "quote", label: "인용구로 블록 전환", icon: <EditorIconQuote size={13} />, run: () => onApplySnippet("> ", "") },
-  ]
-
-  const lineActionItems = [
-    { label: "현재 줄 복제", icon: <EditorIconDuplicate size={13} />, run: () => onApplyLineCommand("duplicate") },
-    { label: "현재 줄 위로 이동", icon: <EditorIconArrowUp size={13} />, run: () => onApplyLineCommand("move-up") },
-    { label: "현재 줄 아래로 이동", icon: <EditorIconArrowDown size={13} />, run: () => onApplyLineCommand("move-down") },
-    { label: "현재 줄 삭제", icon: <EditorIconTrash size={13} />, run: () => onApplyLineCommand("delete") },
-  ]
 
   const bubbleButtons = [
     { label: "선택 영역 일반 문단", icon: <EditorIconParagraph size={14} />, run: () => onStripBlockPrefix() },
@@ -506,47 +462,58 @@ export const MarkdownEditorBlockChrome = ({
       icon: <EditorIconLink size={14} />,
       active: Boolean(parseMarkdownLinkSelection(selectedText)) || isLinkPopoverOpen,
       expanded: isLinkPopoverOpen,
-      run: () => setIsLinkPopoverOpen((prev) => !prev),
+      run: () => {
+        setIsColorPopoverOpen(false)
+        setIsLinkPopoverOpen((prev) => !prev)
+      },
     },
   ]
+
+  const gutterDimmed = isTypingDimmed && !isBlockMenuOpen
+  const hasInlineColorActive = /^\{\{color:([^|{}]+)\|/.test(selectedText)
 
   return (
     <>
       {canShowGutterPlus && gutterTop !== null ? (
         <>
-          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={gutterLeft} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}><EditorIconPlus size={18} /></GutterPlusButton>
-          <GutterDragMenuButton ref={gutterHandleRef} type="button" aria-label="현재 줄 블록 메뉴" aria-haspopup="menu" aria-expanded={isBlockMenuOpen} data-block-kind={currentBlockKind} data-testid="markdown-block-gutter-handle" $top={gutterTop} $left={gutterLeft + 34} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsBlockMenuOpen((prev) => !prev)}><EditorIconGripSixDots size={18} /></GutterDragMenuButton>
+          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={gutterLeft} $dimmed={gutterDimmed} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}><EditorIconPlus size={15} /></GutterPlusButton>
+          <GutterDragMenuButton
+            ref={gutterHandleRef}
+            type="button"
+            aria-label="현재 줄 블록 메뉴"
+            aria-haspopup="menu"
+            aria-expanded={isBlockMenuOpen}
+            data-block-kind={effectiveBlockKind}
+            data-testid="markdown-block-gutter-handle"
+            $top={gutterTop}
+            $left={gutterLeft + 25}
+            $dimmed={gutterDimmed}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setIsTypingDimmed(false)
+              if (!isBlockMenuOpen && hoveredLineStart !== null && hoveredLineStart !== activeLineStart) {
+                onSelectGutterLine?.(hoveredLineStart)
+              }
+              setIsBlockMenuOpen((prev) => !prev)
+            }}
+          >
+            <EditorIconGripSixDots size={15} />
+          </GutterDragMenuButton>
         </>
       ) : null}
       {isBlockMenuOpen && blockMenuPosition ? (
-        <BlockActionMenuPopover ref={blockMenuRef} role="menu" aria-label="블록 작업 메뉴" data-testid="markdown-block-action-menu" $top={blockMenuPosition.top} $left={blockMenuPosition.left} onKeyDown={handleBlockMenuKeyDown} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsBlockMenuOpen(false) }}>
-          <BlockMenuSectionHeader aria-hidden="true">블록 전환</BlockMenuSectionHeader>
-          {turnIntoItems.map((item) => (
-            <BlockMenuItemButton key={item.label} type="button" role="menuitem" data-active={currentBlockKind === item.kind ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
-              <span className="glyph" aria-hidden="true">{item.icon}</span>
-              <span>{item.label}</span>
-              {currentBlockKind === item.kind ? <span className="check" aria-hidden="true"><EditorIconCheck size={13} /></span> : null}
-            </BlockMenuItemButton>
-          ))}
-          <BlockMenuSectionDivider aria-hidden="true" />
-          <BlockMenuSectionHeader aria-hidden="true">글자 색상</BlockMenuSectionHeader>
-          <ColorSwatchRow>
-            {EDITOR_COLOR_SWATCH_SPECS.map((swatch) => (
-              <ColorSwatchMenuButton key={swatch.label} type="button" role="menuitem" aria-label={swatch.label} title={swatch.label} $color={swatch.hex} onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(() => applyLineColorSwatch(swatch.token))}>
-                <ColorSwatchDot $color={swatch.hex} />
-                <span aria-hidden="true">A</span>
-              </ColorSwatchMenuButton>
-            ))}
-          </ColorSwatchRow>
-          <BlockMenuSectionDivider aria-hidden="true" />
-          <BlockMenuSectionHeader aria-hidden="true">블록 작업</BlockMenuSectionHeader>
-          {lineActionItems.map((item) => (
-            <BlockMenuItemButton key={item.label} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => runMenuAction(item.run)}>
-              <span className="glyph" aria-hidden="true">{item.icon}</span>
-              <span>{item.label}</span>
-            </BlockMenuItemButton>
-          ))}
-        </BlockActionMenuPopover>
+        <MarkdownEditorBlockMenuPopover
+          blockMenuRef={blockMenuRef}
+          position={blockMenuPosition}
+          activeBlockKind={effectiveBlockKind}
+          onKeyDown={handleBlockMenuKeyDown}
+          onClose={() => setIsBlockMenuOpen(false)}
+          onApplySnippet={onApplySnippet}
+          onApplyListCommand={onApplyListCommand}
+          onStripBlockPrefix={onStripBlockPrefix}
+          onApplyLineCommand={onApplyLineCommand}
+          onApplyColorSwatch={applyLineColorSwatch}
+        />
       ) : null}
       {canShowBubble && bubblePosition ? (
         <SelectionBubbleToolbar ref={bubbleRef} role="toolbar" aria-label="선택 텍스트 빠른 서식" data-testid="markdown-selection-bubble" $top={bubblePosition.top} $left={bubblePosition.left}>
@@ -568,12 +535,47 @@ export const MarkdownEditorBlockChrome = ({
             </BubbleActionButton>
           ))}
           <BubbleDivider aria-hidden="true" />
+          <BubbleActionButton
+            type="button"
+            aria-label="선택 영역 글자 색상"
+            title="선택 영역 글자 색상"
+            aria-pressed={hasInlineColorActive}
+            aria-expanded={isColorPopoverOpen}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setIsLinkPopoverOpen(false)
+              setIsColorPopoverOpen((prev) => !prev)
+            }}
+          >
+            <BubbleColorTriggerGlyph>A</BubbleColorTriggerGlyph>
+          </BubbleActionButton>
+        </SelectionBubbleToolbar>
+      ) : null}
+      {canShowBubble && bubblePosition && isColorPopoverOpen ? (
+        <BubbleColorSwatchPopover
+          ref={colorPopoverRef}
+          role="menu"
+          aria-label="선택 영역 글자 색상 팔레트"
+          $top={bubblePosition.top + 36}
+          $left={bubblePosition.left}
+        >
           {EDITOR_COLOR_SWATCH_SPECS.map((swatch) => (
-            <BubbleActionButton key={swatch.label} type="button" aria-label={`선택 영역 ${swatch.label}`} title={swatch.label} onMouseDown={(event) => event.preventDefault()} onClick={() => applyLineColorSwatch(swatch.token)}>
+            <BubbleActionButton
+              key={swatch.label}
+              type="button"
+              role="menuitem"
+              aria-label={`선택 영역 ${swatch.label}`}
+              title={swatch.label}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                applyLineColorSwatch(swatch.token)
+                setIsColorPopoverOpen(false)
+              }}
+            >
               <ColorSwatchDot $color={swatch.hex} />
             </BubbleActionButton>
           ))}
-        </SelectionBubbleToolbar>
+        </BubbleColorSwatchPopover>
       ) : null}
       {canShowBubble && bubblePosition && isLinkPopoverOpen ? (
         <MarkdownEditorBubbleLinkPopover

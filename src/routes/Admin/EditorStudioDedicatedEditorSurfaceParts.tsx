@@ -30,7 +30,7 @@ import {
   adminTextSecondary,
 } from "./adminColorTokens"
 
-export const EditorStudioRoot = styled.main`
+export const EditorStudioRoot = styled.div`
   ${({ theme }) => adminSystemThemeVariables(theme)}
   box-sizing: border-box;
   width: 100%;
@@ -103,6 +103,11 @@ export const EditorStudioDedicatedTopBar = styled.header`
     gap: 4px 8px;
     padding: 6px 12px;
     border-bottom: 1px solid ${adminBorder};
+
+    > *:last-child {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
   }
 `
 
@@ -157,11 +162,6 @@ export const EditorStudioTopBarActions = styled.div`
     height: 34px;
     min-height: 34px;
     padding: 0 12px;
-
-    @media (pointer: coarse) {
-      height: auto;
-      min-height: 44px;
-    }
   }
 
   @media (max-width: 820px) {
@@ -182,6 +182,13 @@ export const EditorStudioTopBarActions = styled.div`
       font-size: 0.78rem;
       white-space: nowrap;
       flex-shrink: 0;
+    }
+  }
+
+  @media (pointer: coarse) {
+    button {
+      height: auto;
+      min-height: 44px;
     }
   }
 `
@@ -383,16 +390,27 @@ export const EditorStudioFrame = styled.div<{
     overflow-x: hidden;
     overflow-y: auto;
   }
+
+  ${({ $showOutline = false, $showInspector = false }) =>
+    $showOutline && $showInspector
+      ? `
+      @media (min-width: 1101px) and (max-width: 1440px) {
+        [data-testid="markdown-editor-toolbar"] [data-mobile-hidden="true"] {
+          display: none;
+        }
+      }
+    `
+      : ""}
 `
 
 export const EditorStudioWritingColumn = styled.section<{
   $zenMode?: boolean
 }>`
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
   max-width: 100%;
@@ -412,17 +430,22 @@ export const EditorStudioDedicatedMetaSection = styled.section`
   border: 0;
   border-radius: 0;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  padding: 28px 40px 0;
+  padding: 36px 56px 0;
 
   @media (max-width: 820px) {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    padding: 12px 16px 6px;
+    padding: 16px 16px 6px;
   }
 `
 
 export {
+  EditorMobileSheetScrim,
+  EditorSectionEyebrow,
+  EditorStudioPaperScrollSheet,
+  EditorStudioToolbarDock,
+  EditorVisibilityMonoPill,
   EditorInspectorTagInputRow,
   EditorTagRow,
   InlineMetaInput,
@@ -490,7 +513,7 @@ export const MobilePropertiesToggle = styled.button<{ $visibleOnDesktop?: boolea
   gap: 4px;
   background: transparent;
   border: 1px solid ${adminBorder};
-  border-radius: 999px;
+  border-radius: 4px;
   padding: 4px 10px;
   margin-top: 8px;
   color: ${adminTextSecondary};
@@ -515,7 +538,7 @@ export const PublishNotice = styled.div`
   position: absolute;
   left: 50%;
   right: auto;
-  top: 10px;
+  top: 54px;
   bottom: auto;
   transform: translateX(-50%);
   z-index: 18;
@@ -540,7 +563,7 @@ export const PublishNotice = styled.div`
   &[data-tone="loading"] { color: ${adminTextPrimary}; border: 1px solid ${adminBorderStrong}; background: ${adminSurfaceMuted}; }
   &[data-tone="success"] { color: ${adminStatusSuccessText}; border: 1px solid ${adminStatusSuccessBorder}; background: ${adminStatusSuccessBg}; }
   &[data-tone="error"] { color: ${adminStatusDangerText}; border: 1px solid ${adminStatusDangerBorder}; background: ${adminStatusDangerBg}; }
-  @media (max-width: 820px) { max-width: calc(100% - 24px); top: 8px; }
+  @media (max-width: 820px) { max-width: calc(100% - 24px); top: 52px; }
 `
 
 export {

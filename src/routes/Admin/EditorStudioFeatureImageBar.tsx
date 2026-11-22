@@ -10,7 +10,15 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import { boxShadowColor } from "src/design-system/tokens"
 import { useLanguage } from "src/libs/language"
 import { adminT } from "./adminI18n"
-import { adminBorder, adminSurfaceMuted, adminTextPrimary } from "./adminColorTokens"
+import {
+  adminBorder,
+  adminBorderStrong,
+  adminSurface,
+  adminSurfaceMuted,
+  adminTextMuted,
+  adminTextPrimary,
+  adminTextSecondary,
+} from "./adminColorTokens"
 import { normalizeSafePreviewThumbnailUrl } from "./editorStudioMetaModel"
 
 export type EditorStudioFeatureImageBarProps = {
@@ -23,21 +31,33 @@ export type EditorStudioFeatureImageBarProps = {
 }
 
 const FeatureImageWrap = styled.div`
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+`
+
+const FeatureEmptyRow = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`
+
+const FeatureEyebrow = styled.span`
+  font: 650 10.5px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: ${adminTextMuted};
 `
 
 const FeatureAddButton = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-block-size: 30px;
-  padding: 0 10px;
-  margin-left: -10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray10};
-  font: 600 13px/1 var(--aq-font-sans);
+  min-block-size: 28px;
+  padding: 0 9px;
+  border-radius: 4px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurface};
+  color: ${adminTextSecondary};
+  font: 600 12px/1 var(--aq-font-sans);
   cursor: pointer;
 
   ${focusVisibleRing}
@@ -51,9 +71,9 @@ const FeatureAddButton = styled.button`
 
   @media (hover: hover) {
     &:hover:not(:disabled) {
-      border-color: ${({ theme }) => theme.publicDesign.border};
-      background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-      color: ${({ theme }) => theme.colors.gray12};
+      border-color: ${adminBorderStrong};
+      background: ${adminSurfaceMuted};
+      color: ${adminTextPrimary};
     }
   }
 
@@ -63,26 +83,24 @@ const FeatureAddButton = styled.button`
   }
 
   @media (pointer: coarse), (max-width: 768px) {
-    margin-left: 0;
     min-block-size: 44px;
-    border-color: ${({ theme }) => theme.publicDesign.border};
   }
 `
 
 const FeatureCoverCard = styled.figure`
+  position: relative;
   margin: 0 0 8px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 `
 
 const FeatureCoverHeroFrame = styled.div`
   position: relative;
   width: 100%;
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid ${({ theme }) => theme.publicDesign.border};
-  background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-  box-shadow: 0 8px 24px ${boxShadowColor.cardSubtle};
+  border-radius: 8px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurfaceMuted};
 `
 
 const FeatureCoverHeroImage = styled.img`
@@ -91,64 +109,74 @@ const FeatureCoverHeroImage = styled.img`
   max-height: 292px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  background: ${({ theme }) => theme.publicDesign.surfaceElevated};
+  background: ${adminSurfaceMuted};
 `
 
 const FeatureCoverPlaceholder = styled.div`
   width: 100%;
   min-height: 132px;
-  border-radius: 12px;
-  background: ${({ theme }) => theme.publicDesign.surfaceElevated};
-  color: ${({ theme }) => theme.colors.gray10};
+  border-radius: 6px;
+  background: ${adminSurfaceMuted};
+  color: ${adminTextMuted};
   font: 650 12px/1.3 var(--aq-font-sans);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 `
 
-const FeatureCoverCaptionBar = styled.figcaption`
+const FeatureCoverOverlayBar = styled.figcaption`
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
+  gap: 8px;
+  pointer-events: none;
+
+  @media (hover: hover) {
+    opacity: 0.92;
+  }
+
+  ${FeatureCoverCard}:hover &,
+  ${FeatureCoverCard}:focus-within & {
+    opacity: 1;
+  }
 
   @media (max-width: 640px) {
+    position: static;
     flex-wrap: wrap;
-    gap: 8px;
+    pointer-events: auto;
   }
 `
 
-const FeatureCoverMeta = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-`
-
 const FeatureCoverBadge = styled.span`
+  pointer-events: auto;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   width: max-content;
   flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: 999px;
+  padding: 4px 8px;
+  border-radius: 4px;
   border: 1px solid ${adminBorder};
-  background: ${adminSurfaceMuted};
+  background: color-mix(in srgb, ${adminSurface} 92%, transparent);
+  backdrop-filter: blur(8px);
   color: ${adminTextPrimary};
-  font: 600 10.5px/1.2 var(--aq-font-sans);
+  font: 600 11px/1.2 var(--aq-font-sans);
+  box-shadow: 0 2px 8px ${boxShadowColor.subtleHover};
 `
 
-const FeatureCoverUrlCaption = styled.span`
-  font: 500 11.5px/1.25 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: ${({ theme }) => theme.colors.gray10};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 340px;
+const FeatureCoverDot = styled.span`
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.colors.green9};
 `
 
 const FeatureCoverActions = styled.div`
+  pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -156,26 +184,28 @@ const FeatureCoverActions = styled.div`
 `
 
 const FeatureCoverActionButton = styled.button<{ $tone?: "neutral" | "danger" }>`
-  min-block-size: 30px;
-  padding: 0 11px;
-  border-radius: 999px;
+  min-block-size: 28px;
+  padding: 0 10px;
+  border-radius: 4px;
   border: 1px solid
     ${({ theme, $tone }) =>
-      $tone === "danger" ? theme.colors.red6 : theme.publicDesign.borderStrong};
-  background: ${({ theme }) => theme.publicDesign.readableSurface};
+      $tone === "danger" ? theme.colors.red6 : adminBorderStrong};
+  background: color-mix(in srgb, ${adminSurface} 94%, transparent);
+  backdrop-filter: blur(8px);
   color: ${({ theme, $tone }) =>
-    $tone === "danger" ? theme.colors.red11 : theme.colors.gray11};
-  font: 650 12px/1 var(--aq-font-sans);
+    $tone === "danger" ? theme.colors.red11 : adminTextPrimary};
+  font: 650 11.5px/1 var(--aq-font-sans);
   white-space: nowrap;
   cursor: pointer;
+  box-shadow: 0 2px 8px ${boxShadowColor.subtleHover};
 
   ${focusVisibleRing}
 
   &:hover:not(:disabled) {
     background: ${({ theme, $tone }) =>
-      $tone === "danger" ? theme.colors.red2 : theme.colors.gray3};
+      $tone === "danger" ? theme.colors.red2 : adminSurfaceMuted};
     color: ${({ theme, $tone }) =>
-      $tone === "danger" ? theme.colors.red11 : theme.colors.gray12};
+      $tone === "danger" ? theme.colors.red11 : adminTextPrimary};
   }
 
   &:disabled {
@@ -214,19 +244,22 @@ export const EditorStudioFeatureImageBar = ({
   if (!manualUrl) {
     return (
       <FeatureImageWrap>
-        <FeatureAddButton
-          type="button"
-          data-testid="editor-feature-image-add"
-          disabled={isThumbnailUploading || isThumbnailUploadDisabled}
-          onClick={onOpenThumbnailFileInput}
-        >
-          <EditorIconImage size={14} />
-          <span>
-            {isThumbnailUploading
-              ? adminT("editorFeatureUploadingCover", language)
-              : adminT("editorFeatureAddCover", language)}
-          </span>
-        </FeatureAddButton>
+        <FeatureEmptyRow>
+          <FeatureEyebrow>{adminT("editorCoverEyebrow", language)}</FeatureEyebrow>
+          <FeatureAddButton
+            type="button"
+            data-testid="editor-feature-image-add"
+            disabled={isThumbnailUploading || isThumbnailUploadDisabled}
+            onClick={onOpenThumbnailFileInput}
+          >
+            <EditorIconImage size={13} />
+            <span>
+              {isThumbnailUploading
+                ? adminT("editorFeatureUploadingCover", language)
+                : adminT("editorFeatureAddCover", language)}
+            </span>
+          </FeatureAddButton>
+        </FeatureEmptyRow>
       </FeatureImageWrap>
     )
   }
@@ -248,11 +281,11 @@ export const EditorStudioFeatureImageBar = ({
             </FeatureCoverPlaceholder>
           )}
         </FeatureCoverHeroFrame>
-        <FeatureCoverCaptionBar>
-          <FeatureCoverMeta>
-            <FeatureCoverBadge>{adminT("editorFeatureBadge", language)}</FeatureCoverBadge>
-            <FeatureCoverUrlCaption title={manualUrl}>{manualUrl}</FeatureCoverUrlCaption>
-          </FeatureCoverMeta>
+        <FeatureCoverOverlayBar>
+          <FeatureCoverBadge>
+            <FeatureCoverDot aria-hidden="true" />
+            <span>{adminT("editorFeatureBadge", language)}</span>
+          </FeatureCoverBadge>
           <FeatureCoverActions>
             {onOpenThumbnailFileInput ? (
               <FeatureCoverActionButton
@@ -276,7 +309,7 @@ export const EditorStudioFeatureImageBar = ({
               </FeatureCoverActionButton>
             ) : null}
           </FeatureCoverActions>
-        </FeatureCoverCaptionBar>
+        </FeatureCoverOverlayBar>
       </FeatureCoverCard>
     </FeatureImageWrap>
   )

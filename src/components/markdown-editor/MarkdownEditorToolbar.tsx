@@ -3,7 +3,7 @@
  * - TryGhost/Koenig packages/koenig-lexical/src/components/ui/ToolbarMenu.jsx (MIT License, Copyright (c) Ghost Foundation)
  * - Milkdown/milkdown packages/crepe/src/feature/toolbar/ (MIT License, Copyright (c) 2021 Mirone)
  */
-import { memo, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react"
+import { memo, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react"
 import { useLanguage } from "../../libs/language"
 import { editorT } from "./markdownEditorI18n"
 import type { BlockSnippetSpec } from "./markdownEditorBlockSnippets"
@@ -15,49 +15,28 @@ import type { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import {
-  EditorIconArrowDown,
-  EditorIconArrowUp,
-  EditorIconBold,
-  EditorIconBookmarkCard,
   EditorIconBulletList,
-  EditorIconCalloutDanger,
-  EditorIconCalloutInfo,
-  EditorIconCalloutTip,
-  EditorIconCalloutWarning,
   EditorIconCodeBlock,
-  EditorIconDiagramNodes,
-  EditorIconDivider,
-  EditorIconDuplicate,
-  EditorIconEmbedWindow,
   EditorIconEye,
   EditorIconFileCode,
   EditorIconHeading,
-  EditorIconHeading1,
-  EditorIconHeading2,
-  EditorIconHeading3,
-  EditorIconHighlight,
-  EditorIconImage,
-  EditorIconInlineCode,
-  EditorIconItalic,
   EditorIconLink,
-  EditorIconMathSigma,
   EditorIconMoreHorizontal,
   EditorIconOrderedList,
-  EditorIconPaperclip,
   EditorIconPenLine,
   EditorIconPlus,
   EditorIconQuote,
   EditorIconSearch,
-  EditorIconStrikethrough,
-  EditorIconTaskList,
-  EditorIconToggle,
-  EditorIconTrash,
 } from "./MarkdownEditorIcons"
+import {
+  renderFormatCommandIcon,
+  renderMenuItemIcon,
+  renderPrimarySnippetIcon,
+} from "./MarkdownEditorToolbarIconsMap"
 import {
   EditorToolbar,
   ToolbarButton,
   ToolbarGroup,
-  ToolbarHiddenInput,
 } from "./MarkdownEditor.styles"
 import {
   ToolbarCluster,
@@ -104,6 +83,7 @@ type MarkdownEditorToolbarProps = {
   onApplyTableEdit: (edit: MarkdownEditorTableEdit) => void
   isTableEditDisabled: (edit: MarkdownEditorTableEdit) => boolean
   onOpenFindReplace: () => void
+  onOpenLinkPopover?: () => boolean
   onImageFileSelect: (file: File | null) => void
   onAttachmentFileSelect: (file: File | null) => void
   onViewModeChange: (mode: "live" | "source" | "reading") => void
@@ -138,51 +118,6 @@ const handleEditorToolbarArrowKeyDown = (event: ReactKeyboardEvent<HTMLDivElemen
   buttons[nextIndex]?.focus()
 }
 
-const renderFormatCommandIcon = (command: MarkdownEditorCommandDescriptor): ReactNode => {
-  if (command.id === "format.bold") return <EditorIconBold size={15} />
-  return command.toolbarLabel
-}
-
-const renderPrimarySnippetIcon = (label: string): ReactNode => {
-  if (label === "I") return <EditorIconItalic size={15} />
-  if (label === "`") return <EditorIconInlineCode size={15} />
-  return label
-}
-
-const MENU_ITEM_ICONS: Readonly<Record<string, ReactNode>> = {
-  H1: <EditorIconHeading1 size={14} />,
-  H2: <EditorIconHeading2 size={14} />,
-  H3: <EditorIconHeading3 size={14} />,
-  unordered: <EditorIconBulletList size={14} />,
-  ordered: <EditorIconOrderedList size={14} />,
-  task: <EditorIconTaskList size={14} />,
-  인용구: <EditorIconQuote size={14} />,
-  콜아웃: <EditorIconCalloutInfo size={14} />,
-  "콜아웃 (정보)": <EditorIconCalloutInfo size={14} />,
-  "콜아웃 (팁)": <EditorIconCalloutTip size={14} />,
-  "콜아웃 (주의)": <EditorIconCalloutWarning size={14} />,
-  "콜아웃 (위험)": <EditorIconCalloutDanger size={14} />,
-  토글: <EditorIconToggle size={14} />,
-  북마크: <EditorIconBookmarkCard size={14} />,
-  "수식 블록": <EditorIconMathSigma size={14} />,
-  Mermaid: <EditorIconDiagramNodes size={14} />,
-  다이어그램: <EditorIconDiagramNodes size={14} />,
-  임베드: <EditorIconEmbedWindow size={14} />,
-  구분선: <EditorIconDivider size={14} />,
-  "block.divider": <EditorIconDivider size={14} />,
-  S: <EditorIconStrikethrough size={14} />,
-  "format.highlight": <EditorIconHighlight size={14} />,
-  "line.move-up": <EditorIconArrowUp size={14} />,
-  "line.move-down": <EditorIconArrowDown size={14} />,
-  "line.duplicate": <EditorIconDuplicate size={14} />,
-  "line.delete": <EditorIconTrash size={14} />,
-  "media.image": <EditorIconImage size={14} />,
-  "media.file": <EditorIconPaperclip size={14} />,
-  "tool.find-replace": <EditorIconSearch size={14} />,
-}
-
-const renderMenuItemIcon = (key: string): ReactNode => MENU_ITEM_ICONS[key] ?? null
-
 const MarkdownEditorToolbarView = ({
   disabled,
   disableMermaid,
@@ -208,8 +143,7 @@ const MarkdownEditorToolbarView = ({
   onApplyTableEdit,
   isTableEditDisabled,
   onOpenFindReplace,
-  onImageFileSelect,
-  onAttachmentFileSelect,
+  onOpenLinkPopover,
   onViewModeChange,
 }: MarkdownEditorToolbarProps) => {
   const { language } = useLanguage()
@@ -276,7 +210,10 @@ const MarkdownEditorToolbarView = ({
               aria-label={editorT("toolbarLinkTitle", language)}
               disabled={isAuthoringDisabled}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onApplyFormatShortcut("link")}
+              onClick={() => {
+                if (onOpenLinkPopover?.()) return
+                onApplyFormatShortcut("link")
+              }}
             >
               <EditorIconLink size={15} />
             </ToolbarButton>
@@ -502,33 +439,19 @@ const MarkdownEditorToolbarView = ({
               ]}
             />
           </ToolbarCluster>
-          <ToolbarHiddenInput
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={isAuthoringDisabled || !hasUploadImage}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0] ?? null
-              onImageFileSelect(file)
-              event.currentTarget.value = ""
-            }}
-          />
-          <ToolbarHiddenInput
-            ref={fileInputRef}
-            type="file"
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={isAuthoringDisabled || !hasUploadFile}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0] ?? null
-              onAttachmentFileSelect(file)
-              event.currentTarget.value = ""
-            }}
-          />
         </ToolbarGroup>
         <ToolbarGroup data-align="end">
+          <ToolbarButton
+            type="button"
+            data-mobile-hidden="true"
+            title={editorT("toolbarQuickFindTitle", language)}
+            aria-label={editorT("toolbarQuickFindTitle", language)}
+            disabled={isAuthoringDisabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onOpenFindReplace}
+          >
+            <EditorIconSearch size={14} />
+          </ToolbarButton>
           <ToolbarModeSegmentGroup role="group" aria-label={editorT("toolbarGroupMode", language)}>
             <ToolbarModeSegmentButton
               type="button"

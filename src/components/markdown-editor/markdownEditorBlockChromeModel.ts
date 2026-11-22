@@ -1,4 +1,5 @@
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
+import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export const EDITOR_COLOR_SWATCH_SPECS = [
   { label: "글자 기본색", token: "default", hex: "#787774" },
@@ -48,12 +49,14 @@ const computeBubbleFromRects = (
   canShowBubble: boolean,
   startCoords: CoordsRect | null,
   endCoords: CoordsRect | null,
-  containerRect: DOMRect | null
+  containerRect: DOMRect | null,
+  measuredBubbleWidth?: number
 ): { top: number; left: number } | null => {
   if (!canShowBubble) return null
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
   const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-  const estimatedWidth = Math.min(410, viewportWidth - 24)
+  const targetWidth = measuredBubbleWidth && measuredBubbleWidth > 0 ? measuredBubbleWidth : 348
+  const estimatedWidth = Math.min(targetWidth, viewportWidth - 24)
 
   if (startCoords && endCoords && startCoords.bottom > 0 && endCoords.bottom > 0) {
     if (
@@ -146,6 +149,7 @@ export const measureBlockChromeLayout = ({
   activeLineStart,
   resolveCoords,
   container,
+  measuredBubbleWidth,
 }: {
   canShowBubble: boolean
   canShowGutterPlus: boolean
@@ -154,6 +158,7 @@ export const measureBlockChromeLayout = ({
   activeLineStart: number
   resolveCoords: (pos: number) => CoordsRect | null
   container: HTMLElement | null
+  measuredBubbleWidth?: number
 }): BlockChromeMeasuredLayout => {
   if (!canShowBubble && !canShowGutterPlus) {
     return { bubble: null, gutterTop: null, gutterLeft: 10, blockMenu: null }
@@ -166,7 +171,13 @@ export const measureBlockChromeLayout = ({
   const startCoords = canShowBubble ? resolveCoords(selection.from) : null
   const endCoords = canShowBubble ? resolveCoords(selection.to) : null
   const lineCoords = canShowGutterPlus ? resolveCoords(activeLineStart) : null
-  const bubble = computeBubbleFromRects(canShowBubble, startCoords, endCoords, containerRect)
+  const bubble = computeBubbleFromRects(
+    canShowBubble,
+    startCoords,
+    endCoords,
+    containerRect,
+    measuredBubbleWidth
+  )
   const gutterTop = computeGutterTopFromRects(
     canShowGutterPlus,
     activeLineStart,
@@ -256,4 +267,54 @@ export const moveBlockMenuFocus = (
     return true
   }
   return false
+}
+
+export type ColorSwatchMutationResult =
+  | { kind: "replace"; plan: PlannedTextMutation }
+  | { kind: "wrap"; before: string; after: string }
+  | { kind: "noop" }
+
+export const computeColorSwatchMutationPlan = (
+  value: string,
+  selection: { from: number; to: number },
+  selectedText: string,
+  token: string
+): ColorSwatchMutationResult => {
+  if (selection.from < selection.to) {
+    const existingMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(selectedText)
+    if (existingMatch) {
+      const inner = existingMatch[2] ?? ""
+      const replacement =
+        token === "default" || existingMatch[1]?.trim() === token
+          ? inner
+          : `{{color:${token}|${inner}}}`
+      return {
+        kind: "replace",
+        plan: planReplaceSelection(selection.from, selection.to, replacement),
+      }
+    }
+    if (token !== "default") {
+      return { kind: "wrap", before: `{{color:${token}|`, after: "}}" }
+    }
+    return { kind: "noop" }
+  }
+
+  const lineStart = selection.from > 0 ? value.lastIndexOf("\n", selection.from - 1) + 1 : 0
+  const nextBreak = value.indexOf("\n", selection.from)
+  const lineEnd = nextBreak === -1 ? value.length : nextBreak
+  const lineText = value.slice(lineStart, lineEnd)
+  const prefixMatch =
+    /^(?:[ \t]*(?:#{1,6}[ \t]+|>+[ \t]*|(?:[-+*]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?))/.exec(lineText)
+  const bodyOffset = prefixMatch ? prefixMatch[0].length : 0
+  const rawBody = lineText.slice(bodyOffset)
+  const existingColorMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(rawBody)
+  const innerText = (existingColorMatch ? existingColorMatch[2] ?? "" : rawBody) || "강조 텍스트"
+  const replacement =
+    token === "default" || existingColorMatch?.[1]?.trim() === token
+      ? innerText
+      : `{{color:${token}|${innerText}}}`
+  return {
+    kind: "replace",
+    plan: planReplaceSelection(lineStart + bodyOffset, lineEnd, replacement),
+  }
 }

@@ -1,9 +1,7 @@
 /**
- * 참조 구현: TryGhost/Ghost (MIT License, Copyright (c) Ghost Foundation)
- * 원본 경로:
- * - apps/admin/src/editor/writing-focus.ts (lines 1-79: POINTER_TRAVEL_TO_REVEAL, nextWritingFocus, isWritingInput)
- * - apps/admin/src/editor/settings-open.ts (lines 1-54: settingsOpenAtStart, readSettingsOpen, writeSettingsOpen)
- * - apps/admin/src/editor/post-editor.tsx (lines 93-132: useAutosize with ResizeObserver & document.fonts)
+ * 참조 구현:
+ * - TryGhost/Ghost apps/admin/src/editor/{writing-focus.ts,settings-open.ts,post-editor.tsx} (MIT License, Copyright (c) Ghost Foundation)
+ * - marktext/marktext src/muya/lib/contentState/focus.ts (MIT License, Copyright (c) 2018-present Jocs / MarkText)
  */
 import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from "react"
 import { EDITOR_SURFACE_ZEN_BITS } from "./editorStudioDedicatedSurfaceModel"
@@ -134,12 +132,10 @@ export const useEditorWritingFocus = ({
 
     area.addEventListener("beforeinput", onBeforeInput)
     window.addEventListener("pointermove", onPointerMove, { passive: true })
-    window.addEventListener("wheel", onReveal, { passive: true })
     window.addEventListener("keydown", onKeyDown)
     return () => {
       area.removeEventListener("beforeinput", onBeforeInput)
       window.removeEventListener("pointermove", onPointerMove)
-      window.removeEventListener("wheel", onReveal)
       window.removeEventListener("keydown", onKeyDown)
     }
   }, [blocked, writingAreaRef])

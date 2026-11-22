@@ -13,7 +13,6 @@ import {
   adminFocusRing,
   adminSurface,
   adminSurfaceMuted,
-  adminTagChipPalettes,
   adminTeal,
   adminTextMuted,
   adminTextPrimary,
@@ -27,6 +26,97 @@ export const EditorialMetaInner = styled.div`
   display: grid;
   gap: 0;
   min-width: 0;
+`
+
+export const EditorStudioToolbarDock = styled.div`
+  position: relative;
+  z-index: 12;
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: 92px;
+  overflow: visible;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+  border-bottom: 1px solid ${adminBorderSubtle};
+  transition: max-height 0.18s ease, opacity 0.16s ease, border-color 0.16s ease;
+
+  &:empty {
+    display: none;
+  }
+
+  [data-focus-mode="true"] & {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-bottom-color: transparent;
+  }
+
+  [data-focus-mode="true"] &:hover,
+  [data-focus-mode="true"] &:focus-within {
+    max-height: 92px;
+    opacity: 1;
+    overflow: visible;
+    border-bottom-color: ${adminBorderSubtle};
+  }
+`
+
+export const EditorStudioPaperScrollSheet = styled.div`
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 34vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: ${({ theme }) => theme.publicDesign.readableSurface};
+
+  @media (max-width: 820px) {
+    padding-bottom: 18vh;
+  }
+`
+
+export const EditorVisibilityMonoPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurfaceMuted};
+  color: ${adminTextSecondary};
+  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  @media (max-width: 820px) {
+    display: none;
+  }
+`
+
+export const EditorSectionEyebrow = styled.span`
+  display: block;
+  margin: 0 0 2px;
+  color: ${adminTextMuted};
+  font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+`
+
+export const EditorMobileSheetScrim = styled.button`
+  display: none;
+
+  @media (max-width: 820px) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 155;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: color-mix(in srgb, ${adminTextPrimary} 36%, transparent);
+    cursor: pointer;
+  }
 `
 
 export const InlineExcerptInput = styled.textarea`
@@ -74,9 +164,9 @@ export const InlineExcerptInput = styled.textarea`
 
 export const EditorEditorialDivider = styled.hr`
   width: 100%;
-  margin: 18px 0 8px;
+  margin: 20px 0 6px;
   border: 0;
-  border-top: 1px solid ${({ theme }) => theme.publicDesign.border};
+  border-top: 1px solid ${adminBorderSubtle};
 
   @media (max-width: 820px) {
     margin: 12px 0 6px;
@@ -319,23 +409,11 @@ export const SelectedTagChip = styled.span`
   min-width: 0;
   max-width: 100%;
   min-height: 24px;
-  border-radius: 999px;
-  border: 1px solid ${adminTagChipPalettes[0].border};
-  background: ${adminTagChipPalettes[0].bg};
-  color: ${adminTagChipPalettes[0].color};
+  border-radius: 4px;
+  border: 1px solid ${adminBorder};
+  background: ${adminSurfaceMuted};
+  color: ${adminTextPrimary};
   overflow: hidden;
-
-  ${adminTagChipPalettes
-    .slice(1)
-    .map(
-      (palette, offset) => `
-  &:nth-of-type(6n + ${offset + 2}) {
-    border-color: ${palette.border};
-    background: ${palette.bg};
-    color: ${palette.color};
-  }`
-    )
-    .join("")}
 
   .label {
     display: inline-flex;
@@ -344,7 +422,7 @@ export const SelectedTagChip = styled.span`
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 8px;
+    padding: 0 7px;
     color: inherit;
     font: 650 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   }
@@ -357,22 +435,21 @@ export const SelectedTagChip = styled.span`
     min-width: 22px;
     padding: 0 5px;
     border: 0;
-    border-left: 1px solid currentColor;
+    border-left: 1px solid ${adminBorder};
     background: transparent;
-    color: inherit;
-    opacity: 0.72;
+    color: ${adminTextMuted};
     cursor: pointer;
     flex: 0 0 auto;
     font-size: 0.94rem;
     line-height: 1;
 
     &:hover {
-      opacity: 1;
-      background: ${boxShadowColor.subtleHover};
+      color: ${adminTextPrimary};
+      background: ${adminSurface};
     }
 
     &:focus-visible {
-      opacity: 1;
+      color: ${adminTextPrimary};
       outline: 2px solid currentColor;
       outline-offset: -2px;
     }

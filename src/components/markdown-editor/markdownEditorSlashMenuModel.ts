@@ -1,0 +1,88 @@
+export type SlashCommandGroup = "기본 블록" | "콜아웃 · 확장" | "미디어 · 수식 · 표"
+
+export type SlashGroupFilter = "all" | SlashCommandGroup
+
+export const SLASH_GROUP_FILTERS: ReadonlyArray<{ id: SlashGroupFilter; label: string; labelEn: string }> = [
+  { id: "all", label: "전체", labelEn: "All" },
+  { id: "기본 블록", label: "기본", labelEn: "Basic" },
+  { id: "콜아웃 · 확장", label: "확장", labelEn: "Blocks" },
+  { id: "미디어 · 수식 · 표", label: "미디어", labelEn: "Media" },
+]
+
+export const SLASH_GROUP_EN: Readonly<Record<SlashCommandGroup, string>> = {
+  "기본 블록": "Basic Blocks",
+  "콜아웃 · 확장": "Callouts & Toggles",
+  "미디어 · 수식 · 표": "Media, Math & Tables",
+}
+
+export const SLASH_ITEM_EN_LABELS: Readonly<Record<string, string>> = {
+  "heading-1": "Heading 1 (H1)",
+  "heading-2": "Heading 2 (H2)",
+  "heading-3": "Heading 3 (H3)",
+  "bullet-list": "Bullet List",
+  "ordered-list": "Numbered List",
+  "task-list": "Task List (Todo)",
+  quote: "Quote",
+  divider: "Divider",
+  "callout-info": "Callout Info",
+  "callout-tip": "Callout Tip",
+  "callout-warning": "Callout Warning",
+  "callout-danger": "Callout Danger",
+  toggle: "Toggle",
+  "code-block": "Code Block",
+  table: "Table",
+  math: "Math Block",
+  mermaid: "Diagram (Mermaid)",
+  image: "Upload Image",
+  attachment: "Attach File",
+  embed: "Embed Block",
+  bookmark: "Bookmark Card",
+}
+
+export const SLASH_ITEM_EN_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  "heading-1": "Large top-level section title",
+  "heading-2": "Section subheading",
+  "heading-3": "Compact inner subheading",
+  "bullet-list": "Unordered bulleted items",
+  "ordered-list": "Sequential numbered items",
+  "task-list": "Interactive checkbox list",
+  quote: "Quoted passage or reference",
+  divider: "Horizontal section rule",
+  "callout-info": "Neutral background context callout",
+  "callout-tip": "Practical tip or shortcut note",
+  "callout-warning": "Caution or caveat callout",
+  "callout-danger": "Critical warning block",
+  toggle: "Collapsible details container",
+  "code-block": "Syntax-highlighted code block",
+  table: "Structured multi-column table",
+  math: "Block LaTeX formula ($$)",
+  mermaid: "Flowchart or sequence diagram",
+  image: "Upload and insert image",
+  attachment: "Upload and link attachment",
+  embed: "External media or iframe embed",
+  bookmark: "Rich external link card",
+}
+
+export const SLASH_ITEM_SYNTAX_HINTS: Readonly<Record<string, string>> = {
+  "heading-1": "#",
+  "heading-2": "##",
+  "heading-3": "###",
+  "bullet-list": "-",
+  "ordered-list": "1.",
+  "task-list": "[ ]",
+  quote: ">",
+  divider: "---",
+  "callout-info": "[!INFO]",
+  "callout-tip": "[!TIP]",
+  "callout-warning": "[!WARN]",
+  "callout-danger": "[!DANGER]",
+  toggle: ":::",
+  "code-block": "```",
+  table: "| |",
+  math: "$$",
+  mermaid: "mermaid",
+  image: "IMG",
+  attachment: "FILE",
+  embed: "embed",
+  bookmark: "card",
+}

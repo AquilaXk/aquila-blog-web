@@ -12,6 +12,7 @@ import {
   DEFAULT_THUMBNAIL_ZOOM,
 } from "src/libs/thumbnailFocus"
 import { POST_IMAGE_UPLOAD_RULE_LABEL } from "src/libs/profileImageUpload"
+import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { WriterEditorHost } from "./WriterEditorHost"
 import {
   handleMarkdownEditorFocusRequestReady,
@@ -21,6 +22,10 @@ import {
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
+import {
+  countMarkdownLinkWarnings,
+  countMarkdownTotalLinks,
+} from "./editorStudioDedicatedSurfaceModel"
 import { deriveEditorPersistenceState, derivePublishActionViewModel } from "./editorStudioState"
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
@@ -132,6 +137,19 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     () => (hasEditorMinimumFields ? detectPublishPlaceholderIssue(postContent) : null),
     [hasEditorMinimumFields, postContent]
   )
+  const publishReadinessSummary = useMemo(() => {
+    if (!isPublishModalOpen) return undefined
+    const insights = createMarkdownDocumentInsights(postContent)
+    return {
+      hasTitle: postTitle.trim().length > 0,
+      wordCount: insights.wordCount,
+      hasBody: postContent.trim().length > 0,
+      hasManualSummary: postSummarySource === "MANUAL" && postSummary.trim().length > 0,
+      tagCount: postTags.length,
+      linkWarningCount: countMarkdownLinkWarnings(postContent),
+      totalLinkCount: countMarkdownTotalLinks(postContent),
+    }
+  }, [isPublishModalOpen, postContent, postSummary, postSummarySource, postTags.length, postTitle])
   const editorPersistenceState = deriveEditorPersistenceState({
     editorMode,
     hasSelectedManagedPost,
@@ -459,6 +477,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
               postSummary={postSummary}
               thumbnailUrl={safePreviewThumbnail}
               postId={postId}
+              readinessSummary={publishReadinessSummary}
               previewMetaEditorPanel={previewMetaEditorPanel}
               publishActionButtonDisabled={publishActionButtonDisabled}
               publishActionButtonText={publishActionButtonText}
