@@ -1,3 +1,10 @@
+/**
+ * 참조 구현:
+ * - launch-ui/launch-ui (components/sections/{items,footer}/default.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/layout/{site-header,site-footer}.tsx, MIT License)
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/{tabs,card,badge}.tsx, MIT License)
+ * - fuma-nama/fumadocs (packages/base-ui/src/components/codeblock.tsx, MIT License)
+ */
 import { useEffect, useState } from "react"
 import { CONFIG } from "site.config"
 import BrandMark, { ArrowRightGlyph } from "src/components/branding/BrandMark"
@@ -354,20 +361,7 @@ const CompanyDownloadPageView: React.FC<Props> = ({
           ))}
         </S.FooterInner>
         <Sec.FooterWordmarkBanner aria-hidden="true">
-          <svg viewBox="0 0 1120 154" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <text
-              x="560"
-              y="126"
-              textAnchor="middle"
-              fill="currentColor"
-              fontFamily="Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
-              fontSize="148"
-              fontWeight="700"
-              letterSpacing="-5.5"
-            >
-              Aquila Software
-            </text>
-          </svg>
+          <p className="footerWordmarkText">{COMPANY_SURFACE.name}</p>
         </Sec.FooterWordmarkBanner>
         <S.FooterBottomBar>
           <span>© {CONFIG.since} {COMPANY_SURFACE.name}</span>

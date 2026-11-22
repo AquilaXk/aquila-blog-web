@@ -1,3 +1,7 @@
+/**
+ * 참조 구현:
+ * - magicuidesign/magicui (apps/www/registry/magicui/particles.tsx, MIT License)
+ */
 import { useEffect, useRef } from "react"
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"

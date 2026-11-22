@@ -1,3 +1,8 @@
+/**
+ * 참조 구현:
+ * - magicuidesign/magicui (apps/www/registry/magicui/bento-grid.tsx, MIT License)
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/card.tsx, MIT License)
+ */
 import { COMPANY_FEATURE_CARDS } from "src/routes/Company/CompanyPageModel"
 import { renderCapabilityVisual } from "src/routes/Company/CompanyCapabilityVisuals"
 import { CompanyVectorIcon, type CompanyIconName } from "src/routes/Company/CompanyIcons"

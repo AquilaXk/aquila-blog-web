@@ -1,25 +1,25 @@
-// 참조 구현: Mermaid Live Editor (`mermaid-js/mermaid-live-editor`, `src/lib/components/PanZoomToolbar.svelte`, MIT License, Copyright (c) 2021 Knut Sveidqvist), Quartz v4 (`jackyzha0/quartz`, `quartz/components/scripts/mermaid.inline.ts` `DiagramPanZoom` & `quartz/plugins/transformers/ofm.ts` `.expand-button`, MIT License, Copyright (c) 2021 Jacky Zhao), PhotoSwipe (`dimsemenov/PhotoSwipe`, 2-pointer pinch-to-zoom, MIT License, Copyright (c) 2014-2024 Dmitry Semenov)
+// 참조 구현: Mermaid Live Editor (`mermaid-js/mermaid-live-editor`, `src/lib/components/PanZoomToolbar.svelte`, MIT License, Copyright (c) 2021 Knut Sveidqvist), Quartz v4 (`jackyzha0/quartz`, `quartz/components/scripts/mermaid.inline.ts` `DiagramPanZoom` & `quartz/plugins/transformers/ofm.ts` `.expand-button`, MIT License, Copyright (c) 2021 Jacky Zhao), PhotoSwipe (`dimsemenov/PhotoSwipe`, 2-pointer pinch-to-zoom, MIT License, Copyright (c) 2014-2024 Dmitry Semenov), Lucide Icons (`lucide-icons/lucide`, `icons/{maximize-2,copy,check,minus,plus,x}.svg`, ISC License)
 
 export const MIN_MERMAID_ZOOM = 0.4
 export const MAX_MERMAID_ZOOM = 4
 
 export const MERMAID_ICON_EXPAND =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>'
 
 export const MERMAID_ICON_COPY =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>'
 
 export const MERMAID_ICON_CHECK =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
 
 export const MERMAID_ICON_ZOOM_OUT =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>'
 
 export const MERMAID_ICON_ZOOM_IN =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>'
 
 export const MERMAID_ICON_CLOSE =
-  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
 
 export type MermaidPanZoomState = {
   scale: number

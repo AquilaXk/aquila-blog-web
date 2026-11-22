@@ -245,14 +245,25 @@ export const EmptyState = ({ label, title, description, actions }: EmptyStatePro
 )
 
 const EmptyStateShell = styled.section`
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 0.75rem;
-  padding: 1.5rem 0;
-  border-top: 1px solid ${({ theme }) => semanticColors(theme).hairline};
-  border-bottom: 1px solid ${({ theme }) => semanticColors(theme).hairline};
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed ${({ theme }) => semanticColors(theme).border};
+  border-radius: 12px;
+  background: ${({ theme }) => semanticColors(theme).surface};
   color: ${({ theme }) => semanticColors(theme).textPrimary};
 
   .status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: ${({ theme }) => semanticColors(theme).surfaceMuted};
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};
     font-weight: ${editorialLabel.fontWeight};
@@ -263,23 +274,25 @@ const EmptyStateShell = styled.section`
 
   h2 {
     margin: 0;
-    font-size: 1.15rem;
+    font-size: 1.125rem;
     line-height: 1.35;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.015em;
   }
 
   p {
     margin: 0;
-    max-width: 36rem;
+    max-width: 32rem;
+    font-size: 0.875rem;
     color: ${({ theme }) => semanticColors(theme).textSecondary};
-    line-height: 1.65;
+    line-height: 1.6;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 0.55rem;
-    margin-top: 0.2rem;
+    margin-top: 0.25rem;
   }
 `

@@ -1,3 +1,7 @@
+/**
+ * 참조 구현:
+ * - magicuidesign/magicui (apps/www/registry/magicui/{dock.tsx,bento-grid.tsx}, MIT License)
+ */
 import { useEffect, useRef } from "react"
 
 const STAGGER_MS = 65

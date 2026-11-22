@@ -232,13 +232,20 @@ export const PostDetailNavigationChrome = ({
         tabIndex={showBackToTop ? 0 : -1}
         onClick={onBackToTop}
       >
-        <svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
-          <path
-            fillRule="evenodd"
-            d="M3.293 9.707a1 1 0 011.414 0L9 13.414V3a1 1 0 112 0v10.414l4.293-4.707a1 1 0 011.414 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414z"
-            clipRule="evenodd"
-            transform="rotate(180 10 10)"
-          />
+        <svg
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="m5 12 7-7 7 7" />
+          <path d="M12 19V5" />
         </svg>
       </BackToTopButton>
     </>

@@ -1,3 +1,8 @@
+/**
+ * 참조 구현:
+ * - launch-ui/launch-ui (components/sections/{items,cta,footer}/default.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/sections/{modules-showcase,closing-cta}.tsx, MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingDark as dark, marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint, control } from "src/design-system/tokens"
@@ -350,12 +355,20 @@ export const FooterWordmarkBanner = styled.div`
   margin: 0 auto;
   padding: 0 2.5rem 2rem;
   user-select: none;
+  overflow: hidden;
 
-  svg {
-    display: block;
+  .footerWordmarkText {
+    margin: 0;
     width: 100%;
-    height: auto;
-    color: ${light.surfaceSubtle};
+    text-align: center;
+    font-size: clamp(2.5rem, 9.6vw, 7.75rem);
+    font-weight: 800;
+    line-height: 0.94;
+    letter-spacing: -0.045em;
+    white-space: nowrap;
+    color: ${light.border};
+    -webkit-mask-image: linear-gradient(to bottom, black 22%, transparent 96%);
+    mask-image: linear-gradient(to bottom, black 22%, transparent 96%);
   }
 
   @media (max-width: ${breakpoint.md - 1}px) {

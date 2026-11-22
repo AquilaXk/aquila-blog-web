@@ -1,6 +1,7 @@
 /**
  * 참조 구현:
  * - mickasmt/next-saas-stripe-starter (components/sections/modules-showcase.tsx, MIT License)
+ * - lucide-icons/lucide (icons/{globe,shield-check,lock,smartphone}.svg, ISC License, Copyright (c) Lucide Contributors)
  */
 import React from "react"
 import {

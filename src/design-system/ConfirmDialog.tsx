@@ -1,3 +1,7 @@
+/**
+ * 참조 구현:
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/alert-dialog.tsx, MIT License, Copyright (c) 2023 shadcn)
+ */
 import type { Theme } from "@emotion/react"
 import styled from "@emotion/styled"
 import { useRef, type ReactNode } from "react"
@@ -5,6 +9,7 @@ import { useLanguage } from "src/libs/language"
 import { zIndexes } from "src/styles/zIndexes"
 import { focusVisibleRing } from "./focusRing"
 import { modalSafeAreaPadding } from "./safeArea"
+import { boxShadowColor } from "./tokens"
 import { useModalFocusTrap } from "./useModalFocusTrap"
 
 export type ConfirmDialogTone = "default" | "danger"
@@ -90,62 +95,63 @@ const ConfirmBackdrop = styled.div`
 const ConfirmPanel = styled.div`
   width: min(28rem, 100%);
   display: grid;
-  gap: 0.95rem;
-  padding: 1.1rem;
+  gap: 1rem;
+  padding: 1.5rem;
   border-radius: 12px;
   border: 1px solid ${({ theme }) => theme.colors.gray6};
   background: ${({ theme }) => theme.colors.gray1};
-  box-shadow: none;
+  box-shadow: 0 10px 28px ${boxShadowColor.modalElevated};
 
   > strong {
-    font-size: 1.02rem;
+    font-size: 1.125rem;
+    line-height: 1.35;
+    font-weight: 600;
     letter-spacing: -0.02em;
+    color: ${({ theme }) => theme.colors.gray12};
   }
 `
 
 const Description = styled.p`
   margin: 0;
   display: grid;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  font-size: 0.875rem;
   color: ${({ theme }) => theme.colors.gray10};
   line-height: 1.55;
 
   .rowTitle {
     color: ${({ theme }) => theme.colors.gray12};
-    font-weight: 800;
+    font-weight: 700;
   }
 `
 
 const ActionRow = styled.div<{ $actionRowBackground?: (theme: Theme) => string }>`
   display: flex;
-  gap: 0.55rem;
+  gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
-  width: fit-content;
-  max-width: 100%;
-  border-top: 1px solid ${({ theme }) => theme.colors.gray5};
-  padding-top: 12px;
+  width: 100%;
+  padding-top: 0.25rem;
   background: ${({ theme, $actionRowBackground }) =>
     $actionRowBackground ? $actionRowBackground(theme) : "transparent"};
-  border-radius: 0;
 `
 
 const GhostButton = styled.button`
-  border: 0;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray11};
+  border: 1px solid ${({ theme }) => theme.colors.gray6};
+  background: ${({ theme }) => theme.colors.gray1};
+  color: ${({ theme }) => theme.colors.gray12};
   min-height: 40px;
-  padding: 0 0.85rem;
-  border-radius: 6px;
-  font-size: 0.88rem;
-  font-weight: 700;
+  padding: 0 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
   ${focusVisibleRing}
 
   &:hover {
     background: ${({ theme }) => theme.colors.gray3};
-    color: ${({ theme }) => theme.colors.gray12};
   }
 
   @media (max-width: 768px), (pointer: coarse) {
@@ -155,27 +161,28 @@ const GhostButton = styled.button`
 
 const ConfirmButton = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.gray12};
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray12};
+  background: ${({ theme }) => theme.colors.gray12};
+  color: ${({ theme }) => theme.colors.gray1};
   min-height: 40px;
-  padding: 0 0.85rem;
-  border-radius: 6px;
-  font-size: 0.92rem;
-  font-weight: 800;
+  padding: 0 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
   ${focusVisibleRing}
 
   &:hover {
-    background: ${({ theme }) => theme.colors.gray3};
+    opacity: 0.9;
   }
 
   &[data-tone="danger"] {
     border-color: ${({ theme }) => theme.colors.statusDangerBorder};
-    color: ${({ theme }) => theme.colors.statusDangerText};
+    background: ${({ theme }) => theme.colors.statusDangerText};
+    color: ${({ theme }) => theme.colors.gray1};
 
     &:hover {
-      background: color-mix(in srgb, ${({ theme }) => theme.colors.statusDangerBorder} 12%, transparent);
+      opacity: 0.92;
     }
   }
 

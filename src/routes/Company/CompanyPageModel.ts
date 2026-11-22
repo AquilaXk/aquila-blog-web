@@ -1,3 +1,7 @@
+/**
+ * 참조 구현:
+ * - mickasmt/next-saas-stripe-starter & launch-ui/launch-ui 랜딩 데이터 모델 (MIT License)
+ */
 import { CONFIG } from "site.config"
 
 export const COMPANY_SURFACE = CONFIG.surfaces.company

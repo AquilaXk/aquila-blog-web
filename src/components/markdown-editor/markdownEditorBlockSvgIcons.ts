@@ -131,11 +131,11 @@ export const LIVE_TABLE_TOOLBAR_SVGS = {
   gripHorizontal: svgWrap(
     14,
     2,
-    '<circle cx="12" cy="9" r="1"/><circle cx="19" cy="9" r="1"/><circle cx="5" cy="9" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="19" cy="15" r="1"/><circle cx="5" cy="15" r="1"/>'
+    '<circle cx="12" cy="9" r="1" fill="currentColor"/><circle cx="19" cy="9" r="1" fill="currentColor"/><circle cx="5" cy="9" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="19" cy="15" r="1" fill="currentColor"/><circle cx="5" cy="15" r="1" fill="currentColor"/>'
   ),
   gripVertical: svgWrap(
     14,
     2,
-    '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>'
+    '<circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="5" r="1" fill="currentColor"/><circle cx="9" cy="19" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="5" r="1" fill="currentColor"/><circle cx="15" cy="19" r="1" fill="currentColor"/>'
   ),
 } as const

@@ -1,6 +1,8 @@
 /**
  * 참조 구현:
- * - timlrx/tailwind-nextjs-starter-blog (components/Footer.tsx, components/social-icons/icons.tsx, MIT License)
+ * - timlrx/tailwind-nextjs-starter-blog (components/Footer.tsx, MIT License)
+ * - lucide-icons/lucide (icons/{mail,rss}.svg, ISC License, Copyright (c) Lucide Contributors)
+ * - simple-icons/simple-icons (icons/github.svg, CC0 1.0 Universal)
  */
 import { CONFIG } from "site.config"
 import React from "react"
@@ -26,9 +28,9 @@ const Footer: React.FC<Props> = ({ className }) => {
               aria-label="Email"
               className="socialLink"
             >
-              <svg viewBox="0 0 20 20" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
               </svg>
             </a>
           ) : null}

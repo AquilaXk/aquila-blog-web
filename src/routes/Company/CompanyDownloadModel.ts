@@ -1,3 +1,7 @@
+/**
+ * 참조 구현:
+ * - launch-ui/launch-ui (components/sections/items/default.tsx 데이터 모델, MIT License)
+ */
 import type { CompanyIconName } from "src/routes/Company/CompanyIcons"
 
 export const EASYOFFICE_REPO_URL = "https://github.com/AquilaXk/easyoffice"

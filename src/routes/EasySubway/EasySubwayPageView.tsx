@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { CONFIG } from "site.config"
 import { ArrowRightGlyph } from "src/components/branding/BrandMark"
-import { marketingLight as light } from "src/design-system/marketingPalette"
+import { MagicAndroidHardwareChrome } from "src/components/branding/MagicAndroidChrome"
 import EasySubwayRouteSpecTable from "src/routes/EasySubway/EasySubwayRouteSpecTable"
 import EasySubwayTechSpecGrid from "src/routes/EasySubway/EasySubwayTechSpecGrid"
 import useScrollReveal from "src/routes/EasySubway/useScrollReveal"
@@ -41,25 +41,7 @@ const AndroidDeviceFrame: React.FC<{
   priority?: boolean
 }> = ({ src, alt, compact = false, priority = false }) => (
   <S.AndroidPhoneFigure $compact={compact}>
-    <svg
-      className="androidHardwareChrome"
-      viewBox="0 0 380 830"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M376 153C376.5 153 378 154 378 156V250C378 252 376.5 253 376 253V153Z"
-        fill={light.deviceOuterFill}
-      />
-      <path
-        d="M376 301C376.5 301 378 302 378 304V349C378 351 376.5 352 376 352V301Z"
-        fill={light.deviceOuterFill}
-      />
-      <circle cx="189" cy="24" r="7" fill={light.deviceCameraOuter} fillOpacity="0.22" />
-      <circle cx="189" cy="24" r="3.5" fill={light.deviceCameraInner} fillOpacity="0.55" />
-    </svg>
+    <MagicAndroidHardwareChrome />
     <picture>
       <source srcSet={src.replace(/\.png$/, ".webp")} type="image/webp" />
       <img

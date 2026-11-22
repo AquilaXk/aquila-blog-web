@@ -1,3 +1,10 @@
+/**
+ * 참조 구현:
+ * - launch-ui/launch-ui (components/sections/items/default.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/layout/site-header.tsx, MIT License)
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/{tabs,card,badge,button}.tsx, MIT License)
+ * - fuma-nama/fumadocs (packages/base-ui/src/components/codeblock.tsx, MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint, control } from "src/design-system/tokens"
@@ -300,16 +307,21 @@ export const SnippetList = styled.div`
 `
 
 export const SnippetGroup = styled.div`
-  display: grid;
-  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid ${light.gridBorder};
+  background: ${light.surfaceScaffold};
+  overflow: hidden;
 `
 
 export const SnippetHeader = styled.div`
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
+  padding: 0.5625rem 0.875rem;
+  border-bottom: 1px solid ${light.gridBorder};
+  background: ${light.surface};
   color: ${light.inkPrimary};
-  font-size: 0.90625rem;
+  font-size: 0.84375rem;
   font-weight: 600;
 `
 
@@ -318,10 +330,7 @@ export const SnippetBox = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid ${light.gridBorder};
-  background: ${light.surfaceScaffold};
+  padding: 0.5625rem 0.5625rem 0.5625rem 0.875rem;
 
   code {
     min-width: 0;
@@ -363,24 +372,32 @@ export const StudioModulesGrid = styled.div`
   margin-top: 2.5rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2.75rem 3.5rem;
+  gap: 1.25rem;
 
   @media (max-width: ${breakpoint.md - 1}px) {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2rem;
+    gap: 1rem;
   }
 `
 
 export const StudioModuleCardWrap = styled.article`
   position: relative;
   overflow: hidden;
-  padding: 1.25rem;
-  margin: -1.25rem;
+  padding: 1.375rem;
   border-radius: 1rem;
+  border: 1px solid ${light.border};
+  background: ${light.surface};
+  box-shadow: ${light.cardShadowSm};
+  transition: border-color 180ms ease, box-shadow 180ms ease;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.75rem;
+
+  &:hover {
+    border-color: ${light.borderBrand};
+    box-shadow: ${light.cardShadowXl};
+  }
 
   &::before {
     content: "";

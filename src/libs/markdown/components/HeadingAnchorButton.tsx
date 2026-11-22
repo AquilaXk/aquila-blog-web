@@ -1,4 +1,4 @@
-// 참조 구현: Fumadocs (`fuma-nama/fumadocs`, `packages/base-ui/src/components/heading.tsx`, MIT License, Copyright (c) 2024 Fuma Nama)
+// 참조 구현: Fumadocs (`fuma-nama/fumadocs`, `packages/base-ui/src/components/heading.tsx`, MIT License, Copyright (c) 2024 Fuma Nama) & Lucide Icons (`lucide-icons/lucide`, `icons/{check,link}.svg`, ISC License)
 import { FC, useEffect, useRef, useState } from "react"
 import { copyTextToClipboard } from "./PrettyCodeBlock"
 
@@ -60,11 +60,11 @@ export const HeadingAnchorButton: FC<HeadingAnchorButtonProps> = ({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2.2"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <polyline points="20 6 9 17 4 12" />
+          <path d="M20 6 9 17l-5-5" />
         </svg>
       ) : (
         <svg

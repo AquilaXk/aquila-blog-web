@@ -1,7 +1,12 @@
+/**
+ * 참조 구현:
+ * - magicuidesign/magicui (apps/www/registry/magicui/dock.tsx, bento-grid.tsx — MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint } from "src/design-system/tokens"
-import { CheckGlyph, CompanyVectorIcon, type CompanyIconName } from "src/routes/Company/CompanyIcons"
+import { renderMagicBentoStage } from "src/routes/Company/CompanyBentoVisuals"
+import { CompanyVectorIcon, type CompanyIconName } from "src/routes/Company/CompanyIcons"
 
 const WAVE_ORBS: readonly { icon: CompanyIconName; offsetPx: number }[] = [
   { icon: "train-front", offsetPx: 18 },
@@ -78,124 +83,4 @@ export const CompanyCapabilityOrbWave: React.FC = () => (
   </OrbWaveStrip>
 )
 
-const VisualWell = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.875rem 1rem;
-  margin-bottom: 1.25rem;
-  border-radius: 0.75rem;
-  border: 1px solid ${light.border};
-  background: ${light.surfaceScaffold};
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 0.75rem;
-  color: ${light.inkSecondary};
-`
-
-const VisualChip = styled.span<{ $tone?: "brand" | "emerald" | "neutral" }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  border: 1px solid
-    ${({ $tone }) =>
-      $tone === "brand" ? light.borderBrand : $tone === "emerald" ? light.border : light.gridBorder};
-  background: ${({ $tone }) => ($tone === "brand" ? light.surfaceBrand : light.surface)};
-  color: ${({ $tone }) =>
-    $tone === "brand"
-      ? light.onSignature
-      : $tone === "emerald"
-        ? light.emerald
-        : light.inkPrimary};
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-`
-
-const VisualConnector = styled.span`
-  color: ${light.inkMuted};
-  font-weight: 600;
-`
-
-export const renderCapabilityVisual = (id: string) => {
-  switch (id) {
-    case "accessibility":
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip>강남역 2호선</VisualChip>
-          <VisualConnector>→</VisualConnector>
-          <VisualChip $tone="brand">단차 0cm 직결</VisualChip>
-          <VisualConnector>→</VisualConnector>
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>9-2 승차</span>
-          </VisualChip>
-        </VisualWell>
-      )
-    case "local-engine":
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip $tone="brand">HWP · HWPX</VisualChip>
-          <VisualChip>DOCX</VisualChip>
-          <VisualChip>XLSX</VisualChip>
-          <VisualChip>PPTX</VisualChip>
-          <VisualChip>PDF</VisualChip>
-        </VisualWell>
-      )
-    case "sandbox-convert":
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip>308 Formats</VisualChip>
-          <VisualConnector>→</VisualConnector>
-          <VisualChip $tone="brand">Sandbox</VisualChip>
-          <VisualConnector>→</VisualConnector>
-          <VisualChip $tone="emerald">Auto-Delete</VisualChip>
-        </VisualWell>
-      )
-    case "resilience":
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>Magic Bytes</span>
-          </VisualChip>
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>&lt;= 100 MP</span>
-          </VisualChip>
-          <VisualChip $tone="brand">Fail-Closed</VisualChip>
-        </VisualWell>
-      )
-    case "operations":
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>BLUE · 200 OK</span>
-          </VisualChip>
-          <VisualConnector>⇄</VisualConnector>
-          <VisualChip>GREEN · Standby</VisualChip>
-        </VisualWell>
-      )
-    default:
-      return (
-        <VisualWell aria-hidden="true">
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>axe A11y</span>
-          </VisualChip>
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>Bundle</span>
-          </VisualChip>
-          <VisualChip $tone="emerald">
-            <CheckGlyph size={12} />
-            <span>OpenAPI 3.1</span>
-          </VisualChip>
-          <VisualChip $tone="brand">SSRF Guard</VisualChip>
-        </VisualWell>
-      )
-  }
-}
+export const renderCapabilityVisual = (id: string) => renderMagicBentoStage(id)

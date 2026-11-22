@@ -62,19 +62,6 @@ const resolveSiteDomainLabel = (): string => {
   }
 }
 
-const buildGridPatternMarkup = (): string => {
-  const lines: string[] = []
-  for (let x = 60; x < OG_IMAGE_WIDTH; x += 60) {
-    lines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${OG_IMAGE_HEIGHT}"/>`)
-  }
-  for (let y = 60; y < OG_IMAGE_HEIGHT; y += 60) {
-    lines.push(`<line x1="0" y1="${y}" x2="${OG_IMAGE_WIDTH}" y2="${y}"/>`)
-  }
-  return lines.join("")
-}
-
-const STATIC_GRID_LINES = buildGridPatternMarkup()
-
 export const buildOgCardSvg = (
   params: OgCardQueryParams,
   options: { hasMascotBadge?: boolean; font?: TrueTypeOutlineFont } = {}
@@ -86,12 +73,14 @@ export const buildOgCardSvg = (
   const siteTitle = (CONFIG.blog.title || "AquilaLog").trim()
   const siteDomain = resolveSiteDomainLabel()
 
-  const cardLeft = 56
-  const cardTop = 48
-  const cardWidth = 1088
-  const cardHeight = 534
-  const contentLeft = 108
-  const contentRight = 1092
+  const cardLeft = 52
+  const cardTop = 44
+  const cardWidth = 1084
+  const cardHeight = 532
+  const shadowOffsetX = 16
+  const shadowOffsetY = 16
+  const contentLeft = 104
+  const contentRight = 1084
   const maxTextWidth = contentRight - contentLeft
 
   const kickerLabel = params.category || "TECH POST"
@@ -102,7 +91,7 @@ export const buildOgCardSvg = (
   const kickerPath = font.renderTextToSvgPathD(
     kickerLabel,
     contentLeft + kickerPadX,
-    130,
+    126,
     kickerFontSize,
     0.2
   )
@@ -111,7 +100,7 @@ export const buildOgCardSvg = (
   const titleFontSize = singlePassWidth <= maxTextWidth * 1.85 ? 54 : 46
   const titleLineHeight = titleFontSize === 54 ? 72 : 62
   const titleLines = font.wrapTextLines(params.title, titleFontSize, maxTextWidth, 3, -0.6)
-  const firstTitleBaselineY = titleLines.length === 1 ? 256 : titleLines.length === 2 ? 236 : 218
+  const firstTitleBaselineY = titleLines.length === 1 ? 252 : titleLines.length === 2 ? 232 : 214
 
   const titlePaths: string[] = []
   for (let i = 0; i < titleLines.length; i += 1) {
@@ -131,40 +120,35 @@ export const buildOgCardSvg = (
   if (params.tags.length > 0) {
     const tagText = params.tags.map((tag) => `#${tag}`).join("   ")
     const clippedTagLine = font.wrapTextLines(tagText, 23, maxTextWidth, 1, 0)[0] ?? ""
-    const tagPathD = font.renderTextToSvgPathD(clippedTagLine, contentLeft, 444, 23, 0)
+    const tagPathD = font.renderTextToSvgPathD(clippedTagLine, contentLeft, 440, 23, 0)
     if (tagPathD) {
       tagsMarkup = `<path d="${tagPathD}" fill="${palette.gray10}"/>`
     }
   }
 
   const brandNameX = hasMascot ? contentLeft + MASCOT_SIZE + 14 : contentLeft
-  const brandNamePath = font.renderTextToSvgPathD(siteTitle, brandNameX, 536, 26, -0.2)
+  const brandNamePath = font.renderTextToSvgPathD(siteTitle, brandNameX, 532, 26, -0.2)
   const domainWidth = font.measureTextWidth(siteDomain, 21, 0)
   const domainPath = font.renderTextToSvgPathD(
     siteDomain,
     Math.max(brandNameX + 220, contentRight - domainWidth),
-    535,
+    531,
     21,
     0
   )
 
   return [
     `<svg width="${OG_IMAGE_WIDTH}" height="${OG_IMAGE_HEIGHT}" viewBox="0 0 ${OG_IMAGE_WIDTH} ${OG_IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">`,
-    `<defs><clipPath id="ogCardClip"><rect x="${cardLeft}" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" rx="20" ry="20"/></clipPath></defs>`,
-    `<rect width="${OG_IMAGE_WIDTH}" height="${OG_IMAGE_HEIGHT}" fill="${palette.gray3}"/>`,
-    `<g stroke="${palette.gray4}" stroke-width="1">${STATIC_GRID_LINES}</g>`,
-    `<g clip-path="url(#ogCardClip)">`,
-    `<rect x="${cardLeft}" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" fill="${palette.gray1}"/>`,
-    `<rect x="${cardLeft}" y="${cardTop}" width="${cardWidth}" height="8" fill="${palette.accentControl}"/>`,
-    `</g>`,
-    `<rect x="${cardLeft}" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" rx="20" ry="20" fill="none" stroke="${palette.gray5}" stroke-width="1.5"/>`,
-    `<rect x="${contentLeft}" y="102" width="${kickerWidth}" height="40" rx="20" ry="20" fill="${palette.accentSurfaceSubtle}" stroke="${palette.accentBorder}" stroke-width="1"/>`,
+    `<rect width="${OG_IMAGE_WIDTH}" height="${OG_IMAGE_HEIGHT}" fill="${palette.gray2}"/>`,
+    `<rect x="${cardLeft + shadowOffsetX}" y="${cardTop + shadowOffsetY}" width="${cardWidth}" height="${cardHeight}" rx="12" ry="12" fill="${palette.gray4}" stroke="${palette.gray12}" stroke-width="3"/>`,
+    `<rect x="${cardLeft}" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" rx="12" ry="12" fill="${palette.gray1}" stroke="${palette.gray12}" stroke-width="3"/>`,
+    `<rect x="${contentLeft}" y="98" width="${kickerWidth}" height="40" rx="8" ry="8" fill="${palette.accentSurfaceSubtle}" stroke="${palette.accentBorder}" stroke-width="1.5"/>`,
     kickerPath ? `<path d="${kickerPath}" fill="${palette.accentControl}"/>` : "",
     titlePaths.join(""),
     tagsMarkup,
-    `<line x1="${contentLeft}" y1="482" x2="${contentRight}" y2="482" stroke="${palette.gray4}" stroke-width="1.5"/>`,
+    `<line x1="${contentLeft}" y1="478" x2="${contentRight}" y2="478" stroke="${palette.gray5}" stroke-width="1.5"/>`,
     brandNamePath ? `<path d="${brandNamePath}" fill="${palette.gray12}"/>` : "",
-    domainPath ? `<path d="${domainPath}" fill="${palette.gray9}"/>` : "",
+    domainPath ? `<path d="${domainPath}" fill="${palette.gray10}"/>` : "",
     `</svg>`,
   ].join("")
 }

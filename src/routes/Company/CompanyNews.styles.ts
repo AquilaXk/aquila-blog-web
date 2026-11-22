@@ -1,3 +1,8 @@
+/**
+ * 참조 구현:
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/card.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/sections/modules-showcase.tsx, MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint } from "src/design-system/tokens"

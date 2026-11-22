@@ -7,7 +7,17 @@ import {
   CompanyFeatureExplorerView,
   formatCapabilityIndex,
 } from "../../src/routes/Company/CompanyFeatureCarousel"
-import { CompanyCapabilityOrbWave } from "../../src/routes/Company/CompanyCapabilityVisuals"
+import {
+  CompanyCapabilityOrbWave,
+  renderCapabilityVisual,
+} from "../../src/routes/Company/CompanyCapabilityVisuals"
+import { CompanySafariFrame } from "../../src/routes/Company/CompanyDeviceFrames"
+import { MagicAndroidHardwareChrome } from "../../src/components/branding/MagicAndroidChrome"
+import AppIcon from "../../src/components/icons/AppIcon"
+import {
+  CODE_COPY_STACK_ICONS_HTML,
+  CODE_WORD_WRAP_ICON_SVG,
+} from "../../src/libs/markdown/components/PrettyCodeBlock"
 import {
   computeCenterClearance,
   computeFrameTrigRates,
@@ -607,6 +617,55 @@ test("CompanyCapabilityOrbWave와 CompanyFeatureExplorerView 및 페이지 뷰�
   )
   expect(downloadViewSource).toContain("useCompanySurfaceMotion")
   expect(downloadViewSource).toContain('data-spotlight="true"')
+})
+
+test("업스트림 UI·SVG 개편 후 Bento 프리뷰 6종·Safari/Android 목업·Lucide 원본 벡터가 수제 도형 없이 렌더된다", () => {
+  for (const card of COMPANY_FEATURE_CARDS) {
+    const html = renderToStaticMarkup(unwrapPw(renderCapabilityVisual(card.id)))
+    expect(html, card.id).toContain('aria-hidden="true"')
+  }
+
+  const safariHtml = renderToStaticMarkup(
+    unwrapPw(
+      (CompanySafariFrame as unknown as (props: Record<string, unknown>) => unknown)({
+        chromeLabel: "convert.aquilaxk.site",
+        src: "/company/easyconvert-home.webp",
+        alt: "EasyConvert",
+        width: 1200,
+        height: 800,
+      })
+    )
+  )
+  expect(safariHtml).toContain("convert.aquilaxk.site")
+  expect(safariHtml).toContain('viewBox="0 0 24 24"')
+
+  const androidChromeHtml = renderToStaticMarkup(
+    unwrapPw((MagicAndroidHardwareChrome as unknown as () => unknown)())
+  )
+  expect(androidChromeHtml).toContain('viewBox="0 0 433 882"')
+
+  const questionIconHtml = renderToStaticMarkup(
+    unwrapPw((AppIcon as unknown as (props: { name: "question" }) => unknown)({ name: "question" }))
+  )
+  expect(questionIconHtml).toContain("M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3")
+
+  expect(CODE_WORD_WRAP_ICON_SVG).toContain('stroke="currentColor"')
+  expect(CODE_WORD_WRAP_ICON_SVG).not.toContain('fill="currentColor"')
+  expect(CODE_COPY_STACK_ICONS_HTML).toContain('stroke="currentColor"')
+  expect(CODE_COPY_STACK_ICONS_HTML).not.toContain('fill="currentColor"')
+
+  const navChromeSource = fs.readFileSync(
+    path.resolve(__dirname, "../../src/routes/Detail/PostDetail/PostDetailNavigationChrome.tsx"),
+    "utf8"
+  )
+  expect(navChromeSource).not.toContain("rotate(180")
+
+  const defaultProfileSvg = fs.readFileSync(
+    path.resolve(__dirname, "../../public/images/default-profile.svg"),
+    "utf8"
+  )
+  expect(defaultProfileSvg).toContain("lucide-icons/lucide")
+  expect(defaultProfileSvg).not.toContain("<linearGradient")
 })
 
 

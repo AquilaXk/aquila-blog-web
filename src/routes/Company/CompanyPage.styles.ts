@@ -1,3 +1,8 @@
+/**
+ * 참조 구현:
+ * - mickasmt/next-saas-stripe-starter (components/layout/site-header.tsx, grid-section.tsx, MIT License)
+ * - launch-ui/launch-ui (components/sections/hero/default.tsx, MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint, control } from "src/design-system/tokens"

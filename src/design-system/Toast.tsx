@@ -1,9 +1,14 @@
+/**
+ * 참조 구현:
+ * - emilkowalski/sonner & shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/sonner.tsx, MIT License)
+ * - lucide-icons/lucide (icons/{circle-check,circle-alert,info}.svg, ISC License, Copyright (c) Lucide Contributors)
+ */
 import styled from "@emotion/styled"
 import { type ReactNode } from "react"
 import { useLanguage } from "src/libs/language"
 import { focusVisibleRing } from "./focusRing"
 import { fixedBottomSafeArea, fixedHorizontalSafeArea } from "./safeArea"
-import { editorialLabel, layoutBreakpoint, radius, semanticColors, space } from "./tokens"
+import { boxShadowColor, layoutBreakpoint, radius, semanticColors, space } from "./tokens"
 
 export type ToastTone = "neutral" | "success" | "danger"
 
@@ -16,6 +21,41 @@ export type ToastProps = {
   actions?: ReactNode
   zIndex?: number
 }
+
+const ToneIcon: React.FC<{ tone: ToastTone }> = ({ tone }) => (
+  <svg
+    className="toastIcon"
+    viewBox="0 0 24 24"
+    width={18}
+    height={18}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {tone === "success" ? (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ) : tone === "danger" ? (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" x2="12" y1="8" y2="12" />
+        <line x1="12" x2="12.01" y1="16" y2="16" />
+      </>
+    ) : (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4" />
+        <path d="M12 8h.01" />
+      </>
+    )}
+  </svg>
+)
 
 export const Toast = ({
   message,
@@ -30,7 +70,6 @@ export const Toast = ({
   if (!open) return null
 
   const showActions = Boolean(actions) || Boolean(onOpenChange)
-
   const isDanger = tone === "danger"
 
   return (
@@ -41,7 +80,7 @@ export const Toast = ({
       $zIndex={zIndex}
     >
       <div className="copy">
-        <span className="dot" aria-hidden="true" />
+        <ToneIcon tone={tone} />
         <div className="text">
           {title ? <strong>{title}</strong> : null}
           <span>{message}</span>
@@ -70,19 +109,19 @@ const toneColor = (tone: ToastTone, theme: Parameters<typeof semanticColors>[0])
 
 const ToastViewport = styled.div<{ "data-tone": ToastTone; $zIndex: number }>`
   position: fixed;
-  right: 1.2rem;
-  ${fixedBottomSafeArea("1.2rem")}
+  right: 1.25rem;
+  ${fixedBottomSafeArea("1.25rem")}
   z-index: ${({ $zIndex }) => $zIndex};
   display: grid;
   gap: ${space[3]}px;
-  min-width: min(24rem, calc(100vw - 2rem));
-  max-width: min(28rem, calc(100vw - 2rem));
-  padding: ${space[4]}px ${space[4]}px;
-  border-radius: ${radius.md}px;
+  min-width: min(22rem, calc(100vw - 2rem));
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: ${space[4]}px;
+  border-radius: ${radius.lg}px;
   border: 1px solid ${({ theme }) => semanticColors(theme).border};
   background: ${({ theme }) => semanticColors(theme).surface};
   color: ${({ theme }) => semanticColors(theme).textPrimary};
-  box-shadow: none;
+  box-shadow: 0 4px 12px ${boxShadowColor.cardFloating};
 
   .copy {
     display: flex;
@@ -91,13 +130,10 @@ const ToastViewport = styled.div<{ "data-tone": ToastTone; $zIndex: number }>`
     min-width: 0;
   }
 
-  .dot {
-    width: 8px;
-    height: 8px;
-    margin-top: 0.45em;
-    border-radius: 50%;
+  .toastIcon {
+    margin-top: 0.1rem;
     flex: 0 0 auto;
-    background: ${({ theme, "data-tone": tone }) => toneColor(tone, theme)};
+    color: ${({ theme, "data-tone": tone }) => toneColor(tone, theme)};
   }
 
   .text {
@@ -107,18 +143,16 @@ const ToastViewport = styled.div<{ "data-tone": ToastTone; $zIndex: number }>`
   }
 
   .text strong {
-    font-family: ${editorialLabel.fontFamily};
-    font-size: ${editorialLabel.fontSize};
-    font-weight: ${editorialLabel.fontWeight};
-    letter-spacing: ${editorialLabel.letterSpacing};
-    text-transform: ${editorialLabel.textTransform};
-    color: ${({ theme, "data-tone": tone }) => toneColor(tone, theme)};
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: ${({ theme }) => semanticColors(theme).textPrimary};
   }
 
   .text span {
     color: ${({ theme }) => semanticColors(theme).textSecondary};
     font-size: 0.84rem;
-    line-height: 1.55;
+    line-height: 1.5;
   }
 
   .actions {

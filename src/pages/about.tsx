@@ -1,7 +1,8 @@
 /**
  * 참조 구현:
  * - timlrx/tailwind-nextjs-starter-blog (components/social-icons/icons.tsx, MIT License, Copyright (c) 2023 Timothy Lin)
- * - lucide-icons/lucide (icons/code.svg, icons/globe.svg, ISC License, Copyright (c) Lucide Contributors)
+ * - lucide-icons/lucide (icons/{code,globe,mail}.svg, ISC License, Copyright (c) Lucide Contributors)
+ * - simple-icons/simple-icons (icons/github.svg, CC0 1.0 Universal)
  */
 import { GetServerSideProps } from "next"
 import { CONFIG } from "site.config"
@@ -167,9 +168,9 @@ const AboutPage: NextPageWithLayout<AboutPageProps> = ({ initialAdminProfile, in
     const lower = `${label} ${href}`.toLowerCase()
     if (lower.includes("mailto:") || lower.includes("mail") || lower.includes("email")) {
       return (
-        <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor" aria-hidden="true" focusable="false">
-          <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-          <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+          <rect width="20" height="16" x="2" y="4" rx="2" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
         </svg>
       )
     }

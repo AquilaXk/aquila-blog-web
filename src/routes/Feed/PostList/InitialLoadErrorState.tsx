@@ -1,6 +1,10 @@
+/**
+ * 참조 구현:
+ * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/{empty,alert}.tsx, MIT License, Copyright (c) 2023 shadcn)
+ * - lucide-icons/lucide (icons/circle-alert.svg, ISC License, Copyright (c) Lucide Contributors)
+ */
 import React, { memo } from "react"
 import styled from "@emotion/styled"
-import AppIcon from "src/components/icons/AppIcon"
 import { useLanguage } from "src/libs/language"
 
 type Props = {
@@ -13,7 +17,22 @@ const InitialLoadErrorState: React.FC<Props> = ({ hasFilter, onRetryInitialLoad 
   return (
     <StyledWrapper role="alert" aria-live="assertive">
       <div className="initialLoadErrorIcon" aria-hidden="true">
-        <AppIcon name="question" />
+        <svg
+          viewBox="0 0 24 24"
+          width={20}
+          height={20}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" x2="12" y1="8" y2="12" />
+          <line x1="12" x2="12.01" y1="16" y2="16" />
+        </svg>
       </div>
       <h3>{hasFilter ? t("initialErrorFilterTitle") : t("initialErrorTitle")}</h3>
       <p>{t("initialErrorDesc")}</p>
@@ -28,34 +47,33 @@ export default memo(InitialLoadErrorState)
 
 const StyledWrapper = styled.section`
   grid-column: 1 / -1;
-  border-top: 1px solid ${({ theme }) => theme.colors.red6};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.red6};
-  border-radius: 6px;
-  min-height: 10rem;
-  padding: 1rem 0;
+  border: 1px dashed ${({ theme }) => theme.colors.red6};
+  border-radius: 12px;
+  min-height: 11rem;
+  padding: 2rem 1.25rem;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 0.48rem;
+  gap: 0.6rem;
   text-align: center;
 
   .initialLoadErrorIcon {
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: 6px;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 10px;
+    background: ${({ theme }) => theme.colors.statusDangerSurface};
     border: 1px solid ${({ theme }) => theme.colors.red6};
     color: ${({ theme }) => theme.colors.red11};
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
   }
 
   h3 {
     margin: 0;
     color: ${({ theme }) => theme.colors.red11};
-    font-size: 1.02rem;
-    font-weight: 800;
+    font-size: 1.05rem;
+    font-weight: 600;
     line-height: 1.35;
   }
 

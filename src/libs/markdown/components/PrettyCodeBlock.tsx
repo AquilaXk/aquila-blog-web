@@ -1,4 +1,4 @@
-// 참조 구현: Docusaurus (`facebook/docusaurus`, `packages/docusaurus-theme-common/src/hooks/useCodeWordWrap.ts`, `WordWrapButton`, `CopyButton`, `Icon/WordWrap`, `Icon/Copy`, `Icon/Success`, MIT License, Copyright (c) Meta Platforms, Inc. and affiliates.) & Fumadocs (`fuma-nama/fumadocs`, `packages/base-ui/src/components/codeblock.tsx`, MIT License, Copyright (c) 2024 Fuma Nama)
+// 참조 구현: Fumadocs (`fuma-nama/fumadocs`, `packages/base-ui/src/components/codeblock.tsx`, MIT License, Copyright (c) 2024 Fuma Nama), Docusaurus (`facebook/docusaurus`, `useCodeWordWrap.ts`, MIT License), & Lucide Icons (`lucide-icons/lucide`, `icons/{wrap-text,copy,check}.svg`, ISC License)
 import { CSSProperties, FC, ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { type SiteLanguage, useLanguage } from "src/libs/language"
 import { toLanguageLabel } from "src/libs/markdown/rendering"
@@ -30,18 +30,23 @@ export const CODE_COPY_FAILED_BIT = 1 << 2
 export const CODE_WRAPPED_BIT = 1 << 3
 export const CODE_SCROLLABLE_BIT = 1 << 4
 
-const WORD_WRAP_PATH_D =
-  "M4 19h6v-2H4v2zM20 5H4v2h16V5zm-3 6H4v2h13.25c1.1 0 2 .9 2 2s-.9 2-2 2H15v-2l-3 3l3 3v-2h2c2.21 0 4-1.79 4-4s-1.79-4-4-4z"
-const COPY_ICON_PATH_D =
-  "M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
-const CHECK_ICON_PATH_D = "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
-
-export const CODE_WORD_WRAP_ICON_SVG = `<svg aria-hidden="true" viewBox="0 0 24 24" class="aq-code-icon"><path fill="currentColor" d="${WORD_WRAP_PATH_D}"/></svg>`
+export const CODE_WORD_WRAP_ICON_SVG =
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="aq-code-icon">' +
+  '<line x1="3" x2="21" y1="6" y2="6"/>' +
+  '<path d="M3 12h15a3 3 0 1 1 0 6h-4"/>' +
+  '<polyline points="16 16 14 18 16 20"/>' +
+  '<line x1="3" x2="10" y1="18" y2="18"/>' +
+  "</svg>"
 
 export const CODE_COPY_STACK_ICONS_HTML =
   '<span class="aq-code-copy-icons" aria-hidden="true">' +
-  `<svg aria-hidden="true" viewBox="0 0 24 24" class="aq-code-copy-icon"><path fill="currentColor" d="${COPY_ICON_PATH_D}"/></svg>` +
-  `<svg aria-hidden="true" viewBox="0 0 24 24" class="aq-code-copy-success-icon"><path fill="currentColor" d="${CHECK_ICON_PATH_D}"/></svg>` +
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="aq-code-copy-icon">' +
+  '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>' +
+  '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>' +
+  "</svg>" +
+  '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="aq-code-copy-success-icon">' +
+  '<path d="M20 6 9 17l-5-5"/>' +
+  "</svg>" +
   "</span>"
 
 export const isCodeShellHorizontallyScrollable = (
@@ -249,8 +254,20 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
             title={extraLabels.wrapLabel}
             onClick={() => setUiMask((prev) => prev ^ CODE_WRAPPED_BIT)}
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="aq-code-icon">
-              <path fill="currentColor" d={WORD_WRAP_PATH_D} />
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="aq-code-icon"
+            >
+              <line x1="3" x2="21" y1="6" y2="6" />
+              <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
+              <polyline points="16 16 14 18 16 20" />
+              <line x1="3" x2="10" y1="18" y2="18" />
             </svg>
           </button>
           <button
@@ -263,11 +280,30 @@ const PrettyCodeBlock: FC<PrettyCodeBlockProps> = ({
             title={copied ? t("codeCopied") : copyFailed ? extraLabels.copyFailed : t("codeCopy")}
           >
             <span className="aq-code-copy-icons" aria-hidden="true">
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="aq-code-copy-icon">
-                <path fill="currentColor" d={COPY_ICON_PATH_D} />
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="aq-code-copy-icon"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </svg>
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="aq-code-copy-success-icon">
-                <path fill="currentColor" d={CHECK_ICON_PATH_D} />
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="aq-code-copy-success-icon"
+              >
+                <path d="M20 6 9 17l-5-5" />
               </svg>
             </span>
           </button>

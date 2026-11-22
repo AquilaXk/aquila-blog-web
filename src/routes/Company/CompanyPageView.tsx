@@ -1,8 +1,15 @@
+/**
+ * 참조 구현:
+ * - launch-ui/launch-ui (components/sections/{hero,stats,items,cta,footer}/default.tsx, MIT License)
+ * - magicuidesign/magicui (apps/www/registry/magicui/{android,safari,bento-grid,particles}.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/layout/site-header.tsx, site-footer.tsx, MIT License)
+ */
 /* eslint-disable @next/next/no-img-element */
 import { CONFIG } from "site.config"
 import BrandMark, { ArrowRightGlyph } from "src/components/branding/BrandMark"
-import { marketingLight as light } from "src/design-system/marketingPalette"
+import { MagicAndroidHardwareChrome } from "src/components/branding/MagicAndroidChrome"
 import { CompanyCapabilityOrbWave } from "src/routes/Company/CompanyCapabilityVisuals"
+import { CompanySafariFrame } from "src/routes/Company/CompanyDeviceFrames"
 import CompanyFeatureCarousel from "src/routes/Company/CompanyFeatureCarousel"
 import CompanyHeroParticles from "src/routes/Company/CompanyHeroParticles"
 import { CheckGlyph, SparklesGlyph } from "src/routes/Company/CompanyIcons"
@@ -51,25 +58,7 @@ const CompanyAndroidFrame: React.FC<{
 }> = ({ src, alt, width, height }) => (
   <Sec.AndroidFrameWrap>
     <div className="androidDeviceShell">
-      <svg
-        className="androidHardwareChrome"
-        viewBox="0 0 380 830"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <path
-          d="M376 153C376.5 153 378 154 378 156V250C378 252 376.5 253 376 253V153Z"
-          fill={light.deviceOuterFill}
-        />
-        <path
-          d="M376 301C376.5 301 378 302 378 304V349C378 351 376.5 352 376 352V301Z"
-          fill={light.deviceOuterFill}
-        />
-        <circle cx="189" cy="24" r="7" fill={light.deviceCameraOuter} fillOpacity="0.22" />
-        <circle cx="189" cy="24" r="3.5" fill={light.deviceCameraInner} fillOpacity="0.55" />
-      </svg>
+      <MagicAndroidHardwareChrome />
       <picture className="androidScreenBezel">
         <source srcSet={src.replace(/\.png$/, ".webp")} type="image/webp" />
         <img
@@ -86,22 +75,9 @@ const CompanyAndroidFrame: React.FC<{
   </Sec.AndroidFrameWrap>
 )
 
-const FooterWordmarkSvg: React.FC = () => (
+const FooterWordmarkBannerText: React.FC = () => (
   <Sec.FooterWordmarkBanner aria-hidden="true">
-    <svg viewBox="0 0 1120 154" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <text
-        x="560"
-        y="126"
-        textAnchor="middle"
-        fill="currentColor"
-        fontFamily="Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
-        fontSize="148"
-        fontWeight="700"
-        letterSpacing="-5.5"
-      >
-        Aquila Software
-      </text>
-    </svg>
+    <p className="footerWordmarkText">Aquila Software</p>
   </Sec.FooterWordmarkBanner>
 )
 
@@ -221,25 +197,14 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                         height={product.image.height}
                       />
                     ) : (
-                      <Sec.BrowserFrame>
-                        <div className="browserChrome" aria-hidden="true">
-                          <div className="chromeDots">
-                            <span />
-                            <span />
-                            <span />
-                          </div>
-                          <span className="chromeHost">{product.frame.chromeLabel}</span>
-                        </div>
-                        <img
-                          src={product.image.src}
-                          alt={product.image.alt}
-                          width={product.image.width}
-                          height={product.image.height}
-                          loading="lazy"
-                          decoding="async"
-                          data-ui={`company-showcase-${product.id}`}
-                        />
-                      </Sec.BrowserFrame>
+                      <CompanySafariFrame
+                        chromeLabel={product.frame.chromeLabel}
+                        src={product.image.src}
+                        alt={product.image.alt}
+                        width={product.image.width}
+                        height={product.image.height}
+                        dataUi={`company-showcase-${product.id}`}
+                      />
                     )}
                   </Sec.ShowcaseStage>
                 </Sec.ShowcaseRow>
@@ -417,7 +382,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
             </S.FooterGroup>
           ))}
         </S.FooterInner>
-        <FooterWordmarkSvg />
+        <FooterWordmarkBannerText />
         <S.FooterBottomBar>
           <span>© {CONFIG.since} {COMPANY_SURFACE.name}</span>
           <span>EasySubway · EasyOffice · EasyConvert · AquilaLog</span>

@@ -1,10 +1,10 @@
 /**
  * 참조 구현:
  * - lucide-icons/lucide (icons/accessibility.svg, arrow-left-right.svg, badge-check.svg,
- *   check.svg, copy.svg, cpu.svg, database.svg, download.svg, file-check-2.svg, file-text.svg,
- *   git-branch.svg, globe.svg, layers.svg, lock.svg, presentation.svg, server.svg,
- *   shield-check.svg, sparkles.svg, table-2.svg, terminal.svg, train-front.svg —
- *   ISC License, Copyright (c) Lucide Contributors)
+ *   check.svg, chevron-left.svg, chevron-right.svg, copy.svg, cpu.svg, database.svg,
+ *   download.svg, file-check-2.svg, file-text.svg, git-branch.svg, globe.svg, layers.svg,
+ *   lock.svg, presentation.svg, server.svg, shield-check.svg, sparkles.svg, table-2.svg,
+ *   terminal.svg, train-front.svg — ISC License, Copyright (c) Lucide Contributors)
  * - simple-icons/simple-icons (icons/apple.svg, icons/windows.svg, icons/linux.svg —
  *   CC0 1.0 Universal)
  */
@@ -109,6 +109,8 @@ export type CompanyIconName =
   | "lock"
   | "globe"
   | "database"
+  | "chevron-left"
+  | "chevron-right"
 
 export const CompanyVectorIcon: React.FC<IconProps & { name: CompanyIconName }> = ({
   name,
@@ -256,6 +258,18 @@ export const CompanyVectorIcon: React.FC<IconProps & { name: CompanyIconName }> 
           <ellipse cx="12" cy="5" rx="9" ry="3" />
           <path d="M3 5V19A9 3 0 0 0 21 19V5" />
           <path d="M3 12A9 3 0 0 0 21 12" />
+        </svg>
+      )
+    case "chevron-left":
+      return (
+        <svg {...props}>
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      )
+    case "chevron-right":
+      return (
+        <svg {...props}>
+          <path d="m9 18 6-6-6-6" />
         </svg>
       )
     case "globe":

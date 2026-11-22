@@ -5,6 +5,7 @@
 import { useEffect, useRef } from "react"
 import { useLanguage } from "../../libs/language"
 import { editorT } from "./markdownEditorI18n"
+import { EditorIconClose } from "./MarkdownEditorIcons"
 import {
   FindReplaceCheckbox,
   FindReplaceCloseButton,
@@ -142,7 +143,7 @@ export const MarkdownEditorFindReplace = ({
       </FindReplaceRow>
 
       <FindReplaceCloseButton name="close" aria-label={editorT("closeLabel", language)} onClick={onClose} type="button">
-        ×
+        <EditorIconClose size={14} />
       </FindReplaceCloseButton>
     </FindReplaceRegion>
   )

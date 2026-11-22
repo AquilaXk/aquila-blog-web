@@ -1,3 +1,9 @@
+/**
+ * 참조 구현:
+ * - magicuidesign/magicui (apps/www/registry/magicui/{bento-grid,android}.tsx, MIT License)
+ * - launch-ui/launch-ui (components/sections/stats/default.tsx, MIT License)
+ * - mickasmt/next-saas-stripe-starter (components/sections/why-modular.tsx, MIT License)
+ */
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import { breakpoint } from "src/design-system/tokens"
@@ -243,48 +249,6 @@ export const AndroidFrameWrap = styled.div`
     height: auto;
     aspect-ratio: 1080 / 2340;
     border-radius: 20px;
-  }
-`
-
-export const BrowserFrame = styled.div`
-  border-radius: 0.875rem;
-  border: 1px solid ${light.border};
-  background: ${light.surface};
-  box-shadow: ${light.phoneShadow};
-  overflow: hidden;
-
-  .browserChrome {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.625rem 0.9375rem;
-    border-bottom: 1px solid ${light.gridBorder};
-    background: ${light.surfaceScaffold};
-  }
-
-  .chromeDots {
-    display: flex;
-    gap: 0.375rem;
-
-    span {
-      width: 0.625rem;
-      height: 0.625rem;
-      border-radius: 9999px;
-      background: ${light.borderStrong};
-      opacity: 0.45;
-    }
-  }
-
-  .chromeHost {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.72rem;
-    color: ${light.inkMuted};
-  }
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
   }
 `
 

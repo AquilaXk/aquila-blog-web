@@ -1,7 +1,7 @@
 /**
  * 참조 구현:
  * - timlrx/tailwind-nextjs-starter-blog (components/Header.tsx, components/MobileNav.tsx, components/SearchButton.tsx, MIT License)
- * - lucide-icons/lucide (icons/globe.svg, ISC License, Copyright (c) Lucide Contributors)
+ * - lucide-icons/lucide (icons/{search,menu,x,globe}.svg, ISC License, Copyright (c) Lucide Contributors)
  */
 import type { NextRouter } from "next/router"
 
@@ -16,18 +16,17 @@ export const SearchGlyph = () => (
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"
-    width="24"
-    height="24"
-    strokeWidth={1.5}
+    width="20"
+    height="20"
+    strokeWidth={2}
     stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
     focusable="false"
   >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-    />
+    <path d="m21 21-4.34-4.34" />
+    <circle cx="11" cy="11" r="8" />
   </svg>
 )
 
@@ -36,18 +35,20 @@ export const SearchIcon = SearchGlyph
 export const MenuGlyph = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 20 20"
-    width="32"
-    height="32"
-    fill="currentColor"
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
     focusable="false"
   >
-    <path
-      fillRule="evenodd"
-      d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-      clipRule="evenodd"
-    />
+    <line x1="4" x2="20" y1="12" y2="12" />
+    <line x1="4" x2="20" y1="6" y2="6" />
+    <line x1="4" x2="20" y1="18" y2="18" />
   </svg>
 )
 
@@ -56,18 +57,19 @@ export const MenuIcon = MenuGlyph
 export const CloseGlyph = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 20 20"
-    width="24"
-    height="24"
-    fill="currentColor"
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
     focusable="false"
   >
-    <path
-      fillRule="evenodd"
-      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-      clipRule="evenodd"
-    />
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
   </svg>
 )
 
