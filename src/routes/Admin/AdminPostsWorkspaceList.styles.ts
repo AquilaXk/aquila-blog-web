@@ -10,12 +10,8 @@ import {
   adminStatusDangerDot,
   adminStatusDangerText,
   adminStatusInfoDot,
-  adminStatusSuccessBg,
   adminStatusSuccessDot,
-  adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnDot,
-  adminStatusWarnText,
   adminSurface,
   adminSurfaceMuted,
   adminSurfaceRaised,
@@ -128,21 +124,21 @@ export const TopicChip = styled.span`
   max-width: 100%;
   height: 1.45rem;
   padding: 0 0.52rem;
-  border: 1px solid transparent;
+  border: 1px solid ${adminBorder};
   border-radius: 6px;
-  background: ${adminSurfaceMuted};
+  background: ${adminSurface};
   color: ${adminTextSecondary};
   font-size: 0.74rem;
-  font-weight: 600;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `
 
 export const StatusDotIndicator = styled.i<{ "data-tone": string }>`
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
   flex: 0 0 auto;
   background: ${adminStatusSuccessDot};
 
@@ -172,39 +168,28 @@ export const VisibilityBadge = styled(AdminStatusPill)<{ "data-tone": string }>`
   gap: 0.36rem;
   border-radius: 6px;
   font-size: 0.72rem;
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: ${adminTextSecondary};
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
   border-color: ${adminBorder};
 
   &[data-tone="DRAFT"],
-  &[data-tone="draft"] {
-    color: ${adminStatusWarnText};
-    background: ${adminStatusWarnBg};
-    border-color: transparent;
-  }
-
+  &[data-tone="draft"],
   &[data-tone="warn"],
-  &[data-tone="PUBLIC_UNLISTED"] {
+  &[data-tone="PUBLIC_UNLISTED"],
+  &[data-tone="PRIVATE"],
+  &[data-tone="danger"] {
     color: ${adminTextSecondary};
-    background: ${adminSurfaceMuted};
-    border-color: ${adminBorderSubtle};
-  }
-
-  &[data-tone="PRIVATE"] {
-    color: ${adminTextMuted};
-    background: ${({ theme }) => adminMutedSurface(theme)};
-    border-color: ${adminBorderSubtle};
+    background: ${adminSurfaceRaised};
+    border-color: ${adminBorder};
   }
 
   &[data-tone="danger"] {
     color: ${adminStatusDangerText};
-    background: ${adminStatusDangerBg};
-    border-color: transparent;
   }
 `
 
@@ -218,6 +203,7 @@ export const PageFooter = styled(ActionRow)`
 `
 
 export const RowActions = styled(ActionRow)`
+  width: 100%;
   justify-content: flex-end;
   gap: 0.25rem;
   flex-wrap: nowrap;
@@ -228,6 +214,7 @@ export const RowActions = styled(ActionRow)`
   box-shadow: none;
 
   @media (max-width: 1100px) {
+    width: auto;
     justify-content: flex-start;
     flex-wrap: wrap;
   }
@@ -358,7 +345,7 @@ export const PostThumbnailSlot = styled.span`
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  border: 0;
+  border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   color: ${adminTextMuted};
   overflow: hidden;

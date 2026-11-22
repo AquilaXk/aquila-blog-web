@@ -6,6 +6,7 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import {
+  adminBarFillSubtle,
   adminBorder,
   adminBorderStrong,
   adminBorderSubtle,
@@ -328,10 +329,10 @@ export const ShareBarItem = styled.a`
 
 export const ShareBarFill = styled.span<{ $widthPct: number }>`
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 2px auto 2px 0;
   width: ${({ $widthPct }) => `${Math.max(0, Math.min(100, $widthPct))}%`};
-  border-radius: 6px;
-  background: ${adminSurfaceMuted};
+  border-radius: 4px;
+  background: ${adminBarFillSubtle};
   transition: width 180ms ease;
   pointer-events: none;
 `
@@ -340,9 +341,9 @@ export const ShareBarCopy = styled.span`
   position: relative;
   z-index: 1;
   min-width: 0;
-  color: ${adminTextSecondary};
+  color: ${adminTextPrimary};
   font-size: 0.8rem;
-  font-weight: 550;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

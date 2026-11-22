@@ -25,8 +25,8 @@ import {
 
 export const WorkspaceShell = styled.section`
   display: grid;
-  grid-template-columns: 230px minmax(0, 780px);
-  gap: 2rem;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 1.75rem;
   align-items: start;
 
   @media (max-width: 1060px) {
@@ -65,16 +65,16 @@ export const SectionRail = styled(AdminWorkspaceSectionNav)`
 export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
   position: relative;
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
   justify-content: flex-start;
-  padding: 0.5rem 0.75rem 0.5rem 0.88rem;
+  padding: 0.45rem 0.75rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: ${adminTextSecondary};
   font-size: 0.84rem;
-  font-weight: 600;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   ${focusVisibleRing}
 
   &:hover {
@@ -85,18 +85,9 @@ export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
   &[aria-selected="true"],
   &[data-active="true"] {
     background: ${adminSurfaceMuted};
+    border-color: ${adminBorder};
     color: ${adminTextPrimary};
-    font-weight: 720;
-
-    &::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0.42rem;
-      bottom: 0.42rem;
-      border-left: 2px solid ${adminTeal};
-      border-radius: 2px;
-    }
+    font-weight: 600;
   }
 
   @media (max-width: 1060px) and (min-width: 769px) {
@@ -106,6 +97,8 @@ export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`
 
     &[aria-selected="true"]::after,
     &[data-active="true"]::after {
+      content: "";
+      position: absolute;
       left: 0.45rem;
       right: 0.45rem;
       top: auto;
@@ -169,7 +162,7 @@ export const EditorPaneHeader = styled(AdminPaneHeader)`
 `
 
 export const EditorSurface = styled(AdminSubtleCard)`
-  max-width: 780px;
+  max-width: none;
   width: 100%;
   padding: 1.4rem 1.6rem;
   border: 1px solid ${adminBorder};

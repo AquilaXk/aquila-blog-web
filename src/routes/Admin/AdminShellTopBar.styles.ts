@@ -77,9 +77,14 @@ export const TopBar = styled.header`
     display: none;
     width: 36px;
     height: 36px;
-    border-color: ${adminBorder};
-    background: ${adminSurfaceRaised};
+    border-color: transparent;
+    background: transparent;
     color: ${adminTextPrimary};
+
+    &:hover {
+      background: ${adminSurfaceMuted};
+      border-color: ${adminBorder};
+    }
   }
 
   .seqPending {
@@ -162,7 +167,9 @@ export const CompactNav = styled.nav`
     width: 100%;
     min-width: 0;
     overflow-x: auto;
+    padding-top: 0.25rem;
     padding-bottom: 0.08rem;
+    border-top: 1px solid ${adminBorderSubtle};
     scrollbar-width: none;
 
     &::-webkit-scrollbar {
@@ -175,7 +182,7 @@ export const CompactNavLink = styled.a`
   min-height: ${control.lg}px;
   min-width: ${control.lg}px;
   padding: 0.3rem 0.55rem;
-  border-radius: 7px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -189,15 +196,19 @@ export const CompactNavLink = styled.a`
   span {
     display: inline;
     font-size: 0.73rem;
-    font-weight: 680;
+    font-weight: 550;
     line-height: 1;
     white-space: nowrap;
   }
 
   &[data-active="true"] {
-    border-color: ${adminBorderStrong};
-    background: ${adminSurfaceAccent};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceMuted};
     color: ${adminTextPrimary};
+
+    span {
+      font-weight: 600;
+    }
   }
 `
 

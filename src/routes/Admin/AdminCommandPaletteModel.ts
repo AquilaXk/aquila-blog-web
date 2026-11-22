@@ -143,7 +143,7 @@ export const getAdminPaletteItems = (
     {
       id: "nav-hub",
       group: "navigation",
-      icon: "spark",
+      icon: "layout-dashboard",
       label: language === "en" ? "Hub" : "관리자 허브",
       subLabel: language === "en" ? "Overview & recent activity" : "전체 지표 및 최근 콘텐츠 요약",
       shortcut: "G H",
@@ -173,7 +173,7 @@ export const getAdminPaletteItems = (
     {
       id: "nav-dashboard",
       group: "navigation",
-      icon: "service",
+      icon: "activity",
       label: language === "en" ? "Dashboard" : "운영 대시보드",
       subLabel: language === "en" ? "Service health, queue & live logs" : "서비스 상태, 작업 큐 및 실시간 로그",
       shortcut: "G D",
@@ -183,7 +183,7 @@ export const getAdminPaletteItems = (
     {
       id: "nav-tools",
       group: "navigation",
-      icon: "laptop",
+      icon: "wrench",
       label: language === "en" ? "Operations Tools" : "운영 도구",
       subLabel: language === "en" ? "DLQ replay, search flags & diagnostics" : "DLQ 재실행, 검색 플래그 및 복구 진단",
       shortcut: "G T",
@@ -193,7 +193,7 @@ export const getAdminPaletteItems = (
     {
       id: "nav-profile",
       group: "navigation",
-      icon: "camera",
+      icon: "settings",
       label: language === "en" ? "Profile Settings" : "프로필 설정",
       subLabel: language === "en" ? "Identity, About page & social links" : "계정 정보, 소개 페이지 및 외부 링크",
       shortcut: "G U",
@@ -212,7 +212,7 @@ export const getAdminPaletteItems = (
     {
       id: "toggle-language",
       group: "actions",
-      icon: "spark",
+      icon: "globe",
       label: language === "en" ? "한국어로 전환" : "Switch to English",
       subLabel: language === "en" ? "Switch admin interface language" : "관리자 인터페이스 언어 전환",
       action: toggleLanguage,

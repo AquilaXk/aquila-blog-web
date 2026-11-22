@@ -7,18 +7,16 @@ import {
   adminBorder,
   adminBorderStrong,
   adminCardShadow,
-  adminStatusDangerBg,
   adminStatusDangerDot,
   adminStatusDangerText,
   adminStatusInfoDot,
-  adminStatusSuccessBg,
   adminStatusSuccessDot,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnDot,
   adminStatusWarnText,
   adminSurface,
   adminSurfaceMuted,
+  adminSurfaceRaised,
   adminTeal,
   adminTextMuted,
   adminTextPrimary,
@@ -92,10 +90,6 @@ const BullQueueCardEl = styled.article`
     border-color: ${adminBorderStrong};
   }
 
-  &[data-tone="warn"] .cardPrimaryValue {
-    color: ${adminStatusWarnText};
-  }
-
   &[data-tone="danger"] .cardPrimaryValue {
     color: ${adminStatusDangerText};
   }
@@ -158,31 +152,47 @@ const HeaderContext = styled.div`
 const QueueStatusPill = styled.span<{ "data-tone"?: string }>`
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.36rem;
   height: 1.4rem;
-  padding: 0 0.48rem;
+  padding: 0 0.5rem;
   border-radius: 6px;
   border: 1px solid ${adminBorder};
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   font-size: 0.6875rem;
-  font-weight: 550;
+  font-weight: 500;
+
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: ${adminTextMuted};
+    flex: 0 0 auto;
+  }
 
   &[data-tone="good"] {
-    background: ${adminSurface};
     color: ${adminStatusSuccessText};
+
+    &::before {
+      background: ${adminStatusSuccessDot};
+    }
   }
 
   &[data-tone="warn"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
+
+    &::before {
+      background: ${adminStatusWarnDot};
+    }
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
+
+    &::before {
+      background: ${adminStatusDangerDot};
+    }
   }
 `
 

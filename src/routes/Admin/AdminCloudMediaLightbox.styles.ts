@@ -21,6 +21,7 @@ import {
   adminStatusWarnText,
   adminSurface,
   adminSurfaceMuted,
+  adminSurfaceRaised,
   adminTeal,
   adminTerminalBg,
   adminTerminalBorder,
@@ -387,13 +388,18 @@ export const AssetPreviewContainer = styled.div`
   width: 100%;
   aspect-ratio: 16 / 9;
   max-height: 24rem;
-  padding: 0.75rem;
-  border-radius: 6px;
-  background: ${adminCheckerboardBackground};
+  padding: 0;
+  border: 1px solid ${adminBorder};
+  border-radius: 8px;
+  background: ${adminSurfaceRaised};
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  &[data-svg="true"] {
+    padding: 0.75rem;
+    background: ${adminCheckerboardBackground};
+  }
   &[data-surface="muted"] {
     background: ${adminSurfaceMuted};
   }

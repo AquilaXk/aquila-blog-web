@@ -336,11 +336,11 @@ export const FloatingBulkBar = styled.div`
 
   @media (max-width: 720px) {
     bottom: 0.75rem;
-    flex-wrap: wrap;
-    justify-content: center;
-    width: calc(100vw - 1.25rem);
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: max-content;
     max-width: calc(100vw - 1.25rem);
-    overflow: hidden;
+    overflow-x: auto;
   }
 `
 

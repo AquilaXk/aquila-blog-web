@@ -11,14 +11,7 @@ import {
   adminPrimaryText,
   adminRaisedSurface,
   adminSecondaryText,
-  adminStatusDangerBg,
-  adminStatusDangerBorder,
   adminStatusDangerText,
-  adminStatusSuccessBg,
-  adminStatusSuccessBorder,
-  adminStatusSuccessText,
-  adminStatusWarnBg,
-  adminStatusWarnBorder,
   adminStatusWarnText,
   adminStrongBorder,
 } from "src/routes/Admin/adminColorTokens"
@@ -147,73 +140,40 @@ export const AdminWorkspaceSectionNavButton = styled.button`
   align-items: center;
   justify-content: flex-start;
   gap: 0.42rem;
-  min-height: 42px;
-  padding: 0 0.9rem;
-  border-radius: 0;
-  border: 0;
-  border-left: 3px solid transparent;
+  min-height: 36px;
+  padding: 0.42rem 0.72rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
   background: transparent;
-  color: ${({ theme }) => adminMutedText(theme)};
-  font-size: 0.84rem;
-  font-weight: 700;
+  color: ${({ theme }) => adminSecondaryText(theme)};
+  font-size: 0.82rem;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
   transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease,
-    color 0.18s ease,
-    box-shadow 0.18s ease;
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
 
   &:focus-visible {
     outline: none;
-    border-left-color: ${({ theme }) => adminStrongBorder(theme)};
     box-shadow: ${({ theme }) => adminInteractiveFocusRing(theme)};
   }
 
+  &:hover {
+    background: ${({ theme }) => adminRaisedSurface(theme)};
+    color: ${({ theme }) => adminPrimaryText(theme)};
+  }
+
   &[data-active="true"] {
-    color: ${adminGold};
-    border-left-color: ${adminGold};
-    background: ${({ theme }) => adminAccentSurface(theme)};
-  }
-
-  &[data-freshness="fresh"] {
-    border-left-color: ${({ theme }) => theme.colors.statusSuccessBorder};
-  }
-
-  &[data-freshness="aging"] {
-    border-left-color: ${({ theme }) => theme.colors.orange7};
-  }
-
-  &[data-freshness="stale"] {
-    border-left-color: ${({ theme }) => theme.colors.gray7};
-  }
-
-  &[data-freshness]::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 7px;
-    bottom: 7px;
-    width: 3px;
-    border-radius: 4px;
-    background: ${({ theme }) => theme.colors.gray7};
-  }
-
-  &[data-freshness="fresh"]::before {
-    background: ${({ theme }) => theme.colors.statusSuccessBorder};
-  }
-
-  &[data-freshness="aging"]::before {
-    background: ${({ theme }) => theme.colors.orange8};
-  }
-
-  &[data-freshness="stale"]::before {
-    background: ${({ theme }) => theme.colors.gray8};
+    color: ${({ theme }) => adminPrimaryText(theme)};
+    border-color: ${({ theme }) => adminCardBorder(theme)};
+    background: ${({ theme }) => adminMutedSurface(theme)};
+    font-weight: 600;
   }
 
   &[data-tone="danger"] {
-    border-left-color: ${({ theme }) => theme.colors.statusDangerBorder};
     color: ${({ theme }) => theme.colors.statusDangerText};
   }
 
@@ -295,51 +255,41 @@ export const AdminStatusPill = styled.span<{ $size?: "sm" | "md" }>`
   background: ${({ theme }) => adminRaisedSurface(theme)};
   color: ${({ theme }) => adminSecondaryText(theme)};
   font-size: ${({ $size = "md" }) => ($size === "sm" ? "0.72rem" : "0.74rem")};
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 
-  &[data-tone="neutral"] {
+  &[data-tone="neutral"],
+  &[data-tone="accent"],
+  &[data-tone="success"] {
     border-color: ${({ theme }) => adminCardBorder(theme)};
     background: ${({ theme }) => adminRaisedSurface(theme)};
-    color: ${({ theme }) => adminMutedText(theme)};
-  }
-
-  &[data-tone="accent"] {
-    border-color: ${({ theme }) => adminCardBorder(theme)};
-    background: ${({ theme }) => adminAccentSurface(theme)};
-    color: ${adminGold};
-  }
-
-  &[data-tone="success"] {
-    border-color: ${adminStatusSuccessBorder};
-    background: ${adminStatusSuccessBg};
-    color: ${adminStatusSuccessText};
+    color: ${({ theme }) => adminSecondaryText(theme)};
   }
 
   &[data-tone="warn"] {
-    border-color: ${adminStatusWarnBorder};
-    background: ${adminStatusWarnBg};
+    border-color: ${({ theme }) => adminCardBorder(theme)};
+    background: ${({ theme }) => adminRaisedSurface(theme)};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
-    border-color: ${adminStatusDangerBorder};
-    background: ${adminStatusDangerBg};
+    border-color: ${({ theme }) => adminCardBorder(theme)};
+    background: ${({ theme }) => adminRaisedSurface(theme)};
     color: ${adminStatusDangerText};
   }
 `
 
 export const AdminInlineActionRow = styled.div`
   display: flex;
-  gap: 0.55rem;
+  gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
   width: fit-content;
   max-width: 100%;
-  padding: 0.42rem 0.48rem;
-  border-radius: 6px;
-  background: ${({ theme }) => adminMutedSurface(theme)};
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
 
   & + & {
     margin-top: 0.4rem;
@@ -424,7 +374,7 @@ export const AdminActionCardButton = styled.button`
   text-align: left;
   display: grid;
   gap: 0.16rem;
-  padding: 0.82rem 0.88rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 6px;
   border: 1px solid ${({ theme }) => adminCardBorder(theme)};
   background: ${({ theme }) => adminRaisedSurface(theme)};
@@ -451,8 +401,8 @@ export const AdminActionCardButton = styled.button`
   }
 
   span {
-    font-size: 0.88rem;
-    font-weight: 760;
+    font-size: 0.8125rem;
+    font-weight: 600;
   }
 
   small {

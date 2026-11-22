@@ -248,8 +248,8 @@ export const AdminToolsOpsOverview = (props: AdminToolsOpsOverviewProps) => {
     {
       key: "storage-cleanup",
       title: "캐시 · 스토리지 정리",
-      subtitle: `DB ${dbStatus}`,
-      valueText: redisStatus,
+      subtitle: `삭제 대기 ${pendingDeleteCount}건 · Redis ${redisStatus === "UP" ? "정상" : redisStatus}`,
+      valueText: `${purgeCandidateCount}건`,
       badgeText: toToneBadgeCode(cacheTone),
       tone: cacheTone,
       actionLabel: "정리 진단",

@@ -8,14 +8,11 @@ import {
   adminBorderStrong,
   adminBorderSubtle,
   adminControlText,
-  adminStatusDangerBg,
   adminStatusDangerDot,
   adminStatusDangerText,
   adminStatusInfoDot,
-  adminStatusSuccessBg,
   adminStatusSuccessDot,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnDot,
   adminStatusWarnText,
   adminSurface,
@@ -191,26 +188,20 @@ export const ToolsKpiBadge = styled.span<{ "data-tone"?: string }>`
   padding: 0.12rem 0.46rem;
   border-radius: 6px;
   border: 1px solid ${adminBorder};
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   font-size: 0.6875rem;
-  font-weight: 550;
+  font-weight: 500;
 
   &[data-tone="good"] {
-    border-color: ${adminBorder};
-    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="warn"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
   }
 `
@@ -244,25 +235,20 @@ export const ToolsStatusChip = styled(AdminStatusPill)`
   padding: 0 0.52rem;
   border-radius: 6px;
   border-color: ${adminBorder};
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
+  color: ${adminTextSecondary};
   font-size: 0.72rem;
-  font-weight: 550;
+  font-weight: 500;
 
   &[data-tone="good"] {
-    border-color: ${adminBorder};
-    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="warn"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
   }
 `

@@ -14,6 +14,7 @@ import {
 } from "react"
 import { getCloudFileContentUrl, type CloudFile } from "src/apis/backend/cloud"
 import {
+  adminBorder,
   adminBorderStrong,
   adminBorderSubtle,
   adminCardShadow,
@@ -23,6 +24,7 @@ import {
   adminSurfaceMuted,
   adminSurfaceRaised,
   adminTeal,
+  adminTextMuted,
   adminTextPrimary,
   adminTextSecondary,
 } from "src/routes/Admin/adminColorTokens"
@@ -188,7 +190,7 @@ const AssetCardItem = ({
           />
         </W.AssetGridCardCheckboxOverlay>
 
-        <PreviewContainer>
+        <PreviewContainer data-svg={toBooleanAttr(isSvg)}>
           {isImage && !mediaLoadFailed ? (
             <StyledImage
               src={versionedUrl}
@@ -202,7 +204,7 @@ const AssetCardItem = ({
             />
           ) : (
             <IconPreview aria-hidden="true">
-              <DocIcon width={48} height={48} />
+              <DocIcon width={36} height={36} />
             </IconPreview>
           )}
         </PreviewContainer>
@@ -211,7 +213,7 @@ const AssetCardItem = ({
       <CardBody>
         <CardFooter>
           <FileTypeIcon aria-hidden="true">
-            <TypeIcon width={20} height={20} />
+            <TypeIcon width={16} height={16} />
           </FileTypeIcon>
           <AssetCardNameButton
             type="button"
@@ -320,7 +322,7 @@ export const AdminCloudAssetGrid = ({
 const StyledCard = styled.article`
   display: flex;
   flex-direction: column;
-  border: 1px solid ${adminBorderSubtle};
+  border: 1px solid ${adminBorder};
   border-radius: 8px;
   overflow: hidden;
   isolation: isolate;
@@ -341,7 +343,7 @@ const StyledCard = styled.article`
   &[data-highlighted="true"] {
     border-color: ${adminTeal};
     background: ${adminSurfaceRaised};
-    box-shadow: 0 0 0 1px ${adminTeal}, ${adminCardShadow};
+    box-shadow: 0 0 0 1px ${adminTeal};
   }
   &:focus-visible {
     outline: 2px solid ${adminTeal};
@@ -361,7 +363,12 @@ const PreviewContainer = styled.div`
   padding-bottom: 62.5%;
   height: 0;
   overflow: hidden;
-  background: ${adminCheckerboardBackground};
+  background: ${adminSurfaceRaised};
+
+  &[data-svg="true"] {
+    background: ${adminCheckerboardBackground};
+    padding: 0.75rem;
+  }
 `
 
 const StyledImage = styled.img`
@@ -384,7 +391,7 @@ const IconPreview = styled.div`
   align-items: center;
   justify-content: center;
   background: ${adminSurfaceMuted};
-  color: ${adminTextSecondary};
+  color: ${adminTextMuted};
 `
 
 const CardBody = styled.div`
@@ -419,8 +426,8 @@ const AssetCardNameButton = styled.button`
   cursor: pointer;
   text-align: left;
   color: ${adminTextPrimary};
-  font-size: 0.83rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 550;
   strong {
     display: block;
     min-width: 0;

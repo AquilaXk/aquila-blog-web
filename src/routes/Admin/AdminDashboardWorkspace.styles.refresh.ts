@@ -4,7 +4,6 @@ import { focusVisibleRing } from "src/design-system/focusRing"
 import {
   adminBorder,
   adminBorderStrong,
-  adminMutedSurface,
   adminStatusDangerDot,
   adminStatusDangerText,
   adminStatusInfoDot,
@@ -179,11 +178,10 @@ export const ChartBarLabel = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  font-family: ${MONO_FONT};
-  font-size: 0.76rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: ${adminTextSecondary};
-  line-height: 1.2;
+  line-height: 1.3;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -193,8 +191,8 @@ export const ChartBarTrack = styled.div`
   display: flex;
   align-items: center;
   width: 100%;
-  height: 8px;
-  border-radius: 999px;
+  height: 6px;
+  border-radius: 3px;
   background: ${adminSurfaceMuted};
   overflow: hidden;
 `
@@ -202,7 +200,7 @@ export const ChartBarTrack = styled.div`
 export const ChartBar = styled.i`
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: 3px;
   background: ${adminTeal};
   transition: width 0.25s ease-out;
 
@@ -229,11 +227,11 @@ export const ChartBarValue = styled.strong`
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0.14rem 0.45rem;
-  border-radius: 6px;
-  background: ${({ theme }) => adminMutedSurface(theme)};
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   font-family: ${MONO_FONT};
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: ${adminTextPrimary};
   line-height: 1.25;

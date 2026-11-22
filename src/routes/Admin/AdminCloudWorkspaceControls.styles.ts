@@ -14,6 +14,9 @@ import {
   adminCardShadow,
   adminCloudSelectionAccent,
   adminControlText as controlText,
+  adminDisabledBg,
+  adminDisabledBorder,
+  adminDisabledFg,
   adminGoldTintFocus,
   adminSurface as surface,
   adminSurfaceAccent as surfaceAccent,
@@ -73,11 +76,13 @@ export const CloudSearchField = styled.label`
   position: relative;
   display: flex;
   align-items: center;
-  width: min(17.5rem, 100%);
-  flex: 0 1 17.5rem;
-  min-width: 11.5rem;
+  width: auto;
+  max-width: 12.5rem;
+  flex: 1 1 8rem;
+  min-width: 6.75rem;
   @media (max-width: 768px) {
     flex: 1 1 13rem;
+    max-width: none;
     width: 100%;
   }
   svg {
@@ -136,7 +141,7 @@ export const SortSelect = styled.select`
   height: 34px;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 0 0.68rem;
+  padding: 0 0.52rem;
   background: ${surfaceMuted};
   color: ${textPrimary};
   font-size: 0.79rem;
@@ -150,6 +155,7 @@ export const SortSelect = styled.select`
   @media (pointer: coarse) {
     height: auto;
     min-height: 44px;
+    min-width: 44px;
   }
   &:focus-visible {
     outline: none;
@@ -164,7 +170,7 @@ export const ActionBar = styled.div`
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.6rem 0.85rem;
+  gap: 0.5rem 0.65rem;
   min-width: 0;
   margin-bottom: 0.85rem;
   padding: 0.35rem 0 0.65rem;
@@ -172,6 +178,11 @@ export const ActionBar = styled.div`
   border-bottom: 1px solid ${borderSubtle};
   border-radius: 0;
   background: transparent;
+  @media (min-width: 1120px) {
+    &:not([data-pagination="true"]) {
+      flex-wrap: nowrap;
+    }
+  }
   &[data-pagination="true"] {
     margin-top: 1rem;
     margin-bottom: 0;
@@ -184,11 +195,15 @@ export const ActionBar = styled.div`
 export const ActionGroup = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   min-width: 0;
   flex-wrap: wrap;
   &[data-slot="view-bar-nav"] {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
+    min-width: 0;
+    @media (min-width: 1120px) {
+      flex-wrap: nowrap;
+    }
   }
   &[data-align="end"] {
     justify-content: flex-end;
@@ -241,7 +256,9 @@ export const PrimaryButton = styled.button`
   }
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.62;
+    border-color: ${adminDisabledBorder};
+    background: ${adminDisabledBg};
+    color: ${adminDisabledFg};
   }
   &:focus-visible {
     outline: none;
@@ -253,7 +270,8 @@ export const SecondaryButton = styled.button`
   border: 1px solid ${border};
   border-radius: 8px;
   min-height: 34px;
-  padding: 0 0.76rem;
+  padding: 0 0.64rem;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -327,7 +345,7 @@ export const ViewModeButton = styled.button`
   flex-shrink: 0;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 0 0.7rem;
+  padding: 0 0.56rem;
   background: ${surfaceMuted};
   color: ${textSecondary};
   font-size: 0.79rem;
@@ -363,17 +381,21 @@ export const FilterGroup = styled.div`
   gap: 0.16rem;
   align-items: center;
   flex-wrap: wrap;
+  flex-shrink: 0;
   padding: 0.18rem;
   border-radius: 8px;
   border: none;
   background: ${surfaceMuted};
+  @media (min-width: 640px) {
+    flex-wrap: nowrap;
+  }
 `
 
 export const GhostButton = styled.button`
   border: 0;
   border-radius: 6px;
   min-height: 28px;
-  padding: 0 0.62rem;
+  padding: 0 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -546,12 +568,13 @@ export const AssetGridCardCheckboxOverlay = styled.div`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  background: ${adminActionGroupLightSurface};
+  width: 24px;
+  height: 24px;
+  border: 1px solid ${border};
+  border-radius: 5px;
+  background: ${surface};
   box-shadow: ${adminCardShadow};
-  opacity: 0.78;
+  opacity: 0;
   transition: opacity 140ms ease;
   &[data-checked="true"] {
     opacity: 1;

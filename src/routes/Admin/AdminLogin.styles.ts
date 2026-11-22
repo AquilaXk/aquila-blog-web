@@ -5,6 +5,9 @@ import {
   adminBorder,
   adminCardShadow,
   adminControlText,
+  adminDisabledBg,
+  adminDisabledBorder,
+  adminDisabledFg,
   adminGoldTintFocus,
   adminLoginCanvasBg,
   adminStatusDangerBg,
@@ -321,7 +324,7 @@ export const LoginPreference = styled.label`
   gap: 0.45rem;
   color: ${adminTextSecondary};
   font-size: 0.83rem;
-  font-weight: 560;
+  font-weight: 500;
   cursor: pointer;
 
   input[type="checkbox"] {
@@ -363,7 +366,10 @@ export const LoginSubmit = styled.button`
   &:disabled,
   &[aria-disabled="true"] {
     cursor: not-allowed;
-    opacity: 0.64;
+    border-color: ${adminDisabledBorder};
+    background: ${adminDisabledBg};
+    color: ${adminDisabledFg};
+    box-shadow: none;
   }
 
   @media (max-width: 820px), (pointer: coarse) {

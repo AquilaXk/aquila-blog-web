@@ -14,6 +14,9 @@ import {
   adminBorderStrong,
   adminBorderSubtle,
   adminControlText,
+  adminDisabledBg,
+  adminDisabledBorder,
+  adminDisabledFg,
   adminStatusDangerBg,
   adminStatusDangerBorder,
   adminStatusDangerDot,
@@ -219,24 +222,25 @@ export const CardSectionHeading = styled.div`
 
 export const ActionToneBadge = styled(AdminStatusPill)`
   border-radius: 6px;
-  border-color: ${adminBorderSubtle};
-  background: ${adminSurfaceMuted};
-  color: ${adminTextPrimary};
+  border-color: ${adminBorder};
+  background: ${adminSurfaceRaised};
+  color: ${adminTextSecondary};
 
   &[data-tone="write"] {
-    border-color: ${adminBorderSubtle};
-    background: ${adminSurfaceMuted};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminTextPrimary};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusDangerText};
   }
 
   &[data-tone="read"] {
-    border-color: ${adminBorderSubtle};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
   }
 `
@@ -251,14 +255,14 @@ export const ActionRowButton = styled(AdminActionCardButton)``
 export const ActionRowLink = styled.a`
   display: inline-flex;
   align-items: center;
-  min-height: 42px;
-  padding: 0.7rem 0.88rem;
-  border-radius: 8px;
+  min-height: 36px;
+  padding: 0.48rem 0.75rem;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
   color: ${adminTextPrimary};
-  font-size: 0.84rem;
-  font-weight: 680;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-decoration: none;
 
   &:hover {
@@ -305,13 +309,13 @@ export const FieldLabel = styled.label`
 
 export const Input = styled.input`
   width: 100%;
-  min-height: 42px;
-  border-radius: 8px;
+  min-height: 36px;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};
   color: ${adminTextPrimary};
-  padding: 0.68rem 0.85rem;
-  font-size: 0.88rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.84rem;
   ${focusVisibleRing}
 
   @media (pointer: coarse) {
@@ -322,14 +326,14 @@ export const Input = styled.input`
 
 export const TextArea = styled.textarea`
   width: 100%;
-  min-height: 96px;
-  border-radius: 8px;
+  min-height: 64px;
+  border-radius: 6px;
   border: 1px solid ${adminBorder};
   background: ${adminSurface};
   color: ${adminTextPrimary};
-  padding: 0.72rem 0.85rem;
-  font-size: 0.88rem;
-  line-height: 1.55;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
   resize: vertical;
   ${focusVisibleRing}
 
@@ -339,14 +343,14 @@ export const TextArea = styled.textarea`
 `
 
 export const PrimaryButton = styled.button`
-  min-height: 40px;
-  padding: 0 0.95rem;
-  border-radius: 8px;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 6px;
   border: 1px solid ${adminTeal};
   background: ${adminTeal};
   color: ${adminControlText};
-  font-size: 0.83rem;
-  font-weight: 720;
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
   ${focusVisibleRing}
 
@@ -356,7 +360,10 @@ export const PrimaryButton = styled.button`
   }
 
   &:disabled {
-    opacity: 0.56;
+    border-color: ${adminDisabledBorder};
+    background: ${adminDisabledBg};
+    color: ${adminDisabledFg};
+    opacity: 1;
     cursor: not-allowed;
   }
 
@@ -435,14 +442,14 @@ export const ConfirmDeleteRow = styled.div`
 
 export const DangerButton = styled.button`
   width: fit-content;
-  min-height: 40px;
-  padding: 0 0.95rem;
-  border-radius: 8px;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 6px;
   border: 1px solid ${adminStatusDangerBorder};
   background: ${adminSurface};
   color: ${adminStatusDangerText};
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
   ${focusVisibleRing}
 
@@ -451,7 +458,10 @@ export const DangerButton = styled.button`
   }
 
   &:disabled {
-    opacity: 0.55;
+    border-color: ${adminDisabledBorder};
+    background: ${adminDisabledBg};
+    color: ${adminDisabledFg};
+    opacity: 1;
     cursor: not-allowed;
   }
 
@@ -461,10 +471,10 @@ export const DangerButton = styled.button`
 `
 
 export const ToolsStatusDot = styled.span`
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   flex: none;
-  border-radius: 50%;
+  border-radius: 2px;
   background: ${adminTextMuted};
 
   &[data-tone="good"] {

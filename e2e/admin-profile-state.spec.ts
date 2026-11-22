@@ -95,7 +95,7 @@ test.describe("admin profile state contract", () => {
     const combinedWorkspaceSource = [sectionSource, identitySource, layoutStyleSource, sectionStyleSource].join("\n")
 
     expect(layoutStyleSource).toContain("export const SectionRail = styled(AdminWorkspaceSectionNav)`")
-    expect(layoutStyleSource).toContain("grid-template-columns: 230px minmax(0, 780px);")
+    expect(layoutStyleSource).toContain("grid-template-columns: 210px minmax(0, 1fr);")
     expect(layoutStyleSource).toContain("@media (max-width: 1060px)")
     expect(layoutStyleSource).toContain("export const SectionRailButton = styled(AdminWorkspaceSectionNavButton)`")
     expect(layoutStyleSource).toContain("border-bottom: 2px solid")

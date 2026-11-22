@@ -456,6 +456,7 @@ const ImageOrSvgPreview = ({
     <AssetPreviewContainer
       aria-label={`${file.originalFilename} 사진 미리보기`}
       aria-busy={imageState === "loading" && svgViewMode === "render" ? "true" : "false"}
+      data-svg={isSvg && svgViewMode === "render" ? "true" : undefined}
       data-flush={isSvg && svgViewMode === "code" ? "true" : undefined}
     >
       <PreviewActionsOverlay

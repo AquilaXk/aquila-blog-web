@@ -87,7 +87,7 @@ export const CheckboxHitLabel = styled.label`
     accent-color: ${adminTeal};
   }
 
-  &:focus-within {
+  &:has(input:focus-visible) {
     outline: 2px solid ${adminBorderStrong};
     outline-offset: 1px;
   }

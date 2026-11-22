@@ -9,13 +9,10 @@ import {
   adminCardGradient,
   adminCardShadow,
   adminControlText,
-  adminStatusDangerBg,
   adminStatusDangerDot,
   adminStatusDangerText,
-  adminStatusSuccessBg,
   adminStatusSuccessDot,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnDot,
   adminStatusWarnText,
   adminSurface,
@@ -112,31 +109,25 @@ export const StatusChip = styled.span`
   align-items: center;
   justify-content: center;
   gap: 0.36rem;
-  min-height: 26px;
-  padding: 0 0.55rem;
+  min-height: 24px;
+  padding: 0 0.52rem;
   border-radius: 6px;
   border: 1px solid ${adminBorder};
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   font-size: 0.72rem;
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 
   &[data-tone="good"] {
-    border-color: ${adminBorder};
-    background: ${adminSurface};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="warn"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
     color: ${adminStatusDangerText};
   }
 `
@@ -261,7 +252,7 @@ export const MetricCopy = styled.div`
     height: 1.25rem;
     padding: 0 0.44rem;
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: 6px;
     background: ${adminSurfaceMuted};
     color: ${adminTextSecondary};
     font-family: ${MONO_FONT};
@@ -461,9 +452,9 @@ export const StatusRow = styled.div`
 `
 
 export const StatusDot = styled.i`
-  width: 0.44rem;
-  height: 0.44rem;
-  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
   flex: 0 0 auto;
   background: ${adminStatusSuccessDot};
 

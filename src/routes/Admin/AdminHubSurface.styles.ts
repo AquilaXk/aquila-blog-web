@@ -11,18 +11,14 @@ import {
   adminCardShadow,
   adminControlText,
   adminMutedSurface,
-  adminStatusDangerBg,
   adminStatusDangerDot,
   adminStatusDangerText,
   adminStatusInfoDot,
-  adminStatusSuccessBg,
   adminStatusSuccessDot,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnDot,
   adminStatusWarnText,
   adminSurface,
-  adminSurfaceMuted,
   adminSurfaceRaised,
   adminTeal,
   adminTealBorder,
@@ -46,19 +42,19 @@ const truncateSingleLineCss = css`
 const outlineDotPillCss = css`
   display: inline-flex;
   align-items: center;
-  gap: 0.34rem;
+  gap: 0.36rem;
   border: 1px solid ${adminBorder};
   border-radius: 6px;
-  background: ${adminSurface};
+  background: ${adminSurfaceRaised};
   color: ${adminTextSecondary};
   font-size: 0.72rem;
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 
   i {
-    width: 0.42rem;
-    height: 0.42rem;
-    border-radius: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
     background: ${adminTextMuted};
     flex: 0 0 auto;
   }
@@ -274,9 +270,9 @@ export const StatusRow = styled.div`
   }
 
   i {
-    width: 0.42rem;
-    height: 0.42rem;
-    border-radius: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
     flex: 0 0 auto;
     background: ${adminTextMuted};
   }
@@ -294,10 +290,11 @@ export const StatusRow = styled.div`
     padding: 0.18rem 0.5rem;
     border-radius: 6px;
     border: 1px solid ${adminBorder};
-    background: ${({ theme }) => adminMutedSurface(theme)};
+    background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
+    font-family: inherit;
     font-size: 0.72rem;
-    font-weight: 550;
+    font-weight: 500;
   }
 
   &[data-tone="good"] i {
@@ -306,7 +303,7 @@ export const StatusRow = styled.div`
 
   &[data-kind="service"][data-tone="good"] strong {
     border-color: ${adminBorder};
-    background: ${adminSurface};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusSuccessText};
   }
 
@@ -315,8 +312,8 @@ export const StatusRow = styled.div`
   }
 
   &[data-kind="service"][data-tone="warn"] strong {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusWarnText};
   }
 
@@ -325,8 +322,8 @@ export const StatusRow = styled.div`
   }
 
   &[data-kind="service"][data-tone="danger"] strong {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusDangerText};
   }
 `
@@ -418,7 +415,7 @@ export const ContentRow = styled.a`
 
   &[data-status="PUBLISHED"] small {
     border-color: ${adminBorder};
-    background: ${adminSurface};
+    background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
   }
 
@@ -428,8 +425,8 @@ export const ContentRow = styled.a`
 
   &[data-status="DRAFT"] small {
     border-color: ${adminBorder};
-    background: ${adminStatusWarnBg};
-    color: ${adminStatusWarnText};
+    background: ${adminSurfaceRaised};
+    color: ${adminTextSecondary};
   }
 
   &[data-status="DRAFT"] small i {

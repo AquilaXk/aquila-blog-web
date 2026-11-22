@@ -16,9 +16,7 @@ import {
   adminStatusDangerBg,
   adminStatusDangerBorder,
   adminStatusDangerText,
-  adminStatusSuccessBg,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnText,
   adminSurface,
   adminSurfaceMuted,
@@ -102,19 +100,19 @@ export const StatusBadge = styled(AdminStatusPill)`
   min-height: 24px;
   padding: 0 0.54rem;
   border-radius: 6px;
-  border-color: transparent;
-  background: ${adminStatusWarnBg};
+  border-color: ${adminBorder};
+  background: ${adminSurfaceRaised};
   color: ${adminWarningBadgeText()};
 
   &[data-tone="success"] {
     border-color: ${adminBorder};
-    background: ${adminSurface};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusDangerText};
   }
 `
@@ -124,24 +122,26 @@ export const FreshnessBadge = styled(AdminStatusPill)`
   padding: 0 0.52rem;
   border-radius: 6px;
   border-color: ${adminBorder};
+  background: ${adminSurfaceRaised};
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.71rem;
+  font-weight: 500;
 
   &[data-tone="fresh"] {
     border-color: ${adminBorder};
-    background: ${adminSurface};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusSuccessText};
   }
 
   &[data-tone="aging"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusWarnText};
   }
 
   &[data-tone="stale"] {
-    border-color: ${adminBorderSubtle};
-    background: ${adminSurfaceMuted};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminTextSecondary};
   }
 `

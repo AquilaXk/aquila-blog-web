@@ -14,7 +14,6 @@ import {
   adminCardShadow,
   adminCheckerboardBackground,
   adminCloudSelectionAccent,
-  adminControlText as controlText,
   adminFloatingShadow,
   adminGoldTintFocus,
   adminSurface as surface,
@@ -173,19 +172,19 @@ export const SearchInput = styled.input`
   width: 100%;
   min-height: 34px;
   height: 34px;
-  border: 1px solid transparent;
+  border: 1px solid ${border};
   border-radius: 8px;
-  padding: 0 4.5rem 0 2.15rem;
-  background: ${surfaceMuted};
+  padding: 0 2.2rem 0 2.1rem;
+  background: ${surface};
   color: ${textPrimary};
   font-size: 0.81rem;
-  font-weight: 600;
+  font-weight: 500;
   transition: background-color 140ms ease, border-color 140ms ease;
   &::placeholder {
     color: ${textMuted};
   }
   &:hover {
-    border-color: ${border};
+    border-color: ${borderStrong};
   }
   &:focus-visible {
     outline: none;
@@ -458,34 +457,35 @@ export const FoldersBand = styled.div`
 export const FolderTileButton = styled.button`
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 34px;
-  padding: 0.32rem 0.72rem;
-  border: 1px solid ${borderSubtle};
-  border-radius: 8px;
-  background: ${surfaceMuted};
+  gap: 0.42rem;
+  min-height: 32px;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid ${border};
+  border-radius: 6px;
+  background: ${surface};
   color: ${textSecondary};
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 550;
   user-select: none;
   cursor: pointer;
   transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
   ${focusVisibleRing}
   svg {
-    width: 18px;
-    height: 18px;
+    width: 15px;
+    height: 15px;
     color: ${textMuted};
     flex-shrink: 0;
   }
   &:hover {
-    border-color: ${border};
+    border-color: ${borderStrong};
     background: ${surfaceRaised};
     color: ${textPrimary};
   }
   &[data-active="true"] {
-    border-color: transparent;
-    background: ${accentTeal};
-    color: ${controlText};
+    border-color: ${borderStrong};
+    background: ${surfaceMuted};
+    color: ${textPrimary};
+    font-weight: 600;
     box-shadow: none;
     svg {
       color: currentColor;

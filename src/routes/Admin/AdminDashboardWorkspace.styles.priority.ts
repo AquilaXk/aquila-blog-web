@@ -5,12 +5,8 @@ import { AdminPlainCard } from "src/routes/Admin/AdminSurfacePrimitives"
 import {
   adminBorder,
   adminCardShadow,
-  adminMutedSurface,
-  adminStatusDangerBg,
   adminStatusDangerText,
-  adminStatusSuccessBg,
   adminStatusSuccessText,
-  adminStatusWarnBg,
   adminStatusWarnText,
   adminSurface,
   adminSurfaceRaised,
@@ -73,25 +69,25 @@ export const PrioritySummary = styled.div`
   }
 
   &:not([href])[data-tone="neutral"] {
-    border-color: transparent;
-    background: ${({ theme }) => adminMutedSurface(theme)};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
   }
 
   &:not([href])[data-tone="good"] {
-    border-color: transparent;
-    background: ${adminStatusSuccessBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusSuccessText};
   }
 
   &:not([href])[data-tone="warn"] {
-    border-color: transparent;
-    background: ${adminStatusWarnBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusWarnText};
   }
 
   &:not([href])[data-tone="danger"] {
-    border-color: transparent;
-    background: ${adminStatusDangerBg};
+    border-color: ${adminBorder};
+    background: ${adminSurfaceRaised};
     color: ${adminStatusDangerText};
   }
 

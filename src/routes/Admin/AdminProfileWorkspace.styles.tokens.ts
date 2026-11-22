@@ -8,10 +8,12 @@ import {
   adminBorderStrong,
   adminCardShadow,
   adminControlText,
+  adminDisabledBg,
+  adminDisabledBorder,
+  adminDisabledFg,
   adminFloatingShadow,
   adminStatusDangerBorder,
   adminStatusDangerText,
-  adminStatusSuccessBg,
   adminStatusSuccessBorder,
   adminStatusSuccessDot,
   adminStatusSuccessText,
@@ -28,7 +30,6 @@ import {
   adminTextPrimary,
   adminTextSecondary,
   adminWarningBadgeBorder,
-  adminWarningBadgeSurface,
   adminWarningBadgeText,
 } from "src/routes/Admin/adminColorTokens"
 
@@ -111,6 +112,14 @@ export const PrimaryButton = styled(BaseButton)`
     border-color: ${adminTealBorderHover};
     background: ${adminTealHover};
     color: ${adminControlText};
+  }
+
+  &:disabled {
+    border-color: ${adminDisabledBorder};
+    background: ${adminDisabledBg};
+    color: ${adminDisabledFg};
+    opacity: 1;
+    box-shadow: none;
   }
 `
 
@@ -220,23 +229,22 @@ export const SyncStateBadge = styled.span<{ "data-tone"?: "synced" | "dirty" }>`
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  min-height: 26px;
+  min-height: 24px;
   padding: 0 0.56rem;
   border-radius: 6px;
-  border: 1px solid transparent;
-  background: ${({ "data-tone": tone }) =>
-    tone === "dirty" ? adminWarningBadgeSurface() : adminStatusSuccessBg};
+  border: 1px solid ${adminBorder};
+  background: ${adminSurfaceRaised};
   color: ${({ "data-tone": tone }) =>
-    tone === "dirty" ? adminWarningBadgeText() : adminStatusSuccessText};
+    tone === "dirty" ? adminWarningBadgeText() : adminTextSecondary};
   font-size: 0.74rem;
-  font-weight: 680;
+  font-weight: 500;
   white-space: nowrap;
 
   &::before {
     content: "";
     width: 6px;
     height: 6px;
-    border-radius: 50%;
+    border-radius: 2px;
     background: ${({ "data-tone": tone }) =>
       tone === "dirty" ? adminStatusWarnDot : adminStatusSuccessDot};
     flex-shrink: 0;
@@ -270,23 +278,23 @@ export const SectionStateBadge = styled.span`
   min-height: 24px;
   padding: 0 0.52rem;
   border-radius: 6px;
-  border: 1px solid transparent;
+  border: 1px solid ${adminBorder};
   color: ${adminTextSecondary};
-  background: ${adminSurfaceMuted};
+  background: ${adminSurfaceRaised};
   font-size: 0.72rem;
-  font-weight: 680;
+  font-weight: 500;
 
   &[data-tone="dirty"],
   &[data-tone="published"] {
-    border-color: transparent;
+    border-color: ${adminBorder};
     color: ${adminWarningBadgeText()};
-    background: ${adminWarningBadgeSurface()};
+    background: ${adminSurfaceRaised};
   }
 
   &[data-tone="synced"] {
-    border-color: transparent;
+    border-color: ${adminBorder};
     color: ${adminStatusSuccessText};
-    background: ${adminStatusSuccessBg};
+    background: ${adminSurfaceRaised};
   }
 `
 

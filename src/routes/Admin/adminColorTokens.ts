@@ -34,6 +34,10 @@ const adminLightThemeVariables = `
   --admin-primary-border: #18181b;
   --admin-primary-border-hover: #27272a;
   --admin-control-text: #fafafa;
+  --admin-disabled-bg: #f4f4f5;
+  --admin-disabled-fg: #a1a1aa;
+  --admin-disabled-border: #e4e4e7;
+  --admin-bar-fill-subtle: rgba(24, 24, 27, 0.045);
   --admin-focus-ring: rgba(24, 24, 27, 0.14);
   --admin-focus-ring-strong: rgba(24, 24, 27, 0.24);
   --admin-action-group-surface: rgba(255, 255, 255, 0.96);
@@ -118,6 +122,10 @@ export const adminGold = adminAccentText
 export const adminTeal = "var(--admin-primary, #18181b)"
 export const adminTealHover = "var(--admin-primary-hover, #27272a)"
 export const adminControlText = "var(--admin-control-text, #fafafa)"
+export const adminDisabledBg = "var(--admin-disabled-bg, #f4f4f5)"
+export const adminDisabledFg = "var(--admin-disabled-fg, #a1a1aa)"
+export const adminDisabledBorder = "var(--admin-disabled-border, #e4e4e7)"
+export const adminBarFillSubtle = "var(--admin-bar-fill-subtle, rgba(24, 24, 27, 0.045))"
 export const adminTealBorder = "var(--admin-primary-border, #18181b)"
 export const adminTealBorderHover = "var(--admin-primary-border-hover, #27272a)"
 export const adminGoldTintSubtle = adminSurfaceAccent

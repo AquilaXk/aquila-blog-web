@@ -4,8 +4,9 @@ import { useState } from "react"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { control } from "src/design-system/tokens"
 import {
+  adminBorder,
+  adminBorderStrong,
   adminBorderSubtle,
-  adminControlText,
   adminSurfaceMuted,
   adminSurfaceRaised,
   adminTeal,
@@ -222,12 +223,12 @@ export const ResultFilterButton = styled.button`
   }
 
   &[data-active="true"] {
-    border-color: ${adminTeal};
-    background: ${adminTeal};
-    color: ${adminControlText};
+    border-color: ${adminBorderStrong};
+    background: ${adminSurfaceMuted};
+    color: ${adminTextPrimary};
 
     span {
-      color: ${adminControlText};
+      color: ${adminTextPrimary};
     }
   }
 `

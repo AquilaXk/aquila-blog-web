@@ -161,8 +161,32 @@ export const AdminSearchRuntimeControlSection = ({ disabled }: Props) => {
         ) {
           setRuntimeFlagsSummary(
             isEn
-              ? `Current flags · pipeline=${String(pipelineForceControl ?? "unknown")}, mirrorDisabled=${String(mirrorForceDisabled ?? "unknown")}`
-              : `현재 설정 · 파이프라인=${String(pipelineForceControl ?? "미확인")}, 미러 비활성=${String(mirrorForceDisabled ?? "미확인")}`
+              ? `Current flags · pipeline ${
+                  pipelineForceControl === undefined
+                    ? "unknown"
+                    : pipelineForceControl
+                      ? "forced"
+                      : "auto"
+                } · mirror ${
+                  mirrorForceDisabled === undefined
+                    ? "unknown"
+                    : mirrorForceDisabled
+                      ? "disabled"
+                      : "active"
+                }`
+              : `현재 설정 · 파이프라인 ${
+                  pipelineForceControl === undefined
+                    ? "미확인"
+                    : pipelineForceControl
+                      ? "강제 제어"
+                      : "자동"
+                } · 미러 ${
+                  mirrorForceDisabled === undefined
+                    ? "미확인"
+                    : mirrorForceDisabled
+                      ? "비활성"
+                      : "정상"
+                }`
           )
         }
       })

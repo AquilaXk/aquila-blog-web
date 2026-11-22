@@ -66,10 +66,9 @@ import { useAdminCloudWorkspaceActions } from "./useAdminCloudWorkspaceActions"
 
 const toBooleanAttr = (value: boolean) => (value ? "true" : "false")
 
-const formatSearchDetailText = (isSearchBusy: boolean, keyword: string) => {
-  if (isSearchBusy) return "검색 중"
-  if (keyword) return "파일"
-  return "/폴더명 검색어"
+const formatSearchDetailText = (isSearchBusy: boolean) => {
+  if (isSearchBusy) return "검색 중…"
+  return ""
 }
 
 const CLOUD_PAGE_SIZE = 40
@@ -345,7 +344,7 @@ const AdminCloudWorkspacePage = () => {
                     </SearchClearButton>
                   ) : null}
                   <SearchDetail aria-busy={toBooleanAttr(isSearchBusy)}>
-                    {formatSearchDetailText(isSearchBusy, keyword)}
+                    {formatSearchDetailText(isSearchBusy)}
                   </SearchDetail>
                 </SearchTrailing>
               </CloudSearchField>
