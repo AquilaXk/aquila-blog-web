@@ -98,8 +98,8 @@ export const Global = () => {
         }
 
         ::selection {
-          background: ${theme.colors.blue7};
-          color: ${theme.colors.accentControlText};
+          background: ${theme.colors.blue4};
+          color: ${theme.colors.gray12};
         }
 
         * {

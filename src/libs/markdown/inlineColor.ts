@@ -1,13 +1,13 @@
 export const INLINE_TEXT_COLOR_OPTIONS = [
-  { label: "하늘", token: "sky", value: "#60a5fa" },
-  { label: "바이올렛", token: "violet", value: "#a78bfa" },
-  { label: "그린", token: "green", value: "#34d399" },
-  { label: "에메랄드", token: "emerald", value: "#10b981" },
-  { label: "오렌지", token: "orange", value: "#fb923c" },
-  { label: "앰버", token: "amber", value: "#f59e0b" },
-  { label: "로즈", token: "rose", value: "#f472b6" },
-  { label: "옐로", token: "yellow", value: "#facc15" },
-  { label: "슬레이트", token: "slate", value: "#94a3b8" },
+  { label: "하늘", token: "sky", value: "#0369a1" },
+  { label: "바이올렛", token: "violet", value: "#6d28d9" },
+  { label: "그린", token: "green", value: "#15803d" },
+  { label: "에메랄드", token: "emerald", value: "#047857" },
+  { label: "오렌지", token: "orange", value: "#c2410c" },
+  { label: "앰버", token: "amber", value: "#b45309" },
+  { label: "로즈", token: "rose", value: "#be123c" },
+  { label: "옐로", token: "yellow", value: "#854d0e" },
+  { label: "슬레이트", token: "slate", value: "#475569" },
 ] as const
 
 const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i

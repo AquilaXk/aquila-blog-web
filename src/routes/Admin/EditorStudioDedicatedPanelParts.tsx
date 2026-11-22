@@ -51,7 +51,7 @@ export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   user-select: none;
 
   &[data-writing-focus="hidden"] {
-    opacity: 0.22;
+    opacity: 0.48;
   }
 
   &:hover {

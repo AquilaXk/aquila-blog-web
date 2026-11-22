@@ -5,13 +5,13 @@
 import styled from "@emotion/styled"
 import { useRouter } from "next/router"
 import React, { memo, startTransition, useCallback, useMemo, useState } from "react"
-import { boxShadowColor, breakpoint } from "src/design-system/tokens"
 import { usePostsTotalCountQuery } from "src/hooks/usePostsTotalCountQuery"
 import { useTagsQuery } from "src/hooks/useTagsQuery"
 import { normalizeOptionalTagQuery } from "src/libs/query/normalize"
 import { replaceShallowRoutePreservingScroll } from "src/libs/router"
 import { useLanguage } from "src/libs/language"
 import {
+  FEED_TAG_RAIL_DESKTOP_MIN_PX,
   FEED_TAG_REPRESENTATIVE_CHIP_LIMIT,
   FEED_TAG_REPRESENTATIVE_DESKTOP_LIMIT,
   MOBILE_TOUCH_TARGET_MIN_PX,
@@ -231,13 +231,15 @@ const StyledWrapper = styled.div`
 
   .desktopPanel {
     display: none;
-    width: 280px;
-    min-width: 280px;
-    max-width: 280px;
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
     align-self: flex-start;
-    border-radius: 0.25rem;
-    background: var(--aq-surface-subtle);
-    box-shadow: 0 4px 6px -1px ${boxShadowColor.cardHover}, 0 2px 4px -2px ${boxShadowColor.cardHover};
+    border: 0;
+    border-right: 1px solid var(--aq-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     position: sticky;
     top: calc(var(--app-header-height, 65px) + 1.5rem);
     max-height: calc(100vh - var(--app-header-height, 65px) - 2.5rem);
@@ -248,7 +250,7 @@ const StyledWrapper = styled.div`
   .panelInner {
     display: flex;
     flex-direction: column;
-    padding: 1.25rem 1.5rem;
+    padding: 0.25rem 1.25rem 0.25rem 0;
     max-height: inherit;
     min-height: 0;
   }
@@ -264,7 +266,6 @@ const StyledWrapper = styled.div`
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 700;
-    text-transform: uppercase;
     text-align: left;
     cursor: pointer;
     flex-shrink: 0;
@@ -332,7 +333,6 @@ const StyledWrapper = styled.div`
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
-    text-transform: uppercase;
     text-align: left;
     cursor: pointer;
     transition: color 120ms ease;
@@ -405,7 +405,6 @@ const StyledWrapper = styled.div`
     width: 100%;
     max-width: 100%;
     flex-wrap: wrap;
-    flex-wrap: balance;
     justify-content: flex-start;
     align-items: center;
     gap: 0.375rem 0.5rem;
@@ -423,7 +422,6 @@ const StyledWrapper = styled.div`
     color: var(--aq-muted);
     font-size: 0.8125rem;
     font-weight: 500;
-    text-transform: uppercase;
     cursor: pointer;
 
     &[data-active="true"] {
@@ -447,7 +445,7 @@ const StyledWrapper = styled.div`
     background: var(--aq-surface-subtle);
   }
 
-  @media (min-width: ${breakpoint.md}px) {
+  @media (min-width: ${FEED_TAG_RAIL_DESKTOP_MIN_PX}px) {
     .desktopPanel {
       display: flex;
       flex-direction: column;

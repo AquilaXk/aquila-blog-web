@@ -294,13 +294,12 @@ const StyledWrapper = styled.div`
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
-    text-transform: uppercase;
-    color: var(--aq-accent-link, var(--aq-accent));
+    color: var(--aq-text-secondary);
     text-decoration: none;
     transition: color 120ms ease;
 
     &:hover {
-      color: var(--aq-text);
+      color: var(--aq-accent-link, var(--aq-accent));
     }
 
     &:focus-visible {

@@ -33,9 +33,9 @@ export const articleTypographyScale = {
   h4FontSizeMobile: "1rem",
   h4LineHeightMobile: "24px",
   bodyFontSize: "1rem",
-  bodyLineHeight: "1.65",
+  bodyLineHeight: "1.74",
   bodyFontSizeMobile: "1rem",
-  bodyLineHeightMobile: "1.65",
+  bodyLineHeightMobile: "1.74",
   codeFontSize: "0.9375rem",
   codeLineHeight: "23px",
   codeFontSizeMobile: "0.85rem",
@@ -87,6 +87,7 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
     margin: 0.72rem 0;
     font-size: ${articleTypographyScale.bodyFontSize};
     line-height: ${articleTypographyScale.bodyLineHeight};
+    word-break: keep-all;
     overflow-wrap: anywhere;
   }
 
@@ -130,6 +131,7 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
 
   ${selector} li {
     line-height: ${articleTypographyScale.bodyLineHeight};
+    word-break: keep-all;
     overflow-wrap: anywhere;
   }
 

@@ -557,8 +557,8 @@ test.describe("Block-level Markdown editor model", () => {
   })
 
   test("renders inline code, strikethrough, highlight, math, <br>, and links in appendInlineMarkdownNodes and resolves emerald/amber colors", () => {
-    expect(resolveInlineColorValue("emerald")).toBe("#10b981")
-    expect(resolveInlineColorValue("amber")).toBe("#f59e0b")
+    expect(resolveInlineColorValue("emerald")).toBe("#047857")
+    expect(resolveInlineColorValue("amber")).toBe("#b45309")
 
     const restoreDoc = installFakeInlineDocument()
     try {

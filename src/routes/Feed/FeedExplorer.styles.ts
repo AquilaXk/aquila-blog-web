@@ -5,6 +5,7 @@
  */
 import styled from "@emotion/styled"
 import { boxShadowColor, breakpoint } from "src/design-system/tokens"
+import { FEED_TAG_RAIL_CHIP_MAX_PX } from "./feedUiTokens"
 
 const FEED_POST_COLUMN_MAX_WIDTH_REM = 100
 
@@ -233,7 +234,7 @@ export const FeedBody = styled.section`
     gap: 2.5rem;
   }
 
-  @media (max-width: ${breakpoint.md - 1}px) {
+  @media (max-width: ${FEED_TAG_RAIL_CHIP_MAX_PX}px) {
     flex-direction: column;
     gap: 1.5rem;
     padding: 1.5rem 0 3.5rem;

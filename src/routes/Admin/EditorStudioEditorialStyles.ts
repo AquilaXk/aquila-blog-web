@@ -180,7 +180,7 @@ export const EditorWritingChromeDim = styled.div`
   gap: 8px;
 
   &[data-writing-focus="hidden"] {
-    opacity: 0.18;
+    opacity: 0.52;
   }
 
   &:hover,
@@ -195,7 +195,7 @@ export const EditorWritingChromeDim = styled.div`
 
 export const EditorWritingChromeBlock = styled.div`
   &[data-writing-focus="hidden"] {
-    opacity: 0.18;
+    opacity: 0.52;
   }
 
   &:hover,
@@ -226,7 +226,7 @@ export const EditorFloatingMiniToc = styled.button`
   ${focusVisibleRing}
 
   &[data-writing-focus="hidden"] {
-    opacity: 0.22;
+    opacity: 0.48;
   }
 
   @media (hover: hover) {

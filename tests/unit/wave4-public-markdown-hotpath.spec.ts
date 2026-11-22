@@ -279,7 +279,7 @@ test.describe("wave4 Track A public routes, responsive hardening, deslop, and ho
 
     const tagListTsx = readRepoFile("src/routes/Feed/TagList.tsx")
     expect(tagListTsx).toContain("@media (pointer: coarse)")
-    expect(tagListTsx).toContain("min-width: 280px;")
+    expect(tagListTsx).toContain("min-width: 220px;")
 
     const aboutStyles = readRepoFile("src/routes/About/AboutPage.styles.ts")
     expect(aboutStyles).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);")

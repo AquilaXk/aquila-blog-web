@@ -151,10 +151,10 @@ test.describe("wave6 round4 public markdown regressions", () => {
       applyInlineColors({ textContent: textNode.nodeValue } as unknown as HTMLElement)
       expect(replacedNodes).toHaveLength(4)
       expect(replacedNodes[0]?.className).toBe("aq-inline-color")
-      expect(replacedNodes[0]?.cssVar).toBe("#34d399")
+      expect(replacedNodes[0]?.cssVar).toBe("#15803d")
       expect(replacedNodes[0]?.textContent).toBe("C:\\")
       expect(replacedNodes[2]?.className).toBe("aq-inline-color")
-      expect(replacedNodes[2]?.cssVar).toBe("#34d399")
+      expect(replacedNodes[2]?.cssVar).toBe("#15803d")
       expect(replacedNodes[2]?.textContent).toBe("obj { a: { b: 1 } }")
       expect(replacedNodes[3]?.textContent).toBe(" and {{color:red|line1\nline2}}")
     })
@@ -302,7 +302,7 @@ test.describe("wave6 round4 public markdown regressions", () => {
 
     const colorRenderedHtml = renderMarkdownHtml("{{color:green|keep \\}\\} and `x}}y`}}")
     expect(colorRenderedHtml).toContain(
-      "<span class=\"aq-inline-color\" style=\"--aq-inline-color:#34d399\">keep }} and <code class=\"aq-inline-code\">x}}y</code></span>"
+      "<span class=\"aq-inline-color\" style=\"--aq-inline-color:#15803d\">keep }} and <code class=\"aq-inline-code\">x}}y</code></span>"
     )
     expect(colorRenderedHtml).not.toContain("\uE000")
 

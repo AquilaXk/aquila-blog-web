@@ -2,12 +2,12 @@ import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export const EDITOR_COLOR_SWATCH_SPECS = [
-  { label: "글자 기본색", token: "default", hex: "#787774" },
-  { label: "글자 파란색", token: "sky", hex: "#2383e2" },
-  { label: "글자 초록색", token: "emerald", hex: "#10b981" },
-  { label: "글자 주황색", token: "amber", hex: "#f59e0b" },
-  { label: "글자 보라색", token: "violet", hex: "#9065b0" },
-  { label: "글자 빨간색", token: "rose", hex: "#eb5757" },
+  { label: "글자 기본색", token: "default", hex: "#57534e" },
+  { label: "글자 파란색", token: "sky", hex: "#0369a1" },
+  { label: "글자 초록색", token: "emerald", hex: "#047857" },
+  { label: "글자 주황색", token: "amber", hex: "#b45309" },
+  { label: "글자 보라색", token: "violet", hex: "#6d28d9" },
+  { label: "글자 빨간색", token: "rose", hex: "#be123c" },
 ] as const
 
 export type CoordsRect = { top: number; bottom: number; left: number; right: number }

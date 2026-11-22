@@ -1076,7 +1076,7 @@ test.describe("core smoke detail rendering", () => {
   })
   await expect(readTypography(".aq-markdown p")).resolves.toEqual({
     fontSize: "16px",
-    lineHeight: "26.4px",
+    lineHeight: "27.84px",
     fontWeight: "400",
   })
   await expect(readTypography(".aq-code code, pre code")).resolves.toEqual({
@@ -1086,7 +1086,7 @@ test.describe("core smoke detail rendering", () => {
   })
   await expect(readTypography(".aq-callout .aq-markdown-text")).resolves.toEqual({
     fontSize: "16px",
-    lineHeight: "26.4px",
+    lineHeight: "27.84px",
     fontWeight: "400",
   })
 })

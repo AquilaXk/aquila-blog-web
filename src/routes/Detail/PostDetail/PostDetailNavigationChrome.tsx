@@ -26,10 +26,6 @@ const MobileFooterMeta = styled.div`
   padding-top: 1.5rem;
   border-top: 1px solid var(--aq-border);
 
-  @media (min-width: ${breakpoint.lg}px) {
-    display: none;
-  }
-
   .mobileMetaTags {
     display: flex;
     flex-wrap: wrap;
@@ -37,11 +33,21 @@ const MobileFooterMeta = styled.div`
   }
 
   .mobileTagLink {
-    color: var(--aq-accent-link, var(--aq-accent));
+    color: var(--aq-text-secondary);
     font-size: 0.875rem;
     font-weight: 500;
-    text-transform: uppercase;
     text-decoration: none;
+  }
+
+  .mobileBackWrap {
+    display: block;
+  }
+
+  @media (min-width: ${breakpoint.lg}px) {
+    .mobileMetaTags,
+    .mobileBackWrap {
+      display: none;
+    }
   }
 
   .mobileBackLink {
@@ -73,11 +79,18 @@ const AdjacentCardLink = styled(Link)`
   min-height: 44px;
   padding: 14px 16px;
   border: 1px solid var(--aq-border);
-  border-radius: 12px;
+  border-radius: 0.625rem;
   background: var(--aq-surface);
   color: var(--aq-text);
   text-decoration: none;
   transition: border-color 0.16s ease, color 0.16s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--aq-border-strong, var(--aq-accent));
+      color: var(--aq-accent-link, var(--aq-accent));
+    }
+  }
 
   &.isNext {
     text-align: right;
@@ -216,7 +229,7 @@ export const PostDetailNavigationChrome = ({
             )}
           </AdjacentNav>
         ) : null}
-        <div>
+        <div className="mobileBackWrap">
           <Link href="/" className="mobileBackLink">
             <span aria-hidden="true">←</span>
             <span>{t("postAllPosts")}</span>
