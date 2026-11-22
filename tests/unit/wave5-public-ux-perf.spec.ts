@@ -8,7 +8,6 @@ import { syncResponsiveTables } from "../../src/libs/markdown/hooks/useResponsiv
 import { selectUniqueRelatedPosts } from "../../src/routes/Detail/PostDetail/PostDetailRelatedSection"
 import {
   RAIL_UI_DETAILED_TOC,
-  RAIL_UI_LEFT_ACTIVE,
   RAIL_UI_RIGHT_ACTIVE,
 } from "../../src/routes/Detail/PostDetail"
 import {
@@ -110,11 +109,8 @@ test.describe("wave-5 public UX, responsive layout, and hot-path optimizations",
 
   test("bitmask constants for PostDetail rail UI and TagList expand state are distinct powers of two", () => {
     expect(RAIL_UI_DETAILED_TOC).toBe(1)
-    expect(RAIL_UI_LEFT_ACTIVE).toBe(2)
     expect(RAIL_UI_RIGHT_ACTIVE).toBe(4)
-    expect(
-      RAIL_UI_DETAILED_TOC & RAIL_UI_LEFT_ACTIVE & RAIL_UI_RIGHT_ACTIVE
-    ).toBe(0)
+    expect(RAIL_UI_DETAILED_TOC & RAIL_UI_RIGHT_ACTIVE).toBe(0)
 
     expect(TAG_EXPAND_DESKTOP).toBe(1)
     expect(TAG_EXPAND_CHIP).toBe(2)

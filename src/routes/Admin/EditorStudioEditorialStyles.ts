@@ -6,6 +6,7 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { boxShadowColor } from "src/design-system/tokens"
+import { zIndexes } from "src/styles/zIndexes"
 import {
   adminBorder,
   adminBorderStrong,
@@ -110,7 +111,7 @@ export const EditorMobileSheetScrim = styled.button`
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 155;
+    z-index: ${zIndexes.mobileSheet - 5};
     border: 0;
     padding: 0;
     margin: 0;

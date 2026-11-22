@@ -4,6 +4,7 @@
  * - lucide-icons/lucide (icons/{search,menu,x,globe}.svg, ISC License, Copyright (c) Lucide Contributors)
  */
 import type { NextRouter } from "next/router"
+import { getPreferredScrollBehavior } from "src/design-system/motion"
 
 export const primaryLinks = [
   ["notes", "Notes", "/", "navNotes"],
@@ -173,7 +174,7 @@ export const focusTopicsRailElement = (): boolean => {
   const target = isDesktopVisible ? topicsRoot : mobileRail ?? topicsRoot
   if (!target) return false
 
-  target.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
+  target.scrollIntoView?.({ behavior: getPreferredScrollBehavior(), block: "nearest" })
   const highlightTarget = topicsRoot ?? target
   highlightTarget.setAttribute?.("data-topics-highlighted", "true")
   if (clearTopicsHighlightTimer) {

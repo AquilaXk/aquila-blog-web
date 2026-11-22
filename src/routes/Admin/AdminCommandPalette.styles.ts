@@ -1,6 +1,7 @@
 // 참조 구현: shadcn-ui/ui apps/v4/registry/new-york-v4/ui/command.tsx (MIT), TryGhost/Ghost apps/admin/src/global-search/global-search-modal.tsx (MIT)
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { zIndexes } from "src/styles/zIndexes"
 import {
   adminBorder,
   adminBorderSubtle,
@@ -17,7 +18,7 @@ import {
 export const PaletteScrim = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: ${zIndexes.commandPalette};
   display: flex;
   align-items: flex-start;
   justify-content: center;

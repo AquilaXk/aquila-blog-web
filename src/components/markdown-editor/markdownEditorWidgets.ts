@@ -482,7 +482,7 @@ const renderMermaidFallbackCode = (container: HTMLElement, text: string) => {
 }
 
 const renderMermaidErrorFallback = (container: HTMLElement, text: string) => {
-  container.innerHTML = ""
+  container.replaceChildren()
   container.dataset.mermaidState = "error"
   const banner = document.createElement("div")
   banner.className = "cm-live-mermaid-error"

@@ -1,13 +1,13 @@
 // 참조 구현: strapi/strapi (MIT), transloadit/uppy (MIT), payloadcms/payload (MIT) — 미디어 워크스페이스 액션·O(1) 인덱싱·벌크 삭제
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import {
   bulkDeleteCloudFiles,
   deleteCloudFile,
@@ -178,7 +178,19 @@ export const useAdminCloudWorkspaceActions = () => {
 
   const deleteDialogRef = useRef<HTMLDivElement | null>(null)
   const deleteCancelButtonRef = useRef<HTMLButtonElement | null>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  const closeDeleteConfirm = useCallback(() => {
+    if (isDeletePending) return
+    setDeleteConfirm(null)
+  }, [isDeletePending])
+
+  const { handleKeyDown: handleDeleteDialogKeyDown } = useModalFocusTrap({
+    open: Boolean(deleteConfirm),
+    onClose: closeDeleteConfirm,
+    containerRef: deleteDialogRef,
+    initialFocusRef: deleteCancelButtonRef,
+    lockScroll: true,
+  })
 
   // 업로드 큐 훅 연결
   const {
@@ -250,30 +262,6 @@ export const useAdminCloudWorkspaceActions = () => {
     document.addEventListener("keydown", handleEscape)
     return () => document.removeEventListener("keydown", handleEscape)
   }, [deleteConfirm, setIsDetailPanelOpen, shouldShowDetailPanel])
-
-  useEffect(() => {
-    if (!deleteConfirm) return
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const focusFrame = window.requestAnimationFrame(() => {
-      deleteCancelButtonRef.current?.focus()
-    })
-    return () => {
-      window.cancelAnimationFrame(focusFrame)
-      previousFocusRef.current?.focus()
-      previousFocusRef.current = null
-    }
-  }, [deleteConfirm])
-
-  useEffect(() => {
-    if (!deleteConfirm) return
-    const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || isDeletePending) return
-      event.preventDefault()
-      setDeleteConfirm(null)
-    }
-    document.addEventListener("keydown", handleDocumentKeyDown)
-    return () => document.removeEventListener("keydown", handleDocumentKeyDown)
-  }, [deleteConfirm, isDeletePending])
 
   const resetSelectionAnchor = useCallback(() => {
     lastCheckedRowIndexRef.current = null
@@ -373,41 +361,6 @@ export const useAdminCloudWorkspaceActions = () => {
     setKnownFolders(nextFolders)
     if (activeFolderPath && !nextFolders.includes(activeFolderPath)) {
       setKeyword((current) => applyCloudFolderFilter(current, ""))
-    }
-  }
-
-  const closeDeleteConfirm = () => {
-    if (isDeletePending) return
-    setDeleteConfirm(null)
-  }
-
-  const handleDeleteDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault()
-      closeDeleteConfirm()
-      return
-    }
-    if (event.key !== "Tab") return
-
-    const dialog = deleteDialogRef.current
-    if (!dialog) return
-    const focusableElements = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled)"))
-    if (focusableElements.length === 0) {
-      event.preventDefault()
-      return
-    }
-
-    const firstElement = focusableElements[0]
-    const lastElement = focusableElements.at(-1)
-    if (!lastElement) return
-    if (event.shiftKey && document.activeElement === firstElement) {
-      event.preventDefault()
-      lastElement.focus()
-      return
-    }
-    if (!event.shiftKey && document.activeElement === lastElement) {
-      event.preventDefault()
-      firstElement.focus()
     }
   }
 

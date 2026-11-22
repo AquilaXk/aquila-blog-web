@@ -237,6 +237,11 @@ export const StyledWrapper = styled.div`
       &:hover {
         color: var(--aq-text);
       }
+
+      @media (pointer: coarse) {
+        min-height: ${control.lg}px;
+        min-width: ${control.lg}px;
+      }
     }
   }
 

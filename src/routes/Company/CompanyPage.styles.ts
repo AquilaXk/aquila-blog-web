@@ -127,6 +127,12 @@ export const NavLink = styled.a`
     padding: 0.375rem 0.625rem;
     font-size: 0.8125rem;
   }
+
+  @media (pointer: coarse) {
+    min-height: ${control.lg}px;
+    min-width: ${control.lg}px;
+    justify-content: center;
+  }
 `
 
 export const HeaderAction = styled.a`
@@ -151,6 +157,12 @@ export const HeaderAction = styled.a`
 
   @media (max-width: ${breakpoint.md - 1}px) {
     min-height: ${control.lg}px;
+  }
+
+  @media (pointer: coarse) {
+    min-height: ${control.lg}px;
+    min-width: ${control.lg}px;
+    justify-content: center;
   }
 `
 
@@ -447,6 +459,11 @@ export const FooterGroup = styled.div`
 
     @media (max-width: ${breakpoint.md - 1}px) {
       min-height: ${control.lg}px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
     }
   }
 `

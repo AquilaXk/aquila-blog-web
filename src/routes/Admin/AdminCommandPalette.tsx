@@ -2,6 +2,7 @@
 import { useRouter } from "next/router"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import AppIcon from "./AdminAppIcon"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import { useLanguage } from "src/libs/language"
 import {
   ClosePaletteButton,
@@ -57,8 +58,14 @@ export const AdminCommandPalette = ({ isOpen, onClose }: Props) => {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
   const modalRef = useRef<HTMLDivElement | null>(null)
+  const { handleKeyDown: handleModalKeyDown } = useModalFocusTrap({
+    open: isOpen,
+    onClose,
+    containerRef: modalRef,
+    initialFocusRef: inputRef,
+    lockScroll: true,
+  })
 
   const toggleLanguage = useCallback(() => {
     setLanguage(language === "ko" ? "en" : "ko")
@@ -114,57 +121,17 @@ export const AdminCommandPalette = ({ isOpen, onClose }: Props) => {
 
   useEffect(() => {
     if (!isOpen) return
-    previousFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
     setQuery("")
     setSelectedIndex(0)
 
     const timer = requestAnimationFrame(() => {
-      inputRef.current?.focus()
       inputRef.current?.select()
     })
 
     return () => {
       cancelAnimationFrame(timer)
-      previousFocusRef.current?.focus()
-      previousFocusRef.current = null
     }
   }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDownCapture = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        event.stopPropagation()
-        onClose()
-        return
-      }
-
-      if (event.key === "Tab") {
-        const modal = modalRef.current
-        if (!modal) return
-        const focusable = modal.querySelectorAll<HTMLElement>(
-          'input, button:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
-        )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault()
-          last.focus()
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault()
-          first.focus()
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDownCapture, true)
-    return () => window.removeEventListener("keydown", handleKeyDownCapture, true)
-  }, [isOpen, onClose])
 
   const handleSelectItem = useCallback(
     (item: AdminPaletteItem) => {
@@ -256,6 +223,7 @@ export const AdminCommandPalette = ({ isOpen, onClose }: Props) => {
         role="dialog"
         aria-modal="true"
         aria-label={language === "en" ? "Command Palette" : "커맨드 팔레트"}
+        onKeyDown={handleModalKeyDown}
       >
         <SearchBox>
           <SearchLeadIcon aria-hidden="true">

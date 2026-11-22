@@ -135,18 +135,12 @@ export const createOverlayIconControl = ({
   if (labelSpan) {
     labelSpan.textContent = textLabel
     button.appendChild(labelSpan)
-    if (button.textContent !== textLabel) {
-      button.textContent = textLabel
-    }
   }
 
   const setVisual = (nextIconSvg: string, nextTextLabel = "") => {
     iconSpan.innerHTML = nextIconSvg
     if (labelSpan) {
       labelSpan.textContent = nextTextLabel
-      if (button.textContent !== nextTextLabel) {
-        button.textContent = nextTextLabel
-      }
     }
   }
 

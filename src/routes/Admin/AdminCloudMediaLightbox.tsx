@@ -394,7 +394,7 @@ export const AdminCloudMediaLightbox = ({
     onClose,
     containerRef: modalRef,
     initialFocusRef: closeButtonRef,
-    lockScroll: false,
+    lockScroll: true,
   })
 
   if (!open || !file) return null

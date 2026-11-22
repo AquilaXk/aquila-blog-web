@@ -33,6 +33,10 @@ const StyledTextField = styled.input<{ $fieldSize: ControlSize }>`
   @media (max-width: 768px), (pointer: coarse) {
     min-height: ${control.lg}px;
   }
+
+  @media (pointer: coarse) {
+    font-size: 1rem;
+  }
 `
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(

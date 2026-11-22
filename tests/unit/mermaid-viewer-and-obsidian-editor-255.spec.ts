@@ -484,6 +484,18 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
             children.push(child)
             return child
           },
+          replaceChildren: (...nodes: Array<Record<string, unknown> | string>) => {
+            html = ""
+            elem.textContent = ""
+            children.length = 0
+            for (const node of nodes) {
+              if (typeof node === "string") {
+                elem.textContent = `${String(elem.textContent ?? "")}${node}`
+              } else {
+                children.push(node)
+              }
+            }
+          },
           addEventListener: () => {},
         }
         return elem

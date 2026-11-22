@@ -5,11 +5,11 @@
 import type { ChangeEventHandler, KeyboardEventHandler, ReactNode, Ref } from "react"
 import { EditorIconClose, EditorIconPlus } from "src/components/markdown-editor/MarkdownEditorIcons"
 import { useLanguage, type SiteLanguage } from "src/libs/language"
+import { EditorMobileSheetContainer } from "./EditorMobileSheetContainer"
 import { adminT } from "./adminI18n"
 import {
   EditorInspector,
   EditorInspectorTagInputRow,
-  EditorMobileSheetScrim,
   EditorOutline,
   EditorOutlineItem,
   EditorPanelHeader,
@@ -276,51 +276,52 @@ export const renderEditorOutlinePanel = ({
         : `약 ${readingMinutes}분 읽기`
       : null
   return (
-    <>
-      <EditorMobileSheetScrim
-        type="button"
-        aria-label={adminT("editorOutlineClose", language)}
-        onClick={() => setIsOutlineOpen(false)}
-      />
-      <EditorOutline aria-label={adminT("editorOutlineTitle", language)}>
-      <EditorPanelHeader>
-        <h3>{adminT("editorOutlineTitle", language)}</h3>
-        <button type="button" aria-label={adminT("editorOutlineClose", language)} onClick={() => setIsOutlineOpen(false)}>
-          <EditorIconClose size={14} />
-        </button>
-      </EditorPanelHeader>
-      <EditorOutlineSummaryBar data-testid="editor-outline-summary">
-        <span>{headingLabel}</span>
-        {readingLabel ? <span>{readingLabel}</span> : null}
-      </EditorOutlineSummaryBar>
-      {outlineItems.length > 0 ? (
-        <EditorOutlineTree>
-          {outlineItems.map((item, index) => (
-            <EditorOutlineItem
-              key={item.id}
-              type="button"
-              data-level={item.level}
-              data-active={String(index === activeOutlineIndex)}
-              onClick={() =>
-                activateEditorOutlineItem(
-                  item.range,
-                  setIsOutlineOpen,
-                  setLastActivatedOutlineOffset,
-                  onOutlineBodyHeadingActivate,
-                  focusTitle
-                )
-              }
-            >
-              <span aria-hidden="true">H{item.level}</span>
-              <strong>{item.label}</strong>
-            </EditorOutlineItem>
-          ))}
-        </EditorOutlineTree>
-      ) : (
-        <p>{adminT("editorOutlineEmpty", language)}</p>
+    <EditorMobileSheetContainer
+      open={isOutlineOpen}
+      onClose={() => setIsOutlineOpen(false)}
+      closeLabel={adminT("editorOutlineClose", language)}
+    >
+      {({ panelRef, panelProps }) => (
+        <EditorOutline ref={panelRef} aria-label={adminT("editorOutlineTitle", language)} {...panelProps}>
+          <EditorPanelHeader>
+            <h3>{adminT("editorOutlineTitle", language)}</h3>
+            <button type="button" aria-label={adminT("editorOutlineClose", language)} onClick={() => setIsOutlineOpen(false)}>
+              <EditorIconClose size={14} />
+            </button>
+          </EditorPanelHeader>
+          <EditorOutlineSummaryBar data-testid="editor-outline-summary">
+            <span>{headingLabel}</span>
+            {readingLabel ? <span>{readingLabel}</span> : null}
+          </EditorOutlineSummaryBar>
+          {outlineItems.length > 0 ? (
+            <EditorOutlineTree>
+              {outlineItems.map((item, index) => (
+                <EditorOutlineItem
+                  key={item.id}
+                  type="button"
+                  data-level={item.level}
+                  data-active={String(index === activeOutlineIndex)}
+                  onClick={() =>
+                    activateEditorOutlineItem(
+                      item.range,
+                      setIsOutlineOpen,
+                      setLastActivatedOutlineOffset,
+                      onOutlineBodyHeadingActivate,
+                      focusTitle
+                    )
+                  }
+                >
+                  <span aria-hidden="true">H{item.level}</span>
+                  <strong>{item.label}</strong>
+                </EditorOutlineItem>
+              ))}
+            </EditorOutlineTree>
+          ) : (
+            <p>{adminT("editorOutlineEmpty", language)}</p>
+          )}
+        </EditorOutline>
       )}
-      </EditorOutline>
-    </>
+    </EditorMobileSheetContainer>
   )
 }
 
@@ -420,13 +421,9 @@ export const renderEditorInspectorPanel = ({
       ? `${linkWarningCount} incomplete link(s) detected. Please complete the URL.`
       : `링크 주소가 비어 있거나 http:// 또는 https://만 입력된 링크가 ${linkWarningCount}개 있습니다. 주소를 완성해 주세요.`
   return (
-    <>
-      <EditorMobileSheetScrim
-        type="button"
-        aria-label={adminT("editorSettingsCloseAria", language)}
-        onClick={onCloseInspector}
-      />
-      <EditorInspector data-testid="editor-inspector-aside" aria-label={adminT("editorPublishSettingsAria", language)}>
+    <EditorMobileSheetContainer open={isInspectorOpen} onClose={onCloseInspector} closeLabel={adminT("editorSettingsCloseAria", language)}>
+      {({ panelRef, panelProps }) => (
+        <EditorInspector ref={panelRef} data-testid="editor-inspector-aside" aria-label={adminT("editorPublishSettingsAria", language)} {...panelProps}>
         <EditorPanelHeader>
           <h3>{adminT("editorSettingsHeading", language)}</h3>
           <button type="button" aria-label={adminT("editorSettingsCloseAria", language)} onClick={onCloseInspector}>
@@ -535,8 +532,9 @@ export const renderEditorInspectorPanel = ({
           currentContent={currentContent}
         />
         {linkWarningCount > 0 ? <p role="alert">{linkWarningMessage}</p> : null}
-      </EditorInspector>
-    </>
+        </EditorInspector>
+      )}
+    </EditorMobileSheetContainer>
   )
 }
 

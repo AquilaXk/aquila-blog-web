@@ -5,6 +5,7 @@ import { useRouter } from "next/router"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import { apiFetch } from "src/apis/backend/client"
+import { getPreferredScrollBehavior } from "src/design-system/motion"
 import useAuthSession from "src/hooks/useAuthSession"
 import { pushRoute } from "src/libs/router"
 import {
@@ -256,7 +257,7 @@ export const AdminPostWorkspacePage: NextPage<AdminPostsWorkspacePageProps> = ({
     if (!router.isReady) return
     if (router.query.surface !== "manage") return
     const timer = window.setTimeout(() => {
-      listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      listSectionRef.current?.scrollIntoView({ behavior: getPreferredScrollBehavior(), block: "start" })
     }, 160)
     return () => window.clearTimeout(timer)
   }, [router.isReady, router.query.surface])

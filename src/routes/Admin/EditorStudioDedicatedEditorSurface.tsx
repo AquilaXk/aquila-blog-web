@@ -168,15 +168,11 @@ const useResponsiveEditorPanelEffects = (
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "f") {
         event.preventDefault()
         handleToggleZenMode()
-        return
-      }
-      if (event.key === "Escape" && isMobileEditorViewport()) {
-        setPanelUiMask((m) => m & ~EDITOR_SURFACE_ZEN_BITS)
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [handleToggleZenMode, setPanelUiMask])
+  }, [handleToggleZenMode])
 }
 
 export const EditorStudioDedicatedEditorSurface = ({

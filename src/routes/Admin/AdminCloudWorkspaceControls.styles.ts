@@ -156,6 +156,7 @@ export const SortSelect = styled.select`
     height: auto;
     min-height: 44px;
     min-width: 44px;
+    font-size: 1rem;
   }
   &:focus-visible {
     outline: none;

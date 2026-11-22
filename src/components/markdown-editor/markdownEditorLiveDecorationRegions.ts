@@ -221,7 +221,7 @@ export const collectSyntaxNodesInRanges = (
 
 export const mergeSortedDirtyRegions = (ranges: readonly DecorationRangeSpec[]): DecorationRangeSpec[] => {
   if (ranges.length === 0) return []
-  const sorted = [...ranges].sort((a, b) => a.from - b.from || a.to - b.to)
+  const sorted = ranges.toSorted((a, b) => a.from - b.from || a.to - b.to)
   const merged: DecorationRangeSpec[] = []
   for (const r of sorted) {
     const prev = merged.at(-1)

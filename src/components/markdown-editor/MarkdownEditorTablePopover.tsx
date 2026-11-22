@@ -92,6 +92,11 @@ const TableMatrixGrid = styled.div`
   grid-template-columns: repeat(6, 20px);
   gap: 3px;
   justify-content: center;
+
+  @media (pointer: coarse) {
+    grid-template-columns: repeat(6, 36px);
+    gap: 4px;
+  }
 `
 
 const TableMatrixCell = styled.button<{ $active: boolean }>`
@@ -104,6 +109,11 @@ const TableMatrixCell = styled.button<{ $active: boolean }>`
   cursor: pointer;
   transition: background-color 0.08s ease, border-color 0.08s ease;
   ${focusVisibleRing}
+
+  @media (pointer: coarse) {
+    width: 36px;
+    height: 36px;
+  }
 `
 
 type MarkdownEditorTablePopoverProps = {

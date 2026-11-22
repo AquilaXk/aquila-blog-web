@@ -90,15 +90,42 @@ export const useModalFocusTrap = ({
 }: UseModalFocusTrapOptions) => {
   const triggerRef = useRef<HTMLElement | null>(null)
   const pausedRef = useRef(paused)
+  const onCloseRef = useRef(onClose)
   const handledTabEventsRef = useRef<WeakSet<Event> | null>(null)
+  const releaseScrollLockRef = useRef<(() => void) | null>(null)
   const trapActive = open && !paused
 
   pausedRef.current = paused
+  onCloseRef.current = onClose
 
   useEffect(() => {
-    if (!open || !lockScroll) return
-    return acquireBodyScrollLock()
+    if (!open || !lockScroll) {
+      releaseScrollLockRef.current?.()
+      releaseScrollLockRef.current = null
+      return
+    }
+    const release = acquireBodyScrollLock()
+    releaseScrollLockRef.current = release
+    return () => {
+      release()
+      if (releaseScrollLockRef.current === release) {
+        releaseScrollLockRef.current = null
+      }
+    }
   }, [open, lockScroll])
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return
+    const handlePopState = () => {
+      releaseScrollLockRef.current?.()
+      releaseScrollLockRef.current = null
+      onCloseRef.current()
+    }
+    window.addEventListener("popstate", handlePopState)
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return

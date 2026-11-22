@@ -11,7 +11,9 @@ import {
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { boxShadowColor } from "src/design-system/tokens"
+import { useLanguage } from "src/libs/language"
 import { zIndexes } from "src/styles/zIndexes"
+import { getBlockChromeLabels, getColorSwatchLabel } from "./markdownEditorBlockChromeLabels"
 import type { MarkdownFormatShortcut } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
@@ -188,6 +190,8 @@ export const MarkdownEditorBlockChrome = ({
   onApplySnippet, onApplyFormatShortcut, onApplyListCommand,
   onStripBlockPrefix, onApplyLineCommand, onTriggerSlashCommand,
 }: MarkdownEditorBlockChromeProps) => {
+  const { language } = useLanguage()
+  const labels = getBlockChromeLabels(language)
   const [isDismissed, setIsDismissed] = useState(false)
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false)
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false)
@@ -443,22 +447,22 @@ export const MarkdownEditorBlockChrome = ({
   }
 
   const bubbleButtons = [
-    { label: "선택 영역 일반 문단", icon: <EditorIconParagraph size={14} />, run: () => onStripBlockPrefix() },
-    { label: "선택 영역 제목 1", icon: <EditorIconHeading1 size={14} />, run: () => onApplySnippet("# ", "") },
-    { label: "선택 영역 제목 2", icon: <EditorIconHeading2 size={14} />, run: () => onApplySnippet("## ", "") },
-    { label: "선택 영역 제목 3", icon: <EditorIconHeading3 size={14} />, run: () => onApplySnippet("### ", "") },
-    { label: "선택 영역 인용구", icon: <EditorIconQuote size={14} />, run: () => onApplySnippet("> ", "") },
-    { label: "선택 영역 할 일", icon: <EditorIconTaskList size={14} />, run: () => onApplyListCommand("task") },
+    { label: labels.selParagraph, icon: <EditorIconParagraph size={14} />, run: () => onStripBlockPrefix() },
+    { label: labels.selHeading1, icon: <EditorIconHeading1 size={14} />, run: () => onApplySnippet("# ", "") },
+    { label: labels.selHeading2, icon: <EditorIconHeading2 size={14} />, run: () => onApplySnippet("## ", "") },
+    { label: labels.selHeading3, icon: <EditorIconHeading3 size={14} />, run: () => onApplySnippet("### ", "") },
+    { label: labels.selQuote, icon: <EditorIconQuote size={14} />, run: () => onApplySnippet("> ", "") },
+    { label: labels.selTask, icon: <EditorIconTaskList size={14} />, run: () => onApplyListCommand("task") },
   ]
 
   const inlineButtons = [
-    { label: "선택 영역 굵게", icon: <EditorIconBold size={14} />, active: isWrapSelectionActive(value, selection.from, selection.to, "**", "**"), run: () => onApplyFormatShortcut("bold") },
-    { label: "선택 영역 기울임", icon: <EditorIconItalic size={14} />, active: isWrapSelectionActive(value, selection.from, selection.to, "_", "_"), run: () => onApplyFormatShortcut("italic") },
-    { label: "선택 영역 취소선", icon: <EditorIconStrikethrough size={14} />, active: /^~~[\s\S]+~~$/.test(selectedText), run: () => onApplyFormatShortcut("strikethrough") },
-    { label: "선택 영역 인라인 코드", icon: <EditorIconInlineCode size={14} />, active: /^`[^`]+`$/.test(selectedText), run: () => onApplyFormatShortcut("inlineCode") },
-    { label: "선택 영역 하이라이트", icon: <EditorIconHighlight size={14} />, active: /^==[\s\S]+==$/.test(selectedText), run: () => onApplySnippet("==", "==", { toggle: true }) },
+    { label: labels.selBold, icon: <EditorIconBold size={14} />, active: isWrapSelectionActive(value, selection.from, selection.to, "**", "**"), run: () => onApplyFormatShortcut("bold") },
+    { label: labels.selItalic, icon: <EditorIconItalic size={14} />, active: isWrapSelectionActive(value, selection.from, selection.to, "_", "_"), run: () => onApplyFormatShortcut("italic") },
+    { label: labels.selStrikethrough, icon: <EditorIconStrikethrough size={14} />, active: /^~~[\s\S]+~~$/.test(selectedText), run: () => onApplyFormatShortcut("strikethrough") },
+    { label: labels.selInlineCode, icon: <EditorIconInlineCode size={14} />, active: /^`[^`]+`$/.test(selectedText), run: () => onApplyFormatShortcut("inlineCode") },
+    { label: labels.selHighlight, icon: <EditorIconHighlight size={14} />, active: /^==[\s\S]+==$/.test(selectedText), run: () => onApplySnippet("==", "==", { toggle: true }) },
     {
-      label: "선택 영역 링크",
+      label: labels.selLink,
       icon: <EditorIconLink size={14} />,
       active: Boolean(parseMarkdownLinkSelection(selectedText)) || isLinkPopoverOpen,
       expanded: isLinkPopoverOpen,
@@ -476,11 +480,11 @@ export const MarkdownEditorBlockChrome = ({
     <>
       {canShowGutterPlus && gutterTop !== null ? (
         <>
-          <GutterPlusButton type="button" aria-label="현재 줄에 블록 삽입" data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={gutterLeft} $dimmed={gutterDimmed} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}><EditorIconPlus size={15} /></GutterPlusButton>
+          <GutterPlusButton type="button" aria-label={labels.gutterPlus} data-testid="markdown-block-gutter-plus" $top={gutterTop} $left={gutterLeft} $dimmed={gutterDimmed} onMouseDown={(event) => event.preventDefault()} onClick={handleTriggerSlashAtCurrentLine}><EditorIconPlus size={15} /></GutterPlusButton>
           <GutterDragMenuButton
             ref={gutterHandleRef}
             type="button"
-            aria-label="현재 줄 블록 메뉴"
+            aria-label={labels.gutterHandle}
             aria-haspopup="menu"
             aria-expanded={isBlockMenuOpen}
             data-block-kind={effectiveBlockKind}
@@ -516,7 +520,7 @@ export const MarkdownEditorBlockChrome = ({
         />
       ) : null}
       {canShowBubble && bubblePosition ? (
-        <SelectionBubbleToolbar ref={bubbleRef} role="toolbar" aria-label="선택 텍스트 빠른 서식" data-testid="markdown-selection-bubble" $top={bubblePosition.top} $left={bubblePosition.left}>
+        <SelectionBubbleToolbar ref={bubbleRef} role="toolbar" aria-label={labels.selectionToolbar} data-testid="markdown-selection-bubble" $top={bubblePosition.top} $left={bubblePosition.left}>
           {bubbleButtons.map((item) => (
             <BubbleActionButton key={item.label} type="button" aria-label={item.label} onMouseDown={(event) => event.preventDefault()} onClick={item.run}>{item.icon}</BubbleActionButton>
           ))}
@@ -537,8 +541,8 @@ export const MarkdownEditorBlockChrome = ({
           <BubbleDivider aria-hidden="true" />
           <BubbleActionButton
             type="button"
-            aria-label="선택 영역 글자 색상"
-            title="선택 영역 글자 색상"
+            aria-label={labels.selTextColor}
+            title={labels.selTextColor}
             aria-pressed={hasInlineColorActive}
             aria-expanded={isColorPopoverOpen}
             onMouseDown={(event) => event.preventDefault()}
@@ -555,17 +559,17 @@ export const MarkdownEditorBlockChrome = ({
         <BubbleColorSwatchPopover
           ref={colorPopoverRef}
           role="menu"
-          aria-label="선택 영역 글자 색상 팔레트"
+          aria-label={labels.selTextColorPalette}
           $top={bubblePosition.top + 36}
           $left={bubblePosition.left}
         >
           {EDITOR_COLOR_SWATCH_SPECS.map((swatch) => (
             <BubbleActionButton
-              key={swatch.label}
+              key={swatch.token}
               type="button"
               role="menuitem"
-              aria-label={`선택 영역 ${swatch.label}`}
-              title={swatch.label}
+              aria-label={getColorSwatchLabel(language, swatch.token, swatch.label, true)}
+              title={getColorSwatchLabel(language, swatch.token, swatch.label)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 applyLineColorSwatch(swatch.token)

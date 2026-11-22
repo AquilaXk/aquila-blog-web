@@ -1,16 +1,24 @@
 import { RefObject, useEffect } from "react"
 
-const normalizeHeaderLabel = (value: string, index: number) => {
+const getFallbackColumnPrefix = () => {
+  if (typeof document === "undefined") return "항목"
+  const lang = document.documentElement?.lang ?? ""
+  return lang.toLowerCase().startsWith("en") ? "Item" : "항목"
+}
+
+const normalizeHeaderLabel = (value: string, index: number, fallbackPrefix: string) => {
   const trimmed = value.trim()
-  if (!trimmed) return `항목 ${index + 1}`
+  if (!trimmed) return `${fallbackPrefix} ${index + 1}`
   return trimmed
 }
 
-const buildHeaderLabels = (table: HTMLTableElement) => {
+const buildHeaderLabels = (table: HTMLTableElement, fallbackPrefix: string) => {
   const headRows = table.tHead ? Array.from(table.tHead.rows) : []
   if (!headRows.length) {
     const fallbackHeadCells = Array.from(table.querySelectorAll<HTMLTableCellElement>("tr:first-of-type th"))
-    return fallbackHeadCells.map((cell, index) => normalizeHeaderLabel(cell.textContent || "", index))
+    return fallbackHeadCells.map((cell, index) =>
+      normalizeHeaderLabel(cell.textContent || "", index, fallbackPrefix)
+    )
   }
 
   const matrix: string[][] = []
@@ -23,7 +31,7 @@ const buildHeaderLabels = (table: HTMLTableElement) => {
     Array.from(row.cells).forEach((cell) => {
       const colSpan = Math.max(1, cell.colSpan || 1)
       const rowSpan = Math.max(1, cell.rowSpan || 1)
-      const label = normalizeHeaderLabel(cell.textContent || "", colIndex)
+      const label = normalizeHeaderLabel(cell.textContent || "", colIndex, fallbackPrefix)
 
       while (matrix[rowIndex][colIndex] !== undefined) {
         colIndex += 1
@@ -47,20 +55,21 @@ const buildHeaderLabels = (table: HTMLTableElement) => {
       .filter(Boolean)
       .filter((value, index, source) => index === 0 || value !== source[index - 1])
 
-    if (!path.length) return `항목 ${columnIndex + 1}`
+    if (!path.length) return `${fallbackPrefix} ${columnIndex + 1}`
     return path.join(" · ")
   })
 }
 
 // 참조 구현: Responsive markdown table data-label mapper — 단일 패스 zero-allocation 경량화
 const applyResponsiveTableLabels = (root: HTMLElement) => {
+  const fallbackPrefix = getFallbackColumnPrefix()
   const tables = root.querySelectorAll<HTMLTableElement>("table")
   for (let t = 0; t < tables.length; t += 1) {
     const table = tables[t]
     if (!table.classList.contains("aq-table-responsive")) {
       table.classList.add("aq-table-responsive")
     }
-    const labels = buildHeaderLabels(table)
+    const labels = buildHeaderLabels(table, fallbackPrefix)
 
     const bodyRows: HTMLTableRowElement[] = []
     if (table.tBodies.length > 0) {
@@ -96,7 +105,7 @@ const applyResponsiveTableLabels = (root: HTMLElement) => {
         const colSpan = Math.max(1, child.colSpan || 1)
         let label = ""
         if (colSpan === 1) {
-          label = labels[visualColumnIndex] || `항목 ${cellIndex + 1}`
+          label = labels[visualColumnIndex] || `${fallbackPrefix} ${cellIndex + 1}`
         } else {
           let prev = ""
           for (let spanIdx = 0; spanIdx < colSpan; spanIdx += 1) {
@@ -106,7 +115,7 @@ const applyResponsiveTableLabels = (root: HTMLElement) => {
             prev = part
           }
           if (!label) {
-            label = labels[visualColumnIndex] || `항목 ${cellIndex + 1}`
+            label = labels[visualColumnIndex] || `${fallbackPrefix} ${cellIndex + 1}`
           }
         }
         if (child.getAttribute("data-label") !== label) {

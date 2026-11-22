@@ -82,7 +82,6 @@ const PostDetailNavigationChrome = dynamic<PostDetailNavigationChromeProps>(
 )
 
 export const RAIL_UI_DETAILED_TOC = 1
-export const RAIL_UI_LEFT_ACTIVE = 1 << 1
 export const RAIL_UI_RIGHT_ACTIVE = 1 << 2
 
 const PostDetail: React.FC = () => {

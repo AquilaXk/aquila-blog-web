@@ -52,6 +52,11 @@ export const DownloadAnnouncementInner = styled.div`
     &:hover {
       text-decoration: underline;
     }
+
+    @media (pointer: coarse) {
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
+    }
   }
 
   @media (max-width: ${breakpoint.md - 1}px) {
@@ -164,9 +169,15 @@ export const StickyOsNavInner = styled.div`
   margin: 0 auto;
   padding: 0.875rem 2rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   align-items: center;
   gap: 0.5rem;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   @media (max-width: ${breakpoint.md - 1}px) {
     padding: 0.75rem 1rem;
@@ -174,6 +185,8 @@ export const StickyOsNavInner = styled.div`
 `
 
 export const OsTabButton = styled.button<{ $active: boolean }>`
+  flex: 0 0 auto;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -252,6 +265,13 @@ export const VersionChip = styled.a`
 
   &:hover {
     background: ${light.surfaceBrandStrong};
+  }
+
+  @media (pointer: coarse) {
+    min-height: ${control.lg}px;
+    min-width: ${control.lg}px;
+    justify-content: center;
+    padding: 0.25rem 0.75rem;
   }
 `
 

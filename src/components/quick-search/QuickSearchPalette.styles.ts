@@ -161,7 +161,7 @@ export const QuickSearchDialog = styled.div`
     gap: 2px;
   }
 
-  li[role="option"] {
+  li[role="none"] {
     border: 0;
   }
 
@@ -197,7 +197,7 @@ export const QuickSearchDialog = styled.div`
     }
   }
 
-  li[aria-selected="true"] > .qsItemButton {
+  .qsItemButton[aria-selected="true"] {
     background: var(--aq-surface-subtle);
     color: var(--aq-text);
   }

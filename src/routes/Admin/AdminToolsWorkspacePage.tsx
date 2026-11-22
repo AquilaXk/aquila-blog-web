@@ -5,6 +5,7 @@ import { useRouter } from "next/router"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { toUserFacingMessage } from "src/apis/backend/errorClassification"
+import { getPreferredScrollBehavior } from "src/design-system/motion"
 import useAuthSession from "src/hooks/useAuthSession"
 import type { DashboardSnapshotPayload } from "src/routes/Admin/AdminDashboardWorkspaceModel"
 import {
@@ -518,7 +519,7 @@ const AdminToolsPage: NextPage<AdminToolsPageProps> = ({
       if (typeof window !== "undefined") {
         document
           .getElementById(SECTION_IDS[section])
-          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+          ?.scrollIntoView({ behavior: getPreferredScrollBehavior(), block: "start" })
       }
     },
     [handleSelectExecutionTab, handleSelectQueueTab]

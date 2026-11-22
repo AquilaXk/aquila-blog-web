@@ -51,7 +51,10 @@ export const ErrorFallbackView = ({
   onRetry,
 }: ErrorFallbackViewProps) => {
   const { language } = useLanguage()
-  const isEnglish = language === "en" || getClientStoredLanguage() === "en"
+  const isEnglish =
+    variant === "global"
+      ? language === "en" || getClientStoredLanguage() === "en"
+      : language === "en"
   const dict = isEnglish ? translations.en : translations.ko
   const copy = copyByVariant[variant]
   const title = isEnglish

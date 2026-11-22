@@ -119,6 +119,22 @@ export class SimpleDomElement {
     for (const node of nodes) this.appendChild(node)
   }
 
+  replaceChildren(...nodes: Array<SimpleDomElement | string>) {
+    for (const prev of this.children) {
+      prev.parentElement = null
+    }
+    this.children = []
+    this.rawTextContent = ""
+    this.innerHtmlValue = ""
+    for (const node of nodes) {
+      if (typeof node === "string") {
+        this.rawTextContent += node
+      } else {
+        this.appendChild(node)
+      }
+    }
+  }
+
   contains(other: unknown): boolean {
     let cur = other as SimpleDomElement | null
     while (cur) {

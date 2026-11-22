@@ -129,14 +129,10 @@ const resolvePublicUrlForCloudFile = async (
 
   assertCloudPickerFallbackByteBudget(file.byteSize, null)
   const sourceUrl = isImageAsset ? getCloudFileContentUrl(file.id) : getCloudFileDownloadUrl(file.id)
-  const abortController = new AbortController()
-  const timeoutId = window.setTimeout(() => abortController.abort(), 30_000)
-  let response: Response
-  try {
-    response = await fetch(sourceUrl, { credentials: "include", signal: abortController.signal })
-  } finally {
-    window.clearTimeout(timeoutId)
-  }
+  const response = await fetch(sourceUrl, {
+    credentials: "include",
+    signal: AbortSignal.timeout(30_000),
+  })
 
   if (!response.ok) {
     throw new Error(`${isImageAsset ? "클라우드 이미지" : "클라우드 파일"}를 내려받지 못했습니다. (HTTP ${response.status})`)

@@ -356,6 +356,7 @@ test.describe("Wave 3 — Issue #261: Obsidian UX Parity & Bit-Level Optimizatio
       const listeners = new Map<string, Array<(e: any) => void>>()
       const children: any[] = []
       const attrs: Record<string, string> = {}
+      let rawText = ""
       const styleObj: Record<string, any> = {
         setProperty(k: string, v: string) {
           this[k] = v
@@ -365,7 +366,15 @@ test.describe("Wave 3 — Issue #261: Obsidian UX Parity & Bit-Level Optimizatio
         tagName: tag.toUpperCase(),
         type: "",
         className: "",
-        textContent: "",
+        get textContent(): string {
+          return children.length > 0
+            ? children.map((child) => child.textContent ?? "").join("")
+            : rawText
+        },
+        set textContent(val: string) {
+          rawText = val
+          children.length = 0
+        },
         innerHTML: "",
         style: styleObj,
         children,

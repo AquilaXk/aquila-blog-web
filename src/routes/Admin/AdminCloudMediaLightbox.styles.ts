@@ -36,7 +36,7 @@ import { zIndexes } from "src/styles/zIndexes"
 export const YarlPortal = styled.div`
   position: fixed;
   inset: 0;
-  z-index: ${zIndexes.dialog + 4};
+  z-index: ${zIndexes.lightbox};
   overflow: hidden;
   overscroll-behavior: contain;
   background: ${adminTerminalBg};

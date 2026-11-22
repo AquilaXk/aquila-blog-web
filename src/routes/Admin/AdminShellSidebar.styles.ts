@@ -2,6 +2,7 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import { layoutBreakpoint } from "src/design-system/tokens"
+import { zIndexes } from "src/styles/zIndexes"
 import {
   adminAccentText,
   adminBorder,
@@ -192,7 +193,7 @@ export const Sidebar = styled.aside<{ $collapsed?: boolean }>`
       height: 100dvh;
       max-height: 100dvh;
       overflow-y: auto;
-      z-index: 91;
+      z-index: ${zIndexes.mobileNavOverlay + 1};
       width: min(17.5rem, 84vw);
       padding: 1rem 0.85rem;
       background: ${adminSurface};
@@ -396,7 +397,7 @@ export const ContentColumn = styled.div`
 export const MobileDrawerScrim = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: ${zIndexes.mobileNavOverlay};
   background: ${adminModalBackdropOverlay};
   backdrop-filter: blur(2px);
   overflow: hidden;

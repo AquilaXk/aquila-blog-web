@@ -396,6 +396,13 @@ export const EditorInspector = styled.aside`
     line-height: 1.58;
   }
 
+  @media (pointer: coarse) {
+    select,
+    textarea {
+      font-size: 1rem;
+    }
+  }
+
   p {
     display: flex;
     justify-content: space-between;

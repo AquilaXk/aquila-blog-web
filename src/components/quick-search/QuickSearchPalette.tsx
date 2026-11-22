@@ -334,12 +334,16 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
                     const optionId = `${paletteId}-option-${index}`
                     const itemTags = post.tags?.slice(0, 3) ?? []
                     return (
-                      <li id={optionId} key={post.id} role="option" aria-selected={selected}>
+                      <li key={post.id} role="none">
                         <button
+                          id={optionId}
                           ref={(node) => {
                             itemRefs.current[index] = node
                           }}
                           type="button"
+                          role="option"
+                          aria-selected={selected}
+                          tabIndex={-1}
                           data-slot="command-item"
                           className={selected ? "qsItemButton active" : "qsItemButton"}
                           data-selected={selected}

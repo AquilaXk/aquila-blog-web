@@ -5,6 +5,7 @@
  */
 /* eslint-disable @next/next/no-img-element */
 import React from "react"
+import { useLanguage } from "src/libs/language"
 
 type Props = React.ImgHTMLAttributes<HTMLImageElement> & {
   fillContainer?: boolean
@@ -23,6 +24,7 @@ const ProfileImage: React.FC<Props> = ({
   height,
   ...props
 }) => {
+  const { language } = useLanguage()
   const requestedSrc = typeof src === "string" ? src : ""
   const [failedSrc, setFailedSrc] = React.useState<string | null>(null)
   const imageRef = React.useRef<HTMLImageElement | null>(null)
@@ -62,7 +64,11 @@ const ProfileImage: React.FC<Props> = ({
       <span
         {...props}
         role="img"
-        aria-label={`${alt || "프로필"} 이미지를 불러올 수 없습니다.`}
+        aria-label={
+          language === "en"
+            ? `Failed to load ${alt || "profile"} image.`
+            : `${alt || "프로필"} 이미지를 불러올 수 없습니다.`
+        }
         style={{
           width,
           height,
@@ -100,7 +106,7 @@ const ProfileImage: React.FC<Props> = ({
       width={width}
       height={height}
       loading={loading || (priority ? "eager" : "lazy")}
-      {...(priority ? ({ fetchpriority: "high" } as Record<string, string>) : {})}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
       draggable={false}
       onError={handleImageError}

@@ -79,7 +79,7 @@ export const PostHeaderThumbnail: React.FC<PostHeaderThumbnailProps> = ({
           src={thumbnailSrc}
           alt={alt}
           loading="eager"
-          {...({ fetchpriority: "high" } as Record<string, string>)}
+          fetchPriority="high"
           decoding="async"
           draggable={false}
           style={{

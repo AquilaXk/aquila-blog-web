@@ -205,6 +205,13 @@ export const StyledWrapper = styled.div`
       outline-offset: 2px;
       border-radius: 2px;
     }
+
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
+    }
   }
 
   .sidebarActionsRow {
@@ -248,6 +255,11 @@ export const StyledWrapper = styled.div`
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
     }
   }
 
@@ -305,6 +317,11 @@ export const StyledWrapper = styled.div`
       outline-offset: 2px;
       border-radius: 2px;
     }
+
+    @media (pointer: coarse) {
+      min-height: ${control.lg}px;
+      min-width: ${control.lg}px;
+    }
   }
 
   .rightRail {
@@ -360,6 +377,15 @@ export const StyledWrapper = styled.div`
       &:focus-visible {
         outline: 2px solid var(--aq-focus-ring);
         outline-offset: 2px;
+      }
+
+      @media (pointer: coarse) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: ${control.lg}px;
+        min-width: ${control.lg}px;
+        padding: 0 0.75rem;
       }
     }
 

@@ -11,6 +11,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import BrandLogoMark from "src/components/branding/BrandMark"
 import ProfileImage from "src/components/ProfileImage"
 import { ConfirmDialog } from "src/design-system/ConfirmDialog"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import { useAdminShellProfile } from "src/hooks/useAdminShellProfile"
 import type { AuthMember } from "src/hooks/useAuthSession"
 import { useLanguage } from "src/libs/language"
@@ -111,6 +112,18 @@ const AdminShell = ({
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [shortcutPrefix, setShortcutPrefix] = useState("⌘")
+  const mobileDrawerRef = useRef<HTMLElement | null>(null)
+  const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
+  const closeMobileDrawer = useCallback(() => setIsMobileDrawerOpen(false), [])
+
+  const { handleKeyDown: handleMobileDrawerKeyDown } = useModalFocusTrap({
+    open: isMobileDrawerOpen,
+    onClose: closeMobileDrawer,
+    containerRef: mobileDrawerRef,
+    returnFocusRef: mobileMenuToggleRef,
+    paused: isPaletteOpen || isLogoutConfirmOpen,
+    lockScroll: true,
+  })
 
   const sequenceMachineRef = useRef<SequenceHotkeyStateMachine | null>(null)
   if (sequenceMachineRef.current === null) {
@@ -180,12 +193,6 @@ const AdminShell = ({
         }
       }
 
-      if (event.key === "Escape" && isMobileDrawerOpen) {
-        event.preventDefault()
-        setIsMobileDrawerOpen(false)
-        return
-      }
-
       if (machine) {
         machine.handleKeyDown(
           event,
@@ -245,8 +252,15 @@ const AdminShell = ({
 
       <StudioCardFrame $collapsed={effectiveCollapsed}>
         <Sidebar
+          ref={mobileDrawerRef}
           $collapsed={effectiveCollapsed}
           data-mobile-open={isMobileDrawerOpen ? "true" : undefined}
+          role={isMobileDrawerOpen ? "dialog" : undefined}
+          aria-modal={isMobileDrawerOpen ? true : undefined}
+          aria-label={
+            isMobileDrawerOpen ? (isEn ? "Admin menu" : "관리자 메뉴") : undefined
+          }
+          onKeyDown={isMobileDrawerOpen ? handleMobileDrawerKeyDown : undefined}
         >
           <div className="brandHeaderRow">
             <BrandBlock $collapsed={effectiveCollapsed}>
@@ -371,6 +385,7 @@ const AdminShell = ({
               </button>
               <span className="headerDivider" aria-hidden="true" />
               <button
+                ref={mobileMenuToggleRef}
                 type="button"
                 className="mobileMenuBtn"
                 aria-label={isEn ? "Open navigation menu" : "메뉴 열기"}

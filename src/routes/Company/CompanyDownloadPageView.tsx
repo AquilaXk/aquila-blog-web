@@ -5,7 +5,7 @@
  * - shadcn-ui/ui (apps/v4/registry/new-york-v4/ui/{tabs,card,badge}.tsx, MIT License)
  * - fuma-nama/fumadocs (packages/base-ui/src/components/codeblock.tsx, MIT License)
  */
-import { useEffect, useState } from "react"
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { CONFIG } from "site.config"
 import BrandMark, { ArrowRightGlyph } from "src/components/branding/BrandMark"
 import {
@@ -91,6 +91,33 @@ const CompanyDownloadPageView: React.FC<Props> = ({
     }
   }
 
+  const handleOsTabListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const count = EASYOFFICE_OS_PLATFORMS.length
+    if (count === 0) return
+
+    const currentIndex = EASYOFFICE_OS_PLATFORMS.findIndex((platform) => platform.os === activeOs)
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0
+    let nextIndex: number | null = null
+
+    if (event.key === "ArrowRight") {
+      nextIndex = (safeIndex + 1) % count
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (safeIndex - 1 + count) % count
+    } else if (event.key === "Home") {
+      nextIndex = 0
+    } else if (event.key === "End") {
+      nextIndex = count - 1
+    }
+
+    if (nextIndex === null) return
+    event.preventDefault()
+    const nextPlatform = EASYOFFICE_OS_PLATFORMS[nextIndex]
+    if (!nextPlatform) return
+    handleSelectOs(nextPlatform.os)
+    const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    tabs[nextIndex]?.focus()
+  }
+
   const handleCopySnippet = async (id: string, command: string) => {
     try {
       await navigator.clipboard?.writeText(command)
@@ -166,15 +193,21 @@ const CompanyDownloadPageView: React.FC<Props> = ({
         </D.DownloadHeaderBand>
 
         <D.StickyOsNav aria-label="운영체제 선택">
-          <D.StickyOsNavInner role="tablist" aria-label="EasyOffice 지원 운영체제">
+          <D.StickyOsNavInner
+            role="tablist"
+            aria-label="EasyOffice 지원 운영체제"
+            onKeyDown={handleOsTabListKeyDown}
+          >
             {EASYOFFICE_OS_PLATFORMS.map((platform) => {
               const selected = platform.os === activeOs
               return (
                 <D.OsTabButton
                   key={platform.os}
+                  id={`os-tab-${platform.os}`}
                   type="button"
                   role="tab"
                   aria-selected={selected}
+                  tabIndex={selected ? 0 : -1}
                   data-os={platform.os}
                   $active={selected}
                   onClick={() => handleSelectOs(platform.os)}
@@ -187,7 +220,7 @@ const CompanyDownloadPageView: React.FC<Props> = ({
           </D.StickyOsNavInner>
         </D.StickyOsNav>
 
-        <D.DownloadSectionBand id="desktop-app" aria-labelledby="easyoffice-desktop-heading">
+        <D.DownloadSectionBand id="desktop-app" role="tabpanel" aria-labelledby={`os-tab-${activeOs}`}>
           <D.DownloadSectionInner>
             <D.SectionHeaderRow>
               <h2 id="easyoffice-desktop-heading">EasyOffice Desktop</h2>
