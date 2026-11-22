@@ -366,9 +366,9 @@ export const FooterWordmarkBanner = styled.div`
     line-height: 0.94;
     letter-spacing: -0.045em;
     white-space: nowrap;
-    color: ${light.border};
-    -webkit-mask-image: linear-gradient(to bottom, black 22%, transparent 96%);
-    mask-image: linear-gradient(to bottom, black 22%, transparent 96%);
+    color: ${light.inkMuted};
+    -webkit-mask-image: ${light.wordmarkFadeMask};
+    mask-image: ${light.wordmarkFadeMask};
   }
 
   @media (max-width: ${breakpoint.md - 1}px) {

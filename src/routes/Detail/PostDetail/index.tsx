@@ -48,7 +48,12 @@ import { RecoverableSurfaceBoundary } from "src/components/error/ErrorBoundary"
 const MarkdownLoadingSkeleton: React.FC = () => {
   const { t } = useLanguage()
   return (
-    <div className="markdownLoadingSkeleton" aria-busy="true" aria-label={t("postLoadingAria")}>
+    <div
+      className="markdownLoadingSkeleton"
+      role="status"
+      aria-busy="true"
+      aria-label={t("postLoadingAria")}
+    >
       <span className="skeletonLine skeletonLineWide" />
       <span className="skeletonLine skeletonLineFull" />
       <span className="skeletonLine skeletonLineMid" />

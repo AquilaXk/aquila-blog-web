@@ -172,6 +172,7 @@ export const marketingLight = {
   darkCardSurface: "rgba(38, 44, 84, 0.78)",
   darkCardBorder: "rgba(180, 188, 251, 0.22)",
   darkPillHover: "rgba(255, 255, 255, 0.1)",
+  wordmarkFadeMask: "linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0%, transparent 96%)",
 } as const
 
 /**
