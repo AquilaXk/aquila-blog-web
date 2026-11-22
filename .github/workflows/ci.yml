@@ -5,13 +5,20 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "TODO.md"
+      - "SECURITY.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "docs/**"
 
 permissions:
   contents: read
 
 concurrency:
   group: web-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -29,6 +36,13 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('src/**', 'packages/**', 'next.config.js') }}
+          restore-keys: |
+            nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
       - run: node scripts/repo-boundary/check-web-root.mjs
       - run: node --test scripts/repo-boundary/check-web-root.test.mjs
       - run: node scripts/repo-boundary/check-web-boundary.mjs
@@ -39,11 +53,12 @@ jobs:
       - run: node --test scripts/contracts/receive-platform-deployment-workflow.test.mjs
       - run: PLAYWRIGHT_USE_WEBSERVER=false yarn playwright test e2e/platform-deployment-smoke.spec.ts --grep "rejects readiness fallback payloads" --workers=1
       - run: node --test scripts/contracts/frontend-image-workflow.test.mjs
-      - run: node --test scripts/contracts/rescan-approved-web-image-workflow.test.mjs
-      - run: node --test scripts/security/native-image-evidence.test.mjs
       - run: yarn contracts:check
       - run: yarn lint
+      - run: yarn type-check
       - run: yarn build
+      - run: yarn check:bundle-size
+      - run: yarn check:runtime-image-payload
       - run: yarn check:runtime-metrics-standalone
         env:
           WEB_METRICS_TOKEN: ci-metrics-${{ github.run_id }}-${{ github.run_attempt }}-standalone-contract
@@ -61,10 +76,8 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: yarn build
-      - run: yarn check:bundle-size
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -91,8 +104,15 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('src/**', 'packages/**', 'next.config.js') }}
+          restore-keys: |
+            nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -119,8 +139,15 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('src/**', 'packages/**', 'next.config.js') }}
+          restore-keys: |
+            nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright

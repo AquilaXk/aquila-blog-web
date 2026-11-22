@@ -5,6 +5,13 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "TODO.md"
+      - "SECURITY.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "docs/**"
   schedule:
     - cron: "23 2 * * 1"
   workflow_dispatch:
@@ -37,12 +44,19 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('src/**', 'packages/**', 'next.config.js') }}
+          restore-keys: |
+            nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
       - run: yarn build
       - name: Analyze trusted context
-        if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]')
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: github/codeql-action/analyze@256d634097be96e792d6764f9edaefc4320557b1 # v4
-      - name: Analyze without upload for fork or Dependabot PR
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.repo.fork == true || github.actor == 'dependabot[bot]')
+      - name: Analyze without upload for fork PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
         uses: github/codeql-action/analyze@256d634097be96e792d6764f9edaefc4320557b1 # v4
         with:
           upload: never
@@ -112,5 +126,23 @@ jobs:
           cache: yarn
           cache-dependency-path: yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('src/**', 'packages/**', 'next.config.js') }}
+          restore-keys: |
+            nextjs-cache-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - run: yarn playwright test e2e/security-csp-header.spec.ts --project=chromium --workers=1

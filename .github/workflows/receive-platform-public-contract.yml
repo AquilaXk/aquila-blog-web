@@ -6,7 +6,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: platform-public-contract-receiver
@@ -15,7 +14,6 @@ concurrency:
 env:
   PLATFORM_REPOSITORY: AquilaXk/aquila-blog
   WEB_REPOSITORY: AquilaXk/aquila-blog-web
-  SYNC_BRANCH: chore/platform-contract-sync
 
 jobs:
   receive:
@@ -92,7 +90,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.delivery.outputs.target_commit }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js 20
@@ -172,30 +170,9 @@ jobs:
             echo "changed=true" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Discover exact existing Web Draft PR
-        id: existing-pr
-        if: ${{ steps.freshness.outputs.stale == 'false' }}
-        env:
-          WEB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          prs="$(GH_TOKEN="${WEB_TOKEN}" gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
-          PRS="${prs}" node - <<'NODE'
-          const fs = require("node:fs")
-          const prs = JSON.parse(process.env.PRS)
-          if (!Array.isArray(prs) || prs.length > 1) throw new Error("expected at most one generated Draft PR")
-          if (!prs.length) {
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, "exists=false\npr_number=\n")
-            process.exit(0)
-          }
-          const pr = prs[0]
-          if (!pr.draft || pr.state !== "open" || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated Draft PR identity is invalid")
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `exists=true\npr_number=${pr.number}\n`)
-          NODE
-
       - name: Recheck source and target freshness before Web write token
         id: prewrite
-        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' }}
         env:
           PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
           WEB_TOKEN: ${{ github.token }}
@@ -210,7 +187,7 @@ jobs:
 
       - name: Create Web write token
         id: web-token
-        if: ${{ steps.freshness.outputs.stale == 'false' && (steps.changes.outputs.changed == 'true' || steps.existing-pr.outputs.exists == 'true') && steps.prewrite.outputs.stale == 'false' }}
+        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.REPO_SYNC_APP_CLIENT_ID }}
@@ -218,9 +195,8 @@ jobs:
           owner: AquilaXk
           repositories: aquila-blog-web
           permission-contents: write
-          permission-pull-requests: write
 
-      - name: Commit Web-local contract candidate
+      - name: Commit and push synced Web contract to main
         id: commit
         if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' }}
         env:
@@ -228,6 +204,7 @@ jobs:
           WEB_TOKEN: ${{ steps.web-token.outputs.token }}
           PLATFORM_TOKEN: ${{ steps.platform-token.outputs.token }}
           SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
+          TARGET_COMMIT: ${{ steps.delivery.outputs.target_commit }}
           EXPECTED_APP_LOGIN: ${{ vars.REPO_SYNC_APP_BOT_LOGIN }}
           APP_SLUG: ${{ steps.web-token.outputs.app-slug }}
         run: |
@@ -235,67 +212,18 @@ jobs:
           gh auth setup-git; app_login="${APP_SLUG}[bot]"; app_id="$(gh api "/users/${app_login}" --jq .id)"
           if [[ -z "${EXPECTED_APP_LOGIN}" || "${app_login}" != "${EXPECTED_APP_LOGIN}" || ! "${app_id}" =~ ^[0-9]+$ ]]; then echo "write token identity is not the configured App bot" >&2; exit 1; fi
           git config user.name "${app_login}"; git config user.email "${app_id}+${app_login}@users.noreply.github.com"
-          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
-          if git ls-remote --exit-code --heads origin "refs/heads/${SYNC_BRANCH}" >/dev/null 2>&1; then git fetch --no-tags origin "refs/heads/${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}"; fi
-          if git show-ref --verify --quiet "refs/remotes/origin/${SYNC_BRANCH}"; then git checkout -B "${SYNC_BRANCH}" "origin/${SYNC_BRANCH}"; git merge --no-edit origin/main; else git checkout -B "${SYNC_BRANCH}" origin/main; fi
           allowed_path() { [[ "$1" == contracts/platform/* || "$1" == packages/shared-contracts/src/generated/backend-openapi.d.ts ]]; }
-          while IFS= read -r changed; do [[ -z "${changed}" ]] || allowed_path "${changed}" || { echo "stable branch contains out-of-scope path: ${changed}" >&2; exit 1; }; done < <(git diff --name-only origin/main...HEAD)
-          cp .contract-candidate/platform/openapi.json .contract-candidate/platform/error-codes.json .contract-candidate/platform/manifest.lock.json contracts/platform/
-          cp .contract-candidate/platform/summary-fixtures.json contracts/platform/
+          cp .contract-candidate/platform/openapi.json .contract-candidate/platform/error-codes.json .contract-candidate/platform/manifest.lock.json .contract-candidate/platform/summary-fixtures.json contracts/platform/
           cp .contract-candidate/generated/backend-openapi.d.ts packages/shared-contracts/src/generated/backend-openapi.d.ts
-          git add -A -- contracts/platform
-          git add packages/shared-contracts/src/generated/backend-openapi.d.ts
+          rm -rf .contract-candidate incoming
+          git add -- contracts/platform/openapi.json contracts/platform/error-codes.json contracts/platform/summary-fixtures.json contracts/platform/manifest.lock.json packages/shared-contracts/src/generated/backend-openapi.d.ts
           while IFS= read -r changed; do [[ -z "${changed}" ]] || allowed_path "${changed}" || { echo "staged change is out of scope: ${changed}" >&2; exit 1; }; done < <(git diff --cached --name-only)
-          if ! git diff --cached --quiet; then git commit -m "chore(contracts): sync Platform ${SOURCE_COMMIT:0:12}"; fi
+          yarn contracts:check
+          yarn type-check
           source_main="$(GH_TOKEN="${PLATFORM_TOKEN}" gh api "repos/${PLATFORM_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"; target_main="$(GH_TOKEN="${WEB_TOKEN}" gh api "repos/${WEB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
           if [[ ! "${source_main}" =~ ^[a-f0-9]{40}$ || ! "${target_main}" =~ ^[a-f0-9]{40}$ ]]; then echo "current repository SHA is invalid" >&2; exit 1; fi
-          if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${{ steps.delivery.outputs.target_commit }}" ]]; then echo "ready=false" >> "${GITHUB_OUTPUT}"; exit 0; fi
-          if ! git show-ref --verify --quiet "refs/remotes/origin/${SYNC_BRANCH}" || [[ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/remotes/origin/${SYNC_BRANCH}")" ]]; then git push origin "HEAD:refs/heads/${SYNC_BRANCH}"; fi
-          echo "ready=true" >> "${GITHUB_OUTPUT}"
-
-      - name: Close stale Web Draft PR
-        id: close-stale-pr
-        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'false' && steps.existing-pr.outputs.exists == 'true' && steps.prewrite.outputs.stale == 'false' }}
-        env:
-          GH_TOKEN: ${{ steps.web-token.outputs.token }}
-          PR_NUMBER: ${{ steps.existing-pr.outputs.pr_number }}
-        run: |
-          set -euo pipefail
-          pr="$(gh api "repos/${WEB_REPOSITORY}/pulls/${PR_NUMBER}")"
-          should_close="$(PR="${pr}" node - <<'NODE'
-          const pr = JSON.parse(process.env.PR)
-          if (pr.state === "closed") { process.stdout.write("false"); process.exit(0) }
-          if (pr.state !== "open" || !pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("stale Draft PR identity is invalid")
-          process.stdout.write("true")
-          NODE
-          )"
-          if [[ "${should_close}" == "true" ]]; then gh pr close "${PR_NUMBER}" --repo "${WEB_REPOSITORY}"; fi
-
-      - name: Create or update the Web draft PR
-        if: ${{ steps.freshness.outputs.stale == 'false' && steps.changes.outputs.changed == 'true' && steps.prewrite.outputs.stale == 'false' && steps.commit.outputs.ready == 'true' }}
-        env:
-          GH_TOKEN: ${{ steps.web-token.outputs.token }}
-          SYNC_BRANCH: ${{ env.SYNC_BRANCH }}
-          SOURCE_REPOSITORY: ${{ steps.delivery.outputs.source_repository }}
-          SOURCE_COMMIT: ${{ steps.delivery.outputs.source_commit }}
-          DELIVERY_ID: ${{ steps.delivery.outputs.delivery_id }}
-          MANIFEST_SHA256: ${{ steps.delivery.outputs.manifest_sha256 }}
-          OPENAPI_SHA256: ${{ steps.delivery.outputs.openapi_sha256 }}
-          ERROR_CODES_SHA256: ${{ steps.delivery.outputs.error_codes_sha256 }}
-        run: |
-          set -euo pipefail
-          prs="$(gh api --method GET "repos/${WEB_REPOSITORY}/pulls?state=open&head=AquilaXk:${SYNC_BRANCH}&base=main")"
-          pr_number="$(PRS="${prs}" node - <<'NODE'
-          const prs = JSON.parse(process.env.PRS); if (!Array.isArray(prs) || prs.length > 1) throw new Error("expected at most one generated draft PR"); if (!prs.length) process.exit(0)
-          const pr = prs[0]; if (!pr.draft || pr.base?.ref !== "main" || pr.head?.ref !== process.env.SYNC_BRANCH || pr.head?.repo?.full_name !== "AquilaXk/aquila-blog-web") throw new Error("generated PR identity is invalid"); process.stdout.write(String(pr.number))
-          NODE
-          )"
-          body="$(mktemp)"
-          {
-            printf '%s\n' "## Verified delivery" "" "Sync a verified Platform public contract delivery." ""
-            printf '%s\n' "- Source commit: https://github.com/${SOURCE_REPOSITORY}/commit/${SOURCE_COMMIT}" "- Delivery ID: ${DELIVERY_ID}" ""
-            printf '%s\n' "## SHA-256" "" "- Manifest: ${MANIFEST_SHA256}" "- OpenAPI: ${OPENAPI_SHA256}" "- Error codes: ${ERROR_CODES_SHA256}" ""
-            printf '%s\n' "## Generated scope" "" "- \`contracts/platform/**\`" "- \`packages/shared-contracts/src/generated/backend-openapi.d.ts\`" ""
-            printf '%s\n' "## Verification" "" "The receiver completed byte, hash, and import validation before writing the branch." "" "Required CI owns the full Web regression for this Draft PR."
-          } > "${body}"
-          if [[ -n "${pr_number}" ]]; then gh pr edit "${pr_number}" --repo "${WEB_REPOSITORY}" --title "[Chore] Sync Platform public contract" --body-file "${body}"; else gh pr create --repo "${WEB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --draft --title "[Chore] Sync Platform public contract" --body-file "${body}"; fi
+          if [[ "${source_main}" != "${SOURCE_COMMIT}" || "${target_main}" != "${TARGET_COMMIT}" ]]; then echo "stale=true" >> "${GITHUB_OUTPUT}"; exit 0; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "[Chore] 플랫폼 공개 API 계약 동기화 (${SOURCE_COMMIT:0:12})"
+            git push origin HEAD:refs/heads/main
+          fi

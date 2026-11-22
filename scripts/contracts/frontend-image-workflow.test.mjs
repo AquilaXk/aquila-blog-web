@@ -225,12 +225,79 @@ printf '%s\n' "$*" >> "${calls}"
   return { ...result, callLog, summaryText }
 }
 
+function runCiAndSecurityGate(overrides = {}) {
+  const fixture = deliveryFixture(overrides)
+  const gate = step(workflow().document.jobs.publish, "Require successful Web CI and Web Security for source SHA")
+  const directory = mkdtempSync(path.join(tmpdir(), "aquila-web-ci-gate-"))
+  const sleepCalls = path.join(directory, "sleep-calls")
+  const gh = path.join(directory, "gh")
+  const sleepBin = path.join(directory, "sleep")
+  const responsesFile = path.join(directory, "responses.json")
+  const countsFile = path.join(directory, "counts.json")
+  const resolver = path.join(directory, "resolve.mjs")
+  writeFileSync(sleepCalls, "")
+  writeFileSync(countsFile, JSON.stringify({ "ci.yml": 0, "security.yml": 0 }))
+  writeFileSync(responsesFile, JSON.stringify({
+    "ci.yml": overrides.ciResponses ?? [[{ id: 101, event: "push", head_branch: "main", status: "completed", conclusion: "success" }]],
+    "security.yml": overrides.securityResponses ?? [[{ id: 201, event: "push", head_branch: "main", status: "completed", conclusion: "success" }]],
+    apiErrorOn: overrides.apiErrorOn ?? null,
+  }))
+  writeFileSync(resolver, `
+    import fs from "node:fs"
+    const [rPath, cPath, wf] = process.argv.slice(2)
+    const r = JSON.parse(fs.readFileSync(rPath, "utf8"))
+    const c = JSON.parse(fs.readFileSync(cPath, "utf8"))
+    const attempt = c[wf] ?? 0
+    c[wf] = attempt + 1
+    fs.writeFileSync(cPath, JSON.stringify(c))
+    if (r.apiErrorOn && r.apiErrorOn.wf === wf && r.apiErrorOn.attempt === attempt) process.exit(22)
+    const runs = r[wf][Math.min(attempt, r[wf].length - 1)]
+    process.stdout.write(JSON.stringify({ total_count: runs.length, workflow_runs: runs }))
+  `)
+  writeFileSync(gh, `#!/usr/bin/env bash
+set -euo pipefail
+[ "\${GH_TOKEN:-}" = "web-token-fixture" ] || exit 9
+[ "\${1:-}" = "api" ] && [ "\${3:-}" = "--paginate" ] && [ "\${4:-}" = "--jq" ] || exit 1
+case "\${2:-}" in
+  "repos/AquilaXk/aquila-blog-web/actions/workflows/ci.yml/runs?head_sha=${fixture.sourceSha}&per_page=50") wf="ci.yml" ;;
+  "repos/AquilaXk/aquila-blog-web/actions/workflows/security.yml/runs?head_sha=${fixture.sourceSha}&per_page=50") wf="security.yml" ;;
+  *) exit 1 ;;
+esac
+node "${resolver}" "${responsesFile}" "${countsFile}" "\${wf}" | jq -r "\${5:-}"
+`)
+  writeFileSync(sleepBin, `#!/usr/bin/env bash\nprintf '%s\n' "$*" >> "${sleepCalls}"\n`)
+  chmodSync(gh, 0o755)
+  chmodSync(sleepBin, 0o755)
+  const result = spawnSync("bash", ["-c", gate.run], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      GH_TOKEN: overrides.webToken ?? fixture.webToken,
+      SOURCE_REPOSITORY: overrides.sourceRepository ?? fixture.sourceRepository,
+      SOURCE_SHA: overrides.sourceSha ?? fixture.sourceSha,
+      PATH: `${directory}:${process.env.PATH}`,
+    },
+  })
+  const sleepLog = readFileSync(sleepCalls, "utf8").trim().split("\n").filter(Boolean)
+  rmSync(directory, { recursive: true, force: true })
+  return { ...result, sleepLog }
+}
+
 test("frontend image producer pins its immutable build, scan, and dispatch contract", () => {
   const { source, document } = workflow()
   const job = document.jobs.publish
 
   assert.deepEqual(document.true.push.branches, ["main"])
+  assert.deepEqual(document.true.push["paths-ignore"], [
+    "README.md",
+    "CHANGELOG.md",
+    "TODO.md",
+    "SECURITY.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/**",
+  ])
   assert.deepEqual(document.permissions, {
+    actions: "read",
     attestations: "write",
     contents: "read",
     "id-token": "write",
@@ -255,14 +322,20 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
   assert.match(handoffConfig.run, /\[\[ -n "\$\{REPO_SYNC_APP_PRIVATE_KEY\}" \]\]/)
   assert.doesNotMatch(handoffConfig.run, /(?:echo|printf).*\$\{REPO_(?:SPLIT_SYNC_ENABLED|SYNC_APP_CLIENT_ID|SYNC_APP_PRIVATE_KEY)\}/)
 
+  const buildx = step(job, "Set up Docker Buildx")
+  assert.equal(buildx.uses, "docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e")
+  assert.ok(job.steps.indexOf(handoffConfig) < job.steps.indexOf(buildx))
+
   const build = step(job, "Build and push immutable Web image")
-  assert.ok(job.steps.indexOf(handoffConfig) < job.steps.indexOf(build))
+  assert.ok(job.steps.indexOf(buildx) < job.steps.indexOf(build))
   assert.match(build.uses, /^docker\/build-push-action@[a-f0-9]{40}$/)
   assert.equal(build.with.context, ".")
   assert.equal(build.with.file, "Dockerfile.runtime")
   assert.equal(build.with.push, true)
   assert.equal(build.with.tags, "ghcr.io/aquilaxk/aquila-blog-web-front:sha-${{ github.sha }}")
   assert.equal(build.with["build-args"], "NEXT_PUBLIC_AQUILA_BUILD_SHA=${{ steps.source.outputs.source_sha }}")
+  assert.equal(build.with["cache-from"], "type=gha")
+  assert.equal(build.with["cache-to"], "type=gha,mode=max")
 
   const digest = step(job, "Validate pushed image digest")
   assert.match(digest.run, /\^sha256:\[a-f0-9\]\{64\}\$/)
@@ -294,31 +367,21 @@ test("frontend image producer pins its immutable build, scan, and dispatch contr
   assert.ok(job.steps.indexOf(provenance) < job.steps.indexOf(sbom))
   assert.ok(job.steps.indexOf(sbom) < job.steps.indexOf(vulnerability))
 
-  const evidence = step(job, "Verify exact Web image attestations")
-  for (const predicateType of [
-    "https://slsa.dev/provenance/v1",
-    "https://spdx.dev/Document/v2.3",
-    "https://cosign.sigstore.dev/attestation/vuln/v1",
-  ]) {
-    assert.match(evidence.run, new RegExp(predicateType.replaceAll("/", "\\/")))
-  }
-  assert.match(evidence.run, /gh attestation verify "oci:\/\/\$\{IMAGE_REF\}"/)
-  assert.match(evidence.run, /--repo "\$\{SOURCE_REPOSITORY\}"/)
-  assert.match(evidence.run, /--source-digest "\$\{SOURCE_SHA\}"/)
-  assert.match(evidence.run, /--source-ref refs\/heads\/main/)
-  assert.match(evidence.run, /--signer-workflow AquilaXk\/aquila-blog-web\/.github\/workflows\/frontend-image\.yml/)
-  assert.match(evidence.run, /--deny-self-hosted-runners/)
-  assert.match(evidence.run, /--format json/)
-  assert.match(evidence.run, /native-image-evidence\.mjs verify-attestation-set/)
-  assert.match(evidence.run, /https:\/\/github\.com\/\$\{SOURCE_REPOSITORY\}\/actions\/runs\/\$\{PRODUCER_RUN_ID\}\/attempts\/\$\{PRODUCER_RUN_ATTEMPT\}/)
-  assert.ok(job.steps.indexOf(vulnerability) < job.steps.indexOf(evidence))
+  assert.equal(job.steps.find((candidate) => candidate.name === "Verify exact Web image attestations"), undefined)
+  assert.doesNotMatch(source, /native-image-evidence\.mjs|gh attestation verify/)
+
+  const ciGate = step(job, "Require successful Web CI and Web Security for source SHA")
+  assert.equal(ciGate.env.GH_TOKEN, "${{ github.token }}")
+  assert.equal(ciGate.env.SOURCE_REPOSITORY, "AquilaXk/aquila-blog-web")
+  assert.equal(ciGate.env.SOURCE_SHA, "${{ steps.source.outputs.source_sha }}")
+  assert.ok(job.steps.indexOf(vulnerability) < job.steps.indexOf(ciGate))
 
   const freshness = step(job, "Check current Web source freshness")
   assert.equal(freshness.env.WEB_GH_TOKEN, "${{ github.token }}")
   assert.equal(freshness.env.PLATFORM_GH_TOKEN, undefined)
   assert.match(freshness.run, /repos\/\$\{SOURCE_REPOSITORY\}\/commits\/main/)
   assert.doesNotMatch(freshness.run, /AquilaXk\/aquila-blog\/commits\/main|PLATFORM_GH_TOKEN/)
-  assert.ok(job.steps.indexOf(evidence) < job.steps.indexOf(freshness))
+  assert.ok(job.steps.indexOf(ciGate) < job.steps.indexOf(freshness))
 
   const token = step(job, "Create Platform dispatch token")
   assert.equal(token.if, "steps.freshness.outputs.should_dispatch == 'true'")
@@ -486,6 +549,38 @@ test("delivery identity is stable across attempts and changes with immutable inp
     assert.equal(changed.status, 0, changed.stderr)
     assert.notEqual(changed.values.delivery_id, first.values.delivery_id)
   }
+})
+
+test("CI and Security gate polls active runs to success and fails closed on terminal failure, API error, or timeout", () => {
+  const pushMain = (id, status, conclusion = null) => ({ id, event: "push", head_branch: "main", status, conclusion })
+  const prFailure = { id: 99, event: "pull_request", head_branch: "feat/x", status: "completed", conclusion: "failure" }
+
+  const polledSuccess = runCiAndSecurityGate({
+    ciResponses: [[prFailure, pushMain(101, "completed", "success")]],
+    securityResponses: [
+      [pushMain(199, "completed", "failure"), pushMain(201, "in_progress")],
+      [pushMain(199, "completed", "failure"), pushMain(202, "completed", "success")],
+    ],
+  })
+  assert.equal(polledSuccess.status, 0, polledSuccess.stderr)
+  assert.deepEqual(polledSuccess.sleepLog, ["15"])
+
+  const failedRun = runCiAndSecurityGate({
+    securityResponses: [[prFailure, pushMain(201, "completed", "failure")]],
+  })
+  assert.notEqual(failedRun.status, 0)
+  assert.deepEqual(failedRun.sleepLog, [])
+
+  const apiFailure = runCiAndSecurityGate({ apiErrorOn: { wf: "security.yml", attempt: 0 } })
+  assert.notEqual(apiFailure.status, 0)
+  assert.deepEqual(apiFailure.sleepLog, [])
+
+  const timedOut = runCiAndSecurityGate({
+    securityResponses: [[pushMain(201, "in_progress")]],
+  })
+  assert.notEqual(timedOut.status, 0)
+  assert.equal(timedOut.sleepLog.length, 79)
+  assert.equal(timedOut.sleepLog.every((d) => d === "15"), true)
 })
 
 test("Web CI executes the frontend image workflow contract test", () => {

@@ -81,7 +81,7 @@ test("receiver admits only the verified Platform deployment event before any exp
   const { source, document } = workflow()
   const job = document.jobs.receive
   assert.match(source, /^  repository_dispatch:\n    types: \[platform_web_deployment_ready\]/m)
-  assert.deepEqual(document.permissions, { attestations: "read", contents: "read", packages: "read" })
+  assert.deepEqual(document.permissions, { contents: "read" })
   assert.equal(job.if, undefined, "untrusted dispatches must fail in admission, not be silently skipped")
 
   const admission = step(job, "Validate verified Platform deployment")
@@ -125,63 +125,49 @@ test("the executable admission heredoc rejects representative untrusted deliveri
   }
 })
 
-test("receiver verifies native evidence, smokes, and records only the approved deployment", () => {
+test("receiver caches Playwright, runs served smoke, and records the deployment backlink", () => {
   const { source, document } = workflow()
   const job = document.jobs.receive
+
+  for (const retiredStep of [
+    "Log in to GitHub Container Registry",
+    "Verify exact Web image attestations",
+    "Create approved deployment variable token",
+    "Record approved Web deployment",
+  ]) {
+    assert.equal(job.steps.find((candidate) => candidate.name === retiredStep), undefined)
+  }
+  assert.doesNotMatch(
+    source,
+    /docker\/login-action|gh attestation verify|native-image-evidence\.mjs|create-github-app-token|AQUILA_APPROVED_WEB_DEPLOYMENT_V1|pull-requests:|git push|gh pr|--draft|web_frontend_image_ready/i,
+  )
+
+  const cache = step(job, "Cache Playwright browsers")
+  assert.equal(cache.uses, "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9")
+  assert.equal(cache.with.path, "~/.cache/ms-playwright")
+  assert.equal(cache.with.key, "playwright-browsers-${{ runner.os }}-${{ hashFiles('yarn.lock') }}")
+  const install = step(job, "Install Playwright browsers")
+  assert.equal(install.if, "steps.playwright-cache.outputs.cache-hit != 'true'")
+  assert.match(install.run, /playwright install chromium --with-deps|playwright install --with-deps chromium/)
+  const deps = step(job, "Install Playwright OS dependencies")
+  assert.equal(deps.if, "steps.playwright-cache.outputs.cache-hit == 'true'")
+  assert.match(deps.run, /playwright install-deps chromium/)
+
   const smoke = step(job, "Run served Platform deployment smoke")
   assert.match(smoke.run, /e2e\/platform-deployment-smoke\.spec\.ts/)
   assert.match(smoke.run, /--project=chromium/)
   assert.match(smoke.run, /--workers=1/)
   assert.match(smoke.run, /timeout 5m/)
   assert.ok(job["timeout-minutes"] <= 15, "the complete receiver job must remain bounded")
-
-  const evidence = step(job, "Verify exact Web image attestations")
-  const registryLogin = step(job, "Log in to GitHub Container Registry")
-  assert.match(registryLogin.uses, /^docker\/login-action@[a-f0-9]{40}$/)
-  assert.equal(registryLogin.with.registry, "ghcr.io")
-  assert.equal(registryLogin.with.password, "${{ github.token }}")
-  assert.equal(evidence.env.GH_TOKEN, "${{ github.token }}")
-  assert.match(evidence.run, /gh attestation verify "oci:\/\/\$\{IMAGE_REF\}"/)
-  assert.match(evidence.run, /--source-digest "\$\{WEB_SHA\}"/)
-  assert.match(evidence.run, /--source-ref refs\/heads\/main/)
-  assert.match(evidence.run, /--signer-workflow AquilaXk\/aquila-blog-web\/.github\/workflows\/frontend-image\.yml/)
-  assert.match(evidence.run, /https:\/\/slsa\.dev\/provenance\/v1/)
-  assert.match(evidence.run, /https:\/\/spdx\.dev\/Document\/v2\.3/)
-  assert.match(evidence.run, /https:\/\/cosign\.sigstore\.dev\/attestation\/vuln\/v1/)
-  assert.match(
-    evidence.run,
-    /native-image-evidence\.mjs verify-attestation-set \\\n\s+\/tmp\/web-image-provenance\.json \\\n\s+\/tmp\/web-image-sbom\.json \\\n\s+\/tmp\/web-image-vulnerability-attestation\.json/,
-  )
-  assert.ok(job.steps.indexOf(registryLogin) < job.steps.indexOf(evidence))
-  assert.ok(job.steps.indexOf(evidence) < job.steps.indexOf(smoke))
-
-  const variableToken = step(job, "Create approved deployment variable token")
-  assert.equal(variableToken.if, "steps.smoke.outcome == 'success'")
-  assert.equal(variableToken.with.owner, "AquilaXk")
-  assert.equal(variableToken.with.repositories, "aquila-blog-web")
-  assert.equal(variableToken.with["permission-contents"], "read")
-  assert.equal(variableToken.with["permission-actions-variables"], "write")
-  assert.equal(variableToken.with["permission-variables"], undefined)
-  assert.match(variableToken.uses, /^actions\/create-github-app-token@[a-f0-9]{40}$/)
-
-  const approved = step(job, "Record approved Web deployment")
-  assert.equal(approved.if, "steps.smoke.outcome == 'success'")
-  assert.equal(approved.env.GH_TOKEN, "${{ steps.variable-token.outputs.token }}")
-  assert.match(approved.run, /repos\/AquilaXk\/aquila-blog-web\/commits\/main/)
-  assert.match(approved.run, /repos\/AquilaXk\/aquila-blog-web\/actions\/variables/)
-  assert.match(approved.run, /AQUILA_APPROVED_WEB_DEPLOYMENT_V1/)
-  assert.match(approved.run, /native-image-evidence\.mjs build-approved-record/)
-  assert.match(approved.run, /native-image-evidence\.mjs authorize-replacement/)
-  assert.match(approved.run, /gh variable set AQUILA_APPROVED_WEB_DEPLOYMENT_V1/)
-  assert.ok(job.steps.indexOf(smoke) < job.steps.indexOf(variableToken))
-  assert.ok(job.steps.indexOf(variableToken) < job.steps.indexOf(approved))
+  assert.ok(job.steps.indexOf(cache) < job.steps.indexOf(install))
+  assert.ok(job.steps.indexOf(install) < job.steps.indexOf(deps))
+  assert.ok(job.steps.indexOf(deps) < job.steps.indexOf(smoke))
 
   const summary = step(job, "Record Platform deployment backlink")
   assert.equal(summary.env.PLATFORM_REPOSITORY, "${{ steps.delivery.outputs.platform_repository }}")
   assert.match(summary.run, /https:\/\/github\.com\/\$\{PLATFORM_REPOSITORY\}\/actions\/runs\/\$\{DEPLOY_RUN_ID\}/)
   assert.match(source, /GITHUB_STEP_SUMMARY/)
   assert.match(source, /deployment_identity/)
-  assert.doesNotMatch(source, /pull-requests:|git push|gh pr |--draft|web_frontend_image_ready/i)
 
   const ci = readFileSync(ciPath, "utf8")
   assert.match(ci, /node --test scripts\/contracts\/receive-platform-deployment-workflow\.test\.mjs/)

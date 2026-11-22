@@ -3,8 +3,16 @@ name: Publish Web frontend image
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "TODO.md"
+      - "SECURITY.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "docs/**"
 
 permissions:
+  actions: read
   attestations: write
   contents: read
   id-token: write
@@ -68,6 +76,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
       - name: Build and push immutable Web image
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -77,6 +88,8 @@ jobs:
           push: true
           tags: ghcr.io/aquilaxk/aquila-blog-web-front:sha-${{ github.sha }}
           build-args: NEXT_PUBLIC_AQUILA_BUILD_SHA=${{ steps.source.outputs.source_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Validate pushed image digest
         id: image
@@ -146,45 +159,57 @@ jobs:
           predicate-type: https://cosign.sigstore.dev/attestation/vuln/v1
           predicate-path: /tmp/web-image-vulnerability.json
 
-      - name: Verify exact Web image attestations
+      - name: Require successful Web CI and Web Security for source SHA
         env:
           GH_TOKEN: ${{ github.token }}
-          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
-          PRODUCER_RUN_ATTEMPT: ${{ github.run_attempt }}
-          PRODUCER_RUN_ID: ${{ github.run_id }}
           SOURCE_REPOSITORY: AquilaXk/aquila-blog-web
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: |
           set -euo pipefail
-          gh attestation verify "oci://${IMAGE_REF}" \
-            --repo "${SOURCE_REPOSITORY}" \
-            --source-digest "${SOURCE_SHA}" \
-            --source-ref refs/heads/main \
-            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
-            --deny-self-hosted-runners \
-            --predicate-type https://slsa.dev/provenance/v1 \
-            --format json > /tmp/web-image-provenance.json
-          gh attestation verify "oci://${IMAGE_REF}" \
-            --repo "${SOURCE_REPOSITORY}" \
-            --source-digest "${SOURCE_SHA}" \
-            --source-ref refs/heads/main \
-            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
-            --deny-self-hosted-runners \
-            --predicate-type https://spdx.dev/Document/v2.3 \
-            --format json > /tmp/web-image-sbom.json
-          gh attestation verify "oci://${IMAGE_REF}" \
-            --repo "${SOURCE_REPOSITORY}" \
-            --source-digest "${SOURCE_SHA}" \
-            --source-ref refs/heads/main \
-            --signer-workflow AquilaXk/aquila-blog-web/.github/workflows/frontend-image.yml \
-            --deny-self-hosted-runners \
-            --predicate-type https://cosign.sigstore.dev/attestation/vuln/v1 \
-            --format json > /tmp/web-image-vulnerability-attestation.json
-          node scripts/security/native-image-evidence.mjs verify-attestation-set \
-            /tmp/web-image-provenance.json \
-            /tmp/web-image-sbom.json \
-            /tmp/web-image-vulnerability-attestation.json \
-            "https://github.com/${SOURCE_REPOSITORY}/actions/runs/${PRODUCER_RUN_ID}/attempts/${PRODUCER_RUN_ATTEMPT}"
+
+          if [ "${SOURCE_REPOSITORY}" != "AquilaXk/aquila-blog-web" ]; then
+            echo "Web image delivery source repository is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Web image delivery source SHA must be full lowercase hex" >&2
+            exit 1
+          fi
+
+          for ATTEMPT in $(seq 1 80); do
+            ALL_PASSED=true
+            for wf in ci.yml security.yml; do
+              RUN_STATES="$(
+                gh api \
+                  "repos/${SOURCE_REPOSITORY}/actions/workflows/${wf}/runs?head_sha=${SOURCE_SHA}&per_page=50" \
+                  --paginate \
+                  --jq '.workflow_runs[] | select(.event == "push" and .head_branch == "main") | if (.status == "completed" and .conclusion == "success") then "success:\(.id)" elif .status != "completed" then "active:\(.id)" elif .status == "completed" then "terminal:\(.id)" else empty end'
+              )" || {
+                echo "Workflow ${wf} API lookup failed for source_sha=${SOURCE_SHA}" >&2
+                exit 1
+              }
+
+              if printf '%s\n' "${RUN_STATES}" | grep -qx 'success:.*'; then
+                continue
+              fi
+
+              ALL_PASSED=false
+              if printf '%s\n' "${RUN_STATES}" | grep -qx 'terminal:.*' && ! printf '%s\n' "${RUN_STATES}" | grep -qx 'active:.*'; then
+                echo "Web image delivery blocked: matching ${wf} push run failed for source_sha=${SOURCE_SHA}" >&2
+                exit 1
+              fi
+            done
+
+            if [ "${ALL_PASSED}" = "true" ]; then
+              echo "Web CI and Web Security gates passed for source_sha=${SOURCE_SHA}"
+              exit 0
+            fi
+
+            if [ "${ATTEMPT}" -lt 80 ]; then sleep 15; fi
+          done
+
+          echo "Web image delivery blocked: timed out waiting for successful Web CI and Web Security runs for source_sha=${SOURCE_SHA}" >&2
+          exit 1
 
       - name: Check current Web source freshness
         id: freshness

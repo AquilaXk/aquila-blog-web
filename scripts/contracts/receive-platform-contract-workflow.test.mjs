@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { spawnSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import test from "node:test"
 
 const root = path.resolve(import.meta.dirname, "../..")
@@ -29,7 +29,7 @@ test("receiver admits only the exact App-owned nine-key Platform payload", () =>
   const job = document.jobs.receive
   assert.match(source, /^  repository_dispatch:\n    types: \[platform_public_contract_ready\]/m)
   assert.equal(job.if, undefined, "untrusted dispatches must fail in admission, not be silently skipped")
-  assert.equal(document.permissions["pull-requests"], "read")
+  assert.deepEqual(document.permissions, { contents: "read" })
   const admit = step(job, "Validate immutable Platform delivery")
   assert.equal(admit.env.EXPECTED_APP_LOGIN, "${{ vars.REPO_SYNC_APP_BOT_LOGIN }}")
   assert.match(admit.run, /EVENT_SENDER_TYPE !== "Bot"/)
@@ -64,13 +64,18 @@ test("receiver reads the manifest-declared immutable Platform bytes before any W
   assert.doesNotMatch(source, /path:\s*platform/)
   assert.doesNotMatch(source, /git -C platform|git clone|actions\/checkout[^\n]*aquila-blog/)
 
-  const writerIndex = job.steps.indexOf(step(job, "Create Web write token"))
+  const writeToken = step(job, "Create Web write token")
+  const writerIndex = job.steps.indexOf(writeToken)
   const checkout = step(job, "Checkout immutable Web target without persisted credentials")
   assert.equal(checkout.with.ref, "${{ steps.delivery.outputs.target_commit }}")
-  assert.equal(checkout.with["fetch-depth"], 0, "durable sync branch merge requires full history")
+  assert.equal(checkout.with["fetch-depth"], 1, "direct fast-forward push needs only target commit")
   assert.ok(job.steps.indexOf(token) < job.steps.indexOf(checkout), "stale Platform source must avoid checkout/install")
   assert.ok(job.steps.indexOf(fetch) < writerIndex)
-  assert.match(String(step(job, "Create Web write token").if), /steps\.changes\.outputs\.changed == 'true'/)
+  assert.equal(writeToken.with["permission-contents"], "write")
+  assert.equal(writeToken.with["permission-pull-requests"], undefined)
+  assert.match(String(writeToken.if), /steps\.changes\.outputs\.changed == 'true'/)
+  assert.match(String(writeToken.if), /steps\.prewrite\.outputs\.stale == 'false'/)
+  assert.doesNotMatch(String(writeToken.if), /existing-pr/)
   assert.ok(job.steps.indexOf(step(job, "Set up Node.js 20")) < job.steps.indexOf(step(job, "Build validated Web-local contract candidate")))
   assert.match(step(job, "Install locked Web dependencies").run, /yarn install --frozen-lockfile/)
 })
@@ -158,60 +163,166 @@ test("stale delivery is a successful no-write no-op and Web changes remain narro
   assert.match(prewrite.run, /current repository SHA is invalid/)
   assert.match(String(step(job, "Create Web write token").if), /steps\.prewrite\.outputs\.stale == 'false'/)
   assert.doesNotMatch(source, /outputs\.stale != 'true'/)
-  assert.match(source, /chore\/platform-contract-sync/)
-  assert.match(source, /contracts\/platform\/\*\*/)
-  assert.match(source, /packages\/shared-contracts\/src\/generated\/backend-openapi\.d\.ts/)
-  assert.match(source, /--draft/)
-  assert.doesNotMatch(source, /git push --force|--force-with-lease/)
+  assert.equal(document.env.SYNC_BRANCH, undefined)
+  for (const retiredStep of [
+    "Discover exact existing Web Draft PR",
+    "Commit Web-local contract candidate",
+    "Close stale Web Draft PR",
+    "Create or update the Web draft PR",
+  ]) {
+    assert.equal(job.steps.find((candidate) => candidate.name === retiredStep), undefined)
+  }
+  assert.doesNotMatch(
+    source,
+    /pull-requests|permission-pull-requests|SYNC_BRANCH|chore\/platform-contract-sync|gh pr|--draft|git add -A|git merge|git checkout -B|git branch -[dD]|git reset|git push[^\n]*(?:--force|--force-with-lease)/,
+  )
 })
 
-test("stable branch, write identity, and Draft PR stay exactly Web-owned", () => {
-  const { source, document } = workflow()
-  const job = document.jobs.receive
-  const commit = step(job, "Commit Web-local contract candidate")
+function runDirectMainSync(overrides = {}) {
+  const { document } = workflow()
+  const commit = step(document.jobs.receive, "Commit and push synced Web contract to main")
+  const directory = mkdtempSync(path.join(tmpdir(), "web-contract-sync-push-"))
+  const remote = path.join(directory, "remote.git")
+  const work = path.join(directory, "work")
+  const bin = path.join(directory, "bin")
+  const output = path.join(directory, "github-output")
+  const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
+  try {
+    mkdirSync(remote)
+    git(remote, ["init", "--bare", "--initial-branch=main"])
+    mkdirSync(work)
+    git(work, ["init", "--initial-branch=main"])
+    git(work, ["config", "user.email", "seed@example.com"])
+    git(work, ["config", "user.name", "Seed"])
+    for (const file of [
+      "contracts/platform/openapi.json",
+      "contracts/platform/error-codes.json",
+      "contracts/platform/summary-fixtures.json",
+      "contracts/platform/manifest.lock.json",
+      "packages/shared-contracts/src/generated/backend-openapi.d.ts",
+    ]) {
+      mkdirSync(path.dirname(path.join(work, file)), { recursive: true })
+      writeFileSync(path.join(work, file), "initial\n")
+    }
+    git(work, ["add", "contracts/platform", "packages/shared-contracts/src/generated/backend-openapi.d.ts"])
+    git(work, ["commit", "-m", "initial"])
+    git(work, ["remote", "add", "origin", remote])
+    git(work, ["push", "origin", "HEAD:refs/heads/main"])
+    const initialSha = git(work, ["rev-parse", "HEAD"])
+    git(work, ["checkout", "--detach", initialSha])
+
+    for (const [file, content] of [
+      [".contract-candidate/platform/openapi.json", "updated-openapi\n"],
+      [".contract-candidate/platform/error-codes.json", "updated-errors\n"],
+      [".contract-candidate/platform/summary-fixtures.json", "updated-fixtures\n"],
+      [".contract-candidate/platform/manifest.lock.json", "updated-lock\n"],
+      [".contract-candidate/generated/backend-openapi.d.ts", "export type updated = true\n"],
+    ]) {
+      mkdirSync(path.dirname(path.join(work, file)), { recursive: true })
+      writeFileSync(path.join(work, file), content)
+    }
+
+    mkdirSync(bin)
+    const sourceCommit = overrides.sourceCommit ?? "a".repeat(40)
+    const targetCommit = overrides.targetCommit ?? initialSha
+    const liveSourceMain = overrides.liveSourceMain ?? sourceCommit
+    const liveTargetMain = overrides.liveTargetMain ?? targetCommit
+    writeFileSync(path.join(bin, "gh"), `#!/usr/bin/env bash
+set -euo pipefail
+if [ "\${1:-}" = "auth" ] && [ "\${2:-}" = "setup-git" ]; then exit 0; fi
+if [ "\${1:-}" = "api" ]; then
+  case "\${2:-}" in
+    /users/aquila-repo-sync\\[bot\\]) echo "424242" ;;
+    repos/AquilaXk/aquila-blog/git/ref/heads/main) echo "${liveSourceMain}" ;;
+    repos/AquilaXk/aquila-blog-web/git/ref/heads/main) echo "${liveTargetMain}" ;;
+    *) echo "unexpected gh api: $*" >&2; exit 1 ;;
+  esac
+  exit 0
+fi
+exit 1
+`)
+    writeFileSync(path.join(bin, "yarn"), `#!/usr/bin/env bash
+set -euo pipefail
+case "\${1:-}" in
+  contracts:check) exit ${overrides.contractsCheckExit ?? 0} ;;
+  type-check) exit ${overrides.typeCheckExit ?? 0} ;;
+  *) echo "unexpected yarn arg: $*" >&2; exit 1 ;;
+esac
+`)
+    chmodSync(path.join(bin, "gh"), 0o755)
+    chmodSync(path.join(bin, "yarn"), 0o755)
+    writeFileSync(output, "")
+
+    const result = spawnSync("bash", ["-c", commit.run], {
+      cwd: work,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PLATFORM_REPOSITORY: "AquilaXk/aquila-blog",
+        WEB_REPOSITORY: "AquilaXk/aquila-blog-web",
+        GH_TOKEN: "web-write-token",
+        WEB_TOKEN: "web-write-token",
+        PLATFORM_TOKEN: "platform-read-token",
+        SOURCE_COMMIT: sourceCommit,
+        TARGET_COMMIT: targetCommit,
+        EXPECTED_APP_LOGIN: "aquila-repo-sync[bot]",
+        APP_SLUG: "aquila-repo-sync",
+        GITHUB_OUTPUT: output,
+        PATH: `${bin}:${process.env.PATH}`,
+      },
+    })
+    const remoteMainAfter = git(remote, ["rev-parse", "refs/heads/main"])
+    const remoteFiles = git(remote, ["show", "--name-only", "--format=%s", remoteMainAfter])
+    return { ...result, initialSha, remoteMainAfter, remoteFiles, output: readFileSync(output, "utf8") }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+test("direct main sync verifies contracts:check, type-check, allowed paths, and fast-forward pushes", () => {
+  const { document } = workflow()
+  const detect = step(document.jobs.receive, "Detect Web-local contract changes")
+  const commit = step(document.jobs.receive, "Commit and push synced Web contract to main")
+
+  assert.match(detect.run, /summary-fixtures\.json/)
+  assert.doesNotMatch(detect.run, /candidate presence/)
+  assert.match(String(commit.if), /steps\.freshness\.outputs\.stale == 'false'/)
+  assert.match(String(commit.if), /steps\.changes\.outputs\.changed == 'true'/)
+  assert.match(String(commit.if), /steps\.prewrite\.outputs\.stale == 'false'/)
   assert.equal(commit.env.APP_SLUG, "${{ steps.web-token.outputs.app-slug }}")
-  assert.match(commit.run, /app_login="\$\{APP_SLUG\}\[bot\]"/)
-  assert.match(commit.run, /gh api "\/users\/\$\{app_login\}" --jq \.id/)
-  assert.match(commit.run, /EXPECTED_APP_LOGIN/)
-  assert.match(commit.run, /\+refs\/heads\/main:refs\/remotes\/origin\/main/)
-  assert.match(commit.run, /allowed_path\(\)/)
-  assert.match(commit.run, /git diff --name-only origin\/main\.\.\.HEAD/)
-  assert.match(commit.run, /git diff --cached --name-only/)
-  assert.ok(commit.run.indexOf("git config user.name") < commit.run.indexOf("git merge --no-edit"))
-  assert.match(commit.run, /ready=false/)
-  assert.match(commit.run, /git rev-parse HEAD/)
-  assert.doesNotMatch(source, /gh pr list/)
-  const pr = step(job, "Create or update the Web draft PR")
-  assert.match(pr.run, /repos\/\$\{WEB_REPOSITORY\}\/pulls\?state=open&head=AquilaXk:\$\{SYNC_BRANCH\}&base=main/)
-  assert.match(pr.run, /pr\.head\?\.repo\?\.full_name !== "AquilaXk\/aquila-blog-web"/)
-  assert.match(String(pr.if), /steps\.commit\.outputs\.ready == 'true'/)
-  assert.match(pr.run, /\[Chore\] Sync Platform public contract/)
-  for (const section of ["## Verified delivery", "## SHA-256", "## Generated scope", "## Verification"]) assert.ok(pr.run.includes(section))
-})
+  assert.equal(commit.env.TARGET_COMMIT, "${{ steps.delivery.outputs.target_commit }}")
+  assert.match(commit.run, /git add -- contracts\/platform\/openapi\.json contracts\/platform\/error-codes\.json contracts\/platform\/summary-fixtures\.json contracts\/platform\/manifest\.lock\.json packages\/shared-contracts\/src\/generated\/backend-openapi\.d\.ts/)
+  assert.match(commit.run, /yarn contracts:check/)
+  assert.match(commit.run, /yarn type-check/)
+  assert.match(commit.run, /\[Chore\] 플랫폼 공개 API 계약 동기화 \(\$\{SOURCE_COMMIT:0:12\}\)/)
+  assert.match(commit.run, /git push origin HEAD:refs\/heads\/main/)
 
-test("a fresh unchanged candidate only opens the scoped stale-Draft-PR lifecycle when one exact PR exists", () => {
-  const { source, document } = workflow()
-  const job = document.jobs.receive
-  assert.equal(document.permissions["pull-requests"], "read")
-  const discovery = job.steps.find((candidate) => candidate.id === "existing-pr")
-  assert.ok(discovery, "the receiver must discover an exact existing Draft PR before creating a Web write token")
-  assert.equal(discovery.env.WEB_TOKEN, "${{ github.token }}")
-  assert.match(discovery.run, /repos\/\$\{WEB_REPOSITORY\}\/pulls\?state=open&head=AquilaXk:\$\{SYNC_BRANCH\}&base=main/)
-  assert.match(discovery.run, /pr\.head\?\.repo\?\.full_name !== "AquilaXk\/aquila-blog-web"/)
-  assert.match(discovery.run, /pr\.draft/)
-  assert.match(discovery.run, /pr\.base\?\.ref !== "main"/)
-  assert.match(discovery.run, /exists=false/)
-  assert.match(discovery.run, /exists=true/)
+  const failedContract = runDirectMainSync({ contractsCheckExit: 1 })
+  assert.notEqual(failedContract.status, 0)
+  assert.equal(failedContract.remoteMainAfter, failedContract.initialSha)
 
-  const writeToken = step(job, "Create Web write token")
-  assert.match(String(writeToken.if), /steps\.changes\.outputs\.changed == 'true'/)
-  assert.match(String(writeToken.if), /steps\.existing-pr\.outputs\.exists == 'true'/)
-  const close = job.steps.find((candidate) => candidate.id === "close-stale-pr")
-  assert.ok(close, "only an existing stale Draft PR may enter the close path")
-  assert.match(String(close.if), /steps\.changes\.outputs\.changed == 'false'/)
-  assert.match(String(close.if), /steps\.existing-pr\.outputs\.exists == 'true'/)
-  assert.match(close.run, /pr\.state === "closed"/)
-  assert.doesNotMatch(source, /git branch -[dD]|git reset|git push[^\n]*(?:--force|--force-with-lease)/)
+  const failedTypes = runDirectMainSync({ typeCheckExit: 1 })
+  assert.notEqual(failedTypes.status, 0)
+  assert.equal(failedTypes.remoteMainAfter, failedTypes.initialSha)
+
+  const staleBeforePush = runDirectMainSync({ liveTargetMain: "b".repeat(40) })
+  assert.equal(staleBeforePush.status, 0, staleBeforePush.stderr)
+  assert.match(staleBeforePush.output, /stale=true/)
+  assert.equal(staleBeforePush.remoteMainAfter, staleBeforePush.initialSha)
+
+  const synced = runDirectMainSync()
+  assert.equal(synced.status, 0, synced.stderr)
+  assert.notEqual(synced.remoteMainAfter, synced.initialSha)
+  assert.match(synced.remoteFiles, /^\[Chore\] 플랫폼 공개 API 계약 동기화 \(aaaaaaaaaaaa\)$/m)
+  for (const file of [
+    "contracts/platform/openapi.json",
+    "contracts/platform/error-codes.json",
+    "contracts/platform/summary-fixtures.json",
+    "contracts/platform/manifest.lock.json",
+    "packages/shared-contracts/src/generated/backend-openapi.d.ts",
+  ]) {
+    assert.match(synced.remoteFiles, new RegExp(`^${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"))
+  }
 })
 
 function detectChanges(run, candidate, current) {
@@ -276,27 +387,4 @@ test("sourceCommit-only manifest provenance changes are a Web receiver no-op", (
   assert.equal(detectChanges(detect.run, openApiHashChanged, current), "changed=true")
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/platform/openapi.json": "{\"openapi\":\"3.1.1\"}\n" }, current), "changed=true")
   assert.equal(detectChanges(detect.run, { ...onlySourceCommitChanged, ".contract-candidate/generated/backend-openapi.d.ts": "export type paths = { changed: true }\n" }, current), "changed=true")
-})
-
-test("generated Draft PR metadata records only signed delivery identity and generated paths", () => {
-  const { document } = workflow()
-  const detect = step(document.jobs.receive, "Detect Web-local contract changes")
-  const commit = step(document.jobs.receive, "Commit Web-local contract candidate")
-  const pr = step(document.jobs.receive, "Create or update the Web draft PR")
-
-  assert.match(detect.run, /summary-fixtures\.json/)
-  assert.doesNotMatch(detect.run, /candidate presence/)
-  assert.doesNotMatch(commit.run, /rm -f contracts\/platform\/summary-fixtures\.json/)
-  assert.match(commit.run, /git add -A -- contracts\/platform/)
-  assert.equal(pr.env.SOURCE_REPOSITORY, "${{ steps.delivery.outputs.source_repository }}")
-  assert.equal(pr.env.SOURCE_COMMIT, "${{ steps.delivery.outputs.source_commit }}")
-  assert.equal(pr.env.DELIVERY_ID, "${{ steps.delivery.outputs.delivery_id }}")
-  assert.equal(pr.env.MANIFEST_SHA256, "${{ steps.delivery.outputs.manifest_sha256 }}")
-  assert.equal(pr.env.OPENAPI_SHA256, "${{ steps.delivery.outputs.openapi_sha256 }}")
-  assert.equal(pr.env.ERROR_CODES_SHA256, "${{ steps.delivery.outputs.error_codes_sha256 }}")
-  assert.match(pr.run, /https:\/\/github\.com\/\$\{SOURCE_REPOSITORY\}\/commit\/\$\{SOURCE_COMMIT\}/)
-  for (const value of ["${DELIVERY_ID}", "${MANIFEST_SHA256}", "${OPENAPI_SHA256}", "${ERROR_CODES_SHA256}"]) assert.ok(pr.run.includes(value))
-  for (const generatedPath of ["contracts/platform/**", "packages/shared-contracts/src/generated/backend-openapi.d.ts"]) assert.ok(pr.run.includes(generatedPath))
-  for (const staleMetadata of [/Refs #35/, /Platform #1520/, /summary-only/, /transport-only/, /[가-힣]/]) assert.doesNotMatch(pr.run, staleMetadata)
-  assert.match(pr.run, /\[Chore\] Sync Platform public contract/)
 })
