@@ -2,20 +2,29 @@ import { useEffect, useRef } from "react"
 import styled from "@emotion/styled"
 import { marketingLight as light } from "src/design-system/marketingPalette"
 import {
+  computeCenterClearance,
   computeFrameTrigRates,
+  createCursorKinematicsState,
   createParticleSoABuffers,
   resolveParticleClearance,
-  smoothstep,
+  stepCursorKinematics,
+  stepParticleSpringFieldFromSoA,
+  triggerCursorRipple,
 } from "./companyHeroParticleMath"
 
 export {
   computeCenterClearance,
   computeFrameTrigRates,
+  createCursorKinematicsState,
   createParticleSeeds,
   createParticleSoABuffers,
   evaluateParticleWavesFromSoA,
   resolveParticleClearance,
   smoothstep,
+  stepCursorKinematics,
+  stepParticleSpringFieldFromSoA,
+  triggerCursorRipple,
+  type CursorKinematicsState,
   type FrameTrigRates,
   type ParticleClearanceSpec,
   type ParticleSeed,
@@ -74,20 +83,13 @@ const CompanyHeroParticles: React.FC = () => {
     let rectHeight = 0
     let dpr = 1
     let clearance = resolveParticleClearance(1, 1)
-    let invClearRx = 1 / clearance.clearRx
-    let invClearRy = 1 / clearance.clearRy
-    let innerStopSq = clearance.innerStop * clearance.innerStop
-    let outerStopSq = clearance.outerStop * clearance.outerStop
     let baseScale = 0.75
-    let ringX = 0.18
-    let ringY = -0.12
-    let targetX = 0.18
-    let targetY = -0.12
-    let pointerActive = false
+    const cursorState = createCursorKinematicsState()
     let isIntersecting = true
     let rectDirty = false
     let rafId: number | null = null
     const startTime = performance.now()
+    let prevNow = startTime
 
     const syncRect = () => {
       const rect = container.getBoundingClientRect()
@@ -110,10 +112,6 @@ const CompanyHeroParticles: React.FC = () => {
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
       clearance = resolveParticleClearance(width, height)
-      invClearRx = 1 / clearance.clearRx
-      invClearRy = 1 / clearance.clearRy
-      innerStopSq = clearance.innerStop * clearance.innerStop
-      outerStopSq = clearance.outerStop * clearance.outerStop
       baseScale = Math.max(0.75, Math.min(1.25, width / 1280))
     }
 
@@ -137,22 +135,14 @@ const CompanyHeroParticles: React.FC = () => {
 
     const renderFrame = (now: number) => {
       if (!ctx || width <= 1 || height <= 1) return
+      const dtSeconds = Math.max(0.004, Math.min(0.05, (now - prevNow) * 0.001))
+      prevNow = now
       const elapsed = (now - startTime) * 0.001
       const time = elapsed * 0.55
 
-      const wanderX = Math.sin(time * 1.15 + 1.4) * 0.36 + Math.cos(time * 0.52) * 0.14
-      const wanderY = Math.cos(time * 0.95 + 0.7) * 0.24 + Math.sin(time * 0.63) * 0.1
-      const desiredX = pointerActive ? targetX * 0.78 + wanderX * 0.22 : wanderX
-      const desiredY = pointerActive ? targetY * 0.78 + wanderY * 0.22 : wanderY
-      const lerpFactor = pointerActive ? 0.055 : 0.025
-
-      ringX += (desiredX - ringX) * lerpFactor
-      ringY += (desiredY - ringY) * lerpFactor
-
-      const ringRadius = 0.38 + Math.sin(time * 1.3) * 0.04 + Math.cos(time * 2.8) * 0.022
-      const ringWidth = 0.22
-      const ringWidthInner = 0.085
-      const ringDisplacement = 0.16
+      stepCursorKinematics(cursorState, time, dtSeconds)
+      const frame = computeFrameTrigRates(time)
+      stepParticleSpringFieldFromSoA(particles, cursorState, time, frame, clearance, dtSeconds)
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
@@ -160,13 +150,79 @@ const CompanyHeroParticles: React.FC = () => {
 
       const halfWidth = clearance.cx
       const halfHeight = clearance.cy
+
+      if (cursorState.pointerActive) {
+        const auraPx = (cursorState.ringX + 1) * halfWidth
+        const auraPy = (cursorState.ringY + 1) * halfHeight
+        const auraClearance = computeCenterClearance(auraPx, auraPy, width, height, clearance)
+        if (auraClearance > 0.08) {
+          const auraRadius = Math.max(140, Math.min(260, width * 0.19))
+          const auraGrad = ctx.createRadialGradient(auraPx, auraPy, 0, auraPx, auraPy, auraRadius)
+          auraGrad.addColorStop(0, light.particleAuraFill)
+          auraGrad.addColorStop(1, light.particleAuraTransparent)
+          ctx.globalAlpha = auraClearance * 0.85
+          ctx.fillStyle = auraGrad
+          ctx.beginPath()
+          ctx.arc(auraPx, auraPy, auraRadius, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
       const {
-        s14, c14, s10, c10, s085, c085, s28, c28, s22, c22,
-      } = computeFrameTrigRates(time)
-      const {
-        bucketCount, bucketStarts, bucketEnds,
-        refX: pRefX, refY: pRefY, posX: pPosX, posY: pPosY, scale: pScale, trigBases,
+        bucketCount,
+        bucketStarts,
+        bucketEnds,
+        refX: pRefX,
+        refY: pRefY,
+        velX: pVelX,
+        velY: pVelY,
+        scale: pScale,
+        energy: pEnergy,
+        screenX: pScreenX,
+        screenY: pScreenY,
+        screenAlpha: pScreenAlpha,
+        trigBases,
       } = particles
+
+      const maxLinkDist = Math.max(108, Math.min(215, width * 0.155))
+      const maxLinkDistSq = maxLinkDist * maxLinkDist
+
+      // Active constellation filaments (subway line / pipeline motif) around cursor & ripple ring
+      if (cursorState.pointerActive || cursorState.rippleStrength > 0.02) {
+        ctx.strokeStyle = light.particleFilamentStroke
+        ctx.lineWidth = Math.max(0.85, 1.05 * baseScale)
+        for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+          const start = bucketStarts[bucket]!
+          const end = bucketEnds[bucket]!
+          for (let i = start; i < end; i += 1) {
+            const alphaA = pScreenAlpha[i]!
+            const energyA = pEnergy[i]!
+            if (alphaA <= 0.06 || energyA <= 0.24) continue
+            const ax = pScreenX[i]!
+            const ay = pScreenY[i]!
+            const neighborLimit = Math.min(end, i + 8)
+            for (let j = i + 1; j < neighborLimit; j += 1) {
+              const alphaB = pScreenAlpha[j]!
+              const energyB = pEnergy[j]!
+              if (alphaB <= 0.06 || energyB <= 0.24) continue
+              const bx = pScreenX[j]!
+              const by = pScreenY[j]!
+              const linkDx = bx - ax
+              const linkDy = by - ay
+              const distSq = linkDx * linkDx + linkDy * linkDy
+              if (distSq > maxLinkDistSq || distSq < 16) continue
+              const distRatio = 1 - Math.sqrt(distSq) / maxLinkDist
+              const linkAlpha = Math.min(alphaA, alphaB) * distRatio * 0.32
+              if (linkAlpha <= 0.02) continue
+              ctx.globalAlpha = linkAlpha
+              ctx.beginPath()
+              ctx.moveTo(ax, ay)
+              ctx.lineTo(bx, by)
+              ctx.stroke()
+            }
+          }
+        }
+      }
 
       for (let bucket = 0; bucket < bucketCount; bucket += 1) {
         const start = bucketStarts[bucket]!
@@ -175,81 +231,39 @@ const CompanyHeroParticles: React.FC = () => {
         ctx.strokeStyle = palette[bucket]!
 
         for (let i = start; i < end; i += 1) {
+          const alpha = pScreenAlpha[i]!
+          if (alpha < 0.06) continue
+
+          const px = pScreenX[i]!
+          const py = pScreenY[i]!
+          const nextScale = pScale[i]!
           const rx = pRefX[i]!
           const ry = pRefY[i]!
           const b = i * 14
 
-          const dx = rx - ringX
-          const dy = ry - ringY
+          const dx = rx - cursorState.ringX
+          const dy = ry - cursorState.ringY
           const dist = Math.hypot(dx, dy)
-          const noiseJitter = (trigBases[b]! * c14 + trigBases[b + 1]! * s14) * 0.014
-          const distJittered = Math.max(0, dist + noiseJitter)
-
-          const bandOuter =
-            smoothstep(ringRadius - ringWidth * 2, ringRadius, dist) -
-            smoothstep(ringRadius, ringRadius + ringWidth, distJittered)
-          const bandInner =
-            smoothstep(ringRadius - ringWidthInner * 2, ringRadius, dist) -
-            smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
-          const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
-
-          const clampedOuter = Math.max(0, bandOuter)
-          const clampedInner = Math.max(0, bandInner)
-          const tOuter = clampedOuter * clampedOuter
-          const tInner = clampedInner * clampedInner * clampedInner
-          const ambientWave =
-            (((trigBases[b + 2]! * c10 + trigBases[b + 3]! * s10) +
-              (trigBases[b + 5]! * c085 - trigBases[b + 4]! * s085)) *
-              0.25 +
-              0.5) *
-            0.42
-
-          const targetScale =
-            0.34 + ambientWave + tOuter * 0.95 + tInner * 2.05 + insideCore * 0.3
-
+          const invDist = dist > 1e-4 ? 1 / dist : 0
           const clampedDist = Math.min(1, dist)
           const dispX =
-            (trigBases[b + 6]! * c28 + trigBases[b + 7]! * s28) * 0.014 * clampedDist +
-            (trigBases[b + 9]! * c10 - trigBases[b + 8]! * s10) * 0.008
+            (trigBases[b + 6]! * frame.c28 + trigBases[b + 7]! * frame.s28) * 0.014 * clampedDist +
+            (trigBases[b + 9]! * frame.c10 - trigBases[b + 8]! * frame.s10) * 0.008
           const dispY =
-            (trigBases[b + 11]! * c22 - trigBases[b + 10]! * s22) * 0.014 * clampedDist +
-            (trigBases[b + 12]! * c10 + trigBases[b + 13]! * s10) * 0.008
+            (trigBases[b + 11]! * frame.c22 - trigBases[b + 10]! * frame.s22) *
+              0.014 *
+              clampedDist +
+            (trigBases[b + 12]! * frame.c10 + trigBases[b + 13]! * frame.s10) * 0.008
 
-          const pushFactor = Math.sqrt(tInner * Math.sqrt(tInner)) * ringDisplacement
-          const nextPosX = pPosX[i]! * 0.8 + (rx + dispX - ringX) * pushFactor
-          const nextPosY = pPosY[i]! * 0.8 + (ry + dispY - ringY) * pushFactor
-          const nextScale = pScale[i]! + (targetScale - pScale[i]!) * 0.2
-          pPosX[i] = nextPosX
-          pPosY[i] = nextPosY
-          pScale[i] = nextScale
-
-          const finalX = rx + dispX + nextPosX * 0.28
-          const finalY = ry + dispY + nextPosY * 0.28
-
-          const px = (finalX + 1) * halfWidth
-          const py = (finalY + 1) * halfHeight
-          const nx = (px - halfWidth) * invClearRx
-          const ny = (py - halfHeight) * invClearRy
-          const normSq = nx * nx + ny * ny
-          if (normSq <= innerStopSq) continue
-
-          const centerClearance =
-            normSq >= outerStopSq
-              ? 1
-              : smoothstep(clearance.innerStop, clearance.outerStop, Math.sqrt(normSq))
-          const alpha =
-            Math.min(clearance.maxAlpha, Math.max(0.14, nextScale * 0.44)) * centerClearance
-
-          if (alpha < 0.06) continue
-
-          const invDist = dist > 1e-4 ? 1 / dist : 0
-          const tx = (-dy * 0.72 + dx * 0.38) * invDist + dispX * 4.5
-          const ty = (dx * 0.72 + dy * 0.38) * invDist + dispY * 4.5
+          const tx =
+            (-dy * 0.72 + dx * 0.38) * invDist + dispX * 4.5 + pVelX[i]! * 24 + cursorState.vx * 6
+          const ty =
+            (dx * 0.72 + dy * 0.38) * invDist + dispY * 4.5 + pVelY[i]! * 24 + cursorState.vy * 6
           const tNorm = Math.hypot(tx, ty) || 1
           const cosAngle = tx / tNorm
           const sinAngle = ty / tNorm
-          const halfLen = (2.8 + nextScale * 2.6) * baseScale
-          const lineWidth = (1.65 + Math.min(1.2, nextScale * 0.45)) * baseScale
+          const halfLen = (2.8 + nextScale * 2.6 + pEnergy[i]! * 1.4) * baseScale
+          const lineWidth = (1.65 + Math.min(1.25, nextScale * 0.45)) * baseScale
 
           drawFlowDashParticle(ctx, px, py, halfLen, cosAngle, sinAngle, lineWidth, alpha)
         }
@@ -265,7 +279,7 @@ const CompanyHeroParticles: React.FC = () => {
       renderFrame(startTime + 1200)
       const onResizeReduced = () => {
         syncSize()
-        renderFrame(startTime + 1200)
+        renderFrame(performance.now())
       }
       window.addEventListener("resize", onResizeReduced, { passive: true })
       return () => {
@@ -284,6 +298,7 @@ const CompanyHeroParticles: React.FC = () => {
 
     const startLoop = () => {
       if (rafId === null && isIntersecting && !document.hidden) {
+        prevNow = performance.now()
         rafId = window.requestAnimationFrame(loop)
       }
     }
@@ -296,22 +311,40 @@ const CompanyHeroParticles: React.FC = () => {
     }
 
     const hostSection = container.parentElement
-    const onPointerMove = (event: PointerEvent) => {
+    const toNormalizedPointer = (clientX: number, clientY: number) => {
       if (rectDirty) syncRect()
-      if (!rectWidth || !rectHeight) return
-      const nx = ((event.clientX - rectLeft) / rectWidth) * 2 - 1
-      const ny = ((event.clientY - rectTop) / rectHeight) * 2 - 1
+      if (!rectWidth || !rectHeight) return null
+      const nx = ((clientX - rectLeft) / rectWidth) * 2 - 1
+      const ny = ((clientY - rectTop) / rectHeight) * 2 - 1
+      return { nx, ny }
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      const coords = toNormalizedPointer(event.clientX, event.clientY)
+      if (!coords) return
+      const { nx, ny } = coords
       if (nx < -1.1 || nx > 1.1 || ny < -1.1 || ny > 1.1) {
-        pointerActive = false
+        cursorState.pointerActive = false
         return
       }
-      targetX = Math.max(-1, Math.min(1, nx))
-      targetY = Math.max(-1, Math.min(1, ny))
-      pointerActive = true
+      cursorState.targetX = Math.max(-1, Math.min(1, nx))
+      cursorState.targetY = Math.max(-1, Math.min(1, ny))
+      cursorState.pointerActive = true
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const coords = toNormalizedPointer(event.clientX, event.clientY)
+      if (!coords) return
+      const { nx, ny } = coords
+      if (nx < -1.05 || nx > 1.05 || ny < -1.05 || ny > 1.05) return
+      cursorState.targetX = Math.max(-1, Math.min(1, nx))
+      cursorState.targetY = Math.max(-1, Math.min(1, ny))
+      cursorState.pointerActive = true
+      triggerCursorRipple(cursorState, nx, ny)
     }
 
     const onPointerLeave = () => {
-      pointerActive = false
+      cursorState.pointerActive = false
     }
 
     const onResize = () => {
@@ -350,6 +383,7 @@ const CompanyHeroParticles: React.FC = () => {
     if (finePointer && hostSection) {
       window.addEventListener("scroll", markRectDirty, { passive: true })
       hostSection.addEventListener("pointermove", onPointerMove, { passive: true })
+      hostSection.addEventListener("pointerdown", onPointerDown, { passive: true })
       hostSection.addEventListener("pointerleave", onPointerLeave, { passive: true })
     }
 
@@ -363,6 +397,7 @@ const CompanyHeroParticles: React.FC = () => {
       if (finePointer && hostSection) {
         window.removeEventListener("scroll", markRectDirty)
         hostSection.removeEventListener("pointermove", onPointerMove)
+        hostSection.removeEventListener("pointerdown", onPointerDown)
         hostSection.removeEventListener("pointerleave", onPointerLeave)
       }
     }

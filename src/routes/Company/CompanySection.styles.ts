@@ -106,11 +106,39 @@ export const BentoCard = styled.article<{ $wide?: boolean }>`
   background: ${light.surface};
   box-shadow: ${light.bentoShadow};
   grid-column: ${({ $wide }) => ($wide ? "span 2" : "span 1")};
-  transition: border-color 180ms ease, background-color 180ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: ${light.cardSpotlightBg};
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 220ms ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &[data-spotlight-active="true"]::before {
+    opacity: 1;
+  }
 
   &:hover {
     border-color: ${light.borderBrand};
-    background: ${light.bentoHoverTint};
+    box-shadow: ${light.cardShadowXl};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      display: none;
+      transition: none;
+    }
   }
 
   @media (max-width: ${breakpoint.lg - 1}px) {
@@ -273,11 +301,46 @@ export const ComparisonGrid = styled.div`
 `
 
 export const ComparisonCard = styled.div<{ $highlighted?: boolean }>`
+  position: relative;
+  overflow: hidden;
   padding: 1.75rem;
   border-radius: 1.25rem;
   background: ${light.surface};
   border: 1px solid ${({ $highlighted }) => ($highlighted ? light.borderBrand : light.border)};
   box-shadow: ${({ $highlighted }) => ($highlighted ? light.bentoShadow : light.cardShadowSm)};
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: ${light.cardSpotlightBg};
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 220ms ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &[data-spotlight-active="true"]::before {
+    opacity: 1;
+  }
+
+  &:hover {
+    border-color: ${light.borderBrand};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      display: none;
+      transition: none;
+    }
+  }
 
   .cardTop {
     display: flex;

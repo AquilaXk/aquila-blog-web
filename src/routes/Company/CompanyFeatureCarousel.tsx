@@ -30,6 +30,7 @@ export const CompanyFeatureExplorerView: React.FC = () => (
         $wide={index === 0 || index === 3 || index === 5}
         data-reveal
         data-reveal-group="capabilities-cards"
+        data-spotlight="true"
       >
         <div>
           <Sec.BentoMetaRow>

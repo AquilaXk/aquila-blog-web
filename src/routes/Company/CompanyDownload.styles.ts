@@ -372,10 +372,43 @@ export const StudioModulesGrid = styled.div`
 `
 
 export const StudioModuleCardWrap = styled.article`
+  position: relative;
+  overflow: hidden;
+  padding: 1.25rem;
+  margin: -1.25rem;
+  border-radius: 1rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.75rem;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: ${light.cardSpotlightBg};
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 220ms ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &[data-spotlight-active="true"]::before {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      display: none;
+      transition: none;
+    }
+  }
 
   .moduleHead {
     display: flex;

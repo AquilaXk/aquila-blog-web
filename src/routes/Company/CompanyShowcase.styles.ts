@@ -126,6 +126,35 @@ export const ShowcaseStage = styled.div<{ $tone: ShowcaseStageTone }>`
         ? light.stageAmbientWarm
         : light.stageAmbientCool};
   overflow: hidden;
+  transition: border-color 180ms ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: ${light.stageSpotlightBg};
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 220ms ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &[data-spotlight-active="true"]::before {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      display: none;
+      transition: none;
+    }
+  }
 
   @media (max-width: ${breakpoint.md - 1}px) {
     border-radius: 1.25rem;

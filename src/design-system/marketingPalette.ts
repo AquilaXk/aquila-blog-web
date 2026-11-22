@@ -112,7 +112,14 @@ export const marketingLight = {
   surfaceHoverTint: "rgba(31, 35, 64, 0.04)",
   borderHairline: "rgba(31, 35, 64, 0.08)",
   phoneShadow: "0 16px 32px rgba(31, 35, 64, 0.08)",
-  particleColors: ["#2C64ED", "#5C6BC0", "#7480D2", "#F84242", "#FFCF03"] as const,
+  particleColors: ["#4F46E5", "#5C6BC0", "#7C3AED", "#0284C7", "#047857"] as const,
+  particleFilamentStroke: "#5C6BC0",
+  particleAuraFill: "rgba(92, 107, 192, 0.12)",
+  particleAuraTransparent: "rgba(92, 107, 192, 0)",
+  cardSpotlightBg:
+    "radial-gradient(360px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(92, 107, 192, 0.11), rgba(124, 58, 237, 0.05) 42%, transparent 72%)",
+  stageSpotlightBg:
+    "radial-gradient(460px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(92, 107, 192, 0.14), rgba(124, 58, 237, 0.06) 46%, transparent 74%)",
   /** mickasmt/next-saas-stripe-starter + magicui/magicui + launch-ui 참조 시맨틱 토큰 */
   gridBorder: "#e4e4e7",
   gridPaperBg:

@@ -212,7 +212,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                       <ArrowRightGlyph size={15} />
                     </Sec.ShowcaseActionPill>
                   </Sec.ShowcaseCopy>
-                  <Sec.ShowcaseStage $tone={product.stageTone}>
+                  <Sec.ShowcaseStage $tone={product.stageTone} data-spotlight="true">
                     {product.frame.kind === "android" ? (
                       <CompanyAndroidFrame
                         src={product.image.src}
@@ -270,7 +270,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
               <S.SectionLead>기획, 엔진 구현, 인프라 운영을 직접 맡아 현장의 불편을 제품에서 바로 고칩니다.</S.SectionLead>
             </Sec.CenteredHeader>
             <Sec.ComparisonGrid>
-              <Sec.ComparisonCard $highlighted>
+              <Sec.ComparisonCard $highlighted data-spotlight="true">
                 <div className="cardTop">
                   <h3>엔지니어링 원칙</h3>
                   <span className="cardTag">Core Standard</span>
@@ -286,7 +286,7 @@ const CompanyPageView: React.FC<Props> = ({ news, surfaceUrl }) => {
                   ))}
                 </ul>
               </Sec.ComparisonCard>
-              <Sec.ComparisonCard>
+              <Sec.ComparisonCard data-spotlight="true">
                 <div className="cardTop">
                   <h3>인프라 및 검증</h3>
                   <span className="cardTag">Operations</span>

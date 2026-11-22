@@ -34,6 +34,7 @@ import {
 import * as S from "src/routes/Company/CompanyPage.styles"
 import * as Sec from "src/routes/Company/CompanySection.styles"
 import * as D from "src/routes/Company/CompanyDownload.styles"
+import { useCompanySurfaceMotion } from "src/routes/Company/useCompanySurfaceMotion"
 
 type Props = {
   initialOs: DownloadOsKey
@@ -61,23 +62,15 @@ const CompanyDownloadPageView: React.FC<Props> = ({
   companyUrl,
   release = null,
 }) => {
+  const surfaceRef = useCompanySurfaceMotion<HTMLDivElement>()
   const [activeOs, setActiveOs] = useState<DownloadOsKey>(initialOs)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     if (hasExplicitOsQuery || typeof navigator === "undefined") return
     const detected = detectClientDownloadOs(navigator.userAgent, navigator.platform || "")
     setActiveOs((current) => (current === detected ? current : detected))
   }, [hasExplicitOsQuery])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const onScroll = () => setScrolled(window.scrollY > 12)
-    onScroll()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [])
 
   const handleSelectOs = (nextOs: DownloadOsKey) => {
     setActiveOs(nextOs)
@@ -112,8 +105,8 @@ const CompanyDownloadPageView: React.FC<Props> = ({
   const versionChipLabel = release ? `${release.tag} · ${release.publishedDate}` : "최신 정식 릴리스"
 
   return (
-    <S.CompanySurface data-download-page data-active-os={activeOs}>
-      <S.SurfaceHeader data-header className={scrolled ? "scrolled" : undefined}>
+    <S.CompanySurface ref={surfaceRef} data-download-page data-active-os={activeOs}>
+      <S.SurfaceHeader data-header data-scroll-reactive="true">
         <S.HeaderInner>
           <S.BrandLink href={companyUrl} style={{ minHeight: 44 }}>
             <BrandMark priority />
@@ -299,7 +292,7 @@ const CompanyDownloadPageView: React.FC<Props> = ({
             </D.SectionDescription>
             <D.StudioModulesGrid>
               {EASYOFFICE_STUDIO_MODULES.map((mod) => (
-                <D.StudioModuleCardWrap key={mod.id}>
+                <D.StudioModuleCardWrap key={mod.id} data-spotlight="true">
                   <div className="moduleHead">
                     <span className="moduleIcon">
                       <CompanyVectorIcon name={mod.icon} size={22} strokeWidth={1.85} />

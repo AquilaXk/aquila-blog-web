@@ -7,12 +7,20 @@ import {
   CompanyFeatureExplorerView,
   formatCapabilityIndex,
 } from "../../src/routes/Company/CompanyFeatureCarousel"
+import { CompanyCapabilityOrbWave } from "../../src/routes/Company/CompanyCapabilityVisuals"
 import {
   computeCenterClearance,
+  computeFrameTrigRates,
+  createCursorKinematicsState,
   createParticleSeeds,
+  createParticleSoABuffers,
   resolveParticleClearance,
   smoothstep,
+  stepCursorKinematics,
+  stepParticleSpringFieldFromSoA,
+  triggerCursorRipple,
 } from "../../src/routes/Company/CompanyHeroParticles"
+import { marketingLight } from "../../src/design-system/marketingPalette"
 import * as Sec from "../../src/routes/Company/CompanySection.styles"
 import {
   BLOG_URL,
@@ -441,6 +449,140 @@ test("CompanyVectorIcon은 18종 아이콘 모두를 외부 좌표 참조 없이
   expect(iconsSource).not.toContain("lucide-icons/lucide")
   expect(iconsSource).not.toContain("CompanyLucideIcon")
 })
+
+test("히어로 커서 물리 엔진은 Aquila 5색 스펙트럼, 속도 슬립스트림, 클릭 파동, 스프링 복원 및 중앙 마스킹을 수행한다", () => {
+  expect([...marketingLight.particleColors]).toEqual([
+    "#4F46E5",
+    "#5C6BC0",
+    "#7C3AED",
+    "#0284C7",
+    "#047857",
+  ])
+  expect(marketingLight.particleColors).not.toContain("#F84242")
+  expect(marketingLight.particleColors).not.toContain("#FFCF03")
+
+  const buffers = createParticleSoABuffers(22, 12, marketingLight.particleColors.length)
+  const clearance = resolveParticleClearance(1440, 640)
+  const cursor = createCursorKinematicsState()
+  cursor.pointerActive = true
+  cursor.ringX = -0.68
+  cursor.ringY = -0.2
+  cursor.targetX = -0.52
+  cursor.targetY = -0.18
+
+  // 1) 커서를 +X 방향으로 이동시킬 때 커서 속도 vx > 0 및 중앙 타이포 마스킹 검증
+  for (let frame = 0; frame < 4; frame += 1) {
+    stepCursorKinematics(cursor, 0.5 + frame * (1 / 60), 1 / 60)
+  }
+  expect(cursor.vx).toBeGreaterThan(0)
+  expect(cursor.speed).toBeGreaterThan(0)
+
+  let nearIdx = -1
+  let minNearDist = Infinity
+  let centerIdx = -1
+  let minCenterDist = Infinity
+  for (let i = 0; i < buffers.count; i += 1) {
+    const rx = buffers.refX[i]!
+    const ry = buffers.refY[i]!
+    const dCursor = Math.hypot(rx - cursor.ringX, ry - cursor.ringY)
+    if (dCursor < minNearDist) {
+      minNearDist = dCursor
+      nearIdx = i
+    }
+    const dCenter = Math.hypot(rx, ry)
+    if (dCenter < minCenterDist) {
+      minCenterDist = dCenter
+      centerIdx = i
+    }
+  }
+  expect(nearIdx).toBeGreaterThanOrEqual(0)
+  expect(centerIdx).toBeGreaterThanOrEqual(0)
+
+  // 동일 입자에서 커서 이동 속도에 의한 슬립스트림(wake) +X 충격을 정적 커서 대비 차분으로 검증
+  const staticBuffers = createParticleSoABuffers(22, 12, marketingLight.particleColors.length)
+  const staticCursor = { ...cursor, vx: 0, vy: 0, speed: 0 }
+  stepParticleSpringFieldFromSoA(
+    staticBuffers,
+    staticCursor,
+    0.5,
+    computeFrameTrigRates(0.5),
+    clearance,
+    1 / 60
+  )
+
+  const movingCursor = { ...cursor, vx: 0.08, vy: 0, speed: 0.08 }
+  stepParticleSpringFieldFromSoA(
+    buffers,
+    movingCursor,
+    0.5,
+    computeFrameTrigRates(0.5),
+    clearance,
+    1 / 60
+  )
+  expect(buffers.energy[nearIdx]!).toBeGreaterThan(0.2)
+  expect(buffers.velX[nearIdx]!).toBeGreaterThan(staticBuffers.velX[nearIdx]!)
+  expect(buffers.screenAlpha[centerIdx]).toBe(0)
+
+  // 2) 클릭 파동 트리거 시 반경·파동 에너지 전파 검증
+  triggerCursorRipple(cursor, -0.7, 0.2)
+  expect(cursor.rippleStrength).toBe(1)
+  stepCursorKinematics(cursor, 0.55, 1 / 60)
+  expect(cursor.rippleRadius).toBeGreaterThan(0.04)
+  expect(cursor.rippleStrength).toBeLessThan(1)
+  stepParticleSpringFieldFromSoA(
+    buffers,
+    cursor,
+    0.55,
+    computeFrameTrigRates(0.55),
+    clearance,
+    1 / 60
+  )
+
+  // 3) 포인터 이탈 후 후크의 법칙 스프링-댐퍼로 입자 변위·속도 감쇠 복원 검증
+  cursor.pointerActive = false
+  cursor.rippleStrength = 0
+  buffers.velX[nearIdx] = 0.08
+  for (let step = 0; step < 30; step += 1) {
+    const t = 0.6 + step * (1 / 60)
+    stepCursorKinematics(cursor, t, 1 / 60)
+    stepParticleSpringFieldFromSoA(
+      buffers,
+      cursor,
+      t,
+      computeFrameTrigRates(t),
+      clearance,
+      1 / 60
+    )
+  }
+  expect(Math.abs(buffers.velX[nearIdx]!)).toBeLessThan(0.08)
+})
+
+test("CompanyCapabilityOrbWave와 CompanyFeatureExplorerView 및 페이지 뷰는 커서 스포트라이트·마그네틱 오브 웨이브 계약을 노출한다", () => {
+  const orbMarkup = renderToStaticMarkup(unwrapPw((CompanyCapabilityOrbWave as () => unknown)()))
+  expect(orbMarkup).toContain('data-orb-wave="true"')
+  expect((orbMarkup.match(/data-orb-index="/g) ?? []).length).toBe(12)
+
+  const featureMarkup = renderToStaticMarkup(
+    unwrapPw((CompanyFeatureExplorerView as () => unknown)())
+  )
+  expect((featureMarkup.match(/data-spotlight="true"/g) ?? []).length).toBe(
+    COMPANY_FEATURE_CARDS.length
+  )
+
+  const pageViewSource = fs.readFileSync(
+    path.resolve(__dirname, "../../src/routes/Company/CompanyPageView.tsx"),
+    "utf8"
+  )
+  expect(pageViewSource).toContain('data-spotlight="true"')
+
+  const downloadViewSource = fs.readFileSync(
+    path.resolve(__dirname, "../../src/routes/Company/CompanyDownloadPageView.tsx"),
+    "utf8"
+  )
+  expect(downloadViewSource).toContain("useCompanySurfaceMotion")
+  expect(downloadViewSource).toContain('data-spotlight="true"')
+})
+
 
 
 

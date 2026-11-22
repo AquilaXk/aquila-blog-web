@@ -29,10 +29,31 @@ export type ParticleSoABuffers = {
   refY: Float32Array
   posX: Float32Array
   posY: Float32Array
+  velX: Float32Array
+  velY: Float32Array
   scale: Float32Array
+  energy: Float32Array
+  screenX: Float32Array
+  screenY: Float32Array
+  screenAlpha: Float32Array
   seedA: Float32Array
   seedB: Float32Array
   trigBases: Float32Array
+}
+
+export type CursorKinematicsState = {
+  ringX: number
+  ringY: number
+  targetX: number
+  targetY: number
+  vx: number
+  vy: number
+  speed: number
+  pointerActive: boolean
+  rippleX: number
+  rippleY: number
+  rippleRadius: number
+  rippleStrength: number
 }
 
 export type FrameTrigRates = {
@@ -228,8 +249,14 @@ export const createParticleSoABuffers = (
   const refYArr = new Float32Array(count)
   const posXArr = new Float32Array(count)
   const posYArr = new Float32Array(count)
+  const velXArr = new Float32Array(count)
+  const velYArr = new Float32Array(count)
   const scaleArr = new Float32Array(count)
   scaleArr.fill(0.35)
+  const energyArr = new Float32Array(count)
+  const screenXArr = new Float32Array(count)
+  const screenYArr = new Float32Array(count)
+  const screenAlphaArr = new Float32Array(count)
   const seedAArr = new Float32Array(count)
   const seedBArr = new Float32Array(count)
   const trigBases = new Float32Array(count * 14)
@@ -260,9 +287,239 @@ export const createParticleSoABuffers = (
     refY: refYArr,
     posX: posXArr,
     posY: posYArr,
+    velX: velXArr,
+    velY: velYArr,
     scale: scaleArr,
+    energy: energyArr,
+    screenX: screenXArr,
+    screenY: screenYArr,
+    screenAlpha: screenAlphaArr,
     seedA: seedAArr,
     seedB: seedBArr,
     trigBases,
+  }
+}
+
+export const createCursorKinematicsState = (): CursorKinematicsState => ({
+  ringX: 0.18,
+  ringY: -0.12,
+  targetX: 0.18,
+  targetY: -0.12,
+  vx: 0,
+  vy: 0,
+  speed: 0,
+  pointerActive: false,
+  rippleX: 0,
+  rippleY: 0,
+  rippleRadius: 0,
+  rippleStrength: 0,
+})
+
+export const triggerCursorRipple = (
+  state: CursorKinematicsState,
+  normX: number,
+  normY: number
+): void => {
+  state.rippleX = Math.max(-1, Math.min(1, normX))
+  state.rippleY = Math.max(-1, Math.min(1, normY))
+  state.rippleRadius = 0.04
+  state.rippleStrength = 1
+}
+
+export const stepCursorKinematics = (
+  state: CursorKinematicsState,
+  time: number,
+  dtSeconds = 1 / 60
+): void => {
+  const frameScale = Math.max(0.25, Math.min(3, dtSeconds * 60))
+  const wanderX = Math.sin(time * 1.15 + 1.4) * 0.36 + Math.cos(time * 0.52) * 0.14
+  const wanderY = Math.cos(time * 0.95 + 0.7) * 0.24 + Math.sin(time * 0.63) * 0.1
+  const desiredX = state.pointerActive ? state.targetX * 0.92 + wanderX * 0.08 : wanderX
+  const desiredY = state.pointerActive ? state.targetY * 0.92 + wanderY * 0.08 : wanderY
+  const baseLerp = state.pointerActive ? 0.14 : 0.03
+  const lerpFactor = 1 - Math.pow(1 - baseLerp, frameScale)
+
+  const nextRingX = state.ringX + (desiredX - state.ringX) * lerpFactor
+  const nextRingY = state.ringY + (desiredY - state.ringY) * lerpFactor
+  const instVx = (nextRingX - state.ringX) / frameScale
+  const instVy = (nextRingY - state.ringY) / frameScale
+  const velDecay = Math.pow(0.72, frameScale)
+  state.vx = state.vx * velDecay + instVx * (1 - velDecay)
+  state.vy = state.vy * velDecay + instVy * (1 - velDecay)
+  state.speed = Math.min(0.22, Math.hypot(state.vx, state.vy))
+  state.ringX = nextRingX
+  state.ringY = nextRingY
+
+  if (state.rippleStrength > 0.004) {
+    state.rippleRadius += 0.032 * frameScale
+    state.rippleStrength *= Math.pow(0.945, frameScale)
+    if (state.rippleStrength <= 0.004 || state.rippleRadius > 2.4) {
+      state.rippleStrength = 0
+    }
+  }
+}
+
+export const stepParticleSpringFieldFromSoA = (
+  particles: ParticleSoABuffers,
+  cursor: CursorKinematicsState,
+  time: number,
+  frame: FrameTrigRates,
+  clearance: ParticleClearanceSpec,
+  dtSeconds = 1 / 60
+): void => {
+  const frameScale = Math.max(0.25, Math.min(3, dtSeconds * 60))
+  const stiffness = 0.18 * frameScale
+  const damping = Math.pow(0.78, frameScale)
+  const scaleLerp = 1 - Math.pow(0.8, frameScale)
+
+  const ringRadius = 0.36 + Math.sin(time * 1.3) * 0.036 + Math.cos(time * 2.8) * 0.018
+  const ringWidth = 0.24
+  const ringWidthInner = 0.09
+  const ringDisplacement = 0.15
+  const wakeRadius = 0.44
+  const hasRipple = cursor.rippleStrength > 0.004
+  const invClearRx = 1 / clearance.clearRx
+  const invClearRy = 1 / clearance.clearRy
+  const innerStopSq = clearance.innerStop * clearance.innerStop
+  const outerStopSq = clearance.outerStop * clearance.outerStop
+  const halfWidth = clearance.cx
+  const halfHeight = clearance.cy
+
+  const {
+    count,
+    refX,
+    refY,
+    posX,
+    posY,
+    velX,
+    velY,
+    scale,
+    energy,
+    screenX,
+    screenY,
+    screenAlpha,
+    trigBases,
+  } = particles
+
+  for (let i = 0; i < count; i += 1) {
+    const rx = refX[i]!
+    const ry = refY[i]!
+    const b = i * 14
+
+    const dx = rx - cursor.ringX
+    const dy = ry - cursor.ringY
+    const dist = Math.hypot(dx, dy)
+    const invDist = dist > 1e-4 ? 1 / dist : 0
+    const noiseJitter = (trigBases[b]! * frame.c14 + trigBases[b + 1]! * frame.s14) * 0.014
+    const distJittered = Math.max(0, dist + noiseJitter)
+
+    const bandOuter =
+      smoothstep(ringRadius - ringWidth * 2, ringRadius, dist) -
+      smoothstep(ringRadius, ringRadius + ringWidth, distJittered)
+    const bandInner =
+      smoothstep(ringRadius - ringWidthInner * 2, ringRadius, dist) -
+      smoothstep(ringRadius, ringRadius + ringWidthInner, distJittered)
+    const insideCore = smoothstep(ringRadius + ringWidthInner, ringRadius, dist)
+
+    const clampedOuter = Math.max(0, bandOuter)
+    const clampedInner = Math.max(0, bandInner)
+    const tOuter = clampedOuter * clampedOuter
+    const tInner = clampedInner * clampedInner * clampedInner
+    const ambientWave =
+      (((trigBases[b + 2]! * frame.c10 + trigBases[b + 3]! * frame.s10) +
+        (trigBases[b + 5]! * frame.c085 - trigBases[b + 4]! * frame.s085)) *
+        0.25 +
+        0.5) *
+      0.4
+
+    let ripplePulse = 0
+    let rippleForceX = 0
+    let rippleForceY = 0
+    if (hasRipple) {
+      const rdx = rx - cursor.rippleX
+      const rdy = ry - cursor.rippleY
+      const rDist = Math.hypot(rdx, rdy)
+      const rDiff = rDist - cursor.rippleRadius
+      ripplePulse = Math.exp(-(rDiff * rDiff) / (2 * 0.13 * 0.13)) * cursor.rippleStrength
+      if (rDist > 1e-4 && ripplePulse > 0.01) {
+        const invR = 1 / rDist
+        rippleForceX = rdx * invR * ripplePulse * 0.042
+        rippleForceY = rdy * invR * ripplePulse * 0.042
+      }
+    }
+
+    let wakeForceX = 0
+    let wakeForceY = 0
+    let wakeEnergy = 0
+    if (cursor.pointerActive && dist < wakeRadius) {
+      const falloff = 1 - dist / wakeRadius
+      const falloffSq = falloff * falloff
+      wakeEnergy = falloffSq
+      const repel = falloffSq * 0.012
+      wakeForceX = dx * invDist * repel + cursor.vx * falloffSq * 0.42
+      wakeForceY = dy * invDist * repel + cursor.vy * falloffSq * 0.42
+    }
+
+    const pushFactor = Math.sqrt(tInner * Math.sqrt(tInner)) * ringDisplacement
+    const targetOffsetX = (rx - cursor.ringX) * pushFactor
+    const targetOffsetY = (ry - cursor.ringY) * pushFactor
+
+    const curPosX = posX[i]!
+    const curPosY = posY[i]!
+    const nextVelX =
+      (velX[i]! + (targetOffsetX - curPosX) * stiffness + wakeForceX + rippleForceX) * damping
+    const nextVelY =
+      (velY[i]! + (targetOffsetY - curPosY) * stiffness + wakeForceY + rippleForceY) * damping
+    const nextPosX = curPosX + nextVelX * frameScale
+    const nextPosY = curPosY + nextVelY * frameScale
+
+    posX[i] = nextPosX
+    posY[i] = nextPosY
+    velX[i] = nextVelX
+    velY[i] = nextVelY
+
+    const localEnergy = Math.min(1, tInner * 0.85 + tOuter * 0.35 + wakeEnergy * 0.9 + ripplePulse)
+    energy[i] = localEnergy
+
+    const targetScale =
+      0.34 +
+      ambientWave +
+      tOuter * 0.95 +
+      tInner * 2.05 +
+      insideCore * 0.3 +
+      wakeEnergy * 0.65 +
+      ripplePulse * 1.15
+    const nextScale = scale[i]! + (targetScale - scale[i]!) * scaleLerp
+    scale[i] = nextScale
+
+    const clampedDist = Math.min(1, dist)
+    const dispX =
+      (trigBases[b + 6]! * frame.c28 + trigBases[b + 7]! * frame.s28) * 0.014 * clampedDist +
+      (trigBases[b + 9]! * frame.c10 - trigBases[b + 8]! * frame.s10) * 0.008
+    const dispY =
+      (trigBases[b + 11]! * frame.c22 - trigBases[b + 10]! * frame.s22) * 0.014 * clampedDist +
+      (trigBases[b + 12]! * frame.c10 + trigBases[b + 13]! * frame.s10) * 0.008
+
+    const px = (rx + dispX + nextPosX * 0.36 + 1) * halfWidth
+    const py = (ry + dispY + nextPosY * 0.36 + 1) * halfHeight
+    screenX[i] = px
+    screenY[i] = py
+
+    const nx = (px - halfWidth) * invClearRx
+    const ny = (py - halfHeight) * invClearRy
+    const normSq = nx * nx + ny * ny
+    if (normSq <= innerStopSq) {
+      screenAlpha[i] = 0
+      continue
+    }
+
+    const centerClearance =
+      normSq >= outerStopSq
+        ? 1
+        : smoothstep(clearance.innerStop, clearance.outerStop, Math.sqrt(normSq))
+    const rawAlpha =
+      Math.min(clearance.maxAlpha, Math.max(0.14, (nextScale + ripplePulse * 0.35) * 0.44)) *
+      centerClearance
+    screenAlpha[i] = rawAlpha < 0.06 ? 0 : rawAlpha
   }
 }

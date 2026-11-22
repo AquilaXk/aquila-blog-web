@@ -46,7 +46,20 @@ const OrbBubble = styled.span<{ $offset: number }>`
   background: ${light.surface};
   box-shadow: ${light.orbShadow};
   color: ${light.inkPrimary};
-  transform: translate3d(0, ${({ $offset }) => $offset}px, 0);
+  transform: translate3d(0, calc(${({ $offset }) => $offset}px + var(--orb-lift-px, 0px)), 0)
+    scale(var(--orb-scale, 1));
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  &:hover {
+    border-color: ${light.borderBrand};
+    box-shadow: ${light.cardShadowXl};
+  }
 
   @media (max-width: ${breakpoint.lg - 1}px) {
     width: 2.75rem;
@@ -56,9 +69,9 @@ const OrbBubble = styled.span<{ $offset: number }>`
 `
 
 export const CompanyCapabilityOrbWave: React.FC = () => (
-  <OrbWaveStrip aria-hidden="true">
-    {WAVE_ORBS.map((orb) => (
-      <OrbBubble key={orb.icon} $offset={orb.offsetPx}>
+  <OrbWaveStrip aria-hidden="true" data-orb-wave="true">
+    {WAVE_ORBS.map((orb, idx) => (
+      <OrbBubble key={orb.icon} $offset={orb.offsetPx} data-orb-index={idx}>
         <CompanyVectorIcon name={orb.icon} size={21} strokeWidth={1.75} />
       </OrbBubble>
     ))}
