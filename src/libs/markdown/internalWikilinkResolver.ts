@@ -22,6 +22,24 @@ export const splitWikilinkTargetAndAnchor = (
   }
 }
 
+const assignResolvedTarget = (
+  resolved: Record<string, string>,
+  key: string,
+  href: string
+) => {
+  if (!key || Object.hasOwn(resolved, key)) return
+  if (key === "__proto__") {
+    Object.defineProperty(resolved, key, {
+      value: href,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    })
+    return
+  }
+  resolved[key] = href
+}
+
 export const buildPostInternalLinkTargets = (
   markdown: string,
   catalogPosts: readonly { id: string | number; title: string; slug?: string }[]
@@ -42,16 +60,17 @@ export const buildPostInternalLinkTargets = (
   for (const post of catalogPosts) {
     const postId = String(post.id ?? "").trim()
     if (!/^[1-9]\d*$/.test(postId)) continue
+    const href = `/posts/${postId}`
     const titleKey = normalizeWikilinkLookupKey(post.title || "")
-    if (titleKey && neededKeys.has(titleKey) && !Object.hasOwn(resolved, titleKey)) {
-      resolved[titleKey] = `/posts/${postId}`
+    if (titleKey && neededKeys.has(titleKey)) {
+      assignResolvedTarget(resolved, titleKey, href)
     }
     const slugKey = post.slug ? normalizeWikilinkLookupKey(post.slug) : ""
-    if (slugKey && neededKeys.has(slugKey) && !Object.hasOwn(resolved, slugKey)) {
-      resolved[slugKey] = `/posts/${postId}`
+    if (slugKey && neededKeys.has(slugKey)) {
+      assignResolvedTarget(resolved, slugKey, href)
     }
-    if (neededKeys.has(postId) && !Object.hasOwn(resolved, postId)) {
-      resolved[postId] = `/posts/${postId}`
+    if (neededKeys.has(postId)) {
+      assignResolvedTarget(resolved, postId, href)
     }
   }
   return resolved

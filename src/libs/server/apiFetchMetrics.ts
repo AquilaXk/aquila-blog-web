@@ -12,6 +12,7 @@ import {
 type ActiveApiFetchContext = {
   requestId: string
   clientIp?: string
+  trustedClientIp?: boolean
   source: "ssr"
 }
 
@@ -20,6 +21,7 @@ export type SsrApiFetchContextInput =
   | {
       requestId: string
       clientIp?: string
+      trustedClientIp?: boolean
     }
 
 type ApiFetchMetricsState = {
@@ -52,6 +54,7 @@ export const runWithSsrApiFetchContext = async <T>(
       : {
           requestId: input.requestId,
           ...(input.clientIp ? { clientIp: input.clientIp } : {}),
+          ...(input.trustedClientIp !== undefined ? { trustedClientIp: input.trustedClientIp } : {}),
           source: "ssr",
         }
   return await getState().storage.run(normalized, handler)
@@ -70,8 +73,10 @@ export const registerServerApiFetchMetrics = () => {
     let observed = false
     headers.set("X-Request-Id", requestId)
     if (activeContext?.clientIp) {
-      if (!headers.has("cf-connecting-ip")) headers.set("CF-Connecting-IP", activeContext.clientIp)
-      if (!headers.has("x-internal-client-ip")) headers.set("X-Internal-Client-IP", activeContext.clientIp)
+      if (activeContext.trustedClientIp === true) {
+        if (!headers.has("cf-connecting-ip")) headers.set("CF-Connecting-IP", activeContext.clientIp)
+        if (!headers.has("x-internal-client-ip")) headers.set("X-Internal-Client-IP", activeContext.clientIp)
+      }
       if (!headers.has("x-forwarded-for")) headers.set("X-Forwarded-For", activeContext.clientIp)
     }
     const observe = (result: BackendFetchResult) => {

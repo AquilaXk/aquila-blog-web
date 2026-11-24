@@ -367,8 +367,23 @@ test("serverApiFetchJson and backend proxy forward trusted client IP headers and
   } as unknown as IncomingMessage
 
   await serverApiFetchJson(socketReq, "/member/api/v1/auth/me")
-  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("192.0.2.44")
+  expect(observedHeaders.at(-1)?.get("cf-connecting-ip")).toBeNull()
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBeNull()
   expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("192.0.2.44")
+  expect(observedHeaders.at(-1)?.get("x-injected")).toBeNull()
+
+  const trustedMalformedReq = {
+    headers: {
+      "cf-connecting-ip": "203.0.113.1\r\nX-Injected: pwn",
+    },
+    socket: { remoteAddress: "::ffff:127.0.0.1" },
+    url: "/posts",
+  } as unknown as IncomingMessage
+
+  await serverApiFetchJson(trustedMalformedReq, "/member/api/v1/auth/me")
+  expect(observedHeaders.at(-1)?.get("cf-connecting-ip")).toBe("127.0.0.1")
+  expect(observedHeaders.at(-1)?.get("x-internal-client-ip")).toBe("127.0.0.1")
+  expect(observedHeaders.at(-1)?.get("x-forwarded-for")).toBe("127.0.0.1")
   expect(observedHeaders.at(-1)?.get("x-injected")).toBeNull()
 
   const proxyReq = {

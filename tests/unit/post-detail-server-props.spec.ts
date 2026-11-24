@@ -5,6 +5,7 @@ import { buildCanonicalPostDetailServerProps } from "../../src/libs/server/postD
 
 const originalFetch = globalThis.fetch
 const originalBackend = process.env.BACKEND_INTERNAL_URL
+const originalTrustedProxyIps = process.env.TRUSTED_PROXY_IPS
 const post = {
   id: 101, title: "Initially public", content: "Protected manuscript",
   summary: "Summary", summarySource: "MANUAL", authorId: 1, authorName: "Aquila",
@@ -27,6 +28,8 @@ test.afterEach(() => {
   globalThis.fetch = originalFetch
   if (originalBackend === undefined) delete process.env.BACKEND_INTERNAL_URL
   else process.env.BACKEND_INTERNAL_URL = originalBackend
+  if (originalTrustedProxyIps === undefined) delete process.env.TRUSTED_PROXY_IPS
+  else process.env.TRUSTED_PROXY_IPS = originalTrustedProxyIps
 })
 
 for (const status of [404, 503]) {
@@ -155,6 +158,74 @@ test("forwards sanitized visitor CF-Connecting-IP on detail SSR backend requests
   expect(capturedDetailHeaders).toEqual([
     {
       cfConnectingIp: "198.51.100.77",
+      xForwardedFor: "198.51.100.77",
+    },
+  ])
+})
+
+test("untrusted SSR peer strips CF-Connecting-IP and X-Internal-Client-IP and forwards only X-Forwarded-For", async () => {
+  delete process.env.TRUSTED_PROXY_IPS
+  const capturedDetailHeaders: Array<{ cfConnectingIp: string | null; xInternalClientIp: string | null; xForwardedFor: string | null }> = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (url.includes("/posts/101")) {
+      const headers = new Headers(init?.headers)
+      capturedDetailHeaders.push({
+        cfConnectingIp: headers.get("cf-connecting-ip"),
+        xInternalClientIp: headers.get("x-internal-client-ip"),
+        xForwardedFor: headers.get("x-forwarded-for"),
+      })
+      return json(200, post)
+    }
+    return json(200, { username: "Aquila", nickname: "Aquila", profileImageUrl: "" })
+  }) as typeof fetch
+
+  const res = response()
+  await buildCanonicalPostDetailServerProps("101", res.res, {
+    headers: {
+      "cf-connecting-ip": "1.2.3.4",
+    },
+    socket: { remoteAddress: "203.0.113.50" },
+  })
+
+  expect(capturedDetailHeaders).toEqual([
+    {
+      cfConnectingIp: null,
+      xInternalClientIp: null,
+      xForwardedFor: "203.0.113.50",
+    },
+  ])
+})
+
+test("CIDR trusted peer in TRUSTED_PROXY_IPS forwards visitor CF-Connecting-IP on detail SSR", async () => {
+  process.env.TRUSTED_PROXY_IPS = "172.16.0.0/12"
+  const capturedDetailHeaders: Array<{ cfConnectingIp: string | null; xInternalClientIp: string | null; xForwardedFor: string | null }> = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (url.includes("/posts/101")) {
+      const headers = new Headers(init?.headers)
+      capturedDetailHeaders.push({
+        cfConnectingIp: headers.get("cf-connecting-ip"),
+        xInternalClientIp: headers.get("x-internal-client-ip"),
+        xForwardedFor: headers.get("x-forwarded-for"),
+      })
+      return json(200, post)
+    }
+    return json(200, { username: "Aquila", nickname: "Aquila", profileImageUrl: "" })
+  }) as typeof fetch
+
+  const res = response()
+  await buildCanonicalPostDetailServerProps("101", res.res, {
+    headers: {
+      "cf-connecting-ip": "198.51.100.77",
+    },
+    socket: { remoteAddress: "::ffff:172.18.0.3" },
+  })
+
+  expect(capturedDetailHeaders).toEqual([
+    {
+      cfConnectingIp: "198.51.100.77",
+      xInternalClientIp: "198.51.100.77",
       xForwardedFor: "198.51.100.77",
     },
   ])

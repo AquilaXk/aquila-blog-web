@@ -2,7 +2,7 @@ import type { GetServerSideProps, GetServerSidePropsResult, PreviewData } from "
 import type { ServerResponse } from "node:http"
 import type { ParsedUrlQuery } from "node:querystring"
 import { registerServerApiFetchMetrics, runWithSsrApiFetchContext } from "src/libs/server/apiFetchMetrics"
-import { resolveTrustedClientIp } from "src/libs/server/backend"
+import { isTrustedProxyPeerIp, resolveTrustedClientIp } from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { getRuntimeMetrics, type RuntimeMetrics } from "src/libs/server/runtimeMetrics"
 import { bindSsrResponse } from "src/libs/server/ssrBackendCookies"
@@ -62,8 +62,9 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
     let result: GetServerSidePropsResult<Props>
     try {
       const clientIp = resolveTrustedClientIp(context.req)
+      const trustedClientIp = isTrustedProxyPeerIp(context.req.socket?.remoteAddress)
       result = await runWithSsrApiFetchContext(
-        { requestId, ...(clientIp ? { clientIp } : {}) },
+        { requestId, ...(clientIp ? { clientIp } : {}), trustedClientIp },
         async () => await handler(context)
       )
     } catch (error) {

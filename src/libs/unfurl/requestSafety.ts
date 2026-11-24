@@ -72,8 +72,11 @@ const resolveDefaultPort = (protocol: string) => {
   throw new UnfurlValidationError("http/https URL만 지원합니다.")
 }
 
+const stripIpv6Brackets = (hostname: string): string =>
+  hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname
+
 const resolvePublicAddress = async (hostname: string): Promise<ResolvedPublicAddress> => {
-  if (isIP(hostname)) {
+  if (isIP(stripIpv6Brackets(hostname.trim()))) {
     throw new UnfurlValidationError("IP 주소 직접 unfurl은 허용되지 않습니다.")
   }
 
@@ -109,8 +112,16 @@ const parseConfiguredUnfurlAllowlist = (): string[] => {
 
 const isAllowedUnfurlHost = (hostname: string) => {
   const normalizedHostname = hostname.trim().toLowerCase().replace(/\.+$/, "")
-  if (!normalizedHostname || !normalizedHostname.includes(".")) return false
-  if (isIP(normalizedHostname)) return false
+  const unbracketedHostname = stripIpv6Brackets(normalizedHostname)
+  if (!unbracketedHostname || !unbracketedHostname.includes(".")) return false
+  if (
+    normalizedHostname.startsWith("[") ||
+    normalizedHostname.endsWith("]") ||
+    normalizedHostname.includes(":") ||
+    isIP(unbracketedHostname)
+  ) {
+    return false
+  }
   if (BLOCKED_UNFURL_HOST_EXACT.has(normalizedHostname)) return false
   if (BLOCKED_UNFURL_HOST_SUFFIXES.some((suffix) => normalizedHostname.endsWith(suffix))) {
     return false

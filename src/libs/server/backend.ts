@@ -9,6 +9,7 @@ import {
   type ServerApiFetchMetricsContext,
 } from "src/apis/backend/serverMetricsBridge"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
+import { ipv4ToNumber, parseIpv6Words } from "src/libs/network/publicHostSafety"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { applySsrBackendCookies } from "src/libs/server/ssrBackendCookies"
 
@@ -23,43 +24,209 @@ const readFirstHeaderValue = (value: string | string[] | undefined): string => {
   return typeof value === "string" ? value : ""
 }
 
-const isValidIpv4 = (value: string): boolean => {
-  const parts = value.split(".")
-  if (parts.length !== 4) return false
-  return parts.every((part) => /^(?:0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255)
+type TrustedIpv4Rule = {
+  kind: "v4"
+  network: number
+  mask: number
 }
 
-const isValidIpv6 = (value: string): boolean => {
-  if (!value.includes(":") || !/^[0-9a-fA-F:.]+$/.test(value)) return false
-  try {
-    const parsed = new URL(`http://[${value}]/`)
-    return parsed.hostname.startsWith("[") && parsed.hostname.endsWith("]")
-  } catch {
-    return false
+type TrustedIpv6Rule = {
+  kind: "v6"
+  network: Uint16Array
+  mask: Uint16Array
+}
+
+export type TrustedProxyAllowlist = {
+  ipv4Rules: TrustedIpv4Rule[]
+  ipv6Rules: TrustedIpv6Rule[]
+}
+
+const DEFAULT_TRUSTED_PROXY_V4_RULE: TrustedIpv4Rule = {
+  kind: "v4",
+  network: 0x7f000001, // 127.0.0.1/32
+  mask: 0xffffffff,
+}
+
+const DEFAULT_TRUSTED_PROXY_V6_RULE: TrustedIpv6Rule = {
+  kind: "v6",
+  network: new Uint16Array([0, 0, 0, 0, 0, 0, 0, 1]), // ::1/128
+  mask: new Uint16Array([0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff]),
+}
+
+let cachedTrustedProxyRaw: string | undefined
+let cachedTrustedProxyAllowlist: TrustedProxyAllowlist | undefined
+
+const formatIpv4Uint32 = (value: number): string =>
+  `${(value >>> 24) & 0xff}.${(value >>> 16) & 0xff}.${(value >>> 8) & 0xff}.${value & 0xff}`
+
+const parseIpv4MappedWordsToUint32 = (words: Uint16Array): number | null => {
+  if (
+    words[0] === 0 &&
+    words[1] === 0 &&
+    words[2] === 0 &&
+    words[3] === 0 &&
+    words[4] === 0 &&
+    words[5] === 0xffff
+  ) {
+    return ((words[6]! << 16) | words[7]!) >>> 0
   }
+  return null
+}
+
+const parseCidrPrefix = (rawPrefix: string, maxPrefix: number): number | null => {
+  if (!/^(?:0|[1-9]\d{0,2})$/.test(rawPrefix)) return null
+  const prefix = Number.parseInt(rawPrefix, 10)
+  return prefix >= 0 && prefix <= maxPrefix ? prefix : null
+}
+
+const createIpv4Rule = (ipNum: number, prefix: number): TrustedIpv4Rule => {
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
+  return {
+    kind: "v4",
+    mask,
+    network: (ipNum & mask) >>> 0,
+  }
+}
+
+const createIpv6Rule = (words: Uint16Array, prefix: number): TrustedIpv6Rule => {
+  const mask = new Uint16Array(8)
+  const network = new Uint16Array(8)
+  for (let i = 0; i < 8; i += 1) {
+    const remaining = prefix - i * 16
+    const wordMask =
+      remaining >= 16
+        ? 0xffff
+        : remaining <= 0
+          ? 0
+          : (0xffff << (16 - remaining)) & 0xffff
+    mask[i] = wordMask
+    network[i] = words[i]! & wordMask
+  }
+  return { kind: "v6", network, mask }
 }
 
 const sanitizeClientIpCandidate = (raw: string | undefined): string => {
   if (!raw) return ""
-  const trimmed = raw.trim().replace(/^::ffff:/i, "")
+  const trimmed = raw.trim()
   if (!trimmed || trimmed.length > 64 || /[\r\n\0\s,]/.test(trimmed)) return ""
-  return isValidIpv4(trimmed) || isValidIpv6(trimmed) ? trimmed : ""
+  const stripped = trimmed.replace(/^::ffff:/i, "")
+  if (ipv4ToNumber(stripped) !== null) return stripped
+  if (!trimmed.includes(":") || !/^[0-9a-fA-F:.]+$/.test(trimmed)) return ""
+  const words = parseIpv6Words(trimmed)
+  if (!words) return ""
+  const mappedV4 = parseIpv4MappedWordsToUint32(words)
+  return mappedV4 !== null ? formatIpv4Uint32(mappedV4) : trimmed
 }
 
-const parseTrustedProxyAllowlist = (): Set<string> => {
-  const raw = process.env.TRUSTED_PROXY_IPS || ""
-  const set = new Set<string>(["127.0.0.1", "::1"])
-  for (const entry of raw.split(",")) {
-    const normalized = sanitizeClientIpCandidate(entry)
-    if (normalized) set.add(normalized)
+export const parseTrustedProxyAllowlist = (rawInput?: string): TrustedProxyAllowlist => {
+  const envRaw = process.env.TRUSTED_PROXY_IPS || ""
+  const effectiveRaw = rawInput ?? envRaw
+  const useCache = rawInput === undefined
+  if (useCache && cachedTrustedProxyAllowlist && cachedTrustedProxyRaw === effectiveRaw) {
+    return cachedTrustedProxyAllowlist
   }
-  return set
+
+  const ipv4Rules: TrustedIpv4Rule[] = [DEFAULT_TRUSTED_PROXY_V4_RULE]
+  const ipv6Rules: TrustedIpv6Rule[] = [DEFAULT_TRUSTED_PROXY_V6_RULE]
+
+  for (const rawEntry of effectiveRaw.split(",")) {
+    const trimmed = rawEntry.trim()
+    if (!trimmed || trimmed.length > 64 || /[\r\n\0\s[\]%]/.test(trimmed)) continue
+
+    const slashIndex = trimmed.indexOf("/")
+    if (slashIndex < 0) {
+      const normalizedSingle = sanitizeClientIpCandidate(trimmed)
+      if (!normalizedSingle) continue
+      const v4 = ipv4ToNumber(normalizedSingle)
+      if (v4 !== null) {
+        ipv4Rules.push(createIpv4Rule(v4, 32))
+        continue
+      }
+      const v6 = parseIpv6Words(normalizedSingle)
+      if (v6) {
+        ipv6Rules.push(createIpv6Rule(v6, 128))
+      }
+      continue
+    }
+
+    if (trimmed.indexOf("/", slashIndex + 1) >= 0) continue
+    const ipPart = trimmed.slice(0, slashIndex)
+    const prefixPart = trimmed.slice(slashIndex + 1)
+    if (!ipPart || !prefixPart) continue
+
+    const v4 = ipv4ToNumber(ipPart)
+    if (v4 !== null) {
+      const prefix = parseCidrPrefix(prefixPart, 32)
+      if (prefix !== null) ipv4Rules.push(createIpv4Rule(v4, prefix))
+      continue
+    }
+
+    if (!ipPart.includes(":") || !/^[0-9a-fA-F:.]+$/.test(ipPart)) continue
+    const words = parseIpv6Words(ipPart)
+    if (!words) continue
+    const mappedV4 = parseIpv4MappedWordsToUint32(words)
+    if (mappedV4 !== null) {
+      const v6Prefix = parseCidrPrefix(prefixPart, 128)
+      if (v6Prefix !== null && v6Prefix >= 96) {
+        ipv4Rules.push(createIpv4Rule(mappedV4, v6Prefix - 96))
+      } else {
+        const strippedIpPart = ipPart.replace(/^::ffff:/i, "")
+        if (strippedIpPart !== ipPart && ipv4ToNumber(strippedIpPart) !== null) {
+          const v4Prefix = parseCidrPrefix(prefixPart, 32)
+          if (v4Prefix !== null) ipv4Rules.push(createIpv4Rule(mappedV4, v4Prefix))
+        }
+      }
+      continue
+    }
+
+    const v6Prefix = parseCidrPrefix(prefixPart, 128)
+    if (v6Prefix !== null) {
+      ipv6Rules.push(createIpv6Rule(words, v6Prefix))
+    }
+  }
+
+  const allowlist = { ipv4Rules, ipv6Rules }
+  if (useCache) {
+    cachedTrustedProxyRaw = effectiveRaw
+    cachedTrustedProxyAllowlist = allowlist
+  }
+  return allowlist
 }
 
 export const isTrustedProxyPeerIp = (remoteAddress?: string | null): boolean => {
-  const peerIp = sanitizeClientIpCandidate(remoteAddress ?? undefined)
-  if (!peerIp) return false
-  return parseTrustedProxyAllowlist().has(peerIp)
+  if (!remoteAddress) return false
+  const trimmed = remoteAddress.trim()
+  if (!trimmed || trimmed.length > 64 || /[\r\n\0\s,[\]]/.test(trimmed)) return false
+
+  const allowlist = parseTrustedProxyAllowlist()
+  const strippedV4 = trimmed.replace(/^::ffff:/i, "")
+  const v4 = ipv4ToNumber(strippedV4)
+  if (v4 !== null) {
+    return allowlist.ipv4Rules.some((rule) => ((v4 & rule.mask) >>> 0) === rule.network)
+  }
+
+  const zoneIndex = trimmed.indexOf("%")
+  const hostWithoutZone = zoneIndex >= 0 ? trimmed.slice(0, zoneIndex) : trimmed
+  if (zoneIndex >= 0 && !/^[A-Za-z0-9._-]+$/.test(trimmed.slice(zoneIndex + 1))) {
+    return false
+  }
+  if (!hostWithoutZone.includes(":") || !/^[0-9a-fA-F:.]+$/.test(hostWithoutZone)) {
+    return false
+  }
+  const words = parseIpv6Words(hostWithoutZone)
+  if (!words) return false
+
+  const mappedV4 = parseIpv4MappedWordsToUint32(words)
+  if (mappedV4 !== null) {
+    return allowlist.ipv4Rules.some((rule) => ((mappedV4 & rule.mask) >>> 0) === rule.network)
+  }
+
+  return allowlist.ipv6Rules.some((rule) => {
+    for (let i = 0; i < 8; i += 1) {
+      if ((words[i]! & rule.mask[i]!) !== rule.network[i]!) return false
+    }
+    return true
+  })
 }
 
 export const resolveTrustedClientIp = (req: IncomingMessage): string => {
@@ -151,9 +318,12 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
     headers.set("cookie", cookie)
   }
   const clientIp = resolveTrustedClientIp(req)
+  const trustedPeer = isTrustedProxyPeerIp(req.socket?.remoteAddress)
   if (clientIp) {
-    headers.set("CF-Connecting-IP", clientIp)
-    headers.set("X-Internal-Client-IP", clientIp)
+    if (trustedPeer) {
+      headers.set("CF-Connecting-IP", clientIp)
+      headers.set("X-Internal-Client-IP", clientIp)
+    }
     headers.set("X-Forwarded-For", clientIp)
   }
   headers.set("X-Request-Id", getRequestIdForRequest(req))

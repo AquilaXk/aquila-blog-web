@@ -27,9 +27,20 @@ import {
 import { isImageFile } from "../../src/components/markdown-editor/markdownEditorPasteDropModel"
 import backendProxyHandler from "../../src/pages/api/backend/[...path]"
 import revalidateHandler from "../../src/pages/api/revalidate"
-import unfurlHandler from "../../src/pages/api/editor/unfurl"
+import unfurlHandler, { tryFetchOembedMetadata } from "../../src/pages/api/editor/unfurl"
 import { getStaticProps as getHomeStaticProps } from "../../src/pages/index"
 import { registerServerApiFetchMetrics } from "../../src/libs/server/apiFetchMetrics"
+import {
+  isTrustedProxyPeerIp,
+  parseTrustedProxyAllowlist,
+  serverApiFetchJson,
+} from "../../src/libs/server/backend"
+import { withSsrMetrics } from "../../src/libs/server/withSsrMetrics"
+import { apiFetch } from "../../src/apis/backend/client"
+import {
+  buildPostInternalLinkTargets,
+  resolveInternalWikilinkHref,
+} from "../../src/libs/markdown/internalWikilinkResolver"
 import {
   invalidateServerSnapshotCache,
   readServerSnapshot,
@@ -101,6 +112,7 @@ test.describe("Workstream 1 adversarial security hardening", () => {
   const originalRevalidateToken = process.env.TOKEN_FOR_REVALIDATE
   const originalEnableQaRoutes = process.env.ENABLE_QA_ROUTES
   const originalQaBypass = process.env.ADMIN_GUARD_QA_BYPASS
+  const originalTrustedProxyIps = process.env.TRUSTED_PROXY_IPS
 
   test.afterEach(() => {
     globalThis.fetch = originalFetch
@@ -112,6 +124,8 @@ test.describe("Workstream 1 adversarial security hardening", () => {
     else process.env.ENABLE_QA_ROUTES = originalEnableQaRoutes
     if (originalQaBypass === undefined) delete process.env.ADMIN_GUARD_QA_BYPASS
     else process.env.ADMIN_GUARD_QA_BYPASS = originalQaBypass
+    if (originalTrustedProxyIps === undefined) delete process.env.TRUSTED_PROXY_IPS
+    else process.env.TRUSTED_PROXY_IPS = originalTrustedProxyIps
     invalidateServerSnapshotCache()
     resetPostsRequestCaches()
   })
@@ -793,5 +807,157 @@ test.describe("Workstream 1 adversarial security hardening", () => {
       '<div data-raw-code="const x = 1;"><section><div class="inner"></div><pre><code>fallback</code></pre></section></div>'
     const normalizedContainer = normalizeContentHtmlForMermaid(nestedContainerHtml)
     expect(normalizedContainer).toContain('data-raw-code="const x = 1;"')
+  })
+
+  test("TRUSTED_PROXY_IPS supports IPv4/IPv6 CIDR bitmasks and SSR enforces trustedPeer forwarding boundary", async () => {
+    registerServerApiFetchMetrics()
+    process.env.BACKEND_INTERNAL_URL = "http://backend.test"
+
+    delete process.env.TRUSTED_PROXY_IPS
+    expect(isTrustedProxyPeerIp("127.0.0.1")).toBe(true)
+    expect(isTrustedProxyPeerIp("::1")).toBe(true)
+    expect(isTrustedProxyPeerIp("10.0.0.8")).toBe(false)
+    expect(isTrustedProxyPeerIp("172.18.0.5")).toBe(false)
+
+    process.env.TRUSTED_PROXY_IPS = ""
+    expect(isTrustedProxyPeerIp("10.0.0.8")).toBe(false)
+
+    process.env.TRUSTED_PROXY_IPS =
+      "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10,invalid-cidr/999"
+    const parsedAllowlist = parseTrustedProxyAllowlist()
+    expect(parsedAllowlist.ipv4Rules.length).toBeGreaterThanOrEqual(5)
+    expect(parsedAllowlist.ipv6Rules.length).toBeGreaterThanOrEqual(3)
+    expect(isTrustedProxyPeerIp("172.18.0.5")).toBe(true)
+    expect(isTrustedProxyPeerIp("::ffff:172.18.0.5")).toBe(true)
+    expect(isTrustedProxyPeerIp("::ffff:ac12:0005")).toBe(true)
+    expect(isTrustedProxyPeerIp("172.15.255.255")).toBe(false)
+    expect(isTrustedProxyPeerIp("172.32.0.0")).toBe(false)
+    expect(isTrustedProxyPeerIp("fd12::1")).toBe(true)
+    expect(isTrustedProxyPeerIp("fe80::1")).toBe(true)
+    expect(isTrustedProxyPeerIp("fec0::1")).toBe(false)
+    expect(isTrustedProxyPeerIp("203.0.113.9")).toBe(false)
+
+    const capturedHeaders: Headers[] = []
+    globalThis.fetch = (async (_input, init) => {
+      capturedHeaders.push(new Headers(init?.headers))
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    }) as typeof fetch
+
+    const createSsrContext = (remoteAddress: string, cfHeader: string) => {
+      const responseHeaders = new Map<string, string | string[]>()
+      return {
+        req: {
+          headers: {
+            "cf-connecting-ip": cfHeader,
+          },
+          socket: { remoteAddress },
+          url: "/posts",
+        },
+        res: {
+          headersSent: false,
+          setHeader: (name: string, value: string | string[]) => responseHeaders.set(name.toLowerCase(), value),
+          getHeader: (name: string) => responseHeaders.get(name.toLowerCase()),
+          removeHeader: (name: string) => responseHeaders.delete(name.toLowerCase()),
+          writeHead: () => undefined,
+        },
+      } as never
+    }
+
+    const untrustedHandler = withSsrMetrics("public", async (ctx) => {
+      await apiFetch("/post/api/v1/posts/feed")
+      await serverApiFetchJson(ctx.req, "/post/api/v1/posts/feed")
+      return { props: {} }
+    })
+    await untrustedHandler(createSsrContext("203.0.113.50", "1.2.3.4"))
+
+    expect(capturedHeaders).toHaveLength(2)
+    for (const headers of capturedHeaders) {
+      expect(headers.get("cf-connecting-ip")).toBeNull()
+      expect(headers.get("x-internal-client-ip")).toBeNull()
+      expect(headers.get("x-forwarded-for")).toBe("203.0.113.50")
+    }
+
+    capturedHeaders.length = 0
+    process.env.TRUSTED_PROXY_IPS = "172.16.0.0/12"
+    const trustedHandler = withSsrMetrics("public", async (ctx) => {
+      await apiFetch("/post/api/v1/posts/feed")
+      await serverApiFetchJson(ctx.req, "/post/api/v1/posts/feed")
+      return { props: {} }
+    })
+    await trustedHandler(createSsrContext("::ffff:172.18.0.3", "198.51.100.77"))
+
+    expect(capturedHeaders).toHaveLength(2)
+    for (const headers of capturedHeaders) {
+      expect(headers.get("cf-connecting-ip")).toBe("198.51.100.77")
+      expect(headers.get("x-internal-client-ip")).toBe("198.51.100.77")
+      expect(headers.get("x-forwarded-for")).toBe("198.51.100.77")
+    }
+  })
+
+  test("unfurl rejects bracketed IPv6 literals immediately with 400 and rethrows AbortError from tryFetchOembedMetadata", async () => {
+    expect(() => normalizeSafeUnfurlUrl("http://[::ffff:127.0.0.1]/")).toThrow(UnfurlValidationError)
+    expect(() => normalizeSafeUnfurlUrl("http://[::1]/")).toThrow(UnfurlValidationError)
+    expect(() => normalizeSafeUnfurlUrl("http://[2001:db8::1.2.3.4]/")).toThrow(UnfurlValidationError)
+
+    process.env.ADMIN_GUARD_QA_BYPASS = "true"
+    process.env.ENABLE_QA_ROUTES = "false"
+    let statusCode = 200
+    let responseBody: unknown = null
+    const res = {
+      status(code: number) {
+        statusCode = code
+        return this
+      },
+      setHeader() {
+        return this
+      },
+      json(data: unknown) {
+        responseBody = data
+        return this
+      },
+    } as unknown as NextApiResponse
+
+    await unfurlHandler(
+      {
+        method: "GET",
+        headers: {},
+        query: { url: "http://[::ffff:127.0.0.1]/" },
+      } as unknown as NextApiRequest,
+      res
+    )
+    expect(statusCode).toBe(400)
+    expect(responseBody).toMatchObject({ ok: false })
+
+    const abortController = new AbortController()
+    abortController.abort()
+    await expect(
+      tryFetchOembedMetadata(new URL("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), abortController.signal)
+    ).rejects.toThrow()
+  })
+
+  test("buildPostInternalLinkTargets prevents __proto__ prototype pollution while keeping plain serializable objects", () => {
+    const targets = buildPostInternalLinkTargets("See [[__proto__]] and [[constructor]]", [
+      { id: 42, title: "__proto__" },
+      { id: 43, title: "constructor" },
+    ])
+
+    expect(Object.getPrototypeOf(targets)).toBe(Object.prototype)
+    expect(Object.prototype).not.toHaveProperty("42")
+    expect(Object.hasOwn(targets, "__proto__")).toBe(true)
+    expect(resolveInternalWikilinkHref("__proto__", "#missing", targets)).toEqual({
+      href: "/posts/42",
+      isResolvedPost: true,
+    })
+    expect(resolveInternalWikilinkHref("constructor", "#missing", targets)).toEqual({
+      href: "/posts/43",
+      isResolvedPost: true,
+    })
+    expect(resolveInternalWikilinkHref("toString", "#missing", targets)).toEqual({
+      href: "#missing",
+      isResolvedPost: false,
+    })
   })
 })

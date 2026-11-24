@@ -11,7 +11,7 @@ import {
   registerServerApiFetchMetrics,
   runWithSsrApiFetchContext,
 } from "src/libs/server/apiFetchMetrics"
-import { resolveTrustedClientIp } from "src/libs/server/backend"
+import { isTrustedProxyPeerIp, resolveTrustedClientIp } from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import {
   resolveStaticAdminProfileSeed,
@@ -195,8 +195,9 @@ export const buildCanonicalPostDetailServerProps = async (
     } as IncomingMessage
     const requestId = getRequestIdForRequest(incomingReq)
     const clientIp = resolveTrustedClientIp(incomingReq)
+    const trustedClientIp = isTrustedProxyPeerIp(incomingReq.socket?.remoteAddress)
     return await runWithSsrApiFetchContext(
-      { requestId, ...(clientIp ? { clientIp } : {}) },
+      { requestId, ...(clientIp ? { clientIp } : {}), trustedClientIp },
       runProps
     )
   }

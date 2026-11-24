@@ -101,7 +101,14 @@ export const tryFetchOembedMetadata = async (
       thumbnailUrl: rawThumb ? normalizePublicExternalThumbnailUrl(rawThumb, parsedUrl.toString()) : "",
       ...(embedUrl ? { embedUrl } : {}),
     }
-  } catch {
+  } catch (error) {
+    const isAbortError =
+      signal.aborted ||
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError")
+    if (isAbortError) {
+      throw error
+    }
     return null
   }
 }
