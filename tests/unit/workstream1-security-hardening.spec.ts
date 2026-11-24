@@ -834,6 +834,7 @@ test.describe("Workstream 1 adversarial security hardening", () => {
     expect(isTrustedProxyPeerIp("172.32.0.0")).toBe(false)
     expect(isTrustedProxyPeerIp("fd12::1")).toBe(true)
     expect(isTrustedProxyPeerIp("fe80::1")).toBe(true)
+    expect(isTrustedProxyPeerIp("fe80::1%eth0")).toBe(true)
     expect(isTrustedProxyPeerIp("fec0::1")).toBe(false)
     expect(isTrustedProxyPeerIp("203.0.113.9")).toBe(false)
 
@@ -851,7 +852,7 @@ test.describe("Workstream 1 adversarial security hardening", () => {
       return {
         req: {
           headers: {
-            "cf-connecting-ip": cfHeader,
+            ...(cfHeader ? { "cf-connecting-ip": cfHeader } : {}),
           },
           socket: { remoteAddress },
           url: "/posts",
@@ -895,6 +896,41 @@ test.describe("Workstream 1 adversarial security hardening", () => {
       expect(headers.get("x-internal-client-ip")).toBe("198.51.100.77")
       expect(headers.get("x-forwarded-for")).toBe("198.51.100.77")
     }
+
+    // Zoned link-local peer resolves peer IP cleanly when trusted/untrusted and strips spoofable headers when untrusted
+    capturedHeaders.length = 0
+    process.env.TRUSTED_PROXY_IPS = "fe80::/10"
+    const zonedTrustedHandler = withSsrMetrics("public", async (ctx) => {
+      await apiFetch("/post/api/v1/posts/feed")
+      await serverApiFetchJson(ctx.req, "/post/api/v1/posts/feed")
+      return { props: {} }
+    })
+    await zonedTrustedHandler(createSsrContext("fe80::1%eth0", ""))
+    expect(capturedHeaders).toHaveLength(2)
+    for (const headers of capturedHeaders) {
+      expect(headers.get("cf-connecting-ip")).toBe("fe80::1")
+      expect(headers.get("x-internal-client-ip")).toBe("fe80::1")
+      expect(headers.get("x-forwarded-for")).toBe("fe80::1")
+    }
+
+    capturedHeaders.length = 0
+    delete process.env.TRUSTED_PROXY_IPS
+    const zonedUntrustedHandler = withSsrMetrics("public", async (ctx) => {
+      await apiFetch("/post/api/v1/posts/feed", {
+        headers: { "cf-connecting-ip": "1.2.3.4", "x-internal-client-ip": "1.2.3.4" },
+      })
+      await serverApiFetchJson(ctx.req, "/post/api/v1/posts/feed", {
+        headers: { "cf-connecting-ip": "1.2.3.4", "x-internal-client-ip": "1.2.3.4" },
+      })
+      return { props: {} }
+    })
+    await zonedUntrustedHandler(createSsrContext("fe80::1%eth0", "5.6.7.8"))
+    expect(capturedHeaders).toHaveLength(2)
+    for (const headers of capturedHeaders) {
+      expect(headers.get("cf-connecting-ip")).toBeNull()
+      expect(headers.get("x-internal-client-ip")).toBeNull()
+      expect(headers.get("x-forwarded-for")).toBe("fe80::1")
+    }
   })
 
   test("unfurl rejects bracketed IPv6 literals immediately with 400 and rethrows AbortError from tryFetchOembedMetadata", async () => {
@@ -933,9 +969,14 @@ test.describe("Workstream 1 adversarial security hardening", () => {
 
     const abortController = new AbortController()
     abortController.abort()
-    await expect(
-      tryFetchOembedMetadata(new URL("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), abortController.signal)
-    ).rejects.toThrow()
+    let caughtAbortError: unknown
+    try {
+      await tryFetchOembedMetadata(new URL("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), abortController.signal)
+    } catch (error) {
+      caughtAbortError = error
+    }
+    expect(caughtAbortError).toBeInstanceOf(Error)
+    expect((caughtAbortError as Error).name).toBe("AbortError")
   })
 
   test("buildPostInternalLinkTargets prevents __proto__ prototype pollution while keeping plain serializable objects", () => {

@@ -105,6 +105,17 @@ const createIpv6Rule = (words: Uint16Array, prefix: number): TrustedIpv6Rule => 
   return { kind: "v6", network, mask }
 }
 
+const stripValidatedSocketZoneId = (raw: string | undefined): string => {
+  if (!raw) return ""
+  const trimmed = raw.trim()
+  const zoneIndex = trimmed.indexOf("%")
+  if (zoneIndex < 0) return trimmed
+  const host = trimmed.slice(0, zoneIndex)
+  const zone = trimmed.slice(zoneIndex + 1)
+  if (!host.includes(":") || !/^[A-Za-z0-9._-]+$/.test(zone)) return ""
+  return host
+}
+
 const sanitizeClientIpCandidate = (raw: string | undefined): string => {
   if (!raw) return ""
   const trimmed = raw.trim()
@@ -230,7 +241,7 @@ export const isTrustedProxyPeerIp = (remoteAddress?: string | null): boolean => 
 }
 
 export const resolveTrustedClientIp = (req: IncomingMessage): string => {
-  const peerIp = sanitizeClientIpCandidate(req.socket?.remoteAddress)
+  const peerIp = sanitizeClientIpCandidate(stripValidatedSocketZoneId(req.socket?.remoteAddress))
   if (!isTrustedProxyPeerIp(req.socket?.remoteAddress)) {
     return peerIp
   }
@@ -319,6 +330,10 @@ const createServerApiExchange = async (req: IncomingMessage, path: string, init:
   }
   const clientIp = resolveTrustedClientIp(req)
   const trustedPeer = isTrustedProxyPeerIp(req.socket?.remoteAddress)
+  if (!trustedPeer) {
+    headers.delete("CF-Connecting-IP")
+    headers.delete("X-Internal-Client-IP")
+  }
   if (clientIp) {
     if (trustedPeer) {
       headers.set("CF-Connecting-IP", clientIp)

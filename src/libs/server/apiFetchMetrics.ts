@@ -76,8 +76,14 @@ export const registerServerApiFetchMetrics = () => {
       if (activeContext.trustedClientIp === true) {
         if (!headers.has("cf-connecting-ip")) headers.set("CF-Connecting-IP", activeContext.clientIp)
         if (!headers.has("x-internal-client-ip")) headers.set("X-Internal-Client-IP", activeContext.clientIp)
+      } else {
+        headers.delete("cf-connecting-ip")
+        headers.delete("x-internal-client-ip")
       }
       if (!headers.has("x-forwarded-for")) headers.set("X-Forwarded-For", activeContext.clientIp)
+    } else if (activeContext?.trustedClientIp === false) {
+      headers.delete("cf-connecting-ip")
+      headers.delete("x-internal-client-ip")
     }
     const observe = (result: BackendFetchResult) => {
       if (observed) throw new Error("apiFetch metrics outcome was already observed")

@@ -102,10 +102,14 @@ export const tryFetchOembedMetadata = async (
       ...(embedUrl ? { embedUrl } : {}),
     }
   } catch (error) {
+    const errorName =
+      typeof error === "object" && error !== null && "name" in error
+        ? (error as { name?: unknown }).name
+        : undefined
     const isAbortError =
       signal.aborted ||
-      (error instanceof DOMException && error.name === "AbortError") ||
-      (error instanceof Error && error.name === "AbortError")
+      errorName === "AbortError" ||
+      errorName === "TimeoutError"
     if (isAbortError) {
       throw error
     }

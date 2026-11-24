@@ -195,6 +195,12 @@ const assertSafeUnfurlUrl = (rawUrl: string) => {
 
 export const normalizeSafeUnfurlUrl = (rawUrl: string) => assertSafeUnfurlUrl(rawUrl)
 
+const createAbortError = (signal: AbortSignal): Error => {
+  const reason = (signal as { reason?: unknown }).reason
+  if (reason instanceof Error) return reason
+  return new DOMException("The operation was aborted.", "AbortError")
+}
+
 const fetchViaResolvedPublicAddress = async ({
   currentUrl,
   signal,
@@ -206,7 +212,13 @@ const fetchViaResolvedPublicAddress = async ({
   headers: HeadersInit
   stopAtHeadEnd: boolean
 }) => {
+  if (signal.aborted) {
+    throw createAbortError(signal)
+  }
   const resolvedAddress = await resolvePublicAddress(currentUrl.hostname)
+  if (signal.aborted) {
+    throw createAbortError(signal)
+  }
   const port = Number.parseInt(currentUrl.port || resolveDefaultPort(currentUrl.protocol), 10)
   const requestHeaders = new Headers(headers)
   requestHeaders.set("host", currentUrl.host)
