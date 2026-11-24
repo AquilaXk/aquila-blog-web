@@ -141,7 +141,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   expect(midSnapshot.rightRail).not.toBeNull()
   expect(deepSnapshot.rightRail).not.toBeNull()
 
-  const topTolerance = 12
+  const topTolerance = 4
   expect(Math.abs((midSnapshot.rightRail?.top ?? 0) - midSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
   expect(Math.abs((deepSnapshot.rightRail?.top ?? 0) - deepSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
   expect(Math.abs((midSnapshot.rightRail?.left ?? 0) - (deepSnapshot.rightRail?.left ?? 0))).toBeLessThanOrEqual(2)
@@ -198,12 +198,12 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(searchWidth).toBeLessThanOrEqual(280)
       expect(searchHeight).toBeGreaterThanOrEqual(34)
       expect(searchHeight).toBeLessThanOrEqual(44)
-      expect(firstCardWidth).toBeGreaterThanOrEqual(720)
-      expect(firstCardWidth).toBeLessThanOrEqual(760)
-      expect(firstCardHeight).toBeGreaterThanOrEqual(120)
-      expect(firstCardHeight).toBeLessThanOrEqual(280)
-      expect(snapshot.desktopTagRailRect?.width ?? 0).toBeGreaterThanOrEqual(160)
-      expect(snapshot.desktopTagRailRect?.width ?? 0).toBeLessThanOrEqual(240)
+      expect(firstCardWidth).toBeGreaterThanOrEqual(700)
+      expect(firstCardWidth).toBeLessThanOrEqual(720)
+      expect(firstCardHeight).toBeGreaterThanOrEqual(115)
+      expect(firstCardHeight).toBeLessThanOrEqual(190)
+      expect(snapshot.desktopTagRailRect?.width ?? 0).toBeGreaterThanOrEqual(210)
+      expect(snapshot.desktopTagRailRect?.width ?? 0).toBeLessThanOrEqual(230)
       expect(htmlScrollWidth).toBeLessThanOrEqual(1440)
       expect(htmlScrollWidth).toBeGreaterThanOrEqual(1420)
       expect(bodyScrollWidth).toBeLessThanOrEqual(1440)
@@ -229,17 +229,17 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const firstCardY = snapshot.firstCardRect?.y ?? 0
 
       expect(searchWidth).toBeGreaterThanOrEqual(210)
-      expect(searchWidth).toBeLessThanOrEqual(280)
+      expect(searchWidth).toBeLessThanOrEqual(260)
       // HIG P3-2(#1265): 모바일 터치 타깃 최소 44px
       expect(searchHeight).toBe(44)
-      expect(searchY).toBeGreaterThanOrEqual(120)
-      expect(searchY).toBeLessThanOrEqual(765)
-      expect(firstCardWidth).toBeGreaterThanOrEqual(350)
-      expect(firstCardWidth).toBeLessThanOrEqual(370)
-      expect(firstCardHeight).toBeGreaterThanOrEqual(120)
-      expect(firstCardHeight).toBeLessThanOrEqual(430)
-      expect(firstCardY).toBeGreaterThanOrEqual(240)
-      expect(firstCardY).toBeLessThanOrEqual(870)
+      expect(searchY).toBeGreaterThanOrEqual(150)
+      expect(searchY).toBeLessThanOrEqual(210)
+      expect(firstCardWidth).toBeGreaterThanOrEqual(355)
+      expect(firstCardWidth).toBeLessThanOrEqual(368)
+      expect(firstCardHeight).toBeGreaterThanOrEqual(115)
+      expect(firstCardHeight).toBeLessThanOrEqual(190)
+      expect(firstCardY).toBeGreaterThanOrEqual(360)
+      expect(firstCardY).toBeLessThanOrEqual(465)
       continue
     }
 
@@ -261,17 +261,17 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const firstCardY = snapshot.firstCardRect?.y ?? 0
 
       expect(searchWidth).toBeGreaterThanOrEqual(560)
-      expect(searchWidth).toBeLessThanOrEqual(650)
+      expect(searchWidth).toBeLessThanOrEqual(620)
       // HIG P3-2(#1265): ≤768px 검색 필드도 터치 타깃 44px
       expect(searchHeight).toBe(44)
-      expect(searchY).toBeGreaterThanOrEqual(120)
-      expect(searchY).toBeLessThanOrEqual(760)
-      expect(firstCardWidth).toBeGreaterThanOrEqual(710)
-      expect(firstCardWidth).toBeLessThanOrEqual(750)
-      expect(firstCardHeight).toBeGreaterThanOrEqual(120)
-      expect(firstCardHeight).toBeLessThanOrEqual(430)
-      expect(firstCardY).toBeGreaterThanOrEqual(240)
-      expect(firstCardY).toBeLessThanOrEqual(850)
+      expect(searchY).toBeGreaterThanOrEqual(165)
+      expect(searchY).toBeLessThanOrEqual(230)
+      expect(firstCardWidth).toBeGreaterThanOrEqual(714)
+      expect(firstCardWidth).toBeLessThanOrEqual(730)
+      expect(firstCardHeight).toBeGreaterThanOrEqual(115)
+      expect(firstCardHeight).toBeLessThanOrEqual(190)
+      expect(firstCardY).toBeGreaterThanOrEqual(330)
+      expect(firstCardY).toBeLessThanOrEqual(440)
       continue
     }
 
@@ -295,8 +295,8 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const bodyScrollWidth = snapshot.scrollWidth?.body ?? 0
 
       expect(rightRailWidth).toBe(240)
-      expect(rightRailHeight).toBeGreaterThanOrEqual(240)
-      expect(rightRailHeight).toBeLessThanOrEqual(720)
+      expect(rightRailHeight).toBeGreaterThanOrEqual(340)
+      expect(rightRailHeight).toBeLessThanOrEqual(430)
       expect(htmlScrollWidth).toBeLessThanOrEqual(1440)
       expect(htmlScrollWidth).toBeGreaterThanOrEqual(1420)
       expect(bodyScrollWidth).toBeLessThanOrEqual(1440)
@@ -347,15 +347,15 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       // V4 관리자 dashboard는 iPad mini 768 환경에서 metric strip 다음 steady-state guard를 먼저 노출한다.
       // 관리자 route는 full-bleed 작업 공간이므로 콘텐츠 폭은 742px 안팎으로 고정한다.
       expect(serviceRailWidth).toBeGreaterThanOrEqual(734)
-      expect(serviceRailWidth).toBeLessThanOrEqual(744)
+      expect(serviceRailWidth).toBeLessThanOrEqual(740)
       expect(prioritySectionY).toBeGreaterThanOrEqual(540)
-      expect(prioritySectionY).toBeLessThanOrEqual(680)
+      expect(prioritySectionY).toBeLessThanOrEqual(600)
       expect(panelGridWidth).toBeGreaterThanOrEqual(734)
-      expect(panelGridWidth).toBeLessThanOrEqual(744)
+      expect(panelGridWidth).toBeLessThanOrEqual(740)
       expect(firstPanelWidth).toBeGreaterThanOrEqual(734)
-      expect(firstPanelWidth).toBeLessThanOrEqual(744)
+      expect(firstPanelWidth).toBeLessThanOrEqual(740)
       expect(firstPanelY).toBeGreaterThanOrEqual(prioritySectionBottom)
-      expect(firstPanelY).toBeLessThanOrEqual(1200)
+      expect(firstPanelY).toBeLessThanOrEqual(940)
       expect(htmlScrollWidth).toBeLessThanOrEqual(768)
       expect(bodyScrollWidth).toBeLessThanOrEqual(768)
       continue

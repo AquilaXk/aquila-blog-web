@@ -9,15 +9,15 @@ import { articleTypographyScale } from "src/libs/markdown/contentTypography"
 export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
   .aq-callout.aq-admonition {
     --ad-accent: ${theme.publicDesign.accent};
-    --ad-body-bg: color-mix(in srgb, var(--ad-accent) 4%, ${theme.publicDesign.readableSurface});
-    --ad-border: color-mix(in srgb, var(--ad-accent) 22%, ${theme.colors.gray6});
+    --ad-body-bg: ${theme.publicDesign.readableSurface};
+    --ad-border: ${theme.colors.gray6};
     --ad-text: ${theme.colors.gray12};
     position: relative;
     border: 1px solid var(--ad-border);
     border-radius: 0.75rem;
     overflow: hidden;
-    padding: 0.9rem 1rem 0.9rem 0.55rem;
-    margin: 1.35rem 0;
+    padding: 0.75rem 0.875rem 0.75rem 0.25rem;
+    margin: 1rem 0;
     background: var(--ad-body-bg);
     color: var(--ad-text);
     box-shadow: 0 1px 2px 0 ${boxShadowColor.cardSubtle};
@@ -26,7 +26,7 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
 
   .aq-callout.aq-admonition:not(details) {
     display: flex;
-    gap: 0.65rem;
+    gap: 0.5rem;
     align-items: stretch;
   }
 
@@ -39,7 +39,7 @@ export const markdownRendererRootCalloutStyles = (theme: Theme) => css`
     width: 2px;
     flex: 0 0 2px;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--ad-accent) 72%, transparent);
+    background: color-mix(in srgb, var(--ad-accent) 55%, transparent);
     align-self: stretch;
   }
 

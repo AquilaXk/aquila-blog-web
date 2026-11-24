@@ -411,7 +411,7 @@ export const SelectedTagChip = styled.span`
   min-width: 0;
   max-width: 100%;
   min-height: 24px;
-  border-radius: 9999px;
+  border-radius: 4px;
   border: 1px solid ${adminBorder};
   background: ${adminSurfaceMuted};
   color: ${adminTextPrimary};

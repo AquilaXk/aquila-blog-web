@@ -186,27 +186,18 @@ export const StyledWrapper = styled.div`
   .sidebarTagList {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem 0.4375rem;
-    margin-top: 0.25rem;
+    gap: 0.25rem 0.75rem;
   }
 
   .sidebarTagLink {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.625rem;
-    border-radius: 9999px;
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface-subtle);
     color: var(--aq-accent-link, var(--aq-accent));
-    font-size: 0.8125rem;
-    line-height: 1.25;
-    font-weight: 550;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
     text-decoration: none;
-    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+    transition: color 120ms ease;
 
     &:hover {
-      border-color: var(--aq-accent);
-      background: var(--aq-surface-elevated);
       color: var(--aq-text);
     }
 
@@ -236,8 +227,8 @@ export const StyledWrapper = styled.div`
     align-items: center;
     gap: 0.375rem;
     min-height: 36px;
-    padding: 0 0.875rem;
-    border-radius: 9999px;
+    padding: 0 0.75rem;
+    border-radius: 0.375rem;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text-secondary);
@@ -254,7 +245,6 @@ export const StyledWrapper = styled.div`
 
     &[data-active="true"] {
       border-color: var(--aq-accent);
-      background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
     }
 
@@ -271,6 +261,32 @@ export const StyledWrapper = styled.div`
     @media (pointer: coarse) {
       min-height: ${control.lg}px;
       min-width: ${control.lg}px;
+    }
+  }
+
+  .sidebarAdjacentGroup {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .sidebarAdjacentLink {
+    display: block;
+    color: var(--aq-accent-link, var(--aq-accent));
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    font-weight: 500;
+    text-decoration: none;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+
+    &:hover {
+      color: var(--aq-text);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--aq-focus-ring);
+      outline-offset: 2px;
+      border-radius: 2px;
     }
   }
 

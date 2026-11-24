@@ -103,24 +103,25 @@ export const QuickSearchDialog = styled.div`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background: transparent;
+    height: 24px;
+    padding: 0 0.4rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: var(--aq-surface-subtle);
     color: var(--aq-muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
     line-height: 1;
     cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease;
 
     @media (pointer: coarse) {
       min-width: ${control.lg}px;
       min-height: ${control.lg}px;
+      padding: 0 0.625rem;
     }
 
     &:hover {
-      background: var(--aq-surface-subtle);
       color: var(--aq-text);
     }
 
@@ -181,8 +182,8 @@ export const QuickSearchDialog = styled.div`
     align-items: stretch;
     gap: 0.25rem;
     border: 0;
-    border-radius: 0.5rem;
-    padding: 0.55rem 0.72rem;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.625rem;
     background: transparent;
     color: var(--aq-text);
     font-size: 0.875rem;
@@ -190,7 +191,6 @@ export const QuickSearchDialog = styled.div`
     cursor: pointer;
     user-select: none;
     outline: none;
-    transition: background-color 120ms ease, box-shadow 120ms ease;
 
     &:hover,
     &.active,
@@ -206,8 +206,7 @@ export const QuickSearchDialog = styled.div`
   }
 
   .qsItemButton[aria-selected="true"] {
-    background: var(--aq-accent-muted);
-    box-shadow: inset 2.5px 0 0 var(--aq-accent);
+    background: var(--aq-surface-subtle);
     color: var(--aq-text);
   }
 

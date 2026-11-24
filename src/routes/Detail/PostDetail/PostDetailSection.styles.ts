@@ -20,9 +20,8 @@ export const mobileTocStyles = css`
       z-index: 20;
       margin: 0 0 1.5rem;
       border: 1px solid var(--aq-border);
-      border-radius: 0.75rem;
+      border-radius: 0.5rem;
       background: var(--aq-surface);
-      box-shadow: 0 1px 2px var(--aq-border);
     }
 
     .mobileTocSummary {

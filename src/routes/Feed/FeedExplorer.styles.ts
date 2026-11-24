@@ -15,7 +15,7 @@ export const ExplorerCard = styled.section`
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 1.75rem 0 1.4rem;
+  padding: 1.5rem 0;
   min-width: 0;
   min-height: 0;
   height: auto;
@@ -57,20 +57,20 @@ export const ExplorerCard = styled.section`
   }
 
   .sortTrigger {
-    height: 38px;
+    height: 36px;
     border: 1px solid var(--aq-border);
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--aq-surface);
     display: inline-flex;
     color: var(--aq-muted);
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    min-width: 88px;
-    padding: 0 12px;
+    gap: 12px;
+    min-width: 86px;
+    padding: 0 10px;
     font-size: 0.8125rem;
     line-height: 1;
-    font-weight: 650;
+    font-weight: 740;
     letter-spacing: 0;
     cursor: pointer;
     transition:
@@ -210,10 +210,10 @@ export const FeedBody = styled.section`
   --feed-post-column-max-width: ${FEED_POST_COLUMN_MAX_WIDTH_REM}rem;
   display: flex;
   align-items: flex-start;
-  gap: 3.5rem;
+  gap: 4rem;
   min-width: 0;
   overflow: visible;
-  padding: 2.25rem 0 4.5rem;
+  padding: 2rem 0 4.5rem;
 
   .tagColumn {
     flex: 0 0 auto;
@@ -228,7 +228,7 @@ export const FeedBody = styled.section`
   }
 
   @media (min-width: ${breakpoint.xl}px) {
-    gap: 5rem;
+    gap: 6rem;
   }
 
   @media (max-width: ${breakpoint.lg - 1}px) {
@@ -294,20 +294,19 @@ export const FilterContextBar = styled.div`
 
   .resetButton {
     flex: 0 0 auto;
-    min-height: 1.75rem;
-    padding: 0 0.7rem;
-    border-radius: 9999px;
-    border: 1px solid var(--aq-border);
+    min-height: 1.7rem;
+    padding: 0 0.56rem;
+    border-radius: 4px;
+    border: 0;
     background: var(--aq-surface-subtle);
     color: var(--aq-text-secondary, var(--aq-muted));
     font-size: 0.74rem;
     font-weight: 600;
     cursor: pointer;
-    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+    transition: color 0.125s ease-in, background-color 0.125s ease-in;
 
     &:hover {
       background: var(--aq-surface-elevated);
-      border-color: var(--aq-border-strong);
       color: var(--aq-text);
     }
 

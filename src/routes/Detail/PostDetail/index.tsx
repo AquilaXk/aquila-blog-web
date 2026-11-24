@@ -495,6 +495,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ initialInternalLinkTargets }) =
           onToggleLike={handleToggleLike}
           shareFeedback={shareFeedback}
           onSharePost={handleSharePost}
+          previousPost={adjacentPosts.previousPost}
+          nextPost={adjacentPosts.nextPost}
           railRef={rightRailRef}
           innerRef={rightRailInnerRef}
           listRef={rightTocListRef}

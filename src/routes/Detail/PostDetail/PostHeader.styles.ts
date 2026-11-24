@@ -29,17 +29,14 @@ export const StyledWrapper = styled.header`
     align-items: center;
     justify-content: center;
     gap: 0.42rem;
-    margin-bottom: 0.75rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface-subtle);
+    margin-bottom: 0.5rem;
     color: var(--aq-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 700;
     line-height: 1.4;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .heroLabelLink {
@@ -59,12 +56,12 @@ export const StyledWrapper = styled.header`
   }
 
   .headerDateList {
-    margin: 0 0 0.625rem;
+    margin: 0 0 0.5rem;
   }
 
   .headerDate {
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: 1rem;
     line-height: 1.5rem;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -217,8 +214,8 @@ export const StyledWrapper = styled.header`
     align-items: center;
     gap: 0.375rem;
     min-height: ${control.md}px;
-    padding: 0 0.875rem;
-    border-radius: 9999px;
+    padding: 0 0.75rem;
+    border-radius: 0.375rem;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text-secondary);

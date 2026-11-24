@@ -396,23 +396,18 @@ export const LiveEditorBody = styled.div<{
     color: ${EDITOR_SYNTAX_COLORS.codeTokComment};
   }
   .cm-line.cm-live-code-fence-open {
-    min-height: 30px;
     border-top: 1px solid ${EDITOR_SYNTAX_COLORS.codeBlockLineBorder};
-    border-bottom: 1px solid ${EDITOR_SYNTAX_COLORS.codeBlockLineBorder};
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding-top: 10px;
     color: ${EDITOR_SYNTAX_COLORS.codeBlockLineMuted};
   }
-  .cm-line.cm-live-code-body-line { padding-top: 2px; padding-bottom: 2px; }
+  .cm-line.cm-live-code-body-line { padding-top: 1px; padding-bottom: 1px; }
   .cm-line.cm-live-code-fence-close {
-    min-height: 10px;
     border-bottom: 1px solid ${EDITOR_SYNTAX_COLORS.codeBlockLineBorder};
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    padding-top: 2px;
-    padding-bottom: 8px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    padding-bottom: 10px;
     color: ${EDITOR_SYNTAX_COLORS.codeBlockLineMuted};
   }
 
@@ -421,16 +416,16 @@ export const LiveEditorBody = styled.div<{
     &::after {
       content: attr(data-code-lang);
       position: absolute;
-      left: 16px;
+      right: 12px;
       top: 50%;
       transform: translateY(-50%);
-      padding: 2px 8px;
+      padding: 2px 7px;
       border-radius: 4px;
       border: 1px solid ${EDITOR_SYNTAX_COLORS.codeLangBadgeBorder};
       background: ${EDITOR_SYNTAX_COLORS.codeLangBadgeSurface};
       color: ${EDITOR_SYNTAX_COLORS.codeLangBadgeText};
-      font: 700 10.5px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      letter-spacing: 0.05em;
+      font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
       pointer-events: none;
       user-select: none;

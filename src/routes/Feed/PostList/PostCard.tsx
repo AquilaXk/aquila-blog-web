@@ -244,7 +244,7 @@ const StyledWrapper = styled.div`
   .headingGroup {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.25rem;
     min-width: 0;
   }
 
@@ -261,9 +261,6 @@ const StyledWrapper = styled.div`
 
     &:hover h2 {
       color: var(--aq-accent-link, var(--aq-accent));
-      text-decoration: underline;
-      text-decoration-thickness: 1.5px;
-      text-underline-offset: 0.2em;
     }
 
     &:focus-visible {
@@ -283,55 +280,49 @@ const StyledWrapper = styled.div`
     overflow-wrap: break-word;
     word-break: keep-all;
     text-wrap: balance;
-    transition: color 140ms ease;
+    transition: color 120ms ease;
   }
 
   .tagRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem 0.5rem;
-    margin-top: 0.25rem;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.125rem;
   }
 
   .tagLink {
     display: inline-flex;
     align-items: center;
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.375rem;
-    border: 1px solid var(--aq-border);
-    background: var(--aq-surface-subtle);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
     color: var(--aq-text-secondary);
     text-decoration: none;
-    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+    transition: color 120ms ease;
 
     &:hover {
       color: var(--aq-accent-link, var(--aq-accent));
-      border-color: var(--aq-border-strong);
-      background: var(--aq-surface);
     }
 
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 2px;
-      border-radius: 0.375rem;
+      border-radius: 2px;
     }
 
     @media (pointer: coarse) {
       min-height: 44px;
-      padding: 0 0.75rem;
+      padding: 0 0.25rem;
     }
   }
 
   .summary {
     margin: 0;
-    color: var(--aq-text-secondary);
+    color: var(--aq-muted);
     font-size: 1rem;
     line-height: 1.625;
     font-weight: 400;
-    max-width: 68ch;
+    max-width: none;
     word-break: keep-all;
     overflow-wrap: break-word;
     text-wrap: pretty;

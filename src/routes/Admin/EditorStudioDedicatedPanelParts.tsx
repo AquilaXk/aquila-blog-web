@@ -40,12 +40,12 @@ export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   align-items: center;
   gap: 10px;
   min-height: 28px;
-  padding: 4px 13px;
+  padding: 4px 11px;
   border: 1px solid ${adminBorder};
-  border-radius: 9999px;
+  border-radius: 6px;
   background: ${adminSurface};
   box-shadow: 0 2px 10px ${boxShadowColor.subtleHover};
-  color: ${adminTextSecondary};
+  color: ${adminTextMuted};
   font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-variant-numeric: tabular-nums;
   user-select: none;

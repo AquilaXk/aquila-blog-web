@@ -24,6 +24,11 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     contain: layout style;
   }
 
+  .aq-code-block .aq-code {
+    border-radius: 0;
+    border: 0;
+  }
+
   .aq-code-toolbar {
     display: flex;
     align-items: center;

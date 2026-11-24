@@ -75,18 +75,17 @@ const StyledWrapper = styled.footer`
 
   .footerInner {
     margin-top: 2.5rem;
-    margin-bottom: 2.25rem;
+    margin-bottom: 2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.375rem;
   }
 
   .socialRow {
-    margin-bottom: 0.625rem;
+    margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 1rem;
   }
 
   .socialLink {
@@ -95,18 +94,13 @@ const StyledWrapper = styled.footer`
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
-    color: var(--aq-text-secondary);
-    background: var(--aq-surface);
-    border: 1px solid var(--aq-border);
-    border-radius: 999px;
+    color: var(--aq-muted);
     text-decoration: none;
-    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+    border-radius: 0.375rem;
+    transition: color 0.15s ease;
 
     &:hover {
       color: var(--aq-accent-link, var(--aq-accent));
-      background: var(--aq-surface-subtle);
-      border-color: var(--aq-border-strong);
-      transform: translateY(-1px);
     }
 
     &:focus-visible {
@@ -123,14 +117,12 @@ const StyledWrapper = styled.footer`
     justify-content: center;
     gap: 0.5rem;
     font-size: 0.875rem;
-    line-height: 1.4;
+    line-height: 1.25rem;
     color: var(--aq-muted);
-    letter-spacing: -0.01em;
 
     a {
-      color: var(--aq-text-secondary);
+      color: var(--aq-muted);
       text-decoration: none;
-      transition: color 140ms ease;
 
       &:hover {
         color: var(--aq-text);

@@ -6,6 +6,7 @@
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
 import {
+  adminBarFillSubtle,
   adminBorder,
   adminBorderStrong,
   adminBorderSubtle,
@@ -16,7 +17,6 @@ import {
   adminSurface,
   adminSurfaceMuted,
   adminSurfaceRaised,
-  adminTeal,
   adminTextMuted,
   adminTextPrimary,
   adminTextSecondary,
@@ -300,30 +300,23 @@ export const SegmentedToggle = styled.div`
 
 export const ShareBarList = styled.div`
   display: grid;
-  gap: 0.55rem;
+  gap: 0.45rem;
   padding: 0.9rem 1.15rem 1.05rem;
 `
 
 export const ShareBarItem = styled.a`
+  position: relative;
   display: grid;
-  gap: 0.35rem;
-  padding: 0.42rem 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.6rem;
   border-radius: 6px;
   color: inherit;
   text-decoration: none;
-  transition: background-color 140ms ease;
+  overflow: hidden;
   ${focusVisibleRing}
-
-  .shareBarHead {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 0.75rem;
-  }
-
-  &:hover {
-    background: ${adminSurfaceRaised};
-  }
 
   &:hover .shareBarTitle {
     color: ${adminTextPrimary};
@@ -331,41 +324,35 @@ export const ShareBarItem = styled.a`
 
   @media (pointer: coarse) {
     min-height: 44px;
-    align-content: center;
   }
 `
 
-export const ShareBarTrack = styled.span`
-  display: block;
-  width: 100%;
-  height: 5px;
-  border-radius: 9999px;
-  background: ${adminSurfaceMuted};
-  overflow: hidden;
-`
-
 export const ShareBarFill = styled.span<{ $widthPct: number }>`
-  display: block;
+  position: absolute;
+  inset: 2px auto 2px 0;
   width: ${({ $widthPct }) => `${Math.max(0, Math.min(100, $widthPct))}%`};
-  height: 100%;
-  border-radius: 9999px;
-  background: ${adminTeal};
-  opacity: 0.84;
+  border-radius: 4px;
+  background: ${adminBarFillSubtle};
   transition: width 180ms ease;
+  pointer-events: none;
 `
 
 export const ShareBarCopy = styled.span`
+  position: relative;
+  z-index: 1;
   min-width: 0;
   color: ${adminTextPrimary};
   font-size: 0.8rem;
-  font-weight: 550;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `
 
 export const ShareBarValue = styled.span`
-  color: ${adminTextSecondary};
+  position: relative;
+  z-index: 1;
+  color: ${adminTextPrimary};
   font-family: ${MONO_FONT};
   font-size: 0.75rem;
   font-weight: 600;

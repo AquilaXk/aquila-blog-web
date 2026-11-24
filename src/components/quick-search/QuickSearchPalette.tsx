@@ -314,23 +314,8 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
               className="qsCloseBtn"
               onClick={onClose}
               aria-label={copy.close}
-              title={copy.close}
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
+              Esc
             </button>
           </div>
 

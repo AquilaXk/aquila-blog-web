@@ -105,15 +105,13 @@ export const StyledWrapper = styled.div`
     justify-content: center;
     min-width: ${control.lg}px;
     min-height: ${control.lg}px;
-    border: 1px solid transparent;
-    border-radius: 9999px;
+    border-radius: 0.375rem;
     color: var(--aq-muted);
     text-decoration: none;
-    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+    transition: color 140ms ease, background-color 140ms ease;
 
     &:hover {
       color: var(--aq-accent-link, var(--aq-accent));
-      border-color: var(--aq-border);
       background: var(--aq-surface-subtle);
     }
 
@@ -264,7 +262,7 @@ export const StyledWrapper = styled.div`
     padding: 0;
     list-style: none;
     display: grid;
-    gap: 0;
+    gap: 0.875rem;
   }
 
   .proseListItem {
@@ -272,20 +270,9 @@ export const StyledWrapper = styled.div`
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.25rem 0.75rem;
-    padding: 0.65rem 0;
-    border-bottom: 1px solid var(--aq-border);
     font-size: 1rem;
     line-height: 1.65;
     color: var(--aq-text-secondary, var(--aq-text));
-
-    &:last-child {
-      border-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    &:first-child {
-      padding-top: 0;
-    }
   }
 
   .proseListMeta {
