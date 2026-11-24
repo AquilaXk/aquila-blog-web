@@ -128,7 +128,6 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-gutter: stable;
     border: 1px solid ${tableChrome.border};
     border-radius: 0.75rem;
     background: ${tableChrome.background};

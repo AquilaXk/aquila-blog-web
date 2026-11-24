@@ -971,11 +971,13 @@ test.describe("core smoke detail rendering", () => {
       tableWidth: Math.round(table.getBoundingClientRect().width),
       scrollWidth: shell.scrollWidth,
       clientWidth: shell.clientWidth,
+      scrollbarGutter: window.getComputedStyle(shell).scrollbarGutter,
       headerWidths: headerCells.map((cell) => Math.round(cell.getBoundingClientRect().width)),
     }
   })
 
   expect(metrics).not.toBeNull()
+  expect(metrics?.scrollbarGutter).toBe("auto")
   expect(Math.abs((metrics?.tableWidth || 0) - (metrics?.shellWidth || 0))).toBeLessThanOrEqual(2)
   expect((metrics?.scrollWidth || 0) - (metrics?.clientWidth || 0)).toBeLessThanOrEqual(2)
   expect(metrics?.headerWidths[1] || 0).toBeGreaterThan(metrics?.headerWidths[0] || 0)
