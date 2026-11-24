@@ -398,7 +398,8 @@ export const useMarkdownEditorSlashMenu = ({
   ])
 
   const checkSlashCommand = useCallback(
-    (markdown: string, selection: SlashSelection) => {
+    (markdown: string, selection: SlashSelection, options?: { isComposing?: boolean }) => {
+      if (options?.isComposing) return
       const trigger = matchSlashCommandTrigger(markdown, selection)
       if (!trigger) {
         setSlashMenuState((prev) =>

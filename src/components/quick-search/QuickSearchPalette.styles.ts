@@ -174,8 +174,8 @@ export const QuickSearchDialog = styled.div`
     align-items: stretch;
     gap: 0.25rem;
     border: 0;
-    border-radius: 0.375rem;
-    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    padding: 0.55rem 0.72rem;
     background: transparent;
     color: var(--aq-text);
     font-size: 0.875rem;
@@ -183,6 +183,7 @@ export const QuickSearchDialog = styled.div`
     cursor: pointer;
     user-select: none;
     outline: none;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
 
     &:hover,
     &.active,
@@ -198,7 +199,8 @@ export const QuickSearchDialog = styled.div`
   }
 
   .qsItemButton[aria-selected="true"] {
-    background: var(--aq-surface-subtle);
+    background: var(--aq-accent-muted);
+    box-shadow: inset 2.5px 0 0 var(--aq-accent);
     color: var(--aq-text);
   }
 

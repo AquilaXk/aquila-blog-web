@@ -338,12 +338,14 @@ export const MarkdownEditor = ({
   })
 
   const handleLiveSelectionChange = useCallback(
-    (selection: TextareaSelection) => {
+    (selection: TextareaSelection, _docChanged?: boolean, isComposing?: boolean) => {
       syncSelectionState(selection)
       handleFindReplaceSelectionChange(selection)
       syncSelectionTableAvailability(valueRef.current, selection)
       onSelectionChange?.(selection)
-      if (viewMode === "live" && !disabled) checkSlashCommand(valueRef.current, selection)
+      if (viewMode === "live" && !disabled) {
+        checkSlashCommand(valueRef.current, selection, { isComposing })
+      }
     },
     [checkSlashCommand, disabled, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, syncSelectionTableAvailability, viewMode]
   )

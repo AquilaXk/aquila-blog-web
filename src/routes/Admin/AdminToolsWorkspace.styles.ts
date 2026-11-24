@@ -192,6 +192,8 @@ export const ToolsKpiBadge = styled.span<{ "data-tone"?: string }>`
   color: ${adminTextSecondary};
   font-size: 0.6875rem;
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &[data-tone="good"] {
     color: ${adminStatusSuccessText};
@@ -209,12 +211,13 @@ export const ToolsKpiBadge = styled.span<{ "data-tone"?: string }>`
 export const ToolsKpiValue = styled.strong`
   display: block;
   color: ${adminTextPrimary};
-  font-size: 1.2rem;
+  font-size: clamp(1.0625rem, 1.35vw, 1.22rem);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
+  line-height: 1.18;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 `
 
 export const ToolsKpiFooter = styled.div`
@@ -223,8 +226,9 @@ export const ToolsKpiFooter = styled.div`
   color: ${adminTextSecondary};
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.7rem;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  line-height: 1.38;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 `
 
 export const ToolsStatusChip = styled(AdminStatusPill)`
@@ -239,6 +243,8 @@ export const ToolsStatusChip = styled(AdminStatusPill)`
   color: ${adminTextSecondary};
   font-size: 0.72rem;
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &[data-tone="good"] {
     color: ${adminStatusSuccessText};

@@ -98,8 +98,8 @@ const StyledWrapper = styled.footer`
     color: var(--aq-text-secondary);
     background: var(--aq-surface);
     border: 1px solid var(--aq-border);
-    text-decoration: none;
     border-radius: 999px;
+    text-decoration: none;
     transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 
     &:hover {

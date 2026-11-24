@@ -110,7 +110,7 @@ test("RSS and Sitemap extract correct dates and lastmod from domain post", () =>
   }
 
   const rssDate = getRssPostDate(domainPost)
-  expect(rssDate.toISOString()).toBe("2026-09-02T12:00:00.000Z")
+  expect(rssDate.toISOString()).toBe("2026-09-01T10:00:00.000Z")
 
   const sitemapLastmod = getSitemapPostLastmod(domainPost)
   expect(sitemapLastmod).toBe("2026-09-02T12:00:00.000Z")

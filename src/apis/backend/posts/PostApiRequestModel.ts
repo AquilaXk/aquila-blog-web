@@ -10,6 +10,7 @@ export const isServerRuntime = typeof window === "undefined"
 
 export const POSTS_TAGS_API_PATH = asOpenApiPath("/post/api/v1/posts/tags")
 export const POSTS_SITEMAP_API_PATH = asOpenApiPath("/post/api/v1/posts/sitemap")
+export const POSTS_WIKILINK_CATALOG_API_PATH = asOpenApiPath("/post/api/v1/posts/wikilink-catalog")
 export const SITEMAP_API_MAX_LIMIT = 10_000
 
 const POSTS_EXPLORE_API_PATH = asOpenApiPath("/post/api/v1/posts/explore")
@@ -223,3 +224,8 @@ export const buildSitemapPostsPath = (limit = SITEMAP_API_MAX_LIMIT) => {
     : SITEMAP_API_MAX_LIMIT
   return `${POSTS_SITEMAP_API_PATH}?limit=${safeLimit}`
 }
+
+const POSTS_BACKLINKS_PATH_TEMPLATE = asOpenApiPath("/post/api/v1/posts/{id}/backlinks")
+
+export const buildPostBacklinksPath = (postId: string | number) =>
+  POSTS_BACKLINKS_PATH_TEMPLATE.replace("{id}", encodeURIComponent(String(postId).trim()))

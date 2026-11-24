@@ -256,7 +256,8 @@ export const mapPostDetail = async (
 
   const hasActorCanModify = typeof post.actorCanModify === "boolean"
   const hasActorCanDelete = typeof post.actorCanDelete === "boolean"
-  const trustedContentHtml = !allowTrustedContentHtml || postContent.trim()
+  const hasMarkdownBody = normalizedContent.trim().length > 0
+  const trustedContentHtml = !allowTrustedContentHtml || hasMarkdownBody
     ? undefined
     : await resolveTrustedContentHtml(post)
   const resolvedThumbnail = pickPreferredImageUrl(

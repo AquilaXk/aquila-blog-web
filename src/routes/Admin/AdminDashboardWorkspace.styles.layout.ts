@@ -263,14 +263,13 @@ export const MetricCopy = styled.div`
 
   strong {
     color: ${adminTextPrimary};
-    font-size: 1.65rem;
+    font-size: clamp(1.1rem, 1.55vw, 1.5rem);
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.18;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   small {
@@ -279,11 +278,10 @@ export const MetricCopy = styled.div`
     color: ${adminTextSecondary};
     font-size: 0.74rem;
     font-weight: 500;
-    line-height: 1.32;
+    line-height: 1.38;
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   @media (max-width: 720px) {

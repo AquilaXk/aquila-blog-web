@@ -101,6 +101,7 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
   const router = useRouter()
   const { t, language } = useLanguage()
   const [query, setQuery] = useState("")
+  const [isComposing, setIsComposing] = useState(false)
   const [results, setResults] = useState<TPost[]>([])
   const [loading, setLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -146,6 +147,7 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
       setLoading(false)
       return
     }
+    if (isComposing) return
 
     const trimmed = query.trim()
     const controller = new AbortController()
@@ -190,7 +192,7 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [open, query])
+  }, [isComposing, open, query])
 
   const navigateToPost = useCallback(
     (post: TPost) => {
@@ -298,6 +300,11 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
               aria-activedescendant={activeOptionId}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(event) => {
+                setIsComposing(false)
+                setQuery(event.currentTarget.value)
+              }}
               placeholder={copy.placeholder}
               aria-label={copy.aria}
             />

@@ -19,6 +19,7 @@ import {
   buildExplorePath,
   buildFeedCursorPath,
   buildFeedPath,
+  buildPostBacklinksPath,
   buildRelatedByAuthorPath,
   buildSearchPath,
   buildSitemapPostsPath,
@@ -28,6 +29,7 @@ import {
   POSTS_BOOTSTRAP_SSR_CACHE_MAX_ENTRIES,
   POSTS_BOOTSTRAP_SSR_CACHE_TTL_MS,
   POSTS_TAGS_API_PATH,
+  POSTS_WIKILINK_CATALOG_API_PATH,
   recordRuntimeEndpoint,
   setServerSnapshot,
   SITEMAP_API_MAX_LIMIT,
@@ -429,5 +431,74 @@ export const getPublicSitemapPosts = async ({
     })
   }
 
+  return mapped
+}
+
+type PublicWikilinkCatalogResBody = components["schemas"]["PublicWikilinkCatalogResBody"]
+type PublicPostBacklinksResBody = components["schemas"]["PublicPostBacklinksResBody"]
+
+export type PublicWikilinkCatalogEntry = {
+  id: string
+  slug: string
+  title: string
+  createdAt?: string
+}
+
+export type PublicPostBacklinkEntry = {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  createdAt?: string
+  modifiedAt?: string
+}
+
+export const getPublicWikilinkCatalogPosts = async (
+  signal?: AbortSignal
+): Promise<PublicWikilinkCatalogEntry[]> => {
+  recordRuntimeEndpoint(POSTS_WIKILINK_CATALOG_API_PATH, "page")
+  const response = await apiFetch<PublicWikilinkCatalogResBody>(POSTS_WIKILINK_CATALOG_API_PATH, { signal })
+  const items = Array.isArray(response?.items) ? response.items : []
+  const mapped: PublicWikilinkCatalogEntry[] = []
+  for (const item of items) {
+    const rawId = item?.id
+    const title = typeof item?.title === "string" ? item.title.trim() : ""
+    if (typeof rawId !== "number" || !Number.isInteger(rawId) || rawId <= 0 || !title) continue
+    const id = String(rawId)
+    mapped.push({
+      id,
+      slug: id,
+      title,
+      ...(typeof item.createdAt === "string" && item.createdAt.trim() ? { createdAt: item.createdAt.trim() } : {}),
+    })
+  }
+  return mapped
+}
+
+export const getPostBacklinks = async (
+  postId: string | number,
+  signal?: AbortSignal
+): Promise<PublicPostBacklinkEntry[]> => {
+  const normalizedId = String(postId).trim()
+  if (!normalizedId) return []
+  const endpoint = buildPostBacklinksPath(normalizedId)
+  recordRuntimeEndpoint(endpoint, "page")
+  const response = await apiFetch<PublicPostBacklinksResBody>(endpoint, { signal })
+  const items = Array.isArray(response?.items) ? response.items : []
+  const mapped: PublicPostBacklinkEntry[] = []
+  for (const item of items) {
+    const rawId = item?.id
+    const title = typeof item?.title === "string" ? item.title.trim() : ""
+    if (typeof rawId !== "number" || !Number.isInteger(rawId) || rawId <= 0 || !title) continue
+    const id = String(rawId)
+    mapped.push({
+      id,
+      slug: id,
+      title,
+      summary: typeof item.summary === "string" ? item.summary.trim() : "",
+      ...(typeof item.createdAt === "string" && item.createdAt.trim() ? { createdAt: item.createdAt.trim() } : {}),
+      ...(typeof item.modifiedAt === "string" && item.modifiedAt.trim() ? { modifiedAt: item.modifiedAt.trim() } : {}),
+    })
+  }
   return mapped
 }

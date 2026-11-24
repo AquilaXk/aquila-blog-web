@@ -34,7 +34,7 @@ export const RELEASE_UI_QA_LONG_URL =
 
 export const RELEASE_UI_QA_IMAGE_PATHS = Array.from(
   { length: 20 },
-  (_, index) => `/qa/release-image-${String(index + 1).padStart(2, "0")}.png`
+  (_, index) => `/post/api/v1/images/release-image-${String(index + 1).padStart(2, "0")}.png`
 )
 
 const releaseUiQaImageMarkdown = RELEASE_UI_QA_IMAGE_PATHS.map(
@@ -83,6 +83,7 @@ export const RELEASE_UI_QA_DETAIL_POST = {
     "출시 전 실제 기기 UI QA 매트릭스 긴 제목 줄바꿈 회귀 확인용 제목입니다 ".repeat(3).trim(),
   summary:
     "긴 summary, tag 20개, 긴 URL, 넓은 table, Mermaid, 수식, 이미지 20개 fixture를 모두 포함한 release QA 게시글입니다.",
+  summarySource: "MANUAL",
   content: RELEASE_UI_QA_DETAIL_CONTENT,
   tags: RELEASE_UI_QA_TAGS,
   category: ["Release QA"],
@@ -113,7 +114,7 @@ export const RELEASE_UI_QA_FEED_PAGE = {
 export const mockReleaseUiQaEndpoints = async (page: Page) => {
   await mockAvatarAsset(page)
 
-  await page.route("**/qa/release-image-*.png", async (route) => {
+  await page.route("**/post/api/v1/images/release-image-*.png", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "image/png",

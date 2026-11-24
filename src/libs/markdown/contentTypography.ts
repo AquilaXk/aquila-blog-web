@@ -93,7 +93,7 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
     font-size: ${articleTypographyScale.bodyFontSize};
     line-height: ${articleTypographyScale.bodyLineHeight};
     word-break: keep-all;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     text-wrap: pretty;
   }
 
@@ -102,7 +102,8 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
     text-decoration: underline;
     text-underline-offset: 0.16em;
     text-decoration-thickness: 0.08em;
-    word-break: break-word;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   ${selector} a:hover {
@@ -140,7 +141,7 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   ${selector} li {
     line-height: ${articleTypographyScale.bodyLineHeight};
     word-break: keep-all;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     text-wrap: pretty;
   }
 

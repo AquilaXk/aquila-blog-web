@@ -4,7 +4,8 @@ import { toCanonicalPostPath } from "src/libs/utils/postPath"
 
 export const RSS_FEED_CONTENT_TYPE = "application/rss+xml; charset=utf-8"
 export const RSS_FEED_PAGE_SIZE = 30
-export const RSS_FEED_MAX_PAGES = 1_000
+export const RSS_FEED_MAX_PAGES = 10
+export const RSS_FEED_MAX_ITEMS = 50
 
 export type RssFeedPostPageLoader = (params: {
   order?: "asc" | "desc"
@@ -39,10 +40,10 @@ const toStableDate = (value: string | undefined) => {
 }
 
 export const getRssPostDate = (post: TPost) =>
-  toStableDate(post.modifiedAt) ??
-  toStableDate(post.modifiedTime) ??
   toStableDate(post.createdAt) ??
   toStableDate(post.createdTime) ??
+  toStableDate(post.modifiedAt) ??
+  toStableDate(post.modifiedTime) ??
   (post.date ? toStableDate(post.date.start_date) : null) ??
   new Date(0)
 
@@ -102,10 +103,15 @@ const escapeXml = (value: string) =>
 
 export const collectRssFeedPosts = async (
   loadPage: RssFeedPostPageLoader,
-  { pageSize = RSS_FEED_PAGE_SIZE, maxPages = RSS_FEED_MAX_PAGES }: CollectRssFeedPostsOptions = {}
+  {
+    pageSize = RSS_FEED_PAGE_SIZE,
+    maxPages = RSS_FEED_MAX_PAGES,
+    maxItems = RSS_FEED_MAX_ITEMS,
+  }: CollectRssFeedPostsOptions & { maxItems?: number } = {}
 ) => {
   const safePageSize = toSafePositiveInteger(pageSize, RSS_FEED_PAGE_SIZE)
   const safeMaxPages = toSafePositiveInteger(maxPages, RSS_FEED_MAX_PAGES)
+  const safeMaxItems = toSafePositiveInteger(maxItems, RSS_FEED_MAX_ITEMS)
   const posts: TPost[] = []
   const seenPostIds = new Set<string>()
   const seenRawRowIds = new Set<string>()
@@ -126,21 +132,26 @@ export const collectRssFeedPosts = async (
       if (!isRssVisiblePost(post) || seenPostIds.has(post.id)) continue
       seenPostIds.add(post.id)
       posts.push(post)
+      if (posts.length >= safeMaxItems) break
     }
 
+    if (posts.length >= safeMaxItems) break
     if (result.posts.length > 0 && addedRawRowInPage === 0) break
 
     const hasMore = result.posts.length > 0 && hasMoreRssPages(result, page, safePageSize)
     if (!hasMore) break
 
     if (page === safeMaxPages) {
+      if (posts.length > 0) break
       throw new Error(
-        `RSS feed collection reached maxPages=${safeMaxPages} before exhausting posts. Increase the limit or split the feed.`
+        `RSS feed collection reached maxPages=${safeMaxPages} without finding visible posts.`
       )
     }
   }
 
-  return posts.sort((left, right) => getRssPostDate(right).getTime() - getRssPostDate(left).getTime())
+  return posts
+    .sort((left, right) => getRssPostDate(right).getTime() - getRssPostDate(left).getTime())
+    .slice(0, safeMaxItems)
 }
 
 export const buildRssFeedXml = (posts: TPost[], options: BuildRssFeedOptions) => {

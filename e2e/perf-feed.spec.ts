@@ -16,7 +16,11 @@ const expectDeferredPostHeadingVisible = async (page: Page, name: string) => {
   for (let attempt = 0; attempt < 4 && (await heading.count()) === 0; attempt += 1) {
     const placeholder = page.locator(".deferredPostCardPlaceholder").first()
     if ((await placeholder.count()) === 0) break
-    await placeholder.scrollIntoViewIfNeeded()
+    await page.evaluate(() => {
+      const target = document.querySelector(".deferredPostCardPlaceholder")
+      if (target) target.scrollIntoView({ block: "center" })
+      else window.scrollBy(0, window.innerHeight)
+    })
     await page.waitForTimeout(120)
   }
 

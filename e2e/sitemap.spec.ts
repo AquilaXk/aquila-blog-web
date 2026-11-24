@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test"
+import type { GetServerSidePropsContext } from "next"
 import type { ExplorePostsPage } from "../src/apis/backend/posts"
 import { buildSitemapFields, collectSitemapPosts } from "../src/libs/sitemapPosts"
+import * as sitemapPage from "../src/pages/sitemap.xml"
 import type { TPost, TPostStatus } from "../src/types"
 
 const makePost = (
@@ -137,5 +139,40 @@ test.describe("server sitemap post collection", () => {
         changefreq: "daily",
       },
     ])
+  })
+
+  test("sitemap route fails closed with 503 and Retry-After when backend lookup throws", async () => {
+    const headers = new Map<string, string>()
+    let endedBody = ""
+    const res = {
+      statusCode: 0,
+      headersSent: false,
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      setHeader: (name: string, value: string) => headers.set(name.toLowerCase(), value),
+      removeHeader: (name: string) => headers.delete(name.toLowerCase()),
+      end: (chunk?: string) => {
+        if (chunk) endedBody += chunk
+      },
+    }
+    const prevBackendUrl = process.env.BACKEND_INTERNAL_URL
+    process.env.BACKEND_INTERNAL_URL = "http://127.0.0.1:1"
+    const originalError = console.error
+    console.error = () => undefined
+
+    try {
+      await sitemapPage.getServerSideProps({
+        req: { headers: { host: "blog.aquilaxk.site" } },
+        res,
+      } as unknown as GetServerSidePropsContext)
+
+      expect(res.statusCode).toBe(503)
+      expect(headers.get("retry-after")).toBe("300")
+      expect(headers.get("cache-control")).toBe("no-store")
+      expect(endedBody).toBe("Service Unavailable")
+    } finally {
+      console.error = originalError
+      if (prevBackendUrl === undefined) delete process.env.BACKEND_INTERNAL_URL
+      else process.env.BACKEND_INTERNAL_URL = prevBackendUrl
+    }
   })
 })

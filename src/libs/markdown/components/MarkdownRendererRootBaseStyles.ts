@@ -345,6 +345,7 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
   }
 
   a.aq-wikilink {
+    display: inline;
     color: ${theme.publicDesign.accent};
     background-color: ${theme.colors.accentSurfaceSubtle};
     border-bottom: 1px solid ${theme.colors.accentBorder};
@@ -352,6 +353,10 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
     padding: 0.08em 0.36em;
     text-decoration: none;
     font-weight: 550;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 
     &[data-wikilink-resolved="true"] {

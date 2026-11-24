@@ -267,41 +267,49 @@ export const EditorOutlineItem = styled.button`
 `
 
 export const LocalDraftRestoreCard = styled.div`
-  display: grid;
-  gap: 8px;
-  padding: 11px 14px;
-  margin-bottom: 16px;
-  border-radius: 10px;
-  border: 1px solid ${adminBorderStrong};
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid ${adminBorder};
   background: ${adminSurfaceRaised};
-  box-shadow: 0 1px 3px ${boxShadowColor.cardSubtle};
+  box-shadow: none;
   box-sizing: border-box;
 
   .card-header {
-    font-size: 0.84rem;
+    flex: 0 0 auto;
+    font-size: 0.8125rem;
     font-weight: 600;
     color: ${adminTextPrimary};
-    line-height: 1.4;
+    line-height: 1.35;
   }
 
   select {
-    width: 100%;
-    min-height: 38px;
-    padding: 6px 10px;
-    font-size: 0.84rem;
+    flex: 1 1 200px;
+    width: auto;
+    min-width: 0;
+    max-width: 340px;
+    min-height: 34px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
     border-radius: 6px;
     border: 1px solid ${adminBorder};
     background: ${adminSurface};
     color: ${adminTextPrimary};
     box-sizing: border-box;
     ${focusVisibleRing}
-    @media (max-width: 768px), (pointer: coarse) { min-height: 44px; font-size: 16px; }
+    @media (max-width: 768px), (pointer: coarse) { flex: 1 1 100%; max-width: none; min-height: 44px; font-size: 16px; }
   }
 
   .card-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    margin-left: auto;
 
     button {
       font-size: 0.78rem;

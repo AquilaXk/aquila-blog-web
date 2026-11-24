@@ -50,7 +50,7 @@ export const resolveMarkdownRenderModel = ({
 }): MarkdownRenderModel => {
   const normalizedContent = normalizeMarkdownForRender(content || "")
   const { cleanedMarkdown, layouts: tableLayouts } = extractMarkdownTableLayouts(normalizedContent)
-  const resolvedContentHtml = normalizedContent
+  const resolvedContentHtml = cleanedMarkdown.trim()
     ? ""
     : filterTrustedPostImageHtml(
         normalizeContentHtmlForMermaid(trustedContentHtml?.html.trim() || ""),

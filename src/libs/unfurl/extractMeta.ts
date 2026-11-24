@@ -22,9 +22,6 @@ const FILE_EXTENSION_PATTERN =
 
 const EMBED_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/
 const EMBED_SEGMENT_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
-const META_TAG_REGEX = /<meta\b([^>]*?)>/gi
-const TITLE_TAG_REGEX = /<title[^>]*>([^<]*)<\/title>/i
-const ATTR_PAIR_REGEX = /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g
 
 const HTML_ENTITY_MAP: Record<string, string> = {
   amp: "&",
@@ -48,54 +45,6 @@ const htmlDecode = (value: string) =>
 
 const MAX_HEAD_SCAN_CHARS = 512 * 1024
 
-const sliceHeadDocument = (html: string): string => {
-  if (!html) return ""
-  const upperLimit = Math.min(html.length, MAX_HEAD_SCAN_CHARS)
-  const bounded = upperLimit < html.length ? html.slice(0, upperLimit) : html
-  const lower = bounded.toLowerCase()
-  const headCloseIndex = lower.indexOf("</head>")
-  if (headCloseIndex >= 0) {
-    return bounded.slice(0, headCloseIndex)
-  }
-  const bodyOpenIndex = lower.indexOf("<body")
-  return bodyOpenIndex >= 0 ? bounded.slice(0, bodyOpenIndex) : bounded
-}
-
-const collectMetaTagValues = (headHtml: string): Map<string, string> => {
-  const values = new Map<string, string>()
-  META_TAG_REGEX.lastIndex = 0
-
-  let metaMatch: RegExpExecArray | null
-  while ((metaMatch = META_TAG_REGEX.exec(headHtml)) !== null) {
-    const rawAttrs = metaMatch[1] || ""
-    let propertyKey = ""
-    let nameKey = ""
-    let itempropKey = ""
-    let contentValue = ""
-
-    ATTR_PAIR_REGEX.lastIndex = 0
-    let attrMatch: RegExpExecArray | null
-    while ((attrMatch = ATTR_PAIR_REGEX.exec(rawAttrs)) !== null) {
-      const attrName = (attrMatch[1] || "").toLowerCase()
-      const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? ""
-      if (attrName === "property") propertyKey = attrVal.trim().toLowerCase()
-      else if (attrName === "name") nameKey = attrVal.trim().toLowerCase()
-      else if (attrName === "itemprop") itempropKey = attrVal.trim().toLowerCase()
-      else if (attrName === "content") contentValue = attrVal
-    }
-
-    const decodedContent = htmlDecode(contentValue)
-    if (!decodedContent) continue
-
-    const key = propertyKey || nameKey || itempropKey
-    if (key && !values.has(key)) {
-      values.set(key, decodedContent)
-    }
-  }
-
-  return values
-}
-
 const firstMetaValue = (metaValues: ReadonlyMap<string, string>, keys: readonly string[]): string => {
   for (const key of keys) {
     const value = metaValues.get(key)
@@ -104,9 +53,129 @@ const firstMetaValue = (metaValues: ReadonlyMap<string, string>, keys: readonly 
   return ""
 }
 
+const decodeMetaAttributeValue = (value: string) => htmlDecode(value.trim())
+
+const stripHtmlComments = (html: string): string => {
+  let out = ""
+  let cursor = 0
+  while (cursor < html.length) {
+    const start = html.indexOf("<!--", cursor)
+    if (start === -1) {
+      out += html.slice(cursor)
+      break
+    }
+    out += html.slice(cursor, start)
+    const end = html.indexOf("-->", start + 4)
+    if (end === -1) break
+    cursor = end + 3
+  }
+  return out
+}
+
+const sliceCleanHeadDocument = (html: string): string => {
+  if (!html) return ""
+  const bounded = html.length > MAX_HEAD_SCAN_CHARS ? html.slice(0, MAX_HEAD_SCAN_CHARS) : html
+  const withoutComments = stripHtmlComments(bounded)
+  const lower = withoutComments.toLowerCase()
+  const headEnd = lower.indexOf("</head>")
+  const bodyStart = lower.indexOf("<body")
+  const cutoff =
+    headEnd !== -1
+      ? headEnd
+      : bodyStart !== -1
+        ? bodyStart
+        : withoutComments.length
+  return withoutComments.slice(0, cutoff)
+}
+
+const scanMetaTagAttributes = (headHtml: string): Map<string, string> => {
+  const values = new Map<string, string>()
+  const lower = headHtml.toLowerCase()
+  let cursor = 0
+
+  while (cursor < headHtml.length) {
+    const tagStart = lower.indexOf("<meta", cursor)
+    if (tagStart === -1) break
+    const afterName = headHtml.charCodeAt(tagStart + 5)
+    if (
+      tagStart + 5 < headHtml.length &&
+      afterName !== 32 &&
+      afterName !== 9 &&
+      afterName !== 10 &&
+      afterName !== 13 &&
+      afterName !== 47 &&
+      afterName !== 62
+    ) {
+      cursor = tagStart + 5
+      continue
+    }
+
+    let pos = tagStart + 5
+    let quote: string | null = null
+    while (pos < headHtml.length) {
+      const ch = headHtml[pos]!
+      if (quote) {
+        if (ch === quote) quote = null
+      } else if (ch === '"' || ch === "'") {
+        quote = ch
+      } else if (ch === ">") {
+        break
+      }
+      pos += 1
+    }
+
+    const attrsSource = headHtml.slice(tagStart + 5, pos)
+    cursor = pos + 1
+
+    const attrs = new Map<string, string>()
+    let attrPos = 0
+    while (attrPos < attrsSource.length) {
+      while (attrPos < attrsSource.length && /\s|\//.test(attrsSource[attrPos]!)) attrPos += 1
+      if (attrPos >= attrsSource.length) break
+      const nameStart = attrPos
+      while (attrPos < attrsSource.length && !/[\s=/>]/.test(attrsSource[attrPos]!)) attrPos += 1
+      const name = attrsSource.slice(nameStart, attrPos).toLowerCase()
+      while (attrPos < attrsSource.length && /\s/.test(attrsSource[attrPos]!)) attrPos += 1
+      if (attrsSource[attrPos] !== "=") continue
+      attrPos += 1
+      while (attrPos < attrsSource.length && /\s/.test(attrsSource[attrPos]!)) attrPos += 1
+      if (attrPos >= attrsSource.length) break
+
+      let rawVal = ""
+      const q = attrsSource[attrPos]!
+      if (q === '"' || q === "'") {
+        attrPos += 1
+        const valStart = attrPos
+        while (attrPos < attrsSource.length && attrsSource[attrPos] !== q) attrPos += 1
+        rawVal = attrsSource.slice(valStart, attrPos)
+        if (attrPos < attrsSource.length) attrPos += 1
+      } else {
+        const valStart = attrPos
+        while (attrPos < attrsSource.length && !/[\s>]/.test(attrsSource[attrPos]!)) attrPos += 1
+        rawVal = attrsSource.slice(valStart, attrPos)
+      }
+      if (name) attrs.set(name, rawVal)
+    }
+
+    const metaKey = (attrs.get("property") || attrs.get("name") || "").trim().toLowerCase()
+    const metaContent = attrs.get("content")
+    if (metaKey && typeof metaContent === "string" && metaContent.trim() && !values.has(metaKey)) {
+      values.set(metaKey, decodeMetaAttributeValue(metaContent))
+    }
+  }
+
+  return values
+}
+
 const extractTitleElement = (html: string): string => {
-  const match = TITLE_TAG_REGEX.exec(html)
-  const rawTitle = match?.[1]?.trim() || ""
+  const lower = html.toLowerCase()
+  const openStart = lower.indexOf("<title")
+  if (openStart === -1) return ""
+  const openEnd = html.indexOf(">", openStart + 6)
+  if (openEnd === -1) return ""
+  const closeStart = lower.indexOf("</title>", openEnd + 1)
+  if (closeStart === -1) return ""
+  const rawTitle = html.slice(openEnd + 1, closeStart).trim()
   return rawTitle ? htmlDecode(rawTitle) : ""
 }
 
@@ -234,8 +303,8 @@ export const formatReadableFileSize = (sizeBytes?: number | null) => formatFileS
 
 export const extractUnfurlMetadata = (url: string, html: string): UnfurlMetadata => {
   const parsedUrl = new URL(url)
-  const headHtml = sliceHeadDocument(html)
-  const metaValues = collectMetaTagValues(headHtml)
+  const headHtml = sliceCleanHeadDocument(html)
+  const metaValues = scanMetaTagAttributes(headHtml)
   const siteName =
     firstMetaValue(metaValues, ["og:site_name", "application-name"]) || humanizeHost(parsedUrl.hostname)
   const provider = inferLinkProvider(url) || siteName

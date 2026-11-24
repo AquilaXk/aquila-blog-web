@@ -66,8 +66,7 @@ const MarkdownRenderer = dynamic(() => import("src/libs/markdown/MarkdownRendere
 })
 
 const RelatedPostsSection = dynamic<RelatedPostsSectionProps>(
-  () => import("./PostDetailRelatedSection").then((mod) => mod.RelatedPostsSection),
-  { ssr: false }
+  () => import("./PostDetailRelatedSection").then((mod) => mod.RelatedPostsSection)
 )
 
 const PostDetailMobileToc = dynamic(() => import("./PostDetailMobileToc"))
@@ -77,8 +76,7 @@ const MobileSummaryActions = dynamic<MobileSummaryActionsProps>(() =>
 )
 
 const PostDetailNavigationChrome = dynamic<PostDetailNavigationChromeProps>(
-  () => import("./PostDetailNavigationChrome").then((mod) => mod.PostDetailNavigationChrome),
-  { ssr: false }
+  () => import("./PostDetailNavigationChrome").then((mod) => mod.PostDetailNavigationChrome)
 )
 
 export const RAIL_UI_DETAILED_TOC = 1

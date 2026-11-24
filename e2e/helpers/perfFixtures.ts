@@ -272,6 +272,8 @@ export const mockDetailRailEndpoint = async (page: Page, postId: number) => {
         authorUsername: "aquila",
         authorProfileImageDirectUrl: "/avatar.png",
         title: "상세 레일 스티키 회귀 점검",
+        summary: "",
+        summarySource: "NONE",
         content: [
           "## 개요",
           "레일 스티키 안정성 검증용 본문입니다.",
@@ -535,7 +537,7 @@ export const getVisualLayoutFingerprint = async (page: Page) =>
       rightRailRect: readRect(".rightRailInner"),
       ...(route === "/admin/dashboard"
         ? {
-            dashboardServiceRailRect: readRect('[data-ui="monitoring-service-rail"]'),
+            dashboardServiceRailRect: readRect('[data-ui="bullboard-queue-grid"], [data-ui="monitoring-service-rail"]'),
             dashboardPrioritySectionRect: readSectionRectByHeading("서브시스템 점검 항목"),
             dashboardPanelGridRect: readSectionRectByHeading("운영 지표 요약"),
             dashboardFirstPanelRect: readSectionRectByHeading("최근 운영 이벤트"),

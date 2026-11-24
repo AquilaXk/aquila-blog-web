@@ -525,6 +525,7 @@ const FeedExplorer: React.FC<FeedExplorerProps> = ({
             searchQuery={normalizedQuery}
             sortMode={sortMode}
             hasFilter={hasFilter}
+            hasSearchFilter={Boolean(normalizedQuery)}
             hasExternalResults={visiblePosts.pinnedPosts.length > 0}
             onClearFilters={handleClearFilters}
             isInitialLoading={isInitialLoading}

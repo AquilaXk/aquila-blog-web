@@ -92,6 +92,7 @@ export const StyledWrapper = styled.div`
 
   .postSidebar {
     min-width: 0;
+    align-self: stretch;
     display: flex;
     flex-direction: column;
     font-size: 0.875rem;
@@ -164,6 +165,7 @@ export const StyledWrapper = styled.div`
   .sidebarDivided {
     display: flex;
     flex-direction: column;
+    flex: 1 0 auto;
   }
 
   .sidebarSection {
@@ -301,6 +303,8 @@ export const StyledWrapper = styled.div`
     position: sticky;
     top: calc(var(--app-header-height, 65px) + 1.25rem);
     align-self: stretch;
+    margin-top: 1.25rem;
+    padding-top: 0;
   }
 
   .sidebarBackWrap {

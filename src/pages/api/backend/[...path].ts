@@ -1,7 +1,11 @@
 import { Readable } from "node:stream"
 import type { NextApiRequest, NextApiResponse } from "next"
 import { normalizeApiRequestPath } from "src/libs/backend/requestPath"
-import { resolveServerApiBaseUrl, resolveTrustedClientIp } from "src/libs/server/backend"
+import {
+  isTrustedProxyPeerIp,
+  resolveServerApiBaseUrl,
+  resolveTrustedClientIp,
+} from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { classifyBackendHttpResult, classifyBackendRoute, getRuntimeMetrics, type BackendFetchResult } from "src/libs/server/runtimeMetrics"
 import { getSetCookieHeaders } from "src/libs/server/ssrBackendCookies"
@@ -273,9 +277,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   headers.set("X-Forwarded-Host", req.headers.host || "")
   headers.set("X-Forwarded-Proto", "https")
   const clientIp = resolveTrustedClientIp(req)
+  const trustedPeer = isTrustedProxyPeerIp(req.socket?.remoteAddress)
   if (clientIp) {
-    headers.set("CF-Connecting-IP", clientIp)
-    headers.set("X-Internal-Client-IP", clientIp)
+    if (trustedPeer) {
+      headers.set("CF-Connecting-IP", clientIp)
+      headers.set("X-Internal-Client-IP", clientIp)
+    }
     headers.set("X-Forwarded-For", clientIp)
   }
   headers.set("X-Request-Id", requestId)

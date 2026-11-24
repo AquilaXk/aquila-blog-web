@@ -104,7 +104,11 @@ type MarkdownEditorLiveSurfaceProps = {
     editorFocused: boolean,
     options?: { clearUploadError?: boolean }
   ) => void
-  onSelectionChange: (selection: MarkdownLiveSelection, docChanged?: boolean) => void
+  onSelectionChange: (
+    selection: MarkdownLiveSelection,
+    docChanged?: boolean,
+    isComposing?: boolean
+  ) => void
   onRequestFocusTitle?: () => void
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement>
   onPasteCapture?: ClipboardEventHandler<HTMLDivElement>
@@ -309,6 +313,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
           },
           compositionend: (_event, view) => {
             view.dispatch({ effects: setComposition.of(false) })
+            const selection = view.state.selection.main
+            onSelectionChangeRef.current({ from: selection.from, to: selection.to }, false, false)
             return false
           },
         }),
@@ -330,7 +336,12 @@ export const MarkdownEditorLiveSurface = forwardRef<
           }
           if (update.selectionSet || update.docChanged) {
             const selection = update.state.selection.main
-            onSelectionChangeRef.current({ from: selection.from, to: selection.to }, update.docChanged)
+            const isComposing = update.state.field(compositionField, false) ?? false
+            onSelectionChangeRef.current(
+              { from: selection.from, to: selection.to },
+              update.docChanged,
+              isComposing
+            )
           }
         }),
       ],

@@ -98,7 +98,23 @@ test.describe("RSS feed contract", () => {
       '<atom:link href="https://example.com/feed" rel="self" type="application/rss+xml; charset=utf-8" />'
     )
     expect(xml).toContain('<guid isPermaLink="true">https://example.com/posts/1</guid>')
-    expect(xml).toContain("<pubDate>Sun, 21 Jun 2026 00:00:00 GMT</pubDate>")
+    expect(xml).toContain("<pubDate>Sat, 20 Jun 2026 00:00:00 GMT</pubDate>")
+  })
+
+  test("caps RSS collection to recent bounded items without scanning hundreds of pages", async () => {
+    const requestedPages: number[] = []
+    const posts = Array.from({ length: 120 }, (_, index) =>
+      makePost(index + 1, ["Public"], {
+        createdTime: `2026-06-${String(28 - Math.floor(index / 5)).padStart(2, "0")}T${String(23 - (index % 24)).padStart(2, "0")}:00:00.000Z`,
+      })
+    )
+
+    const collected = await collectRssFeedPosts(createPagedLoader(posts, requestedPages), {
+      pageSize: 20,
+    })
+
+    expect(requestedPages).toEqual([1, 2, 3])
+    expect(collected).toHaveLength(50)
   })
 
   test("includes dc:creator and escaped category tags in RSS items", () => {

@@ -2,6 +2,7 @@ import type { GetServerSideProps, GetServerSidePropsResult, PreviewData } from "
 import type { ServerResponse } from "node:http"
 import type { ParsedUrlQuery } from "node:querystring"
 import { registerServerApiFetchMetrics, runWithSsrApiFetchContext } from "src/libs/server/apiFetchMetrics"
+import { resolveTrustedClientIp } from "src/libs/server/backend"
 import { getRequestIdForRequest } from "src/libs/server/requestId"
 import { getRuntimeMetrics, type RuntimeMetrics } from "src/libs/server/runtimeMetrics"
 import { bindSsrResponse } from "src/libs/server/ssrBackendCookies"
@@ -19,17 +20,24 @@ const isSharedCacheable = (cacheControl: number | string | string[] | undefined)
 
 const applyRequestIdResponsePolicy = (response: ServerResponse, requestId: string) => {
   if (response.headersSent) return
-  const setCookie = response.getHeader("Set-Cookie")
+  const getHeader =
+    typeof response.getHeader === "function"
+      ? (name: string) => response.getHeader(name)
+      : () => undefined
+  const setCookie = getHeader("Set-Cookie")
+  const cacheControl = getHeader("Cache-Control")
   if (
     (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) &&
-    isSharedCacheable(response.getHeader("Cache-Control"))
+    isSharedCacheable(cacheControl)
   ) {
     response.setHeader("Cache-Control", "private, no-store")
     response.setHeader("X-Request-Id", requestId)
     return
   }
-  if (isSharedCacheable(response.getHeader("Cache-Control"))) {
-    response.removeHeader("X-Request-Id")
+  if (isSharedCacheable(cacheControl)) {
+    if (typeof response.removeHeader === "function") {
+      response.removeHeader("X-Request-Id")
+    }
     return
   }
   response.setHeader("X-Request-Id", requestId)
@@ -53,7 +61,11 @@ export const withSsrMetrics = <Props extends { [key: string]: any }, Params exte
   try {
     let result: GetServerSidePropsResult<Props>
     try {
-      result = await runWithSsrApiFetchContext(requestId, async () => await handler(context))
+      const clientIp = resolveTrustedClientIp(context.req)
+      result = await runWithSsrApiFetchContext(
+        { requestId, ...(clientIp ? { clientIp } : {}) },
+        async () => await handler(context)
+      )
     } catch (error) {
       applyRequestIdResponsePolicy(context.res, requestId)
       getRuntimeMetrics().observeSsrRequest({

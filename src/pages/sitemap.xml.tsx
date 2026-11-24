@@ -21,20 +21,29 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("system", a
     return { notFound: true }
   }
 
-  const posts = await collectSitemapPosts()
-  const fields = buildSitemapFields(posts, CONFIG.link, `${CONFIG.since}-01-01T00:00:00.000Z`)
-  const xml = buildSitemapXml(fields)
+  try {
+    const posts = await collectSitemapPosts()
+    const fields = buildSitemapFields(posts, CONFIG.link, `${CONFIG.since}-01-01T00:00:00.000Z`)
+    const xml = buildSitemapXml(fields)
 
-  ctx.res.statusCode = 200
-  ctx.res.setHeader("Content-Type", SITEMAP_XML_CONTENT_TYPE)
-  ctx.res.setHeader(
-    "Cache-Control",
-    "public, s-maxage=600, stale-while-revalidate=3600, stale-if-error=86400"
-  )
-  ctx.res.write(xml)
-  ctx.res.end()
+    ctx.res.statusCode = 200
+    ctx.res.setHeader("Content-Type", SITEMAP_XML_CONTENT_TYPE)
+    ctx.res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=600, stale-while-revalidate=3600, stale-if-error=86400"
+    )
+    ctx.res.write(xml)
+    ctx.res.end()
 
-  return { props: {} }
+    return { props: {} }
+  } catch (error) {
+    console.error("Failed to generate sitemap.xml", error)
+    ctx.res.statusCode = 503
+    ctx.res.setHeader("Retry-After", "300")
+    ctx.res.setHeader("Cache-Control", "no-store")
+    ctx.res.end("Service Unavailable")
+    return { props: {} }
+  }
 })
 
 const Sitemap = () => null

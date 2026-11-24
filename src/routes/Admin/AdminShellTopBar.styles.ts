@@ -114,6 +114,10 @@ export const TopBar = styled.header`
 
     .topBarCrumb {
       grid-area: title;
+      min-width: 0;
+      overflow: hidden;
+      margin-right: 0;
+      padding-right: 0.25rem;
     }
 
     .railExpandBtn,
@@ -138,6 +142,7 @@ export const TopBarTitle = styled.div`
   display: flex;
   align-items: center;
   gap: 0.42rem;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -145,14 +150,25 @@ export const TopBarTitle = styled.div`
 
   .shellHeaderTitle,
   strong {
+    display: block;
+    min-width: 0;
+    width: 100%;
     margin: 0;
     color: ${adminTextPrimary};
     font-size: 1rem;
     font-weight: 500;
     line-height: 1.4;
     letter-spacing: -0.01em;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  @media (max-width: 520px) {
+    .shellHeaderTitle,
+    strong {
+      font-size: 0.94rem;
+    }
   }
 `
 
@@ -181,12 +197,12 @@ export const CompactNav = styled.nav`
 export const CompactNavLink = styled.a`
   min-height: ${control.lg}px;
   min-width: ${control.lg}px;
-  padding: 0.3rem 0.55rem;
+  padding: 0.25rem 0.46rem;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.32rem;
+  gap: 0.26rem;
   flex-shrink: 0;
   border: 1px solid transparent;
   color: ${adminTextSecondary};
@@ -195,7 +211,7 @@ export const CompactNavLink = styled.a`
 
   span {
     display: inline;
-    font-size: 0.73rem;
+    font-size: 0.72rem;
     font-weight: 550;
     line-height: 1;
     white-space: nowrap;
@@ -220,7 +236,11 @@ export const TopBarActions = styled.div`
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px) {
     grid-area: actions;
-    gap: 0.38rem;
+    gap: 0.34rem;
+  }
+
+  @media (max-width: 520px) {
+    gap: 0.26rem;
   }
 `
 
@@ -305,6 +325,15 @@ export const SecondaryTopAction = styled.a`
     min-height: ${control.lg}px;
     padding: 0 0.65rem;
   }
+
+  @media (max-width: 520px) {
+    min-width: ${control.lg}px;
+    padding: 0;
+
+    span {
+      display: none;
+    }
+  }
 `
 
 export const PrimaryTopAction = styled.a`
@@ -321,6 +350,7 @@ export const PrimaryTopAction = styled.a`
   text-decoration: none;
   font-size: 0.78rem;
   font-weight: 680;
+  white-space: nowrap;
   ${focusVisibleRing}
 
   &:hover {
@@ -329,6 +359,12 @@ export const PrimaryTopAction = styled.a`
 
   @media (max-width: ${layoutBreakpoint.adminCompact}px), (pointer: coarse) {
     min-height: ${control.lg}px;
+  }
+
+  @media (max-width: 520px) {
+    min-width: 48px;
+    padding: 0 0.68rem;
+    font-size: 0.76rem;
   }
 `
 

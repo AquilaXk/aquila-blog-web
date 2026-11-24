@@ -11,8 +11,16 @@ import {
 
 type ActiveApiFetchContext = {
   requestId: string
+  clientIp?: string
   source: "ssr"
 }
+
+export type SsrApiFetchContextInput =
+  | string
+  | {
+      requestId: string
+      clientIp?: string
+    }
 
 type ApiFetchMetricsState = {
   storage: AsyncLocalStorage<ActiveApiFetchContext>
@@ -32,8 +40,22 @@ const getState = (): ApiFetchMetricsState => {
   return authority.__aquilaApiFetchMetricsState
 }
 
-export const runWithSsrApiFetchContext = async <T>(requestId: string, handler: () => Promise<T>): Promise<T> =>
-  await getState().storage.run({ requestId, source: "ssr" }, handler)
+export const hasActiveSsrApiFetchContext = (): boolean => Boolean(getState().storage.getStore())
+
+export const runWithSsrApiFetchContext = async <T>(
+  input: SsrApiFetchContextInput,
+  handler: () => Promise<T>
+): Promise<T> => {
+  const normalized: ActiveApiFetchContext =
+    typeof input === "string"
+      ? { requestId: input, source: "ssr" }
+      : {
+          requestId: input.requestId,
+          ...(input.clientIp ? { clientIp: input.clientIp } : {}),
+          source: "ssr",
+        }
+  return await getState().storage.run(normalized, handler)
+}
 
 export const registerServerApiFetchMetrics = () => {
   const state = getState()
@@ -47,6 +69,11 @@ export const registerServerApiFetchMetrics = () => {
     const startedAt = performance.now()
     let observed = false
     headers.set("X-Request-Id", requestId)
+    if (activeContext?.clientIp) {
+      if (!headers.has("cf-connecting-ip")) headers.set("CF-Connecting-IP", activeContext.clientIp)
+      if (!headers.has("x-internal-client-ip")) headers.set("X-Internal-Client-IP", activeContext.clientIp)
+      if (!headers.has("x-forwarded-for")) headers.set("X-Forwarded-For", activeContext.clientIp)
+    }
     const observe = (result: BackendFetchResult) => {
       if (observed) throw new Error("apiFetch metrics outcome was already observed")
       observed = true

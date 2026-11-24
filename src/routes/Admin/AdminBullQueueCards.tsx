@@ -121,7 +121,7 @@ const ValueGroup = styled.div`
 
   .cardPrimaryValue {
     color: ${adminTextPrimary};
-    font-size: clamp(1.0625rem, 1.45vw, 1.3rem);
+    font-size: clamp(1.0625rem, 1.35vw, 1.25rem);
     font-weight: 700;
     line-height: 1.24;
     letter-spacing: -0.02em;
@@ -159,6 +159,8 @@ const QueueStatusPill = styled.span<{ "data-tone"?: string }>`
   color: ${adminTextSecondary};
   font-size: 0.6875rem;
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &::before {
     content: "";

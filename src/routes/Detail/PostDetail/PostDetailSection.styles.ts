@@ -137,7 +137,7 @@ export const mobileTocStyles = css`
       text-align: left;
       cursor: pointer;
       white-space: normal;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
       word-break: keep-all;
       transition: background-color 140ms ease, color 140ms ease;
     }

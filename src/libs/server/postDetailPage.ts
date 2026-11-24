@@ -1,12 +1,18 @@
 import { dehydrate } from "@tanstack/react-query"
 import type { GetServerSidePropsResult } from "next"
-import type { ServerResponse } from "node:http"
+import type { IncomingMessage, ServerResponse } from "node:http"
 import { getPostDetailById } from "src/apis"
 import { apiFetch } from "src/apis/backend/client"
 import { queryKey } from "src/constants/queryKey"
 import type { AdminProfile } from "src/hooks/useAdminProfile"
 import { createQueryClient } from "src/libs/react-query"
-import { registerServerApiFetchMetrics } from "src/libs/server/apiFetchMetrics"
+import {
+  hasActiveSsrApiFetchContext,
+  registerServerApiFetchMetrics,
+  runWithSsrApiFetchContext,
+} from "src/libs/server/apiFetchMetrics"
+import { resolveTrustedClientIp } from "src/libs/server/backend"
+import { getRequestIdForRequest } from "src/libs/server/requestId"
 import {
   resolveStaticAdminProfileSeed,
 } from "src/libs/server/adminProfile"
@@ -115,50 +121,85 @@ const fetchPublicAdminProfile: FetchStaticAdminProfile = async () => {
   return await apiFetch<AdminProfile>("/member/api/v1/members/adminProfile")
 }
 
+type DetailRequestLike =
+  | IncomingMessage
+  | {
+      headers?: Record<string, string | string[] | undefined>
+      socket?: { remoteAddress?: string }
+    }
+
 export const buildCanonicalPostDetailServerProps = async (
   postId: string,
   res: Pick<ServerResponse, "setHeader">,
-  req?: { headers?: { cookie?: string } },
+  req?: DetailRequestLike,
 ): Promise<GetServerSidePropsResult<DetailPageProps>> => {
   res.setHeader("Cache-Control", "private, no-store")
   registerServerApiFetchMetrics()
-  const queryClient = createQueryClient()
-  const numericPostId = Number(postId)
-  if (!IS_QA_CLIENT_FETCH_MODE && (!Number.isInteger(numericPostId) || numericPostId <= 0)) {
-    return { notFound: true }
-  }
-  const [postDetail, adminProfileSeed] = await Promise.all([
-    IS_QA_CLIENT_FETCH_MODE ? Promise.resolve(null) : getPostDetailById(postId),
-    resolveStaticAdminProfileSeed(fetchPublicAdminProfile),
-  ])
-  if (!IS_QA_CLIENT_FETCH_MODE && !postDetail) return { notFound: true }
-  const initialAdminProfile = adminProfileSeed.profile
-  const initialAdminProfileSource = adminProfileSeed.source
-  queryClient.setQueryData(queryKey.adminProfile(), initialAdminProfile)
 
-  const initialInternalLinkTargets = await (async (): Promise<Record<string, string>> => {
-    if (!postDetail?.content?.includes("[[")) return {}
-    try {
-      const { getFeedPostsPage } = await import("src/apis/backend/posts")
-      const { buildPostInternalLinkTargets } = await import("src/libs/markdown/internalWikilinkResolver")
-      const catalogPage = await getFeedPostsPage({ page: 1, pageSize: 30, order: "desc" })
-      return buildPostInternalLinkTargets(postDetail.content, catalogPage.posts)
-    } catch {
-      return {}
+  const runProps = async (): Promise<GetServerSidePropsResult<DetailPageProps>> => {
+    const queryClient = createQueryClient()
+    const numericPostId = Number(postId)
+    if (!IS_QA_CLIENT_FETCH_MODE && (!Number.isInteger(numericPostId) || numericPostId <= 0)) {
+      return { notFound: true }
     }
-  })()
+    const [postDetail, adminProfileSeed] = await Promise.all([
+      IS_QA_CLIENT_FETCH_MODE ? Promise.resolve(null) : getPostDetailById(postId),
+      resolveStaticAdminProfileSeed(fetchPublicAdminProfile),
+    ])
+    if (!IS_QA_CLIENT_FETCH_MODE && !postDetail) return { notFound: true }
+    const initialAdminProfile = adminProfileSeed.profile
+    const initialAdminProfileSource = adminProfileSeed.source
+    queryClient.setQueryData(queryKey.adminProfile(), initialAdminProfile)
 
-  if (postDetail) {
-    queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
+    const initialInternalLinkTargets = await (async (): Promise<Record<string, string>> => {
+      if (!postDetail?.content?.includes("[[")) return {}
+      try {
+        const { getFeedPostsPage, getPublicWikilinkCatalogPosts } = await import("src/apis/backend/posts")
+        const { buildPostInternalLinkTargets } = await import("src/libs/markdown/internalWikilinkResolver")
+        try {
+          const catalogEntries = await getPublicWikilinkCatalogPosts()
+          if (catalogEntries.length > 0) {
+            return buildPostInternalLinkTargets(postDetail.content, catalogEntries)
+          }
+        } catch {
+          // Fall back to first feed page when catalog endpoint is unavailable in older origins or mocks.
+        }
+        const catalogPage = await getFeedPostsPage({ page: 1, pageSize: 30, order: "desc" })
+        return buildPostInternalLinkTargets(postDetail.content, catalogPage.posts)
+      } catch {
+        return {}
+      }
+    })()
+
+    if (postDetail) {
+      queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
+    }
+    const rawCookie = req?.headers?.cookie
+    const cookieHeader = Array.isArray(rawCookie) ? rawCookie.join("; ") : rawCookie
+    const initialLanguage = parseLanguagePreference(cookieHeader) ?? undefined
+    return {
+      props: {
+        dehydratedState: toSerializableState(dehydrate(queryClient)),
+        initialAdminProfile,
+        initialAdminProfileSource,
+        ...(Object.keys(initialInternalLinkTargets).length > 0 ? { initialInternalLinkTargets } : {}),
+        ...(initialLanguage ? { initialLanguage } : {}),
+      },
+    }
   }
-  const initialLanguage = parseLanguagePreference(req?.headers?.cookie) ?? undefined
-  return {
-    props: {
-      dehydratedState: toSerializableState(dehydrate(queryClient)),
-      initialAdminProfile,
-      initialAdminProfileSource,
-      ...(Object.keys(initialInternalLinkTargets).length > 0 ? { initialInternalLinkTargets } : {}),
-      ...(initialLanguage ? { initialLanguage } : {}),
-    },
+
+  if (req && !hasActiveSsrApiFetchContext()) {
+    const incomingReq = {
+      headers: req.headers ?? {},
+      socket: req.socket,
+    } as IncomingMessage
+    const requestId = getRequestIdForRequest(incomingReq)
+    const clientIp = resolveTrustedClientIp(incomingReq)
+    return await runWithSsrApiFetchContext(
+      { requestId, ...(clientIp ? { clientIp } : {}) },
+      runProps
+    )
   }
+
+  return await runProps()
 }

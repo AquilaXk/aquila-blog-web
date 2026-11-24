@@ -128,3 +128,68 @@ test("resolves [[wikilink]] post targets on SSR when post content references int
   }
 })
 
+test("forwards sanitized visitor CF-Connecting-IP on detail SSR backend requests", async () => {
+  const capturedDetailHeaders: Array<Record<string, string>> = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (url.includes("/posts/101")) {
+      const headers = new Headers(init?.headers)
+      capturedDetailHeaders.push({
+        cfConnectingIp: headers.get("cf-connecting-ip") ?? "",
+        xForwardedFor: headers.get("x-forwarded-for") ?? "",
+      })
+      return json(200, post)
+    }
+    return json(200, { username: "Aquila", nickname: "Aquila", profileImageUrl: "" })
+  }) as typeof fetch
+
+  const res = response()
+  await buildCanonicalPostDetailServerProps("101", res.res, {
+    headers: {
+      cookie: "aquila_lang=ko",
+      "cf-connecting-ip": "198.51.100.77",
+    },
+    socket: { remoteAddress: "127.0.0.1" },
+  })
+
+  expect(capturedDetailHeaders).toEqual([
+    {
+      cfConnectingIp: "198.51.100.77",
+      xForwardedFor: "198.51.100.77",
+    },
+  ])
+})
+
+test("resolves [[wikilink]] targets via wikilink-catalog before feed fallback", async () => {
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    if (url.includes("/post/api/v1/posts/wikilink-catalog")) {
+      return json(200, {
+        items: [
+          {
+            id: 712,
+            title: "Older Deep Archive Post",
+            createdAt: "2024-01-15T00:00:00Z",
+          },
+        ],
+      })
+    }
+    if (url.includes("/posts/101")) {
+      return json(200, {
+        ...post,
+        content: "Background in [[Older Deep Archive Post|Archive]].",
+      })
+    }
+    return json(200, { username: "Aquila", nickname: "Aquila", profileImageUrl: "" })
+  }) as typeof fetch
+
+  const res = response()
+  const result = await buildCanonicalPostDetailServerProps("101", res.res)
+  expect("props" in result).toBe(true)
+  if ("props" in result) {
+    expect((result.props as Record<string, unknown>).initialInternalLinkTargets).toEqual({
+      "older deep archive post": "/posts/712",
+    })
+  }
+})
+

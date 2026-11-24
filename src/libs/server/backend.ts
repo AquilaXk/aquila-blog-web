@@ -46,7 +46,28 @@ const sanitizeClientIpCandidate = (raw: string | undefined): string => {
   return isValidIpv4(trimmed) || isValidIpv6(trimmed) ? trimmed : ""
 }
 
+const parseTrustedProxyAllowlist = (): Set<string> => {
+  const raw = process.env.TRUSTED_PROXY_IPS || ""
+  const set = new Set<string>(["127.0.0.1", "::1"])
+  for (const entry of raw.split(",")) {
+    const normalized = sanitizeClientIpCandidate(entry)
+    if (normalized) set.add(normalized)
+  }
+  return set
+}
+
+export const isTrustedProxyPeerIp = (remoteAddress?: string | null): boolean => {
+  const peerIp = sanitizeClientIpCandidate(remoteAddress ?? undefined)
+  if (!peerIp) return false
+  return parseTrustedProxyAllowlist().has(peerIp)
+}
+
 export const resolveTrustedClientIp = (req: IncomingMessage): string => {
+  const peerIp = sanitizeClientIpCandidate(req.socket?.remoteAddress)
+  if (!isTrustedProxyPeerIp(req.socket?.remoteAddress)) {
+    return peerIp
+  }
+
   const headers = req.headers || {}
   const cfIp = sanitizeClientIpCandidate(readFirstHeaderValue(headers["cf-connecting-ip"]))
   if (cfIp) return cfIp
@@ -60,7 +81,7 @@ export const resolveTrustedClientIp = (req: IncomingMessage): string => {
   const realIp = sanitizeClientIpCandidate(readFirstHeaderValue(headers["x-real-ip"]))
   if (realIp) return realIp
 
-  return sanitizeClientIpCandidate(req.socket?.remoteAddress)
+  return peerIp
 }
 
 const resolveServerTimeoutMs = (path: string, init: ServerApiFetchInit): number => {

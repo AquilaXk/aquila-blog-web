@@ -189,12 +189,13 @@ export const MetricCard = styled.div`
 
   strong {
     color: ${adminTextPrimary};
-    font-size: 1.65rem;
+    font-size: clamp(1.15rem, 1.7vw, 1.55rem);
     font-weight: 650;
-    line-height: 1.12;
+    line-height: 1.2;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
-    ${truncateSingleLineCss}
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   &[data-tone="danger"] strong {
@@ -207,9 +208,10 @@ export const MetricCard = styled.div`
     color: ${adminTextSecondary};
     font-size: 0.75rem;
     font-weight: 500;
-    line-height: 1.35;
+    line-height: 1.38;
     font-variant-numeric: tabular-nums;
-    ${truncateSingleLineCss}
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 `
 

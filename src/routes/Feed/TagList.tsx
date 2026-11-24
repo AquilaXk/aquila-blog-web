@@ -277,6 +277,7 @@ const StyledWrapper = styled.div`
     &[data-active="true"] {
       color: var(--aq-accent-link, var(--aq-accent));
       background: var(--aq-accent-muted);
+      box-shadow: inset 2.5px 0 0 var(--aq-accent);
       cursor: default;
     }
 
@@ -359,6 +360,7 @@ const StyledWrapper = styled.div`
     &[data-active="true"] {
       background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
+      box-shadow: inset 2.5px 0 0 var(--aq-accent);
       font-weight: 700;
     }
 
@@ -371,6 +373,8 @@ const StyledWrapper = styled.div`
 
     .count {
       flex-shrink: 0;
+      min-width: 2.2ch;
+      text-align: right;
       font-size: 0.75rem;
       line-height: 1;
       color: var(--aq-subtle);

@@ -990,4 +990,35 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(queueCardsSource).not.toContain("text-overflow: ellipsis;\n    white-space: nowrap;\n  }\n\n  small")
     expect(queueCardsSource).toContain("<ValueGroup>")
   })
+
+  test("16. ignores directives in HTML comments and 4-space indented code blocks across editor and renderer", () => {
+    const sample = [
+      "<!--",
+      ":::callout info Ignored Comment",
+      "inside comment",
+      ":::",
+      "-->",
+      "",
+      "    :::callout warning Indented Code",
+      "    code line",
+      "    :::",
+      "",
+      ":::toggle Real Toggle",
+      "- item with `code`",
+      "",
+      ":::",
+    ].join("\n")
+
+    const editorBlocks = parseBlockContainerBlocks(sample)
+    expect(editorBlocks).toHaveLength(1)
+    expect(editorBlocks[0]).toMatchObject({ kind: "toggle", title: "Real Toggle" })
+
+    const rendered = renderMarkdownHtml(sample)
+    expect(rendered).not.toContain('class="aq-callout')
+    expect(rendered).toContain("aq-code-block")
+    expect(rendered).toContain(":::callout warning Indented Code")
+    expect(rendered).toContain('class="aq-toggle"')
+    expect(rendered).toContain("Real Toggle")
+    expect(rendered).toContain('<code class="aq-inline-code">code</code>')
+  })
 })

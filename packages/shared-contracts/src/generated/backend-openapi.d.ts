@@ -701,6 +701,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/posts/{id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBacklinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/post/api/v1/posts/{id}/adjacent": {
         parameters: {
             query?: never;
@@ -709,6 +725,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getAdjacent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/post/api/v1/posts/wikilink-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWikilinkCatalog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1651,6 +1683,10 @@ export interface components {
             url?: string;
             markdown?: string;
         };
+        AdmPostRevisionRestoreRequest: {
+            /** Format: int64 */
+            expectedVersion?: number | null;
+        };
         /** @description 관리자 글 일괄 처리 요청 */
         AdmPostBulkActionRequest: {
             /**
@@ -2077,6 +2113,19 @@ export interface components {
             numberOfElements?: number;
             paged?: boolean;
         };
+        PublicPostBacklinkItemDto: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            summary?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            modifiedAt?: string;
+        };
+        PublicPostBacklinksResBody: {
+            items?: components["schemas"]["PublicPostBacklinkItemDto"][];
+        };
         AdjacentPostsDto: {
             previousPost?: components["schemas"]["FeedPostDto"] | null;
             nextPost?: components["schemas"]["FeedPostDto"] | null;
@@ -2106,6 +2155,16 @@ export interface components {
             likesCount?: number;
             /** Format: int32 */
             hitCount?: number;
+        };
+        PublicWikilinkCatalogItemDto: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PublicWikilinkCatalogResBody: {
+            items?: components["schemas"]["PublicWikilinkCatalogItemDto"][];
         };
         TagCountDto: {
             tag?: string;
@@ -2828,7 +2887,9 @@ export interface operations {
     };
     restoreRevision: {
         parameters: {
-            query?: never;
+            query?: {
+                expectedVersion?: number;
+            };
             header?: never;
             path: {
                 id: number;
@@ -2836,7 +2897,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AdmPostRevisionRestoreRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -3517,6 +3582,28 @@ export interface operations {
             };
         };
     };
+    getBacklinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicPostBacklinksResBody"];
+                };
+            };
+        };
+    };
     getAdjacent: {
         parameters: {
             query?: never;
@@ -3535,6 +3622,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdjacentPostsDto"];
+                };
+            };
+        };
+    };
+    getWikilinkCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicWikilinkCatalogResBody"];
                 };
             };
         };

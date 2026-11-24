@@ -1,10 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from "next"
-import { extractUnfurlMetadata } from "src/libs/unfurl/extractMeta"
+import {
+  extractUnfurlMetadata,
+  inferLinkProvider,
+  resolveEmbedPreviewUrl,
+} from "src/libs/unfurl/extractMeta"
+import { normalizePublicExternalThumbnailUrl } from "src/libs/markdown/externalThumbnailUrlPolicy"
 import {
   fetchSafeUnfurlResponse,
   MAX_UNFURL_RESPONSE_BYTES,
   normalizeSafeUnfurlUrl,
   UnfurlResponseTooLargeError,
+  UnfurlUnsupportedEncodingError,
+  UnfurlUpstreamRedirectError,
+  UnfurlValidationError,
 } from "src/libs/unfurl/requestSafety"
 import { fetchServerAdminSession } from "src/libs/server/authSession"
 import { shouldBypassAdminGuardForQa } from "src/libs/server/adminGuard"
@@ -45,6 +53,59 @@ const createError = (status: number, message: string) => ({
   },
 })
 
+const resolveOembedEndpoint = (parsedUrl: URL): string | null => {
+  const host = parsedUrl.hostname.replace(/^www\./i, "").toLowerCase()
+  const encoded = encodeURIComponent(parsedUrl.toString())
+  if (host === "youtube.com" || host === "youtu.be") {
+    return `https://www.youtube.com/oembed?url=${encoded}&format=json`
+  }
+  if (host === "vimeo.com") {
+    return `https://vimeo.com/api/oembed.json?url=${encoded}`
+  }
+  if (host === "codepen.io") {
+    return `https://codepen.io/api/oembed?format=json&url=${encoded}`
+  }
+  return null
+}
+
+export const tryFetchOembedMetadata = async (
+  parsedUrl: URL,
+  signal: AbortSignal
+) => {
+  const oembedEndpoint = resolveOembedEndpoint(parsedUrl)
+  if (!oembedEndpoint) return null
+  try {
+    const { response } = await fetchSafeUnfurlResponse({
+      initialUrl: oembedEndpoint,
+      signal,
+      stopAtHeadEnd: false,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "aquila-editor-unfurl/1.0",
+      },
+    })
+    if (!response.ok) return null
+    const payload = JSON.parse(await response.text()) as Record<string, unknown>
+    const title = typeof payload.title === "string" ? payload.title.trim() : ""
+    if (!title) return null
+    const rawThumb = typeof payload.thumbnail_url === "string" ? payload.thumbnail_url.trim() : ""
+    const rawProvider = typeof payload.provider_name === "string" ? payload.provider_name.trim() : ""
+    const rawAuthor = typeof payload.author_name === "string" ? payload.author_name.trim() : ""
+    const embedUrl = resolveEmbedPreviewUrl(parsedUrl.toString())
+    return {
+      url: parsedUrl.toString(),
+      title,
+      description: rawAuthor ? `${rawAuthor}` : "",
+      siteName: rawProvider || inferLinkProvider(parsedUrl.toString()),
+      provider: rawProvider || inferLinkProvider(parsedUrl.toString()),
+      thumbnailUrl: rawThumb ? normalizePublicExternalThumbnailUrl(rawThumb, parsedUrl.toString()) : "",
+      ...(embedUrl ? { embedUrl } : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET")
@@ -84,9 +145,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const timeout = setTimeout(() => controller.abort(), 5000)
 
     try {
+      const oembedMetadata = await tryFetchOembedMetadata(parsedUrl, controller.signal)
+      if (oembedMetadata) {
+        return res.status(200).json({ ok: true, data: oembedMetadata })
+      }
+
       const { response, finalUrl } = await fetchSafeUnfurlResponse({
         initialUrl: parsedUrl.toString(),
         signal: controller.signal,
+        stopAtHeadEnd: true,
         headers: {
           Accept: "text/html,application/xhtml+xml",
           "User-Agent": "aquila-editor-unfurl/1.0",
@@ -111,6 +178,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (error) {
       if (error instanceof UnfurlResponseTooLargeError) {
         const { status, body } = createError(413, "unfurl 대상 응답 크기가 제한을 초과했습니다.")
+        return res.status(status).json(body)
+      }
+      if (error instanceof UnfurlValidationError) {
+        return res.status(400).json({ ok: false, message: error.message })
+      }
+      if (error instanceof UnfurlUnsupportedEncodingError) {
+        const { status, body } = createError(415, "지원하지 않는 응답 인코딩입니다.")
+        return res.status(status).json(body)
+      }
+      if (error instanceof UnfurlUpstreamRedirectError) {
+        const { status, body } = createError(502, "리다이렉트 처리 중 오류가 발생했습니다.")
         return res.status(status).json(body)
       }
       const { status, body } = createError(504, "링크 메타데이터를 불러오지 못했습니다.")

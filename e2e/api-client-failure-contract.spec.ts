@@ -6,7 +6,7 @@ import {
   PUBLIC_ADMIN_PROFILE_ROUTE,
 } from "./helpers/smokeFixtures"
 
-test("seeded public profile 503 reaches the global error boundary", async ({ page }) => {
+test("seeded public profile 503 degrades gracefully without crashing the home shell", async ({ page }) => {
   await mockPublicAdminProfile(page)
   await mockAnonymousSession(page)
   await mockFeedEndpoints(page)
@@ -20,8 +20,8 @@ test("seeded public profile 503 reaches the global error boundary", async ({ pag
 
   await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: "문제가 발생했습니다" })).toBeVisible()
-  await expect(page.locator('[data-ui="feed-home-product-shell"]')).toHaveCount(0)
+  await expect(page.locator('[data-ui="feed-home-product-shell"]')).toBeVisible()
+  await expect(page.getByRole("heading", { name: "문제가 발생했습니다" })).toHaveCount(0)
 })
 
 test("cached browser representation does not become success after a 503", async ({
@@ -114,16 +114,38 @@ test("304 reuses the ETag representation as fresh data", async ({ page }) => {
   await page.route(
     "**/post/api/v1/posts/feed?mode=not-modified",
     async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": "*",
+            "access-control-allow-methods": "GET, OPTIONS",
+            "access-control-allow-headers": "if-none-match, x-request-id",
+          },
+        })
+      }
       count += 1
       if (count === 1)
         return route.fulfill({
           status: 200,
           contentType: "application/json",
-          headers: { etag: '"v1"', "cache-control": "max-age=60" },
+          headers: {
+            etag: '"v1"',
+            "cache-control": "max-age=60",
+            "access-control-allow-origin": "*",
+            "access-control-expose-headers": "etag",
+          },
           body: JSON.stringify({ title: "cached" }),
         })
       ifNoneMatch = route.request().headers()["if-none-match"]
-      return route.fulfill({ status: 304 })
+      return route.fulfill({
+        status: 304,
+        headers: {
+          etag: '"v1"',
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "etag",
+        },
+      })
     }
   )
   await page.goto("/_qa/api-client-failure-contract")

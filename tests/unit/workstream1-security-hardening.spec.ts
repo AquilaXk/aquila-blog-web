@@ -8,12 +8,16 @@ const { CLIENT_RUNTIME_RECOVERY_SCRIPT } = require("../../src/libs/security/docu
 import { clearFeedExplorerRestoreCache } from "../../src/libs/feed/feedRestoreCache"
 import { extractUnfurlMetadata, resolveEmbedPreviewUrl } from "../../src/libs/unfurl/extractMeta"
 import {
+  decodeHtmlBufferWithCharset,
   decodeUnfurlResponseBuffer,
   isPrivateIpv6,
   MAX_UNFURL_RESPONSE_BYTES,
+  normalizeSafeUnfurlUrl,
   parseIpv6Words,
   readBoundedIncomingResponse,
   UnfurlResponseTooLargeError,
+  UnfurlUnsupportedEncodingError,
+  UnfurlValidationError,
 } from "../../src/libs/unfurl/requestSafety"
 import { normalizePublicExternalThumbnailUrl } from "../../src/libs/markdown/externalThumbnailUrlPolicy"
 import {
@@ -122,6 +126,42 @@ test.describe("Workstream 1 adversarial security hardening", () => {
 
     const safeText = Buffer.from("<html><title>ok</title></html>")
     expect(decodeUnfurlResponseBuffer(gzipSync(safeText), "gzip").toString("utf8")).toBe(safeText.toString("utf8"))
+    expect(
+      decodeUnfurlResponseBuffer(gzipSync(brotliCompressSync(safeText)), "br, gzip").toString("utf8")
+    ).toBe(safeText.toString("utf8"))
+    expect(() => decodeUnfurlResponseBuffer(safeText, "zstd")).toThrow(UnfurlUnsupportedEncodingError)
+    expect(() => decodeUnfurlResponseBuffer(Buffer.from("not-gzip"), "gzip")).toThrow(
+      UnfurlUnsupportedEncodingError
+    )
+
+    const latin1Html = Buffer.from(
+      '<html><head><meta charset="iso-8859-1"><title>Caf\xe9</title></head></html>',
+      "latin1"
+    )
+    expect(decodeHtmlBufferWithCharset(latin1Html, "text/html")).toContain("Café")
+
+    expect(normalizeSafeUnfurlUrl("https://spring.io/projects/spring-boot").hostname).toBe("spring.io")
+    expect(() => normalizeSafeUnfurlUrl("https://example.com/forbidden")).toThrow(UnfurlValidationError)
+    expect(() => normalizeSafeUnfurlUrl("http://localhost:3000/test")).toThrow(UnfurlValidationError)
+
+    // Large >256KB HTML page terminates cleanly at </head> when stopAtHeadEnd is enabled
+    const largeHtmlStream = new PassThrough() as PassThrough & {
+      statusCode: number
+      headers: Record<string, string>
+    }
+    largeHtmlStream.statusCode = 200
+    largeHtmlStream.headers = {
+      "content-type": "text/html; charset=utf-8",
+      "content-length": String(500_000),
+    }
+    const largeHtmlPromise = readBoundedIncomingResponse(largeHtmlStream, undefined, {
+      stopAtHeadEnd: true,
+    })
+    largeHtmlStream.write(
+      '<!doctype html><html><head><meta property="og:title" content="Early Head"></head><body>'
+    )
+    const largeHtmlResponse = await largeHtmlPromise
+    expect(await largeHtmlResponse.text()).toContain("Early Head")
 
     // Stream byte limit & upstream destroy
     const oversizedStream = new PassThrough() as PassThrough & {
@@ -339,6 +379,17 @@ test.describe("Workstream 1 adversarial security hardening", () => {
     expect(parsed.title).toBe("Reversed Attribute Title")
     expect(parsed.description).toBe("Reversed Description")
     expect(parsed.thumbnailUrl).toBe("https://cdn.example.test/og-thumb.png")
+
+    const angleBracketHtml = [
+      "<html><head>",
+      '<!-- <meta property="og:title" content="Commented Out"> <title>Comment Title</title> -->',
+      '<meta property="og:title" content="A > B &amp; C">',
+      "<title>Real Title</title>",
+      "</head></html>",
+    ].join("")
+    expect(extractUnfurlMetadata("https://github.com/aquilaxk/aquila-blog", angleBracketHtml).title).toBe(
+      "A > B & C"
+    )
 
     expect(extractUnfurlMetadata("https://github.com/a/b", '<meta content="http://127.0.0.1:8080/internal.png" property="og:image">').thumbnailUrl).toBe("")
     expect(extractUnfurlMetadata("https://github.com/a/b", '<meta content="http://169.254.169.254/latest" property="og:image">').thumbnailUrl).toBe("")

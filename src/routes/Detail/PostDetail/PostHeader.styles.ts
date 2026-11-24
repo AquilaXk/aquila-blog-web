@@ -103,7 +103,7 @@ export const StyledWrapper = styled.header`
     color: var(--aq-text-secondary, var(--aq-muted));
     font-size: 1.0625rem;
     line-height: 1.65;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     word-break: keep-all;
     text-wrap: pretty;
   }
@@ -138,7 +138,7 @@ export const StyledWrapper = styled.header`
     border-radius: 9999px;
     overflow: hidden;
     background: var(--aq-surface-elevated, var(--aq-surface));
-    box-shadow: inset 0 0 0 1px var(--aq-border);
+    box-shadow: inset 0 0 0 1px var(--aq-border-strong);
 
     img {
       object-fit: cover;
@@ -167,7 +167,8 @@ export const StyledWrapper = styled.header`
       color: var(--aq-text);
       font-size: 0.875rem;
       font-weight: 600;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
+      word-break: keep-all;
     }
   }
 

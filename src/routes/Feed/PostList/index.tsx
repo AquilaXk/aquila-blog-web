@@ -20,6 +20,7 @@ type Props = {
   searchQuery?: string
   sortMode?: FeedSortMode
   hasFilter?: boolean
+  hasSearchFilter?: boolean
   hasExternalResults?: boolean
   onClearFilters?: () => void
   isInitialLoading?: boolean
@@ -104,6 +105,7 @@ const PostList: React.FC<Props> = ({
   searchQuery,
   sortMode = "latest",
   hasFilter = false,
+  hasSearchFilter = false,
   hasExternalResults = false,
   onClearFilters,
   isInitialLoading = false,
@@ -206,7 +208,7 @@ const PostList: React.FC<Props> = ({
           </div>
         ))}
       {showInitialLoadError && (
-        <InitialLoadErrorState hasFilter={hasFilter} onRetryInitialLoad={onRetryInitialLoad} />
+        <InitialLoadErrorState hasFilter={hasSearchFilter} onRetryInitialLoad={onRetryInitialLoad} />
       )}
       {showEmptyState && <EmptyPostState hasFilter={hasFilter} onClearFilters={onClearFilters} />}
       {posts.length > 0 && (

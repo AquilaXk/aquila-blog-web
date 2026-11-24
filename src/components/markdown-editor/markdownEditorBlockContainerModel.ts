@@ -8,10 +8,13 @@ import {
 import {
   extractAsideOpenTail,
   hasCommonMarkCodeIndent,
+  overlapsSortedRanges,
   stripClosingAsideTag,
 } from "../../libs/markdown/pandocMathScanner"
+import { parseCommonMarkBlockRanges } from "../../libs/markdown/commonMarkCodeBlockRanges"
 import {
   extractPromotedCalloutTitle,
+  isLineStartInCommentRanges,
   resolveCustomDirectiveBlockPayload,
 } from "../../libs/markdown/renderingDirectiveModel"
 import { normalizeSafeMarkdownUrl } from "../../libs/markdown/safeMarkdownUrl"
@@ -302,6 +305,9 @@ const parseCalloutContainerPayload = (
   }
 }
 
+const readExtraText = (value: unknown): string | undefined =>
+  typeof value === "string" && value ? value : undefined
+
 const finalizeCustomContainerBlock = (
   candidate: Extract<OpenContainerCandidate, { kind: "bookmark" | "embed" | "file" }>,
   lineEnd: number
@@ -320,56 +326,30 @@ const finalizeCustomContainerBlock = (
       ? finalizedUrl
       : resolved.primaryTitle
 
-  const siteName =
-    typeof resolved.extraAttrs.siteName === "string" && resolved.extraAttrs.siteName
-      ? resolved.extraAttrs.siteName
-      : undefined
-  const provider =
-    typeof resolved.extraAttrs.provider === "string" && resolved.extraAttrs.provider
-      ? resolved.extraAttrs.provider
-      : undefined
-  const mimeType =
-    typeof resolved.extraAttrs.mimeType === "string" && resolved.extraAttrs.mimeType
-      ? resolved.extraAttrs.mimeType
-      : undefined
-  const sizeBytes =
-    typeof resolved.extraAttrs.sizeBytes === "number" && Number.isFinite(resolved.extraAttrs.sizeBytes)
-      ? resolved.extraAttrs.sizeBytes
-      : undefined
+  const siteName = readExtraText(resolved.extraAttrs.siteName)
+  const provider = readExtraText(resolved.extraAttrs.provider)
+  const mimeType = readExtraText(resolved.extraAttrs.mimeType)
+  const rawSize = resolved.extraAttrs.sizeBytes
+  const sizeBytes = typeof rawSize === "number" && Number.isFinite(rawSize) ? rawSize : undefined
 
   if (candidate.kind === "embed") {
     return {
-      kind: "embed",
-      from: candidate.from,
-      to: lineEnd,
-      url: finalizedUrl,
-      title: primaryTitle,
-      caption: resolved.secondaryText,
-      ...(provider ? { provider } : {}),
-      ...(siteName ? { siteName } : {}),
+      kind: "embed", from: candidate.from, to: lineEnd, url: finalizedUrl,
+      title: primaryTitle, caption: resolved.secondaryText,
+      ...(provider ? { provider } : {}), ...(siteName ? { siteName } : {}),
     }
   }
   if (candidate.kind === "file") {
     return {
-      kind: "file",
-      from: candidate.from,
-      to: lineEnd,
-      url: finalizedUrl,
-      name: primaryTitle,
-      description: resolved.secondaryText,
-      ...(mimeType ? { mimeType } : {}),
-      ...(sizeBytes !== undefined ? { sizeBytes } : {}),
+      kind: "file", from: candidate.from, to: lineEnd, url: finalizedUrl,
+      name: primaryTitle, description: resolved.secondaryText,
+      ...(mimeType ? { mimeType } : {}), ...(sizeBytes !== undefined ? { sizeBytes } : {}),
     }
   }
   return {
-    kind: "bookmark",
-    from: candidate.from,
-    to: lineEnd,
-    url: finalizedUrl,
-    title: primaryTitle,
-    description: resolved.secondaryText,
-    ...(siteName ? { siteName } : {}),
-    ...(provider ? { provider } : {}),
+    kind: "bookmark", from: candidate.from, to: lineEnd, url: finalizedUrl,
+    title: primaryTitle, description: resolved.secondaryText,
+    ...(siteName ? { siteName } : {}), ...(provider ? { provider } : {}),
   }
 }
 
@@ -398,9 +378,47 @@ const buildAsideCalloutBlock = (
   }
 }
 
+const finalizeBlockCandidate = (
+  candidate: OpenContainerCandidate,
+  lineEnd: number
+): EditorContainerBlock | null => {
+  if (candidate.kind === "callout") {
+    const parsed = parseCalloutContainerPayload(
+      candidate.rawHeader,
+      candidate.bodyLines,
+      candidate.quotedTitle
+    )
+    return {
+      kind: "callout",
+      from: candidate.from,
+      to: lineEnd,
+      tone: parsed.tone,
+      icon: parsed.icon,
+      title: parsed.title,
+      body: parsed.body,
+      bodyOffset: candidate.bodyOffset,
+      ...(parsed.foldable
+        ? { foldable: true, defaultCollapsed: Boolean(parsed.defaultCollapsed) }
+        : {}),
+    }
+  }
+  if (candidate.kind === "toggle") {
+    return {
+      kind: "toggle",
+      from: candidate.from,
+      to: lineEnd,
+      title: candidate.rawTitle.trim() || "토글 블록",
+      body: candidate.bodyLines.join("\n").trim(),
+      bodyOffset: candidate.bodyOffset,
+    }
+  }
+  return finalizeCustomContainerBlock(candidate, lineEnd)
+}
+
 export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock[] => {
   if (!docText.includes(":::") && !docText.includes("<aside")) return []
 
+  const { codeBlockRanges, commentRanges } = parseCommonMarkBlockRanges(docText)
   const blocks: EditorContainerBlock[] = []
   let pos = 0
   let inFence = false
@@ -418,7 +436,12 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
     const offset = nextBreak === -1 ? lineEnd : lineEnd + 1
     pos = nextBreak === -1 ? docText.length + 1 : lineEnd + 1
 
-    const fenceMatch = FENCE_DELIMITER_LINE_RE.exec(lineText)
+    const isInComment = isLineStartInCommentRanges(commentRanges, lineText, lineStart)
+    const isInCommonMarkCode =
+      overlapsSortedRanges(codeBlockRanges, lineStart, Math.max(lineStart + 1, lineEnd)) ||
+      hasCommonMarkCodeIndent(lineText)
+
+    const fenceMatch = isInComment ? null : FENCE_DELIMITER_LINE_RE.exec(lineText)
     if (fenceMatch) {
       const marker = fenceMatch[2]?.[0] ?? ""
       const length = fenceMatch[2]?.length ?? 0
@@ -444,7 +467,7 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
     }
 
     if (asideCandidate) {
-      if (!hasCommonMarkCodeIndent(lineText)) {
+      if (!isInComment && !hasCommonMarkCodeIndent(lineText)) {
         const closedTail = stripClosingAsideTag(lineText)
         if (closedTail !== null) {
           if (closedTail.length > 0) asideCandidate.bodyLines.push(closedTail)
@@ -458,60 +481,36 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
     }
 
     if (candidate) {
-      const closeLen = resolveClosingDirectiveFenceLength(lineText)
-      if (closeLen >= 3) {
-        const stack = candidate.fenceStack
-        while (stack.length > 0 && closeLen > stack[stack.length - 1]!) {
-          stack.pop()
-        }
-        if (stack.length > 0 && closeLen >= stack[stack.length - 1]!) {
-          stack.pop()
-        }
-        if (stack.length === 0) {
-          if (candidate.kind === "callout") {
-            const parsed = parseCalloutContainerPayload(
-              candidate.rawHeader,
-              candidate.bodyLines,
-              candidate.quotedTitle
-            )
-            blocks.push({
-              kind: "callout",
-              from: candidate.from,
-              to: lineEnd,
-              tone: parsed.tone,
-              icon: parsed.icon,
-              title: parsed.title,
-              body: parsed.body,
-              bodyOffset: candidate.bodyOffset,
-              ...(parsed.foldable
-                ? { foldable: true, defaultCollapsed: Boolean(parsed.defaultCollapsed) }
-                : {}),
-            })
-          } else if (candidate.kind === "toggle") {
-            blocks.push({
-              kind: "toggle",
-              from: candidate.from,
-              to: lineEnd,
-              title: candidate.rawTitle.trim() || "토글 블록",
-              body: candidate.bodyLines.join("\n").trim(),
-              bodyOffset: candidate.bodyOffset,
-            })
-          } else {
-            const finalized = finalizeCustomContainerBlock(candidate, lineEnd)
-            if (finalized) blocks.push(finalized)
+      if (!isInComment && !hasCommonMarkCodeIndent(lineText)) {
+        const closeLen = resolveClosingDirectiveFenceLength(lineText)
+        if (closeLen >= 3) {
+          const stack = candidate.fenceStack
+          while (stack.length > 0 && closeLen > stack[stack.length - 1]!) {
+            stack.pop()
           }
-          candidate = null
+          if (stack.length > 0 && closeLen >= stack[stack.length - 1]!) {
+            stack.pop()
+          }
+          if (stack.length === 0) {
+            const finalized = finalizeBlockCandidate(candidate, lineEnd)
+            if (finalized) blocks.push(finalized)
+            candidate = null
+            continue
+          }
+          candidate.bodyLines.push(lineText)
           continue
         }
-        candidate.bodyLines.push(lineText)
-        continue
-      }
 
-      const nestedOpen = parseOpeningDirectiveLine(lineText)
-      if (nestedOpen) {
-        candidate.fenceStack.push(nestedOpen.fenceLength)
+        const nestedOpen = parseOpeningDirectiveLine(lineText)
+        if (nestedOpen) {
+          candidate.fenceStack.push(nestedOpen.fenceLength)
+        }
       }
       candidate.bodyLines.push(lineText)
+      continue
+    }
+
+    if (isInComment || isInCommonMarkCode) {
       continue
     }
 

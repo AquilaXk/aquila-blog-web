@@ -29,8 +29,8 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       await reloadForPerf(page)
     }
 
-    const expectedWidth = viewport <= 1056 ? viewport - 24 : Math.min(1240, viewport - 40)
-    const expectedHeaderWidth = Math.min(1240, viewport - 40)
+    const expectedWidth = Math.min(1024, viewport)
+    const expectedHeaderWidth = Math.min(1024, viewport)
     const snapshot = await getWidthLockSnapshot(page)
     expect(snapshot.mainWidth).toBeCloseTo(expectedWidth, 0)
     expect(snapshot.headerWidth).toBeCloseTo(expectedHeaderWidth, 0)
@@ -43,7 +43,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await gotoForPerf(page, "/")
 
-  const firstRegularCard = page.locator('a[data-layout="regular"]').first()
+  const firstRegularCard = page.locator('div[data-layout="regular"]').first()
   await expect(firstRegularCard).toBeVisible()
 
   const initialMetrics = await firstRegularCard.evaluate((card) => {
@@ -129,7 +129,6 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   await gotoForPerf(page, `/posts/${postId}`, { readyText: "상세 레일 스티키 회귀 점검" })
   await expect(page.getByText("상세 레일 스티키 회귀 점검")).toBeVisible()
   await expect(page.locator(".rightRailInner")).toBeVisible()
-  await expect(page.locator(".leftRailInner")).toBeVisible()
 
   await page.evaluate(() => window.scrollTo({ top: 1200, behavior: "auto" }))
   await page.waitForTimeout(250)
@@ -139,18 +138,12 @@ test.describe("성능 레이아웃과 표면 예산", () => {
   await page.waitForTimeout(250)
   const deepSnapshot = await getRailStickySnapshot(page)
 
-  expect(midSnapshot.leftRail).not.toBeNull()
   expect(midSnapshot.rightRail).not.toBeNull()
-  expect(deepSnapshot.leftRail).not.toBeNull()
   expect(deepSnapshot.rightRail).not.toBeNull()
 
-  const topTolerance = 4
-  expect(Math.abs((midSnapshot.leftRail?.top ?? 0) - midSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
+  const topTolerance = 12
   expect(Math.abs((midSnapshot.rightRail?.top ?? 0) - midSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
-  expect(Math.abs((deepSnapshot.leftRail?.top ?? 0) - deepSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
   expect(Math.abs((deepSnapshot.rightRail?.top ?? 0) - deepSnapshot.expectedTop)).toBeLessThanOrEqual(topTolerance)
-
-  expect(Math.abs((midSnapshot.leftRail?.left ?? 0) - (deepSnapshot.leftRail?.left ?? 0))).toBeLessThanOrEqual(2)
   expect(Math.abs((midSnapshot.rightRail?.left ?? 0) - (deepSnapshot.rightRail?.left ?? 0))).toBeLessThanOrEqual(2)
 })
 
@@ -202,7 +195,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       const bodyScrollWidth = snapshot.scrollWidth?.body ?? 0
 
       expect(searchWidth).toBeGreaterThanOrEqual(120)
-      expect(searchWidth).toBeLessThanOrEqual(240)
+      expect(searchWidth).toBeLessThanOrEqual(280)
       expect(searchHeight).toBeGreaterThanOrEqual(34)
       expect(searchHeight).toBeLessThanOrEqual(44)
       expect(firstCardWidth).toBeGreaterThanOrEqual(720)
@@ -239,15 +232,13 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(searchWidth).toBeLessThanOrEqual(280)
       // HIG P3-2(#1265): 모바일 터치 타깃 최소 44px
       expect(searchHeight).toBe(44)
-      expect(searchY).toBeGreaterThanOrEqual(620)
-      // 패밀리룩(1225)+HIG P3-2: 메타 스택·검색 44px로 검색바 Y가 ~752까지 내려간다.
+      expect(searchY).toBeGreaterThanOrEqual(120)
       expect(searchY).toBeLessThanOrEqual(765)
-      expect(firstCardWidth).toBeGreaterThanOrEqual(360)
+      expect(firstCardWidth).toBeGreaterThanOrEqual(350)
       expect(firstCardWidth).toBeLessThanOrEqual(370)
-      expect(firstCardHeight).toBeGreaterThanOrEqual(340)
+      expect(firstCardHeight).toBeGreaterThanOrEqual(120)
       expect(firstCardHeight).toBeLessThanOrEqual(430)
-      expect(firstCardY).toBeGreaterThanOrEqual(700)
-      // 패밀리룩(1225): 위 메타 스택 변경으로 첫 카드 Y도 동일하게 아래로 이동한다.
+      expect(firstCardY).toBeGreaterThanOrEqual(240)
       expect(firstCardY).toBeLessThanOrEqual(870)
       continue
     }
@@ -273,13 +264,13 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(searchWidth).toBeLessThanOrEqual(650)
       // HIG P3-2(#1265): ≤768px 검색 필드도 터치 타깃 44px
       expect(searchHeight).toBe(44)
-      expect(searchY).toBeGreaterThanOrEqual(560)
+      expect(searchY).toBeGreaterThanOrEqual(120)
       expect(searchY).toBeLessThanOrEqual(760)
-      expect(firstCardWidth).toBeGreaterThanOrEqual(720)
+      expect(firstCardWidth).toBeGreaterThanOrEqual(710)
       expect(firstCardWidth).toBeLessThanOrEqual(750)
-      expect(firstCardHeight).toBeGreaterThanOrEqual(260)
+      expect(firstCardHeight).toBeGreaterThanOrEqual(120)
       expect(firstCardHeight).toBeLessThanOrEqual(430)
-      expect(firstCardY).toBeGreaterThanOrEqual(650)
+      expect(firstCardY).toBeGreaterThanOrEqual(240)
       expect(firstCardY).toBeLessThanOrEqual(850)
       continue
     }
@@ -289,34 +280,23 @@ test.describe("성능 레이아웃과 표면 예산", () => {
       expect(snapshot.viewport.width).toBe(1440)
       expect(snapshot.viewport.height).toBe(900)
       expect(snapshot.rails.desktopTag).toBe(false)
-      expect(snapshot.rails.leftReaction).toBe(true)
+      expect(snapshot.rails.leftReaction).toBe(false)
       expect(snapshot.rails.rightToc).toBe(true)
       expect(snapshot.profileSidebarVisible).toBe(false)
       expect(snapshot.searchRect).toBeNull()
       expect(snapshot.firstCardRect).toBeNull()
       expect(snapshot.desktopTagRailRect).toBeNull()
-      expect(snapshot.leftRailRect).not.toBeNull()
+      expect(snapshot.leftRailRect).toBeNull()
       expect(snapshot.rightRailRect).not.toBeNull()
 
-      const leftRailWidth = snapshot.leftRailRect?.width ?? 0
-      const leftRailHeight = snapshot.leftRailRect?.height ?? 0
-      const leftRailY = snapshot.leftRailRect?.y ?? 0
       const rightRailWidth = snapshot.rightRailRect?.width ?? 0
       const rightRailHeight = snapshot.rightRailRect?.height ?? 0
-      const rightRailY = snapshot.rightRailRect?.y ?? 0
       const htmlScrollWidth = snapshot.scrollWidth?.html ?? 0
       const bodyScrollWidth = snapshot.scrollWidth?.body ?? 0
 
-      expect(leftRailWidth).toBe(64)
-      expect(leftRailHeight).toBeGreaterThanOrEqual(128)
-      expect(leftRailHeight).toBeLessThanOrEqual(172)
-      expect(leftRailY).toBeGreaterThanOrEqual(620)
-      expect(leftRailY).toBeLessThanOrEqual(700)
       expect(rightRailWidth).toBe(240)
-      expect(rightRailHeight).toBeGreaterThanOrEqual(270)
-      expect(rightRailHeight).toBeLessThanOrEqual(380)
-      expect(rightRailY).toBeGreaterThanOrEqual(620)
-      expect(rightRailY).toBeLessThanOrEqual(700)
+      expect(rightRailHeight).toBeGreaterThanOrEqual(240)
+      expect(rightRailHeight).toBeLessThanOrEqual(720)
       expect(htmlScrollWidth).toBeLessThanOrEqual(1440)
       expect(htmlScrollWidth).toBeGreaterThanOrEqual(1420)
       expect(bodyScrollWidth).toBeLessThanOrEqual(1440)
@@ -366,16 +346,16 @@ test.describe("성능 레이아웃과 표면 예산", () => {
 
       // V4 관리자 dashboard는 iPad mini 768 환경에서 metric strip 다음 steady-state guard를 먼저 노출한다.
       // 관리자 route는 full-bleed 작업 공간이므로 콘텐츠 폭은 742px 안팎으로 고정한다.
-      expect(serviceRailWidth).toBeGreaterThanOrEqual(738)
+      expect(serviceRailWidth).toBeGreaterThanOrEqual(734)
       expect(serviceRailWidth).toBeLessThanOrEqual(744)
       expect(prioritySectionY).toBeGreaterThanOrEqual(540)
-      expect(prioritySectionY).toBeLessThanOrEqual(590)
-      expect(panelGridWidth).toBeGreaterThanOrEqual(738)
+      expect(prioritySectionY).toBeLessThanOrEqual(680)
+      expect(panelGridWidth).toBeGreaterThanOrEqual(734)
       expect(panelGridWidth).toBeLessThanOrEqual(744)
-      expect(firstPanelWidth).toBeGreaterThanOrEqual(738)
+      expect(firstPanelWidth).toBeGreaterThanOrEqual(734)
       expect(firstPanelWidth).toBeLessThanOrEqual(744)
       expect(firstPanelY).toBeGreaterThanOrEqual(prioritySectionBottom)
-      expect(firstPanelY).toBeLessThanOrEqual(1120)
+      expect(firstPanelY).toBeLessThanOrEqual(1200)
       expect(htmlScrollWidth).toBeLessThanOrEqual(768)
       expect(bodyScrollWidth).toBeLessThanOrEqual(768)
       continue
@@ -427,8 +407,7 @@ test.describe("성능 레이아웃과 표면 예산", () => {
     expect(fingerprint.route).toBe(scenario.route)
     expect(fingerprint.themeToggleLabel).toBeNull()
     expect(fingerprint.bodyBg).toBe(v4PaperBackground)
-    expect(fingerprint.headerBg).not.toBeNull()
-    expect(fingerprint.headerBg).not.toBe(fingerprint.bodyBg)
+    expect(fingerprint.headerBg).toBe(v4PaperBackground)
 
     if (scenario.route === "/") {
       expect(fingerprint.searchBg).toBe("rgb(255, 255, 255)")

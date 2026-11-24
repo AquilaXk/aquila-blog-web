@@ -196,7 +196,7 @@ export const AvatarWorkspaceCard = styled.div`
     height: 64px;
     border-radius: 50%;
     overflow: hidden;
-    border: 0;
+    border: 1px solid ${adminBorderStrong};
     background: ${adminSurfaceMuted};
 
     & > span {

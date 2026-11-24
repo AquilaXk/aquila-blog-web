@@ -101,7 +101,7 @@ test.describe("관리자 표면 공통 계약", () => {
     expect(shellSource).not.toContain("width: 100vw;")
     expect(shellSource).toContain("background: ${adminFrameBackground};")
     expect(shellSource).toContain("<TopBar>")
-    expect(shellSource).toContain('<SecondaryTopAction as={Link} href="/">')
+    expect(shellSource).toMatch(/<SecondaryTopAction\s+as=\{Link\}\s+href="\/"/)
     expect(shellSource).not.toContain('<button type="button" onClick={() => void handleLogout()}>')
     expect(shellSource).toContain('apiFetch("/member/api/v1/auth/logout", { method: "DELETE" })')
     expect(shellSource).toContain("SidebarLogoutAction")

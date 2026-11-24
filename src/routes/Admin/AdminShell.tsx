@@ -428,7 +428,12 @@ const AdminShell = ({
                 <span className="paletteLabel">{isEn ? "Commands" : "명령 팔레트"}</span>
                 <kbd>{`${shortcutPrefix}K`}</kbd>
               </PaletteTriggerButton>
-              <SecondaryTopAction as={Link} href="/">
+              <SecondaryTopAction
+                as={Link}
+                href="/"
+                aria-label={adminShellT("shellViewBlog", language)}
+                title={adminShellT("shellViewBlog", language)}
+              >
                 <AppIcon name="globe" width={13} height={13} />
                 <span>{adminShellT("shellViewBlog", language)}</span>
               </SecondaryTopAction>
