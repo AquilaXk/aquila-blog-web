@@ -35,7 +35,7 @@ const adminLightThemeVariables = `
   --admin-primary-border-hover: #27272a;
   --admin-control-text: #fafafa;
   --admin-disabled-bg: #f4f4f5;
-  --admin-disabled-fg: #a1a1aa;
+  --admin-disabled-fg: #71717a;
   --admin-disabled-border: #e4e4e7;
   --admin-bar-fill-subtle: rgba(24, 24, 27, 0.045);
   --admin-focus-ring: rgba(24, 24, 27, 0.14);
@@ -43,6 +43,7 @@ const adminLightThemeVariables = `
   --admin-action-group-surface: rgba(255, 255, 255, 0.96);
   --admin-card-gradient: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
   --admin-card-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
+  --admin-elevated-panel-shadow: 0 4px 16px rgba(9, 9, 11, 0.05), 0 1px 2px rgba(9, 9, 11, 0.03);
   --admin-inset-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
   --admin-floating-shadow: 0 12px 32px rgba(9, 9, 11, 0.12), 0 1px 3px rgba(9, 9, 11, 0.06);
   --admin-command-bar-bg: #18181b;
@@ -123,7 +124,7 @@ export const adminTeal = "var(--admin-primary, #18181b)"
 export const adminTealHover = "var(--admin-primary-hover, #27272a)"
 export const adminControlText = "var(--admin-control-text, #fafafa)"
 export const adminDisabledBg = "var(--admin-disabled-bg, #f4f4f5)"
-export const adminDisabledFg = "var(--admin-disabled-fg, #a1a1aa)"
+export const adminDisabledFg = "var(--admin-disabled-fg, #71717a)"
 export const adminDisabledBorder = "var(--admin-disabled-border, #e4e4e7)"
 export const adminBarFillSubtle = "var(--admin-bar-fill-subtle, rgba(24, 24, 27, 0.045))"
 export const adminTealBorder = "var(--admin-primary-border, #18181b)"
@@ -136,6 +137,7 @@ export const adminActionGroupLightSurface = "var(--admin-action-group-surface)"
 export const adminActionGroupDarkSurface = adminActionGroupLightSurface
 export const adminCardGradient = "var(--admin-card-gradient)"
 export const adminCardShadow = "var(--admin-card-shadow)"
+export const adminElevatedPanelShadow = "var(--admin-elevated-panel-shadow)"
 export const adminInsetShadow = "var(--admin-inset-shadow)"
 export const adminFloatingShadow = "var(--admin-floating-shadow)"
 

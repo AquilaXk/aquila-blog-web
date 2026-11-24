@@ -42,6 +42,7 @@ export const setComposition = StateEffect.define<boolean>()
 export const setPointerSelecting = StateEffect.define<boolean>()
 export const setEditorMode = StateEffect.define<MarkdownEditorSurfaceMode>()
 export const setDisableMermaid = StateEffect.define<boolean>()
+export const setEditorFocus = StateEffect.define<boolean>()
 
 const defineEffectStateField = <T>(initial: T, effectType: StateEffectType<T>) =>
   StateField.define<T>({
@@ -58,6 +59,7 @@ export const compositionField = defineEffectStateField(false, setComposition)
 export const pointerSelectingField = defineEffectStateField(false, setPointerSelecting)
 export const editorModeField = defineEffectStateField<MarkdownEditorSurfaceMode>("live", setEditorMode)
 export const disableMermaidField = defineEffectStateField(false, setDisableMermaid)
+export const editorFocusField = defineEffectStateField(true, setEditorFocus)
 
 const markClassByKind: Partial<Record<MarkdownLivePreviewDecoration["kind"], string>> = {
   strong: "cm-live-strong",

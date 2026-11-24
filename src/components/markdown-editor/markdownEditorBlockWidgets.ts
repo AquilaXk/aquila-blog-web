@@ -12,7 +12,13 @@ import {
 } from "./markdownEditorBlockContainerModel"
 import { forEachOverlappingSortedIndex, isRangeActiveInSelections } from "./markdownEditorLiveDecorationRegions"
 import { getLiveCalloutIconSvg, LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
-import { editorModeField, getDocString, setEditorMode } from "./markdownEditorLiveSurfaceDecorations"
+import {
+  editorFocusField,
+  editorModeField,
+  getDocString,
+  setEditorFocus,
+  setEditorMode,
+} from "./markdownEditorLiveSurfaceDecorations"
 import {
   bindContainerActivateTarget,
   MarkdownBookmarkBlockWidget,
@@ -309,11 +315,12 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
   const blocks = getCachedBlockContainerBlocks(state.doc)
   if (blocks.length === 0) return Decoration.none
 
+  const isFocused = state.field(editorFocusField, false) ?? true
   const selections = state.selection.ranges
   const decorations: Range<Decoration>[] = []
 
   for (const block of blocks) {
-    if (mode === "live" && isContainerBlockActive(block, selections)) {
+    if (mode === "live" && isFocused && isContainerBlockActive(block, selections)) {
       const startLineNo = state.doc.lineAt(block.from).number
       const endLineNo = state.doc.lineAt(block.to).number
       const toneClass = block.kind === "callout" ? ` cm-live-container-tone-${block.tone}` : ""
@@ -340,8 +347,10 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
 export const blockContainerBlockField = StateField.define<DecorationSet>({
   create: buildBlockContainerDecorations,
   update: (decorations, transaction) => {
-    const hasModeEffect = transaction.effects.some((effect) => effect.is(setEditorMode))
-    if (!transaction.docChanged && !hasModeEffect) {
+    const hasModeOrFocusEffect = transaction.effects.some(
+      (effect) => effect.is(setEditorMode) || effect.is(setEditorFocus)
+    )
+    if (!transaction.docChanged && !hasModeOrFocusEffect) {
       if (!transaction.selection) return decorations
       const blocks = getCachedBlockContainerBlocks(transaction.state.doc)
       if (haveSameActiveContainerBlocks(blocks, transaction.startState.selection.ranges, transaction.state.selection.ranges)) {

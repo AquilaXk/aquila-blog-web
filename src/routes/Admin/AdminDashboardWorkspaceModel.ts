@@ -1,5 +1,5 @@
 // 참조 구현: felixmosh/bull-board packages/ui/src/components/QueueCard/QueueStats/QueueStats.tsx (MIT), shadcn-ui/ui apps/v4/registry/new-york-v4/blocks/dashboard-01/components/section-cards.tsx (MIT)
-import { formatWithNormalizedHours } from "src/libs/utils"
+import { formatShortDateTime, formatWithNormalizedHours } from "src/libs/utils"
 
 export type DashboardTone = "neutral" | "good" | "warn" | "danger"
 
@@ -140,15 +140,6 @@ const DASHBOARD_FRESHNESS_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
 })
 
-const DASHBOARD_INSTANT_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-  timeZone: ADMIN_DASHBOARD_DISPLAY_TIME_ZONE,
-})
-
 export const formatDashboardFreshnessLabel = (dataUpdatedAtMs: number) => {
   if (!dataUpdatedAtMs) return null
 
@@ -240,10 +231,8 @@ export const resolveHealthCardDetail = (options: {
 export const formatInstant = (value: string | null | undefined) => {
   if (!value) return DASHBOARD_DATA_MISSING_LABEL
 
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return formatWithNormalizedHours(DASHBOARD_INSTANT_FORMATTER, date)
+  const formatted = formatShortDateTime(value, "ko-KR", ADMIN_DASHBOARD_DISPLAY_TIME_ZONE)
+  return formatted || value
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

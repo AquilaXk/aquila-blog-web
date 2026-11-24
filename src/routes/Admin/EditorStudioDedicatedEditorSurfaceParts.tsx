@@ -487,7 +487,8 @@ export const TitleInput = styled.textarea`
   resize: none;
   overflow: hidden;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 
   &::placeholder {
     color: ${({ theme }) => theme.colors.gray9};

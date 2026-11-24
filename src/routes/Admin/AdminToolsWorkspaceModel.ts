@@ -1,4 +1,4 @@
-import { formatWithNormalizedHours } from "src/libs/utils"
+import { formatShortInstantFromFormatter } from "src/libs/utils"
 
 export type JsonValue = unknown
 export type TaskRetryPolicy = {
@@ -84,7 +84,7 @@ export const formatInstant = (value: string | null | undefined) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
-  return formatWithNormalizedHours(TOOLS_INSTANT_FORMATTER, date)
+  return formatShortInstantFromFormatter(TOOLS_INSTANT_FORMATTER, date)
 }
 
 export const formatAge = (seconds: number | null | undefined) => {

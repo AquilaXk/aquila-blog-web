@@ -458,4 +458,20 @@ export const ContentRow = styled.a`
       display: none;
     }
   }
+
+  @media (max-width: 520px) {
+    padding: 0.72rem 0.95rem;
+    align-items: start;
+
+    .mediaThumb {
+      display: none;
+    }
+
+    .rowMeta {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      line-height: 1.4;
+    }
+  }
 `

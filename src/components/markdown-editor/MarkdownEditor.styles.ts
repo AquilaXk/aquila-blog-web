@@ -139,6 +139,8 @@ export const LiveEditorBody = styled.div<{
     box-sizing: content-box;
     caret-color: ${({ theme }) => theme.colors.gray12};
     padding: 12px 56px 96px 56px;
+    word-break: keep-all;
+    overflow-wrap: break-word;
     @media (max-width: 820px) {
       width: 100%;
       max-width: 100%;

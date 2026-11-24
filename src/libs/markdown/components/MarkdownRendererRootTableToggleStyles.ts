@@ -323,10 +323,10 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
 
     table,
     .aq-table {
-      width: max-content;
+      width: 100%;
       min-width: 100%;
-      max-width: none;
-      table-layout: auto;
+      max-width: 100%;
+      table-layout: fixed;
     }
 
     table[data-overflow-mode="wide"],
@@ -334,6 +334,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
       width: max-content;
       min-width: 100%;
       max-width: none;
+      table-layout: auto;
     }
 
     table th,
@@ -345,6 +346,13 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
       overflow-wrap: break-word;
       font-size: 0.875rem;
       line-height: 1.54;
+      padding: 0.56rem 0.62rem;
+    }
+
+    table[data-overflow-mode="wide"] th,
+    table[data-overflow-mode="wide"] td,
+    .aq-table.aq-table-wide th,
+    .aq-table.aq-table-wide td {
       padding: 0.62rem 0.78rem;
       min-width: max(${TABLE_MIN_COLUMN_WIDTH_PX}px, 12ch);
       max-width: 24ch;

@@ -54,10 +54,12 @@ import {
   compositionField,
   computeMinimalDocChange,
   disableMermaidField,
+  editorFocusField,
   editorModeField,
   getDocString,
   pointerSelectingField,
   setComposition,
+  setEditorFocus,
   setDisableMermaid,
   setEditorMode,
   setPointerSelecting,
@@ -256,6 +258,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         EditorView.lineWrapping,
         compositionField,
         pointerSelectingField,
+        editorFocusField.init(() => false),
         editorModeField.init(() => initialState.mode),
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         blockDecorationField,
@@ -301,9 +304,22 @@ export const MarkdownEditorLiveSurface = forwardRef<
             }
             return false
           },
+          focus: (_event, view) => {
+            if (!view.state.field(editorFocusField)) {
+              view.dispatch({ effects: setEditorFocus.of(true) })
+            }
+            return false
+          },
           blur: (_event, view) => {
+            const effects = []
             if (view.state.field(pointerSelectingField)) {
-              view.dispatch({ effects: setPointerSelecting.of(false) })
+              effects.push(setPointerSelecting.of(false))
+            }
+            if (view.state.field(editorFocusField)) {
+              effects.push(setEditorFocus.of(false))
+            }
+            if (effects.length > 0) {
+              view.dispatch({ effects })
             }
             return false
           },

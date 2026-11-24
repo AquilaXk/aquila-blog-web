@@ -84,6 +84,14 @@ export const QuickSearchDialog = styled.div`
     color: var(--aq-text);
     font-size: 1rem;
     outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &::-webkit-search-decoration,
+    &::-webkit-search-cancel-button {
+      display: none;
+      -webkit-appearance: none;
+    }
 
     &::placeholder {
       color: var(--aq-muted);
@@ -95,25 +103,24 @@ export const QuickSearchDialog = styled.div`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 24px;
-    padding: 0 0.4rem;
-    border: 0;
-    border-radius: 0.25rem;
-    background: var(--aq-surface-subtle);
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    background: transparent;
     color: var(--aq-muted);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
     line-height: 1;
     cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
 
     @media (pointer: coarse) {
       min-width: ${control.lg}px;
       min-height: ${control.lg}px;
-      padding: 0 0.625rem;
     }
 
     &:hover {
+      background: var(--aq-surface-subtle);
       color: var(--aq-text);
     }
 

@@ -80,8 +80,8 @@ export const CloudSearchField = styled.label`
   max-width: 12.5rem;
   flex: 1 1 8rem;
   min-width: 6.75rem;
-  @media (max-width: 768px) {
-    flex: 1 1 13rem;
+  @media (max-width: 960px) {
+    flex: 1 1 100%;
     max-width: none;
     width: 100%;
   }
@@ -212,9 +212,15 @@ export const ActionGroup = styled.div`
     flex-shrink: 0;
   }
   @media (max-width: 960px) {
+    &[data-slot="view-bar-nav"] {
+      flex: 1 1 100%;
+      width: 100%;
+    }
     &[data-align="end"] {
+      flex: 1 1 100%;
+      width: 100%;
       margin-left: 0;
-      justify-content: flex-start;
+      justify-content: space-between;
     }
   }
 `

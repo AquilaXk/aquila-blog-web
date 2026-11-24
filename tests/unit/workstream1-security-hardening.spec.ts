@@ -163,6 +163,82 @@ test.describe("Workstream 1 adversarial security hardening", () => {
     const largeHtmlResponse = await largeHtmlPromise
     expect(await largeHtmlResponse.text()).toContain("Early Head")
 
+    // Compressed >256KB HTML page (gzip / br) stops early at </head> instead of triggering 413
+    const hugeBody = "x".repeat(400_000)
+    for (const [encName, compressedPayload] of [
+      [
+        "gzip",
+        gzipSync(
+          Buffer.from(
+            `<!doctype html><html><head><meta property="og:title" content="Compressed Head"></head><body>${hugeBody}</body></html>`
+          )
+        ),
+      ],
+      [
+        "br",
+        brotliCompressSync(
+          Buffer.from(
+            `<!doctype html><html><head><meta property="og:title" content="Compressed Head"></head><body>${hugeBody}</body></html>`
+          )
+        ),
+      ],
+    ] as const) {
+      const compressedStream = new PassThrough() as PassThrough & {
+        statusCode: number
+        headers: Record<string, string>
+      }
+      compressedStream.statusCode = 200
+      compressedStream.headers = {
+        "content-type": "text/html; charset=utf-8",
+        "content-encoding": encName,
+      }
+      let compressedAborted = false
+      const compressedPromise = readBoundedIncomingResponse(
+        compressedStream,
+        () => {
+          compressedAborted = true
+        },
+        { stopAtHeadEnd: true }
+      )
+      compressedStream.write(compressedPayload)
+      const compressedResp = await compressedPromise
+      expect(await compressedResp.text()).toContain("Compressed Head")
+      expect(compressedAborted).toBe(true)
+    }
+
+    // Compressed gzip bomb without </head> still fails closed with UnfurlResponseTooLargeError
+    const bombStream = new PassThrough() as PassThrough & {
+      statusCode: number
+      headers: Record<string, string>
+    }
+    bombStream.statusCode = 200
+    bombStream.headers = {
+      "content-type": "text/html; charset=utf-8",
+      "content-encoding": "gzip",
+    }
+    const bombPromise = readBoundedIncomingResponse(bombStream, undefined, { stopAtHeadEnd: true })
+    bombStream.end(gzipSync(bombPayload))
+    await expect(bombPromise).rejects.toBeInstanceOf(UnfurlResponseTooLargeError)
+
+    // Unquoted charset attribute with trailing semicolon stops cleanly at ';'
+    const semicolonCharsetHtml = Buffer.from(
+      "<html><head><meta charset=iso-8859-1; viewport=width><title>Na\xefve</title></head></html>",
+      "latin1"
+    )
+    expect(decodeHtmlBufferWithCharset(semicolonCharsetHtml, "text/html")).toContain("Naïve")
+
+    // Metadata extraction handles quoted '<!--', skips <script> fake <meta>, and decodes numeric/named entities
+    const parsedMeta = extractUnfurlMetadata(
+      "https://github.com/vercel/next.js",
+      [
+        "<html><head>",
+        '<script>const fake = "<meta property=\\"og:title\\" content=\\"Hijacked\\">";</script>',
+        '<meta property="og:title" content="Next.js &mdash; Developer&#8217;s Guide &#x2014; <!-- keep arrow --> v15&nbsp;Beta">',
+        "</head></html>",
+      ].join("")
+    )
+    expect(parsedMeta.title).toBe("Next.js — Developer’s Guide — <!-- keep arrow --> v15 Beta")
+
     // Stream byte limit & upstream destroy
     const oversizedStream = new PassThrough() as PassThrough & {
       statusCode: number

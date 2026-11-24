@@ -280,7 +280,7 @@ const StyledWrapper = styled.div`
     line-height: 2rem;
     font-weight: 700;
     letter-spacing: -0.025em;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     word-break: keep-all;
     text-wrap: balance;
     transition: color 140ms ease;
@@ -332,7 +332,8 @@ const StyledWrapper = styled.div`
     line-height: 1.625;
     font-weight: 400;
     max-width: 68ch;
-    overflow-wrap: anywhere;
+    word-break: keep-all;
+    overflow-wrap: break-word;
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-line-clamp: ${uiTokens.feed.card.summaryLines};

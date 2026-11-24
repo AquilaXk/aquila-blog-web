@@ -363,84 +363,84 @@ const MarkdownEditorToolbarView = ({
                 })),
               ]}
             />
-            <MarkdownEditorToolbarMenu
-              label={editorT("toolbarMore", language)}
-              triggerLabel={<EditorIconMoreHorizontal size={15} />}
-              showChevron={false}
-              disabled={isAuthoringDisabled}
-              align="end"
-              onBeforeOpen={onRememberSelection}
-              actions={[
-                ...toolbarMarkdownSnippets
-                  .filter((snippet) => snippet.group === "more")
-                  .map((snippet) => ({
-                    id: snippet.title,
-                    label: isEn ? snippet.titleEn : snippet.title,
-                    icon: renderMenuItemIcon(snippet.label),
-                    onSelect: () =>
-                      onApplySnippet(snippet.before, snippet.after, {
-                        toggle: "toggle" in snippet && snippet.toggle,
-                      }),
-                  })),
-                {
-                  id: "format.highlight",
-                  label: editorT("toolbarHighlight", language),
-                  icon: renderMenuItemIcon("format.highlight"),
-                  onSelect: () => onApplySnippet("==", "==", { toggle: true }),
-                },
-                ...(onApplyLineCommand
-                  ? [
-                      {
-                        id: "line.move-up",
-                        label: editorT("toolbarLineMoveUp", language),
-                        icon: renderMenuItemIcon("line.move-up"),
-                        onSelect: () => onApplyLineCommand("move-up"),
-                      },
-                      {
-                        id: "line.move-down",
-                        label: editorT("toolbarLineMoveDown", language),
-                        icon: renderMenuItemIcon("line.move-down"),
-                        onSelect: () => onApplyLineCommand("move-down"),
-                      },
-                      {
-                        id: "line.duplicate",
-                        label: editorT("toolbarLineDuplicate", language),
-                        icon: renderMenuItemIcon("line.duplicate"),
-                        onSelect: () => onApplyLineCommand("duplicate"),
-                      },
-                      {
-                        id: "line.delete",
-                        label: editorT("toolbarLineDelete", language),
-                        icon: renderMenuItemIcon("line.delete"),
-                        onSelect: () => onApplyLineCommand("delete"),
-                      },
-                    ]
-                  : []),
-                {
-                  id: "media.image",
-                  label: editorT("toolbarImage", language),
-                  icon: renderMenuItemIcon("media.image"),
-                  disabled: !hasUploadImage,
-                  onSelect: () => imageInputRef.current?.click(),
-                },
-                {
-                  id: "media.file",
-                  label: editorT("toolbarFile", language),
-                  icon: renderMenuItemIcon("media.file"),
-                  disabled: !hasUploadFile,
-                  onSelect: () => fileInputRef.current?.click(),
-                },
-                {
-                  id: "tool.find-replace",
-                  label: editorT("toolbarFindReplace", language),
-                  icon: renderMenuItemIcon("tool.find-replace"),
-                  onSelect: onOpenFindReplace,
-                },
-              ]}
-            />
           </ToolbarCluster>
         </ToolbarGroup>
         <ToolbarGroup data-align="end">
+          <MarkdownEditorToolbarMenu
+            label={editorT("toolbarMore", language)}
+            triggerLabel={<EditorIconMoreHorizontal size={15} />}
+            showChevron={false}
+            disabled={isAuthoringDisabled}
+            align="end"
+            onBeforeOpen={onRememberSelection}
+            actions={[
+              ...toolbarMarkdownSnippets
+                .filter((snippet) => snippet.group === "more")
+                .map((snippet) => ({
+                  id: snippet.title,
+                  label: isEn ? snippet.titleEn : snippet.title,
+                  icon: renderMenuItemIcon(snippet.label),
+                  onSelect: () =>
+                    onApplySnippet(snippet.before, snippet.after, {
+                      toggle: "toggle" in snippet && snippet.toggle,
+                    }),
+                })),
+              {
+                id: "format.highlight",
+                label: editorT("toolbarHighlight", language),
+                icon: renderMenuItemIcon("format.highlight"),
+                onSelect: () => onApplySnippet("==", "==", { toggle: true }),
+              },
+              ...(onApplyLineCommand
+                ? [
+                    {
+                      id: "line.move-up",
+                      label: editorT("toolbarLineMoveUp", language),
+                      icon: renderMenuItemIcon("line.move-up"),
+                      onSelect: () => onApplyLineCommand("move-up"),
+                    },
+                    {
+                      id: "line.move-down",
+                      label: editorT("toolbarLineMoveDown", language),
+                      icon: renderMenuItemIcon("line.move-down"),
+                      onSelect: () => onApplyLineCommand("move-down"),
+                    },
+                    {
+                      id: "line.duplicate",
+                      label: editorT("toolbarLineDuplicate", language),
+                      icon: renderMenuItemIcon("line.duplicate"),
+                      onSelect: () => onApplyLineCommand("duplicate"),
+                    },
+                    {
+                      id: "line.delete",
+                      label: editorT("toolbarLineDelete", language),
+                      icon: renderMenuItemIcon("line.delete"),
+                      onSelect: () => onApplyLineCommand("delete"),
+                    },
+                  ]
+                : []),
+              {
+                id: "media.image",
+                label: editorT("toolbarImage", language),
+                icon: renderMenuItemIcon("media.image"),
+                disabled: !hasUploadImage,
+                onSelect: () => imageInputRef.current?.click(),
+              },
+              {
+                id: "media.file",
+                label: editorT("toolbarFile", language),
+                icon: renderMenuItemIcon("media.file"),
+                disabled: !hasUploadFile,
+                onSelect: () => fileInputRef.current?.click(),
+              },
+              {
+                id: "tool.find-replace",
+                label: editorT("toolbarFindReplace", language),
+                icon: renderMenuItemIcon("tool.find-replace"),
+                onSelect: onOpenFindReplace,
+              },
+            ]}
+          />
           <ToolbarButton
             type="button"
             data-mobile-hidden="true"

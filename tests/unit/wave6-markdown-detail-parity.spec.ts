@@ -981,6 +981,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
       path.join(REPO_ROOT, "src/libs/markdown/components/MarkdownRendererRootTableToggleStyles.ts"),
       "utf8"
     )
+    expect(mobileTableStyles).toContain("max-width: 100%;\n      table-layout: fixed;")
     expect(mobileTableStyles).toContain("max-width: none;\n      table-layout: auto;")
 
     const queueCardsSource = readFileSync(

@@ -126,6 +126,23 @@ export const formatWithNormalizedHours = (
     .map((part) => (part.type === "hour" && part.value === "24" ? "00" : part.value))
     .join("")
 
+export const formatShortInstantFromFormatter = (
+  formatter: Intl.DateTimeFormat,
+  date: Date
+): string => {
+  let month = ""
+  let day = ""
+  let hour = ""
+  let minute = ""
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type === "month") month = part.value
+    else if (part.type === "day") day = part.value
+    else if (part.type === "hour") hour = part.value === "24" ? "00" : part.value
+    else if (part.type === "minute") minute = part.value
+  }
+  return `${month}.${day} ${hour}:${minute}`
+}
+
 export const formatIsoDateTime = (value?: string, fallback: string = "-"): string => {
   if (!value) return fallback
   return value.slice(0, 16).replace("T", " ")

@@ -273,6 +273,12 @@ const ScopeTabs = styled.div`
   @media (max-width: 980px) {
     border-bottom: 1px solid ${adminBorder};
   }
+
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 0.12rem;
+  }
 `
 
 const ScopeTabButton = styled.button<{ "data-active"?: boolean }>`

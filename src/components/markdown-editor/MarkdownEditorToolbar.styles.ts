@@ -52,6 +52,7 @@ export const ToolbarGroup = styled.div`
 
   &[data-align="end"] {
     margin-left: auto;
+    gap: 2px;
   }
 
   @media (max-width: 820px) {

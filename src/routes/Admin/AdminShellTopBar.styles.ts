@@ -130,6 +130,10 @@ export const TopBar = styled.header`
     }
   }
 
+  @media (max-width: 520px) {
+    padding: 0.45rem 0.65rem 0.35rem;
+  }
+
   @media (pointer: coarse) {
     .mobileMenuBtn {
       width: ${control.lg}px;
@@ -192,6 +196,10 @@ export const CompactNav = styled.nav`
       display: none;
     }
   }
+
+  @media (max-width: 520px) {
+    gap: 0.08rem;
+  }
 `
 
 export const CompactNavLink = styled.a`
@@ -215,6 +223,21 @@ export const CompactNavLink = styled.a`
     font-weight: 550;
     line-height: 1;
     white-space: nowrap;
+  }
+
+  @media (max-width: 520px) {
+    min-width: 44px;
+    padding: 0.18rem 0.24rem;
+    gap: 0.14rem;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    span {
+      font-size: 0.65625rem;
+    }
   }
 
   &[data-active="true"] {

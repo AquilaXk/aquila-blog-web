@@ -8,8 +8,6 @@ import Link from "next/link"
 import AppIcon from "src/components/icons/AppIcon"
 import ProfileImage from "src/components/ProfileImage"
 import { useLanguage } from "src/libs/language"
-import { toCanonicalPostPath } from "src/libs/utils/postPath"
-import type { TPost } from "src/types"
 import type { TocItem } from "./PostDetailTocModel"
 
 export type ShareFeedback = "copied" | "shared" | "failed" | null
@@ -195,8 +193,6 @@ export type PostLayoutSidebarProps = {
   onToggleLike?: () => void
   shareFeedback: ShareFeedback
   onSharePost: () => void
-  previousPost: TPost | null
-  nextPost: TPost | null
   railRef: RefObject<HTMLElement | null>
   innerRef: RefObject<HTMLElement | null>
   listRef: RefObject<HTMLOListElement | null>
@@ -224,8 +220,6 @@ export const PostLayoutSidebar = memo(function PostLayoutSidebar({
   onToggleLike,
   shareFeedback,
   onSharePost,
-  previousPost,
-  nextPost,
   railRef,
   innerRef,
   listRef,
@@ -333,27 +327,6 @@ export const PostLayoutSidebar = memo(function PostLayoutSidebar({
                 </span>
               </button>
             </div>
-          </div>
-        ) : null}
-
-        {previousPost || nextPost ? (
-          <div className="sidebarSection sidebarAdjacentGroup">
-            {previousPost ? (
-              <div>
-                <h2 className="sidebarHeading">{isEnglish ? "Previous Article" : "이전 글"}</h2>
-                <Link href={toCanonicalPostPath(previousPost.id)} className="sidebarAdjacentLink">
-                  {previousPost.title || (isEnglish ? "Untitled" : "제목 없음")}
-                </Link>
-              </div>
-            ) : null}
-            {nextPost ? (
-              <div>
-                <h2 className="sidebarHeading">{isEnglish ? "Next Article" : "다음 글"}</h2>
-                <Link href={toCanonicalPostPath(nextPost.id)} className="sidebarAdjacentLink">
-                  {nextPost.title || (isEnglish ? "Untitled" : "제목 없음")}
-                </Link>
-              </div>
-            ) : null}
           </div>
         ) : null}
 

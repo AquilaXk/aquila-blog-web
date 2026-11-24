@@ -42,6 +42,7 @@ import {
   ShareBarFill,
   ShareBarItem,
   ShareBarList,
+  ShareBarTrack,
   ShareBarValue,
   StatusList,
   StatusRow,
@@ -251,11 +252,15 @@ export const AdminHubSurfaceSections = ({
               <ShareBarList aria-label={isEn ? "Recent post view share" : "최근 글 조회 비중"}>
                 {shareBars.map((bar) => (
                   <ShareBarItem as={Link} key={`${bar.href}-${bar.title}`} href={bar.href}>
-                    <ShareBarFill $widthPct={bar.widthPct} aria-hidden="true" />
-                    <ShareBarCopy className="shareBarTitle">{bar.title}</ShareBarCopy>
-                    <ShareBarValue>
-                      {bar.views.toLocaleString()} ({bar.sharePct}%)
-                    </ShareBarValue>
+                    <div className="shareBarHead">
+                      <ShareBarCopy className="shareBarTitle">{bar.title}</ShareBarCopy>
+                      <ShareBarValue>
+                        {bar.views.toLocaleString()} ({bar.sharePct}%)
+                      </ShareBarValue>
+                    </div>
+                    <ShareBarTrack aria-hidden="true">
+                      <ShareBarFill $widthPct={bar.widthPct} />
+                    </ShareBarTrack>
                   </ShareBarItem>
                 ))}
               </ShareBarList>

@@ -274,31 +274,6 @@ export const StyledWrapper = styled.div`
     }
   }
 
-  .sidebarAdjacentGroup {
-    display: grid;
-    gap: 1.25rem;
-  }
-
-  .sidebarAdjacentLink {
-    display: block;
-    color: var(--aq-accent-link, var(--aq-accent));
-    font-size: 0.875rem;
-    line-height: 1.375rem;
-    font-weight: 500;
-    text-decoration: none;
-    overflow-wrap: anywhere;
-
-    &:hover {
-      color: var(--aq-text);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--aq-focus-ring);
-      outline-offset: 2px;
-      border-radius: 2px;
-    }
-  }
-
   .sidebarStickySlot {
     position: sticky;
     top: calc(var(--app-header-height, 65px) + 1.25rem);

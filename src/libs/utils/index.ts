@@ -2,6 +2,7 @@ export {
   formatDate,
   formatDateTime,
   formatShortDateTime,
+  formatShortInstantFromFormatter,
   formatWithNormalizedHours,
   formatIsoDateTime,
 } from "./format-date"

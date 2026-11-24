@@ -138,7 +138,8 @@ export const InlineExcerptInput = styled.textarea`
   resize: none;
   overflow: hidden;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   font-family: inherit;
   font-size: 19px;
   font-weight: 450;

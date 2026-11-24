@@ -3,11 +3,14 @@ import styled from "@emotion/styled"
 import Link from "next/link"
 import {
   adminBorder,
+  adminBorderStrong,
+  adminBorderSubtle,
   adminCardShadow,
   adminControlText,
   adminDisabledBg,
   adminDisabledBorder,
   adminDisabledFg,
+  adminElevatedPanelShadow,
   adminGoldTintFocus,
   adminLoginCanvasBg,
   adminStatusDangerBg,
@@ -77,11 +80,11 @@ export const LoginBrandOrb = styled.div`
 
 export const LoginPanel = styled.div`
   width: 100%;
-  padding: 1.75rem;
-  border: 1px solid ${adminBorder};
-  border-radius: 12px;
+  padding: 1.85rem;
+  border: 1px solid ${adminBorderStrong};
+  border-radius: 14px;
   background: ${adminSurface};
-  box-shadow: ${adminCardShadow};
+  box-shadow: ${adminElevatedPanelShadow};
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -382,6 +385,8 @@ export const LoginFooterRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-top: 0.9rem;
+  border-top: 1px solid ${adminBorderSubtle};
 `
 
 export const LoginBackLink = styled(Link)`
