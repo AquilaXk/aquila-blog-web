@@ -29,14 +29,34 @@ const MobileFooterMeta = styled.div`
   .mobileMetaTags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem 0.75rem;
+    gap: 0.45rem 0.5rem;
   }
 
   .mobileTagLink {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.72rem;
+    border-radius: 9999px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-subtle);
     color: var(--aq-text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    font-weight: 550;
     text-decoration: none;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+
+    @media (hover: hover) {
+      &:hover {
+        border-color: var(--aq-accent);
+        background: var(--aq-surface-elevated);
+        color: var(--aq-accent-link, var(--aq-accent));
+      }
+    }
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 
   .mobileBackWrap {
@@ -74,20 +94,21 @@ const AdjacentNav = styled.nav`
 
 const AdjacentCardLink = styled(Link)`
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
   min-height: 44px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--aq-border);
-  border-radius: 0.625rem;
+  border-radius: 0.75rem;
   background: var(--aq-surface);
   color: var(--aq-text);
   text-decoration: none;
-  transition: border-color 0.16s ease, color 0.16s ease;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
 
   @media (hover: hover) {
     &:hover {
       border-color: var(--aq-border-strong, var(--aq-accent));
+      background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
     }
   }

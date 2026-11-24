@@ -9,11 +9,15 @@ import {
   hasCommonMarkCodeIndent,
   stripClosingAsideTag,
 } from "../../libs/markdown/pandocMathScanner"
-import { resolveCustomDirectiveBlockPayload } from "../../libs/markdown/renderingDirectiveModel"
+import {
+  extractPromotedCalloutTitle,
+  resolveCustomDirectiveBlockPayload,
+} from "../../libs/markdown/renderingDirectiveModel"
 import { normalizeSafeMarkdownUrl } from "../../libs/markdown/safeMarkdownUrl"
 import {
   parseCustomDirectiveFromOpening,
   parseOpeningDirectiveLine,
+  resolveCalloutDirectiveRawHeader,
   resolveClosingDirectiveFenceLength,
 } from "../../libs/markdown/sharedDirectiveContainerParser"
 
@@ -255,9 +259,12 @@ const parseCalloutContainerPayload = (
       }
       rest = firstLine.slice(bodyEmojiMatch[0].length).trim()
       remainingBodyLines = remainingBodyLines.slice(1)
-    } else if (firstLine.length > 0) {
-      rest = firstLine
-      remainingBodyLines = remainingBodyLines.slice(1)
+    } else {
+      const promoted = extractPromotedCalloutTitle(remainingBodyLines)
+      if (promoted.title) {
+        rest = promoted.title
+        remainingBodyLines = promoted.bodyLines
+      }
     }
   }
 
@@ -514,7 +521,7 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
         from: lineStart,
         bodyOffset: Math.max(0, offset - lineStart),
         fenceStack: [open.fenceLength],
-        rawHeader: open.remainder,
+        rawHeader: resolveCalloutDirectiveRawHeader(open),
         quotedTitle: open.quotedTitle,
         bodyLines: [],
       }

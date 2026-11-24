@@ -149,10 +149,10 @@ const StyledWrapper = styled.div`
     min-width: 0;
     min-height: 38px;
     padding: 0 0.75rem;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
-    transition: border-color 0.125s ease-in, background-color 0.125s ease-in;
+    transition: border-color 0.14s ease, background-color 0.14s ease;
 
     .searchIcon {
       display: inline-flex;

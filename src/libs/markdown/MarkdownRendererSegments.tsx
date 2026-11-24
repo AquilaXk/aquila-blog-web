@@ -260,7 +260,9 @@ export const renderMarkdownSegment = ({
       )
     }
 
-    const hasTitle = Boolean(segment.title)
+    const resolvedNonFoldableTitle =
+      segment.title || (segment.kind === "summary" ? (t ? t("calloutTitleSummary") : fallbackTranslate("calloutTitleSummary")) : "")
+    const hasTitle = Boolean(resolvedNonFoldableTitle)
     return (
       <div
         key={`callout-${index}`}
@@ -275,7 +277,7 @@ export const renderMarkdownSegment = ({
         <div className="aq-callout-box-text">
           {hasTitle ? (
             <div className="aq-callout-head" data-has-title="true">
-              <strong className="aq-callout-title">{segment.title}</strong>
+              <strong className="aq-callout-title">{resolvedNonFoldableTitle}</strong>
             </div>
           ) : null}
           {segment.content ? renderMarkdown(segment.content, `callout-body-${index}`, true) : null}

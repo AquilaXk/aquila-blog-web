@@ -145,18 +145,27 @@ export const collectRssFeedPosts = async (
 
 export const buildRssFeedXml = (posts: TPost[], options: BuildRssFeedOptions) => {
   const siteUrl = normalizeSiteUrl(options.siteUrl)
+  const selfFeedUrl = `${siteUrl}/feed`
   const latestPostDate = posts.length > 0 ? getRssPostDate(posts[0]) : new Date(0)
   const items = posts
     .map((post) => {
       const canonicalUrl = `${siteUrl}${toCanonicalPostPath(post.id)}`
       const summary = post.summary ?? ""
+      const creatorName = (post.author?.[0]?.name || "").trim()
+      const categories = (post.tags || [])
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+        .slice(0, 10)
+        .map((tag) => `      <category>${escapeXml(tag)}</category>`)
 
       return [
         "    <item>",
         `      <title>${escapeXml(post.title)}</title>`,
         `      <link>${escapeXml(canonicalUrl)}</link>`,
-        `      <guid>${escapeXml(canonicalUrl)}</guid>`,
+        `      <guid isPermaLink="true">${escapeXml(canonicalUrl)}</guid>`,
         ...(summary ? [`      <description>${escapeXml(summary)}</description>`] : []),
+        ...(creatorName ? [`      <dc:creator>${escapeXml(creatorName)}</dc:creator>`] : []),
+        ...categories,
         `      <pubDate>${getRssPostDate(post).toUTCString()}</pubDate>`,
         "    </item>",
       ].join("\n")
@@ -165,10 +174,11 @@ export const buildRssFeedXml = (posts: TPost[], options: BuildRssFeedOptions) =>
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<rss version="2.0">',
+    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">',
     "  <channel>",
     `    <title>${escapeXml(options.title)}</title>`,
     `    <link>${escapeXml(siteUrl)}</link>`,
+    `    <atom:link href="${escapeXml(selfFeedUrl)}" rel="self" type="${RSS_FEED_CONTENT_TYPE}" />`,
     `    <description>${escapeXml(options.description)}</description>`,
     `    <language>${escapeXml(options.lang)}</language>`,
     `    <lastBuildDate>${latestPostDate.toUTCString()}</lastBuildDate>`,

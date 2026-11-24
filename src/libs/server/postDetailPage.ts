@@ -136,6 +136,18 @@ export const buildCanonicalPostDetailServerProps = async (
   const initialAdminProfileSource = adminProfileSeed.source
   queryClient.setQueryData(queryKey.adminProfile(), initialAdminProfile)
 
+  const initialInternalLinkTargets = await (async (): Promise<Record<string, string>> => {
+    if (!postDetail?.content?.includes("[[")) return {}
+    try {
+      const { getFeedPostsPage } = await import("src/apis/backend/posts")
+      const { buildPostInternalLinkTargets } = await import("src/libs/markdown/internalWikilinkResolver")
+      const catalogPage = await getFeedPostsPage({ page: 1, pageSize: 30, order: "desc" })
+      return buildPostInternalLinkTargets(postDetail.content, catalogPage.posts)
+    } catch {
+      return {}
+    }
+  })()
+
   if (postDetail) {
     queryClient.setQueryData(queryKey.post(postDetail.id), postDetail)
   }
@@ -145,6 +157,7 @@ export const buildCanonicalPostDetailServerProps = async (
       dehydratedState: toSerializableState(dehydrate(queryClient)),
       initialAdminProfile,
       initialAdminProfileSource,
+      ...(Object.keys(initialInternalLinkTargets).length > 0 ? { initialInternalLinkTargets } : {}),
       ...(initialLanguage ? { initialLanguage } : {}),
     },
   }

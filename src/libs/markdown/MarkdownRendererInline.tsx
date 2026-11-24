@@ -31,6 +31,7 @@ import {
 } from "src/libs/markdown/inlineTokenScanners"
 import { slugifyMarkdownHeading } from "src/libs/markdown/markdownDocumentInsights"
 import { normalizeSafeRelativeMarkdownPath } from "src/libs/markdown/safeMarkdownUrl"
+import { resolveInternalWikilinkHref } from "src/libs/markdown/internalWikilinkResolver"
 
 const INLINE_COLOR_CHILD_PLACEHOLDER_PREFIX = "__AQ_INLINE_COLOR_CHILD_"
 const INLINE_COLOR_CHILD_PLACEHOLDER_SUFFIX = "__"
@@ -181,9 +182,23 @@ const normalizeWikilinkFlat = (children: ReactNode, sentinels: ProtectedInlineSe
     for (const span of spans) {
       const resolved = resolveMarkdownWikilinkTarget(span.rawTarget, span.rawAlias, sentinels)
       if (!resolved) continue
+      const resolvedInternal = resolveInternalWikilinkHref(
+        span.rawTarget,
+        resolved.href,
+        sentinels.internalLinkTargets
+      )
       if (span.from > cursor) nodes.push(child.slice(cursor, span.from))
       nodes.push(
-        createElement("a", { key: `inline-wikilink-${linkIndex}`, className: "aq-wikilink", href: resolved.href }, resolved.label)
+        createElement(
+          "a",
+          {
+            key: `inline-wikilink-${linkIndex}`,
+            className: "aq-wikilink",
+            href: resolvedInternal.href,
+            ...(resolvedInternal.isResolvedPost ? { "data-wikilink-resolved": "true" } : {}),
+          },
+          resolved.label
+        )
       )
       linkIndex += 1
       matchedAny = true

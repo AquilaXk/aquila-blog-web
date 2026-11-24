@@ -29,14 +29,17 @@ export const StyledWrapper = styled.header`
     align-items: center;
     justify-content: center;
     gap: 0.42rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-subtle);
     color: var(--aq-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     line-height: 1.4;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .heroLabelLink {
@@ -56,14 +59,15 @@ export const StyledWrapper = styled.header`
   }
 
   .headerDateList {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.625rem;
   }
 
   .headerDate {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.9375rem;
     line-height: 1.5rem;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
     color: var(--aq-muted);
   }
 
@@ -95,12 +99,13 @@ export const StyledWrapper = styled.header`
 
   .deck {
     max-width: 42rem;
-    margin: 0.875rem auto 0;
-    color: var(--aq-muted);
+    margin: 0.95rem auto 0;
+    color: var(--aq-text-secondary, var(--aq-muted));
     font-size: 1.0625rem;
     line-height: 1.65;
     overflow-wrap: anywhere;
     word-break: keep-all;
+    text-wrap: pretty;
   }
 
   .headerMobileMeta {
@@ -211,17 +216,27 @@ export const StyledWrapper = styled.header`
     align-items: center;
     gap: 0.375rem;
     min-height: ${control.md}px;
-    padding: 0 0.75rem;
-    border-radius: 0.375rem;
+    padding: 0 0.875rem;
+    border-radius: 9999px;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-text-secondary);
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+
+    @media (hover: hover) {
+      &:hover:not(:disabled) {
+        border-color: var(--aq-border-strong);
+        background: var(--aq-surface-subtle);
+        color: var(--aq-text);
+      }
+    }
 
     &[data-active="true"] {
       border-color: var(--aq-accent);
+      background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
     }
 

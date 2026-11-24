@@ -3,7 +3,7 @@ import { articleTypographyScale } from "src/libs/markdown/contentTypography"
 
 export const markdownRendererRootCodeStyles = (theme: Theme) => css`
   .aq-code {
-    border-radius: 0;
+    border-radius: 0.75rem;
     padding: 1.02rem 1.1rem;
     overflow-x: auto;
     background: #0f1728;
@@ -17,7 +17,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     margin: 28px 0;
     max-width: 100%;
     min-width: 0;
-    border-radius: 0;
+    border-radius: 0.75rem;
     overflow: hidden;
     border: 1px solid #27334a;
     box-shadow: none;
@@ -212,6 +212,7 @@ export const markdownRendererRootCodeStyles = (theme: Theme) => css`
     min-width: 0;
     display: block;
     overflow-x: auto;
+    scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
     touch-action: pan-x;

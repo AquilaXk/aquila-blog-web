@@ -194,7 +194,7 @@ test.describe("Visual verification of Home Feed and Editor", () => {
     })
 
     // 2. Click title input to verify no giant focus rectangle
-    const titleInput = page.getByPlaceholder("제목을 입력하세요")
+    const titleInput = page.getByPlaceholder("제목을 입력하세요", { exact: true })
     await expect(titleInput).toBeVisible()
     await titleInput.click()
     await expect(titleInput).toBeFocused()

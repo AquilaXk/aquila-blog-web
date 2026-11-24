@@ -232,7 +232,13 @@ const addCodeLineDecorationOnce = (ctx: PlanSpecDecorationContext, lineFrom: num
   ctx.decorations.push(decoration.range(lineFrom))
 }
 
+const isClosingCodeFenceLine = (text: string): boolean => {
+  const trimmed = text.trim()
+  return trimmed.startsWith("```") || trimmed.startsWith("~~~")
+}
+
 const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecorationContext) => {
+  const isComposing = ctx.state.field(compositionField, false) ?? false
   const startLine = ctx.state.doc.lineAt(spec.from)
   const endLine = ctx.state.doc.lineAt(spec.to)
   const openDeco = spec.codeLanguage
@@ -242,11 +248,17 @@ const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpe
       })
     : CODE_FENCE_OPEN_DECORATION
   addCodeLineDecorationOnce(ctx, startLine.from, openDeco)
+  if (!isComposing && startLine.to > startLine.from) {
+    pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, startLine.from, startLine.to)
+  }
   for (let lineNo = startLine.number + 1; lineNo < endLine.number; lineNo += 1) {
     addCodeLineDecorationOnce(ctx, ctx.state.doc.line(lineNo).from, CODE_BODY_LINE_DECORATION)
   }
   if (endLine.number > startLine.number) {
     addCodeLineDecorationOnce(ctx, endLine.from, CODE_FENCE_CLOSE_DECORATION)
+    if (!isComposing && endLine.to > endLine.from && isClosingCodeFenceLine(endLine.text)) {
+      pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, endLine.from, endLine.to)
+    }
   }
 }
 

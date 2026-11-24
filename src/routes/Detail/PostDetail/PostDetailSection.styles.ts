@@ -20,8 +20,9 @@ export const mobileTocStyles = css`
       z-index: 20;
       margin: 0 0 1.5rem;
       border: 1px solid var(--aq-border);
-      border-radius: 0.5rem;
+      border-radius: 0.75rem;
       background: var(--aq-surface);
+      box-shadow: 0 1px 2px var(--aq-border);
     }
 
     .mobileTocSummary {
@@ -126,8 +127,9 @@ export const mobileTocStyles = css`
       align-items: center;
       min-height: ${control.lg}px;
       box-sizing: border-box;
-      padding: 0.5rem 0.4rem;
+      padding: 0.5rem 0.55rem;
       border: 0;
+      border-radius: 0.375rem;
       background: transparent;
       color: var(--aq-text-secondary);
       font-size: 0.875rem;
@@ -137,9 +139,11 @@ export const mobileTocStyles = css`
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: keep-all;
+      transition: background-color 140ms ease, color 140ms ease;
     }
 
     .mobileTocList button[data-active="true"] {
+      background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
       font-weight: 700;
     }

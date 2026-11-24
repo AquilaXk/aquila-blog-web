@@ -13,6 +13,7 @@ export type MarkdownRendererProps = {
   disableMermaid?: boolean
   forceScheme?: "dark" | "light"
   editableImages?: boolean
+  internalLinkTargets?: Readonly<Record<string, string>>
   onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
 }
 

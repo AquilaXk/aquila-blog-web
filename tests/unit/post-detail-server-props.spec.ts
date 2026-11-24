@@ -86,3 +86,45 @@ test("invalid post ID returns notFound without making network requests", async (
   expect(fetchCount).toBe(0)
 })
 
+test("resolves [[wikilink]] post targets on SSR when post content references internal posts", async () => {
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    if (url.includes("/posts/101")) {
+      return json(200, {
+        ...post,
+        content: "See [[Target Architecture#Cache Layer|Cache Note]] and [[Missing Note]].",
+      })
+    }
+    if (url.includes("/post/api/v1/posts/feed")) {
+      return json(200, {
+        content: [
+          {
+            id: 205,
+            title: "Target Architecture",
+            summary: "Target summary",
+            summarySource: "MANUAL",
+            authorId: 1,
+            authorName: "Aquila",
+            tags: ["Architecture"],
+            published: true,
+            listed: true,
+            createdAt: "2026-09-02T00:00:00Z",
+            modifiedAt: "2026-09-02T00:00:00Z",
+          },
+        ],
+        pageable: { pageNumber: 1, pageSize: 100, totalElements: 1 },
+      })
+    }
+    return json(200, { username: "Aquila", nickname: "Aquila", profileImageUrl: "" })
+  }) as typeof fetch
+
+  const res = response()
+  const result = await buildCanonicalPostDetailServerProps("101", res.res)
+  expect("props" in result).toBe(true)
+  if ("props" in result) {
+    expect((result.props as Record<string, unknown>).initialInternalLinkTargets).toEqual({
+      "target architecture": "/posts/205",
+    })
+  }
+})
+

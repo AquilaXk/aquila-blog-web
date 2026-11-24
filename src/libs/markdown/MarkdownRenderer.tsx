@@ -62,6 +62,7 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
   disableMermaid = false,
   forceScheme,
   editableImages = false,
+  internalLinkTargets,
   onImageWidthCommit,
 }) => {
   const { t, language } = useLanguage()
@@ -73,10 +74,14 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
     [blockedImageLabel, content, trustedContentHtml]
   )
   const { normalizedContent, renderKey, resolvedContentHtml, segments, footnotes, footnoteMarker, tableLayouts } = renderModel
-  const sentinels = useMemo(
-    () => createProtectedInlineSentinels(`${content ?? ""}\n${normalizedContent}`),
-    [content, normalizedContent]
-  )
+  const sentinels = useMemo(() => {
+    const baseSentinels = createProtectedInlineSentinels(`${content ?? ""}\n${normalizedContent}`)
+    if (!internalLinkTargets) return baseSentinels
+    return {
+      ...baseSentinels,
+      internalLinkTargets,
+    }
+  }, [content, internalLinkTargets, normalizedContent])
   const standaloneImageIndices = useMemo(
     () =>
       segments.reduce<{ next: number; indices: number[] }>(

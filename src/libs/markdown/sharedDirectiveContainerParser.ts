@@ -21,6 +21,16 @@ export type DirectiveCloseScanRanges = {
 
 const DIRECTIVE_ALIAS_MAP: Record<string, ContainerDirectiveKind> = {
   callout: "callout",
+  summary: "callout",
+  tip: "callout",
+  info: "callout",
+  note: "callout",
+  warning: "callout",
+  caution: "callout",
+  danger: "callout",
+  important: "callout",
+  abstract: "callout",
+  tldr: "callout",
   toggle: "toggle",
   bookmark: "bookmark",
   embed: "embed",
@@ -29,6 +39,13 @@ const DIRECTIVE_ALIAS_MAP: Record<string, ContainerDirectiveKind> = {
   file: "file",
   attachment: "file",
   pdf: "file",
+}
+
+export const resolveCalloutDirectiveRawHeader = (
+  open: Pick<ParsedOpeningDirectiveLine, "rawName" | "remainder">
+): string => {
+  if (open.rawName === "callout") return open.remainder
+  return open.remainder ? `${open.rawName} ${open.remainder}` : open.rawName
 }
 
 const isAsciiWhitespaceCode = (code: number): boolean => code === 32 || code === 9

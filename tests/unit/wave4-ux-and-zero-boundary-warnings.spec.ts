@@ -72,6 +72,18 @@ test.describe("Issue #263 Wave 4 UX & Zero Boundary Warnings", () => {
     expect(lineClassesByLineNumber.get(5)?.join(" ")).toContain("cm-live-code-body-line")
     expect(lineClassesByLineNumber.get(6)?.join(" ")).toContain("cm-live-code-line")
     expect(lineClassesByLineNumber.get(6)?.join(" ")).toContain("cm-live-code-fence-close")
+
+    const replacedLineNumbers = new Set<number>()
+    decoSet.between(0, state.doc.length, (from, to, value) => {
+      const spec = (value as { spec?: { class?: string; widget?: unknown; attributes?: unknown } }).spec
+      if (from < to && spec && !spec.class && !spec.widget && !spec.attributes) {
+        if (state.doc.lineAt(from).from === from && state.doc.lineAt(from).to === to) {
+          replacedLineNumbers.add(state.doc.lineAt(from).number)
+        }
+      }
+    })
+    expect(replacedLineNumbers.has(3)).toBe(true)
+    expect(replacedLineNumbers.has(6)).toBe(true)
   })
 
   test("R-4: useResponsiveTableEffect runs synchronously per renderKey without persistent MutationObserver", () => {

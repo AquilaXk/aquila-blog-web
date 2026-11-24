@@ -15,7 +15,7 @@ export const ExplorerCard = styled.section`
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 1.5rem 0;
+  padding: 1.75rem 0 1.4rem;
   min-width: 0;
   min-height: 0;
   height: auto;
@@ -34,8 +34,9 @@ export const ExplorerCard = styled.section`
     color: var(--aq-text);
     font-size: 1.875rem;
     line-height: 2.25rem;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.028em;
     font-weight: 800;
+    text-wrap: balance;
 
     @media (min-width: ${breakpoint.sm}px) {
       font-size: 2.25rem;
@@ -56,20 +57,20 @@ export const ExplorerCard = styled.section`
   }
 
   .sortTrigger {
-    height: 36px;
+    height: 38px;
     border: 1px solid var(--aq-border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--aq-surface);
     display: inline-flex;
     color: var(--aq-muted);
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    min-width: 86px;
-    padding: 0 10px;
+    gap: 10px;
+    min-width: 88px;
+    padding: 0 12px;
     font-size: 0.8125rem;
     line-height: 1;
-    font-weight: 740;
+    font-weight: 650;
     letter-spacing: 0;
     cursor: pointer;
     transition:
@@ -209,10 +210,10 @@ export const FeedBody = styled.section`
   --feed-post-column-max-width: ${FEED_POST_COLUMN_MAX_WIDTH_REM}rem;
   display: flex;
   align-items: flex-start;
-  gap: 4rem;
+  gap: 3.5rem;
   min-width: 0;
   overflow: visible;
-  padding: 2rem 0 4.5rem;
+  padding: 2.25rem 0 4.5rem;
 
   .tagColumn {
     flex: 0 0 auto;
@@ -227,7 +228,7 @@ export const FeedBody = styled.section`
   }
 
   @media (min-width: ${breakpoint.xl}px) {
-    gap: 6rem;
+    gap: 5rem;
   }
 
   @media (max-width: ${breakpoint.lg - 1}px) {
@@ -273,8 +274,9 @@ export const FilterContextBar = styled.div`
   .contextCount {
     font-size: 0.88rem;
     color: var(--aq-text);
-    font-weight: 740;
+    font-weight: 700;
     letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
   }
 
   .filterSummary {
@@ -292,19 +294,20 @@ export const FilterContextBar = styled.div`
 
   .resetButton {
     flex: 0 0 auto;
-    min-height: 1.7rem;
-    padding: 0 0.56rem;
-    border-radius: 4px;
-    border: 0;
+    min-height: 1.75rem;
+    padding: 0 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid var(--aq-border);
     background: var(--aq-surface-subtle);
     color: var(--aq-text-secondary, var(--aq-muted));
     font-size: 0.74rem;
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.125s ease-in, background-color 0.125s ease-in;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 
     &:hover {
       background: var(--aq-surface-elevated);
+      border-color: var(--aq-border-strong);
       color: var(--aq-text);
     }
 

@@ -40,12 +40,12 @@ export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   align-items: center;
   gap: 10px;
   min-height: 28px;
-  padding: 4px 11px;
+  padding: 4px 13px;
   border: 1px solid ${adminBorder};
-  border-radius: 6px;
+  border-radius: 9999px;
   background: ${adminSurface};
   box-shadow: 0 2px 10px ${boxShadowColor.subtleHover};
-  color: ${adminTextMuted};
+  color: ${adminTextSecondary};
   font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-variant-numeric: tabular-nums;
   user-select: none;
@@ -268,12 +268,13 @@ export const EditorOutlineItem = styled.button`
 
 export const LocalDraftRestoreCard = styled.div`
   display: grid;
-  gap: 10px;
-  padding: 14px;
-  margin-bottom: 18px;
+  gap: 8px;
+  padding: 11px 14px;
+  margin-bottom: 16px;
   border-radius: 10px;
   border: 1px solid ${adminBorderStrong};
   background: ${adminSurfaceRaised};
+  box-shadow: 0 1px 3px ${boxShadowColor.cardSubtle};
   box-sizing: border-box;
 
   .card-header {

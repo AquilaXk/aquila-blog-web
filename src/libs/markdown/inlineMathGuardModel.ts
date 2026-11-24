@@ -106,6 +106,7 @@ export type ProtectedInlineSentinels = {
   lb: string
   rb: string
   entityPattern: RegExp
+  internalLinkTargets?: Readonly<Record<string, string>>
 }
 
 export type ProtectedInlineTokenEntry = {

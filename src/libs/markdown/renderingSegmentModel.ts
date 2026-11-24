@@ -22,6 +22,7 @@ import {
 import {
   parseOpeningDirectiveLine,
   parseCustomDirectiveFromOpening,
+  resolveCalloutDirectiveRawHeader,
 } from "src/libs/markdown/sharedDirectiveContainerParser"
 import { trimMarkdownPreservingCodeIndent } from "src/libs/markdown/renderingNormalizeModel"
 import { normalizeSafeMarkdownUrl } from "src/libs/markdown/safeMarkdownUrl"
@@ -376,7 +377,7 @@ const tryConsumeColonBlockAt = (
       open.fenceLength
     )
     if (closedIndex >= 0) {
-      const baseHeader = resolveDirectiveCalloutHeader(open.remainder)
+      const baseHeader = resolveDirectiveCalloutHeader(resolveCalloutDirectiveRawHeader(open))
       const hasQuotedTitle = open.quotedTitle !== null && open.quotedTitle.length > 0
       const header: ParsedCalloutHeader = hasQuotedTitle
         ? { ...baseHeader, title: open.quotedTitle!, explicitTitle: true }

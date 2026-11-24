@@ -84,7 +84,11 @@ const PostDetailNavigationChrome = dynamic<PostDetailNavigationChromeProps>(
 export const RAIL_UI_DETAILED_TOC = 1
 export const RAIL_UI_RIGHT_ACTIVE = 1 << 2
 
-const PostDetail: React.FC = () => {
+type PostDetailProps = {
+  initialInternalLinkTargets?: Record<string, string>
+}
+
+const PostDetail: React.FC<PostDetailProps> = ({ initialInternalLinkTargets }) => {
   const { language, t } = useLanguage()
   const { post: data } = usePostQuery()
   const postId = data?.id ?? ""
@@ -535,6 +539,7 @@ const PostDetail: React.FC = () => {
               <MarkdownRenderer
                 content={renderedContent}
                 trustedContentHtml={data?.trustedContentHtml}
+                internalLinkTargets={initialInternalLinkTargets}
                 forceScheme="light"
               />
             </RecoverableSurfaceBoundary>

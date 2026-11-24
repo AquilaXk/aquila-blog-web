@@ -57,10 +57,11 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   ${selector} h2,
   ${selector} h3,
   ${selector} h4 {
-    letter-spacing: 0;
-    margin-top: 1.65rem;
-    margin-bottom: 0.68rem;
+    letter-spacing: -0.015em;
+    margin-top: 1.75rem;
+    margin-bottom: 0.72rem;
     font-weight: 600;
+    text-wrap: balance;
   }
 
   ${selector} h1 {
@@ -69,11 +70,15 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   }
 
   ${selector} h2 {
+    margin-top: 2.25rem;
+    padding-bottom: 0.42rem;
+    border-bottom: 1px solid ${theme.colors.gray5};
     font-size: ${articleTypographyScale.h2FontSize};
     line-height: ${articleTypographyScale.h2LineHeight};
   }
 
   ${selector} h3 {
+    margin-top: 1.85rem;
     font-size: ${articleTypographyScale.h3FontSize};
     line-height: ${articleTypographyScale.h3LineHeight};
   }
@@ -84,11 +89,12 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   }
 
   ${selector} p {
-    margin: 0.72rem 0;
+    margin: 0.75rem 0;
     font-size: ${articleTypographyScale.bodyFontSize};
     line-height: ${articleTypographyScale.bodyLineHeight};
     word-break: keep-all;
     overflow-wrap: anywhere;
+    text-wrap: pretty;
   }
 
   ${selector} a {
@@ -104,11 +110,13 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   }
 
   ${selector} blockquote {
-    margin: 0.95rem 0;
-    padding: 0.12rem 0 0.12rem 1rem;
-    border-left: 4px solid ${theme.colors.gray7};
+    margin: 1.25rem 0;
+    padding: 0.85rem 1.15rem;
+    border-left: 3px solid ${theme.publicDesign.accent};
+    border-radius: 0 0.5rem 0.5rem 0;
     color: ${theme.colors.gray11};
-    background: transparent;
+    background: color-mix(in srgb, ${theme.colors.gray3} 70%, transparent);
+    text-wrap: pretty;
   }
 
   ${selector} blockquote > :first-of-type {
@@ -126,13 +134,14 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   }
 
   ${selector} li + li {
-    margin-top: 0.22rem;
+    margin-top: 0.25rem;
   }
 
   ${selector} li {
     line-height: ${articleTypographyScale.bodyLineHeight};
     word-break: keep-all;
     overflow-wrap: anywhere;
+    text-wrap: pretty;
   }
 
   ${selector} hr {

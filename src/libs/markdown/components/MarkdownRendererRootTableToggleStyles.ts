@@ -128,6 +128,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-gutter: stable;
     border: 1px solid ${tableChrome.border};
     border-radius: 0.75rem;
     background: ${tableChrome.background};
@@ -196,6 +197,7 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
     top: 0;
     z-index: 1;
     text-align: left;
+    text-wrap: balance;
     background: ${tableChrome.headerBackground};
     color: ${theme.colors.gray10};
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
@@ -279,6 +281,16 @@ export const markdownRendererRootTableToggleStyles = (theme: Theme) => css`
   .aq-table tr td:last-child,
   .aq-table tr th:last-child {
     border-right: 0;
+  }
+
+  tbody tr:nth-of-type(even),
+  .aq-table tbody tr:nth-of-type(even) {
+    background: color-mix(in srgb, var(--aq-surface-subtle) 55%, transparent);
+  }
+
+  tbody tr:hover,
+  .aq-table tbody tr:hover {
+    background: var(--aq-surface-subtle);
   }
 
   tbody tr:last-child td,

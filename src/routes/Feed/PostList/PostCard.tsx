@@ -227,6 +227,7 @@ const StyledWrapper = styled.div`
     line-height: 1.5rem;
     font-weight: 500;
     color: var(--aq-muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .sortMetric {
@@ -243,7 +244,7 @@ const StyledWrapper = styled.div`
   .headingGroup {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.375rem;
     min-width: 0;
   }
 
@@ -260,6 +261,9 @@ const StyledWrapper = styled.div`
 
     &:hover h2 {
       color: var(--aq-accent-link, var(--aq-accent));
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 0.2em;
     }
 
     &:focus-visible {
@@ -278,50 +282,58 @@ const StyledWrapper = styled.div`
     letter-spacing: -0.025em;
     overflow-wrap: anywhere;
     word-break: keep-all;
-    transition: color 120ms ease;
+    text-wrap: balance;
+    transition: color 140ms ease;
   }
 
   .tagRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-    margin-top: 0.125rem;
+    gap: 0.375rem 0.5rem;
+    margin-top: 0.25rem;
   }
 
   .tagLink {
     display: inline-flex;
     align-items: center;
-    font-size: 0.875rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--aq-border);
+    background: var(--aq-surface-subtle);
+    font-size: 0.8125rem;
     line-height: 1.25rem;
     font-weight: 500;
     color: var(--aq-text-secondary);
     text-decoration: none;
-    transition: color 120ms ease;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 
     &:hover {
       color: var(--aq-accent-link, var(--aq-accent));
+      border-color: var(--aq-border-strong);
+      background: var(--aq-surface);
     }
 
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 2px;
-      border-radius: 2px;
+      border-radius: 0.375rem;
     }
 
     @media (pointer: coarse) {
       min-height: 44px;
-      padding: 0 0.25rem;
+      padding: 0 0.75rem;
     }
   }
 
   .summary {
     margin: 0;
-    color: var(--aq-muted);
+    color: var(--aq-text-secondary);
     font-size: 1rem;
     line-height: 1.625;
     font-weight: 400;
-    max-width: none;
+    max-width: 68ch;
     overflow-wrap: anywhere;
+    text-wrap: pretty;
     display: -webkit-box;
     -webkit-line-clamp: ${uiTokens.feed.card.summaryLines};
     -webkit-box-orient: vertical;

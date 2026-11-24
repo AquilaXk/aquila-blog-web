@@ -250,7 +250,7 @@ const StyledWrapper = styled.div`
   .panelInner {
     display: flex;
     flex-direction: column;
-    padding: 0.25rem 1.25rem 0.25rem 0;
+    padding: 0.25rem 1.25rem 0.5rem 0;
     max-height: inherit;
     min-height: 0;
   }
@@ -258,9 +258,12 @@ const StyledWrapper = styled.div`
   .allPostsButton {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.65rem;
     border: 0;
+    border-radius: 0.5rem;
     background: transparent;
     color: var(--aq-text);
     font-size: 0.875rem;
@@ -269,23 +272,25 @@ const StyledWrapper = styled.div`
     text-align: left;
     cursor: pointer;
     flex-shrink: 0;
-    transition: color 120ms ease;
+    transition: color 140ms ease, background-color 140ms ease;
 
     &[data-active="true"] {
       color: var(--aq-accent-link, var(--aq-accent));
+      background: var(--aq-accent-muted);
       cursor: default;
     }
 
     @media (hover: hover) {
       &:hover:not([data-active="true"]) {
         color: var(--aq-accent-link, var(--aq-accent));
+        background: var(--aq-surface-subtle);
       }
     }
 
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 2px;
-      border-radius: 0.25rem;
+      border-radius: 0.5rem;
     }
 
     .allCount {
@@ -298,7 +303,7 @@ const StyledWrapper = styled.div`
 
   .desktopList {
     list-style: none;
-    margin: 0.35rem 0 0;
+    margin: 0.5rem 0 0;
     padding: 0;
     flex: 1 1 auto;
     min-height: 0;
@@ -315,19 +320,19 @@ const StyledWrapper = styled.div`
   }
 
   .desktopList li {
-    margin: 0.75rem 0;
+    margin: 0.1875rem 0;
     min-width: 0;
   }
 
   .desktopList button {
     width: 100%;
     display: flex;
-    align-items: baseline;
-    justify-content: flex-start;
-    gap: 0.35rem;
-    padding: 0.5rem 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4375rem 0.75rem;
     border: 0;
-    border-radius: 0.25rem;
+    border-radius: 0.5rem;
     background: transparent;
     color: var(--aq-muted);
     font-size: 0.875rem;
@@ -335,10 +340,13 @@ const StyledWrapper = styled.div`
     font-weight: 500;
     text-align: left;
     cursor: pointer;
-    transition: color 120ms ease;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
 
     @media (hover: hover) {
       &:hover {
+        background: var(--aq-surface-subtle);
         color: var(--aq-accent-link, var(--aq-accent));
       }
     }
@@ -349,6 +357,7 @@ const StyledWrapper = styled.div`
     }
 
     &[data-active="true"] {
+      background: var(--aq-surface-subtle);
       color: var(--aq-accent-link, var(--aq-accent));
       font-weight: 700;
     }
@@ -362,7 +371,14 @@ const StyledWrapper = styled.div`
 
     .count {
       flex-shrink: 0;
+      font-size: 0.75rem;
+      line-height: 1;
+      color: var(--aq-subtle);
       font-variant-numeric: tabular-nums;
+    }
+
+    &[data-active="true"] .count {
+      color: var(--aq-accent-link, var(--aq-accent));
     }
   }
 
@@ -370,6 +386,7 @@ const StyledWrapper = styled.div`
     margin-top: 0.5rem;
     min-height: 32px;
     border: 0;
+    border-radius: 0.5rem;
     background: transparent;
     color: var(--aq-muted);
     font-size: 0.8125rem;
@@ -378,9 +395,11 @@ const StyledWrapper = styled.div`
     padding: 0.25rem 0.75rem;
     cursor: pointer;
     flex-shrink: 0;
+    transition: color 140ms ease, background-color 140ms ease;
 
     @media (hover: hover) {
       &:hover {
+        background: var(--aq-surface-subtle);
         color: var(--aq-accent-link, var(--aq-accent));
       }
     }
@@ -388,7 +407,7 @@ const StyledWrapper = styled.div`
     &:focus-visible {
       outline: 2px solid var(--aq-focus-ring);
       outline-offset: 2px;
-      border-radius: 0.25rem;
+      border-radius: 0.5rem;
     }
   }
 
@@ -413,16 +432,27 @@ const StyledWrapper = styled.div`
   .chipRail button {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3125rem;
     min-height: ${MOBILE_TOUCH_TARGET_MIN_PX}px;
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.25rem;
+    padding: 0.25rem 0.875rem;
+    border-radius: 9999px;
     border: 1px solid var(--aq-border);
     background: var(--aq-surface);
     color: var(--aq-muted);
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      color 140ms ease;
+
+    @media (hover: hover) {
+      &:hover {
+        border-color: var(--aq-border-strong);
+        color: var(--aq-text);
+      }
+    }
 
     &[data-active="true"] {
       border-color: var(--aq-accent);
@@ -437,7 +467,9 @@ const StyledWrapper = styled.div`
     }
 
     .count {
+      font-size: 0.75rem;
       font-variant-numeric: tabular-nums;
+      opacity: 0.82;
     }
   }
 

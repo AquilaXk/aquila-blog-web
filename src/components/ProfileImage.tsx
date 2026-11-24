@@ -90,7 +90,7 @@ const ProfileImage: React.FC<Props> = ({
           strokeLinejoin="round"
           aria-hidden="true"
           focusable="false"
-          style={{ width: "min(20px, 56%)", height: "min(20px, 56%)", opacity: 0.72 }}
+          style={{ width: "42%", height: "42%", maxWidth: "56px", maxHeight: "56px", opacity: 0.68 }}
         >
           <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
           <circle cx="12" cy="7" r="4" />

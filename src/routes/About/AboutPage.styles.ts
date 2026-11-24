@@ -26,6 +26,7 @@ export const StyledWrapper = styled.div`
       line-height: 2.25rem;
       font-weight: 800;
       letter-spacing: -0.025em;
+      text-wrap: balance;
 
       @media (min-width: ${breakpoint.sm}px) {
         font-size: 2.25rem;
@@ -104,13 +105,15 @@ export const StyledWrapper = styled.div`
     justify-content: center;
     min-width: ${control.lg}px;
     min-height: ${control.lg}px;
-    border-radius: 0.375rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
     color: var(--aq-muted);
     text-decoration: none;
-    transition: color 140ms ease, background-color 140ms ease;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 
     &:hover {
       color: var(--aq-accent-link, var(--aq-accent));
+      border-color: var(--aq-border);
       background: var(--aq-surface-subtle);
     }
 
@@ -137,16 +140,19 @@ export const StyledWrapper = styled.div`
       letter-spacing: -0.02em;
       color: var(--aq-text);
       word-break: keep-all;
+      text-wrap: balance;
     }
 
     p {
       margin: 0;
+      max-width: 65ch;
       color: var(--aq-text-secondary, var(--aq-muted));
       font-size: 1.0625rem;
       line-height: 1.75;
       white-space: pre-line;
       overflow-wrap: anywhere;
       word-break: keep-all;
+      text-wrap: pretty;
     }
   }
 
@@ -182,6 +188,14 @@ export const StyledWrapper = styled.div`
     border-radius: 0.375rem;
     border: 2px solid var(--aq-border);
     background: var(--aq-surface);
+    transition: border-color 160ms ease, background-color 160ms ease;
+
+    @media (hover: hover) {
+      &:hover {
+        border-color: var(--aq-border-strong, var(--aq-accent));
+        background: var(--aq-surface-subtle);
+      }
+    }
 
     .projectCardBody {
       min-width: 0;
@@ -250,7 +264,7 @@ export const StyledWrapper = styled.div`
     padding: 0;
     list-style: none;
     display: grid;
-    gap: 0.875rem;
+    gap: 0;
   }
 
   .proseListItem {
@@ -258,9 +272,20 @@ export const StyledWrapper = styled.div`
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.25rem 0.75rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--aq-border);
     font-size: 1rem;
     line-height: 1.65;
     color: var(--aq-text-secondary, var(--aq-text));
+
+    &:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    &:first-child {
+      padding-top: 0;
+    }
   }
 
   .proseListMeta {

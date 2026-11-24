@@ -19,6 +19,7 @@ import {
   parseMarkdownTableLayoutComment,
 } from "../../src/libs/markdown/tableMetadata"
 import { parseMarkdownSegments } from "../../src/libs/markdown/renderingSegmentModel"
+import { parseBlockContainerBlocks } from "../../src/components/markdown-editor/markdownEditorBlockContainerModel"
 import {
   createMarkdownDocumentInsights,
   formatMarkdownHeadingLabel,
@@ -56,6 +57,7 @@ const renderMarkdownHtml = (
   options: {
     forceScheme?: "light" | "dark"
     strictMode?: boolean
+    internalLinkTargets?: Readonly<Record<string, string>>
   } = {}
 ): string => {
   const queryClient = new QueryClient()
@@ -63,6 +65,7 @@ const renderMarkdownHtml = (
     content,
     disableMermaid: true,
     forceScheme: options.forceScheme,
+    internalLinkTargets: options.internalLinkTargets,
   })
   const tree = createElement(
     QueryClientProvider,
@@ -882,5 +885,68 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     expect(markdownRendererSource).toContain("standaloneImageIndices")
     expect(markdownRendererSource).not.toContain("tableRenderIndexRef")
     expect(markdownRendererSource).not.toContain("imageRenderOrderRef")
+  })
+
+  test("13. parses :::summary and shorthand callout directives identically across MarkdownRenderer and editor container parser", () => {
+    const markdown = [
+      ":::summary",
+      "L1 캐시와 Redis Singleflight를 결합해 스탬피드를 방지합니다.",
+      ":::",
+      "",
+      ":::summary title=\"핵심 포인트\"",
+      "- 항목 1",
+      "- 항목 2",
+      ":::",
+      "",
+      ":::warning 주의사항",
+      "만료 시각 계산에 주의하세요.",
+      ":::",
+    ].join("\n")
+
+    const segments = parseMarkdownSegments(markdown)
+    expect(segments.filter((s) => s.type === "callout")).toHaveLength(3)
+    expect(segments.map((s) => (s.type === "callout" ? `${s.kind}:${s.title}` : s.type))).toEqual([
+      "summary:",
+      "summary:핵심 포인트",
+      "warning:주의사항",
+    ])
+
+    const html = renderMarkdownHtml(markdown)
+    expect(html).not.toContain(":::summary")
+    expect(html).not.toContain(":::warning")
+    expect(html).toContain('data-callout="summary"')
+    expect(html).toContain("핵심 요약")
+    expect(html).toContain("핵심 포인트")
+    expect(html).toContain('data-callout="warning"')
+    expect(html).toContain("주의사항")
+
+    const editorBlocks = parseBlockContainerBlocks(markdown)
+    expect(editorBlocks).toHaveLength(3)
+    expect(editorBlocks.map((b) => (b.kind === "callout" ? `${b.tone}:${b.title}` : b.kind))).toEqual([
+      "purple:콜아웃",
+      "purple:핵심 포인트",
+      "warning:주의사항",
+    ])
+    if (editorBlocks[0]?.kind === "callout") {
+      expect(editorBlocks[0].body).toBe("L1 캐시와 Redis Singleflight를 결합해 스탬피드를 방지합니다.")
+    }
+  })
+
+  test("14. resolves [[wikilink]] targets to /posts/<id>#<anchor> via internalLinkTargets and rejects unsafe target paths fail-closed", () => {
+    const markdown = [
+      "Read [[Distributed Consensus#Raft Leader|Consensus Guide]] and [[Unknown Topic]].",
+    ].join("\n")
+
+    const html = renderMarkdownHtml(markdown, {
+      internalLinkTargets: {
+        "distributed consensus": "/posts/99",
+        "tampered": "javascript:alert(1)",
+      },
+    })
+
+    expect(html).toContain('href="/posts/99#raft-leader"')
+    expect(html).toContain('data-wikilink-resolved="true"')
+    expect(html).toContain(`href="/?q=${encodeURIComponent("Unknown Topic")}"`)
+    expect(html).not.toContain("javascript:alert(1)")
   })
 })

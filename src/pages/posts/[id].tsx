@@ -26,7 +26,11 @@ export const getServerSideProps: GetServerSideProps = withSsrMetrics("public", a
   return await buildCanonicalPostDetailServerProps(postId, res, req)
 })
 
-const CanonicalPostPage: NextPageWithLayout = () => {
+type CanonicalPostPageProps = {
+  initialInternalLinkTargets?: Record<string, string>
+}
+
+const CanonicalPostPage: NextPageWithLayout<CanonicalPostPageProps> = ({ initialInternalLinkTargets }) => {
   const { post, isNotFound, isError, isPending, refetch } = usePostQuery()
   const renderState = resolvePostDetailRenderState({
     isNotFound,
@@ -53,7 +57,7 @@ const CanonicalPostPage: NextPageWithLayout = () => {
     <>
       <MetaConfig {...meta} />
       <DetailShell data-type={post.type?.[0] ?? "Post"}>
-        <PostDetail />
+        <PostDetail initialInternalLinkTargets={initialInternalLinkTargets} />
       </DetailShell>
     </>
   )
