@@ -18,6 +18,7 @@ import {
 import {
   deriveAdminHubActivityItems,
   deriveAdminHubOperationalMetrics,
+  deriveAdminHubShareBars,
   mergeAdminHubOperationalRefresh,
 } from "src/routes/Admin/AdminHubSurfaceModel"
 import {
@@ -213,6 +214,19 @@ test.describe("Track 2 — Admin Hub global KPI & refresh resilience", () => {
     expect(merged.snapshot.systemHealth).toBe(previous.systemHealth)
     expect(merged.snapshot.dashboard).toBe(previous.dashboard)
     expect(merged.snapshot.fetchedAt).toBe(previous.fetchedAt)
+  })
+
+  test("derives Readership Share bars directly from total view percentage shares", () => {
+    const bars = deriveAdminHubShareBars([
+      { href: "/admin/editor/1", title: "Alpha", views: 3421 },
+      { href: "/admin/editor/2", title: "Beta", views: 2180 },
+      { href: "/admin/editor/3", title: "Gamma", views: 1640 },
+    ])
+    expect(bars.map((bar) => ({ sharePct: bar.sharePct, widthPct: bar.widthPct }))).toEqual([
+      { sharePct: 47, widthPct: 47 },
+      { sharePct: 30, widthPct: 30 },
+      { sharePct: 23, widthPct: 23 },
+    ])
   })
 })
 

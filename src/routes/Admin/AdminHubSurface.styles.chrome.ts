@@ -329,7 +329,7 @@ export const ShareBarItem = styled.a`
 
 export const ShareBarFill = styled.span<{ $widthPct: number }>`
   position: absolute;
-  inset: 2px auto 2px 0;
+  inset: 4px auto 4px 0;
   width: ${({ $widthPct }) => `${Math.max(0, Math.min(100, $widthPct))}%`};
   border-radius: 4px;
   background: ${adminBarFillSubtle};

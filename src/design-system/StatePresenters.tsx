@@ -262,7 +262,7 @@ const EmptyStateShell = styled.section`
     align-items: center;
     justify-content: center;
     padding: 0.25rem 0.65rem;
-    border-radius: 999px;
+    border-radius: 0.25rem;
     background: ${({ theme }) => semanticColors(theme).surfaceMuted};
     font-family: ${editorialLabel.fontFamily};
     font-size: ${editorialLabel.fontSize};

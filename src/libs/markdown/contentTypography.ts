@@ -111,12 +111,12 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
   }
 
   ${selector} blockquote {
-    margin: 1.25rem 0;
-    padding: 0.85rem 1.15rem;
-    border-left: 3px solid ${theme.publicDesign.accent};
-    border-radius: 0 0.5rem 0.5rem 0;
+    margin: 0.95rem 0;
+    padding: 0.12rem 0 0.12rem 1rem;
+    border-left: 4px solid ${theme.colors.gray7};
+    border-radius: 0;
     color: ${theme.colors.gray11};
-    background: color-mix(in srgb, ${theme.colors.gray3} 70%, transparent);
+    background: transparent;
     text-wrap: pretty;
   }
 

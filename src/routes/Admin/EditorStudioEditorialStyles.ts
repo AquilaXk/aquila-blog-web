@@ -343,7 +343,7 @@ export const EditorOutlineTree = styled.div`
       top: 5px;
       bottom: 5px;
       width: 2px;
-      border-radius: 999px;
+      border-radius: 1px;
       background: ${adminTeal};
     }
   }
@@ -390,9 +390,9 @@ export const EditorStatusRightGroup = styled.div`
 
 export const EditorStatusWarningBadge = styled.span`
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid ${({ theme }) => theme.colors.orange7};
-  background: ${({ theme }) => theme.colors.orange3};
+  background: ${adminSurfaceMuted};
   color: ${({ theme }) => theme.colors.orange11};
 `
 

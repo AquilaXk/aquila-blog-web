@@ -165,7 +165,6 @@ export const StyledWrapper = styled.div`
   .sidebarDivided {
     display: flex;
     flex-direction: column;
-    flex: 1 0 auto;
   }
 
   .sidebarSection {
@@ -299,7 +298,13 @@ export const StyledWrapper = styled.div`
   }
 
   .sidebarBackWrap {
-    padding-top: 1.25rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--aq-border);
+
+    &:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
   }
 
   .sidebarBackLink {

@@ -84,6 +84,32 @@ test.describe("Issue #263 Wave 4 UX & Zero Boundary Warnings", () => {
     })
     expect(replacedLineNumbers.has(3)).toBe(true)
     expect(replacedLineNumbers.has(6)).toBe(true)
+
+    const unclosedDoc = [
+      "본문 작성 중입니다.",
+      "",
+      "```",
+    ].join("\n")
+    const unclosedState = EditorState.create({
+      doc: unclosedDoc,
+      selection: EditorSelection.cursor(0),
+      extensions: [
+        markdown({ extensions: GFM }),
+        compositionField,
+        pointerSelectingField,
+        editorModeField,
+        disableMermaidField,
+      ],
+    })
+    const unclosedDeco = buildDecorations(unclosedState)
+    const unclosedReplaced = new Set<number>()
+    unclosedDeco.between(0, unclosedState.doc.length, (from, to, value) => {
+      const spec = (value as { spec?: { class?: string; widget?: unknown; attributes?: unknown } }).spec
+      if (from < to && spec && !spec.class && !spec.widget && !spec.attributes) {
+        unclosedReplaced.add(unclosedState.doc.lineAt(from).number)
+      }
+    })
+    expect(unclosedReplaced.has(3)).toBe(false)
   })
 
   test("R-4: useResponsiveTableEffect runs synchronously per renderKey without persistent MutationObserver", () => {

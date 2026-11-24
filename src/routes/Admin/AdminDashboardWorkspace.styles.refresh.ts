@@ -192,7 +192,7 @@ export const ChartBarTrack = styled.div`
   align-items: center;
   width: 100%;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 2px;
   background: ${adminSurfaceMuted};
   overflow: hidden;
 `
@@ -200,7 +200,7 @@ export const ChartBarTrack = styled.div`
 export const ChartBar = styled.i`
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
   background: ${adminTeal};
   transition: width 0.25s ease-out;
 

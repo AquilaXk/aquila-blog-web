@@ -188,7 +188,7 @@ const SkipToMainLink = styled.a`
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 999px;
+  border-radius: 0.375rem;
   border: 2px solid ${({ theme }) => theme.colors.indigo8};
   background: ${({ theme }) => theme.colors.gray12};
   color: ${({ theme }) => theme.publicDesign.readableSurface};

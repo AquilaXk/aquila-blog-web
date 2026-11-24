@@ -315,7 +315,7 @@ const QuickSearchPalette: React.FC<QuickSearchPaletteProps> = ({
               onClick={onClose}
               aria-label={copy.close}
             >
-              Esc
+              ESC
             </button>
           </div>
 

@@ -471,7 +471,7 @@ export const TitleInput = styled.textarea`
   height: auto;
   field-sizing: content;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
   border-radius: 0;
   padding: 0 0 4px;
   min-height: 50px;
@@ -504,7 +504,7 @@ export const TitleInput = styled.textarea`
   &:focus-visible {
     outline: none;
     box-shadow: none;
-    border-bottom-color: ${adminTeal};
+    border-bottom-color: ${adminBorderStrong};
   }
 
   @media (max-width: 820px) {

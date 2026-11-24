@@ -452,7 +452,7 @@ const RevisionCardSummary = styled.summary`
 
   .summaryBadge {
     padding: 2px 7px;
-    border-radius: 999px;
+    border-radius: 4px;
     border: 1px solid ${adminBorder};
     background: ${adminSurfaceMuted};
     color: ${adminTextSecondary};

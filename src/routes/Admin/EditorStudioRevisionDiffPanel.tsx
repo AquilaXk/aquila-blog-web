@@ -165,7 +165,7 @@ const DiffTagPill = styled.span`
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.68rem;
   font-weight: 600;
 

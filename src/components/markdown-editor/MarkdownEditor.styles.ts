@@ -399,7 +399,8 @@ export const LiveEditorBody = styled.div<{
     border-top: 1px solid ${EDITOR_SYNTAX_COLORS.codeBlockLineBorder};
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
-    padding-top: 10px;
+    padding-top: 8px;
+    line-height: 1.45;
     color: ${EDITOR_SYNTAX_COLORS.codeBlockLineMuted};
   }
   .cm-line.cm-live-code-body-line { padding-top: 1px; padding-bottom: 1px; }
@@ -407,7 +408,9 @@ export const LiveEditorBody = styled.div<{
     border-bottom: 1px solid ${EDITOR_SYNTAX_COLORS.codeBlockLineBorder};
     border-bottom-left-radius: 4px;
     border-bottom-right-radius: 4px;
-    padding-bottom: 10px;
+    padding-top: 0;
+    padding-bottom: 6px;
+    line-height: 0.85;
     color: ${EDITOR_SYNTAX_COLORS.codeBlockLineMuted};
   }
 

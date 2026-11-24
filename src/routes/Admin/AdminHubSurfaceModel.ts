@@ -312,20 +312,20 @@ export const deriveAdminHubShareBars = (
   normalized.sort((a, b) => b.views - a.views)
 
   let totalViews = 0
-  let maxViews = 0
   for (let i = 0; i < normalized.length; i += 1) {
-    const v = normalized[i]!.views
-    totalViews += v
-    if (v > maxViews) maxViews = v
+    totalViews += normalized[i]!.views
   }
 
-  return normalized.map((item) => ({
-    href: item.href,
-    title: item.title,
-    views: item.views,
-    widthPct: maxViews > 0 && item.views > 0 ? Math.max(4, Math.round((item.views / maxViews) * 100)) : 0,
-    sharePct: totalViews > 0 ? Math.round((item.views / totalViews) * 100) : 0,
-  }))
+  return normalized.map((item) => {
+    const sharePct = totalViews > 0 ? Math.round((item.views / totalViews) * 100) : 0
+    return {
+      href: item.href,
+      title: item.title,
+      views: item.views,
+      widthPct: item.views > 0 ? Math.max(4, sharePct) : 0,
+      sharePct,
+    }
+  })
 }
 
 export const deriveAdminHubActivityItems = (input: {

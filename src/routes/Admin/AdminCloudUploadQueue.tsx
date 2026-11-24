@@ -531,7 +531,7 @@ const ProgressTrack = styled.div`
   grid-column: 1 / -1;
   height: 0.28rem;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 2px;
   background: ${adminSurfaceRaised};
 
   span {

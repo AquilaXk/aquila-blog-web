@@ -43,7 +43,7 @@ const ReadinessCard = styled.div`
 const ReadinessProgressTrack = styled.div`
   width: 100%;
   height: 4px;
-  border-radius: 999px;
+  border-radius: 2px;
   background: ${adminSurfaceMuted};
   overflow: hidden;
 `
@@ -51,7 +51,7 @@ const ReadinessProgressTrack = styled.div`
 const ReadinessProgressFill = styled.div<{ $percent: number; $hasWarning: boolean }>`
   width: ${({ $percent }) => `${$percent}%`};
   height: 100%;
-  border-radius: 999px;
+  border-radius: 2px;
   background: ${({ theme, $hasWarning }) =>
     $hasWarning ? adminTeal : theme.colors.green9};
   transition: width 0.2s ease, background-color 0.2s ease;
@@ -71,12 +71,11 @@ const ReadinessTitle = styled.span`
 
 const ReadinessScoreBadge = styled.span<{ $hasWarning: boolean }>`
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid
     ${({ theme, $hasWarning }) =>
       $hasWarning ? theme.colors.orange7 : adminBorder};
-  background: ${({ theme, $hasWarning }) =>
-    $hasWarning ? theme.colors.orange3 : adminSurfaceMuted};
+  background: ${adminSurfaceMuted};
   color: ${({ theme, $hasWarning }) =>
     $hasWarning ? theme.colors.orange11 : adminTextSecondary};
   font: 600 10.5px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

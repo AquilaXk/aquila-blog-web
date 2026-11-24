@@ -111,7 +111,6 @@ export const VisibilityOptionButton = styled.button`
   &[data-active="true"] {
     border-color: ${adminTealBorder};
     background: ${adminSurfaceMuted};
-    box-shadow: inset 3px 0 0 ${adminTeal};
   }
 
   &:hover:not([data-active="true"]) {

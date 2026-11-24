@@ -356,25 +356,6 @@ export const PostLayoutSidebar = memo(function PostLayoutSidebar({
             ) : null}
           </div>
         ) : null}
-
-        {showStickyToc ? (
-          <div className="sidebarSection sidebarStickySlot">
-            <RightTocRail
-              railRef={railRef}
-              innerRef={innerRef}
-              listRef={listRef}
-              buttonRefsById={buttonRefsById}
-              active={active}
-              showStickyToc={showStickyToc}
-              visibleTocItems={visibleTocItems}
-              activeTocId={activeTocId}
-              hasDepth4Toc={hasDepth4Toc}
-              showDetailedToc={showDetailedToc}
-              onToggleDetailed={onToggleDetailed}
-              onNavigate={onNavigate}
-            />
-          </div>
-        ) : null}
       </div>
 
       <div className="sidebarBackWrap">
@@ -383,6 +364,25 @@ export const PostLayoutSidebar = memo(function PostLayoutSidebar({
           <span>{t("postAllPosts")}</span>
         </Link>
       </div>
+
+      {showStickyToc ? (
+        <div className="sidebarStickySlot">
+          <RightTocRail
+            railRef={railRef}
+            innerRef={innerRef}
+            listRef={listRef}
+            buttonRefsById={buttonRefsById}
+            active={active}
+            showStickyToc={showStickyToc}
+            visibleTocItems={visibleTocItems}
+            activeTocId={activeTocId}
+            hasDepth4Toc={hasDepth4Toc}
+            showDetailedToc={showDetailedToc}
+            onToggleDetailed={onToggleDetailed}
+            onNavigate={onNavigate}
+          />
+        </div>
+      ) : null}
     </aside>
   )
 })
