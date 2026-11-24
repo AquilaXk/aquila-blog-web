@@ -69,8 +69,12 @@ export const resolveInternalWikilinkHref = (
   }
   const { baseTarget, anchorSlug } = splitWikilinkTargetAndAnchor(trimmed)
   if (!baseTarget) return { href: fallbackHref, isResolvedPost: false }
-  const matchedPath = internalLinkTargets[normalizeWikilinkLookupKey(baseTarget)]
-  if (!matchedPath || !/^\/posts\/[1-9]\d*$/.test(matchedPath)) {
+  const normalizedKey = normalizeWikilinkLookupKey(baseTarget)
+  if (!Object.hasOwn(internalLinkTargets, normalizedKey)) {
+    return { href: fallbackHref, isResolvedPost: false }
+  }
+  const matchedPath = internalLinkTargets[normalizedKey]
+  if (typeof matchedPath !== "string" || !/^\/posts\/[1-9]\d*$/.test(matchedPath)) {
     return { href: fallbackHref, isResolvedPost: false }
   }
   return {

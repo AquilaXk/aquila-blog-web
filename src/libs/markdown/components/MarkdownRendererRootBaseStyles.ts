@@ -197,13 +197,16 @@ export const markdownRendererRootBaseStyles = (theme: Theme) => css`
 
   li.task-list-item {
     list-style: none;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.52rem;
+    position: relative;
+    display: block;
+    padding-left: 1.55rem;
   }
 
   li.task-list-item input[type="checkbox"] {
-    margin: 0.34rem 0 0;
+    position: absolute;
+    left: 0;
+    top: 0.34rem;
+    margin: 0;
     width: 0.95rem;
     height: 0.95rem;
     accent-color: ${theme.publicDesign.accent};

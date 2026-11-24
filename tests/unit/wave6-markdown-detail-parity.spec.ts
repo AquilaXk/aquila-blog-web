@@ -45,6 +45,7 @@ import {
   FloatingActionRail,
   MobileSummaryActions,
 } from "../../src/routes/Detail/PostDetail/PostDetailActionSections"
+import { selectUniqueRelatedPosts } from "../../src/routes/Detail/PostDetail/PostDetailRelatedSection"
 import { createTheme } from "../../src/styles/theme"
 import type { TPost } from "../../src/types"
 import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
@@ -923,7 +924,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
     const editorBlocks = parseBlockContainerBlocks(markdown)
     expect(editorBlocks).toHaveLength(3)
     expect(editorBlocks.map((b) => (b.kind === "callout" ? `${b.tone}:${b.title}` : b.kind))).toEqual([
-      "purple:콜아웃",
+      "purple:핵심 요약",
       "purple:핵심 포인트",
       "warning:주의사항",
     ])
@@ -934,7 +935,7 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
 
   test("14. resolves [[wikilink]] targets to /posts/<id>#<anchor> via internalLinkTargets and rejects unsafe target paths fail-closed", () => {
     const markdown = [
-      "Read [[Distributed Consensus#Raft Leader|Consensus Guide]] and [[Unknown Topic]].",
+      "Read [[Distributed Consensus#Raft Leader|Consensus Guide]], [[toString]], [[constructor]], and [[Unknown Topic]].",
     ].join("\n")
 
     const html = renderMarkdownHtml(markdown, {
@@ -946,7 +947,47 @@ test.describe("wave 6 public markdown parity, sanitization, and PostDetail stabi
 
     expect(html).toContain('href="/posts/99#raft-leader"')
     expect(html).toContain('data-wikilink-resolved="true"')
+    expect(html).toContain(`href="/?q=${encodeURIComponent("toString")}"`)
+    expect(html).toContain(`href="/?q=${encodeURIComponent("constructor")}"`)
     expect(html).toContain(`href="/?q=${encodeURIComponent("Unknown Topic")}"`)
     expect(html).not.toContain("javascript:alert(1)")
+  })
+
+  test("15. enforces task-list inline wrapping, mobile table readability, adjacent/related dedup, and non-truncated admin KPI values", () => {
+    const related = selectUniqueRelatedPosts(
+      [
+        { id: "10", title: "Next Post" } as TPost,
+        { id: "11", title: "Distinct Related" } as TPost,
+      ],
+      [{ id: "12", title: "Author Related" } as TPost],
+      4,
+      ["10"]
+    )
+    expect(related.map((post) => post.id)).toEqual(["11", "12"])
+
+    const baseStyles = readFileSync(
+      path.join(REPO_ROOT, "src/libs/markdown/components/MarkdownRendererRootBaseStyles.ts"),
+      "utf8"
+    )
+    expect(baseStyles).toContain("li.task-list-item {\n    list-style: none;\n    position: relative;\n    display: block;")
+
+    const typographyStyles = readFileSync(
+      path.join(REPO_ROOT, "src/libs/markdown/contentTypography.ts"),
+      "utf8"
+    )
+    expect(typographyStyles).toContain("overflow-wrap: break-word;\n    word-break: normal;")
+
+    const mobileTableStyles = readFileSync(
+      path.join(REPO_ROOT, "src/libs/markdown/components/MarkdownRendererRootTableToggleStyles.ts"),
+      "utf8"
+    )
+    expect(mobileTableStyles).toContain("max-width: none;\n      table-layout: auto;")
+
+    const queueCardsSource = readFileSync(
+      path.join(REPO_ROOT, "src/routes/Admin/AdminBullQueueCards.tsx"),
+      "utf8"
+    )
+    expect(queueCardsSource).not.toContain("text-overflow: ellipsis;\n    white-space: nowrap;\n  }\n\n  small")
+    expect(queueCardsSource).toContain("<ValueGroup>")
   })
 })

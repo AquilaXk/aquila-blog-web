@@ -36,6 +36,7 @@ export const EditorToolbar = styled.div`
 
   @media (max-width: 820px) {
     padding: 2px 8px;
+    gap: 8px;
   }
 `
 
@@ -62,9 +63,12 @@ export const ToolbarGroup = styled.div`
       flex: 1 1 0%;
       width: 0;
       flex-wrap: nowrap;
+      padding-right: 14px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+      mask-image: linear-gradient(to right, currentColor 0, currentColor calc(100% - 14px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, currentColor 0, currentColor calc(100% - 14px), transparent 100%);
       &::-webkit-scrollbar {
         display: none;
       }

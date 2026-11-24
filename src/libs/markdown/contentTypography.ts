@@ -167,6 +167,8 @@ export const markdownContentTypography = (selector: string, theme: ThemeLike) =>
         --aq-inline-code-border,
         ${theme.publicDesign.inlineCodeBorder}
       );
+    overflow-wrap: break-word;
+    word-break: normal;
     letter-spacing: -0.01em;
     font-size: ${articleTypographyScale.codeFontSize};
     line-height: ${articleTypographyScale.codeLineHeight};

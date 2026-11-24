@@ -249,7 +249,10 @@ const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpe
     : CODE_FENCE_OPEN_DECORATION
   addCodeLineDecorationOnce(ctx, startLine.from, openDeco)
   if (!isComposing && startLine.to > startLine.from) {
-    pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, startLine.from, startLine.to)
+    const hideFrom = Math.max(startLine.from, spec.from)
+    if (startLine.to > hideFrom) {
+      pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, hideFrom, startLine.to)
+    }
   }
   for (let lineNo = startLine.number + 1; lineNo < endLine.number; lineNo += 1) {
     addCodeLineDecorationOnce(ctx, ctx.state.doc.line(lineNo).from, CODE_BODY_LINE_DECORATION)
@@ -257,7 +260,11 @@ const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpe
   if (endLine.number > startLine.number) {
     addCodeLineDecorationOnce(ctx, endLine.from, CODE_FENCE_CLOSE_DECORATION)
     if (!isComposing && endLine.to > endLine.from && isClosingCodeFenceLine(endLine.text)) {
-      pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, endLine.from, endLine.to)
+      const fenceOffset = endLine.text.search(/```|~~~/)
+      const hideFrom = fenceOffset >= 0 ? endLine.from + fenceOffset : endLine.from
+      if (endLine.to > hideFrom) {
+        pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, hideFrom, endLine.to)
+      }
     }
   }
 }

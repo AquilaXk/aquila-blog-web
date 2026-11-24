@@ -551,6 +551,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ initialInternalLinkTargets }) =
               relatedByTagPosts={relatedByTagPosts}
               showRelatedAuthorSkeleton={showRelatedAuthorSkeleton}
               relatedByAuthorPosts={relatedByAuthorPosts}
+              excludePostIds={[adjacentPosts.previousPost?.id, adjacentPosts.nextPost?.id]}
             />
           ) : null}
           <PostDetailNavigationChrome

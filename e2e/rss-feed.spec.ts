@@ -90,10 +90,33 @@ test.describe("RSS feed contract", () => {
     )
 
     expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-    expect(xml).toContain('<rss version="2.0">')
+    expect(xml).toContain(
+      '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    )
     expect(xml).toContain("<link>https://example.com</link>")
-    expect(xml).toContain("<guid>https://example.com/posts/1</guid>")
+    expect(xml).toContain(
+      '<atom:link href="https://example.com/feed" rel="self" type="application/rss+xml; charset=utf-8" />'
+    )
+    expect(xml).toContain('<guid isPermaLink="true">https://example.com/posts/1</guid>')
     expect(xml).toContain("<pubDate>Sun, 21 Jun 2026 00:00:00 GMT</pubDate>")
+  })
+
+  test("includes dc:creator and escaped category tags in RSS items", () => {
+    const postWithMeta = {
+      ...makePost(2),
+      author: [{ id: "1", name: "Aquila <Dev>" }],
+      tags: ["Next.js & React", "TypeScript", "  "],
+    }
+    const xml = buildRssFeedXml([postWithMeta], {
+      siteUrl: "https://example.com",
+      title: "AquilaLog",
+      description: "RSS contract",
+      lang: "ko-KR",
+    })
+
+    expect(xml).toContain("<dc:creator>Aquila &lt;Dev&gt;</dc:creator>")
+    expect(xml).toContain("<category>Next.js &amp; React</category>")
+    expect(xml).toContain("<category>TypeScript</category>")
   })
 
   test("NONE canonical summary는 RSS item description을 title이나 placeholder로 대체하지 않는다", () => {

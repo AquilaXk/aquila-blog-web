@@ -90,7 +90,8 @@ export const LiveEditorBody = styled.div<{
       right: 16px;
       max-width: calc(100% - 22px);
       white-space: normal;
-      overflow-wrap: anywhere;
+      word-break: keep-all;
+      overflow-wrap: break-word;
       pointer-events: none;
       user-select: none;
     }
@@ -102,7 +103,8 @@ export const LiveEditorBody = styled.div<{
     display: inline-block;
     max-width: calc(100% - 8px);
     white-space: normal;
-    overflow-wrap: anywhere;
+    word-break: keep-all;
+    overflow-wrap: break-word;
     vertical-align: baseline;
     pointer-events: none;
     user-select: none;

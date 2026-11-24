@@ -76,10 +76,10 @@ export const BullQueueGrid = styled.section`
 const BullQueueCardEl = styled.article`
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.75rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
   min-width: 0;
-  padding: 1rem 1.125rem;
+  padding: 0.9rem 1rem;
   border: 1px solid ${adminBorder};
   border-radius: 10px;
   background: ${adminSurface};
@@ -97,15 +97,9 @@ const BullQueueCardEl = styled.article`
 
 const CardHeader = styled.div`
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  min-width: 0;
-`
-
-const TitleGroup = styled.div`
-  display: grid;
-  gap: 0.25rem;
+  gap: 0.5rem;
   min-width: 0;
 
   h3 {
@@ -114,28 +108,32 @@ const TitleGroup = styled.div`
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
+`
+
+const ValueGroup = styled.div`
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
 
   .cardPrimaryValue {
     color: ${adminTextPrimary};
-    font-size: 1.35rem;
+    font-size: clamp(1.0625rem, 1.45vw, 1.3rem);
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.24;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   small {
     color: ${adminTextMuted};
-    font-family: ${MONO_FONT};
-    font-size: 0.72rem;
-    line-height: 1.38;
+    font-size: 0.75rem;
+    line-height: 1.4;
     word-break: keep-all;
     overflow-wrap: break-word;
   }
@@ -310,11 +308,7 @@ export const AdminBullQueueCards = ({
         return (
           <BullQueueCardEl key={card.key} data-tone={card.tone}>
             <CardHeader>
-              <TitleGroup>
-                <h3>{card.title}</h3>
-                <strong className="cardPrimaryValue">{card.valueText}</strong>
-                {card.subtitle ? <small>{card.subtitle}</small> : null}
-              </TitleGroup>
+              <h3>{card.title}</h3>
               <HeaderContext>
                 <QueueStatusPill data-tone={card.tone}>{card.badgeText}</QueueStatusPill>
                 {card.actionHref && card.actionLabel ? (
@@ -328,6 +322,10 @@ export const AdminBullQueueCards = ({
                 ) : null}
               </HeaderContext>
             </CardHeader>
+            <ValueGroup>
+              <strong className="cardPrimaryValue">{card.valueText}</strong>
+              {card.subtitle ? <small>{card.subtitle}</small> : null}
+            </ValueGroup>
 
             {card.segments.length > 0 ? (
               <StatsBox>

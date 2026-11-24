@@ -1,4 +1,5 @@
 // 참조 구현: silverbulletmd/silverbullet (MIT) — 콜아웃·접힘 토큰 및 embed/bookmark 컨테이너 모델
+import { translations, type TranslationKey } from "../../libs/language/translations"
 import {
   resolveCalloutBlockquote,
   resolveCalloutLegacyEmoji,
@@ -147,12 +148,26 @@ const normalizeEmojiIcon = (raw: string): string => {
   return raw === "⚠" ? "⚠️" : raw
 }
 
-const resolveCalloutToneFromKeyword = (token: string): { tone: EditorCalloutTone; icon: string } | undefined => {
+const DEFAULT_CALLOUT_TITLE_KEYS: Record<CalloutKind, TranslationKey> = {
+  summary: "calloutTitleSummary",
+  info: "calloutTitleInfo",
+  tip: "calloutTitleTip",
+  warning: "calloutTitleWarning",
+  danger: "calloutTitleDanger",
+  example: "calloutTitleExample",
+  outline: "calloutTitleOutline",
+}
+
+const resolveCalloutToneFromKeyword = (
+  token: string
+): { tone: EditorCalloutTone; icon: string; calloutKind?: CalloutKind } | undefined => {
   if (Object.hasOwn(CONTAINER_KEYWORD_OVERRIDES, token)) {
     return CONTAINER_KEYWORD_OVERRIDES[token]
   }
   const registryEntry = resolveCalloutBlockquote(token)
-  return registryEntry ? CONTAINER_TONE_BY_CALLOUT_KIND[registryEntry.kind] : undefined
+  return registryEntry
+    ? { ...CONTAINER_TONE_BY_CALLOUT_KIND[registryEntry.kind], calloutKind: registryEntry.kind }
+    : undefined
 }
 
 const resolveCalloutToneFromEmoji = (normalizedIcon: string, rawEmoji: string): EditorCalloutTone => {
@@ -184,6 +199,7 @@ const parseCalloutContainerPayload = (
   let hasExplicitTone = false
   let foldable = false
   let defaultCollapsed = false
+  let calloutKind: CalloutKind | undefined
 
   if (rest.length > 0) {
     const bracketedTokenMatch = /^\[!([a-zA-Z0-9_-]+)\]([+-])?(?=[ \t]|$)/.exec(rest)
@@ -194,6 +210,7 @@ const parseCalloutContainerPayload = (
       if (mappedKeyword) {
         tone = mappedKeyword.tone
         icon = mappedKeyword.icon
+        calloutKind = mappedKeyword.calloutKind
         hasExplicitTone = true
       }
       if (foldSign === "+" || foldSign === "-") {
@@ -219,6 +236,7 @@ const parseCalloutContainerPayload = (
       if (mappedKeyword) {
         tone = mappedKeyword.tone
         icon = mappedKeyword.icon
+        calloutKind = mappedKeyword.calloutKind
         hasExplicitTone = true
         rest = firstSpace === -1 ? "" : rest.slice(firstSpace).trim()
       }
@@ -268,10 +286,17 @@ const parseCalloutContainerPayload = (
     }
   }
 
+  const resolvedDefaultTitle =
+    calloutKind === "summary"
+      ? translations.ko[DEFAULT_CALLOUT_TITLE_KEYS.summary]
+      : foldable && calloutKind
+        ? translations.ko[DEFAULT_CALLOUT_TITLE_KEYS[calloutKind]]
+        : "콜아웃"
+
   return {
     tone,
     icon,
-    title: rest || "콜아웃",
+    title: rest || resolvedDefaultTitle,
     body: remainingBodyLines.join("\n").trim(),
     ...foldFields,
   }

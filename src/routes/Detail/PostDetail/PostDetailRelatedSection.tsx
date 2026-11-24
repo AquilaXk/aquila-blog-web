@@ -19,6 +19,7 @@ export type RelatedPostsSectionProps = {
   relatedByTagPosts: TPost[]
   showRelatedAuthorSkeleton: boolean
   relatedByAuthorPosts: TPost[]
+  excludePostIds?: ReadonlyArray<string | number | null | undefined>
 }
 
 const renderSkeletonItems = (prefix: string) =>
@@ -38,10 +39,17 @@ const formatRelatedPostMeta = (post: TPost, locale: string) => {
 export const selectUniqueRelatedPosts = (
   relatedByTagPosts: readonly TPost[],
   relatedByAuthorPosts: readonly TPost[],
-  limit = RELATED_POSTS_DEFAULT_LIMIT
+  limit = RELATED_POSTS_DEFAULT_LIMIT,
+  excludePostIds: ReadonlyArray<string | number | null | undefined> = []
 ): TPost[] => {
   if (limit <= 0) return []
   const seenIds = new Set<string>()
+  for (let i = 0; i < excludePostIds.length; i += 1) {
+    const excludeId = excludePostIds[i]
+    if (excludeId !== null && excludeId !== undefined && String(excludeId)) {
+      seenIds.add(String(excludeId))
+    }
+  }
   const selected: TPost[] = []
   const sources = [relatedByTagPosts, relatedByAuthorPosts]
 
@@ -66,13 +74,15 @@ const RelatedPostsSectionComponent = ({
   relatedByTagPosts,
   showRelatedAuthorSkeleton,
   relatedByAuthorPosts,
+  excludePostIds,
 }: RelatedPostsSectionProps) => {
   const { t, language } = useLanguage()
   const locale = language === "en" ? "en-US" : "ko-KR"
   const relatedPosts = selectUniqueRelatedPosts(
     relatedByTagPosts,
     relatedByAuthorPosts,
-    RELATED_POSTS_DEFAULT_LIMIT
+    RELATED_POSTS_DEFAULT_LIMIT,
+    excludePostIds
   )
   const showSkeleton = relatedPosts.length === 0 && (showRelatedTagSkeleton || showRelatedAuthorSkeleton)
 
