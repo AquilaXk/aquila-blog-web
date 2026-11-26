@@ -178,21 +178,21 @@ export const CloudFileDetailDrawer = ({
       if (!markdown) {
         throw new Error(
           isEn
-            ? "Failed to create markdown image snippet."
-            : "공개 포스트 에셋 마크다운을 생성하지 못했습니다."
+            ? "Failed to create image markdown."
+            : "이미지 마크다운을 생성하지 못했습니다."
         )
       }
       if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
         throw new Error(
           isEn
             ? "Clipboard permission is required to copy markdown."
-            : "클립보드 접근 권한이 없어 마크다운 태그를 복사하지 못했습니다."
+            : "클립보드 접근 권한이 없어 마크다운을 복사하지 못했습니다."
         )
       }
       await navigator.clipboard.writeText(markdown)
       onToast?.({
         tone: "success",
-        text: isEn ? "Copied markdown image tag." : "마크다운 태그를 복사했습니다.",
+        text: isEn ? "Copied image markdown." : "이미지 마크다운을 복사했습니다.",
       })
     } catch (err) {
       onToast?.({ tone: "error", text: toUserFacingMessage(err) })
@@ -287,7 +287,7 @@ export const CloudFileDetailDrawer = ({
                   </span>
                   {isEn ? "Access" : "권한"}
                 </dt>
-                <dd>{isEn ? "Owner only (private)" : "계정 소유주만 볼 수 있음"}</dd>
+                <dd>{isEn ? "Owner only (private)" : "소유자만 보기 (비공개)"}</dd>
               </DetailMetaItem>
             </DetailMetaGrid>
           </div>
@@ -363,7 +363,7 @@ export const CloudFileDetailDrawer = ({
             {isImage ? (
               <IconButton
                 type="button"
-                aria-label={isEn ? "Copy post markdown" : "마크다운 복사"}
+                aria-label={isEn ? "Copy image markdown" : "이미지 마크다운 복사"}
                 title={promotionEligibility.reason || undefined}
                 disabled={isPromoting || !promotionEligibility.promotable}
                 onClick={() => void handleCopyMarkdown()}

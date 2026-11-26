@@ -411,7 +411,7 @@ const setupAdminCloudMocks = async (
       route,
       {
         resultCode: "201-1",
-        msg: "외부 재생 token이 발급되었습니다.",
+        msg: "외부 재생 링크가 발급되었습니다.",
         data: {
           fileId: Number(id),
           token: `external-token-${id}`,
@@ -948,7 +948,7 @@ test.describe("관리자 클라우드", () => {
 
     await page.locator('button[title="운영 점검 리포트.pdf"]').click()
     await expect(page.getByRole("heading", { name: "운영 점검 리포트.pdf" })).toBeVisible()
-    await expect(page.getByText("계정 소유주만 볼 수 있음").first()).toBeVisible()
+    await expect(page.getByText("소유자만 보기 (비공개)").first()).toBeVisible()
     await expect(page.getByText("미리보기 완료")).toBeVisible()
     await expectPdfPreviewFitsDetailPanel(page, "운영 점검 리포트.pdf PDF 미리보기")
     await page.getByRole("button", { name: "상세 패널 닫기" }).click()
@@ -1016,7 +1016,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByRole("button", { name: "mpv 명령 복사" }).click()
     await expect(page.getByRole("status").filter({ hasText: "mpv 명령을 표시했습니다. 6시간 동안 유효합니다." })).toBeVisible()
     await expect.poll(() => mocks.externalPlaybackTokenRequests).toEqual(["103", "103"])
-    const manualCmdInput = page.getByLabel("수동 복사 명령")
+    const manualCmdInput = page.getByLabel("직접 복사할 명령")
     await expect(manualCmdInput).toBeVisible()
     await expect(manualCmdInput).toHaveValue(/^mpv "https?:\/\/.*\/system\/api\/v1\/adm\/cloud\/files\/103\/external-content\?token=external-token-103"$/)
     const promptText = await page.evaluate(
@@ -1773,7 +1773,7 @@ test.describe("관리자 클라우드", () => {
     const newFolderDialog = page.getByRole("dialog", { name: "새 폴더 만들기" })
     await expect(newFolderDialog).toBeVisible()
     await newFolderDialog.getByLabel("폴더 경로").fill("2026 세미나")
-    await newFolderDialog.getByRole("button", { name: "폴더 열기" }).click()
+    await newFolderDialog.getByRole("button", { name: "폴더 만들기" }).click()
     await expect(newFolderDialog).toHaveCount(0)
 
     const searchInput = page.getByLabel("클라우드 파일 검색")
@@ -1807,8 +1807,8 @@ test.describe("관리자 클라우드", () => {
       /\/system\/api\/v1\/adm\/cloud\/files\/101\/content\?download=true$/
     )
 
-    await detailPanel.getByRole("button", { name: "관리자 경로 복사" }).click()
-    await expect(page.getByText("관리자 내부 경로를 복사했습니다.")).toBeVisible()
+    await detailPanel.getByRole("button", { name: "관리자 전용 링크 복사" }).click()
+    await expect(page.getByText("관리자 전용 링크를 복사했습니다.")).toBeVisible()
     const copiedLink = await page.evaluate(() => (window as unknown as { __adminCloudCopiedText?: string }).__adminCloudCopiedText)
     expect(copiedLink).toContain("/system/api/v1/adm/cloud/files/101/content")
 
@@ -1953,14 +1953,14 @@ test.describe("관리자 클라우드", () => {
     await shareDialog.getByRole("button", { name: "7일" }).click()
     await shareDialog.getByRole("button", { name: "공유 링크 발급" }).click()
     await expect.poll(() => mocks.shareLinkRequests).toEqual([{ fileId: "102", ttlSeconds: 604800 }])
-    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveValue(
+    await expect(shareDialog.getByLabel("외부 공유 링크")).toHaveValue(
       /\/system\/api\/v1\/public\/cloud\/files\/102\/share\?token=share-token-102-604800/
     )
-    await shareDialog.getByRole("tab", { name: "관리자 내부 경로" }).click()
-    await expect(shareDialog.getByLabel("관리자 내부 경로")).toHaveValue(/\/system\/api\/v1\/adm\/cloud\/files\/102\/content/)
-    await shareDialog.getByRole("tab", { name: "서명 외부 공유 링크" }).click()
-    await expect(shareDialog.getByRole("button", { name: "회수" }).first()).toBeVisible()
-    await shareDialog.getByRole("button", { name: "모두 회수" }).click()
+    await shareDialog.getByRole("tab", { name: "관리자 전용 링크" }).click()
+    await expect(shareDialog.getByLabel("관리자 전용 링크")).toHaveValue(/\/system\/api\/v1\/adm\/cloud\/files\/102\/content/)
+    await shareDialog.getByRole("tab", { name: "외부 공유 링크" }).click()
+    await expect(shareDialog.getByRole("button", { name: "해제" }).first()).toBeVisible()
+    await shareDialog.getByRole("button", { name: "모두 해제" }).click()
     await expect.poll(() => mocks.revokedShareLinkIds.length).toBeGreaterThan(0)
     await shareDialog.getByRole("button", { name: "닫기" }).click()
     await expect(shareDialog).toHaveCount(0)
@@ -2050,17 +2050,17 @@ test.describe("관리자 클라우드", () => {
     expect(toastZOrder.hitsToast).toBe(true)
     await shareErrorToast.getByRole("button", { name: "닫기" }).click()
     await expect(shareErrorToast).toHaveCount(0)
-    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveValue(
+    await expect(shareDialog.getByLabel("외부 공유 링크")).toHaveValue(
       /\/system\/api\/v1\/public\/cloud\/files\/102\/share\?token=/
     )
 
-    await shareDialog.getByRole("tab", { name: "관리자 내부 경로" }).click()
-    const copyInternalBtn = shareDialog.getByRole("button", { name: "관리자 경로 복사" })
+    await shareDialog.getByRole("tab", { name: "관리자 전용 링크" }).click()
+    const copyInternalBtn = shareDialog.getByRole("button", { name: "관리자 전용 링크 복사" })
     await copyInternalBtn.click()
     await expect(
       page.getByRole("status").filter({ hasText: "클립보드 접근 권한이 없습니다" })
     ).toBeVisible()
-    await expect(copyInternalBtn).toHaveText("관리자 경로 복사")
+    await expect(copyInternalBtn).toHaveText("관리자 전용 링크 복사")
     await expect(page.getByText(/복사됨/)).toHaveCount(0)
   })
 
@@ -2328,7 +2328,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
     await expect(shareDialog).toBeVisible()
     await expect(shareDialog.getByText(/#9501/)).toHaveCount(0)
-    await expect(shareDialog.getByText("발급된 활성 링크가 없습니다.")).toBeVisible()
+    await expect(shareDialog.getByText("발급된 링크가 없습니다.")).toBeVisible()
     await shareDialog.getByRole("button", { name: "닫기" }).click()
 
     // 102 지연 요청 발생 -> 완료 전 닫기 -> 101 즉시 열기 -> 102 응답 도착 후에도 9501 미노출
@@ -2339,7 +2339,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
     await page.waitForTimeout(450)
     await expect(shareDialog.getByText(/#9501/)).toHaveCount(0)
-    await expect(shareDialog.getByText("발급된 활성 링크가 없습니다.")).toBeVisible()
+    await expect(shareDialog.getByText("발급된 링크가 없습니다.")).toBeVisible()
     await shareDialog.getByRole("button", { name: "닫기" }).click()
 
     // 1b) 동일 파일 모달 닫기 -> 즉시 재오픈 시 이전 발급 세션 응답 덮어쓰기 차단
@@ -2349,8 +2349,8 @@ test.describe("관리자 클라우드", () => {
     await shareDialog.getByRole("button", { name: "닫기" }).click()
     await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
     await page.waitForTimeout(500)
-    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveCount(0)
-    await expect(page.getByText(/서명 외부 공유 링크 — 복사됨/)).toHaveCount(0)
+    await expect(shareDialog.getByLabel("외부 공유 링크")).toHaveCount(0)
+    await expect(page.getByText(/외부 공유 링크 — 복사됨/)).toHaveCount(0)
     await shareDialog.getByRole("button", { name: "닫기" }).click()
 
     // 2) CloudInspectorVideoSection: 103 지연 조회 중 105로 전환하면 9602만 표시되고 9601로 덮어쓰지 않음
@@ -2368,7 +2368,7 @@ test.describe("관리자 클라우드", () => {
     await page.locator('button[title="release-demo.mp4"]').click()
     await page.locator('button[title="deploy-walkthrough.mp4"]').click()
     await page.waitForTimeout(500)
-    await expect(detailPanel.getByLabel("수동 복사 명령")).toHaveCount(0)
+    await expect(detailPanel.getByLabel("직접 복사할 명령")).toHaveCount(0)
     await expect(detailPanel.getByText(/IINA 명령을/)).toHaveCount(0)
 
     // 3) .sh 텍스트 스크립트 업로드 허용 확인

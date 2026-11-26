@@ -12,6 +12,8 @@ import { MAX_SVG_MARKUP_BYTES, parseSvgDimensionsFromMarkup } from "../../src/ro
 import { getStrapiAssetIcon, StrapiFileCodeIcon, StrapiFilePdfIcon, StrapiHeadphonesIcon, StrapiImageIcon, StrapiPlayIcon } from "../../src/routes/Admin/adminStrapiIcons"
 import * as AdminProfilePersistenceModel from "../../src/routes/Admin/AdminProfilePersistenceModel"
 import * as EditorStudioCloudAssetPickerModule from "../../src/routes/Admin/EditorStudioCloudAssetPicker"
+import { getCloudDictionary } from "../../src/routes/Admin/cloud/adminCloudI18n"
+import { getCloudSignatureMessages } from "../../src/routes/Admin/cloud/cloudSignatureMessages"
 import { buildToolsOpsBars } from "../../src/routes/Admin/AdminToolsOpsOverview"
 import { formatRetryPolicy } from "../../src/routes/Admin/AdminToolsWorkspaceModel"
 import { formatOperationPollingStatus } from "../../src/routes/Admin/useAdminOperationPolling"
@@ -155,13 +157,13 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
 
     // 영어 모드(language = "en") 시그니처·용량·텍스트 검사 오류 메시지 확인
     const enFakePdf = await validateCloudFileBeforeUpload(fakePdf, "en")
-    expect(enFakePdf).toEqual({ ok: false, reason: "Invalid PDF file header signature (%PDF-)." })
+    expect(enFakePdf).toEqual({ ok: false, reason: "Invalid PDF file." })
     const enFakeMp4 = await validateCloudFileBeforeUpload(fakeMp4, "en")
-    expect(enFakeMp4).toEqual({ ok: false, reason: "Invalid video container header signature (ftyp/EBML)." })
+    expect(enFakeMp4).toEqual({ ok: false, reason: "Invalid video file." })
     const enXssSvg = await validateCloudFileBeforeUpload(scriptSvg, "en")
     expect(enXssSvg).toEqual({
       ok: false,
-      reason: "SVG files with scripts or event handlers cannot be uploaded.",
+      reason: "SVG files containing scripts cannot be uploaded.",
     })
     const enEmpty = await validateCloudFileBeforeUpload(new File([], "empty.txt", { type: "text/plain" }), "en")
     expect(enEmpty).toEqual({ ok: false, reason: "Empty files (0 bytes) cannot be uploaded." })
@@ -243,6 +245,46 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
     expect(
       checkEligibility({ mediaKind: "DOCUMENT", contentType: "application/pdf", originalFilename: "doc.pdf", byteSize: 1024 }).promotable
     ).toBe(false)
+
+    expect(
+      checkEligibility(
+        { mediaKind: "PHOTO", contentType: "image/svg+xml", originalFilename: "vec.svg", byteSize: 1024 },
+        "ko"
+      )
+    ).toEqual({ promotable: false, reason: "SVG는 본문에 삽입할 수 없습니다" })
+    expect(
+      checkEligibility(
+        { mediaKind: "PHOTO", contentType: "image/svg+xml", originalFilename: "vec.svg", byteSize: 1024 },
+        "en"
+      )
+    ).toEqual({ promotable: false, reason: "SVG cannot be inserted into posts" })
+    expect(
+      checkEligibility(
+        { mediaKind: "PHOTO", contentType: "image/jpeg", originalFilename: "big.jpg", byteSize: 8 * 1024 * 1024 + 1 },
+        "ko"
+      )
+    ).toEqual({ promotable: false, reason: "8MB 초과 (삽입 불가)" })
+
+    const koDict = getCloudDictionary("ko")
+    const enDict = getCloudDictionary("en")
+    const koText = Object.values(koDict)
+      .filter((v): v is string => typeof v === "string")
+      .join("\n")
+    const enText = Object.values(enDict)
+      .filter((v): v is string => typeof v === "string")
+      .join("\n")
+    expect(koText).not.toMatch(/승격|피커|래스터|서명|토큰|회수|인스펙터|MIME|에셋/)
+    expect(enText).not.toMatch(/promot|raster|signed|token|inspector|mime/i)
+    expect(koDict.pickerHeading).toBe("클라우드 사진 삽입")
+    expect(koDict.pickerPromotableOnly).toBe("삽입 가능한 사진만")
+    expect(koDict.pickerAllFolders).toBe("전체 폴더")
+    expect(enDict.pickerHeading).toBe("Insert Cloud Photo")
+    expect(enDict.pickerPromotableOnly).toBe("Insertable only")
+
+    const koSigText = Object.values(getCloudSignatureMessages("ko"))
+      .filter((v): v is string => typeof v === "string")
+      .join("\n")
+    expect(koSigText).not.toMatch(/시그니처|바이너리|NUL|루트 태그/)
 
     const buildSnippet = pickerMod.buildCloudAssetMarkdownSnippet as (
       file: { mediaKind: "PHOTO" | "VIDEO" | "DOCUMENT"; contentType: string; originalFilename: string },

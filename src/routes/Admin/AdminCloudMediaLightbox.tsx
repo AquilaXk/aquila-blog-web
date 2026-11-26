@@ -101,8 +101,8 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
         <strong>
           {result.status === "binary"
             ? isEn
-              ? "Binary file cannot be previewed as text"
-              : "텍스트로 미리볼 수 없는 바이너리 형식입니다"
+              ? "This file cannot be previewed as text"
+              : "텍스트로 미리볼 수 없는 파일입니다"
             : result.message}
         </strong>
         <span>{file.originalFilename}</span>
@@ -117,8 +117,8 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
       {result.truncated ? (
         <S.YarlTruncationBanner role="status">
           {isEn
-            ? "Showing the first 256KB safely. Download the file to view the rest."
-            : "안전한 메모리 보호를 위해 미리보기 상한(256KB)까지만 표시했습니다. 전체 파일은 다운로드해 확인하세요."}
+            ? "Showing up to 256KB for preview. Download the file to view the rest."
+            : "최대 256KB까지만 미리보기로 표시합니다. 전체 파일은 다운로드해 확인하세요."}
         </S.YarlTruncationBanner>
       ) : null}
       <S.YarlCodeScroll>
@@ -295,7 +295,7 @@ export const AdminCloudMediaLightbox = ({
   const resolveSvgStatusText = (res: BoundedSvgPreviewResult | null): string => {
     if (!res) return isEn ? "Loading SVG source..." : "SVG 원문을 불러오는 중..."
     if (res.status === "too_large" || res.status === "error") return res.message
-    return isEn ? "File contains binary data." : "이진 데이터가 포함된 파일입니다."
+    return isEn ? "File cannot be previewed." : "미리보기할 수 없는 파일입니다."
   }
 
   return (
@@ -319,7 +319,7 @@ export const AdminCloudMediaLightbox = ({
 
       <S.YarlToolbar
         role="toolbar"
-        aria-label={isEn ? "Lightbox toolbar" : "라이트박스 도구 모음"}
+        aria-label={isEn ? "Preview toolbar" : "미리보기 도구 모음"}
         onClick={(e) => e.stopPropagation()}
       >
         {canZoomImage || canZoomPdf ? (
@@ -496,7 +496,7 @@ export const AdminCloudMediaLightbox = ({
             </video>
             <S.YarlBottomBar
               role="group"
-              aria-label={isEn ? "Video playback speed" : "라이트박스 동영상 배속"}
+              aria-label={isEn ? "Video playback speed" : "동영상 재생 속도"}
             >
               {PLAYBACK_SPEEDS.map((speed) => (
                 <S.YarlDarkPill

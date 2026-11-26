@@ -448,7 +448,7 @@ export const useAdminCloudWorkspaceActions = () => {
       await navigator.clipboard.writeText(linkUrl)
       setToast({
         tone: "success",
-        text: isEn ? "Copied admin internal path." : "관리자 내부 경로를 복사했습니다.",
+        text: isEn ? "Copied admin-only link." : "관리자 전용 링크를 복사했습니다.",
       })
     } catch {
       setToast({

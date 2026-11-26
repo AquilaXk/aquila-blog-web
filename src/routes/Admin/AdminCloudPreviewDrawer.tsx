@@ -256,8 +256,8 @@ const InlineTextPreview = ({
             {snippet.truncated ? (
               <div className="truncatedNote">
                 {isEn
-                  ? "Showing snippet · open fullscreen for up to 256KB"
-                  : "상위 스니펫만 표시 중 · 전체화면으로 최대 256KB 확인"}
+                  ? "Showing preview · open fullscreen for up to 256KB"
+                  : "앞부분만 미리 표시 중 · 전체화면에서 최대 256KB 확인"}
               </div>
             ) : null}
           </div>
@@ -267,11 +267,11 @@ const InlineTextPreview = ({
               ? snippet.message
               : snippet?.status === "binary"
                 ? isEn
-                  ? "Binary files must be downloaded to view."
-                  : "바이너리 파일은 다운로드 후 확인할 수 있습니다."
+                  ? "Download this file to view its contents."
+                  : "이 파일은 다운로드 후 확인할 수 있습니다."
                 : isEn
-                  ? "Loading text snippet..."
-                  : "코드 스니펫 불러오는 중..."}
+                  ? "Loading preview..."
+                  : "내용을 불러오는 중..."}
           </div>
         )}
       </AssetCodeSnippetFrame>
@@ -354,8 +354,8 @@ const ImageOrSvgPreview = ({
                 ? svgResult.message
                 : svgResult?.status === "binary"
                   ? isEn
-                    ? "File contains binary data."
-                    : "이진 데이터가 포함된 파일입니다."
+                    ? "File cannot be previewed."
+                    : "미리보기할 수 없는 파일입니다."
                   : isEn
                     ? "Loading SVG source..."
                     : "SVG 원문을 불러오는 중..."}

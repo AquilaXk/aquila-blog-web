@@ -88,7 +88,7 @@ const createVideoUploadSession = async (
       timeoutMs: 30_000,
     }
   )
-  if (!response.data?.id) throw new Error("대용량 동영상 업로드 세션을 생성하지 못했습니다.")
+  if (!response.data?.id) throw new Error("대용량 동영상 업로드를 시작하지 못했습니다.")
   return response.data
 }
 

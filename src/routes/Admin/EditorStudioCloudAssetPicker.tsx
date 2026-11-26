@@ -219,8 +219,8 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
         if (!snippet) {
           throw new Error(
             language === "en"
-              ? "Failed to build public markdown image link."
-              : "공개 본문 마크다운 링크를 생성하지 못했습니다."
+              ? "Failed to create markdown image link."
+              : "본문 이미지 링크를 생성하지 못했습니다."
           )
         }
         onInsertMarkdownSnippet?.(snippet)
@@ -245,8 +245,8 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
           error instanceof Error && error.message.trim()
             ? error.message
             : language === "en"
-              ? "Failed to promote Cloud photo into a post image."
-              : "클라우드 사진을 게시글 이미지로 승격하지 못했습니다."
+              ? "Failed to insert Cloud photo into the post."
+              : "클라우드 사진을 본문에 삽입하지 못했습니다."
         )
       } finally {
         setPromotingFileId(null)
@@ -304,7 +304,7 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
               aria-pressed={!folderFilter}
               onClick={() => setFolderFilter("")}
             >
-              {t.rootFolder}
+              {t.pickerAllFolders}
             </PickerFilterChip>
             {availableFolders.map((folder) => (
               <PickerFilterChip
@@ -340,10 +340,12 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
             const actionLabel = isPromoting
               ? t.pickerInserting
               : isCopied
-                ? t.shareCopied
+                ? onInsertMarkdownSnippet
+                  ? t.pickerInserted
+                  : t.shareCopied
                 : onInsertMarkdownSnippet
                   ? t.pickerInsertImage
-                  : t.shareCopyLink
+                  : t.pickerCopyMarkdown
             return (
               <li key={file.id} className="assetCard">
                 <PickerCardThumbnail

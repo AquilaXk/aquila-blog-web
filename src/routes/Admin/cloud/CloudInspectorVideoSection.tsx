@@ -166,7 +166,7 @@ export const CloudInspectorVideoSection = ({
     const playerLabel = EXTERNAL_PLAYBACK_PLAYER_LABELS[player]
     setCommandState({
       status: "pending",
-      message: isEn ? `Preparing ${playerLabel} command...` : `${playerLabel} 명령 발급 중`,
+      message: isEn ? `Preparing ${playerLabel} command...` : `${playerLabel} 명령 준비 중...`,
     })
     const isStaleRequest = () =>
       !isMountedRef.current ||
@@ -209,7 +209,7 @@ export const CloudInspectorVideoSection = ({
       setPlaybackTokens((current) => current.filter((token) => token.id !== tokenId))
       onToast?.({
         tone: "success",
-        text: isEn ? "Revoked playback token." : "재생 토큰을 폐기했습니다.",
+        text: isEn ? "Disabled playback link." : "재생 링크를 해제했습니다.",
       })
     } catch (err) {
       if (
@@ -239,8 +239,8 @@ export const CloudInspectorVideoSection = ({
       onToast?.({
         tone: "success",
         text: isEn
-          ? `Revoked ${res.revokedCount} playback token(s).`
-          : `${res.revokedCount}개의 재생 토큰을 모두 폐기했습니다.`,
+          ? `Disabled ${res.revokedCount} playback link(s).`
+          : `재생 링크 ${res.revokedCount}개를 모두 해제했습니다.`,
       })
     } catch (err) {
       if (
@@ -294,7 +294,7 @@ export const CloudInspectorVideoSection = ({
               <ModalInput
                 type="text"
                 readOnly
-                aria-label={isEn ? "Manual player command copy" : "수동 복사 명령"}
+                aria-label={isEn ? "Playback command" : "직접 복사할 명령"}
                 value={commandState.manualCommand}
               />
             ) : null}
@@ -306,8 +306,8 @@ export const CloudInspectorVideoSection = ({
         <PlaybackTokenHeader>
           <strong>
             {isEn
-              ? `External playback tokens (${playbackTokens.length})`
-              : `외부 재생 토큰 (${playbackTokens.length}개)`}
+              ? `External playback links (${playbackTokens.length})`
+              : `외부 재생 링크 (${playbackTokens.length}개)`}
           </strong>
           {playbackTokens.length > 0 ? (
             <CompactTokenButton type="button" onClick={() => void handleRevokeAllTokens()}>
@@ -316,10 +316,10 @@ export const CloudInspectorVideoSection = ({
           ) : null}
         </PlaybackTokenHeader>
         {isLoadingTokens ? (
-          <PlaybackTokenEmpty>{isEn ? "Loading tokens..." : "토큰 목록 조회 중..."}</PlaybackTokenEmpty>
+          <PlaybackTokenEmpty>{isEn ? "Loading playback links..." : "재생 링크 불러오는 중..."}</PlaybackTokenEmpty>
         ) : playbackTokens.length === 0 ? (
           <PlaybackTokenEmpty>
-            {isEn ? "No active external playback tokens." : "활성 외부 재생 토큰이 없습니다."}
+            {isEn ? "No active playback links." : "발급된 외부 재생 링크가 없습니다."}
           </PlaybackTokenEmpty>
         ) : (
           <PlaybackTokenList>

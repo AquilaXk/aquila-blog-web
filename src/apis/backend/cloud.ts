@@ -101,7 +101,7 @@ const normalizeCloudExternalPlaybackToken = (
   const expiresAt = token?.expiresAt?.trim() || ""
   const contentPath = token?.contentPath?.trim() || ""
   if (!normalizedFileId || !rawToken || !expiresAt || !contentPath) {
-    throw new Error("외부 공유/재생 토큰을 발급하지 못했습니다.")
+    throw new Error("공유 또는 재생 링크를 생성하지 못했습니다.")
   }
 
   return {
@@ -327,7 +327,7 @@ export const promoteCloudFileToPostAsset = async (
     { method: "POST" }
   )
   const d = response.data
-  if (!d?.url) throw new Error("포스트 에셋 승격에 실패했습니다.")
+  if (!d?.url) throw new Error("클라우드 사진을 게시글 이미지로 불러오지 못했습니다.")
   return {
     fileId: Number(d.fileId || fileId),
     key: d.key || "",
