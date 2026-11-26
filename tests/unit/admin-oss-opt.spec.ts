@@ -259,7 +259,7 @@ test.describe("클라우드 64B 워드 매직바이트 & 크기 선검증 가드
     expect(result.ok).toBe(true)
   })
 
-  test("실행 파일 (.exe, .sh) 및 확장자 위장 실행 바이너리(MZ/ELF)는 거부된다", async () => {
+  test("실행 파일 (.exe) 및 확장자 위장 실행 바이너리(MZ/PNG)는 거부된다", async () => {
     const buffer = new ArrayBuffer(64)
     const exeFile = new File([buffer], "malicious.exe", { type: "application/x-msdownload" })
     const result = await validateCloudFileBeforeUpload(exeFile)

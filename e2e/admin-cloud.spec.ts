@@ -185,6 +185,7 @@ const setupAdminCloudMocks = async (
     listDelayMs?: number
     lookupOnlyFiles?: CloudFileFixture[]
     normalizeVideoSessionFilename?: boolean
+    shareIssueDelayMsByFileId?: Record<string, number>
     shareLinksDelayMsByFileId?: Record<string, number>
     svgBodiesById?: Record<string, string>
     uploadResponseFilenames?: Record<string, string>
@@ -733,6 +734,8 @@ const setupAdminCloudMocks = async (
       return
     }
     if (method === "POST") {
+      const issueDelay = options.shareIssueDelayMsByFileId?.[fileId]
+      if (issueDelay) await delay(issueDelay)
       const body = JSON.parse(request.postData() || "{}") as { ttlSeconds?: number }
       const ttlSeconds = Number(body.ttlSeconds || 86400)
       shareLinkRequests.push({ fileId, ttlSeconds })
@@ -2302,8 +2305,12 @@ test.describe("관리자 클라우드", () => {
           },
         ],
       },
+      externalPlaybackTokenDelayMs: 400,
       externalPlaybackTokensListDelayMsByFileId: {
         "103": 400,
+      },
+      shareIssueDelayMsByFileId: {
+        "102": 400,
       },
     })
 
@@ -2335,6 +2342,17 @@ test.describe("관리자 클라우드", () => {
     await expect(shareDialog.getByText("발급된 활성 링크가 없습니다.")).toBeVisible()
     await shareDialog.getByRole("button", { name: "닫기" }).click()
 
+    // 1b) 동일 파일 모달 닫기 -> 즉시 재오픈 시 이전 발급 세션 응답 덮어쓰기 차단
+    await page.locator('button[title="home-server-rack.png"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    await shareDialog.getByRole("button", { name: "공유 링크 발급" }).click()
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    await page.waitForTimeout(500)
+    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveCount(0)
+    await expect(page.getByText(/서명 외부 공유 링크 — 복사됨/)).toHaveCount(0)
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+
     // 2) CloudInspectorVideoSection: 103 지연 조회 중 105로 전환하면 9602만 표시되고 9601로 덮어쓰지 않음
     await page.locator('button[title="deploy-walkthrough.mp4"]').click()
     await page.locator('button[title="release-demo.mp4"]').click()
@@ -2343,6 +2361,15 @@ test.describe("관리자 클라우드", () => {
     await page.waitForTimeout(500)
     await expect(detailPanel.getByText(/#9602/)).toBeVisible()
     await expect(detailPanel.getByText(/#9601/)).toHaveCount(0)
+
+    // 2b) 동일 동영상 103 -> 명령 발급 중 105 -> 즉시 103 복귀 시 이전 세션 명령 결과 차단
+    await page.locator('button[title="deploy-walkthrough.mp4"]').click()
+    await detailPanel.getByRole("button", { name: "IINA 명령 복사" }).click()
+    await page.locator('button[title="release-demo.mp4"]').click()
+    await page.locator('button[title="deploy-walkthrough.mp4"]').click()
+    await page.waitForTimeout(500)
+    await expect(detailPanel.getByLabel("수동 복사 명령")).toHaveCount(0)
+    await expect(detailPanel.getByText(/IINA 명령을/)).toHaveCount(0)
 
     // 3) .sh 텍스트 스크립트 업로드 허용 확인
     await page.getByLabel("클라우드 파일 업로드").setInputFiles({

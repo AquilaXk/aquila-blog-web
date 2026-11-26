@@ -109,6 +109,13 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
     )
     expect((await validateCloudFileBeforeUpload(nsIframeSvg)).ok).toBe(false)
 
+    const nsDotScriptSvg = new File(
+      [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" xmlns:a.b="http://www.w3.org/1999/xhtml"><a.b:script>alert(1)</a.b:script></svg>')],
+      "xss-ns-dot-script.svg",
+      { type: "image/svg+xml" }
+    )
+    expect((await validateCloudFileBeforeUpload(nsDotScriptSvg)).ok).toBe(false)
+
     const dataSvgUri = new File(
       [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/svg+xml;utf8,<svg/>"/></svg>')],
       "xss-data-svg.svg",
@@ -464,7 +471,56 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
             expect(queueApi.uploadQueue[1]?.message).toBe("Cancelled by user")
           }
 
-          // 3) 언마운트 시 완료·중단 콜백 미호출
+          // 3) 대기(queued) 중 취소 -> 재시도 후 비사용자 abort 시 취소 오분류 방지
+          const queuedFiles = [1, 2, 3, 4].map(
+            (idx) =>
+              new File([new TextEncoder().encode(`echo ${idx}\n`)], `batch-${idx}.sh`, {
+                type: "text/plain",
+              })
+          )
+          await act(async () => {
+            await queueApi.queueUploadFiles(queuedFiles)
+          })
+          await act(async () => {
+            await Promise.resolve()
+          })
+          // 동시성 3이므로 4번째 항목은 queued 상태
+          const fourthItem = queueApi.uploadQueue.find((item) => item.name === "batch-4.sh")!
+          expect(fourthItem.status).toBe("queued")
+          await act(async () => {
+            queueApi.handleCancelUpload(fourthItem)
+            await Promise.resolve()
+          })
+          // 1..3 완료/abort 시켜 슬롯 비우기
+          for (const xhr of xhrInstances.slice(2, 5)) {
+            await act(async () => {
+              xhr.onabort?.()
+              await Promise.resolve()
+            })
+          }
+          const cancelledFourth = queueApi.uploadQueue.find((item) => item.name === "batch-4.sh")!
+          await act(async () => {
+            queueApi.handleRetryUpload(cancelledFourth)
+            await Promise.resolve()
+          })
+          await act(async () => {
+            await Promise.resolve()
+          })
+          const retriedXhr = xhrInstances.at(-1)!
+          await act(async () => {
+            retriedXhr.onabort?.()
+            await Promise.resolve()
+          })
+          const retriedFourth = queueApi.uploadQueue.find((item) => item.name === "batch-4.sh")!
+          if (language === "ko") {
+            expect(notices.at(-1)).toBe("batch-4.sh 업로드 일시 중단")
+            expect(retriedFourth.message).toBe("전송 일시 중단됨")
+          } else {
+            expect(notices.at(-1)).toBe("batch-4.sh upload paused")
+            expect(retriedFourth.message).toBe("Paused on navigation")
+          }
+
+          // 4) 언마운트 시 완료·중단 콜백 미호출
           await act(async () => {
             await queueApi.queueUploadFiles([scriptFile])
           })

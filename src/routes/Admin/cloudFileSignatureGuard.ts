@@ -52,7 +52,7 @@ const MAGIC_MACHO_64_LE = 0xcffaedfe
 
 // SVG XSS Fail-Closed 패턴 (백엔드 CloudArchiveAndDocumentInspector와 정합)
 const SVG_XSS_PATTERN =
-  /<!\s*(?:doctype|entity)\b|&#|<\s*(?:[a-z0-9_-]+:)?(?:script|foreignobject|iframe|object|embed)\b|javascript\s*:|vbscript\s*:|data\s*:\s*text\/html|data\s*:\s*image\/svg\+xml|\bon[a-z]+\s*=/i
+  /<!\s*(?:doctype|entity)\b|&#|<\s*(?:[a-z0-9_.-]+:)?(?:script|foreignobject|iframe|object|embed)\b|javascript\s*:|vbscript\s*:|data\s*:\s*text\/html|data\s*:\s*image\/svg\+xml|\bon[a-z]+\s*=/i
 
 // 128바이트 ASCII 허용 테이블 (\t, \n, \f, \r, 0x20..0x7E)
 const TEXT_ASCII_ALLOWED = new Uint8Array(128)

@@ -263,6 +263,7 @@ export const useAdminCloudUploadQueue = ({
       const validFiles: File[] = []
       for (const file of selectedFiles) {
         const validation = await validateCloudFileBeforeUpload(file, language)
+        if (!mountedRef.current) return
         if (!validation.ok) {
           onToast({ tone: "error", text: `${file.name}: ${validation.reason}` })
           continue
@@ -270,7 +271,7 @@ export const useAdminCloudUploadQueue = ({
         validFiles.push(file)
       }
 
-      if (validFiles.length === 0) return
+      if (!mountedRef.current || validFiles.length === 0) return
 
       setUploadQueue((current) => [
         ...current,
@@ -313,7 +314,9 @@ export const useAdminCloudUploadQueue = ({
   const handleCancelUpload = useCallback(
     (item: UploadQueueItem) => {
       if (!isUploadActive(item.status)) return
-      userCancelledIdsRef.current.add(item.id)
+      if (activeJobsRef.current.has(item.id) || uploadControllersRef.current.has(item.id)) {
+        userCancelledIdsRef.current.add(item.id)
+      }
       cancelControllersRef.current.get(item.id)?.abort()
       uploadControllersRef.current.get(item.id)?.abort()
       const cancelMsg = language === "en" ? "Cancelled by user" : "사용자가 취소함"
@@ -335,6 +338,7 @@ export const useAdminCloudUploadQueue = ({
   const handleRetryUpload = useCallback(
     (item: UploadQueueItem) => {
       if (item.status !== "failed" && item.status !== "cancelled") return
+      userCancelledIdsRef.current.delete(item.id)
       const waitMsg = language === "en" ? "Queued" : "업로드 대기 중"
       setUploadQueue((current) =>
         current.map((queueItem) =>
