@@ -171,6 +171,15 @@ export const registeredBrowserStorageKeys: BrowserStorageRegistryEntry[] = [
   },
   {
     area: "localStorage",
+    key: "admin.cloud.viewPreferences.v1",
+    purpose: "admin-cloud-view-preferences",
+    required: false,
+    retention: "until view or sort preference changes or browser storage is cleared",
+    deletion: "preference overwrite or browser storage deletion",
+    stores: "JSON object containing cloud workspace viewMode and sortMode",
+  },
+  {
+    area: "localStorage",
     key: "aquila_blog_liked_posts_v1",
     purpose: "post-liked-state",
     required: false,

@@ -9,12 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getCloudFileContentUrl, getCloudFileDownloadUrl, type CloudFile } from "src/apis/backend/cloud"
 import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
+import { useLanguage } from "src/libs/language"
 import * as S from "./AdminCloudMediaLightbox.styles"
-import {
-  LightboxPdfStage,
-  readBoundedCloudSvgPreview,
-  type BoundedSvgPreviewResult,
-} from "./AdminCloudPreviewDrawer"
 import {
   PLAYBACK_SPEEDS,
   appendCloudAssetVersionUrl,
@@ -40,10 +36,16 @@ import {
   YarlZoomOutIcon,
   getStrapiAssetIcon,
 } from "./adminStrapiIcons"
+import { CloudPdfLightboxStage } from "./cloud/CloudPdfLightboxStage"
+import {
+  MAX_TEXT_PREVIEW_BYTES,
+  getCloudDocumentSubtype,
+  readBoundedCloudSvgPreview,
+  readBoundedCloudTextPreview,
+  type BoundedSvgPreviewResult,
+  type BoundedTextPreviewResult,
+} from "./cloud/cloudPreviewHelpers"
 
-export const MAX_TEXT_PREVIEW_BYTES = 256 * 1024
-export const MAX_INLINE_TEXT_SNIPPET_BYTES = 16 * 1024
-const MAX_TEXT_PREVIEW_LINES = 2500
 const IMAGE_ZOOM_MIN = 0.5
 const IMAGE_ZOOM_MAX = 3
 const IMAGE_ZOOM_STEP = 0.5
@@ -51,208 +53,36 @@ const PDF_ZOOM_MIN = 0.5
 const PDF_ZOOM_MAX = 2.5
 const PDF_ZOOM_STEP = 0.25
 
-const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "m4a", "ogg", "flac", "aac", "opus", "weba"])
-const TEXT_EXTENSIONS = new Set([
-  "md", "markdown", "mdx", "json", "jsonl", "txt", "csv", "tsv", "yml", "yaml", "xml", "log", "ini",
-  "toml", "conf", "sql", "sh", "bash", "zsh", "py", "ts", "tsx", "js", "jsx", "mjs", "cjs", "kt",
-  "java", "go", "rs", "c", "cpp", "h", "css", "scss", "html",
-])
-const ARCHIVE_EXTENSIONS = new Set(["zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar", "zst"])
-const TEXT_MIMES = new Set([
-  "application/json", "application/ld+json", "application/xml", "application/yaml",
-  "application/x-yaml", "application/javascript", "application/typescript", "application/sql",
-])
-
-export type CloudDocumentSubtype = "pdf" | "audio" | "code" | "archive" | "document"
-
-const extractLowerExt = (filename: string): string => {
-  const dotIdx = filename.lastIndexOf(".")
-  return dotIdx < 0 || dotIdx === filename.length - 1 ? "" : filename.slice(dotIdx + 1).trim().toLowerCase()
-}
-
-export const isPdfCloudFile = (file: CloudFile): boolean =>
-  file.contentType.toLowerCase() === "application/pdf" || extractLowerExt(file.originalFilename) === "pdf"
-
-export const isAudioCloudFile = (file: CloudFile): boolean =>
-  file.contentType.toLowerCase().startsWith("audio/") || AUDIO_EXTENSIONS.has(extractLowerExt(file.originalFilename))
-
-export const isTextPreviewableCloudFile = (file: CloudFile): boolean => {
-  if (isImageCloudFile(file) || file.mediaKind === "VIDEO" || isPdfCloudFile(file) || isAudioCloudFile(file)) {
-    return false
-  }
-  const mime = file.contentType.toLowerCase()
-  return mime.startsWith("text/") || TEXT_MIMES.has(mime) || TEXT_EXTENSIONS.has(extractLowerExt(file.originalFilename))
-}
-
-export const getCloudDocumentSubtype = (file: CloudFile): CloudDocumentSubtype => {
-  if (isPdfCloudFile(file)) return "pdf"
-  if (isAudioCloudFile(file)) return "audio"
-  if (isTextPreviewableCloudFile(file)) return "code"
-  const ext = extractLowerExt(file.originalFilename)
-  const mime = file.contentType.toLowerCase()
-  return ARCHIVE_EXTENSIONS.has(ext) || mime.includes("zip") || mime.includes("compressed") || mime.includes("tar")
-    ? "archive"
-    : "document"
-}
-
-export type BoundedTextPreviewResult =
-  | { status: "ready"; lines: string[]; bytesRead: number; truncated: boolean }
-  | { status: "binary" }
-  | { status: "error"; message: string }
-
-const hasNullByteInSlice = (bytes: Uint8Array, limit = bytes.byteLength): boolean => {
-  const end = bytes.byteLength < limit ? bytes.byteLength : limit
-  for (let i = 0; i < end; i += 1) {
-    if (bytes[i] === 0) return true
-  }
-  return false
-}
-
-const trimIncompleteUtf8Tail = (bytes: Uint8Array): Uint8Array => {
-  let idx = bytes.byteLength - 1
-  let cont = 0
-  while (idx >= 0 && cont < 3 && (bytes[idx] & 0xc0) === 0x80) {
-    cont += 1
-    idx -= 1
-  }
-  if (idx < 0 || bytes[idx] < 0x80) return bytes
-  const lead = bytes[idx]
-  const need = (lead & 0xe0) === 0xc0 ? 2 : (lead & 0xf0) === 0xe0 ? 3 : (lead & 0xf8) === 0xf0 ? 4 : 1
-  return cont + 1 < need ? bytes.subarray(0, idx) : bytes
-}
-
-export const splitBoundedLines = (text: string, maxLines: number): { lines: string[]; lineTruncated: boolean } => {
-  const lines: string[] = []
-  let cursor = 0
-  while (cursor <= text.length && lines.length < maxLines) {
-    const nl = text.indexOf("\n", cursor)
-    if (nl === -1) {
-      const tail = text.slice(cursor)
-      lines.push(tail.endsWith("\r") ? tail.slice(0, -1) : tail)
-      return { lines, lineTruncated: false }
-    }
-    const raw = text.slice(cursor, nl)
-    lines.push(raw.endsWith("\r") ? raw.slice(0, -1) : raw)
-    cursor = nl + 1
-  }
-  return { lines, lineTruncated: cursor <= text.length }
-}
-
-export type StreamReadOutcome =
-  | { kind: "ok"; bytes: Uint8Array; overflowed: boolean }
-  | { kind: "binary" }
-  | { kind: "too_large" }
-
-export const readStreamBytesWithGuard = async (
-  response: Response,
-  maxBytes: number,
-  mode: "truncate" | "reject",
-  fullNullScan: boolean
-): Promise<StreamReadOutcome> => {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    const rawBuf = new Uint8Array(await response.arrayBuffer())
-    if (hasNullByteInSlice(rawBuf, fullNullScan ? rawBuf.byteLength : 512)) return { kind: "binary" }
-    if (rawBuf.byteLength > maxBytes) {
-      return mode === "reject"
-        ? { kind: "too_large" }
-        : { kind: "ok", bytes: rawBuf.subarray(0, maxBytes), overflowed: true }
-    }
-    return { kind: "ok", bytes: rawBuf, overflowed: false }
-  }
-
-  const chunks: Uint8Array[] = []
-  let receivedBytes = 0
-  let sampled = false
-  let overflowed = false
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value || value.byteLength === 0) continue
-      if (fullNullScan || !sampled) {
-        sampled = true
-        if (hasNullByteInSlice(value, fullNullScan ? value.byteLength : 512)) {
-          await reader.cancel().catch(() => undefined)
-          return { kind: "binary" }
-        }
-      }
-      if (receivedBytes + value.byteLength > maxBytes) {
-        if (mode === "reject") {
-          await reader.cancel().catch(() => undefined)
-          return { kind: "too_large" }
-        }
-        const remain = maxBytes - receivedBytes
-        if (remain > 0) chunks.push(value.subarray(0, remain))
-        receivedBytes = maxBytes
-        overflowed = true
-        await reader.cancel().catch(() => undefined)
-        break
-      }
-      chunks.push(value)
-      receivedBytes += value.byteLength
-    }
-  } finally {
-    reader.releaseLock()
-  }
-
-  const merged = new Uint8Array(receivedBytes)
-  let offset = 0
-  for (const chunk of chunks) {
-    merged.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return { kind: "ok", bytes: merged, overflowed }
-}
-
-export const readBoundedCloudTextPreview = async (
-  url: string,
-  declaredByteSize: number,
-  maxBytes = MAX_TEXT_PREVIEW_BYTES,
-  signal?: AbortSignal,
-  maxLines = MAX_TEXT_PREVIEW_LINES
-): Promise<BoundedTextPreviewResult> => {
-  const response = await fetch(url, { credentials: "include", signal })
-  if (!response.ok) return { status: "error", message: `미리보기를 불러오지 못했습니다. (HTTP ${response.status})` }
-
-  const streamRes = await readStreamBytesWithGuard(response, maxBytes, "truncate", false)
-  if (streamRes.kind === "binary") return { status: "binary" }
-  if (streamRes.kind === "too_large") return { status: "error", message: "파일 크기 상한을 초과했습니다." }
-
-  const truncated = streamRes.overflowed || (Number.isFinite(declaredByteSize) && declaredByteSize > maxBytes)
-  const safeBytes = truncated ? trimIncompleteUtf8Tail(streamRes.bytes) : streamRes.bytes
-  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(safeBytes)
-  const { lines, lineTruncated } = splitBoundedLines(decoded, maxLines)
-  return { status: "ready", lines, bytesRead: safeBytes.byteLength, truncated: truncated || lineTruncated }
-}
-
-export { readBoundedCloudSvgPreview, type BoundedSvgPreviewResult }
-
-const resolveSvgPendingLabel = (res: BoundedSvgPreviewResult | null): string => {
-  if (!res) return "SVG 원문을 불러오는 중..."
-  if (res.status === "too_large" || res.status === "error") return res.message
-  return "이진 데이터가 포함된 파일입니다."
-}
-
 const clampZoom = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.round(v * 100) / 100))
 
 const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentUrl: string }) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const [result, setResult] = useState<BoundedTextPreviewResult | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     setResult(null)
     void readBoundedCloudTextPreview(contentUrl, file.byteSize, MAX_TEXT_PREVIEW_BYTES, controller.signal)
-      .then((res) => { if (!controller.signal.aborted) setResult(res) })
-      .catch(() => { if (!controller.signal.aborted) setResult({ status: "error", message: "텍스트 파일을 읽어오지 못했습니다." }) })
+      .then((res) => {
+        if (!controller.signal.aborted) setResult(res)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setResult({
+            status: "error",
+            message: isEn ? "Failed to load text file." : "텍스트 파일을 읽어오지 못했습니다.",
+          })
+        }
+      })
     return () => controller.abort()
-  }, [contentUrl, file.byteSize, file.id])
+  }, [contentUrl, file.byteSize, file.id, isEn])
 
   if (!result) {
     return (
       <S.YarlMediaCard role="status" onClick={(e) => e.stopPropagation()}>
-        <strong>문서 내용을 불러오는 중...</strong>
+        <strong>{isEn ? "Loading document..." : "문서 내용을 불러오는 중..."}</strong>
         <span>{file.originalFilename}</span>
       </S.YarlMediaCard>
     )
@@ -260,10 +90,16 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
   if (result.status !== "ready") {
     return (
       <S.YarlMediaCard role="alert" onClick={(e) => e.stopPropagation()}>
-        <strong>{result.status === "binary" ? "텍스트로 미리볼 수 없는 바이너리 형식입니다" : result.message}</strong>
+        <strong>
+          {result.status === "binary"
+            ? isEn
+              ? "Binary file cannot be previewed as text"
+              : "텍스트로 미리볼 수 없는 바이너리 형식입니다"
+            : result.message}
+        </strong>
         <span>{file.originalFilename}</span>
         <S.YarlFallbackDownloadLink href={getCloudFileDownloadUrl(file.id)} download={file.originalFilename}>
-          다운로드
+          {isEn ? "Download" : "다운로드"}
         </S.YarlFallbackDownloadLink>
       </S.YarlMediaCard>
     )
@@ -272,7 +108,9 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
     <S.YarlCodeShell onClick={(e) => e.stopPropagation()}>
       {result.truncated ? (
         <S.YarlTruncationBanner role="status">
-          안전한 메모리 보호를 위해 미리보기 상한(256KB)까지만 표시했습니다. 전체 파일은 다운로드해 확인하세요.
+          {isEn
+            ? "Showing the first 256KB safely. Download the file to view the rest."
+            : "안전한 메모리 보호를 위해 미리보기 상한(256KB)까지만 표시했습니다. 전체 파일은 다운로드해 확인하세요."}
         </S.YarlTruncationBanner>
       ) : null}
       <S.YarlCodeScroll>
@@ -303,6 +141,8 @@ export const AdminCloudMediaLightbox = ({
   onClose,
   onSelectFile,
 }: AdminCloudMediaLightboxProps) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const modalRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -340,7 +180,10 @@ export const AdminCloudMediaLightbox = ({
   useEffect(() => {
     if (!open || !file || !isSvg) return
     const controller = new AbortController()
-    const versionedUrl = appendCloudAssetVersionUrl(getCloudFileContentUrl(file.id), file.modifiedAt || file.createdAt)
+    const versionedUrl = appendCloudAssetVersionUrl(
+      getCloudFileContentUrl(file.id),
+      file.modifiedAt || file.createdAt
+    )
     void readBoundedCloudSvgPreview(versionedUrl, file.byteSize, controller.signal)
       .then((res) => {
         if (controller.signal.aborted) return
@@ -348,10 +191,15 @@ export const AdminCloudMediaLightbox = ({
         if (res.status === "ready" && res.dimensions) setNaturalSize(res.dimensions)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setSvgPreview({ status: "error", message: "SVG 원문을 불러오지 못했습니다." })
+        if (!controller.signal.aborted) {
+          setSvgPreview({
+            status: "error",
+            message: isEn ? "Failed to load SVG source." : "SVG 원문을 불러오지 못했습니다.",
+          })
+        }
       })
     return () => controller.abort()
-  }, [file, isSvg, open])
+  }, [file, isEn, isSvg, open])
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = videoSpeed
@@ -365,18 +213,27 @@ export const AdminCloudMediaLightbox = ({
     return () => document.removeEventListener("fullscreenchange", syncFullscreen)
   }, [open])
 
-  const currentIndex = useMemo(() => (file ? files.findIndex((c) => c.id === file.id) : -1), [file, files])
+  const currentIndex = useMemo(
+    () => (file ? files.findIndex((c) => c.id === file.id) : -1),
+    [file, files]
+  )
   const prevFile = currentIndex > 0 ? files[currentIndex - 1] : null
   const nextFile = currentIndex >= 0 && currentIndex < files.length - 1 ? files[currentIndex + 1] : null
-  const goPrev = useCallback(() => { if (prevFile && onSelectFile) onSelectFile(prevFile.id) }, [onSelectFile, prevFile])
-  const goNext = useCallback(() => { if (nextFile && onSelectFile) onSelectFile(nextFile.id) }, [nextFile, onSelectFile])
+  const goPrev = useCallback(() => {
+    if (prevFile && onSelectFile) onSelectFile(prevFile.id)
+  }, [onSelectFile, prevFile])
+  const goNext = useCallback(() => {
+    if (nextFile && onSelectFile) onSelectFile(nextFile.id)
+  }, [nextFile, onSelectFile])
 
   useEffect(() => {
     if (!open || !file) return
     const onArrow = (e: globalThis.KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "VIDEO" || tag === "AUDIO") return
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "VIDEO" || tag === "AUDIO") {
+        return
+      }
       if (e.key === "ArrowLeft" && prevFile && onSelectFile) {
         e.preventDefault()
         onSelectFile(prevFile.id)
@@ -427,67 +284,149 @@ export const AdminCloudMediaLightbox = ({
     else void modalRef.current?.requestFullscreen?.().catch(() => undefined)
   }
 
+  const resolveSvgStatusText = (res: BoundedSvgPreviewResult | null): string => {
+    if (!res) return isEn ? "Loading SVG source..." : "SVG 원문을 불러오는 중..."
+    if (res.status === "too_large" || res.status === "error") return res.message
+    return isEn ? "File contains binary data." : "이진 데이터가 포함된 파일입니다."
+  }
+
   return (
     <S.YarlPortal
       ref={modalRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${file.originalFilename} 미리보기`}
+      aria-label={isEn ? `${file.originalFilename} preview` : `${file.originalFilename} 미리보기`}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
       <S.YarlCounter aria-live="polite">
-        <span className="yarlCounterIndex">{displayIndex} / {displayTotal}</span>
+        <span className="yarlCounterIndex">
+          {displayIndex} / {displayTotal}
+        </span>
         <span className="yarlCounterCaption">
           {file.originalFilename}
           {naturalSize ? ` · ${naturalSize.width} × ${naturalSize.height}` : ""}
         </span>
       </S.YarlCounter>
 
-      <S.YarlToolbar role="toolbar" aria-label="라이트박스 도구 모음" onClick={(e) => e.stopPropagation()}>
+      <S.YarlToolbar
+        role="toolbar"
+        aria-label={isEn ? "Lightbox toolbar" : "라이트박스 도구 모음"}
+        onClick={(e) => e.stopPropagation()}
+      >
         {canZoomImage || canZoomPdf ? (
           <>
-            <S.YarlToolbarButton type="button" aria-label="확대" disabled={activeZoom >= activeMaxZoom} onClick={() => stepActiveZoom(1)}>
+            <S.YarlToolbarButton
+              type="button"
+              aria-label={isEn ? "Zoom in" : "확대"}
+              disabled={activeZoom >= activeMaxZoom}
+              onClick={() => stepActiveZoom(1)}
+            >
               <YarlZoomInIcon />
             </S.YarlToolbarButton>
-            <S.YarlToolbarButton type="button" aria-label="축소" disabled={activeZoom <= activeMinZoom} onClick={() => stepActiveZoom(-1)}>
+            <S.YarlToolbarButton
+              type="button"
+              aria-label={isEn ? "Zoom out" : "축소"}
+              disabled={activeZoom <= activeMinZoom}
+              onClick={() => stepActiveZoom(-1)}
+            >
               <YarlZoomOutIcon />
             </S.YarlToolbarButton>
           </>
         ) : null}
         {isSvg ? (
-          <S.YarlToolbarButton type="button" aria-label={svgViewMode === "render" ? "SVG 코드 보기" : "SVG 렌더링 보기"} data-active={svgViewMode === "code" ? "true" : "false"} onClick={() => setSvgViewMode((m) => (m === "render" ? "code" : "render"))}>
-            {svgViewMode === "render" ? <StrapiFileCodeIcon width={24} height={24} /> : <StrapiImageIcon width={24} height={24} />}
+          <S.YarlToolbarButton
+            type="button"
+            aria-label={
+              svgViewMode === "render"
+                ? isEn
+                  ? "View SVG source"
+                  : "SVG 코드 보기"
+                : isEn
+                  ? "View SVG render"
+                  : "SVG 렌더링 보기"
+            }
+            data-active={svgViewMode === "code" ? "true" : "false"}
+            onClick={() => setSvgViewMode((m) => (m === "render" ? "code" : "render"))}
+          >
+            {svgViewMode === "render" ? (
+              <StrapiFileCodeIcon width={24} height={24} />
+            ) : (
+              <StrapiImageIcon width={24} height={24} />
+            )}
           </S.YarlToolbarButton>
         ) : null}
         {canZoomImage ? (
-          <S.YarlToolbarButton type="button" aria-label="투명 배경 격자 전환" aria-pressed={checkerboard} data-active={checkerboard ? "true" : "false"} onClick={() => setCheckerboard((c) => !c)}>
+          <S.YarlToolbarButton
+            type="button"
+            aria-label={isEn ? "Toggle transparency grid" : "투명 배경 격자 전환"}
+            aria-pressed={checkerboard}
+            data-active={checkerboard ? "true" : "false"}
+            onClick={() => setCheckerboard((c) => !c)}
+          >
             <StrapiGridFourIcon width={24} height={24} />
           </S.YarlToolbarButton>
         ) : null}
-        <S.YarlToolbarLink href={downloadUrl} download={file.originalFilename} aria-label="다운로드">
+        <S.YarlToolbarLink
+          href={downloadUrl}
+          download={file.originalFilename}
+          aria-label={isEn ? "Download" : "다운로드"}
+        >
           <YarlDownloadIcon />
         </S.YarlToolbarLink>
-        <S.YarlToolbarButton type="button" aria-label="전체화면 전환" aria-pressed={isFullscreen} data-active={isFullscreen ? "true" : "false"} onClick={handleToggleFullscreen}>
+        <S.YarlToolbarButton
+          type="button"
+          aria-label={isEn ? "Toggle fullscreen" : "전체화면 전환"}
+          aria-pressed={isFullscreen}
+          data-active={isFullscreen ? "true" : "false"}
+          onClick={handleToggleFullscreen}
+        >
           {isFullscreen ? <YarlExitFullscreenIcon /> : <YarlEnterFullscreenIcon />}
         </S.YarlToolbarButton>
-        <S.YarlToolbarButton ref={closeButtonRef} type="button" aria-label="미리보기 닫기" onClick={onClose}>
+        <S.YarlToolbarButton
+          ref={closeButtonRef}
+          type="button"
+          aria-label={isEn ? "Close preview" : "미리보기 닫기"}
+          onClick={onClose}
+        >
           <YarlCloseIcon />
         </S.YarlToolbarButton>
       </S.YarlToolbar>
 
       {files.length > 1 && onSelectFile ? (
         <>
-          <S.YarlNavigationButton type="button" $side="prev" aria-label="이전 파일 보기" disabled={!prevFile} onClick={(e) => { e.stopPropagation(); goPrev() }}>
+          <S.YarlNavigationButton
+            type="button"
+            $side="prev"
+            aria-label={isEn ? "Previous file" : "이전 파일 보기"}
+            disabled={!prevFile}
+            onClick={(e) => {
+              e.stopPropagation()
+              goPrev()
+            }}
+          >
             <YarlPreviousIcon width={32} height={32} />
           </S.YarlNavigationButton>
-          <S.YarlNavigationButton type="button" $side="next" aria-label="다음 파일 보기" disabled={!nextFile} onClick={(e) => { e.stopPropagation(); goNext() }}>
+          <S.YarlNavigationButton
+            type="button"
+            $side="next"
+            aria-label={isEn ? "Next file" : "다음 파일 보기"}
+            disabled={!nextFile}
+            onClick={(e) => {
+              e.stopPropagation()
+              goNext()
+            }}
+          >
             <YarlNextIcon width={32} height={32} />
           </S.YarlNavigationButton>
         </>
       ) : null}
 
-      <S.YarlSlide onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <S.YarlSlide
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose()
+        }}
+      >
         {isImage ? (
           isSvg && svgViewMode === "code" ? (
             svgPreview?.status === "ready" ? (
@@ -503,14 +442,14 @@ export const AdminCloudMediaLightbox = ({
               </S.YarlCodeShell>
             ) : (
               <S.YarlMediaCard role="status" onClick={(e) => e.stopPropagation()}>
-                <strong>{resolveSvgPendingLabel(svgPreview)}</strong>
+                <strong>{resolveSvgStatusText(svgPreview)}</strong>
                 <span>{file.originalFilename}</span>
               </S.YarlMediaCard>
             )
           ) : imageError ? (
             <S.YarlMediaCard role="alert" onClick={(e) => e.stopPropagation()}>
               <YarlErrorIcon width={44} height={44} />
-              <strong>이미지를 불러올 수 없습니다</strong>
+              <strong>{isEn ? "Unable to load image" : "이미지를 불러올 수 없습니다"}</strong>
               <span>{file.originalFilename}</span>
             </S.YarlMediaCard>
           ) : (
@@ -534,7 +473,9 @@ export const AdminCloudMediaLightbox = ({
                 onLoad={(e) => {
                   if (isSvg) return
                   const { naturalWidth, naturalHeight } = e.currentTarget
-                  if (naturalWidth > 0 && naturalHeight > 0) setNaturalSize({ width: naturalWidth, height: naturalHeight })
+                  if (naturalWidth > 0 && naturalHeight > 0) {
+                    setNaturalSize({ width: naturalWidth, height: naturalHeight })
+                  }
                 }}
                 onError={() => setImageError(true)}
               />
@@ -545,36 +486,54 @@ export const AdminCloudMediaLightbox = ({
             <video ref={videoRef} src={rawContentUrl} controls autoPlay playsInline>
               <track kind="captions" />
             </video>
-            <S.YarlBottomBar role="group" aria-label="라이트박스 동영상 배속">
+            <S.YarlBottomBar
+              role="group"
+              aria-label={isEn ? "Video playback speed" : "라이트박스 동영상 배속"}
+            >
               {PLAYBACK_SPEEDS.map((speed) => (
-                <S.YarlDarkPill key={speed} type="button" data-active={videoSpeed === speed ? "true" : "false"} onClick={() => setVideoSpeed(speed)}>
+                <S.YarlDarkPill
+                  key={speed}
+                  type="button"
+                  data-active={videoSpeed === speed ? "true" : "false"}
+                  onClick={() => setVideoSpeed(speed)}
+                >
                   {speed}x
                 </S.YarlDarkPill>
               ))}
             </S.YarlBottomBar>
           </S.YarlVideoStage>
         ) : docSubtype === "pdf" ? (
-          <LightboxPdfStage file={file} contentUrl={rawContentUrl} pdfZoom={pdfZoom} currentPage={pdfPage} onChangePage={setPdfPage} />
+          <CloudPdfLightboxStage
+            file={file}
+            contentUrl={rawContentUrl}
+            pdfZoom={pdfZoom}
+            currentPage={pdfPage}
+            onChangePage={setPdfPage}
+          />
         ) : docSubtype === "code" ? (
           <LightboxTextCodeStage file={file} contentUrl={rawContentUrl} />
         ) : docSubtype === "audio" ? (
           <S.YarlMediaCard onClick={(e) => e.stopPropagation()}>
             <StrapiHeadphonesIcon width={48} height={48} />
             <strong>{file.originalFilename}</strong>
-            <span>{getCloudKindBadge(file)} · {formatCloudFileSize(file.byteSize)}</span>
+            <span>
+              {getCloudKindBadge(file)} · {formatCloudFileSize(file.byteSize)}
+            </span>
             <audio src={rawContentUrl} controls autoPlay />
           </S.YarlMediaCard>
         ) : (
           <S.YarlMediaCard onClick={(e) => e.stopPropagation()}>
             <FallbackIcon width={48} height={48} />
             <strong>{file.originalFilename}</strong>
-            <span>{getCloudKindBadge(file)} · {formatCloudFileSize(file.byteSize)}</span>
-            <S.YarlFallbackDownloadLink href={downloadUrl} download={file.originalFilename}>파일 다운로드</S.YarlFallbackDownloadLink>
+            <span>
+              {getCloudKindBadge(file)} · {formatCloudFileSize(file.byteSize)}
+            </span>
+            <S.YarlFallbackDownloadLink href={downloadUrl} download={file.originalFilename}>
+              {isEn ? "Download original" : "원본 파일 다운로드"}
+            </S.YarlFallbackDownloadLink>
           </S.YarlMediaCard>
         )}
       </S.YarlSlide>
     </S.YarlPortal>
   )
 }
-
-export default AdminCloudMediaLightbox

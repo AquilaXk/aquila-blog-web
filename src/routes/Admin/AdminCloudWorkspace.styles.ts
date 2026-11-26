@@ -61,7 +61,7 @@ export const CloudWorkspace = styled.section`
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  min-height: calc(100vh - var(--app-header-height, 73px) - 3.95rem);
+  min-height: calc(100vh - var(--app-header-height, 48px));
   &[data-detail-open="true"][data-detail-mode="inline"] {
     grid-template-columns: minmax(0, 1fr) minmax(21rem, 24rem);
   }
@@ -399,6 +399,10 @@ export const SkeletonRow = styled.span`
   }
   &:nth-of-type(3) {
     width: 58%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.78;
   }
   @keyframes admin-cloud-skeleton {
     0%, 100% {

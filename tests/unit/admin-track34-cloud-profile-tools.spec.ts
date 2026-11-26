@@ -130,53 +130,43 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
     await expect(AdminProfilePersistenceModel.readImageSourceSizeFromFile(fakeAvatar)).rejects.toThrow()
   })
 
-  test("EditorStudioCloudAssetPicker 폴백 다운로드 바이트 예산 가드가 20MB 초과 응답을 Fail-Closed로 차단한다", async () => {
+  test("EditorStudioCloudAssetPicker는 8MB·래스터 이미지 승격만 허용하고 비래스터·초과 이미지·20MB 폴백을 제거한다", async () => {
     const pickerMod = EditorStudioCloudAssetPickerModule as Record<string, unknown>
-    const maxBytes = pickerMod.MAX_PICKER_FALLBACK_BYTES as number | undefined
-    const assertBudget = pickerMod.assertCloudPickerFallbackByteBudget as
-      | ((declaredBytes: number, contentLengthHeader?: string | null) => void)
-      | undefined
-    const readBoundedBlob = pickerMod.readBoundedResponseBlob as
-      | ((response: Response, maxBudget?: number, declaredBytes?: number) => Promise<Blob>)
-      | undefined
+    expect(pickerMod.MAX_PICKER_FALLBACK_BYTES).toBeUndefined()
+    expect(pickerMod.readBoundedResponseBlob).toBeUndefined()
+    expect(pickerMod.MAX_POST_PROMOTABLE_IMAGE_BYTES).toBe(8 * 1024 * 1024)
 
-    expect(maxBytes).toBe(20 * 1024 * 1024)
-    expect(typeof assertBudget).toBe("function")
-    expect(typeof readBoundedBlob).toBe("function")
+    const checkEligibility = pickerMod.getCloudFilePostPromotionEligibility as (
+      file: { mediaKind: "PHOTO" | "VIDEO" | "DOCUMENT"; contentType: string; originalFilename: string; byteSize: number },
+      language?: "ko" | "en"
+    ) => { promotable: boolean; reason: string | null }
 
-    // 1. 선언된 파일 크기가 20MB 초과일 때 즉시 거부
-    expect(() => assertBudget!(20 * 1024 * 1024 + 1, null)).toThrow()
+    expect(
+      checkEligibility({ mediaKind: "PHOTO", contentType: "image/png", originalFilename: "ok.png", byteSize: 4 * 1024 * 1024 })
+    ).toEqual({ promotable: true, reason: null })
 
-    // 2. Content-Length 헤더가 20MB 초과일 때 즉시 거부
-    expect(() => assertBudget!(1024, String(20 * 1024 * 1024 + 512))).toThrow()
+    expect(
+      checkEligibility({ mediaKind: "PHOTO", contentType: "image/jpeg", originalFilename: "big.jpg", byteSize: 8 * 1024 * 1024 + 1 }).promotable
+    ).toBe(false)
 
-    // 3. Content-Length가 없더라도 스트림 누적 바이트가 상한을 넘는 순간 취소·거부하고 후속 청크를 읽지 않음
-    let pulledChunks = 0
-    let cancelled = false
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        pulledChunks += 1
-        controller.enqueue(new Uint8Array(1024))
-      },
-      cancel() {
-        cancelled = true
-      },
-    })
-    const oversizedStreamRes = new Response(stream, {
-      status: 200,
-      headers: { "content-type": "application/octet-stream" },
-    })
-    await expect(readBoundedBlob!(oversizedStreamRes, 1500, 0)).rejects.toThrow()
-    expect(cancelled).toBe(true)
-    expect(pulledChunks).toBeLessThanOrEqual(3)
+    expect(
+      checkEligibility({ mediaKind: "PHOTO", contentType: "image/svg+xml", originalFilename: "vec.svg", byteSize: 1024 }).promotable
+    ).toBe(false)
 
-    // 4. 예산 이내의 정상 응답은 Blob으로 안전하게 읽음
-    const validRes = new Response(new Uint8Array([1, 2, 3, 4, 5]), {
-      status: 200,
-      headers: { "content-type": "image/png", "content-length": "5" },
-    })
-    const blob = await readBoundedBlob!(validRes, maxBytes, 5)
-    expect(blob.size).toBe(5)
+    expect(
+      checkEligibility({ mediaKind: "DOCUMENT", contentType: "application/pdf", originalFilename: "doc.pdf", byteSize: 1024 }).promotable
+    ).toBe(false)
+
+    const buildSnippet = pickerMod.buildCloudAssetMarkdownSnippet as (
+      file: { mediaKind: "PHOTO" | "VIDEO" | "DOCUMENT"; contentType: string; originalFilename: string },
+      url?: string
+    ) => string
+    expect(
+      buildSnippet(
+        { mediaKind: "PHOTO", contentType: "image/png", originalFilename: "a[1]\\b.png" },
+        "https://cdn.example.com/a.png"
+      )
+    ).toBe("![a\\[1\\]\\\\b.png](https://cdn.example.com/a.png)")
   })
 
   test("AdminToolsOpsOverview 바 차트 빌더가 부분 누락된 스냅샷을 안전하게 처리하고 0건 막대를 0%·기준선으로 계산한다", () => {

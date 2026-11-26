@@ -12,7 +12,12 @@ import {
   useMemo,
   useState,
 } from "react"
-import { getCloudFileContentUrl, type CloudFile } from "src/apis/backend/cloud"
+import {
+  getCloudFileContentUrl,
+  getCloudFileThumbnailUrl,
+  type CloudFile,
+} from "src/apis/backend/cloud"
+import { useLanguage } from "src/libs/language"
 import {
   adminBorder,
   adminBorderStrong,
@@ -31,15 +36,20 @@ import {
 import * as W from "./AdminCloudWorkspace.styles"
 import {
   appendCloudAssetVersionUrl,
+  formatCloudDate,
+  formatCloudFileSize,
+  getCloudKindLabel,
   isImageCloudFile,
   isSvgCloudFile,
+  splitCloudFilenameParts,
 } from "./AdminCloudWorkspaceModel"
 import {
-  StrapiFolderIcon,
   StrapiGridFourIcon,
   StrapiListBulletsIcon,
   getStrapiAssetIcon,
 } from "./adminStrapiIcons"
+import { CardKebabButton, TruncatedFilename } from "./cloud/AdminCloudOverlay.styles"
+import { getCloudDictionary } from "./cloud/adminCloudI18n"
 
 export type CloudViewMode = "grid" | "list"
 
@@ -51,61 +61,33 @@ export const CloudViewToggle = ({
 }: {
   viewMode: CloudViewMode
   onChange: (next: CloudViewMode) => void
-}) => (
-  <W.ViewToggleTrack role="group" aria-label="보기 방식 전환">
-    <W.ViewToggleSegment
-      type="button"
-      aria-label="그리드 보기"
-      aria-pressed={viewMode === "grid"}
-      data-state={viewMode === "grid" ? "on" : "off"}
-      onClick={() => onChange("grid")}
-    >
-      <StrapiGridFourIcon width={16} height={16} />
-    </W.ViewToggleSegment>
-    <W.ViewToggleSegment
-      type="button"
-      aria-label="목록 보기"
-      aria-pressed={viewMode === "list"}
-      data-state={viewMode === "list" ? "on" : "off"}
-      onClick={() => onChange("list")}
-    >
-      <StrapiListBulletsIcon width={16} height={16} />
-    </W.ViewToggleSegment>
-  </W.ViewToggleTrack>
-)
-
-export const CloudFolderBar = ({
-  folders,
-  activeFolderPath,
-  onSelectFolder,
-}: {
-  folders: readonly string[]
-  activeFolderPath: string
-  onSelectFolder: (folderPath: string) => void
 }) => {
-  if (folders.length === 0) return null
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
   return (
-    <W.FoldersBand role="group" aria-label="폴더 필터">
-      <W.FolderTileButton
+    <W.ViewToggleTrack
+      role="group"
+      aria-label={language === "en" ? "Switch view mode" : "보기 방식 전환"}
+    >
+      <W.ViewToggleSegment
         type="button"
-        data-active={toBooleanAttr(!activeFolderPath)}
-        onClick={() => onSelectFolder("")}
+        aria-label={t.viewGrid}
+        aria-pressed={viewMode === "grid"}
+        data-state={viewMode === "grid" ? "on" : "off"}
+        onClick={() => onChange("grid")}
       >
-        <StrapiFolderIcon width={18} height={18} />
-        <span>전체 폴더</span>
-      </W.FolderTileButton>
-      {folders.map((folder) => (
-        <W.FolderTileButton
-          key={folder}
-          type="button"
-          data-active={toBooleanAttr(activeFolderPath === folder)}
-          onClick={() => onSelectFolder(folder)}
-        >
-          <StrapiFolderIcon width={18} height={18} />
-          <span>/{folder}</span>
-        </W.FolderTileButton>
-      ))}
-    </W.FoldersBand>
+        <StrapiGridFourIcon width={16} height={16} />
+      </W.ViewToggleSegment>
+      <W.ViewToggleSegment
+        type="button"
+        aria-label={t.viewList}
+        aria-pressed={viewMode === "list"}
+        data-state={viewMode === "list" ? "on" : "off"}
+        onClick={() => onChange("list")}
+      >
+        <StrapiListBulletsIcon width={16} height={16} />
+      </W.ViewToggleSegment>
+    </W.ViewToggleTrack>
   )
 }
 
@@ -113,6 +95,7 @@ type AssetCardItemProps = {
   checked: boolean
   file: CloudFile
   onExpandFile?: (fileId: number) => void
+  onOpenContextMenu?: (file: CloudFile, x: number, y: number) => void
   onPreviewFile: (fileId: number) => void
   onToggleChecked: (fileId: number, shiftKey?: boolean) => void
   selected: boolean
@@ -122,21 +105,25 @@ const AssetCardItem = ({
   checked,
   file,
   onExpandFile,
+  onOpenContextMenu,
   onPreviewFile,
   onToggleChecked,
   selected,
 }: AssetCardItemProps) => {
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
   const [mediaLoadFailed, setMediaLoadFailed] = useState(false)
   useEffect(() => setMediaLoadFailed(false), [file.id, file.modifiedAt])
 
   const isImage = isImageCloudFile(file)
   const isSvg = isSvgCloudFile(file)
   const versionedUrl = appendCloudAssetVersionUrl(
-    getCloudFileContentUrl(file.id),
+    isSvg ? getCloudFileContentUrl(file.id) : getCloudFileThumbnailUrl(file.id),
     file.modifiedAt || file.createdAt
   )
   const DocIcon = getStrapiAssetIcon(file.contentType, file.originalFilename)
   const TypeIcon = DocIcon
+  const { stem, extension } = splitCloudFilenameParts(file.originalFilename)
 
   const handleCardClick = (event: ReactMouseEvent<HTMLElement>) => {
     if (event.shiftKey) onToggleChecked(file.id, true)
@@ -159,6 +146,13 @@ const AssetCardItem = ({
     }
   }
 
+  const handleContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!onOpenContextMenu) return
+    event.preventDefault()
+    event.stopPropagation()
+    onOpenContextMenu(file, event.clientX, event.clientY)
+  }
+
   return (
     <StyledCard
       role="listitem"
@@ -169,6 +163,7 @@ const AssetCardItem = ({
       onClick={handleCardClick}
       onDoubleClick={handleCardDoubleClick}
       onKeyDown={handleCardKeyDown}
+      onContextMenu={handleContextMenu}
       onDragStart={(e) => e.preventDefault()}
     >
       <StyledCardHeader>
@@ -180,7 +175,9 @@ const AssetCardItem = ({
         >
           <W.RowCheckbox
             type="checkbox"
-            aria-label={`${file.originalFilename} 선택`}
+            aria-label={
+              language === "en" ? `Select ${file.originalFilename}` : `${file.originalFilename} 선택`
+            }
             checked={checked}
             onClick={(e) => {
               e.stopPropagation()
@@ -223,15 +220,37 @@ const AssetCardItem = ({
               onPreviewFile(file.id)
             }}
           >
-            <strong>{file.originalFilename}</strong>
+            <TruncatedFilename>
+              <strong className="stem">{stem}</strong>
+              {extension ? <span className="ext">{extension}</span> : null}
+            </TruncatedFilename>
           </AssetCardNameButton>
+          {onOpenContextMenu ? (
+            <CardKebabButton
+              type="button"
+              aria-label={`${file.originalFilename} ${t.actionMore}`}
+              aria-haspopup="menu"
+              onClick={(e) => {
+                e.stopPropagation()
+                const rect = e.currentTarget.getBoundingClientRect()
+                onOpenContextMenu(file, rect.right - 180, rect.bottom + 4)
+              }}
+            >
+              ⋯
+            </CardKebabButton>
+          ) : null}
         </CardFooter>
+        <CardMetaText>
+          {formatCloudFileSize(file.byteSize)} · {getCloudKindLabel(file.mediaKind, language)} ·{" "}
+          {formatCloudDate(file.modifiedAt || file.createdAt, language)}
+        </CardMetaText>
       </CardBody>
     </StyledCard>
   )
 }
 
 export type AdminCloudAssetGridProps = {
+  activeFolderPath?: string
   activeUploadCount: number
   checkedFileIds: readonly number[]
   emptyTitle: string
@@ -239,6 +258,7 @@ export type AdminCloudAssetGridProps = {
   isFetching: boolean
   isFileListError: boolean
   onExpandFile?: (fileId: number) => void
+  onOpenContextMenu?: (file: CloudFile, x: number, y: number) => void
   onOpenUploadPicker: () => void
   onPreviewFile: (fileId: number) => void
   onRetryList: () => void
@@ -249,6 +269,7 @@ export type AdminCloudAssetGridProps = {
 }
 
 export const AdminCloudAssetGrid = ({
+  activeFolderPath = "",
   activeUploadCount,
   checkedFileIds,
   emptyTitle,
@@ -256,6 +277,7 @@ export const AdminCloudAssetGrid = ({
   isFetching,
   isFileListError,
   onExpandFile,
+  onOpenContextMenu,
   onOpenUploadPicker,
   onPreviewFile,
   onRetryList,
@@ -264,11 +286,19 @@ export const AdminCloudAssetGrid = ({
   shouldShowDetailPanel,
   showEmptyLoading,
 }: AdminCloudAssetGridProps) => {
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
+  const isEn = language === "en"
   const checkedSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
 
   if (showEmptyLoading) {
     return (
-      <div role="status" aria-label="파일 목록 로딩" aria-busy="true" style={{ width: "100%", minHeight: "14rem" }}>
+      <div
+        role="status"
+        aria-label={isEn ? "Loading file list" : "파일 목록 로딩"}
+        aria-busy="true"
+        style={{ width: "100%", minHeight: "14rem" }}
+      >
         <W.AssetItemsGrid aria-hidden="true">
           {[0, 1, 2].map((slot) => (
             <W.SkeletonAssetCard key={slot} data-admin-cloud-skeleton-row="true">
@@ -286,17 +316,24 @@ export const AdminCloudAssetGrid = ({
 
   if (files.length === 0) {
     const retryOrUpload = isFileListError ? (
-      <W.PrimaryButton type="button" aria-label="파일 목록 다시 시도" onClick={onRetryList}>
-        파일 목록 다시 시도
+      <W.PrimaryButton
+        type="button"
+        aria-label={isEn ? "Retry loading files" : "파일 목록 다시 시도"}
+        onClick={onRetryList}
+      >
+        {isEn ? "Retry loading files" : "파일 목록 다시 시도"}
       </W.PrimaryButton>
     ) : (
-      <W.PrimaryButton type="button" aria-label="파일 업로드" onClick={onOpenUploadPicker}>
-        + 파일 업로드
+      <W.PrimaryButton type="button" aria-label={t.uploadButton} onClick={onOpenUploadPicker}>
+        + {t.uploadButton}
       </W.PrimaryButton>
     )
     return (
       <W.EmptyTableState>
         <strong>{emptyTitle}</strong>
+        {!isFileListError && activeFolderPath && activeUploadCount === 0 ? (
+          <p>{t.emptyFolderUploadHint}</p>
+        ) : null}
         {activeUploadCount > 0 ? null : retryOrUpload}
       </W.EmptyTableState>
     )
@@ -311,6 +348,7 @@ export const AdminCloudAssetGrid = ({
           checked={checkedSet.has(file.id)}
           selected={shouldShowDetailPanel && selectedFile?.id === file.id}
           onExpandFile={onExpandFile}
+          onOpenContextMenu={onOpenContextMenu}
           onPreviewFile={onPreviewFile}
           onToggleChecked={onToggleChecked}
         />
@@ -360,14 +398,12 @@ const StyledCardHeader = styled.div`
 const PreviewContainer = styled.div`
   position: relative;
   width: 100%;
-  padding-bottom: 62.5%;
-  height: 0;
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   background: ${adminSurfaceRaised};
 
   &[data-svg="true"] {
     background: ${adminCheckerboardBackground};
-    padding: 0.75rem;
   }
 `
 
@@ -381,6 +417,8 @@ const StyledImage = styled.img`
   object-fit: cover;
   &[data-fit="contain"] {
     object-fit: contain;
+    padding: 0.75rem;
+    box-sizing: border-box;
   }
 `
 
@@ -395,16 +433,28 @@ const IconPreview = styled.div`
 `
 
 const CardBody = styled.div`
-  padding: 0.65rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.62rem 0.72rem;
   min-width: 0;
 `
 
 const CardFooter = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.42rem;
   min-width: 0;
   width: 100%;
+`
+
+const CardMetaText = styled.span`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: ${adminTextMuted};
+  font-size: 0.72rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
 `
 
 const FileTypeIcon = styled.span`
@@ -427,14 +477,9 @@ const AssetCardNameButton = styled.button`
   text-align: left;
   color: ${adminTextPrimary};
   font-size: 0.8125rem;
-  font-weight: 550;
-  strong {
-    display: block;
-    min-width: 0;
-    width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  font-weight: 600;
+  strong.stem {
+    font-weight: 600;
   }
   &:focus-visible {
     outline: none;

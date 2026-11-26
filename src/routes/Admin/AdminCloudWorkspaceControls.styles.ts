@@ -77,9 +77,9 @@ export const CloudSearchField = styled.label`
   display: flex;
   align-items: center;
   width: auto;
-  max-width: 12.5rem;
-  flex: 1 1 8rem;
-  min-width: 6.75rem;
+  max-width: 24rem;
+  flex: 1 1 15rem;
+  min-width: 10.5rem;
   @media (max-width: 960px) {
     flex: 1 1 100%;
     max-width: none;
@@ -587,8 +587,10 @@ export const AssetGridCardCheckboxOverlay = styled.div`
     opacity: 1;
   }
   @media (pointer: coarse) {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     opacity: 1;
   }
 `

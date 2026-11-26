@@ -4,7 +4,28 @@ import path from "node:path"
 import { createElement } from "react"
 import { renderToString } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { ApiError } from "../../src/apis/backend/client"
+import { ApiError, ApiNetworkError, ApiTimeoutError } from "../../src/apis/backend/client"
+import {
+  CloudApiError,
+  createUploadSpeedEstimator,
+  isRetryableCloudUploadError,
+  parseRetryAfterMs,
+  resolveCloudRetryDelayMs,
+} from "../../src/apis/backend/cloudXhrTransport"
+import {
+  buildCloudFolderBreadcrumbs,
+  buildCloudWorkspaceUrlQuery,
+  extractDirectChildFolders,
+  normalizeCloudFolderPath,
+  parseCloudWorkspaceUrlQuery,
+  validateCloudFolderPath,
+} from "../../src/routes/Admin/cloud/cloudFolderHelpers"
+import { validateCloudFileBeforeUpload } from "../../src/routes/Admin/cloudFileSignatureGuard"
+import {
+  computeAggregateQueueProgress,
+  formatCloudEta,
+  formatCloudTransferRate,
+} from "../../src/routes/Admin/cloudUploadQueueModel"
 import { queryKey } from "../../src/constants/queryKey"
 import {
   CLOUD_SYNC_UPLOAD_MAX_BYTES,
@@ -41,11 +62,10 @@ import { normalizeAdminNextPath, normalizeNextPath, toAdminLoginPath } from "../
 import { isSafeInlineHref } from "../../src/components/markdown-editor/markdownEditorWidgets"
 import { normalizeEditorReturnRoute } from "../../src/routes/Admin/EditorStudioWorkspaceControllerRootModel"
 import {
-  applyCloudFolderFilter,
+  doesCloudFileMatchFilters,
   extractCloudFolders,
   isCloudSearchPending,
   resolveCloudEmptyTitle,
-  resolveCloudSearchParams,
   shouldShowCloudEmptyLoading,
   sortCloudFiles,
   updateCachedCloudFilesForMutation,
@@ -353,17 +373,44 @@ caption
       false
     )
 
-    expect(resolveCloudSearchParams("/ops 점검")).toEqual({
-      folderPath: "ops",
-      keyword: "점검",
+    expect(normalizeCloudFolderPath(" /ops\\2026 세미나/ ")).toBe("ops/2026 세미나")
+    expect(validateCloudFolderPath("ops/2026 세미나")).toEqual({ ok: true, path: "ops/2026 세미나" })
+    expect(validateCloudFolderPath("ops/../secret").ok).toBe(false)
+    expect(buildCloudFolderBreadcrumbs("ops/2026 세미나/발표자료", "전체")).toEqual([
+      { label: "전체", path: "" },
+      { label: "ops", path: "ops" },
+      { label: "ops/2026 세미나".split("/")[1], path: "ops/2026 세미나" },
+      { label: "발표자료", path: "ops/2026 세미나/발표자료" },
+    ])
+    expect(
+      parseCloudWorkspaceUrlQuery({
+        folder: "/ops/2026 세미나/",
+        kw: "발표 자료",
+        kind: "PHOTO",
+        sort: "NAME",
+        dir: "desc",
+      })
+    ).toEqual({
+      folderPath: "ops/2026 세미나",
+      keyword: "발표 자료",
+      mediaFilter: "PHOTO",
+      sortMode: "NAME",
+      sortDirection: "desc",
     })
-    expect(resolveCloudSearchParams("/ops")).toEqual({
-      folderPath: "ops",
-      keyword: "",
-    })
-    expect(resolveCloudSearchParams("  deploy  ")).toEqual({
-      folderPath: "",
-      keyword: "deploy",
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "/ops/2026 세미나/",
+        keyword: "발표",
+        mediaFilter: "PHOTO",
+        sortMode: "NAME",
+        sortDirection: "desc",
+      })
+    ).toEqual({
+      folder: "ops/2026 세미나",
+      kw: "발표",
+      kind: "PHOTO",
+      sort: "NAME",
+      dir: "desc",
     })
 
     const sampleFiles: CloudFile[] = [
@@ -414,22 +461,137 @@ caption
       "photos",
       "videos",
     ])
-    expect(applyCloudFolderFilter("", "ops")).toBe("/ops")
-    expect(applyCloudFolderFilter("점검", "/ops/")).toBe("/ops 점검")
-    expect(applyCloudFolderFilter("/ops 점검", "ops")).toBe("점검")
-    expect(applyCloudFolderFilter("/ops 점검", "photos")).toBe("/photos 점검")
-    expect(applyCloudFolderFilter("/ops 점검", "")).toBe("점검")
+    expect(
+      extractDirectChildFolders(["ops", "ops/2026 세미나", "ops/2026 세미나/사진", "photos"], "ops")
+    ).toEqual(["ops/2026 세미나"])
+    expect(
+      doesCloudFileMatchFilters(
+        { ...sampleFiles[0]!, folderPath: "ops/2026 세미나" },
+        "DOCUMENT",
+        "alpha",
+        "ops/2026 세미나"
+      )
+    ).toBe(true)
+    expect(
+      doesCloudFileMatchFilters(
+        { ...sampleFiles[0]!, folderPath: "ops/2026 세미나" },
+        "DOCUMENT",
+        "alpha",
+        "ops"
+      )
+    ).toBe(false)
 
     const movedFile: CloudFile = { ...sampleFiles[0]!, folderPath: "ops/2026" }
     expect(
-      updateCachedCloudFilesForMutation(sampleFiles, movedFile, "ALL", "").map((f) => f.folderPath),
+      updateCachedCloudFilesForMutation(sampleFiles, movedFile, "ALL", "", "").map((f) => f.folderPath),
     ).toEqual(["ops/2026", "photos", "videos"])
     expect(
-      updateCachedCloudFilesForMutation([sampleFiles[0]!], movedFile, "ALL", "/ops").map((f) => f.id),
+      updateCachedCloudFilesForMutation([sampleFiles[0]!], movedFile, "ALL", "", "ops").map((f) => f.id),
     ).toEqual([])
     expect(
-      updateCachedCloudFilesForMutation([], movedFile, "ALL", "/ops/2026").map((f) => f.id),
+      updateCachedCloudFilesForMutation([], movedFile, "ALL", "", "ops/2026").map((f) => f.id),
     ).toEqual([1])
+  })
+
+  test("cloud signature guard enforces high-res PNG, SVG XSS, UTF-8 text, archive/video/audio headers and rejects executables", async () => {
+    const makePngFile = (name: string, width: number, height: number) => {
+      const buf = new Uint8Array(24)
+      const view = new DataView(buf.buffer)
+      view.setUint32(0, 0x89504e47, false)
+      view.setUint32(4, 0x0d0a1a0a, false)
+      view.setUint32(8, 13, false)
+      view.setUint32(12, 0x49484452, false)
+      view.setUint32(16, width, false)
+      view.setUint32(20, height, false)
+      return new File([buf], name, { type: "image/png" })
+    }
+
+    expect((await validateCloudFileBeforeUpload(makePngFile("hi-res.png", 8000, 6000))).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(makePngFile("too-wide.png", 16385, 100))).ok).toBe(false)
+    expect((await validateCloudFileBeforeUpload(makePngFile("too-many-mp.png", 12000, 10000))).ok).toBe(false)
+
+    const safeSvg = new File(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect/></svg>'], "icon.svg", {
+      type: "image/svg+xml",
+    })
+    const xssSvg = new File(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>'], "xss.svg", {
+      type: "image/svg+xml",
+    })
+    expect((await validateCloudFileBeforeUpload(safeSvg)).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(xssSvg)).ok).toBe(false)
+
+    const validUtf8 = new File(["안녕하세요\nconsole.log('ok')\n"], "notes.md", { type: "text/markdown" })
+    const binaryText = new File([new Uint8Array([0x41, 0x00, 0x42])], "fake.txt", { type: "text/plain" })
+    const ansiLog = new File([new Uint8Array([0x1b, 0x5b, 0x33, 0x32, 0x6d, 0x4f, 0x4b])], "build.log", {
+      type: "text/plain",
+    })
+    expect((await validateCloudFileBeforeUpload(validUtf8)).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(binaryText)).ok).toBe(false)
+    expect((await validateCloudFileBeforeUpload(ansiLog)).ok).toBe(true)
+
+    const moovMov = new Uint8Array(12)
+    new DataView(moovMov.buffer).setUint32(4, 0x6d6f6f76, false)
+    expect((await validateCloudFileBeforeUpload(new File([moovMov], "clip.mov", { type: "video/quicktime" }))).ok).toBe(
+      true
+    )
+
+    const hwpxZip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00])
+    expect((await validateCloudFileBeforeUpload(new File([hwpxZip], "spec.hwpx", { type: "application/hwp+zip" }))).ok).toBe(
+      true
+    )
+
+    const mzExe = new Uint8Array([0x4d, 0x5a, 0x90, 0x00])
+    expect((await validateCloudFileBeforeUpload(new File([mzExe], "payload.exe", { type: "application/octet-stream" }))).ok).toBe(
+      false
+    )
+    expect((await validateCloudFileBeforeUpload(new File([mzExe], "disguised.png", { type: "image/png" }))).ok).toBe(
+      false
+    )
+  })
+
+  test("cloud XHR retry classification, EMA speed estimator, and aggregate queue ETA behave deterministically", () => {
+    expect(isRetryableCloudUploadError(new ApiNetworkError("/upload"))).toBe(true)
+    expect(isRetryableCloudUploadError(new ApiTimeoutError("/upload", 10_000))).toBe(true)
+    expect(isRetryableCloudUploadError(new CloudApiError(429, "/upload", "", null, 4_000))).toBe(true)
+    expect(isRetryableCloudUploadError(new CloudApiError(408, "/upload", ""))).toBe(true)
+    expect(isRetryableCloudUploadError(new CloudApiError(503, "/upload", ""))).toBe(true)
+    expect(isRetryableCloudUploadError(new CloudApiError(400, "/upload", ""))).toBe(false)
+
+    expect(parseRetryAfterMs("3")).toBe(3_000)
+    expect(parseRetryAfterMs("0")).toBe(250)
+    expect(parseRetryAfterMs("120")).toBe(30_000)
+    expect(resolveCloudRetryDelayMs(new CloudApiError(429, "/upload", "", null, 4_500), 600)).toBe(4_500)
+
+    const estimate = createUploadSpeedEstimator(10_000, 1_000)
+    const sample1 = estimate(2_000, 2_000)
+    expect(sample1.loadedBytes).toBe(2_000)
+    expect(sample1.speedBps).toBe(2_000)
+    expect(sample1.etaSeconds).toBe(4)
+
+    const dummyFile = new File(["abc"], "a.bin")
+    const aggregate = computeAggregateQueueProgress([
+      { id: "1", file: dummyFile, name: "a.bin", byteSize: 1000, folderPath: "", status: "done", progress: 100, message: "ok" },
+      {
+        id: "2",
+        file: dummyFile,
+        name: "b.bin",
+        byteSize: 2000,
+        folderPath: "",
+        status: "uploading",
+        progress: 50,
+        loadedBytes: 1000,
+        speedBps: 500,
+        etaSeconds: 2,
+        message: "uploading",
+      },
+      { id: "3", file: dummyFile, name: "c.bin", byteSize: 1000, folderPath: "", status: "queued", progress: 0, message: "queued" },
+      { id: "4", file: dummyFile, name: "d.bin", byteSize: 1000, folderPath: "", status: "queued", progress: 0, message: "queued" },
+    ])
+    expect(aggregate.percent).toBe(40)
+    expect(aggregate.queuedCount).toBe(2)
+    expect(aggregate.etaSeconds).toBe(6)
+    expect(formatCloudTransferRate(aggregate.speedBps)).toBe("500 B/s")
+    expect(formatCloudEta(65, "ko")).toBe("약 1분 5초 남음")
+    expect(formatCloudEta(65, "en")).toBe("~1m 5s left")
   })
 
   test("useAuthSession logout clears admin editor local drafts even when backend logout fails, and browserStorageRegistry documents logout and post-like keys", async () => {

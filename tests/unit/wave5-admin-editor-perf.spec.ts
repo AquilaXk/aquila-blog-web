@@ -97,13 +97,30 @@ test.describe("wave5 admin, editor, and mapper optimizations", () => {
       createdAt: "2026-10-20T00:00:00Z",
       modifiedAt: "2026-10-20T00:00:00Z",
     }
+    const mockPhotoAsset = {
+      id: 8,
+      ownerMemberId: 1,
+      originalFilename: "cover [v1].png",
+      contentType: "image/png",
+      mediaKind: "PHOTO" as const,
+      byteSize: 2048,
+      folderPath: "",
+      createdAt: "2026-10-20T00:00:00Z",
+      modifiedAt: "2026-10-20T00:00:00Z",
+    }
     expect(buildCloudAssetMarkdownSnippet(mockDocAsset)).toBe("")
     expect(
       buildCloudAssetMarkdownSnippet(
         mockDocAsset,
         "/post/api/v1/files/posts/report.pdf"
       )
-    ).toBe("[report.pdf](/post/api/v1/files/posts/report.pdf)")
+    ).toBe("")
+    expect(
+      buildCloudAssetMarkdownSnippet(
+        mockPhotoAsset,
+        "/post/api/v1/images/posts/cover.webp"
+      )
+    ).toBe("![cover \\[v1\\].png](/post/api/v1/images/posts/cover.webp)")
   })
 
   test("extractPostIdFromSlug and normalizeStringArray avoid redundant allocations", () => {

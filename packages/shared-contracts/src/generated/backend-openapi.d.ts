@@ -149,6 +149,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/api/v1/adm/cloud/files/{id}/share-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listShareLinks"];
+        put?: never;
+        post: operations["issueShareLink"];
+        delete: operations["revokeAllShareLinks"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/api/v1/adm/cloud/files/{id}/promote-post-asset": {
         parameters: {
             query?: never;
@@ -442,6 +458,24 @@ export interface paths {
         patch: operations["updateProfileIdentity"];
         trace?: never;
     };
+    "/system/api/v1/public/cloud/files/{id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 서명 공유 링크 파일 콘텐츠 조회 */
+        get: operations["shareContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        /** 서명 공유 링크 파일 메타데이터 조회 */
+        head: operations["shareHead"];
+        patch?: never;
+        trace?: never;
+    };
     "/system/api/v1/public/cloud/files/{id}/playback": {
         parameters: {
             query?: never;
@@ -457,6 +491,22 @@ export interface paths {
         options?: never;
         /** 외부 비디오 파일 메타데이터 조회 */
         head: operations["playbackHead"];
+        patch?: never;
+        trace?: never;
+    };
+    "/system/api/v1/adm/cloud/files/{id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head: operations["thumbnailHead"];
         patch?: never;
         trace?: never;
     };
@@ -1189,6 +1239,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/api/v1/adm/cloud/files/{id}/share-links/{tokenId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["revokeShareLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/api/v1/adm/cloud/files/{id}/external-playback-tokens/{tokenId}": {
         parameters: {
             query?: never;
@@ -1528,17 +1594,9 @@ export interface components {
             msg?: string;
             data?: components["schemas"]["CloudFileDto"];
         };
-        PromoteCloudPostAssetResBody: {
+        IssueCloudExternalTokenReqBody: {
             /** Format: int64 */
-            fileId?: number;
-            key?: string;
-            url?: string;
-            markdown?: string;
-        };
-        RsDataPromoteCloudPostAssetResBody: {
-            resultCode?: string;
-            msg?: string;
-            data?: components["schemas"]["PromoteCloudPostAssetResBody"];
+            ttlSeconds?: number | null;
         };
         CloudExternalPlaybackTokenDto: {
             /** Format: int64 */
@@ -1552,6 +1610,18 @@ export interface components {
             resultCode?: string;
             msg?: string;
             data?: components["schemas"]["CloudExternalPlaybackTokenDto"];
+        };
+        PromoteCloudPostAssetResBody: {
+            /** Format: int64 */
+            fileId?: number;
+            key?: string;
+            url?: string;
+            markdown?: string;
+        };
+        RsDataPromoteCloudPostAssetResBody: {
+            resultCode?: string;
+            msg?: string;
+            data?: components["schemas"]["PromoteCloudPostAssetResBody"];
         };
         CreateVideoUploadSessionReqBody: {
             originalFilename?: string | null;
@@ -2055,6 +2125,8 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             expiresAt?: string;
+            /** @enum {string} */
+            purpose?: "EXTERNAL_PLAYBACK" | "SHARE_LINK";
         };
         CloudFileFacetsResBody: {
             /** Format: int64 */
@@ -2631,6 +2703,76 @@ export interface operations {
             };
         };
     };
+    listShareLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CloudExternalPlaybackTokenListResBody"];
+                };
+            };
+        };
+    };
+    issueShareLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IssueCloudExternalTokenReqBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataCloudExternalPlaybackTokenDto"];
+                };
+            };
+        };
+    };
+    revokeAllShareLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataRevokeExternalPlaybackTokensResBody"];
+                };
+            };
+        };
+    };
     promotePostAsset: {
         parameters: {
             query?: never;
@@ -2662,7 +2804,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IssueCloudExternalTokenReqBody"];
+            };
+        };
         responses: {
             /** @description Created */
             201: {
@@ -3155,6 +3301,53 @@ export interface operations {
             };
         };
     };
+    shareContent: {
+        parameters: {
+            query: {
+                token: string;
+                download?: boolean;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    shareHead: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     playback: {
         parameters: {
             query: {
@@ -3201,10 +3394,53 @@ export interface operations {
             };
         };
     };
+    thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    thumbnailHead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     content: {
         parameters: {
             query?: {
                 download?: boolean;
+                thumbnail?: boolean;
             };
             header?: never;
             path: {
@@ -4240,6 +4476,29 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+        };
+    };
+    revokeShareLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                tokenId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataVoid"];
                 };
             };
         };

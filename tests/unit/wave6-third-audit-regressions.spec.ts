@@ -312,9 +312,12 @@ test.describe("Third audit 10-item regressions", () => {
     expect(dashboardViewSource).not.toContain("Public read latency")
 
     const cloudPageSource = readSrc("routes/Admin/AdminCloudWorkspacePage.tsx")
-    const cloudActionsSource = readSrc("routes/Admin/useAdminCloudWorkspaceActions.ts")
-    expect(cloudPageSource).toContain("setEditingFileId(null)")
-    expect(cloudActionsSource).toContain("uploadControllersRef")
+    const cloudModalsSource = readSrc("routes/Admin/cloud/CloudFolderModals.tsx")
+    const cloudQueueSource = readSrc("routes/Admin/useAdminCloudUploadQueue.ts")
+    expect(cloudPageSource).toContain("setRenameTarget(null)")
+    expect(cloudModalsSource).toContain("useModalFocusTrap")
+    expect(cloudQueueSource).toContain("uploadControllersRef")
+    expect(cloudQueueSource).toContain("cancelControllersRef")
   })
 
   test("10. GlobalErrorBoundary stored EN language fallback, EN detail/markdown labels, related/author policy, and profile image cache invalidation", async () => {

@@ -154,9 +154,30 @@ This repository includes patterns and algorithms adapted from or inspired by the
 ## Uppy
 
 - Repository: https://github.com/transloadit/uppy
-- Reference pattern: Full-area drag-and-drop overlay state, parallel upload queue scheduler, visual aggregate progress bar, file signature pre-validation, and exponential backoff retry for chunk uploads
-- Applied in: `src/apis/backend/cloud.ts`, `src/routes/Admin/AdminCloudWorkspace.styles.ts`, `src/routes/Admin/AdminCloudUploadQueue.tsx`, `src/routes/Admin/cloudUploadQueueModel.ts`, `src/routes/Admin/useAdminCloudUploadQueue.ts`, `src/routes/Admin/cloudFileSignatureGuard.ts`
+- Reference path: `packages/@uppy/xhr-upload`, `packages/@uppy/utils/src/emaFilter.ts`, `packages/@uppy/core/src/Uppy.ts` (full-area drag-and-drop overlay state, parallel upload queue scheduler, XHR byte progress & EMA transfer speed/ETA estimation, file signature pre-validation, and exponential backoff / `Retry-After` retry for chunk uploads)
+- Applied in: `src/apis/backend/cloud.ts`, `src/apis/backend/cloudXhrTransport.ts`, `src/apis/backend/cloudVideoUpload.ts`, `src/routes/Admin/AdminCloudWorkspace.styles.ts`, `src/routes/Admin/AdminCloudUploadQueue.tsx`, `src/routes/Admin/cloudUploadQueueModel.ts`, `src/routes/Admin/useAdminCloudUploadQueue.ts`, `src/routes/Admin/cloudFileSignatureGuard.ts`
 - License: MIT License (Copyright (c) 2026 Transloadit Ltd and Acquired Trends)
+
+## Supabase Storage Explorer
+
+- Repository: https://github.com/supabase/supabase
+- Reference path: `apps/studio/components/interfaces/Storage/` (`StorageExplorer/`, `CustomExpiryModal.tsx`, `FileExplorerHeader.tsx`, `StorageMenuV2.tsx` — always-inline desktop inspector layout, custom-expiry share-link modal, virtual folder path navigation, and batch action coordination)
+- Applied in: `src/apis/backend/cloud.ts`, `src/routes/Admin/AdminCloudWorkspacePage.tsx`, `src/routes/Admin/AdminCloudWorkspaceDetailDrawer.tsx`, `src/routes/Admin/AdminCloudPreviewDrawer.tsx`, `src/routes/Admin/cloud/CloudShareLinkModal.tsx`, `src/routes/Admin/cloud/AdminCloudOverlay.styles.ts`
+- License: Apache License 2.0 (Copyright (c) 2020-present Supabase, Inc.)
+
+## FileBrowser
+
+- Repository: https://github.com/filebrowser/filebrowser
+- Reference path: `frontend/src/components/prompts/` (`NewDir.vue`, `Move.vue`, `Rename.vue`), `frontend/src/components/files/ListingItem.vue`, `frontend/src/components/ContextMenu.vue` (breadcrumb folder bar, modal prompt ergonomics, context menu positioning & keyboard actions, sortable file table headers, and Ctrl/⌘+V paste upload)
+- Applied in: `src/routes/Admin/cloud/cloudFolderHelpers.ts`, `src/routes/Admin/cloud/CloudBreadcrumbBar.tsx`, `src/routes/Admin/cloud/CloudFolderModals.tsx`, `src/routes/Admin/cloud/CloudContextMenu.tsx`, `src/routes/Admin/cloud/CloudFloatingBulkBar.tsx`, `src/routes/Admin/cloud/CloudFileTableSection.tsx`, `src/routes/Admin/cloud/useCloudWorkspaceUrlAndShortcuts.ts`
+- License: Apache License 2.0 (Copyright (c) 2016-present FileBrowser Contributors)
+
+## PDF.js (`pdfjs-dist` & CMap Assets)
+
+- Repository: https://github.com/mozilla/pdf.js
+- Reference path: `external/bcmaps/` (CJK character map `.bcmap` assets served under `public/pdfjs/cmaps/` and configured via `cMapUrl` / `cMapPacked` for Korean/CJK PDF rendering)
+- Applied in: `public/pdfjs/cmaps/`, `src/routes/Admin/cloud/cloudPreviewHelpers.ts`, `src/routes/Admin/cloud/CloudPdfLightboxStage.tsx`
+- License: Apache License 2.0 (Copyright (c) 2012-present Mozilla Foundation)
 
 ## cmdk & github/hotkey
 

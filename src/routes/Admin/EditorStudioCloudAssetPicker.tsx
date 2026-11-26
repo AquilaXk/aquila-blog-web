@@ -1,7 +1,6 @@
 /**
  * 참조 구현:
  * - strapi/strapi packages/core/upload/admin/src/components/AssetDialog/BrowseStep/index.tsx (MIT License, Copyright (c) 2015-present Strapi Solutions SAS)
- * - igordanchenko/yet-another-react-lightbox src/styles.scss (MIT License, Copyright (c) 2022 Igor Danchenko)
  */
 /* eslint-disable @next/next/no-img-element */
 import styled from "@emotion/styled"
@@ -9,14 +8,13 @@ import { useQuery } from "@tanstack/react-query"
 import { useCallback, useMemo, useState } from "react"
 import {
   type CloudFile,
-  type CloudMediaKind,
-  getCloudFileContentUrl,
-  getCloudFileDownloadUrl,
+  getCloudFileThumbnailUrl,
   listCloudFiles,
   promoteCloudFileToPostAsset,
 } from "src/apis/backend/cloud"
 import { escapeMarkdownLinkDestination } from "src/components/markdown-editor/markdownEditorUploadModel"
 import { focusVisibleRing } from "src/design-system/focusRing"
+import { useLanguage, type SiteLanguage } from "src/libs/language"
 import { formatFileSize } from "src/libs/utils"
 import { adminBorderSubtle, adminCheckerboardBackground } from "src/routes/Admin/adminColorTokens"
 import { AdminCloudMediaLightbox } from "./AdminCloudMediaLightbox"
@@ -29,19 +27,21 @@ import {
   normalizeCloudFolderPathSearch,
 } from "./AdminCloudWorkspaceModel"
 import { StrapiCornersOutIcon, getStrapiAssetIcon } from "./adminStrapiIcons"
+import { getCloudDictionary } from "./cloud/adminCloudI18n"
 import { SecondaryButton } from "./EditorStudioDedicatedEditorSurfaceParts"
 
 const CLOUD_PICKER_MAX_ITEMS = 24
-export const MAX_PICKER_FALLBACK_BYTES = 20 * 1024 * 1024
+export const MAX_POST_PROMOTABLE_IMAGE_BYTES = 8 * 1024 * 1024
+export const MAX_POST_PROMOTABLE_DIMENSION = 4_096
 
-type PickerMediaFilter = "ALL" | CloudMediaKind
-
-const PICKER_FILTER_OPTIONS: ReadonlyArray<{ value: PickerMediaFilter; label: string }> = [
-  { value: "ALL", label: "전체" },
-  { value: "PHOTO", label: "사진" },
-  { value: "VIDEO", label: "동영상" },
-  { value: "DOCUMENT", label: "문서" },
-]
+const PROMOTABLE_RASTER_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"])
+const PROMOTABLE_RASTER_MIMES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+])
 
 type EditorStudioCloudAssetPickerProps = {
   onUploadPostImage?: (file: File) => Promise<{ alt?: string; title?: string; url?: string; src?: string }>
@@ -49,117 +49,67 @@ type EditorStudioCloudAssetPickerProps = {
   onInsertMarkdownSnippet?: (snippet: string) => void
 }
 
-const isImageCloudAsset = (file: CloudFile): boolean => isImageCloudFile(file)
+export type CloudPostPromotionEligibility =
+  | { promotable: true; reason: null }
+  | { promotable: false; reason: string }
+
+const extractLowerExtension = (filename: string): string => {
+  const dot = filename.lastIndexOf(".")
+  return dot >= 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : ""
+}
+
+export const getCloudFilePostPromotionEligibility = (
+  file: Pick<CloudFile, "mediaKind" | "contentType" | "originalFilename" | "byteSize">,
+  language: SiteLanguage = "ko"
+): CloudPostPromotionEligibility => {
+  const t = getCloudDictionary(language)
+  if (isSvgCloudFile(file)) {
+    return { promotable: false, reason: t.pickerReasonSvgUnsupported }
+  }
+  const ext = extractLowerExtension(file.originalFilename)
+  const mime = (file.contentType || "").toLowerCase()
+  const isPromotableRaster =
+    file.mediaKind === "PHOTO" &&
+    (PROMOTABLE_RASTER_EXTENSIONS.has(ext) || PROMOTABLE_RASTER_MIMES.has(mime))
+  if (!isPromotableRaster) {
+    return { promotable: false, reason: t.pickerReasonNotRaster }
+  }
+  if (file.byteSize > MAX_POST_PROMOTABLE_IMAGE_BYTES) {
+    return { promotable: false, reason: t.pickerReasonOver8Mb }
+  }
+  return { promotable: true, reason: null }
+}
 
 const sanitizeMarkdownLabel = (rawName: string | undefined): string =>
-  (rawName || "attachment").replace(/[[\]\\]/g, "\\$&")
+  (rawName || "image").replace(/[[\]\\]/g, "\\$&")
 
-export const buildCloudAssetMarkdownSnippet = (file: CloudFile, promotedPublicAssetUrl?: string): string => {
+export const buildCloudAssetMarkdownSnippet = (
+  file: CloudFile,
+  promotedPublicAssetUrl?: string
+): string => {
+  if (!getCloudFilePostPromotionEligibility(file).promotable) return ""
   const safeLabel = sanitizeMarkdownLabel(file.originalFilename)
   const rawTargetUrl = promotedPublicAssetUrl?.trim() || ""
   if (!rawTargetUrl) return ""
   const targetUrl = escapeMarkdownLinkDestination(rawTargetUrl)
-  return isImageCloudAsset(file) ? `![${safeLabel}](${targetUrl})` : `[${safeLabel}](${targetUrl})`
+  return `![${safeLabel}](${targetUrl})`
 }
 
-export const assertCloudPickerFallbackByteBudget = (
-  declaredByteSize: number,
-  contentLengthHeader?: string | null,
-  maxBytes = MAX_PICKER_FALLBACK_BYTES
-): void => {
-  if (Number.isFinite(declaredByteSize) && declaredByteSize > maxBytes) {
-    throw new Error("클라우드 파일 크기가 에디터 직접 변환 상한(20MB)을 초과했습니다.")
-  }
-  const parsedContentLength = Number(contentLengthHeader || 0)
-  if (Number.isFinite(parsedContentLength) && parsedContentLength > maxBytes) {
-    throw new Error("응답 크기가 에디터 직접 변환 상한(20MB)을 초과했습니다.")
-  }
-}
-
-export const readBoundedResponseBlob = async (
-  response: Response,
-  maxBytes = MAX_PICKER_FALLBACK_BYTES,
-  declaredByteSize = 0
-): Promise<Blob> => {
-  assertCloudPickerFallbackByteBudget(declaredByteSize, response.headers.get("content-length"), maxBytes)
-  const contentType = response.headers.get("content-type") || ""
-  const reader = response.body?.getReader()
-  if (!reader) {
-    const fallbackBlob = await response.blob()
-    if (fallbackBlob.size > maxBytes) {
-      throw new Error("내려받은 파일 크기가 에디터 직접 변환 상한(20MB)을 초과했습니다.")
-    }
-    return fallbackBlob
-  }
-
-  const chunks: Uint8Array[] = []
-  let receivedBytes = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value) continue
-      receivedBytes += value.byteLength
-      if (receivedBytes > maxBytes) {
-        await reader.cancel().catch(() => undefined)
-        throw new Error("내려받는 중 에디터 직접 변환 상한(20MB)을 초과해 중단했습니다.")
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  return new Blob(chunks as BlobPart[], { type: contentType })
-}
-
-const resolvePublicUrlForCloudFile = async (
-  file: CloudFile,
-  isImageAsset: boolean,
-  onUploadPostImage: EditorStudioCloudAssetPickerProps["onUploadPostImage"],
-  onUploadPostAttachment: EditorStudioCloudAssetPickerProps["onUploadPostAttachment"]
-): Promise<string> => {
-  if (isImageAsset) {
-    try {
-      const promotedRes = await promoteCloudFileToPostAsset(file.id)
-      if (promotedRes.url?.trim()) return promotedRes.url.trim()
-    } catch {
-      // 승격 실패 시 바이트 예산 가드 폴백 업로드 수행
-    }
-  }
-
-  assertCloudPickerFallbackByteBudget(file.byteSize, null)
-  const sourceUrl = isImageAsset ? getCloudFileContentUrl(file.id) : getCloudFileDownloadUrl(file.id)
-  const response = await fetch(sourceUrl, {
-    credentials: "include",
-    signal: AbortSignal.timeout(30_000),
-  })
-
-  if (!response.ok) {
-    throw new Error(`${isImageAsset ? "클라우드 이미지" : "클라우드 파일"}를 내려받지 못했습니다. (HTTP ${response.status})`)
-  }
-  const blob = await readBoundedResponseBlob(response, MAX_PICKER_FALLBACK_BYTES, file.byteSize)
-  const fallbackName = file.originalFilename || (isImageAsset ? `cloud-image-${file.id}.png` : `cloud-file-${file.id}`)
-  const mime = blob.type || file.contentType || (isImageAsset ? "image/png" : "application/octet-stream")
-  const uploadFile = new File([blob], fallbackName, { type: mime })
-
-  if (isImageAsset && onUploadPostImage) {
-    const uploaded = await onUploadPostImage(uploadFile)
-    return (uploaded.src || uploaded.url || "").trim()
-  }
-  if (!isImageAsset && onUploadPostAttachment) {
-    const uploaded = await onUploadPostAttachment(uploadFile)
-    return (uploaded.url || "").trim()
-  }
-  return ""
-}
-
-const PickerCardThumbnail = ({ file, onExpand }: { file: CloudFile; onExpand: () => void }) => {
+const PickerCardThumbnail = ({
+  file,
+  onExpand,
+  expandLabel,
+}: {
+  file: CloudFile
+  onExpand: () => void
+  expandLabel: string
+}) => {
   const [failed, setFailed] = useState(false)
-  const isImage = isImageCloudAsset(file)
+  const isImage = isImageCloudFile(file)
   const isSvg = isSvgCloudFile(file)
-  const showImage = isImage && !failed
-  const contentUrl = appendCloudAssetVersionUrl(
-    getCloudFileContentUrl(file.id),
+  const showImage = isImage && !isSvg && !failed
+  const thumbUrl = appendCloudAssetVersionUrl(
+    getCloudFileThumbnailUrl(file.id),
     file.modifiedAt || file.createdAt
   )
   const AssetIcon = getStrapiAssetIcon(file.contentType, file.originalFilename)
@@ -168,11 +118,11 @@ const PickerCardThumbnail = ({ file, onExpand }: { file: CloudFile; onExpand: ()
     <div className="assetThumb" data-fallback={showImage ? "false" : "true"} onDoubleClick={onExpand}>
       {showImage ? (
         <img
-          src={contentUrl}
+          src={thumbUrl}
           alt=""
           loading="lazy"
           decoding="async"
-          data-fit={isSvg ? "contain" : "cover"}
+          data-fit="cover"
           onError={() => setFailed(true)}
         />
       ) : (
@@ -183,7 +133,7 @@ const PickerCardThumbnail = ({ file, onExpand }: { file: CloudFile; onExpand: ()
       <button
         type="button"
         className="thumbExpandBtn"
-        aria-label={`${file.originalFilename} 크게 보기`}
+        aria-label={expandLabel}
         onClick={(e) => {
           e.stopPropagation()
           onExpand()
@@ -195,13 +145,11 @@ const PickerCardThumbnail = ({ file, onExpand }: { file: CloudFile; onExpand: ()
   )
 }
 
-const CloudAssetPickerOpenBody = ({
-  onUploadPostImage,
-  onUploadPostAttachment,
-  onInsertMarkdownSnippet,
-}: EditorStudioCloudAssetPickerProps) => {
+const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloudAssetPickerProps) => {
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [mediaFilter, setMediaFilter] = useState<PickerMediaFilter>("ALL")
+  const [promotableOnly, setPromotableOnly] = useState(true)
   const [folderFilter, setFolderFilter] = useState("")
   const [promotingFileId, setPromotingFileId] = useState<number | null>(null)
   const [actionErrorText, setActionErrorText] = useState("")
@@ -209,28 +157,40 @@ const CloudAssetPickerOpenBody = ({
   const [previewFileId, setPreviewFileId] = useState<number | null>(null)
 
   const cloudFilesQuery = useQuery({
-    queryKey: ["admin-cloud-files", mediaFilter, ""],
+    queryKey: ["admin-cloud-files", "PHOTO", ""],
     staleTime: 30_000,
     refetchOnWindowFocus: false,
-    queryFn: () => listCloudFiles({ folderPath: "", mediaKind: mediaFilter === "ALL" ? undefined : mediaFilter }),
+    queryFn: () => listCloudFiles({ folderPath: "", mediaKind: "PHOTO" }),
   })
 
-  const rawFiles = useMemo(() => (Array.isArray(cloudFilesQuery.data) ? cloudFilesQuery.data : []), [cloudFilesQuery.data])
-  const availableFolders = useMemo(() => extractCloudFolders(rawFiles, folderFilter), [folderFilter, rawFiles])
+  const rawFiles = useMemo(
+    () => (Array.isArray(cloudFilesQuery.data) ? cloudFilesQuery.data : []),
+    [cloudFilesQuery.data]
+  )
+  const availableFolders = useMemo(
+    () => extractCloudFolders(rawFiles, folderFilter),
+    [folderFilter, rawFiles]
+  )
 
   const filteredFiles = useMemo(() => {
     const q = searchKeyword.trim().toLowerCase()
     const folder = normalizeCloudFolderPathSearch(folderFilter)
     return rawFiles
       .filter((file) => {
+        if (promotableOnly && !getCloudFilePostPromotionEligibility(file, language).promotable) {
+          return false
+        }
         if (folder && normalizeCloudFolderPathSearch(file.folderPath) !== folder) return false
         return !q || file.originalFilename.toLowerCase().includes(q)
       })
       .slice(0, CLOUD_PICKER_MAX_ITEMS)
-  }, [folderFilter, rawFiles, searchKeyword])
+  }, [folderFilter, language, promotableOnly, rawFiles, searchKeyword])
 
   const previewFile = useMemo(
-    () => (previewFileId !== null ? filteredFiles.find((item) => item.id === previewFileId) ?? null : null),
+    () =>
+      previewFileId !== null
+        ? filteredFiles.find((item) => item.id === previewFileId) ?? null
+        : null,
     [filteredFiles, previewFileId]
   )
 
@@ -238,57 +198,63 @@ const CloudAssetPickerOpenBody = ({
     cloudFilesQuery.error instanceof Error && cloudFilesQuery.error.message.trim()
       ? cloudFilesQuery.error.message
       : cloudFilesQuery.isError
-        ? "클라우드 파일 목록을 불러오지 못했습니다."
+        ? t.emptyError
         : ""
   const errorText = actionErrorText || queryErrorMessage
   const isLoading = cloudFilesQuery.isFetching
 
-  const handleInsertOrCopySnippet = useCallback(
+  const handlePromoteAndInsert = useCallback(
     async (file: CloudFile) => {
       if (promotingFileId !== null) return
+      const eligibility = getCloudFilePostPromotionEligibility(file, language)
+      if (!eligibility.promotable) {
+        setActionErrorText(eligibility.reason)
+        return
+      }
       setActionErrorText("")
-      const isImageAsset = isImageCloudAsset(file)
-      if (isImageAsset && !onUploadPostImage) {
-        setActionErrorText("공개 본문 이미지 업로드 경로가 연결되지 않아 클라우드 이미지를 삽입할 수 없습니다.")
-        return
-      }
-      if (!isImageAsset && !onUploadPostAttachment) {
-        setActionErrorText("공개 첨부 파일 업로드 경로가 연결되지 않아 클라우드 파일을 삽입할 수 없습니다.")
-        return
-      }
-
       setPromotingFileId(file.id)
-      let promotedPublicAssetUrl = ""
-      try {
-        promotedPublicAssetUrl = await resolvePublicUrlForCloudFile(file, isImageAsset, onUploadPostImage, onUploadPostAttachment)
-        if (!promotedPublicAssetUrl) throw new Error("공개 포스트 자산 URL을 발급받지 못했습니다.")
-      } catch (error) {
-        setActionErrorText(error instanceof Error && error.message.trim() ? error.message : "클라우드 자산을 공개 본문 자산으로 변환하지 못했습니다.")
-        setPromotingFileId(null)
-        return
-      }
-      setPromotingFileId(null)
 
-      const snippet = buildCloudAssetMarkdownSnippet(file, promotedPublicAssetUrl)
-      if (!snippet) {
-        setActionErrorText("공개 본문 마크다운 링크를 생성하지 못했습니다.")
-        return
-      }
-      onInsertMarkdownSnippet?.(snippet)
       try {
-        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(snippet)
+        const promotedRes = await promoteCloudFileToPostAsset(file.id)
+        const snippet =
+          promotedRes.markdown?.trim() || buildCloudAssetMarkdownSnippet(file, promotedRes.url)
+        if (!snippet) {
+          throw new Error(
+            language === "en"
+              ? "Failed to build public markdown image link."
+              : "공개 본문 마크다운 링크를 생성하지 못했습니다."
+          )
         }
-        setCopiedId(file.id)
-      } catch {
-        if (onInsertMarkdownSnippet) {
+        onInsertMarkdownSnippet?.(snippet)
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(snippet)
+          }
           setCopiedId(file.id)
-          return
+        } catch {
+          if (onInsertMarkdownSnippet) {
+            setCopiedId(file.id)
+          } else {
+            setActionErrorText(
+              language === "en"
+                ? "Clipboard copy failed."
+                : "클립보드 복사에 실패했습니다. 수동으로 복사해주세요."
+            )
+          }
         }
-        setActionErrorText("클립보드 복사에 실패했습니다. 수동으로 마크다운 링크를 복사해 주세요.")
+      } catch (error) {
+        setActionErrorText(
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : language === "en"
+              ? "Failed to promote Cloud photo into a post image."
+              : "클라우드 사진을 게시글 이미지로 승격하지 못했습니다."
+        )
+      } finally {
+        setPromotingFileId(null)
       }
     },
-    [onInsertMarkdownSnippet, onUploadPostAttachment, onUploadPostImage, promotingFileId]
+    [language, onInsertMarkdownSnippet, promotingFileId]
   )
 
   return (
@@ -297,18 +263,29 @@ const CloudAssetPickerOpenBody = ({
         <input
           type="search"
           className="pickerSearchInput"
-          aria-label="클라우드 자산 검색"
-          placeholder="파일명 검색..."
+          aria-label={t.searchLabel}
+          placeholder={t.searchPlaceholder}
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
         />
         <div className="pickerFilterRow">
-          <div className="pickerFilterTabs" role="group" aria-label="클라우드 자산 종류 필터">
-            {PICKER_FILTER_OPTIONS.map((opt) => (
-              <PickerFilterChip key={opt.value} type="button" data-active={mediaFilter === opt.value} aria-pressed={mediaFilter === opt.value} onClick={() => setMediaFilter(opt.value)}>
-                {opt.label}
-              </PickerFilterChip>
-            ))}
+          <div className="pickerFilterTabs" role="group" aria-label={t.pickerHeading}>
+            <PickerFilterChip
+              type="button"
+              data-active={promotableOnly}
+              aria-pressed={promotableOnly}
+              onClick={() => setPromotableOnly(true)}
+            >
+              {t.pickerPromotableOnly}
+            </PickerFilterChip>
+            <PickerFilterChip
+              type="button"
+              data-active={!promotableOnly}
+              aria-pressed={!promotableOnly}
+              onClick={() => setPromotableOnly(false)}
+            >
+              {t.filterAll}
+            </PickerFilterChip>
           </div>
           <SecondaryButton
             type="button"
@@ -318,16 +295,27 @@ const CloudAssetPickerOpenBody = ({
             }}
             disabled={isLoading || promotingFileId !== null}
           >
-            {isLoading ? "불러오는 중..." : "새로고침"}
+            {isLoading ? t.emptyLoading : language === "en" ? "Refresh" : "새로고침"}
           </SecondaryButton>
         </div>
         {availableFolders.length > 0 ? (
-          <div className="pickerFolderRow" role="group" aria-label="클라우드 자산 폴더 필터">
-            <PickerFilterChip type="button" data-active={!folderFilter} aria-pressed={!folderFilter} onClick={() => setFolderFilter("")}>
-              전체 폴더
+          <div className="pickerFolderRow" role="group" aria-label={t.folderBreadcrumbAria}>
+            <PickerFilterChip
+              type="button"
+              data-active={!folderFilter}
+              aria-pressed={!folderFilter}
+              onClick={() => setFolderFilter("")}
+            >
+              {t.rootFolder}
             </PickerFilterChip>
             {availableFolders.map((folder) => (
-              <PickerFilterChip key={folder} type="button" data-active={folderFilter === folder} aria-pressed={folderFilter === folder} onClick={() => setFolderFilter(folder)}>
+              <PickerFilterChip
+                key={folder}
+                type="button"
+                data-active={folderFilter === folder}
+                aria-pressed={folderFilter === folder}
+                onClick={() => setFolderFilter(folder)}
+              >
                 /{folder}
               </PickerFilterChip>
             ))}
@@ -335,35 +323,52 @@ const CloudAssetPickerOpenBody = ({
         ) : null}
       </div>
 
-      {errorText ? <p className="pickerError" role="alert">{errorText}</p> : null}
-      {!isLoading && !errorText && filteredFiles.length === 0 ? (
-        <p className="pickerEmpty">
-          {searchKeyword.trim() || folderFilter ? "검색 조건에 맞는 클라우드 파일이 없습니다." : "최근 클라우드 파일이 없습니다."}
+      {errorText ? (
+        <p className="pickerError" role="alert">
+          {errorText}
         </p>
+      ) : null}
+      {!isLoading && !errorText && filteredFiles.length === 0 ? (
+        <p className="pickerEmpty">{t.pickerEmpty}</p>
       ) : null}
 
       {filteredFiles.length > 0 ? (
         <ul className="assetGrid">
           {filteredFiles.map((file) => {
+            const eligibility = getCloudFilePostPromotionEligibility(file, language)
             const isPromoting = promotingFileId === file.id
             const isCopied = copiedId === file.id
             const folderText = normalizeCloudFolderPathSearch(file.folderPath)
             const actionLabel = isPromoting
-              ? "업로드 중..."
+              ? t.pickerInserting
               : isCopied
-                ? onInsertMarkdownSnippet ? "삽입·복사됨" : "복사됨"
-                : onInsertMarkdownSnippet ? "본문 삽입" : "마크다운 복사"
+                ? t.shareCopied
+                : onInsertMarkdownSnippet
+                  ? t.pickerInsertImage
+                  : t.shareCopyLink
             return (
               <li key={file.id} className="assetCard">
-                <PickerCardThumbnail file={file} onExpand={() => setPreviewFileId(file.id)} />
+                <PickerCardThumbnail
+                  file={file}
+                  expandLabel={`${file.originalFilename} ${t.actionPreview}`}
+                  onExpand={() => setPreviewFileId(file.id)}
+                />
                 <div className="assetMeta">
                   <strong title={file.originalFilename}>{file.originalFilename}</strong>
                   <span>
                     {getCloudKindBadge(file)} · {formatFileSize(file.byteSize, { fallback: "0 B" })}
                     {folderText ? ` · /${folderText}` : ""}
                   </span>
+                  {!eligibility.promotable ? (
+                    <span className="assetIneligibleReason">{eligibility.reason}</span>
+                  ) : null}
                 </div>
-                <SecondaryButton type="button" disabled={promotingFileId !== null} onClick={() => void handleInsertOrCopySnippet(file)}>
+                <SecondaryButton
+                  type="button"
+                  disabled={promotingFileId !== null || !eligibility.promotable}
+                  title={eligibility.reason || undefined}
+                  onClick={() => void handlePromoteAndInsert(file)}
+                >
                   {actionLabel}
                 </SecondaryButton>
               </li>
@@ -384,16 +389,18 @@ const CloudAssetPickerOpenBody = ({
 }
 
 export const EditorStudioCloudAssetPicker = (props: EditorStudioCloudAssetPickerProps = {}) => {
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <CloudAssetPickerSection aria-label="개인 클라우드 자산 빠른 삽입">
+    <CloudAssetPickerSection aria-label={t.pickerHeading}>
       <div className="pickerHeader">
-        <span>클라우드 자산</span>
+        <span>{t.pickerHeading}</span>
         <SecondaryButton type="button" onClick={() => setIsOpen((prev) => !prev)}>
-          {isOpen ? "목록 접기" : "클라우드 파일 불러오기"}
+          {isOpen ? t.pickerToggleClose : t.pickerToggleOpen}
         </SecondaryButton>
       </div>
-      <small>개인 클라우드 자산을 공개 본문 이미지·첨부파일로 승격해 삽입하거나 마크다운 링크를 복사합니다.</small>
+      <small>{t.pickerSubtitle}</small>
       {isOpen ? <CloudAssetPickerOpenBody {...props} /> : null}
     </CloudAssetPickerSection>
   )
@@ -407,11 +414,14 @@ const PickerFilterChip = styled.button<{ "data-active"?: boolean }>`
   font-weight: 650;
   cursor: pointer;
   border: 0;
-  background: ${({ theme, "data-active": active }) => (active ? theme.colors.gray12 : theme.colors.gray3)};
-  color: ${({ theme, "data-active": active }) => (active ? theme.colors.gray1 : theme.colors.gray11)};
+  background: ${({ theme, "data-active": active }) =>
+    active ? theme.colors.gray12 : theme.colors.gray3};
+  color: ${({ theme, "data-active": active }) =>
+    active ? theme.colors.gray1 : theme.colors.gray11};
   ${focusVisibleRing}
   &:hover {
-    background: ${({ theme, "data-active": active }) => (active ? theme.colors.gray12 : theme.colors.gray4)};
+    background: ${({ theme, "data-active": active }) =>
+      active ? theme.colors.gray12 : theme.colors.gray4};
   }
   @media (pointer: coarse) {
     min-height: 44px;
@@ -484,7 +494,6 @@ const CloudAssetPickerSection = styled.section`
     font-size: 0.75rem;
     color: ${({ theme }) => theme.colors.gray10};
   }
-
   .assetGrid {
     margin: 0;
     padding: 0;
@@ -524,9 +533,6 @@ const CloudAssetPickerSection = styled.section`
       object-fit: cover;
       display: block;
     }
-    img[data-fit="contain"] {
-      object-fit: contain;
-    }
     .thumbFallback {
       display: flex;
       align-items: center;
@@ -549,10 +555,6 @@ const CloudAssetPickerSection = styled.section`
       ${focusVisibleRing}
       &:hover {
         opacity: 1;
-      }
-      svg {
-        width: 0.85rem;
-        height: 0.85rem;
       }
       @media (pointer: coarse) {
         width: 44px;
@@ -578,6 +580,10 @@ const CloudAssetPickerSection = styled.section`
     span {
       font-size: 0.68rem;
       color: ${({ theme }) => theme.colors.gray10};
+    }
+    .assetIneligibleReason {
+      color: ${({ theme }) => theme.colors.red11};
+      font-weight: 600;
     }
   }
 `

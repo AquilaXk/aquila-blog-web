@@ -1,4 +1,5 @@
-// 참조 구현: transloadit/uppy (MIT) — Uppy 동시성 큐 모델 및 합산 진행률
+// 참조 구현: transloadit/uppy (MIT) — Uppy 동시성 큐 모델·EMA 전송 속도·ETA·합산 진행률
+import { formatFileSize } from "src/libs/utils"
 import type { UploadQueueItem } from "./AdminCloudWorkspaceModel"
 
 export const MAX_CONCURRENT_CLOUD_UPLOADS = 3
@@ -11,6 +12,33 @@ export type AggregateQueueProgress = {
   cancelledCount: number
   queuedCount: number
   percent: number
+  loadedBytes: number
+  totalBytes: number
+  speedBps: number
+  etaSeconds: number | null
+}
+
+export const formatCloudTransferRate = (speedBps?: number): string => {
+  if (!speedBps || !Number.isFinite(speedBps) || speedBps <= 0) return ""
+  return `${formatFileSize(speedBps, { fallback: "0 B" })}/s`
+}
+
+export const formatCloudEta = (
+  etaSeconds: number | null | undefined,
+  language: "ko" | "en" = "ko"
+): string => {
+  if (etaSeconds === null || etaSeconds === undefined || !Number.isFinite(etaSeconds) || etaSeconds <= 0) {
+    return ""
+  }
+  const rounded = Math.ceil(etaSeconds)
+  if (rounded < 60) {
+    return language === "en" ? `~${rounded}s left` : `약 ${rounded}초 남음`
+  }
+  const minutes = Math.floor(rounded / 60)
+  const seconds = rounded % 60
+  return language === "en"
+    ? `~${minutes}m ${seconds}s left`
+    : `약 ${minutes}분 ${seconds}초 남음`
 }
 
 export const computeAggregateQueueProgress = (
@@ -26,6 +54,10 @@ export const computeAggregateQueueProgress = (
       cancelledCount: 0,
       queuedCount: 0,
       percent: 100,
+      loadedBytes: 0,
+      totalBytes: 0,
+      speedBps: 0,
+      etaSeconds: null,
     }
   }
 
@@ -36,16 +68,25 @@ export const computeAggregateQueueProgress = (
   let queuedCount = 0
   let totalBytes = 0
   let loadedBytes = 0
+  let activeSpeedBps = 0
 
   for (const item of queue) {
     const bytes = Math.max(1, item.byteSize)
     totalBytes += bytes
 
     switch (item.status) {
-      case "uploading":
+      case "uploading": {
         activeCount += 1
-        loadedBytes += (bytes * Math.min(100, Math.max(0, item.progress))) / 100
+        const itemLoaded =
+          typeof item.loadedBytes === "number" && item.loadedBytes >= 0
+            ? Math.min(bytes, item.loadedBytes)
+            : (bytes * Math.min(100, Math.max(0, item.progress))) / 100
+        loadedBytes += itemLoaded
+        if (typeof item.speedBps === "number" && item.speedBps > 0) {
+          activeSpeedBps += item.speedBps
+        }
         break
+      }
       case "done":
         completedCount += 1
         loadedBytes += bytes
@@ -63,6 +104,11 @@ export const computeAggregateQueueProgress = (
   }
 
   const percent = totalBytes > 0 ? Math.round((loadedBytes / totalBytes) * 100) : 0
+  const remainingBytes = Math.max(0, totalBytes - loadedBytes)
+  const etaSeconds =
+    activeSpeedBps > 0 && remainingBytes > 0
+      ? Math.max(1, Math.ceil(remainingBytes / activeSpeedBps))
+      : null
 
   return {
     totalCount,
@@ -72,6 +118,10 @@ export const computeAggregateQueueProgress = (
     cancelledCount,
     queuedCount,
     percent: Math.min(100, Math.max(0, percent)),
+    loadedBytes: Math.round(loadedBytes),
+    totalBytes,
+    speedBps: Math.round(activeSpeedBps),
+    etaSeconds,
   }
 }
 

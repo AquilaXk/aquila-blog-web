@@ -1,36 +1,20 @@
 /**
  * 참조 구현:
  * - strapi/strapi packages/core/upload/admin/src/pages/Assets/AssetsPage.tsx (MIT License, Copyright (c) 2015-present Strapi Solutions SAS)
+ * - supabase/supabase StorageExplorer & CustomExpiryModal & MoveItemsModal (Apache-2.0)
  * - TryGhost/Ghost apps/shade/src/components/layout/view-bar.tsx (MIT License, Copyright (c) Ghost Foundation)
  */
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
-import { getCloudFileFacets } from "src/apis/backend/cloud"
+import { useRouter } from "next/router"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  getCloudFileDownloadUrl,
+  getCloudFileFacets,
+  type CloudFile,
+} from "src/apis/backend/cloud"
+import { useLanguage } from "src/libs/language"
 import AppIcon from "./AdminAppIcon"
-import {
-  AdminCloudAssetGrid,
-  CloudFolderBar,
-  CloudViewToggle,
-  type CloudViewMode,
-} from "./AdminCloudAssetGrid"
-import { AdminCloudMediaLightbox } from "./AdminCloudMediaLightbox"
-import { CloudDeleteConfirmDialog } from "./AdminCloudPreviewDrawer"
-import { CloudFileDetailDrawer } from "./AdminCloudWorkspaceDetailDrawer"
-import { StrapiUploadIcon } from "./adminStrapiIcons"
-import {
-  CLOUD_FILTERS,
-  CLOUD_SORT_OPTIONS,
-  type CloudMediaFilter,
-  type CloudSortMode,
-  formatCloudFileSize,
-  getCloudSummary,
-  isCloudSearchPending,
-  normalizeCloudFolderPathSearch,
-  resolveCloudEmptyTitle,
-  resolveCloudSearchParams,
-  shouldShowCloudEmptyLoading,
-} from "./AdminCloudWorkspaceModel"
+import { AdminCloudAssetGrid, CloudViewToggle } from "./AdminCloudAssetGrid"
 import AdminCloudUploadQueue, { CloudFileTableSection } from "./AdminCloudUploadQueue"
 import {
   ActionBar,
@@ -57,30 +41,60 @@ import {
   SecondaryButton,
   SelectAllLabel,
   SortSelect,
-  ToastViewport,
   UploadIconBadge,
   UploadInput,
   ViewModeButton,
 } from "./AdminCloudWorkspace.styles"
+import { CloudFileDetailDrawer } from "./AdminCloudWorkspaceDetailDrawer"
+import {
+  CLOUD_FILTERS,
+  CLOUD_SORT_OPTIONS,
+  type CloudSortMode,
+  formatCloudFileSize,
+  getCloudSummary,
+  isCloudSearchPending,
+  resolveCloudEmptyTitle,
+  shouldShowCloudEmptyLoading,
+} from "./AdminCloudWorkspaceModel"
+import { StrapiUploadIcon } from "./adminStrapiIcons"
+import {
+  getCloudDictionary,
+  getCloudKindLabelI18n,
+  getCloudSortLabelI18n,
+} from "./cloud/adminCloudI18n"
+import { CloudFolderBreadcrumbBar } from "./cloud/CloudBreadcrumbBar"
+import type { CloudContextMenuState } from "./cloud/CloudContextMenu"
+import { CloudWorkspaceModalsAndOverlays } from "./cloud/CloudWorkspaceModalsAndOverlays"
+import { useCloudWorkspaceUrlAndShortcuts } from "./cloud/useCloudWorkspaceUrlAndShortcuts"
 import { useAdminCloudWorkspaceActions } from "./useAdminCloudWorkspaceActions"
 
 const toBooleanAttr = (value: boolean) => (value ? "true" : "false")
-
-const formatSearchDetailText = (isSearchBusy: boolean) => {
-  if (isSearchBusy) return "검색 중…"
-  return ""
-}
-
 const CLOUD_PAGE_SIZE = 40
+
+const triggerFileDownload = (file: CloudFile) => {
+  if (typeof document === "undefined") return
+  const link = document.createElement("a")
+  link.href = getCloudFileDownloadUrl(file.id)
+  link.download = file.originalFilename
+  link.style.display = "none"
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
 const AdminCloudWorkspacePage = () => {
   const router = useRouter()
+  const { language } = useLanguage()
+  const t = getCloudDictionary(language)
+  const isEn = language === "en"
+
   const {
     activeFolderPath,
     activeUploadCount,
     aggregateProgress,
-    availableFolders,
+    allFolders,
     checkedFileIds,
+    childFolders,
     closeDeleteConfirm,
     completedUploadCount,
     debouncedKeyword,
@@ -88,18 +102,22 @@ const AdminCloudWorkspacePage = () => {
     deleteConfirm,
     deleteDialogRef,
     files,
+    filesById,
     filesQuery,
     filter,
     handleCancelUpload,
     handleClearFinishedUploads,
     handleConfirmDelete,
     handleCopyFileLink,
+    handleCreateFolder,
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
+    handleMoveFiles,
     handlePreviewFile,
     handleRequestDeleteFile,
     handleRetryUpload,
     handleSelectFolder,
+    handleSortColumn,
     handleToggleAllChecked,
     handleToggleChecked,
     handleUpdateFile,
@@ -107,13 +125,16 @@ const AdminCloudWorkspacePage = () => {
     handleUploadDragOver,
     handleUploadDrop,
     handleUploadSelect,
-    isDetailDrawerMode,
     isDeletePending,
+    isDetailDrawerMode,
     isDragActive,
+    isMutationPending,
     keyword,
     notice,
+    queueUploadFiles,
     resetSelectionAnchor,
     selectedFile,
+    setCheckedFileIds,
     setFilter,
     setIsComposing,
     setIsDetailPanelOpen,
@@ -121,97 +142,80 @@ const AdminCloudWorkspacePage = () => {
     setSelectedFileId,
     setSortMode,
     setToast,
+    setViewMode,
     shouldShowDetailPanel,
+    sortDirection,
     sortMode,
     toast,
     uploadInputRef,
     uploadQueue,
+    viewMode,
   } = useAdminCloudWorkspaceActions()
 
   const [page, setPage] = useState(1)
-  const [viewMode, setViewMode] = useState<CloudViewMode>("grid")
   const [lightboxFileId, setLightboxFileId] = useState<number | null>(null)
-  // CloudFileDetailDrawer maintains editingFileId internally and resets via setEditingFileId(null)
+  const [contextMenu, setContextMenu] = useState<CloudContextMenuState>(null)
+  const [newFolderModalOpen, setNewFolderModalOpen] = useState(false)
+  const [moveTargets, setMoveTargets] = useState<CloudFile[] | null>(null)
+  const [renameTarget, setRenameTarget] = useState<CloudFile | null>(null)
+  const [shareTarget, setShareTarget] = useState<CloudFile | null>(null)
+
   const totalPages = Math.max(1, Math.ceil(files.length / CLOUD_PAGE_SIZE))
+  const clampedPage = Math.min(page, totalPages)
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
   const slicedFiles = useMemo(
-    () => files.slice((page - 1) * CLOUD_PAGE_SIZE, page * CLOUD_PAGE_SIZE),
-    [files, page]
+    () => files.slice((clampedPage - 1) * CLOUD_PAGE_SIZE, clampedPage * CLOUD_PAGE_SIZE),
+    [clampedPage, files]
   )
   const slicedFileIds = useMemo(() => slicedFiles.map((file) => file.id), [slicedFiles])
   const checkedSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
-  const allSliceChecked = slicedFileIds.length > 0 && slicedFileIds.every((id) => checkedSet.has(id))
+  const allSliceChecked =
+    slicedFileIds.length > 0 && slicedFileIds.every((id) => checkedSet.has(id))
   const lightboxFile = useMemo(
     () => (lightboxFileId !== null ? files.find((item) => item.id === lightboxFileId) ?? null : null),
     [files, lightboxFileId]
   )
 
   useEffect(() => {
-    if (lightboxFileId !== null && !lightboxFile) {
-      setLightboxFileId(null)
-    }
+    if (lightboxFileId !== null && !lightboxFile) setLightboxFileId(null)
   }, [lightboxFile, lightboxFileId])
 
-  const hasHydratedQueryRef = useRef(false)
-  useEffect(() => {
-    if (!router.isReady || hasHydratedQueryRef.current) return
-    hasHydratedQueryRef.current = true
-    const qKw = typeof router.query.kw === "string" ? router.query.kw.trim() : ""
-    const qKind = typeof router.query.kind === "string" ? router.query.kind : ""
-    const qSort = typeof router.query.sort === "string" ? router.query.sort : ""
-    const qFolder = typeof router.query.folder === "string" ? normalizeCloudFolderPathSearch(router.query.folder) : ""
+  const anyOverlayModalOpen =
+    Boolean(deleteConfirm) ||
+    newFolderModalOpen ||
+    moveTargets !== null ||
+    renameTarget !== null ||
+    shareTarget !== null ||
+    lightboxFile !== null
 
-    if (qFolder && qKw && !qKw.startsWith("/")) {
-      setKeyword(`/${qFolder} ${qKw}`)
-    } else if (qKw) {
-      setKeyword(qKw)
-    } else if (qFolder) {
-      handleSelectFolder(qFolder)
-    }
-    if (qKind && CLOUD_FILTERS.some((f) => f.value === qKind)) {
-      setFilter(qKind as CloudMediaFilter)
-    }
-    if (qSort && CLOUD_SORT_OPTIONS.some((s) => s.key === qSort)) {
-      setSortMode(qSort as CloudSortMode)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady])
-
-  useEffect(() => {
-    if (!router.isReady || !hasHydratedQueryRef.current) return
-    if (isCloudSearchPending(keyword, debouncedKeyword)) return
-
-    const parsedSearch = resolveCloudSearchParams(debouncedKeyword)
-    const nextFolder = normalizeCloudFolderPathSearch(parsedSearch.folderPath || "")
-    const nextKw = (parsedSearch.keyword || "").trim()
-    const nextKind = filter !== "ALL" ? filter : ""
-    const nextSort = sortMode !== "LATEST" ? sortMode : ""
-
-    const curFolder = typeof router.query.folder === "string" ? normalizeCloudFolderPathSearch(router.query.folder) : ""
-    const curKw = typeof router.query.kw === "string" ? router.query.kw : ""
-    const curKind = typeof router.query.kind === "string" ? router.query.kind : ""
-    const curSort = typeof router.query.sort === "string" ? router.query.sort : ""
-
-    if (curFolder === nextFolder && curKw === nextKw && curKind === nextKind && curSort === nextSort) {
-      return
-    }
-
-    const query: Record<string, string> = {}
-    if (nextFolder) query.folder = nextFolder
-    if (nextKw) query.kw = nextKw
-    if (nextKind) query.kind = nextKind
-    if (nextSort) query.sort = nextSort
-    void router.replace({ pathname: router.pathname, query }, undefined, { shallow: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedKeyword, filter, keyword, router.isReady, sortMode])
-
-  useEffect(() => {
-    setPage(1)
-    resetSelectionAnchor()
-  }, [filter, keyword, sortMode, activeFolderPath, resetSelectionAnchor])
-
-  useEffect(() => {
-    resetSelectionAnchor()
-  }, [page, resetSelectionAnchor])
+  useCloudWorkspaceUrlAndShortcuts({
+    router,
+    activeFolderPath,
+    keyword,
+    debouncedKeyword,
+    filter,
+    sortMode,
+    sortDirection,
+    anyOverlayModalOpen,
+    checkedFileIds,
+    filesById,
+    selectedFile,
+    clampedPage,
+    onSelectFolder: handleSelectFolder,
+    setKeyword,
+    setFilter,
+    setSortMode,
+    setPage,
+    resetSelectionAnchor,
+    queueUploadFiles,
+    onOpenRename: setRenameTarget,
+    handleDeleteSelected,
+    handleRequestDeleteFile,
+  })
 
   const facetsQuery = useQuery({
     queryKey: ["admin-cloud-facets"],
@@ -233,6 +237,7 @@ const AdminCloudWorkspacePage = () => {
     isFetching: filesQuery.isFetching,
     isLoading: filesQuery.isLoading,
     keyword,
+    language,
   })
   const showEmptyLoading = shouldShowCloudEmptyLoading({
     filesCount: files.length,
@@ -246,6 +251,22 @@ const AdminCloudWorkspacePage = () => {
   const photoCount = hasValidFacets ? facets.photoCount : summary.photoCount
   const videoCount = hasValidFacets ? facets.videoCount : summary.videoCount
   const documentCount = hasValidFacets ? facets.documentCount : summary.documentCount
+
+  const handleOpenBulkMove = useCallback(() => {
+    const targets = checkedFileIds.flatMap((id) => {
+      const f = filesById.get(id)
+      return f ? [f] : []
+    })
+    if (targets.length > 0) setMoveTargets(targets)
+  }, [checkedFileIds, filesById])
+
+  const handleBulkDownload = useCallback(() => {
+    const targets = checkedFileIds.flatMap((id) => {
+      const f = filesById.get(id)
+      return f ? [f] : []
+    })
+    targets.slice(0, 10).forEach((file) => triggerFileDownload(file))
+  }, [checkedFileIds, filesById])
 
   return (
     <CloudMain>
@@ -261,25 +282,27 @@ const AdminCloudWorkspacePage = () => {
         >
           <CloudTitleBar>
             <div>
-              <h1>미디어 라이브러리</h1>
-              <CloudFacetStrip aria-label="스토리지 용량 요약">
-                전체 {totalCount}개 · {totalSizeText} · 사진 {photoCount} · 동영상 {videoCount} · 문서 {documentCount}
+              <h1>{t.pageTitle}</h1>
+              <CloudFacetStrip aria-label={isEn ? "Storage summary" : "스토리지 용량 요약"}>
+                {isEn
+                  ? `${totalCount} total · ${totalSizeText} · Photos ${photoCount} · Videos ${videoCount} · Docs ${documentCount}`
+                  : `전체 ${totalCount}개 · ${totalSizeText} · 사진 ${photoCount} · 동영상 ${videoCount} · 문서 ${documentCount}`}
               </CloudFacetStrip>
             </div>
             <CloudHeaderActions>
               <UploadInput
                 ref={uploadInputRef}
-                aria-label="클라우드 파일 업로드"
+                aria-label={isEn ? "Cloud file upload" : "클라우드 파일 업로드"}
                 type="file"
                 multiple
                 onChange={handleUploadSelect}
               />
               <PrimaryButton
                 type="button"
-                aria-label={activeUploadCount > 0 ? "업로드 중" : "파일 업로드"}
+                aria-label={activeUploadCount > 0 ? t.uploadingButton : t.uploadButton}
                 onClick={() => uploadInputRef.current?.click()}
               >
-                파일 업로드
+                {t.uploadButton}
               </PrimaryButton>
             </CloudHeaderActions>
           </CloudTitleBar>
@@ -289,8 +312,8 @@ const AdminCloudWorkspacePage = () => {
               <UploadIconBadge>
                 <StrapiUploadIcon width={22} height={22} />
               </UploadIconBadge>
-              <strong>파일을 놓아 미디어 라이브러리에 업로드</strong>
-              <span>사진 50MB · 문서/압축 95MB · 동영상 5GB 이하</span>
+              <strong>{t.dropOverlayTitle}</strong>
+              <span>{t.capacityLimitHint}</span>
             </CloudDropOverlay>
           ) : null}
 
@@ -299,23 +322,20 @@ const AdminCloudWorkspacePage = () => {
               <SelectAllLabel>
                 <RowCheckbox
                   type="checkbox"
-                  aria-label={allSliceChecked ? "전체 선택 해제" : "전체 선택"}
+                  aria-label={allSliceChecked ? t.bulkClearSelection : t.selectAll}
                   checked={allSliceChecked}
                   disabled={slicedFileIds.length === 0}
                   onChange={() => handleToggleAllChecked(slicedFileIds)}
                 />
                 <span>
-                  {checkedFileIds.length > 0 ? `${checkedFileIds.length}개 선택` : "전체 선택"}
+                  {checkedFileIds.length > 0
+                    ? t.bulkSelectedCount(checkedFileIds.length)
+                    : isEn
+                      ? "Select all"
+                      : "전체 선택"}
                 </span>
               </SelectAllLabel>
-              <SecondaryButton
-                type="button"
-                disabled={checkedFileIds.length === 0}
-                onClick={handleDeleteSelected}
-              >
-                선택 삭제
-              </SecondaryButton>
-              <FilterGroup aria-label="파일 종류 필터">
+              <FilterGroup aria-label={isEn ? "File kind filter" : "파일 종류 필터"}>
                 {CLOUD_FILTERS.map((item) => (
                   <GhostButton
                     key={item.value}
@@ -323,15 +343,15 @@ const AdminCloudWorkspacePage = () => {
                     data-active={toBooleanAttr(filter === item.value)}
                     onClick={() => setFilter(item.value)}
                   >
-                    {item.label}
+                    {getCloudKindLabelI18n(item.value, language)}
                   </GhostButton>
                 ))}
               </FilterGroup>
               <CloudSearchField>
                 <AppIcon name="search" />
                 <SearchInput
-                  aria-label="클라우드 파일 검색"
-                  placeholder="클라우드 파일 검색"
+                  aria-label={t.searchLabel}
+                  placeholder={t.searchPlaceholder}
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   onCompositionStart={() => setIsComposing(true)}
@@ -339,12 +359,16 @@ const AdminCloudWorkspacePage = () => {
                 />
                 <SearchTrailing>
                   {keyword ? (
-                    <SearchClearButton type="button" aria-label="검색어 지우기" onClick={() => setKeyword("")}>
-                      지우기
+                    <SearchClearButton
+                      type="button"
+                      aria-label={t.clearSearch}
+                      onClick={() => setKeyword("")}
+                    >
+                      {isEn ? "Clear" : "지우기"}
                     </SearchClearButton>
                   ) : null}
                   <SearchDetail aria-busy={toBooleanAttr(isSearchBusy)}>
-                    {formatSearchDetailText(isSearchBusy)}
+                    {isSearchBusy ? (isEn ? "Searching..." : "검색 중…") : ""}
                   </SearchDetail>
                 </SearchTrailing>
               </CloudSearchField>
@@ -353,20 +377,20 @@ const AdminCloudWorkspacePage = () => {
             <ActionGroup data-align="end" data-slot="view-bar-actions">
               {notice ? <Notice>{notice}</Notice> : null}
               <SortSelect
-                aria-label="파일 정렬"
+                aria-label={isEn ? "Sort files" : "파일 정렬"}
                 value={sortMode}
                 onChange={(event) => setSortMode(event.target.value as CloudSortMode)}
               >
                 {CLOUD_SORT_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>
-                    {option.label}
+                    {getCloudSortLabelI18n(option.key, language)}
                   </option>
                 ))}
               </SortSelect>
               <CloudViewToggle viewMode={viewMode} onChange={setViewMode} />
               <ViewModeButton
                 type="button"
-                aria-label="상세 패널 보기"
+                aria-label={isEn ? "Toggle details panel" : "상세 패널 보기"}
                 data-active={toBooleanAttr(shouldShowDetailPanel)}
                 onClick={() => {
                   const firstFileId = slicedFiles[0]?.id ?? files[0]?.id ?? null
@@ -375,15 +399,16 @@ const AdminCloudWorkspacePage = () => {
                 }}
               >
                 <AppIcon name="info" />
-                정보
+                {isEn ? "Info" : "정보"}
               </ViewModeButton>
             </ActionGroup>
           </ActionBar>
 
-          <CloudFolderBar
-            folders={availableFolders}
+          <CloudFolderBreadcrumbBar
             activeFolderPath={activeFolderPath}
+            childFolders={childFolders}
             onSelectFolder={handleSelectFolder}
+            onOpenNewFolder={() => setNewFolderModalOpen(true)}
           />
 
           <AdminCloudUploadQueue
@@ -398,6 +423,7 @@ const AdminCloudWorkspacePage = () => {
 
           {viewMode === "grid" ? (
             <AdminCloudAssetGrid
+              activeFolderPath={activeFolderPath}
               activeUploadCount={activeUploadCount}
               checkedFileIds={checkedFileIds}
               emptyTitle={emptyTitle}
@@ -405,10 +431,13 @@ const AdminCloudWorkspacePage = () => {
               isFetching={filesQuery.isFetching}
               isFileListError={isFileListError}
               onExpandFile={(fileId) => setLightboxFileId(fileId)}
+              onOpenContextMenu={(file, x, y) => setContextMenu({ file, x, y })}
               onOpenUploadPicker={() => uploadInputRef.current?.click()}
               onPreviewFile={handlePreviewFile}
               onRetryList={() => void filesQuery.refetch()}
-              onToggleChecked={(fileId, shiftKey) => handleToggleChecked(fileId, shiftKey, slicedFileIds)}
+              onToggleChecked={(fileId, shiftKey) =>
+                handleToggleChecked(fileId, shiftKey, slicedFileIds)
+              }
               selectedFile={selectedFile}
               shouldShowDetailPanel={shouldShowDetailPanel}
               showEmptyLoading={showEmptyLoading}
@@ -416,17 +445,24 @@ const AdminCloudWorkspacePage = () => {
           ) : (
             <FileTableScroll>
               <CloudFileTableSection
+                activeFolderPath={activeFolderPath}
                 activeUploadCount={activeUploadCount}
                 checkedFileIds={checkedFileIds}
                 emptyTitle={emptyTitle}
                 files={slicedFiles}
                 isFetching={filesQuery.isFetching}
                 isFileListError={isFileListError}
+                sortMode={sortMode}
+                sortDirection={sortDirection}
+                onSortColumn={handleSortColumn}
                 onExpandFile={(fileId) => setLightboxFileId(fileId)}
+                onOpenContextMenu={(file, x, y) => setContextMenu({ file, x, y })}
                 onOpenUploadPicker={() => uploadInputRef.current?.click()}
                 onPreviewFile={handlePreviewFile}
                 onRetryList={() => void filesQuery.refetch()}
-                onToggleChecked={(fileId, shiftKey) => handleToggleChecked(fileId, shiftKey, slicedFileIds)}
+                onToggleChecked={(fileId, shiftKey) =>
+                  handleToggleChecked(fileId, shiftKey, slicedFileIds)
+                }
                 selectedFile={selectedFile}
                 shouldShowDetailPanel={shouldShowDetailPanel}
                 showEmptyLoading={showEmptyLoading}
@@ -435,38 +471,44 @@ const AdminCloudWorkspacePage = () => {
           )}
 
           {totalPages > 1 ? (
-            <ActionBar data-pagination="true" aria-label="클라우드 파일 페이지 이동">
+            <ActionBar
+              data-pagination="true"
+              aria-label={isEn ? "Cloud pagination" : "클라우드 파일 페이지 이동"}
+            >
               <CloudPaginationLabel>
-                {page} / {totalPages} 페이지 (총 {files.length}개)
+                {isEn
+                  ? `Page ${clampedPage} / ${totalPages} (${files.length} total)`
+                  : `${clampedPage} / ${totalPages} 페이지 (총 ${files.length}개)`}
               </CloudPaginationLabel>
               <ActionGroup>
                 <SecondaryButton
                   type="button"
-                  disabled={page <= 1}
+                  disabled={clampedPage <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  이전
+                  {isEn ? "Previous" : "이전"}
                 </SecondaryButton>
                 <SecondaryButton
                   type="button"
-                  disabled={page >= totalPages}
+                  disabled={clampedPage >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  다음
+                  {isEn ? "Next" : "다음"}
                 </SecondaryButton>
               </ActionGroup>
             </ActionBar>
           ) : null}
         </CloudContent>
 
-        {shouldShowDetailPanel && selectedFile ? (
+        {shouldShowDetailPanel ? (
           <CloudFileDetailDrawer
             detailMode={detailMode}
-            isDeleteConfirmOpen={Boolean(deleteConfirm)}
+            isDeleteConfirmOpen={anyOverlayModalOpen}
             isLightboxOpen={lightboxFile !== null}
             onClose={() => setIsDetailPanelOpen(false)}
             onCopyFileLink={handleCopyFileLink}
             onOpenLightbox={(fileId) => setLightboxFileId(fileId)}
+            onOpenShareModal={(file) => setShareTarget(file)}
             onRequestDeleteFile={handleRequestDeleteFile}
             onUpdateFile={handleUpdateFile}
             selectedFile={selectedFile}
@@ -475,38 +517,50 @@ const AdminCloudWorkspacePage = () => {
         ) : null}
       </CloudWorkspace>
 
-      <AdminCloudMediaLightbox
-        open={lightboxFile !== null}
-        file={lightboxFile}
+      <CloudWorkspaceModalsAndOverlays
+        checkedCount={checkedFileIds.length}
+        isBusy={isDeletePending || isMutationPending}
+        activeFolderPath={activeFolderPath}
+        allFolders={allFolders}
         files={files}
-        onClose={() => setLightboxFileId(null)}
-        onSelectFile={(nextId) => {
-          setLightboxFileId(nextId)
-          setSelectedFileId(nextId)
-        }}
+        contextMenu={contextMenu}
+        newFolderModalOpen={newFolderModalOpen}
+        moveTargets={moveTargets}
+        renameTarget={renameTarget}
+        shareTarget={shareTarget}
+        lightboxFile={lightboxFile}
+        toast={toast}
+        deleteConfirm={deleteConfirm}
+        isDeletePending={isDeletePending}
+        deleteDialogRef={deleteDialogRef}
+        deleteCancelButtonRef={deleteCancelButtonRef}
+        onCloseContextMenu={() => setContextMenu(null)}
+        onCloseNewFolder={() => setNewFolderModalOpen(false)}
+        onCloseMove={() => setMoveTargets(null)}
+        onCloseRename={() => setRenameTarget(null)}
+        onCloseShare={() => setShareTarget(null)}
+        onCloseLightbox={() => setLightboxFileId(null)}
+        onCloseDelete={closeDeleteConfirm}
+        onClearToast={() => setToast(null)}
+        onOpenBulkMove={handleOpenBulkMove}
+        onBulkDownload={handleBulkDownload}
+        onBulkDelete={handleDeleteSelected}
+        onClearSelection={() => setCheckedFileIds([])}
+        onOpenLightbox={(fileId) => setLightboxFileId(fileId)}
+        onSelectFile={setSelectedFileId}
+        onOpenRename={(file) => setRenameTarget(file)}
+        onOpenMove={(targets) => setMoveTargets(targets)}
+        onOpenShare={(file) => setShareTarget(file)}
+        onDownloadFile={triggerFileDownload}
+        onRequestDeleteFile={handleRequestDeleteFile}
+        onCreateFolder={handleCreateFolder}
+        onMoveFiles={handleMoveFiles}
+        onUpdateFile={handleUpdateFile}
         onCopyFileLink={handleCopyFileLink}
+        onConfirmDelete={() => void handleConfirmDelete()}
+        onDeleteDialogKeyDown={handleDeleteDialogKeyDown}
+        onToast={setToast}
       />
-
-      {toast ? (
-        <ToastViewport data-tone={toast.tone} role="status" aria-live="polite">
-          <strong>{toast.tone === "error" ? "작업 실패" : "작업 완료"}</strong>
-          <span>{toast.text}</span>
-          <button type="button" onClick={() => setToast(null)}>
-            닫기
-          </button>
-        </ToastViewport>
-      ) : null}
-      {deleteConfirm ? (
-        <CloudDeleteConfirmDialog
-          files={deleteConfirm.files}
-          isDeletePending={isDeletePending}
-          deleteDialogRef={deleteDialogRef}
-          deleteCancelButtonRef={deleteCancelButtonRef}
-          onClose={closeDeleteConfirm}
-          onConfirm={() => void handleConfirmDelete()}
-          onKeyDown={handleDeleteDialogKeyDown}
-        />
-      ) : null}
     </CloudMain>
   )
 }

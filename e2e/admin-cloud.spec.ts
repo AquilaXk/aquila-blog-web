@@ -168,6 +168,7 @@ const setupAdminCloudMocks = async (
     failUploadOnceNames?: string[]
     failUploadNames?: string[]
     failVideoPartOnceNumber?: number
+    failVideoPartFailureCounts?: Record<number, number>
     failVideoSessionGetOnceStatus?: number
     externalPlaybackTokenDelayMs?: number
     initialFiles?: CloudFileFixture[]
@@ -193,14 +194,30 @@ const setupAdminCloudMocks = async (
   const videoCancels: string[] = []
   const deletedIds: string[] = []
   const requestedContentIds: string[] = []
+  const requestedThumbnailIds: string[] = []
   const externalPlaybackTokenRequests: string[] = []
+  const shareLinkRequests: Array<{ fileId: string; ttlSeconds: number }> = []
+  const revokedShareLinkIds: number[] = []
+  const bulkDeletedBatches: number[][] = []
+  const shareTokensByFileId = new Map<
+    string,
+    Array<{ id: number; fileId: number; purpose: "SHARE_LINK"; createdAt: string; expiresAt: string }>
+  >()
+  const playbackTokensByFileId = new Map<
+    string,
+    Array<{ id: number; fileId: number; purpose: "EXTERNAL_PLAYBACK"; createdAt: string; expiresAt: string }>
+  >()
   const uploadedFiles: CloudFileFixture[] = []
   const failedDeleteIds = new Set(options.failDeleteIds ?? [])
   const failedUploadNames = new Set(options.failUploadNames ?? [])
   const failUploadOnceNames = new Set(options.failUploadOnceNames ?? [])
   const invalidPdfIds = new Set(options.invalidPdfIds ?? [])
   const failedVideoPartOnceNumbers = new Set<number>()
+  const remainingVideoPartFailures = new Map<number, number>(
+    Object.entries(options.failVideoPartFailureCounts ?? {}).map(([k, v]) => [Number(k), v])
+  )
   let didFailVideoSessionGet = false
+  let nextTokenId = 9001
   const initialFiles = (options.initialFiles ?? CLOUD_FILES).map((item) => ({ ...item }))
   const lookupOnlyFiles = (options.lookupOnlyFiles ?? []).map((item) => ({ ...item }))
   let videoSessionFilename = "대용량 교육 영상.mp4"
@@ -275,6 +292,12 @@ const setupAdminCloudMocks = async (
 
     if (request.method() === "PUT" && url.pathname.includes("/parts/")) {
       const partNumber = Number(url.pathname.match(/\/parts\/(\d+)$/)?.[1] || 0)
+      const remainingFailures = remainingVideoPartFailures.get(partNumber) ?? 0
+      if (remainingFailures > 0) {
+        remainingVideoPartFailures.set(partNumber, remainingFailures - 1)
+        await fulfillJson(route, { msg: "transient video part failure" }, 503)
+        return
+      }
       if (
         options.failVideoPartOnceNumber === partNumber &&
         !failedVideoPartOnceNumbers.has(partNumber)
@@ -320,13 +343,29 @@ const setupAdminCloudMocks = async (
   })
 
   await page.route("**/system/api/v1/adm/cloud/files/*/external-playback-tokens**", async (route) => {
-    const method = route.request().method()
+    const request = route.request()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/\/files\/(\d+)\/external-playback-tokens(?:\/(\d+))?$/)
+    const fileId = match?.[1] ?? ""
+    const tokenId = match?.[2] ? Number(match[2]) : null
+    const method = request.method()
+    const currentTokens = playbackTokensByFileId.get(fileId) ?? []
     if (method === "GET") {
-      await fulfillJson(route, { tokens: [] })
+      await fulfillJson(route, { tokens: currentTokens })
+      return
+    }
+    if (method === "DELETE" && tokenId !== null) {
+      playbackTokensByFileId.set(
+        fileId,
+        currentTokens.filter((item) => item.id !== tokenId)
+      )
+      await fulfillJson(route, { resultCode: "200-1", msg: "revoked" })
       return
     }
     if (method === "DELETE") {
-      await fulfillJson(route, { resultCode: "200-1", msg: "revoked", data: { revokedCount: 0 } })
+      const revokedCount = currentTokens.length
+      playbackTokensByFileId.set(fileId, [])
+      await fulfillJson(route, { resultCode: "200-1", msg: "revoked", data: { revokedCount } })
       return
     }
     await route.fallback()
@@ -345,6 +384,16 @@ const setupAdminCloudMocks = async (
     if (options.externalPlaybackTokenDelayMs) {
       await delay(options.externalPlaybackTokenDelayMs)
     }
+    const tokenId = nextTokenId++
+    const current = playbackTokensByFileId.get(id) ?? []
+    current.unshift({
+      id: tokenId,
+      fileId: Number(id),
+      purpose: "EXTERNAL_PLAYBACK",
+      createdAt: "2026-06-26T06:00:00Z",
+      expiresAt: "2026-06-26T12:05:00Z",
+    })
+    playbackTokensByFileId.set(id, current)
     await fulfillJson(
       route,
       {
@@ -370,7 +419,11 @@ const setupAdminCloudMocks = async (
       await route.fallback()
       return
     }
-    if (url.pathname.includes("/external-playback-token")) {
+    if (
+      url.pathname.includes("/external-playback-token") ||
+      url.pathname.includes("/share-links") ||
+      url.pathname.endsWith("/thumbnail")
+    ) {
       await route.fallback()
       return
     }
@@ -429,7 +482,11 @@ const setupAdminCloudMocks = async (
       await route.fallback()
       return
     }
-    if (url.pathname.includes("/external-playback-token")) {
+    if (
+      url.pathname.includes("/external-playback-token") ||
+      url.pathname.includes("/share-links") ||
+      url.pathname.endsWith("/thumbnail")
+    ) {
       await route.fallback()
       return
     }
@@ -461,6 +518,7 @@ const setupAdminCloudMocks = async (
     if (url.pathname.endsWith("/files/bulk-delete") && request.method() === "POST") {
       const payload = JSON.parse(request.postData() || "{}") as { ids?: number[] }
       const requestedIds = Array.isArray(payload.ids) ? payload.ids : []
+      bulkDeletedBatches.push(requestedIds.map(Number))
       const succeededNumericIds: number[] = []
       for (const rawId of requestedIds) {
         const strId = String(rawId)
@@ -628,6 +686,83 @@ const setupAdminCloudMocks = async (
     })
   })
 
+  await page.route(/\/system\/api\/v1\/adm\/cloud\/files\/\d+\/thumbnail(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url())
+    const id = url.pathname.match(/\/files\/(\d+)\/thumbnail/)?.[1] ?? ""
+    requestedThumbnailIds.push(id)
+    if (options.contentDelayMs) await delay(options.contentDelayMs)
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: pixelPng,
+      headers: {
+        "cache-control": "private, max-age=0, must-revalidate",
+      },
+    })
+  })
+
+  await page.route("**/system/api/v1/adm/cloud/files/*/share-links**", async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/\/files\/(\d+)\/share-links(?:\/(\d+))?$/)
+    const fileId = match?.[1] ?? ""
+    const tokenId = match?.[2] ? Number(match[2]) : null
+    const method = request.method()
+    const currentTokens = shareTokensByFileId.get(fileId) ?? []
+
+    if (method === "GET") {
+      await fulfillJson(route, { tokens: currentTokens })
+      return
+    }
+    if (method === "POST") {
+      const body = JSON.parse(request.postData() || "{}") as { ttlSeconds?: number }
+      const ttlSeconds = Number(body.ttlSeconds || 86400)
+      shareLinkRequests.push({ fileId, ttlSeconds })
+      const issuedId = nextTokenId++
+      const expiresAt = `2026-06-27T${String((ttlSeconds / 3600) % 24).padStart(2, "0")}:00:00Z`
+      currentTokens.unshift({
+        id: issuedId,
+        fileId: Number(fileId),
+        purpose: "SHARE_LINK",
+        createdAt: "2026-06-26T00:00:00Z",
+        expiresAt,
+      })
+      shareTokensByFileId.set(fileId, currentTokens)
+      await fulfillJson(
+        route,
+        {
+          resultCode: "201-1",
+          msg: "공유 링크가 발급되었습니다.",
+          data: {
+            fileId: Number(fileId),
+            token: `share-token-${fileId}-${ttlSeconds}`,
+            expiresAt,
+            contentPath: `/system/api/v1/public/cloud/files/${fileId}/share?token=share-token-${fileId}-${ttlSeconds}`,
+          },
+        },
+        201
+      )
+      return
+    }
+    if (method === "DELETE" && tokenId !== null) {
+      revokedShareLinkIds.push(tokenId)
+      shareTokensByFileId.set(
+        fileId,
+        currentTokens.filter((item) => item.id !== tokenId)
+      )
+      await fulfillJson(route, { resultCode: "200-1", msg: "revoked" })
+      return
+    }
+    if (method === "DELETE") {
+      const revokedCount = currentTokens.length
+      currentTokens.forEach((item) => revokedShareLinkIds.push(item.id))
+      shareTokensByFileId.set(fileId, [])
+      await fulfillJson(route, { resultCode: "200-1", msg: "revoked", data: { revokedCount } })
+      return
+    }
+    await route.fallback()
+  })
+
   return {
     requestedKinds,
     requestedFolderPaths,
@@ -641,7 +776,11 @@ const setupAdminCloudMocks = async (
     videoCancels,
     deletedIds,
     requestedContentIds,
+    requestedThumbnailIds,
     externalPlaybackTokenRequests,
+    shareLinkRequests,
+    revokedShareLinkIds,
+    bulkDeletedBatches,
   }
 }
 
@@ -688,7 +827,7 @@ test.describe("관리자 클라우드", () => {
 
     await page.goto("/admin/cloud")
 
-    await expect(page.getByRole("heading", { name: "미디어 라이브러리" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "클라우드", level: 1 })).toBeVisible()
     const headerUploadButton = page.getByRole("button", {
       name: "파일 업로드",
       exact: true,
@@ -698,7 +837,7 @@ test.describe("관리자 클라우드", () => {
     const cloudDropSurface = page.locator("[data-drag-active]")
     await cloudDropSurface.dispatchEvent("dragover")
     await expect(cloudDropSurface).toHaveAttribute("data-drag-active", "true")
-    await expect(page.getByText("파일을 놓아 미디어 라이브러리에 업로드")).toBeVisible()
+    await expect(page.getByText("파일을 놓아 클라우드에 업로드")).toBeVisible()
     await cloudDropSurface.dispatchEvent("dragleave")
     await expect(cloudDropSurface).toHaveAttribute("data-drag-active", "false")
     await expect(page.getByRole("link", { name: "클라우드" }).first()).toHaveAttribute("href", "/admin/cloud")
@@ -715,8 +854,8 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByRole("row", { name: /home-server-rack\.png/ })).toBeVisible()
     await expect(page.getByRole("row", { name: /deploy-walkthrough\.mp4/ })).toBeVisible()
     await expect(page.getByText("표시할 파일이 없습니다.")).toHaveCount(0)
-    await expect(page.getByLabel("클라우드 상세정보")).toHaveCount(0)
-    await expect(page.getByRole("button", { name: "새 폴더" })).toHaveCount(0)
+    await expect(page.getByLabel("클라우드 상세정보")).toHaveAttribute("data-mode", "inline")
+    await expect(page.getByRole("button", { name: /새 폴더/ })).toBeVisible()
     await expect(page.getByRole("button", { name: /즐겨찾기/ })).toHaveCount(0)
     await expect(page.getByRole("button", { name: "상세 패널 보기" })).toBeVisible()
     await expect(page.getByText("문", { exact: true })).toHaveCount(0)
@@ -724,12 +863,14 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByLabel("관리자 검색")).toHaveCount(0)
     await expect(page.getByPlaceholder("관리자 메뉴 검색")).toHaveCount(0)
 
-    const searchInput = page.getByLabel("클라우드 파일 검색")
-    await searchInput.fill("/photos")
+    const folderNav = page.getByLabel("폴더 경로 탐색").last()
+    await folderNav.getByRole("button", { name: "photos", exact: true }).click()
     await expect.poll(() => mocks.requestedFolderPaths).toContain("photos")
     await expect(page.getByRole("row", { name: /home-server-rack\.png/ })).toBeVisible()
     await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toHaveCount(0)
+    await page.getByRole("button", { name: "루트", exact: true }).click()
 
+    const searchInput = page.getByLabel("클라우드 파일 검색")
     await searchInput.fill("deploy")
     await expect(page.getByRole("row", { name: /deploy-walkthrough\.mp4/ })).toBeVisible()
 
@@ -852,22 +993,15 @@ test.describe("관리자 클라우드", () => {
       })
     })
     await page.getByRole("button", { name: "mpv 명령 복사" }).click()
-    await expect(page.getByRole("status")).toContainText("mpv 명령을 표시했습니다. 6시간 동안 유효합니다.")
+    await expect(page.getByRole("status").filter({ hasText: "mpv 명령을 표시했습니다. 6시간 동안 유효합니다." })).toBeVisible()
     await expect.poll(() => mocks.externalPlaybackTokenRequests).toEqual(["103", "103"])
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as typeof window & { __adminCloudPromptText?: string }).__adminCloudPromptText || ""
-        )
-      )
-      .toMatch(/^mpv "https?:\/\//)
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as typeof window & { __adminCloudPromptText?: string }).__adminCloudPromptText || ""
-        )
-      )
-      .toContain("/system/api/v1/adm/cloud/files/103/external-content?token=external-token-103")
+    const manualCmdInput = page.getByLabel("수동 복사 명령")
+    await expect(manualCmdInput).toBeVisible()
+    await expect(manualCmdInput).toHaveValue(/^mpv "https?:\/\/.*\/system\/api\/v1\/adm\/cloud\/files\/103\/external-content\?token=external-token-103"$/)
+    const promptText = await page.evaluate(
+      () => (window as typeof window & { __adminCloudPromptText?: string }).__adminCloudPromptText || ""
+    )
+    expect(promptText).toBe("")
 
     await expect(page.getByRole("button", { name: "deploy-walkthrough.mp4 삭제" })).toHaveCount(0)
     await page.getByRole("checkbox", { name: "deploy-walkthrough.mp4 선택" }).check()
@@ -883,7 +1017,7 @@ test.describe("관리자 클라우드", () => {
 
     await page.goto("/admin/cloud")
 
-    await expect(page.getByRole("heading", { name: "미디어 라이브러리" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "클라우드", level: 1 })).toBeVisible()
     await expect(page.locator('button[aria-label="파일 업로드"]').first()).toBeVisible()
     await expect(page.getByRole("status", { name: "파일 목록 로딩" })).toBeVisible()
     await expect(page.locator("[data-admin-cloud-skeleton-row]")).toHaveCount(3)
@@ -978,8 +1112,24 @@ test.describe("관리자 클라우드", () => {
     expect(mocks.videoCancels).toEqual([])
   })
 
-  test("대용량 동영상 part 실패 후 재시도는 기존 세션의 업로드된 조각부터 이어간다", async ({ page }, testInfo) => {
-    const mocks = await setupAdminCloudMocks(page, { failVideoPartOnceNumber: 2 })
+  test("대용량 동영상 일시 503 실패는 재시도 백오프 후 자동 복구된다", async ({ page }, testInfo) => {
+    const autoRecoverMocks = await setupAdminCloudMocks(page, { failVideoPartOnceNumber: 2 })
+    const largeVideo = Buffer.alloc(101 * 1024 * 1024)
+    Buffer.from([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70]).copy(largeVideo)
+    const autoVideoPath = testInfo.outputPath("자동복구 교육 영상.mp4")
+    writeFileSync(autoVideoPath, largeVideo)
+
+    await page.goto("/admin/cloud")
+    await page.getByLabel("클라우드 파일 업로드").setInputFiles(autoVideoPath)
+    await expect.poll(() => autoRecoverMocks.videoCompletes, { timeout: 25_000 }).toEqual(["301"])
+    expect(autoRecoverMocks.videoPartNumbers).toEqual([1, 2])
+  })
+
+  test("대용량 동영상 part 재시도 소진 후 수동 재시도는 기존 세션의 업로드된 조각부터 이어간다", async ({
+    page,
+  }, testInfo) => {
+    test.slow()
+    const mocks = await setupAdminCloudMocks(page, { failVideoPartFailureCounts: { 2: 3 } })
     const largeVideo = Buffer.alloc(101 * 1024 * 1024)
     Buffer.from([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70]).copy(largeVideo)
     const largeVideoPath = testInfo.outputPath("대용량 교육 영상.mp4")
@@ -989,7 +1139,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByLabel("클라우드 파일 업로드").setInputFiles(largeVideoPath)
 
     const uploadPanel = page.getByLabel("업로드 중인 파일")
-    await expect(page.getByText(/대용량 교육 영상\.mp4 업로드 실패/)).toBeVisible()
+    await expect(page.getByText(/대용량 교육 영상\.mp4 업로드 실패/)).toBeVisible({ timeout: 25_000 })
     await expect(uploadPanel.getByRole("heading", { name: "항목 1개 업로드 실패/취소" })).toBeVisible()
     await expect
       .poll(() =>
@@ -1014,8 +1164,9 @@ test.describe("관리자 클라우드", () => {
   })
 
   test("대용량 동영상 재시도는 서버 정규화 파일명 세션을 버리지 않는다", async ({ page }, testInfo) => {
+    test.slow()
     const mocks = await setupAdminCloudMocks(page, {
-      failVideoPartOnceNumber: 2,
+      failVideoPartFailureCounts: { 2: 3 },
       normalizeVideoSessionFilename: true,
     })
     const largeVideo = Buffer.alloc(101 * 1024 * 1024)
@@ -1029,7 +1180,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByLabel("클라우드 파일 업로드").setInputFiles(largeVideoPath)
 
     const uploadPanel = page.getByLabel("업로드 중인 파일")
-    await expect(uploadPanel.getByRole("heading", { name: "항목 1개 업로드 실패/취소" })).toBeVisible()
+    await expect(uploadPanel.getByRole("heading", { name: "항목 1개 업로드 실패/취소" })).toBeVisible({ timeout: 25_000 })
     await uploadPanel.getByRole("button", { name: `${nfdFilename} 업로드 다시 시도` }).click()
 
     await expect.poll(() => mocks.videoSessionGets).toContain("301")
@@ -1040,8 +1191,9 @@ test.describe("관리자 클라우드", () => {
   })
 
   test("대용량 동영상 세션 조회 일시 실패는 저장된 세션을 지우지 않는다", async ({ page }, testInfo) => {
+    test.slow()
     const mocks = await setupAdminCloudMocks(page, {
-      failVideoPartOnceNumber: 2,
+      failVideoPartFailureCounts: { 2: 3 },
       failVideoSessionGetOnceStatus: 503,
     })
     const largeVideo = Buffer.alloc(101 * 1024 * 1024)
@@ -1053,7 +1205,7 @@ test.describe("관리자 클라우드", () => {
     await page.getByLabel("클라우드 파일 업로드").setInputFiles(largeVideoPath)
 
     const uploadPanel = page.getByLabel("업로드 중인 파일")
-    await expect(page.getByText(/대용량 교육 영상\.mp4 업로드 실패/)).toBeVisible()
+    await expect(page.getByText(/대용량 교육 영상\.mp4 업로드 실패/)).toBeVisible({ timeout: 25_000 })
     await uploadPanel.getByRole("button", { name: "대용량 교육 영상.mp4 업로드 다시 시도" }).click()
     await expect(page.getByText(/대용량 교육 영상\.mp4 업로드 실패: 서버 오류가 발생했습니다/)).toBeVisible()
     await expect
@@ -1277,6 +1429,7 @@ test.describe("관리자 클라우드", () => {
   })
 
   test("파일이 많은 목록은 상세정보를 드로어로 열어 목록 폭을 유지한다", async ({ page }) => {
+    await page.setViewportSize({ width: 1120, height: 800 })
     const manyFiles = Array.from({ length: 9 }, (_, index): CloudFileFixture => ({
       id: 300 + index,
       ownerMemberId: 1,
@@ -1358,7 +1511,7 @@ test.describe("관리자 클라우드", () => {
     })
 
     await page.goto("/admin/cloud")
-    await expect(page.getByRole("heading", { name: "미디어 라이브러리" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "클라우드", level: 1 })).toBeVisible()
     await page.waitForTimeout(250)
 
     expect(snapshotRequestCount).toBe(0)
@@ -1582,27 +1735,35 @@ test.describe("관리자 클라우드", () => {
     const rowsBySize = page.locator("tbody tr")
     await expect(rowsBySize.first()).toContainText("deploy-walkthrough.mp4")
 
-    const folderFilterGroup = page.getByLabel("폴더 필터")
-    await expect(folderFilterGroup).toBeVisible()
-    await folderFilterGroup.getByRole("button", { name: "/ops" }).click()
-    await expect(page.getByLabel("클라우드 파일 검색")).toHaveValue("/ops")
+    const folderNav = page.getByLabel("폴더 경로 탐색").last()
+    await expect(folderNav).toBeVisible()
+    await folderNav.getByRole("button", { name: "ops", exact: true }).click()
+    await expect.poll(() => mocks.requestedFolderPaths).toContain("ops")
     await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
-    await folderFilterGroup.getByRole("button", { name: "전체 폴더" }).click()
     await expect(page.getByLabel("클라우드 파일 검색")).toHaveValue("")
+    await page.getByRole("button", { name: "루트", exact: true }).click()
+
+    await page.getByRole("button", { name: /새 폴더/ }).click()
+    const newFolderDialog = page.getByRole("dialog", { name: "새 폴더 만들기" })
+    await expect(newFolderDialog).toBeVisible()
+    await newFolderDialog.getByLabel("폴더 경로").fill("2026 세미나")
+    await newFolderDialog.getByRole("button", { name: "폴더 열기" }).click()
+    await expect(newFolderDialog).toHaveCount(0)
 
     const searchInput = page.getByLabel("클라우드 파일 검색")
-    await searchInput.fill("/ops 점검")
+    await searchInput.fill("seminar")
     await expect(page.getByRole("button", { name: "검색어 지우기" })).toBeVisible()
-    await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
     await page.getByLabel("클라우드 파일 업로드").setInputFiles({
-      name: "ops-점검-추가.pdf",
+      name: "seminar-발표.pdf",
       mimeType: "application/pdf",
       buffer: minimalPdf,
     })
-    await expect.poll(() => mocks.uploadedFolderPaths).toContain("ops")
-    await expect(page.getByRole("row", { name: /ops-점검-추가\.pdf/ })).toBeVisible()
+    await expect.poll(() => mocks.uploadedFolderPaths).toContain("2026 세미나")
+    await expect(page.getByRole("row", { name: /seminar-발표\.pdf/ })).toBeVisible()
     await page.getByRole("button", { name: "검색어 지우기" }).click()
     await expect(searchInput).toHaveValue("")
+    await page.getByRole("button", { name: "루트", exact: true }).click()
+    await expect(page.getByRole("row", { name: /운영 점검 리포트\.pdf/ })).toBeVisible()
 
     await page.locator('button[title="운영 점검 리포트.pdf"]').click()
     const detailPanel = page.getByLabel("클라우드 상세정보")
@@ -1620,8 +1781,8 @@ test.describe("관리자 클라우드", () => {
       /\/system\/api\/v1\/adm\/cloud\/files\/101\/content\?download=true$/
     )
 
-    await detailPanel.getByRole("button", { name: "링크 복사" }).click()
-    await expect(page.getByText("파일 링크를 복사했습니다.")).toBeVisible()
+    await detailPanel.getByRole("button", { name: "관리자 경로 복사" }).click()
+    await expect(page.getByText("관리자 내부 경로를 복사했습니다.")).toBeVisible()
     const copiedLink = await page.evaluate(() => (window as unknown as { __adminCloudCopiedText?: string }).__adminCloudCopiedText)
     expect(copiedLink).toContain("/system/api/v1/adm/cloud/files/101/content")
 
@@ -1639,7 +1800,6 @@ test.describe("관리자 클라우드", () => {
     await expect(detailPanel.getByRole("heading", { name: "연간 운영 점검 리포트.pdf" })).toBeVisible()
     await expect(detailPanel.getByLabel("폴더 경로 수정")).toHaveValue("ops/2026")
     await expect(page.getByRole("row", { name: /연간 운영 점검 리포트\.pdf/ })).toBeVisible()
-    await expect(folderFilterGroup.getByRole("button", { name: "/ops/2026" })).toBeVisible()
 
     await page.locator('button[title$="게시.pdf"]').click()
     await expect(detailPanel.getByText("미리보기를 불러오지 못했습니다")).toBeVisible()
@@ -1699,6 +1859,8 @@ test.describe("관리자 클라우드", () => {
     const svgCardImg = page.getByTestId("assets-grid").getByAltText("architecture-diagram.svg")
     await expect(svgCardImg).toBeVisible()
     await expect(svgCardImg).toHaveCSS("object-fit", "contain")
+    const svgCardImgBox = await svgCardImg.boundingBox()
+    expect(svgCardImgBox?.height ?? 0).toBeGreaterThanOrEqual(80)
 
     await page.locator('button[title="architecture-diagram.svg"]').click()
     const detailPanel = page.getByLabel("클라우드 상세정보")
@@ -1735,5 +1897,92 @@ test.describe("관리자 클라우드", () => {
     await page.keyboard.press("Escape")
     await expect(page.getByRole("dialog", { name: /미리보기$/ })).toHaveCount(0)
     await expect(detailPanel).toBeVisible()
+  })
+
+  test("만료 기한 선택형 공유 링크 발급/회수, 4개 이상 대기열 완주, 플로팅 벌크 이동·컨텍스트 이름 변경이 동작한다", async ({
+    page,
+  }) => {
+    const mocks = await setupAdminCloudMocks(page, { initialFiles: CLOUD_FILES })
+    await page.addInitScript(() => {
+      Object.assign(window, { __adminCloudCopiedText: "" })
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            Object.assign(window, { __adminCloudCopiedText: text })
+          },
+        },
+      })
+    })
+
+    await page.goto("/admin/cloud")
+
+    // 1. Custom-Expiry Signed Share Link Modal (7일 / 1시간 발급, 조회, 회수)
+    await page.locator('button[title="home-server-rack.png"]').click()
+    const detailPanel = page.getByLabel("클라우드 상세정보")
+    await detailPanel.getByRole("button", { name: "공유 링크" }).click()
+
+    const shareDialog = page.getByRole("dialog", { name: "공유 링크 관리" })
+    await expect(shareDialog).toBeVisible()
+    await shareDialog.getByRole("button", { name: "7일" }).click()
+    await shareDialog.getByRole("button", { name: "공유 링크 발급" }).click()
+    await expect.poll(() => mocks.shareLinkRequests).toEqual([{ fileId: "102", ttlSeconds: 604800 }])
+    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveValue(
+      /\/system\/api\/v1\/public\/cloud\/files\/102\/share\?token=share-token-102-604800/
+    )
+    await shareDialog.getByRole("tab", { name: "관리자 내부 경로" }).click()
+    await expect(shareDialog.getByLabel("관리자 내부 경로")).toHaveValue(/\/system\/api\/v1\/adm\/cloud\/files\/102\/content/)
+    await shareDialog.getByRole("tab", { name: "서명 외부 공유 링크" }).click()
+    await expect(shareDialog.getByRole("button", { name: "회수" }).first()).toBeVisible()
+    await shareDialog.getByRole("button", { name: "모두 회수" }).click()
+    await expect.poll(() => mocks.revokedShareLinkIds.length).toBeGreaterThan(0)
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+    await expect(shareDialog).toHaveCount(0)
+
+    // 2. Upload 4+ files simultaneously to verify scheduler re-entry finishes every queued item
+    await page.getByLabel("클라우드 파일 업로드").setInputFiles([
+      { name: "batch-1.txt", mimeType: "text/plain", buffer: Buffer.from("one") },
+      { name: "batch-2.txt", mimeType: "text/plain", buffer: Buffer.from("two") },
+      { name: "batch-3.txt", mimeType: "text/plain", buffer: Buffer.from("three") },
+      { name: "batch-4.txt", mimeType: "text/plain", buffer: Buffer.from("four") },
+    ])
+    await expect.poll(() => mocks.uploadedNames, { timeout: 10_000 }).toEqual(
+      expect.arrayContaining(["batch-1.txt", "batch-2.txt", "batch-3.txt", "batch-4.txt"])
+    )
+
+    // 3. List view: sortable column header + context menu rename + FloatingBulkBar MoveItemsModal
+    await switchToCloudListView(page)
+    await page.getByRole("button", { name: "이름" }).click()
+    await page.getByRole("checkbox", { name: "batch-1.txt 선택" }).check()
+    await page.getByRole("checkbox", { name: "batch-2.txt 선택" }).check()
+    const bulkBar = page.getByRole("region", { name: "2개 선택됨" })
+    await expect(bulkBar).toBeVisible()
+    await bulkBar.getByRole("button", { name: "폴더 이동" }).click()
+
+    const moveDialog = page.getByRole("dialog", { name: "선택한 2개 파일 이동" })
+    await expect(moveDialog).toBeVisible()
+    await moveDialog.getByRole("textbox", { name: "이동할 폴더" }).fill("2026 세미나/자료")
+    await moveDialog.getByRole("button", { name: "이동" }).click()
+    await expect(moveDialog).toHaveCount(0)
+    await expect(page.getByRole("status").filter({ hasText: "2개 파일을 이동했습니다." })).toBeVisible()
+
+    await page.locator('button[title="batch-3.txt"]').click({ button: "right" })
+    const contextMenu = page.getByRole("menu", { name: "batch-3.txt 더 보기" })
+    await expect(contextMenu).toBeVisible()
+    await contextMenu.getByRole("menuitem", { name: /이름 변경/ }).click()
+
+    const renameDialog = page.getByRole("dialog", { name: "파일 이름 변경" })
+    await expect(renameDialog).toBeVisible()
+    await renameDialog.getByRole("textbox", { name: "새 파일 이름" }).fill("batch-3-renamed.txt")
+    await renameDialog.getByRole("button", { name: "저장" }).click()
+    await expect(renameDialog).toHaveCount(0)
+    await expect(page.getByRole("row", { name: /batch-3-renamed\.txt/ })).toBeVisible()
+
+    // 4. Keyboard F2 shortcut opens rename dialog for active file
+    await page.locator('button[title="batch-3-renamed.txt"]').click()
+    await page.locator("body").press("F2")
+    await expect(page.getByRole("dialog", { name: "파일 이름 변경" })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(page.getByRole("dialog", { name: "파일 이름 변경" })).toHaveCount(0)
   })
 })

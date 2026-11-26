@@ -5,18 +5,17 @@
  * - transloadit/uppy packages/@uppy/core/src/Uppy.ts (MIT License, Copyright (c) Transloadit Ltd)
  */
 import type { CloudFile, CloudMediaKind } from "src/apis/backend/cloud"
+import type { SiteLanguage } from "src/libs/language"
 import { formatFileSize, formatWithNormalizedHours } from "src/libs/utils"
-
-export const MAX_SVG_MARKUP_BYTES = 256 * 1024
-const MAX_SVG_DIMENSION_COORD = 1_000_000
-
-export type CloudAssetDimensions = {
-  width: number
-  height: number
-}
+export {
+  MAX_SVG_MARKUP_BYTES,
+  parseSvgDimensionsFromMarkup,
+  type CloudAssetDimensions,
+} from "./cloud/cloudSvgDimensionParser"
 
 export type CloudMediaFilter = "ALL" | CloudMediaKind
 export type CloudSortMode = "LATEST" | "OLDEST" | "NAME" | "SIZE"
+export type CloudSortDirection = "asc" | "desc"
 export type UploadQueueStatus = "queued" | "uploading" | "done" | "failed" | "cancelled"
 export type UploadQueueItem = {
   id: string
@@ -27,6 +26,9 @@ export type UploadQueueItem = {
   status: UploadQueueStatus
   progress: number
   message: string
+  loadedBytes?: number
+  speedBps?: number
+  etaSeconds?: number | null
   uploadedFileId?: number
   retryCount?: number
 }
@@ -51,11 +53,35 @@ export const CLOUD_SORT_OPTIONS: ReadonlyArray<{ key: CloudSortMode; label: stri
 
 export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
 
-export const getCloudKindLabel = (kind: CloudMediaFilter) => {
+export const getCloudKindLabel = (kind: CloudMediaFilter, language: SiteLanguage = "ko") => {
+  if (language === "en") {
+    if (kind === "DOCUMENT") return "Document"
+    if (kind === "PHOTO") return "Photo"
+    if (kind === "VIDEO") return "Video"
+    return "All"
+  }
   if (kind === "DOCUMENT") return "문서"
   if (kind === "PHOTO") return "사진"
   if (kind === "VIDEO") return "동영상"
   return "전체"
+}
+
+export const splitCloudFilenameParts = (
+  filename: string
+): { stem: string; extension: string } => {
+  const trimmed = filename.trim()
+  const dotIdx = trimmed.lastIndexOf(".")
+  if (dotIdx <= 0 || dotIdx === trimmed.length - 1) {
+    return { stem: trimmed, extension: "" }
+  }
+  const ext = trimmed.slice(dotIdx)
+  if (ext.length > 10 || /\s/.test(ext)) {
+    return { stem: trimmed, extension: "" }
+  }
+  return {
+    stem: trimmed.slice(0, dotIdx),
+    extension: ext,
+  }
 }
 
 export const getCloudInspectorHeading = (file: CloudFile): string => file.originalFilename
@@ -83,142 +109,6 @@ export const appendCloudAssetVersionUrl = (url: string, versionStamp?: string): 
   return `${url}${separator}v=${encodeURIComponent(stamp)}`
 }
 
-const isAsciiWhitespace = (code: number): boolean =>
-  code === 0x20 || code === 0x09 || code === 0x0a || code === 0x0d || code === 0x0c
-
-const isAttrNameStop = (code: number): boolean =>
-  isAsciiWhitespace(code) || code === 0x3d || code === 0x3e || code === 0x2f
-
-const isUnquotedValStop = (code: number): boolean =>
-  isAsciiWhitespace(code) || code === 0x3e || code === 0x2f
-
-const parseSvgPixelLength = (raw: string | null): number | null => {
-  if (!raw) return null
-  const trimmed = raw.trim()
-  if (!trimmed || !/^\+?(?:\d+\.?\d*|\.\d+)(?:px)?$/i.test(trimmed)) return null
-  const value = Number.parseFloat(trimmed)
-  if (!Number.isFinite(value) || value <= 0 || value > MAX_SVG_DIMENSION_COORD) return null
-  const rounded = Math.round(value)
-  return rounded > 0 ? rounded : null
-}
-
-const parseSvgViewBoxDimensions = (raw: string | null): CloudAssetDimensions | null => {
-  if (!raw) return null
-  const tokens = raw.trim().split(/[\s,]+/)
-  if (tokens.length !== 4) return null
-  const [minX, minY, vbWidth, vbHeight] = tokens.map(Number)
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null
-  if (!Number.isFinite(vbWidth) || vbWidth <= 0 || vbWidth > MAX_SVG_DIMENSION_COORD) return null
-  if (!Number.isFinite(vbHeight) || vbHeight <= 0 || vbHeight > MAX_SVG_DIMENSION_COORD) return null
-  const width = Math.round(vbWidth)
-  const height = Math.round(vbHeight)
-  return width > 0 && height > 0 ? { width, height } : null
-}
-
-const locateSvgStartTagBodyOffset = (svgText: string): number => {
-  const len = svgText.length
-  let i = svgText.charCodeAt(0) === 0xfeff ? 1 : 0
-  while (i < len) {
-    const lt = svgText.indexOf("<", i)
-    if (lt < 0 || lt + 3 >= len) return -1
-    if (svgText.startsWith("<!--", lt)) {
-      const endComment = svgText.indexOf("-->", lt + 4)
-      if (endComment < 0) return -1
-      i = endComment + 3
-      continue
-    }
-    if (svgText.startsWith("<?", lt)) {
-      const endPi = svgText.indexOf("?>", lt + 2)
-      if (endPi < 0) return -1
-      i = endPi + 2
-      continue
-    }
-    if (svgText.slice(lt, lt + 9).toLowerCase() === "<!doctype") {
-      let cursor = lt + 9
-      let bracketDepth = 0
-      while (cursor < len) {
-        const ch = svgText.charCodeAt(cursor)
-        if (ch === 0x5b) bracketDepth += 1
-        else if (ch === 0x5d && bracketDepth > 0) bracketDepth -= 1
-        else if (ch === 0x3e && bracketDepth === 0) break
-        cursor += 1
-      }
-      if (cursor >= len) return -1
-      i = cursor + 1
-      continue
-    }
-    const c1 = svgText.charCodeAt(lt + 1) | 0x20
-    const c2 = svgText.charCodeAt(lt + 2) | 0x20
-    const c3 = svgText.charCodeAt(lt + 3) | 0x20
-    const nextCode = lt + 4 < len ? svgText.charCodeAt(lt + 4) : 0x3e
-    if (c1 === 0x73 && c2 === 0x76 && c3 === 0x67 && isUnquotedValStop(nextCode)) {
-      return lt + 4
-    }
-    i = lt + 1
-  }
-  return -1
-}
-
-export const parseSvgDimensionsFromMarkup = (svgText: string): CloudAssetDimensions | null => {
-  if (!svgText || svgText.length > MAX_SVG_MARKUP_BYTES || svgText.indexOf("\0") !== -1) {
-    return null
-  }
-  let cursor = locateSvgStartTagBodyOffset(svgText)
-  if (cursor < 0) return null
-
-  const len = svgText.length
-  let widthAttr: string | null = null
-  let heightAttr: string | null = null
-  let viewBoxAttr: string | null = null
-
-  while (cursor < len) {
-    while (cursor < len && isAsciiWhitespace(svgText.charCodeAt(cursor))) cursor += 1
-    if (cursor >= len) return null
-    const ch = svgText.charCodeAt(cursor)
-    if (ch === 0x3e) break
-    if (ch === 0x2f) {
-      cursor += 1
-      continue
-    }
-    const nameStart = cursor
-    while (cursor < len && !isAttrNameStop(svgText.charCodeAt(cursor))) cursor += 1
-    if (cursor === nameStart) {
-      cursor += 1
-      continue
-    }
-    const attrName = svgText.slice(nameStart, cursor).toLowerCase()
-    while (cursor < len && isAsciiWhitespace(svgText.charCodeAt(cursor))) cursor += 1
-    if (cursor >= len || svgText.charCodeAt(cursor) !== 0x3d) continue
-    cursor += 1
-    while (cursor < len && isAsciiWhitespace(svgText.charCodeAt(cursor))) cursor += 1
-    if (cursor >= len) return null
-
-    const quote = svgText.charCodeAt(cursor)
-    let attrValue = ""
-    if (quote === 0x22 || quote === 0x27) {
-      const closeIdx = svgText.indexOf(quote === 0x22 ? '"' : "'", cursor + 1)
-      if (closeIdx < 0) return null
-      attrValue = svgText.slice(cursor + 1, closeIdx)
-      cursor = closeIdx + 1
-    } else {
-      const valStart = cursor
-      while (cursor < len && !isUnquotedValStop(svgText.charCodeAt(cursor))) cursor += 1
-      attrValue = svgText.slice(valStart, cursor)
-    }
-
-    if (attrName === "width") widthAttr = attrValue
-    else if (attrName === "height") heightAttr = attrValue
-    else if (attrName === "viewbox") viewBoxAttr = attrValue
-  }
-
-  const parsedWidth = parseSvgPixelLength(widthAttr)
-  const parsedHeight = parseSvgPixelLength(heightAttr)
-  if (parsedWidth !== null && parsedHeight !== null) {
-    return { width: parsedWidth, height: parsedHeight }
-  }
-  return parseSvgViewBoxDimensions(viewBoxAttr)
-}
-
 export const getCloudKindBadge = (file: CloudFile) => {
   const extension = getCloudFileExtension(file.originalFilename)
   if (file.mediaKind === "DOCUMENT") return extension || "DOC"
@@ -240,7 +130,7 @@ export const getCloudFileExtension = (filename: string) => {
 export const formatCloudFileSize = (bytes: number) =>
   formatFileSize(bytes, { fallback: "0 B" })
 
-const CLOUD_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+const CLOUD_DATE_FORMATTER_KO = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
@@ -250,14 +140,35 @@ const CLOUD_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
 })
 
-export const formatCloudDate = (value?: string) => {
-  if (!value) return "날짜 없음"
+const CLOUD_DATE_FORMATTER_EN = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Asia/Seoul",
+})
+
+export const formatCloudDate = (value?: string, language: SiteLanguage = "ko") => {
+  const emptyLabel = language === "en" ? "No date" : "날짜 없음"
+  if (!value) return emptyLabel
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "날짜 없음"
-  return formatWithNormalizedHours(CLOUD_DATE_FORMATTER, date)
+  if (Number.isNaN(date.getTime())) return emptyLabel
+  return formatWithNormalizedHours(
+    language === "en" ? CLOUD_DATE_FORMATTER_EN : CLOUD_DATE_FORMATTER_KO,
+    date
+  )
 }
 
-export const getUploadStatusLabel = (status: UploadQueueStatus) => {
+export const getUploadStatusLabel = (status: UploadQueueStatus, language: SiteLanguage = "ko") => {
+  if (language === "en") {
+    if (status === "queued") return "Queued"
+    if (status === "uploading") return "Uploading"
+    if (status === "done") return "Done"
+    if (status === "failed") return "Failed"
+    return "Cancelled"
+  }
   if (status === "queued") return "대기"
   if (status === "uploading") return "업로드 중"
   if (status === "done") return "완료"
@@ -265,29 +176,19 @@ export const getUploadStatusLabel = (status: UploadQueueStatus) => {
   return "취소됨"
 }
 
-export const isUploadActive = (status: UploadQueueStatus) => status === "queued" || status === "uploading"
+export const isUploadActive = (status: UploadQueueStatus) =>
+  status === "queued" || status === "uploading"
 
-export const normalizeCloudFolderPathSearch = (value: string) => value.trim().replace(/^\/+|\/+$/g, "")
-
-export const resolveCloudSearchParams = (input: string): CloudSearchParams => {
-  const trimmed = input.trim()
-  if (!trimmed) return { folderPath: "", keyword: "" }
-  if (!trimmed.startsWith("/")) return { folderPath: "", keyword: trimmed }
-
-  const spaceIndex = trimmed.search(/\s/)
-  const rawFolder = spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex)
-  const rawKeyword = spaceIndex === -1 ? "" : trimmed.slice(spaceIndex + 1).trim()
-  const folderPath = normalizeCloudFolderPathSearch(rawFolder)
-
-  return {
-    folderPath,
-    keyword: rawKeyword,
-  }
-}
+export const normalizeCloudFolderPathSearch = (value: string) =>
+  value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/")
+    .replace(/^\/+|\/+$/g, "")
 
 export const extractCloudFolders = (
   files: readonly CloudFile[],
-  activeFolderPath = "",
+  activeFolderPath = ""
 ): string[] => {
   const folders = new Set<string>()
   const normalizedActive = normalizeCloudFolderPathSearch(activeFolderPath)
@@ -299,26 +200,14 @@ export const extractCloudFolders = (
   return Array.from(folders).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
 }
 
-export const applyCloudFolderFilter = (currentSearchText: string, folderPath: string): string => {
-  const current = resolveCloudSearchParams(currentSearchText)
-  const normalizedTarget = normalizeCloudFolderPathSearch(folderPath)
-  const currentFolder = normalizeCloudFolderPathSearch(current.folderPath ?? "")
-  const currentKeyword = (current.keyword ?? "").trim()
-
-  if (!normalizedTarget || normalizedTarget === currentFolder) {
-    return currentKeyword
-  }
-
-  return currentKeyword ? `/${normalizedTarget} ${currentKeyword}` : `/${normalizedTarget}`
-}
-
 export const updateCachedCloudFilesForMutation = (
   current: readonly CloudFile[],
   updated: CloudFile,
   filter: CloudMediaFilter,
   keyword: string,
+  activeFolderPath = ""
 ): CloudFile[] => {
-  if (!doesCloudFileMatchFilters(updated, filter, keyword)) {
+  if (!doesCloudFileMatchFilters(updated, filter, keyword, activeFolderPath)) {
     return current.filter((item) => item.id !== updated.id)
   }
   if (current.some((item) => item.id === updated.id)) {
@@ -336,20 +225,25 @@ const toCloudTimestamp = (value?: string): number => {
 export const sortCloudFiles = (
   files: readonly CloudFile[],
   sortMode: CloudSortMode,
+  direction?: CloudSortDirection
 ): CloudFile[] => {
   if (sortMode === "NAME") {
+    const dir = direction ?? "asc"
     const copy = [...files]
     copy.sort((a, b) => {
       const nameDiff = a.originalFilename.localeCompare(b.originalFilename, "ko", { numeric: true })
-      return nameDiff !== 0 ? nameDiff : a.id - b.id
+      const diff = nameDiff !== 0 ? nameDiff : a.id - b.id
+      return dir === "asc" ? diff : -diff
     })
     return copy
   }
   if (sortMode === "SIZE") {
+    const dir = direction ?? "desc"
     const copy = [...files]
     copy.sort((a, b) => {
       const sizeDiff = b.byteSize - a.byteSize
-      return sizeDiff !== 0 ? sizeDiff : b.id - a.id
+      const diff = sizeDiff !== 0 ? sizeDiff : b.id - a.id
+      return dir === "desc" ? diff : -diff
     })
     return copy
   }
@@ -357,7 +251,8 @@ export const sortCloudFiles = (
     file,
     ts: toCloudTimestamp(file.modifiedAt || file.createdAt),
   }))
-  if (sortMode === "OLDEST") {
+  const effectiveDir: CloudSortDirection = direction ?? (sortMode === "OLDEST" ? "asc" : "desc")
+  if (effectiveDir === "asc") {
     withTimestamps.sort((a, b) => {
       const timeDiff = a.ts - b.ts
       return timeDiff !== 0 ? timeDiff : a.file.id - b.file.id
@@ -375,24 +270,27 @@ export const doesCloudFileMatchSearchParams = (
   file: CloudFile,
   filter: CloudMediaFilter,
   searchParams: CloudSearchParams,
-  normalizedKeyword = (searchParams.keyword ?? "").toLowerCase(),
+  normalizedKeyword = (searchParams.keyword ?? "").trim().toLowerCase()
 ) => {
   const matchesKind = filter === "ALL" || file.mediaKind === filter
+  const targetFolder = normalizeCloudFolderPathSearch(searchParams.folderPath ?? "")
   const matchesFolderPath =
-    !searchParams.folderPath ||
-    normalizeCloudFolderPathSearch(file.folderPath) === searchParams.folderPath
-  const matchesKeyword = !normalizedKeyword || file.originalFilename.toLowerCase().includes(normalizedKeyword)
+    !targetFolder || normalizeCloudFolderPathSearch(file.folderPath) === targetFolder
+  const matchesKeyword =
+    !normalizedKeyword || file.originalFilename.toLowerCase().includes(normalizedKeyword)
   return matchesKind && matchesFolderPath && matchesKeyword
 }
 
 export const doesCloudFileMatchFilters = (
   file: CloudFile,
   filter: CloudMediaFilter,
-  searchText: string,
-) => {
-  const searchParams = resolveCloudSearchParams(searchText)
-  return doesCloudFileMatchSearchParams(file, filter, searchParams)
-}
+  keyword: string,
+  folderPath = ""
+) =>
+  doesCloudFileMatchSearchParams(file, filter, {
+    folderPath: normalizeCloudFolderPathSearch(folderPath),
+    keyword: keyword.trim(),
+  })
 
 export type CloudEmptyStateInput = {
   activeUploadCount: number
@@ -402,9 +300,11 @@ export type CloudEmptyStateInput = {
   isFetching: boolean
   isLoading: boolean
   keyword: string
+  language?: SiteLanguage
 }
 
-export const isCloudSearchPending = (keyword: string, debouncedKeyword: string) => keyword !== debouncedKeyword
+export const isCloudSearchPending = (keyword: string, debouncedKeyword: string) =>
+  keyword !== debouncedKeyword
 
 export const resolveCloudEmptyTitle = ({
   activeUploadCount,
@@ -414,7 +314,16 @@ export const resolveCloudEmptyTitle = ({
   isFetching,
   isLoading,
   keyword,
+  language = "ko",
 }: CloudEmptyStateInput) => {
+  if (language === "en") {
+    if (isLoading) return "Loading files..."
+    if (isError) return "Could not load cloud files."
+    if (activeUploadCount > 0) return "Uploads are in progress."
+    if (isCloudSearchPending(keyword, debouncedKeyword) || isFetching) return "Searching..."
+    if (debouncedKeyword || filter !== "ALL") return "No files match your filters."
+    return "No files to display."
+  }
   if (isLoading) return "파일을 불러오는 중입니다."
   if (isError) return "파일 목록을 불러오지 못했습니다."
   if (activeUploadCount > 0) return "업로드 중인 파일이 있습니다."
@@ -495,10 +404,20 @@ export const applyUploadQueueProgress = (
   current: UploadQueueItem[],
   targetId: string,
   progress: number,
-  message: string
+  message: string,
+  metrics?: { loadedBytes?: number; speedBps?: number; etaSeconds?: number | null }
 ): UploadQueueItem[] =>
   current.map((item) =>
-    item.id === targetId && item.status !== "cancelled" ? { ...item, progress, message } : item
+    item.id === targetId && item.status !== "cancelled"
+      ? {
+          ...item,
+          progress,
+          message,
+          loadedBytes: metrics?.loadedBytes ?? item.loadedBytes,
+          speedBps: metrics?.speedBps ?? item.speedBps,
+          etaSeconds: metrics?.etaSeconds !== undefined ? metrics.etaSeconds : item.etaSeconds,
+        }
+      : item
   )
 
 export const applyUploadQueueSuccess = (

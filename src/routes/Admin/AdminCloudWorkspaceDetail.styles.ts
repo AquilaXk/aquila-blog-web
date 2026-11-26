@@ -28,6 +28,12 @@ export const DetailPanel = styled.aside`
 
   &[data-mode="inline"] {
     grid-column: 2;
+    @media (min-width: 1280px) {
+      position: sticky;
+      top: var(--app-header-height, 48px);
+      height: calc(100vh - var(--app-header-height, 48px));
+      overflow: hidden;
+    }
   }
 
   &[data-mode="drawer"] {
@@ -299,7 +305,7 @@ export const PhotoFallback = styled.div`
 
 export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
   position: fixed;
-  top: calc(var(--app-header-height, 61px) + 1rem);
+  top: calc(var(--app-header-height, 48px) + 1rem);
   right: max(1rem, env(safe-area-inset-right));
   z-index: ${zIndexes.dialogHoverCard};
   display: grid;
@@ -352,7 +358,7 @@ export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
 export const ConfirmBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: ${zIndexes.dialog};
+  z-index: ${zIndexes.confirmDialog};
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -409,7 +415,7 @@ export const QueuePanel = styled.section`
   display: grid;
   gap: 0.55rem;
   width: min(25rem, calc(100vw - 2rem));
-  max-height: min(24rem, calc(100vh - var(--app-header-height, 73px) - 2rem));
+  max-height: min(24rem, calc(100vh - var(--app-header-height, 48px) - 2rem));
   padding: 0.85rem;
   border: 1px solid ${border};
   border-radius: 12px;
@@ -425,7 +431,7 @@ export const QueuePanel = styled.section`
     right: 0.72rem;
     bottom: 0.72rem;
     width: calc(100vw - 1.44rem);
-    max-height: min(22rem, calc(100vh - var(--app-header-height, 73px) - 1.44rem));
+    max-height: min(22rem, calc(100vh - var(--app-header-height, 48px) - 1.44rem));
     padding: 0.72rem;
   }
 `

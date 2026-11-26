@@ -1,67 +1,47 @@
-// 참조 구현: strapi/strapi (MIT), transloadit/uppy (MIT), payloadcms/payload (MIT) — 미디어 워크스페이스 액션·O(1) 인덱싱·벌크 삭제
+// 참조 구현: strapi/strapi (MIT), transloadit/uppy (MIT), supabase/supabase (Apache-2.0) — 클라우드 워크스페이스 상태·폴더/검색 분리
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
-import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
-import {
-  bulkDeleteCloudFiles,
-  deleteCloudFile,
   getCloudFileContentUrl,
   listCloudFiles,
-  updateCloudFile,
   type CloudFile,
   type CloudMediaKind,
 } from "src/apis/backend/cloud"
-import { toUserFacingMessage } from "src/apis/backend/errorClassification"
+import { useModalFocusTrap } from "src/design-system/useModalFocusTrap"
 import { useDebouncedValue } from "src/hooks/useDebouncedValue"
+import { useLanguage } from "src/libs/language"
 import {
-  CLOUD_FILTERS,
-  applyCloudFolderFilter,
-  doesCloudFileMatchSearchParams,
+  doesCloudFileMatchFilters,
   extractCloudFolders,
   mergeCloudFiles,
-  normalizeCloudFolderPathSearch,
-  resolveCloudSearchParams,
   sortCloudFiles,
-  updateCachedCloudFilesForMutation,
   type CloudMediaFilter,
+  type CloudSortDirection,
   type CloudSortMode,
 } from "./AdminCloudWorkspaceModel"
+import {
+  extractAllCloudFolders,
+  extractDirectChildFolders,
+  getDefaultSortDirection,
+  loadCloudViewPreferences,
+  normalizeCloudFolderPath,
+  saveCloudViewPreferences,
+  type CloudViewMode,
+} from "./cloud/cloudFolderHelpers"
+import { useCloudWorkspaceMutations } from "./cloud/useCloudWorkspaceMutations"
 import { computeShiftRangeSelection } from "./cloudUploadQueueModel"
 import { useAdminCloudUploadQueue } from "./useAdminCloudUploadQueue"
 
 const CLOUD_QUERY_KEY = "admin-cloud-files"
-const CLOUD_FACETS_QUERY_KEY = "admin-cloud-facets"
 const EMPTY_CLOUD_FILES: CloudFile[] = []
+
 const CLOUD_UI_COMPOSING = 1
 const CLOUD_UI_DETAIL_OPEN = 1 << 1
 const CLOUD_UI_DELETE_PENDING = 1 << 2
-
-const resolveBulkDeleteFailureMessage = (
-  deletedCount: number,
-  failedCount: number,
-  firstFailure?: PromiseRejectedResult
-): string => {
-  if (deletedCount > 0) return `${deletedCount}개 삭제 완료, ${failedCount}개 실패`
-  if (firstFailure) return toUserFacingMessage(firstFailure.reason)
-  return `${failedCount}개 파일 삭제 실패`
-}
+const CLOUD_UI_MUTATION_PENDING = 1 << 3
 
 const mediaKindFromFilter = (filter: CloudMediaFilter): CloudMediaKind | undefined =>
   filter === "ALL" ? undefined : filter
-
-const isCloudMediaFilter = (value: unknown): value is CloudMediaFilter =>
-  CLOUD_FILTERS.some((item) => item.value === value)
-
-const getCachedCloudQueryFilters = (queryKey: readonly unknown[]) => ({
-  filter: isCloudMediaFilter(queryKey[1]) ? queryKey[1] : ("ALL" as CloudMediaFilter),
-  keyword: typeof queryKey[2] === "string" ? queryKey[2] : "",
-})
 
 type DeleteConfirmState = {
   files: CloudFile[]
@@ -74,17 +54,26 @@ export type CloudToastState =
     }
   | null
 
-// 업로드 취소 컨트롤러 추적: uploadControllersRef는 useAdminCloudUploadQueue에서 안전하게 소유 및 관리됨
 export const useAdminCloudWorkspaceActions = () => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const queryClient = useQueryClient()
+
   const [filter, setFilter] = useState<CloudMediaFilter>("ALL")
-  const [sortMode, setSortMode] = useState<CloudSortMode>("LATEST")
+  const [sortMode, setSortModeState] = useState<CloudSortMode>("LATEST")
+  const [sortDirection, setSortDirectionState] = useState<CloudSortDirection>("desc")
+  const [viewMode, setViewModeState] = useState<CloudViewMode>("grid")
+  const [activeFolderPath, setActiveFolderPathState] = useState("")
   const [keyword, setKeyword] = useState("")
   const [cloudUiMask, setCloudUiMask] = useState(0)
+
+  const prefsLoadedRef = useRef(false)
+  const initialDesktopSyncDoneRef = useRef(false)
 
   const isComposing = (cloudUiMask & CLOUD_UI_COMPOSING) !== 0
   const isDetailPanelOpen = (cloudUiMask & CLOUD_UI_DETAIL_OPEN) !== 0
   const isDeletePending = (cloudUiMask & CLOUD_UI_DELETE_PENDING) !== 0
+  const isMutationPending = (cloudUiMask & CLOUD_UI_MUTATION_PENDING) !== 0
 
   const setIsComposing = useCallback(
     (v: boolean) => setCloudUiMask((m) => (v ? m | CLOUD_UI_COMPOSING : m & ~CLOUD_UI_COMPOSING)),
@@ -99,70 +88,142 @@ export const useAdminCloudWorkspaceActions = () => {
     []
   )
   const setIsDeletePending = useCallback(
-    (v: boolean) => setCloudUiMask((m) => (v ? m | CLOUD_UI_DELETE_PENDING : m & ~CLOUD_UI_DELETE_PENDING)),
+    (v: boolean) =>
+      setCloudUiMask((m) => (v ? m | CLOUD_UI_DELETE_PENDING : m & ~CLOUD_UI_DELETE_PENDING)),
+    []
+  )
+  const setIsMutationPending = useCallback(
+    (v: boolean) =>
+      setCloudUiMask((m) => (v ? m | CLOUD_UI_MUTATION_PENDING : m & ~CLOUD_UI_MUTATION_PENDING)),
     []
   )
 
+  useEffect(() => {
+    if (prefsLoadedRef.current) return
+    prefsLoadedRef.current = true
+    const saved = loadCloudViewPreferences()
+    setViewModeState(saved.viewMode)
+    setSortModeState(saved.sortMode)
+    setSortDirectionState(saved.sortDirection)
+  }, [])
+
+  const updateSavedPreferences = useCallback(
+    (next: { viewMode?: CloudViewMode; sortMode?: CloudSortMode; sortDirection?: CloudSortDirection }) => {
+      saveCloudViewPreferences({
+        viewMode: next.viewMode ?? viewMode,
+        sortMode: next.sortMode ?? sortMode,
+        sortDirection: next.sortDirection ?? sortDirection,
+      })
+    },
+    [sortDirection, sortMode, viewMode]
+  )
+
+  const setViewMode = useCallback(
+    (next: CloudViewMode) => {
+      setViewModeState(next)
+      updateSavedPreferences({ viewMode: next })
+    },
+    [updateSavedPreferences]
+  )
+
+  const setSortMode = useCallback(
+    (next: CloudSortMode, explicitDirection?: CloudSortDirection) => {
+      const dir = explicitDirection ?? getDefaultSortDirection(next)
+      setSortModeState(next)
+      setSortDirectionState(dir)
+      updateSavedPreferences({ sortMode: next, sortDirection: dir })
+    },
+    [updateSavedPreferences]
+  )
+
+  const handleSortColumn = useCallback(
+    (column: "NAME" | "SIZE" | "LATEST") => {
+      if (column === "LATEST") {
+        const currentlyDesc = sortMode === "LATEST" && sortDirection === "desc"
+        setSortMode(currentlyDesc ? "OLDEST" : "LATEST", currentlyDesc ? "asc" : "desc")
+        return
+      }
+      if (sortMode === column) {
+        setSortMode(column, sortDirection === "asc" ? "desc" : "asc")
+        return
+      }
+      setSortMode(column, getDefaultSortDirection(column))
+    },
+    [setSortMode, sortDirection, sortMode]
+  )
+
   const debouncedKeyword = useDebouncedValue(keyword, isComposing)
+  const normalizedFolderPath = normalizeCloudFolderPath(activeFolderPath)
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null)
   const [checkedFileIds, setCheckedFileIds] = useState<number[]>([])
   const [notice, setNotice] = useState("")
   const [toast, setToast] = useState<CloudToastState>(null)
   const [optimisticFiles, setOptimisticFiles] = useState<CloudFile[]>([])
   const [knownFolders, setKnownFolders] = useState<string[]>([])
+  const [createdFolders, setCreatedFolders] = useState<string[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null)
   const lastCheckedRowIndexRef = useRef<number | null>(null)
 
   const filesQuery = useQuery({
-    queryKey: [CLOUD_QUERY_KEY, filter, debouncedKeyword],
+    queryKey: [CLOUD_QUERY_KEY, filter, debouncedKeyword.trim(), normalizedFolderPath],
     retry: false,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    queryFn: () => {
-      const searchParams = resolveCloudSearchParams(debouncedKeyword)
-      return listCloudFiles({
-        folderPath: searchParams.folderPath,
-        keyword: searchParams.keyword,
+    queryFn: () =>
+      listCloudFiles({
+        folderPath: normalizedFolderPath,
+        keyword: debouncedKeyword.trim(),
         mediaKind: mediaKindFromFilter(filter),
-      })
-    },
+      }),
   })
 
   const serverFiles = filesQuery.data ?? EMPTY_CLOUD_FILES
-  const visibleOptimisticFiles = useMemo(() => {
-    const searchParams = resolveCloudSearchParams(debouncedKeyword)
-    const normalizedKeyword = (searchParams.keyword ?? "").toLowerCase()
-    return optimisticFiles.filter((file) =>
-      doesCloudFileMatchSearchParams(file, filter, searchParams, normalizedKeyword)
-    )
-  }, [debouncedKeyword, filter, optimisticFiles])
-
-  const files = useMemo(
-    () => sortCloudFiles(mergeCloudFiles(visibleOptimisticFiles, serverFiles), sortMode),
-    [serverFiles, sortMode, visibleOptimisticFiles]
+  const visibleOptimisticFiles = useMemo(
+    () =>
+      optimisticFiles.filter((file) =>
+        doesCloudFileMatchFilters(file, filter, debouncedKeyword, normalizedFolderPath)
+      ),
+    [debouncedKeyword, filter, normalizedFolderPath, optimisticFiles]
   )
 
-  // O(1) 빠른 조회를 위한 맵 및 셋
+  const files = useMemo(
+    () => sortCloudFiles(mergeCloudFiles(visibleOptimisticFiles, serverFiles), sortMode, sortDirection),
+    [serverFiles, sortDirection, sortMode, visibleOptimisticFiles]
+  )
+  const hadNoFilesRef = useRef(true)
+  hadNoFilesRef.current = serverFiles.length === 0 && optimisticFiles.length === 0
+
   const filesById = useMemo(() => new Map(files.map((file) => [file.id, file])), [files])
   const fileIds = useMemo(() => files.map((file) => file.id), [files])
   const fileIdIndexMap = useMemo(() => new Map(files.map((file, i) => [file.id, i])), [files])
   const checkedFileIdSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
   const fileIdSet = useMemo(() => new Set(fileIds), [fileIds])
 
-  const parsedSearch = useMemo(() => resolveCloudSearchParams(keyword), [keyword])
-  const activeFolderPath = parsedSearch.folderPath || ""
-  const availableFolders = useMemo(() => {
-    const combined = new Set([...knownFolders, ...extractCloudFolders(files)])
-    return Array.from(combined).sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
-  }, [files, knownFolders])
+  const allFolders = useMemo(
+    () => extractAllCloudFolders(files, [...knownFolders, ...createdFolders], normalizedFolderPath),
+    [createdFolders, files, knownFolders, normalizedFolderPath]
+  )
+  const childFolders = useMemo(
+    () => extractDirectChildFolders(allFolders, normalizedFolderPath),
+    [allFolders, normalizedFolderPath]
+  )
 
-  const selectedFile = (selectedFileId ? filesById.get(selectedFileId) : null) || files[0] || null
+  const selectedFile = useMemo(
+    () => (selectedFileId ? filesById.get(selectedFileId) ?? null : null),
+    [filesById, selectedFileId]
+  )
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
     const mediaQuery = window.matchMedia("(max-width: 1279px)")
-    const syncDrawerMode = () => setIsNarrowViewport(mediaQuery.matches)
+    const syncDrawerMode = () => {
+      setIsNarrowViewport(mediaQuery.matches)
+      if (!initialDesktopSyncDoneRef.current) {
+        initialDesktopSyncDoneRef.current = true
+        setIsDetailPanelOpen(!mediaQuery.matches)
+      }
+    }
     syncDrawerMode()
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", syncDrawerMode)
@@ -170,10 +231,12 @@ export const useAdminCloudWorkspaceActions = () => {
     }
     mediaQuery.addListener(syncDrawerMode)
     return () => mediaQuery.removeListener(syncDrawerMode)
-  }, [])
+  }, [setIsDetailPanelOpen])
 
-  const isDetailDrawerMode = isNarrowViewport || files.length > 8
-  const shouldShowDetailPanel = isDetailPanelOpen && selectedFile !== null
+  const isDetailDrawerMode = isNarrowViewport
+  const shouldShowDetailPanel = isDetailDrawerMode
+    ? isDetailPanelOpen && selectedFile !== null
+    : isDetailPanelOpen
   const allVisibleChecked = files.length > 0 && files.every((file) => checkedFileIdSet.has(file.id))
 
   const deleteDialogRef = useRef<HTMLDivElement | null>(null)
@@ -192,7 +255,6 @@ export const useAdminCloudWorkspaceActions = () => {
     lockScroll: true,
   })
 
-  // 업로드 큐 훅 연결
   const {
     uploadQueue,
     uploadInputRef,
@@ -200,6 +262,7 @@ export const useAdminCloudWorkspaceActions = () => {
     completedUploadCount,
     aggregateProgress,
     isDragActive,
+    queueUploadFiles,
     handleUploadSelect,
     handleUploadDragOver,
     handleUploadDragLeave,
@@ -208,18 +271,41 @@ export const useAdminCloudWorkspaceActions = () => {
     handleClearFinishedUploads,
     handleRetryUpload,
   } = useAdminCloudUploadQueue({
-    activeFolderPath,
+    activeFolderPath: normalizedFolderPath,
     onUploadSuccess: (displayUploaded) => {
+      const shouldAutoOpenOnFirstEmptyUpload = hadNoFilesRef.current
+      hadNoFilesRef.current = false
       setOptimisticFiles((current) => mergeCloudFiles([displayUploaded], current))
-      setIsDetailPanelOpen(true)
-      setSelectedFileId(displayUploaded.id)
+      setSelectedFileId((current) => current ?? displayUploaded.id)
+      if (shouldAutoOpenOnFirstEmptyUpload) {
+        setIsDetailPanelOpen(true)
+      }
     },
     onNotice: setNotice,
     onToast: setToast,
   })
 
+  const {
+    handleUpdateFile,
+    handleMoveFiles,
+    performSingleDelete,
+    performBulkDelete,
+  } = useCloudWorkspaceMutations({
+    isEn,
+    queryClient,
+    optimisticFiles,
+    selectedFileId,
+    setOptimisticFiles,
+    setCheckedFileIds,
+    setSelectedFileId,
+    setKnownFolders,
+    setCreatedFolders,
+    setIsMutationPending,
+    setToast,
+  })
+
   useEffect(() => {
-    const isUnfiltered = filter === "ALL" && !debouncedKeyword.trim()
+    const isUnfiltered = filter === "ALL" && !debouncedKeyword.trim() && !normalizedFolderPath
     if (isUnfiltered && (!filesQuery.isSuccess || filesQuery.isPlaceholderData)) return
     const discovered = extractCloudFolders(mergeCloudFiles(optimisticFiles, serverFiles))
     if (!isUnfiltered && discovered.length === 0) return
@@ -233,12 +319,19 @@ export const useAdminCloudWorkspaceActions = () => {
         ? current
         : next
     })
-  }, [debouncedKeyword, filesQuery.isPlaceholderData, filesQuery.isSuccess, filter, optimisticFiles, serverFiles])
+  }, [
+    debouncedKeyword,
+    filesQuery.isPlaceholderData,
+    filesQuery.isSuccess,
+    filter,
+    normalizedFolderPath,
+    optimisticFiles,
+    serverFiles,
+  ])
 
   useEffect(() => {
-    if (selectedFileId && fileIdSet.has(selectedFileId)) return
-    setSelectedFileId(files[0]?.id ?? null)
-  }, [fileIdSet, files, selectedFileId])
+    if (selectedFileId && !fileIdSet.has(selectedFileId)) setSelectedFileId(null)
+  }, [fileIdSet, selectedFileId])
 
   useEffect(() => {
     setCheckedFileIds((current) => current.filter((id) => fileIdSet.has(id)))
@@ -253,7 +346,7 @@ export const useAdminCloudWorkspaceActions = () => {
   }, [toast])
 
   useEffect(() => {
-    if (!shouldShowDetailPanel || deleteConfirm) return
+    if (!isDetailDrawerMode || !shouldShowDetailPanel || deleteConfirm) return
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return
       event.preventDefault()
@@ -261,7 +354,7 @@ export const useAdminCloudWorkspaceActions = () => {
     }
     document.addEventListener("keydown", handleEscape)
     return () => document.removeEventListener("keydown", handleEscape)
-  }, [deleteConfirm, setIsDetailPanelOpen, shouldShowDetailPanel])
+  }, [deleteConfirm, isDetailDrawerMode, setIsDetailPanelOpen, shouldShowDetailPanel])
 
   const resetSelectionAnchor = useCallback(() => {
     lastCheckedRowIndexRef.current = null
@@ -279,7 +372,6 @@ export const useAdminCloudWorkspaceActions = () => {
     lastCheckedRowIndexRef.current = null
   }
 
-  // Shift+Click 다중 범위 선택 지원 (현재 페이지 가시 슬라이스 기준)
   const handleToggleChecked = (fileId: number, shiftKey = false, visibleIds?: readonly number[]) => {
     const scopeIds = visibleIds ?? fileIds
     const currentIndex = visibleIds ? scopeIds.indexOf(fileId) : (fileIdIndexMap.get(fileId) ?? -1)
@@ -298,39 +390,24 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   const handlePreviewFile = (fileId: number) => {
-    setIsDetailPanelOpen(true)
     setSelectedFileId(fileId)
+    setIsDetailPanelOpen(true)
   }
 
-  const handleUpdateFile = async (
-    fileId: number,
-    payload: { originalFilename: string; folderPath: string }
-  ): Promise<boolean> => {
-    try {
-      const updated = await updateCloudFile(fileId, payload)
-      const nextOptimistic = optimisticFiles.map((item) => (item.id === fileId ? updated : item))
-      setOptimisticFiles(nextOptimistic)
-      const remainingFiles: CloudFile[] = [...nextOptimistic, updated]
-      queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
-        if (!Array.isArray(current)) return
-        const { filter: cachedFilter, keyword: cachedKeyword } = getCachedCloudQueryFilters(queryKey)
-        const nextFiles = updateCachedCloudFilesForMutation(current, updated, cachedFilter, cachedKeyword)
-        queryClient.setQueryData(queryKey, nextFiles)
-        remainingFiles.push(...nextFiles)
-      })
-      setKnownFolders(extractCloudFolders(remainingFiles))
-      const updatedFolder = normalizeCloudFolderPathSearch(updated.folderPath)
-      if (activeFolderPath && activeFolderPath !== updatedFolder) {
-        setKeyword((current) => applyCloudFolderFilter(current, updatedFolder))
-      }
-      void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
-      setToast({ tone: "success", text: "파일 정보를 수정했습니다." })
-      return true
-    } catch (error) {
-      setToast({ tone: "error", text: toUserFacingMessage(error) })
-      return false
-    }
-  }
+  const handleSelectFolder = useCallback((folderPath: string) => {
+    setActiveFolderPathState(normalizeCloudFolderPath(folderPath))
+  }, [])
+
+  const handleCreateFolder = useCallback((folderPath: string) => {
+    const normalized = normalizeCloudFolderPath(folderPath)
+    if (!normalized) return
+    setCreatedFolders((current) =>
+      current.includes(normalized)
+        ? current
+        : [...current, normalized].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }))
+    )
+    setActiveFolderPathState(normalized)
+  }, [])
 
   const handleCopyFileLink = async (file: CloudFile): Promise<void> => {
     const linkUrl =
@@ -338,128 +415,46 @@ export const useAdminCloudWorkspaceActions = () => {
         ? new URL(getCloudFileContentUrl(file.id), window.location.origin).toString()
         : getCloudFileContentUrl(file.id)
     if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-      setToast({ tone: "error", text: "클립보드 접근 권한이 없어 파일 링크를 복사하지 못했습니다." })
+      setToast({
+        tone: "error",
+        text: isEn
+          ? "Clipboard permission is unavailable."
+          : "클립보드 접근 권한이 없어 파일 링크를 복사하지 못했습니다.",
+      })
       return
     }
     try {
       await navigator.clipboard.writeText(linkUrl)
-      setToast({ tone: "success", text: "파일 링크를 복사했습니다." })
+      setToast({
+        tone: "success",
+        text: isEn ? "Copied admin internal path." : "관리자 내부 경로를 복사했습니다.",
+      })
     } catch {
-      setToast({ tone: "error", text: "클립보드 복사가 거부되었습니다. 브라우저 권한을 확인해주세요." })
+      setToast({
+        tone: "error",
+        text: isEn
+          ? "Clipboard write denied by browser."
+          : "클립보드 복사가 거부되었습니다. 브라우저 권한을 확인해주세요.",
+      })
     }
   }
 
-  const removeDeletedFilesFromCloudCaches = (deletedIds: Set<number>) => {
-    const remainingFiles: CloudFile[] = optimisticFiles.filter((file) => !deletedIds.has(file.id))
-    queryClient.getQueriesData<CloudFile[]>({ queryKey: [CLOUD_QUERY_KEY] }).forEach(([queryKey, current]) => {
-      if (!Array.isArray(current)) return
-      const nextFiles = current.filter((file) => !deletedIds.has(file.id))
-      queryClient.setQueryData(queryKey, nextFiles)
-      remainingFiles.push(...nextFiles)
-    })
-    const nextFolders = extractCloudFolders(remainingFiles)
-    setKnownFolders(nextFolders)
-    if (activeFolderPath && !nextFolders.includes(activeFolderPath)) {
-      setKeyword((current) => applyCloudFolderFilter(current, ""))
-    }
-  }
-
-  const performSingleDelete = async (file: CloudFile) => {
-    try {
-      await deleteCloudFile(file.id)
-      const deletedIds = new Set([file.id])
-      setToast({ tone: "success", text: `${file.originalFilename} 삭제 완료` })
-      setOptimisticFiles((current) => current.filter((item) => item.id !== file.id))
-      setCheckedFileIds((current) => current.filter((id) => id !== file.id))
-      removeDeletedFilesFromCloudCaches(deletedIds)
-      if (selectedFileId === file.id) setSelectedFileId(null)
-    } catch (error) {
-      setToast({ tone: "error", text: toUserFacingMessage(error) })
-    } finally {
-      await queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [CLOUD_FACETS_QUERY_KEY] })
-    }
-  }
-
-  // 단일 배치 API로 일괄 삭제 (미지원·라우트 폴백 시 개별 병렬 삭제 및 부분 실패 집계)
-  const performBulkDelete = async (targets: CloudFile[]) => {
-    const ids = targets.map((f) => f.id)
-    const applyDeletedState = (deletedIds: Set<number>) => {
-      if (deletedIds.size === 0) return
-      setOptimisticFiles((current) => current.filter((file) => !deletedIds.has(file.id)))
-      setCheckedFileIds((current) => current.filter((id) => !deletedIds.has(id)))
-      removeDeletedFilesFromCloudCaches(deletedIds)
-      if (selectedFileId && deletedIds.has(selectedFileId)) setSelectedFileId(null)
-    }
-
-    try {
-      const response = await bulkDeleteCloudFiles(ids)
-      const deletedList = Array.isArray(response.deletedIds) ? response.deletedIds : []
-      const deletedIds = new Set<number>(deletedList)
-      const failedCount = Math.max(0, targets.length - deletedIds.size)
-      applyDeletedState(deletedIds)
-      if (failedCount > 0) {
-        setToast({
-          tone: "error",
-          text: resolveBulkDeleteFailureMessage(deletedIds.size, failedCount),
-        })
-      } else {
-        setToast({ tone: "success", text: `${deletedIds.size}개 파일 삭제 완료` })
-      }
-    } catch (error) {
-      try {
-        const results = await Promise.allSettled(ids.map((id) => deleteCloudFile(id)))
-        const deletedIds = new Set(
-          results.flatMap((res, i) => (res.status === "fulfilled" ? [ids[i]] : []))
-        )
-        const failedCount = targets.length - deletedIds.size
-        const firstFailure = results.find(
-          (result): result is PromiseRejectedResult => result.status === "rejected"
-        )
-        applyDeletedState(deletedIds)
-        if (failedCount > 0) {
-          setToast({
-            tone: "error",
-            text: resolveBulkDeleteFailureMessage(deletedIds.size, failedCount, firstFailure),
-          })
-        } else {
-          setToast({ tone: "success", text: `${deletedIds.size}개 파일 삭제 완료` })
-        }
-      } catch {
-        setToast({ tone: "error", text: toUserFacingMessage(error) })
-      }
-    } finally {
-      await queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [CLOUD_FACETS_QUERY_KEY] })
-    }
-  }
-
-  const handleSelectFolder = (folderPath: string) => {
-    setKeyword((current) => applyCloudFolderFilter(current, folderPath))
-  }
-
-  const handleRequestDeleteFile = (file: CloudFile) => {
-    setDeleteConfirm({ files: [file] })
-  }
+  const handleRequestDeleteFile = (file: CloudFile) => setDeleteConfirm({ files: [file] })
 
   const handleDeleteSelected = () => {
     const targets = checkedFileIds.flatMap((id) => {
       const found = filesById.get(id)
       return found ? [found] : []
     })
-    if (targets.length === 0) return
-    setDeleteConfirm({ files: targets })
+    if (targets.length > 0) setDeleteConfirm({ files: targets })
   }
 
   const handleConfirmDelete = async () => {
     if (!deleteConfirm || isDeletePending) return
     setIsDeletePending(true)
     try {
-      if (deleteConfirm.files.length === 1) {
-        await performSingleDelete(deleteConfirm.files[0])
-      } else {
-        await performBulkDelete(deleteConfirm.files)
-      }
+      if (deleteConfirm.files.length === 1) await performSingleDelete(deleteConfirm.files[0]!)
+      else await performBulkDelete(deleteConfirm.files)
       setDeleteConfirm(null)
     } finally {
       setIsDeletePending(false)
@@ -467,12 +462,13 @@ export const useAdminCloudWorkspaceActions = () => {
   }
 
   return {
-    activeFolderPath,
+    activeFolderPath: normalizedFolderPath,
     activeUploadCount,
     aggregateProgress,
+    allFolders,
     allVisibleChecked,
-    availableFolders,
     checkedFileIds,
+    childFolders,
     closeDeleteConfirm,
     completedUploadCount,
     debouncedKeyword,
@@ -480,18 +476,22 @@ export const useAdminCloudWorkspaceActions = () => {
     deleteConfirm,
     deleteDialogRef,
     files,
+    filesById,
     filesQuery,
     filter,
     handleCancelUpload,
     handleClearFinishedUploads,
     handleConfirmDelete,
     handleCopyFileLink,
+    handleCreateFolder,
     handleDeleteDialogKeyDown,
     handleDeleteSelected,
+    handleMoveFiles,
     handlePreviewFile,
     handleRequestDeleteFile,
     handleRetryUpload,
     handleSelectFolder,
+    handleSortColumn,
     handleToggleAllChecked,
     handleToggleChecked,
     handleUpdateFile,
@@ -499,13 +499,16 @@ export const useAdminCloudWorkspaceActions = () => {
     handleUploadDragOver,
     handleUploadDrop,
     handleUploadSelect,
-    isDetailDrawerMode,
     isDeletePending,
+    isDetailDrawerMode,
     isDragActive,
+    isMutationPending,
     keyword,
     notice,
+    queueUploadFiles,
     resetSelectionAnchor,
     selectedFile,
+    setCheckedFileIds,
     setFilter,
     setIsComposing,
     setIsDetailPanelOpen,
@@ -513,10 +516,13 @@ export const useAdminCloudWorkspaceActions = () => {
     setSelectedFileId,
     setSortMode,
     setToast,
+    setViewMode,
     shouldShowDetailPanel,
+    sortDirection,
     sortMode,
     toast,
     uploadInputRef,
     uploadQueue,
+    viewMode,
   }
 }

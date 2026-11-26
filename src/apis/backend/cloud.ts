@@ -1,27 +1,53 @@
-// 참조 구현: strapi/strapi (MIT) & transloadit/uppy (MIT) — 클라우드 스토리지 API 및 조각 백오프 재시도
+// 참조 구현: strapi/strapi (MIT), transloadit/uppy (MIT), supabase/supabase (Apache-2.0) — 클라우드 스토리지 API·서명 공유 링크
 import type { components } from "@shared/contracts"
 import type { RsData } from "src/types"
 import { ApiError, apiFetch, getApiRequestUrl } from "./client"
+import {
+  CLOUD_SYNC_UPLOAD_MAX_BYTES,
+  type CloudFile,
+  type CloudFileDto,
+  type CloudMediaKind,
+  type CloudUploadOptions,
+  isResumableVideoUploadFile,
+  normalizeCloudFile,
+  uploadCloudVideoFileResumable,
+} from "./cloudVideoUpload"
+import { createUploadSpeedEstimator, sendCloudUploadXhr } from "./cloudXhrTransport"
 
-export type CloudFileDto = components["schemas"]["CloudFileDto"]
-export type CloudMediaKind = NonNullable<CloudFileDto["mediaKind"]>
+export { ApiError }
+export {
+  CLOUD_SYNC_UPLOAD_MAX_BYTES,
+  clearStoredVideoUploadSessionId,
+  isDefinitiveStaleVideoUploadSessionError,
+  isExplicitUploadAbort,
+  isResumableVideoUploadFile,
+  readStoredVideoUploadSessionId,
+  storeVideoUploadSessionId,
+  type CloudFile,
+  type CloudFileDto,
+  type CloudMediaKind,
+  type CloudUploadOptions,
+  type CloudUploadProgress,
+  type CloudVideoUploadSession,
+} from "./cloudVideoUpload"
+
 type CloudFileListResBody = components["schemas"]["CloudFileListResBody"]
 type RsDataCloudFileDto = components["schemas"]["RsDataCloudFileDto"]
 type RsDataVoid = components["schemas"]["RsDataVoid"]
+type CloudExternalPlaybackTokenDto = components["schemas"]["CloudExternalPlaybackTokenDto"]
+type RsDataCloudExternalPlaybackTokenDto = components["schemas"]["RsDataCloudExternalPlaybackTokenDto"]
+export type CloudExternalTokenPurpose = NonNullable<
+  components["schemas"]["CloudExternalPlaybackTokenSummaryDto"]["purpose"]
+>
+export type CloudExternalPlaybackTokenItem = components["schemas"]["CloudExternalPlaybackTokenSummaryDto"]
+export type CloudFileFacetsResBody = components["schemas"]["CloudFileFacetsResBody"]
+export type CloudBulkDeleteResultDto = components["schemas"]["BulkDeleteCloudFilesResBody"]
+export type CloudPromotePostAssetResultDto = components["schemas"]["PromoteCloudPostAssetResBody"]
+type RevokeTokensResBody = components["schemas"]["RevokeExternalPlaybackTokensResBody"]
+
+export type CloudShareLinkTtlSeconds = 3600 | 21600 | 86400 | 604800
 
 const CLOUD_UPLOAD_TIMEOUT_MS = 10 * 60_000 + 30_000
-export const CLOUD_SYNC_UPLOAD_MAX_BYTES = 95 * 1024 * 1024
-const CLOUD_VIDEO_RESUMABLE_PART_BYTES = 64 * 1024 * 1024
-const CLOUD_VIDEO_RESUMABLE_CHUNK_TIMEOUT_MS = 5 * 60_000
-const CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX = "aquila-cloud-video-upload-session"
-
-export type CloudFile = Required<
-  Pick<
-    CloudFileDto,
-    "id" | "ownerMemberId" | "originalFilename" | "contentType" | "byteSize" | "mediaKind" | "folderPath"
-  >
-> &
-  Pick<CloudFileDto, "createdAt" | "modifiedAt">
 
 export type CloudFileListParams = {
   folderPath?: string
@@ -37,61 +63,6 @@ export type CloudExternalPlaybackToken = {
   contentUrl: string
 }
 
-type CloudExternalPlaybackTokenDto = {
-  fileId?: number
-  token?: string
-  expiresAt?: string
-  contentPath?: string
-}
-
-type RsDataCloudExternalPlaybackTokenDto = RsData<CloudExternalPlaybackTokenDto | undefined>
-
-type CloudVideoUploadSession = {
-  id: number
-  ownerMemberId: number
-  originalFilename: string
-  contentType: string
-  byteSize: number
-  folderPath: string
-  partSizeBytes: number
-  totalParts: number
-  uploadedParts: number[]
-  status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "EXPIRED"
-  expiresAt: string
-  completedFileId?: number | null
-}
-
-type CloudVideoUploadPartResult = {
-  session: CloudVideoUploadSession
-  part: {
-    partNumber: number
-    byteSize: number
-  }
-}
-
-type RsDataCloudVideoUploadSession = RsData<CloudVideoUploadSession | undefined>
-
-type CloudUploadProgress = {
-  progress: number
-  message: string
-}
-
-type CloudUploadOptions = {
-  onProgress?: (progress: CloudUploadProgress) => void
-}
-
-const normalizeCloudFile = (file: CloudFileDto): CloudFile => ({
-  id: Number(file.id || 0),
-  ownerMemberId: Number(file.ownerMemberId || 0),
-  originalFilename: file.originalFilename || "cloud-file",
-  contentType: file.contentType || "application/octet-stream",
-  byteSize: Number(file.byteSize || 0),
-  mediaKind: file.mediaKind || "DOCUMENT",
-  folderPath: file.folderPath || "/",
-  createdAt: file.createdAt,
-  modifiedAt: file.modifiedAt,
-})
-
 const appendQuery = (path: string, params: Record<string, string | undefined>) => {
   const query = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
@@ -105,8 +76,21 @@ const appendQuery = (path: string, params: Record<string, string | undefined>) =
 export const getCloudFileContentUrl = (fileId: number) =>
   getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content`)
 
+export const getCloudFileThumbnailUrl = (fileId: number) =>
+  getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/thumbnail`)
+
 export const getCloudFileDownloadUrl = (fileId: number): string =>
   getApiRequestUrl(`/system/api/v1/adm/cloud/files/${fileId}/content?download=true`)
+
+export const resolveCloudPublicShareUrl = (contentPath: string): string => {
+  const requestPath = getApiRequestUrl(contentPath)
+  if (typeof window === "undefined") return requestPath
+  try {
+    return new URL(requestPath, window.location.origin).toString()
+  } catch {
+    return requestPath
+  }
+}
 
 const normalizeCloudExternalPlaybackToken = (
   fileId: number,
@@ -117,7 +101,7 @@ const normalizeCloudExternalPlaybackToken = (
   const expiresAt = token?.expiresAt?.trim() || ""
   const contentPath = token?.contentPath?.trim() || ""
   if (!normalizedFileId || !rawToken || !expiresAt || !contentPath) {
-    throw new Error("외부 재생 token을 발급하지 못했습니다.")
+    throw new Error("외부 공유/재생 토큰을 발급하지 못했습니다.")
   }
 
   return {
@@ -125,30 +109,63 @@ const normalizeCloudExternalPlaybackToken = (
     token: rawToken,
     expiresAt,
     contentPath,
-    contentUrl: getApiRequestUrl(contentPath),
+    contentUrl: resolveCloudPublicShareUrl(contentPath),
   }
 }
 
-export const issueCloudExternalPlaybackToken = async (fileId: number): Promise<CloudExternalPlaybackToken> => {
+export const issueCloudExternalPlaybackToken = async (
+  fileId: number,
+  ttlSeconds?: CloudShareLinkTtlSeconds
+): Promise<CloudExternalPlaybackToken> => {
   const response = await apiFetch<RsDataCloudExternalPlaybackTokenDto>(
     `/system/api/v1/adm/cloud/files/${fileId}/external-playback-token`,
     {
       method: "POST",
+      body: ttlSeconds ? JSON.stringify({ ttlSeconds }) : undefined,
       timeoutMs: 30_000,
     }
   )
   return normalizeCloudExternalPlaybackToken(fileId, response.data)
 }
 
-export const isResumableVideoUploadFile = (file: File) => {
-  const lowerName = file.name.toLowerCase()
-  const looksLikeVideo =
-    file.type.startsWith("video/") ||
-    lowerName.endsWith(".mp4") ||
-    lowerName.endsWith(".m4v") ||
-    lowerName.endsWith(".mov") ||
-    lowerName.endsWith(".webm")
-  return looksLikeVideo && file.size > CLOUD_SYNC_UPLOAD_MAX_BYTES
+export const issueCloudShareLink = async (
+  fileId: number,
+  ttlSeconds: CloudShareLinkTtlSeconds
+): Promise<CloudExternalPlaybackToken> => {
+  const response = await apiFetch<RsDataCloudExternalPlaybackTokenDto>(
+    `/system/api/v1/adm/cloud/files/${fileId}/share-links`,
+    {
+      method: "POST",
+      body: JSON.stringify({ ttlSeconds }),
+      timeoutMs: 30_000,
+    }
+  )
+  return normalizeCloudExternalPlaybackToken(fileId, response.data)
+}
+
+export const listCloudShareLinks = async (
+  fileId: number,
+  signal?: AbortSignal
+): Promise<CloudExternalPlaybackTokenItem[]> => {
+  const response = await apiFetch<components["schemas"]["CloudExternalPlaybackTokenListResBody"]>(
+    `/system/api/v1/adm/cloud/files/${fileId}/share-links`,
+    { signal }
+  )
+  return response.tokens || []
+}
+
+export const revokeCloudShareLink = async (fileId: number, tokenId: number): Promise<void> => {
+  await apiFetch<RsDataVoid>(`/system/api/v1/adm/cloud/files/${fileId}/share-links/${tokenId}`, {
+    method: "DELETE",
+  })
+}
+
+export const revokeAllCloudShareLinks = async (fileId: number): Promise<{ revokedCount: number }> => {
+  const response = await apiFetch<RsData<RevokeTokensResBody | undefined>>(
+    `/system/api/v1/adm/cloud/files/${fileId}/share-links`,
+    { method: "DELETE" }
+  )
+  return { revokedCount: Number(response.data?.revokedCount || 0) }
 }
 
 export const listCloudFiles = async ({
@@ -170,7 +187,7 @@ export const uploadCloudFile = async (
   file: File,
   folderPath = "",
   signal?: AbortSignal,
-  options: CloudUploadOptions = {},
+  options: CloudUploadOptions = {}
 ): Promise<CloudFile> => {
   if (isResumableVideoUploadFile(file)) {
     return uploadCloudVideoFileResumable(file, folderPath, signal, options)
@@ -179,265 +196,53 @@ export const uploadCloudFile = async (
   const formData = new FormData()
   formData.append("clientFilename", file.name)
   formData.append("file", file)
-  const response = await apiFetch<RsDataCloudFileDto>(
-    appendQuery("/system/api/v1/adm/cloud/files", { folderPath }),
-    {
+  const targetPath = appendQuery("/system/api/v1/adm/cloud/files", { folderPath })
+
+  if (typeof XMLHttpRequest !== "undefined") {
+    const estimator = createUploadSpeedEstimator(Math.max(1, file.size))
+    options.onProgress?.({
+      progress: 1,
+      message: "업로드 시작",
+      loadedBytes: 0,
+      totalBytes: file.size,
+      speedBps: 0,
+      etaSeconds: null,
+    })
+    const response = await sendCloudUploadXhr<RsDataCloudFileDto>({
+      path: targetPath,
       method: "POST",
       body: formData,
       signal,
       timeoutMs: CLOUD_UPLOAD_TIMEOUT_MS,
-    }
-  )
-  return normalizeCloudFile(response.data || {})
-}
-
-const createVideoUploadSession = async (
-  file: File,
-  folderPath: string,
-  signal?: AbortSignal,
-): Promise<CloudVideoUploadSession> => {
-  const response = await apiFetch<RsDataCloudVideoUploadSession>(
-    "/system/api/v1/adm/cloud/files/video-upload-sessions",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        originalFilename: file.name,
-        contentType: file.type || "application/octet-stream",
-        byteSize: file.size,
-        folderPath,
-      }),
-      signal,
-      timeoutMs: 30_000,
-    }
-  )
-  if (!response.data) throw new Error("대용량 동영상 업로드 세션을 생성하지 못했습니다.")
-  return response.data
-}
-
-const VIDEO_PART_RETRY_BACKOFF_MS = [600, 1500]
-
-const isRetryableVideoPartError = (error: unknown) => {
-  if (error instanceof ApiError) {
-    return error.status === 408 || error.status === 429
-  }
-  return error instanceof TypeError
-}
-
-const sleepWithSignal = (ms: number, signal?: AbortSignal): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(new DOMException("Upload aborted", "AbortError"))
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort)
-      resolve()
-    }, ms)
-    const onAbort = () => {
-      clearTimeout(timer)
-      reject(new DOMException("Upload aborted", "AbortError"))
-    }
-    signal?.addEventListener("abort", onAbort, { once: true })
-  })
-
-const uploadVideoPart = async (
-  sessionId: number,
-  partNumber: number,
-  chunk: Blob,
-  signal?: AbortSignal,
-): Promise<CloudVideoUploadPartResult> => {
-  let attempt = 0
-  while (true) {
-    if (signal?.aborted) throw new DOMException("Upload aborted", "AbortError")
-    try {
-      return await apiFetch<CloudVideoUploadPartResult>(
-        `/system/api/v1/adm/cloud/files/video-upload-sessions/${sessionId}/parts/${partNumber}`,
-        {
-          method: "PUT",
-          body: chunk,
-          headers: { "Content-Type": "application/octet-stream" },
-          signal,
-          timeoutMs: CLOUD_VIDEO_RESUMABLE_CHUNK_TIMEOUT_MS,
-        }
-      )
-    } catch (error) {
-      if (isExplicitUploadAbort(error, signal)) throw error
-      if (attempt < VIDEO_PART_RETRY_BACKOFF_MS.length && isRetryableVideoPartError(error)) {
-        const backoffMs = VIDEO_PART_RETRY_BACKOFF_MS[attempt]
-        attempt += 1
-        await sleepWithSignal(backoffMs, signal)
-        continue
-      }
-      throw error
-    }
-  }
-}
-
-const completeVideoUploadSession = async (
-  sessionId: number,
-  signal?: AbortSignal,
-): Promise<CloudFile> => {
-  const response = await apiFetch<RsDataCloudFileDto>(
-    `/system/api/v1/adm/cloud/files/video-upload-sessions/${sessionId}/complete`,
-    {
-      method: "POST",
-      signal,
-      timeoutMs: 60_000,
-    }
-  )
-  return normalizeCloudFile(response.data || {})
-}
-
-const getCloudFile = async (fileId: number, signal?: AbortSignal): Promise<CloudFile> =>
-  normalizeCloudFile(
-    await apiFetch<CloudFileDto>(`/system/api/v1/adm/cloud/files/${fileId}`, {
-      signal,
-      timeoutMs: 30_000,
+      onProgress: (loadedBytes, rawTotalBytes) => {
+        const effectiveTotal = rawTotalBytes > 0 ? rawTotalBytes : Math.max(1, file.size)
+        const metrics = estimator(loadedBytes)
+        const percent = Math.min(98, Math.max(2, Math.round((loadedBytes / effectiveTotal) * 98)))
+        options.onProgress?.({
+          progress: percent,
+          message: loadedBytes >= effectiveTotal ? "서버 처리 중" : `${percent}% 전송 중`,
+          loadedBytes: metrics.loadedBytes,
+          totalBytes: metrics.totalBytes,
+          speedBps: metrics.speedBps,
+          etaSeconds: metrics.etaSeconds,
+        })
+      },
     })
-  )
+    return normalizeCloudFile(response.data || {})
+  }
 
-const getVideoUploadSession = (sessionId: number, signal?: AbortSignal): Promise<CloudVideoUploadSession> =>
-  apiFetch<CloudVideoUploadSession>(`/system/api/v1/adm/cloud/files/video-upload-sessions/${sessionId}`, {
+  const response = await apiFetch<RsDataCloudFileDto>(targetPath, {
+    method: "POST",
+    body: formData,
     signal,
-    timeoutMs: 30_000,
+    timeoutMs: CLOUD_UPLOAD_TIMEOUT_MS,
   })
-
-const cancelVideoUploadSession = async (sessionId: number) => {
-  await apiFetch<RsDataVoid>(`/system/api/v1/adm/cloud/files/video-upload-sessions/${sessionId}`, {
-    method: "DELETE",
-    timeoutMs: 30_000,
-  })
-}
-
-const buildVideoUploadStorageKey = (file: File, folderPath: string) =>
-  [
-    CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX,
-    folderPath.trim(),
-    file.name,
-    String(file.size),
-    String(file.lastModified || 0),
-  ].join(":")
-
-export const readStoredVideoUploadSessionId = (storageKey: string): number | null => {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.localStorage.getItem(storageKey)
-    const parsed = Number.parseInt(raw || "", 10)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-export const storeVideoUploadSessionId = (storageKey: string, sessionId: number) => {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(storageKey, String(sessionId))
-  } catch {}
-}
-
-export const clearStoredVideoUploadSessionId = (storageKey: string) => {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.removeItem(storageKey)
-  } catch {}
-}
-
-const isMatchingVideoUploadSessionFile = (session: CloudVideoUploadSession, file: File) =>
-  session.byteSize === file.size
-
-export const isDefinitiveStaleVideoUploadSessionError = (error: unknown) =>
-  error instanceof ApiError && (error.status === 404 || error.status === 410)
-
-type ResolvedVideoUploadSession =
-  | { kind: "inProgress"; session: CloudVideoUploadSession }
-  | { kind: "completed"; file: CloudFile }
-
-const resolveVideoUploadSession = async (
-  file: File,
-  folderPath: string,
-  storageKey: string,
-  signal?: AbortSignal,
-): Promise<ResolvedVideoUploadSession> => {
-  const storedSessionId = readStoredVideoUploadSessionId(storageKey)
-  if (storedSessionId) {
-    try {
-      const storedSession = await getVideoUploadSession(storedSessionId, signal)
-      if (isMatchingVideoUploadSessionFile(storedSession, file)) {
-        if (storedSession.status === "IN_PROGRESS") {
-          return { kind: "inProgress", session: storedSession }
-        }
-        if (storedSession.status === "COMPLETED" && storedSession.completedFileId) {
-          return { kind: "completed", file: await getCloudFile(storedSession.completedFileId, signal) }
-        }
-      }
-    } catch (error) {
-      if (!isDefinitiveStaleVideoUploadSessionError(error)) throw error
-    }
-    clearStoredVideoUploadSessionId(storageKey)
-  }
-
-  const session = await createVideoUploadSession(file, folderPath, signal)
-  storeVideoUploadSessionId(storageKey, session.id)
-  return { kind: "inProgress", session }
-}
-
-export const isExplicitUploadAbort = (error: unknown, signal?: AbortSignal) => {
-  if (signal?.aborted) return true
-  if (!(error instanceof Error)) return false
-  return error.name === "AbortError"
-}
-
-const uploadCloudVideoFileResumable = async (
-  file: File,
-  folderPath: string,
-  signal?: AbortSignal,
-  options: CloudUploadOptions = {},
-): Promise<CloudFile> => {
-  let session: CloudVideoUploadSession | null = null
-  const storageKey = buildVideoUploadStorageKey(file, folderPath)
-  try {
-    options.onProgress?.({ progress: 2, message: "대용량 업로드 준비 중" })
-    const resolvedSession = await resolveVideoUploadSession(file, folderPath, storageKey, signal)
-    if (resolvedSession.kind === "completed") {
-      clearStoredVideoUploadSessionId(storageKey)
-      return resolvedSession.file
-    }
-
-    session = resolvedSession.session
-    const partSize = session.partSizeBytes || CLOUD_VIDEO_RESUMABLE_PART_BYTES
-    const uploadedParts = new Set(session.uploadedParts || [])
-    const totalParts = session.totalParts || Math.ceil(file.size / partSize)
-
-    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
-      if (signal?.aborted) throw new DOMException("Upload aborted", "AbortError")
-      if (!uploadedParts.has(partNumber)) {
-        const start = (partNumber - 1) * partSize
-        const end = Math.min(start + partSize, file.size)
-        const chunk = file.slice(start, end)
-        await uploadVideoPart(session.id, partNumber, chunk, signal)
-      }
-      uploadedParts.add(partNumber)
-      const progress = Math.min(96, Math.max(5, Math.round((uploadedParts.size / totalParts) * 92)))
-      options.onProgress?.({
-        progress,
-        message: `동영상 조각 ${uploadedParts.size}/${totalParts} 업로드`,
-      })
-    }
-
-    options.onProgress?.({ progress: 98, message: "동영상 업로드 완료 처리 중" })
-    const completed = await completeVideoUploadSession(session.id, signal)
-    clearStoredVideoUploadSessionId(storageKey)
-    return completed
-  } catch (error) {
-    if (session && isExplicitUploadAbort(error, signal)) {
-      await cancelVideoUploadSession(session.id).catch(() => undefined)
-      clearStoredVideoUploadSessionId(storageKey)
-    }
-    throw error
-  }
+  return normalizeCloudFile(response.data || {})
 }
 
 export const updateCloudFile = async (
   fileId: number,
-  payload: { originalFilename?: string; folderPath?: string },
+  payload: { originalFilename?: string; folderPath?: string }
 ): Promise<CloudFile> => {
   const response = await apiFetch<RsDataCloudFileDto | CloudFileDto>(
     `/system/api/v1/adm/cloud/files/${fileId}`,
@@ -450,9 +255,7 @@ export const updateCloudFile = async (
     response && typeof response === "object" && "data" in response && response.data
       ? response.data
       : (response as CloudFileDto | undefined)
-  if (!fileData) {
-    throw new Error("클라우드 파일 수정 응답이 비어 있습니다.")
-  }
+  if (!fileData) throw new Error("클라우드 파일 수정 응답이 비어 있습니다.")
   return normalizeCloudFile(fileData)
 }
 
@@ -472,8 +275,19 @@ export type CloudFileFacets = {
   documentBytes: number
 }
 
-export const getCloudFileFacets = async (signal?: AbortSignal): Promise<CloudFileFacets> =>
-  apiFetch<CloudFileFacets>("/system/api/v1/adm/cloud/files/facets", { signal })
+export const getCloudFileFacets = async (signal?: AbortSignal): Promise<CloudFileFacets> => {
+  const res = await apiFetch<CloudFileFacetsResBody>("/system/api/v1/adm/cloud/files/facets", { signal })
+  return {
+    allCount: Number(res.allCount || 0),
+    allBytes: Number(res.allBytes || 0),
+    photoCount: Number(res.photoCount || 0),
+    photoBytes: Number(res.photoBytes || 0),
+    videoCount: Number(res.videoCount || 0),
+    videoBytes: Number(res.videoBytes || 0),
+    documentCount: Number(res.documentCount || 0),
+    documentBytes: Number(res.documentBytes || 0),
+  }
+}
 
 export type CloudBulkDeleteResult = {
   deletedIds: number[]
@@ -481,11 +295,17 @@ export type CloudBulkDeleteResult = {
 }
 
 export const bulkDeleteCloudFiles = async (ids: number[]): Promise<CloudBulkDeleteResult> => {
-  const response = await apiFetch<RsData<CloudBulkDeleteResult>>("/system/api/v1/adm/cloud/files/bulk-delete", {
-    method: "POST",
-    body: JSON.stringify({ ids }),
-  })
-  return response.data || { deletedIds: [], deletedCount: 0 }
+  const response = await apiFetch<RsData<CloudBulkDeleteResultDto | undefined>>(
+    "/system/api/v1/adm/cloud/files/bulk-delete",
+    {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }
+  )
+  return {
+    deletedIds: (response.data?.deletedIds || []).map(Number),
+    deletedCount: Number(response.data?.deletedCount || 0),
+  }
 }
 
 export type CloudPromotePostAssetResult = {
@@ -495,29 +315,28 @@ export type CloudPromotePostAssetResult = {
   markdown: string
 }
 
-export const promoteCloudFileToPostAsset = async (fileId: number): Promise<CloudPromotePostAssetResult> => {
-  const response = await apiFetch<RsData<CloudPromotePostAssetResult>>(
-    `/system/api/v1/adm/cloud/files/${fileId}/promote-post-asset`,
-    {
-      method: "POST",
-    }
-  )
-  if (!response.data) throw new Error("포스트 에셋 승격에 실패했습니다.")
-  return response.data
-}
-
-export type CloudExternalPlaybackTokenItem = {
-  id: number
+export const promoteCloudFileToPostAsset = async (
   fileId: number
-  createdAt: string
-  expiresAt: string
+): Promise<CloudPromotePostAssetResult> => {
+  const response = await apiFetch<RsData<CloudPromotePostAssetResultDto | undefined>>(
+    `/system/api/v1/adm/cloud/files/${fileId}/promote-post-asset`,
+    { method: "POST" }
+  )
+  const d = response.data
+  if (!d?.url) throw new Error("포스트 에셋 승격에 실패했습니다.")
+  return {
+    fileId: Number(d.fileId || fileId),
+    key: d.key || "",
+    url: d.url,
+    markdown: d.markdown || "",
+  }
 }
 
 export const listCloudExternalPlaybackTokens = async (
   fileId: number,
   signal?: AbortSignal
 ): Promise<CloudExternalPlaybackTokenItem[]> => {
-  const response = await apiFetch<{ tokens: CloudExternalPlaybackTokenItem[] }>(
+  const response = await apiFetch<components["schemas"]["CloudExternalPlaybackTokenListResBody"]>(
     `/system/api/v1/adm/cloud/files/${fileId}/external-playback-tokens`,
     { signal }
   )
@@ -528,23 +347,18 @@ export const revokeCloudExternalPlaybackToken = async (
   fileId: number,
   tokenId: number
 ): Promise<void> => {
-  await apiFetch<RsData<void>>(
+  await apiFetch<RsDataVoid>(
     `/system/api/v1/adm/cloud/files/${fileId}/external-playback-tokens/${tokenId}`,
-    {
-      method: "DELETE",
-    }
+    { method: "DELETE" }
   )
 }
 
 export const revokeAllCloudExternalPlaybackTokens = async (
   fileId: number
 ): Promise<{ revokedCount: number }> => {
-  const response = await apiFetch<RsData<{ revokedCount: number }>>(
+  const response = await apiFetch<RsData<RevokeTokensResBody | undefined>>(
     `/system/api/v1/adm/cloud/files/${fileId}/external-playback-tokens`,
-    {
-      method: "DELETE",
-    }
+    { method: "DELETE" }
   )
-  return response.data || { revokedCount: 0 }
+  return { revokedCount: Number(response.data?.revokedCount || 0) }
 }
-

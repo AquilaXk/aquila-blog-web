@@ -84,6 +84,7 @@ const buildContentSecurityPolicy = (options = {}) => {
     "https://s3-us-west-2.amazonaws.com",
     "https://avatars.githubusercontent.com",
     ...runtimeOrigins,
+    ...localDevConnectSources,
   ]
 
   const directives = [
@@ -105,7 +106,7 @@ const buildContentSecurityPolicy = (options = {}) => {
       ...localDevConnectSources,
     ],
     ["font-src", "'self'", "data:"],
-    ["media-src", "'self'", "blob:", ...aquilaDomains, ...runtimeOrigins],
+    ["media-src", "'self'", "blob:", ...aquilaDomains, ...runtimeOrigins, ...localDevConnectSources],
     ["frame-src", "'self'", ...runtimeOrigins, ...embedFrameSources],
     ["object-src", "'none'"],
     ["base-uri", "'self'"],
