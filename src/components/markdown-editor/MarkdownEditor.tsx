@@ -25,10 +25,12 @@ import { type MarkdownFileUploadResult, type MarkdownImageUploadResult } from ".
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
 import {
+  captureMarkdownScrollSnapshot,
   isLivePreviewSurfaceMode,
   nextEditorViewMode,
   scheduleScrollSyncAfterModeToggle,
   type MarkdownEditorSurfaceMode,
+  type MarkdownScrollSnapshot,
 } from "./markdownEditorLivePreview"
 import { MarkdownEditorLiveSurface, type MarkdownEditorLiveSurfaceHandle } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorReadingPreview } from "./MarkdownEditorReadingPreview"
@@ -136,11 +138,22 @@ export const MarkdownEditor = ({
   const uploadInFlightCountRef = useRef(0)
   const allowNativeTabAfterEscapeRef = useRef(false)
   const pendingFindReplaceInvalidationRef = useRef(false)
+  const viewModeRef = useRef<MarkdownEditorSurfaceMode>(viewMode)
+  viewModeRef.current = viewMode
+  const pendingReadingScrollSnapshotRef = useRef<MarkdownScrollSnapshot | null>(null)
+  const getLiveEditorBodyNode = useCallback(() => liveEditorBodyRef.current, [])
   const isAuthoringDisabled = isEditorAuthoringDisabled(disabled, viewMode)
   const applyViewModeWithScrollSync = useCallback((nextOrUpdater: MarkdownEditorSurfaceMode | ((prev: MarkdownEditorSurfaceMode) => MarkdownEditorSurfaceMode)) => {
-    scheduleScrollSyncAfterModeToggle(() => liveEditorBodyRef.current)
-    setViewModeState(nextOrUpdater)
-  }, [])
+    const nextMode = typeof nextOrUpdater === "function" ? nextOrUpdater(viewModeRef.current) : nextOrUpdater
+    const snapshot = captureMarkdownScrollSnapshot(liveEditorBodyRef.current)
+    if (nextMode === "reading") {
+      pendingReadingScrollSnapshotRef.current = snapshot
+    } else {
+      pendingReadingScrollSnapshotRef.current = null
+      scheduleScrollSyncAfterModeToggle(getLiveEditorBodyNode, snapshot)
+    }
+    setViewModeState(nextMode)
+  }, [getLiveEditorBodyNode])
   const cycleViewMode = useCallback(() => applyViewModeWithScrollSync(nextEditorViewMode), [applyViewModeWithScrollSync])
   useEffect(() => {
     onToggleViewModeRequestReady?.(cycleViewMode)
@@ -281,7 +294,7 @@ export const MarkdownEditor = ({
 
   const { handleImageInput, handleFileInput, handlePaste, handleDragOver, handleDrop } =
     useMarkdownEditorMediaTransfers({
-      disabled: isAuthoringDisabled, viewMode,
+      disabled: isAuthoringDisabled, viewMode, language,
       valueRef, selectionRef, documentGenerationRef, onUploadImage, onUploadFile,
       applyPlannedMarkdownMutation, applyRecordedMarkdownMutation: applyMutationPlan,
       applyBackgroundMarkdownMutation, resolveActiveSelection,
@@ -485,6 +498,9 @@ export const MarkdownEditor = ({
             disableMermaid={disableMermaid}
             internalLinkTargets={internalLinkTargets}
             onImageWidthCommit={disabled ? undefined : handleImageWidthCommit}
+            viewMode={viewMode}
+            pendingScrollSnapshotRef={pendingReadingScrollSnapshotRef}
+            getScrollBodyNode={getLiveEditorBodyNode}
           />
         ) : null}
       </LiveEditorBody>

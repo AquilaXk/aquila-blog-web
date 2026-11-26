@@ -17,6 +17,10 @@ import {
   clearScheduledForcedEditorExitUrl,
   scheduleForcedEditorExitUrl,
 } from "./editorStudioUnsavedExitGuard"
+import {
+  consumeCreatedEditorPostHandoff,
+  type CreatedEditorPostHandoff,
+} from "./editorCreatedPostHandoff"
 
 type StudioSetState<T> = Dispatch<SetStateAction<T>>
 
@@ -43,6 +47,7 @@ type UseEditorStudioRoutingParams = {
   autoLoadedPostIdRef: MutableRefObject<string | null>
   autoCreatedTempDraftRef: MutableRefObject<boolean>
   restoreLocalDraft: () => void
+  applyCreatedPostHandoff?: (handoff: CreatedEditorPostHandoff) => void
   loadPostForEditor: (
     targetPostId?: string,
   ) => Promise<void>
@@ -55,6 +60,7 @@ type UseEditorStudioRoutingParams = {
 
 export const useEditorStudioRouting = ({
   adminPostsWorkspaceRoute,
+  applyCreatedPostHandoff,
   authStatus,
   autoCreatedTempDraftRef,
   autoLoadedPostIdRef,
@@ -139,9 +145,15 @@ export const useEditorStudioRouting = ({
     if (autoLoadedPostIdRef.current === queryPostId) return
 
     autoLoadedPostIdRef.current = queryPostId
+    const handoff = consumeCreatedEditorPostHandoff(queryPostId)
+    if (handoff && applyCreatedPostHandoff) {
+      applyCreatedPostHandoff(handoff)
+      return
+    }
     setPostId(queryPostId)
     void loadPostForEditor(queryPostId)
   }, [
+    applyCreatedPostHandoff,
     autoLoadedPostIdRef,
     loadPostForEditor,
     router.isReady,

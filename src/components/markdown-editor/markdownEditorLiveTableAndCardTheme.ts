@@ -495,6 +495,9 @@ export const liveTableAndCardThemeSpec: Record<string, ThemeStyleBlock> = {
     fontWeight: "650",
     letterSpacing: "0.03em",
   },
+  '&[data-editor-lang="en"] .cm-live-mermaid[data-mermaid-state="rendered"]::before': {
+    content: '"MERMAID DIAGRAM · Click to edit source"',
+  },
   '.cm-live-mermaid[data-mermaid-state="loading"], .cm-live-mermaid[data-mermaid-state="empty"]': {
     padding: "14px 16px",
   },

@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import { clearAllAdminEditorLocalDrafts } from "src/libs/privacy/browserStorageRegistry"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
@@ -76,15 +77,16 @@ export const resolveCurrentDocumentDraftStorageKey = (source: LocalDraftSource):
 }
 
 export const describeLocalDraftSlot = (
-  draft: Pick<LocalDraftPayload, "title" | "savedAt" | "source">
+  draft: Pick<LocalDraftPayload, "title" | "savedAt" | "source">,
+  language: SiteLanguage = "ko"
 ): string => {
   const savedClock = draft.savedAt ? draft.savedAt.slice(11, 16) : ""
   const savedSuffix = savedClock ? ` · ${savedClock}` : ""
   if (draft.source.kind === "create") {
-    return `새 글${savedSuffix}`
+    return `${language === "en" ? "New post" : "새 글"}${savedSuffix}`
   }
-  const title = draft.title.trim() || "제목 없음"
-  return `글 #${draft.source.postId} · ${title}${savedSuffix}`
+  const title = draft.title.trim() || (language === "en" ? "Untitled" : "제목 없음")
+  return `${language === "en" ? "Post" : "글"} #${draft.source.postId} · ${title}${savedSuffix}`
 }
 
 const getSafeLocalStorage = (): Storage | null => {

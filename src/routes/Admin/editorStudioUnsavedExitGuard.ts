@@ -47,7 +47,8 @@ const resolveFirstDelimiterIndex = (queryIdx: number, hashIdx: number) => {
 
 const editorRoutePathname = (url: string) => {
   const endIdx = resolveFirstDelimiterIndex(url.indexOf("?"), url.indexOf("#"))
-  return endIdx === -1 ? url : url.slice(0, endIdx)
+  const path = endIdx === -1 ? url : url.slice(0, endIdx)
+  return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path
 }
 
 let scheduledForcedEditorExitPath: string | null = null

@@ -22,9 +22,12 @@ const setupAdminEditorRoutes = async (
   options?: {
     initialContent?: string
     onPutPost?: (body: Record<string, unknown>) => void
+    onPostCreate?: (body: Record<string, unknown>) => void
+    onAdmGetPost?: (id: number) => void
     onPutTempDraft?: (body: Record<string, unknown>) => void
   }
 ) => {
+  let nextCreatedId = 995
   const drafts = new Map<number, Record<string, unknown>>([
     [
       990,
@@ -68,6 +71,10 @@ const setupAdminEditorRoutes = async (
       await fulfillJson(route, ["Compiler Design", "Systems Notes"])
       return
     }
+    if (urlPath === "/post/api/v1/adm/posts" && method === "GET") {
+      await fulfillJson(route, { content: Array.from(drafts.values()), totalPages: 1, totalElements: drafts.size })
+      return
+    }
     if (urlPath.endsWith("/adm/posts/temp")) {
       if (method === "GET") {
         await fulfillJson(route, Array.from(drafts.values()))
@@ -97,13 +104,47 @@ const setupAdminEditorRoutes = async (
       return
     }
     const id = Number(urlPath.split("/").pop())
+    if (method === "GET" && Number.isFinite(id)) options?.onAdmGetPost?.(id)
     const found = drafts.get(id) ?? drafts.get(990)
     await fulfillJson(route, found)
+  })
+  await page.route("**/api/revalidate", async (route) => {
+    await fulfillJson(route, { revalidated: true })
+  })
+  await page.route("**/post/api/v1/posts", async (route) => {
+    if (route.request().method() === "POST" && new URL(route.request().url()).pathname === "/post/api/v1/posts") {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      options?.onPostCreate?.(body)
+      const assignedId = nextCreatedId++
+      const created = {
+        id: assignedId,
+        version: 1,
+        title: body.title,
+        content: body.content,
+        summary: "Created summary",
+        summarySource: "EXTRACTED",
+        published: body.published,
+        listed: body.listed,
+        tempDraft: false,
+        scheduledAt: body.scheduledAt ?? null,
+        seriesName: body.seriesName ?? null,
+        seriesOrder: body.seriesOrder ?? null,
+        canonicalUrl: body.canonicalUrl ?? null,
+      }
+      drafts.set(assignedId, created)
+      await fulfillJson(route, { resultCode: "201-1", msg: "created", data: created }, 201)
+      return
+    }
+    await route.continue()
   })
   await page.route("**/post/api/v1/posts/temp/*", async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown> | null
     if (body) options?.onPutTempDraft?.(body)
-    await fulfillJson(route, { resultCode: "200-1", msg: "saved", data: { id: 990, version: 2 } })
+    await fulfillJson(route, {
+      resultCode: "200-1",
+      msg: "saved",
+      data: { id: 990, version: 2, summary: "", summarySource: "NONE" },
+    })
   })
   await page.route("**/post/api/v1/posts/*", async (route) => {
     if (route.request().method() === "PUT") {
@@ -415,5 +456,154 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
     await expect(modal).toContainText("Adjust thumbnail focus")
     await expect(modal).toContainText("Upload cover image")
     await expect(modal).not.toContainText("썸네일 위치 조정")
+  })
+
+  test("create-mode publish from /admin/editor/new and /admin/editor with source=local-draft syncs URL without duplicate GET or exit prompt", async ({
+    page,
+  }) => {
+    const admGetPostIds: number[] = []
+    await setupAdminEditorRoutes(page, {
+      onAdmGetPost: (id) => admGetPostIds.push(id),
+    })
+
+    // 1. /admin/editor/new?source=local-draft -> publish -> /admin/editor/995?returnTo=%2Fadmin%2Fposts
+    await page.goto("/admin/editor/new?source=local-draft&returnTo=%2Fadmin%2Fposts")
+    await expect(page).toHaveURL(/\/admin\/editor\/new\?returnTo=%2Fadmin%2Fposts$/)
+    await expect(page.locator("#post-title")).toBeVisible()
+    await page.locator("#post-title").fill("Created Post From New Route")
+    const editorTextbox = page.getByTestId("markdown-editor-content")
+    await expect(editorTextbox.locator(".cm-line").first()).toBeVisible()
+    await editorTextbox.click()
+    await page.keyboard.type("Fresh markdown body from /admin/editor/new.")
+    await expect(editorTextbox).toContainText("Fresh markdown body from /admin/editor/new.")
+
+    await page.getByTestId("editor-publish-open-button").click()
+    await page.getByTestId("editor-publish-submit-button").click()
+
+    await expect(page).toHaveURL(/\/admin\/editor\/995\?returnTo=%2Fadmin%2Fposts$/)
+    expect(admGetPostIds).not.toContain(995)
+    await expect(page.locator("#post-title")).toHaveValue("Created Post From New Route")
+    await expect(page.getByTestId("markdown-editor-content")).toContainText(
+      "Fresh markdown body from /admin/editor/new."
+    )
+
+    // Exiting immediately must not trigger any unsaved-changes confirmation dialog
+    await page.getByRole("button", { name: "← 글 관리" }).click()
+    await expect(page.getByRole("dialog", { name: /저장되지 않은 변경/ })).toHaveCount(0)
+    await expect(page).toHaveURL(/\/admin\/posts$/)
+
+    // 2. /admin/editor?source=local-draft -> publish -> /admin/editor/996
+    await page.goto("/admin/editor?source=local-draft")
+    await expect(page).toHaveURL(/\/admin\/editor$/)
+    await expect(page.locator("#post-title")).toBeVisible()
+    await page.locator("#post-title").fill("Created Post From Root Route")
+    const rootEditorTextbox = page.getByTestId("markdown-editor-content")
+    await expect(rootEditorTextbox.locator(".cm-line").first()).toBeVisible()
+    await rootEditorTextbox.click()
+    await page.keyboard.type("Fresh markdown body from /admin/editor.")
+    await expect(rootEditorTextbox).toContainText("Fresh markdown body from /admin/editor.")
+
+    await page.getByTestId("editor-publish-open-button").click()
+    await page.getByTestId("editor-publish-submit-button").click()
+
+    await expect(page).toHaveURL(/\/admin\/editor\/996$/)
+    expect(admGetPostIds).not.toContain(996)
+    await expect(page.locator("#post-title")).toHaveValue("Created Post From Root Route")
+  })
+
+  test("reading mode restores scroll ratio after delayed MarkdownRenderer chunk mount and EN mode localizes CM6 widgets", async ({
+    page,
+  }) => {
+    const longSections = Array.from(
+      { length: 65 },
+      (_, idx) =>
+        `## Section ${idx + 1}\n\nParagraph ${idx + 1} with enough explanatory prose to ensure tall vertical overflow across both editing and reading surfaces.`
+    ).join("\n\n")
+
+    await setupAdminEditorRoutes(page, { initialContent: longSections })
+    await page.goto("/admin/editor/990")
+    await expect(page.getByTestId("markdown-editor-content").locator(".cm-line").first()).toBeVisible()
+
+    // Scroll live editor host to ~50%
+    const beforeMetrics = await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="editor-paper-scroll-sheet"]')
+      const scroller = document.querySelector<HTMLElement>(".cm-scroller")
+      const host =
+        scroller && scroller.clientHeight > 0 && scroller.scrollHeight > scroller.clientHeight + 2
+          ? scroller
+          : sheet
+      if (!host) return null
+      const maxScroll = Math.max(0, host.scrollHeight - host.clientHeight)
+      host.scrollTop = Math.round(maxScroll * 0.5)
+      return {
+        scrollTop: host.scrollTop,
+        maxScroll,
+        ratio: maxScroll > 0 ? host.scrollTop / maxScroll : 0,
+      }
+    })
+    expect(beforeMetrics).not.toBeNull()
+    expect(beforeMetrics!.scrollTop).toBeGreaterThan(200)
+
+    // Delay dynamic chunk fetch on first reading-mode toggle so loading placeholder renders asynchronously
+    await page.route("**/_next/static/chunks/**/*.js", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 160))
+      await route.continue()
+    })
+
+    await page.getByRole("button", { name: "읽기 뷰" }).click()
+    await expect(page.locator('[data-testid="markdown-editor-reading-surface"] .aq-markdown')).toBeVisible()
+
+    // Allow two rAF passes for scroll ratio restoration to commit
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    )
+    const afterMetrics = await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="editor-paper-scroll-sheet"]')
+      const reading = document.querySelector<HTMLElement>('[data-testid="markdown-editor-reading-surface"]')
+      const host = sheet && sheet.scrollHeight > sheet.clientHeight + 2 ? sheet : reading
+      if (!host) return null
+      const maxScroll = Math.max(0, host.scrollHeight - host.clientHeight)
+      return {
+        scrollTop: host.scrollTop,
+        maxScroll,
+        ratio: maxScroll > 0 ? host.scrollTop / maxScroll : 0,
+      }
+    })
+    expect(afterMetrics).not.toBeNull()
+    expect(afterMetrics!.scrollTop).toBeGreaterThan(150)
+    expect(Math.abs(afterMetrics!.ratio - beforeMetrics!.ratio)).toBeLessThan(0.2)
+
+    await page.unroute("**/_next/static/chunks/**/*.js")
+
+    // Verify EN CM6 widget localization in a clean English page session
+    await page.addInitScript(() => {
+      window.localStorage.setItem("aquila_blog_lang", "en")
+    })
+    await setupAdminEditorRoutes(page, {
+      initialContent: [
+        "Intro line",
+        "",
+        "![sample](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=)",
+        "",
+        "```ts",
+        "const x = 1",
+        "```",
+        "",
+        "| Col1 | Col2 |",
+        "| --- | --- |",
+        "| A | B |",
+        "",
+        ":::toggle",
+        ":::",
+      ].join("\n"),
+    })
+    await page.goto("/admin/editor/990")
+    await expect(page.locator('.cm-editor[data-editor-lang="en"]')).toBeVisible()
+    await expect(page.getByRole("button", { name: "Resize image width" })).toBeVisible()
+    await expect(page.locator('input[placeholder="Caption / alt"]')).toBeVisible()
+    await expect(page.getByRole("combobox", { name: "Code language" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Copy code" })).toBeVisible()
+    await expect(page.getByRole("toolbar", { name: "Table quick edit toolbar" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Toggle expand/collapse" })).toBeVisible()
   })
 })

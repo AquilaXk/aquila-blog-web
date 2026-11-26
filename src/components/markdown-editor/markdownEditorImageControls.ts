@@ -12,7 +12,9 @@ import {
   serializeStandaloneMarkdownImageLine,
   type ParsedStandaloneMarkdownImage,
 } from "../../libs/markdown/renderingImageModel"
+import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import { getImageControlLabels } from "./markdownEditorWidgetLabels"
 
 export const IMAGE_WIDTH_PRESETS = [320, 520, 720] as const
 const IMAGE_ALIGN_OPTIONS: readonly { value: NonNullable<ParsedStandaloneMarkdownImage["align"]>; label: string }[] = [
@@ -186,12 +188,13 @@ export const attachLiveImageControls = ({
   wrap.appendChild(frame)
 
   if (!editable || !view) return
+  const labels = getImageControlLabels(resolveEditorViewLanguage(view, "ko"))
 
   const resizeHandle = document.createElement("button")
   resizeHandle.type = "button"
   resizeHandle.className = "cm-live-image-resize-handle"
-  resizeHandle.setAttribute("aria-label", "Resize image width")
-  resizeHandle.title = "Drag to resize width"
+  resizeHandle.setAttribute("aria-label", labels.resizeAria)
+  resizeHandle.title = labels.resizeTitle
   stopControlPropagation(resizeHandle)
 
   let dragStartX = 0
@@ -267,7 +270,7 @@ export const attachLiveImageControls = ({
     button.className = "cm-live-image-ctrl-btn"
     button.textContent = `${preset}`
     if (widthPx === preset && align !== "full") button.dataset.active = "true"
-    button.setAttribute("aria-label", `Set width ${preset}px`)
+    button.setAttribute("aria-label", labels.presetWidthAria(preset))
     button.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
@@ -291,7 +294,7 @@ export const attachLiveImageControls = ({
   fullButton.className = "cm-live-image-ctrl-btn"
   fullButton.textContent = "100%"
   if (align === "full") fullButton.dataset.active = "true"
-  fullButton.setAttribute("aria-label", "Set width 100%")
+  fullButton.setAttribute("aria-label", labels.fullWidthAria)
   fullButton.addEventListener("click", (event) => {
     event.preventDefault()
     event.stopPropagation()
@@ -320,7 +323,7 @@ export const attachLiveImageControls = ({
     button.className = "cm-live-image-ctrl-btn"
     button.textContent = opt.label
     if (align === opt.value) button.dataset.active = "true"
-    button.setAttribute("aria-label", `Align image ${opt.value}`)
+    button.setAttribute("aria-label", labels.alignAria(opt.value))
     button.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
@@ -343,8 +346,8 @@ export const attachLiveImageControls = ({
   captionInput.type = "text"
   captionInput.className = "cm-live-image-caption-input"
   captionInput.value = alt
-  captionInput.placeholder = "Caption / alt"
-  captionInput.setAttribute("aria-label", "Image caption")
+  captionInput.placeholder = labels.captionPlaceholder
+  captionInput.setAttribute("aria-label", labels.captionAria)
   let isCaptionComposing = false
 
   const commitCaption = () => {

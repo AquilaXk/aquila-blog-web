@@ -3,12 +3,15 @@
  * - silverbulletmd/silverbullet (MIT) & Milkdown/milkdown (MIT) — 라이브 에디터 카드 위젯 & 메타 배지 DOM 빌더
  */
 import { EditorView, WidgetType } from "@codemirror/view"
+import type { SiteLanguage } from "src/libs/language"
 import { normalizePublicExternalThumbnailUrl } from "../../libs/markdown/externalThumbnailUrlPolicy"
 import { normalizePublicPostImageUrl } from "../../libs/markdown/postImageUrlPolicy"
 import { normalizeSafeMarkdownUrl, setSafeAnchorHref } from "../../libs/markdown/safeMarkdownUrl"
 import { fetchEditorUnfurl, getCachedEditorUnfurl } from "../../libs/unfurl/fetchEditorUnfurl"
 import { formatReadableFileSize, inferLinkProvider, resolveEmbedPreviewUrl } from "../../libs/unfurl/extractMeta"
 import { LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
+import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
+import { getCardBlockLabels } from "./markdownEditorWidgetLabels"
 
 export const focusContainerBlockOrigin = (
   view: EditorView | undefined,
@@ -100,9 +103,11 @@ const buildLinkCardContainerDOM = (
     sig: string
     from: number
     to: number
+    uiLanguage?: SiteLanguage
   },
   view?: EditorView
 ): HTMLElement => {
+  const uiLang = options.uiLanguage ?? resolveEditorViewLanguage(view, "ko")
   const root = document.createElement("div")
   root.className =
     options.cardKind === "bookmark"
@@ -111,6 +116,7 @@ const buildLinkCardContainerDOM = (
   root.dataset.testid = `cm-live-${options.cardKind}-widget`
   root.dataset.from = String(options.from)
   root.dataset.sig = options.sig
+  root.dataset.lang = uiLang
 
   const headerRow = document.createElement("div")
   headerRow.className = "cm-live-bookmark-header"
@@ -184,7 +190,7 @@ const buildLinkCardContainerDOM = (
       frameWrap.className = "cm-live-embed-preview"
       const iframe = document.createElement("iframe")
       iframe.src = safeEmbed
-      iframe.title = resolvedTitle || "Embed preview"
+      iframe.title = resolvedTitle || getCardBlockLabels(uiLang).embedPreviewTitle
       iframe.loading = "lazy"
       iframe.referrerPolicy = "strict-origin-when-cross-origin"
       iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation")
@@ -226,7 +232,8 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     readonly to: number,
     readonly siteName = "",
     readonly provider = "",
-    readonly thumbnailUrl = ""
+    readonly thumbnailUrl = "",
+    readonly language: SiteLanguage = "ko"
   ) {
     super()
   }
@@ -240,22 +247,25 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
       other instanceof MarkdownBookmarkBlockWidget &&
       other.signature === this.signature &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.language === this.language
     )
   }
 
-  updateDOM(dom: HTMLElement) {
-    if (dom.dataset?.sig !== this.signature) return false
+  updateDOM(dom: HTMLElement, view?: EditorView) {
+    const lang = resolveEditorViewLanguage(view, this.language)
+    if (dom.dataset?.sig !== this.signature || (dom.dataset?.lang ?? "ko") !== lang) return false
     dom.dataset.from = String(this.from)
     return true
   }
 
   toDOM(view?: EditorView) {
+    const uiLanguage = resolveEditorViewLanguage(view, this.language)
     const badge = this.siteName || this.provider || formatHostBadge(this.url)
     return buildLinkCardContainerDOM(
       {
         cardKind: "bookmark",
-        openLabel: "북마크 링크 열기",
+        openLabel: getCardBlockLabels(uiLanguage).bookmarkOpen,
         url: this.url,
         title: this.title,
         secondary: this.description,
@@ -264,6 +274,7 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
         sig: this.signature,
         from: this.from,
         to: this.to,
+        uiLanguage,
       },
       view
     )
@@ -280,7 +291,8 @@ export class MarkdownEmbedBlockWidget extends WidgetType {
     readonly provider = "",
     readonly siteName = "",
     readonly thumbnailUrl = "",
-    readonly embedUrl = ""
+    readonly embedUrl = "",
+    readonly language: SiteLanguage = "ko"
   ) {
     super()
   }
@@ -294,22 +306,25 @@ export class MarkdownEmbedBlockWidget extends WidgetType {
       other instanceof MarkdownEmbedBlockWidget &&
       other.signature === this.signature &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.language === this.language
     )
   }
 
-  updateDOM(dom: HTMLElement) {
-    if (dom.dataset?.sig !== this.signature) return false
+  updateDOM(dom: HTMLElement, view?: EditorView) {
+    const lang = resolveEditorViewLanguage(view, this.language)
+    if (dom.dataset?.sig !== this.signature || (dom.dataset?.lang ?? "ko") !== lang) return false
     dom.dataset.from = String(this.from)
     return true
   }
 
   toDOM(view?: EditorView) {
+    const uiLanguage = resolveEditorViewLanguage(view, this.language)
     const badge = this.provider || this.siteName || formatHostBadge(this.url)
     return buildLinkCardContainerDOM(
       {
         cardKind: "embed",
-        openLabel: "임베드 링크 열기",
+        openLabel: getCardBlockLabels(uiLanguage).embedOpen,
         url: this.url,
         title: this.title,
         secondary: this.caption,
@@ -319,6 +334,7 @@ export class MarkdownEmbedBlockWidget extends WidgetType {
         sig: this.signature,
         from: this.from,
         to: this.to,
+        uiLanguage,
       },
       view
     )
@@ -333,7 +349,8 @@ export class MarkdownFileBlockWidget extends WidgetType {
     readonly from: number,
     readonly to: number,
     readonly mimeType = "",
-    readonly sizeBytes?: number
+    readonly sizeBytes?: number,
+    readonly language: SiteLanguage = "ko"
   ) {
     super()
   }
@@ -347,17 +364,20 @@ export class MarkdownFileBlockWidget extends WidgetType {
       other instanceof MarkdownFileBlockWidget &&
       other.signature === this.signature &&
       other.from === this.from &&
-      other.to === this.to
+      other.to === this.to &&
+      other.language === this.language
     )
   }
 
-  updateDOM(dom: HTMLElement) {
-    if (dom.dataset?.sig !== this.signature) return false
+  updateDOM(dom: HTMLElement, view?: EditorView) {
+    const lang = resolveEditorViewLanguage(view, this.language)
+    if (dom.dataset?.sig !== this.signature || (dom.dataset?.lang ?? "ko") !== lang) return false
     dom.dataset.from = String(this.from)
     return true
   }
 
   toDOM(view?: EditorView) {
+    const uiLanguage = resolveEditorViewLanguage(view, this.language)
     const badges: string[] = []
     if (this.mimeType) badges.push(this.mimeType)
     const readableSize = formatReadableFileSize(this.sizeBytes)
@@ -365,7 +385,7 @@ export class MarkdownFileBlockWidget extends WidgetType {
     return buildLinkCardContainerDOM(
       {
         cardKind: "file",
-        openLabel: "첨부 파일 열기",
+        openLabel: getCardBlockLabels(uiLanguage).fileOpen,
         url: this.url,
         title: this.name,
         secondary: this.description,
@@ -373,6 +393,7 @@ export class MarkdownFileBlockWidget extends WidgetType {
         sig: this.signature,
         from: this.from,
         to: this.to,
+        uiLanguage,
       },
       view
     )

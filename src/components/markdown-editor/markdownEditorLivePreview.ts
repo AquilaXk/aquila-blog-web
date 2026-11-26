@@ -17,19 +17,15 @@ export type MarkdownEditorSurfaceMode = "live" | "source" | "split" | "reading"
 export const isLivePreviewSurfaceMode = (mode: MarkdownEditorSurfaceMode): boolean =>
   mode === "live" || mode === "split"
 
-export const computePreservedScrollTop = (
-  prevScrollTop: number,
-  prevScrollHeight: number,
-  prevClientHeight: number,
-  nextScrollHeight: number,
-  nextClientHeight: number
-): number => {
-  const prevMax = Math.max(0, prevScrollHeight - prevClientHeight)
-  const nextMax = Math.max(0, nextScrollHeight - nextClientHeight)
-  if (prevMax <= 0 || nextMax <= 0) return 0
-  const ratio = Math.max(0, Math.min(1, prevScrollTop / prevMax))
-  return Math.round(ratio * nextMax)
-}
+export {
+  captureMarkdownScrollSnapshot,
+  computePreservedScrollTop,
+  nextEditorViewMode,
+  resolveMarkdownScrollHost,
+  restoreMarkdownScrollSnapshot,
+  scheduleScrollSyncAfterModeToggle,
+  type MarkdownScrollSnapshot,
+} from "./markdownEditorScrollSync"
 
 const fallbackMarkdownParser = parser.configure(GFM)
 
@@ -540,28 +536,3 @@ export const buildMarkdownLivePreviewDecorationSpecs = (
     : resolveMarkdownLivePreviewPlanFromEntries(buildMarkdownLivePreviewEntries(markdown), selections, composing, mode)
 
 export { computeMarkdownFoldRange } from "./markdownEditorFoldModel"
-
-export const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode =>
-  prev === "live" ? "source" : prev === "source" ? "split" : prev === "split" ? "reading" : "live"
-
-export const resolveMarkdownScrollHost = (bodyNode: HTMLElement | null): HTMLElement | null => {
-  if (!bodyNode) return null
-  const cmScroller = bodyNode.querySelector<HTMLElement>(".cm-scroller")
-  if (cmScroller && cmScroller.scrollHeight > cmScroller.clientHeight + 2) return cmScroller
-  const paperSheet = bodyNode.closest<HTMLElement>('[data-testid="editor-paper-scroll-sheet"]')
-  if (paperSheet && paperSheet.scrollHeight > paperSheet.clientHeight + 2) return paperSheet
-  return cmScroller ?? paperSheet
-}
-
-export const scheduleScrollSyncAfterModeToggle = (getBodyNode: () => HTMLElement | null) => {
-  const host = resolveMarkdownScrollHost(getBodyNode())
-  if (!host || typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") return
-  const { scrollTop: prevTop, scrollHeight: prevHeight, clientHeight: prevClient } = host
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      const target = resolveMarkdownScrollHost(getBodyNode()) ?? host
-      const nextTop = computePreservedScrollTop(prevTop, prevHeight, prevClient, target.scrollHeight, target.clientHeight)
-      if (Math.abs(target.scrollTop - nextTop) > 2) target.scrollTop = nextTop
-    })
-  })
-}

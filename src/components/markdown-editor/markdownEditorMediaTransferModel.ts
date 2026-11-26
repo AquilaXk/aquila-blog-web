@@ -1,5 +1,6 @@
 import type { ClipboardEvent as ReactClipboardEvent } from "react"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
+import type { SiteLanguage } from "src/libs/language"
 import {
   fetchEditorUnfurl,
   formatUnfurlDirectiveBlock,
@@ -8,6 +9,11 @@ import {
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import { isLivePreviewSurfaceMode, type MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
+import {
+  getMarkdownUploadErrorMessages,
+  MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+  MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+} from "./markdownEditorUploadModel"
 import {
   convertSafeHtmlPasteToMarkdown,
   isOffsetInsideInlineCodeSpan,
@@ -34,6 +40,7 @@ export type ResolveMarkdownEditorUploadErrorOptions = {
   kind: "image" | "file"
   fileName: string
   fallbackMessage: string
+  language?: SiteLanguage
 }
 
 const GENERIC_CLIENT_STATUS_MESSAGES = new Set([
@@ -41,43 +48,88 @@ const GENERIC_CLIENT_STATUS_MESSAGES = new Set([
   "요청 처리 중 오류가 발생했습니다.",
 ])
 
-const resolveApiUploadErrorMessage = (error: ApiError, fallbackMessage: string): string => {
-  if (error.status >= 500) return fallbackMessage
-  if (error.status === 413) {
-    return error.userMessage || "업로드 파일 용량이 너무 큽니다. 용량을 줄여 다시 시도해주세요."
-  }
-  if (error.status === 401 || error.status === 403 || error.status === 429) {
-    return error.userMessage || fallbackMessage
-  }
-  if (error.userMessage && !GENERIC_CLIENT_STATUS_MESSAGES.has(error.userMessage)) {
-    return error.userMessage
+const hasKoreanText = (value: string): boolean => /[가-힣]/.test(value)
+
+const resolveLocalizedUploadFallback = (
+  fallbackMessage: string,
+  language: SiteLanguage,
+  kind: "image" | "file"
+): string => {
+  if (language !== "en") return fallbackMessage
+  if (
+    fallbackMessage === MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE ||
+    fallbackMessage === MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE
+  ) {
+    const messages = getMarkdownUploadErrorMessages("en")
+    return kind === "image" ? messages.imageFailed : messages.attachmentFailed
   }
   return fallbackMessage
 }
 
-const resolveGenericErrorKoreanMessage = (error: Error): string | null => {
+const resolveApiUploadErrorMessage = (
+  error: ApiError,
+  fallbackMessage: string,
+  language: SiteLanguage
+): string => {
+  if (error.status >= 500) return fallbackMessage
+  const usableUserMessage =
+    error.userMessage && !(language === "en" && hasKoreanText(error.userMessage))
+      ? error.userMessage
+      : ""
+  if (error.status === 413) {
+    return (
+      usableUserMessage ||
+      (language === "en"
+        ? "The uploaded file is too large. Reduce the file size and try again."
+        : "업로드 파일 용량이 너무 큽니다. 용량을 줄여 다시 시도해주세요.")
+    )
+  }
+  if (error.status === 401 || error.status === 403 || error.status === 429) {
+    return usableUserMessage || fallbackMessage
+  }
+  if (usableUserMessage && !GENERIC_CLIENT_STATUS_MESSAGES.has(usableUserMessage)) {
+    return usableUserMessage
+  }
+  return fallbackMessage
+}
+
+const resolveGenericErrorLocalizedMessage = (error: Error, language: SiteLanguage): string | null => {
   const trimmed = error.message.trim()
-  if (!trimmed || !/[가-힣]/.test(trimmed)) return null
-  return /Exception|endpoint|bucket|provider|stack/i.test(trimmed) ? null : trimmed
+  if (!trimmed) return null
+  if (language === "ko") {
+    if (!hasKoreanText(trimmed)) return null
+    return /Exception|endpoint|bucket|provider|stack/i.test(trimmed) ? null : trimmed
+  }
+  if (hasKoreanText(trimmed)) return null
+  return /Exception|Error:|TypeError|ReferenceError|SyntaxError|endpoint|bucket|provider|stack|ECONN|ENOTFOUND|fetch/i.test(
+    trimmed
+  )
+    ? null
+    : trimmed
 }
 
 export const resolveMarkdownEditorUploadErrorMessage = (
   error: unknown,
-  { fallbackMessage }: ResolveMarkdownEditorUploadErrorOptions
+  { kind, fallbackMessage, language = "ko" }: ResolveMarkdownEditorUploadErrorOptions
 ): string => {
+  const resolvedFallback = resolveLocalizedUploadFallback(fallbackMessage, language, kind)
   if (error instanceof ApiTimeoutError) {
-    return "업로드 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+    return language === "en"
+      ? "Upload timed out. Wait a moment and try again."
+      : "업로드 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
   }
   if (error instanceof ApiNetworkError) {
-    return "네트워크 연결에 실패했습니다. 잠시 후 다시 시도해주세요."
+    return language === "en"
+      ? "Network connection failed. Wait a moment and try again."
+      : "네트워크 연결에 실패했습니다. 잠시 후 다시 시도해주세요."
   }
   if (error instanceof ApiError) {
-    return resolveApiUploadErrorMessage(error, fallbackMessage)
+    return resolveApiUploadErrorMessage(error, resolvedFallback, language)
   }
   if (error instanceof Error) {
-    return resolveGenericErrorKoreanMessage(error) ?? fallbackMessage
+    return resolveGenericErrorLocalizedMessage(error, language) ?? resolvedFallback
   }
-  return fallbackMessage
+  return resolvedFallback
 }
 
 export const shouldLinkifySelectionOnUrlPaste = (
@@ -191,6 +243,7 @@ export type HtmlPasteHandlerContext = {
   viewMode: MarkdownEditorSurfaceMode
   currentValue: string
   selection: TextareaSelection
+  language?: SiteLanguage
   applyRecordedMarkdownMutation: (plan: PlannedTextMutation) => boolean
   setEditorError: (message: string) => void
 }
@@ -202,6 +255,7 @@ export const applyHtmlPasteIfEligible = ({
   viewMode,
   currentValue,
   selection,
+  language = "ko",
   applyRecordedMarkdownMutation,
   setEditorError,
 }: HtmlPasteHandlerContext) => {
@@ -222,7 +276,7 @@ export const applyHtmlPasteIfEligible = ({
   event.preventDefault()
   if (imported.kind === "error") {
     if (shouldReportEmptyHtmlPasteError(html, plainText)) {
-      setEditorError(imported.message)
+      setEditorError(language === "en" ? "No safe HTML content could be pasted." : imported.message)
       return
     }
     applyRecordedMarkdownMutation(

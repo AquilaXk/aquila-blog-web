@@ -65,6 +65,7 @@ import {
   setEditorMode,
   setPointerSelecting,
 } from "./markdownEditorLiveSurfaceDecorations"
+import { editorLanguageField, setEditorLanguage } from "./markdownEditorLanguageState"
 import {
   blockDecorationField,
   liveInlineViewportPlugin,
@@ -180,6 +181,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onSelectionChangeRef = useRef(onSelectionChange)
   const onRequestFocusTitleRef = useRef(onRequestFocusTitle)
   const onToggleViewModeRef = useRef(onToggleViewMode)
+  const disabledRef = useRef(disabled)
+  const valueRef = useRef(value)
   const editableCompartmentRef = useRef(new Compartment())
   const historyCompartmentRef = useRef(new Compartment())
   const contentAttrsCompartmentRef = useRef(new Compartment())
@@ -188,6 +191,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
   onSelectionChangeRef.current = onSelectionChange
   onRequestFocusTitleRef.current = onRequestFocusTitle
   onToggleViewModeRef.current = onToggleViewMode
+  disabledRef.current = disabled
+  valueRef.current = value
 
   useEffect(() => {
     const host = hostRef.current
@@ -264,21 +269,25 @@ export const MarkdownEditorLiveSurface = forwardRef<
         pointerSelectingField,
         editorFocusField.init(() => false),
         editorModeField.init(() => initialState.mode),
+        editorLanguageField.init(() => initialState.language),
         disableMermaidField.init(() => Boolean(initialState.disableMermaid)),
         blockDecorationField,
         liveInlineViewportPlugin,
         blockContainerBlockField,
         activeEmptyLineField,
         liveSurfaceTheme,
-        contentAttrsCompartmentRef.current.of(
+        contentAttrsCompartmentRef.current.of([
           EditorView.contentAttributes.of({
             "aria-label": initialState.language === "en" ? "Markdown body" : "Markdown 본문",
             "aria-description": initialState.ariaDescription,
             title: initialState.ariaDescription,
             "data-testid": "markdown-editor-content",
             spellcheck: "false",
-          })
-        ),
+          }),
+          EditorView.editorAttributes.of({
+            "data-editor-lang": initialState.language,
+          }),
+        ]),
         editableCompartment.of([
           EditorState.readOnly.of(initialReadOnly),
           EditorView.editable.of(!initialReadOnly),
@@ -408,15 +417,21 @@ export const MarkdownEditorLiveSurface = forwardRef<
     const view = viewRef.current
     if (!view) return
     view.dispatch({
-      effects: contentAttrsCompartmentRef.current.reconfigure(
-        EditorView.contentAttributes.of({
-          "aria-label": language === "en" ? "Markdown body" : "Markdown 본문",
-          "aria-description": ariaDescription,
-          title: ariaDescription,
-          "data-testid": "markdown-editor-content",
-          spellcheck: "false",
-        })
-      ),
+      effects: [
+        setEditorLanguage.of(language),
+        contentAttrsCompartmentRef.current.reconfigure([
+          EditorView.contentAttributes.of({
+            "aria-label": language === "en" ? "Markdown body" : "Markdown 본문",
+            "aria-description": ariaDescription,
+            title: ariaDescription,
+            "data-testid": "markdown-editor-content",
+            spellcheck: "false",
+          }),
+          EditorView.editorAttributes.of({
+            "data-editor-lang": language,
+          }),
+        ]),
+      ],
     })
   }, [ariaDescription, language])
 
@@ -456,7 +471,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
               options.scrollIntoView !== false
             )
           )
-          if (options.focus !== false && !disabled) view.focus()
+          if (options.focus !== false && !disabledRef.current) view.focus()
           return true
         }
 
@@ -475,12 +490,12 @@ export const MarkdownEditorLiveSurface = forwardRef<
           selection: EditorSelection.range(plan.selectionStart, plan.selectionEnd),
           scrollIntoView: options?.scrollIntoView !== false,
         })
-        if (options?.focus !== false && !disabled) view.focus()
+        if (options?.focus !== false && !disabledRef.current) view.focus()
         return true
       },
       focus: (selection) => {
         const view = viewRef.current
-        if (!view || disabled) return
+        if (!view || disabledRef.current) return
         if (selection) {
           const from = Math.max(0, Math.min(selection.from, view.state.doc.length))
           const to = Math.max(0, Math.min(selection.to, view.state.doc.length))
@@ -492,7 +507,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const view = viewRef.current
         const selection = view?.state.selection.main
         return {
-          documentValue: view ? getDocString(view.state.doc) : value,
+          documentValue: view ? getDocString(view.state.doc) : valueRef.current,
           selection: selection ? { from: selection.from, to: selection.to } : { from: 0, to: 0 },
         }
       },
@@ -505,7 +520,26 @@ export const MarkdownEditorLiveSurface = forwardRef<
         const view = viewRef.current
         if (!view) return null
         const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
-        return view.coordsAtPos(clamped)
+        const direct = view.coordsAtPos(clamped)
+        if (direct && direct.bottom > direct.top) return direct
+        if (clamped >= view.viewport.from && clamped <= view.viewport.to) {
+          try {
+            const block = view.lineBlockAt(clamped)
+            const docTop = view.documentTop
+            const contentLeft = view.contentDOM.getBoundingClientRect().left
+            if (block.bottom > block.top) {
+              return {
+                top: docTop + block.top,
+                bottom: docTop + block.bottom,
+                left: direct?.left ?? contentLeft,
+                right: direct?.right ?? contentLeft,
+              }
+            }
+          } catch {
+            return direct
+          }
+        }
+        return direct
       },
       requestMeasure: (spec) => {
         const view = viewRef.current
@@ -530,7 +564,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
         return completionStatus(view.state) === "active"
       },
     }),
-    [disabled, value]
+    []
   )
 
   return (

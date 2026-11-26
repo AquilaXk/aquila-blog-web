@@ -1,6 +1,9 @@
 import { EditorView, WidgetType } from "@codemirror/view"
+import type { SiteLanguage } from "src/libs/language"
 import { CODE_BLOCK_LANGUAGE_OPTIONS } from "./markdownEditorCodeLanguages"
+import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
 import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
+import { getCodeChromeLabels } from "./markdownEditorWidgetLabels"
 
 export const LIVE_CODE_HEADER_STYLES = `
   .cm-live-code-fence-open.cm-live-code-has-header {
@@ -117,16 +120,18 @@ const copyPlainTextToClipboard = async (text: string): Promise<boolean> => {
 export class MarkdownCodeBlockHeaderWidget extends WidgetType {
   constructor(
     private readonly language: string,
-    private readonly openFrom: number
+    private readonly openFrom: number,
+    private readonly uiLanguage: SiteLanguage = "ko"
   ) {
     super()
   }
 
   eq(other: MarkdownCodeBlockHeaderWidget) {
-    return other.language === this.language
+    return other.language === this.language && other.uiLanguage === this.uiLanguage
   }
 
   toDOM(view: EditorView) {
+    const labels = getCodeChromeLabels(resolveEditorViewLanguage(view, this.uiLanguage))
     const root = document.createElement("span")
     root.className = "cm-live-code-header"
     root.dataset.testid = "cm-live-code-header"
@@ -135,7 +140,7 @@ export class MarkdownCodeBlockHeaderWidget extends WidgetType {
     const normalizedLang = this.language.trim().toLowerCase()
     const select = document.createElement("select")
     select.className = "cm-live-code-lang-select"
-    select.setAttribute("aria-label", "Code language")
+    select.setAttribute("aria-label", labels.languageAria)
     let hasCurrent = normalizedLang === ""
 
     for (const optionSpec of CODE_BLOCK_LANGUAGE_OPTIONS) {
@@ -165,8 +170,8 @@ export class MarkdownCodeBlockHeaderWidget extends WidgetType {
     const copyBtn = document.createElement("button")
     copyBtn.type = "button"
     copyBtn.className = "cm-live-code-copy-btn"
-    copyBtn.textContent = "Copy"
-    copyBtn.setAttribute("aria-label", "Copy code")
+    copyBtn.textContent = labels.copyText
+    copyBtn.setAttribute("aria-label", labels.copyAria)
     for (const evName of ["mousedown", "pointerdown"] as const) {
       copyBtn.addEventListener(evName, (event) => {
         event.preventDefault()
@@ -180,10 +185,10 @@ export class MarkdownCodeBlockHeaderWidget extends WidgetType {
       const code = extractCodeBlockBodyText(view, root, this.openFrom)
       void copyPlainTextToClipboard(code).then((ok) => {
         if (!ok) return
-        copyBtn.textContent = "Copied"
+        copyBtn.textContent = labels.copiedText
         if (copiedTimer) clearTimeout(copiedTimer)
         copiedTimer = setTimeout(() => {
-          copyBtn.textContent = "Copy"
+          copyBtn.textContent = labels.copyText
         }, 1400)
       })
     })

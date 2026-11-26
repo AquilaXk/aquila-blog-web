@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import {
   localDraftSourcesEqual,
   type LocalDraftFingerprintPayload,
@@ -232,8 +233,10 @@ export const shouldReleasePostIdTransitionGate = (input: {
   return false
 }
 
-const CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT =
-  "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요."
+const CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT = {
+  ko: "글 작성 응답에 글 ID가 없습니다. 로컬 임시저장은 유지됩니다. 다시 시도해주세요.",
+  en: "Post ID is missing from the create response. Your local draft is preserved. Please try again.",
+}
 
 export type CreateWritePostIdResolution =
   | { ok: true; postId: string }
@@ -241,16 +244,17 @@ export type CreateWritePostIdResolution =
 
 /** Create-mode write success must include a non-empty post id before draft cleanup. */
 export const resolveCreateWritePostId = (
-  writeResult: { id?: number | string } | null | undefined
+  writeResult: { id?: number | string } | null | undefined,
+  language: SiteLanguage = "ko"
 ): CreateWritePostIdResolution => {
   const rawId = writeResult?.id
   if (rawId == null || rawId === "") {
-    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT }
+    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT[language] }
   }
 
   const postId = String(rawId).trim()
   if (!postId) {
-    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT }
+    return { ok: false, statusText: CREATE_WRITE_MISSING_POST_ID_STATUS_TEXT[language] }
   }
 
   return { ok: true, postId }

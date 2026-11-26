@@ -5,6 +5,7 @@ import {
   useCallback,
   useRef,
 } from "react"
+import type { SiteLanguage } from "src/libs/language"
 import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import {
   type MarkdownMutationOptions,
@@ -32,6 +33,7 @@ import {
   type ReservedTransferJob,
 } from "./markdownEditorPasteDropModel"
 import {
+  getMarkdownUploadErrorMessages,
   MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
   MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
   resolveMarkdownAttachmentLink,
@@ -54,6 +56,7 @@ export {
 type UseMarkdownEditorMediaTransfersArgs = {
   disabled: boolean
   viewMode?: MarkdownEditorSurfaceMode
+  language?: SiteLanguage
   valueRef: MutableRefObject<string>
   selectionRef: MutableRefObject<TextareaSelection>
   documentGenerationRef: MutableRefObject<number>
@@ -71,6 +74,7 @@ type UseMarkdownEditorMediaTransfersArgs = {
 export const useMarkdownEditorMediaTransfers = ({
   disabled,
   viewMode = "live",
+  language = "ko",
   valueRef,
   selectionRef,
   documentGenerationRef,
@@ -167,7 +171,11 @@ export const useMarkdownEditorMediaTransfers = ({
           resolveMarkdownEditorUploadErrorMessage(error, {
             kind: "image",
             fileName: file.name,
-            fallbackMessage: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+            fallbackMessage:
+              language === "en"
+                ? getMarkdownUploadErrorMessages("en").imageFailed
+                : MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+            language,
           })
         )
         return
@@ -175,7 +183,7 @@ export const useMarkdownEditorMediaTransfers = ({
         if (manageInFlight) setUploadInFlight(-1)
       }
 
-      const resolved = resolveMarkdownImageEmbed(uploaded, file.name)
+      const resolved = resolveMarkdownImageEmbed(uploaded, file.name, { language })
       if ("error" in resolved) {
         removeExactPlaceholder(placeholder)
         reportUploadError(resolved.error)
@@ -191,6 +199,7 @@ export const useMarkdownEditorMediaTransfers = ({
     },
     [
       documentGenerationRef,
+      language,
       onUploadImage,
       removeExactPlaceholder,
       replaceExactOrAppend,
@@ -218,7 +227,11 @@ export const useMarkdownEditorMediaTransfers = ({
           resolveMarkdownEditorUploadErrorMessage(error, {
             kind: "file",
             fileName: file.name,
-            fallbackMessage: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+            fallbackMessage:
+              language === "en"
+                ? getMarkdownUploadErrorMessages("en").attachmentFailed
+                : MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+            language,
           })
         )
         return
@@ -226,7 +239,7 @@ export const useMarkdownEditorMediaTransfers = ({
         if (manageInFlight) setUploadInFlight(-1)
       }
 
-      const resolved = resolveMarkdownAttachmentLink(uploaded, file.name)
+      const resolved = resolveMarkdownAttachmentLink(uploaded, file.name, language)
       if ("error" in resolved) {
         removeExactPlaceholder(placeholder)
         reportUploadError(resolved.error)
@@ -242,6 +255,7 @@ export const useMarkdownEditorMediaTransfers = ({
     },
     [
       documentGenerationRef,
+      language,
       onUploadFile,
       removeExactPlaceholder,
       replaceExactOrAppend,
@@ -269,7 +283,7 @@ export const useMarkdownEditorMediaTransfers = ({
       if (!onUploadImage) return
       clearUploadError()
       const startedGeneration = documentGenerationRef.current
-      const placeholder = buildUploadingImagePlaceholder(file.name || "image", createUploadPlaceholderId())
+      const placeholder = buildUploadingImagePlaceholder(file.name || "image", createUploadPlaceholderId(), language)
       insertAtActiveSelection(placeholder)
       await completeReservedImageUpload(file, placeholder, { startedGeneration })
     },
@@ -278,6 +292,7 @@ export const useMarkdownEditorMediaTransfers = ({
       completeReservedImageUpload,
       documentGenerationRef,
       insertAtActiveSelection,
+      language,
       onUploadImage,
     ]
   )
@@ -294,14 +309,14 @@ export const useMarkdownEditorMediaTransfers = ({
     async (file: File | null) => {
       if (!file || !onUploadFile) return
       clearUploadError()
-      const sizeError = validateMarkdownAttachmentSize(file)
+      const sizeError = validateMarkdownAttachmentSize(file, language)
       if (sizeError) {
         reportUploadError(sizeError)
         return
       }
 
       const startedGeneration = documentGenerationRef.current
-      const placeholder = buildUploadingFilePlaceholder(file.name || "file", createUploadPlaceholderId())
+      const placeholder = buildUploadingFilePlaceholder(file.name || "file", createUploadPlaceholderId(), language)
       insertAtActiveSelection(placeholder)
       await completeReservedAttachmentUpload(file, placeholder, { startedGeneration })
     },
@@ -310,6 +325,7 @@ export const useMarkdownEditorMediaTransfers = ({
       completeReservedAttachmentUpload,
       documentGenerationRef,
       insertAtActiveSelection,
+      language,
       onUploadFile,
       reportUploadError,
     ]
@@ -323,6 +339,7 @@ export const useMarkdownEditorMediaTransfers = ({
       const { jobs, errors } = planTransferFileReservations(files, {
         canUploadImage: Boolean(onUploadImage),
         canUploadFile: Boolean(onUploadFile),
+        language,
       })
 
       if (jobs.length > 0) {
@@ -353,6 +370,7 @@ export const useMarkdownEditorMediaTransfers = ({
       completeReservedJob,
       documentGenerationRef,
       insertAtActiveSelection,
+      language,
       onUploadFile,
       onUploadImage,
       reportUploadError,
@@ -428,6 +446,7 @@ export const useMarkdownEditorMediaTransfers = ({
           viewMode,
           currentValue: valueRef.current,
           selection,
+          language,
           applyRecordedMarkdownMutation,
           setEditorError,
         })
@@ -439,6 +458,7 @@ export const useMarkdownEditorMediaTransfers = ({
       applyRecordedMarkdownMutation,
       disabled,
       documentGenerationRef,
+      language,
       onUploadFile,
       onUploadImage,
       processTransferFiles,

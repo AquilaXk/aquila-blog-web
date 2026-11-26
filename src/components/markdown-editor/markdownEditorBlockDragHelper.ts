@@ -213,6 +213,18 @@ export const useMarkdownEditorBlockDrag = ({
   }
 }
 
+const BLOCK_CHROME_FLOATING_TARGET_SELECTOR =
+  '[data-testid="markdown-block-gutter-handle"], [data-testid="markdown-block-gutter-plus"], [data-testid="markdown-selection-bubble"], [data-testid="markdown-bubble-link-popover"], [role="menu"], [role="dialog"]'
+
+export const shouldIgnoreBlockChromeHoverTarget = (target: EventTarget | null): boolean => {
+  if (!target) return false
+  const element =
+    typeof (target as { closest?: unknown }).closest === "function"
+      ? (target as Element)
+      : ((target as { parentElement?: Element | null }).parentElement ?? null)
+  return Boolean(element?.closest?.(BLOCK_CHROME_FLOATING_TARGET_SELECTOR))
+}
+
 export const useBlockChromeViewportListeners = ({
   containerRef,
   disabled,
@@ -242,7 +254,7 @@ export const useBlockChromeViewportListeners = ({
     const container = containerRef.current
     let layoutRafId: number | null = null
     let mouseMoveRafId: number | null = null
-    let pendingPointer: { x: number; y: number } | null = null
+    let pendingPointer: { x: number; y: number; doc: string } | null = null
     const bumpLayout = () => {
       if (layoutRafId !== null) return
       if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
@@ -258,10 +270,10 @@ export const useBlockChromeViewportListeners = ({
       mouseMoveRafId = null
       const coords = pendingPointer
       pendingPointer = null
-      if (!coords) return
+      if (!coords || isDragActiveRef.current) return
       const { isBlockMenuOpen: menuOpen, resolvePosAtCoords: resolvePos, selection: sel, value: doc } =
         liveRefs.current
-      if (!resolvePos || menuOpen || sel.from !== sel.to) return
+      if (coords.doc !== doc || !resolvePos || menuOpen || sel.from !== sel.to) return
       const pos = resolvePos(coords)
       if (pos === null) return
       const lineStart = pos > 0 ? doc.lastIndexOf("\n", pos - 1) + 1 : 0
@@ -269,10 +281,12 @@ export const useBlockChromeViewportListeners = ({
     }
     const handleMouseMove = (event: MouseEvent) => {
       setIsTypingDimmed(false)
-      if (isDragActiveRef.current?.active) return
-      const { isBlockMenuOpen: menuOpen, resolvePosAtCoords: resolvePos, selection: sel } = liveRefs.current
+      if (isDragActiveRef.current) return
+      if (shouldIgnoreBlockChromeHoverTarget(event.target)) return
+      const { isBlockMenuOpen: menuOpen, resolvePosAtCoords: resolvePos, selection: sel, value: doc } =
+        liveRefs.current
       if (!resolvePos || menuOpen || sel.from !== sel.to) return
-      pendingPointer = { x: event.clientX, y: event.clientY }
+      pendingPointer = { x: event.clientX, y: event.clientY, doc }
       if (mouseMoveRafId !== null) return
       if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
         mouseMoveRafId = window.requestAnimationFrame(flushHoverLine)

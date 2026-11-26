@@ -1,7 +1,9 @@
+import type { SiteLanguage } from "src/libs/language"
 import {
   MAX_EDIT_COLUMNS,
   type MarkdownTableGridAction,
 } from "./markdownEditorTableModel"
+import { getTableLabels } from "./markdownEditorWidgetLabels"
 
 export type TableVisualOptions = {
   headerRow: boolean
@@ -259,7 +261,8 @@ export const attachColumnResizeHandle = (
   colEl: HTMLElement,
   visualOptions: TableVisualOptions,
   onVisualOptionsChange?: () => void,
-  isEditable?: () => boolean
+  isEditable?: () => boolean,
+  language: SiteLanguage = "ko"
 ): HTMLElement => {
   const resizer = document.createElement("span")
   resizer.className = "cm-live-table-col-resizer"
@@ -269,7 +272,7 @@ export const attachColumnResizeHandle = (
   }
   resizer.setAttribute("role", "separator")
   resizer.setAttribute("aria-orientation", "vertical")
-  resizer.setAttribute("aria-label", `${colIndex + 1}열 너비 조절`)
+  resizer.setAttribute("aria-label", getTableLabels(language).colResizerAria(colIndex))
   resizer.addEventListener("click", stopAndPrevent)
   resizer.addEventListener("dblclick", (event: MouseEvent) => {
     stopAndPrevent(event)

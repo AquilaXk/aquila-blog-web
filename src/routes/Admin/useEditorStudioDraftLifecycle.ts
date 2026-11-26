@@ -1,25 +1,21 @@
 import type { NextRouter } from "next/router"
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
+  useCallback, useEffect, useRef,
+  type Dispatch, type MutableRefObject, type SetStateAction,
 } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import type { ApiEditorPostDto } from "src/apis/backend/posts/PostApiDtos"
+import { useLanguage } from "src/libs/language"
 import { replaceRoute } from "src/libs/router"
+import { clearCreatedEditorPostHandoff } from "./editorCreatedPostHandoff"
+import {
+  editorDraftLoadNewPostFailed, editorDraftNotice, editorDraftReloadLatestFailed,
+} from "./editorStudioDraftNoticeMessages"
 import type { LocalDraftPayload, LocalDraftSource } from "./editorStudioMetaModel"
 import { isServerTempDraftPost, isTempDraftCandidate, isTempDraftTitlePlaceholder } from "./editorTempDraft"
+import { unwrapTempDraftRecoveryResponse, useEditorStudioLocalDraftLifecycle } from "./useEditorStudioDraftLifecycleModel"
 import {
-  unwrapTempDraftRecoveryResponse,
-  useEditorStudioLocalDraftLifecycle,
-} from "./useEditorStudioDraftLifecycleModel"
-import {
-  resolvePersistedSummaryResult,
-  type CanonicalSummaryState,
-  type SummaryIntent,
+  resolvePersistedSummaryResult, type CanonicalSummaryState, type SummaryIntent,
 } from "./EditorStudioWorkspaceControllerRootModel"
 
 import type { PostVisibility, RsData } from "src/types"
@@ -188,6 +184,7 @@ export const useEditorStudioDraftLifecycle = ({
   setPublishStatus, setResult, syncEditorMeta, tempPostRequestRef, toEditorPostRoute,
   toVisibility,
 }: UseEditorStudioDraftLifecycleParams) => {
+  const { language } = useLanguage()
   const loadGenerationRef = useRef(0)
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -224,6 +221,7 @@ export const useEditorStudioDraftLifecycle = ({
   }, [restoreStoredLocalDraft, setLoadingKey])
 
   const switchToCreateMode = useCallback((options?: { keepContent?: boolean }) => {
+    clearCreatedEditorPostHandoff()
     loadGenerationRef.current += 1
     setLoadingKey("")
     const keepContent = options?.keepContent ?? true
@@ -376,6 +374,7 @@ export const useEditorStudioDraftLifecycle = ({
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
   ) => {
+    clearCreatedEditorPostHandoff()
     const generation = ++loadGenerationRef.current
     const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
@@ -408,27 +407,18 @@ export const useEditorStudioDraftLifecycle = ({
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postOne")
-      setPublishStatus(
-        { tone: "loading", text: "현재 작성 내용을 임시글로 보관하고 서버 최신본을 불러오는 중입니다..." },
-        "page"
-      )
+      setPublishStatus({ tone: "loading", text: editorDraftNotice(language, "reloadLatestLoading") }, "page")
       const resolvedPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       if (!isCurrentLoad()) return false
       applyResolvedServerPost(resolvedPost)
-      setPublishStatus(
-        {
-          tone: "success",
-          text: "현재 작성 내용을 브라우저 임시글로 보관하고 서버 최신본을 불러왔습니다. 임시글 복구 카드에서 비교하거나 복구해 다시 저장할 수 있습니다.",
-        },
-        "page"
-      )
+      setPublishStatus({ tone: "success", text: editorDraftNotice(language, "reloadLatestDone") }, "page")
       return true
     } catch (error) {
       if (!isCurrentLoad()) return false
       const message = error instanceof Error ? error.message : String(error)
       const errorNotice: PublishNotice = {
         tone: "error",
-        text: `서버 최신본 다시 불러오기 실패: ${message} 현재 작성 내용과 브라우저 임시저장은 유지됩니다.`,
+        text: editorDraftReloadLatestFailed(language, message),
       }
       setPublishStatus(errorNotice)
       setPublishStatus(errorNotice, "page")
@@ -439,7 +429,7 @@ export const useEditorStudioDraftLifecycle = ({
       if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
-    applyResolvedServerPost, beginLocalDraftPostLoad, endLocalDraftPostLoad, postId,
+    applyResolvedServerPost, beginLocalDraftPostLoad, endLocalDraftPostLoad, language, postId,
     preserveLocalDraftForConflictReload, pretty, setLoadingKey, setPublishStatus, setResult,
   ])
 
@@ -458,7 +448,7 @@ export const useEditorStudioDraftLifecycle = ({
             // Keep restored server state even if storage cleanup fails
           }
           setLocalDraftSavedAt("")
-          setPublishStatus({ tone: "success", text: "선택한 리비전으로 원고를 복원했습니다." }, "page")
+          setPublishStatus({ tone: "success", text: editorDraftNotice(language, "revisionRestored") }, "page")
         } finally {
           endLocalDraftPostLoad()
         }
@@ -475,7 +465,7 @@ export const useEditorStudioDraftLifecycle = ({
     },
     [
       applyResolvedServerPost, beginLocalDraftPostLoad, cancelPendingAutosave, endLocalDraftPostLoad,
-      loadPostForEditor, postId, removeLocalDraft, setLocalDraftSavedAt, setPublishStatus,
+      language, loadPostForEditor, postId, removeLocalDraft, setLocalDraftSavedAt, setPublishStatus,
     ]
   )
 
@@ -506,12 +496,13 @@ export const useEditorStudioDraftLifecycle = ({
     source?: string
     returnTo?: string
   }) => {
+    clearCreatedEditorPostHandoff()
     const generation = ++loadGenerationRef.current
     const isCurrentLoad = () => mountedRef.current && generation === loadGenerationRef.current
     beginLocalDraftPostLoad()
     try {
       setLoadingKey("postTemp")
-      setPublishStatus({ tone: "loading", text: "새 글을 준비하고 있습니다..." }, "page")
+      setPublishStatus({ tone: "loading", text: editorDraftNotice(language, "prepareNewPost") }, "page")
       if (!tempPostRequestRef.current) {
         tempPostRequestRef.current = requestTempPostWithConflictRetry(loadExistingTempPostForRecovery).finally(() => {
           tempPostRequestRef.current = null
@@ -536,9 +527,7 @@ export const useEditorStudioDraftLifecycle = ({
       setPublishStatus(
         {
           tone: "success",
-          text: loadedPostState.shouldMaskTempPlaceholder
-            ? "새 글을 시작할 수 있습니다."
-            : "저장된 임시 저장본을 불러왔습니다.",
+          text: editorDraftNotice(language, loadedPostState.shouldMaskTempPlaceholder ? "newPostReady" : "tempDraftLoaded"),
         },
         "page"
       )
@@ -546,7 +535,7 @@ export const useEditorStudioDraftLifecycle = ({
     } catch (error) {
       if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
-      setPublishStatus({ tone: "error", text: `새 글 불러오기 실패: ${message}` }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftLoadNewPostFailed(language, message) }, "page")
       setResult(pretty({ error: message }))
       setIsNewEditorBootstrapPending(false)
     } finally {
@@ -557,6 +546,7 @@ export const useEditorStudioDraftLifecycle = ({
     applyResolvedServerPost,
     beginLocalDraftPostLoad,
     endLocalDraftPostLoad,
+    language,
     pretty,
     requestTempPostWithConflictRetry,
     router,
@@ -587,6 +577,8 @@ export const useEditorStudioDraftLifecycle = ({
     clearLocalDraft,
     cancelPendingAutosave,
     signalLocalDraftBaselineReady,
+    beginLocalDraftPostLoad,
+    endLocalDraftPostLoad,
     switchToCreateMode,
     loadPostForEditor,
     reloadLatestServerPost,

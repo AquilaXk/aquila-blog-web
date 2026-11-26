@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import { createSecureRandomUuid } from "src/libs/security/secureRandomUuid"
 import type { PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
@@ -20,11 +21,27 @@ export const shouldAppendMissingPlaceholder = (
   currentGeneration: number
 ): boolean => startedGeneration === currentGeneration
 
-export const buildUploadingImagePlaceholder = (fileName: string, uploadId: string): string =>
-  `![업로드 중: ${sanitizeUploadPlaceholderFileName(fileName)} · ${uploadId}…]()`
+export const buildUploadingImagePlaceholder = (
+  fileName: string,
+  uploadId: string,
+  language: SiteLanguage = "ko"
+): string => {
+  const safeName = sanitizeUploadPlaceholderFileName(fileName)
+  return language === "en"
+    ? `![Uploading: ${safeName} · ${uploadId}…]()`
+    : `![업로드 중: ${safeName} · ${uploadId}…]()`
+}
 
-export const buildUploadingAttachmentPlaceholder = (fileName: string, uploadId: string): string =>
-  `[업로드 중: ${sanitizeUploadPlaceholderFileName(fileName)} · ${uploadId}…]()`
+export const buildUploadingAttachmentPlaceholder = (
+  fileName: string,
+  uploadId: string,
+  language: SiteLanguage = "ko"
+): string => {
+  const safeName = sanitizeUploadPlaceholderFileName(fileName)
+  return language === "en"
+    ? `[Uploading: ${safeName} · ${uploadId}…]()`
+    : `[업로드 중: ${safeName} · ${uploadId}…]()`
+}
 
 export const isImageFile = (file: File): boolean => {
   const lowerType = (file.type || "").split(";", 1)[0]?.trim().toLowerCase() || ""
@@ -76,22 +93,23 @@ export type ReservedTransferJob =
 
 const reserveSingleTransferFile = (
   file: File,
-  options: { canUploadImage: boolean; canUploadFile: boolean },
+  options: { canUploadImage: boolean; canUploadFile: boolean; language?: SiteLanguage },
   createId: () => string,
   jobs: ReservedTransferJob[],
   errors: string[]
 ): void => {
+  const language = options.language ?? "ko"
   if (isImageFile(file)) {
     if (!options.canUploadImage) return
     jobs.push({
       kind: "image",
       file,
-      placeholder: buildUploadingImagePlaceholder(file.name || "image", createId()),
+      placeholder: buildUploadingImagePlaceholder(file.name || "image", createId(), language),
     })
     return
   }
   if (!options.canUploadFile) return
-  const sizeError = validateMarkdownAttachmentSize(file)
+  const sizeError = validateMarkdownAttachmentSize(file, language)
   if (sizeError) {
     errors.push(sizeError)
     return
@@ -99,7 +117,7 @@ const reserveSingleTransferFile = (
   jobs.push({
     kind: "attachment",
     file,
-    placeholder: buildUploadingAttachmentPlaceholder(file.name || "file", createId()),
+    placeholder: buildUploadingAttachmentPlaceholder(file.name || "file", createId(), language),
   })
 }
 
@@ -109,6 +127,7 @@ export const planTransferFileReservations = (
     canUploadImage: boolean
     canUploadFile: boolean
     createId?: () => string
+    language?: SiteLanguage
   }
 ): { jobs: ReservedTransferJob[]; errors: string[] } => {
   const createId = options.createId ?? createUploadPlaceholderId

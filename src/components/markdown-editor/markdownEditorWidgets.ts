@@ -16,6 +16,7 @@ import { resolveCalloutBlockquote, type CalloutKind } from "../../libs/markdown/
 import { getLiveCalloutIconSvg, LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
 import { attachLiveImageControls } from "./markdownEditorImageControls"
 import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
+import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
 
 export type MermaidColorScheme = "dark" | "light"
 
@@ -486,12 +487,12 @@ const renderMermaidFallbackCode = (container: HTMLElement, text: string) => {
   container.appendChild(pre)
 }
 
-const renderMermaidErrorFallback = (container: HTMLElement, text: string) => {
+const renderMermaidErrorFallback = (container: HTMLElement, text: string, language: "ko" | "en" = "ko") => {
   container.replaceChildren()
   container.dataset.mermaidState = "error"
   const banner = document.createElement("div")
   banner.className = "cm-live-mermaid-error"
-  banner.textContent = "Mermaid 다이어그램 문법 오류"
+  banner.textContent = language === "en" ? "Mermaid diagram syntax error" : "Mermaid 다이어그램 문법 오류"
   container.appendChild(banner)
   renderMermaidFallbackCode(container, text)
 }
@@ -500,6 +501,7 @@ export type MarkdownMermaidWidgetOptions = {
   scheme?: MermaidColorScheme
   runtimeLoader?: () => Promise<unknown>
   timeoutMs?: number
+  uiLanguage?: "ko" | "en"
 }
 
 export class MarkdownMermaidWidget extends WidgetType {
@@ -522,7 +524,8 @@ export class MarkdownMermaidWidget extends WidgetType {
       other.scheme === this.scheme &&
       other.customRenderer === this.customRenderer &&
       other.options?.runtimeLoader === this.options?.runtimeLoader &&
-      other.options?.timeoutMs === this.options?.timeoutMs
+      other.options?.timeoutMs === this.options?.timeoutMs &&
+      other.options?.uiLanguage === this.options?.uiLanguage
     )
   }
 
@@ -575,19 +578,20 @@ export class MarkdownMermaidWidget extends WidgetType {
     root.dataset.mermaidState = "loading"
     renderMermaidFallbackCode(root, normalized)
 
+    const uiLang = resolveEditorViewLanguage(view, this.options?.uiLanguage ?? "ko")
     const renderId = `cm-live-mermaid-${(mermaidRenderCounter += 1)}`
     void this.runMermaidRender(renderId, normalized)
       .then((res) => {
         const sanitizedSvg = res?.svg ? sanitizeMermaidSvg(res.svg) : ""
         if (!sanitizedSvg) {
-          renderMermaidErrorFallback(root, normalized)
+          renderMermaidErrorFallback(root, normalized, uiLang)
           return
         }
         if (this.usesSharedSvgCache()) cacheLiveMermaidSvg(cacheKey, sanitizedSvg)
         root.dataset.mermaidState = "rendered"
         root.innerHTML = sanitizedSvg
       })
-      .catch(() => renderMermaidErrorFallback(root, normalized))
+      .catch(() => renderMermaidErrorFallback(root, normalized, uiLang))
 
     return root
   }

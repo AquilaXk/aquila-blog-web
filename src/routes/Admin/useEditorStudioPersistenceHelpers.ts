@@ -112,6 +112,10 @@ export type UseEditorStudioPersistenceParams = {
   pretty: (value: unknown) => string
   generateIdempotencyKey: () => string
   signalLocalDraftBaselineReady: (signal?: LocalDraftBaselineReadySignal) => void
+  onPostCreatedRouteSync?: (
+    postId: string,
+    handoff: import("./editorCreatedPostHandoff").CreatedEditorPostHandoffInput
+  ) => Promise<boolean | void> | boolean | void
   cancelPendingAutosave?: () => void
   saveLocalDraft?: (options?: { silent?: boolean; force?: boolean }) => void
   uploadWithConflictRetry: (requestUpload: () => Promise<Response>) => Promise<Response>
@@ -353,7 +357,11 @@ export const executeServerTempDraftSave = async ({
         "page"
       )
     } else {
-      const recovery = resolveEditorFailureRecovery(error, { action: "modify", isOnline: isBrowserOnline() })
+      const recovery = resolveEditorFailureRecovery(error, {
+        action: "modify",
+        isOnline: isBrowserOnline(),
+        language: isEn ? "en" : "ko",
+      })
       if (recovery.result.errorType === "version-conflict") {
         setLastSaveError(recovery.result)
         setPublishStatus({ tone: "error", text: recovery.statusText }, "page")

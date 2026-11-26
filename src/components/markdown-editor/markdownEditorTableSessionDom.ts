@@ -1,8 +1,10 @@
+import type { SiteLanguage } from "src/libs/language"
 import {
   applyMarkdownTableGridCellEdit, applyMarkdownTableGridPaste, applyTableCellInlineFormat,
   parseMarkdownTableGrid, type MarkdownTableGrid, type MarkdownTableGridAction, type TableCellInlineFormatKind,
 } from "./markdownEditorTableModel"
 import { type TableVisualOptions } from "./markdownEditorTableWidgetDom"
+import { getTableLabels } from "./markdownEditorWidgetLabels"
 
 export type TableSelectionMode = "cell" | "row" | "col"
 export type TableCellTarget = { row: number; col: number; openEditor?: boolean }
@@ -37,13 +39,13 @@ export const focusElementPreventScroll = (el: HTMLElement | null | undefined) =>
   }
 }
 
-export const createTableImeProxyElement = (): HTMLTextAreaElement => {
+export const createTableImeProxyElement = (language: SiteLanguage = "ko"): HTMLTextAreaElement => {
   const proxy = document.createElement("textarea")
   proxy.className = "cm-live-table-ime-proxy"
   proxy.tabIndex = -1
   proxy.setAttribute("tabindex", "-1")
   if (proxy.dataset) proxy.dataset.testid = "cm-live-table-ime-proxy"
-  proxy.setAttribute("aria-label", "표 셀 입력 대리자")
+  proxy.setAttribute("aria-label", getTableLabels(language).imeProxyAria)
   proxy.setAttribute("autocapitalize", "off")
   proxy.setAttribute("autocomplete", "off")
   proxy.setAttribute("spellcheck", "false")
@@ -99,7 +101,7 @@ const canNavigateHorizontallyFromInput = (
 
 export type OpenTableCellEditorParams = TableSessionCallbacks & {
   cellEl: HTMLElement; preservedControls: HTMLElement[]; row: number; col: number
-  initialText?: string; deferFocus?: boolean
+  initialText?: string; deferFocus?: boolean; language?: SiteLanguage
   clearActiveSessionIfMatch: (session: ActiveCellEditorSession) => void
   setActiveCoordinates: (row: number, col: number) => void
   flushActiveCellMarkdown: () => string
@@ -199,7 +201,7 @@ export const openTableCellEditorSession = (params: OpenTableCellEditorParams): A
   input.type = "text"
   input.className = "cm-live-table-cell-input"
   if (input.dataset) input.dataset.testid = "cm-live-table-cell-input"
-  input.setAttribute("aria-label", "표 셀 편집")
+  input.setAttribute("aria-label", getTableLabels(params.language ?? "ko").cellEditorAria)
   input.value = initialText ? `${initialValue}${initialText}` : initialValue
   cellEl.appendChild(input)
   for (const control of preservedControls) cellEl.appendChild(control)

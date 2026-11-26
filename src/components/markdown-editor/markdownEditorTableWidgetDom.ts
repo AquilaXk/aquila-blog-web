@@ -2,7 +2,9 @@
  * 참조 구현:
  * - Milkdown/milkdown Crepe (packages/crepe/src/theme/common/table.css, packages/crepe/src/feature/table/, MIT License, Copyright (c) 2021 Mirone)
  */
+import type { SiteLanguage } from "src/libs/language"
 import { LIVE_TABLE_TOOLBAR_SVGS } from "./markdownEditorBlockSvgIcons"
+import { getTableLabels } from "./markdownEditorWidgetLabels"
 import {
   MAX_EDIT_COLUMNS,
   MAX_EDIT_ROWS,
@@ -137,6 +139,7 @@ export const createTableToolbarElement = (params: {
   onActivateToolbar?: () => void
   onVisualOptionsChange?: () => void
   isEditable?: () => boolean
+  language?: SiteLanguage
 }): {
   toolbar: HTMLDivElement
   toolbarButtons: TableToolbarButtonEntry[]
@@ -154,11 +157,13 @@ export const createTableToolbarElement = (params: {
     onActivateToolbar,
     onVisualOptionsChange,
     isEditable,
+    language = "ko",
   } = params
+  const labels = getTableLabels(language)
   const toolbar = document.createElement("div")
   toolbar.className = "cm-live-table-toolbar"
   toolbar.setAttribute("role", "toolbar")
-  toolbar.setAttribute("aria-label", "표 빠른 편집 도구")
+  toolbar.setAttribute("aria-label", labels.toolbarAria)
   if (toolbar.dataset) toolbar.dataset.testid = "cm-live-table-toolbar"
 
   const toolbarButtons: TableToolbarButtonEntry[] = []
@@ -190,28 +195,28 @@ export const createTableToolbarElement = (params: {
   })
 
   const actionSpecs: TableToolbarActionSpec[] = [
-    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.headerRow, "제목행", "표 제목 행 강조 전환", "cm-live-table-toggle-header-row", "headerRow"),
-    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.headerCol, "제목열", "표 제목 열 강조 전환", "cm-live-table-toggle-header-col", "headerColumn"),
-    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.fitWidth, "너비맞춤", "표 페이지 너비 맞춤 전환", "cm-live-table-toggle-full-width", "fitPageWidth"),
-    { group: "align", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignLeft, ariaLabel: "표 열 왼쪽 정렬", align: "left", action: { kind: "set-alignment", alignment: "left" } },
-    { group: "align", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignCenter, ariaLabel: "표 열 가운데 정렬", align: "center", action: { kind: "set-alignment", alignment: "center" } },
-    { group: "align", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignRight, ariaLabel: "표 열 오른쪽 정렬", align: "right", action: { kind: "set-alignment", alignment: "right" } },
-    { group: "row", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertRowAbove, ariaLabel: "표 위에 행 추가", action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertRowBelow, ariaLabel: "표 아래에 행 추가", action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveUp, ariaLabel: "표 행 위로 이동", action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveDown, ariaLabel: "표 행 아래로 이동", action: { kind: "move-row-down" }, isDisabled: (row) => row < 1 || row >= grid.rows.length },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.duplicate, ariaLabel: "표 행 복제", action: { kind: "duplicate-row" }, isDisabled: () => !canAddRow() },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.clear, ariaLabel: "표 행 내용 비우기", action: { kind: "clear-row" } },
-    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: "표 행 삭제", action: { kind: "delete-row" }, isDisabled: (row) => row === 0 || grid.rows.length <= 1 },
-    { group: "col", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertColLeft, ariaLabel: "표 왼쪽에 열 추가", action: { kind: "insert-column-left" }, isDisabled: () => !canAddCol() },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertColRight, ariaLabel: "표 오른쪽에 열 추가", action: { kind: "add-column" }, isDisabled: () => !canAddCol() },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveLeft, ariaLabel: "표 열 왼쪽으로 이동", action: { kind: "move-column-left" }, isDisabled: (_row, col) => col < 1 },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveRight, ariaLabel: "표 열 오른쪽으로 이동", action: { kind: "move-column-right" }, isDisabled: (_row, col) => col >= grid.headers.length - 1 },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.duplicate, ariaLabel: "표 열 복제", action: { kind: "duplicate-column" }, isDisabled: () => !canAddCol() },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.clear, ariaLabel: "표 열 내용 비우기", action: { kind: "clear-column" } },
-    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: "표 열 삭제", action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
-    { group: "source", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.code, ariaLabel: "표 마크다운 원본 편집", onSelect: () => onEditSource() },
-    { group: "source", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: "표 삭제", testId: "cm-live-table-delete-table", onSelect: () => onDeleteTable?.() },
+    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.headerRow, labels.headerRowShort, labels.headerRowAria, "cm-live-table-toggle-header-row", "headerRow"),
+    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.headerCol, labels.headerColShort, labels.headerColAria, "cm-live-table-toggle-header-col", "headerColumn"),
+    toggleOptionSpec(LIVE_TABLE_TOOLBAR_SVGS.fitWidth, labels.fitWidthShort, labels.fitWidthAria, "cm-live-table-toggle-full-width", "fitPageWidth"),
+    { group: "align", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignLeft, ariaLabel: labels.alignLeftAria, align: "left", action: { kind: "set-alignment", alignment: "left" } },
+    { group: "align", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignCenter, ariaLabel: labels.alignCenterAria, align: "center", action: { kind: "set-alignment", alignment: "center" } },
+    { group: "align", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.alignRight, ariaLabel: labels.alignRightAria, align: "right", action: { kind: "set-alignment", alignment: "right" } },
+    { group: "row", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertRowAbove, ariaLabel: labels.insertRowAboveAria, action: { kind: "insert-row-above" }, isDisabled: () => !canAddRow() },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertRowBelow, ariaLabel: labels.insertRowBelowAria, action: { kind: "add-row" }, isDisabled: () => !canAddRow() },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveUp, ariaLabel: labels.moveRowUpAria, action: { kind: "move-row-up" }, isDisabled: (row) => row < 2 },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveDown, ariaLabel: labels.moveRowDownAria, action: { kind: "move-row-down" }, isDisabled: (row) => row < 1 || row >= grid.rows.length },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.duplicate, ariaLabel: labels.duplicateRowAria, action: { kind: "duplicate-row" }, isDisabled: () => !canAddRow() },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.clear, ariaLabel: labels.clearRowAria, action: { kind: "clear-row" } },
+    { group: "row", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: labels.deleteRowAria, action: { kind: "delete-row" }, isDisabled: (row) => row === 0 || grid.rows.length <= 1 },
+    { group: "col", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertColLeft, ariaLabel: labels.insertColLeftAria, action: { kind: "insert-column-left" }, isDisabled: () => !canAddCol() },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.insertColRight, ariaLabel: labels.insertColRightAria, action: { kind: "add-column" }, isDisabled: () => !canAddCol() },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveLeft, ariaLabel: labels.moveColLeftAria, action: { kind: "move-column-left" }, isDisabled: (_row, col) => col < 1 },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.moveRight, ariaLabel: labels.moveColRightAria, action: { kind: "move-column-right" }, isDisabled: (_row, col) => col >= grid.headers.length - 1 },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.duplicate, ariaLabel: labels.duplicateColAria, action: { kind: "duplicate-column" }, isDisabled: () => !canAddCol() },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.clear, ariaLabel: labels.clearColAria, action: { kind: "clear-column" } },
+    { group: "col", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: labels.deleteColAria, action: { kind: "delete-column" }, isDisabled: () => grid.headers.length <= 1 },
+    { group: "source", groupStart: true, iconSvg: LIVE_TABLE_TOOLBAR_SVGS.code, ariaLabel: labels.editSourceAria, onSelect: () => onEditSource() },
+    { group: "source", iconSvg: LIVE_TABLE_TOOLBAR_SVGS.trash, danger: true, ariaLabel: labels.deleteTableAria, testId: "cm-live-table-delete-table", onSelect: () => onDeleteTable?.() },
   ]
 
   for (const spec of actionSpecs) {
@@ -386,6 +391,7 @@ type InteractiveSurfaceParams = {
   onMoveRowTo?: (fromRow: number, toRow: number) => void
   onVisualOptionsChange?: () => void
   isEditable?: () => boolean
+  language?: SiteLanguage
 }
 
 const buildInteractiveTableHead = (
@@ -404,7 +410,9 @@ const buildInteractiveTableHead = (
     onMoveRowTo,
     onVisualOptionsChange,
     isEditable,
+    language = "ko",
   } = params
+  const labels = getTableLabels(language)
   const thead = document.createElement("thead")
   const headTr = document.createElement("tr")
   const headCellEls: HTMLElement[] = []
@@ -417,7 +425,7 @@ const buildInteractiveTableHead = (
       axis: "col",
       index: col,
       draggable: true,
-      ariaLabel: `${col + 1}열 선택 및 이동`,
+      ariaLabel: labels.selectColAria(col),
       dragState,
       onSelect: onSelectColumn,
       onMoveTo: onMoveColumnTo,
@@ -429,13 +437,13 @@ const buildInteractiveTableHead = (
         axis: "row",
         index: 0,
         draggable: false,
-        ariaLabel: "제목 행 선택",
+        ariaLabel: labels.selectHeaderRowAria,
         dragState,
         onSelect: onSelectRow,
         onMoveTo: onMoveRowTo,
       })
     }
-    attachColumnResizeHandle(th, col, cols[col]!, visualOptions, onVisualOptionsChange, isEditable)
+    attachColumnResizeHandle(th, col, cols[col]!, visualOptions, onVisualOptionsChange, isEditable, language)
     headCellEls.push(th)
     headTr.appendChild(th)
   }
@@ -449,7 +457,8 @@ const buildInteractiveTableBody = (
   dragState: TableDragState,
   cellElements: HTMLElement[][]
 ): HTMLElement => {
-  const { grid, onActivateCell, onSelectRow, onMoveRowTo } = params
+  const { grid, onActivateCell, onSelectRow, onMoveRowTo, language = "ko" } = params
+  const labels = getTableLabels(language)
   const tbody = document.createElement("tbody")
   for (let rowIdx = 0; rowIdx < grid.rows.length; rowIdx += 1) {
     const row = grid.rows[rowIdx]!
@@ -465,7 +474,7 @@ const buildInteractiveTableBody = (
           axis: "row",
           index: rowIdx + 1,
           draggable: true,
-          ariaLabel: `${rowIdx + 1}행 선택 및 이동`,
+          ariaLabel: labels.selectRowAria(rowIdx),
           dragState,
           onSelect: onSelectRow,
           onMoveTo: onMoveRowTo,
@@ -488,7 +497,8 @@ export const createInteractiveTableSurface = (
   cellElements: HTMLElement[][]
   colElements: HTMLElement[]
 } => {
-  const { grid, visualOptions, canAddCol, canAddRow, onAddColumn, onAddRow, onAddRowAndColumn } = params
+  const { grid, visualOptions, canAddCol, canAddRow, onAddColumn, onAddRow, onAddRowAndColumn, language = "ko" } = params
+  const labels = getTableLabels(language)
   const cellElements: HTMLElement[][] = []
   const gridRow = document.createElement("div")
   gridRow.className = "cm-live-table-grid-row"
@@ -504,7 +514,7 @@ export const createInteractiveTableSurface = (
 
   const addColBtn = createAddBarButton(
     "cm-live-table-add-col",
-    "표 오른쪽에 새 열 추가",
+    labels.addColAria,
     "cm-live-table-add-col",
     LIVE_TABLE_TOOLBAR_SVGS.plus,
     !canAddCol(),
@@ -516,15 +526,15 @@ export const createInteractiveTableSurface = (
   footerRow.className = "cm-live-table-footer-row"
   const addRowBtn = createAddBarButton(
     "cm-live-table-add-row",
-    "표 아래에 새 행 추가",
+    labels.addRowAria,
     "cm-live-table-add-row",
-    `${LIVE_TABLE_TOOLBAR_SVGS.plus}<span>새 행 추가</span>`,
+    `${LIVE_TABLE_TOOLBAR_SVGS.plus}<span>${labels.addRowButtonLabel}</span>`,
     !canAddRow(),
     onAddRow
   )
   const addCornerBtn = createAddBarButton(
     "cm-live-table-add-corner",
-    "표 행과 열 동시 추가",
+    labels.addCornerAria,
     "cm-live-table-add-corner",
     LIVE_TABLE_TOOLBAR_SVGS.plus,
     !canAddRow() && !canAddCol(),

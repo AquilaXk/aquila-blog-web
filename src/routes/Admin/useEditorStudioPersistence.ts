@@ -20,15 +20,9 @@ import {
 } from "./useEditorStudioPersistenceModel"
 import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 import {
-  armLocalDraftFingerprintBaseline,
-  buildPublishingMetadataPayload,
-  executeServerTempDraftSave,
-  isBrowserOnline,
-  resolveEffectivePublishingFlags,
-  validateEditorContentPreflight,
-  type EditorFingerprintPayload,
-  type PostWriteResult,
-  type UseEditorStudioPersistenceParams,
+  armLocalDraftFingerprintBaseline, buildPublishingMetadataPayload, executeServerTempDraftSave,
+  isBrowserOnline, resolveEffectivePublishingFlags, validateEditorContentPreflight,
+  type EditorFingerprintPayload, type PostWriteResult, type UseEditorStudioPersistenceParams,
 } from "./useEditorStudioPersistenceHelpers"
 
 import type { RsData } from "src/types"
@@ -38,7 +32,7 @@ export const useEditorStudioPersistence = ({
   dedupeStrings, defaultThumbnailFocusX, defaultThumbnailFocusY, defaultThumbnailZoom,
   detectPublishPlaceholderIssue, editorMode, effectiveThumbnailUrl, extractImageFileFromClipboard,
   generateIdempotencyKey, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
-  lastWriteIdempotencyKeyRef, loadingKey, normalizeSafeImageUrl, postCategory,
+  lastWriteIdempotencyKeyRef, loadingKey, normalizeSafeImageUrl, onPostCreatedRouteSync, postCategory,
   getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
   postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
   postVersion, postVisibility, postScheduledAt = "", postSeriesName = "", postSeriesOrder = null,
@@ -171,7 +165,7 @@ export const useEditorStudioPersistence = ({
 
   const reportSaveFailure = useCallback(
     (error: unknown, action: "write" | "modify" | "publish-temp"): false => {
-      const recovery = resolveEditorFailureRecovery(error, { action, isOnline: isBrowserOnline() })
+      const recovery = resolveEditorFailureRecovery(error, { action, isOnline: isBrowserOnline(), language })
       setLastSaveError(recovery.result)
       setPublishStatus({ tone: "error", text: recovery.statusText })
       if (recovery.result.errorType === "version-conflict") {
@@ -180,7 +174,7 @@ export const useEditorStudioPersistence = ({
       setResult(pretty(recovery.result))
       return false
     },
-    [pretty, setPublishStatus, setResult]
+    [language, pretty, setPublishStatus, setResult]
   )
 
   const buildSuccessfulWriteFingerprintPayload = useCallback(
@@ -297,7 +291,7 @@ export const useEditorStudioPersistence = ({
 
       setResult(pretty(response))
 
-      const createWritePostId = resolveCreateWritePostId(response?.data)
+      const createWritePostId = resolveCreateWritePostId(response?.data, language)
       if (!createWritePostId.ok) {
         setPublishStatus({ tone: "error", text: createWritePostId.statusText })
         setResult(pretty({ error: createWritePostId.statusText, response }))
@@ -325,26 +319,35 @@ export const useEditorStudioPersistence = ({
 
       cancelPendingAutosave?.()
       const removedSubmittedDraft = cleanupSubmittedDraft()
-      signalLocalDraftBaselineReady({
-        baselineFingerprint: armLocalDraftFingerprintBaseline(
-          lastLocalDraftFingerprintRef,
-          fingerprintPayload,
-          dedupeStrings
-        ),
-      })
+      const localDraftBaselineFingerprint = armLocalDraftFingerprintBaseline(
+        lastLocalDraftFingerprintRef, fingerprintPayload, dedupeStrings
+      )
+      signalLocalDraftBaselineReady({ baselineFingerprint: localDraftBaselineFingerprint })
       if (removedSubmittedDraft) {
         setLocalDraftSavedAt("")
       }
 
-      setPublishStatus(
-        await resolvePostSaveRefresh(
-          () => refreshPublicPostReadViews(createWritePostId.postId),
-          isEn
-            ? `Created: ${response.msg} (Visibility: ${visibilityText})`
-            : `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`
-        ),
-        "page"
+      const nextPublishNotice = await resolvePostSaveRefresh(
+        () => refreshPublicPostReadViews(createWritePostId.postId),
+        isEn
+          ? `Created: ${response.msg} (Visibility: ${visibilityText})`
+          : `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`
       )
+      setPublishStatus(nextPublishNotice, "page")
+      setLoadingKey("")
+      await onPostCreatedRouteSync?.(createWritePostId.postId, {
+        ...fingerprintPayload,
+        scheduledAt: fingerprintPayload.scheduledAt ?? "",
+        seriesName: fingerprintPayload.seriesName ?? "",
+        seriesOrder: fingerprintPayload.seriesOrder ?? null,
+        canonicalUrl: fingerprintPayload.canonicalUrl ?? "",
+        postId: createWritePostId.postId,
+        postVersion: typeof response.data?.version === "number" ? response.data.version : null,
+        serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
+        localDraftBaselineFingerprint,
+        publishNotice: nextPublishNotice,
+        resultText: pretty(response),
+      })
       return true
     } catch (error) {
       return reportSaveFailure(error, "write")
@@ -355,12 +358,12 @@ export const useEditorStudioPersistence = ({
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
     composeEditorContent, dedupeStrings, editorMode, effectiveThumbnailUrl, generateIdempotencyKey,
     getCurrentPostContent, isEn, language, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
-    lastWriteIdempotencyKeyRef, postCanonicalUrl, postId, postScheduledAt, postSeriesName,
-    postSeriesOrder, postTitle, postVisibility, pretty, refreshPublicPostReadViews, reportSaveFailure,
-    reportValidationError, resolveAuthoringMetadataForWrite, serverBaselineEditorFingerprintRef,
-    signalLocalDraftBaselineReady, cancelPendingAutosave, setEditorMode, setIsTempDraftMode,
-    setLoadingKey, setLocalDraftSavedAt, setPostId, setPostVersion, setPublishStatus, setResult,
-    summaryIntent, toFlags, validateContentPreflight,
+    lastWriteIdempotencyKeyRef, onPostCreatedRouteSync, postCanonicalUrl, postId, postScheduledAt,
+    postSeriesName, postSeriesOrder, postTitle, postVisibility, pretty, refreshPublicPostReadViews,
+    reportSaveFailure, reportValidationError, resolveAuthoringMetadataForWrite,
+    serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, cancelPendingAutosave,
+    setEditorMode, setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt, setPostId,
+    setPostVersion, setPublishStatus, setResult, summaryIntent, toFlags, validateContentPreflight,
   ])
 
   const handleModifyPost = useCallback(async (): Promise<boolean> => {

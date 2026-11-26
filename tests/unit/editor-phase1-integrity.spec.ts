@@ -19,7 +19,23 @@ import {
   createStatefulEditorHarness,
   withWindowStorage,
 } from "./helpers/editorStudioTestHarness"
-import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
+import { materializePlaywrightJsx, wrapPlaywrightJsxComponent } from "./helpers/materializePlaywrightJsx"
+
+const withClientLanguageStorage = async (run: () => Promise<void>) =>
+  withWindowStorage(async () => {
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+    const docStub = { activeElement: null, body: null, documentElement: { lang: "" } }
+    Object.defineProperty(globalThis, "document", { configurable: true, writable: true, value: docStub })
+    ;(globalThis.window as unknown as Record<string, unknown>).document = docStub
+    try {
+      await run()
+    } finally {
+      if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
+      else delete (globalThis as Record<string, unknown>).document
+    }
+  })
+
+const ClientLanguageProvider = wrapPlaywrightJsxComponent(LanguageProvider) as typeof LanguageProvider
 
 const lightTheme = createTheme({ scheme: "light" })
 
@@ -364,6 +380,192 @@ test.describe("Phase 1 editor workflow & integrity invariants", () => {
         })
       }
     })
+  })
+
+  test("Mod+S while non-publish loading commits pending tagDraft, forces local backup, and reports KO/EN notice", async () => {
+    for (const { loadingKey, language, expectedNotice } of [
+      {
+        loadingKey: "uploadThumbnail",
+        language: "ko" as const,
+        expectedNotice: "다른 작업이 진행 중이어서 브라우저 로컬 초안에 안전 저장했습니다.",
+      },
+      {
+        loadingKey: "serverTempDraftSave",
+        language: "en" as const,
+        expectedNotice: "Another task is running; backed up safely as a browser draft.",
+      },
+    ]) {
+      await withClientLanguageStorage(async () => {
+        const container = createMinimalRootContainer()
+        const root = createRoot(container as unknown as Element)
+        const originalFetch = globalThis.fetch
+        let fetchCalls = 0
+        globalThis.fetch = (async () => {
+          fetchCalls += 1
+          return new Response(null, { status: 204 })
+        }) as typeof fetch
+
+        const addedTagBatches: string[][] = []
+        const tagDraftUpdates: string[] = []
+        const localSaveOptions: Array<{ silent?: boolean; force?: boolean } | undefined> = []
+        const statusCalls: Array<{ notice: { tone: string; text: string }; target?: string }> = []
+
+        const Probe = () => {
+          useEditorStudioKeyboardShortcuts({
+            isTempDraftMode: true,
+            editorMode: "edit",
+            postId: "778",
+            postVersion: 2,
+            postTitle: "제목",
+            postSummary: "",
+            postSummarySource: "NONE",
+            effectiveThumbnailUrl: "",
+            getCurrentPostContent: () => "본문",
+            composeEditorContent: (c) => c,
+            postTags: ["existing"],
+            tagDraft: "pending-tag, second-tag",
+            postCategory: "",
+            addTagsToPost: (tags) => {
+              addedTagBatches.push(tags)
+              return ["existing", ...tags]
+            },
+            setTagDraft: (value) => {
+              tagDraftUpdates.push(value)
+            },
+            saveLocalDraft: (options) => {
+              localSaveOptions.push(options)
+            },
+            setPostVersion: () => undefined,
+            setPublishStatus: (notice, target) => {
+              statusCalls.push({ notice, target })
+            },
+            loadingKey,
+            setLoadingKey: () => undefined,
+          })
+          return null
+        }
+
+        try {
+          await act(async () => {
+            root.render(
+              createElement(ClientLanguageProvider, {
+                initialLanguage: language,
+                children: createElement(Probe),
+              })
+            )
+          })
+
+          let prevented = false
+          await act(async () => {
+            const ev = createKeydownEvent({ key: "s", metaKey: true })
+            window.dispatchEvent(ev)
+            prevented = ev.defaultPrevented
+          })
+
+          expect(prevented).toBe(true)
+          expect(fetchCalls).toBe(0)
+          expect(addedTagBatches).toEqual([["pending-tag", "second-tag"]])
+          expect(tagDraftUpdates).toEqual([""])
+          expect(localSaveOptions).toEqual([{ silent: false, force: true }])
+          expect(statusCalls).toEqual([
+            {
+              notice: { tone: "success", text: expectedNotice },
+              target: "page",
+            },
+          ])
+        } finally {
+          globalThis.fetch = originalFetch
+          await act(async () => {
+            root.unmount()
+          })
+        }
+      })
+    }
+  })
+
+  test("Mod+S while publishing saves local backup without mutating tagDraft or overwriting publish status", async () => {
+    for (const publishLoadingKey of ["writePost", "modifyPost", "publishTempPost"] as const) {
+      await withClientLanguageStorage(async () => {
+        const container = createMinimalRootContainer()
+        const root = createRoot(container as unknown as Element)
+        const originalFetch = globalThis.fetch
+        let fetchCalls = 0
+        globalThis.fetch = (async () => {
+          fetchCalls += 1
+          return new Response(null, { status: 204 })
+        }) as typeof fetch
+
+        const addedTagBatches: string[][] = []
+        const tagDraftUpdates: string[] = []
+        const localSaveOptions: Array<{ silent?: boolean; force?: boolean } | undefined> = []
+        const statusCalls: Array<{ notice: { tone: string; text: string }; target?: string }> = []
+
+        const Probe = () => {
+          useEditorStudioKeyboardShortcuts({
+            isTempDraftMode: false,
+            editorMode: "edit",
+            postId: "779",
+            postVersion: 3,
+            postTitle: "발행 중 제목",
+            postSummary: "",
+            postSummarySource: "NONE",
+            effectiveThumbnailUrl: "",
+            getCurrentPostContent: () => "발행 중 본문",
+            composeEditorContent: (c) => c,
+            postTags: ["existing"],
+            tagDraft: "uncommitted-draft-tag",
+            postCategory: "",
+            addTagsToPost: (tags) => {
+              addedTagBatches.push(tags)
+              return tags
+            },
+            setTagDraft: (value) => {
+              tagDraftUpdates.push(value)
+            },
+            saveLocalDraft: (options) => {
+              localSaveOptions.push(options)
+            },
+            setPostVersion: () => undefined,
+            setPublishStatus: (notice, target) => {
+              statusCalls.push({ notice, target })
+            },
+            loadingKey: publishLoadingKey,
+            setLoadingKey: () => undefined,
+          })
+          return null
+        }
+
+        try {
+          await act(async () => {
+            root.render(
+              createElement(ClientLanguageProvider, {
+                initialLanguage: "ko",
+                children: createElement(Probe),
+              })
+            )
+          })
+
+          let prevented = false
+          await act(async () => {
+            const ev = createKeydownEvent({ key: "s", metaKey: true })
+            window.dispatchEvent(ev)
+            prevented = ev.defaultPrevented
+          })
+
+          expect(prevented).toBe(true)
+          expect(fetchCalls).toBe(0)
+          expect(addedTagBatches).toEqual([])
+          expect(tagDraftUpdates).toEqual([])
+          expect(localSaveOptions).toEqual([{ silent: false, force: true }])
+          expect(statusCalls).toEqual([])
+        } finally {
+          globalThis.fetch = originalFetch
+          await act(async () => {
+            root.unmount()
+          })
+        }
+      })
+    }
   })
 
   test("dedicated editor surface topbar shows DRAFT badge when isTempDraftMode is true", () => {

@@ -1,5 +1,6 @@
 import { EditorState, StateField, type Range } from "@codemirror/state"
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view"
+import type { SiteLanguage } from "src/libs/language"
 import {
   parseBlockContainerBlocks,
   type EditorBookmarkContainerBlock,
@@ -13,12 +14,18 @@ import {
 import { forEachOverlappingSortedIndex, isRangeActiveInSelections } from "./markdownEditorLiveDecorationRegions"
 import { getLiveCalloutIconSvg, LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
 import {
+  editorLanguageField,
+  resolveEditorViewLanguage,
+  setEditorLanguage,
+} from "./markdownEditorLanguageState"
+import {
   editorFocusField,
   editorModeField,
   getDocString,
   setEditorFocus,
   setEditorMode,
 } from "./markdownEditorLiveSurfaceDecorations"
+import { getBlockWidgetLabels } from "./markdownEditorWidgetLabels"
 import {
   bindContainerActivateTarget,
   MarkdownBookmarkBlockWidget,
@@ -51,7 +58,8 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
     readonly to: number,
     readonly bodyOffset = 11 + title.length + 1,
     readonly foldable = false,
-    readonly defaultCollapsed = false
+    readonly defaultCollapsed = false,
+    readonly language: SiteLanguage = "ko"
   ) {
     super()
   }
@@ -67,7 +75,8 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
       other.to === this.to &&
       other.bodyOffset === this.bodyOffset &&
       other.foldable === this.foldable &&
-      other.defaultCollapsed === this.defaultCollapsed
+      other.defaultCollapsed === this.defaultCollapsed &&
+      other.language === this.language
     )
   }
 
@@ -78,8 +87,9 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
       : base
   }
 
-  updateDOM(dom: HTMLElement) {
-    if (dom.dataset?.sig !== this.getDomSignature()) {
+  updateDOM(dom: HTMLElement, view?: EditorView) {
+    const lang = resolveEditorViewLanguage(view, this.language)
+    if (dom.dataset?.sig !== this.getDomSignature() || (dom.dataset?.lang ?? "ko") !== lang) {
       return false
     }
     dom.dataset.from = String(this.from)
@@ -87,6 +97,8 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
   }
 
   toDOM(view?: EditorView) {
+    const uiLang = resolveEditorViewLanguage(view, this.language)
+    const labels = getBlockWidgetLabels(uiLang)
     let isCollapsed = this.foldable && this.defaultCollapsed
     const root = document.createElement("div")
     root.className = `cm-live-callout cm-live-callout-tone-${this.tone}${isCollapsed ? " is-collapsed" : ""}`
@@ -94,6 +106,7 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
     root.dataset.from = String(this.from)
     root.dataset.callout = this.tone
     root.dataset.sig = this.getDomSignature()
+    root.dataset.lang = uiLang
 
     const header = document.createElement("div")
     header.className = "cm-live-callout-header"
@@ -103,7 +116,7 @@ export class MarkdownCalloutBlockWidget extends WidgetType {
     badge.innerHTML = getLiveCalloutIconSvg(this.tone)
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-callout-title"
-    appendInlineMarkdownNodes(titleSpan, this.title || "콜아웃")
+    appendInlineMarkdownNodes(titleSpan, this.title || labels.calloutFallback)
     header.append(badge, titleSpan)
     if (this.foldable) {
       const foldIcon = document.createElement("span")
@@ -149,7 +162,8 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     readonly body: string,
     readonly from: number,
     readonly to: number,
-    readonly bodyOffset = 10 + title.length + 1
+    readonly bodyOffset = 10 + title.length + 1,
+    readonly language: SiteLanguage = "ko"
   ) {
     super()
   }
@@ -161,23 +175,30 @@ export class MarkdownToggleBlockWidget extends WidgetType {
       other.body === this.body &&
       other.from === this.from &&
       other.to === this.to &&
-      other.bodyOffset === this.bodyOffset
+      other.bodyOffset === this.bodyOffset &&
+      other.language === this.language
     )
   }
 
-  updateDOM(dom: HTMLElement) {
-    if (dom.dataset?.sig !== `${this.title}\0${this.body}\0${this.bodyOffset}`) return false
+  updateDOM(dom: HTMLElement, view?: EditorView) {
+    const lang = resolveEditorViewLanguage(view, this.language)
+    if (dom.dataset?.sig !== `${this.title}\0${this.body}\0${this.bodyOffset}` || (dom.dataset?.lang ?? "ko") !== lang) {
+      return false
+    }
     dom.dataset.from = String(this.from)
     return true
   }
 
   toDOM(view?: EditorView) {
+    const uiLang = resolveEditorViewLanguage(view, this.language)
+    const labels = getBlockWidgetLabels(uiLang)
     let isCollapsed = false
     const root = document.createElement("div")
     root.className = "cm-live-toggle-block"
     root.dataset.testid = "cm-live-toggle-widget"
     root.dataset.from = String(this.from)
     root.dataset.sig = `${this.title}\0${this.body}\0${this.bodyOffset}`
+    root.dataset.lang = uiLang
 
     const header = document.createElement("div")
     header.className = "cm-live-toggle-header"
@@ -187,7 +208,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     caret.setAttribute("tabindex", "0")
     caret.setAttribute("role", "button")
     caret.setAttribute("aria-expanded", "true")
-    caret.setAttribute("aria-label", "토글 접기/펼치기")
+    caret.setAttribute("aria-label", labels.toggleAria)
     caret.innerHTML = LIVE_BLOCK_UI_SVGS.chevronDown
     const toggleCollapse = (event: Event) => {
       event.preventDefault()
@@ -206,7 +227,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
 
     const titleSpan = document.createElement("span")
     titleSpan.className = "cm-live-toggle-title"
-    appendInlineMarkdownNodes(titleSpan, this.title || "토글 블록")
+    appendInlineMarkdownNodes(titleSpan, this.title || labels.toggleTitleFallback)
     bindContainerActivateTarget(titleSpan, view, root, this.from, this.to, 10)
     header.append(caret, titleSpan)
     root.appendChild(header)
@@ -214,7 +235,7 @@ export class MarkdownToggleBlockWidget extends WidgetType {
     const bodyEl = document.createElement("div")
     bodyEl.className = `cm-live-toggle-body${this.body ? "" : " is-empty"}`
     if (this.body) appendInlineMarkdownNodes(bodyEl, this.body)
-    else bodyEl.textContent = "내용을 입력하려면 클릭하세요..."
+    else bodyEl.textContent = labels.toggleEmptyBody
     bindContainerActivateTarget(bodyEl, view, root, this.from, this.to, this.bodyOffset)
     root.appendChild(bodyEl)
     return root
@@ -258,7 +279,7 @@ export const haveSameActiveContainerBlocks = (
   return checkSelectionRanges(prevRanges) && checkSelectionRanges(nextRanges)
 }
 
-const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => {
+const createBlockContainerWidget = (block: EditorContainerBlock, language: SiteLanguage = "ko"): WidgetType => {
   if (block.kind === "callout") {
     return new MarkdownCalloutBlockWidget(
       block.tone,
@@ -269,11 +290,12 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
       block.to,
       block.bodyOffset,
       Boolean(block.foldable),
-      Boolean(block.defaultCollapsed)
+      Boolean(block.defaultCollapsed),
+      language
     )
   }
   if (block.kind === "toggle") {
-    return new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset)
+    return new MarkdownToggleBlockWidget(block.title, block.body, block.from, block.to, block.bodyOffset, language)
   }
   if (block.kind === "embed") {
     return new MarkdownEmbedBlockWidget(
@@ -285,7 +307,8 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
       block.provider ?? "",
       block.siteName ?? "",
       block.thumbnailUrl ?? "",
-      block.embedUrl ?? ""
+      block.embedUrl ?? "",
+      language
     )
   }
   if (block.kind === "file") {
@@ -296,7 +319,8 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
       block.from,
       block.to,
       block.mimeType ?? "",
-      block.sizeBytes
+      block.sizeBytes,
+      language
     )
   }
   return new MarkdownBookmarkBlockWidget(
@@ -307,7 +331,8 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
     block.to,
     block.siteName ?? "",
     block.provider ?? "",
-    block.thumbnailUrl ?? ""
+    block.thumbnailUrl ?? "",
+    language
   )
 }
 
@@ -315,6 +340,7 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
   const mode = state.field(editorModeField, false) ?? "live"
   if (mode === "source" || state.doc.length === 0) return Decoration.none
 
+  const language = state.field(editorLanguageField, false) ?? "ko"
   const blocks = getCachedBlockContainerBlocks(state.doc)
   if (blocks.length === 0) return Decoration.none
 
@@ -340,7 +366,7 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
       continue
     }
 
-    const widget = createBlockContainerWidget(block)
+    const widget = createBlockContainerWidget(block, language)
     decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to))
   }
 
@@ -351,7 +377,7 @@ export const blockContainerBlockField = StateField.define<DecorationSet>({
   create: buildBlockContainerDecorations,
   update: (decorations, transaction) => {
     const hasModeOrFocusEffect = transaction.effects.some(
-      (effect) => effect.is(setEditorMode) || effect.is(setEditorFocus)
+      (effect) => effect.is(setEditorMode) || effect.is(setEditorFocus) || effect.is(setEditorLanguage)
     )
     if (!transaction.docChanged && !hasModeOrFocusEffect) {
       if (!transaction.selection) return decorations

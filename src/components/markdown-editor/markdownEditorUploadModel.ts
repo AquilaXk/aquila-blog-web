@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import { normalizePostImageUrl } from "src/libs/markdown/postImageUrlPolicy"
 
 export const MARKDOWN_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
@@ -9,6 +10,28 @@ export const MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE = "첨부 파일 업로�
 export const MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE = "첨부 파일 업로드 결과 URL을 확인할 수 없습니다."
 export const MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE = "이미지 업로드에 실패했습니다."
 export const MARKDOWN_IMAGE_URL_MISSING_MESSAGE = "이미지 업로드 결과 URL을 확인할 수 없습니다."
+
+const MARKDOWN_UPLOAD_MESSAGES = {
+  ko: {
+    tooLarge: MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE,
+    unsafeType: MARKDOWN_ATTACHMENT_UNSAFE_TYPE_MESSAGE,
+    attachmentFailed: MARKDOWN_ATTACHMENT_UPLOAD_FAILED_MESSAGE,
+    attachmentUrlMissing: MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE,
+    imageFailed: MARKDOWN_IMAGE_UPLOAD_FAILED_MESSAGE,
+    imageUrlMissing: MARKDOWN_IMAGE_URL_MISSING_MESSAGE,
+  },
+  en: {
+    tooLarge: "Attachments must be 10MB or smaller.",
+    unsafeType: "Executable files such as HTML, SVG, or JavaScript cannot be attached.",
+    attachmentFailed: "Attachment upload failed.",
+    attachmentUrlMissing: "Attachment upload did not return a valid URL.",
+    imageFailed: "Image upload failed.",
+    imageUrlMissing: "Image upload did not return a valid URL.",
+  },
+} as const
+
+export const getMarkdownUploadErrorMessages = (language: SiteLanguage = "ko") =>
+  MARKDOWN_UPLOAD_MESSAGES[language]
 
 const DANGEROUS_ATTACHMENT_EXTENSIONS = new Set([
   ".html",
@@ -67,12 +90,16 @@ export const isDangerousMarkdownAttachmentType = (name: string, mimeType = ""): 
   return Boolean(normalizedMime && DANGEROUS_ATTACHMENT_MIME_TYPES.has(normalizedMime))
 }
 
-export const validateMarkdownAttachmentSize = (file: Pick<File, "size"> & Partial<Pick<File, "name" | "type">>): string | null => {
+export const validateMarkdownAttachmentSize = (
+  file: Pick<File, "size"> & Partial<Pick<File, "name" | "type">>,
+  language: SiteLanguage = "ko"
+): string | null => {
+  const messages = MARKDOWN_UPLOAD_MESSAGES[language]
   if (file.size > MARKDOWN_ATTACHMENT_MAX_BYTES) {
-    return MARKDOWN_ATTACHMENT_TOO_LARGE_MESSAGE
+    return messages.tooLarge
   }
   if (isDangerousMarkdownAttachmentType(file.name || "", file.type || "")) {
-    return MARKDOWN_ATTACHMENT_UNSAFE_TYPE_MESSAGE
+    return messages.unsafeType
   }
   return null
 }
@@ -131,11 +158,12 @@ export const escapeMarkdownLinkDestination = (url: string): string => {
 
 export const resolveMarkdownAttachmentLink = (
   uploaded: MarkdownFileUploadResult,
-  fallbackName: string
+  fallbackName: string,
+  language: SiteLanguage = "ko"
 ): { markdown: string } | { error: string } => {
   const safeUrl = normalizeSafeAttachmentUrl(String(uploaded.url || ""))
   if (!safeUrl) {
-    return { error: MARKDOWN_ATTACHMENT_URL_MISSING_MESSAGE }
+    return { error: MARKDOWN_UPLOAD_MESSAGES[language].attachmentUrlMissing }
   }
 
   const name = String(uploaded.name || fallbackName).trim() || fallbackName
@@ -159,12 +187,12 @@ const appendImageDimensionsIfMissing = (
 export const resolveMarkdownImageEmbed = (
   uploaded: MarkdownImageUploadResult,
   fallbackName: string,
-  options?: { publicApiOrigin?: string },
+  options?: { publicApiOrigin?: string; language?: SiteLanguage },
 ): { markdown: string } | { error: string } => {
   const rawSrc = String(uploaded.url || uploaded.src || "").trim()
   const normalizedSrc = rawSrc ? normalizePostImageUrl(rawSrc, options) : ""
   if (!normalizedSrc) {
-    return { error: MARKDOWN_IMAGE_URL_MISSING_MESSAGE }
+    return { error: MARKDOWN_UPLOAD_MESSAGES[options?.language ?? "ko"].imageUrlMissing }
   }
 
   const alt = String(uploaded.alt || uploaded.title || fallbackName).trim() || fallbackName

@@ -1,4 +1,6 @@
 import { EditorView, WidgetType } from "@codemirror/view"
+import type { SiteLanguage } from "src/libs/language"
+import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
 import {
   applyMarkdownTableGridAction, applyMarkdownTableGridCellEdit, parseMarkdownTableGrid,
   type MarkdownTableGrid, type MarkdownTableGridAction,
@@ -55,7 +57,8 @@ class TableWidgetController implements TableSurfaceInteractionParams {
     readonly grid: MarkdownTableGrid,
     markdown: string,
     from: number | undefined,
-    to: number | undefined
+    to: number | undefined,
+    private readonly uiLanguage: SiteLanguage = "ko"
   ) {
     this.currentMarkdown = markdown
     this.currentFrom = from
@@ -74,7 +77,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
     this.tb = this.initToolbar()
     this.surface = this.buildSurface()
     if (this.isEditable()) {
-      this.imeProxy = createTableImeProxyElement()
+      this.imeProxy = createTableImeProxyElement(this.uiLanguage)
       this.imeProxyController = attachImeProxyListeners(this.imeProxy, this)
     }
     appendTableWrapChildren(wrap, this.tb.toolbar, this.surface.gridRow, this.surface.addRowBtn, this.imeProxy)
@@ -105,7 +108,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 
   private ensureImeProxy(): HTMLTextAreaElement {
     if (!this.imeProxy) {
-      this.imeProxy = createTableImeProxyElement()
+      this.imeProxy = createTableImeProxyElement(this.uiLanguage)
       this.imeProxyController = attachImeProxyListeners(this.imeProxy, this)
       this.wrap.appendChild(this.imeProxy)
     }
@@ -222,6 +225,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
       wrap: this.wrap,
       visualOptions: this.visualOptions,
       isEditable: this.isEditable,
+      language: this.uiLanguage,
       executeGridAction: (action) => this.executeGridAction(action),
       onActivateToolbar: () => {
         if (!this.isEditable()) return
@@ -250,6 +254,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
       canAddCol: this.tb.canAddCol,
       canAddRow: this.tb.canAddRow,
       isEditable: this.isEditable,
+      language: this.uiLanguage,
       onActivateCell: (row, col) => this.activateCellEditor(row, col),
       onAddColumn: () => this.executeGridAction({ kind: "add-column" }, this.activeRow, this.grid.headers.length - 1),
       onAddRow: () => this.executeGridAction({ kind: "add-row" }, this.grid.rows.length, 0),
@@ -324,6 +329,7 @@ class TableWidgetController implements TableSurfaceInteractionParams {
       col: c,
       initialText,
       deferFocus,
+      language: this.uiLanguage,
       getCurrentMarkdown: this.getCurrentMarkdown,
       clearActiveSessionIfMatch: (s) => {
         if (this.activeSession === s) this.activeSession = null
@@ -373,7 +379,10 @@ class TableWidgetController implements TableSurfaceInteractionParams {
     this.activateCellEditor(target.row, target.col)
   }
 
-  update(nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined): boolean {
+  update(nextMarkdown: string, nextFrom: number | undefined, nextTo: number | undefined, nextLanguage?: SiteLanguage): boolean {
+    if (nextLanguage && nextLanguage !== this.uiLanguage) {
+      return false
+    }
     if (nextMarkdown === this.currentMarkdown) {
       this.visualOptions = migrateTableVisualOptionsOffset(this.currentFrom, nextFrom, this.grid.headers.length, this.visualOptions, this.view)
       this.currentFrom = nextFrom
@@ -426,21 +435,34 @@ class TableWidgetController implements TableSurfaceInteractionParams {
 }
 
 export class MarkdownTableWidget extends WidgetType {
-  constructor(private readonly markdown: string, private readonly from?: number, private readonly to?: number) {
+  constructor(
+    private readonly markdown: string,
+    private readonly from?: number,
+    private readonly to?: number,
+    private readonly uiLanguage: SiteLanguage = "ko"
+  ) {
     super()
   }
   eq(other: MarkdownTableWidget) {
-    return other instanceof MarkdownTableWidget && other.markdown === this.markdown && other.from === this.from && other.to === this.to
+    return (
+      other instanceof MarkdownTableWidget &&
+      other.markdown === this.markdown &&
+      other.from === this.from &&
+      other.to === this.to &&
+      other.uiLanguage === this.uiLanguage
+    )
   }
   ignoreEvent() { return true }
-  updateDOM(dom: HTMLElement, _view: EditorView) {
-    return tableDomControllers.get(dom)?.update(this.markdown, this.from, this.to) ?? false
+  updateDOM(dom: HTMLElement, view: EditorView) {
+    const nextLanguage = resolveEditorViewLanguage(view, this.uiLanguage)
+    return tableDomControllers.get(dom)?.update(this.markdown, this.from, this.to, nextLanguage) ?? false
   }
   destroy(dom: HTMLElement) {
     tableDomControllers.get(dom)?.destroy()
     tableDomControllers.delete(dom)
   }
   toDOM(view?: EditorView) {
+    const uiLanguage = resolveEditorViewLanguage(view, this.uiLanguage)
     const wrap = document.createElement("div")
     wrap.className = "cm-live-table-wrap"
     const grid = parseMarkdownTableGrid(this.markdown)
@@ -449,7 +471,7 @@ export class MarkdownTableWidget extends WidgetType {
       wrap.appendChild(renderStaticTableElement(grid))
       return wrap
     }
-    tableDomControllers.set(wrap, new TableWidgetController(wrap, view, grid, this.markdown, this.from, this.to))
+    tableDomControllers.set(wrap, new TableWidgetController(wrap, view, grid, this.markdown, this.from, this.to, uiLanguage))
     return wrap
   }
 }

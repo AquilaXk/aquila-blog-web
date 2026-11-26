@@ -32,6 +32,7 @@ import {
 } from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
 import { MarkdownCodeBlockHeaderWidget } from "./markdownEditorCodeBlockChrome"
+import { editorLanguageField, setEditorLanguage } from "./markdownEditorLanguageState"
 import {
   MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
   MarkdownMermaidWidget, MarkdownRuleWidget, MarkdownTableWidget, MarkdownTaskWidget, MarkdownWikilinkWidget,
@@ -256,7 +257,8 @@ const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpe
   if (hasClosingFence && !isComposing && startLine.to > hideFrom) {
     pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, hideFrom, startLine.to)
     if (showHeader) {
-      ctx.decorations.push(Decoration.widget({ widget: new MarkdownCodeBlockHeaderWidget(spec.codeLanguage ?? "", startLine.from), side: 1 }).range(startLine.to))
+      const editorLang = ctx.state.field(editorLanguageField, false) ?? "ko"
+      ctx.decorations.push(Decoration.widget({ widget: new MarkdownCodeBlockHeaderWidget(spec.codeLanguage ?? "", startLine.from, editorLang), side: 1 }).range(startLine.to))
     }
   }
   const bodyEndLine = hasClosingFence ? endLine.number - 1 : endLine.number
@@ -349,10 +351,11 @@ const appendBlockWidgetDecorations = (
     tables: readonly TableReplacementSpec[]; callouts: readonly CalloutReplacementSpec[]
     images: readonly ImageReplacementSpec[]; maths: readonly MathReplacementSpec[]
     mermaids: readonly MermaidReplacementSpec[]
-  }
+  },
+  editorLanguage: "ko" | "en" = "ko"
 ) => {
   for (const t of groups.tables) {
-    decorations.push(Decoration.replace({ widget: new MarkdownTableWidget(t.markdown, t.from, t.to) }).range(t.from, t.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownTableWidget(t.markdown, t.from, t.to, editorLanguage) }).range(t.from, t.to))
   }
   for (const c of groups.callouts) {
     decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
@@ -364,7 +367,7 @@ const appendBlockWidgetDecorations = (
     decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))
   }
   for (const m of groups.mermaids) {
-    decorations.push(Decoration.replace({ widget: new MarkdownMermaidWidget(m.source, m.from) }).range(m.from, m.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownMermaidWidget(m.source, m.from, undefined, { uiLanguage: editorLanguage }) }).range(m.from, m.to))
   }
 }
 
@@ -480,7 +483,7 @@ export const resolveScopedDecorations = (
   }
 
   if (options.includeBlocks) {
-    appendBlockWidgetDecorations(decorations, filtered)
+    appendBlockWidgetDecorations(decorations, filtered, state.field(editorLanguageField, false) ?? "ko")
   }
   return decorations
 }
@@ -498,10 +501,8 @@ export const buildDecorations = (
 export const hasRelevantDecorationEffect = (effects: readonly StateEffect<unknown>[]): boolean =>
   effects.some(
     (effect) =>
-      effect.is(setComposition) ||
-      (effect.is(setPointerSelecting) && !effect.value) ||
-      effect.is(setEditorMode) ||
-      effect.is(setDisableMermaid)
+      effect.is(setComposition) || (effect.is(setPointerSelecting) && !effect.value) ||
+      effect.is(setEditorMode) || effect.is(setDisableMermaid) || effect.is(setEditorLanguage)
   )
 
 export const canReuseSelectionDecorations = (startState: EditorState, nextState: EditorState): boolean => {

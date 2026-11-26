@@ -170,6 +170,7 @@ export const useEditorStudioPersistenceUploads = ({
         kind: "image",
         fileName: file.name,
         isOnline: isBrowserOnline(),
+        language,
       })
       setPublishStatus({
         tone: "error",
@@ -231,6 +232,7 @@ export const useEditorStudioPersistenceUploads = ({
         kind: "file",
         fileName: file.name,
         isOnline: isBrowserOnline(),
+        language,
       })
       setPublishStatus({
         tone: "error",
@@ -270,6 +272,7 @@ export const useEditorStudioPersistenceUploads = ({
         kind: "thumbnail",
         fileName: file.name,
         isOnline: isBrowserOnline(),
+        language,
       })
       setPublishStatus({
         tone: "error",

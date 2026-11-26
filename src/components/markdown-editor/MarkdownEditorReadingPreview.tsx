@@ -1,19 +1,40 @@
-import { useMemo, useSyncExternalStore } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  type ComponentType,
+  type MutableRefObject,
+} from "react"
 import dynamic from "next/dynamic"
 import styled from "@emotion/styled"
 import { useLanguage } from "../../libs/language"
 import { buildPostInternalLinkTargets } from "../../libs/markdown/internalWikilinkResolver"
-import type { MarkdownImageWidthCommitPayload } from "../../libs/markdown/MarkdownRenderer.types"
+import type {
+  MarkdownImageWidthCommitPayload,
+  MarkdownRendererProps,
+} from "../../libs/markdown/MarkdownRenderer.types"
 import { adminT } from "../../routes/Admin/adminI18n"
 import {
   getRegisteredPostSuggestions,
   subscribeInternalPostSuggestions,
   type InternalPostSuggestion,
 } from "./markdownEditorCompletions"
+import {
+  restoreMarkdownScrollSnapshot,
+  type MarkdownEditorSurfaceMode,
+  type MarkdownScrollSnapshot,
+} from "./markdownEditorLivePreview"
 
-const ReadingPreviewLoadingPlaceholder = () => {
+const READING_PREVIEW_LOADING_SELECTOR = '[data-reading-preview-loading="true"]'
+
+export const ReadingPreviewLoadingPlaceholder = () => {
   const { language } = useLanguage()
-  return <div aria-busy="true">{adminT("editorReadingPreviewLoading", language)}</div>
+  return (
+    <div aria-busy="true" data-reading-preview-loading="true">
+      {adminT("editorReadingPreviewLoading", language)}
+    </div>
+  )
 }
 
 const DynamicMarkdownRenderer = dynamic(
@@ -56,6 +77,10 @@ type MarkdownEditorReadingPreviewProps = {
   disableMermaid?: boolean
   internalLinkTargets?: Readonly<Record<string, string>>
   onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
+  viewMode?: MarkdownEditorSurfaceMode
+  pendingScrollSnapshotRef?: MutableRefObject<MarkdownScrollSnapshot | null>
+  getScrollBodyNode?: () => HTMLElement | null
+  rendererComponent?: ComponentType<MarkdownRendererProps>
 }
 
 export const MarkdownEditorReadingPreview = ({
@@ -63,7 +88,14 @@ export const MarkdownEditorReadingPreview = ({
   disableMermaid = false,
   internalLinkTargets,
   onImageWidthCommit,
+  viewMode = "reading",
+  pendingScrollSnapshotRef,
+  getScrollBodyNode,
+  rendererComponent: Renderer = DynamicMarkdownRenderer,
 }: MarkdownEditorReadingPreviewProps) => {
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const getScrollBodyNodeRef = useRef(getScrollBodyNode)
+  getScrollBodyNodeRef.current = getScrollBodyNode
   const registeredSuggestions = useSyncExternalStore(
     subscribeInternalPostSuggestions,
     getRegisteredPostSuggestions,
@@ -75,13 +107,70 @@ export const MarkdownEditorReadingPreview = ({
     return Object.keys(computed).length > 0 ? computed : undefined
   }, [internalLinkTargets, registeredSuggestions, value])
 
+  useEffect(() => {
+    const snapshotRef = pendingScrollSnapshotRef
+    if (!snapshotRef?.current || viewMode !== "reading") return
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    let cancelled = false
+    let restoreScheduled = false
+    let rafOne: number | null = null
+    let rafTwo: number | null = null
+    let observer: MutationObserver | null = null
+
+    const isPlaceholderMounted = () => Boolean(canvas.querySelector(READING_PREVIEW_LOADING_SELECTOR))
+
+    const scheduleRestore = () => {
+      if (cancelled || restoreScheduled) return
+      if (!snapshotRef.current) return
+      restoreScheduled = true
+      const commit = () => {
+        if (cancelled) return
+        const snapshot = snapshotRef.current
+        if (!snapshot) return
+        snapshotRef.current = null
+        restoreMarkdownScrollSnapshot(snapshot, getScrollBodyNodeRef.current?.() ?? canvas)
+      }
+      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+        rafOne = window.requestAnimationFrame(() => {
+          rafTwo = window.requestAnimationFrame(commit)
+        })
+      } else {
+        commit()
+      }
+    }
+
+    if (!isPlaceholderMounted()) {
+      scheduleRestore()
+    } else if (typeof MutationObserver !== "undefined") {
+      observer = new MutationObserver(() => {
+        if (!isPlaceholderMounted()) {
+          observer?.disconnect()
+          observer = null
+          scheduleRestore()
+        }
+      })
+      observer.observe(canvas, { childList: true, subtree: true })
+    }
+
+    return () => {
+      cancelled = true
+      observer?.disconnect()
+      if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+        if (rafOne !== null) window.cancelAnimationFrame(rafOne)
+        if (rafTwo !== null) window.cancelAnimationFrame(rafTwo)
+      }
+    }
+  }, [pendingScrollSnapshotRef, viewMode])
+
   return (
     <ReadingPreviewRoot
       className="aq-editor-reading-surface"
       data-testid="markdown-editor-reading-surface"
     >
-      <ReadingPreviewCanvas>
-        <DynamicMarkdownRenderer
+      <ReadingPreviewCanvas ref={canvasRef}>
+        <Renderer
           content={value}
           disableMermaid={disableMermaid}
           editableImages={Boolean(onImageWidthCommit)}

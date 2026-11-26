@@ -1,7 +1,13 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react"
+import { useLanguage } from "src/libs/language"
 import { localDraftSourcesEqual, type LocalDraftPayload, type LocalDraftSource } from "./editorStudioMetaModel"
+import {
+  editorDraftLocalRestored,
+  editorDraftLocalSaveDone,
+  editorDraftNotice,
+} from "./editorStudioDraftNoticeMessages"
 import type {
   NoticeTone,
   PublishNotice,
@@ -60,6 +66,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
   setPostVersion, setPostVisibility, setPostScheduledAt, setPostSeriesName,
   setPostSeriesOrder, setPostCanonicalUrl, setPreviewThumbnailSourceUrl, setPublishStatus,
 }: UseEditorStudioLocalDraftLifecycleParams) => {
+  const { language } = useLanguage()
   const draftSource = useMemo(
     () => resolveLocalDraftSource(editorMode, postId),
     [editorMode, postId]
@@ -240,10 +247,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     } catch {
       ownSessionAutosaveRef.current = previousOwnAutosave
       setLocalDraftSavedAt("")
-      setPublishStatus({
-        tone: "error",
-        text: "브라우저 임시저장에 실패했습니다. 현재 원고를 복사하거나 서버에 저장한 뒤 페이지를 닫아주세요.",
-      }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localSaveFailed") }, "page")
       return
     }
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
@@ -255,10 +259,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setLocalDraftSavedAt(payload.savedAt)
 
     if (!options?.silent) {
-      setPublishStatus({ tone: "success", text: `브라우저 임시저장 완료 (${describeLocalDraftSlot(payload)})` }, "page")
+      const slotLabel = describeLocalDraftSlot(payload, language)
+      setPublishStatus({ tone: "success", text: editorDraftLocalSaveDone(language, slotLabel) }, "page")
     }
   }, [
-    buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
+    buildLocalDraftFingerprint, getCurrentPostContent, language, lastLocalDraftFingerprintRef,
     localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt, setPublishStatus,
   ])
 
@@ -269,17 +274,11 @@ export const useEditorStudioLocalDraftLifecycle = ({
     try {
       draft = readLocalDraftCandidate(draftSource, selectedKey)
     } catch {
-      setPublishStatus({ tone: "error", text: "브라우저 임시글을 읽지 못했습니다. 현재 원고와 선택한 초안은 유지됩니다." }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localReadFailed") }, "page")
       return
     }
     if (!draft) {
-      setPublishStatus(
-        {
-          tone: "error",
-          text: "저장된 브라우저 임시글이 없습니다.",
-        },
-        "page"
-      )
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localNotFound") }, "page")
       return
     }
 
@@ -338,15 +337,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostCanonicalUrl?.(draft.canonicalUrl ?? "")
 
     setLocalDraftSavedAt(draft.savedAt || "")
-    setPublishStatus(
-      {
-        tone: "success",
-        text: `브라우저 임시글을 불러왔습니다 (${describeLocalDraftSlot(draft)}).`,
-      },
-      "page"
-    )
+    const slotLabel = describeLocalDraftSlot(draft, language)
+    setPublishStatus({ tone: "success", text: editorDraftLocalRestored(language, slotLabel) }, "page")
   }, [
-    buildLocalDraftFingerprint, dedupeStrings, draftSource, lastLocalDraftFingerprintRef,
+    buildLocalDraftFingerprint, dedupeStrings, draftSource, language, lastLocalDraftFingerprintRef,
     lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, normalizeCategoryValue, postId,
     localDraftCandidate, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
     setPostCategory, setPostContent, setPostId, setPostSummary,
@@ -361,7 +355,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     try {
       removeLocalDraft(draftSource)
     } catch {
-      setPublishStatus({ tone: "error", text: "브라우저 임시저장을 삭제하지 못했습니다. 현재 원고는 유지됩니다." }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localClearFailed") }, "page")
       return
     }
     ownSessionAutosaveRef.current = null
@@ -369,9 +363,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
     cachedRestorableDraftRef.current = { source: draftSource, candidates: localDraftCandidates, fingerprint: null }
     signalLocalDraftRemoved(draftSource)
     setLocalDraftSavedAt("")
-    setPublishStatus({ tone: "success", text: "브라우저 임시저장을 삭제했습니다." }, "page")
+    setPublishStatus({ tone: "success", text: editorDraftNotice(language, "localCleared") }, "page")
   }, [
-    cancelPendingAutosave, draftSource, lastLocalDraftFingerprintRef, localDraftCandidates, localDraftFingerprint,
+    cancelPendingAutosave, draftSource, language, lastLocalDraftFingerprintRef, localDraftCandidates, localDraftFingerprint,
     removeLocalDraft, signalLocalDraftRemoved, setLocalDraftSavedAt, setPublishStatus,
   ])
 
@@ -379,14 +373,14 @@ export const useEditorStudioLocalDraftLifecycle = ({
     const activeOwnKey = ownSessionAutosaveRef.current?.key ?? null
     const candidates = listLocalDraftCandidates(source).map(({ key, draft }) => ({
       key,
-      label: describeLocalDraftSlot(draft),
+      label: describeLocalDraftSlot(draft, language),
       source: draft.source,
       fingerprint: computeStoredDraftFingerprint(draft, buildLocalDraftFingerprint, dedupeStrings, normalizeCategoryValue),
       isActiveSessionAutosave: activeOwnKey != null && key === activeOwnKey,
     }))
     setLocalDraftCandidates(candidates)
     return candidates
-  }, [buildLocalDraftFingerprint, dedupeStrings, normalizeCategoryValue])
+  }, [buildLocalDraftFingerprint, dedupeStrings, language, normalizeCategoryValue])
 
   const refreshLocalDraftCandidates = useCallback(
     () => refreshLocalDraftCandidatesForSource(draftSource),
@@ -409,7 +403,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     } catch {
       const errorNotice: PublishNotice = {
         tone: "error",
-        text: "브라우저 임시저장에 실패해 서버 최신본을 불러오지 않았습니다. 현재 원고를 복사한 뒤 다시 시도해주세요.",
+        text: editorDraftNotice(language, "localConflictPreserveFailed"),
       }
       setPublishStatus(errorNotice)
       setPublishStatus(errorNotice, "page")
@@ -431,7 +425,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     }
     return true
   }, [
-    buildLocalDraftFingerprint, getCurrentPostContent, lastLocalDraftFingerprintRef,
+    buildLocalDraftFingerprint, getCurrentPostContent, language, lastLocalDraftFingerprintRef,
     localDraftCore, persistLocalDraft, postId, refreshLocalDraftCandidatesForSource,
     setLocalDraftSavedAt, setPublishStatus,
   ])
@@ -442,7 +436,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       try {
         candidates = refreshLocalDraftCandidates()
       } catch {
-        setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 선택과 원고는 유지됩니다." }, "page")
+        setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localListReadFailed") }, "page")
         return
       }
       setLocalDraftCandidate((selected) => selectPreferredLocalDraftCandidate(candidates, selected?.key))
@@ -454,7 +448,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       window.removeEventListener("storage", refresh)
       window.removeEventListener("aquila-local-drafts-changed", refresh)
     }
-  }, [refreshLocalDraftCandidates, setPublishStatus])
+  }, [language, refreshLocalDraftCandidates, setPublishStatus])
 
   useEffect(() => {
     const shouldAdoptBaseline = resolveLocalDraftShouldAdoptBaseline({
@@ -547,16 +541,16 @@ export const useEditorStudioLocalDraftLifecycle = ({
     try {
       removeLocalDraftCandidate(draftSource, localDraftCandidate.key)
     } catch {
-      setPublishStatus({ tone: "error", text: "선택한 브라우저 임시글을 삭제하지 못했습니다. 초안과 원고는 유지됩니다." }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localCandidateDiscardFailed") }, "page")
       return
     }
     setLocalDraftCandidate(null)
     try {
       refreshLocalDraftCandidates()
     } catch {
-      setPublishStatus({ tone: "error", text: "브라우저 임시글 목록을 읽지 못했습니다. 현재 원고는 유지됩니다." }, "page")
+      setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localListReadFailedKeepPost") }, "page")
     }
-  }, [draftSource, localDraftCandidate, refreshLocalDraftCandidates, setPublishStatus])
+  }, [draftSource, language, localDraftCandidate, refreshLocalDraftCandidates, setPublishStatus])
 
   const dismissLocalDraftRestoreSuggestion = useCallback(() => {
     setDismissedLocalDraft((current) => [

@@ -148,14 +148,26 @@ const requestTempPostStub = async () => ({
 const uploadWithRetryStub = async () =>
   new Response(JSON.stringify({ url: "" }), { status: 200 })
 
-export const createStatefulEditorHarness = (options?: { failPersist?: () => boolean }) => {
+export const createStatefulEditorHarness = (options?: {
+  failPersist?: () => boolean
+  mode?: EditorMode
+  postId?: string
+  postVersion?: number | null
+  title?: string
+  content?: string
+  tags?: string[]
+  category?: string
+  visibility?: PostVisibility
+  onPostCreatedRouteSync?: (postId: string, handoff: any) => Promise<boolean | void> | boolean | void
+}) => {
+  const initialMode = options?.mode ?? "edit"
   const state = {
-    editorMode: "edit" as EditorMode,
+    editorMode: initialMode,
     isTempDraftMode: false,
-    postId: "101",
-    postVersion: 3 as number | null,
-    postTitle: "내 로컬 수정 제목",
-    postContent: "충돌 직전 로컬 본문",
+    postId: options?.postId ?? (initialMode === "create" ? "" : "101"),
+    postVersion: options?.postVersion !== undefined ? options.postVersion : (initialMode === "create" ? null : 3),
+    postTitle: options?.title ?? "내 로컬 수정 제목",
+    postContent: options?.content ?? "충돌 직전 로컬 본문",
     postSummary: "",
     postSummarySource: "NONE" as "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE",
     summaryIntent: { kind: "auto" } as
@@ -166,11 +178,11 @@ export const createStatefulEditorHarness = (options?: { failPersist?: () => bool
     postThumbnailFocusX: 50,
     postThumbnailFocusY: 50,
     postThumbnailZoom: 1,
-    postTags: ["react"] as string[],
+    postTags: options?.tags ? [...options.tags] : (["react"] as string[]),
     tagDraft: "",
-    postCategory: "",
+    postCategory: options?.category ?? "",
     customCategoryCatalog: ["rocket::Backend"] as string[],
-    postVisibility: "PUBLIC_LISTED" as PostVisibility,
+    postVisibility: options?.visibility ?? ("PUBLIC_LISTED" as PostVisibility),
     localDraftSavedAt: "",
     loadingKey: "",
     result: "",
@@ -363,6 +375,7 @@ export const createStatefulEditorHarness = (options?: { failPersist?: () => bool
       pretty: prettyJson,
       generateIdempotencyKey: fixedIdempotencyKey,
       signalLocalDraftBaselineReady: lifecycleApi.signalLocalDraftBaselineReady,
+      onPostCreatedRouteSync: options?.onPostCreatedRouteSync,
       saveLocalDraft: lifecycleApi.saveLocalDraft,
       uploadWithConflictRetry: uploadWithRetryStub,
       normalizeSafeImageUrl: identityString,
