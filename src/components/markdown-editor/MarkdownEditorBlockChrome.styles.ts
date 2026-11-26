@@ -181,3 +181,39 @@ export const BubbleColorTriggerGlyph = styled.span`
     opacity: 0.78;
   }
 `
+
+export const BubbleDivider = styled.span`
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.gray8}, transparent 80%);
+  flex-shrink: 0;
+`
+
+export const BubbleActionButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.gray10};
+  font: 700 12px/1 var(--aq-font-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  ${focusVisibleRing}
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+  &:active, &[aria-pressed="true"], &[aria-expanded="true"] {
+    background: ${({ theme }) => theme.colors.gray4};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; margin: 2px; }
+`

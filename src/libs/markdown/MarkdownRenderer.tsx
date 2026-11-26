@@ -135,9 +135,11 @@ const MarkdownRendererComponent: FC<MarkdownRendererProps> = ({
         tableLayouts,
         renderPassStateRef,
         sentinels,
+        editableImages,
+        onImageWidthCommit,
         t,
       }),
-    [footnoteMarker, footnotes, sentinels, t, tableLayouts]
+    [editableImages, footnoteMarker, footnotes, onImageWidthCommit, sentinels, t, tableLayouts]
   )
 
   renderPassStateRef.current = createMarkdownRenderPassState()

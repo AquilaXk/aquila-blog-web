@@ -24,9 +24,23 @@ import type { MarkdownEditorFocusRequest } from "src/components/markdown-editor/
 type PublishNoticeTarget = "auto" | "page" | "modal"
 
 const markdownEditorFocusRequestRef: { current: MarkdownEditorFocusRequest | null } = { current: null }
+const toggleViewModeRequestRef: { current: (() => void) | null } = { current: null }
+const excerptFieldRef: { current: HTMLTextAreaElement | null } = { current: null }
 
 export const handleMarkdownEditorFocusRequestReady = (focus: MarkdownEditorFocusRequest | null) => {
   markdownEditorFocusRequestRef.current = focus
+}
+
+export const handleToggleViewModeRequestReady = (toggle: (() => void) | null) => {
+  toggleViewModeRequestRef.current = toggle
+}
+
+export const requestToggleEditorViewMode = () => {
+  toggleViewModeRequestRef.current?.()
+}
+
+export const handleExcerptFieldRef = (node: HTMLTextAreaElement | null) => {
+  excerptFieldRef.current = node
 }
 
 export const requestMarkdownEditorFocus = (selection?: { from: number; to: number }) => {
@@ -148,9 +162,18 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
   const handleTitleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposingKeyboardEvent(event)) return
+    const focusAfterTitle = () => {
+      const excerptNode = excerptFieldRef.current
+      if (excerptNode) {
+        excerptNode.focus()
+        excerptNode.setSelectionRange(0, 0)
+        return
+      }
+      markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+    }
     if (event.key === "Enter") {
       event.preventDefault()
-      markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+      focusAfterTitle()
     } else if (event.key === "ArrowDown") {
       const target = event.currentTarget
       if (
@@ -158,7 +181,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
         !target.value.slice(target.selectionEnd).includes("\n")
       ) {
         event.preventDefault()
-        markdownEditorFocusRequestRef.current?.({ from: 0, to: 0 })
+        focusAfterTitle()
       }
     }
   }, [])
@@ -170,6 +193,17 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
     const len = node.value.length
     node.setSelectionRange(len, len)
   }, [])
+
+  const handleFocusPreviousFromBody = useCallback(() => {
+    const excerptNode = excerptFieldRef.current
+    if (excerptNode) {
+      excerptNode.focus()
+      const len = excerptNode.value.length
+      excerptNode.setSelectionRange(len, len)
+      return
+    }
+    handleFocusTitle()
+  }, [handleFocusTitle])
 
   useEffect(() => {
     syncTitleTextareaHeight(titleFieldRef.current)
@@ -212,6 +246,7 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
   return {
     disabled,
+    handleFocusPreviousFromBody,
     handleFocusTitle,
     handleSelectedPostIdChange,
     handleTitleChange,

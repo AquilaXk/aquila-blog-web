@@ -576,19 +576,19 @@ test.describe("Issue #255 Track 1 + Track 2 verification", () => {
     )
     expect(editPlan).not.toBeNull()
 
-    expect(INLINE_CODE_SHORTCUT).toBe("Mod+Shift+C")
-    expect(VIEW_MODE_CYCLE_SHORTCUT).toBe("Mod+E")
-    expect(
-      resolveFormatShortcut({ key: "e", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
-    ).toBeNull()
+    expect(INLINE_CODE_SHORTCUT).toBe("Mod+E")
+    expect(VIEW_MODE_CYCLE_SHORTCUT).toBe("Mod+Shift+E")
     expect(
       resolveFormatShortcut({ key: "c", metaKey: true, ctrlKey: false, shiftKey: true, altKey: false })
+    ).toBeNull()
+    expect(
+      resolveFormatShortcut({ key: "e", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe("inlineCode")
     expect(() =>
       validateMarkdownEditorCommands([
         {
           ...getMarkdownEditorCommand("block.code")!,
-          shortcut: "Mod+E" as unknown as "Mod+B",
+          shortcut: "Mod+Shift+E" as unknown as "Mod+B",
         },
       ])
     ).toThrow(/reserved/i)

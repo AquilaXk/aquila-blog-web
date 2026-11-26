@@ -206,8 +206,9 @@ export const computeCursorLineAndColumn = (
   markdown: string,
   cursorOffset?: number | null
 ): { line: number; column: number } => {
-  const clamped = Math.max(0, Math.min(cursorOffset ?? 0, markdown.length))
-  const starts = getLineStartOffsets(markdown)
+  const normalized = markdown.includes("\r") ? markdown.replace(/\r\n?/g, "\n") : markdown
+  const clamped = Math.max(0, Math.min(cursorOffset ?? 0, normalized.length))
+  const starts = getLineStartOffsets(normalized)
   let low = 0
   let high = starts.length - 1
   let lineIndex = 0

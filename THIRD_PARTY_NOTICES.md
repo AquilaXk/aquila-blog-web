@@ -74,12 +74,12 @@ This repository includes patterns and algorithms adapted from or inspired by the
 - Applied in: `src/components/markdown-editor/markdownEditorLiveDecorationRegions.ts`, `src/components/markdown-editor/markdownEditorLiveSurfaceDecorations.ts`, `src/components/markdown-editor/markdownEditorLiveViewportDecorations.ts`, `src/components/markdown-editor/markdownEditorBlockContainerModel.ts`, `src/components/markdown-editor/markdownEditorCardBlockWidgets.ts`, `src/libs/markdown/renderingCardMetadataModel.ts`, `src/routes/Admin/editorStudioDedicatedSurfaceModel.ts`
 - License: MIT License (Copyright (c) 2022 Zef Hemel / SilverBullet contributors)
 
-## CodeMirror 6 (`@codemirror/view`, `@codemirror/lang-markdown`, `@codemirror/search`)
+## CodeMirror 6 (`@codemirror/view`, `@codemirror/language`, `@codemirror/lang-markdown`, `@codemirror/search`) & PrismJS
 
-- Repositories: https://github.com/codemirror/view, https://github.com/codemirror/lang-markdown, https://github.com/codemirror/search
-- Reference patterns: `ViewPlugin.fromClass`, `view.visibleRanges` viewport-scoped decoration updates, blockquote/list/fenced-code Enter commands (`insertNewlineContinueMarkup`), compact inline search & replace panel layout
-- Applied in: `src/components/markdown-editor/markdownEditorLiveViewportDecorations.ts`, `src/components/markdown-editor/markdownEditorKeyboardModel.ts`, `src/components/markdown-editor/markdownEditorListCommandsModel.ts`, `src/components/markdown-editor/markdownEditorFenceCommands.ts`, `src/components/markdown-editor/MarkdownEditorFindReplace.tsx`, `src/components/markdown-editor/MarkdownEditorFindReplace.styles.ts`
-- License: MIT License (Copyright (c) 2018-2026 Marijn Haverbeke and contributors)
+- Repositories: https://github.com/codemirror/view, https://github.com/codemirror/language, https://github.com/codemirror/lang-markdown, https://github.com/codemirror/search, https://github.com/PrismJS/prism
+- Reference patterns: `ViewPlugin.fromClass`, `StreamLanguage.define`, `view.visibleRanges` viewport-scoped decoration updates, blockquote/list/fenced-code Enter commands (`insertNewlineContinueMarkup`), compact inline search & replace panel layout, and lazy Prism language grammar loading
+- Applied in: `src/components/markdown-editor/markdownEditorLiveViewportDecorations.ts`, `src/components/markdown-editor/markdownEditorKeyboardModel.ts`, `src/components/markdown-editor/markdownEditorListCommandsModel.ts`, `src/components/markdown-editor/markdownEditorFenceCommands.ts`, `src/components/markdown-editor/markdownEditorCodeLanguages.ts`, `src/components/markdown-editor/MarkdownEditorFindReplace.tsx`, `src/components/markdown-editor/MarkdownEditorFindReplace.styles.ts`
+- License: MIT License (Copyright (c) 2018-2026 Marijn Haverbeke and contributors; Copyright (c) 2012-2024 Lea Verou & PrismJS contributors)
 
 ## Turndown
 

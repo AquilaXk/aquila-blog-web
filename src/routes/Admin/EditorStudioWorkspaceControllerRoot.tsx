@@ -17,7 +17,11 @@ import { useEditorStudioThumbnailControls } from "./useEditorStudioThumbnailCont
 import { useEditorStudioThumbnailPreview } from "./useEditorStudioThumbnailPreview"
 import { useEditorStudioMetaCatalog } from "./useEditorStudioMetaCatalog"
 import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFlow"
-import { useEditorStudioWorkspaceControllerRuntime } from "./useEditorStudioWorkspaceControllerRuntime"
+import { useEditorStudioServerTempDraftAutosave } from "./useEditorStudioServerTempDraftAutosave"
+import {
+  requestToggleEditorViewMode,
+  useEditorStudioWorkspaceControllerRuntime,
+} from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioWorkspaceControllerRootView } from "./EditorStudioWorkspaceControllerRootView"
 import {
   buildEditorStateFingerprint, buildLocalDraftFingerprint, composeEditorContent,
@@ -147,28 +151,12 @@ export const EditorStudioWorkspaceController = ({
   const lastLocalDraftFingerprintRef = useRef("")
   const serverBaselineEditorFingerprintRef = useRef("")
   const {
-    disabled,
-    handleFocusTitle,
-    handleTitleChange,
-    handleTitleFieldRef,
-    handleTitleKeyDown,
-    refreshPublicPostReadViews,
-    setPublishStatus,
+    disabled, handleFocusPreviousFromBody, handleFocusTitle, handleTitleChange,
+    handleTitleFieldRef, handleTitleKeyDown, refreshPublicPostReadViews, setPublishStatus,
   } = useEditorStudioWorkspaceControllerRuntime({
-    isPublishModalOpen,
-    loadingKey,
-    postId,
-    postTitle,
-    queryClient,
-    setEditorMode,
-    setIsTempDraftMode,
-    setLoadingKey,
-    setPostId,
-    setPostTitle,
-    setPostVersion,
-    setPublishModalNotice,
-    setPublishNotice,
-    setResult,
+    isPublishModalOpen, loadingKey, postId, postTitle, queryClient, setEditorMode,
+    setIsTempDraftMode, setLoadingKey, setPostId, setPostTitle, setPostVersion,
+    setPublishModalNotice, setPublishNotice, setResult,
   })
 
   useEffect(() => {
@@ -495,6 +483,14 @@ export const EditorStudioWorkspaceController = ({
     setPostVersion, setPublishStatus, loadingKey, setLoadingKey,
     isPublishModalOpen,
     onOpenPublishModal: () => setIsPublishModalOpen(true),
+    onTogglePreviewMode: requestToggleEditorViewMode,
+  })
+
+  useEditorStudioServerTempDraftAutosave({
+    isTempDraftMode, editorMode, postId, loadingKey, postTitle, postContent, postSummary,
+    postSummarySource, summaryIntent, postThumbnailUrl, postThumbnailFocusX,
+    postThumbnailFocusY, postThumbnailZoom, postTags, postCategory, postVisibility,
+    serverBaselineEditorFingerprintRef, onSaveServerTempDraft: handleSaveServerTempDraft,
   })
 
   useEffect(() => {
@@ -519,50 +515,20 @@ export const EditorStudioWorkspaceController = ({
   )
 
   const { handleExitDedicatedEditor } = useEditorStudioRouting({
-    router,
-    authStatus,
-    sessionMember,
-    postId,
-    isDedicatedEditorRoute,
-    isDedicatedNewEditorRoute,
-    adminPostsWorkspaceRoute: ADMIN_POSTS_WORKSPACE_ROUTE,
-    editorNewRoutePath: EDITOR_NEW_ROUTE_PATH,
-    toEditorPostRoute,
-    normalizeEditorReturnRoute,
-    pretty,
-    setResult,
-    setPostId,
-    setIsNewEditorBootstrapPending,
-    redirectingRef,
-    autoLoadedPostIdRef,
-    autoCreatedTempDraftRef,
-    restoreLocalDraft,
-    loadPostForEditor,
+    router, authStatus, sessionMember, postId, isDedicatedEditorRoute,
+    isDedicatedNewEditorRoute, adminPostsWorkspaceRoute: ADMIN_POSTS_WORKSPACE_ROUTE,
+    editorNewRoutePath: EDITOR_NEW_ROUTE_PATH, toEditorPostRoute, normalizeEditorReturnRoute,
+    pretty, setResult, setPostId, setIsNewEditorBootstrapPending, redirectingRef,
+    autoLoadedPostIdRef, autoCreatedTempDraftRef, restoreLocalDraft, loadPostForEditor,
     handleLoadOrCreateTempPost,
   })
 
-  const {
-    closePublishModal,
-    handleConfirmPublish,
-    openPublishModal,
-  } = useEditorStudioPublishModalFlow({
-    activateComposeSurface,
-    addTagsToPost,
-    commitPostCategory,
-    handleModifyPost,
-    handlePublishTempDraft,
-    handleWritePost,
-    isPreviewThumbnailError,
-    loadingKey,
-    publishActionType,
-    safePreviewThumbnail,
-    setIsMobileMetaEditorOpen,
-    setIsMobileThumbnailEditorOpen,
-    setIsPublishModalOpen,
-    setPublishActionType,
-    setPublishModalNotice,
-    setTagDraft,
-    tagDraft,
+  const { closePublishModal, handleConfirmPublish, openPublishModal } = useEditorStudioPublishModalFlow({
+    activateComposeSurface, addTagsToPost, commitPostCategory, handleModifyPost,
+    handlePublishTempDraft, handleWritePost, isPreviewThumbnailError, loadingKey,
+    publishActionType, safePreviewThumbnail, setIsMobileMetaEditorOpen,
+    setIsMobileThumbnailEditorOpen, setIsPublishModalOpen, setPublishActionType,
+    setPublishModalNotice, setTagDraft, tagDraft,
   })
 
   return (
@@ -575,7 +541,7 @@ export const EditorStudioWorkspaceController = ({
         handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
         commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
         handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleApplyRestoredRevision, handleThumbnailImageFileChange, handleThumbnailPaste,
-        handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
+        handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusPreviousFromBody, handleFocusTitle,
         isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
         isPublishModalOpen, isTempDraftMode, lastLocalDraftFingerprintRef, lastSaveError, loadingKey, localDraftCandidate,

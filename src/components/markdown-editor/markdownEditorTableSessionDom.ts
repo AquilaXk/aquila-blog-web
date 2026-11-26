@@ -67,7 +67,7 @@ export const resolveInlineShortcutKind = (event: KeyboardEvent): TableCellInline
   const lowerKey = event.key.toLowerCase()
   if (!event.shiftKey && lowerKey === "b") return "bold"
   if (!event.shiftKey && lowerKey === "i") return "italic"
-  if (event.shiftKey && lowerKey === "c") return "code"
+  if (!event.shiftKey && lowerKey === "e") return "code"
   if (event.shiftKey && (lowerKey === "x" || lowerKey === "s")) return "strikethrough"
   return null
 }

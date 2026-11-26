@@ -3,8 +3,11 @@
  * - silverbulletmd/silverbullet (MIT) & Milkdown/milkdown (MIT) — 라이브 에디터 카드 위젯 & 메타 배지 DOM 빌더
  */
 import { EditorView, WidgetType } from "@codemirror/view"
+import { normalizePublicExternalThumbnailUrl } from "../../libs/markdown/externalThumbnailUrlPolicy"
+import { normalizePublicPostImageUrl } from "../../libs/markdown/postImageUrlPolicy"
 import { normalizeSafeMarkdownUrl, setSafeAnchorHref } from "../../libs/markdown/safeMarkdownUrl"
-import { formatReadableFileSize, inferLinkProvider } from "../../libs/unfurl/extractMeta"
+import { fetchEditorUnfurl, getCachedEditorUnfurl } from "../../libs/unfurl/fetchEditorUnfurl"
+import { formatReadableFileSize, inferLinkProvider, resolveEmbedPreviewUrl } from "../../libs/unfurl/extractMeta"
 import { LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
 
 export const focusContainerBlockOrigin = (
@@ -79,6 +82,11 @@ const buildCardBadges = (badges: readonly string[]): HTMLElement | null => {
   return row
 }
 
+const resolveSafeCardThumbnail = (raw?: string): string => {
+  if (!raw) return ""
+  return normalizePublicPostImageUrl(raw) || normalizePublicExternalThumbnailUrl(raw)
+}
+
 const buildLinkCardContainerDOM = (
   options: {
     cardKind: "bookmark" | "embed" | "file"
@@ -86,6 +94,8 @@ const buildLinkCardContainerDOM = (
     url: string
     title: string
     secondary: string
+    thumbnailUrl?: string
+    embedUrl?: string
     badges: readonly string[]
     sig: string
     from: number
@@ -102,6 +112,9 @@ const buildLinkCardContainerDOM = (
   root.dataset.from = String(options.from)
   root.dataset.sig = options.sig
 
+  const headerRow = document.createElement("div")
+  headerRow.className = "cm-live-bookmark-header"
+
   const icon = document.createElement("span")
   icon.className = "cm-live-bookmark-icon"
   icon.setAttribute("aria-hidden", "true")
@@ -112,14 +125,20 @@ const buildLinkCardContainerDOM = (
   const badgesRow = buildCardBadges(options.badges)
   if (badgesRow) content.appendChild(badgesRow)
 
+  const cachedMeta = options.cardKind !== "file" ? getCachedEditorUnfurl(options.url) : null
+  const resolvedTitle =
+    options.title && options.title !== options.url ? options.title : cachedMeta?.title || options.title || options.url
+  const resolvedSecondary = options.secondary || cachedMeta?.description || ""
+
   const titleEl = document.createElement("span")
   titleEl.className = "cm-live-bookmark-title"
-  titleEl.textContent = options.title || options.url
+  titleEl.textContent = resolvedTitle
   content.appendChild(titleEl)
-  if (options.secondary) {
-    const descEl = document.createElement("span")
-    descEl.className = "cm-live-bookmark-desc"
-    descEl.textContent = options.secondary
+
+  const descEl = document.createElement("span")
+  descEl.className = "cm-live-bookmark-desc"
+  if (resolvedSecondary) {
+    descEl.textContent = resolvedSecondary
     content.appendChild(descEl)
   }
   const urlEl = document.createElement("span")
@@ -130,6 +149,20 @@ const buildLinkCardContainerDOM = (
   const openLink = document.createElement("a")
   openLink.className = "cm-live-bookmark-open"
   const safeUrl = normalizeSafeMarkdownUrl(options.url)
+  const initialThumb = resolveSafeCardThumbnail(options.thumbnailUrl || cachedMeta?.thumbnailUrl)
+  const attachThumbnail = (thumbSrc: string) => {
+    if (!thumbSrc) return
+    const existingThumb = headerRow.querySelector(".cm-live-bookmark-thumb")
+    if (existingThumb) return
+    const thumbImg = document.createElement("img")
+    thumbImg.className = "cm-live-bookmark-thumb"
+    thumbImg.src = thumbSrc
+    thumbImg.alt = ""
+    thumbImg.loading = "lazy"
+    thumbImg.referrerPolicy = "no-referrer"
+    headerRow.insertBefore(thumbImg, openLink.parentNode === headerRow ? openLink : null)
+  }
+
   if (safeUrl && setSafeAnchorHref(openLink, safeUrl)) {
     if (safeUrl.startsWith("http://") || safeUrl.startsWith("https://")) {
       openLink.target = "_blank"
@@ -137,10 +170,49 @@ const buildLinkCardContainerDOM = (
     }
     openLink.setAttribute("aria-label", options.openLabel)
     openLink.innerHTML = LIVE_BLOCK_UI_SVGS.externalLink
-    root.append(icon, content, openLink)
+    headerRow.append(icon, content, openLink)
   } else {
-    root.append(icon, content)
+    headerRow.append(icon, content)
   }
+  if (initialThumb) attachThumbnail(initialThumb)
+  root.appendChild(headerRow)
+
+  if (options.cardKind === "embed") {
+    const safeEmbed = resolveEmbedPreviewUrl(options.embedUrl || cachedMeta?.embedUrl || options.url)
+    if (safeEmbed) {
+      const frameWrap = document.createElement("div")
+      frameWrap.className = "cm-live-embed-preview"
+      const iframe = document.createElement("iframe")
+      iframe.src = safeEmbed
+      iframe.title = resolvedTitle || "Embed preview"
+      iframe.loading = "lazy"
+      iframe.referrerPolicy = "strict-origin-when-cross-origin"
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation")
+      iframe.setAttribute("allowfullscreen", "true")
+      frameWrap.appendChild(iframe)
+      root.appendChild(frameWrap)
+    }
+  }
+
+  if (
+    options.cardKind !== "file" &&
+    !initialThumb &&
+    typeof window !== "undefined" &&
+    typeof fetch === "function" &&
+    window.location?.protocol?.startsWith("http") &&
+    (options.url.startsWith("http://") || options.url.startsWith("https://"))
+  ) {
+    void fetchEditorUnfurl(options.url).then((fetched) => {
+      if (!fetched || root.isConnected === false) return
+      if (fetched.title && titleEl.textContent === options.url) titleEl.textContent = fetched.title
+      if (fetched.description && !descEl.textContent) {
+        descEl.textContent = fetched.description
+        content.insertBefore(descEl, urlEl)
+      }
+      if (fetched.thumbnailUrl) attachThumbnail(fetched.thumbnailUrl)
+    })
+  }
+
   bindContainerActivateTarget(root, view, root, options.from, options.to, 12, true)
   return root
 }
@@ -153,13 +225,14 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
     readonly from: number,
     readonly to: number,
     readonly siteName = "",
-    readonly provider = ""
+    readonly provider = "",
+    readonly thumbnailUrl = ""
   ) {
     super()
   }
 
   private get signature() {
-    return `${this.url}\0${this.title}\0${this.description}\0${this.siteName}\0${this.provider}`
+    return `${this.url}\0${this.title}\0${this.description}\0${this.siteName}\0${this.provider}\0${this.thumbnailUrl}`
   }
 
   eq(other: MarkdownBookmarkBlockWidget) {
@@ -186,6 +259,7 @@ export class MarkdownBookmarkBlockWidget extends WidgetType {
         url: this.url,
         title: this.title,
         secondary: this.description,
+        thumbnailUrl: this.thumbnailUrl,
         badges: badge ? [badge] : [],
         sig: this.signature,
         from: this.from,
@@ -204,13 +278,15 @@ export class MarkdownEmbedBlockWidget extends WidgetType {
     readonly from: number,
     readonly to: number,
     readonly provider = "",
-    readonly siteName = ""
+    readonly siteName = "",
+    readonly thumbnailUrl = "",
+    readonly embedUrl = ""
   ) {
     super()
   }
 
   private get signature() {
-    return `${this.url}\0${this.title}\0${this.caption}\0${this.provider}\0${this.siteName}`
+    return `${this.url}\0${this.title}\0${this.caption}\0${this.provider}\0${this.siteName}\0${this.thumbnailUrl}\0${this.embedUrl}`
   }
 
   eq(other: MarkdownEmbedBlockWidget) {
@@ -237,6 +313,8 @@ export class MarkdownEmbedBlockWidget extends WidgetType {
         url: this.url,
         title: this.title,
         secondary: this.caption,
+        thumbnailUrl: this.thumbnailUrl,
+        embedUrl: this.embedUrl,
         badges: badge ? [badge] : [],
         sig: this.signature,
         from: this.from,

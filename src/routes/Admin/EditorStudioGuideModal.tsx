@@ -225,7 +225,7 @@ export const EditorGuideRepo = styled.div`
 `
 
 const GUIDE_REFERENCE_ROWS_KO: ReadonlyArray<readonly [string, string, string, string]> = [
-  ["제목과 강조", "문서 구조·인라인 강조", "# 제목 1 / ## 제목 2 / ### 제목 3\n**굵게** · _기울임_ · ==하이라이트==", "⌘B · ⌘I"],
+  ["제목과 강조", "제목(H1) 아래 H2~H4 목차 · 강조", "## 제목 2 / ### 제목 3 / #### 제목 4\n**굵게** · _기울임_ · ==하이라이트==", "⌘B · ⌘I · ⌘E"],
   ["목록과 인용", "목록·체크박스·인용문", "- 목록 / - [x] 완료 / - [ ] 예정\n> 인용문", "⌘Enter"],
   ["콜아웃", "TIP · INFO · WARNING · DANGER", "> [!DANGER]\n> **제목**\n> 내용", "/callout"],
   ["토글", "보조 설명 접기·펼치기", ":::toggle 자세히 보기\n내용\n:::", "/toggle"],
@@ -236,7 +236,7 @@ const GUIDE_REFERENCE_ROWS_KO: ReadonlyArray<readonly [string, string, string, s
 ]
 
 const GUIDE_REFERENCE_ROWS_EN: ReadonlyArray<readonly [string, string, string, string]> = [
-  ["Headings & Style", "Document headings and inline styles", "# H1 / ## H2 / ### H3\n**Bold** · _Italic_ · ==Highlight==", "⌘B · ⌘I"],
+  ["Headings & Style", "H2–H4 TOC sections (Title is H1)", "## H2 / ### H3 / #### H4\n**Bold** · _Italic_ · ==Highlight==", "⌘B · ⌘I · ⌘E"],
   ["Lists & Quotes", "Bullets, tasks, and blockquotes", "- Item / - [x] Done / - [ ] Todo\n> Quote", "⌘Enter"],
   ["Callout", "TIP · INFO · WARNING · DANGER", "> [!DANGER]\n> **Title**\n> Body", "/callout"],
   ["Toggle", "Collapsible detail section", ":::toggle Details\nBody\n:::", "/toggle"],

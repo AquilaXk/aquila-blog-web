@@ -16,6 +16,7 @@ import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocume
 import { WriterEditorHost } from "./WriterEditorHost"
 import {
   handleMarkdownEditorFocusRequestReady,
+  handleToggleViewModeRequestReady,
   requestMarkdownEditorFocus,
   requestMarkdownEditorInsertSnippet,
 } from "./useEditorStudioWorkspaceControllerRuntime"
@@ -30,6 +31,7 @@ import { deriveEditorPersistenceState, derivePublishActionViewModel } from "./ed
 import { isEditorUnsavedDirtyByFingerprint } from "./editorStudioUnsavedExitGuard"
 import { useEditorStudioUnsavedExitGuard } from "./useEditorStudioUnsavedExitGuard"
 import { buildEditorStateFingerprint, detectPublishPlaceholderIssue } from "./editorStudioMetaModel"
+import { scanMarkdownPrePublishWarnings } from "./editorStudioPublishWarnings"
 import { isLocalDraftRestoreSuggestionEligible } from "./useEditorStudioDraftLifecycleModel"
 import {
   getPublishVisibilityOptions,
@@ -63,7 +65,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
     commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
     handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleApplyRestoredRevision, handleThumbnailImageFileChange, handleThumbnailPaste,
-    handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
+    handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusPreviousFromBody, handleFocusTitle,
     isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
     isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
     isPublishModalOpen, isTempDraftMode, getCurrentPostContent, lastLocalDraftFingerprintRef, lastSaveError,
@@ -148,6 +150,7 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
       tagCount: postTags.length,
       linkWarningCount: countMarkdownLinkWarnings(postContent),
       totalLinkCount: countMarkdownTotalLinks(postContent),
+      prePublishWarnings: scanMarkdownPrePublishWarnings(postContent),
     }
   }, [isPublishModalOpen, postContent, postSummary, postSummarySource, postTags.length, postTitle])
   const editorPersistenceState = deriveEditorPersistenceState({
@@ -320,6 +323,18 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   const handleDedicatedEditorRequestSave = useCallback(() => {
     saveLocalDraft({ silent: false })
   }, [saveLocalDraft])
+  const handleRequestCloudAsset = useCallback(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") return
+    const inspectorToggle = document.querySelector<HTMLButtonElement>('[data-testid="editor-inspector-toggle"]')
+    if (inspectorToggle && inspectorToggle.getAttribute("aria-pressed") !== "true") {
+      inspectorToggle.click()
+    }
+    window.dispatchEvent(new CustomEvent("aquila-open-cloud-asset-picker"))
+    window.requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent("aquila-open-cloud-asset-picker"))
+      document.querySelector<HTMLElement>('[data-testid="editor-cloud-asset-picker"]')?.scrollIntoView({ block: "nearest" })
+    })
+  }, [])
 
   const dedicatedEditorCanvas = useMemo(
     () => (
@@ -330,11 +345,13 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onSelectionChange={setEditorSelection}
         onFlushMarkdownReady={handleFlushMarkdownReady}
         onFocusRequestReady={handleMarkdownEditorFocusRequestReady}
-        onRequestFocusTitle={handleFocusTitle}
+        onToggleViewModeRequestReady={handleToggleViewModeRequestReady}
+        onRequestFocusTitle={handleFocusPreviousFromBody}
         onRequestSave={handleDedicatedEditorRequestSave}
         onUploadingChange={handleMarkdownUploadingChange}
         onImageUpload={handleMarkdownEditorImageUpload}
         onFileUpload={handleMarkdownEditorFileUpload}
+        onRequestCloudAsset={handleRequestCloudAsset}
         mermaidEnabled={MARKDOWN_EDITOR_MERMAID_ENABLED}
         disabled={isMarkdownEditorDisabled}
         onCommitDuration={handleEditorCommitDuration}
@@ -342,10 +359,11 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     ),
     [
       handleDedicatedEditorRequestSave,
-      handleFocusTitle,
+      handleFocusPreviousFromBody,
       handleMarkdownEditorChange,
       handleMarkdownEditorFileUpload,
       handleMarkdownEditorImageUpload,
+      handleRequestCloudAsset,
       handleFlushMarkdownReady,
       handleEditorCommitDuration,
       handleMarkdownUploadingChange,

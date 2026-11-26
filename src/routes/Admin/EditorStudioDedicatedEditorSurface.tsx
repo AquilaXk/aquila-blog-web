@@ -16,6 +16,7 @@ import {
   EditorIconSidebarRight,
 } from "src/components/markdown-editor/MarkdownEditorIcons"
 import { adminT } from "./adminI18n"
+import { handleExcerptFieldRef } from "./useEditorStudioWorkspaceControllerRuntime"
 import { createMarkdownDocumentInsights } from "src/libs/markdown/markdownDocumentInsights"
 import { splitCategoryDisplay } from "src/libs/utils"
 import {
@@ -306,7 +307,12 @@ export const EditorStudioDedicatedEditorSurface = ({
         target.selectionStart === 0
       ) {
         event.preventDefault()
-        titleNodeRef.current?.focus()
+        const titleNode = titleNodeRef.current
+        if (titleNode) {
+          titleNode.focus()
+          const end = titleNode.value.length
+          titleNode.setSelectionRange(end, end)
+        }
       }
     },
     [onOutlineBodyHeadingActivate]
@@ -380,6 +386,7 @@ export const EditorStudioDedicatedEditorSurface = ({
             </EditorSidebarToggleButton>
             <EditorSidebarToggleButton
               type="button"
+              data-testid="editor-inspector-toggle"
               $active={isInspectorOpen}
               aria-pressed={isInspectorOpen}
               onClick={() => toggleResponsiveSidebar(EDITOR_SURFACE_INSPECTOR_OPEN)}
@@ -470,7 +477,7 @@ export const EditorStudioDedicatedEditorSurface = ({
                   onKeyDown={onPostTitleKeyDown}
                 />
                 <InlineExcerptInput
-                  ref={excerptNodeRef}
+                  ref={(node) => { excerptNodeRef.current = node; handleExcerptFieldRef(node) }}
                   data-testid="editor-inline-excerpt"
                   aria-label={isInspectorOpen ? adminT("editorSubtitleLabel", language) : adminT("editorSummaryLabel", language)}
                   placeholder={adminT("editorSummaryPlaceholder", language)}
@@ -531,57 +538,26 @@ export const EditorStudioDedicatedEditorSurface = ({
           </EditorStudioPaperScrollSheet>
 
           {renderEditorFloatingStatusHud({
-            language,
-            sidebarsOpen: isOutlineOpen || isInspectorOpen,
-            writingFocus,
-            cursorLine: cursorPosition.line,
-            cursorColumn: cursorPosition.column,
-            selectedCharCount,
-            wordCount: outlineInsights.wordCount,
-            readingMinutes: outlineInsights.readingMinutes,
-            totalLinkCount,
-            linkWarningCount,
+            language, sidebarsOpen: isOutlineOpen || isInspectorOpen, writingFocus,
+            cursorLine: cursorPosition.line, cursorColumn: cursorPosition.column,
+            selectedCharCount, wordCount: outlineInsights.wordCount,
+            readingMinutes: outlineInsights.readingMinutes, totalLinkCount, linkWarningCount,
           })}
-
           {renderPublishNoticeBanner({
-            language,
-            showPublishNotice,
-            publishNoticeTone,
-            publishNoticeText,
-            onReloadLatestServerPost,
-            actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
+            language, showPublishNotice, publishNoticeTone, publishNoticeText,
+            onReloadLatestServerPost, actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
           })}
         </EditorStudioWritingColumn>
 
         {renderEditorInspectorPanel({
-          language,
-          isInspectorOpen,
-          onCloseInspector: () => setIsInspectorOpen(false),
-          postSummary,
-          onPostSummaryChange,
-          postTags,
-          onRemoveTag,
-          tagDraft,
-          onTagDraftChange: handleTagDraftChange,
-          onTagDraftKeyDown: handleTagDraftKeyDown,
-          onAddTag,
-          linkWarningCount,
-          postVisibility,
-          onPostVisibilityChange,
-          postCategory,
-          onPostCategoryChange,
-          onCommitPostCategory,
-          decodedCategorySuggestions,
-          onUploadPostImage,
-          onUploadPostAttachment,
-          onInsertMarkdownSnippet,
-          managedPostId,
-          postVersion,
-          actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
-          onRevisionRestored,
-          currentTitle: postTitle,
-          currentTags: postTags,
-          currentContent: postContent,
+          language, isInspectorOpen, onCloseInspector: () => setIsInspectorOpen(false),
+          postSummary, onPostSummaryChange, postTags, onRemoveTag,
+          tagDraft, onTagDraftChange: handleTagDraftChange, onTagDraftKeyDown: handleTagDraftKeyDown,
+          onAddTag, linkWarningCount, postVisibility, onPostVisibilityChange,
+          postCategory, onPostCategoryChange, onCommitPostCategory, decodedCategorySuggestions,
+          onUploadPostImage, onUploadPostAttachment, onInsertMarkdownSnippet,
+          managedPostId, postVersion, actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
+          onRevisionRestored, currentTitle: postTitle, currentTags: postTags, currentContent: postContent,
         })}
       </EditorStudioFrame>
 

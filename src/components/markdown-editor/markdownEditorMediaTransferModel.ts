@@ -1,7 +1,12 @@
 import type { ClipboardEvent as ReactClipboardEvent } from "react"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "src/apis/backend/client"
+import {
+  fetchEditorUnfurl,
+  formatUnfurlDirectiveBlock,
+  inferDirectiveKindForPastedUrl,
+} from "src/libs/unfurl/fetchEditorUnfurl"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
-import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
+import { isLivePreviewSurfaceMode, type MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import {
   convertSafeHtmlPasteToMarkdown,
@@ -10,8 +15,10 @@ import {
   shouldReportEmptyHtmlPasteError,
 } from "./markdownEditorHtmlPasteModel"
 import {
+  findExactSubstringIndex,
   parseSingleHttpUrl,
   planLinkifySelectionWithUrl,
+  planReplaceExactSubstring,
 } from "./markdownEditorPasteDropModel"
 
 export type TextareaSelection = {
@@ -79,7 +86,8 @@ export const shouldLinkifySelectionOnUrlPaste = (
   selection: TextareaSelection
 ): boolean => {
   if (selection.from >= selection.to) return false
-  if ((viewMode ?? "live") !== "live") return false
+  const resolved = viewMode ?? "live"
+  if (resolved !== "live" && resolved !== "split") return false
   if (isOffsetInsideFencedCodeBlock(currentValue, selection.from)) return false
   if (isOffsetInsideInlineCodeSpan(currentValue, selection.from)) return false
   return true
@@ -99,6 +107,80 @@ export const tryApplyUrlSelectionLinkify = (
   event.preventDefault()
   const selectedText = currentValue.slice(selection.from, selection.to)
   applyPlannedMarkdownMutation(planLinkifySelectionWithUrl(selection.from, selection.to, selectedText, url))
+  return true
+}
+
+export const tryApplyStandaloneUrlPaste = ({
+  event,
+  viewMode,
+  currentValue,
+  selection,
+  plainText,
+  applyPlannedMarkdownMutation,
+  applyBackgroundMarkdownMutation,
+  isCurrentGeneration,
+  getCurrentValue,
+}: {
+  event: ReactClipboardEvent<HTMLElement>
+  viewMode: MarkdownEditorSurfaceMode | undefined
+  currentValue: string
+  selection: TextareaSelection
+  plainText: string
+  applyPlannedMarkdownMutation: (plan: PlannedTextMutation, options?: MarkdownMutationOptions) => boolean
+  applyBackgroundMarkdownMutation: (plan: PlannedTextMutation) => boolean
+  isCurrentGeneration: () => boolean
+  getCurrentValue: () => string
+}): boolean => {
+  const hasShiftKey = Boolean((event as unknown as { shiftKey?: boolean }).shiftKey)
+  if (selection.from !== selection.to || hasShiftKey) return false
+  if (!isLivePreviewSurfaceMode(viewMode ?? "live")) return false
+  if (isOffsetInsideFencedCodeBlock(currentValue, selection.from)) return false
+  if (isOffsetInsideInlineCodeSpan(currentValue, selection.from)) return false
+
+  const url = parseSingleHttpUrl(plainText)
+  if (!url) return false
+
+  const lineStart = currentValue.lastIndexOf("\n", Math.max(0, selection.from - 1)) + 1
+  const nextBreak = currentValue.indexOf("\n", selection.from)
+  const lineEnd = nextBreak === -1 ? currentValue.length : nextBreak
+  const lineText = currentValue.slice(lineStart, lineEnd)
+  const directiveMatch = /^:::(bookmark|embed)(?:\s+(https?:\/\/)?)?\s*$/.exec(lineText.trim())
+  const isBlankLine = lineText.trim().length === 0
+
+  if (!isBlankLine && !directiveMatch) return false
+
+  const kind = directiveMatch
+    ? (directiveMatch[1] as "bookmark" | "embed")
+    : inferDirectiveKindForPastedUrl(url)
+
+  event.preventDefault()
+  let placeholderBlock = formatUnfurlDirectiveBlock(kind, url)
+  if (directiveMatch) {
+    const closeToken = "\n:::"
+    const afterLine = currentValue.slice(lineEnd)
+    const hasClosingLine = /^\n\s*:::(?:\n|$)/.test(afterLine) || /^\n\n\s*:::(?:\n|$)/.test(afterLine)
+    const replaceStart = lineStart
+    const replaceEnd = hasClosingLine
+      ? lineEnd + afterLine.indexOf(closeToken) + closeToken.length
+      : lineEnd
+    applyPlannedMarkdownMutation(planReplaceSelection(replaceStart, replaceEnd, placeholderBlock))
+  } else {
+    applyPlannedMarkdownMutation(planReplaceSelection(lineStart, lineEnd, placeholderBlock))
+  }
+
+  if (typeof fetch === "function") {
+    void fetchEditorUnfurl(url).then((meta) => {
+      if (!meta || !isCurrentGeneration()) return
+      const latest = getCurrentValue()
+      if (findExactSubstringIndex(latest, placeholderBlock) === -1) return
+      const enriched = formatUnfurlDirectiveBlock(kind, url, meta)
+      const replacePlan = planReplaceExactSubstring(latest, placeholderBlock, enriched, 0, 0)
+      if (replacePlan) {
+        placeholderBlock = enriched
+        applyBackgroundMarkdownMutation(replacePlan)
+      }
+    })
+  }
   return true
 }
 

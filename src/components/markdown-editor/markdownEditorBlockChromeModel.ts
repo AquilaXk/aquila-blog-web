@@ -1,4 +1,5 @@
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
+import { readVisualViewportBounds } from "./markdownEditorLinkUtils"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export const EDITOR_COLOR_SWATCH_SPECS = [
@@ -53,8 +54,9 @@ const computeBubbleFromRects = (
   measuredBubbleWidth?: number
 ): { top: number; left: number } | null => {
   if (!canShowBubble) return null
-  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
-  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
+  const vp = readVisualViewportBounds()
+  const viewportWidth = vp.width
+  const viewportHeight = vp.height
   const targetWidth = measuredBubbleWidth && measuredBubbleWidth > 0 ? measuredBubbleWidth : 348
   const estimatedWidth = Math.min(targetWidth, viewportWidth - 24)
 
@@ -70,26 +72,26 @@ const computeBubbleFromRects = (
         Math.max(startCoords.right, endCoords.right)) /
       2
     const left = Math.max(
-      12,
-      Math.min(Math.round(centerX - estimatedWidth / 2), viewportWidth - estimatedWidth - 12)
+      vp.offsetLeft + 12,
+      Math.min(Math.round(centerX - estimatedWidth / 2), vp.right - estimatedWidth - 12)
     )
     const bottomEdge = Math.max(startCoords.bottom, endCoords.bottom)
     const isMobileViewport = viewportWidth <= 820
     const placeBelow = isMobileViewport
-      ? bottomEdge + 60 <= viewportHeight
+      ? bottomEdge + 60 <= vp.bottom
       : startCoords.top - (containerRect?.top ?? 0) < 52
     const top = placeBelow
-      ? Math.min(viewportHeight - 56, Math.round(bottomEdge + 8))
-      : Math.max(12, Math.round(startCoords.top - 48))
+      ? Math.min(vp.bottom - 56, Math.round(bottomEdge + 8))
+      : Math.max(vp.offsetTop + 12, Math.round(startCoords.top - 48))
     return { top, left }
   }
 
   if (containerRect && containerRect.height > 0) {
     return {
-      top: Math.round(containerRect.top + 48),
+      top: Math.max(vp.offsetTop + 12, Math.round(containerRect.top + 48)),
       left: Math.max(
-        12,
-        Math.min(Math.round(containerRect.left + 24), viewportWidth - estimatedWidth - 12)
+        vp.offsetLeft + 12,
+        Math.min(Math.round(containerRect.left + 24), vp.right - estimatedWidth - 12)
       ),
     }
   }

@@ -7,6 +7,7 @@ import styled from "@emotion/styled"
 import { EditorIconCheck } from "src/components/markdown-editor/MarkdownEditorIcons"
 import { useLanguage } from "src/libs/language"
 import { adminT } from "./adminI18n"
+import type { MarkdownPrePublishWarning } from "./editorStudioPublishWarnings"
 import {
   adminBorder,
   adminBorderSubtle,
@@ -25,6 +26,7 @@ export type EditorStudioPublishReadinessProps = {
   tagCount: number
   linkWarningCount: number
   totalLinkCount: number
+  prePublishWarnings?: readonly MarkdownPrePublishWarning[]
 }
 
 type ReadinessRowTone = "ready" | "neutral" | "warning"
@@ -130,6 +132,43 @@ const ReadinessStatusValue = styled.span<{ $tone: ReadinessRowTone }>`
   }};
 `
 
+const ReadinessWarningsList = styled.ul`
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.colors.orange6};
+  background: ${({ theme }) => theme.colors.orange2};
+`
+
+const ReadinessWarningItem = styled.li`
+  font: 550 11px/1.35 var(--aq-font-sans);
+  color: ${({ theme }) => theme.colors.orange11};
+`
+
+const formatPrePublishWarningText = (warning: MarkdownPrePublishWarning, isEn: boolean): string => {
+  if (warning.kind === "unclosed-fence") {
+    return isEn
+      ? `Unclosed code block at line ${warning.line}`
+      : `닫히지 않은 코드 블록이 있습니다 (${warning.line}번 줄)`
+  }
+  if (warning.kind === "unclosed-directive") {
+    return isEn
+      ? `Unclosed ::: container block at line ${warning.line}`
+      : `닫히지 않은 ::: 컨테이너 블록이 있습니다 (${warning.line}번 줄)`
+  }
+  if (warning.kind === "placeholder-marker") {
+    return isEn
+      ? `Draft placeholder marker "${warning.token}" at line ${warning.line}`
+      : `미완성 표식 "${warning.token}"가 남아 있습니다 (${warning.line}번 줄)`
+  }
+  return isEn
+    ? `${warning.count} body H1 heading (line ${warning.firstLine}) — H2–H4 recommended below post title`
+    : `본문 H1 제목 ${warning.count}개 (${warning.firstLine}번 줄) — 글 제목 아래에서는 H2~H4 권장`
+}
+
 export const EditorStudioPublishReadinessCard = ({
   hasTitle,
   wordCount,
@@ -138,10 +177,11 @@ export const EditorStudioPublishReadinessCard = ({
   tagCount,
   linkWarningCount,
   totalLinkCount,
+  prePublishWarnings = [],
 }: EditorStudioPublishReadinessProps) => {
   const { language } = useLanguage()
   const isEn = language === "en"
-  const hasWarning = linkWarningCount > 0 || !hasTitle || !hasBody
+  const hasWarning = linkWarningCount > 0 || !hasTitle || !hasBody || prePublishWarnings.length > 0
   const rows: Array<{ label: string; value: string; tone: ReadinessRowTone }> = [
     {
       label: adminT("editorReadinessTitleRow", language),
@@ -213,6 +253,15 @@ export const EditorStudioPublishReadinessCard = ({
           </ReadinessRow>
         ))}
       </ReadinessList>
+      {prePublishWarnings.length > 0 ? (
+        <ReadinessWarningsList data-testid="editor-publish-warnings" role="status">
+          {prePublishWarnings.map((warning) => (
+            <ReadinessWarningItem key={`${warning.kind}-${"line" in warning ? warning.line : warning.firstLine}`}>
+              {formatPrePublishWarningText(warning, isEn)}
+            </ReadinessWarningItem>
+          ))}
+        </ReadinessWarningsList>
+      ) : null}
     </ReadinessCard>
   )
 }

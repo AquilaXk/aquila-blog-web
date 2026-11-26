@@ -517,7 +517,7 @@ export const activeEmptyLineField = StateField.define<DecorationSet>({
     if (
       transaction.docChanged ||
       hasModeEffect ||
-      (transaction.selection && mode === "live")
+      (transaction.selection && (mode === "live" || mode === "split"))
     ) {
       return buildActiveEmptyLineDecorations(transaction.state)
     }

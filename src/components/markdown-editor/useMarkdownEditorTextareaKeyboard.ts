@@ -181,7 +181,7 @@ export const useMarkdownEditorTextareaKeyboard = ({
       const isModToggle =
         (event.metaKey || event.ctrlKey) &&
         (event.key === "e" || event.key === "E") &&
-        !event.shiftKey &&
+        event.shiftKey &&
         !event.altKey
       if (!isModToggle || !onToggleViewMode) return false
       event.preventDefault()

@@ -119,10 +119,10 @@ test.describe("Third audit 10-item regressions", () => {
     }
   })
 
-  test("2. table cell inline shortcut maps Mod+Shift+C to code and frees Mod+E for view mode toggle", () => {
+  test("2. table cell inline shortcut maps Mod+E to code and frees Mod+Shift+E for view mode toggle", () => {
     const tableDomSource = readSrc("components/markdown-editor/markdownEditorTableSessionDom.ts")
-    expect(tableDomSource).not.toContain('!event.shiftKey && lowerKey === "e"')
-    expect(tableDomSource).toContain('event.shiftKey && lowerKey === "c"')
+    expect(tableDomSource).toContain('!event.shiftKey && lowerKey === "e"')
+    expect(tableDomSource).not.toContain('event.shiftKey && lowerKey === "c"')
   })
 
   test("3. cloud asset markdown snippet escapes URLs with spaces/parentheses and editor binds Mod+F / Mod+H", () => {

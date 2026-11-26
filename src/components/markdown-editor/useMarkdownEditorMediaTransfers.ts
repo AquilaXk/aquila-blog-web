@@ -11,6 +11,7 @@ import {
   type TextareaSelection,
   applyHtmlPasteIfEligible,
   resolveMarkdownEditorUploadErrorMessage,
+  tryApplyStandaloneUrlPaste,
   tryApplyUrlSelectionLinkify,
 } from "./markdownEditorMediaTransferModel"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
@@ -391,6 +392,23 @@ export const useMarkdownEditorMediaTransfers = ({
         return
       }
 
+      const pasteGeneration = documentGenerationRef.current
+      if (
+        tryApplyStandaloneUrlPaste({
+          event,
+          viewMode,
+          currentValue: valueRef.current,
+          selection,
+          plainText,
+          applyPlannedMarkdownMutation,
+          applyBackgroundMarkdownMutation,
+          isCurrentGeneration: () => documentGenerationRef.current === pasteGeneration,
+          getCurrentValue: () => valueRef.current,
+        })
+      ) {
+        return
+      }
+
       if (plainText) {
         const smart = resolveSmartPasteText(plainText, valueRef.current, selection.from)
         if (smart.isTable) {
@@ -416,9 +434,11 @@ export const useMarkdownEditorMediaTransfers = ({
       }
     },
     [
+      applyBackgroundMarkdownMutation,
       applyPlannedMarkdownMutation,
       applyRecordedMarkdownMutation,
       disabled,
+      documentGenerationRef,
       onUploadFile,
       onUploadImage,
       processTransferFiles,

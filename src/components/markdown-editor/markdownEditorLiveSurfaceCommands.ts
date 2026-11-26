@@ -3,10 +3,6 @@
  * - fuma-nama/fumadocs (packages/base-ui/src/components/callout.tsx, MIT License, Copyright (c) 2024 Fuma Nama)
  * - Milkdown/milkdown Crepe (packages/crepe/src/theme/common/table.css, MIT License, Copyright (c) 2021 Mirone)
  */
-import { LanguageDescription, LanguageSupport } from "@codemirror/language"
-import { javascriptLanguage, typescriptLanguage, jsxLanguage, tsxLanguage } from "@codemirror/lang-javascript"
-import { htmlLanguage } from "@codemirror/lang-html"
-import { cssLanguage } from "@codemirror/lang-css"
 import { EditorSelection, Transaction } from "@codemirror/state"
 import { EditorView } from "@codemirror/view"
 import { cycleTaskCheckboxInLine } from "./markdownEditorKeyboardModel"
@@ -15,6 +11,7 @@ import { liveTableAndCardThemeSpec } from "./markdownEditorLiveTableAndCardTheme
 import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
 
 export { handleFenceEnter, handleFenceShiftEnter } from "./markdownEditorFenceCommands"
+export { codeLanguages } from "./markdownEditorCodeLanguages"
 
 export const selectNextOccurrenceCommand = (view: EditorView): boolean => {
   const { state } = view
@@ -88,39 +85,6 @@ export const cycleTaskCommand = (view: EditorView): boolean => {
   }
   return false
 }
-
-export const codeLanguages = [
-  LanguageDescription.of({
-    name: "javascript",
-    alias: ["js", "mjs", "cjs"],
-    support: new LanguageSupport(javascriptLanguage),
-  }),
-  LanguageDescription.of({
-    name: "typescript",
-    alias: ["ts"],
-    support: new LanguageSupport(typescriptLanguage),
-  }),
-  LanguageDescription.of({
-    name: "jsx",
-    support: new LanguageSupport(jsxLanguage),
-  }),
-  LanguageDescription.of({
-    name: "tsx",
-    support: new LanguageSupport(tsxLanguage),
-  }),
-  LanguageDescription.of({
-    name: "html",
-    support: new LanguageSupport(htmlLanguage),
-  }),
-  LanguageDescription.of({
-    name: "css",
-    support: new LanguageSupport(cssLanguage),
-  }),
-  LanguageDescription.of({
-    name: "json",
-    support: new LanguageSupport(javascriptLanguage),
-  }),
-]
 
 export const liveSurfaceTheme = EditorView.theme({
   "&": { height: "100%" },

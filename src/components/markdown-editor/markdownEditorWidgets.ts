@@ -14,6 +14,7 @@ import { normalizeSafeMarkdownImageSrc } from "../../libs/markdown/safeMarkdownU
 import { extractPromotedCalloutTitle } from "../../libs/markdown/renderingDirectiveModel"
 import { resolveCalloutBlockquote, type CalloutKind } from "../../libs/markdown/calloutRegistry"
 import { getLiveCalloutIconSvg, LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
+import { attachLiveImageControls } from "./markdownEditorImageControls"
 import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
 
 export type MermaidColorScheme = "dark" | "light"
@@ -131,7 +132,8 @@ export class MarkdownImageWidget extends WidgetType {
     private readonly alt: string,
     private readonly widthPx?: number,
     private readonly align?: string,
-    private readonly title?: string
+    private readonly title?: string,
+    private readonly from = 0
   ) {
     super()
   }
@@ -146,7 +148,7 @@ export class MarkdownImageWidget extends WidgetType {
     )
   }
 
-  toDOM() {
+  toDOM(view?: EditorView) {
     const wrap = document.createElement("span")
     wrap.className = "cm-live-image-wrap"
     if (this.align) wrap.dataset.align = this.align
@@ -159,7 +161,10 @@ export class MarkdownImageWidget extends WidgetType {
     if (this.title) img.title = this.title
     if (this.widthPx) img.width = this.widthPx
     img.loading = "lazy"
-    wrap.appendChild(img)
+    attachLiveImageControls({
+      view, wrap, img, src: this.src, alt: this.alt, widthPx: this.widthPx,
+      align: this.align, title: this.title, fallbackFrom: this.from,
+    })
     return wrap
   }
 }

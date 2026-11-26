@@ -34,12 +34,12 @@ export const modShortcutLabel =
     : "Ctrl+"
 
 export const toolbarMarkdownSnippets = [
-  { group: "heading", label: "H1", title: "제목 1", titleEn: "Heading 1", before: "# ", after: "" },
-  { group: "heading", label: "H2", title: "제목 2", titleEn: "Heading 2", before: "## ", after: "" },
+  { group: "heading", label: "H2", title: "제목 2 (권장)", titleEn: "Heading 2", before: "## ", after: "" },
   { group: "heading", label: "H3", title: "제목 3", titleEn: "Heading 3", before: "### ", after: "" },
+  { group: "heading", label: "H1", title: "제목 1 (본문 비권장 · TOC 제외)", titleEn: "Heading 1 (Not in TOC)", before: "# ", after: "" },
   { group: "primary", label: "I", title: `기울임 (${modShortcutLabel}I)`, titleEn: `Italic (${modShortcutLabel}I)`, before: "_", after: "_", toggle: true },
   { group: "more", label: "S", title: `취소선 (${modShortcutLabel}Shift+X)`, titleEn: `Strikethrough (${modShortcutLabel}Shift+X)`, before: "~~", after: "~~", toggle: true },
-  { group: "primary", label: "`", title: `인라인 코드 (${modShortcutLabel}Shift+C)`, titleEn: `Inline code (${modShortcutLabel}Shift+C)`, before: "`", after: "`", toggle: true },
+  { group: "primary", label: "`", title: `인라인 코드 (${modShortcutLabel}E)`, titleEn: `Inline code (${modShortcutLabel}E)`, before: "`", after: "`", toggle: true },
   { group: "structure", label: ">", title: "인용구", titleEn: "Quote", before: "> ", after: "" },
 ] as const
 

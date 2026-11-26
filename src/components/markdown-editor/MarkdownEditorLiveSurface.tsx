@@ -98,7 +98,7 @@ type MarkdownEditorLiveSurfaceProps = {
   value: string
   disabled: boolean
   disableMermaid?: boolean
-  mode?: "live" | "source" | "reading"
+  mode?: "live" | "source" | "split" | "reading"
   ariaDescription: string
   onToggleViewMode?: () => void
   onChange: (
@@ -198,7 +198,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
       handleFenceEnter,
       handleFenceShiftEnter,
       {
-        key: "Mod-e",
+        key: "Mod-Shift-e",
         run: () => {
           if (onToggleViewModeRef.current) {
             onToggleViewModeRef.current()

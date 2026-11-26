@@ -3,6 +3,7 @@ import dynamic from "next/dynamic"
 import styled from "@emotion/styled"
 import { useLanguage } from "../../libs/language"
 import { buildPostInternalLinkTargets } from "../../libs/markdown/internalWikilinkResolver"
+import type { MarkdownImageWidthCommitPayload } from "../../libs/markdown/MarkdownRenderer.types"
 import { adminT } from "../../routes/Admin/adminI18n"
 import {
   getRegisteredPostSuggestions,
@@ -24,11 +25,12 @@ const DynamicMarkdownRenderer = dynamic(
 )
 
 const ReadingPreviewRoot = styled.div`
-  height: 100%;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   padding: 12px 56px 64px;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
 
   @media (max-width: 820px) {
     padding: 14px 16px 32px;
@@ -53,12 +55,14 @@ type MarkdownEditorReadingPreviewProps = {
   value: string
   disableMermaid?: boolean
   internalLinkTargets?: Readonly<Record<string, string>>
+  onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
 }
 
 export const MarkdownEditorReadingPreview = ({
   value,
   disableMermaid = false,
   internalLinkTargets,
+  onImageWidthCommit,
 }: MarkdownEditorReadingPreviewProps) => {
   const registeredSuggestions = useSyncExternalStore(
     subscribeInternalPostSuggestions,
@@ -80,7 +84,9 @@ export const MarkdownEditorReadingPreview = ({
         <DynamicMarkdownRenderer
           content={value}
           disableMermaid={disableMermaid}
+          editableImages={Boolean(onImageWidthCommit)}
           internalLinkTargets={resolvedInternalLinkTargets}
+          onImageWidthCommit={onImageWidthCommit}
         />
       </ReadingPreviewCanvas>
     </ReadingPreviewRoot>

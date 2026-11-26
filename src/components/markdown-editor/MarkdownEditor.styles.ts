@@ -7,6 +7,8 @@
  */
 import styled from "@emotion/styled"
 import { articleTypographyScale } from "src/libs/markdown/contentTypography"
+import { LIVE_CODE_HEADER_STYLES } from "./markdownEditorCodeBlockChrome"
+import { LIVE_IMAGE_CONTROL_STYLES } from "./markdownEditorImageStyles"
 import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
 
 export {
@@ -116,6 +118,45 @@ export const LiveEditorBody = styled.div<{
     min-height: 0;
     height: 100%;
     ${({ $isReading }) => ($isReading ? "display: none;" : "")}
+  }
+
+  &[data-view-mode="split"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0;
+  }
+
+  &[data-view-mode="split"] .cm-sizer {
+    max-width: 100%;
+  }
+
+  &[data-view-mode="split"] .cm-content {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    padding: 12px 24px 96px;
+  }
+
+  &[data-view-mode="split"] .aq-editor-reading-surface {
+    padding: 12px 24px 64px;
+    border-left: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.gray8}, transparent 75%);
+  }
+
+  &[data-view-mode="split"] .aq-editor-reading-surface > div {
+    max-width: 100%;
+  }
+
+  @media (max-width: 1100px) {
+    &[data-view-mode="split"] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    &[data-view-mode="split"] .aq-editor-reading-surface {
+      border-left: 0;
+      border-top: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.gray8}, transparent 75%);
+    }
   }
 
   .cm-editor {
@@ -414,7 +455,7 @@ export const LiveEditorBody = styled.div<{
     color: ${EDITOR_SYNTAX_COLORS.codeBlockLineMuted};
   }
 
-  .cm-live-code-fence-open[data-code-lang] {
+  .cm-live-code-fence-open[data-code-lang]:not(.cm-live-code-has-header) {
     position: relative;
     &::after {
       content: attr(data-code-lang);
@@ -434,6 +475,7 @@ export const LiveEditorBody = styled.div<{
       user-select: none;
     }
   }
+  ${LIVE_CODE_HEADER_STYLES}
 
   .cm-gutters, .cm-editor .cm-gutters { background: transparent; border-right: 0 !important; border: 0; }
   .cm-foldGutter .cm-gutterElement {
@@ -452,15 +494,7 @@ export const LiveEditorBody = styled.div<{
     line-height: 1.65;
   }
 
-  .cm-live-image-wrap {
-    display: inline-block; max-width: min(100%, var(--aq-image-width, 100%));
-    &[data-align="center"], &[data-align="right"], &[data-align="left"], &[data-align="wide"], &[data-align="full"] { display: flex; width: 100%; max-width: 100%; }
-    &[data-align="center"], &[data-align="wide"] { justify-content: center; }
-    &[data-align="right"] { justify-content: flex-end; }
-    &[data-align="left"] { justify-content: flex-start; }
-    .cm-live-image { max-width: min(100%, var(--aq-image-width, 100%)); height: auto; }
-    &[data-align="full"] .cm-live-image { width: 100%; max-width: 100%; }
-  }
+  ${LIVE_IMAGE_CONTROL_STYLES}
 
   &[aria-disabled="true"] .cm-editor { cursor: not-allowed; opacity: 0.7; }
 

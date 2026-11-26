@@ -18,11 +18,11 @@ import {
   EditorStudioRoot,
   EditorStudioStatusBar,
   EditorTagRow,
-  LocalDraftRestoreCard,
   PublishNotice,
   SecondaryButton,
   SelectedTagChip,
 } from "./EditorStudioDedicatedEditorSurfaceParts"
+export { LocalDraftRestoreSuggestion } from "./EditorStudioLocalDraftRestoreCard"
 import { EditorStudioCloudAssetPicker } from "./EditorStudioCloudAssetPicker"
 import {
   EditorFloatingMiniToc,
@@ -108,18 +108,6 @@ export type EditorStudioDedicatedEditorSurfaceProps = {
   onRevisionRestored?: (restoredPost?: unknown) => Promise<void> | void
 }
 
-type LocalDraftRestoreSuggestionProps = {
-  visible: boolean
-  disabled: boolean
-  onRestore: () => void
-  candidates: Array<{ key: string; label: string }>
-  selectedKey: string
-  onSelect: (key: string) => void
-  onDiscard: () => void
-  onClear: () => void
-  onDismiss: () => void
-}
-
 export const activateEditorOutlineItem = (
   range: { start: number; end: number } | null,
   setIsOutlineOpen: (next: boolean) => void,
@@ -135,60 +123,6 @@ export const activateEditorOutlineItem = (
   }
   setLastActivatedOutlineOffset(null)
   focusTitle()
-}
-
-export const LocalDraftRestoreSuggestion = ({
-  visible,
-  disabled,
-  onRestore,
-  candidates,
-  selectedKey,
-  onSelect,
-  onDiscard,
-  onClear,
-  onDismiss,
-}: LocalDraftRestoreSuggestionProps) => {
-  const { language } = useLanguage()
-  if (!visible) return null
-  return (
-    <LocalDraftRestoreCard role="status" aria-live="polite">
-      <div className="card-header">
-        <span>{adminT("editorDraftBannerTitle", language)}</span>
-      </div>
-      <select
-        aria-label={adminT("editorDraftSelectAria", language)}
-        disabled={disabled}
-        value={selectedKey}
-        onChange={(event) => onSelect(event.target.value)}
-      >
-        <option value="">{adminT("editorDraftSelectPlaceholder", language)}</option>
-        {candidates.map((candidate) => (
-          <option key={candidate.key} value={candidate.key}>
-            {candidate.label}
-          </option>
-        ))}
-      </select>
-      <div className="card-actions">
-        <SecondaryButton
-          type="button"
-          disabled={disabled || !selectedKey}
-          onClick={onRestore}
-        >
-          {adminT("editorDraftRestore", language)}
-        </SecondaryButton>
-        <SecondaryButton
-          type="button"
-          disabled={disabled || !selectedKey}
-          onClick={selectedKey ? onDiscard : onClear}
-        >
-          {adminT("editorDraftDelete", language)}
-        </SecondaryButton>
-        <SecondaryButton type="button" disabled={disabled} onClick={onDismiss}>
-          {adminT("editorDraftDismiss", language)}
-        </SecondaryButton>
-      </div>
-    </LocalDraftRestoreCard>
-  )
 }
 
 export const EditorStudioDedicatedEditorLoadingState = () => {
@@ -297,12 +231,21 @@ export const renderEditorOutlinePanel = ({
           </EditorOutlineSummaryBar>
           {outlineItems.length > 0 ? (
             <EditorOutlineTree>
-              {outlineItems.map((item, index) => (
+              {outlineItems.map((item, index) => {
+                const isBodyDuplicateH1 = item.range !== null && item.level === 1
+                const dupHint = isBodyDuplicateH1
+                  ? language === "en"
+                    ? "Body H1 duplicates post title and is excluded from public TOC (H2–H4)."
+                    : "본문 H1(#)은 글 제목과 중복되며 공개 목차(H2~H4)에서 제외됩니다."
+                  : undefined
+                return (
                 <EditorOutlineItem
                   key={item.id}
                   type="button"
                   data-level={item.level}
                   data-active={String(index === activeOutlineIndex)}
+                  data-duplicate-h1={isBodyDuplicateH1 ? "true" : undefined}
+                  title={dupHint}
                   onClick={() =>
                     activateEditorOutlineItem(
                       item.range,
@@ -313,10 +256,11 @@ export const renderEditorOutlinePanel = ({
                     )
                   }
                 >
-                  <span aria-hidden="true">H{item.level}</span>
+                  <span aria-hidden="true">{isBodyDuplicateH1 ? "H1!" : `H${item.level}`}</span>
                   <strong>{item.label}</strong>
                 </EditorOutlineItem>
-              ))}
+                )
+              })}
             </EditorOutlineTree>
           ) : (
             <p>{adminT("editorOutlineEmpty", language)}</p>

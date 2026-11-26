@@ -9,7 +9,6 @@ import {
   adminBorder,
   adminBorderStrong,
   adminBorderSubtle,
-  adminControlText,
   adminFocusRing,
   adminStatusDangerBg,
   adminStatusDangerBorder,
@@ -19,16 +18,16 @@ import {
   adminStatusSuccessText,
   adminSurface,
   adminSurfaceMuted,
-  adminSurfaceRaised,
   adminSystemThemeVariables,
-  adminTeal,
-  adminTealBorder,
-  adminTealBorderHover,
-  adminTealHover,
   adminTextMuted,
   adminTextPrimary,
   adminTextSecondary,
 } from "./adminColorTokens"
+export {
+  EditorInspectorFullWidthAction,
+  PrimaryButton,
+  SecondaryButton,
+} from "./EditorStudioSurfaceButtons"
 
 export const EditorStudioRoot = styled.div`
   ${({ theme }) => adminSystemThemeVariables(theme)}
@@ -230,83 +229,6 @@ export const EditorStudioSaveState = styled.span`
   }
 `
 
-const Button = styled.button`
-  border: 1px solid ${adminBorder};
-  border-radius: 6px;
-  padding: 0.48rem 0.88rem;
-  min-height: 36px;
-  background: ${adminSurface};
-  color: ${adminTextSecondary};
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 550;
-
-  @media (pointer: coarse) {
-    min-height: 44px;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    transition:
-      border-color 0.16s ease,
-      background-color 0.16s ease,
-      color 0.16s ease,
-      box-shadow 0.16s ease;
-  }
-
-  &:hover:not(:disabled) {
-    border-color: ${adminBorderStrong};
-    background: ${adminSurfaceMuted};
-    color: ${adminTextPrimary};
-  }
-
-  &:focus-visible {
-    outline: none;
-    border-color: ${adminBorderStrong};
-    box-shadow: ${({ theme }) => adminFocusRing(theme)};
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-`
-
-export const PrimaryButton = styled(Button)`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 6px;
-  padding: 0 14px;
-  border-color: ${adminTealBorder};
-  background: ${adminTeal};
-  color: ${adminControlText};
-  font-weight: 600;
-
-  &:hover:not(:disabled) {
-    border-color: ${adminTealBorderHover};
-    background: ${adminTealHover};
-    color: ${adminControlText};
-  }
-`
-
-export const SecondaryButton = styled(Button)`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 6px;
-  border-color: ${adminBorder};
-  background: ${adminSurface};
-  color: ${adminTextPrimary};
-  font-weight: 550;
-
-  &:hover:not(:disabled) {
-    border-color: ${adminBorderStrong};
-    background: ${adminSurfaceMuted};
-  }
-`
-
 export const EditorSidebarToggleButton = styled.button<{ $active?: boolean }>`
   display: inline-flex;
   align-items: center;
@@ -391,10 +313,12 @@ export const EditorStudioFrame = styled.div<{
   @media (max-width: 820px) {
     width: 100%;
     max-width: 100%;
+    height: 100%;
+    min-height: 0;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
   }
 
   ${({ $showOutline = false, $showInspector = false }) =>
@@ -424,6 +348,10 @@ export const EditorStudioWritingColumn = styled.section<{
   width: 100%;
   background: ${({ theme }) => theme.publicDesign.readableSurface};
   border-inline: 0;
+
+  @media (max-width: 820px) {
+    height: 100%;
+  }
 `
 
 export const EditorStudioDedicatedMetaSection = styled.section`
@@ -457,12 +385,6 @@ export {
   InlineMetaInput,
   SelectedTagChip,
 } from "./EditorStudioEditorialStyles"
-
-export const EditorInspectorFullWidthAction = styled(SecondaryButton)`
-  width: 100%;
-  margin-top: 8px;
-  border-radius: 8px;
-`
 
 export const TitleInput = styled.textarea`
   width: 100%;

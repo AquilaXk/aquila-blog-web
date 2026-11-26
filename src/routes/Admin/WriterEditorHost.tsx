@@ -12,6 +12,7 @@ type WriterEditorHostProps = {
   onSelectionChange?: (selection: { from: number; to: number }) => void
   onFlushMarkdownReady: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
+  onToggleViewModeRequestReady?: (toggle: (() => void) | null) => void
   onRequestFocusTitle?: () => void
   onRequestSave?: () => void
   onUploadingChange?: (isUploading: boolean) => void
@@ -23,6 +24,7 @@ type WriterEditorHostProps = {
     sizeBytes?: number
     description?: string
   }>
+  onRequestCloudAsset?: () => void
   mermaidEnabled: boolean
   disabled?: boolean
   onCommitDuration?: (actualDuration: number) => void
@@ -35,11 +37,13 @@ export const WriterEditorHost = ({
   onSelectionChange,
   onFlushMarkdownReady,
   onFocusRequestReady,
+  onToggleViewModeRequestReady,
   onRequestFocusTitle,
   onRequestSave,
   onUploadingChange,
   onImageUpload,
   onFileUpload,
+  onRequestCloudAsset,
   mermaidEnabled,
   disabled = false,
   onCommitDuration,
@@ -57,11 +61,13 @@ export const WriterEditorHost = ({
         onSelectionChange={onSelectionChange}
         onFlushMarkdownReady={onFlushMarkdownReady}
         onFocusRequestReady={onFocusRequestReady}
+        onToggleViewModeRequestReady={onToggleViewModeRequestReady}
         onRequestFocusTitle={onRequestFocusTitle}
         onRequestSave={onRequestSave}
         onUploadingChange={onUploadingChange}
         onUploadImage={onImageUpload}
         onUploadFile={onFileUpload}
+        onRequestCloudAsset={onRequestCloudAsset}
         disableMermaid={!mermaidEnabled}
         disabled={disabled}
       />

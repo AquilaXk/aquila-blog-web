@@ -18,6 +18,9 @@ import {
   resolveCustomDirectiveBlockPayload,
 } from "../../libs/markdown/renderingDirectiveModel"
 import { normalizeSafeMarkdownUrl } from "../../libs/markdown/safeMarkdownUrl"
+import { normalizePublicExternalThumbnailUrl } from "../../libs/markdown/externalThumbnailUrlPolicy"
+import { normalizePublicPostImageUrl } from "../../libs/markdown/postImageUrlPolicy"
+import { resolveEmbedPreviewUrl } from "../../libs/unfurl/extractMeta"
 import {
   parseCustomDirectiveFromOpening,
   parseOpeningDirectiveLine,
@@ -63,6 +66,7 @@ export type EditorBookmarkContainerBlock = {
   description: string
   siteName?: string
   provider?: string
+  thumbnailUrl?: string
 }
 
 export type EditorEmbedContainerBlock = {
@@ -74,6 +78,8 @@ export type EditorEmbedContainerBlock = {
   caption: string
   provider?: string
   siteName?: string
+  thumbnailUrl?: string
+  embedUrl?: string
 }
 
 export type EditorFileContainerBlock = {
@@ -328,6 +334,12 @@ const finalizeCustomContainerBlock = (
 
   const siteName = readExtraText(resolved.extraAttrs.siteName)
   const provider = readExtraText(resolved.extraAttrs.provider)
+  const rawThumb = readExtraText(resolved.extraAttrs.thumbnailUrl)
+  const thumbnailUrl = rawThumb
+    ? normalizePublicPostImageUrl(rawThumb) || normalizePublicExternalThumbnailUrl(rawThumb)
+    : ""
+  const rawEmbedUrl = readExtraText(resolved.extraAttrs.embedUrl)
+  const embedUrl = rawEmbedUrl ? resolveEmbedPreviewUrl(rawEmbedUrl) : ""
   const mimeType = readExtraText(resolved.extraAttrs.mimeType)
   const rawSize = resolved.extraAttrs.sizeBytes
   const sizeBytes = typeof rawSize === "number" && Number.isFinite(rawSize) ? rawSize : undefined
@@ -337,6 +349,7 @@ const finalizeCustomContainerBlock = (
       kind: "embed", from: candidate.from, to: lineEnd, url: finalizedUrl,
       title: primaryTitle, caption: resolved.secondaryText,
       ...(provider ? { provider } : {}), ...(siteName ? { siteName } : {}),
+      ...(thumbnailUrl ? { thumbnailUrl } : {}), ...(embedUrl ? { embedUrl } : {}),
     }
   }
   if (candidate.kind === "file") {
@@ -350,6 +363,7 @@ const finalizeCustomContainerBlock = (
     kind: "bookmark", from: candidate.from, to: lineEnd, url: finalizedUrl,
     title: primaryTitle, description: resolved.secondaryText,
     ...(siteName ? { siteName } : {}), ...(provider ? { provider } : {}),
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
   }
 }
 
@@ -551,33 +565,24 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
       }
       continue
     }
-
     if (open.kind === "toggle") {
+      const rawTitle = open.quotedTitle !== null ? open.quotedTitle : open.remainder
       candidate = {
         kind: "toggle",
         from: lineStart,
         bodyOffset: Math.max(0, offset - lineStart),
         fenceStack: [open.fenceLength],
-        rawTitle: open.quotedTitle !== null ? open.quotedTitle : open.remainder,
+        rawTitle,
         bodyLines: [],
       }
       continue
     }
-
     const custom = parseCustomDirectiveFromOpening(open)
     if (!custom) continue
     const url = custom.rawUrl.trim()
-    candidate =
-      !url || normalizeSafeMarkdownUrl(url)
-        ? {
-            kind: custom.directive,
-            from: lineStart,
-            fenceStack: [open.fenceLength],
-            url,
-            inlineTitle: custom.inlineTitle,
-            bodyLines: [],
-          }
-        : null
+    candidate = !url || normalizeSafeMarkdownUrl(url)
+      ? { kind: custom.directive, from: lineStart, fenceStack: [open.fenceLength], url, inlineTitle: custom.inlineTitle, bodyLines: [] }
+      : null
   }
 
   return blocks

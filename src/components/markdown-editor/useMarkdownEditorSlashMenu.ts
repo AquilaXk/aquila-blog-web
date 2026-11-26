@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type MutableRefObject } from "react"
+import type { SiteLanguage } from "../../libs/language"
 import {
   hasWhitespaceOrSlash,
   isAsciiWhitespace,
@@ -104,20 +105,24 @@ export const matchSlashCommandTrigger = (
 export const SLASH_FLAG_MERMAID = 1
 export const SLASH_FLAG_IMAGE = 1 << 1
 export const SLASH_FLAG_ATTACHMENT = 1 << 2
+export const SLASH_FLAG_CLOUD = 1 << 3
 
 export const packSlashDisabledFeaturesMask = (options?: {
   disableMermaid?: boolean
   disableImageUpload?: boolean
   disableFileUpload?: boolean
+  disableCloudAsset?: boolean
 }): number =>
   (options?.disableMermaid ? SLASH_FLAG_MERMAID : 0) |
   (options?.disableImageUpload ? SLASH_FLAG_IMAGE : 0) |
-  (options?.disableFileUpload ? SLASH_FLAG_ATTACHMENT : 0)
+  (options?.disableFileUpload ? SLASH_FLAG_ATTACHMENT : 0) |
+  (options?.disableCloudAsset ? SLASH_FLAG_CLOUD : 0)
 
 const resolveSlashSpecFlagMask = (id: string): number => {
   if (id === "mermaid") return SLASH_FLAG_MERMAID
   if (id === "image") return SLASH_FLAG_IMAGE
   if (id === "attachment") return SLASH_FLAG_ATTACHMENT
+  if (id === "cloud") return SLASH_FLAG_CLOUD
   return 0
 }
 
@@ -197,13 +202,14 @@ export const computeSlashSpecMatchScore = (
 export const filterSlashCommandSpecs = (
   query: string,
   disableMermaid = false,
-  options?: { disableImageUpload?: boolean; disableFileUpload?: boolean }
+  options?: { disableImageUpload?: boolean; disableFileUpload?: boolean; disableCloudAsset?: boolean }
 ) => {
   const q = query.trim().toLowerCase()
   const disabledMask = packSlashDisabledFeaturesMask({
     disableMermaid,
     disableImageUpload: options?.disableImageUpload,
     disableFileUpload: options?.disableFileUpload,
+    disableCloudAsset: options?.disableCloudAsset,
   })
 
   type ScoredItem = { spec: (typeof SLASH_COMMAND_SPECS)[number]; score: number }
@@ -226,10 +232,26 @@ export const filterSlashCommandSpecs = (
 export const resolveSlashCommandMutation = (
   spec: { id: string; snippet: string },
   slashStart: number,
-  selectionEnd: number
+  selectionEnd: number,
+  language: SiteLanguage = "ko"
 ): PlannedTextMutation => {
-  if (spec.snippet === "__IMAGE_UPLOAD__" || spec.snippet === "__FILE_UPLOAD__") {
+  if (
+    spec.snippet === "__IMAGE_UPLOAD__" ||
+    spec.snippet === "__FILE_UPLOAD__" ||
+    spec.snippet === "__CLOUD_ASSET__"
+  ) {
     return planReplaceSelection(slashStart, selectionEnd, "")
+  }
+  if (spec.id === "toggle" && language === "en") {
+    const snippet = ":::toggle Toggle title\n\n:::"
+    const cursor = slashStart + 23
+    return {
+      rangeStart: slashStart,
+      rangeEnd: selectionEnd,
+      replacement: snippet,
+      selectionStart: cursor,
+      selectionEnd: cursor,
+    }
   }
   if (spec.snippet === "__TABLE__") {
     const table = createMarkdownEditorTable(2, 2)
@@ -249,6 +271,7 @@ export const resolveSlashCommandMutation = (
     math: 3,
     mermaid: 11,
     toggle: 16,
+    wikilink: 2,
     embed: 17,
     bookmark: 20,
   }
@@ -319,20 +342,26 @@ const resolveSlashMenuPosition = (
 export const useMarkdownEditorSlashMenu = ({
   selectionRef,
   applyMutationPlan,
+  language = "ko",
   disableMermaid = false,
   disableImageUpload = false,
   disableFileUpload = false,
+  disableCloudAsset = false,
   onRequestImageUpload,
   onRequestFileUpload,
+  onRequestCloudAsset,
   resolveSlashCoords,
 }: {
   selectionRef: MutableRefObject<SlashSelection>
   applyMutationPlan: (plan: PlannedTextMutation) => boolean
+  language?: SiteLanguage
   disableMermaid?: boolean
   disableImageUpload?: boolean
   disableFileUpload?: boolean
+  disableCloudAsset?: boolean
   onRequestImageUpload?: () => void
   onRequestFileUpload?: () => void
+  onRequestCloudAsset?: () => void
   resolveSlashCoords?: (pos: number) => SlashAnchorRect | null
 }) => {
   const [slashMenuState, setSlashMenuState] = useState<{
@@ -358,17 +387,21 @@ export const useMarkdownEditorSlashMenu = ({
       const selection = selectionRef.current
       const start = slashMenuState.slashFrom
       const end = selection.to
-      applyMutationPlan(resolveSlashCommandMutation(spec, start, end))
+      applyMutationPlan(resolveSlashCommandMutation(spec, start, end, language))
       closeSlashMenu()
       if (spec.snippet === "__IMAGE_UPLOAD__") {
         onRequestImageUpload?.()
       } else if (spec.snippet === "__FILE_UPLOAD__") {
         onRequestFileUpload?.()
+      } else if (spec.snippet === "__CLOUD_ASSET__") {
+        onRequestCloudAsset?.()
       }
     },
     [
       applyMutationPlan,
       closeSlashMenu,
+      language,
+      onRequestCloudAsset,
       onRequestFileUpload,
       onRequestImageUpload,
       selectionRef,
@@ -380,6 +413,7 @@ export const useMarkdownEditorSlashMenu = ({
     const specs = filterSlashCommandSpecs(slashMenuState.query, disableMermaid, {
       disableImageUpload,
       disableFileUpload,
+      disableCloudAsset,
     })
     return specs.map((spec) => ({
       id: spec.id,
@@ -390,6 +424,7 @@ export const useMarkdownEditorSlashMenu = ({
       action: () => handleSelectSlashItem(spec),
     }))
   }, [
+    disableCloudAsset,
     disableFileUpload,
     disableImageUpload,
     disableMermaid,

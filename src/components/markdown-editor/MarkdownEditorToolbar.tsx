@@ -7,6 +7,7 @@ import { memo, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "
 import { useLanguage } from "../../libs/language"
 import { editorT } from "./markdownEditorI18n"
 import type { BlockSnippetSpec } from "./markdownEditorBlockSnippets"
+import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import type {
   MarkdownEditorCommandContext,
   MarkdownEditorCommandDescriptor,
@@ -27,6 +28,7 @@ import {
   EditorIconPlus,
   EditorIconQuote,
   EditorIconSearch,
+  EditorIconSplitPane,
 } from "./MarkdownEditorIcons"
 import {
   renderFormatCommandIcon,
@@ -61,7 +63,7 @@ import {
 type MarkdownEditorToolbarProps = {
   disabled: boolean
   disableMermaid: boolean
-  viewMode: "live" | "source" | "reading"
+  viewMode: MarkdownEditorSurfaceMode
   tableRows: number
   tableColumns: number
   commandContext: MarkdownEditorCommandContext
@@ -86,7 +88,7 @@ type MarkdownEditorToolbarProps = {
   onOpenLinkPopover?: () => boolean
   onImageFileSelect: (file: File | null) => void
   onAttachmentFileSelect: (file: File | null) => void
-  onViewModeChange: (mode: "live" | "source" | "reading") => void
+  onViewModeChange: (mode: MarkdownEditorSurfaceMode) => void
 }
 
 const handleEditorToolbarArrowKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -476,6 +478,20 @@ const MarkdownEditorToolbarView = ({
             >
               <EditorIconFileCode size={13} />
               <span>{editorT("toolbarModeSourceShort", language)}</span>
+            </ToolbarModeSegmentButton>
+            <ToolbarModeSegmentButton
+              type="button"
+              data-mobile-hidden="true"
+              data-testid="markdown-editor-mode-split"
+              title={editorT("toolbarModeSplitTitle", language)}
+              aria-label={editorT("toolbarModeSplitAria", language)}
+              aria-pressed={viewMode === "split"}
+              disabled={disabled}
+              $active={viewMode === "split"}
+              onClick={() => onViewModeChange("split")}
+            >
+              <EditorIconSplitPane size={13} />
+              <span>{editorT("toolbarModeSplitShort", language)}</span>
             </ToolbarModeSegmentButton>
             <ToolbarModeSegmentButton
               type="button"

@@ -429,6 +429,20 @@ export const EditorIconMaximize: React.FC<EditorIconProps> = (props) => (
   </IconFrame>
 )
 
+export const EditorIconSplitPane: React.FC<EditorIconProps> = (props) => (
+  <IconFrame {...props}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M12 3v18" />
+  </IconFrame>
+)
+
+export const EditorIconCopy: React.FC<EditorIconProps> = (props) => (
+  <IconFrame {...props}>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </IconFrame>
+)
+
 export {
   EditorIconBold as Bold,
   EditorIconItalic as Italic,

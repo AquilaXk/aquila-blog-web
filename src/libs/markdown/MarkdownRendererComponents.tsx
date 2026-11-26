@@ -15,6 +15,7 @@ import {
 import { resolveMarkdownImageDimensions } from "src/libs/markdown/renderingImageModel"
 import { extractNormalizedMermaidSource } from "src/libs/markdown/mermaid"
 import type { TranslationKey } from "src/libs/language"
+import type { MarkdownImageWidthCommitPayload } from "src/libs/markdown/MarkdownRenderer.types"
 import { HeadingAnchorButton } from "src/libs/markdown/components/HeadingAnchorButton"
 import PrettyCodeBlock from "src/libs/markdown/components/PrettyCodeBlock"
 import { renderImmediateCodeToHtml } from "src/libs/markdown/prismRuntime"
@@ -262,7 +263,9 @@ const renderMarkdownPreElement = ({ node, children, className: _className, ...pr
 const renderMarkdownImageElement = (
   { src, alt, node }: MarkdownElementProps,
   state: MarkdownRenderPassState,
-  t: (key: TranslationKey) => string
+  t: (key: TranslationKey) => string,
+  editableImages = false,
+  onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
 ) => {
   const imageSrc = normalizeSafeMarkdownImageSrc(typeof src === "string" ? src : "")
   if (!imageSrc) {
@@ -283,7 +286,9 @@ const renderMarkdownImageElement = (
       heightPx={heightPx}
       aspectRatio={aspectRatio}
       eager={imageIndex === 0}
+      editable={editableImages}
       imageIndex={imageIndex}
+      onWidthCommit={onImageWidthCommit}
     />
   )
 }
@@ -294,6 +299,8 @@ export const createMarkdownComponentVariants = ({
   tableLayouts,
   renderPassStateRef,
   sentinels,
+  editableImages = false,
+  onImageWidthCommit,
   t,
 }: {
   footnotes: ReturnType<typeof resolveMarkdownRenderModel>["footnotes"]
@@ -301,6 +308,8 @@ export const createMarkdownComponentVariants = ({
   tableLayouts: ReturnType<typeof resolveMarkdownRenderModel>["tableLayouts"]
   renderPassStateRef?: { current: MarkdownRenderPassState }
   sentinels?: ProtectedInlineSentinels
+  editableImages?: boolean
+  onImageWidthCommit?: (payload: MarkdownImageWidthCommitPayload) => void
   t?: (key: TranslationKey) => string
 }) => {
   const fallbackPassStateRef = { current: createMarkdownRenderPassState() }
@@ -372,7 +381,9 @@ export const createMarkdownComponentVariants = ({
       renderMarkdownImageElement(
         props,
         getPassState(),
-        t ?? (() => "")
+        t ?? (() => ""),
+        editableImages,
+        onImageWidthCommit
       ),
     a({ children, href, title, node: _node, ...props }: MarkdownElementProps) {
       const normalizedChildren = normalizeAnchorInlineChildren(children, sentinels)

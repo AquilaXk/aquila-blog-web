@@ -4,7 +4,7 @@
  */
 /* eslint-disable @next/next/no-img-element */
 import { useQuery } from "@tanstack/react-query"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   type CloudFile,
   getCloudFileThumbnailUrl,
@@ -394,11 +394,29 @@ export const EditorStudioCloudAssetPicker = (props: EditorStudioCloudAssetPicker
   const { language } = useLanguage()
   const t = getCloudDictionary(language)
   const [isOpen, setIsOpen] = useState(false)
+  const sectionRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const handleOpenEvent = () => {
+      setIsOpen(true)
+      window.requestAnimationFrame(() => {
+        sectionRef.current?.querySelector<HTMLInputElement>(".pickerSearchInput")?.focus()
+      })
+    }
+    window.addEventListener("aquila-open-cloud-asset-picker", handleOpenEvent)
+    return () => window.removeEventListener("aquila-open-cloud-asset-picker", handleOpenEvent)
+  }, [])
+
   return (
-    <CloudAssetPickerSection aria-label={t.pickerHeading}>
+    <CloudAssetPickerSection ref={sectionRef} data-testid="editor-cloud-asset-picker" aria-label={t.pickerHeading}>
       <div className="pickerHeader">
         <span>{t.pickerHeading}</span>
-        <SecondaryButton type="button" onClick={() => setIsOpen((prev) => !prev)}>
+        <SecondaryButton
+          type="button"
+          data-testid="editor-cloud-asset-picker-toggle"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((prev) => !prev)}
+        >
           {isOpen ? t.pickerToggleClose : t.pickerToggleOpen}
         </SecondaryButton>
       </div>

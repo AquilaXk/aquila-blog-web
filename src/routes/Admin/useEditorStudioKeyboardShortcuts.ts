@@ -179,6 +179,9 @@ export const useEditorStudioKeyboardShortcuts = ({
 
       const state = stateRef.current
       if (state.loadingKey) {
+        if (state.loadingKey === "uploadThumbnail") {
+          state.saveLocalDraft({ silent: false, force: true })
+        }
         return
       }
 

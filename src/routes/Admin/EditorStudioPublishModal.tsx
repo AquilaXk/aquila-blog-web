@@ -24,6 +24,7 @@ import {
   type EditorStudioPublishVisibilityOption,
 } from "./EditorStudioPublishModalParts"
 import { EditorStudioPublishReadinessCard } from "./EditorStudioPublishReadinessCard"
+import type { MarkdownPrePublishWarning } from "./editorStudioPublishWarnings"
 import {
   PublishButton,
   PublishDialog,
@@ -64,6 +65,7 @@ type EditorStudioPublishModalProps = {
     tagCount: number
     linkWarningCount: number
     totalLinkCount: number
+    prePublishWarnings?: readonly MarkdownPrePublishWarning[]
   }
   previewMetaEditorPanel: ReactNode
   publishActionButtonDisabled: boolean

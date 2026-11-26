@@ -18,6 +18,7 @@ import type { MarkdownFormatShortcut } from "./markdownEditorKeyboardModel"
 import type { MarkdownEditorLineCommand } from "./markdownEditorLineCommandsModel"
 import type { MarkdownEditorListCommand } from "./markdownEditorListCommandsModel"
 import { MarkdownEditorBubbleLinkPopover, parseMarkdownLinkSelection } from "./MarkdownEditorBubbleLinkPopover"
+import { findMarkdownLinkAtOffset } from "./markdownEditorLinkUtils"
 import {
   EditorIconBold,
   EditorIconGripSixDots,
@@ -42,11 +43,15 @@ import {
   moveBlockMenuFocus,
 } from "./markdownEditorBlockChromeModel"
 import {
+  BubbleActionButton,
   BubbleColorSwatchPopover,
   BubbleColorTriggerGlyph,
+  BubbleDivider,
   ColorSwatchDot,
 } from "./MarkdownEditorBlockChrome.styles"
 import { MarkdownEditorBlockMenuPopover } from "./MarkdownEditorBlockMenuPopover"
+import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
+import { isLivePreviewSurfaceMode } from "./markdownEditorLivePreview"
 import {
   isWrapSelectionActive,
   planReplaceSelection,
@@ -57,7 +62,7 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 
 type MarkdownEditorBlockChromeProps = {
   containerRef: RefObject<HTMLElement | null>
-  mode: "live" | "source" | "reading"
+  mode: MarkdownEditorSurfaceMode
   disabled: boolean
   value: string
   selection: { from: number; to: number }
@@ -77,100 +82,22 @@ type MarkdownEditorBlockChromeProps = {
 }
 
 const SelectionBubbleToolbar = styled.div<{ $top: number; $left: number }>`
-  position: fixed;
-  z-index: ${zIndexes.dropdownMenu + 5};
-  top: ${({ $top }) => $top}px;
-  left: ${({ $left }) => $left}px;
-  max-width: calc(100vw - 24px);
-  overflow: visible;
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  padding: 3px 4px;
-  border-radius: 8px;
-  border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
+  position: fixed; z-index: ${zIndexes.dropdownMenu + 5}; top: ${({ $top }) => $top}px; left: ${({ $left }) => $left}px;
+  max-width: calc(100vw - 24px); overflow: visible; display: flex; align-items: center; gap: 1px; padding: 3px 4px;
+  border-radius: 8px; border: 1px solid ${({ theme }) => theme.publicDesign.borderStrong};
   background: ${({ theme }) => theme.publicDesign.readableSurface};
-  box-shadow: 0 2px 6px ${boxShadowColor.cardHover}, 0 10px 24px ${boxShadowColor.popover};
-  user-select: none;
-
-  @media (max-width: 720px) {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-`
-
-const BubbleDivider = styled.span`
-  width: 1px;
-  height: 16px;
-  margin: 0 3px;
-  background: color-mix(in srgb, ${({ theme }) => theme.colors.gray8}, transparent 80%);
-  flex-shrink: 0;
-`
-
-const BubbleActionButton = styled.button`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray10};
-  font: 700 12px/1 var(--aq-font-sans);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.12s ease, color 0.12s ease;
-  ${focusVisibleRing}
-  &:hover {
-    background: ${({ theme }) => theme.colors.gray3};
-    color: ${({ theme }) => theme.colors.gray12};
-  }
-  &:active, &[aria-pressed="true"], &[aria-expanded="true"] {
-    background: ${({ theme }) => theme.colors.gray4};
-    color: ${({ theme }) => theme.colors.gray12};
-  }
-  @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; margin: 2px; }
+  box-shadow: 0 2px 6px ${boxShadowColor.cardHover}, 0 10px 24px ${boxShadowColor.popover}; user-select: none;
+  @media (max-width: 720px) { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 `
 
 const GutterHandleButtonBase = styled.button<{ $top: number; $left: number; $dimmed?: boolean }>`
-  position: absolute;
-  left: ${({ $left }) => $left}px;
-  top: ${({ $top }) => $top}px;
-  z-index: 4;
-  width: 24px;
-  height: 24px;
-  padding: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.gray9};
-  cursor: pointer;
-  opacity: ${({ $dimmed }) => ($dimmed ? 0.14 : 0.72)};
-  user-select: none;
-  transition: opacity 0.18s ease, background-color 0.15s ease, color 0.15s ease;
-  ${focusVisibleRing}
-  &:hover, &:focus-visible {
-    opacity: 1;
-    border: 0;
-    background: ${({ theme }) => theme.colors.gray3};
-    color: ${({ theme }) => theme.colors.gray12};
-  }
-  &[aria-expanded="true"] {
-    opacity: 1;
-    border: 0;
-    background: ${({ theme }) => theme.colors.gray4};
-    color: ${({ theme }) => theme.colors.gray12};
-  }
+  position: absolute; left: ${({ $left }) => $left}px; top: ${({ $top }) => $top}px; z-index: 4;
+  width: 24px; height: 24px; padding: 2px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 5px; background: transparent; color: ${({ theme }) => theme.colors.gray9};
+  cursor: pointer; opacity: ${({ $dimmed }) => ($dimmed ? 0.14 : 0.72)}; user-select: none;
+  transition: opacity 0.18s ease, background-color 0.15s ease, color 0.15s ease; ${focusVisibleRing}
+  &:hover, &:focus-visible { opacity: 1; border: 0; background: ${({ theme }) => theme.colors.gray3}; color: ${({ theme }) => theme.colors.gray12}; }
+  &[aria-expanded="true"] { opacity: 1; border: 0; background: ${({ theme }) => theme.colors.gray4}; color: ${({ theme }) => theme.colors.gray12}; }
   @media (pointer: coarse) { display: none; }
   @media (max-width: 820px) { display: none; }
 `
@@ -180,8 +107,7 @@ const GutterPlusButton = styled(GutterHandleButtonBase)`
 `
 
 const GutterDragMenuButton = styled(GutterHandleButtonBase)`
-  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  letter-spacing: -1px;
+  font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: -1px;
 `
 
 export const MarkdownEditorBlockChrome = ({
@@ -203,6 +129,7 @@ export const MarkdownEditorBlockChrome = ({
   const [gutterTop, setGutterTop] = useState<number | null>(null)
   const [gutterLeft, setGutterLeft] = useState(10)
   const [blockMenuPosition, setBlockMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [linkAnchorPosition, setLinkAnchorPosition] = useState<{ top: number; left: number } | null>(null)
   const bubbleRef = useRef<HTMLDivElement | null>(null)
   const blockMenuRef = useRef<HTMLDivElement | null>(null)
   const colorPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -220,25 +147,49 @@ export const MarkdownEditorBlockChrome = ({
   useEffect(() => {
     if (value !== prevValueRef.current) {
       prevValueRef.current = value
-      if (mode === "live" && !disabled && !isBlockMenuOpen) {
+      if (isLivePreviewSurfaceMode(mode) && !disabled && !isBlockMenuOpen) {
         setIsTypingDimmed(true)
         setHoveredLineStart(null)
       }
     }
   }, [disabled, isBlockMenuOpen, mode, value])
 
+  const { activeLineStart, activeLineEnd, activeLineText, currentBlockKind, insideFence } = useMemo(
+    () => computeActiveLineState(value, selection.from),
+    [value, selection.from]
+  )
+  const activeCursorLink = useMemo(
+    () =>
+      isLivePreviewSurfaceMode(mode) &&
+      !disabled &&
+      !isSlashMenuOpen &&
+      !isFindReplaceOpen &&
+      !isDismissed &&
+      selection.from === selection.to &&
+      !insideFence
+        ? findMarkdownLinkAtOffset(value, selection.from)
+        : null,
+    [disabled, insideFence, isDismissed, isFindReplaceOpen, isSlashMenuOpen, mode, selection.from, selection.to, value]
+  )
+
   useEffect(() => {
     if (linkPopoverTriggerNonce === lastLinkNonceRef.current) return
     lastLinkNonceRef.current = linkPopoverTriggerNonce
-    if (mode === "live" && !disabled && !isSlashMenuOpen && !isFindReplaceOpen && selection.from < selection.to) {
+    if (
+      isLivePreviewSurfaceMode(mode) &&
+      !disabled &&
+      !isSlashMenuOpen &&
+      !isFindReplaceOpen &&
+      (selection.from < selection.to || activeCursorLink !== null)
+    ) {
       setIsDismissed(false)
       setIsColorPopoverOpen(false)
       setIsLinkPopoverOpen(true)
     }
-  }, [disabled, isFindReplaceOpen, isSlashMenuOpen, linkPopoverTriggerNonce, mode, selection.from, selection.to])
+  }, [activeCursorLink, disabled, isFindReplaceOpen, isSlashMenuOpen, linkPopoverTriggerNonce, mode, selection.from, selection.to])
 
   useEffect(() => {
-    if (mode !== "live" || disabled) return
+    if (!isLivePreviewSurfaceMode(mode) || disabled) return
     const container = containerRef.current
     let rafId: number | null = null
     const bumpLayout = () => {
@@ -280,10 +231,6 @@ export const MarkdownEditorBlockChrome = ({
     }
   }, [containerRef, disabled, isBlockMenuOpen, mode, resolvePosAtCoords, selection.from, selection.to, value])
 
-  const { activeLineStart, activeLineEnd, activeLineText, currentBlockKind, insideFence } = useMemo(
-    () => computeActiveLineState(value, selection.from),
-    [value, selection.from]
-  )
   const targetGutterPos = hoveredLineStart !== null ? hoveredLineStart : selection.from
   const targetLineState = useMemo(
     () =>
@@ -300,19 +247,19 @@ export const MarkdownEditorBlockChrome = ({
     [selection.from, selection.to, value]
   )
   const canShowBubble =
-    mode === "live" && !disabled && !isSlashMenuOpen && !isFindReplaceOpen && !isDismissed &&
+    isLivePreviewSurfaceMode(mode) && !disabled && !isSlashMenuOpen && !isFindReplaceOpen && !isDismissed &&
     selection.from < selection.to && selection.to - selection.from <= 600 &&
     selectedText.trim().length > 0 && !insideFence && !/^\s*(`{3,}|~{3,})/.test(selectedText)
 
   useEffect(() => {
-    if (!canShowBubble && !isBlockMenuOpen) return
+    if (!canShowBubble && !isBlockMenuOpen && !activeCursorLink) return
     const handleMouseDownCapture = (event: MouseEvent) => {
       const target = event.target as Node | null
       if (!target) return
       if (isBlockMenuOpen && !blockMenuRef.current?.contains(target) && !gutterHandleRef.current?.contains(target)) {
         setIsBlockMenuOpen(false)
       }
-      if (canShowBubble && !bubbleRef.current?.contains(target) && !colorPopoverRef.current?.contains(target)) {
+      if ((canShowBubble || activeCursorLink) && !bubbleRef.current?.contains(target) && !colorPopoverRef.current?.contains(target)) {
         const element = target instanceof Element ? target : target.parentElement
         if (!element?.closest('[data-testid="markdown-editor-content"], [data-testid="markdown-bubble-link-popover"]')) {
           setIsDismissed(true)
@@ -341,15 +288,15 @@ export const MarkdownEditorBlockChrome = ({
       document.removeEventListener("mousedown", handleMouseDownCapture, true)
       window.removeEventListener("keydown", handleKeyDownCapture, true)
     }
-  }, [canShowBubble, isBlockMenuOpen, isColorPopoverOpen, isLinkPopoverOpen])
+  }, [activeCursorLink, canShowBubble, isBlockMenuOpen, isColorPopoverOpen, isLinkPopoverOpen])
 
   const canShowGutterPlus =
-    mode === "live" && !disabled && !isSlashMenuOpen && selection.from === selection.to && !targetLineState.insideFence && targetGutterPos >= 0
+    isLivePreviewSurfaceMode(mode) && !disabled && !isSlashMenuOpen && selection.from === selection.to && !targetLineState.insideFence && targetGutterPos >= 0
 
   useIsomorphicLayoutEffect(() => {
     let cancelled = false
-    const readLayout = () =>
-      measureBlockChromeLayout({
+    const readLayout = () => {
+      const base = measureBlockChromeLayout({
         canShowBubble,
         canShowGutterPlus,
         isBlockMenuOpen,
@@ -359,6 +306,12 @@ export const MarkdownEditorBlockChrome = ({
         container: containerRef.current,
         measuredBubbleWidth: bubbleRef.current?.offsetWidth,
       })
+      const linkCoords = activeCursorLink ? resolveCoords(activeCursorLink.from) : null
+      return {
+        ...base,
+        linkAnchor: linkCoords ? { top: Math.round(linkCoords.top), left: Math.round(linkCoords.left) } : null,
+      }
+    }
     const writeLayout = (measured: ReturnType<typeof readLayout>) => {
       if (cancelled) return
       setBubblePosition((prev) =>
@@ -373,6 +326,11 @@ export const MarkdownEditorBlockChrome = ({
           ? prev
           : measured.blockMenu
       )
+      setLinkAnchorPosition((prev) =>
+        prev?.top === measured.linkAnchor?.top && prev?.left === measured.linkAnchor?.left
+          ? prev
+          : measured.linkAnchor
+      )
     }
     const scheduled = requestMeasure?.({
       key: "block-chrome-layout",
@@ -386,6 +344,7 @@ export const MarkdownEditorBlockChrome = ({
       cancelled = true
     }
   }, [
+    activeCursorLink,
     canShowBubble,
     canShowGutterPlus,
     containerRef,
@@ -581,15 +540,19 @@ export const MarkdownEditorBlockChrome = ({
           ))}
         </BubbleColorSwatchPopover>
       ) : null}
-      {canShowBubble && bubblePosition && isLinkPopoverOpen ? (
+      {(canShowBubble && bubblePosition && isLinkPopoverOpen) || (activeCursorLink && linkAnchorPosition) ? (
         <MarkdownEditorBubbleLinkPopover
-          isOpen={isLinkPopoverOpen}
-          top={bubblePosition.top}
-          left={bubblePosition.left}
+          isOpen={true}
+          top={isLinkPopoverOpen && bubblePosition ? bubblePosition.top : (linkAnchorPosition?.top ?? 0)}
+          left={isLinkPopoverOpen && bubblePosition ? bubblePosition.left : (linkAnchorPosition?.left ?? 0)}
           value={value}
-          selection={selection}
+          selection={activeCursorLink && !canShowBubble ? { from: activeCursorLink.from, to: activeCursorLink.to } : selection}
+          autoFocus={isLinkPopoverOpen}
           onApplyPlan={onTriggerSlashCommand}
-          onClose={() => setIsLinkPopoverOpen(false)}
+          onClose={() => {
+            setIsLinkPopoverOpen(false)
+            if (activeCursorLink) setIsDismissed(true)
+          }}
         />
       ) : null}
     </>

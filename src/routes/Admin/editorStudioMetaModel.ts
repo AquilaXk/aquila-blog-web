@@ -434,6 +434,7 @@ export const buildLocalDraftFingerprint = (payload: LocalDraftFingerprintPayload
   buildEditorStateFingerprint(payload)
 
 const TOGGLE_TITLE_PLACEHOLDER_LINE = `:::toggle ${EDITOR_TOGGLE_TITLE_PLACEHOLDER}`
+const TOGGLE_TITLE_EN_PLACEHOLDER_LINE = ":::toggle Toggle title"
 
 type FenceMarker = "`" | "~"
 
@@ -452,7 +453,7 @@ const detectPlaceholderLineIssue = (trimmed: string): string | null => {
   if (trimmed === EDITOR_BODY_PLACEHOLDER) {
     return "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
   }
-  if (trimmed === TOGGLE_TITLE_PLACEHOLDER_LINE) {
+  if (trimmed === TOGGLE_TITLE_PLACEHOLDER_LINE || trimmed === TOGGLE_TITLE_EN_PLACEHOLDER_LINE) {
     return "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
   }
   return null

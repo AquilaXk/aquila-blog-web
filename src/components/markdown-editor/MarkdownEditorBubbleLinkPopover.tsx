@@ -21,6 +21,7 @@ import {
   EditorIconClose,
   EditorIconUnlink,
 } from "./MarkdownEditorIcons"
+import { clampBoxToVisualViewport } from "./markdownEditorLinkUtils"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type ParsedMarkdownLinkSelection = {
@@ -202,12 +203,36 @@ const LinkErrorBanner = styled.p`
   box-shadow: 0 2px 6px ${boxShadowColor.cardHover};
 `
 
+const LinkOpenAnchor = styled.a`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: ${({ theme }) => theme.colors.gray11};
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+  text-decoration: none;
+  white-space: nowrap;
+  ${focusVisibleRing}
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray3};
+    color: ${({ theme }) => theme.colors.gray12};
+  }
+  @media (pointer: coarse), (max-width: 768px) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+`
+
 type MarkdownEditorBubbleLinkPopoverProps = {
   isOpen: boolean
   top: number
   left: number
   value: string
   selection: { from: number; to: number }
+  autoFocus?: boolean
   onApplyPlan: (plan: PlannedTextMutation) => void
   onClose: () => void
 }
@@ -218,6 +243,7 @@ export const MarkdownEditorBubbleLinkPopover = ({
   left,
   value,
   selection,
+  autoFocus = true,
   onApplyPlan,
   onClose,
 }: MarkdownEditorBubbleLinkPopoverProps) => {
@@ -225,6 +251,7 @@ export const MarkdownEditorBubbleLinkPopover = ({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const selectedText = value.slice(selection.from, selection.to)
   const existingLink = parseMarkdownLinkSelection(selectedText)
+  const safeExistingHref = existingLink?.url ? normalizeSafeMarkdownLinkHref(existingLink.url) : ""
   const [urlInput, setUrlInput] = useState(existingLink?.url ?? "")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -233,16 +260,15 @@ export const MarkdownEditorBubbleLinkPopover = ({
     const nextLink = parseMarkdownLinkSelection(value.slice(selection.from, selection.to))
     setUrlInput(nextLink?.url ?? "")
     setErrorMessage(null)
-    inputRef.current?.focus()
-    inputRef.current?.select()
-  }, [isOpen, selection.from, selection.to, value])
+    if (autoFocus) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [autoFocus, isOpen, selection.from, selection.to, value])
 
   if (!isOpen) return null
 
-  const clampedLeft =
-    typeof window !== "undefined" ? Math.max(12, Math.min(left, window.innerWidth - 340)) : left
-  const clampedTop =
-    typeof window !== "undefined" ? Math.max(12, Math.min(top + 48, window.innerHeight - 104)) : top + 48
+  const { top: clampedTop, left: clampedLeft } = clampBoxToVisualViewport(top + 48, left, 336, 96)
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -297,6 +323,18 @@ export const MarkdownEditorBubbleLinkPopover = ({
         <LinkActionButton type="submit" $tone="primary" aria-label={editorT("linkApplyAria", language)}>
           <EditorIconCheck size={18} />
         </LinkActionButton>
+        {safeExistingHref ? (
+          <LinkOpenAnchor
+            href={safeExistingHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="markdown-link-open-btn"
+            aria-label={editorT("linkOpenAria", language)}
+            title={editorT("linkOpenAria", language)}
+          >
+            {editorT("linkOpenLabel", language)}
+          </LinkOpenAnchor>
+        ) : null}
         {existingLink ? (
           <LinkActionButton
             type="button"

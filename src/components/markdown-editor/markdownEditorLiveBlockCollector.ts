@@ -154,6 +154,11 @@ const collectEntryWatchRanges = (
   if (entry.kind === "task") {
     const taskPrefix = resolveTaskPrefixRange(markdownValue, entry.from, entry.to)
     raw.push({ from: taskPrefix.from, to: taskPrefix.to })
+  } else if (entry.kind === "fenced-code") {
+    raw.push({ from: entry.from, to: entry.to })
+    const openBreak = markdownValue.indexOf("\n", entry.from)
+    const openEnd = openBreak === -1 ? entry.to : Math.min(entry.to, openBreak)
+    if (openEnd > entry.from) raw.push({ from: entry.from, to: openEnd })
   } else if (ACTIVE_WIDGET_KINDS.has(entry.kind)) {
     raw.push({ from: entry.from, to: entry.to })
   }

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { createPortal } from "react-dom"
 import { useLanguage, type SiteLanguage } from "../../libs/language"
+import { createBareDirectiveUnfurlTracker } from "./markdownEditorBareDirectiveUnfurl"
+import {
+  applyImageWidthCommitToMarkdown,
+  type MarkdownImageWidthCommitPayload,
+} from "./markdownEditorImageControls"
+import { findMarkdownLinkAtOffset } from "./markdownEditorLinkUtils"
 import {
   EDITOR_ACTIVE_LINE_PLACEHOLDER,
   EDITOR_EMPTY_BODY_PLACEHOLDER,
@@ -17,7 +23,12 @@ import { useMarkdownEditorFindReplace } from "./useMarkdownEditorFindReplace"
 import { type MarkdownFileUploadResult, type MarkdownImageUploadResult } from "./markdownEditorUploadModel"
 import { useMarkdownEditorMediaTransfers } from "./useMarkdownEditorMediaTransfers"
 import { useMarkdownEditorTextareaKeyboard } from "./useMarkdownEditorTextareaKeyboard"
-import { type MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
+import {
+  isLivePreviewSurfaceMode,
+  nextEditorViewMode,
+  scheduleScrollSyncAfterModeToggle,
+  type MarkdownEditorSurfaceMode,
+} from "./markdownEditorLivePreview"
 import { MarkdownEditorLiveSurface, type MarkdownEditorLiveSurfaceHandle } from "./MarkdownEditorLiveSurface"
 import { MarkdownEditorReadingPreview } from "./MarkdownEditorReadingPreview"
 import { MarkdownEditorBlockChrome } from "./MarkdownEditorBlockChrome"
@@ -51,15 +62,14 @@ type MarkdownEditorProps = {
   onSelectionChange?: (selection: MarkdownEditorFocusSelection) => void
   onFlushMarkdownReady?: (flush: (() => string) | null) => void
   onFocusRequestReady?: (focus: MarkdownEditorFocusRequest | null) => void
+  onToggleViewModeRequestReady?: (toggle: (() => void) | null) => void
   onRequestSave?: () => void; onUploadingChange?: (isUploading: boolean) => void
   onUploadImage?: (file: File) => Promise<MarkdownImageUploadResult>
   onUploadFile?: (file: File) => Promise<MarkdownFileUploadResult>
+  onRequestCloudAsset?: () => void
 }
 
 type TextareaSelection = MarkdownEditorFocusSelection
-
-const nextEditorViewMode = (prev: MarkdownEditorSurfaceMode): MarkdownEditorSurfaceMode =>
-  prev === "live" ? "source" : prev === "source" ? "reading" : "live"
 
 const isEditorAuthoringDisabled = (disabled: boolean, viewMode: MarkdownEditorSurfaceMode): boolean =>
   disabled || viewMode === "reading"
@@ -102,13 +112,13 @@ const renderFindReplaceSection = (
 
 export const MarkdownEditor = ({
   value, disabled = false, disableMermaid = false, internalLinkTargets, onRequestFocusTitle, onChange,
-  onSelectionChange, onFlushMarkdownReady, onFocusRequestReady, onRequestSave,
-  onUploadingChange, onUploadImage, onUploadFile,
+  onSelectionChange, onFlushMarkdownReady, onFocusRequestReady, onToggleViewModeRequestReady, onRequestSave,
+  onUploadingChange, onUploadImage, onUploadFile, onRequestCloudAsset,
 }: MarkdownEditorProps) => {
   const { language } = useLanguage()
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
-  const [viewMode, setViewMode] = useState<MarkdownEditorSurfaceMode>("live")
+  const [viewMode, setViewModeState] = useState<MarkdownEditorSurfaceMode>("live")
   const [editorSelection, setEditorSelectionState] = useState<TextareaSelection>({ from: 0, to: 0 })
   const liveEditorBodyRef = useRef<HTMLDivElement | null>(null)
   const liveSurfaceRef = useRef<MarkdownEditorLiveSurfaceHandle | null>(null)
@@ -117,11 +127,23 @@ export const MarkdownEditor = ({
   const valueRef = useRef(value)
   const selectionRef = useRef<TextareaSelection>({ from: 0, to: 0 })
   const documentGenerationRef = useRef(0)
+  const bareDirectiveUnfurlTrackerRef = useRef<ReturnType<typeof createBareDirectiveUnfurlTracker> | null>(null)
+  if (!bareDirectiveUnfurlTrackerRef.current) {
+    bareDirectiveUnfurlTrackerRef.current = createBareDirectiveUnfurlTracker()
+  }
   const uploadInFlightCountRef = useRef(0)
   const allowNativeTabAfterEscapeRef = useRef(false)
   const pendingFindReplaceInvalidationRef = useRef(false)
   const isAuthoringDisabled = isEditorAuthoringDisabled(disabled, viewMode)
-  const cycleViewMode = useCallback(() => setViewMode(nextEditorViewMode), [])
+  const applyViewModeWithScrollSync = useCallback((nextOrUpdater: MarkdownEditorSurfaceMode | ((prev: MarkdownEditorSurfaceMode) => MarkdownEditorSurfaceMode)) => {
+    scheduleScrollSyncAfterModeToggle(() => liveEditorBodyRef.current)
+    setViewModeState(nextOrUpdater)
+  }, [])
+  const cycleViewMode = useCallback(() => applyViewModeWithScrollSync(nextEditorViewMode), [applyViewModeWithScrollSync])
+  useEffect(() => {
+    onToggleViewModeRequestReady?.(cycleViewMode)
+    return () => onToggleViewModeRequestReady?.(null)
+  }, [cycleViewMode, onToggleViewModeRequestReady])
   const clearUploadError = useCallback(() => setUploadError(""), [])
 
   const syncSelectionState = useCallback((next: TextareaSelection) => {
@@ -274,9 +296,11 @@ export const MarkdownEditor = ({
 
   const { slashMenuState, slashMenuOpenRef, slashMenuItems, checkSlashCommand, closeSlashMenu } =
     useMarkdownEditorSlashMenu({
-      selectionRef, applyMutationPlan, disableMermaid,
+      selectionRef, applyMutationPlan, language, disableMermaid,
+      disableCloudAsset: !onRequestCloudAsset,
       onRequestImageUpload: createOptionalInputPicker(Boolean(onUploadImage), imageInputRef),
       onRequestFileUpload: createOptionalInputPicker(Boolean(onUploadFile), fileInputRef),
+      onRequestCloudAsset,
       resolveSlashCoords,
     })
 
@@ -301,9 +325,11 @@ export const MarkdownEditor = ({
 
   const handleOpenLiveLinkPopover = useCallback(
     (explicitSelection?: TextareaSelection): boolean => {
-      if (isAuthoringDisabled || viewMode !== "live") return false
+      if (isAuthoringDisabled || !isLivePreviewSurfaceMode(viewMode)) return false
       const activeSel = explicitSelection ?? resolveActiveSelection()
-      if (activeSel.from >= activeSel.to) return false
+      const hasCollapsedLink =
+        activeSel.from === activeSel.to && findMarkdownLinkAtOffset(valueRef.current, activeSel.from) !== null
+      if (activeSel.from >= activeSel.to && !hasCollapsedLink) return false
       setLinkPopoverTriggerNonce((prev) => prev + 1)
       return true
     },
@@ -344,11 +370,42 @@ export const MarkdownEditor = ({
       handleFindReplaceSelectionChange(selection)
       syncSelectionTableAvailability(valueRef.current, selection)
       onSelectionChange?.(selection)
-      if (viewMode === "live" && !disabled) {
+      if (isLivePreviewSurfaceMode(viewMode) && !disabled) {
         checkSlashCommand(valueRef.current, selection, { isComposing })
+        const expectedGen = documentGenerationRef.current
+        bareDirectiveUnfurlTrackerRef.current?.trackSelection({
+          markdown: valueRef.current,
+          offset: selection.from,
+          isCurrentGeneration: () => documentGenerationRef.current === expectedGen,
+          getCurrentValue: () => valueRef.current,
+          applyBackgroundMutation: applyBackgroundMarkdownMutation,
+        })
       }
     },
-    [checkSlashCommand, disabled, handleFindReplaceSelectionChange, onSelectionChange, syncSelectionState, syncSelectionTableAvailability, viewMode]
+    [
+      applyBackgroundMarkdownMutation,
+      checkSlashCommand,
+      disabled,
+      handleFindReplaceSelectionChange,
+      onSelectionChange,
+      syncSelectionState,
+      syncSelectionTableAvailability,
+      viewMode,
+    ]
+  )
+
+  const handleImageWidthCommit = useCallback(
+    (payload: MarkdownImageWidthCommitPayload) => {
+      if (disabled) return
+      const plan = applyImageWidthCommitToMarkdown(valueRef.current, payload)
+      if (!plan) return
+      if (isAuthoringDisabled) {
+        applyFallbackValueMutation(plan)
+      } else {
+        applyPlannedMarkdownMutation(plan)
+      }
+    },
+    [applyFallbackValueMutation, applyPlannedMarkdownMutation, disabled, isAuthoringDisabled]
   )
 
   const handleLiveChange = useCallback(
@@ -384,7 +441,7 @@ export const MarkdownEditor = ({
       onApplyTableEdit={tableEditAction} isTableEditDisabled={isTableEditDisabled}
       onOpenFindReplace={findReplace.open} onOpenLinkPopover={handleToolbarLinkPopover}
       onImageFileSelect={handleImageFileSelect}
-      onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={setViewMode}
+      onAttachmentFileSelect={handleAttachmentFileSelect} onViewModeChange={applyViewModeWithScrollSync}
     />
   )
 
@@ -419,11 +476,12 @@ export const MarkdownEditor = ({
           onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}
         />
-        {viewMode === "reading" ? (
+        {viewMode === "reading" || viewMode === "split" ? (
           <MarkdownEditorReadingPreview
             value={draftValue}
             disableMermaid={disableMermaid}
             internalLinkTargets={internalLinkTargets}
+            onImageWidthCommit={disabled ? undefined : handleImageWidthCommit}
           />
         ) : null}
       </LiveEditorBody>

@@ -58,8 +58,8 @@ export const markdownEditorCommands = [
   },
 ] as const satisfies readonly MarkdownEditorCommandDescriptor[]
 
-export const INLINE_CODE_SHORTCUT = "Mod+Shift+C" as const
-export const VIEW_MODE_CYCLE_SHORTCUT = "Mod+E" as const
+export const INLINE_CODE_SHORTCUT = "Mod+E" as const
+export const VIEW_MODE_CYCLE_SHORTCUT = "Mod+Shift+E" as const
 
 export const validateMarkdownEditorCommands = (commands: readonly MarkdownEditorCommandDescriptor[]) => {
   const ids = new Set<string>()

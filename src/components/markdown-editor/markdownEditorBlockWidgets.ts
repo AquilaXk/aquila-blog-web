@@ -283,7 +283,9 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
       block.from,
       block.to,
       block.provider ?? "",
-      block.siteName ?? ""
+      block.siteName ?? "",
+      block.thumbnailUrl ?? "",
+      block.embedUrl ?? ""
     )
   }
   if (block.kind === "file") {
@@ -304,7 +306,8 @@ const createBlockContainerWidget = (block: EditorContainerBlock): WidgetType => 
     block.from,
     block.to,
     block.siteName ?? "",
-    block.provider ?? ""
+    block.provider ?? "",
+    block.thumbnailUrl ?? ""
   )
 }
 
@@ -320,7 +323,7 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
   const decorations: Range<Decoration>[] = []
 
   for (const block of blocks) {
-    if (mode === "live" && isFocused && isContainerBlockActive(block, selections)) {
+    if ((mode === "live" || mode === "split") && isFocused && isContainerBlockActive(block, selections)) {
       const startLineNo = state.doc.lineAt(block.from).number
       const endLineNo = state.doc.lineAt(block.to).number
       const toneClass = block.kind === "callout" ? ` cm-live-container-tone-${block.tone}` : ""

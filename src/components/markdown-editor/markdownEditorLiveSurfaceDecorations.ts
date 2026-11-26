@@ -22,7 +22,7 @@ import {
   type DecorationRangeSpec,
 } from "./markdownEditorLiveDecorationRegions"
 import {
-  getMarkdownLivePreviewBundle, isTokenActive, resolveMarkdownLivePreviewPlanFromEntries,
+  getMarkdownLivePreviewBundle, isLivePreviewSurfaceMode, isTokenActive, resolveMarkdownLivePreviewPlanFromEntries,
   type MarkdownEditorSurfaceMode, type MarkdownLivePreviewDecoration,
   type MarkdownLivePreviewPlanEntry,
 } from "./markdownEditorLivePreview"
@@ -31,6 +31,7 @@ import {
   type MathReplacementSpec,
 } from "./markdownEditorMathModel"
 export { collectMathReplacementSpecs } from "./markdownEditorMathModel"
+import { MarkdownCodeBlockHeaderWidget } from "./markdownEditorCodeBlockChrome"
 import {
   MarkdownCalloutWidget, MarkdownImageWidget, MarkdownMarkerWidget, MarkdownMathWidget,
   MarkdownMermaidWidget, MarkdownRuleWidget, MarkdownTableWidget, MarkdownTaskWidget, MarkdownWikilinkWidget,
@@ -79,6 +80,7 @@ const RULE_DECORATION = Decoration.replace({ widget: new MarkdownRuleWidget() })
 const QUOTE_MARKER_DECORATION = Decoration.replace({ widget: new MarkdownMarkerWidget("", "cm-live-quote-marker") })
 const BULLET_MARKER_DECORATION = Decoration.replace({ widget: new MarkdownMarkerWidget("•", "cm-live-list-marker") })
 const CODE_FENCE_OPEN_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-fence-open" })
+const CODE_FENCE_HEADER_OPEN_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-fence-open cm-live-code-has-header" })
 const CODE_BODY_LINE_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-body-line" })
 const CODE_FENCE_CLOSE_DECORATION = Decoration.line({ class: "cm-live-code-line cm-live-code-fence-close" })
 const HEADING_LINE_DECORATIONS = [1, 2, 3, 4, 5, 6].map((level) =>
@@ -244,17 +246,17 @@ const appendFencedCodeLineDecorations = (spec: ResolvedPreviewSpec, ctx: PlanSpe
   const startLine = ctx.state.doc.lineAt(spec.from)
   const endLine = ctx.state.doc.lineAt(spec.to)
   const hasClosingFence = endLine.number > startLine.number && isClosingCodeFenceLine(endLine.text)
+  const hideFrom = Math.max(startLine.from, spec.from)
+  const showHeader = !isComposing && hasClosingFence && startLine.to > hideFrom && !isTokenActive(startLine.from, startLine.to, ctx.selections)
+  const openClass = showHeader ? "cm-live-code-line cm-live-code-fence-open cm-live-code-has-header" : "cm-live-code-line cm-live-code-fence-open"
   const openDeco = spec.codeLanguage
-    ? Decoration.line({
-        class: "cm-live-code-line cm-live-code-fence-open",
-        attributes: { "data-code-lang": spec.codeLanguage },
-      })
-    : CODE_FENCE_OPEN_DECORATION
+    ? Decoration.line({ class: openClass, attributes: { "data-code-lang": spec.codeLanguage } })
+    : (showHeader ? CODE_FENCE_HEADER_OPEN_DECORATION : CODE_FENCE_OPEN_DECORATION)
   addCodeLineDecorationOnce(ctx, startLine.from, openDeco)
-  if (!isComposing && hasClosingFence && startLine.to > startLine.from) {
-    const hideFrom = Math.max(startLine.from, spec.from)
-    if (startLine.to > hideFrom) {
-      pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, hideFrom, startLine.to)
+  if (hasClosingFence && !isComposing && startLine.to > hideFrom) {
+    pushReplaceDecoration(ctx, HIDE_MARK_DECORATION, hideFrom, startLine.to)
+    if (showHeader) {
+      ctx.decorations.push(Decoration.widget({ widget: new MarkdownCodeBlockHeaderWidget(spec.codeLanguage ?? "", startLine.from), side: 1 }).range(startLine.to))
     }
   }
   const bodyEndLine = hasClosingFence ? endLine.number - 1 : endLine.number
@@ -356,7 +358,7 @@ const appendBlockWidgetDecorations = (
     decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
   }
   for (const img of groups.images) {
-    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align, img.title) }).range(img.from, img.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align, img.title, img.from) }).range(img.from, img.to))
   }
   for (const m of groups.maths) {
     decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))
@@ -530,7 +532,7 @@ export const tryIncrementalDecorationSetUpdate = (
   if (!transaction.docChanged && treeChanged) return null
   const prevMode = transaction.startState.field(editorModeField, false) ?? "live"
   const nextMode = transaction.state.field(editorModeField, false) ?? "live"
-  if (prevMode !== "live" || nextMode !== "live") return null
+  if (!isLivePreviewSurfaceMode(prevMode) || !isLivePreviewSurfaceMode(nextMode)) return null
   if (
     (transaction.startState.field(compositionField, false) ?? false) ||
     (transaction.state.field(compositionField, false) ?? false) ||

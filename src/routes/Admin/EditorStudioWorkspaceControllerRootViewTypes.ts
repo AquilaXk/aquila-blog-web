@@ -23,6 +23,7 @@ export type EditorStudioDocumentSlice = {
   getCurrentPostContent: () => string
   handleExitDedicatedEditor: () => void
   handleFlushMarkdownReady: (flushFn: (() => string) | null) => void
+  handleFocusPreviousFromBody: () => void
   handleFocusTitle: () => void
   handleMarkdownEditorChange: (next: string, meta?: { editorFocused: boolean }) => void
   handlePostCategoryChange: (value: string) => void
