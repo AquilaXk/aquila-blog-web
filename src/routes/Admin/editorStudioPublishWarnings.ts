@@ -1,4 +1,8 @@
 import { isOffsetInsideInlineCodeSpan } from "../../components/markdown-editor/markdownEditorHtmlPasteModel"
+import {
+  parseOpeningDirectiveLine,
+  resolveClosingDirectiveFenceLength,
+} from "../../libs/markdown/sharedDirectiveContainerParser"
 
 export type MarkdownPrePublishWarning =
   | { kind: "unclosed-fence"; line: number }
@@ -10,7 +14,6 @@ export type MarkdownPrePublishWarning =
 const MAX_POST_BODY_LENGTH = 500_000
 
 const FENCE_OPEN_RE = /^( {0,3})(`{3,}|~{3,})([^\r\n]*)$/
-const CONTAINER_OPEN_RE = /^(:{3,})\s*(callout|toggle|embed|bookmark)\b/
 const ATX_H1_RE = /^ {0,3}#(?:\s+|$)/
 
 const findPlaceholderTokenOutsideInlineCode = (line: string, fullDocOffset: number, fullDoc: string): string | null => {
@@ -63,15 +66,13 @@ export const scanMarkdownPrePublishWarnings = (content: string): MarkdownPrePubl
           openFence = { char: marker[0]!, len: marker.length, line: lineNo }
         }
       } else {
-        if (containerStack.length > 0 && /^(:{3,})\s*$/.test(trimmed)) {
-          const closeLen = /^(:{3,})/.exec(trimmed)?.[1]?.length ?? 3
-          if (closeLen >= containerStack[containerStack.length - 1]!.len) {
-            containerStack.pop()
-          }
+        const closeLen = containerStack.length > 0 ? resolveClosingDirectiveFenceLength(trimmed) : 0
+        if (closeLen >= (containerStack[containerStack.length - 1]?.len ?? Number.POSITIVE_INFINITY)) {
+          containerStack.pop()
         } else {
-          const openContainer = CONTAINER_OPEN_RE.exec(trimmed)
+          const openContainer = parseOpeningDirectiveLine(trimmed)
           if (openContainer) {
-            containerStack.push({ len: openContainer[1]?.length ?? 3, line: lineNo })
+            containerStack.push({ len: openContainer.fenceLength, line: lineNo })
           }
         }
 

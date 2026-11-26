@@ -13,6 +13,7 @@ import {
   parseThumbnailZoomFromUrl,
   stripThumbnailFocusFromUrl,
 } from "src/libs/thumbnailFocus"
+import type { SiteLanguage } from "src/libs/language"
 import type { PostVisibility } from "./editorStudioState"
 import { dedupeStrings } from "./editorStudioMetaModelHelpers"
 
@@ -491,21 +492,43 @@ const updateFenceMarker = (
   return { marker: current === nextMarker ? null : current, isFenceLine: true }
 }
 
-const detectPlaceholderLineIssue = (trimmed: string): string | null => {
-  if (trimmed === EDITOR_BODY_PLACEHOLDER) {
-    return "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
+type PlaceholderIssueCode = "body-placeholder" | "toggle-title" | "non-canonical-image"
+
+const formatPlaceholderIssue = (code: PlaceholderIssueCode | null, language: SiteLanguage): string | null => {
+  if (!code) return null
+  if (code === "body-placeholder") {
+    return language === "en"
+      ? "Default placeholder body text remains. Replace it with real content before publishing."
+      : "본문에 기본 placeholder 문구가 남아 있습니다. 실제 내용으로 교체한 뒤 다시 시도해주세요."
   }
+  if (code === "toggle-title") {
+    return language === "en"
+      ? "Default toggle title remains. Replace it with a real title before publishing."
+      : "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
+  }
+  return language === "en"
+    ? "Body images must use uploaded Aquila image URLs. Re-upload the image before publishing."
+    : "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
+}
+
+const detectPlaceholderLineIssueCode = (trimmed: string): PlaceholderIssueCode | null => {
+  if (trimmed === EDITOR_BODY_PLACEHOLDER) return "body-placeholder"
   if (trimmed === TOGGLE_TITLE_PLACEHOLDER_LINE || trimmed === TOGGLE_TITLE_EN_PLACEHOLDER_LINE) {
-    return "토글 제목이 기본값으로 남아 있습니다. 실제 제목으로 바꾼 뒤 다시 시도해주세요."
+    return "toggle-title"
   }
   return null
 }
 
 let cachedPlaceholderInput: string | null = null
-let cachedPlaceholderIssue: string | null = null
+let cachedPlaceholderIssueCode: PlaceholderIssueCode | null = null
 
-export const detectPublishPlaceholderIssue = (content: string): string | null => {
-  if (content === cachedPlaceholderInput) return cachedPlaceholderIssue
+export const detectPublishPlaceholderIssue = (
+  content: string,
+  language: SiteLanguage = "ko"
+): string | null => {
+  if (content === cachedPlaceholderInput) {
+    return formatPlaceholderIssue(cachedPlaceholderIssueCode, language)
+  }
   let fenceMarker: FenceMarker | null = null
   let cursor = 0
 
@@ -517,11 +540,11 @@ export const detectPublishPlaceholderIssue = (content: string): string | null =>
       const fenceState = updateFenceMarker(fenceMarker, trimmed)
       fenceMarker = fenceState.marker
       if (!fenceState.isFenceLine && !fenceMarker && !trimmed.startsWith(">")) {
-        const lineIssue = detectPlaceholderLineIssue(trimmed)
-        if (lineIssue) {
+        const lineIssueCode = detectPlaceholderLineIssueCode(trimmed)
+        if (lineIssueCode) {
           cachedPlaceholderInput = content
-          cachedPlaceholderIssue = lineIssue
-          return lineIssue
+          cachedPlaceholderIssueCode = lineIssueCode
+          return formatPlaceholderIssue(lineIssueCode, language)
         }
       }
     }
@@ -529,10 +552,10 @@ export const detectPublishPlaceholderIssue = (content: string): string | null =>
     cursor = nextBreak + 1
   }
 
-  const imageIssue = hasNonCanonicalPostImageSource(content)
-    ? "본문 이미지는 업로드한 Aquila 이미지 URL만 사용할 수 있습니다. 이미지를 다시 업로드한 뒤 시도해주세요."
+  const imageIssueCode: PlaceholderIssueCode | null = hasNonCanonicalPostImageSource(content)
+    ? "non-canonical-image"
     : null
   cachedPlaceholderInput = content
-  cachedPlaceholderIssue = imageIssue
-  return imageIssue
+  cachedPlaceholderIssueCode = imageIssueCode
+  return formatPlaceholderIssue(imageIssueCode, language)
 }

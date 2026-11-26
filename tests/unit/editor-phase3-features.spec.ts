@@ -7,6 +7,7 @@ import { LanguageProvider } from "../../src/libs/language"
 import {
   editorT,
 } from "../../src/components/markdown-editor/markdownEditorI18n"
+import { parseMarkdownLinkSelection } from "../../src/components/markdown-editor/MarkdownEditorBubbleLinkPopover"
 import {
   planMarkdownEditorLineCommand,
   planMoveBlockToOffset,
@@ -24,13 +25,18 @@ import {
   buildEditorStateFingerprint,
   CANONICAL_URL_MAX_LENGTH,
   computeContentFingerprint,
+  detectPublishPlaceholderIssue,
   normalizeSafeCanonicalUrl,
   POST_CONTENT_MAX_LENGTH,
 } from "../../src/routes/Admin/editorStudioMetaModel"
 import { scanMarkdownPrePublishWarnings } from "../../src/routes/Admin/editorStudioPublishWarnings"
 import { EditorStudioPublishReadinessCard } from "../../src/routes/Admin/EditorStudioPublishReadinessCard"
+import { EditorStudioThumbnailEditorPanel } from "../../src/routes/Admin/EditorStudioThumbnailPanels"
 import { toVisibility } from "../../src/routes/Admin/editorStudioState"
-import { validateEditorContentPreflight } from "../../src/routes/Admin/useEditorStudioPersistenceHelpers"
+import {
+  executeServerTempDraftSave,
+  validateEditorContentPreflight,
+} from "../../src/routes/Admin/useEditorStudioPersistenceHelpers"
 import {
   fromLocalDateTimeInputValue,
   isScheduleTimestampValid,
@@ -267,5 +273,137 @@ test.describe("Editor Phase 3 features & edge cases", () => {
     expect(editorT("toolbarLinkTitle", "ko", "⌘")).toBe("링크 (⌘K)")
     expect(editorT("toolbarLinkTitle", "en", "Ctrl+")).toBe("Link (Ctrl+K)")
     expect(["⌘", "Ctrl+"]).toContain(detectClientModShortcutLabel())
+  })
+
+  test("planMoveBlockToOffset skips adjacent downward no-op without document corruption and supports directive aliases", () => {
+    const applyPlan = (doc: string, plan: ReturnType<typeof planMoveBlockToOffset>) => {
+      if (!plan) return doc
+      return doc.slice(0, plan.rangeStart) + plan.replacement + doc.slice(plan.rangeEnd)
+    }
+
+    const threeLines = "Line A\nLine B\nLine C"
+    expect(planMoveBlockToOffset(threeLines, 1, threeLines.indexOf("Line B") + 1, false)).toBeNull()
+
+    const movedBeforeC = planMoveBlockToOffset(threeLines, 1, threeLines.indexOf("Line C") + 1, false)
+    expect(movedBeforeC).not.toBeNull()
+    expect(applyPlan(threeLines, movedBeforeC)).toBe("Line B\nLine A\nLine C")
+
+    const movedAfterB = planMoveBlockToOffset(threeLines, 1, threeLines.indexOf("Line B") + 1, true)
+    expect(movedAfterB).not.toBeNull()
+    expect(applyPlan(threeLines, movedAfterB)).toBe("Line B\nLine A\nLine C")
+
+    const directiveDoc = ":::file Report\nhttps://example.com/a.pdf\n:::\nTail"
+    const fileRange = resolveContainerAwareBlockRange(directiveDoc, 10, 10)
+    expect(fileRange).toEqual({
+      blockStart: 0,
+      blockEnd: directiveDoc.indexOf("\nTail"),
+    })
+    expect(scanMarkdownPrePublishWarnings(":::file Report\nunclosed")).toEqual([
+      { kind: "unclosed-directive", line: 1 },
+    ])
+  })
+
+  test("parseMarkdownLinkSelection supports balanced parentheses in URLs and labels while rejecting non-links", () => {
+    expect(parseMarkdownLinkSelection("[Docs (v2)](https://example.com/a_(b))")).toEqual({
+      label: "Docs (v2)",
+      url: "https://example.com/a_(b)",
+    })
+    expect(parseMarkdownLinkSelection("![Image](https://example.com/a.png)")).toBeNull()
+    expect(parseMarkdownLinkSelection("[a](https://a.test) [b](https://b.test)")).toBeNull()
+  })
+
+  test("English editor surfaces localize thumbnail controls and publish placeholder errors", () => {
+    expect(detectPublishPlaceholderIssue(":::toggle 토글 제목\n\n:::", "en")).toContain("Default toggle title")
+    expect(detectPublishPlaceholderIssue(":::toggle 토글 제목\n\n:::")).toContain("토글 제목")
+
+    const thumbHtml = renderThemed(
+      createElement(EditorStudioThumbnailEditorPanel, {
+        finalizePreviewThumbPointer: () => {},
+        handlePreviewThumbPointerDown: () => {},
+        handlePreviewThumbPointerMove: () => {},
+        isPreviewThumbDragging: false,
+        isPreviewThumbnailError: false,
+        postThumbnailZoom: 1,
+        previewThumbFrameRef: { current: null },
+        safePreviewThumbnail: "",
+        setIsPreviewThumbnailError: () => {},
+        onThumbnailZoomChange: () => {},
+        onResetThumbnailZoom: () => {},
+      }),
+      "en"
+    )
+    expect(thumbHtml).toContain("Adjust thumbnail focus")
+    expect(thumbHtml).toContain("Using auto OG card")
+    expect(thumbHtml).not.toContain("썸네일 위치 조정")
+  })
+
+  test("executeServerTempDraftSave sanitizes partial invalid canonicalUrl during autosave", async () => {
+    const capturedBodies: Array<Record<string, unknown>> = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (typeof init?.body === "string") {
+        capturedBodies.push(JSON.parse(init.body) as Record<string, unknown>)
+      }
+      return new Response(
+        JSON.stringify({
+          resultCode: "200-1",
+          msg: "ok",
+          data: { id: 99, version: 2, summary: "Auto summary", summarySource: "AUTO" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }) as typeof fetch
+
+    try {
+      const ok = await executeServerTempDraftSave({
+        silent: true,
+        isEn: false,
+        normalizedPostId: "99",
+        postTitle: "Draft",
+        currentPostContent: "Draft body",
+        composed: "Draft body",
+        postVersion: 1,
+        effectiveTags: [],
+        effectiveCategory: "",
+        effectiveThumbnailUrl: "",
+        postSummary: "",
+        postSummarySource: "NONE",
+        postScheduledAt: "",
+        postSeriesName: "",
+        postSeriesOrder: null,
+        postCanonicalUrl: "https://",
+        getCurrentPostContent: () => "Draft body",
+        applyCanonicalWriteResponse: () => ({ summary: "Auto summary", summarySource: "EXTRACTED", intent: { kind: "auto" } }),
+        buildSuccessfulWriteFingerprintPayload: () => ({
+          title: "Draft",
+          content: "Draft body",
+          tags: [],
+          category: "",
+          thumbnailUrl: "",
+          thumbnailFocusX: 50,
+          thumbnailFocusY: 50,
+          thumbnailZoom: 1,
+          summary: "Auto summary",
+          summarySource: "EXTRACTED",
+          summaryIntent: { kind: "auto" },
+          visibility: "PUBLIC_LISTED",
+        }),
+        buildEditorStateFingerprint: () => "fp-1",
+        dedupeStrings: (items) => items,
+        serverBaselineEditorFingerprintRef: { current: "" },
+        lastLocalDraftFingerprintRef: { current: "" },
+        signalLocalDraftBaselineReady: () => {},
+        setPostVersion: () => {},
+        setLocalDraftSavedAt: () => {},
+        setLoadingKey: () => {},
+        setLastSaveError: () => {},
+        setPublishStatus: () => {},
+      })
+      expect(ok).toBe(true)
+      expect(capturedBodies).toHaveLength(1)
+      expect(capturedBodies[0]?.canonicalUrl).toBeNull()
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

@@ -7,6 +7,7 @@ import {
   type DragEventHandler,
   type KeyboardEventHandler,
 } from "react"
+import type { SiteLanguage } from "../../libs/language"
 import {
   defaultKeymap,
   history,
@@ -99,6 +100,7 @@ type MarkdownEditorLiveSurfaceProps = {
   disabled: boolean
   disableMermaid?: boolean
   mode?: "live" | "source" | "split" | "reading"
+  language?: SiteLanguage
   ariaDescription: string
   onToggleViewMode?: () => void
   onChange: (
@@ -159,6 +161,7 @@ export const MarkdownEditorLiveSurface = forwardRef<
     disabled,
     disableMermaid = false,
     mode = "live",
+    language = "ko",
     ariaDescription,
     onToggleViewMode,
     onChange,
@@ -179,7 +182,8 @@ export const MarkdownEditorLiveSurface = forwardRef<
   const onToggleViewModeRef = useRef(onToggleViewMode)
   const editableCompartmentRef = useRef(new Compartment())
   const historyCompartmentRef = useRef(new Compartment())
-  const initialStateRef = useRef({ value, disabled, disableMermaid, mode, ariaDescription })
+  const contentAttrsCompartmentRef = useRef(new Compartment())
+  const initialStateRef = useRef({ value, disabled, disableMermaid, mode, language, ariaDescription })
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
   onRequestFocusTitleRef.current = onRequestFocusTitle
@@ -266,13 +270,15 @@ export const MarkdownEditorLiveSurface = forwardRef<
         blockContainerBlockField,
         activeEmptyLineField,
         liveSurfaceTheme,
-        EditorView.contentAttributes.of({
-          "aria-label": "Markdown 본문",
-          "aria-description": initialState.ariaDescription,
-          title: initialState.ariaDescription,
-          "data-testid": "markdown-editor-content",
-          spellcheck: "false",
-        }),
+        contentAttrsCompartmentRef.current.of(
+          EditorView.contentAttributes.of({
+            "aria-label": initialState.language === "en" ? "Markdown body" : "Markdown 본문",
+            "aria-description": initialState.ariaDescription,
+            title: initialState.ariaDescription,
+            "data-testid": "markdown-editor-content",
+            spellcheck: "false",
+          })
+        ),
         editableCompartment.of([
           EditorState.readOnly.of(initialReadOnly),
           EditorView.editable.of(!initialReadOnly),
@@ -397,6 +403,22 @@ export const MarkdownEditorLiveSurface = forwardRef<
     if (!view) return
     view.dispatch({ effects: setDisableMermaid.of(Boolean(disableMermaid)) })
   }, [disableMermaid])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: contentAttrsCompartmentRef.current.reconfigure(
+        EditorView.contentAttributes.of({
+          "aria-label": language === "en" ? "Markdown body" : "Markdown 본문",
+          "aria-description": ariaDescription,
+          title: ariaDescription,
+          "data-testid": "markdown-editor-content",
+          spellcheck: "false",
+        })
+      ),
+    })
+  }, [ariaDescription, language])
 
   useEffect(() => {
     const view = viewRef.current

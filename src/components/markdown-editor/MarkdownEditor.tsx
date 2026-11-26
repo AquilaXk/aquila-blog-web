@@ -473,7 +473,8 @@ export const MarkdownEditor = ({
         />
         <MarkdownEditorLiveSurface
           ref={liveSurfaceRef} value={draftValue} disabled={disabled} disableMermaid={disableMermaid}
-          mode={viewMode} onToggleViewMode={cycleViewMode} ariaDescription={editorT("keyboardHelp", language, activeModLabel)}
+          mode={viewMode} language={language} onToggleViewMode={cycleViewMode}
+          ariaDescription={editorT("keyboardHelp", language, activeModLabel)}
           onChange={handleLiveChange} onSelectionChange={handleLiveSelectionChange}
           onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}

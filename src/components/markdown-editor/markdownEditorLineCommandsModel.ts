@@ -14,7 +14,8 @@ type LineSpan = {
 }
 
 const FENCE_LINE_RE = /^( {0,3})(`{3,}|~{3,})(.*)$/
-const DIRECTIVE_OPEN_RE = /^(:{3,})\s*(?:callout|toggle|embed|bookmark|note|info|warn|warning|tip|danger)\b/
+const DIRECTIVE_OPEN_RE =
+  /^(:{3,})\s*(?:callout|summary|tip|info|note|warning|warn|caution|danger|important|abstract|tldr|toggle|bookmark|embed|video|youtube|file|attachment|pdf)\b/i
 const DIRECTIVE_CLOSE_RE = /^(:{3,})\s*$/
 
 const readLineAt = (value: string, offset: number): LineSpan => {
@@ -257,7 +258,7 @@ export const planMoveBlockToOffset = (
     }
   }
 
-  const insertEnd = placeAfterTarget ? target.blockEnd : Math.max(source.blockEnd + 1, target.blockStart - 1)
+  const insertEnd = placeAfterTarget ? target.blockEnd : target.blockStart - 1
   if (insertEnd <= source.blockEnd) return null
   const between = value.slice(source.blockEnd + 1, insertEnd)
   const replacement = `${between}\n${movingBlock}`

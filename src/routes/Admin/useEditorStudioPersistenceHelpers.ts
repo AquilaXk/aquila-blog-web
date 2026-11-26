@@ -107,7 +107,7 @@ export type UseEditorStudioPersistenceParams = {
   toFlags: (visibility: PostVisibility) => { published: boolean; listed: boolean }
   buildEditorStateFingerprint: (payload: EditorFingerprintPayload) => string
   dedupeStrings: (items: string[]) => string[]
-  detectPublishPlaceholderIssue: (content: string) => string
+  detectPublishPlaceholderIssue: (content: string, language?: SiteLanguage) => string
   refreshPublicPostReadViews: (affectedPostId?: string | number) => Promise<void>
   pretty: (value: unknown) => string
   generateIdempotencyKey: () => string
@@ -164,7 +164,7 @@ export const validateEditorContentPreflight = (params: {
   postVisibility: PostVisibility
   language: SiteLanguage
   normalizeSafeImageUrl: (raw: string) => string
-  detectPublishPlaceholderIssue: (content: string) => string
+  detectPublishPlaceholderIssue: (content: string, language?: SiteLanguage) => string
 }): string | null => {
   const {
     postTitle,
@@ -200,7 +200,7 @@ export const validateEditorContentPreflight = (params: {
       return adminT("editorValidationScheduledPast", language)
     }
   }
-  const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
+  const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent, language)
   return placeholderIssue || null
 }
 
@@ -294,6 +294,7 @@ export const executeServerTempDraftSave = async ({
       )
     }
     const trimmedSeries = postSeriesName.trim()
+    const safeCanonicalUrl = normalizeSafeCanonicalUrl(postCanonicalUrl) || null
     const response = await apiFetch<RsData<PostWriteResult>>(
       `/post/api/v1/posts/temp/${encodeURIComponent(normalizedPostId)}`,
       {
@@ -308,7 +309,7 @@ export const executeServerTempDraftSave = async ({
           scheduledAt: postScheduledAt.trim() || null,
           seriesName: trimmedSeries || null,
           seriesOrder: trimmedSeries && postSeriesOrder ? postSeriesOrder : null,
-          canonicalUrl: postCanonicalUrl.trim() || null,
+          canonicalUrl: safeCanonicalUrl,
         }),
       }
     )

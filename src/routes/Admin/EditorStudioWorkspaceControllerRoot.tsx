@@ -477,7 +477,7 @@ export const EditorStudioWorkspaceController = ({
     toFlags,
     buildEditorStateFingerprint,
     dedupeStrings,
-    detectPublishPlaceholderIssue: (content) => detectPublishPlaceholderIssue(content) || "",
+    detectPublishPlaceholderIssue: (content, lang = "ko") => detectPublishPlaceholderIssue(content, lang) || "",
     refreshPublicPostReadViews,
     pretty,
     generateIdempotencyKey,

@@ -1,5 +1,5 @@
 import styled from "@emotion/styled"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { ApiPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { ConfirmDialog } from "src/design-system/ConfirmDialog"
 import { focusVisibleRing } from "src/design-system/focusRing"
@@ -167,6 +167,17 @@ const EmptyText = styled.p`
   color: ${adminTextMuted};
 `
 
+const ActionErrorBanner = styled.p`
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  border: 1px solid ${({ theme }) => theme.colors.red7};
+  background: ${({ theme }) => theme.colors.red3};
+  color: ${adminStatusDangerText};
+  font-size: 0.8rem;
+  font-weight: 550;
+`
+
 type Props = {
   open: boolean
   loading: boolean
@@ -191,16 +202,35 @@ export const EditorStudioTempDraftDrawer = ({
   const { language } = useLanguage()
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | number | null>(null)
+  const [actionError, setActionError] = useState("")
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmDeleteId(null)
+      setActionError("")
+    }
+  }, [open])
 
   const { handleKeyDown } = useModalFocusTrap({
     open,
     onClose,
     containerRef: dialogRef,
     lockScroll: true,
+    paused: confirmDeleteId !== null,
   })
 
   if (!open) return null
-  const untitledLabel = language === "en" ? "Untitled draft" : "제목 없는 임시글"
+  const isEn = language === "en"
+  const untitledLabel = isEn ? "Untitled draft" : "제목 없는 임시글"
+  const runDrawerAction = async (action: () => Promise<void>, fallbackMessage: string) => {
+    setActionError("")
+    try {
+      await action()
+    } catch (error) {
+      const detail = error instanceof Error && error.message.trim() ? error.message.trim() : ""
+      setActionError(detail || fallbackMessage)
+    }
+  }
 
   return (
     <>
@@ -221,7 +251,12 @@ export const EditorStudioTempDraftDrawer = ({
                 type="button"
                 disabled={loading}
                 data-testid="editor-temp-drafts-create-new"
-                onClick={() => void onCreateNew()}
+                onClick={() =>
+                  void runDrawerAction(
+                    onCreateNew,
+                    isEn ? "Failed to create a new draft." : "새 임시글 생성에 실패했습니다."
+                  )
+                }
               >
                 {adminT("editorTempDraftsCreateNew", language)}
               </PrimaryButton>
@@ -234,6 +269,7 @@ export const EditorStudioTempDraftDrawer = ({
               </CloseIconButton>
             </HeaderActions>
           </DrawerHeader>
+          {actionError ? <ActionErrorBanner role="alert">{actionError}</ActionErrorBanner> : null}
           <DraftList>
             {loading && drafts.length === 0 ? (
               <EmptyText>{adminT("editorTempDraftsLoading", language)}</EmptyText>
@@ -264,7 +300,12 @@ export const EditorStudioTempDraftDrawer = ({
                         <SecondaryButton
                           type="button"
                           disabled={loading}
-                          onClick={() => void onSelectDraft(draftId)}
+                          onClick={() =>
+                            void runDrawerAction(
+                              () => onSelectDraft(draftId),
+                              isEn ? "Failed to open the selected draft." : "선택한 임시글을 여는 데 실패했습니다."
+                            )
+                          }
                         >
                           {adminT("editorTempDraftsOpen", language)}
                         </SecondaryButton>
@@ -299,7 +340,10 @@ export const EditorStudioTempDraftDrawer = ({
           const targetId = confirmDeleteId
           setConfirmDeleteId(null)
           if (targetId !== null) {
-            void onDeleteDraft(targetId)
+            void runDrawerAction(
+              () => onDeleteDraft(targetId),
+              isEn ? "Failed to delete the selected draft." : "임시글 삭제에 실패했습니다."
+            )
           }
         }}
       />

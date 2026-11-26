@@ -519,7 +519,22 @@ export const useEditorStudioPersistence = ({
       const silent = options?.silent === true
       const normalizedPostId = postId.trim()
       if (editorMode !== "edit" || !normalizedPostId) return false
-      if (loadingKey || tempDraftSaveInFlightRef.current) return false
+      if (loadingKey || tempDraftSaveInFlightRef.current) {
+        if (!silent) {
+          resolveAuthoringMetadataForWrite()
+          saveLocalDraft?.({ silent: false, force: true })
+          setPublishStatus(
+            {
+              tone: "success",
+              text: isEn
+                ? "Another save is in progress; backed up safely as a browser draft."
+                : "다른 저장·업로드 작업 중이어서 브라우저 로컬 초안에 먼저 안전 저장했습니다.",
+            },
+            "page"
+          )
+        }
+        return false
+      }
 
       const currentPostContent = getCurrentPostContent()
       const { tags: effectiveTags, category: effectiveCategory } = silent

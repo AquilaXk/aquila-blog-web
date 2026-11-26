@@ -153,8 +153,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   const hasEditorDraftContent = Boolean(postTitle.trim() || postContent.trim())
   const hasEditorMinimumFields = Boolean(postTitle.trim() && postContent.trim())
   const publishPlaceholderIssue = useMemo(
-    () => (hasEditorMinimumFields ? detectPublishPlaceholderIssue(postContent) : null),
-    [hasEditorMinimumFields, postContent]
+    () => (hasEditorMinimumFields ? detectPublishPlaceholderIssue(postContent, language) : null),
+    [hasEditorMinimumFields, language, postContent]
   )
   const publishReadinessSummary = useMemo(() => {
     if (!isPublishModalOpen) return undefined

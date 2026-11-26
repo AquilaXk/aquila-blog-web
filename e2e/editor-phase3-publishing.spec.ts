@@ -19,7 +19,11 @@ const fulfillJson = async (route: Route, data: unknown, status = 200) => {
 
 const setupAdminEditorRoutes = async (
   page: Page,
-  options?: { initialContent?: string; onPutPost?: (body: Record<string, unknown>) => void }
+  options?: {
+    initialContent?: string
+    onPutPost?: (body: Record<string, unknown>) => void
+    onPutTempDraft?: (body: Record<string, unknown>) => void
+  }
 ) => {
   const drafts = new Map<number, Record<string, unknown>>([
     [
@@ -97,6 +101,8 @@ const setupAdminEditorRoutes = async (
     await fulfillJson(route, found)
   })
   await page.route("**/post/api/v1/posts/temp/*", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown> | null
+    if (body) options?.onPutTempDraft?.(body)
     await fulfillJson(route, { resultCode: "200-1", msg: "saved", data: { id: 990, version: 2 } })
   })
   await page.route("**/post/api/v1/posts/*", async (route) => {
@@ -281,5 +287,133 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
     } finally {
       await context.close()
     }
+  })
+
+  test("Escape on stacked delete confirm keeps drafts drawer open and deleting active dirty draft navigates cleanly", async ({
+    page,
+  }) => {
+    await setupAdminEditorRoutes(page, { initialContent: "Alpha body line" })
+    await page.goto("/admin/editor/990")
+
+    // Make active draft dirty before 2.5s server autosave fires
+    const editorTextbox = page.getByTestId("markdown-editor-content")
+    await editorTextbox.click()
+    await page.keyboard.type(" edited locally")
+
+    await page.getByTestId("editor-temp-drafts-button").click()
+    const drawer = page.getByTestId("editor-temp-drafts-dialog")
+    await expect(drawer).toBeVisible()
+
+    // Open confirm dialog on current active draft 990 and press Escape -> drawer stays open
+    await page.getByTestId("temp-draft-delete-990").click()
+    const confirmDialog = page.getByRole("dialog", { name: "삭제" })
+    await expect(confirmDialog).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(confirmDialog).toHaveCount(0)
+    await expect(drawer).toBeVisible()
+
+    // Now confirm delete on active dirty draft 990 -> transitions cleanly to 991 with no unsaved modal
+    await page.getByTestId("temp-draft-delete-990").click()
+    await page.getByRole("dialog", { name: "삭제" }).getByRole("button", { name: "삭제" }).click()
+    await expect(page).toHaveURL(/\/admin\/editor\/991$/)
+    await expect(page.getByRole("dialog", { name: "저장되지 않은 변경이 있습니다" })).toHaveCount(0)
+  })
+
+  test("bubble link popover handles balanced-paren URLs and real pointer drag reorders adjacent blocks cleanly", async ({
+    page,
+  }) => {
+    await setupAdminEditorRoutes(page, {
+      initialContent: "First block [Docs (v2)](https://example.com/a_(b))\nSecond block\nThird block",
+    })
+    await page.goto("/admin/editor/990")
+
+    const editorTextbox = page.getByTestId("markdown-editor-content")
+    await editorTextbox.locator(".cm-line").first().click()
+    await expect(editorTextbox).toContainText("Docs (v2)")
+
+    // Place caret inside the balanced-paren markdown link on line 1 and verify bubble popover exposes Open & Remove
+    await page.keyboard.press("Home")
+    for (let i = 0; i < 14; i += 1) await page.keyboard.press("ArrowRight")
+
+    const linkDialog = page.getByRole("dialog", { name: "선택 텍스트 링크 편집" })
+    await expect(linkDialog).toBeVisible()
+    await expect(linkDialog.getByRole("link", { name: /새 탭에서 링크 열기/ })).toBeVisible()
+    await linkDialog.getByRole("button", { name: "링크 제거" }).click()
+    await expect(editorTextbox).toContainText("First block Docs (v2)")
+
+    // Real pointer drag: hovering top half of adjacent next block keeps lines intact (no-op),
+    // then dragging downward past Third block bottom reorders blocks cleanly
+    const firstLine = editorTextbox.locator(".cm-line").first()
+    const secondLine = editorTextbox.locator(".cm-line").nth(1)
+    const thirdLine = editorTextbox.locator(".cm-line").nth(2)
+    await firstLine.hover()
+    const handle = page.getByTestId("markdown-block-gutter-handle")
+    await expect(handle).toBeVisible()
+
+    const handleBox = await handle.boundingBox()
+    const secondBox = await secondLine.boundingBox()
+    const thirdBox = await thirdLine.boundingBox()
+    expect(handleBox).not.toBeNull()
+    expect(secondBox).not.toBeNull()
+    expect(thirdBox).not.toBeNull()
+    if (handleBox && secondBox && thirdBox) {
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(secondBox.x + 24, secondBox.y + secondBox.height * 0.15, { steps: 6 })
+      await page.mouse.up()
+
+      await expect(editorTextbox.locator(".cm-line").first()).toContainText("First block Docs (v2)")
+      await expect(editorTextbox.locator(".cm-line").nth(1)).toContainText("Second block")
+
+      await firstLine.hover()
+      const handleBoxAfterNoOp = await handle.boundingBox()
+      expect(handleBoxAfterNoOp).not.toBeNull()
+      if (handleBoxAfterNoOp) {
+        await page.mouse.move(
+          handleBoxAfterNoOp.x + handleBoxAfterNoOp.width / 2,
+          handleBoxAfterNoOp.y + handleBoxAfterNoOp.height / 2
+        )
+        await page.mouse.down()
+        await page.mouse.move(thirdBox.x + 24, thirdBox.y + thirdBox.height * 0.85, { steps: 8 })
+        await page.mouse.up()
+      }
+    }
+
+    await expect(editorTextbox.locator(".cm-line").first()).toContainText("Second block")
+    await expect(editorTextbox.locator(".cm-line").nth(2)).toContainText("First block Docs (v2)")
+  })
+
+  test("EN mode localizes thumbnail controls and body aria-label, and temp autosave sanitizes partial canonical URL", async ({
+    page,
+  }) => {
+    const tempDraftBodies: Array<Record<string, unknown>> = []
+    await page.addInitScript(() => {
+      window.localStorage.setItem("aquila_blog_lang", "en")
+    })
+    await setupAdminEditorRoutes(page, {
+      onPutTempDraft: (body) => tempDraftBodies.push(body),
+    })
+    await page.goto("/admin/editor/990")
+
+    await expect(page.getByTestId("markdown-editor-content")).toHaveAttribute("aria-label", "Markdown body")
+
+    // Open inspector if needed, type partial invalid canonical URL, and verify autosave sends null
+    const inspectorToggle = page.getByTestId("editor-inspector-toggle")
+    if ((await inspectorToggle.getAttribute("aria-pressed")) !== "true") {
+      await inspectorToggle.click()
+    }
+    const inspector = page.getByTestId("editor-inspector-aside")
+    const canonicalInput = inspector.getByLabel("Canonical URL (cross-post)")
+    await canonicalInput.fill("https://")
+    await expect.poll(() => tempDraftBodies.length, { timeout: 6000 }).toBeGreaterThan(0)
+    expect(tempDraftBodies[tempDraftBodies.length - 1]?.canonicalUrl).toBeNull()
+
+    // Open publish modal and verify localized thumbnail panel controls
+    await page.getByTestId("editor-publish-open-button").click()
+    const modal = page.getByTestId("editor-publish-dialog")
+    await expect(modal).toBeVisible()
+    await expect(modal).toContainText("Adjust thumbnail focus")
+    await expect(modal).toContainText("Upload cover image")
+    await expect(modal).not.toContainText("썸네일 위치 조정")
   })
 })

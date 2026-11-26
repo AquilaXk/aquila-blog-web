@@ -7,6 +7,17 @@ import {
   listAdminTempDrafts,
 } from "src/apis/backend/posts/PostApiAdminDraftRequests"
 import type { ApiPostDto } from "src/apis/backend/posts/PostApiDtos"
+import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
+import {
+  clearScheduledForcedEditorExitUrl,
+  scheduleForcedEditorExitUrl,
+} from "./editorStudioUnsavedExitGuard"
+
+const isCancelledRouteNavigationError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "cancelled" in error &&
+  (error as { cancelled?: unknown }).cancelled === true
 
 export const toLocalDateTimeInputValue = (isoUtc: string): string => {
   const trimmed = isoUtc.trim()
@@ -99,7 +110,11 @@ export const useEditorStudioPublishingMetadata = ({
   const handleSelectTempDraft = useCallback(
     async (draftId: string | number) => {
       setIsTempDraftDrawerOpen(false)
-      await router.push(toEditorPostRoute(draftId))
+      try {
+        await router.push(toEditorPostRoute(draftId))
+      } catch (error) {
+        if (!isCancelledRouteNavigationError(error)) throw error
+      }
     },
     [router, toEditorPostRoute]
   )
@@ -111,7 +126,11 @@ export const useEditorStudioPublishingMetadata = ({
       const createdId = res?.data?.id
       if (createdId) {
         setIsTempDraftDrawerOpen(false)
-        await router.push(toEditorPostRoute(createdId))
+        try {
+          await router.push(toEditorPostRoute(createdId))
+        } catch (error) {
+          if (!isCancelledRouteNavigationError(error)) throw error
+        }
       } else {
         await refreshAdminTempDrafts()
       }
@@ -125,21 +144,32 @@ export const useEditorStudioPublishingMetadata = ({
       setIsTempDraftsLoading(true)
       try {
         await deleteAdminTempDraft(draftId)
-        const remaining = await listAdminTempDrafts()
+        captureLocalDraftCleanup({ kind: "post", postId: String(draftId) })()
+        let remaining: ApiPostDto[] = []
+        try {
+          remaining = await listAdminTempDrafts()
+        } catch {
+          remaining = adminTempDrafts.filter((item) => String(item.id ?? "") !== String(draftId))
+        }
         setAdminTempDrafts(remaining)
         if (String(draftId) === postId.trim()) {
           setIsTempDraftDrawerOpen(false)
-          if (remaining[0]?.id) {
-            await router.replace(toEditorPostRoute(remaining[0].id))
-          } else {
-            await router.replace(editorNewRoutePath)
+          const targetUrl = remaining[0]?.id
+            ? toEditorPostRoute(remaining[0].id)
+            : editorNewRoutePath
+          scheduleForcedEditorExitUrl(targetUrl)
+          try {
+            await router.replace(targetUrl)
+          } catch (error) {
+            clearScheduledForcedEditorExitUrl()
+            if (!isCancelledRouteNavigationError(error)) throw error
           }
         }
       } finally {
         setIsTempDraftsLoading(false)
       }
     },
-    [editorNewRoutePath, postId, router, toEditorPostRoute]
+    [adminTempDrafts, editorNewRoutePath, postId, router, toEditorPostRoute]
   )
 
   return {

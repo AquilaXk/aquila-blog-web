@@ -1,6 +1,7 @@
 import { useRouter } from "next/router"
 import { createElement, useCallback, useEffect, useId, useRef, useState } from "react"
 import { ConfirmDialog } from "src/design-system/ConfirmDialog"
+import { useLanguage } from "src/libs/language"
 import type { UrlObject } from "url"
 import {
   activateScheduledForcedEditorExitIfMatching,
@@ -272,14 +273,18 @@ export const useEditorStudioUnsavedExitGuard = ({
     }
   }, [clearAllowNavigation, enabled, readIsDirty, router])
 
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const dialog = createElement(ConfirmDialog, {
     open: confirmOpen,
     titleId,
     descriptionId,
-    title: "저장되지 않은 변경이 있습니다",
-    description: EDITOR_UNSAVED_CHANGES_MESSAGE,
-    confirmLabel: "나가기",
-    cancelLabel: "계속 작성",
+    title: isEn ? "Unsaved changes" : "저장되지 않은 변경이 있습니다",
+    description: isEn
+      ? "You have unsaved changes. Leaving this page may discard them."
+      : EDITOR_UNSAVED_CHANGES_MESSAGE,
+    confirmLabel: isEn ? "Leave" : "나가기",
+    cancelLabel: isEn ? "Keep writing" : "계속 작성",
     confirmTone: "danger",
     onConfirm: confirmLeave,
     onCancel: closeConfirm,

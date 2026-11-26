@@ -79,6 +79,8 @@ export const EditorStudioThumbnailEditorPanel = ({
   onResetThumbnailZoom,
   onThumbnailMoveOffset,
 }: EditorStudioThumbnailEditorPanelProps) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const isCropReady = Boolean(safePreviewThumbnail) && !isPreviewThumbnailError
 
   const applyKeyboardPan = (offset: KeyboardMoveOffset) => {
@@ -122,13 +124,21 @@ export const EditorStudioThumbnailEditorPanel = ({
   return (
     <PreviewEditorSection>
       <PreviewEditorSectionHeader>
-        <strong>썸네일 위치 조정</strong>
-        <span>드래그 또는 방향키(이동), +/-(배율)로 초점을 맞춥니다.</span>
+        <strong>{isEn ? "Adjust thumbnail focus" : "썸네일 위치 조정"}</strong>
+        <span>
+          {isEn
+            ? "Drag or press arrow keys to pan, +/- to zoom."
+            : "드래그 또는 방향키(이동), +/-(배율)로 초점을 맞춥니다."}
+        </span>
       </PreviewEditorSectionHeader>
       <PreviewThumbFrame
         ref={previewThumbFrameRef}
         tabIndex={isCropReady ? 0 : -1}
-        aria-label="썸네일 크롭 프레임 (방향키 이동, +, -, 0 배율 조정)"
+        aria-label={
+          isEn
+            ? "Thumbnail crop frame (arrow keys to pan, +, -, 0 to zoom)"
+            : "썸네일 크롭 프레임 (방향키 이동, +, -, 0 배율 조정)"
+        }
         data-draggable={isCropReady}
         data-dragging={isPreviewThumbDragging}
         onKeyDown={handleStageKeyDown}
@@ -141,7 +151,7 @@ export const EditorStudioThumbnailEditorPanel = ({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={safePreviewThumbnail}
-            alt="포스트 미리보기 썸네일"
+            alt={isEn ? "Post preview thumbnail" : "포스트 미리보기 썸네일"}
             style={{
               width: "var(--preview-thumb-width)",
               height: "var(--preview-thumb-height)",
@@ -154,13 +164,15 @@ export const EditorStudioThumbnailEditorPanel = ({
           />
         ) : (
           <div className="placeholder">
-            <em>자동 OG 카드 사용</em>
+            <em>{isEn ? "Using auto OG card" : "자동 OG 카드 사용"}</em>
           </div>
         )}
       </PreviewThumbFrame>
       {isCropReady ? (
         <ZoomControlRow>
-          <ThumbnailFieldLabel htmlFor="post-thumbnail-zoom-modal">썸네일 배율</ThumbnailFieldLabel>
+          <ThumbnailFieldLabel htmlFor="post-thumbnail-zoom-modal">
+            {isEn ? "Thumbnail zoom" : "썸네일 배율"}
+          </ThumbnailFieldLabel>
           <ZoomRangeInput
             id="post-thumbnail-zoom-modal"
             type="range"
@@ -173,7 +185,7 @@ export const EditorStudioThumbnailEditorPanel = ({
           <ZoomControlMeta>
             <ZoomValue>{postThumbnailZoom.toFixed(2)}x</ZoomValue>
             <ThumbnailButton type="button" onClick={onResetThumbnailZoom}>
-              배율 초기화
+              {isEn ? "Reset zoom" : "배율 초기화"}
             </ThumbnailButton>
           </ZoomControlMeta>
         </ZoomControlRow>
@@ -259,18 +271,28 @@ export const EditorStudioThumbnailMetaPanel = ({
           disabled={isThumbnailUploadDisabled}
           onClick={onOpenThumbnailFileInput}
         >
-          {isThumbnailUploading ? "업로드 중..." : "썸네일 파일 업로드"}
+          {isThumbnailUploading
+            ? isEn
+              ? "Uploading..."
+              : "업로드 중..."
+            : isEn
+              ? "Upload cover image"
+              : "썸네일 파일 업로드"}
         </ThumbnailPrimaryButton>
       </MetaPrimaryActionRow>
       <MetaSecondaryActionRow>
         <ThumbnailButton type="button" disabled={!hasFirstBodyImage} onClick={onApplyFirstBodyImage}>
-          본문 첫 이미지 사용
+          {isEn ? "Use first body image" : "본문 첫 이미지 사용"}
         </ThumbnailButton>
         <ThumbnailButton type="button" data-variant="text" onClick={onResetThumbnailToAutoMode}>
-          자동 모드로 되돌리기
+          {isEn ? "Reset to auto" : "자동 모드로 되돌리기"}
         </ThumbnailButton>
       </MetaSecondaryActionRow>
-      {thumbnailImageFileName ? <ThumbnailFieldHelp>선택 파일: {thumbnailImageFileName}</ThumbnailFieldHelp> : null}
+      {thumbnailImageFileName ? (
+        <ThumbnailFieldHelp>
+          {isEn ? `Selected file: ${thumbnailImageFileName}` : `선택 파일: ${thumbnailImageFileName}`}
+        </ThumbnailFieldHelp>
+      ) : null}
     </PreviewEditorSection>
   )
 }

@@ -21,7 +21,7 @@ import {
   EditorIconClose,
   EditorIconUnlink,
 } from "./MarkdownEditorIcons"
-import { clampBoxToVisualViewport } from "./markdownEditorLinkUtils"
+import { clampBoxToVisualViewport, findMarkdownLinkAtOffset } from "./markdownEditorLinkUtils"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 
 export type ParsedMarkdownLinkSelection = {
@@ -29,16 +29,34 @@ export type ParsedMarkdownLinkSelection = {
   url: string
 }
 
-const MARKDOWN_LINK_SELECTION_PATTERN = /^\[([^\]]*)\]\(([^)\s]+)\)$/
 const EXPLICIT_SCHEME_PREFIX_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/
 const BARE_DOMAIN_CANDIDATE_PATTERN = /^[^\s/?#]+\.[^\s/]+(?:\/.*)?$/
 
+const hasControlOrSpaceChar = (value: string): boolean => {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (code <= 32 || code === 127) return true
+  }
+  return false
+}
+
 export const parseMarkdownLinkSelection = (selectedText: string): ParsedMarkdownLinkSelection | null => {
-  const match = MARKDOWN_LINK_SELECTION_PATTERN.exec(selectedText.trim())
-  if (!match) return null
+  const trimmed = selectedText.trim()
+  if (
+    !trimmed.startsWith("[") ||
+    !trimmed.endsWith(")") ||
+    trimmed.includes("\n") ||
+    trimmed.includes("\r")
+  ) {
+    return null
+  }
+  const hit = findMarkdownLinkAtOffset(trimmed, 0)
+  if (!hit || hit.from !== 0 || hit.to !== trimmed.length || !hit.url || hasControlOrSpaceChar(hit.url)) {
+    return null
+  }
   return {
-    label: match[1] ?? "",
-    url: match[2] ?? "",
+    label: hit.label,
+    url: hit.url,
   }
 }
 

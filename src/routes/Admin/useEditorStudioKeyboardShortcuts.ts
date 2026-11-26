@@ -4,6 +4,7 @@ import { apiFetch } from "src/apis/backend/client"
 import { useLanguage } from "src/libs/language"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { RsData } from "src/types"
+import { normalizeSafeCanonicalUrl } from "./editorStudioMetaModel"
 import type { EditorMode } from "./editorStudioState"
 import { extractPendingTagDraftValues } from "./useEditorStudioPublishModalFlow"
 
@@ -200,8 +201,28 @@ export const useEditorStudioKeyboardShortcuts = ({
 
       const state = stateRef.current
       if (state.loadingKey) {
-        if (state.loadingKey === "uploadThumbnail") {
-          state.saveLocalDraft({ silent: false, force: true })
+        const isPublishInFlight =
+          state.loadingKey === "writePost" ||
+          state.loadingKey === "modifyPost" ||
+          state.loadingKey === "publishTempPost"
+        if (!isPublishInFlight) {
+          const pendingTags = extractPendingTagDraftValues(state.tagDraft)
+          if (pendingTags.length > 0) {
+            state.addTagsToPost?.(pendingTags)
+            state.setTagDraft?.("")
+          }
+        }
+        state.saveLocalDraft({ silent: false, force: true })
+        if (!isPublishInFlight) {
+          state.setPublishStatus(
+            {
+              tone: "success",
+              text: state.isEn
+                ? "Another task is running; backed up safely as a browser draft."
+                : "다른 작업이 진행 중이어서 브라우저 로컬 초안에 안전 저장했습니다.",
+            },
+            "page"
+          )
         }
         return
       }
@@ -253,7 +274,7 @@ export const useEditorStudioKeyboardShortcuts = ({
                 scheduledAt: state.postScheduledAt.trim() || null,
                 seriesName: state.postSeriesName.trim() || null,
                 seriesOrder: state.postSeriesName.trim() && state.postSeriesOrder ? state.postSeriesOrder : null,
-                canonicalUrl: state.postCanonicalUrl.trim() || null,
+                canonicalUrl: normalizeSafeCanonicalUrl(state.postCanonicalUrl) || null,
               }),
             }
           )
