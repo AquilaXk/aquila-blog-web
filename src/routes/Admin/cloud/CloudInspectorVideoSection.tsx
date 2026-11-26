@@ -168,7 +168,7 @@ export const CloudInspectorVideoSection = ({
       if (isStaleRequest()) return
       setCommandState({
         status: "error",
-        message: `${playerLabel}: ${resolveCloudErrorMessage(error)}`,
+        message: `${playerLabel}: ${resolveCloudErrorMessage(error, language)}`,
       })
     }
   }

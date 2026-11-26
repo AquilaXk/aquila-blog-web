@@ -307,7 +307,7 @@ export const ToastViewport = styled.div<{ "data-tone": "success" | "error" }>`
   position: fixed;
   top: calc(var(--app-header-height, 48px) + 1rem);
   right: max(1rem, env(safe-area-inset-right));
-  z-index: ${zIndexes.dialogHoverCard};
+  z-index: ${zIndexes.confirmDialog + 10};
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.25rem 0.7rem;

@@ -28,6 +28,7 @@ import {
   normalizeCloudFolderPath,
   saveCloudViewPreferences,
   type CloudViewMode,
+  type CloudViewPreferences,
 } from "./cloud/cloudFolderHelpers"
 import { useCloudWorkspaceMutations } from "./cloud/useCloudWorkspaceMutations"
 import { computeShiftRangeSelection } from "./cloudUploadQueueModel"
@@ -71,6 +72,11 @@ export const useAdminCloudWorkspaceActions = () => {
   const [cloudUiMask, setCloudUiMask] = useState(0)
 
   const prefsLoadedRef = useRef(false)
+  const latestPrefsRef = useRef<CloudViewPreferences>({
+    viewMode: "grid",
+    sortMode: "LATEST",
+    sortDirection: "desc",
+  })
   const initialDesktopSyncDoneRef = useRef(false)
 
   const isComposing = (cloudUiMask & CLOUD_UI_COMPOSING) !== 0
@@ -105,6 +111,7 @@ export const useAdminCloudWorkspaceActions = () => {
     if (prefsLoadedRef.current) return
     prefsLoadedRef.current = true
     const saved = loadCloudViewPreferences()
+    latestPrefsRef.current = saved
     setViewModeState(saved.viewMode)
     setSortModeState(saved.sortMode)
     setSortDirectionState(saved.sortDirection)
@@ -112,13 +119,15 @@ export const useAdminCloudWorkspaceActions = () => {
 
   const updateSavedPreferences = useCallback(
     (next: { viewMode?: CloudViewMode; sortMode?: CloudSortMode; sortDirection?: CloudSortDirection }) => {
-      saveCloudViewPreferences({
-        viewMode: next.viewMode ?? viewMode,
-        sortMode: next.sortMode ?? sortMode,
-        sortDirection: next.sortDirection ?? sortDirection,
-      })
+      const merged: CloudViewPreferences = {
+        viewMode: next.viewMode ?? latestPrefsRef.current.viewMode,
+        sortMode: next.sortMode ?? latestPrefsRef.current.sortMode,
+        sortDirection: next.sortDirection ?? latestPrefsRef.current.sortDirection,
+      }
+      latestPrefsRef.current = merged
+      saveCloudViewPreferences(merged)
     },
-    [sortDirection, sortMode, viewMode]
+    []
   )
 
   const setViewMode = useCallback(
@@ -130,11 +139,13 @@ export const useAdminCloudWorkspaceActions = () => {
   )
 
   const setSortMode = useCallback(
-    (next: CloudSortMode, explicitDirection?: CloudSortDirection) => {
+    (next: CloudSortMode, explicitDirection?: CloudSortDirection, options?: { persist?: boolean }) => {
       const dir = explicitDirection ?? getDefaultSortDirection(next)
       setSortModeState(next)
       setSortDirectionState(dir)
-      updateSavedPreferences({ sortMode: next, sortDirection: dir })
+      if (options?.persist !== false) {
+        updateSavedPreferences({ sortMode: next, sortDirection: dir })
+      }
     },
     [updateSavedPreferences]
   )

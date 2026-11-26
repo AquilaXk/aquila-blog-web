@@ -15,6 +15,7 @@ import {
 import {
   buildCloudFolderBreadcrumbs,
   buildCloudWorkspaceUrlQuery,
+  extractAllCloudFolders,
   extractDirectChildFolders,
   normalizeCloudFolderPath,
   parseCloudWorkspaceUrlQuery,
@@ -966,6 +967,54 @@ caption
     } finally {
       globalThis.fetch = previousFetch
     }
+  })
+
+  test("parseCloudWorkspaceUrlQuery와 buildCloudWorkspaceUrlQuery는 dir 단독/OLDEST 역정렬 왕복을 보존한다", () => {
+    expect(parseCloudWorkspaceUrlQuery({ dir: "asc" })).toEqual({
+      folderPath: undefined,
+      keyword: undefined,
+      mediaFilter: undefined,
+      sortMode: undefined,
+      sortDirection: "asc",
+    })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "LATEST",
+        sortDirection: "asc",
+      })
+    ).toEqual({ dir: "asc" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "docs",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "OLDEST",
+        sortDirection: "desc",
+      })
+    ).toEqual({ folder: "docs", sort: "OLDEST", dir: "desc" })
+  })
+
+  test("extractAllCloudFolders와 extractDirectChildFolders는 facets 가상 중간 경로를 누락 없이 전개한다", () => {
+    const folderOnlyFiles: CloudFile[] = [
+      {
+        id: 1,
+        ownerMemberId: 1,
+        originalFilename: "root.pdf",
+        contentType: "application/pdf",
+        byteSize: 100,
+        mediaKind: "DOCUMENT",
+        folderPath: "docs",
+        createdAt: "2026-01-01T00:00:00Z",
+        modifiedAt: "2026-01-01T00:00:00Z",
+      },
+    ]
+    const allFolders = extractAllCloudFolders(folderOnlyFiles, ["docs/2026/q1", "assets/icons"], "docs")
+    expect(allFolders).toEqual(["assets/icons", "docs", "docs/2026/q1"])
+    expect(extractDirectChildFolders(allFolders, "docs")).toEqual(["docs/2026"])
+    expect(extractDirectChildFolders(allFolders, "docs/2026")).toEqual(["docs/2026/q1"])
   })
 })
 

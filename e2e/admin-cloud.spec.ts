@@ -2015,10 +2015,24 @@ test.describe("관리자 클라우드", () => {
     await shareDialog.getByRole("button", { name: "공유 링크 발급" }).click()
     await expect.poll(() => mocks.shareLinkRequests.length).toBe(1)
 
-    await expect(
-      page.getByRole("status").filter({ hasText: "클립보드 접근 권한이 없습니다" })
-    ).toBeVisible()
+    const shareErrorToast = page.getByRole("status").filter({ hasText: "클립보드 접근 권한이 없습니다" })
+    await expect(shareErrorToast).toBeVisible()
     await expect(page.getByText(/복사됨/)).toHaveCount(0)
+    const toastZOrder = await shareErrorToast.evaluate((toastEl) => {
+      const dialog = document.querySelector('[role="dialog"]')
+      const backdrop = dialog?.parentElement
+      const rect = toastEl.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      return {
+        toastZ: Number.parseInt(window.getComputedStyle(toastEl).zIndex || "0", 10),
+        backdropZ: Number.parseInt(backdrop ? window.getComputedStyle(backdrop).zIndex || "0" : "0", 10),
+        hitsToast: hit !== null && (hit === toastEl || toastEl.contains(hit)),
+      }
+    })
+    expect(toastZOrder.toastZ).toBeGreaterThan(toastZOrder.backdropZ)
+    expect(toastZOrder.hitsToast).toBe(true)
+    await shareErrorToast.getByRole("button", { name: "닫기" }).click()
+    await expect(shareErrorToast).toHaveCount(0)
     await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveValue(
       /\/system\/api\/v1\/public\/cloud\/files\/102\/share\?token=/
     )
@@ -2065,6 +2079,13 @@ test.describe("관리자 클라우드", () => {
       const tableBox = await tableHitArea.boundingBox()
       expect(tableBox?.width ?? 0).toBeGreaterThanOrEqual(44)
       expect(tableBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+      await expect(tableCheckbox).toBeChecked()
+      await tableHitArea.click({ position: { x: 4, y: 4 } })
+      await expect(tableCheckbox).not.toBeChecked()
+      await tableHitArea.click({ position: { x: 4, y: 4 } })
+      await expect(tableCheckbox).toBeChecked()
+      await tableHitArea.click({ position: { x: 4, y: 4 } })
+      await expect(tableCheckbox).not.toBeChecked()
 
       await page.getByRole("button", { name: /새 폴더/ }).click()
       const newFolderDialog = page.getByRole("dialog", { name: "새 폴더 만들기" })
@@ -2166,11 +2187,53 @@ test.describe("관리자 클라우드", () => {
     await expect(page.locator("tbody tr").first()).toContainText("docs-older.pdf")
 
     await page.goto("/admin/cloud?folder=docs&sort=OLDEST&dir=desc")
-    await switchToCloudListView(page)
     await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
     await page.waitForTimeout(200)
     expect(new URL(page.url()).searchParams.get("sort")).toBe("OLDEST")
     expect(new URL(page.url()).searchParams.get("dir")).toBe("desc")
     await expect(page.locator("tbody tr").first()).toContainText("docs-root.pdf")
+
+    const savedPrefsJson = await page.evaluate(() =>
+      window.localStorage.getItem("admin.cloud.viewPreferences.v1")
+    )
+    expect(savedPrefsJson).not.toBeNull()
+    expect(JSON.parse(savedPrefsJson ?? "{}").viewMode).toBe("list")
+
+    await page.goto("/admin/cloud?folder=docs&dir=asc")
+    await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
+    await page.waitForTimeout(200)
+    expect(new URL(page.url()).searchParams.get("sort")).toBeNull()
+    expect(new URL(page.url()).searchParams.get("dir")).toBe("asc")
+    await expect(page.locator("tbody tr").first()).toContainText("docs-older.pdf")
+
+    const prefsAfterUrlHydration = await page.evaluate(() =>
+      window.localStorage.getItem("admin.cloud.viewPreferences.v1")
+    )
+    expect(JSON.parse(prefsAfterUrlHydration ?? "{}")).toMatchObject({
+      viewMode: "list",
+      sortMode: "OLDEST",
+    })
+
+    const pushedSpaRoute = await page.evaluate(async () => {
+      const nextWin = window as Window & {
+        next?: { router?: { push: (url: string) => Promise<boolean> } }
+      }
+      if (!nextWin.next?.router) return false
+      await nextWin.next.router.push("/admin/cloud")
+      return true
+    })
+    expect(pushedSpaRoute).toBe(true)
+    await expect.poll(() => new URL(page.url()).search).toBe("")
+    await expect(page.locator('button[title="/docs"]')).toBeVisible()
+    await expect(page.locator('button[title="/photos"]')).toBeVisible()
+    await expect(page.getByRole("row", { name: /photos-unrelated\.png/ })).toBeVisible()
+
+    await page.goBack()
+    await expect.poll(() => new URL(page.url()).searchParams.get("folder")).toBe("docs")
+    await expect.poll(() => new URL(page.url()).searchParams.get("dir")).toBe("asc")
+    await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
+    await expect(page.getByRole("row", { name: /photos-unrelated\.png/ })).toHaveCount(0)
+    await expect(page.locator('button[title="/photos"]')).toHaveCount(0)
+    await expect(page.locator("tbody tr").first()).toContainText("docs-older.pdf")
   })
 })

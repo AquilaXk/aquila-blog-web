@@ -3464,7 +3464,9 @@ export interface operations {
     };
     contentHead: {
         parameters: {
-            query?: never;
+            query?: {
+                thumbnail?: boolean;
+            };
             header?: never;
             path: {
                 id: number;

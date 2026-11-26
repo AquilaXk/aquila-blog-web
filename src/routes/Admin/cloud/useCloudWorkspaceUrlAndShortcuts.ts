@@ -10,9 +10,26 @@ import {
 } from "../AdminCloudWorkspaceModel"
 import {
   buildCloudWorkspaceUrlQuery,
+  getDefaultSortDirection,
   normalizeCloudFolderPath,
   parseCloudWorkspaceUrlQuery,
 } from "./cloudFolderHelpers"
+
+const readComparableRouterQuery = (query: NextRouter["query"]) => ({
+  folder: normalizeCloudFolderPath(typeof query.folder === "string" ? query.folder : ""),
+  kw: typeof query.kw === "string" ? query.kw : "",
+  kind: typeof query.kind === "string" ? query.kind : "",
+  sort: typeof query.sort === "string" ? query.sort : "",
+  dir: typeof query.dir === "string" ? query.dir : "",
+})
+
+const buildComparableQueryKey = (query: {
+  folder: string
+  kw: string
+  kind: string
+  sort: string
+  dir: string
+}) => JSON.stringify([query.folder, query.kw, query.kind, query.sort, query.dir])
 
 const isEditableElement = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false
@@ -59,7 +76,7 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
   onSelectFolder: (folderPath: string) => void
   setKeyword: Dispatch<SetStateAction<string>>
   setFilter: Dispatch<SetStateAction<CloudMediaFilter>>
-  setSortMode: (next: CloudSortMode, dir?: CloudSortDirection) => void
+  setSortMode: (next: CloudSortMode, dir?: CloudSortDirection, options?: { persist?: boolean }) => void
   setPage: Dispatch<SetStateAction<number>>
   resetSelectionAnchor: () => void
   queueUploadFiles: (files: File[]) => Promise<void>
@@ -67,23 +84,60 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
   handleDeleteSelected: () => void
   handleRequestDeleteFile: (file: CloudFile) => void
 }) => {
-  const hasHydratedQueryRef = useRef(false)
+  const lastRouterQueryKeyRef = useRef<string | null>(null)
+  const pendingReplaceKeysRef = useRef<string[]>([])
+  const skipReplaceCommitRef = useRef(false)
   const [isUrlQueryHydrated, setIsUrlQueryHydrated] = useState(false)
 
+  const currentComparableQuery = readComparableRouterQuery(router.query)
+  const currentRouterQueryKey = buildComparableQueryKey(currentComparableQuery)
+
   useEffect(() => {
-    if (!router.isReady || hasHydratedQueryRef.current) return
-    hasHydratedQueryRef.current = true
+    if (!router.isReady) return
+
+    if (lastRouterQueryKeyRef.current === null) {
+      lastRouterQueryKeyRef.current = currentRouterQueryKey
+      const parsed = parseCloudWorkspaceUrlQuery(router.query)
+      if (parsed.folderPath !== undefined) onSelectFolder(parsed.folderPath)
+      if (parsed.keyword !== undefined) setKeyword(parsed.keyword)
+      if (parsed.mediaFilter !== undefined) setFilter(parsed.mediaFilter)
+      if (parsed.sortMode !== undefined) {
+        setSortMode(parsed.sortMode, parsed.sortDirection, { persist: false })
+      } else if (parsed.sortDirection !== undefined) {
+        setSortMode("LATEST", parsed.sortDirection, { persist: false })
+      }
+      setIsUrlQueryHydrated(true)
+      return
+    }
+
+    if (lastRouterQueryKeyRef.current === currentRouterQueryKey) return
+    lastRouterQueryKeyRef.current = currentRouterQueryKey
+
+    const pendingIndex = pendingReplaceKeysRef.current.indexOf(currentRouterQueryKey)
+    if (pendingIndex !== -1) {
+      pendingReplaceKeysRef.current.splice(0, pendingIndex + 1)
+      return
+    }
+
+    pendingReplaceKeysRef.current = []
+    skipReplaceCommitRef.current = true
     const parsed = parseCloudWorkspaceUrlQuery(router.query)
-    if (parsed.folderPath !== undefined) onSelectFolder(parsed.folderPath)
-    if (parsed.keyword !== undefined) setKeyword(parsed.keyword)
-    if (parsed.mediaFilter !== undefined) setFilter(parsed.mediaFilter)
-    if (parsed.sortMode !== undefined) setSortMode(parsed.sortMode, parsed.sortDirection)
-    setIsUrlQueryHydrated(true)
+    onSelectFolder(parsed.folderPath ?? "")
+    setKeyword(parsed.keyword ?? "")
+    setFilter(parsed.mediaFilter ?? "ALL")
+    const nextSortMode = parsed.sortMode ?? "LATEST"
+    setSortMode(nextSortMode, parsed.sortDirection ?? getDefaultSortDirection(nextSortMode), {
+      persist: false,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady])
+  }, [currentRouterQueryKey, router.isReady])
 
   useEffect(() => {
     if (!router.isReady || !isUrlQueryHydrated) return
+    if (skipReplaceCommitRef.current) {
+      skipReplaceCommitRef.current = false
+      return
+    }
     if (isCloudSearchPending(keyword, debouncedKeyword)) return
 
     const nextQuery = buildCloudWorkspaceUrlQuery({
@@ -94,27 +148,26 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
       sortDirection,
     })
 
-    const curFolder = normalizeCloudFolderPath(
-      typeof router.query.folder === "string" ? router.query.folder : ""
-    )
-    const curKw = typeof router.query.kw === "string" ? router.query.kw : ""
-    const curKind = typeof router.query.kind === "string" ? router.query.kind : ""
-    const curSort = typeof router.query.sort === "string" ? router.query.sort : ""
-    const curDir = typeof router.query.dir === "string" ? router.query.dir : ""
+    const nextComparableKey = buildComparableQueryKey({
+      folder: nextQuery.folder || "",
+      kw: nextQuery.kw || "",
+      kind: nextQuery.kind || "",
+      sort: nextQuery.sort || "",
+      dir: nextQuery.dir || "",
+    })
 
-    if (
-      curFolder === (nextQuery.folder || "") &&
-      curKw === (nextQuery.kw || "") &&
-      curKind === (nextQuery.kind || "") &&
-      curSort === (nextQuery.sort || "") &&
-      curDir === (nextQuery.dir || "")
-    ) {
+    if (currentRouterQueryKey === nextComparableKey) {
       return
     }
+    pendingReplaceKeysRef.current = [
+      ...pendingReplaceKeysRef.current.slice(-7),
+      nextComparableKey,
+    ]
     void router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeFolderPath,
+    currentRouterQueryKey,
     debouncedKeyword,
     filter,
     isUrlQueryHydrated,
