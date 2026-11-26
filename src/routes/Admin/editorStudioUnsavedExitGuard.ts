@@ -106,7 +106,7 @@ export const isSamePathEditorSurfaceNavigation = (currentUrl: string, nextUrl: s
 export const isEditorStudioBootstrapNavigation = (currentUrl: string, nextUrl: string) => {
   const current = editorRoutePathname(currentUrl)
   const next = editorRoutePathname(nextUrl)
-  if (current !== "/admin/editor/new") return false
+  if (current !== "/admin/editor/new" && current !== "/admin/editor") return false
   if (!next.startsWith("/admin/editor/")) return false
   const segment = next.slice("/admin/editor/".length)
   return segment.length > 0 && segment !== "new" && !segment.includes("/")

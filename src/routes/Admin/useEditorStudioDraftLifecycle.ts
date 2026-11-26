@@ -268,11 +268,15 @@ export const useEditorStudioDraftLifecycle = ({
   const resolveLoadedPostState = useCallback(
     (post: PostForEditor) => {
       const rawSnapshot = resolveEditorMetaSnapshot(post.content ?? "")
+      const isTempDraft = isTempDraftCandidate(post)
       const shouldMaskTempTitle =
-        isTempDraftCandidate(post) && isTempDraftTitlePlaceholder(post.title ?? "")
+        isTempDraft && isTempDraftTitlePlaceholder(post.title ?? "")
       const shouldMaskTempPlaceholder = isBlankServerTempDraft(post, rawSnapshot)
       const title = shouldMaskTempTitle ? "" : post.title ?? ""
-      const visibility = toVisibility(!!post.published, !!post.listed)
+      const visibility =
+        isTempDraft && !post.published && !post.listed
+          ? "PUBLIC_LISTED"
+          : toVisibility(!!post.published, !!post.listed)
       const resolvedSummary = resolvePersistedSummaryResult(
         { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
         { summary: post.summary, source: post.summarySource },
@@ -315,6 +319,26 @@ export const useEditorStudioDraftLifecycle = ({
     ],
   )
 
+  const applyResolvedServerPost = useCallback(
+    (resolvedPost: PostForEditor) => {
+      const loadedPostState = resolveLoadedPostState(resolvedPost)
+      setPostTitle(loadedPostState.title)
+      setPostVisibility(loadedPostState.visibility)
+      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
+        loadedPostState.fingerprintPayload
+      )
+      applyLoadedPostContext(resolvedPost)
+      signalLocalDraftBaselineReady()
+      setResult(pretty(resolvedPost))
+      return loadedPostState
+    },
+    [
+      applyLoadedPostContext, buildEditorStateFingerprint, pretty, resolveLoadedPostState,
+      serverBaselineEditorFingerprintRef, setPostTitle, setPostVisibility, setResult,
+      signalLocalDraftBaselineReady,
+    ]
+  )
+
   const loadPostForEditor = useCallback(async (
     targetPostId: string = postId,
   ) => {
@@ -326,17 +350,7 @@ export const useEditorStudioDraftLifecycle = ({
       const normalizedTargetPostId = targetPostId.trim()
       const post = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       if (!isCurrentLoad()) return
-      const resolvedPost = post
-
-      const loadedPostState = resolveLoadedPostState(resolvedPost)
-      setPostTitle(loadedPostState.title)
-      setPostVisibility(loadedPostState.visibility)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
-        loadedPostState.fingerprintPayload,
-      )
-      applyLoadedPostContext(resolvedPost)
-      signalLocalDraftBaselineReady()
-      setResult(pretty(resolvedPost))
+      applyResolvedServerPost(post)
     } catch (error) {
       if (!isCurrentLoad()) return
       const message = error instanceof Error ? error.message : String(error)
@@ -346,19 +360,8 @@ export const useEditorStudioDraftLifecycle = ({
       if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
-    applyLoadedPostContext,
-    beginLocalDraftPostLoad,
-    buildEditorStateFingerprint,
-    endLocalDraftPostLoad,
-    postId,
-    pretty,
-    resolveLoadedPostState,
-    serverBaselineEditorFingerprintRef,
-    setLoadingKey,
-    setPostTitle,
-    setPostVisibility,
-    setResult,
-    signalLocalDraftBaselineReady,
+    applyResolvedServerPost, beginLocalDraftPostLoad, endLocalDraftPostLoad,
+    postId, pretty, setLoadingKey, setResult,
   ])
 
   const reloadLatestServerPost = useCallback(async (targetPostId: string = postId): Promise<boolean> => {
@@ -377,16 +380,7 @@ export const useEditorStudioDraftLifecycle = ({
       )
       const resolvedPost = await apiFetch<PostForEditor>(`/post/api/v1/adm/posts/${normalizedTargetPostId}`)
       if (!isCurrentLoad()) return false
-
-      const loadedPostState = resolveLoadedPostState(resolvedPost)
-      setPostTitle(loadedPostState.title)
-      setPostVisibility(loadedPostState.visibility)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
-        loadedPostState.fingerprintPayload
-      )
-      applyLoadedPostContext(resolvedPost)
-      signalLocalDraftBaselineReady()
-      setResult(pretty(resolvedPost))
+      applyResolvedServerPost(resolvedPost)
       setPublishStatus(
         {
           tone: "success",
@@ -411,11 +405,45 @@ export const useEditorStudioDraftLifecycle = ({
       if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
-    applyLoadedPostContext, beginLocalDraftPostLoad, buildEditorStateFingerprint,
-    endLocalDraftPostLoad, postId, preserveLocalDraftForConflictReload, pretty,
-    resolveLoadedPostState, serverBaselineEditorFingerprintRef, setLoadingKey,
-    setPostTitle, setPostVisibility, setPublishStatus, setResult, signalLocalDraftBaselineReady,
+    applyResolvedServerPost, beginLocalDraftPostLoad, endLocalDraftPostLoad, postId,
+    preserveLocalDraftForConflictReload, pretty, setLoadingKey, setPublishStatus, setResult,
   ])
+
+  const applyRestoredRevisionPost = useCallback(
+    async (restoredPost?: unknown) => {
+      const targetPostId = postId.trim()
+      cancelPendingAutosave()
+      if (restoredPost && typeof restoredPost === "object" && "id" in restoredPost) {
+        const post = restoredPost as PostForEditor
+        beginLocalDraftPostLoad()
+        try {
+          applyResolvedServerPost(post)
+          try {
+            removeLocalDraft({ kind: "post", postId: String(post.id) })
+          } catch {
+            // Keep restored server state even if storage cleanup fails
+          }
+          setLocalDraftSavedAt("")
+          setPublishStatus({ tone: "success", text: "선택한 리비전으로 원고를 복원했습니다." }, "page")
+        } finally {
+          endLocalDraftPostLoad()
+        }
+        return
+      }
+      if (!targetPostId) return
+      await loadPostForEditor(targetPostId)
+      try {
+        removeLocalDraft({ kind: "post", postId: targetPostId })
+      } catch {
+        // ignore storage error
+      }
+      setLocalDraftSavedAt("")
+    },
+    [
+      applyResolvedServerPost, beginLocalDraftPostLoad, cancelPendingAutosave, endLocalDraftPostLoad,
+      loadPostForEditor, postId, removeLocalDraft, setLocalDraftSavedAt, setPublishStatus,
+    ]
+  )
 
   const loadExistingTempPostForRecovery = useCallback(async (): Promise<PostForEditor | null> => {
     try {
@@ -469,15 +497,8 @@ export const useEditorStudioDraftLifecycle = ({
         await replaceRoute(router, destination)
         return
       }
-      const loadedPostState = resolveLoadedPostState(tempPost)
-      setPostTitle(loadedPostState.title)
-      setPostVisibility(loadedPostState.visibility)
-      serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
-        loadedPostState.fingerprintPayload,
-      )
-      applyLoadedPostContext(tempPost)
+      const loadedPostState = applyResolvedServerPost(tempPost)
       setIsTempDraftMode(true)
-      signalLocalDraftBaselineReady()
       setPublishStatus(
         {
           tone: "success",
@@ -499,23 +520,17 @@ export const useEditorStudioDraftLifecycle = ({
       if (isCurrentLoad()) setLoadingKey("")
     }
   }, [
-    applyLoadedPostContext,
+    applyResolvedServerPost,
     beginLocalDraftPostLoad,
-    buildEditorStateFingerprint,
     endLocalDraftPostLoad,
     pretty,
     requestTempPostWithConflictRetry,
-    resolveLoadedPostState,
     router,
-    serverBaselineEditorFingerprintRef,
     setIsNewEditorBootstrapPending,
     setIsTempDraftMode,
     setLoadingKey,
-    setPostTitle,
-    setPostVisibility,
     setPublishStatus,
     setResult,
-    signalLocalDraftBaselineReady,
     tempPostRequestRef,
     toEditorPostRoute,
     loadExistingTempPostForRecovery,
@@ -541,6 +556,7 @@ export const useEditorStudioDraftLifecycle = ({
     switchToCreateMode,
     loadPostForEditor,
     reloadLatestServerPost,
+    applyRestoredRevisionPost,
     handleLoadOrCreateTempPost,
   }
 }

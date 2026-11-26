@@ -185,7 +185,7 @@ export const EditorStudioPublishReadinessCard = ({
     },
   ]
 
-  const completedCount = rows.filter((row) => row.tone !== "warning").length
+  const completedCount = rows.filter((row) => row.tone === "ready").length
   const completionPercent = Math.round((completedCount / rows.length) * 100)
 
   return (

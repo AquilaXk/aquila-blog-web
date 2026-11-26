@@ -32,6 +32,7 @@ import {
 import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 import {
   armLocalDraftFingerprintBaseline,
+  executeServerTempDraftSave,
   isBrowserOnline,
   type EditorFingerprintPayload,
   type EditorMode,
@@ -51,7 +52,7 @@ export const useEditorStudioPersistence = ({
   lastWriteIdempotencyKeyRef, loadingKey, normalizeSafeImageUrl, postCategory,
   getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
   postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
-  postVersion, postVisibility, pretty, refreshPublicPostReadViews,
+  postVersion, postVisibility, pretty, refreshPublicPostReadViews, saveLocalDraft,
   serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, cancelPendingAutosave, setEditorMode,
   setIsPreviewThumbnailError, setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
   setPostCategory, setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
@@ -110,11 +111,14 @@ export const useEditorStudioPersistence = ({
     (currentPostContent: string): boolean => {
       if (!postTitle.trim()) return reportValidationError(adminT("editorValidationTitleRequired", language))
       if (!currentPostContent.trim()) return reportValidationError(adminT("editorValidationBodyRequired", language))
+      if (postThumbnailUrl.trim() && !normalizeSafeImageUrl(postThumbnailUrl)) {
+        return reportValidationError(adminT("editorUploadInvalidThumbUrl", language))
+      }
       const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
       if (placeholderIssue) return reportValidationError(placeholderIssue)
       return true
     },
-    [detectPublishPlaceholderIssue, language, postTitle, reportValidationError]
+    [detectPublishPlaceholderIssue, language, normalizeSafeImageUrl, postThumbnailUrl, postTitle, reportValidationError]
   )
 
   const applyCanonicalWriteResponse = useCallback(
@@ -143,6 +147,7 @@ export const useEditorStudioPersistence = ({
     ]
   )
 
+  const tempDraftSaveInFlightRef = useRef(false)
   const [lastSaveError, setLastSaveError] = useState<EditorFailureRecovery["result"] | null>(null)
   const clearLastSaveError = useCallback(() => {
     setLastSaveError(null)
@@ -474,9 +479,54 @@ export const useEditorStudioPersistence = ({
     setPostVersion, setPublishStatus, setResult, validateContentPreflight,
   ])
 
+  const handleSaveServerTempDraft = useCallback(
+    async (options?: { silent?: boolean }): Promise<boolean> => {
+      const silent = options?.silent === true
+      const normalizedPostId = postId.trim()
+      if (editorMode !== "edit" || !normalizedPostId) return false
+      if (loadingKey || tempDraftSaveInFlightRef.current) return false
+
+      const currentPostContent = getCurrentPostContent()
+      const { tags: effectiveTags, category: effectiveCategory } = silent
+        ? {
+            tags: dedupeStrings(postTags),
+            category: resolveCanonicalCategoryFromCatalog(postCategory, customCategoryCatalog ?? []),
+          }
+        : resolveAuthoringMetadataForWrite()
+      const composed = composeEditorContent(currentPostContent, effectiveTags, {
+        category: effectiveCategory,
+        thumbnail: effectiveThumbnailUrl,
+      })
+      tempDraftSaveInFlightRef.current = true
+      try {
+        return await executeServerTempDraftSave({
+          silent, isEn, normalizedPostId, postTitle, currentPostContent, composed, postVersion,
+          effectiveTags, effectiveCategory, effectiveThumbnailUrl, postSummary, postSummarySource,
+          getCurrentPostContent, applyCanonicalWriteResponse, buildSuccessfulWriteFingerprintPayload,
+          buildEditorStateFingerprint, dedupeStrings, serverBaselineEditorFingerprintRef,
+          lastLocalDraftFingerprintRef, cancelPendingAutosave, signalLocalDraftBaselineReady,
+          saveLocalDraft, setPostVersion, setLocalDraftSavedAt, setLoadingKey, setLastSaveError,
+          setPublishStatus,
+        })
+      } finally {
+        tempDraftSaveInFlightRef.current = false
+      }
+    },
+    [
+      applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
+      cancelPendingAutosave, composeEditorContent, customCategoryCatalog, dedupeStrings, editorMode,
+      effectiveThumbnailUrl, getCurrentPostContent, isEn, lastLocalDraftFingerprintRef, loadingKey,
+      postCategory, postId, postSummary, postSummarySource, postTags, postTitle, postVersion,
+      resolveAuthoringMetadataForWrite, saveLocalDraft, serverBaselineEditorFingerprintRef,
+      setLoadingKey, setLocalDraftSavedAt, setPostVersion, setPublishStatus,
+      signalLocalDraftBaselineReady,
+    ]
+  )
+
   return {
     lastSaveError,
     clearLastSaveError,
+    handleSaveServerTempDraft,
     handleMarkdownEditorImageUpload,
     handleMarkdownEditorFileUpload,
     handleUploadThumbnailImage,

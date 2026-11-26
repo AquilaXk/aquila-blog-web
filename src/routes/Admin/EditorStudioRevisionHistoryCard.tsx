@@ -8,6 +8,7 @@ import type { components } from "@shared/contracts"
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { EditorIconChevronDown } from "src/components/markdown-editor/MarkdownEditorIcons"
+import { ConfirmDialog } from "src/design-system/ConfirmDialog"
 import { useLanguage, type SiteLanguage } from "src/libs/language"
 import type { RsData } from "src/types"
 import {
@@ -48,6 +49,7 @@ export type PostRevisionSnapshotItem = {
 
 export type EditorStudioRevisionHistoryCardProps = {
   postId?: number | null
+  postVersion?: number | null
   disabled?: boolean
   initialOpen?: boolean
   initialRevisions?: PostRevisionSummaryItem[]
@@ -55,7 +57,7 @@ export type EditorStudioRevisionHistoryCardProps = {
   currentTitle?: string
   currentTags?: string[]
   currentContent?: string
-  onRevisionRestored?: () => Promise<void> | void
+  onRevisionRestored?: (restoredPost?: unknown) => Promise<void> | void
 }
 
 const isPositiveInteger = (value: unknown): value is number =>
@@ -140,6 +142,7 @@ export const formatRevisionTimestampLabel = (
 
 export const EditorStudioRevisionHistoryCard = ({
   postId,
+  postVersion = null,
   disabled = false,
   initialOpen = false,
   initialRevisions,
@@ -154,6 +157,7 @@ export const EditorStudioRevisionHistoryCard = ({
   const [hasLoaded, setHasLoaded] = useState(Boolean(initialRevisions))
   const [isLoading, setIsLoading] = useState(false)
   const [restoringRevisionId, setRestoringRevisionId] = useState<number | null>(null)
+  const [pendingRestoreRevision, setPendingRestoreRevision] = useState<PostRevisionSummaryItem | null>(null)
   const [comparedRevisionId, setComparedRevisionId] = useState<number | null>(null)
   const [loadingSnapshotId, setLoadingSnapshotId] = useState<number | null>(null)
   const [diffErrorText, setDiffErrorText] = useState("")
@@ -271,18 +275,25 @@ export const EditorStudioRevisionHistoryCard = ({
     })
   }, [comparedRevisionId, currentTags, currentTitle, deferredCurrentContent, snapshotsById])
 
-  const handleRestoreRevision = useCallback(
+  const handleConfirmRestoreRevision = useCallback(
     async (revisionId: number) => {
       if (!isPositiveInteger(postId) || restoringRevisionId !== null || disabled) return
+      setPendingRestoreRevision(null)
       setRestoringRevisionId(revisionId)
       setErrorText("")
       setStatusText("")
       try {
-        await apiFetch<RsData<unknown>>(
+        const requestInit: RequestInit = {
+          method: "POST",
+          ...(typeof postVersion === "number" && Number.isFinite(postVersion)
+            ? { body: JSON.stringify({ expectedVersion: postVersion }) }
+            : {}),
+        }
+        const response = await apiFetch<RsData<unknown>>(
           `/post/api/v1/adm/posts/${postId}/revisions/${revisionId}/restore`,
-          { method: "POST" }
+          requestInit
         )
-        await onRevisionRestored?.()
+        await onRevisionRestored?.(response?.data)
         await loadRevisions()
         setStatusText(
           isEn ? `Restored revision #${revisionId}.` : `#${revisionId} 리비전을 복원했습니다.`
@@ -299,7 +310,7 @@ export const EditorStudioRevisionHistoryCard = ({
         setRestoringRevisionId(null)
       }
     },
-    [disabled, isEn, loadRevisions, onRevisionRestored, postId, restoringRevisionId]
+    [disabled, isEn, loadRevisions, onRevisionRestored, postId, postVersion, restoringRevisionId]
   )
 
   if (!isPositiveInteger(postId)) return null
@@ -379,7 +390,7 @@ export const EditorStudioRevisionHistoryCard = ({
                         type="button"
                         disabled={disabled || isLoading || restoringRevisionId !== null}
                         aria-label={isEn ? `Restore revision ${item.title}` : `${item.title} 리비전 복원`}
-                        onClick={() => void handleRestoreRevision(item.id)}
+                        onClick={() => setPendingRestoreRevision(item)}
                       >
                         {isRestoring ? (isEn ? "Restoring" : "복원 중") : isEn ? "Restore" : "복원"}
                       </SecondaryButton>
@@ -401,6 +412,26 @@ export const EditorStudioRevisionHistoryCard = ({
           </ul>
         ) : null}
       </RevisionCardBody>
+      <ConfirmDialog
+        open={pendingRestoreRevision !== null}
+        titleId={`revision-restore-title-${postId}`}
+        descriptionId={`revision-restore-desc-${postId}`}
+        title={isEn ? "Restore this revision?" : "선택한 리비전으로 복원할까요?"}
+        description={
+          isEn
+            ? `Current draft content will be replaced with "${pendingRestoreRevision?.title ?? ""}".`
+            : `현재 편집 중인 원고가 "${pendingRestoreRevision?.title ?? ""}" 스냅샷으로 바뀝니다.`
+        }
+        confirmLabel={isEn ? "Restore" : "복원"}
+        cancelLabel={isEn ? "Cancel" : "취소"}
+        confirmTone="default"
+        onConfirm={() => {
+          if (pendingRestoreRevision) {
+            void handleConfirmRestoreRevision(pendingRestoreRevision.id)
+          }
+        }}
+        onCancel={() => setPendingRestoreRevision(null)}
+      />
     </RevisionCardDetails>
   )
 }

@@ -181,7 +181,7 @@ export const useEditorStudioRouting = ({
 
   useEffect(() => {
     if (!router.isReady || !isDedicatedEditorRoute || !sessionMember?.isAdmin) return
-    if (router.pathname !== editorNewRoutePath) return
+    if (router.pathname !== editorNewRoutePath && router.pathname !== "/admin/editor") return
     const source = typeof router.query.source === "string" ? router.query.source.trim() : ""
     if (source === "local-draft") return
     if (autoCreatedTempDraftRef.current) return

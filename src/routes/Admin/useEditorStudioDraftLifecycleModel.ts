@@ -192,8 +192,9 @@ export const useEditorStudioLocalDraftLifecycle = ({
   const saveLocalDraft = useCallback((options?: {
     silent?: boolean
     expectedSource?: LocalDraftSource
+    force?: boolean
   }) => {
-    if (loadingKeyRef.current.length > 0) return
+    if (!options?.force && loadingKeyRef.current.length > 0) return
     if (isPostLoadInFlightRef.current) return
     if (isPostIdTransitionGatedRef.current) return
 

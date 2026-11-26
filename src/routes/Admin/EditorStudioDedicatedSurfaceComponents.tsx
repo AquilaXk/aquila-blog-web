@@ -103,7 +103,9 @@ export type EditorStudioDedicatedEditorSurfaceProps = {
   onOpenThumbnailFileInput?: () => void
   onResetThumbnailToAutoMode?: () => void
   managedPostId?: number | null
-  onRevisionRestored?: () => Promise<void> | void
+  postVersion?: number | null
+  isTempDraftMode?: boolean
+  onRevisionRestored?: (restoredPost?: unknown) => Promise<void> | void
 }
 
 type LocalDraftRestoreSuggestionProps = {
@@ -380,6 +382,7 @@ export const renderEditorInspectorPanel = ({
   onUploadPostAttachment,
   onInsertMarkdownSnippet,
   managedPostId,
+  postVersion = null,
   actionsDisabled,
   onRevisionRestored,
   currentTitle = "",
@@ -408,8 +411,9 @@ export const renderEditorInspectorPanel = ({
   onUploadPostAttachment?: EditorStudioDedicatedEditorSurfaceProps["onUploadPostAttachment"]
   onInsertMarkdownSnippet?: EditorStudioDedicatedEditorSurfaceProps["onInsertMarkdownSnippet"]
   managedPostId: number | null
+  postVersion?: number | null
   actionsDisabled: boolean
-  onRevisionRestored?: () => Promise<void> | void
+  onRevisionRestored?: (restoredPost?: unknown) => Promise<void> | void
   currentTitle?: string
   currentTags?: string[]
   currentContent?: string
@@ -525,6 +529,7 @@ export const renderEditorInspectorPanel = ({
         />
         <EditorStudioRevisionHistoryCard
           postId={managedPostId}
+          postVersion={postVersion}
           disabled={actionsDisabled}
           onRevisionRestored={onRevisionRestored}
           currentTitle={currentTitle}

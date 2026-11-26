@@ -62,14 +62,14 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     disabled, editorMode, finalizePreviewThumbPointer, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
     commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
-    handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleThumbnailImageFileChange, handleThumbnailPaste,
+    handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleApplyRestoredRevision, handleThumbnailImageFileChange, handleThumbnailPaste,
     handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
     isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
     isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
     isPublishModalOpen, isTempDraftMode, getCurrentPostContent, lastLocalDraftFingerprintRef, lastSaveError,
     loadingKey, localDraftCandidate, localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal,
     openThumbnailFileInput, postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent,
-    postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
+    postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion,
     postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
     previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft,
     selectLocalDraftCandidate, restoredLocalDraft, safePreviewThumbnail, serverBaselineEditorFingerprintRef,
@@ -312,7 +312,8 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     />
   )
   const editorPrimaryActionType = resolveEditorPrimaryActionType(editorMode, isTempDraftMode)
-  const isMarkdownEditorDisabled = loadingKey.length > 0
+  const isMarkdownEditorDisabled =
+    isEditorSaving || loadingKey === "postOne" || loadingKey === "postTemp"
   const handleEditorCommitDuration = useCallback((actualDuration: number) => {
     recordEditorCommitDurationForRuntimeGuard(actualDuration)
   }, [])
@@ -461,7 +462,9 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onOpenThumbnailFileInput={openThumbnailFileInput}
         onResetThumbnailToAutoMode={resetThumbnailToAutoMode}
         managedPostId={managedRevisionPostId}
-        onRevisionRestored={handleReloadLatestServerPost}
+        postVersion={postVersion}
+        isTempDraftMode={isTempDraftMode}
+        onRevisionRestored={handleApplyRestoredRevision}
         publishModal={
           isPublishModalOpen ? (
             <EditorStudioPublishModal

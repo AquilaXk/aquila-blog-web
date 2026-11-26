@@ -188,7 +188,7 @@ export const EditorStudioDedicatedEditorSurface = ({
   selectedLocalDraftCandidateKey, onSelectLocalDraftCandidate, onDiscardLocalDraftCandidate,
   onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal, onUploadPostImage, onUploadPostAttachment, onInsertMarkdownSnippet,
   postThumbnailUrl, safePreviewThumbnail, isThumbnailUploading, isThumbnailUploadDisabled, onOpenThumbnailFileInput, onResetThumbnailToAutoMode,
-  managedPostId = null, onRevisionRestored,
+  managedPostId = null, postVersion = null, isTempDraftMode = false, onRevisionRestored,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const { language } = useLanguage()
   const isEn = language === "en"
@@ -271,10 +271,11 @@ export const EditorStudioDedicatedEditorSurface = ({
     [activeCursorOffset, deferredPostContent]
   )
   const visibilityShortLabel = useMemo(() => {
+    if (isTempDraftMode) return adminT("editorVisibilityShortDraft", language)
     if (postVisibility === "PUBLIC_LISTED") return adminT("editorVisibilityShortPublic", language)
     if (postVisibility === "PUBLIC_UNLISTED") return adminT("editorVisibilityShortUnlisted", language)
     return adminT("editorVisibilityShortPrivate", language)
-  }, [language, postVisibility])
+  }, [isTempDraftMode, language, postVisibility])
   const handleTagDraftChange = (nextValue: string) =>
     applyCommaSeparatedTagDraft(nextValue, onTagDraftChange, onAddTags)
   const handleTagDraftKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) =>
@@ -285,13 +286,12 @@ export const EditorStudioDedicatedEditorSurface = ({
   }, [titleInputRef])
   const handleInlineExcerptKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (event) => {
+      if (isComposingKeyboardEvent(event)) return
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault()
-        if (isComposingKeyboardEvent(event)) return
         onOutlineBodyHeadingActivate({ from: 0, to: 0 })
         return
       }
-      if (isComposingKeyboardEvent(event)) return
       const target = event.currentTarget
       if (
         event.key === "ArrowDown" &&
@@ -576,6 +576,7 @@ export const EditorStudioDedicatedEditorSurface = ({
           onUploadPostAttachment,
           onInsertMarkdownSnippet,
           managedPostId,
+          postVersion,
           actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
           onRevisionRestored,
           currentTitle: postTitle,

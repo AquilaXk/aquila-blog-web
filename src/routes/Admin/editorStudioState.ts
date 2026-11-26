@@ -112,19 +112,22 @@ export const deriveEditorPersistenceState = ({
   localDraftFingerprint,
   localDraftSavedAt,
   loadingKey,
-  publishNoticeTone = "idle",
   language = "ko",
 }: EditorPersistenceStateParams) => {
   const isSaving =
-    loadingKey === "writePost" || loadingKey === "modifyPost" || loadingKey === "publishTempPost"
+    loadingKey === "writePost" ||
+    loadingKey === "modifyPost" ||
+    loadingKey === "publishTempPost" ||
+    loadingKey === "serverTempDraftSave"
   const isPersistedEditBaseline =
     editorMode === "edit" &&
     hasSelectedManagedPost &&
     editorStateFingerprint === serverBaselineFingerprint
-  const isAutoSavedCreateDraft =
-    editorMode === "create" &&
-    editorStateFingerprint === localDraftFingerprint &&
-    Boolean(localDraftSavedAt)
+  const isAutoSavedLocalDraft =
+    editorStateFingerprint === localDraftFingerprint && Boolean(localDraftSavedAt)
+  const isAutoSavedCreateDraft = editorMode === "create" && isAutoSavedLocalDraft
+  const isLocalAutoSavedEditDraft =
+    editorMode === "edit" && !isPersistedEditBaseline && isAutoSavedLocalDraft
 
   const text = isSaving
     ? adminT("editorStatusSaving", language)
@@ -133,22 +136,24 @@ export const deriveEditorPersistenceState = ({
         ? adminT("editorStatusSaved", language)
         : isAutoSavedCreateDraft
           ? adminT("editorStatusAutoSaved", language)
-          : adminT("editorStatusUnsaved", language)
+          : isLocalAutoSavedEditDraft
+            ? adminT("editorStatusLocalAutoSaved", language)
+            : adminT("editorStatusUnsaved", language)
       : ""
 
   const isSavedState = isPersistedEditBaseline || isAutoSavedCreateDraft
-  const tone =
-    isSaving
-      ? "loading"
-      : (!isSaving && hasEditorDraftContent && isSavedState) || publishNoticeTone === "success"
-        ? "success"
-        : "idle"
+  const tone = isSaving
+    ? "loading"
+    : !isSaving && hasEditorDraftContent && isSavedState
+      ? "success"
+      : "idle"
 
   return {
     text,
     tone,
     isPersistedEditBaseline,
     isAutoSavedCreateDraft,
+    isLocalAutoSavedEditDraft,
   }
 }
 

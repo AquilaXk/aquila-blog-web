@@ -81,6 +81,7 @@ export type AdminEditorI18nKey =
   | "editorStatusSaving"
   | "editorStatusSaved"
   | "editorStatusAutoSaved"
+  | "editorStatusLocalAutoSaved"
   | "editorStatusUnsaved"
   | "editorVisibilityPublicLabel"
   | "editorVisibilityPublicDesc"
@@ -248,6 +249,7 @@ export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI
     editorStatusSaving: "저장 중",
     editorStatusSaved: "저장됨",
     editorStatusAutoSaved: "자동 저장됨",
+    editorStatusLocalAutoSaved: "로컬 임시 저장됨",
     editorStatusUnsaved: "저장되지 않은 변경",
     editorVisibilityPublicLabel: "전체 공개",
     editorVisibilityPublicDesc: "메인 목록과 검색에 노출됩니다.",
@@ -414,6 +416,7 @@ export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI
     editorStatusSaving: "Saving",
     editorStatusSaved: "Saved",
     editorStatusAutoSaved: "Auto-saved",
+    editorStatusLocalAutoSaved: "Saved locally",
     editorStatusUnsaved: "Unsaved changes",
     editorVisibilityPublicLabel: "Public",
     editorVisibilityPublicDesc: "Visible in feed and search.",

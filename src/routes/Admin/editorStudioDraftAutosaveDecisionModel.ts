@@ -32,6 +32,7 @@ export const LOCAL_DRAFT_BASELINE_SETTLE_LOADING_KEYS = new Set([
   "writePost",
   "modifyPost",
   "publishTempPost",
+  "serverTempDraftSave",
 ])
 
 export const isLocalDraftBaselineSettleLoadingKey = (loadingKey: string): boolean =>

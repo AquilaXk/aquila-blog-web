@@ -363,6 +363,7 @@ export const createStatefulEditorHarness = (options?: { failPersist?: () => bool
       pretty: prettyJson,
       generateIdempotencyKey: fixedIdempotencyKey,
       signalLocalDraftBaselineReady: lifecycleApi.signalLocalDraftBaselineReady,
+      saveLocalDraft: lifecycleApi.saveLocalDraft,
       uploadWithConflictRetry: uploadWithRetryStub,
       normalizeSafeImageUrl: identityString,
       extractImageFileFromClipboard: extractNoClipboardImage,

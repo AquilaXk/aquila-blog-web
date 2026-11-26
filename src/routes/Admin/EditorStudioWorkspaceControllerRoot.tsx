@@ -135,7 +135,8 @@ export const EditorStudioWorkspaceController = ({
   }, [])
 
   const isDedicatedEditorRoute = router.pathname.startsWith("/admin/editor")
-  const isDedicatedNewEditorRoute = isDedicatedEditorRoute && router.pathname === EDITOR_NEW_ROUTE_PATH
+  const isDedicatedNewEditorRoute =
+    isDedicatedEditorRoute && (router.pathname === EDITOR_NEW_ROUTE_PATH || router.pathname === "/admin/editor")
   const [isNewEditorBootstrapPending, setIsNewEditorBootstrapPending] = useState(isDedicatedNewEditorRoute)
   const redirectingRef = useRef(false)
   const autoLoadedPostIdRef = useRef<string | null>(null)
@@ -224,6 +225,7 @@ export const EditorStudioWorkspaceController = ({
     localDraftSource,
     loadPostForEditor,
     reloadLatestServerPost,
+    applyRestoredRevisionPost,
     restoredLocalDraft,
     restoreLocalDraft,
     saveLocalDraft,
@@ -411,6 +413,7 @@ export const EditorStudioWorkspaceController = ({
 
   const {
     clearLastSaveError,
+    handleSaveServerTempDraft,
     handleMarkdownEditorFileUpload,
     handleMarkdownEditorImageUpload,
     handleModifyPost,
@@ -478,6 +481,7 @@ export const EditorStudioWorkspaceController = ({
     generateIdempotencyKey,
     signalLocalDraftBaselineReady,
     cancelPendingAutosave,
+    saveLocalDraft,
     uploadWithConflictRetry,
     normalizeSafeImageUrl,
     extractImageFileFromClipboard,
@@ -486,7 +490,9 @@ export const EditorStudioWorkspaceController = ({
   useEditorStudioKeyboardShortcuts({
     isTempDraftMode, editorMode, postId, postVersion, postTitle, postSummary,
     postSummarySource, effectiveThumbnailUrl, getCurrentPostContent, composeEditorContent,
-    postTags, postCategory, saveLocalDraft, setPostVersion, setPublishStatus, loadingKey, setLoadingKey,
+    postTags, tagDraft, postCategory, addTagsToPost, setTagDraft, saveLocalDraft,
+    onSaveServerTempDraft: handleSaveServerTempDraft,
+    setPostVersion, setPublishStatus, loadingKey, setLoadingKey,
     isPublishModalOpen,
     onOpenPublishModal: () => setIsPublishModalOpen(true),
   })
@@ -502,6 +508,15 @@ export const EditorStudioWorkspaceController = ({
       setIsPublishModalOpen(false)
     }
   }, [clearLastSaveError, reloadLatestServerPost, setIsPublishModalOpen])
+
+  const handleApplyRestoredRevision = useCallback(
+    async (restoredPost?: unknown) => {
+      await applyRestoredRevisionPost(restoredPost)
+      clearLastSaveError()
+      setIsPublishModalOpen(false)
+    },
+    [applyRestoredRevisionPost, clearLastSaveError, setIsPublishModalOpen]
+  )
 
   const { handleExitDedicatedEditor } = useEditorStudioRouting({
     router,
@@ -559,14 +574,14 @@ export const EditorStudioWorkspaceController = ({
         getCurrentPostContent, handleMarkdownEditorChange, handleMarkdownEditorFileUpload,
         handleMarkdownEditorImageUpload, handleConfirmPublish, handleExitDedicatedEditor, handleFlushMarkdownReady,
         commitPostCategory, handlePostCategoryChange, handlePostSummaryChange, handlePreviewThumbPointerDown,
-        handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleThumbnailImageFileChange, handleThumbnailPaste,
+        handlePreviewThumbPointerMove, handleReloadLatestServerPost, handleApplyRestoredRevision, handleThumbnailImageFileChange, handleThumbnailPaste,
         handleThumbnailUrlModalChange, handleTitleChange, handleTitleFieldRef, handleTitleKeyDown, handleFocusTitle,
         isCompactMobileLayout, isDedicatedEditorRoute, isDedicatedNewEditorRoute, isMobileMetaEditorOpen,
         isMobileThumbnailEditorOpen, isNewEditorBootstrapPending, isPreviewThumbDragging, isPreviewThumbnailError,
         isPublishModalOpen, isTempDraftMode, lastLocalDraftFingerprintRef, lastSaveError, loadingKey, localDraftCandidate,
         localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal, openThumbnailFileInput,
         postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
-        postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
+        postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility,
         publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef, previewThumbTransformRef,
         resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft, selectLocalDraftCandidate,
         restoredLocalDraft, result, safePreviewThumbnail, serverBaselineEditorFingerprintRef, sessionMember,
