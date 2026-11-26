@@ -465,13 +465,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 서명 공유 링크 파일 콘텐츠 조회 */
+        /** 공유 링크 파일 조회 */
         get: operations["shareContent"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        /** 서명 공유 링크 파일 메타데이터 조회 */
+        /** 공유 링크 파일 정보 조회 */
         head: operations["shareHead"];
         patch?: never;
         trace?: never;

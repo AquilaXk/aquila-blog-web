@@ -1,5 +1,6 @@
 // 참조 구현: transloadit/uppy (MIT) — 대용량 동영상 분할 이어올리기 세션·조각 재시도·언마운트 보존
 import type { components } from "@shared/contracts"
+import type { SiteLanguage } from "src/libs/language"
 import { ApiError, apiFetch } from "./client"
 import {
   createUploadSpeedEstimator,
@@ -43,6 +44,7 @@ export type CloudUploadProgress = {
 export type CloudUploadOptions = {
   onProgress?: (progress: CloudUploadProgress) => void
   cancelSignal?: AbortSignal
+  language?: SiteLanguage
 }
 
 export const normalizeCloudFile = (file: CloudFileDto): CloudFile => ({
@@ -302,12 +304,13 @@ export const uploadCloudVideoFileResumable = async (
   signal?: AbortSignal,
   options: CloudUploadOptions = {}
 ): Promise<CloudFile> => {
+  const isEn = options.language === "en"
   let session: CloudVideoUploadSession | null = null
   const storageKey = buildVideoUploadStorageKey(file, folderPath)
   try {
     options.onProgress?.({
       progress: 2,
-      message: "대용량 업로드 준비 중",
+      message: isEn ? "Preparing large upload" : "대용량 업로드 준비 중",
       loadedBytes: 0,
       totalBytes: file.size,
     })
@@ -322,7 +325,7 @@ export const uploadCloudVideoFileResumable = async (
       const completingId = Number(resolvedSession.session.id)
       options.onProgress?.({
         progress: 98,
-        message: "동영상 업로드 완료 처리 중",
+        message: isEn ? "Finalizing video upload" : "동영상 업로드 완료 처리 중",
         loadedBytes: file.size,
         totalBytes: file.size,
       })
@@ -366,7 +369,9 @@ export const uploadCloudVideoFileResumable = async (
             totalBytes: metrics.totalBytes,
             speedBps: metrics.speedBps,
             etaSeconds: metrics.etaSeconds,
-            message: `동영상 조각 ${uploadedParts.size + 1}/${totalParts} 업로드`,
+            message: isEn
+              ? `Uploading part ${uploadedParts.size + 1}/${totalParts}`
+              : `동영상 조각 ${uploadedParts.size + 1}/${totalParts} 업로드`,
           })
         })
         completedBytes += end - start
@@ -383,13 +388,15 @@ export const uploadCloudVideoFileResumable = async (
         totalBytes: metrics.totalBytes,
         speedBps: metrics.speedBps,
         etaSeconds: metrics.etaSeconds,
-        message: `동영상 조각 ${uploadedParts.size}/${totalParts} 업로드`,
+        message: isEn
+          ? `Uploading part ${uploadedParts.size}/${totalParts}`
+          : `동영상 조각 ${uploadedParts.size}/${totalParts} 업로드`,
       })
     }
 
     options.onProgress?.({
       progress: 98,
-      message: "동영상 업로드 완료 처리 중",
+      message: isEn ? "Finalizing video upload" : "동영상 업로드 완료 처리 중",
       loadedBytes: file.size,
       totalBytes: file.size,
     })

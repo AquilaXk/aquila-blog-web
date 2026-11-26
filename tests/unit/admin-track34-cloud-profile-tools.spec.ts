@@ -8,7 +8,12 @@ import { validateCloudFileBeforeUpload } from "../../src/routes/Admin/cloudFileS
 import { useAdminCloudUploadQueue } from "../../src/routes/Admin/useAdminCloudUploadQueue"
 import { createMinimalRootContainer, withWindowStorage } from "./helpers/editorStudioTestHarness"
 import { wrapPlaywrightJsxComponent } from "./helpers/materializePlaywrightJsx"
-import { MAX_SVG_MARKUP_BYTES, parseSvgDimensionsFromMarkup } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
+import {
+  applyUploadQueueSuccess,
+  createUploadQueueItem,
+  MAX_SVG_MARKUP_BYTES,
+  parseSvgDimensionsFromMarkup,
+} from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 import { getStrapiAssetIcon, StrapiFileCodeIcon, StrapiFilePdfIcon, StrapiHeadphonesIcon, StrapiImageIcon, StrapiPlayIcon } from "../../src/routes/Admin/adminStrapiIcons"
 import * as AdminProfilePersistenceModel from "../../src/routes/Admin/AdminProfilePersistenceModel"
 import * as EditorStudioCloudAssetPickerModule from "../../src/routes/Admin/EditorStudioCloudAssetPicker"
@@ -265,26 +270,49 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
       )
     ).toEqual({ promotable: false, reason: "8MB 초과 (삽입 불가)" })
 
+    const flattenValues = (record: Record<string, unknown>) =>
+      Object.entries(record)
+        .map(([key, value]) =>
+          typeof value === "function"
+            ? (value as (a: number | string, b?: number) => string)(
+                key.includes("File") || key.includes("Single") ? "sample.png" : 2,
+                30
+              )
+            : value
+        )
+        .filter((v): v is string => typeof v === "string")
+        .join("\n")
+
     const koDict = getCloudDictionary("ko")
     const enDict = getCloudDictionary("en")
-    const koText = Object.values(koDict)
-      .filter((v): v is string => typeof v === "string")
-      .join("\n")
-    const enText = Object.values(enDict)
-      .filter((v): v is string => typeof v === "string")
-      .join("\n")
-    expect(koText).not.toMatch(/승격|피커|래스터|서명|토큰|회수|인스펙터|MIME|에셋/)
+    const koText = flattenValues(koDict)
+    const enText = flattenValues(enDict)
+    expect(koText).not.toMatch(/승격|피커|래스터|서명|토큰|회수|인스펙터|MIME|에셋|활성 링크/)
     expect(enText).not.toMatch(/promot|raster|signed|token|inspector|mime/i)
     expect(koDict.pickerHeading).toBe("클라우드 사진 삽입")
     expect(koDict.pickerPromotableOnly).toBe("삽입 가능한 사진만")
     expect(koDict.pickerAllFolders).toBe("전체 폴더")
+    expect(koDict.shareActiveTokensTitle).toBe("발급된 링크")
     expect(enDict.pickerHeading).toBe("Insert Cloud Photo")
     expect(enDict.pickerPromotableOnly).toBe("Insertable only")
+    expect(enDict.shareCopyInternalPath).toBe("Copy admin-only link")
 
-    const koSigText = Object.values(getCloudSignatureMessages("ko"))
-      .filter((v): v is string => typeof v === "string")
-      .join("\n")
-    expect(koSigText).not.toMatch(/시그니처|바이너리|NUL|루트 태그/)
+    const koSigText = flattenValues(getCloudSignatureMessages("ko"))
+    const enSigText = flattenValues(getCloudSignatureMessages("en"))
+    expect(koSigText).not.toMatch(/시그니처|바이너리|NUL|루트 태그|파일 헤더/)
+    expect(enSigText).not.toMatch(/signature|binary|nul|root tag|file header/i)
+
+    const sampleUpload = new File(["ok"], "demo.png", { type: "image/png" })
+    const koQueueItem = createUploadQueueItem(sampleUpload, "", "ko")
+    const enQueueItem = createUploadQueueItem(sampleUpload, "", "en")
+    expect(koQueueItem.message).toBe("업로드 대기 중")
+    expect(enQueueItem.message).toBe("Queued")
+    expect(applyUploadQueueSuccess([koQueueItem], koQueueItem.id, 1, "ko")[0]?.message).toBe(
+      "업로드 완료"
+    )
+    expect(applyUploadQueueSuccess([enQueueItem], enQueueItem.id, 2, "en")[0]?.message).toBe(
+      "Uploaded"
+    )
 
     const buildSnippet = pickerMod.buildCloudAssetMarkdownSnippet as (
       file: { mediaKind: "PHOTO" | "VIDEO" | "DOCUMENT"; contentType: string; originalFilename: string },

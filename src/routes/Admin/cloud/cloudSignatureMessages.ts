@@ -34,7 +34,7 @@ export const getCloudSignatureMessages = (language: SiteLanguage) => {
       tarHeader: "Invalid TAR archive file.",
       tarUstar: "Invalid TAR archive file.",
       unsupportedFormat: "Unsupported cloud file format.",
-      headerReadError: "Could not read file header.",
+      headerReadError: "Could not read file details.",
     } as const
   }
 
@@ -70,6 +70,6 @@ export const getCloudSignatureMessages = (language: SiteLanguage) => {
     tarHeader: "올바른 TAR 압축 파일이 아닙니다.",
     tarUstar: "올바른 TAR 압축 파일이 아닙니다.",
     unsupportedFormat: "지원하지 않는 클라우드 파일 형식입니다.",
-    headerReadError: "파일 헤더를 읽을 수 없습니다.",
+    headerReadError: "파일 정보를 읽을 수 없습니다.",
   } as const
 }

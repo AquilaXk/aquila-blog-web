@@ -277,7 +277,7 @@ const AdminCloudWorkspacePage = () => {
           <CloudTitleBar>
             <div>
               <h1>{t.pageTitle}</h1>
-              <CloudFacetStrip aria-label={isEn ? "Storage summary" : "스토리지 용량 요약"}>
+              <CloudFacetStrip aria-label={isEn ? "Storage summary" : "저장 공간 요약"}>
                 {isEn
                   ? `${totalCount} total · ${totalSizeText} · Photos ${photoCount} · Videos ${videoCount} · Docs ${documentCount}`
                   : `전체 ${totalCount}개 · ${totalSizeText} · 사진 ${photoCount} · 동영상 ${videoCount} · 문서 ${documentCount}`}

@@ -430,7 +430,7 @@ export const CloudDeleteConfirmDialog = ({
           </span>{" "}
           {isEn
             ? "Deleted files will be permanently removed from your Cloud storage."
-            : "삭제한 파일은 관리자 클라우드 목록에서 제거됩니다."}
+            : "삭제한 파일은 클라우드에서 영구 삭제됩니다."}
         </p>
         <div>
           <SecondaryButton

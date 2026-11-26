@@ -174,6 +174,7 @@ export const useAdminCloudUploadQueue = ({
             controller.signal,
             {
               cancelSignal: cancelController.signal,
+              language: callbacksRef.current.language,
               onProgress: ({ progress, message, loadedBytes, speedBps, etaSeconds }) => {
                 if (!mountedRef.current) return
                 setUploadQueue((current) =>
@@ -197,7 +198,12 @@ export const useAdminCloudUploadQueue = ({
             callbacksRef.current.onUploadSuccess(displayUploaded)
             callbacksRef.current.onNotice("")
             setUploadQueue((current) =>
-              applyUploadQueueSuccess(current, nextUpload.id, displayUploaded.id)
+              applyUploadQueueSuccess(
+                current,
+                nextUpload.id,
+                displayUploaded.id,
+                callbacksRef.current.language
+              )
             )
           }
           void callbacksRef.current.queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
@@ -275,7 +281,7 @@ export const useAdminCloudUploadQueue = ({
 
       setUploadQueue((current) => [
         ...current,
-        ...validFiles.map((file) => createUploadQueueItem(file, activeFolderPath)),
+        ...validFiles.map((file) => createUploadQueueItem(file, activeFolderPath, language)),
       ])
     },
     [activeFolderPath, language, onToast]

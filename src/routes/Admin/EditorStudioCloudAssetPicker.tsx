@@ -235,8 +235,8 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
           } else {
             setActionErrorText(
               language === "en"
-                ? "Clipboard copy failed."
-                : "클립보드 복사에 실패했습니다. 수동으로 복사해주세요."
+                ? "Clipboard copy failed. Check browser permissions and try again."
+                : "클립보드 복사에 실패했습니다. 브라우저의 복사 권한을 확인한 뒤 다시 시도해주세요."
             )
           }
         }

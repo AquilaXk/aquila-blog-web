@@ -385,7 +385,11 @@ export const getCloudSummary = (files: readonly CloudFile[]) => {
 
 let nextUploadQueueItemSequence = 1
 
-export const createUploadQueueItem = (file: File, folderPath: string): UploadQueueItem => {
+export const createUploadQueueItem = (
+  file: File,
+  folderPath: string,
+  language: SiteLanguage = "ko"
+): UploadQueueItem => {
   const sequence = nextUploadQueueItemSequence
   nextUploadQueueItemSequence += 1
   return {
@@ -396,7 +400,7 @@ export const createUploadQueueItem = (file: File, folderPath: string): UploadQue
     folderPath,
     status: "queued",
     progress: 0,
-    message: "업로드 대기 중",
+    message: language === "en" ? "Queued" : "업로드 대기 중",
   }
 }
 
@@ -423,7 +427,8 @@ export const applyUploadQueueProgress = (
 export const applyUploadQueueSuccess = (
   current: UploadQueueItem[],
   targetId: string,
-  uploadedFileId: number
+  uploadedFileId: number,
+  language: SiteLanguage = "ko"
 ): UploadQueueItem[] =>
   current.map((item) =>
     item.id === targetId && item.status !== "cancelled"
@@ -431,7 +436,7 @@ export const applyUploadQueueSuccess = (
           ...item,
           status: "done",
           progress: 100,
-          message: "업로드 완료",
+          message: language === "en" ? "Uploaded" : "업로드 완료",
           uploadedFileId,
         }
       : item

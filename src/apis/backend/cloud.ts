@@ -199,10 +199,11 @@ export const uploadCloudFile = async (
   const targetPath = appendQuery("/system/api/v1/adm/cloud/files", { folderPath })
 
   if (typeof XMLHttpRequest !== "undefined") {
+    const isEn = options.language === "en"
     const estimator = createUploadSpeedEstimator(Math.max(1, file.size))
     options.onProgress?.({
       progress: 1,
-      message: "업로드 시작",
+      message: isEn ? "Starting upload" : "업로드 시작",
       loadedBytes: 0,
       totalBytes: file.size,
       speedBps: 0,
@@ -220,7 +221,14 @@ export const uploadCloudFile = async (
         const percent = Math.min(98, Math.max(2, Math.round((loadedBytes / effectiveTotal) * 98)))
         options.onProgress?.({
           progress: percent,
-          message: loadedBytes >= effectiveTotal ? "서버 처리 중" : `${percent}% 전송 중`,
+          message:
+            loadedBytes >= effectiveTotal
+              ? isEn
+                ? "Processing on server"
+                : "서버 처리 중"
+              : isEn
+                ? `${percent}% uploading`
+                : `${percent}% 전송 중`,
           loadedBytes: metrics.loadedBytes,
           totalBytes: metrics.totalBytes,
           speedBps: metrics.speedBps,
